@@ -100,7 +100,8 @@ Control-plane events include:
 The data plane handles large or latency-sensitive data.
 
 ```text
-UI -> nearest Edge / Runner
+UI -> nearest Edge
+UI -> Local Runner Fast Path only when authorized
 UI -> Hub proxy fallback
 ```
 
@@ -114,8 +115,9 @@ Data-plane resources include:
 
 Principles:
 
-- If local direct access is available, use local direct access.
-- If SSH/Tailscale direct access is available, use direct access.
+- UI does not directly access remote Runner.
+- UI may access Local Runner only through a short-lived token issued by Edge.
+- Remote Desktop / Cloud data plane must go through Remote Edge or Hub proxy.
 - If Web/Mobile or NAT traversal is involved, use Hub relay/proxy.
 
 ### Sync Plane
@@ -299,6 +301,8 @@ This is the SaaS-style topology.
 
 ## 6. Authority Model
 
+Detailed authority and write rules are defined in [authority.md](authority.md). This section keeps only the topology-level summary.
+
 ### Conversation Authority
 
 Conversation Authority decides who owns the primary copy of messages, group membership and threads.
@@ -476,6 +480,8 @@ type HubToEdgeCommand =
 ```
 
 ## 10. Preview And Artifact Routing
+
+Detailed data-plane rules are defined in [data-plane.md](data-plane.md). This section keeps only the route vocabulary.
 
 Preview routes:
 
