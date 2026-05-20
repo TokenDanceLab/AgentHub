@@ -1,253 +1,285 @@
-# AgentHub 项目架构
+# AgentHub Architecture
 
-## 目录结构
-
-```
-AgentHub/
-├── ui/                     # React 前端
-├── server/                 # 中心 IM Server（Go）
-├── daemon/                 # 本地 Daemon（Go）
-├── protocol/               # 共享 TS 类型定义
-├── docs/                   # 产品文档 + 调研报告
-└── .agenthub/              # 项目自身的 Memory/规则
-```
-
-## 角色定义
-
-| 角色 | 目录 | 职责 |
-|------|------|------|
-| **IM Server** | `server/` | 用户注册登录 / 联系人好友 / 单聊群聊 / 消息路由中转 / WebSocket Hub / 多端同步 / Orchestrator 调度 |
-| **本地 Daemon** | `daemon/` | 连中心 Server / 管理 Runner / workspace / git / Preview / 进程生命周期 |
-| **Runner** | `daemon/` 内部管理 | 启动 Agent CLI 子进程 / 采集 stdout / 生成事件 |
-| **Agent** | 系统外 CLI | Claude Code / Codex / OpenCode |
-| **UI** | `ui/` | IM 聊天界面 / 会话列表 / 产物面板 / Diff 卡片 |
-
-## 总架构
+## Hub-Edge-Runner 架构总览
 
 ```mermaid
 graph TB
-    subgraph UI["ui/ 前端"]
-        Web["Web / Tauri / PWA"]
+    subgraph Desktop["AgentHub Desktop"]
+        UI["apps/web UI"]
+        Edge["services/edge<br/>Edge Server"]
+        R["services/runner<br/>Runner"]
     end
 
-    subgraph Server["server/ 中心 IM Server"]
-        User["用户/登录"]
-        Contact["联系人/好友"]
-        Conv["会话/群聊"]
-        Msg["消息路由中转"]
-        WS["WebSocket Hub"]
-        Orch["Orchestrator"]
+    subgraph Cloud["云端"]
+        Hub["services/hub<br/>Hub Server"]
     end
 
-    subgraph Daemon["daemon/ 本地 Daemon"]
-        Connect["连中心 Server"]
-        RunnerMgr["Runner 管理"]
-        WS2["Workspace"]
-        Preview["Preview"]
+    subgraph Mobile["移动端"]
+        MUI["PWA / Web"]
     end
 
-    subgraph Agent["Agent CLI"]
+    subgraph Agents["Agent CLI"]
         CC["Claude Code"]
         CX["Codex"]
         OC["OpenCode"]
     end
 
-    Web -->|"HTTPS+WSS"| Server
-    Server -->|"Runner Transport"| Daemon
-    Daemon -->|"child_process"| Agent
+    UI -->|"localhost"| Edge
+    Edge -->|"local transport"| R
+    R -->|"child_process"| Agents
+    Edge <-->|"reverse WSS<br/>sync/relay"| Hub
+    MUI -->|"HTTPS+WSS"| Hub
 ```
 
-## 消息流：用户发消息到 Agent 回复
+## 三个核心角色
+
+### Hub Server（中心 IM Server）
 
 ```mermaid
-sequenceDiagram
-    actor User
-    participant UI as ui/
-    participant Server as server/
-    participant Daemon as daemon/
-    participant Agent as Agent CLI
-
-    User->>UI: "@ClaudeCode 写登录页"
-    UI->>Server: WebSocket 消息
-    Server->>Server: 持久化 + 解析 @mention
-    Server->>Daemon: 下派任务
-    Daemon->>Agent: 启动 claude 子进程
-    Agent-->>Daemon: stdout 流
-    Daemon-->>Server: RunnerEvent 回传
-    Server-->>UI: ServerEvent 推送
-    UI-->>User: 渲染消息气泡/Diff/预览
+graph TB
+    subgraph Hub["services/hub/"]
+        Auth["auth/ 登录/OAuth"]
+        User["user/ 用户"]
+        Device["device/ 设备管理"]
+        Contact["contact/ 好友/Agent联系人"]
+        IM["im/ 单聊/群聊/消息路由"]
+        Sync["sync/ Edge同步"]
+        Relay["relay/ Hub↔Edge命令中继"]
+        Orch["orchestrator/ 云端调度"]
+        Reg["runner-registry/ Edge/Runner注册"]
+        Art["artifact/ 云端artifact"]
+        Mem["memory/ 云端Memory"]
+        WSG["ws-gateway/ Web/Mobile WSS"]
+        Store["store/ PostgreSQL/SQLite"]
+    end
 ```
 
-**消息永远经过 server。daemon 不存消息，不直连 UI。**
+**Hub 是 IM 大脑**：用户账号、好友关系、群聊管理、消息路由中转、多端同步、Edge 节点注册、远程控制中继。
 
-## 四种部署拓扑
+### Edge Server（本地 Server）
+
+```mermaid
+graph TB
+    subgraph Edge["services/edge/"]
+        API["local-api/ Desktop UI REST"]
+        WS["local-ws/ Desktop UI WebSocket"]
+        Store["local-store/ SQLite"]
+        IM["im-lite/ 本地会话/消息"]
+        HC["hub-client/ 连Hub"]
+        SC["sync-client/ 消息/Memory同步"]
+        Orch["local-orchestrator/ 本地调度"]
+        RM["runner-manager/ Runner管理"]
+        CB["context-builder/ 上下文构造"]
+        AI["artifact-index/ 本地产物"]
+        Mem["memory/ .agenthub Markdown"]
+        Sec["security/ 本地权限"]
+    end
+```
+
+**Edge 是本地小中枢**：本地会话、消息存储、项目 Memory、Context 构造、Runner 管理、连 Hub 同步。离线可独立运行。
+
+### Runner（执行节点）
+
+```mermaid
+graph TB
+    subgraph Runner["services/runner/"]
+        Svc["service/ Runner API"]
+        Exec["executor/ 子进程管理"]
+        Adapters["adapters/"]
+        CC["claude-code/"]
+        CX["codex/"]
+        OC["opencode/"]
+        WS["workspace/ git worktree"]
+        Diff["diff/ patch"]
+        Prev["preview/ dev server"]
+        Logs["logs/ stdout/stderr"]
+        Sec["security/ 路径守卫/命令审批"]
+    end
+```
+
+**Runner 只管执行**：启动 Agent CLI、读写 workspace、生成 Diff、启动 Preview。不存消息，不管 IM。
+
+## 四种部署模式
 
 ### P0 Desktop 全本地
 
 ```mermaid
 graph LR
-    subgraph Desktop["Tauri Desktop / 本机"]
-        UI["ui/"]
-        Server["server/"]
-        Daemon["daemon/"]
+    subgraph Local["127.0.0.1"]
+        UI["UI :3000"]
+        Edge["Edge :3210"]
+        Hub["Hub :3211"]
+        Runner["Runner :39731"]
         Agent["Agent CLI"]
     end
 
-    UI -->|"localhost"| Server
-    UI -->|"localhost"| Daemon
-    Server -->|"local transport"| Daemon
-    Daemon -->|"child_process"| Agent
+    UI --> Edge
+    UI --> Hub
+    Edge --> Runner
+    Edge -.->|"IM同步"| Hub
+    Runner --> Agent
 ```
 
-Desktop UI 同时连 Server（IM 消息）和 Daemon（高频数据：日志/文件/Preview）。Server 负责 IM 中枢，Daemon 负责执行。
+Desktop 三个都在本机。Edge 管本地执行，Hub 管 IM（也在 localhost）。离线时 Edge + Runner 仍可工作。
 
-### P1 Desktop + SSH 远程 Runner
+### P1 Desktop + Hub 同步
 
 ```mermaid
 graph LR
     subgraph Local["本机"]
-        UI["ui/"]
-        Server["server/"]
-    end
-
-    subgraph Remote["远程服务器"]
-        Daemon["daemon/"]
-        Agent["Agent CLI"]
-    end
-
-    UI -->|"localhost"| Server
-    Server -->|"SSH Tunnel"| Daemon
-    Daemon --> Agent
-```
-
-本机只跑 UI 和 Server，重活交给远程 daemon。
-
-### P2 Web/Mobile 远程控制
-
-```mermaid
-graph LR
-    subgraph Mobile["手机/浏览器"]
-        UI["ui/ PWA"]
+        UI["UI"]
+        Edge["Edge"]
+        Runner["Runner"]
     end
 
     subgraph Cloud["云端"]
-        Server["server/"]
+        Hub["Hub"]
+    end
+
+    Agent["Agent CLI"]
+
+    UI --> Edge
+    Edge --> Runner
+    Runner --> Agent
+    Edge <-->|"reverse WSS"| Hub
+```
+
+Edge 主动连云端 Hub。手机可查看状态，消息云端备份。本地执行不受影响。
+
+### P2 移动远程控制
+
+```mermaid
+graph LR
+    subgraph Phone["手机"]
+        MUI["PWA"]
+    end
+
+    subgraph Cloud["云端"]
+        Hub["Hub"]
     end
 
     subgraph Home["家里电脑"]
-        Daemon["daemon/"]
-        Agent["Agent CLI"]
+        Edge["Edge"]
+        Runner["Runner"]
     end
 
-    UI -->|"HTTPS+WSS"| Server
-    Daemon -->|"reverse WSS 主动反连"| Server
-    Daemon --> Agent
+    Agent["Agent CLI"]
+
+    MUI -->|"HTTPS+WSS"| Hub
+    Hub <-->|"中继"| Edge
+    Edge --> Runner
+    Runner --> Agent
 ```
 
-移动端只做控制台。家里电脑的 daemon 主动反连云端 Server。
+手机发指令 → Hub 中继 → 家里 Edge → Runner 执行。结果原路返回。
 
 ### P3 全云端
 
 ```mermaid
 graph LR
     subgraph Client["任意端"]
-        UI["ui/"]
+        UI["UI"]
     end
 
     subgraph Cloud["云端 Docker"]
-        Server["server/"]
-        Daemon["daemon/"]
-        Agent["Agent CLI"]
+        Hub["Hub"]
+        Edge["Edge"]
+        Runner["Runner"]
     end
 
-    UI -->|"HTTPS+WSS"| Server
-    Server -->|"内网"| Daemon
-    Daemon --> Agent
+    Agent["Agent CLI"]
+
+    UI --> Hub
+    Hub --> Edge
+    Edge --> Runner
+    Runner --> Agent
 ```
 
-## server/ 内部
+全部跑在云端 Docker 里。不需要本机。
+
+## 消息流完整链路
 
 ```mermaid
-graph TB
-    subgraph Server["server/"]
-        API["api/  HTTP REST"]
-        WS["ws/  WebSocket Hub"]
-        User["user/  注册/登录"]
-        Contact["contact/  好友"]
-        Conv["conversation/  会话/群聊"]
-        Msg["message/  消息路由"]
-        Orch["orchestration/  调度"]
-        Mgr["runnermgr/  Runner管理"]
-        DB["db/  SQLite"]
-        Mem["memory/  Markdown索引"]
-        Ctx["contextbuilder/  上下文构造"]
-    end
+sequenceDiagram
+    actor User
+    participant UI as apps/web
+    participant Hub as Hub Server
+    participant Edge as Edge Server
+    participant Runner as Runner
+    participant Agent as Agent CLI
+
+    User->>UI: @ClaudeCode 写登录页
+    UI->>Edge: WebSocket (localhost)
+    Edge->>Edge: 持久化 + 解析 @mention
+    Edge->>Edge: local-orchestrator 调度
+    Edge->>Runner: 下派任务
+    Runner->>Agent: 启动 claude 子进程
+    Agent-->>Runner: stdout 流
+    Runner-->>Edge: RunnerEvent
+    Edge-->>UI: ServerEvent (WebSocket)
+    Edge-->>Hub: 同步消息摘要 (在线时)
+    UI-->>User: 渲染气泡 / Diff / Preview
 ```
 
-## daemon/ 内部
+## Hub ↔ Edge 同步协议
+
+Edge 主动连接 Hub（reverse WSS），保持长连接。
 
 ```mermaid
-graph TB
-    subgraph Daemon["daemon/"]
-        Connect["connect/  连Server(local/SSH/WSS)"]
-        Runner["runner/  注册/心跳/事件上报"]
-        Adapter["adapter/  ClaudeCode/Codex/OpenCode"]
-        Exec["executor/  子进程启停"]
-        WS["workspace/  git/diff/文件"]
-        Preview["preview/  dev server"]
-    end
+sequenceDiagram
+    participant Edge
+    participant Hub
+
+    Edge->>Hub: edge.register (edgeId, deviceName)
+    Edge->>Hub: edge.heartbeat (定时)
+    Edge->>Hub: conversation.synced (消息批量)
+    Edge->>Hub: run.status (任务状态)
+    Edge->>Hub: artifact.created (产物元数据)
+    Hub-->>Edge: run.start (远程指令)
+    Hub-->>Edge: message.deliver (云端消息)
+    Hub-->>Edge: memory.sync.request
 ```
 
-## ui/ 内部
+## 数据归属
 
-```mermaid
-graph TB
-    subgraph UI["ui/"]
-        Login["pages/login  登录注册"]
-        Chat["pages/chat  主IM界面"]
-        Sidebar["components/sidebar  会话/联系人"]
-        Bubble["components/chat  消息流/@mention"]
-        Contact["components/contact  好友/加好友"]
-        Group["components/group  群聊/成员"]
-        Panel["components/panel  产物面板"]
-        Diff["components/diff  Diff卡片"]
-        Preview["components/preview  iframe预览"]
-        Store["stores/  状态管理"]
-        Hooks["hooks/  WS/API"]
-    end
-```
+| 数据 | Edge | Hub | Runner |
+|------|:----:|:---:|:------:|
+| 本地消息 | **主存** | 同步副本 | - |
+| 云端群聊 | 缓存 | **主存** | - |
+| 好友关系 | 缓存 | **主存** | - |
+| Agent 联系人 | 缓存 | **主存** | - |
+| 项目 .agenthub/ | **主索引** | 同步索引 | 读写文件 |
+| Artifact 元数据 | **主存** | 同步 | 产生 |
+| Diff / 日志文件 | 索引 | 可选同步 | **主存** |
+| workspace 文件 | 索引 | - | **主存** |
+| Runner 进程 | 管理 | 镜像状态 | **主状态** |
 
-## 协议层
+## 共享包
 
-`protocol/` 先于所有代码。每个模块生成时必须读。
-
-```
-protocol/
-├── index.ts
-├── user.ts              # User / Auth
-├── contact.ts           # Contact / FriendRequest
-├── conversation.ts      # Conversation / Message / Thread
-├── agent.ts             # Agent / AgentAdapter / AgentSession
-├── runner.ts            # RunnerCommand / RunnerEvent
-├── server-event.ts      # ServerEvent (WebSocket 推送)
-├── artifact.ts          # Artifact / DiffArtifact
-└── memory.ts            # MemoryDocument
-```
+| 包 | 语言 | 用途 |
+|---|---|---|
+| `packages/protocol/` | TypeScript | 前后端共享事件/类型定义 |
+| `packages/im-core/` | Go | Conversation/Message/Thread 共享逻辑 |
+| `packages/memory-core/` | Go | Memory/ContextBuilder 共享逻辑 |
+| `packages/artifact-core/` | Go | Artifact 类型和索引 |
+| `packages/adapters/` | Go | ClaudeCode/Codex/OpenCode 适配层 |
+| `packages/ui-kit/` | React | 共享 UI 组件 |
 
 ## 端口
 
 | 服务 | 地址 |
 |------|------|
 | Web UI | 127.0.0.1:3000 |
-| Server API | 127.0.0.1:3210 |
-| WebSocket | ws://127.0.0.1:3210/ws |
-| Daemon | 127.0.0.1:39731 |
+| Edge Server | 127.0.0.1:3210 |
+| Hub Server | 127.0.0.1:3211 (P0本地) / 云端域名 (P2) |
+| Runner | 127.0.0.1:39731 |
 | Preview | 127.0.0.1:5100-5199 |
 
 ## 核心原则
 
-- **server 是 IM 中枢**：所有用户、消息、联系人、群聊经过它
-- **daemon 是执行桥梁**：连 center + 管 Runner + workspace + preview
-- **UI 只连 Server**：消息/联系人/群聊走 Server，高频数据（日志/Preview）可本地直连 daemon
-- **daemon 不存消息**：消息持久化只在 server
-- **daemon 默认不暴露公网**：127.0.0.1、SSH tunnel、reverse WSS
+- **Hub 是 IM 中枢**：用户、消息、好友、群聊、多端同步都经过 Hub
+- **Edge 是本地桥梁**：连 Hub + 管 Runner + workspace + preview + Memory
+- **Runner 只管执行**：不存消息、不管 IM、不做 Memory
+- **UI 默认连 Edge**（Desktop），Web/Mobile 连 Hub
+- **Edge 主动连 Hub**：reverse WSS，Hub 不直连用户本机
+- **离线可用**：Edge + Runner 可脱离 Hub 独立工作
