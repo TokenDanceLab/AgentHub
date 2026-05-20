@@ -23,7 +23,7 @@ Desktop UI ─→ Edge Server ─→ Runner ─→ Claude Code / Codex / OpenCod
 | **Runner** | `services/runner/` | 执行节点：workspace、进程、Agent CLI 适配、Diff、Preview、日志 |
 | **Web UI** | `apps/web/` | React 前端，IM 聊天界面 |
 | **Desktop** | `apps/desktop/` | Tauri 壳，内置 Web UI + Edge + Runner |
-| **Protocol** | `packages/protocol/` | Edge / Hub / Runner / UI 共享的类型与事件定义 |
+| **Protocol** | `packages/protocol/` | schema-first 共享协议，生成 Edge / Hub / Runner / UI 类型与事件定义 |
 
 关键抽象：
 
@@ -34,6 +34,16 @@ Hub Server = 中心 IM + 账号 + 同步 + 中继 + 远程控制
 ```
 
 凡是能跑 Runner 的机器，都视为一个 **Edge Node**：本地电脑、同学电脑、实验室 Linux、云服务器都用同一套 Edge/Runner 模型。
+
+### Product Layers
+
+AgentHub 有三层产品能力：
+
+1. **Desktop Command Center**：本地 Project / Thread / Worktree / Diff / Approval / Preview / AGENTS.md。
+2. **IM Collaboration**：单聊、群聊、`@Agent`、Orchestrator、多 Agent review。
+3. **Hub Network**：账号、好友、群聊、多端同步、Edge Relay、Cloud Edge、团队 Memory。
+
+P0 的体验核心是 Desktop Command Center，不是完整好友/群聊平台。
 
 ### Hub vs Edge
 
@@ -62,6 +72,20 @@ AgentHub 从第一天按完整拓扑设计，但实现可按阶段落地。
 详细架构 → [docs/architecture.md](docs/architecture.md)  
 完整拓扑 → [docs/topology.md](docs/topology.md)
 
+### Implementation Plan
+
+AgentHub 从第一天按完整 Hub-Edge-Runner 拓扑设计，但实现按阶段落地。
+
+| Phase | Scope | Goal |
+|---|---|---|
+| P0 | Desktop UI + Local Edge Server + Local Runner | Local agent command center |
+| P1 | Multi-Agent Thread + Orchestrator | Claude Code / Codex / OpenCode 协作 |
+| P2 | Edge-Hub sync | Web/Mobile 状态查看和远程审批 |
+| P3 | Hub Relay + Cloud Edge | 远程 Desktop/Cloud 执行 |
+| P4 | Full IM Collaboration | 好友、群聊、团队 Memory |
+
+P0 不要求 Hub Server 完整可用。Hub API 可以先 stub，Edge 与 Runner 先跑通本地闭环。Hub、Edge、Runner 从 P0 起按 Go 服务实现；TypeScript 只用于 UI 和生成协议类型。
+
 ---
 
 ## Tech Stack
@@ -69,7 +93,7 @@ AgentHub 从第一天按完整拓扑设计，但实现可按阶段落地。
 | 层 | 技术 |
 |----|------|
 | 前端 | React + TypeScript + Vite + shadcn/ui |
-| Hub / Edge / Runner | Go |
+| Hub / Edge / Runner | Go（P0 起即使用 Go，不做 Node 后端原型） |
 | 桌面端 | Tauri |
 | 移动端 | PWA |
 | IM 持久化 | SQLite / PostgreSQL |
@@ -91,15 +115,31 @@ AgentHub/
 │   ├── edge-server/          # Desktop/Cloud Edge Server (Go)
 │   └── runner/               # Runner 执行节点 (Go)
 ├── packages/
-│   ├── protocol/             # 共享类型与事件定义
-│   ├── transport/            # local/ssh/tailscale/hub-relay
+│   ├── protocol/             # schema-first 协议：schema + generated TS/Go
+│   ├── transport/            # route model / resolver / client interfaces
 │   ├── im-core/              # IM 共享逻辑 (Go)
+│   ├── agent-core/           # Project / Thread / Turn / Item / AgentRun (Go)
+│   ├── workspace-core/       # workspace / worktree / patch metadata (Go)
+│   ├── approval-core/        # approval request / decision / policy metadata (Go)
 │   ├── sync-core/            # EdgeEvent / Sync / Relay
 │   ├── memory-core/          # Memory / Context 共享逻辑 (Go)
 │   ├── artifact-core/        # Artifact 共享逻辑 (Go)
 │   ├── adapters/             # Claude Code / Codex / OpenCode 适配层 (Go)
 │   └── ui-kit/               # UI 组件库 (React)
 ├── docs/
+│   ├── architecture.md       # Hub-Edge-Runner 主架构
+│   ├── topology.md           # 完整拓扑和八种连接场景
+│   ├── protocol.md           # schema-first 协议边界
+│   ├── product-model.md      # Command Center / IM / Hub 产品层
+│   ├── data-model.md         # Project / Conversation / Thread / Turn / Item
+│   ├── agent-loop.md         # Go Edge → Runner → Agent loop
+│   ├── workspace.md          # worktree / patch / apply / discard
+│   ├── approvals.md          # command/file/deploy approvals
+│   ├── memory.md             # .agenthub / AGENTS.md / Context Builder
+│   ├── implementation-plan.md # P0-P4 implementation plan
+│   ├── codex-app-reference.md # Codex App ideas adapted to AgentHub
+│   ├── authority.md          # Conversation/Execution/Artifact/Memory 权威
+│   └── data-plane.md         # Preview/Artifact/Local Fast Path
 ├── scripts/
 ├── docker/
 └── .agenthub/                # 项目 Memory / Rules
@@ -129,4 +169,14 @@ cd apps/web && pnpm dev
 
 - [架构文档](docs/architecture.md)
 - [拓扑文档](docs/topology.md)
+- [产品模型](docs/product-model.md)
+- [数据模型](docs/data-model.md)
+- [Agent Loop](docs/agent-loop.md)
+- [Workspace/Worktree](docs/workspace.md)
+- [Approval 机制](docs/approvals.md)
+- [Memory/Context](docs/memory.md)
+- [实现计划](docs/implementation-plan.md)
+- [协议文档](docs/protocol.md)
+- [权威模型](docs/authority.md)
+- [数据面设计](docs/data-plane.md)
 - [开源仓库深度调研](docs/research/)

@@ -275,7 +275,7 @@ P0 不做自动长期记忆写入，先做可解释、可版本管理的 Markdow
 .agenthub/
   project.md          # 项目目标、架构原则、当前决策
   rules.md            # AI 协作规则和安全规则
-  decisions.md        # 架构决策记录
+  architecture.md     # 架构说明
   agents/
     claude-code.md
     codex.md
@@ -325,8 +325,8 @@ P0 不做自动长期记忆写入，先做可解释、可版本管理的 Markdow
 
 ### 第 5 阶段：协作记录和答辩材料
 
-- `.agenthub/project.md`、`rules.md`、`decisions.md` 成为项目权威文档。
-- 记录 AI 协作过程、关键 prompt、架构决策。
+- `.agenthub/project.md`、`rules.md`、`architecture.md` 成为项目权威文档。
+- 记录当前实现状态、项目规则和 Demo 路径。
 - 准备 3 分钟 Demo 路径：新建群聊 -> 生成页面 -> 查看 Diff -> Preview -> Reviewer 审查。
 
 ## 推荐改动清单
