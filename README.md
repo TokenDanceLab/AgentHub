@@ -179,4 +179,4 @@ cd apps/web && pnpm dev
 - [协议文档](docs/protocol.md)
 - [权威模型](docs/authority.md)
 - [数据面设计](docs/data-plane.md)
-- [开源仓库深度调研](docs/Research/)
+- [开源仓库深度调研](docs/research/)
