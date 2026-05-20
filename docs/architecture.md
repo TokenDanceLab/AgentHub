@@ -4,14 +4,14 @@
 
 ```mermaid
 graph TB
-    subgraph Desktop["AgentHub Desktop"]
+    subgraph Desktop["Desktop Edge Node"]
         UI["apps/web UI"]
-        Edge["services/edge<br/>Edge Server"]
+        Edge["services/edge-server<br/>Edge Server"]
         R["services/runner<br/>Runner"]
     end
 
     subgraph Cloud["云端"]
-        Hub["services/hub<br/>Hub Server"]
+        Hub["services/hub-server<br/>Hub Server"]
     end
 
     subgraph Mobile["移动端"]
@@ -37,7 +37,7 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph Hub["services/hub/"]
+    subgraph Hub["services/hub-server/"]
         Auth["auth/ 登录/OAuth"]
         User["user/ 用户"]
         Device["device/ 设备管理"]
@@ -60,7 +60,7 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph Edge["services/edge/"]
+    subgraph Edge["services/edge-server/"]
         API["local-api/ Desktop UI REST"]
         WS["local-ws/ Desktop UI WebSocket"]
         Store["local-store/ SQLite"]
@@ -76,7 +76,7 @@ graph TB
     end
 ```
 
-**Edge 是本地小中枢**：本地会话、消息存储、项目 Memory、Context 构造、Runner 管理、连 Hub 同步。离线可独立运行。
+**Edge 是边缘控制节点**：运行在 Desktop、远程机器或云端节点上，负责本地/边缘会话、项目 Memory、Context 构造、Runner 管理、连 Hub 同步。离线可独立运行。
 
 ### Runner（执行节点）
 
@@ -101,26 +101,25 @@ graph TB
 
 ## 四种部署模式
 
-### P0 Desktop 全本地
+下面四种模式是简化视角。更完整的 Desktop/Web、Desktop/Cloud Runner、SSH/Tailscale 直连、Hub Relay 中继拓扑见 [topology.md](topology.md)。
+
+### P0 Desktop 本地离线
 
 ```mermaid
 graph LR
     subgraph Local["127.0.0.1"]
         UI["UI :3000"]
         Edge["Edge :3210"]
-        Hub["Hub :3211"]
         Runner["Runner :39731"]
         Agent["Agent CLI"]
     end
 
     UI --> Edge
-    UI --> Hub
     Edge --> Runner
-    Edge -.->|"IM同步"| Hub
     Runner --> Agent
 ```
 
-Desktop 三个都在本机。Edge 管本地执行，Hub 管 IM（也在 localhost）。离线时 Edge + Runner 仍可工作。
+Desktop 本机包含 UI + Edge + Runner。Hub 在离线模式下不参与；如果开发时启动本地 Hub，它只作为中心服务的本地开发形态。
 
 ### P1 Desktop + Hub 同步
 
@@ -128,7 +127,7 @@ Desktop 三个都在本机。Edge 管本地执行，Hub 管 IM（也在 localhos
 graph LR
     subgraph Local["本机"]
         UI["UI"]
-        Edge["Edge"]
+        Edge["Cloud Edge"]
         Runner["Runner"]
     end
 
@@ -254,12 +253,35 @@ sequenceDiagram
 | workspace 文件 | 索引 | - | **主存** |
 | Runner 进程 | 管理 | 镜像状态 | **主状态** |
 
+## 权威模型
+
+为避免本地、远程和云端场景混乱，每个会话必须显式区分两个权威：
+
+```ts
+type ConversationAuthority =
+  | { type: "edge"; edgeId: string }
+  | { type: "hub"; hubId: string }
+
+type ExecutionAuthority = {
+  edgeId: string
+  runnerId: string
+  workspaceId: string
+}
+```
+
+- **Conversation Authority**：谁保存消息、群聊、Thread 的主副本。
+- **Execution Authority**：任务实际在哪个 Edge/Runner/workspace 执行。
+
+本地离线时二者通常都在本机 Desktop Edge；Web 远程控制 Desktop 时，Conversation Authority 通常在 Hub，Execution Authority 在目标 Desktop Edge。
+
 ## 共享包
 
 | 包 | 语言 | 用途 |
 |---|---|---|
 | `packages/protocol/` | TypeScript | 前后端共享事件/类型定义 |
+| `packages/transport/` | Go/TypeScript | local / ssh / tailscale / hub-relay 连接抽象 |
 | `packages/im-core/` | Go | Conversation/Message/Thread 共享逻辑 |
+| `packages/sync-core/` | Go | EdgeEvent / Sync / Ack / Relay 协议 |
 | `packages/memory-core/` | Go | Memory/ContextBuilder 共享逻辑 |
 | `packages/artifact-core/` | Go | Artifact 类型和索引 |
 | `packages/adapters/` | Go | ClaudeCode/Codex/OpenCode 适配层 |
@@ -271,7 +293,7 @@ sequenceDiagram
 |------|------|
 | Web UI | 127.0.0.1:3000 |
 | Edge Server | 127.0.0.1:3210 |
-| Hub Server | 127.0.0.1:3211 (P0本地) / 云端域名 (P2) |
+| Hub Server | 127.0.0.1:3211 (本地开发) / 云端域名 |
 | Runner | 127.0.0.1:39731 |
 | Preview | 127.0.0.1:5100-5199 |
 
@@ -280,6 +302,8 @@ sequenceDiagram
 - **Hub 是 IM 中枢**：用户、消息、好友、群聊、多端同步都经过 Hub
 - **Edge 是本地桥梁**：连 Hub + 管 Runner + workspace + preview + Memory
 - **Runner 只管执行**：不存消息、不管 IM、不做 Memory
+- **凡是能跑 Runner 的机器都是 Edge Node**：Desktop、远程电脑、实验室机器、Cloud VM 都统一建模为 Edge
+- **远程执行统一走 Edge**：不要让 UI 直接打远程 Runner
 - **UI 默认连 Edge**（Desktop），Web/Mobile 连 Hub
 - **Edge 主动连 Hub**：reverse WSS，Hub 不直连用户本机
 - **离线可用**：Edge + Runner 可脱离 Hub 独立工作
