@@ -6,7 +6,20 @@
 3. `.agenthub/` project memory
 4. `docs/reference/` research documents
 
-## 1. Git — Conventional Commits
+## 1. Platform Support
+
+| Platform | UI | Agent Execution | Notes |
+|----------|:--:|:---------------:|-------|
+| Windows | Web + Tauri | Yes (WSL/native) | Primary desktop target |
+| macOS | Web + Tauri | Yes | Full CLI toolchain support |
+| Linux | Web | Yes | Primary Runner/Server target |
+| iOS | PWA | No | Control console only |
+| Android | PWA | No | Control console only |
+| Web | Browser | No (needs Edge node) | Remote control console |
+
+> Mobile and Web are **control consoles** — they connect to an Edge node for Agent execution. Only Desktop platforms run the full stack locally.
+
+## 2. Git — Conventional Commits
 
 ```
 type(scope): English description
