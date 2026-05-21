@@ -8,22 +8,22 @@
 
 | Milestone | 含义 |
 |---|---|
-| M0 architecture contracts | 冻结实现要依赖的架构契约：协议、Go 服务布局、权威边界、数据通道、审批和 workspace 安全、前端实时模型、调研溯源。 |
-| M1 desktop command center | 打通本地 Desktop -> Edge -> Runner 主循环，包括 project、thread、AgentRun、worktree、logs、diff、approval、preview。 |
-| M2 multi-agent collaboration | 增加 `@Agent`、Orchestrator、reviewer flow，以及多个 Agent 围绕同一个 artifact 协作。 |
-| M3 edge-hub sync and remote control | 增加 Edge 注册、同步回放、Web/Mobile 状态查看和远程审批。 |
-| M4 relay and cloud execution | 增加 Hub relay、Cloud Edge、Cloud Runner、artifact/preview proxy 和 audit。 |
-| M5 team IM and ecosystem | 增加完整用户、联系人、群聊、团队空间、团队 memory 和扩展生态。 |
+| M0 架构契约冻结 | 冻结实现要依赖的架构契约：协议、Go 服务布局、权威边界、数据通道、审批和 workspace 安全、前端实时模型、调研溯源。 |
+| M1 本地 Agent 工作台 | 打通本地 Desktop -> Edge -> Runner 主循环，包括 project、thread、AgentRun、worktree、logs、diff、approval、preview。 |
+| M2 多 Agent 协作 | 增加 `@Agent`、Orchestrator、reviewer flow，以及多个 Agent 围绕同一个 artifact 协作。 |
+| M3 Edge-Hub 同步与远程控制 | 增加 Edge 注册、同步回放、Web/Mobile 状态查看和远程审批。 |
+| M4 中继与云端执行 | 增加 Hub relay、Cloud Edge、Cloud Runner、artifact/preview proxy 和 audit。 |
+| M5 团队 IM 与生态 | 增加完整用户、联系人、群聊、团队空间、团队 memory 和扩展生态。 |
 
 当前 GitHub milestone：
 
-- `M0 architecture contracts`
+- `M0 架构契约冻结`
 
 ## Labels
 
 Labels 按维度组合，不用一个 label 表达所有信息。
 
-| Prefix | 含义 | 示例 |
+| 前缀 | 含义 | 示例 |
 |---|---|---|
 | `kind:` | 工作类型 | `kind:contract`, `kind:docs` |
 | `area:` | 影响区域 | `area:protocol`, `area:go-services`, `area:sync`, `area:ui` |
@@ -140,7 +140,7 @@ GitHub 模板：
 - 禁止 force push
 - 禁止删除分支
 
-## 当前 M0 Issues
+## 当前 Open M0 Issues
 
 | # | Issue | 目的 |
 |---|---|---|
@@ -150,8 +150,13 @@ GitHub 模板：
 | 4 | M0: 定义审批策略循环和 workspace 隔离契约 | 让危险命令、路径保护、worktree、apply/discard 可控。 |
 | 5 | M0: 对齐前端实时 store 模型和后端协议 | 让 WebSocket events、stores 和生成类型一致。 |
 | 6 | M0: 更新调研索引、竞品覆盖和 ByteDance 溯源 | 保持调研、比赛材料和 Multica/Ruflo/Paperclip 定位最新。 |
-| 7 | M0: 采用轻量分支和 PR 流程 | 固化轻量分支、PR 和 `master` 保护规则。 |
-| 8 | M0: 中文化 AgentHub 自有文档 | 按路线图分批中文化自有文档，供 DeepSeek 等低成本模型执行。 |
+
+已完成治理项：
+
+| # | Issue | 结果 |
+|---|---|---|
+| 7 | M0: 采用轻量分支和 PR 流程 | 已写入 `AGENTS.md` 和本文档，并配置 `master` 保护。 |
+| 8 | M0: 中文化 AgentHub 自有文档 | 已通过 PR #9 完成中文化治理和 Hub Server 需求归档。 |
 
 ## 用词规则
 
