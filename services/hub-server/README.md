@@ -1,33 +1,37 @@
 # AgentHub Hub Server
 
-Hub Server is the central control plane for AgentHub.
+Hub Server 是 AgentHub 的中心控制面和协作层。
 
 Runtime: Go.
 
-## Responsibilities
+## 职责
 
-- Account, login and user identity.
-- Friends, contacts, groups and cloud conversations.
-- Multi-device sync and message delivery.
-- Edge device registration and heartbeat.
-- Hub Relay for Web/Mobile and NAT traversal.
-- Permission checks, audit records and remote command routing.
-- Optional cloud artifact cache and memory index.
+- 账号、登录和用户身份。
+- 好友、联系人、群聊和云端 Conversation。
+- 多端同步和消息投递。
+- Edge 设备注册和心跳。
+- Web/Mobile 远程控制和 NAT 穿透场景下的 Hub Relay。
+- 权限检查、审计记录和远程命令路由。
+- 可选的云端 Artifact 缓存和 Memory 索引。
 
-## Not Responsible For
+## 不负责什么
 
-- Running Claude Code, Codex or OpenCode directly.
-- Reading or writing workspace files directly.
-- Owning local project `.agenthub/` memory by default.
-- Serving as a replacement for Edge in Desktop offline mode.
+- 不直接运行 Claude Code、Codex 或 OpenCode。
+- 不直接读写用户 workspace 文件。
+- 默认不拥有本地项目 `.agenthub/` Memory。
+- 不替代 Desktop 离线模式下的 Edge Server。
 
-## Protocol Surfaces
+## 协议面
 
-- UI <-> Hub: Web/Mobile conversations, device status, remote control.
-- Edge <-> Hub: reverse WSS registration, sync, relay and command delivery.
-- Hub -> Edge: `message.deliver`, `run.start`, `run.stop`, `preview.request`.
+- UI <-> Hub：Web/Mobile Conversation、设备状态、远程控制。
+- Edge <-> Hub：reverse WSS 注册、同步、中继和命令投递。
+- Hub -> Edge：`message.deliver`、`run.start`、`run.stop`、`preview.request`。
 
-## Depends On
+## 需求文档
+
+- [Hub Server 需求文档](../../docs/reference/03-build/backend/16-hub-server-requirements.md)
+
+## 依赖
 
 - `packages/protocol`
 - `packages/im-core`

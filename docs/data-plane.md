@@ -1,52 +1,52 @@
-# AgentHub Data Plane
+# AgentHub 数据面
 
-Date: 2026-05-21
+日期：2026-05-21
 
-## Principle
+## 原则
 
-The control plane decides what should happen. The data plane serves large or latency-sensitive resources.
+控制面决定应该发生什么。数据面提供大流量或延迟敏感的资源。
 
-AgentHub must not let UI directly access arbitrary remote Runner processes.
+AgentHub 不能让 UI 直接访问任意远程 Runner 进程。
 
 ```text
-UI -> nearest Edge
-UI -> Local Runner Fast Path only when authorized by Edge
-UI -> Hub proxy fallback
+UI -> 最近的 Edge
+UI -> Local Runner Fast Path，仅在 Edge 授权时
+UI -> Hub proxy 兜底
 ```
 
-## Access Rules
+## 访问规则
 
-1. UI does not directly access remote Runner.
-2. UI may access Local Runner only in same-machine Desktop mode.
-3. Local Runner Fast Path requires a short-lived token issued by Edge.
-4. Remote Desktop and Cloud data plane must go through Remote Edge or Hub proxy.
-5. Web/Mobile access always starts at Hub.
+1. UI 不直接访问远程 Runner。
+2. UI 只能在同机 Desktop 模式下访问 Local Runner。
+3. Local Runner Fast Path 需要 Edge 签发的短期 token。
+4. 远程 Desktop 和 Cloud 的数据面必须经过 Remote Edge 或 Hub proxy。
+5. Web/Mobile 访问始终从 Hub 开始。
 
 ## Local Fast Path
 
-Local Fast Path is an optimization, not a different authority model.
+Local Fast Path 是一种优化，不是另一种权威模型。
 
 ```text
 Desktop UI -> Edge
-Edge -> short-lived token
+Edge -> 短期 token
 Desktop UI -> Local Runner data endpoint
 ```
 
-Allowed resources:
+允许的资源：
 
-- live stdout/stderr stream
-- local preview iframe
-- diff file read
-- small artifact download
+- 实时 stdout/stderr 流
+- 本地 preview iframe
+- diff 文件读取
+- 小 artifact 下载
 
-Forbidden resources:
+禁止的资源：
 
-- arbitrary workspace path read without Edge approval
-- command execution
-- remote Runner access
-- long-lived bearer token reuse
+- 未经 Edge 审批的任意 workspace 路径读取
+- 命令执行
+- 远程 Runner 访问
+- 长期 bearer token 重用
 
-## Preview Routes
+## Preview 路由
 
 ```ts
 type PreviewRoute =
@@ -56,17 +56,17 @@ type PreviewRoute =
   | { mode: "hub-proxy"; url: "https://hub.example.com/preview/run_123" }
 ```
 
-| Scenario | Preview Route |
+| 场景 | Preview 路由 |
 |---|---|
 | Desktop local | `local` |
 | Desktop -> SSH remote | `ssh-tunnel` |
-| Desktop -> Tailscale remote | `direct` via Remote Edge |
-| Desktop -> Hub relay remote | `hub-proxy` or Remote Edge proxy |
+| Desktop -> Tailscale remote | `direct`，经 Remote Edge |
+| Desktop -> Hub relay remote | `hub-proxy` 或 Remote Edge proxy |
 | Web -> Desktop | `hub-proxy` |
-| Web -> Cloud | `hub-proxy` or Cloud Edge public route |
+| Web -> Cloud | `hub-proxy` 或 Cloud Edge 公网路由 |
 | Mobile -> Desktop | `hub-proxy` |
 
-## Artifact Locations
+## Artifact 位置
 
 ```ts
 type ArtifactLocation =
@@ -76,20 +76,20 @@ type ArtifactLocation =
   | { type: "object-storage"; url: string }
 ```
 
-Rules:
+规则：
 
-- Artifact metadata syncs to Hub.
-- Artifact bytes remain on Edge unless cached or exported.
-- Hub can proxy artifact reads if the UI cannot reach the Edge.
-- Large logs and workspace files are fetched on demand.
-- Workspace trees are never globally uploaded by default.
+- Artifact 元数据同步到 Hub。
+- Artifact 字节留在 Edge，除非缓存或导出。
+- Hub 可以在 UI 无法到达 Edge 时代理 artifact 读取。
+- 大日志和 workspace 文件按需获取。
+- Workspace 树默认绝不上传。
 
-## Data Plane By Topology
+## 各拓扑数据面路径
 
-| Topology | Preferred Data Path | Fallback |
+| 拓扑 | 首选数据路径 | 兜底 |
 |---|---|---|
-| Desktop local | UI -> Edge, optional Local Runner Fast Path | none |
-| Desktop local online | UI -> Edge | Hub cache for synced metadata |
+| Desktop local | UI -> Edge，可选 Local Runner Fast Path | 无 |
+| Desktop local online | UI -> Edge | Hub cache 用于同步的元数据 |
 | Desktop direct remote | UI -> Local Edge -> Remote Edge | SSH tunnel |
 | Desktop relay remote | UI -> Local Edge/Hub -> Hub proxy -> Remote Edge | Hub cache |
 | Desktop direct Cloud | UI -> Local Edge -> Cloud Edge | SSH/Tailscale tunnel |
@@ -97,10 +97,10 @@ Rules:
 | Web relay Desktop | UI -> Hub proxy -> Desktop Edge | Hub cache |
 | Web relay Cloud | UI -> Hub proxy -> Cloud Edge | object storage |
 
-## Security Notes
+## 安全注意事项
 
-- Data tokens should be scoped to a run/artifact and expire quickly.
-- Preview proxy should isolate origins per run.
-- File reads should be rooted under the workspace root.
-- Diff/log views should prefer immutable artifact IDs over raw paths.
-- Hub relay should audit data-plane access for remote Desktop and Cloud Edge.
+- 数据 token 应限定到单个 run/artifact 且快速过期。
+- Preview proxy 应按 run 隔离 origin。
+- 文件读取应限定在 workspace 根目录下。
+- Diff/日志视图应优先使用不可变的 artifact ID 而非原始路径。
+- Hub relay 应审计远程 Desktop 和 Cloud Edge 的数据面访问。

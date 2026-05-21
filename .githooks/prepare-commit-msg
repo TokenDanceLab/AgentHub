@@ -2,6 +2,8 @@
 # AgentHub prepare-commit-msg hook — inject commit template
 # Works on: macOS, Linux, Windows (Git Bash / WSL)
 # Only for: interactive commits (no -m, no -F, no merge, no amend)
+# This template is for commit messages only. GitHub issue and PR text follows
+# the same "English prefix + Chinese content" rule; see docs/project-management.md.
 
 MSG_FILE="$1"
 COMMIT_SOURCE="$2"
@@ -19,7 +21,7 @@ fi
 
 # Inject template
 cat > "$MSG_FILE" << 'TEMPLATE'
-# type(scope): summary
+# type(scope): 中文摘要
 #
 # Allowed types:
 #   init     — project initialization
@@ -34,11 +36,11 @@ cat > "$MSG_FILE" << 'TEMPLATE'
 #   revert   — revert previous commit
 #
 # Scope: optional, lowercase alphanumeric + . _ -
-# Summary: lowercase English, no trailing period, max 72 chars
+# Summary: Chinese-first, no trailing punctuation, max 120 bytes
 #
 # Examples:
-#   docs: add architecture diagrams
-#   feat(edge): implement websocket hub
-#   fix(runner): handle subprocess timeout on windows
+#   docs: 中文化项目入口和文档规范
+#   feat(edge): 实现 WebSocket Hub
+#   fix(runner): 处理 Windows 子进程超时
 
 TEMPLATE

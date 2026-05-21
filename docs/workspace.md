@@ -1,14 +1,14 @@
-# AgentHub Workspace And Worktree
+# AgentHub Workspace 和 Worktree
 
-Date: 2026-05-21
+日期：2026-05-21
 
-## Principle
+## 原则
 
-Every AgentRun should use its own worktree.
+每个 AgentRun 应使用独立的 worktree。
 
-This prevents multiple agents from mutating the main workspace or each other's changes.
+这可以防止多个 agent 同时修改主 workspace 或互相覆盖对方的变更。
 
-## Runtime Layout
+## 运行时布局
 
 ```text
 .agenthub-runtime/
@@ -28,29 +28,29 @@ This prevents multiple agents from mutating the main workspace or each other's c
         run_001.json
 ```
 
-## Run Flow
+## Run 流程
 
-1. Edge creates AgentRun.
-2. Runner creates git worktree.
-3. Agent CLI runs inside the worktree.
-4. Runner detects changed files.
-5. Runner generates unified diff.
-6. UI shows Diff artifact.
-7. User chooses Apply or Discard.
-8. Apply merges/applies patch to the target workspace.
-9. Discard removes the worktree and patch.
+1. Edge 创建 AgentRun。
+2. Runner 创建 git worktree。
+3. Agent CLI 在 worktree 内运行。
+4. Runner 检测文件变更。
+5. Runner 生成 unified diff。
+6. UI 展示 Diff artifact。
+7. 用户选择 Apply 或 Discard。
+8. Apply 将 patch 合并/应用到目标 workspace。
+9. Discard 删除 worktree 和 patch。
 
-## P0 Requirements
+## P0 要求
 
-- Create worktree.
-- Detect changed files.
-- Generate diff.
-- Apply patch.
-- Discard worktree.
-- Record log paths.
+- 创建 worktree。
+- 检测文件变更。
+- 生成 diff。
+- 应用 patch。
+- 丢弃 worktree。
+- 记录日志路径。
 
-## Ownership
+## 归属
 
-Runner owns the worktree lifecycle. Edge owns metadata and user-visible state.
+Runner 拥有 worktree 生命周期。Edge 拥有元数据和用户可见状态。
 
-Hub only syncs artifact metadata unless a user explicitly uploads/caches artifact content.
+Hub 只同步 artifact 元数据，除非用户显式上传/缓存 artifact 内容。
