@@ -1,0 +1,35 @@
+#!/bin/bash
+# AgentHub prepare-commit-msg hook — inject template
+# Only acts on new commits (not merges, squashes, or amends)
+
+case "$2,$3" in
+  message,)  # new commit — inject template
+    cat > "$1" << 'TEMPLATE'
+# type(scope): summary
+#
+# Allowed types:
+#   init     — project initialization
+#   feat     — new feature
+#   fix      — bug fix
+#   docs     — documentation only
+#   refactor — code restructuring (no feature/fix)
+#   chore    — build, deps, tooling
+#   test     — testing
+#   perf     — performance improvement
+#   ci       — CI/CD changes
+#   revert   — revert previous commit
+#
+# Scope is optional (lowercase, alphanumeric + . _ -).
+# Summary: lowercase English, no trailing period, max 72 chars.
+# Leave one blank line between subject and body.
+#
+# Examples:
+#   docs: add architecture diagrams
+#   feat(edge): implement websocket hub
+#   fix(runner): handle subprocess timeout on windows
+#   refactor: reorganize reference docs
+
+TEMPLATE
+    ;;
+  *) ;;  # merge/amend/template — leave unchanged
+esac
