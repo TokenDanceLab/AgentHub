@@ -43,21 +43,21 @@ type(scope): English description
 - Hook enforces at `.githooks/commit-msg`
 - Template at `.githooks/prepare-commit-msg`
 
-## 2. Repository Structure
+## 3. Repository Structure
 
 ```
 AgentHub/
 ├── apps/           # TS frontends (web, desktop, mobile)
 ├── services/       # Go backends (hub-server, edge-server, runner)
 ├── packages/       # shared Go + TS packages
-├── proto/          # Protobuf schema (source of truth)
+├── proto/          # Protobuf schema, the single protocol source
 ├── docs/           # product + architecture + reference
 ├── scripts/        # build, migration, codegen
 ├── .githooks/      # commit-msg + prepare-commit-msg
 └── .agenthub/      # project memory and rules
 ```
 
-## 3. Documentation
+## 4. Documentation
 
 - `docs/architecture.md` — Hub-Edge-Runner topology (authority)
 - `docs/reference/README.md` — research index (Agent navigation guide)
@@ -66,10 +66,10 @@ AgentHub/
 - `docs/reference/03-build/` — engineering specifications (backend + frontend)
 - `docs/reference/04-plan/` — roadmap and impact analysis
 
-## 4. Agent Collaboration Rules
+## 5. Agent Collaboration Rules
 
 - Before writing any code, read relevant `docs/reference/` documents
 - Adapter design: follow `03-build/backend/04-adapter-sdk.md`
-- Protocol changes: update `proto/` schema first, regenerate Go+TS, then implement
+- Protocol changes: update `proto/agenthub/v1` first, regenerate Go+TS, then implement
 - New research findings: add to appropriate `01-learn/` or `02-decide/` path
 - Commit messages in English, Conventional Commits format

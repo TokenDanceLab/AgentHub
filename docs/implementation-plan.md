@@ -21,6 +21,7 @@ Must demonstrate:
 - Project list.
 - Thread list.
 - One Thread starts one AgentRun.
+- Agent profile and runtime status are visible before a run starts.
 - Runner starts Claude Code or Codex CLI.
 - stdout/stderr streamed as Items.
 - git worktree isolation.
@@ -28,6 +29,7 @@ Must demonstrate:
 - Diff viewer.
 - Apply / Discard patch.
 - Approval card.
+- Progress, blocker and error cards in the Thread.
 - `.agenthub/AGENTS.md` context.
 
 Not in P0:

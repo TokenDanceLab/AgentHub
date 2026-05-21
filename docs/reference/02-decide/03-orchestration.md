@@ -45,7 +45,7 @@
 #### YAML 配置（ChatDev）
 
 **核心优势**：
-- YAML 是 SSOT（单一事实来源），Canvas 是编辑器（而非相反）。拓扑可 Git diff/merge/review
+- YAML 是唯一事实源（单一事实来源），Canvas 是编辑器（而非相反）。拓扑可 Git diff/merge/review
 - `BaseConfig.child_routes()` 变体配置机制：`Node.type` 动态选择 Config Schema，类似 discriminated union
 - `FIELD_SPECS` 元数据驱动前端动态表单，新增 Node 类型只需注册 dataclass，无需改前端代码
 - Subgraph 嵌套复用：inline YAML 或外部文件引用，任意深度嵌套

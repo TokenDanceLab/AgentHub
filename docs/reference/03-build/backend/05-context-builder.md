@@ -39,7 +39,7 @@
 
 关键特征:
 - System Prompt 在 CLI 启动时一次性注入，不是每次 LLM 调用前注入
-- Transcript JSONL 是 SSOT，Fork 时完整复制
+- Transcript JSONL 是唯一事实源，Fork 时完整复制
 - Context 压缩由 Claude SDK 自身处理（compaction event）
 - 不介入消息内容的转换/裁剪 — 完全透传给 SDK
 ```
@@ -131,7 +131,7 @@
 - 只读模式，不做任何上下文注入或修改
 - lastN 分页限制消息数量
 - Zod safeParse 容错：单行解析失败不影响整体
-- JSONL 是 SSOT，FTS5 仅存索引加速搜索
+- JSONL 是唯一事实源，FTS5 仅存索引加速搜索
 ```
 
 ### 1.4 OpenCode -- Plugin Hook 双向修改

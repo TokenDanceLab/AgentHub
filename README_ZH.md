@@ -68,8 +68,8 @@ Orchestrator: 完成。预览地址 http://localhost:5173
 
 | 层 | 描述 | 阶段 |
 |----|------|:---:|
-| **Desktop Command Center** | 本地项目、线程、工作树、Diff、审批、预览 | P0 |
-| **IM Collaboration** | 单聊、群聊、@Agent、Orchestrator、多 Agent 审查 | P1 |
+| **Desktop Command Center** | 本地项目、线程、Agent 生命周期、工作树、Diff、审批、预览 | P0 |
+| **IM Collaboration** | 单聊、群聊、@Agent、Orchestrator、多 Agent 审查、Agent 进度卡片 | P1 |
 | **Hub Network** | 账号、好友、群聊、多端同步、Edge 中继、团队记忆 | P2-P4 |
 
 <br>
@@ -115,7 +115,7 @@ AgentHub/
 ├── packages/               # 共享 Go + TS 库
 ├── proto/                  # Protobuf Schema（唯一协议源）
 ├── docs/                   # 架构 + 调研文档
-│   └── reference/          # 65+ 份调研文档（14 个仓库深度分析）
+│   └── reference/          # 68 份调研文档，包含 Multica Tier-0 参考
 ├── .githooks/              # commit-msg + prepare-commit-msg
 └── .agenthub/              # 项目记忆和规则
 ```
@@ -127,7 +127,9 @@ AgentHub/
 | 文档 | 描述 |
 |------|------|
 | [架构文档](docs/architecture.md) | Hub-Edge-Runner 拓扑、部署模式、同步协议 |
-| [调研索引](docs/reference/) | 65 份跨仓库深度分析，Agent 友好的四层结构 |
+| [术语表](docs/glossary.md) | 用白话解释 Hub、Edge、Runner、AgentRun、产物和协议源头 |
+| [项目管理](docs/project-management.md) | 里程碑、标签和 issue 聚合规则 |
+| [调研索引](docs/reference/) | 68 份跨仓库深度分析，Agent 友好的四层结构 |
 | [实现路线图](docs/reference/04-plan/01-research-to-implementation.md) | P0 最小系统、优先级矩阵、调研到代码映射 |
 | [Protocol Schema](docs/reference/03-build/backend/13-protobuf-schema.md) | 6 个 .proto 文件 + buf.gen.yaml |
 
@@ -138,6 +140,7 @@ AgentHub/
 - [Claude Code Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview)
 - [OpenAI Codex CLI](https://github.com/openai/codex)
 - [OpenCode](https://github.com/anomalyco/opencode)
+- [Multica](https://github.com/multica-ai/multica)
 - [LibreChat](https://github.com/danny-avila/LibreChat)
 - [Kanna](https://github.com/jakemor/kanna)
 - [CloudCLI](https://github.com/siteboon/claudecodeui)

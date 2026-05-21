@@ -32,7 +32,7 @@ Flow:
 
 ## JSON-RPC Direction
 
-AgentHub protocol is schema-first, but runtime communication uses JSON-RPC style request/response/notification envelopes where appropriate.
+AgentHub protocol is proto-first, but runtime communication uses JSON-RPC style request/response/notification envelopes where appropriate.
 
 ```text
 UI <-> Edge      JSON-RPC over WebSocket

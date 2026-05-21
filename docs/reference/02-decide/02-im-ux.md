@@ -16,7 +16,7 @@
 | **后端语言/框架** | Hono (Deno/Node 双运行时) | Express (Node.js) | Hono + Effect-TS | Express + `@librechat/agents` SDK |
 | **前端框架** | React + Vite + Tailwind | React + Vite + Tailwind | React 19 + TanStack Router + TanStack Query | React + Recoil + `@radix-ui` |
 | **流式协议** | NDJSON over HTTP | SSE + WebSocket 双通道 | SSE（EventBus 驱动） | SSE / WebSocket |
-| **持久化** | 无 DB，读 Claude JSONL | SQLite（projects/sessions/scanState） | JSONL SSOT + `~/.claude-code-viewer/` 缓存 | MongoDB |
+| **持久化** | 无 DB，读 Claude JSONL | SQLite（projects/sessions/scanState） | JSONL 唯一事实源 + `~/.claude-code-viewer/` 缓存 | MongoDB |
 | **移动端** | Tailwind 响应式 | 768px 断点 + Drawer + PWA | PWA + MobileSidebar + swipe | 响应式面板 + 拖拽分屏 |
 | **认证** | 无（127.0.0.1 本地） | 无（本地工具） | 密码保护（cookie + Bearer 双通道） | OAuth2 + OIDC |
 | **核心差异化** | 最小可行 Web 壳，透传 Claude SDK | 插件系统 + Git 面板 + CLI 自动发现 | Progressive Disclosure + Diff 行级评论 + Push 通知 | 完整的 Agent 市场 + MCP 全栈 + 消息树 |

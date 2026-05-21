@@ -435,7 +435,7 @@ OpenCode 在 dep 类型上的关键约定：
 |---------------|-------------|---------------|---------|
 | **Layer 0 Foundation** | `core`（Effect Services, Schema, 工具函数）| `packages/protocol/` + `packages/transport/` | OpenCode 的 core 是运行时+类型一体；AgentHub 的 protocol 是纯 proto 生成代码，transport 是纯接口。在 Go 中这些应分开。 |
 | **Layer 0 Foundation** | `llm`（LLM Protocol 状态机）| `packages/agent-core/` (agent loop model) + Runner 内部的 `internal/executor/` | Go 中 LLM 调用会通过 Agent CLI 子进程完成，不是 in-process 协议解析。但 LLMEvent/LLMError tagged union 的建模思路可直接映射为 Go sum types（interface + type switch）。 |
-| **Layer 0 Foundation** | `sdk`（OpenAPI codegen client）| `gen/go/` (ConnectRPC 生成) + `gen/ts/` (Connect-ES 生成) | 同等地位。OpenCode 用 `@hey-api/openapi-ts`；AgentHub 用 Buf + ConnectRPC。都是 schema-first codegen。 |
+| **Layer 0 Foundation** | `sdk`（OpenAPI codegen client）| `gen/go/` (ConnectRPC 生成) + `gen/ts/` (Connect-ES 生成) | 同等地位。OpenCode 用 `@hey-api/openapi-ts`；AgentHub 用 Buf + ConnectRPC。都是协议生成代码路线。 |
 | **Layer 1 Domain** | `plugin`（19 hooks + PluginInput）| `runner/internal/adapters/`（Agent adapter interfaces）+ `packages/approval-core/`（权限审批） | OpenCode 的 plugin hooks 是在进程内注册回调（TypeScript 特性），Go 中 adapter interface（Go interface）是更自然的映射。 |
 | **Layer 1 Domain** | `ui`（SolidJS 组件）| `apps/web/`（React UI，独立 workspace）| UI 层独立，与 Go 服务不在同一 module。 |
 | **Layer 2 UI** | `app`（SolidStart SPA）| `apps/web/` | 同上。 |
@@ -449,7 +449,7 @@ OpenCode 在 dep 类型上的关键约定：
 | Protocol/Route 四轴分离 (LLM) | Go interface: `LLMProvider` + `ProtocolAdapter` | **高** — AgentHub 的 Agent adapter 接口应该采用同样的关注点分离 |
 | Discriminated Union 错误/状态 (Effect Schema) | Go sum type: `interface{ isX() }` + type switch | **高** — 直接映射。Go 没有 tagged union，但 interface + sealed method 可实现同等语义 |
 | Plugin Hook 双向修改模式 | Go middleware chain: `func(next Handler) Handler` | **中** — Go 的中间件模式天然适合 |
-| OpenAPI Codegen 驱动 SDK | Buf + ConnectRPC codegen | **高** — 都是 schema-first |
+| OpenAPI Codegen 驱动 SDK | Buf + ConnectRPC codegen | **高** — 都是从协议定义生成类型 |
 | Effect Service + Layer DI | Manual DI + Wire (P2+) | **中** — Go 社区偏好显式构造函数注入 |
 
 ### 5.3 OpenCode 的不足及 AgentHub 应改进的点
@@ -483,7 +483,7 @@ OpenCode 在 dep 类型上的关键约定：
 
 3. **`plugin` → `packages/adapters/`**：OpenCode 的 PluginInput + 19 hooks 双向修改模式，在 Go 中映射为 `AgentAdapter` interface + middleware chain。
 
-4. **`sdk` → Buf + ConnectRPC**：同是 schema-first codegen，AgentHub 生成 Go + TypeScript 双端类型。
+4. **`sdk` → Buf + ConnectRPC**：同是协议生成代码，AgentHub 生成 Go + TypeScript 双端类型。
 
 5. **`opencode` (720 files) → hub/ + edge/ + runner/**：AgentHub 的拆分是正确方向。但需注意：hub/edge/runner 之间有共享逻辑（如 conversation CRUD），应提取到 `packages/im-core/` 而不是复制。
 

@@ -443,14 +443,14 @@ GET    /api/v2/mcp/servers/{name}   # 获取单个服务器
 | `langflow-base` = FastAPI platform | `services/hub-server/` + `services/edge-server/` | 类似分层，但 AgentHub 用 Go 而非 Python |
 | `langflow` = distribution | `apps/desktop/` | 集成层，只做组装 |
 | Frontend = React UI | `apps/web/` | AgentHub 已用 React，可参考 Langflow 的 Zustand store 模式 |
-| SDK = Python client | `packages/protocol/` | AgentHub 用 schema-first protocol（更优） |
+| SDK = Python client | `packages/protocol/` | AgentHub 用 Protobuf + Buf 生成 Go/TypeScript 协议类型 |
 
 ### 5.3 应避免的设计陷阱
 
 1. **MCP server 并发写竞态**：Langflow 用 file-based MCP config + per-user asyncio.Lock。AgentHub 应直接用 DB 事务避免丢更新。
 2. **Component 向后兼容的沉重负担**：Langflow 花了大量精力在 legacy=True / replacement=[] / flow JSON 版本映射上。AgentHub 的 agent 适配层应从第一天设计 versioned schema。
 3. **边界违规积压**：`ARCHITECTURE.md:22` 坦言 lfx 中有 ~13 个 `from langflow.*` import 待修复。AgentHub 应从一开始用 Go interface 做依赖注入，避免同样问题。
-4. **前端类型手写维护**：Langflow 没有用 OpenAPI 生成 TypeScript 类型（`ARCHITECTURE.md:67-68`），前端类型需手动同步。AgentHub 的 schema-first protocol 已避免此问题。
+4. **前端类型手写维护**：Langflow 没有用 OpenAPI 生成 TypeScript 类型（`ARCHITECTURE.md:67-68`），前端类型需手动同步。AgentHub 的 Protobuf + Buf 协议生成路线会避免此问题。
 
 ### 5.4 最值得复用的设计模式
 

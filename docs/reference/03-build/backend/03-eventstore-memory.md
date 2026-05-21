@@ -12,7 +12,7 @@
 | 仓库 | 事件存储方式 | 优点 | 缺点 | AgentHub 适合度 |
 |------|------------|------|------|:---:|
 | Kanna | 5 个 JSONL + 内存 Snapshot | 简单/可回放/writeChain 串行化 | 单机 | **9/10** |
-| Claude Code Viewer | JSONL SSOT + SQLite FTS5 索引 | 可搜索/轻量/porter tokenizer | 无增量同步 | **8/10** |
+| Claude Code Viewer | JSONL 唯一事实源 + SQLite FTS5 索引 | 可搜索/轻量/porter tokenizer | 无增量同步 | **8/10** |
 | Opcode | SHA-256 + zstd + content_pool | 去重/压缩/内容寻址 | 复杂度高 | **7/10** (文件层) |
 | LibreChat | MongoDB 全量存储 | 分布式 | 重依赖 | **3/10** |
 | **AgentHub 方案** | **JSONL + content_pool + FTS5 混合** | **三者之长** | - | - |
@@ -60,7 +60,7 @@ CREATE VIRTUAL TABLE session_messages_fts USING fts5(
 ```
 
 **关键设计**：
-- JSONL 仍是 SSOT，FTS5 仅存索引
+- JSONL 仍是唯一事实源，FTS5 仅存索引
 - BM25 排序，用户消息权重 1.2x
 - `snippet()` 函数生成高亮摘要
 - 外部内容表 + 触发器自动同步
@@ -100,7 +100,7 @@ CREATE VIRTUAL TABLE session_messages_fts USING fts5(
 **三层职责**：
 
 ```
-Layer 1: JSONL Event Log（SSOT，append-only）
+Layer 1: JSONL Event Log（唯一事实源，append-only）
   ~/.agenthub/data/{project}/
     ├── events.jsonl              # 所有事件流（project/thread/turn/message）
     ├── snapshot.json.zst         # Compacted state snapshot（zstd 压缩）
@@ -217,7 +217,7 @@ Layer 1: Global Memory（跨项目持久知识）
 
 Layer 2: Project Memory（项目级上下文）
   {project}/.agenthub/
-    ├── AGENTS.md              # 项目指令（SSOT）
+    ├── AGENTS.md              # 项目指令（唯一事实源）
     ├── memory/                # Markdown 记忆文件
     │   ├── architecture.md    # 架构决策记录
     │   ├── patterns.md        # 项目特有模式
@@ -256,7 +256,7 @@ Layer 4: Conversation Memory（会话上下文）
 ~/.agenthub/
 ├── data/
 │   └── {project}/
-│       ├── events.jsonl          # 事件日志（SSOT）
+│       ├── events.jsonl          # 事件日志（唯一事实源）
 │       ├── snapshot.json.zst     # Compaction 快照（zstd 压缩）
 │       ├── seq                    # 单调递增序列号
 │       └── index.db              # FTS5 搜索 + metadata 表

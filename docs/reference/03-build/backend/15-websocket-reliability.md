@@ -2,7 +2,7 @@
 
 > 分析日期: 2026-05-21
 > 前置: 10-openhands-agent-protocol.md (WS+REST+pending), 02-go-services.md (WSHub), 10-graceful-degradation.md (4层重连), 06-realtime-sync.md (seq LWW)
-> 交叉引用: 01-adapters.md (Agent SDK), 03-eventstore-memory.md (JSONL SSOT), 08-error-handling.md (ErrorCode/Retryable)
+> 交叉引用: 01-adapters.md (Agent SDK), 03-eventstore-memory.md (JSONL 唯一事实源), 08-error-handling.md (ErrorCode/Retryable)
 
 ---
 
@@ -315,5 +315,5 @@ Run 状态 (降级期间):
 | `03-build/backend/02-go-services.md` | WSHub 多房间架构, coder/websocket Ping/Pong, readPump/writePump |
 | `03-build/backend/10-graceful-degradation.md` | 4 层重连策略, auto-recovery protocol, 降级 Banner/Toast |
 | `02-decide/06-realtime-sync.md` | seq LWW, writeChain 串行化, compaction/snapshot, 离线冲突检测 |
-| `03-build/backend/03-eventstore-memory.md` | JSONL SSOT, content_pool 文件层, FTS5 搜索索引 |
+| `03-build/backend/03-eventstore-memory.md` | JSONL 唯一事实源, content_pool 文件层, FTS5 搜索索引 |
 | `03-build/backend/08-error-handling.md` | ErrorCode 分类 (ErrEdgeDisconnected, ErrRunnerUnavailable), retry UX |

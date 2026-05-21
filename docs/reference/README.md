@@ -115,4 +115,6 @@
 我要了解竞品 → 01-learn/web-research/02-competitive-2026.md + 01-learn/web-research/04-agent-command-center-2026.md
 我要定位 Multica → 01-learn/deep-dive/12-multica-product-ui.md + 01-learn/web-research/04-agent-command-center-2026.md + reference/multica/README.md + reference/multica/docs/product-overview.md
 我要对齐比赛材料 → ../research/bytedance.md + 01-learn/web-research/04-agent-command-center-2026.md
+我要看术语白话解释 → ../glossary.md
+我要管理 GitHub issues → ../project-management.md
 ```

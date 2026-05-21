@@ -286,7 +286,7 @@ if (!options.skipSynchronization) {
 - **流式更新**: `updateStreaming()` 通过 `__streaming_<sessionId>` well-known ID 实时更新流式文本
 - **过期策略**: 30s 阈值 (`STALE_THRESHOLD_MS`)，超过后标记为 stale 触发刷新
 - **Session Alias**: `sessionAliasesRef` 支持 session ID 迁移时的别名映射
-- **无 localStorage**: 所有消息数据仅存内存，JSONL 为 SSOT
+- **无 localStorage**: 所有消息数据仅存内存，JSONL 为唯一事实源
 
 ### 3.5 对 AgentHub 的建议
 
@@ -294,7 +294,7 @@ if (!options.skipSynchronization) {
 2. **增量扫描**: `since` 参数 + `last_scanned_at` 时间戳避免每次全量扫描，对大量项目关键
 3. **Promise.allSettled**: 单个 provider 失败不影响其他 -- 关键容错模式
 4. **Session 命名**: 反向扫描 JSONL 找 AI 生成标题的策略比纯用首条消息摘要智能得多
-5. **SSOT**: JSONL 为唯一事实源，前端内存仅做缓存 -- AgentHub 可对齐此原则
+5. **唯一事实源**: JSONL 为唯一事实源，前端内存仅做缓存 -- AgentHub 可对齐此原则
 
 ---
 
@@ -436,7 +436,7 @@ FileTree.tsx
 | IProviderSessionSynchronizer 接口 | 高 | 新增 CLI 工具仅需实现 2 个方法 |
 | Provider Registry 模式 | 高 | 运行时注册，Promise.allSettled 容错 |
 | 增量扫描 (since + lastScanAt) | 高 | 避免每次全量扫 `~/.claude/projects/` |
-| JSONL 为 SSOT | 高 | 前端只做缓存，不存储到 localStorage |
+| JSONL 为唯一事实源 | 高 | 前端只做缓存，不存储到 localStorage |
 | AI 生成 Session 标题 | 中 | 反向扫描 JSONL 末尾的 title 事件 |
 
 ### 5.4 Git 与文件树
@@ -454,6 +454,6 @@ FileTree.tsx
 
 1. **Provider 抽象层**: `IProvider` 接口统管 auth/mcp/skills/sessions/synchronizer 五个维度，新增 CLI 工具即插即用
 2. **Session 双缓存策略**: serverMessages(REST) + realtimeMessages(WS) → merged(去重)，兼顾实时性和持久性
-3. **JSONL SSOT**: 所有 session 数据以 CLI 原生的 JSONL 为准，前端仅做展示缓存
+3. **JSONL 唯一事实源**: 所有 session 数据以 CLI 原生的 JSONL 为准，前端仅做展示缓存
 4. **Plugin RPC Proxy**: 简单的 HTTP 反向代理替代复杂的进程间通信协议
 5. **移动端渐进增强**: isMobile boolean 贯穿所有组件，移动/桌面用同一套代码

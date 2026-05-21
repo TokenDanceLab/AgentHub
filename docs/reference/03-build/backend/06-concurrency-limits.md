@@ -27,7 +27,7 @@ AgentHub sits at the intersection of three concurrency domains: **(a)** tool exe
 ### 2.2 Model Analysis
 
 **Claude Code's Partition-First model (goroutine/subprocess pool equivalent):**
-The key insight is **adjacency-based batching**: three read-only tools in sequence merge into one concurrent batch; a write tool between them splits into three batches. This is a domain-aware partitioner, not a generic thread pool. The `isConcurrencySafe()` per-tool declaration is the source of truth. Conservative default: parse failure or unknown tool = serial.
+The key insight is **adjacency-based batching**: three read-only tools in sequence merge into one concurrent batch; a write tool between them splits into three batches. This is a domain-aware partitioner, not a generic thread pool. The `isConcurrencySafe()` per-tool declaration is the authority for concurrency safety. Conservative default: parse failure or unknown tool = serial.
 
 **Codex CLI's Agent Tree model (thread pool):**
 Each spawned agent is an independent async task with its own `ThreadId`. The control plane (`AgentControl`) enforces `agent_max_threads` (max concurrent) and `agent_max_depth` (max tree depth). The SQ/EQ pattern decouples parent turn loop from child execution. Spawn limits are checked before thread creation.

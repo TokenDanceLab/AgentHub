@@ -2,7 +2,7 @@
 
 > Repository: `d-kimuson/claude-code-viewer` v0.7.5 | License: MIT | 1,150+ stars
 > Tech: Vite + React 19 + TanStack Router + TanStack Query / Hono + Effect-TS
-> Read paths: `~/.claude/projects/*.jsonl` (SSOT), cache at `~/.claude-code-viewer/`
+> Read paths: `~/.claude/projects/*.jsonl` (唯一事实源), cache at `~/.claude-code-viewer/`
 
 ---
 
@@ -308,7 +308,7 @@ Claude Code Viewer 的 UI 设计贯穿了 Progressive Disclosure 理念：
 
 ### 6.1 可复用的架构决策
 
-1. **JSONL as SSOT + Zod validation**: 直接读 Claude Code 原生日志，不做数据迁移。Schema 校验失败不阻塞，返回 `x-error` 占位。AgentHub 以 WebSocket 接收实时事件时可采用相同策略。
+1. **JSONL as authoritative log + Zod validation**: 直接读 Claude Code 原生日志，不做数据迁移。Schema 校验失败不阻塞，返回 `x-error` 占位。AgentHub 以 WebSocket 接收实时事件时可采用相同策略。
 
 2. **Effect-TS 分层**: `Controller (presentation)` -> `Service (business logic)` -> `Infrastructure (data access)` -> `Schema (validation)` 的四层架构，全部通过 Effect `Layer` DI。AgentHub 后端应根据服务复杂度评估是否引入 Effect-TS（如复杂度低可用纯 async/await）。
 

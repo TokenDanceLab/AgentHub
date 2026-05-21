@@ -494,7 +494,7 @@ ToolCall arrives at Runner
 
 4. **Toast for transient, Card for persistent**: Channel selection is driven by Severity and Retryability, not by error origin. A transient transport error should be a toast; a persistent auth error should be an inline card.
 
-5. **Connection state is ambient, not an event**: The connection dot is always visible and reflects the last known state. Disconnects produce a toast on transition but the dot is the SSOT. This avoids error-card spam during flaky connections.
+5. **Connection state is ambient, not an event**: The connection dot is always visible and reflects the last known state. Disconnects produce a toast on transition but the dot is the authoritative state. This avoids error-card spam during flaky connections.
 
 6. **Optimistic send with rollback**: User messages appear immediately. Only on confirmed failure does the UI show an error state. This is the same pattern as DiffCard's optimistic apply→undo window.
 
