@@ -68,8 +68,8 @@ Orchestrator: Done. Preview running at http://localhost:5173
 
 | Layer | Description | Phase |
 |-------|------------|:-----:|
-| **Desktop Command Center** | Local project, thread, worktree, diff, approval, preview | P0 |
-| **IM Collaboration** | Direct chat, group chat, @Agent, orchestrator, multi-agent review | P1 |
+| **Desktop Command Center** | Local project, thread, agent lifecycle, worktree, diff, approval, preview | P0 |
+| **IM Collaboration** | Direct chat, group chat, @Agent, orchestrator, multi-agent review, agent progress cards | P1 |
 | **Hub Network** | Accounts, friends, groups, multi-device sync, Edge relay, team memory | P2-P4 |
 
 <br>
@@ -113,9 +113,9 @@ AgentHub/
 ├── apps/                   # React frontends (web, desktop, mobile)
 ├── services/               # Go backends (hub-server, edge-server, runner)
 ├── packages/               # shared Go + TS libraries
-├── proto/                  # Protobuf schema (SSOT)
+├── proto/                  # Protobuf schema, the single protocol source
 ├── docs/                   # architecture + reference docs
-│   └── reference/          # 65+ research documents (14 repos deep-dived)
+│   └── reference/          # 68 research documents, including Multica Tier-0 reference
 ├── .githooks/              # commit-msg + prepare-commit-msg
 └── .agenthub/              # project memory and rules
 ```
@@ -127,7 +127,7 @@ AgentHub/
 | Document | Description |
 |----------|------------|
 | [Architecture](docs/architecture.md) | Hub-Edge-Runner topology, deployment modes, sync protocol |
-| [Research Index](docs/reference/) | 65 cross-repo deep-dive documents, organized for Agent navigation |
+| [Research Index](docs/reference/) | 68 cross-repo deep-dive documents, organized for Agent navigation |
 | [Implementation Roadmap](docs/reference/04-plan/01-research-to-implementation.md) | P0 minimal system, priority matrix, research-to-code mapping |
 | [Protocol Schema](docs/reference/03-build/backend/13-protobuf-schema.md) | 6 .proto files + buf.gen.yaml |
 
@@ -138,6 +138,7 @@ AgentHub/
 - [Claude Code Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview)
 - [OpenAI Codex CLI](https://github.com/openai/codex)
 - [OpenCode](https://github.com/anomalyco/opencode)
+- [Multica](https://github.com/multica-ai/multica)
 - [LibreChat](https://github.com/danny-avila/LibreChat)
 - [Kanna](https://github.com/jakemor/kanna)
 - [CloudCLI](https://github.com/siteboon/claudecodeui)
