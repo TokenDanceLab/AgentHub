@@ -22,7 +22,7 @@
 | 13 | [codex-cli](01-learn/repos/13-codex-cli.md) | 树形 Multi-Agent + app-server |
 | 14 | [claude-code-sdk](01-learn/repos/14-claude-code-sdk.md) | 28 Hooks + Zod Schema + SDK |
 
-### deep-dive（11 篇源码深度分析）
+### deep-dive（12 篇源码深度分析）
 | # | 文件 | 分析主题 |
 |---|------|----------|
 | 01 | [kanna-orchestrator](01-learn/deep-dive/01-kanna-orchestrator.md) | Kanna AgentCoordinator→AgentHub 精确行号映射 |
@@ -36,6 +36,7 @@
 | 09 | [langflow-flowise-mcp](01-learn/deep-dive/09-langflow-flowise-mcp.md) | MCP 三级链 + Supervisor 协议 |
 | 10 | [openhands-agent-protocol](01-learn/deep-dive/10-openhands-agent-protocol.md) | WebSocket 事件流 + REST 兜底 |
 | 11 | [prompt-engineering-patterns](01-learn/deep-dive/11-prompt-engineering-patterns.md) | Prompt / Rules / Skills 模式提取 |
+| 12 | [multica-product-ui](01-learn/deep-dive/12-multica-product-ui.md) | Multica 产品模型、运行生命周期、前端包边界、设计系统 |
 
 ### web-research（4 篇 Web 生态调研）
 | # | 文件 | 主题 |
@@ -112,5 +113,6 @@
 我要做安全设计 → 02-decide/07-permission-models.md + 03-build/backend/08-error-handling.md + 01-learn/deep-dive/04-claude-code-tool-security.md
 我要写工作台/worktree/diff → 01-learn/web-research/04-agent-command-center-2026.md + 03-build/backend/12-workspace-lifecycle.md + 03-build/frontend/01-desktop-ux.md
 我要了解竞品 → 01-learn/web-research/02-competitive-2026.md + 01-learn/web-research/04-agent-command-center-2026.md
-我要对齐比赛材料 → ../research/ByteDance.md + 01-learn/web-research/04-agent-command-center-2026.md
+我要定位 Multica → 01-learn/deep-dive/12-multica-product-ui.md + 01-learn/web-research/04-agent-command-center-2026.md + reference/multica/README.md + reference/multica/docs/product-overview.md
+我要对齐比赛材料 → ../research/bytedance.md + 01-learn/web-research/04-agent-command-center-2026.md
 ```

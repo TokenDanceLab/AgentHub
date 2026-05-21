@@ -4,15 +4,15 @@ Date: 2026-05-21
 
 ## Principle
 
-AgentHub uses a **schema-first protocol**.
+AgentHub uses a **proto-first protocol**.
 
 ```text
-packages/protocol/schema = source of truth
-packages/protocol/ts     = generated TypeScript types
-packages/protocol/go     = generated Go structs
+proto/agenthub/v1      = single protocol source
+packages/protocol/ts   = generated TypeScript types
+packages/protocol/go   = generated Go structs
 ```
 
-JSON Schema, OpenAPI and AsyncAPI are the authoritative protocol definitions. TypeScript and Go types must be generated from schema to avoid drift between UI, Hub, Edge and Runner.
+Protobuf definitions under `proto/agenthub/v1` are the authoritative protocol definitions. TypeScript and Go types must be generated from proto to avoid drift between UI, Hub, Edge and Runner. OpenAPI / AsyncAPI documents may be generated or derived later, but they are not the primary protocol source.
 
 Hub Server, Edge Server and Runner are Go services. TypeScript protocol output is for UI and client code only.
 
@@ -20,20 +20,6 @@ Hub Server, Edge Server and Runner are Go services. TypeScript protocol output i
 
 ```text
 packages/protocol/
-  schema/
-    common/
-    im/
-    artifact/
-    runner/
-    sync/
-    relay/
-    api/
-      edge.openapi.yaml
-      hub.openapi.yaml
-      runner.openapi.yaml
-    asyncapi/
-      edge-hub.asyncapi.yaml
-      ui-events.asyncapi.yaml
   ts/
     generated/
   go/

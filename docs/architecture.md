@@ -278,7 +278,7 @@ type ExecutionAuthority = {
 
 | 包 | 语言 | 用途 |
 |---|---|---|
-| `packages/protocol/` | Schema + generated TypeScript/Go | schema-first 共享协议，生成 UI/Hub/Edge/Runner 类型，详见 [protocol.md](protocol.md) |
+| `packages/protocol/` | Generated TypeScript/Go protocol outputs | 从 `proto/agenthub/v1` 生成 UI/Hub/Edge/Runner 类型，详见 [protocol.md](protocol.md) |
 | `packages/transport/` | Model + interfaces | local / ssh / tailscale / hub-relay 路由模型、resolver 和 client interface |
 | `packages/im-core/` | Go | Conversation/Message/Thread 共享逻辑 |
 | `packages/agent-core/` | Go | Project / Thread / Turn / Item / AgentRun 共享模型 |
@@ -307,7 +307,7 @@ type ExecutionAuthority = {
 - **Runner 只管执行**：不存消息、不管 IM、不做 Memory
 - **Go-first services**：Hub、Edge、Runner 从 P0 起使用 Go 实现，TypeScript 只用于 UI 和生成类型
 - **Desktop Command Center first**：P0 优先 Project / Thread / Worktree / Diff / Approval / Preview，而不是完整 Hub 好友/群聊
-- **Protocol schema-first**：JSON Schema / OpenAPI / AsyncAPI 是唯一协议源头，TypeScript 与 Go 类型均由 schema 生成
+- **Protocol proto-first**：`proto/agenthub/v1` 是唯一协议源头，TypeScript 与 Go 类型均由 Protobuf 生成
 - **Authority 显式建模**：消息写入、执行、Artifact、Memory 的权威归属见 [authority.md](authority.md)
 - **Data Plane 受 Edge 授权**：UI 不直接访问远程 Runner，本地 Fast Path 需要 Edge 短期 token，见 [data-plane.md](data-plane.md)
 - **凡是能跑 Runner 的机器都是 Edge Node**：Desktop、远程电脑、实验室机器、Cloud VM 都统一建模为 Edge

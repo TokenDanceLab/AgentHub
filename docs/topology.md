@@ -70,6 +70,20 @@ Cloud Node = Headless Edge Server + Cloud Runner + CLI Agent
 Hub Server = central IM + account + sync + relay + remote control
 ```
 
+## 2.1 Multica Mapping
+
+Multica is a Tier-0 reference for managed agent lifecycle, but AgentHub splits the responsibilities differently because the core UX is IM-first and every executable machine is modeled as an Edge Node.
+
+| Multica Concept | AgentHub Mapping | Note |
+|---|---|---|
+| Server | Hub Server + Edge Server split | Hub owns central IM/sync/relay; Edge owns local project, context, runner and artifact authority |
+| Daemon | Edge-managed local execution capability | AgentHub should expose it as Edge health plus Runner availability, not as a user-facing daemon concept |
+| Runtime | RunnerEndpoint / AgentCapability | A runtime means where a CLI agent can run and which CLI/provider is available |
+| Task queue | AgentRun queue | Use queued/running/awaiting_approval/done/failed/cancelled states |
+| WebSocket progress | EdgeEvent / RunnerEvent | Progress must be typed and replayable through EventStore, not just transient socket text |
+| Agent as teammate | AgentProfile + Conversation actor | Human/agent/system actors should appear consistently in chat, artifacts, approvals and run history |
+| Issue board | Optional imported work source | AgentHub's first object remains Conversation / Thread / Artifact, not Issue / Board |
+
 ## 3. Network Planes
 
 ### Control Plane

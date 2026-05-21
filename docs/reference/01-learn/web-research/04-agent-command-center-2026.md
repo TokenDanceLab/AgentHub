@@ -21,7 +21,7 @@
 | Goose | `reference/goose/` | Desktop + CLI + API，生成协议 schema，权限路由，CLI 子进程适配 | 生成协议、Runner 适配 |
 | Roo Code | `reference/Roo-Code/` | Mode 分类、自动审批、命令安全规则 | 模式与权限策略 |
 | Ruflo | `reference/ruflo/` | Claude Code 多 agent 编排、插件、memory、federation | 直接竞品、编排上限 |
-| Multica | `reference/multica/` | managed agents 平台，agent 作为团队成员，Go 后端、daemon | 直接竞品、团队模型 |
+| Multica | `reference/multica/` | managed agents 平台，agent 作为团队成员，Go 后端、daemon/runtime、前端产品质感强 | Tier-0 团队 Agent 产品模型参考 |
 
 ## 2. 总体判断
 
@@ -37,7 +37,8 @@ IM 群聊式多 Agent 协作
 新增仓库验证了两件事：
 
 1. **多 agent 产品正在从“聊天壳”转向“开发命令中心”**：Emdash、Orca、Jean 都把 worktree、diff、preview、PR、远程机器放到桌面工作台中。
-2. **AgentHub 不能变成 Linear 克隆**：Multica 的核心对象是 Issue 和 Board，AgentHub 的核心对象应该是 Conversation / Thread / Artifact，即“像飞书/微信群聊一样组织 agent 协作”。
+2. **Multica 要升为最高优先级参考之一**：它最值得学的是 agent 身份、任务生命周期、runtime/daemon 注册、进度汇报、技能沉淀和前端产品质感。
+3. **AgentHub 不能变成 Linear 克隆**：Multica 的核心对象是 Issue 和 Board，AgentHub 的核心对象应该是 Conversation / Thread / Artifact，即“像飞书/微信群聊一样组织 agent 协作”。
 
 ## 3. Go 与协议层参考
 
@@ -223,7 +224,7 @@ CheckRun
 
 ## 6. 直接竞品：Multica 与 Ruflo
 
-### 6.1 Multica：最强“项目管理式 agent 平台”
+### 6.1 Multica：Tier-0 团队 Agent 产品模型参考
 
 Multica 的强点：
 
@@ -232,17 +233,39 @@ Multica 的强点：
 - 会报告进度和 blocker。
 - 有 cloud/self-host/daemon/runtime。
 - Go 后端 + WebSocket + daemon 模型和 AgentHub 有相似处。
+- 前端结构和视觉纪律成熟，适合作为 AgentHub 工作台 UI 的重点参考。
 
 AgentHub 应该学：
 
 - actor 字段要能表示 human / agent。
 - agent profile、状态、技能、运行中任务要可见。
 - daemon/runtime 注册模型。
+- task queue 状态机：queued / running / failed / cancelled / done。
+- progress / blocker / error 必须作为聊天流里的结构化 item 或卡片出现。
+- 前端包边界：业务逻辑、基础 UI、业务视图、平台路由适配分开。
+- 状态流：服务端数据由查询层负责，WebSocket 只触发刷新或投递 typed event，避免多个 store 同时改同一份对象。
+- 视觉系统：中性色为主，颜色只传递语义；字号、间距、容器层级克制统一。
 
 AgentHub 不应该学：
 
 - 不要把 Issue/Board 放成第一屏。
 - 不要弱化聊天流和群聊协作。
+- 不要把 Chat 降级成 1:1 agent sidecar；AgentHub 的核心是群聊、`@Agent` 和围绕产物的多 Agent 讨论。
+
+映射关系：
+
+| Multica 模型 | AgentHub 采用方式 |
+|---|---|
+| Agent as teammate | 采用：agent profile、头像、状态、技能、当前任务必须可见 |
+| Polymorphic actor | 采用：message/run/artifact/approval 都支持 human / agent / system actor |
+| Issue/Board first | 不采用：AgentHub 第一对象仍是 Conversation / Thread / Artifact |
+| Task queue lifecycle | 采用：AgentRun 需要 queued/running/awaiting_approval/done/failed/cancelled |
+| Daemon/runtime | 采用并改名映射到 Edge / RunnerEndpoint / AgentCapability |
+| Squads | 改造为群聊里的 Coordinator / AgentGroup，不做看板 assignee |
+| Private 1:1 Chat | 只作为 direct chat 子能力，不覆盖群聊 |
+| WebSocket progress | 采用 typed EdgeEvent / RunnerEvent，并写入 EventStore 方便重放 |
+| Frontend package split | 采用 apps + core + ui + views + platform adapter 的分层思想 |
+| Design system | 采用克制信息密度、中性色、语义色、统一字号/间距 |
 
 差异化表述：
 
