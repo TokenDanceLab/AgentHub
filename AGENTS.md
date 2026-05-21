@@ -43,7 +43,65 @@ type(scope): English description
 - Hook enforces at `.githooks/commit-msg`
 - Template at `.githooks/prepare-commit-msg`
 
-## 3. Repository Structure
+## 3. Branch Management
+
+AgentHub uses a lightweight trunk-based workflow. Do not use GitFlow.
+
+### Main Branch
+
+- `master` is the stable branch and should always be readable, demoable and easy to continue from.
+- Code, protocol and service layout changes should land through a pull request.
+- Direct `master` commits are allowed only for small docs/process cleanup with low risk. Prefer a PR when unsure.
+
+### Branch Names
+
+Use lowercase kebab-case:
+
+```text
+<type>/<short-topic>
+```
+
+Allowed branch types:
+
+| type | usage |
+|------|-------|
+| `feat/` | product or architecture feature work |
+| `fix/` | bug or broken-doc fix |
+| `docs/` | documentation-only work |
+| `chore/` | repo process, labels, scripts, tooling |
+| `refactor/` | restructuring without behavior change |
+| `spike/` | time-boxed research or experiment; must not become long-lived |
+| `codex/` | Codex-created working branch when the app creates one automatically |
+
+Examples:
+
+```text
+docs/branch-workflow
+chore/github-labels
+feat/runner-command-protocol
+spike/multica-runtime-model
+```
+
+### Pull Requests
+
+- Keep PRs small enough for one teammate to review in one sitting.
+- Link the relevant GitHub issue when one exists.
+- For code PRs, include the verification command or explain why it cannot run yet.
+- For protocol PRs, update `proto/agenthub/v1` first, then generated Go/TypeScript outputs once generation exists.
+- For docs-only PRs, a concise summary is enough.
+
+### Merge Rules
+
+- Prefer squash merge for short feature branches.
+- Delete merged branches.
+- Do not keep personal long-lived branches.
+- Rebase or merge `master` before merging if the branch touches protocol, service layout or shared package ownership.
+
+### Team Size Rule
+
+This is a three-person project. If a rule creates more coordination work than it prevents, simplify the rule and update this file.
+
+## 4. Repository Structure
 
 ```
 AgentHub/
@@ -57,7 +115,7 @@ AgentHub/
 └── .agenthub/      # project memory and rules
 ```
 
-## 4. Documentation
+## 5. Documentation
 
 - `docs/architecture.md` — Hub-Edge-Runner topology (authority)
 - `docs/reference/README.md` — research index (Agent navigation guide)
@@ -66,7 +124,7 @@ AgentHub/
 - `docs/reference/03-build/` — engineering specifications (backend + frontend)
 - `docs/reference/04-plan/` — roadmap and impact analysis
 
-## 5. Agent Collaboration Rules
+## 6. Agent Collaboration Rules
 
 - Before writing any code, read relevant `docs/reference/` documents
 - Adapter design: follow `03-build/backend/04-adapter-sdk.md`
