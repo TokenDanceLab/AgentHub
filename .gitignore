@@ -34,3 +34,4 @@ Thumbs.db
 
 # Cloned reference repos (at repo root only)
 /reference/
+/chat-verify/
