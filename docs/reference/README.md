@@ -1,6 +1,6 @@
 # AgentHub 调研文档索引
 
-> 60+ 份文档，按"Agent 需要什么"分类。Agent 读文档路径：**Learn → Decide → Build → Plan**。
+> 68 份文档，按"Agent 需要什么"分类。Agent 读文档路径：**Learn → Decide → Build → Plan**。
 
 ## 01-learn — 了解别人怎么做
 
@@ -22,7 +22,7 @@
 | 13 | [codex-cli](01-learn/repos/13-codex-cli.md) | 树形 Multi-Agent + app-server |
 | 14 | [claude-code-sdk](01-learn/repos/14-claude-code-sdk.md) | 28 Hooks + Zod Schema + SDK |
 
-### deep-dive（10 篇源码深度分析）
+### deep-dive（11 篇源码深度分析）
 | # | 文件 | 分析主题 |
 |---|------|----------|
 | 01 | [kanna-orchestrator](01-learn/deep-dive/01-kanna-orchestrator.md) | Kanna AgentCoordinator→AgentHub 精确行号映射 |
@@ -35,13 +35,15 @@
 | 08 | [dify-tool-provider](01-learn/deep-dive/08-dify-tool-provider.md) | Python match→Go switch 翻译 |
 | 09 | [langflow-flowise-mcp](01-learn/deep-dive/09-langflow-flowise-mcp.md) | MCP 三级链 + Supervisor 协议 |
 | 10 | [openhands-agent-protocol](01-learn/deep-dive/10-openhands-agent-protocol.md) | WebSocket 事件流 + REST 兜底 |
+| 11 | [prompt-engineering-patterns](01-learn/deep-dive/11-prompt-engineering-patterns.md) | Prompt / Rules / Skills 模式提取 |
 
-### web-research（3 篇 Web 生态调研）
+### web-research（4 篇 Web 生态调研）
 | # | 文件 | 主题 |
 |---|------|------|
 | 01 | [tech-stack](01-learn/web-research/01-tech-stack.md) | Go/Tauri/WebSocket/SQLite/Buf 选型 |
 | 02 | [competitive-2026](01-learn/web-research/02-competitive-2026.md) | Ruflo/Multica/Paperclip 竞品格局 |
 | 03 | [claude-agent-sdk](01-learn/web-research/03-claude-agent-sdk.md) | Claude Agent SDK GA 分析 |
+| 04 | [agent-command-center-2026](01-learn/web-research/04-agent-command-center-2026.md) | Emdash/Orca/Jean/Crush/ECA/Goose 等新增参考综合 |
 
 ## 02-decide — 对比选型
 
@@ -52,13 +54,15 @@
 | 03 | [orchestration](02-decide/03-orchestration.md) | 4 种调度策略 + 四层防循环 |
 | 04 | [sandbox-tools](02-decide/04-sandbox-tools.md) | 三级沙箱 + Tool 三层架构 |
 | 05 | [undo-rollback](02-decide/05-undo-rollback.md) | Undo 粒度：Fork=Clone + Undo=Replace |
+| 06 | [realtime-sync](02-decide/06-realtime-sync.md) | WebSocket / EventStore / 多端同步语义 |
+| 07 | [permission-models](02-decide/07-permission-models.md) | 权限来源、审批模式、策略优先级 |
 
 ## 03-build — 拿着就能写代码
 
-### backend（14 篇 Go 后端规格）
+### backend（15 篇 Go 后端规格）
 | # | 文件 | 内容 |
 |---|------|------|
-| 01 | [protocol](03-build/backend/01-protocol.md) | Go 类型定义：12 事件 + adapter/sync/orch/approval（1894行） |
+| 01 | [protocol](03-build/backend/01-protocol.md) | Go 类型定义：AgentEvent + adapter/sync/orch/approval |
 | 02 | [go-services](03-build/backend/02-go-services.md) | 单 module + 三层分层 + 11 表 + WS Hub |
 | 03 | [eventstore-memory](03-build/backend/03-eventstore-memory.md) | JSONL + Snapshot 2MB + FTS5 + 四层 Memory |
 | 04 | [adapter-sdk](03-build/backend/04-adapter-sdk.md) | 7 步开发流程 + 3 种注册模式 + Checklist |
@@ -72,6 +76,7 @@
 | 12 | [workspace-lifecycle](03-build/backend/12-workspace-lifecycle.md) | 4 阶段流水线 + 6 状态机 + WorkspacePool |
 | 13 | [protobuf-schema](03-build/backend/13-protobuf-schema.md) | 6 .proto + buf.gen.yaml |
 | 14 | [scaffold-services](03-build/backend/14-scaffold-services.md) | go.mod + Makefile + CI + golangci |
+| 15 | [websocket-reliability](03-build/backend/15-websocket-reliability.md) | WebSocket 可靠性、重连、去重、背压 |
 
 ### frontend（14 篇前端规格）
 | # | 文件 | 内容 |
@@ -103,7 +108,9 @@
 ```
 我要写 Adapter → 03-build/backend/01-protocol.md + 04-adapter-sdk.md + 02-decide/01-adapters.md
 我要写 EventStore → 03-build/backend/03-eventstore-memory.md + 01-learn/deep-dive/06-ccviewer-fts5.md
-我要写前端消息流 → 03-build/frontend/01-desktop-ux.md + 02-monorepo.md + 01-learn/deep-dive/02-librechat-message-tree.md
-我要做安全设计 → 03-build/backend/08-error-handling.md + 01-learn/deep-dive/04-claude-code-tool-security.md
-我要了解竞品 → 02-decide/ + 01-learn/web-research/02-competitive-2026.md
+我要写前端消息流 → 03-build/frontend/01-desktop-ux.md + 02-decide/06-realtime-sync.md + 03-build/backend/15-websocket-reliability.md
+我要做安全设计 → 02-decide/07-permission-models.md + 03-build/backend/08-error-handling.md + 01-learn/deep-dive/04-claude-code-tool-security.md
+我要写工作台/worktree/diff → 01-learn/web-research/04-agent-command-center-2026.md + 03-build/backend/12-workspace-lifecycle.md + 03-build/frontend/01-desktop-ux.md
+我要了解竞品 → 01-learn/web-research/02-competitive-2026.md + 01-learn/web-research/04-agent-command-center-2026.md
+我要对齐比赛材料 → ../research/ByteDance.md + 01-learn/web-research/04-agent-command-center-2026.md
 ```
