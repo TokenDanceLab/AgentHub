@@ -40,8 +40,9 @@ type(scope): English description
 
 - Scope optional, lowercase `[a-z0-9._-]+`
 - Description lowercase English, no trailing period, max 72 chars
-- Hook enforces at `.githooks/commit-msg`
-- Template at `.githooks/prepare-commit-msg`
+- Hook files live in `.githooks/`, but they are optional local helpers.
+- Enable local hooks with `git config core.hooksPath .githooks` if wanted.
+- GitHub branch protection is the actual shared guard.
 
 ## 3. Branch Management
 
@@ -49,9 +50,9 @@ AgentHub uses a lightweight trunk-based workflow. Do not use GitFlow.
 
 ### Main Branch
 
-- `master` is the stable branch and should always be readable, demoable and easy to continue from.
+- `master` is the protected stable branch and should always be readable, demoable and easy to continue from.
 - Code, protocol and service layout changes should land through a pull request.
-- Direct `master` commits are allowed only for small docs/process cleanup with low risk. Prefer a PR when unsure.
+- Direct `master` commits are only for maintainers/admins doing small docs/process cleanup with low risk. Prefer a PR when unsure.
 
 ### Branch Names
 
@@ -89,6 +90,7 @@ spike/multica-runtime-model
 - For code PRs, include the verification command or explain why it cannot run yet.
 - For protocol PRs, update `proto/agenthub/v1` first, then generated Go/TypeScript outputs once generation exists.
 - For docs-only PRs, a concise summary is enough.
+- Current GitHub protection requires a PR path but does not require CI or an approving review yet.
 
 ### Merge Rules
 
@@ -96,6 +98,7 @@ spike/multica-runtime-model
 - Delete merged branches.
 - Do not keep personal long-lived branches.
 - Rebase or merge `master` before merging if the branch touches protocol, service layout or shared package ownership.
+- `master` protection blocks force-pushes and branch deletion.
 
 ### Team Size Rule
 
