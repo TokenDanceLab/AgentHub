@@ -1,10 +1,12 @@
 #!/bin/bash
 # AgentHub prepare-commit-msg hook — inject template
-# Only acts on new commits (not merges, squashes, or amends)
+# Only for interactive commits (no -m, no -F, no merge, no amend).
 
-case "$2,$3" in
-  message,)  # new commit — inject template
-    cat > "$1" << 'TEMPLATE'
+case "$2" in
+  "")
+    # Interactive commit — inject template if file is empty
+    if [ ! -s "$1" ]; then
+      cat > "$1" << 'TEMPLATE'
 # type(scope): summary
 #
 # Allowed types:
@@ -26,10 +28,9 @@ case "$2,$3" in
 # Examples:
 #   docs: add architecture diagrams
 #   feat(edge): implement websocket hub
-#   fix(runner): handle subprocess timeout on windows
-#   refactor: reorganize reference docs
+#   fix(runner): handle subprocess timeout
 
 TEMPLATE
+    fi
     ;;
-  *) ;;  # merge/amend/template — leave unchanged
 esac
