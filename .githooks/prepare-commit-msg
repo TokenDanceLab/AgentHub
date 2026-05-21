@@ -1,12 +1,24 @@
-#!/bin/bash
-# AgentHub prepare-commit-msg hook — inject template
-# Only for interactive commits (no -m, no -F, no merge, no amend).
+#!/usr/bin/env bash
+# AgentHub prepare-commit-msg hook — inject commit template
+# Works on: macOS, Linux, Windows (Git Bash / WSL)
+# Only for: interactive commits (no -m, no -F, no merge, no amend)
 
-case "$2" in
-  "")
-    # Interactive commit — inject template if file is empty
-    if [ ! -s "$1" ]; then
-      cat > "$1" << 'TEMPLATE'
+MSG_FILE="$1"
+COMMIT_SOURCE="$2"
+
+# Only inject template for interactive commits (source is empty or unset)
+# Skip when message is provided via -m, -F, merge, squash, or amend
+if [ -n "$COMMIT_SOURCE" ]; then
+    exit 0
+fi
+
+# Skip if file already has content
+if [ -s "$MSG_FILE" ]; then
+    exit 0
+fi
+
+# Inject template
+cat > "$MSG_FILE" << 'TEMPLATE'
 # type(scope): summary
 #
 # Allowed types:
@@ -14,23 +26,19 @@ case "$2" in
 #   feat     — new feature
 #   fix      — bug fix
 #   docs     — documentation only
-#   refactor — code restructuring (no feature/fix)
+#   refactor — code restructuring
 #   chore    — build, deps, tooling
 #   test     — testing
 #   perf     — performance improvement
 #   ci       — CI/CD changes
 #   revert   — revert previous commit
 #
-# Scope is optional (lowercase, alphanumeric + . _ -).
-# Summary: lowercase English, no trailing period, max 72 chars.
-# Leave one blank line between subject and body.
+# Scope: optional, lowercase alphanumeric + . _ -
+# Summary: lowercase English, no trailing period, max 72 chars
 #
 # Examples:
 #   docs: add architecture diagrams
 #   feat(edge): implement websocket hub
-#   fix(runner): handle subprocess timeout
+#   fix(runner): handle subprocess timeout on windows
 
 TEMPLATE
-    fi
-    ;;
-esac

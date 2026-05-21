@@ -1,10 +1,16 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # AgentHub commit-msg hook — enforce Conventional Commits
-# Rule: type(scope): English description
-# Scope is optional. Description lowercase, no trailing period.
+# Works on: macOS, Linux, Windows (Git Bash / WSL)
+#
+# Format: type(scope): English description
+# Scope optional, description lowercase, no trailing period, max 72 chars.
 
-COMMIT_MSG=$(cat "$1" | tr -d '\r')
-SUBJECT=$(echo "$COMMIT_MSG" | head -1)
+set -euo pipefail
+
+MSG_FILE="$1"
+
+# Strip CR (Windows) and read subject line
+SUBJECT=$(head -1 "$MSG_FILE" | tr -d '\r')
 
 # === 1. Allowed types ===
 TYPES="init|feat|fix|docs|refactor|chore|test|perf|ci|revert"
@@ -17,25 +23,22 @@ if ! echo "$SUBJECT" | grep -qE "$PATTERN"; then
     echo "  Invalid commit message format."
     echo ""
     echo "  Required: type(scope): description"
+    echo "  Allowed types: $TYPES"
+    echo ""
     echo "  Examples:"
     echo "    docs: add architecture diagrams"
     echo "    feat(edge): implement websocket hub"
     echo "    fix(runner): handle subprocess timeout"
     echo "    refactor: reorganize reference docs"
     echo ""
-    echo "  Allowed types: $TYPES"
-    echo "  Scope is optional, lowercase alphanumeric + . _ -"
-    echo "  Description: lowercase English, no trailing period"
-    echo ""
     exit 1
 fi
 
 # === 3. Check subject line length (72 chars max) ===
-LEN=$(echo "$SUBJECT" | wc -c)
-if [ $LEN -gt 72 ]; then
+LEN=$(echo -n "$SUBJECT" | wc -c)
+if [ "$LEN" -gt 72 ]; then
     echo ""
-    echo "  Subject line too long ($LEN > 72 chars)."
-    echo "  Keep it concise — details go in the body."
+    echo "  Subject line too long ($LEN > 72 chars). Keep it concise."
     echo ""
     exit 1
 fi
