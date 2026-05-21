@@ -1,75 +1,75 @@
-# Design: Model Fallback & Provider Degradation
+# 设计：模型 Fallback 与 Provider 降级
 
-> Generated: 2026-05-21
-> Sources: opencode.md, kanna.md, librechat.md, cross-analysis-adapters.md
-> Scope: AgentHub ModelRouter — automatic model switching and provider-level degradation
+> 生成日期：2026-05-21
+> 来源：opencode.md, kanna.md, librechat.md, cross-analysis-adapters.md
+> 范围：AgentHub ModelRouter —— 自动模型切换与 Provider 级降级
 
-## 1. Landscape: What the Four Systems Do Today
+## 1. 现状：四个系统今天做什么
 
-### 1.1 Summary Table
+### 1.1 汇总表
 
-| System | Model Fallback Chain | Error Retry | Provider Degradation | Unknown Provider Fallback |
-|--------|---------------------|-------------|---------------------|--------------------------|
-| **OpenCode** | None — same model retry only | RouteExecutor: exp backoff + jitter, max 2 retries, 500ms base / 10s cap | None — 12 routes are independent, no degradation chain | None — must register a provider explicitly |
-| **Kanna** | None — manual UX toggle only | None — delegates to CC/Codex SDK | Two providers (Claude/Codex), manual switch | N/A — only two providers |
-| **LibreChat** | None — agent-level model config only | None — delegates to LangChain SDK | Per-agent summarization provider is separate from chat provider | Yes — `initializeCustom` for any OpenAI-compatible endpoint |
-| **AgentHub (target)** | **To design** | **To design** | **To design** | **To design** |
+| 系统 | 模型 Fallback 链 | 错误重试 | Provider 降级 | 未知 Provider Fallback |
+|------|-----------------|---------|-------------|---------------------|
+| **OpenCode** | 无——仅同模型重试 | RouteExecutor：指数退避 + jitter，最多 2 次重试，500ms 基础 / 10s 上限 | 无——12 条路由独立，无降级链 | 无——必须显式注册 provider |
+| **Kanna** | 无——仅手动 UX 切换 | 无——委托给 CC/Codex SDK | 两个 Provider（Claude/Codex），手动切换 | N/A——仅两个 provider |
+| **LibreChat** | 无——仅 Agent 级模型配置 | 无——委托给 LangChain SDK | 每个 Agent 的摘要 provider 与聊天 provider 分离 | 是——`initializeCustom` 用于任何 OpenAI 兼容端点 |
+| **AgentHub（目标）** | **待设计** | **待设计** | **待设计** | **待设计** |
 
-### 1.2 OpenCode: Error-Aware, Model-Unaware Retry
+### 1.2 OpenCode：错误感知、模型不感知的重试
 
-OpenCode's `RouteExecutor` (`llm/src/route/executor.ts:334-353`) has the most sophisticated error classification of the four systems:
+OpenCode 的 `RouteExecutor`（`llm/src/route/executor.ts:334-353`）拥有四个系统中最复杂的错误分类：
 
-- **10-variant error discriminated union**: `InvalidRequest | NoRoute | Authentication | RateLimit | QuotaExceeded | ContentPolicy | ProviderInternal | Transport | InvalidProviderOutput | UnknownProvider`
-- **`retryable` getter**: Only `RateLimit` and `ProviderInternal` (500/503/504/529) are retryable; everything else fails immediately
-- **Retry mechanics**: Exponential backoff + jitter, max 2 retries, base delay 500ms, cap 10000ms
-- **Limitation**: Retries hit the **same route** — no alternate model or alternate provider is attempted
+- **10 变体错误可区分联合类型**：`InvalidRequest | NoRoute | Authentication | RateLimit | QuotaExceeded | ContentPolicy | ProviderInternal | Transport | InvalidProviderOutput | UnknownProvider`
+- **`retryable` getter**：只有 `RateLimit` 和 `ProviderInternal`（500/503/504/529）可重试；其他一切立即失败
+- **重试机制**：指数退避 + jitter，最多 2 次重试，基础延迟 500ms，上限 10000ms
+- **局限性**：重试命中**同一条路由**——不尝试替代模型或替代 provider
 
-### 1.3 Kanna: UX-Exposed Provider Catalog
+### 1.3 Kanna：UX 暴露的 Provider 目录
 
-Kanna's `provider-catalog.ts` models a **three-layer resolution chain**:
+Kanna 的 `provider-catalog.ts` 建模了**三层解析链**：
 
 ```
 Provider → Model → Effort
 ```
 
-Each layer has defaults, but there is **no automatic fallback** when a model call fails. The user manually switches providers (Claude/Codex tabs in `ChatPreferenceControls`). The provider selector is **locked during active turns** to prevent mid-stream mutation.
+每层有默认值，但模型调用失败时**没有自动 fallback**。用户手动切换 provider（`ChatPreferenceControls` 中的 Claude/Codex tabs）。Provider 选择器在**活跃 Turn 期间锁定**以防止流中突变。
 
-### 1.4 LibreChat: Adapter Dispatcher with Custom Endpoint Gate
+### 1.4 LibreChat：带自定义端点门的 Adapter 分发
 
-LibreChat's `providerConfigMap` dispatches to known adapters (`anthropic → initializeAnthropic`, `google → initializeGoogle`, etc.). The key insight: **unknown providers fall back to `initializeCustom`**, which treats any endpoint as OpenAI-compatible by looking up `getCustomEndpointConfig` from YAML/DB.
+LibreChat 的 `providerConfigMap` 分发到已知 Adapter（`anthropic → initializeAnthropic`、`google → initializeGoogle` 等）。关键洞察：**未知 provider fallback 到 `initializeCustom`**，通过从 YAML/DB 查找 `getCustomEndpointConfig` 将任何端点视为 OpenAI 兼容。
 
-This is the only system with a **provider-level degradation path**, but it is a compile-time dispatch, not a runtime fallback — it chooses the adapter at config time, not when a call fails.
-
----
-
-## 2. Design Principles for AgentHub ModelRouter
-
-1. **Error classification drives routing decisions** — Not all errors are equal. Rate limits should retry on a different model; auth errors should never retry.
-2. **Model fallback is a chain, not a retry** — When model A fails with a non-retryable error, try model B, not model A again.
-3. **Provider degradation is explicit and configurable** — Provider-level failover crosses billing domains, so it must be opt-in.
-4. **Fallback decisions are observable** — Every switch must emit an event so the user/UI knows which model actually served the request.
-5. **Circuit breaking prevents cascading waste** — A model that just returned 429 should not be retried for N seconds.
+这是唯一有 **Provider 级降级路径**的系统，但它是编译时分发，而非运行时 fallback——在配置时选择 Adapter，而非调用失败时。
 
 ---
 
-## 3. ModelRouter Architecture
+## 2. AgentHub ModelRouter 的设计原则
 
-### 3.1 Error Classification (Inherited from OpenCode)
+1. **错误分类驱动路由决策**——并非所有错误都相同。速率限制应在不同模型上重试；认证错误决不应重试。
+2. **模型 fallback 是链，不是重试**——当模型 A 以不可重试错误失败时，尝试模型 B，而非再次尝试模型 A。
+3. **Provider 降级是显式且可配置的**——Provider 级故障转移跨越计费域，因此必须是主动选择的。
+4. **Fallback 决策是可观测的**——每次切换必须发出事件，以便用户/UI 知道实际是哪个模型服务了请求。
+5. **断路器防止级联浪费**——刚刚返回 429 的模型在 N 秒内不应再次尝试。
+
+---
+
+## 3. ModelRouter 架构
+
+### 3.1 错误分类（继承自 OpenCode）
 
 ```
                     ┌─────────────────────────┐
-                    │     LLM Call Fails      │
+                    │     LLM 调用失败         │
                     └───────────┬─────────────┘
                                 │
                     ┌───────────▼─────────────┐
-                    │  Classify Error by _tag  │
+                    │  按 _tag 分类错误        │
                     └───────────┬─────────────┘
                                 │
           ┌─────────────────────┼─────────────────────┐
           │                     │                     │
   ┌───────▼───────┐   ┌────────▼────────┐   ┌────────▼────────┐
-  │  Retryable    │   │  Fallbackable   │   │  Terminal       │
-  │  (same model) │   │  (next model)   │   │  (fail request) │
+  │  可重试        │   │  可 Fallback    │   │  终止            │
+  │  （同一模型）   │   │  （下一个模型）   │   │  （请求失败）     │
   ├───────────────┤   ├─────────────────┤   ├─────────────────┤
   │ RateLimit     │   │ QuotaExceeded   │   │ Authentication  │
   │ ProviderInternal│  │ NoRoute         │   │ InvalidRequest  │
@@ -78,65 +78,65 @@ This is the only system with a **provider-level degradation path**, but it is a 
   └───────┬───────┘   └────────┬────────┘   └────────┬────────┘
           │                    │                     │
           ▼                    ▼                     ▼
-   Retry N times        Advance to next       Return error
-   on same model        model in chain        to caller
+   在同一模型上          推进到链中的            向调用方
+   重试 N 次             下一个模型              返回错误
 ```
 
-**`Transport`** (network/timeout) is conditionally retryable: retry on same model once, then treat as fallbackable if it persists.
+**`Transport`**（网络/超时）是有条件可重试的：在同一模型上重试一次，如果持续存在则视为可 fallback。
 
-### 3.2 Model Fallback Chain
+### 3.2 模型 Fallback 链
 
 ```go
-// ModelFallbackChain is an ordered list of model entries.
-// The router tries each entry in sequence until one succeeds.
+// ModelFallbackChain 是一个有序的模型条目列表。
+// 路由器按顺序尝试每个条目直到有一个成功。
 type ModelFallbackChain struct {
-    Name     string             // e.g., "production", "budget"
+    Name     string             // 例如 "production", "budget"
     Strategy FallbackStrategy   // "sequential" | "parallel_hedge" | "cost_ascending"
     Entries  []ModelChainEntry
 }
 
 type ModelChainEntry struct {
-    ModelID      string           // e.g., "claude-sonnet-4-6"
-    ProviderID   string           // e.g., "anthropic"
+    ModelID      string           // 例如 "claude-sonnet-4-6"
+    ProviderID   string           // 例如 "anthropic"
     Role         ChainRole        // "primary" | "secondary" | "fallback"
-    RetryConfig  *RetryConfig     // Overrides per-entry
+    RetryConfig  *RetryConfig     // 按条目覆盖
 }
 
 type ChainRole string
 const (
-    RolePrimary   ChainRole = "primary"   // User's preferred model
-    RoleSecondary ChainRole = "secondary" // First fallback
-    RoleFallback  ChainRole = "fallback"  // Last resort
+    RolePrimary   ChainRole = "primary"   // 用户首选模型
+    RoleSecondary ChainRole = "secondary" // 第一个 fallback
+    RoleFallback  ChainRole = "fallback"  // 最后手段
 )
 ```
 
-### 3.3 Provider Degradation Chain
+### 3.3 Provider 降级链
 
-Provider degradation is a **separate concern** from model fallback. A provider is an authentication + billing domain; switching providers mid-request has cost implications.
+Provider 降级是与模型 fallback**独立的关注点**。Provider 是认证 + 计费域；请求中途切换 provider 有成本影响。
 
 ```go
 type ProviderDegradationPolicy struct {
     Enabled      bool
-    SameProviderOnly bool  // If true, never cross provider boundaries
+    SameProviderOnly bool  // true 时，绝不跨越 provider 边界
     AllowedTransitions []ProviderTransition
 }
 
 type ProviderTransition struct {
     From ProviderID
     To   ProviderID
-    MaxBudgetUSD float64  // Cap on failover spend (0 = unlimited)
+    MaxBudgetUSD float64  // 故障转移支出上限（0 = 无限制）
 }
 ```
 
-**Default policy**: `SameProviderOnly = true`. Cross-provider fallback requires explicit admin configuration. This prevents surprise bills from e.g., Anthropic → Google failover.
+**默认策略**：`SameProviderOnly = true`。跨 provider fallback 需要显式管理员配置。这防止了从例如 Anthropic → Google 故障转移产生意外账单。
 
-### 3.4 Circuit Breaker
+### 3.4 断路器
 
 ```go
 type CircuitBreaker struct {
-    FailThreshold   int           // Consecutive failures to open circuit (default: 3)
-    CooldownPeriod  time.Duration // Time before half-open probe (default: 30s)
-    HalfOpenMaxReqs int           // Probe requests allowed in half-open (default: 1)
+    FailThreshold   int           // 打开断路所需的连续失败次数（默认：3）
+    CooldownPeriod  time.Duration // 半开探测前的时间（默认：30s）
+    HalfOpenMaxReqs int           // 半开时允许的探测请求数（默认：1）
 }
 
 type ModelCircuitState struct {
@@ -148,54 +148,54 @@ type ModelCircuitState struct {
 }
 ```
 
-The circuit breaker is **per (ModelID, ProviderID)**. A model that returns 429 goes into open state and is skipped during fallback chain traversal until the cooldown expires.
+断路器是**按 (ModelID, ProviderID)** 的。返回 429 的模型进入 open 状态，并在冷却时间过期前在 fallback 链遍历中被跳过。
 
-### 3.5 Router Execution Flow
+### 3.5 路由器执行流
 
 ```
-Request arrives with:
-  - fallbackChainID: "production"  (or nil = no fallback)
-  - activeCircuitBreakers: map[ModelID]CircuitState
+请求到达，携带：
+  - fallbackChainID："production"（或 nil = 无 fallback）
+  - activeCircuitBreakers：map[ModelID]CircuitState
   ──────────────────────────────────────────────────────
   for each entry in chain:
-    1. Check circuit breaker for (entry.ModelID, entry.ProviderID)
-       - OPEN: skip, emit EventFallbackSkipped
-       - HALF_OPEN + quota exhausted: skip
-       - CLOSED or HALF_OPEN + probe available: proceed
-    2. Execute LLM call
-    3. On success:
-       - Close circuit breaker
-       - Emit EventModelRouted(modelID, providerID, role)
-       - Return response
-    4. On retryable error:
-       - Retry on same entry up to RetryConfig.MaxRetries
-       - On exhaustion: advance to next chain entry
-    5. On fallbackable error:
-       - Open circuit breaker for this entry
-       - Emit EventFallbackTriggered(fromModel, toModel, reason)
-       - Advance to next chain entry
-    6. On terminal error:
-       - Abort chain, return error
+    1. 检查 (entry.ModelID, entry.ProviderID) 的断路器
+       - OPEN：跳过，发出 EventFallbackSkipped
+       - HALF_OPEN + 配额已用完：跳过
+       - CLOSED 或 HALF_OPEN + 探测可用：继续
+    2. 执行 LLM 调用
+    3. 成功时：
+       - 关闭断路器
+       - 发出 EventModelRouted(modelID, providerID, role)
+       - 返回响应
+    4. 可重试错误：
+       - 在同一 entry 上重试，最多 RetryConfig.MaxRetries 次
+       - 耗尽时：推进到下一个链 entry
+    5. 可 fallback 错误：
+       - 为此 entry 打开断路器
+       - 发出 EventFallbackTriggered(fromModel, toModel, reason)
+       - 推进到下一个链 entry
+    6. 终止错误：
+       - 中止链，返回错误
   ──────────────────────────────────────────────────────
-  Chain exhausted:
-    - Return ErrAllModelsExhausted{ChainName, triedModels[]}
+  链耗尽：
+    - 返回 ErrAllModelsExhausted{ChainName, triedModels[]}
 ```
 
-### 3.6 Router Events
+### 3.6 路由器事件
 
 ```go
-// Emitted when fallback is triggered
+// 在 fallback 触发时发出
 type FallbackTriggeredEvent struct {
     FromModel    string
     FromProvider string
     ToModel      string
     ToProvider   string
-    Reason       string   // e.g., "QuotaExceeded", "RateLimit", "Transport"
+    Reason       string   // 例如 "QuotaExceeded", "RateLimit", "Transport"
     ChainName    string
-    Step         int      // Position in chain
+    Step         int      // 链中的位置
 }
 
-// Emitted when the final model is selected
+// 在最终模型选定后发出
 type ModelRoutedEvent struct {
     ModelID     string
     ProviderID  string
@@ -204,7 +204,7 @@ type ModelRoutedEvent struct {
     TotalTries  int
 }
 
-// Emitted when a model is skipped by circuit breaker
+// 在模型被断路器跳过时发出
 type FallbackSkippedEvent struct {
     ModelID    string
     Reason     string   // "circuit_open"
@@ -214,9 +214,9 @@ type FallbackSkippedEvent struct {
 
 ---
 
-## 4. Pre-configured Fallback Chains
+## 4. 预配置的 Fallback 链
 
-### 4.1 Anthropic-only (SameProviderOnly, recommended default)
+### 4.1 Anthropic-only（SameProviderOnly，推荐默认）
 
 ```
 primary:   claude-sonnet-4-6   (anthropic)
@@ -224,9 +224,9 @@ secondary: claude-sonnet-4-5   (anthropic)
 fallback:  claude-haiku-4-5    (anthropic)
 ```
 
-All models share the same API key and billing. No surprise costs. Ideal for AgentHub's default configuration.
+所有模型共享同一 API key 和计费。无意外成本。适合 AgentHub 的默认配置。
 
-### 4.2 Cross-provider (explicit opt-in)
+### 4.2 跨 Provider（显式 opt-in）
 
 ```
 primary:   claude-sonnet-4-6   (anthropic)
@@ -234,86 +234,86 @@ secondary: gpt-5               (openai)
 fallback:  gemini-2.5-pro      (google)
 ```
 
-Requires admin approval + `ProviderDegradationPolicy.AllowedTransitions` entries. Each transition can have a `MaxBudgetUSD` cap.
+需要管理员审批 + `ProviderDegradationPolicy.AllowedTransitions` 条目。每个转换可以有 `MaxBudgetUSD` 上限。
 
-### 4.3 OpenRouter Proxy Chain
+### 4.3 OpenRouter 代理链
 
 ```
 primary:   claude-sonnet-4-6   (openrouter)
 secondary: claude-sonnet-4-6   (anthropic-direct)
 ```
 
-OpenRouter as a front proxy, fall back to direct API if OpenRouter is down. Useful for teams that use OpenRouter for cost aggregation but want a direct-path safety net.
+OpenRouter 作为前置代理，如果 OpenRouter 宕机则 fallback 到直接 API。适用于使用 OpenRouter 进行成本聚合但希望有直接路径安全网的团队。
 
 ---
 
-## 5. Integration with AgentHub Adapter
+## 5. 与 AgentHub Adapter 集成
 
-### 5.1 Adapter Responsibility
+### 5.1 Adapter 职责
 
-The adapter layer (`cross-analysis-adapters.md` Section 2) owns **transport-level retry** (e.g., spawning a subprocess, reconnecting HTTP). The ModelRouter layer owns **model-level fallback** (switching to a different model ID).
+Adapter 层（`cross-analysis-adapters.md` 第 2 节）负责**传输级重试**（例如生成子进程、重连 HTTP）。ModelRouter 层负责**模型级 fallback**（切换到不同的模型 ID）。
 
-| Layer | Owns | Retry Scope |
-|-------|------|-------------|
-| Adapter transport | Network errors, process crashes | Same model, same provider |
-| ModelRouter | Model unavailability, quota, rate limit | Different model, same or different provider |
+| 层 | 负责 | 重试范围 |
+|---|------|---------|
+| Adapter 传输 | 网络错误、进程崩溃 | 相同模型、相同 provider |
+| ModelRouter | 模型不可用、配额、速率限制 | 不同模型、相同或不同 provider |
 
-### 5.2 Adapter Contract Change
+### 5.2 Adapter 契约变更
 
-The `StartRequest` (cross-analysis-adapters.md Section 2.2) gains a `FallbackChainID` field:
+`StartRequest`（cross-analysis-adapters.md 第 2.2 节）增加一个 `FallbackChainID` 字段：
 
 ```go
 type StartRequest struct {
-    // ... existing fields ...
-    FallbackChainID string  // "" = no fallback, "production" = use named chain
-    FallbackChain   *ModelFallbackChain  // Inline override, takes precedence over named chain
+    // ... 现有字段 ...
+    FallbackChainID string              // "" = 无 fallback，"production" = 使用命名链
+    FallbackChain   *ModelFallbackChain  // 内联覆盖，优先级高于命名链
 }
 ```
 
-The adapter calls `ModelRouter.Execute(ctx, req, chain)` instead of calling the LLM directly. The router handles chain traversal and returns either a successful response or `ErrAllModelsExhausted`.
+Adapter 调用 `ModelRouter.Execute(ctx, req, chain)` 而非直接调用 LLM。路由器处理链遍历，返回成功响应或 `ErrAllModelsExhausted`。
 
 ---
 
-## 6. What AgentHub Should NOT Do
+## 6. AgentHub 不应做什么
 
-| Anti-pattern | Why |
-|-------------|-----|
-| Retry on auth errors | 401/403 never self-resolve; retrying wastes quota and delays error propagation |
-| Silent fallback | Every model switch must emit an event visible to the user/UI |
-| Cross-provider by default | Different providers = different billing; must be explicit opt-in |
-| Infinite retry | OpenCode's max-2-retries is a good cap; AgentHub should use 3 with circuit breaker |
-| Fallback to weaker model without downgrade notice | If the chain falls back to haiku, the UI should indicate reduced capability |
-
----
-
-## 7. Implementation Phasing
-
-| Phase | Deliverable | Depends On |
-|-------|------------|------------|
-| P0 | Error classification (10-variant discriminated union → Go) | opencode.md §3.5 |
-| P0 | ModelFallbackChain data model + sequential traversal | This document §3.2 |
-| P0 | Integration into ClaudeCodeAdapter.Start() | cross-analysis-adapters.md §2.2 |
-| P1 | Circuit breaker per (ModelID, ProviderID) | P0 |
-| P1 | Fallback events (FallbackTriggered, ModelRouted, FallbackSkipped) | P0 |
-| P1 | ProviderDegradationPolicy (cross-provider opt-in) | P0 |
-| P2 | Parallel hedge strategy (race primary + secondary, use first success) | P1 |
-| P2 | Cost-ascending auto-chain (sort by $/1M tokens) | P1 |
-| P2 | Dynamic chain builder from agent capabilities (match tool support) | P1 |
+| 反模式 | 原因 |
+|--------|------|
+| 在认证错误上重试 | 401/403 永远不会自我解决；重试浪费配额并延迟错误传播 |
+| 静默 fallback | 每次模型切换必须发出用户/UI 可见的事件 |
+| 默认跨 provider | 不同 provider = 不同计费；必须是显式 opt-in |
+| 无限重试 | OpenCode 的最大 2 次重试是一个好的上限；AgentHub 应使用 3 次并配合断路器 |
+| Fallback 到较弱模型但不提示降级 | 如果链 fallback 到 haiku，UI 应指示能力降低 |
 
 ---
 
-## 8. Key Design Decisions
+## 7. 实施分阶段
 
-1. **Separate error classification from routing**: OpenCode's 10-variant error model is rich enough to drive routing decisions. AgentHub should adopt it directly rather than invent a new taxonomy.
-
-2. **Chain is explicit, not derived**: The user/admin configures fallback chains. AgentHub does not auto-derive chains from model capabilities. This avoids surprises where the router silently picks a model that lacks tool calling or has a different context window.
-
-3. **Circuit breaker is essential, not optional**: Without it, a rate-limited model clogs the chain — every request probes it, incurs latency, then falls through. A 30-second cooldown after 3 consecutive failures is a safe default.
-
-4. **SameProviderOnly by default**: LibreChat's `initializeCustom` pattern (unknown → OpenAI-compatible) is clever for config-time dispatch, but runtime cross-provider fallback crosses billing boundaries. AgentHub must be conservative.
-
-5. **Events are first-class**: Kanna's snapshot broadcast model and LibreChat's MCP event flow both emit structured events for every state change. AgentHub's fallback events follow the same principle — the UI must know which model served the request.
+| 阶段 | 交付物 | 依赖 |
+|------|--------|------|
+| P0 | 错误分类（10 变体可区分联合类型 → Go） | opencode.md 第 3.5 节 |
+| P0 | ModelFallbackChain 数据模型 + 顺序遍历 | 本文第 3.2 节 |
+| P0 | 集成到 ClaudeCodeAdapter.Start() | cross-analysis-adapters.md 第 2.2 节 |
+| P1 | 按 (ModelID, ProviderID) 的断路器 | P0 |
+| P1 | Fallback 事件（FallbackTriggered, ModelRouted, FallbackSkipped） | P0 |
+| P1 | ProviderDegradationPolicy（跨 provider opt-in） | P0 |
+| P2 | 并行对冲策略（竞速 primary + secondary，使用第一个成功者） | P1 |
+| P2 | 成本升序自动链（按 $/1M tokens 排序） | P1 |
+| P2 | 根据 Agent 能力动态构建链（匹配工具支持） | P1 |
 
 ---
 
-*Design complete. 2026-05-21.*
+## 8. 关键设计决策
+
+1. **错误分类与路由分离**：OpenCode 的 10 变体错误模型足够丰富，可以驱动路由决策。AgentHub 应直接采用它，而非发明新的分类法。
+
+2. **链是显式的，不是推导的**：用户/管理员配置 fallback 链。AgentHub 不从模型能力自动推导链。这避免了路由器静默选择一个缺乏工具调用或具有不同上下文窗口的模型带来的意外。
+
+3. **断路器是必需的，不可选**：没有它，一个被限速的模型会堵塞整条链——每个请求都探测它，产生延迟，然后穿透。连续 3 次失败后 30 秒冷却是一个安全的默认值。
+
+4. **默认 SameProviderOnly**：LibreChat 的 `initializeCustom` 模式（未知 → OpenAI 兼容）在配置时分发时很聪明，但运行时跨 provider fallback 跨越了计费边界。AgentHub 必须保守。
+
+5. **事件是一等的**：Kanna 的快照广播模型和 LibreChat 的 MCP 事件流都为每次状态变更发出结构化事件。AgentHub 的 fallback 事件遵循相同原则——UI 必须知道哪个模型服务了请求。
+
+---
+
+*设计完成。2026-05-21.*

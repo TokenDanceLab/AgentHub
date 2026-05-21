@@ -115,7 +115,7 @@ AgentHub/
 ├── packages/               # shared Go + TS libraries
 ├── proto/                  # Protobuf schema, the single protocol source
 ├── docs/                   # architecture + reference docs
-│   └── reference/          # 68 research documents, including Multica Tier-0 reference
+│   └── reference/          # 69 research and engineering specification documents, including Multica Tier-0 reference
 ├── .githooks/              # commit-msg + prepare-commit-msg
 └── .agenthub/              # project memory and rules
 ```
@@ -132,7 +132,7 @@ AgentHub/
 | [Documentation Language Policy](docs/language-policy.md) | Which docs are Chinese-first and which names stay English |
 | [Chinese Documentation Roadmap](docs/chinese-documentation-roadmap.md) | Batch plan for translating AgentHub-owned docs into Chinese |
 | [DeepSeek Handoff](docs/deepseek-handoff.md) | Handoff prompt and acceptance checklist for translation agents |
-| [Research Index](docs/reference/) | 68 cross-repo deep-dive documents, organized for Agent navigation |
+| [Research Index](docs/reference/) | 69 cross-repo research and engineering specification documents, organized for Agent navigation |
 | [Implementation Roadmap](docs/reference/04-plan/01-research-to-implementation.md) | P0 minimal system, priority matrix, research-to-code mapping |
 | [Protocol Schema](docs/reference/03-build/backend/13-protobuf-schema.md) | 6 .proto files + buf.gen.yaml |
 

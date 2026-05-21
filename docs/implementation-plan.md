@@ -1,114 +1,114 @@
-# AgentHub Implementation Plan
+# AgentHub 实现计划
 
-Date: 2026-05-21
+日期：2026-05-21
 
-## Runtime Constraint
+## 运行时约束
 
-Hub Server, Edge Server and Runner are Go services from P0.
+Hub Server、Edge Server 和 Runner 从 P0 起使用 Go 实现。
 
-No Node.js backend prototype is planned. TypeScript is used for UI and generated protocol types.
+没有 Node.js 后端原型计划。TypeScript 只用于 UI 和生成的协议类型。
 
-## P0: Desktop Local Command Center
+## P0：Desktop 本地命令中心
 
-Goal:
+目标：
 
 ```text
 Desktop UI -> Local Edge Server -> Local Runner -> Claude Code / Codex
 ```
 
-Must demonstrate:
+必须演示：
 
-- Project list.
-- Thread list.
-- One Thread starts one AgentRun.
-- Agent profile and runtime status are visible before a run starts.
-- Runner starts Claude Code or Codex CLI.
-- stdout/stderr streamed as Items.
-- git worktree isolation.
-- changed-file detection.
-- Diff viewer.
-- Apply / Discard patch.
-- Approval card.
-- Progress, blocker and error cards in the Thread.
-- `.agenthub/AGENTS.md` context.
+- 项目列表。
+- Thread 列表。
+- 一个 Thread 启动一个 AgentRun。
+- Agent profile 和 runtime 状态在 run 开始前可见。
+- Runner 启动 Claude Code 或 Codex CLI。
+- stdout/stderr 作为 Item 流式输出。
+- git worktree 隔离。
+- 文件变更检测。
+- Diff 查看器。
+- Apply / Discard patch。
+- Approval 卡片。
+- Thread 中展示进度、blocker 和错误卡片。
+- `.agenthub/AGENTS.md` 上下文。
 
-Not in P0:
+不在 P0：
 
-- Friends.
-- Full group chat.
-- Mobile client.
-- Hub Relay.
-- Cloud Edge.
-- Multi-tenant permissions.
-- Plugin marketplace.
+- 好友。
+- 完整群聊。
+- 移动客户端。
+- Hub Relay。
+- Cloud Edge。
+- 多租户权限。
+- Plugin marketplace。
 
-## P1: Multi-Agent Thread
+## P1：多 Agent Thread
 
-Goal:
+目标：
 
 ```text
-One Thread, multiple Agent Turns.
+一个 Thread，多个 Agent Turn。
 ```
 
-Add:
+增加：
 
-- `@ClaudeCode` implement.
-- `@Codex` review.
-- `@OpenCode` alternative plan.
-- Orchestrator summary.
-- Reviewer reads diff artifact.
+- `@ClaudeCode` 实现。
+- `@Codex` 审查。
+- `@OpenCode` 替代方案。
+- Orchestrator 摘要。
+- Reviewer 读取 diff artifact。
 
-## P2: Edge-Hub Sync
+## P2：Edge-Hub 同步
 
-Goal:
+目标：
 
 ```text
 Edge <-> Hub
-Web/Mobile -> Hub status view
+Web/Mobile -> Hub 状态查看
 ```
 
-Add:
+增加：
 
-- Hub Server.
-- Edge registration.
-- Device online/offline.
-- EdgeEvent sync.
-- Artifact metadata sync.
-- Conversation summary sync.
-- remote approval from Web/Mobile.
+- Hub Server。
+- Edge 注册。
+- 设备在线/离线。
+- EdgeEvent 同步。
+- Artifact 元数据同步。
+- 会话摘要同步。
+- 从 Web/Mobile 远程审批。
 
-## P3: Hub Relay And Cloud Edge
+## P3：Hub Relay 和 Cloud Edge
 
-Goal:
+目标：
 
 ```text
 Web/Mobile -> Hub -> Desktop/Cloud Edge -> Runner
 ```
 
-Add:
+增加：
 
-- Hub Relay.
-- Cloud Edge.
-- Cloud Runner.
-- permission audit.
-- remote run start.
-- Preview Hub Proxy.
+- Hub Relay。
+- Cloud Edge。
+- Cloud Runner。
+- 权限审计。
+- 远程 run 启动。
+- Preview Hub Proxy。
 
-## P4: Full IM Collaboration
+## P4：完整 IM 协作
 
-Goal:
+目标：
 
 ```text
-team IM + multi-agent collaboration
+团队 IM + 多 Agent 协作
 ```
 
-Add:
+增加：
 
-- users.
-- friends.
-- groups.
-- team spaces.
-- agent contacts.
-- full multi-device sync.
-- team memory.
-- organization permissions.
+- 用户。
+- 好友。
+- 群组。
+- 团队空间。
+- agent 联系人。
+- 完整多端同步。
+- 团队 memory。
+- 组织权限。

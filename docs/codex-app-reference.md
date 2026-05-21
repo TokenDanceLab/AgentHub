@@ -1,27 +1,27 @@
-# Codex App Reference For AgentHub
+# Codex App 对 AgentHub 的参考意义
 
-Date: 2026-05-21
+日期：2026-05-21
 
-## How AgentHub Uses This Reference
+## AgentHub 如何使用这份参考
 
-Codex App is a product and architecture reference for local coding-agent command centers.
+Codex App 是本地 coding-agent 命令中心的产品和架构参考。
 
-AgentHub should learn from:
+AgentHub 应学习：
 
-- App Server protocol layer.
-- Thread / Turn / Item stream model.
-- worktree isolation.
-- reviewable diffs.
-- approvals.
-- skills / AGENTS.md / context construction.
+- App Server 协议层。
+- Thread / Turn / Item 流式模型。
+- worktree 隔离。
+- 可审查的 diff。
+- 审批。
+- skills / AGENTS.md / 上下文构造。
 
-AgentHub should not copy:
+AgentHub 不应照抄：
 
-- single-agent-only assumptions.
-- OpenAI-only ecosystem assumptions.
-- local-only product boundary.
+- 单 agent 专属假设。
+- OpenAI 专属生态假设。
+- 纯本地的产品边界。
 
-## Mapping
+## 映射
 
 ```text
 Codex App:
@@ -33,17 +33,17 @@ Project -> Conversation -> Thread -> Turn -> Item -> Artifact
              IM / group / @Agent
 ```
 
-## Difference
+## 差异
 
-AgentHub adds:
+AgentHub 增加：
 
-- Claude Code / Codex / OpenCode adapters.
-- IM group and `@Agent` interaction.
-- Orchestrator.
-- Hub sync and relay.
-- Desktop / Cloud / Lab Edge nodes.
-- `.agenthub/` project memory.
+- Claude Code / Codex / OpenCode adapter。
+- IM 群组和 `@Agent` 交互。
+- Orchestrator。
+- Hub 同步和中继。
+- Desktop / Cloud / Lab Edge 节点。
+- `.agenthub/` 项目 memory。
 
-## Runtime Constraint
+## 运行时约束
 
-Even though the reference product may use its own app-server implementation, AgentHub implements Hub, Edge and Runner in Go.
+虽然参考产品可能使用自己的 app-server 实现，但 AgentHub 使用 Go 实现 Hub、Edge 和 Runner。

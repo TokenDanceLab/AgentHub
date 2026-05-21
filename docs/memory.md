@@ -1,14 +1,14 @@
-# AgentHub Memory And Context
+# AgentHub Memory 和 Context
 
-Date: 2026-05-21
+日期：2026-05-21
 
-## Principle
+## 原则
 
-AgentHub uses `.agenthub/` as human-readable project memory and context input.
+AgentHub 使用 `.agenthub/` 作为人类可读的项目 memory 和上下文输入。
 
-P0 uses deterministic file loading. Retrieval and vector search can come later.
+P0 使用确定性文件加载。检索和向量搜索可以后续再做。
 
-## Project Layout
+## 项目布局
 
 ```text
 .agenthub/
@@ -25,37 +25,37 @@ P0 uses deterministic file loading. Retrieval and vector search can come later.
 
 ## Context Builder
 
-Before calling an Agent, Edge builds context from:
+在调用 Agent 之前，Edge 从以下来源构造上下文：
 
 ```text
 System Prompt
 + Agent Profile
 + .agenthub/AGENTS.md
 + .agenthub/RULES.md
-+ relevant SKILLS
-+ current Project
-+ current Thread summary
-+ recent Items
-+ current workspace state
-+ current user request
++ 相关 SKILLS
++ 当前 Project
++ 当前 Thread 摘要
++ 最近的 Items
++ 当前 workspace 状态
++ 当前用户请求
 ```
 
-## P0 Scope
+## P0 范围
 
-P0 loads:
+P0 加载：
 
 - `.agenthub/AGENTS.md`
 - `.agenthub/RULES.md`
-- current Thread recent Items
-- current diff / changed files when available
+- 当前 Thread 的最近 Items
+- 当前 diff / 变更文件（可用时）
 
-P1 can add:
+P1 可以增加：
 
-- Thread summaries
-- pinned messages
-- memory update suggestions
-- skill selection
+- Thread 摘要
+- 置顶消息
+- memory 更新建议
+- skill 选择
 
-## Write Rule
+## 写入规则
 
-Automatic memory writes should produce a suggestion card first. Confirmed writes update the Memory Authority owner.
+自动 memory 写入应先产生建议卡片。确认后的写入更新 Memory Authority 所有者。

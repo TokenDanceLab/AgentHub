@@ -1,151 +1,151 @@
-# AgentHub Plugin Marketplace -- Design
+# AgentHub 插件市场 -- 设计
 
-> Generated: 2026-05-21
-> Sources: cloudcli.md (Plugin manifest + RPC proxy + atomic install),
->   opencode.md (19 Hooks + bidirectional pattern),
->   librechat.md (Agent Marketplace + MCP manager),
->   langflow.md (MCP three-tier upgrade chain + Component registration),
->   design-adapter-sdk.md (3 registration modes + lifecycle)
+> 生成: 2026-05-21
+> 来源: cloudcli.md（Plugin manifest + RPC proxy + 原子安装）、
+>   opencode.md（19 Hooks + 双向模式）、
+>   librechat.md（Agent Marketplace + MCP manager）、
+>   langflow.md（MCP 三层升级链 + Component registration）、
+>   design-adapter-sdk.md（3 种注册模式 + 生命周期）
 
 ---
 
-## 1. Design Philosophy
+## 1. 设计理念
 
-AgentHub's plugin system draws from four reference implementations, each contributing a distinct layer:
+AgentHub 的插件系统借鉴了四个参考实现，每个贡献一个不同的层：
 
-| Reference | Contributes | Layer |
+| 参考 | 贡献 | 层 |
 |-----------|------------|-------|
-| **CloudCLI** | Manifest schema, atomic install, RPC proxy, process manager | Packaging & Distribution |
-| **OpenCode** | Bidirectional hook pattern `(input, output) => Promise<void>`, 19 lifecycle hooks, permission merge | Runtime Extension |
-| **LibreChat** | Agent Marketplace UI (grid + virtualized + category tabs), MCP manager singleton | Discovery & Discovery UI |
-| **Langflow** | `tool_mode=True` → Agent tool → MCP tool upgrade chain, Component registration, per-project MCP | Capability Export |
+| **CloudCLI** | Manifest schema、原子安装、RPC proxy、进程管理器 | 打包与分发 |
+| **OpenCode** | 双向 hook 模式 `(input, output) => Promise<void>`、19 个生命周期 hooks、权限合并 | 运行时扩展 |
+| **LibreChat** | Agent Marketplace UI（grid + 虚拟化 + 分类标签页）、MCP manager 单例 | 发现与发现 UI |
+| **Langflow** | `tool_mode=True` → Agent tool → MCP tool 升级链、Component registration、每项目 MCP | 能力导出 |
 
-Core principle: **a plugin starts as local code, graduates to an Agent tool, and optionally surfaces as an MCP tool -- without code changes**. This is the Langflow three-tier chain applied to AgentHub's Runner model.
+核心原则: **插件以本地代码起步，毕业为 Agent tool，可选地作为 MCP tool 对外暴露 -- 无需代码变更**。这是 Langflow 三层链应用于 AgentHub 的 Runner 模型。
 
 ---
 
-## 2. Plugin Marketplace Lifecycle
+## 2. 插件市场生命周期
 
-### 2.1 Discovery
+### 2.1 发现
 
-Plugins are discovered from three sources, mirroring the adapter registration tri-mode from `design-adapter-sdk.md` Section 1.3:
+插件从三个来源发现，镜像 design-adapter-sdk.md 第 1.3 节的 adapter 注册三模式：
 
 ```
-Source 1: Built-in Registry
-  packages/plugin/registry/ -- Go init() self-registration
-  Loaded at runner startup, always available
+来源 1: 内置注册表
+  packages/plugin/registry/ -- Go init() 自注册
+  Runner 启动时加载，始终可用
 
-Source 2: Marketplace Index
-  ~/.agenthub/plugins/ -- manifest.yaml scan (CloudCLI pattern)
-  discoverPlugins() skips .tmp-* dirs (atomic install guard)
+来源 2: 市场索引
+  ~/.agenthub/plugins/ -- manifest.yaml 扫描（CloudCLI 模式）
+  discoverPlugins() 跳过 .tmp-* 目录（原子安装保护）
 
-Source 3: Remote Registry
+来源 3: 远程注册表
   GET /api/v1/plugins/search?q=&category=&author=&sort=
-  Remote plugin index with version metadata
+  远程插件索引，带版本元数据
 ```
 
-**Marketplace UI** (from LibreChat Section 1.6 + Langflow Section 1.5):
+**市场 UI**（来自 LibreChat 第 1.6 节 + Langflow 第 1.5 节）：
 
-- **Grid view** with virtualized cards (`react-virtualized` or `@tanstack/virtual`)
-- **Category tabs** filtering (agent, tool, theme, skill, mcp-bridge)
-- **Fuse.js fuzzy search** across name, description, author, tags (Langflow sidebar pattern)
-- **Plugin detail** page: description, version history, permissions, install count, author info
-- **Sharing/Permissions UI**: LibreChat's People Picker + Access Roles pattern
+- **Grid 视图**，虚拟化卡片（`react-virtualized` 或 `@tanstack/virtual`）
+- **分类标签页**过滤（agent、tool、theme、skill、mcp-bridge）
+- **Fuse.js 模糊搜索**跨名称、描述、作者、标签（Langflow sidebar 模式）
+- **插件详情**页：描述、版本历史、权限、安装数、作者信息
+- **共享/权限 UI**：LibreChat 的 People Picker + Access Roles 模式
 
-### 2.2 Install Flow (Atomic)
+### 2.2 安装流程（原子化）
 
-Directly adapts CloudCLI's `installPluginFromGit()` atomic pattern (cloudcli.md Section 2.6):
+直接适配 CloudCLI 的 `installPluginFromGit()` 原子模式（cloudcli.md 第 2.6 节）：
 
 ```
-1. Resolve plugin source (git URL, registry ID, or local path)
-2. Validate name + version against the existing registry (duplicate check)
-3. Clone/Download to .tmp-<name>-<hash>/ (skipped by scanPlugins)
-4. Validate manifest.yaml:
+1. 解析插件源（git URL、注册表 ID 或本地路径）
+2. 根据现有注册表验证名称 + 版本（重复检查）
+3. 克隆/下载到 .tmp-<name>-<hash>/（被 scanPlugins 跳过）
+4. 验证 manifest.yaml:
    - name: ^[a-zA-Z0-9_-]+$
-   - displayName: non-empty
-   - entry: no path traversal (.. check), no absolute paths
-   - permissions: must be string array
-5. Run npm install --ignore-scripts (prevent postinstall attack, CloudCLI L341)
-6. Run build script if present (60s timeout, CloudCLI L96-143)
-7. fs.renameSync .tmp-* -> <plugin-name>/ (atomic -- scanner never sees half-installed)
-8. Register in plugin registry
-9. Start server sidecar if manifest has server entry
+   - displayName: 非空
+   - entry: 无路径遍历（.. 检查），无绝对路径
+   - permissions: 必须是字符串数组
+5. 运行 npm install --ignore-scripts（防止 postinstall 攻击，CloudCLI L341）
+6. 如存在 build script，运行构建（60s 超时，CloudCLI L96-143）
+7. fs.renameSync .tmp-* -> <plugin-name>/（原子化 -- 扫描器永不看到半安装状态）
+8. 在插件注册表中注册
+9. 如 manifest 有 server entry，启动 server sidecar
 ```
 
-### 2.3 Update Flow
+### 2.3 更新流程
 
 ```
-1. Check current version from manifest.yaml
-2. Compare with target version (registry or git tag)
-3. Backup current plugin dir -> .bak-<name>-<version>/
-4. Repeat install steps 3-9 into a fresh .tmp-* directory
-5. On success: swap .tmp-* -> plugin dir, delete backup
-6. On failure: restore from .bak-*/, report error
-7. Restart server sidecar (SIGTERM → SIGKILL two-phase, CloudCLI L111-136)
+1. 从 manifest.yaml 检查当前版本
+2. 与目标版本对比（注册表或 git tag）
+3. 备份当前插件目录 -> .bak-<name>-<version>/
+4. 在全新 .tmp-* 目录中重复安装步骤 3-9
+5. 成功时: 将 .tmp-* 替换为插件目录，删除备份
+6. 失败时: 从 .bak-*/ 恢复，报告错误
+7. 重启 server sidecar（SIGTERM → SIGKILL 两阶段，CloudCLI L111-136）
 ```
 
-### 2.4 Uninstall Flow
+### 2.4 卸载流程
 
 ```
-1. SIGTERM server sidecar (5s grace) → SIGKILL
-2. Remove plugin directory
-3. Remove from plugin registry
-4. Clean up any plugin-scoped data (config, secrets, caches)
+1. SIGTERM server sidecar（5s 宽限期）→ SIGKILL
+2. 移除插件目录
+3. 从插件注册表中移除
+4. 清理插件范围数据（配置、密钥、缓存）
 ```
 
-### 2.5 Version Pinning & Dependency Resolution
+### 2.5 版本固定与依赖解析
 
-- **Semver range** in manifest: `"dependencies": { "agenthub": "^1.2.0" }`
-- **Plugin-to-plugin dependency**: `"requires": { "mcp-bridge": ">=0.3.0" }`
-- **Conflict detection**: two plugins requesting the same slot with same priority → user resolves
-- **Rollback**: keep last N versions in `.bak-*` for quick revert
+- **Semver 范围**在 manifest 中: `"dependencies": { "agenthub": "^1.2.0" }`
+- **插件到插件依赖**: `"requires": { "mcp-bridge": ">=0.3.0" }`
+- **冲突检测**: 两个插件以相同优先级请求同一 slot → 用户解决
+- **回滚**: 在 `.bak-*` 中保留最近 N 个版本以供快速还原
 
 ---
 
-## 3. Plugin Slot Types
+## 3. 插件位类型
 
-CloudCLI currently has only `"tab"` (cloudcli.md L140). AgentHub extends to **five slot types**:
+CloudCLI 当前仅有 `"tab"`（cloudcli.md L140）。AgentHub 扩展到**五种位类型**：
 
-| Slot | Display Location | What Plugin Gets | Example Use Case |
+| 位 | 显示位置 | 插件获得的内容 | 示例用例 |
 |------|-----------------|-----------------|-----------------|
-| **`tab`** | Main content area as a new tab (CloudCLI pattern) | Full React component, `mount(container, api)` / `unmount(container)` | Kanban board, diagram editor, workflow designer |
-| **`panel`** | Sidebar bottom section, collapsible panel | React component, limited height (max 400px) | Mini file browser, quick actions, status monitor |
-| **`toolbar`** | Top toolbar icon + dropdown/popover | React component in popover container | Quick prompt templates, clipboard manager |
-| **`tool`** | Registered as an Agent tool (no UI, pure function) | Tool definition: `{ name, description, parameters, execute }` | API call, database query, file transformation |
-| **`skill`** | Registered as an Agent skill (injected into system prompt) | Skill definition: `{ name, description, instructions }` | Code style guide, domain knowledge, workflow template |
-| **`theme`** | Global theme override | CSS variables map + optional dark/light variants | Custom color scheme, font set |
+| **`tab`** | 主内容区域作为新标签页（CloudCLI 模式） | 完整 React 组件，`mount(container, api)` / `unmount(container)` | 看板、图表编辑器、工作流设计器 |
+| **`panel`** | Sidebar 底部区域，可折叠面板 | React 组件，高度受限（最大 400px） | 迷你文件浏览器、快捷操作、状态监控 |
+| **`toolbar`** | 顶部工具栏图标 + 下拉/弹出框 | 弹出框容器中的 React 组件 | 快速提示词模板、剪贴板管理器 |
+| **`tool`** | 注册为 Agent 工具（无 UI，纯函数） | Tool 定义: `{ name, description, parameters, execute }` | API 调用、数据库查询、文件转换 |
+| **`skill`** | 注册为 Agent 技能（注入系统提示词） | Skill 定义: `{ name, description, instructions }` | 代码风格指南、领域知识、工作流模板 |
+| **`theme`** | 全局主题覆盖 | CSS 变量映射 + 可选暗/亮变体 | 自定义配色方案、字体集 |
 
-**Slot priority & conflict resolution**:
-- Multiple plugins can register for the same slot
-- `tab` / `panel` / `toolbar`: sorted by `manifest.priority` (default 0), user can reorder
-- `tool` / `skill`: name-unique; collision = last-installed wins with warning
-- `theme`: only one active theme at a time; user selects in settings
+**位优先级与冲突解决**:
+- 多个插件可注册同一位
+- `tab` / `panel` / `toolbar`: 按 `manifest.priority` 排序（默认 0），用户可重新排序
+- `tool` / `skill`: 名称唯一；冲突 = 最后安装者获胜并警告
+- `theme`: 同一时间仅一个活跃主题；用户在设置中选择
 
-### 3.1 UI Slot API (tab / panel / toolbar)
+### 3.1 UI 位 API（tab / panel / toolbar）
 
-Each UI plugin receives a standard `PluginAPI` object (from CloudCLI L95-115):
+每个 UI 插件接收一个标准 `PluginAPI` 对象（来自 CloudCLI L95-115）：
 
 ```typescript
 interface PluginAPI {
-  // Environment context
+  // 环境上下文
   context: {
     theme: "dark" | "light"
     project: { name: string; path: string }
     session: { id: string; title: string }
   }
-  onContextChange(cb: (ctx: PluginContext) => void): () => void  // unsubscribe
+  onContextChange(cb: (ctx: PluginContext) => void): () => void  // 取消订阅
 
-  // RPC to plugin server sidecar
+  // 到插件 server sidecar 的 RPC
   rpc(method: string, path: string, body?: unknown): Promise<unknown>
 
-  // Agent interaction (tool/skill slots only)
+  // Agent 交互（仅 tool/skill 位）
   agent: {
     sendPrompt(text: string): Promise<void>
     getMessages(): Message[]
     onToolCall(cb: (call: ToolCall) => ToolResult): () => void
   }
 
-  // UI utilities
+  // UI 工具
   ui: {
     showNotification(opts: NotificationOpts): void
     openFile(path: string): void
@@ -153,12 +153,12 @@ interface PluginAPI {
 }
 ```
 
-### 3.2 Non-UI Slot Types (tool / skill)
+### 3.2 非 UI 位类型（tool / skill）
 
-**Tool slot** -- registered as a callable Agent tool:
+**Tool 位** -- 注册为可调用的 Agent 工具：
 
 ```yaml
-# manifest.yaml (tool slot)
+# manifest.yaml（tool 位）
 slot: tool
 tool:
   name: "git_commit_summary"
@@ -170,13 +170,13 @@ tool:
         type: string
         description: "Git rev range, e.g. HEAD~5..HEAD"
     required: ["since"]
-  execute: "tool-handler.js"  # exports async execute(params, context)
+  execute: "tool-handler.js"  # 导出 async execute(params, context)
 ```
 
-**Skill slot** -- injected into Agent system prompt:
+**Skill 位** -- 注入 Agent 系统提示词：
 
 ```yaml
-# manifest.yaml (skill slot)
+# manifest.yaml（skill 位）
 slot: skill
 skill:
   name: "python_style_guide"
@@ -186,53 +186,53 @@ skill:
     - Use type hints on all function signatures
     - Prefer dataclasses over plain dicts
     - Max line length: 100 characters
-  always_apply: false   # true = always in prompt, false = on-demand
+  always_apply: false   # true = 始终在提示词中，false = 按需
 ```
 
-### 3.3 Slot Loading Strategy
+### 3.3 位加载策略
 
-| Slot | Load Timing | Failure Behavior |
+| 位 | 加载时机 | 失败行为 |
 |------|------------|-----------------|
-| `tab` | Manual activation (user clicks) | Error boundary in tab container |
-| `panel` | On sidebar render | Collapsed with error indicator |
-| `toolbar` | On toolbar render | Hidden, logged |
-| `tool` | On agent startup | Skipped, warning in agent init |
-| `skill` | On agent startup | Skipped, warning in system prompt build |
-| `theme` | On app load | Fallback to default theme |
+| `tab` | 手动激活（用户点击） | 标签容器中的错误边界 |
+| `panel` | Sidebar 渲染时 | 折叠并带错误指示器 |
+| `toolbar` | 工具栏渲染时 | 隐藏并记录日志 |
+| `tool` | Agent 启动时 | 跳过，agent init 中警告 |
+| `skill` | Agent 启动时 | 跳过，系统提示词构建中警告 |
+| `theme` | 应用加载时 | 回退到默认主题 |
 
 ---
 
-## 4. Plugin Permission Model
+## 4. 插件权限模型
 
-### 4.1 Permission Categories
+### 4.1 权限类别
 
-Inspired by CloudCLI's permission array (cloudcli.md L131) and OpenCode's hierarchical permission merge (opencode.md Section 2.1 L152-158):
+受 CloudCLI 权限数组（cloudcli.md L131）和 OpenCode 层次化权限合并（opencode.md 第 2.1 节 L152-158）启发：
 
-| Category | Permission | What It Grants |
+| 类别 | 权限 | 授予内容 |
 |----------|-----------|---------------|
-| **`fs`** | `fs.read` | Read files in project scope |
-| | `fs.write` | Write files in project scope |
-| | `fs.delete` | Delete files in project scope |
-| | `fs.exec` | Execute files / run scripts |
-| **`network`** | `network.http` | Outbound HTTP requests |
-| | `network.websocket` | WebSocket connections |
-| | `network.listen` | Open a local server port |
-| **`agent`** | `agent.prompt` | Send prompts to the active agent |
-| | `agent.messages.read` | Read agent conversation history |
-| | `agent.tool.intercept` | Intercept/hook into tool calls |
-| | `agent.tool.define` | Register new tools at runtime |
-| | `agent.subagent.spawn` | Spawn sub-agents |
-| **`system`** | `system.env.read` | Read environment variables |
-| | `system.process.spawn` | Spawn child processes (sidecar) |
-| | `system.clipboard` | Read/write system clipboard |
-| | `system.notification` | Show OS notifications |
-| **`ui`** | `ui.inject` | Inject UI components |
-| | `ui.theme` | Override theme |
-| | `ui.shortcut` | Register keyboard shortcuts |
-| **`user`** | `user.identity` | Access user ID/email |
-| | `user.secrets` | Access per-plugin secrets |
+| **`fs`** | `fs.read` | 读取项目范围内的文件 |
+| | `fs.write` | 写入项目范围内的文件 |
+| | `fs.delete` | 删除项目范围内的文件 |
+| | `fs.exec` | 执行文件 / 运行脚本 |
+| **`network`** | `network.http` | 出站 HTTP 请求 |
+| | `network.websocket` | WebSocket 连接 |
+| | `network.listen` | 打开本地服务器端口 |
+| **`agent`** | `agent.prompt` | 向活跃 agent 发送提示词 |
+| | `agent.messages.read` | 读取 agent 会话历史 |
+| | `agent.tool.intercept` | 拦截/挂钩工具调用 |
+| | `agent.tool.define` | 在运行时注册新工具 |
+| | `agent.subagent.spawn` | 派生子 agent |
+| **`system`** | `system.env.read` | 读取环境变量 |
+| | `system.process.spawn` | 派生子进程（sidecar） |
+| | `system.clipboard` | 读/写系统剪贴板 |
+| | `system.notification` | 显示操作系统通知 |
+| **`ui`** | `ui.inject` | 注入 UI 组件 |
+| | `ui.theme` | 覆盖主题 |
+| | `ui.shortcut` | 注册键盘快捷键 |
+| **`user`** | `user.identity` | 访问用户 ID/email |
+| | `user.secrets` | 访问各插件的密钥 |
 
-### 4.2 Permission Declaration
+### 4.2 权限声明
 
 ```yaml
 # manifest.yaml
@@ -244,27 +244,27 @@ permissions:
   - ui.inject
 ```
 
-### 4.3 Permission Gates
+### 4.3 权限关口
 
-Three-tier permission gating, adapted from OpenCode's merge model:
+三层权限关口，适配自 OpenCode 的合并模型：
 
 ```
-Layer 1: Plugin manifest  →  declared permissions (what the plugin asks for)
-Layer 2: User config      →  user-approved permissions (what the user allows)
-Layer 3: Agent policy     →  organization policy (admin-enforced allow/deny lists)
+层 1: Plugin manifest  → 声明的权限（插件请求的内容）
+层 2: User config      → 用户批准的权限（用户允许的内容）
+层 3: Agent policy     → 组织策略（管理员强制执行的允许/拒绝列表）
 
-Effective permissions = Layer1 ∩ Layer2 ∩ Layer3  (intersection, not union)
+有效权限 = 层1 ∩ 层2 ∩ 层3  （交集，非并集）
 ```
 
-**Runtime enforcement**:
-- `fs.*`: validate path is within project scope (`path.resolve + startsWith` check, CloudCLI L271-273)
-- `network.*`: SSRF-safe proxy for outbound requests (LibreChat `createSSRFSafeUndiciConnect`, librechat.md Section 3.5)
-- `agent.*`: check at each tool call / prompt injection point
-- `user.secrets`: secrets injected as `X-Plugin-Secret-*` headers, never exposed in API response (CloudCLI L244-246)
+**运行时强制执行**:
+- `fs.*`: 验证路径在项目范围内（`path.resolve + startsWith` 检查，CloudCLI L271-273）
+- `network.*`: 出站请求的 SSRF 安全代理（LibreChat `createSSRFSafeUndiciConnect`，librechat.md 第 3.5 节）
+- `agent.*`: 在每次工具调用 / 提示词注入点检查
+- `user.secrets`: 密钥注入为 `X-Plugin-Secret-*` 请求头，永不暴露在 API 响应中（CloudCLI L244-246）
 
-### 4.4 Install-Time Permission Prompt
+### 4.4 安装时权限提示
 
-When a user installs a plugin, they see:
+当用户安装插件时，看到：
 
 ```
 Plugin: "Database Explorer" v1.2.0 by @author
@@ -278,19 +278,19 @@ Required permissions:
 [Allow] [Allow with restrictions...] [Deny]
 ```
 
-**Dangerous permission categories** (`system.process.spawn`, `fs.exec`, `network.listen`) require explicit user confirmation -- they cannot be granted via `--yes` or config defaults.
+**危险权限类别**（`system.process.spawn`、`fs.exec`、`network.listen`）需要用户显式确认 -- 不能通过 `--yes` 或配置默认值授予。
 
-### 4.5 Runtime Permission Audit
+### 4.5 运行时权限审计
 
-- All permission-sensitive operations are logged with `[plugin:<name>]` prefix
-- User can view permission usage: Settings > Plugins > <name> > Permissions Audit
-- Excessive denial events trigger a warning: "Plugin X tried to access fs.write 47 times and was denied"
+- 所有权限敏感的操作记录为 `[plugin:<name>]` 前缀
+- 用户可查看权限使用情况: Settings > Plugins > <name> > Permissions Audit
+- 过多的拒绝事件触发警告: "Plugin X tried to access fs.write 47 times and was denied"
 
 ---
 
-## 5. AgentHub Plugin System Architecture
+## 5. AgentHub 插件系统架构
 
-### 5.1 Overall Architecture
+### 5.1 总体架构
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -298,8 +298,8 @@ Required permissions:
 │                                                    │
 │  ┌──────────────────┐   ┌──────────────────────┐  │
 │  │ Plugin Registry  │   │ Plugin Manager        │  │
-│  │ (init() +        │   │ (lifecycle: install,  │  │
-│  │  manifest scan)  │   │  start, stop, update) │  │
+│  │ （init() +        │   │ （生命周期: install、  │  │
+│  │   manifest scan） │   │  start、stop、update）│  │
 │  └──────┬───────────┘   └──────────┬───────────┘  │
 │         │                          │               │
 │         ▼                          ▼               │
@@ -309,14 +309,14 @@ Required permissions:
 │  │  ┌─────────┐ ┌─────────┐ ┌─────────────────┐  │
 │  │  │ UI Slot │ │Tool Slot│ │ Skill Slot       │  │
 │  │  │ Runtime │ │ Runtime │ │ Runtime           │  │
-│  │  │(React   │ │(Tool    │ │(Prompt injection) │  │
-│  │  │ mount)  │ │Registry)│ │                   │  │
+│  │  │（React   │ │（Tool    │ │（提示词注入）    │  │
+│  │  │ mount）  │ │Registry）│ │                   │  │
 │  │  └────┬────┘ └────┬────┘ └────────┬────────┘  │
 │  │       │           │               │            │
 │  │       ▼           ▼               ▼            │
 │  │  ┌──────────────────────────────────────────┐  │
 │  │  │          Permission Gate                   │  │
-│  │  │  (manifest ∩ user ∩ policy enforcement)   │  │
+│  │  │  （manifest ∩ user ∩ policy 强制执行）    │  │
 │  │  └────────────────────┬─────────────────────┘  │
 │  │                       │                        │
 │  └───────────────────────┼────────────────────────┘
@@ -324,99 +324,99 @@ Required permissions:
 │                          ▼
 │  ┌──────────────────────────────────────────────┐
 │  │          Plugin Server Sidecar                 │
-│  │  (Node.js/Python/Rust -- ready protocol)       │
+│  │  （Node.js/Python/Rust -- ready 协议）         │
 │  │  RPC: POST /rpc/<path>                         │
 │  │  Secrets: X-Plugin-Secret-* headers            │
 │  └──────────────────────────────────────────────┘
 │                                                    │
 │                          │
-│                          ▼  (optional MCP export)
+│                          ▼  （可选 MCP 导出）
 │  ┌──────────────────────────────────────────────┐
-│  │       MCP Endpoint (tool_mode=true)            │
+│  │       MCP Endpoint（tool_mode=true）           │
 │  │  tools/list → plugin tools                     │
 │  │  tools/call → plugin tool invocation           │
 │  └──────────────────────────────────────────────┘
 └──────────────────────────────────────────────────┘
 ```
 
-### 5.2 Plugin Manifest Schema (Final)
+### 5.2 插件 Manifest Schema（最终版）
 
-Synthesized from CloudCLI's manifest (cloudcli.md L116-131) + design-adapter-sdk.md L337-361 + slot extensions:
+综合自 CloudCLI 的 manifest（cloudcli.md L116-131）+ design-adapter-sdk.md L337-361 + 位扩展：
 
 ```yaml
 # manifest.yaml -- AgentHub Plugin Manifest
-name: my-plugin                   # Required: ^[a-zA-Z0-9_-]+$
-displayName: My Plugin            # Required: UI label
-version: 1.2.0                    # Required: semver
+name: my-plugin                   # 必需: ^[a-zA-Z0-9_-]+$
+displayName: My Plugin            # 必需: UI 标签
+version: 1.2.0                    # 必需: semver
 description: "Does something useful"
 author: "developer-name"
-icon: Database                    # Lucide icon name
-type: plugin                      # "plugin" (for marketplace) | "adapter" (for agent adapter)
+icon: Database                    # Lucide 图标名
+type: plugin                      # "plugin"（用于市场） | "adapter"（用于 agent adapter）
 slot: tab                         # tab | panel | toolbar | tool | skill | theme
 
-# UI slot entry (required for tab/panel/toolbar slots)
-entry: dist/plugin.js             # Relative path, no .. allowed
+# UI 位入口（tab/panel/toolbar 位必需）
+entry: dist/plugin.js             # 相对路径，不允许 ..
 
-# Server sidecar (optional)
-server: server.js                 # Relative path, spawns as child process
+# Server sidecar（可选）
+server: server.js                 # 相对路径，作为子进程启动
 
-# Tool/Skill slot fields (required for tool/skill slots)
-tool:                             # Only if slot: tool
+# Tool/Skill 位字段（tool/skill 位必需）
+tool:                             # 仅当 slot: tool
   name: my_tool
   description: "Tool description"
   parameters: {...}               # JSON Schema
   execute: handler.js
 
-skill:                            # Only if slot: skill
+skill:                            # 仅当 slot: skill
   name: my_skill
   description: "Skill description"
   instructions: "Instructions injected into system prompt"
   always_apply: false
 
-# Theme slot fields (required for slot: theme)
-theme:                            # Only if slot: theme
+# Theme 位字段（slot: theme 必需）
+theme:                            # 仅当 slot: theme
   variables:
     --primary: "#3B82F6"
     --background: "#0F172A"
 
-# Permissions (required)
+# 权限（必需）
 permissions:
   - fs.read
   - network.http
 
-# Dependencies (optional)
+# 依赖（可选）
 dependencies:
   agenthub: "^1.0.0"
-requires:                         # Plugin dependencies
+requires:                         # 插件依赖
   mcp-bridge: ">=0.3.0"
 
-# Metadata (optional)
+# 元数据（可选）
 tags: [database, productivity]
 homepage: https://github.com/author/my-plugin
-priority: 0                       # Slot ordering, higher = first
+priority: 0                       # 位顺序，越高越靠前
 ```
 
-### 5.3 Plugin SDK
+### 5.3 插件 SDK
 
-Each plugin type gets a focused SDK:
+每种插件类型获得一个专注的 SDK：
 
-**UI plugins** (`@agenthub/plugin-sdk/ui`):
+**UI 插件**（`@agenthub/plugin-sdk/ui`）：
 
 ```typescript
 import { createPlugin, PluginAPI } from "@agenthub/plugin-sdk/ui"
 
 export default createPlugin({
   mount(container: HTMLElement, api: PluginAPI) {
-    // Render React/Preact/Svelte/Vanilla into container
-    // api.rpc(), api.context, api.onContextChange() available
+    // 将 React/Preact/Svelte/Vanilla 渲染到 container
+    // api.rpc()、api.context、api.onContextChange() 可用
   },
   unmount(container: HTMLElement) {
-    // Cleanup
+    // 清理
   }
 })
 ```
 
-**Tool plugins** (`@agenthub/plugin-sdk/tool`):
+**Tool 插件**（`@agenthub/plugin-sdk/tool`）：
 
 ```typescript
 import { defineTool } from "@agenthub/plugin-sdk/tool"
@@ -426,13 +426,13 @@ export default defineTool({
   description: "Summarize recent git commits",
   parameters: { ... },
   async execute(params, context) {
-    // context.project, context.session, context.secrets
+    // context.project、context.session、context.secrets
     return { summary: "..." }
   }
 })
 ```
 
-**Skill plugins** (`@agenthub/plugin-sdk/skill`):
+**Skill 插件**（`@agenthub/plugin-sdk/skill`）：
 
 ```typescript
 import { defineSkill } from "@agenthub/plugin-sdk/skill"
@@ -440,42 +440,42 @@ import { defineSkill } from "@agenthub/plugin-sdk/skill"
 export default defineSkill({
   name: "python_style_guide",
   instructions: "When writing Python: use type hints...",
-  // Optional: dynamic instructions based on context
+  // 可选：基于上下文的动态指令
   async getInstructions(context) {
     if (context.project.language === "python") {
       return "Full Python style guide ..."
     }
-    return null  // skill not applicable
+    return null  // skill 不适用
   }
 })
 ```
 
-### 5.4 Plugin Hook System
+### 5.4 插件 Hook 系统
 
-Adapted from OpenCode's 19-hook bidirectional model (opencode.md Section 1.2):
+适配自 OpenCode 的 19-hook 双向模型（opencode.md 第 1.2 节）：
 
-Hooks use the `(input, output) => void` bidirectional pattern. All hooks are optional.
+Hooks 使用 `(input, output) => void` 双向模式。所有 hooks 均为可选。
 
-| Hook | When | Input | Output (mutable) |
+| Hook | 何时触发 | Input | Output（可变） |
 |------|------|-------|-----------------|
-| `agent.before_start` | Before agent turn begins | session, prompt | prompt (modified), system_prompt (appended) |
-| `agent.after_turn` | After agent turn completes | session, messages, result | summary |
-| `tool.before_execute` | Before any tool executes | tool_name, args, session | args (modified), block (set true to deny) |
-| `tool.after_execute` | After tool completes | tool_name, args, result, session | result (modified), metadata |
-| `message.received` | New user message received | session, message | message (modified) |
-| `message.before_send` | Before message sent to LLM | session, messages | messages (transformed) |
-| `permission.ask` | Agent requests permission | tool_name, details | decision: "allow" / "deny" / "ask_user" |
-| `session.compacting` | Before context compaction | session, context | instructions (appended to compaction prompt) |
-| `theme.change` | Theme changed | theme (dark/light) | N/A (notify only) |
+| `agent.before_start` | Agent turn 开始前 | session, prompt | prompt（修改后）、system_prompt（追加） |
+| `agent.after_turn` | Agent turn 完成后 | session, messages, result | summary |
+| `tool.before_execute` | 任何工具执行前 | tool_name, args, session | args（修改后）、block（设为 true 以拒绝） |
+| `tool.after_execute` | 工具完成后 | tool_name, args, result, session | result（修改后）、metadata |
+| `message.received` | 收到新用户消息 | session, message | message（修改后） |
+| `message.before_send` | 消息发送到 LLM 前 | session, messages | messages（转换后） |
+| `permission.ask` | Agent 请求权限 | tool_name, details | decision: "allow" / "deny" / "ask_user" |
+| `session.compacting` | 上下文压缩前 | session, context | instructions（追加到压缩提示词） |
+| `theme.change` | 主题变更 | theme（dark/light） | N/A（仅通知） |
 
-Hooks are registered in the plugin's `mount()` or module export:
+Hooks 在插件的 `mount()` 或模块导出中注册：
 
 ```typescript
 export default createPlugin({
   mount(container, api) {
     api.hooks.on("tool.before_execute", ({ args }, output) => {
       if (args.file_path && !args.file_path.startsWith("/safe/")) {
-        output.block = true  // block unsafe file access
+        output.block = true  // 阻止不安全文件访问
       }
     })
   }
@@ -484,114 +484,114 @@ export default createPlugin({
 
 ---
 
-## 6. Security Review Pipeline
+## 6. 安全审查管线
 
-### 6.1 Automated Checks (Install Time)
+### 6.1 自动检查（安装时）
 
-| Check | Description | Reference |
+| 检查 | 描述 | 参考 |
 |-------|-------------|-----------|
-| **Manifest validation** | Required fields, regex, path traversal check | CloudCLI L52-94 |
-| **Permission audit** | Verify declared permissions match actual API usage (best-effort static analysis) | -- |
-| **npm audit** | Run `npm audit` on plugin dependencies | CloudCLI L341 `--ignore-scripts` |
-| **Known vulnerability scan** | Check plugin version against CVE database | -- |
-| **Malicious pattern detection** | Scan for `eval()`, `child_process.exec()`, `fetch()` to unknown domains | -- |
-| **Code signing** (future) | Verify plugin publisher signature | -- |
+| **Manifest 验证** | 必需字段、正则、路径遍历检查 | CloudCLI L52-94 |
+| **权限审计** | 验证声明权限匹配实际 API 使用（尽力静态分析） | -- |
+| **npm audit** | 对插件依赖运行 `npm audit` | CloudCLI L341 `--ignore-scripts` |
+| **已知漏洞扫描** | 对照 CVE 数据库检查插件版本 | -- |
+| **恶意模式检测** | 扫描 `eval()`、`child_process.exec()`、对未知域的 `fetch()` | -- |
+| **代码签名**（未来） | 验证插件发布者签名 | -- |
 
-### 6.2 Runtime Sandboxing
+### 6.2 运行时沙箱
 
-| Slot Type | Sandbox Level | Mechanism |
+| 位类型 | 沙箱级别 | 机制 |
 |-----------|-------------|-----------|
-| `tab` / `panel` / `toolbar` | **iframe isolation** | Plugin UI runs in sandboxed iframe with `sandbox="allow-scripts"`, communication via `postMessage` bridge |
-| `tool` | **Worker thread** (Node.js) or **WASM** (browser) | Isolated execution context, no fs/network by default |
-| `skill` | **Prompt-only** | No code execution; instructions injected as text |
-| `theme` | **CSS-only** | Parsed & sanitized CSS, no `url()` to external resources |
+| `tab` / `panel` / `toolbar` | **iframe 隔离** | 插件 UI 在沙箱 iframe 中运行，使用 `sandbox="allow-scripts"`，通过 `postMessage` 桥通信 |
+| `tool` | **Worker thread**（Node.js）或 **WASM**（浏览器） | 隔离执行上下文，默认无 fs/network |
+| `skill` | **仅提示词** | 无代码执行；指令以文本方式注入 |
+| `theme` | **仅 CSS** | 解析并消毒 CSS，不包含对外部资源的 `url()` |
 
-### 6.3 Plugin Server Sidecar Isolation
+### 6.3 Plugin Server Sidecar 隔离
 
-For plugins with a `server` entry (CloudCLI pattern):
+对于有 `server` entry 的插件（CloudCLI 模式）：
 
-- **Environment**: only `PATH`, `HOME`, `NODE_ENV`, `PLUGIN_NAME` injected (CloudCLI L32-37)
-- **Network**: localhost-only (`127.0.0.1`), OS-assigned port
-- **Secrets**: per-plugin secrets injected as `X-Plugin-Secret-*` request headers (CloudCLI L244-246)
-- **Process lifecycle**: SIGTERM (5s) → SIGKILL two-phase shutdown (CloudCLI L111-136)
-- **Startup timeout**: 10s ready signal (CloudCLI L44-50)
-- **Concurrency guard**: Map<name, Promise> prevents duplicate starts (CloudCLI L21-23)
+- **环境**: 仅注入 `PATH`、`HOME`、`NODE_ENV`、`PLUGIN_NAME`（CloudCLI L32-37）
+- **网络**: 仅 localhost（`127.0.0.1`），操作系统分配的端口
+- **密钥**: 各插件密钥注入为 `X-Plugin-Secret-*` 请求头（CloudCLI L244-246）
+- **进程生命周期**: SIGTERM（5s）→ SIGKILL 两阶段关闭（CloudCLI L111-136）
+- **启动超时**: 10s ready 信号（CloudCLI L44-50）
+- **并发保护**: Map<name, Promise> 防止重复启动（CloudCLI L21-23）
 
-### 6.4 Review Process for Published Plugins
+### 6.4 已发布插件的审查流程
 
 ```
-1. Automated checks pass
-2. Manual review required if:
-   - plugin requests system.process.spawn or fs.exec
-   - plugin has native (binary) dependencies
-   - plugin's npm dependencies include packages with known vulnerabilities
-3. Reviewed plugins marked as "verified" in marketplace
-4. Unreviewed plugins shown with "community" badge + clear warning
+1. 自动检查通过
+2. 需要人工审查的条件:
+   - 插件请求 system.process.spawn 或 fs.exec
+   - 插件具有原生（二进制）依赖
+   - 插件的 npm 依赖包含已知漏洞的包
+3. 已审查的插件在市场中标为 "verified"
+4. 未审查的插件显示 "community" 徽章 + 明确警告
 ```
 
 ---
 
-## 7. MCP Export (The Three-Tier Upgrade Chain)
+## 7. MCP 导出（三层升级链）
 
-From Langflow's three-tier model (langflow.md Section 4):
+来自 Langflow 的三层模型（langflow.md 第 4 节）：
 
 ```
-Tier 1: Plugin tool (internal to AgentHub)
-  slot: tool  →  registered in Agent tool registry
+Tier 1: Plugin tool（AgentHub 内部）
+  slot: tool  →  注册在 Agent tool 注册表中
 
-Tier 2: Agent tool (exposed to AgentHub agents)
-  tool_mode: true  →  agent can call this tool in turns
-  (automatic: any slot=tool plugin is agent-visible)
+Tier 2: Agent tool（对 AgentHub agent 暴露）
+  tool_mode: true  →  agent 可在 turns 中调用此工具
+  （自动: 任何 slot=tool 插件对 agent 可见）
 
-Tier 3: MCP tool (exposed to external MCP clients)
-  export_mcp: true  →  tool appears in MCP tools/list
-  (AgentHub MCP server exposes plugin tools to Claude Code, Codex, etc.)
+Tier 3: MCP tool（对外部 MCP 客户端暴露）
+  export_mcp: true  →  工具出现在 MCP tools/list 中
+  （AgentHub MCP server 将插件工具暴露给 Claude Code、Codex 等）
 ```
 
-A plugin developer writes a tool once. The same tool definition serves as:
-1. An internal AgentHub tool (for Hub-level automation)
-2. An Agent-callable tool (for user-facing agents)
-3. An MCP tool (for external AI tools connecting via MCP)
+插件开发者编写一次工具。同一工具定义同时作为：
+1. 内部 AgentHub 工具（用于 Hub 级自动化）
+2. Agent 可调用工具（用于面向用户的 agent）
+3. MCP 工具（用于通过 MCP 连接的外部 AI 工具）
 
-No code changes required. This is the key insight from Langflow's `tool_mode=True` pattern adapted to AgentHub's Runner model.
+无需代码变更。这是 Langflow `tool_mode=True` 模式应用于 AgentHub Runner 模型的关键洞察。
 
 ---
 
-## 8. Comparison: AgentHub Plugin vs Reference Implementations
+## 8. 对比: AgentHub 插件 vs 参考实现
 
-| Dimension | CloudCLI | OpenCode | LibreChat | Langflow | **AgentHub (synthesized)** |
+| 维度 | CloudCLI | OpenCode | LibreChat | Langflow | **AgentHub（综合）** |
 |-----------|----------|----------|-----------|----------|---------------------------|
-| **Slots** | 1 (tab) | N/A (hooks only) | N/A | Sidebar + Canvas | 6 (tab, panel, toolbar, tool, skill, theme) |
-| **Registration** | manifest.json + git clone | init() + dynamic import | N/A | dynamic import + component_index | init() + manifest.yaml + remote registry |
-| **Permissions** | String array | Hierarchical merge (agent/user config) | Role-based sharing | N/A (same process) | Three-tier intersection (manifest/user/policy) |
-| **Install** | Atomic (tmp + rename) | Bun dynamic import + retry | N/A | N/A (monorepo) | Atomic + backup + rollback |
-| **Hook system** | None (RPC only) | 19 bidirectional hooks | N/A | Graph lifecycle events | 9 essential bidirectional hooks |
-| **Sandboxing** | Process isolation | TUI/server separation | N/A | Same process | Iframe (UI) + Worker (tool) + Process (sidecar) |
-| **MCP export** | None | MCP as first-class citizen | MCP manager singleton | Three-tier (Agentic/Project/External) | Three-tier upgrade chain |
-| **Marketplace** | None | None | Agent grid + virtualized + sharing | Sidebar + Fuse.js search | Grid + virtualized + category + Fuse.js + sharing |
+| **位** | 1（tab） | N/A（仅 hooks） | N/A | Sidebar + Canvas | 6（tab、panel、toolbar、tool、skill、theme） |
+| **注册** | manifest.json + git clone | init() + dynamic import | N/A | dynamic import + component_index | init() + manifest.yaml + 远程注册表 |
+| **权限** | String array | Hierarchical merge（agent/user config） | Role-based sharing | N/A（同进程） | Three-tier intersection（manifest/user/policy） |
+| **安装** | Atomic（tmp + rename） | Bun dynamic import + retry | N/A | N/A（monorepo） | Atomic + backup + rollback |
+| **Hook 系统** | None（仅 RPC） | 19 bidirectional hooks | N/A | Graph lifecycle events | 9 essential bidirectional hooks |
+| **沙箱** | Process isolation | TUI/server separation | N/A | Same process | Iframe（UI）+ Worker（tool）+ Process（sidecar） |
+| **MCP 导出** | None | MCP as first-class citizen | MCP manager singleton | Three-tier（Agentic/Project/External） | Three-tier upgrade chain |
+| **市场** | None | None | Agent grid + virtualized + sharing | Sidebar + Fuse.js search | Grid + virtualized + category + Fuse.js + sharing |
 
 ---
 
-## 9. Implementation Priority
+## 9. 实现优先级
 
-| Phase | Task | Source Pattern |
+| 阶段 | 任务 | 来源模式 |
 |-------|------|---------------|
-| **P0** | Manifest schema + validation | CloudCLI L52-94 |
-| **P0** | Plugin registry (init + manifest scan) | design-adapter-sdk.md Section 3 |
-| **P0** | Atomic install + uninstall | CloudCLI L250-368 |
-| **P0** | Permission model (declaration + gate) | OpenCode L152-158 + CloudCLI L131 |
-| **P1** | UI slot runtime (tab/panel/toolbar) | CloudCLI PluginTabContent |
-| **P1** | Tool/Skill slot runtime | OpenCode tool hook + librechat skill injection |
-| **P1** | Server sidecar + ready protocol + RPC proxy | CloudCLI Section 2.5 + 2.7 |
-| **P1** | Plugin SDK (npm packages) | design-adapter-sdk.md App A |
-| **P2** | Marketplace UI (grid + search + detail) | LibreChat Section 1.6 |
-| **P2** | Hook system (9 hooks) | OpenCode Section 1.2 |
-| **P2** | MCP export tier | Langflow Section 4 |
-| **P2** | Security review pipeline | Section 6 above |
-| **P3** | Plugin-to-plugin dependencies | -- |
+| **P0** | Manifest schema + 验证 | CloudCLI L52-94 |
+| **P0** | Plugin registry（init + manifest scan） | design-adapter-sdk.md 第 3 节 |
+| **P0** | 原子安装 + 卸载 | CloudCLI L250-368 |
+| **P0** | 权限模型（声明 + 关口） | OpenCode L152-158 + CloudCLI L131 |
+| **P1** | UI 位运行时（tab/panel/toolbar） | CloudCLI PluginTabContent |
+| **P1** | Tool/Skill 位运行时 | OpenCode tool hook + librechat skill injection |
+| **P1** | Server sidecar + ready 协议 + RPC proxy | CloudCLI 第 2.5 + 2.7 节 |
+| **P1** | Plugin SDK（npm packages） | design-adapter-sdk.md App A |
+| **P2** | 市场 UI（grid + search + detail） | LibreChat 第 1.6 节 |
+| **P2** | Hook 系统（9 hooks） | OpenCode 第 1.2 节 |
+| **P2** | MCP export tier | Langflow 第 4 节 |
+| **P2** | 安全审查管线 | 上文第 6 节 |
+| **P3** | 插件间依赖 | -- |
 | **P3** | Code signing + verification | -- |
-| **P3** | Remote plugin registry service | -- |
+| **P3** | 远程插件注册表服务 | -- |
 
 ---
 
-*Design complete. 2026-05-21.*
+*设计完成。2026-05-21。*

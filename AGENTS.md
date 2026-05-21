@@ -198,7 +198,7 @@ AgentHub/
 ### 自检命令
 
 ```powershell
-Select-String -Path .\README.md,.\README_EN.md,.\AGENTS.md,.\docs\*.md,.\docs\reference\README.md -Pattern (('README_Z' + 'H') + '|MVP')
+Select-String -Path .\README.md,.\README_EN.md,.\AGENTS.md,.\docs\*.md,.\docs\reference\README.md -Pattern ('README_Z' + 'H')
 git diff --check
 git status --short --branch
 ```

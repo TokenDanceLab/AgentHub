@@ -115,7 +115,7 @@ AgentHub/
 ├── packages/               # 共享 Go + TS 库
 ├── proto/                  # Protobuf Schema（唯一协议源）
 ├── docs/                   # 架构 + 调研文档
-│   └── reference/          # 68 份调研文档，包含 Multica Tier-0 参考
+│   └── reference/          # 69 份调研和工程规格文档，包含 Multica Tier-0 参考
 ├── .githooks/              # commit-msg + prepare-commit-msg
 └── .agenthub/              # 项目记忆和规则
 ```
@@ -132,7 +132,7 @@ AgentHub/
 | [文档语言规则](docs/language-policy.md) | 哪些文档中文优先，哪些内容保留英文 |
 | [中文化路线图](docs/chinese-documentation-roadmap.md) | 交给 DeepSeek 等低成本模型分批翻译和校对的执行清单 |
 | [DeepSeek 交接文档](docs/deepseek-handoff.md) | 可直接复制给 DeepSeek 执行的任务说明和验收要求 |
-| [调研索引](docs/reference/) | 68 份跨仓库深度分析，Agent 友好的四层结构 |
+| [调研索引](docs/reference/) | 69 份跨仓库深度分析和工程规格，Agent 友好的四层结构 |
 | [实现路线图](docs/reference/04-plan/01-research-to-implementation.md) | P0 最小系统、优先级矩阵、调研到代码映射 |
 | [Protocol Schema](docs/reference/03-build/backend/13-protobuf-schema.md) | 6 个 .proto 文件 + buf.gen.yaml |
 
