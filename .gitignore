@@ -31,3 +31,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Cloned reference repos
+reference/
