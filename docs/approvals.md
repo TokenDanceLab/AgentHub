@@ -1,14 +1,14 @@
-# AgentHub Approvals
+# AgentHub 审批
 
-Date: 2026-05-21
+日期：2026-05-21
 
-## Principle
+## 原则
 
-Approval is both a safety mechanism and a product affordance.
+审批既是安全机制，也是产品能力。
 
-AgentHub should surface risky actions as inline approval cards in the Thread.
+AgentHub 应将风险动作以内联审批卡片的形式展示在 Thread 中。
 
-## Approval Request
+## 审批请求
 
 ```ts
 type ApprovalRequest = {
@@ -30,30 +30,30 @@ type ApprovalDecision =
   | { type: "cancel" }
 ```
 
-## P0 Scope
+## P0 范围
 
-P0 supports command approvals:
+P0 支持命令审批：
 
 ```text
-[Claude Code requests command]
+[Claude Code 请求执行命令]
 pnpm install && pnpm test
 
-[Allow once] [Allow for Thread] [Decline] [Edit command]
+[允许本次] [允许本 Thread] [拒绝] [编辑命令]
 ```
 
-## Risk Rules
+## 风险规则
 
-High-risk actions include:
+高风险动作包括：
 
 - `sudo`
 - `rm -rf`
 - `curl | sh`
-- reading `.env`
-- reading `~/.ssh`
+- 读取 `.env`
+- 读取 `~/.ssh`
 - `git push`
-- deploy commands
-- writing outside workspace root
+- 部署命令
+- 写入 workspace 根目录之外
 
-## Authority
+## 权威
 
-Edge evaluates approval policy and records decisions. Runner pauses execution while waiting for approval and resumes only after Edge returns an accepted decision.
+Edge 评估审批策略并记录决策。Runner 在等待审批时暂停执行，仅在 Edge 返回 accepted 决策后恢复。

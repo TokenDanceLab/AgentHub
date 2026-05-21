@@ -1,10 +1,10 @@
-# AgentHub Architecture
+# AgentHub 架构
 
 ## Hub-Edge-Runner 架构总览
 
 ```mermaid
 graph TB
-    subgraph Desktop["Desktop Edge Node"]
+    subgraph Desktop["Desktop Edge 节点"]
         UI["apps/web UI"]
         Edge["services/edge-server<br/>Edge Server"]
         R["services/runner<br/>Runner"]
@@ -41,20 +41,20 @@ graph TB
         Auth["auth/ 登录/OAuth"]
         User["user/ 用户"]
         Device["device/ 设备管理"]
-        Contact["contact/ 好友/Agent联系人"]
+        Contact["contact/ 好友/Agent 联系人"]
         IM["im/ 单聊/群聊/消息路由"]
-        Sync["sync/ Edge同步"]
-        Relay["relay/ Hub↔Edge命令中继"]
+        Sync["sync/ Edge 同步"]
+        Relay["relay/ Hub↔Edge 命令中继"]
         Orch["orchestrator/ 云端调度"]
-        Reg["runner-registry/ Edge/Runner注册"]
-        Art["artifact/ 云端artifact"]
-        Mem["memory/ 云端Memory"]
+        Reg["runner-registry/ Edge/Runner 注册"]
+        Art["artifact/ 云端 artifact"]
+        Mem["memory/ 云端 Memory"]
         WSG["ws-gateway/ Web/Mobile WSS"]
         Store["store/ PostgreSQL/SQLite"]
     end
 ```
 
-**Hub 是中心控制面和云端 IM 权威**：用户账号、好友关系、云端群聊、多端同步、Edge 节点注册、权限和远程控制中继。
+**Hub 是中心控制面和云端 IM 权威**：负责用户账号、好友关系、云端群聊、多端同步、Edge 节点注册、权限和远程控制中继。
 
 ### Edge Server（边缘控制节点）
 
@@ -65,10 +65,10 @@ graph TB
         WS["local-ws/ Desktop UI WebSocket"]
         Store["local-store/ SQLite"]
         IM["im-lite/ 本地会话/消息"]
-        HC["hub-client/ 连Hub"]
-        SC["sync-client/ 消息/Memory同步"]
+        HC["hub-client/ 连 Hub"]
+        SC["sync-client/ 消息/Memory 同步"]
         Orch["local-orchestrator/ 本地调度"]
-        RM["runner-manager/ Runner管理"]
+        RM["runner-manager/ Runner 管理"]
         CB["context-builder/ 上下文构造"]
         AI["artifact-index/ 本地产物"]
         Mem["memory/ .agenthub Markdown"]

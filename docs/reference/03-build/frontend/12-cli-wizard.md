@@ -1,39 +1,39 @@
-# AgentHub CLI Command System & Installation Wizard
+# AgentHub CLI 命令系统与安装向导
 
-> Date: 2026-05-21
-> Based on: design-desktop-ux.md (Section 1, 5), design-go-services.md (cmd/ design), design-adapter-sdk.md (registration), web-research-tech-stack.md (Tauri + cobra)
-> Web research: DataRobot `dr start`, Canopy IDE auto-detect, AgentWire 3-question wizard, Turbo Flow wizard.sh, @itz4blitz/agentful `/agentful-init`
+> 日期: 2026-05-21
+> 依据: design-desktop-ux.md（第 1、5 节）、design-go-services.md（cmd/ 设计）、design-adapter-sdk.md（注册）、web-research-tech-stack.md（Tauri + cobra）
+> Web 调研: DataRobot `dr start`、Canopy IDE 自动检测、AgentWire 3 问向导、Turbo Flow wizard.sh、@itz4blitz/agentful `/agentful-init`
 
 ---
 
-## 1. CLI Architecture
+## 1. CLI 架构
 
-### 1.1 Binary Identity
+### 1.1 二进制身份
 
-The Go binary `agenthub` serves three roles:
+Go 二进制 `agenthub` 承担三种角色：
 
-| Role | Context | Entry Point |
+| 角色 | 上下文 | 入口点 |
 |------|---------|-------------|
-| **CLI tool** | User runs directly in terminal | `cmd/agenthub/main.go` (cobra root) |
-| **Tauri sidecar** | Launched by Tauri desktop app via shell plugin | Same binary, `agenthub serve` mode |
-| **Background daemon** | Edge + Runner running as long-lived process | `agenthub serve --daemon` |
+| **CLI 工具** | 用户在终端直接运行 | `cmd/agenthub/main.go`（cobra root） |
+| **Tauri sidecar** | 通过 shell 插件由 Tauri 桌面应用启动 | 同一二进制，`agenthub serve` 模式 |
+| **后台守护进程** | Edge + Runner 作为长期运行进程 | `agenthub serve --daemon` |
 
-A single binary, three personalities. The Tauri shell plugin spawns `agenthub serve` as a sidecar, reads the `LISTEN_PORT=<n>` stdout line, then the React frontend communicates with it over `http://127.0.0.1:<n>`.
+单一二进制，三种人格。Tauri shell 插件将 `agenthub serve` 作为 sidecar 启动，读取 `LISTEN_PORT=<n>` stdout 行，随后 React 前端通过 `http://127.0.0.1:<n>` 与之通信。
 
-### 1.2 Cobra Command Tree
+### 1.2 Cobra 命令树
 
 ```
 agenthub
-├── init              # First-run wizard
-├── doctor            # Environment diagnostic
-├── serve             # Start Edge + Runner (background)
-├── hub               # Connect to remote Hub
-├── run               # Single prompt execution
-├── logs              # Tail execution logs
-├── status            # View running tasks
-├── stop              # Stop a running task
-├── config            # Manage configuration
-└── version           # Print version info
+├── init              # 首次运行向导
+├── doctor            # 环境诊断
+├── serve             # 启动 Edge + Runner（后台）
+├── hub               # 连接到远程 Hub
+├── run               # 单次提示词执行
+├── logs              # 跟踪执行日志
+├── status            # 查看运行中任务
+├── stop              # 停止运行中任务
+├── config            # 管理配置
+└── version           # 打印版本信息
 ```
 
 `cmd/agenthub/main.go`:
@@ -87,44 +87,44 @@ func init() {
 }
 ```
 
-### 1.3 Global Flags
+### 1.3 全局标志
 
-All commands share these persistent flags:
+所有命令共享以下持久标志：
 
-| Flag | Env Var | Default | Description |
+| 标志 | 环境变量 | 默认值 | 描述 |
 |------|---------|---------|-------------|
-| `--config` | `AGENTHUB_CONFIG` | `~/.agenthub/config.yaml` | Path to config file |
-| `--data-dir` | `AGENTHUB_DATA_DIR` | `~/.agenthub/` | Data directory (DB, logs, runtime) |
-| `--verbose` | `AGENTHUB_VERBOSE` | `false` | Enable debug logging |
-| `--json` | -- | `false` | Output as JSON (for scripting) |
+| `--config` | `AGENTHUB_CONFIG` | `~/.agenthub/config.yaml` | 配置文件路径 |
+| `--data-dir` | `AGENTHUB_DATA_DIR` | `~/.agenthub/` | 数据目录（DB、日志、运行时） |
+| `--verbose` | `AGENTHUB_VERBOSE` | `false` | 启用调试日志 |
+| `--json` | -- | `false` | 以 JSON 输出（用于脚本） |
 
 ---
 
-## 2. Command Specifications
+## 2. 命令规格
 
-### 2.1 `agenthub init` -- First-Run Wizard
+### 2.1 `agenthub init` -- 首次运行向导
 
-Reference: AgentWire (3-question minimal), Turbo Flow (project type + feature selection), @itz4blitz/agentful (7-question interactive).
+参考: AgentWire（3 个最小问题）、Turbo Flow（项目类型 + 功能选择）、@itz4blitz/agentful（7 问交互式）。
 
-**3-step interactive wizard.** Runs automatically on first `agenthub serve` if no config exists.
+**3 步交互式向导。** 首次 `agenthub serve` 时若无配置则自动运行。
 
 ```
 agenthub init [flags]
 
 Flags:
-  --non-interactive     Skip prompts, use defaults + env vars
-  --accept-defaults     Accept all auto-detected defaults
-  --workspace <path>    Default workspace path
-  --force               Overwrite existing config
-  --skip-agent-check    Skip CLI binary detection (offline mode)
+  --non-interactive     跳过提示，使用默认值 + 环境变量
+  --accept-defaults     接受所有自动检测的默认值
+  --workspace <path>    默认工作区路径
+  --force               覆盖现有配置
+  --skip-agent-check    跳过 CLI 二进制检测（离线模式）
 
 Aliases:
   agenthub setup
 ```
 
-#### Step 1: Environment Detection
+#### 第 1 步：环境检测
 
-Auto-detects and displays:
+自动检测并显示：
 
 ```
 AgentHub Setup
@@ -142,7 +142,7 @@ Step 1/3: Environment Detection
   [Enter to continue, or type agent name to configure]
 ```
 
-Detection logic (Go implementation):
+检测逻辑（Go 实现）：
 
 ```go
 // cli/internal/detect/detect.go
@@ -152,7 +152,7 @@ type DetectionResult struct {
     Found    bool   `json:"found"`
     Version  string `json:"version,omitempty"`
     Path     string `json:"path,omitempty"`
-    Hint     string `json:"hint,omitempty"`   // install hint if not found
+    Hint     string `json:"hint,omitempty"`   // 未找到时的安装提示
 }
 
 func DetectAll() []DetectionResult {
@@ -165,7 +165,7 @@ func DetectAll() []DetectionResult {
 }
 ```
 
-If a binary is missing, show inline install hint (Canopy IDE pattern):
+若二进制缺失，显示内联安装提示（Canopy IDE 模式）：
 
 ```
   Codex CLI          NOT FOUND
@@ -173,7 +173,7 @@ If a binary is missing, show inline install hint (Canopy IDE pattern):
     Skip for now? [Y/n]
 ```
 
-#### Step 2: API Key Configuration
+#### 第 2 步：API 密钥配置
 
 ```
 Step 2/3: API Keys
@@ -188,19 +188,19 @@ Step 2/3: API Keys
   [Enter to continue]
 ```
 
-Key storage:
+密钥存储：
 
 ```yaml
-# ~/.agenthub/secrets.yaml (permissions: 0600)
+# ~/.agenthub/secrets.yaml（权限: 0600）
 anthropic_api_key: "sk-ant-..."
 openai_api_key: "sk-..."
 ```
 
-Secrets are NEVER stored in `config.yaml`. The `secrets.yaml` file is `.gitignore`-d by convention and created with `0600` permissions on Unix (Windows: restricted ACL).
+密钥绝不在 `config.yaml` 中存储。`secrets.yaml` 文件遵循 `.gitignore` 惯例，在 Unix 上以 `0600` 权限（Windows：受限 ACL）创建。
 
-Validation: each key is tested with a lightweight API call (e.g., `claude -p "say hi" --max-turns 1` for Anthropic, `codex exec --prompt "say hi" --max-turns 1` for OpenAI). If validation fails, show the error and allow re-entry.
+验证：每个密钥通过轻量 API 调用测试（如 Anthropic 使用 `claude -p "say hi" --max-turns 1`，OpenAI 使用 `codex exec --prompt "say hi" --max-turns 1`）。若验证失败，显示错误并允许重新输入。
 
-#### Step 3: Default Workspace
+#### 第 3 步：默认工作区
 
 ```
 Step 3/3: Default Workspace
@@ -213,9 +213,9 @@ Step 3/3: Default Workspace
   (You can add more workspaces later with 'agenthub config workspace add')
 ```
 
-If the detected path does not exist, offer to create it.
+若检测到的路径不存在，提示创建。
 
-#### Completion
+#### 完成
 
 ```
 Setup Complete!
@@ -232,7 +232,7 @@ Setup Complete!
     agenthub run -p "explain this project"   Try a quick prompt
 ```
 
-Generated `~/.agenthub/config.yaml`:
+生成的 `~/.agenthub/config.yaml`：
 
 ```yaml
 # AgentHub configuration
@@ -273,34 +273,34 @@ logging:
   file: ~/.agenthub/logs/agenthub.log
 ```
 
-#### Non-Interactive Mode
+#### 非交互模式
 
 ```
 agenthub init --non-interactive --workspace /home/user/Projects
 ```
 
-Reads API keys from environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`), auto-detects binaries, accepts defaults. Fails with clear error messages if prerequisites are missing (AgentWire pattern: interactive 15+ questions reduced to 3, `--non-interactive` flag for scripting).
+从环境变量（`ANTHROPIC_API_KEY`、`OPENAI_API_KEY`）读取 API 密钥，自动检测二进制，接受默认值。若缺少先行条件则失败并给出明确错误信息（AgentWire 模式：交互式 15+ 问题精简为 3 个，`--non-interactive` 标志用于脚本）。
 
 ---
 
-### 2.2 `agenthub doctor` -- Diagnostic
+### 2.2 `agenthub doctor` -- 诊断
 
-Reference: Canopy IDE auto-detect pattern (detect Claude/Codex/Gemini CLI availability).
+参考: Canopy IDE 自动检测模式（检测 Claude/Codex/Gemini CLI 可用性）。
 
 ```
 agenthub doctor [flags]
 
 Flags:
-  --json          Output as JSON (default for scripting)
-  --check-ports   Also check port availability
-  --fix           Attempt to auto-fix common issues
+  --json          以 JSON 输出（脚本默认）
+  --check-ports   同时检查端口可用性
+  --fix           尝试自动修复常见问题
 
 Aliases:
   agenthub check
   agenthub diagnose
 ```
 
-#### Human-Readable Output
+#### 人类可读输出
 
 ```
 AgentHub Doctor
@@ -323,12 +323,12 @@ AgentHub Doctor
   [PASS] Data dir     ~/.agenthub/data/ (writable)
   [PASS] Runtime dir  ~/.agenthub/runtime/ (writable)
 
-  [INFO] Git config: user.name="Ding", user.email="..." 
+  [INFO] Git config: user.name="Ding", user.email="..."
 
   8 passed, 1 warning, 0 errors
 ```
 
-#### JSON Output
+#### JSON 输出
 
 ```json
 {
@@ -389,67 +389,67 @@ AgentHub Doctor
 }
 ```
 
-#### Check Items
+#### 检查项目
 
-| Check | Detection Method | Failure Hint |
+| 检查 | 检测方法 | 失败提示 |
 |-------|-----------------|--------------|
-| `claude_code` | `claude --version` (stdout parse) | `npm install -g @anthropic-ai/claude-code` |
-| `codex` | `codex --version` (stdout parse) | `npm install -g @openai/codex` |
+| `claude_code` | `claude --version`（stdout 解析） | `npm install -g @anthropic-ai/claude-code` |
+| `codex` | `codex --version`（stdout 解析） | `npm install -g @openai/codex` |
 | `git` | `git --version` | `https://git-scm.com/downloads` |
 | `go` | `go version` | `https://go.dev/dl/` |
-| `anthropic_key` | `ANTHROPIC_API_KEY` env + lightweight test | Set env var or add to `secrets.yaml` |
-| `openai_key` | `OPENAI_API_KEY` env + lightweight test | Set env var or add to `secrets.yaml` |
-| `ports` | `net.Listen("tcp", ":PORT")` probe | Free the port or configure alternate |
-| `sqlite` | `sql.Open("sqlite", ":memory:")` | Embedded -- should never fail |
-| `directories` | `os.Stat()` + `os.MkdirAll()` test write | Check permissions |
+| `anthropic_key` | `ANTHROPIC_API_KEY` env + 轻量测试 | 设置 env var 或添加到 `secrets.yaml` |
+| `openai_key` | `OPENAI_API_KEY` env + 轻量测试 | 设置 env var 或添加到 `secrets.yaml` |
+| `ports` | `net.Listen("tcp", ":PORT")` 探针 | 释放端口或配置替代端口 |
+| `sqlite` | `sql.Open("sqlite", ":memory:")` | 内嵌 -- 永不应失败 |
+| `directories` | `os.Stat()` + `os.MkdirAll()` 测试写入 | 检查权限 |
 
-#### --fix Mode
+#### --fix 模式
 
 ```
 agenthub doctor --fix
 ```
 
-Auto-fixes:
-- Creates missing `~/.agenthub/` directory structure
-- Sets `0600` permissions on `secrets.yaml`
-- Initializes SQLite WAL database at `~/.agenthub/data/agenthub.db`
-- Generates default `config.yaml` if missing (non-destructive -- prompts if exists)
+自动修复：
+- 创建缺失的 `~/.agenthub/` 目录结构
+- 设置 `secrets.yaml` 的 `0600` 权限
+- 初始化 `~/.agenthub/data/agenthub.db` 的 SQLite WAL 数据库
+- 若缺失则生成默认 `config.yaml`（非破坏性 -- 若已存在则提示）
 
 ---
 
-### 2.3 `agenthub serve` -- Start Edge + Runner
+### 2.3 `agenthub serve` -- 启动 Edge + Runner
 
-Reference: design-go-services.md `cmd/edge/main.go` + `cmd/runner/main.go` (merged into single process for local desktop).
+参考: design-go-services.md `cmd/edge/main.go` + `cmd/runner/main.go`（本地桌面合并为单进程）。
 
 ```
 agenthub serve [flags]
 
 Flags:
-  --edge-port <port>       Edge API port (default: 3210)
-  --runner-port <port>     Runner API port (default: 39731)
-  --hub-url <url>          Connect to remote Hub (optional)
-  --no-browser             Don't open browser on start
-  --daemon                 Run as background daemon (detach from terminal)
-  --log-file <path>        Log file path
-  --dev                    Development mode (verbose logging, CORS *)
+  --edge-port <port>       Edge API 端口（默认: 3210）
+  --runner-port <port>     Runner API 端口（默认: 39731）
+  --hub-url <url>          连接远程 Hub（可选）
+  --no-browser             启动时不打开浏览器
+  --daemon                 作为后台守护进程运行（脱离终端）
+  --log-file <path>        日志文件路径
+  --dev                    开发模式（详细日志、CORS *）
 
 Aliases:
   agenthub start
   agenthub up
 ```
 
-#### Behavior
+#### 行为
 
-1. Load config from `~/.agenthub/config.yaml`
-2. Load secrets from `~/.agenthub/secrets.yaml`
-3. Initialize SQLite database at `~/.agenthub/data/agenthub.db`
-4. Run database migrations
-5. Register built-in adapters (claude-code, codex, opencode)
-6. Discover external adapters from `~/.agenthub/adapters/`
-7. Start Runner HTTP server on `127.0.0.1:39731`
-8. Start Edge HTTP server on `127.0.0.1:3210`
-9. Edge connects to Hub if `--hub-url` provided (reverse WSS)
-10. Print port to stdout for Tauri sidecar detection:
+1. 从 `~/.agenthub/config.yaml` 加载配置
+2. 从 `~/.agenthub/secrets.yaml` 加载密钥
+3. 初始化 `~/.agenthub/data/agenthub.db` 的 SQLite 数据库
+4. 运行数据库迁移
+5. 注册内置 adapter（claude-code、codex、opencode）
+6. 从 `~/.agenthub/adapters/` 发现外部 adapter
+7. 在 `127.0.0.1:39731` 上启动 Runner HTTP 服务器
+8. 在 `127.0.0.1:3210` 上启动 Edge HTTP 服务器
+9. 若提供 `--hub-url`，Edge 连接到 Hub（反向 WSS）
+10. 打印端口到 stdout 供 Tauri sidecar 检测：
 
 ```
 LISTEN_PORT=3210
@@ -459,81 +459,81 @@ AgentHub Edge ready: http://127.0.0.1:3210
   Logs:   ~/.agenthub/logs/agenthub.log
 ```
 
-When launched by Tauri, the Rust side reads `LISTEN_PORT=3210` and connects the webview to `http://127.0.0.1:3210`. When launched from terminal, it optionally opens the browser to the Web UI.
+由 Tauri 启动时，Rust 端读取 `LISTEN_PORT=3210` 并将 webview 连接到 `http://127.0.0.1:3210`。从终端启动时，可选择打开浏览器到 Web UI。
 
-#### Graceful Shutdown
+#### 优雅关闭
 
-- SIGINT/SIGTERM: cancel all running agent processes (SIGTERM with 5s grace, then SIGKILL -- CloudCLI two-phase pattern)
-- Save any pending state to SQLite
-- Close WebSocket connections
-- Exit
+- SIGINT/SIGTERM: 取消所有运行中的 agent 进程（SIGTERM 5s 宽限期，然后 SIGKILL -- CloudCLI 两阶段模式）
+- 将待处理状态保存到 SQLite
+- 关闭 WebSocket 连接
+- 退出
 
-#### Daemon Mode
+#### 守护进程模式
 
 ```
 agenthub serve --daemon
 ```
 
-Detaches from terminal. PID written to `~/.agenthub/runtime/agenthub.pid`. Logs to `~/.agenthub/logs/agenthub.log`.
+脱离终端。PID 写入 `~/.agenthub/runtime/agenthub.pid`。日志写入 `~/.agenthub/logs/agenthub.log`。
 
 ```
-agenthub serve --daemon --stop    # Stop running daemon
-agenthub serve --daemon --status  # Check if daemon is running
+agenthub serve --daemon --stop    # 停止运行中的守护进程
+agenthub serve --daemon --status  # 检查守护进程是否运行
 ```
 
 ---
 
-### 2.4 `agenthub hub` -- Connect to Remote Hub
+### 2.4 `agenthub hub` -- 连接远程 Hub
 
 ```
 agenthub hub [flags]
 
 Flags:
-  --url <url>         Hub server URL (default: from config)
-  --token <token>     Authentication token
-  --register          Register this Edge with the Hub
-  --name <name>       Edge display name
+  --url <url>         Hub server URL（默认: 来自配置）
+  --token <token>     认证 token
+  --register          向 Hub 注册此 Edge
+  --name <name>       Edge 显示名称
 
 Subcommands:
-  agenthub hub connect     Connect to Hub
-  agenthub hub disconnect  Disconnect from Hub
-  agenthub hub status      Show Hub connection status
+  agenthub hub connect     连接到 Hub
+  agenthub hub disconnect  断开 Hub 连接
+  agenthub hub status      显示 Hub 连接状态
 ```
 
-For P1+ Hub integration. In P0 (desktop-only), this is a stub that prints "Hub connection requires AgentHub Hub Server (P1+)."
+用于 P1+ Hub 集成。在 P0（仅桌面），这是一个桩，打印 "Hub connection requires AgentHub Hub Server (P1+)."
 
 ---
 
-### 2.5 `agenthub run` -- Single Prompt Execution
+### 2.5 `agenthub run` -- 单次提示词执行
 
-Reference: `claude -p` headless mode, DataRobot `dr start`.
+参考: `claude -p` 无头模式、DataRobot `dr start`。
 
 ```
 agenthub run [flags]
 
 Flags:
-  -p, --prompt <text>      Prompt to execute (required)
-  -a, --agent <name>       Agent to use: claude-code, codex, opencode (default: claude-code)
-  -m, --model <name>       Model override
-  -w, --workspace <path>   Workspace path (default: config default)
-  --max-turns <n>          Max turns (default: 25)
-  --permission-mode <mode> Permission mode: default, accept-edits, bypass (default: default)
-  -o, --output <format>    Output format: text, stream-json, json (default: text)
-  --no-stream              Disable streaming output
-  --resume <session-id>    Resume a previous session
-  --tools <list>           Allowed tools (comma-separated)
+  -p, --prompt <text>      要执行的提示词（必需）
+  -a, --agent <name>       使用的 Agent: claude-code、codex、opencode（默认: claude-code）
+  -m, --model <name>       模型覆盖
+  -w, --workspace <path>   工作区路径（默认: 配置默认值）
+  --max-turns <n>          最大 turns（默认: 25）
+  --permission-mode <mode> 权限模式: default、accept-edits、bypass（默认: default）
+  -o, --output <format>    输出格式: text、stream-json、json（默认: text）
+  --no-stream              禁用流式输出
+  --resume <session-id>    恢复之前的会话
+  --tools <list>           允许的工具（逗号分隔）
 
 Aliases:
   agenthub exec
   agenthub ask
 ```
 
-#### Behavior
+#### 行为
 
-1. Validates the specified agent is available (binary exists, API key set)
-2. Creates a temporary Run session
-3. Calls the Runner API (`POST /runs`)
-4. Streams output to terminal (or returns structured JSON)
+1. 验证指定 agent 可用（二进制存在、API 密钥已设置）
+2. 创建临时 Run 会话
+3. 调用 Runner API（`POST /runs`）
+4. 将输出流式传输到终端（或返回结构化 JSON）
 
 ```
 $ agenthub run -p "What is 2+2?"
@@ -552,7 +552,7 @@ Created hello.py (14 lines)
 Done. 3 turns, 245 input tokens, 180 output tokens (2.1s)
 ```
 
-#### JSON Output Mode
+#### JSON 输出模式
 
 ```
 agenthub run -p "..." -o json
@@ -579,25 +579,25 @@ agenthub run -p "..." -o json
 
 ---
 
-### 2.6 `agenthub logs` -- Tail Execution Logs
+### 2.6 `agenthub logs` -- 跟踪执行日志
 
 ```
 agenthub logs [run-id] [flags]
 
 Flags:
-  -f, --follow       Follow log output (tail -f)
-  -n, --lines <n>    Number of lines to show (default: 50)
-  --agent <name>     Filter by agent
-  --status <status>  Filter by status (running, completed, failed)
-  --since <time>     Show logs since (e.g., 1h, 30m, 2026-05-21)
+  -f, --follow       跟随日志输出（tail -f）
+  -n, --lines <n>    显示行数（默认: 50）
+  --agent <name>     按 agent 过滤
+  --status <status>  按状态过滤（running、completed、failed）
+  --since <time>     显示自指定时间起的日志（如 1h、30m、2026-05-21）
 
 Aliases:
   agenthub tail
 ```
 
-#### Behavior
+#### 行为
 
-Reads from SQLite `runs` table and/or log files at `~/.agenthub/logs/`.
+从 SQLite `runs` 表和/或 `~/.agenthub/logs/` 中的日志文件读取。
 
 ```
 $ agenthub logs
@@ -620,19 +620,19 @@ Tailing logs for claude-code...
 
 ---
 
-### 2.7 `agenthub status` -- View Running Tasks
+### 2.7 `agenthub status` -- 查看运行中任务
 
 ```
 agenthub status [flags]
 
 Flags:
-  --watch         Watch mode (auto-refresh every 2s)
+  --watch         监视模式（每 2s 自动刷新）
 
 Aliases:
   agenthub ps
 ```
 
-#### Output
+#### 输出
 
 ```
 $ agenthub status
@@ -650,23 +650,23 @@ Agents available:
 
 ---
 
-### 2.8 `agenthub stop` -- Stop a Running Task
+### 2.8 `agenthub stop` -- 停止运行中任务
 
 ```
 agenthub stop <run-id> [flags]
 
 Flags:
-  --all           Stop all running tasks
-  --force         Force kill (SIGKILL, skip graceful shutdown)
+  --all           停止所有运行中任务
+  --force         强制杀死（SIGKILL，跳过优雅关闭）
 
 Aliases:
   agenthub kill
   agenthub cancel
 ```
 
-#### Behavior
+#### 行为
 
-Sends cancel request to Runner API (`DELETE /runs/:id`). Runner sends SIGTERM to agent child process, waits 5s, then SIGKILL if still alive.
+向 Runner API 发送取消请求（`DELETE /runs/:id`）。Runner 向 agent 子进程发送 SIGTERM，等待 5s，若仍存活则 SIGKILL。
 
 ```
 $ agenthub stop run_abc123
@@ -681,33 +681,33 @@ All runs stopped.
 
 ---
 
-### 2.9 `agenthub config` -- Configuration Management
+### 2.9 `agenthub config` -- 配置管理
 
 ```
 agenthub config [subcommand] [flags]
 
 Subcommands:
-  agenthub config show               Show current configuration
-  agenthub config get <key>          Get a specific config value
-  agenthub config set <key> <value>  Set a config value
-  agenthub config workspace          Manage workspaces
-  agenthub config agent              Manage agent configurations
-  agenthub config edit               Open config in $EDITOR
+  agenthub config show               显示当前配置
+  agenthub config get <key>          获取特定配置值
+  agenthub config set <key> <value>  设置配置值
+  agenthub config workspace          管理工作区
+  agenthub config agent              管理 agent 配置
+  agenthub config edit               在 $EDITOR 中打开配置
 
-Workspace subcommands:
+Workspace 子命令:
   agenthub config workspace list
   agenthub config workspace add <path> [--name <name>]
   agenthub config workspace remove <name>
   agenthub config workspace default <name>
 
-Agent subcommands:
+Agent 子命令:
   agenthub config agent list
   agenthub config agent add <name> --binary <path>
   agenthub config agent remove <name>
   agenthub config agent default <name>
 ```
 
-#### Examples
+#### 示例
 
 ```
 $ agenthub config show
@@ -744,14 +744,14 @@ $ agenthub config agent list
 
 ---
 
-### 2.10 `agenthub version` -- Version Info
+### 2.10 `agenthub version` -- 版本信息
 
 ```
 agenthub version [flags]
 
 Flags:
-  --short     Print version number only
-  --json      JSON output
+  --short     仅打印版本号
+  --json      JSON 输出
 ```
 
 ```
@@ -767,97 +767,97 @@ $ agenthub version --json
 
 ---
 
-## 3. `agenthub init` Wizard -- Full Flow Design
+## 3. `agenthub init` 向导 -- 完整流程设计
 
-### 3.1 State Machine
+### 3.1 状态机
 
 ```
               ┌──────────────────────────┐
-              │  Entry: agenthub init     │
+              │  入口: agenthub init       │
               └─────────┬────────────────┘
                         │
               ┌─────────▼────────────────┐
-              │  Check: existing config?  │
-              │  YES (no --force) ────────┼────► "Config exists. Use --force to overwrite."
-              │  NO or --force            │
+              │  检查: 现有配置？          │
+              │  是（无 --force）─────────┼────► "Config exists. Use --force to overwrite."
+              │  否 或 --force            │
               └─────────┬────────────────┘
                         │
               ┌─────────▼────────────────┐
-              │  Step 1: Detect Env       │
-              │  - Find binaries          │
-              │  - Show versions          │
-              │  - Offer install hints    │
+              │  第 1 步: 检测环境         │
+              │  - 查找二进制              │
+              │  - 显示版本                │
+              │  - 提供安装提示            │
               └─────────┬────────────────┘
                         │
               ┌─────────▼────────────────┐
-              │  Step 2: API Keys         │
-              │  - Check env vars first   │
-              │  - Prompt for missing     │
-              │  - Validate each key      │
-              │  - Save to secrets.yaml   │
+              │  第 2 步: API 密钥         │
+              │  - 先检查环境变量          │
+              │  - 提示缺失项              │
+              │  - 验证每个密钥            │
+              │  - 保存到 secrets.yaml     │
               └─────────┬────────────────┘
                         │
               ┌─────────▼────────────────┐
-              │  Step 3: Workspace        │
-              │  - Auto-detect from CWD   │
-              │  - Accept or enter custom │
-              │  - Git repo detection     │
+              │  第 3 步: 工作区            │
+              │  - 从 CWD 自动检测         │
+              │  - 接受或输入自定义         │
+              │  - Git 仓库检测            │
               └─────────┬────────────────┘
                         │
               ┌─────────▼────────────────┐
-              │  Write config.yaml        │
-              │  Write secrets.yaml       │
-              │  Init DB + migrations     │
-              │  Print summary            │
+              │  写入 config.yaml          │
+              │  写入 secrets.yaml         │
+              │  初始化 DB + 迁移          │
+              │  打印摘要                  │
               └──────────────────────────┘
 ```
 
-### 3.2 --non-interactive Flow
+### 3.2 --non-interactive 流程
 
-For CI/CD, Docker, and automated setups:
+用于 CI/CD、Docker 和自动化设置：
 
 ```
 agenthub init --non-interactive [--workspace /path] [--accept-defaults]
 ```
 
-1. Read `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` from environment
-2. Auto-detect binary paths (fail if at least one agent is not found, unless `--skip-agent-check`)
-3. Use `--workspace` if provided, else `$HOME/Projects`, else `$PWD`
-4. Write config and secrets without prompts
-5. Exit 0 on success, exit 1 with message on failure
+1. 从环境变量读取 `ANTHROPIC_API_KEY` 和 `OPENAI_API_KEY`
+2. 自动检测二进制路径（若至少一个 agent 未找到则失败，除非 `--skip-agent-check`）
+3. 使用 `--workspace`（若提供），否则 `$HOME/Projects`，否则 `$PWD`
+4. 无需提示，直接写入配置和密钥
+5. 成功时 exit 0，失败时 exit 1 并附带消息
 
-### 3.3 Tauri Integration
+### 3.3 Tauri 集成
 
-When AgentHub runs as a Tauri desktop app, the "first start" experience uses the same `agenthub init` logic but rendered through the React UI (ProjectSelector / welcome view from design-desktop-ux.md Section 1):
+当 AgentHub 作为 Tauri 桌面应用运行时，"首次启动"体验使用相同的 `agenthub init` 逻辑，但通过 React UI 渲染（来自 design-desktop-ux.md 第 1 节的 ProjectSelector / 欢迎视图）：
 
-1. Tauri spawns `agenthub serve` as sidecar
-2. If no config exists, `agenthub serve` returns a special stdout line: `SETUP_REQUIRED=1`
-3. Tauri reads this and shows the React welcome/setup flow instead of the main UI
-4. The React UI calls `agenthub init --non-interactive` with user-provided values via Tauri command
-5. On completion, Tauri restarts the sidecar with `agenthub serve`
+1. Tauri 将 `agenthub serve` 作为 sidecar 启动
+2. 若配置不存在，`agenthub serve` 返回特殊 stdout 行: `SETUP_REQUIRED=1`
+3. Tauri 读取此信息并显示 React 欢迎/设置流程而非主 UI
+4. React UI 通过 Tauri command 调用 `agenthub init --non-interactive`，传入用户提供的值
+5. 完成后，Tauri 以 `agenthub serve` 重启 sidecar
 
-The desktop UX flow (design-desktop-ux.md):
+桌面 UX 流程（design-desktop-ux.md）：
 
 ```
-ProjectSelector (welcome view, P0)
-├── RecentProjectList (empty on first run)
-├── ProjectCard (not shown on first run)
-├── NewProjectDialog (first-run: "Welcome to AgentHub")
-│   ├── Step 1: Agent detection (auto-filled from 'agenthub doctor --json')
-│   ├── Step 2: API key input (password fields)
-│   └── Step 3: Choose workspace (folder picker via Tauri dialog.open)
+ProjectSelector（欢迎视图，P0）
+├── RecentProjectList（首次运行时为空）
+├── ProjectCard（首次运行时不显示）
+├── NewProjectDialog（首次运行: "Welcome to AgentHub"）
+│   ├── 第 1 步: Agent 检测（从 'agenthub doctor --json' 自动填充）
+│   ├── 第 2 步: API 密钥输入（密码字段）
+│   └── 第 3 步: 选择工作区（通过 Tauri dialog.open 的文件夹选择器）
 └── OpenFolderButton
 ```
 
 ---
 
-## 4. Implementation Notes
+## 4. 实现说明
 
-### 4.1 Package Layout
+### 4.1 包布局
 
 ```
-cli/                          # Cobra CLI package
-├── root.go                   # Root command + global flags
+cli/                          # Cobra CLI 包
+├── root.go                   # Root 命令 + 全局标志
 ├── init.go                   # agenthub init
 ├── doctor.go                 # agenthub doctor
 ├── serve.go                  # agenthub serve
@@ -870,81 +870,81 @@ cli/                          # Cobra CLI package
 ├── version.go                # agenthub version
 └── internal/
     ├── detect/
-    │   └── detect.go         # Binary + env detection
+    │   └── detect.go         # 二进制 + env 检测
     ├── wizard/
-    │   └── wizard.go         # Interactive wizard engine
+    │   └── wizard.go         # 交互式向导引擎
     ├── secret/
-    │   └── secret.go         # secrets.yaml read/write
+    │   └── secret.go         # secrets.yaml 读/写
     └── output/
-        ├── table.go          # Terminal table formatting
-        └── json.go           # JSON output helpers
+        ├── table.go          # 终端表格格式化
+        └── json.go           # JSON 输出辅助
 ```
 
-### 4.2 Dependencies
+### 4.2 依赖
 
 ```
-go.mod additions:
-  github.com/spf13/cobra      # CLI framework
-  github.com/spf13/viper      # Config management (reads config.yaml)
-  github.com/charmbracelet/bubbletea  # Optional: TUI for interactive wizard
-  gopkg.in/yaml.v3            # YAML parsing/generation
-  modernc.org/sqlite          # Already in project
+go.mod 新增:
+  github.com/spf13/cobra      # CLI 框架
+  github.com/spf13/viper      # 配置管理（读取 config.yaml）
+  github.com/charmbracelet/bubbletea  # 可选: 交互式向导的 TUI
+  gopkg.in/yaml.v3            # YAML 解析/生成
+  modernc.org/sqlite          # 项目中已有
 ```
 
-### 4.3 Config File Priority (Viper)
+### 4.3 配置文件优先级（Viper）
 
 ```
-1. Command-line flags (highest priority)
-2. Environment variables (AGENTHUB_*)
+1. 命令行标志（最高优先级）
+2. 环境变量（AGENTHUB_*）
 3. ~/.agenthub/config.yaml
-4. Defaults in code (lowest priority)
+4. 代码中的默认值（最低优先级）
 ```
 
-### 4.4 Port Allocation Strategy
+### 4.4 端口分配策略
 
-| Port | Component | Fallback Strategy |
+| 端口 | 组件 | 回退策略 |
 |------|-----------|-------------------|
-| 3210 | Edge API + WS | Try 3210, then 3211-3220 sequentially |
-| 3211 | Hub API (if local) | Try 3211, then 3212-3220 sequentially |
-| 39731 | Runner API | Try 39731, then 39732-39740 sequentially |
-| 5100-5199 | Preview servers | Allocate from pool |
-| 3000 | Web UI (dev only) | Vite default |
+| 3210 | Edge API + WS | 尝试 3210，然后依次尝试 3211-3220 |
+| 3211 | Hub API（如本地） | 尝试 3211，然后依次尝试 3212-3220 |
+| 39731 | Runner API | 尝试 39731，然后依次尝试 39732-39740 |
+| 5100-5199 | Preview 服务器 | 从池中分配 |
+| 3000 | Web UI（仅开发） | Vite 默认 |
 
-Port conflicts are detected in `agenthub doctor` and configurable via `agenthub config set edge.port <n>`.
+端口冲突在 `agenthub doctor` 中检测，可通过 `agenthub config set edge.port <n>` 配置。
 
-### 4.5 Security Boundaries
+### 4.5 安全边界
 
-| Data | Storage | Permissions | Sync to Hub? |
+| 数据 | 存储 | 权限 | 同步到 Hub？ |
 |------|---------|-------------|-------------|
-| `config.yaml` | `~/.agenthub/` | 0644 | No |
-| `secrets.yaml` | `~/.agenthub/` | 0600 (Unix) / restricted ACL (Windows) | Never |
-| `agenthub.db` | `~/.agenthub/data/` | 0644 | Only if Hub-connected (P1+) |
-| Logs | `~/.agenthub/logs/` | 0644 | No |
-| Runtime files | `~/.agenthub/runtime/` | 0755 | No |
+| `config.yaml` | `~/.agenthub/` | 0644 | 否 |
+| `secrets.yaml` | `~/.agenthub/` | 0600（Unix）/ 受限 ACL（Windows） | 永不 |
+| `agenthub.db` | `~/.agenthub/data/` | 0644 | 仅当连接 Hub（P1+） |
+| 日志 | `~/.agenthub/logs/` | 0644 | 否 |
+| 运行时文件 | `~/.agenthub/runtime/` | 0755 | 否 |
 
-API keys are NEVER:
-- Logged
-- Stored in config.yaml
-- Sent to Hub
-- Included in doctor JSON output (redacted as `"set"` / `"missing"`)
-- Included in error messages or stack traces
+API 密钥绝不：
+- 记录到日志
+- 存储在 config.yaml 中
+- 发送到 Hub
+- 包含在 doctor JSON 输出中（脱敏为 `"set"` / `"missing"`）
+- 包含在错误消息或堆栈跟踪中
 
 ---
 
-## 5. Reference: Design Decisions
+## 5. 参考: 设计决策
 
-| Decision | Choice | Rationale |
+| 决策 | 选择 | 理由 |
 |----------|--------|-----------|
-| CLI framework | Cobra | De facto standard for Go CLIs; 40k+ stars; POSIX-compliant flags |
-| Config format | YAML | Human-readable; viper natively supports it |
-| Secret storage | Separate `secrets.yaml` | Prevents accidental config sharing; 0600 permissions |
-| Wizard design | 3-step (AgentWire pattern) | Minimal; auto-detect eliminates most manual entry |
-| Non-interactive | `--non-interactive` flag | Required for CI/CD and Tauri integration |
-| Install hints | Inline in wizard + doctor | Canopy IDE pattern -- embed install commands directly |
-| Port detection | `net.Listen` probe | Reliable; no race condition with other tools |
-| API key validation | Lightweight test call | Catches expired/revoked keys before they cause runtime errors |
-| Doctor output | Dual human + JSON | Human for terminal, JSON for scripting and Tauri integration |
+| CLI 框架 | Cobra | Go CLI 事实标准；40k+ stars；POSIX 兼容标志 |
+| 配置格式 | YAML | 人类可读；viper 原生支持 |
+| 密钥存储 | 单独的 `secrets.yaml` | 防止意外共享配置；0600 权限 |
+| 向导设计 | 3 步（AgentWire 模式） | 最小化；自动检测消除大部分手动输入 |
+| 非交互式 | `--non-interactive` 标志 | CI/CD 和 Tauri 集成需要 |
+| 安装提示 | 向导 + doctor 中内联 | Canopy IDE 模式 -- 直接嵌入安装命令 |
+| 端口检测 | `net.Listen` 探针 | 可靠；与其他工具无竞争条件 |
+| API 密钥验证 | 轻量测试调用 | 在运行时错误前捕获过期/已撤销密钥 |
+| Doctor 输出 | 双模式：人类 + JSON | 人类用于终端，JSON 用于脚本和 Tauri 集成 |
 
 ---
 
-*Design complete. 2026-05-21.*
+*设计完成。2026-05-21。*

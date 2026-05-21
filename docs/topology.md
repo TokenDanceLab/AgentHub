@@ -1,45 +1,45 @@
-# AgentHub Topology
+# AgentHub 拓扑
 
-Date: 2026-05-21
+日期：2026-05-21
 
-## 1. Roles
+## 1. 角色
 
-AgentHub uses a **Hub - Edge - Runner** architecture.
+AgentHub 使用 **Hub - Edge - Runner** 架构。
 
-| Role | Deploys On | Responsibility |
+| 角色 | 部署位置 | 职责 |
 |---|---|---|
-| **AgentHub UI** | Desktop / Web / Mobile | IM interface, message stream, artifact panel, diff/preview cards |
-| **Hub Server** | Public cloud / central server | Account, global IM, friends, groups, multi-device sync, relay, permissions, audit |
-| **Edge Server** | Desktop / cloud node / remote machine | Local control node: projects, memory, context builder, runner manager, artifact index |
-| **Runner** | Same machine as an Edge node | Execute Claude Code / Codex / OpenCode, manage workspace, logs, diff, preview |
-| **CLI Agent** | External process | Claude Code, Codex, OpenCode |
-| **Transport** | local / ssh / tailscale / hub-relay | Connect UI, Hub, Edge and Runner |
+| **AgentHub UI** | Desktop / Web / Mobile | IM 界面、消息流、产物面板、diff/preview 卡片 |
+| **Hub Server** | 公网 / 中心服务器 | 账号、全局 IM、好友、群聊、多端同步、中继、权限、审计 |
+| **Edge Server** | Desktop / 云端节点 / 远程机器 | 本地控制节点：项目、memory、上下文构造、runner 管理、产物索引 |
+| **Runner** | 与 Edge 节点同机 | 执行 Claude Code / Codex / OpenCode，管理 workspace、日志、diff、preview |
+| **CLI Agent** | 外部进程 | Claude Code、Codex、OpenCode |
+| **Transport** | local / ssh / tailscale / hub-relay | 连接 UI、Hub、Edge 和 Runner |
 
-Key rule:
+核心规则：
 
-> Any machine that can run a Runner should be modeled as an **Edge Node**.
+> 任何能运行 Runner 的机器都应建模为 **Edge Node**。
 
-Examples:
+示例：
 
-| Machine | Node Type |
+| 机器 | 节点类型 |
 |---|---|
-| User laptop | Desktop Edge Node |
-| Classmate's desktop | Remote Desktop Edge Node |
-| Lab Linux machine | Remote Edge Node |
+| 用户笔记本 | Desktop Edge Node |
+| 同学台式机 | Remote Desktop Edge Node |
+| 实验室 Linux 机器 | Remote Edge Node |
 | Cloud VM / Docker host | Cloud Edge Node |
 
-## 2. Final Topology
+## 2. 最终拓扑
 
 ```mermaid
 graph TB
-    subgraph Clients["Clients"]
+    subgraph Clients["客户端"]
         DesktopUI["Desktop UI"]
         WebUI["Web UI"]
         MobileUI["Mobile PWA"]
     end
 
     subgraph HubPlane["Hub Server"]
-        Hub["Auth / IM / Friends / Groups / Sync / Relay / ACL / Audit"]
+        Hub["Auth / IM / 好友 / 群聊 / Sync / Relay / ACL / Audit"]
     end
 
     subgraph DesktopNode["Desktop Edge Node"]
@@ -62,33 +62,33 @@ graph TB
     CEdge <-->|"reverse WSS / internal"| Hub
 ```
 
-Short form:
+简写：
 
 ```text
 Desktop = UI + Edge Server + Local Runner + CLI Agent
 Cloud Node = Headless Edge Server + Cloud Runner + CLI Agent
-Hub Server = central IM + account + sync + relay + remote control
+Hub Server = 中心 IM + 账号 + 同步 + 中继 + 远程控制
 ```
 
-## 2.1 Multica Mapping
+## 2.1 Multica 映射
 
-Multica is a Tier-0 reference for managed agent lifecycle, but AgentHub splits the responsibilities differently because the core UX is IM-first and every executable machine is modeled as an Edge Node.
+Multica 是 managed agent lifecycle 的 Tier-0 参考，但 AgentHub 拆分职责的方式不同，因为核心 UX 是 IM-first，且每台可执行机器都建模为 Edge Node。
 
-| Multica Concept | AgentHub Mapping | Note |
+| Multica 概念 | AgentHub 映射 | 说明 |
 |---|---|---|
-| Server | Hub Server + Edge Server split | Hub owns central IM/sync/relay; Edge owns local project, context, runner and artifact authority |
-| Daemon | Edge-managed local execution capability | AgentHub should expose it as Edge health plus Runner availability, not as a user-facing daemon concept |
-| Runtime | RunnerEndpoint / AgentCapability | A runtime means where a CLI agent can run and which CLI/provider is available |
-| Task queue | AgentRun queue | Use queued/running/awaiting_approval/done/failed/cancelled states |
-| WebSocket progress | EdgeEvent / RunnerEvent | Progress must be typed and replayable through EventStore, not just transient socket text |
-| Agent as teammate | AgentProfile + Conversation actor | Human/agent/system actors should appear consistently in chat, artifacts, approvals and run history |
-| Issue board | Optional imported work source | AgentHub's first object remains Conversation / Thread / Artifact, not Issue / Board |
+| Server | Hub Server + Edge Server 拆分 | Hub 拥有中心 IM/sync/relay；Edge 拥有本地项目、上下文、runner 和产物权威 |
+| Daemon | Edge 管理的本地执行能力 | AgentHub 将其暴露为 Edge 健康状态 + Runner 可用性，不作为用户可见的 daemon 概念 |
+| Runtime | RunnerEndpoint / AgentCapability | Runtime 表示 CLI agent 可以在哪里运行以及哪个 CLI/provider 可用 |
+| Task queue | AgentRun queue | 使用 queued/running/awaiting_approval/done/failed/cancelled 状态 |
+| WebSocket progress | EdgeEvent / RunnerEvent | 进度必须通过 EventStore 类型化和可回放，不只是瞬时的 socket 文本 |
+| Agent as teammate | AgentProfile + Conversation actor | 人类/agent/system actor 应在聊天、产物、审批和运行历史中一致出现 |
+| Issue board | 可选的外部工作源 | AgentHub 的首要对象仍是 Conversation / Thread / Artifact，不是 Issue / Board |
 
-## 3. Network Planes
+## 3. 网络三面
 
-### Control Plane
+### 控制面
 
-The control plane handles commands, scheduling, status and permissions.
+控制面处理命令、调度、状态和权限。
 
 ```text
 UI -> Edge Server
@@ -97,87 +97,87 @@ Hub Server -> Edge Server
 Edge Server -> Runner
 ```
 
-Control-plane events include:
+控制面事件包括：
 
-- send message
-- create conversation
-- parse `@Agent`
-- orchestrator scheduling
-- start / stop run
-- approve command
-- runner heartbeat
-- run status
-- permission check
+- 发送消息
+- 创建会话
+- 解析 `@Agent`
+- orchestrator 调度
+- 启动 / 停止 run
+- 审批命令
+- runner 心跳
+- run 状态
+- 权限检查
 
-### Data Plane
+### 数据面
 
-The data plane handles large or latency-sensitive data.
+数据面处理大流量或延迟敏感的数据。
 
 ```text
-UI -> nearest Edge
-UI -> Local Runner Fast Path only when authorized
-UI -> Hub proxy fallback
+UI -> 最近的 Edge
+UI -> Local Runner Fast Path，仅在授权时
+UI -> Hub proxy 兜底
 ```
 
-Data-plane resources include:
+数据面资源包括：
 
-- log stream
-- file read
-- diff content
+- 日志流
+- 文件读取
+- diff 内容
 - preview iframe
-- large artifact download
+- 大产物下载
 
-Principles:
+原则：
 
-- UI does not directly access remote Runner.
-- UI may access Local Runner only through a short-lived token issued by Edge.
-- Remote Desktop / Cloud data plane must go through Remote Edge or Hub proxy.
-- If Web/Mobile or NAT traversal is involved, use Hub relay/proxy.
+- UI 不直接访问远程 Runner。
+- UI 只能通过 Edge 签发的短期 token 访问 Local Runner。
+- 远程 Desktop / Cloud 的数据面必须经过 Remote Edge 或 Hub proxy。
+- Web/Mobile 或涉及 NAT 穿透时，使用 Hub relay/proxy。
 
-### Sync Plane
+### 同步面
 
-The sync plane mirrors state between Edge and Hub.
+同步面在 Edge 和 Hub 之间镜像状态。
 
 ```text
 Edge Server <-> Hub Server
 ```
 
-Sync content:
+同步内容：
 
-- message summary
-- run status
-- artifact metadata
-- preview route
-- memory index
-- conversation summary
-- device status
+- 消息摘要
+- run 状态
+- artifact 元数据
+- preview 路由
+- memory 索引
+- 会话摘要
+- 设备状态
 
-Large logs, large files and workspace contents are not synced by default.
+大日志、大文件和 workspace 内容默认不同步。
 
-## 4. Supported Topologies
+## 4. 支持的拓扑
 
-| Scenario | UI Connection | Control Path | Execution | Hub Required | Recommended Use |
+| 场景 | UI 连接方式 | 控制路径 | 执行位置 | 需要 Hub | 推荐用途 |
 |---|---|---|---|---|---|
-| 1. Desktop local offline | Desktop UI -> Local Edge | Edge -> Local Runner | local machine | No | Offline development, course demo |
-| 2. Desktop local online | Desktop UI -> Local Edge | Edge -> Local Runner, Edge <-> Hub sync | local machine | Optional | Local execution + cloud sync |
-| 3. Desktop direct to remote Desktop | Desktop UI -> Local Edge | Local Edge -> Remote Edge -> Remote Runner | remote desktop | No | LAN / SSH / Tailscale remote execution |
-| 4. Desktop relay to remote Desktop | Desktop UI -> Local Edge or Hub | Local Edge/Hub -> Hub Relay -> Remote Edge -> Runner | remote desktop | Yes | NAT traversal remote execution |
-| 5. Desktop direct to Cloud | Desktop UI -> Local Edge | Local Edge -> Cloud Edge -> Cloud Runner | cloud server | No | High-performance cloud execution |
-| 6. Desktop relay to Cloud | Desktop UI -> Local Edge or Hub | Hub -> Cloud Edge -> Cloud Runner | cloud server | Yes | Hosted cloud runner |
-| 7. Web relay to Desktop | Web UI -> Hub | Hub -> Desktop Edge -> Local Runner | user desktop | Yes | Browser/mobile remote control |
-| 8. Web relay to Cloud | Web UI -> Hub | Hub -> Cloud Edge -> Cloud Runner | cloud server | Yes | SaaS / public demo |
+| 1. Desktop 本地离线 | Desktop UI -> Local Edge | Edge -> Local Runner | 本机 | 否 | 离线开发、课程 demo |
+| 2. Desktop 本地在线 | Desktop UI -> Local Edge | Edge -> Local Runner, Edge <-> Hub sync | 本机 | 可选 | 本地执行 + 云端同步 |
+| 3. Desktop 直连远程 Desktop | Desktop UI -> Local Edge | Local Edge -> Remote Edge -> Remote Runner | 远程桌面 | 否 | LAN / SSH / Tailscale 远程执行 |
+| 4. Desktop 中继到远程 Desktop | Desktop UI -> Local Edge or Hub | Local Edge/Hub -> Hub Relay -> Remote Edge -> Runner | 远程桌面 | 是 | NAT 穿透远程执行 |
+| 5. Desktop 直连云 | Desktop UI -> Local Edge | Local Edge -> Cloud Edge -> Cloud Runner | 云端服务器 | 否 | 高性能云端执行 |
+| 6. Desktop 中继到云 | Desktop UI -> Local Edge or Hub | Hub -> Cloud Edge -> Cloud Runner | 云端服务器 | 是 | 托管云 runner |
+| 7. Web 中继到 Desktop | Web UI -> Hub | Hub -> Desktop Edge -> Local Runner | 用户桌面 | 是 | 浏览器/手机远程控制 |
+| 8. Web 中继到云 | Web UI -> Hub | Hub -> Cloud Edge -> Cloud Runner | 云端服务器 | 是 | SaaS / 公开 demo |
 
-All scenarios reduce to three transport classes:
+所有场景归结为三种传输类型：
 
 ```text
-local   = same-machine connection
-direct  = SSH / Tailscale / LAN connection
-relay   = Hub Server relay
+local   = 同机连接
+direct  = SSH / Tailscale / LAN 连接
+relay   = Hub Server 中继
 ```
 
-## 5. Scenario Details
+## 5. 场景详解
 
-### 1. Desktop Local Offline
+### 1. Desktop 本地离线
 
 ```text
 Desktop UI
@@ -186,19 +186,19 @@ Desktop UI
   -> Claude Code / Codex / OpenCode
 ```
 
-- Hub does not participate.
-- Local SQLite is the message store.
-- `.agenthub/` is local project memory.
-- Local preview and local artifacts work offline.
+- Hub 不参与。
+- 本地 SQLite 是消息存储。
+- `.agenthub/` 是本地项目 memory。
+- 本地 preview 和 artifact 离线可用。
 
-Authority:
+权威归属：
 
 ```text
 Conversation authority = edge
 Execution authority = local runner
 ```
 
-### 2. Desktop Local Online
+### 2. Desktop 本地在线
 
 ```text
 Desktop UI
@@ -209,16 +209,16 @@ Desktop UI
 Local Edge Server <-> Hub Server
 ```
 
-Hub handles login, device registration, message summary sync, artifact metadata sync, remote status view and notifications.
+Hub 负责登录、设备注册、消息摘要同步、artifact 元数据同步、远程状态查看和通知。
 
-Authority:
+权威归属：
 
 ```text
 Conversation authority = edge
 Sync target = hub
 ```
 
-### 3. Desktop Direct to Remote Desktop Edge
+### 3. Desktop 直连远程 Desktop Edge
 
 ```text
 Local Desktop UI
@@ -229,9 +229,9 @@ Local Desktop UI
   -> Remote Agent CLI
 ```
 
-Do not model this as direct-to-Runner. The remote machine should also run an Edge Server because the remote Edge owns permissions, workspace roots, runner status and artifact index.
+不要建模为直连 Runner。远程机器上也应运行 Edge Server，因为远程 Edge 拥有权限、workspace 根路径、runner 状态和 artifact 索引。
 
-### 4. Desktop Relay to Remote Desktop Edge
+### 4. Desktop 中继到远程 Desktop Edge
 
 ```text
 Local Desktop UI
@@ -243,15 +243,15 @@ Local Desktop UI
   -> Agent CLI
 ```
 
-The remote Desktop Edge connects out to Hub:
+远程 Desktop Edge 主动连接 Hub：
 
 ```bash
 agenthub-edge connect --hub https://hub.example.com --token edge_xxx
 ```
 
-This works when the remote machine has no public IP or inbound port.
+这适用于远程机器没有公网 IP 或入站端口的情况。
 
-### 5. Desktop Direct to Cloud Edge
+### 5. Desktop 直连 Cloud Edge
 
 ```text
 Desktop UI
@@ -262,13 +262,13 @@ Desktop UI
   -> Agent CLI
 ```
 
-Cloud Runner should not be a naked process. Model it as:
+Cloud Runner 不应该是裸进程。建模为：
 
 ```text
 Cloud Node = Cloud Edge Server + Cloud Runner + CLI Agent
 ```
 
-### 6. Desktop Relay to Cloud Edge
+### 6. Desktop 中继到 Cloud Edge
 
 ```text
 Desktop UI
@@ -279,9 +279,9 @@ Desktop UI
   -> Agent CLI
 ```
 
-Hub can select a cloud Edge, check permission, dispatch `run.start`, receive `run.status` / artifact metadata, and push updates back to Desktop.
+Hub 可以选择 cloud Edge、检查权限、下发 `run.start`、接收 `run.status` / artifact 元数据，并将更新推回 Desktop。
 
-### 7. Web Relay to Desktop Edge
+### 7. Web 中继到 Desktop Edge
 
 ```text
 Web UI
@@ -293,15 +293,15 @@ Web UI
   -> Agent CLI
 ```
 
-Web cannot directly access a user's local Edge. It must go through Hub relay.
+Web 不能直接访问用户的本地 Edge，必须通过 Hub 中继。
 
-Requirements:
+要求：
 
-- Desktop Edge keeps an outbound connection to Hub.
-- Hub shows device online/offline state.
-- Remote commands have permission checks and audit logs.
+- Desktop Edge 保持到 Hub 的出站连接。
+- Hub 显示设备在线/离线状态。
+- 远程命令有权限检查和审计日志。
 
-### 8. Web Relay to Cloud Edge
+### 8. Web 中继到 Cloud Edge
 
 ```text
 Web UI
@@ -311,15 +311,15 @@ Web UI
   -> Agent CLI
 ```
 
-This is the SaaS-style topology.
+这是 SaaS 形态的拓扑。
 
-## 6. Authority Model
+## 6. 权威模型
 
-Detailed authority and write rules are defined in [authority.md](authority.md). This section keeps only the topology-level summary.
+详细的权威和写入规则见 [authority.md](authority.md)。本节只保留拓扑层面的摘要。
 
 ### Conversation Authority
 
-Conversation Authority decides who owns the primary copy of messages, group membership and threads.
+Conversation Authority 决定谁拥有消息、群组成员和 thread 的主副本。
 
 ```ts
 type ConversationAuthority =
@@ -329,7 +329,7 @@ type ConversationAuthority =
 
 ### Execution Authority
 
-Execution Authority decides where the task runs.
+Execution Authority 决定任务在哪里运行。
 
 ```ts
 type ExecutionAuthority = {
@@ -339,7 +339,7 @@ type ExecutionAuthority = {
 }
 ```
 
-Examples:
+示例：
 
 ```json
 {
@@ -374,9 +374,9 @@ Examples:
 }
 ```
 
-## 7. Route Resolution
+## 7. 路由解析
 
-Do not hardcode each topology. Use a route model.
+不要硬编码每种拓扑，用路由模型统一处理。
 
 ```ts
 type TransportKind = "local" | "ssh" | "tailscale" | "hub-relay"
@@ -419,22 +419,22 @@ type AgentRoute = {
 }
 ```
 
-Route resolver priority:
+路由解析优先级：
 
 ```text
 local > tailscale > ssh > hub-relay
 ```
 
-Reasoning:
+原因：
 
-- `local` has the lowest latency.
-- `tailscale` is the best direct multi-device UX.
-- `ssh` is explicit and reliable for self-managed machines.
-- `hub-relay` has the broadest reach and works behind NAT.
+- `local` 延迟最低。
+- `tailscale` 是直接多设备的最佳 UX。
+- `ssh` 对自管机器显式且可靠。
+- `hub-relay` 覆盖最广，NAT 后也能工作。
 
-## 8. Edge-Hub Sync
+## 8. Edge-Hub 同步
 
-Edge keeps a local event log.
+Edge 维护本地事件日志。
 
 ```ts
 type EdgeEvent = {
@@ -454,28 +454,28 @@ type EdgeEvent = {
 }
 ```
 
-Sync flow:
+同步流程：
 
 ```text
 Edge -> Hub:
-  upload edge events
+  上传 edge events
 
 Hub -> Edge:
-  deliver remote commands
-  deliver remote messages
-  deliver sync ack
+  下发远程命令
+  下发远程消息
+  下发 sync ack
 ```
 
-Reconnect:
+重连机制：
 
 ```text
-Hub stores lastAckSeq.
-Edge reconnects and uploads from lastAckSeq + 1.
+Hub 存储 lastAckSeq。
+Edge 重连后从 lastAckSeq + 1 开始上传。
 ```
 
-## 9. Hub Relay Protocol
+## 9. Hub 中继协议
 
-Edge connects out to Hub through reverse WebSocket.
+Edge 通过 reverse WebSocket 出站连接 Hub。
 
 ```ts
 type EdgeToHubEvent =
@@ -493,11 +493,11 @@ type HubToEdgeCommand =
   | { type: "preview.request"; runId: string }
 ```
 
-## 10. Preview And Artifact Routing
+## 10. Preview 和 Artifact 路由
 
-Detailed data-plane rules are defined in [data-plane.md](data-plane.md). This section keeps only the route vocabulary.
+详细的数据面规则见 [data-plane.md](data-plane.md)。本节只保留路由词汇。
 
-Preview routes:
+Preview 路由：
 
 ```ts
 type PreviewRoute =
@@ -507,16 +507,16 @@ type PreviewRoute =
   | { mode: "hub-proxy"; url: "https://hub.example.com/preview/run_123" }
 ```
 
-| Scenario | Preview Mode |
+| 场景 | Preview 模式 |
 |---|---|
 | Desktop local | `local` |
 | Desktop -> SSH remote | `ssh-tunnel` |
 | Desktop -> Tailscale remote | `direct` |
 | Web -> Desktop | `hub-proxy` |
-| Web -> Cloud | `hub-proxy` or `direct` |
+| Web -> Cloud | `hub-proxy` 或 `direct` |
 | Mobile -> Desktop | `hub-proxy` |
 
-Artifact location:
+Artifact 位置：
 
 ```ts
 type ArtifactLocation =
@@ -525,16 +525,16 @@ type ArtifactLocation =
   | { type: "object-storage"; url: string }
 ```
 
-Principles:
+原则：
 
-- Artifact metadata syncs to Hub.
-- Large content is fetched on demand.
-- Small high-value artifacts may be cached by Hub.
-- Workspace content is not uploaded by default.
+- Artifact 元数据同步到 Hub。
+- 大内容按需获取。
+- 小的高价值 artifact 可由 Hub 缓存。
+- Workspace 内容默认不上传。
 
-## 11. Module Reuse
+## 11. 模块复用
 
-Hub and Edge should not duplicate IM logic.
+Hub 和 Edge 不应重复 IM 逻辑。
 
 ```text
 packages/im-core
@@ -555,60 +555,60 @@ packages/artifact-core
   diff metadata
 ```
 
-Edge uses:
+Edge 使用的包：
 
 ```text
 im-core + memory-core + artifact-core + runner-manager + hub-client
 ```
 
-Hub uses:
+Hub 使用的包：
 
 ```text
 im-core + memory-core + artifact-core + auth + sync + relay + device-registry
 ```
 
-Runner uses:
+Runner 使用的包：
 
 ```text
 protocol + adapters + workspace + artifact-core
 ```
 
-## 12. Final Architecture Statement
+## 12. 最终架构声明
 
 ```text
-AgentHub = Hub-Edge-Runner architecture
+AgentHub = Hub-Edge-Runner 架构
 
-Desktop is not just a client:
+Desktop 不只是客户端：
 Desktop = UI + Edge Server + Local Runner + CLI Agent
 
-Hub Server is central IM and relay:
-Hub = Auth + Friends + Groups + Sync + Relay + Permissions
+Hub Server 是中心 IM 和中继：
+Hub = Auth + 好友 + 群聊 + Sync + Relay + 权限
 
-Cloud Runner is not naked:
+Cloud Runner 不是裸进程：
 Cloud Node = Headless Edge Server + Cloud Runner + CLI Agent
 
-Web / Mobile connect to Hub:
+Web / Mobile 连接 Hub：
 Web/Mobile -> Hub -> Edge -> Runner
 
-Desktop defaults to local Edge:
+Desktop 默认连本地 Edge：
 Desktop UI -> Local Edge -> Local Runner
 
-All remote execution uses:
+所有远程执行使用：
 source UI -> authority server -> target Edge -> target Runner
 ```
 
-This design covers all long-term topologies from day one, while implementation can still start with:
+这个设计从第一天覆盖所有长期拓扑，同时实现仍可从以下起步：
 
 ```text
 Desktop UI -> Local Edge Server -> Local Runner
 ```
 
-The code should reserve:
+代码应为以下预留空间：
 
 - Hub Server
 - Edge-Hub reverse WSS
-- Transport abstraction
+- Transport 抽象
 - Route Resolver
 - Conversation Authority
 - Execution Authority
-- Artifact / Preview routing
+- Artifact / Preview 路由

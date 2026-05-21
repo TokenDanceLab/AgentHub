@@ -1,33 +1,33 @@
-# Deep Dive: Claude Code Tool Orchestration & Bash Security
+# 深入：Claude Code 工具编排与 Bash 安全
 
-> Sources: `claude-code-main/src/services/tools/toolOrchestration.ts`,
-> `claude-code-main/src/tools/BashTool/bashSecurity.ts` (105KB, 23+ checks),
-> `claude-code-main/src/services/tools/toolExecution.ts`,
-> `claude-code-main/src/tools/BashTool/BashTool.tsx`,
+> 源码：`claude-code-main/src/services/tools/toolOrchestration.ts`、
+> `claude-code-main/src/tools/BashTool/bashSecurity.ts`（105KB，23+ 检查）、
+> `claude-code-main/src/services/tools/toolExecution.ts`、
+> `claude-code-main/src/tools/BashTool/BashTool.tsx`、
 > `Group2_ToolSystem/Group2_Summary.md`
-> Target: AgentHub Runner executor + PolicyEngine design
-> Date: 2026-05-21
+> 目标：AgentHub Runner executor + PolicyEngine 设计
+> 日期：2026-05-21
 
 ---
 
-## 1. Tool Orchestration Engine
+## 1. 工具编排引擎
 
-### 1.1 Architecture Overview
+### 1.1 架构概览
 
-Claude Code's tool orchestration is a **partitioned concurrent executor**. The core insight: read-only tools can run in parallel (they observe state), while write tools must run serially (they mutate state). The orchestrator is not a scheduler -- it's a **batch partitioner** that groups adjacent read-only tool calls into concurrent batches and interleaves them with serial write batches.
+Claude Code 的工具编排是一个**分区并发执行器**。核心洞察：只读工具可以并行运行（它们观察状态），而写入工具必须串行运行（它们修改状态）。编排器不是调度器——它是一个**批处理分区器**，将相邻的只读工具调用分组为并发批次，并与串行写入批次交替执行。
 
 ```
 runTools(toolUseMessages) {
   for batch of partitionToolCalls(toolUseMessages):
     if batch.isConcurrencySafe:
-      runToolsConcurrently(batch)   // up to 10 parallel
+      runToolsConcurrently(batch)   // 最多 10 个并行
     else:
-      runToolsSerially(batch)       // one at a time
+      runToolsSerially(batch)       // 每次一个
   }
 }
 ```
 
-### 1.2 Partition Logic (the heart of the orchestrator)
+### 1.2 分区逻辑（编排器的核心）
 
 ```typescript
 // src/services/tools/toolOrchestration.ts:91-116
@@ -43,11 +43,11 @@ function partitionToolCalls(
           try {
             return Boolean(tool?.isConcurrencySafe(parsedInput.data))
           } catch {
-            return false  // parse failure -> conservative: treat as serial
+            return false  // 解析失败 -> 保守处理：视为串行
           }
         })()
       : false
-    // Adjacent concurrency-safe tools merge into the same batch
+    // 相邻的并发安全工具合并到同一批次
     if (isConcurrencySafe && acc[acc.length - 1]?.isConcurrencySafe) {
       acc[acc.length - 1]!.blocks.push(toolUse)
     } else {
@@ -58,12 +58,12 @@ function partitionToolCalls(
 }
 ```
 
-Key properties:
-- **Adjacency matters**: three read-only tools in a row become one concurrent batch. A write tool between them splits into three batches.
-- **Conservative default**: if `isConcurrencySafe()` throws (e.g. shell-quote parse failure), the tool is treated as serial.
-- **Per-tool declaration**: each tool declares its concurrency safety via `Tool.isConcurrencySafe(input)`. GlobTool, GrepTool, ReadTool return `true`; BashTool, WriteTool, EditTool return `false`.
+关键特性：
+- **相邻性很重要**：三个连续只读工具成为一个并发批次。中间有一个写入工具则拆分为三个批次。
+- **保守默认**：如果 `isConcurrencySafe()` 抛出异常（如 shell-quote 解析失败），工具按串行处理。
+- **逐工具声明**：每个工具通过 `Tool.isConcurrencySafe(input)` 声明其并发安全性。GlobTool、GrepTool、ReadTool 返回 `true`；BashTool、WriteTool、EditTool 返回 `false`。
 
-### 1.3 Concurrency Mechanism
+### 1.3 并发机制
 
 ```typescript
 // src/services/tools/toolOrchestration.ts:152-177
@@ -75,13 +75,13 @@ async function* runToolsConcurrently(
 ): AsyncGenerator<MessageUpdateLazy, void> {
   yield* all(
     toolUseMessages.map(async function* (toolUse) {
-      // Mark as in-progress, run, mark complete
+      // 标记为进行中，运行，标记完成
       toolUseContext.setInProgressToolUseIDs(prev =>
         new Set(prev).add(toolUse.id))
       yield* runToolUse(toolUse, ...)
       markToolUseAsComplete(toolUseContext, toolUse.id)
     }),
-    getMaxToolUseConcurrency(),  // default 10
+    getMaxToolUseConcurrency(),  // 默认 10
   )
 }
 
@@ -92,7 +92,7 @@ function getMaxToolUseConcurrency(): number {
 }
 ```
 
-The `all()` generator (from `src/utils/generators.ts`) is a **bounded concurrent async generator**. It runs up to `concurrencyCap` generators simultaneously, yielding values from any generator as they complete and immediately starting the next one:
+`all()` 生成器（来自 `src/utils/generators.ts`）是一个**有界并发异步生成器**。它最多同时运行 `concurrencyCap` 个生成器，在任何生成器完成时立即产出值并启动下一个：
 
 ```typescript
 export async function* all<A>(
@@ -101,14 +101,14 @@ export async function* all<A>(
 ): AsyncGenerator<A, void>
 ```
 
-### 1.4 Context Flow
+### 1.4 上下文流转
 
-**Serial path** (`runToolsSerially`): context flows linearly. Each tool's `contextModifier` is applied to `currentContext` immediately, and subsequent tools see the updated context.
+**串行路径**（`runToolsSerially`）：上下文线性流转。每个工具的 `contextModifier` 立即应用于 `currentContext`，后续工具看到更新后的上下文。
 
-**Concurrent path** (`runToolsConcurrently`): context modifiers from concurrent tools are **queued and applied after all tools in the batch complete**. This prevents race conditions where concurrent tools read stale or partially-modified context.
+**并发路径**（`runToolsConcurrently`）：并发工具的上下文修改器被**排队，在批次中所有工具完成后统一应用**。这防止了并发工具读取过期或部分修改的上下文。
 
 ```typescript
-// Queued application after batch completes:
+// 批次完成后排队应用：
 for (const block of blocks) {
   const modifiers = queuedContextModifiers[block.id]
   if (!modifiers) continue
@@ -118,16 +118,16 @@ for (const block of blocks) {
 }
 ```
 
-### 1.5 Tool Result -> LLM Feedback Loop
+### 1.5 工具结果 -> LLM 反馈循环
 
-Each tool execution produces a `MessageUpdate` containing a user message with a `tool_result` content block:
+每次工具执行生成一个 `MessageUpdate`，包含一条带有 `tool_result` 内容块的 user 消息：
 
 ```typescript
 // toolExecution.ts
 message: createUserMessage({
   content: [{
     type: 'tool_result',
-    content: outputContent,  // stdout text or error message
+    content: outputContent,  // stdout 文本或错误消息
     is_error: boolean,
     tool_use_id: toolUse.id,
   }],
@@ -136,11 +136,11 @@ message: createUserMessage({
 })
 ```
 
-These tool_result messages are accumulated and fed back to the LLM in the next API call. The Anthropic API format requires tool_result blocks to reference the original tool_use id, closing the loop.
+这些 tool_result 消息被累积并在下一次 API 调用中反馈给 LLM。Anthropic API 格式要求 tool_result 块引用原始的 tool_use id，形成闭环。
 
-### 1.6 AgentHub Runner Integration
+### 1.6 AgentHub Runner 集成
 
-The AgentHub Runner executor should adopt the same partition-first model:
+AgentHub Runner executor 应采用相同的分区优先模型：
 
 ```go
 // packages/executor/orchestrator.go
@@ -150,7 +150,7 @@ type ToolBatch struct {
     Blocks            []ToolCall
 }
 
-// PartitionToolCalls groups adjacent concurrency-safe tools into batches.
+// PartitionToolCalls 将相邻的并发安全工具分组为批次。
 func PartitionToolCalls(calls []ToolCall, registry ToolRegistry) []ToolBatch {
     var batches []ToolBatch
     for _, call := range calls {
@@ -169,10 +169,10 @@ func PartitionToolCalls(calls []ToolCall, registry ToolRegistry) []ToolBatch {
     return batches
 }
 
-// Executor runs the partitioned tool calls.
+// Executor 运行分区后的工具调用。
 type Executor struct {
-    MaxConcurrency int           // default 10
-    PolicyEngine   *PolicyEngine // security approval
+    MaxConcurrency int           // 默认 10
+    PolicyEngine   *PolicyEngine // 安全审批
 }
 
 func (e *Executor) Execute(ctx context.Context, calls []ToolCall) <-chan ToolResult {
@@ -194,88 +194,88 @@ func (e *Executor) Execute(ctx context.Context, calls []ToolCall) <-chan ToolRes
 
 ---
 
-## 2. Bash Security Check Pipeline
+## 2. Bash 安全检查管道
 
-### 2.1 Architecture
+### 2.1 架构
 
-Claude Code's bash security is a **pipeline of 23 independent validator functions**, each returning either `passthrough` (no concern), `ask` (require user approval), or `allow` (explicitly safe). The pipeline is ordered: early-allow validators run first, then misparsing validators (which block at the gate), then non-misparsing validators (which go through standard permissions).
+Claude Code 的 bash 安全是一个**由 23 个独立 validator 函数组成的管道**，每个函数返回 `passthrough`（无问题）、`ask`（需要用户审批）或 `allow`（明确安全）。管道有序排列：early-allow validator 先运行，然后是 misparsing validator（在入口处阻断），最后是 non-misparsing validator（走标准权限流程）。
 
 ```
 bashCommandIsSafe(command):
-  1. CONTROL_CHAR_RE check (pre-processing guard)
-  2. shell-quote single-quote bug check (pre-processing guard)
-  3. extractHeredocs (strip quoted heredoc bodies)
+  1. CONTROL_CHAR_RE 检查（预处理守卫）
+  2. shell-quote 单引号 bug 检查（预处理守卫）
+  3. extractHeredocs（剥离带引号的 heredoc 正文）
   4. extractQuotedContent -> ValidationContext
-  5. EARLY VALIDATORS (allow -> passthrough return):
-     - validateEmpty (empty command is safe)
-     - validateIncompleteCommands (tab start, flag start, operator start -> ask)
-     - validateSafeCommandSubstitution ($(cat <<'EOF') -> allow)
-     - validateGitCommit (safe git commit -> allow)
-  6. MAIN VALIDATORS (ordered, with deferred non-misparsing):
-     [see full list below]
+  5. EARLY VALIDATORS（allow -> passthrough 返回）：
+     - validateEmpty（空命令安全）
+     - validateIncompleteCommands（tab 开头、flag 开头、操作符开头 -> ask）
+     - validateSafeCommandSubstitution（$(cat <<'EOF') -> allow）
+     - validateGitCommit（安全 git commit -> allow）
+  6. MAIN VALIDATORS（有序，含延迟 non-misparsing）：
+     [见下方完整列表]
 ```
 
-### 2.2 Complete Validator Catalog (23 checks)
+### 2.2 完整 Validator 目录（23 项检查）
 
-| # | Validator | Check ID | Category | Behavior on Trigger |
+| # | Validator | 检查 ID | 类别 | 触发时行为 |
 |---|-----------|----------|----------|---------------------|
-| 1 | `validateEmpty` | - | Early-allow | `allow` (empty cmd is safe) |
-| 2 | `validateIncompleteCommands` | INCOMPLETE_COMMANDS | Early-ask | Sub-1: starts with tab; Sub-2: starts with `-`; Sub-3: starts with `&&`/`\|\|`/`;`/`>>`/`<` |
-| 3 | `validateSafeCommandSubstitution` | - | Early-allow | `allow` for `$(cat <<'DELIM')`; validates heredoc body is literal text, no nested heredocs, substitution NOT in command-name position |
-| 4 | `validateGitCommit` | GIT_COMMIT_SUBSTITUTION | Early-ask | `ask` if commit message contains `$()` or backticks |
-| 5 | `validateJqCommand` | JQ_SYSTEM_FUNCTION / JQ_FILE_ARGUMENTS | Misparsing | `ask` if jq uses `system`/`env`/`input_filename` or `--rawfile`/`--slurpfile` writes |
-| 6 | `validateObfuscatedFlags` | OBFUSCATED_FLAGS | Misparsing | Block ANSI-C quoting (`$'...'`), locale quoting (`$"..."`), empty quotes before dash (`""-f`), quote concatenation obfuscation within 8 chars of dash |
-| 7 | `validateShellMetacharacters` | SHELL_METACHARACTERS | Misparsing | `ask` if `;` `\|` `&` inside quoted `find -name` / `-path` / `-regex` arguments |
-| 8 | `validateDangerousVariables` | DANGEROUS_VARIABLES | Misparsing | `ask` on variable in redirection/pipe context: `[<>\|]\s*$VAR` or `$VAR\s*[<>\|]` |
-| 9 | `validateCommentQuoteDesync` | COMMENT_QUOTE_DESYNC | Misparsing | `ask` if `#` comment contains quote chars that could desync quote tracking |
-| 10 | `validateQuotedNewline` | QUOTED_NEWLINE | Misparsing | `ask` if `\n` inside quotes followed by `#`-prefixed line (hides args from line-based checks) |
-| 11 | `validateCarriageReturn` | - | Misparsing | `ask` if `\r` in command (shell-quote treats CR as token boundary, bash does not -- parser differential) |
-| 12 | `validateNewlines` | NEWLINES | Non-misparsing | `ask` if unquoted newline followed by non-whitespace (not including `\<newline>` continuation) |
-| 13 | `validateIFSInjection` | IFS_INJECTION | Misparsing | `ask` on `$IFS` or `${...IFS...}` patterns |
-| 14 | `validateProcEnvironAccess` | PROC_ENVIRON_ACCESS | Misparsing | `ask` on `/proc/*/environ` access |
-| 15 | `validateDangerousPatterns` | DANGEROUS_PATTERNS_COMMAND_SUBSTITUTION | Misparsing | Backtick (unescaped) + 12 substitution patterns: `<()` `>()` `=()` Zsh `=cmd` expansion, `$()` `${}` `$[]` `~[]` `(e:` `(+` `}\s*always\s*{` `<#` (PowerShell) |
-| 16 | `validateRedirections` | DANGEROUS_PATTERNS_INPUT_REDIRECTION / OUTPUT_REDIRECTION | Non-misparsing | `ask` on `<` or `>` in fully-unquoted content (after stripping `>/dev/null` and `2>&1`) |
-| 17 | `validateBackslashEscapedWhitespace` | BACKSLASH_ESCAPED_WHITESPACE | Misparsing | `ask` on `\<whitespace>` patterns that could alter parsing |
-| 18 | `validateBackslashEscapedOperators` | BACKSLASH_ESCAPED_OPERATORS | Misparsing | `ask` on `\;` `\|` `\&` `\<` `\>` -- splitCommand normalizes `\;` to bare `;`, causing double-parse bugs |
-| 19 | `validateUnicodeWhitespace` | UNICODE_WHITESPACE | Misparsing | `ask` on `     -          　 ﻿` |
-| 20 | `validateMidWordHash` | MID_WORD_HASH | Misparsing | `ask` on `\S#` (non-whitespace followed by `#`) -- shell-quote treats as comment-start, bash treats as literal |
-| 21 | `validateBraceExpansion` | BRACE_EXPANSION | Misparsing | 3 sub-checks: (1) unescaped `{` with `,`/`..` at outermost depth -> brace expansion; (2) excess `}` after quote stripping (quoted-brace obfuscation); (3) quoted brace char `'{'` inside unquoted `{..}` context |
-| 22 | `validateZshDangerousCommands` | ZSH_DANGEROUS_COMMANDS | Misparsing | Block 18 Zsh commands: `zmodload em emulate sysopen sysread syswrite sysseek zpty ztcp zsocket mapfile zf_rm zf_mv zf_ln zf_chmod zf_chown zf_mkdir zf_rmdir zf_chgrp`; also block `fc -e` |
-| 23 | `validateMalformedTokenInjection` | MALFORMED_TOKEN_INJECTION | Misparsing | `ask` if command has both `;`/`&&`/`\|\|` operators AND unbalanced token delimiters (eval bypass from HackerOne review) |
+| 1 | `validateEmpty` | - | Early-allow | `allow`（空命令安全） |
+| 2 | `validateIncompleteCommands` | INCOMPLETE_COMMANDS | Early-ask | 子项-1：tab 开头；子项-2：`-` 开头；子项-3：`&&`/`\|\|`/`;`/`>>`/`<` 开头 |
+| 3 | `validateSafeCommandSubstitution` | - | Early-allow | `allow` 用于 `$(cat <<'DELIM')`；验证 heredoc 正文为字面文本、无嵌套 heredoc、替换不在命令名位置 |
+| 4 | `validateGitCommit` | GIT_COMMIT_SUBSTITUTION | Early-ask | 如果 commit message 包含 `$()` 或反引号则 `ask` |
+| 5 | `validateJqCommand` | JQ_SYSTEM_FUNCTION / JQ_FILE_ARGUMENTS | Misparsing | 如果 jq 使用 `system`/`env`/`input_filename` 或 `--rawfile`/`--slurpfile` 写入则 `ask` |
+| 6 | `validateObfuscatedFlags` | OBFUSCATED_FLAGS | Misparsing | 阻断 ANSI-C 引用（`$'...'`）、locale 引用（`$"..."`）、横线前空引号（`""-f`）、横线 8 字符内引号拼接混淆 |
+| 7 | `validateShellMetacharacters` | SHELL_METACHARACTERS | Misparsing | 引号内 `find -name` / `-path` / `-regex` 参数中出现 `;` `\|` `&` 时 `ask` |
+| 8 | `validateDangerousVariables` | DANGEROUS_VARIABLES | Misparsing | 变量出现在重定向/管道上下文中时 `ask`：`[<>\|]\s*$VAR` 或 `$VAR\s*[<>\|]` |
+| 9 | `validateCommentQuoteDesync` | COMMENT_QUOTE_DESYNC | Misparsing | `#` 注释中包含可能导致引号跟踪不同步的引号字符时 `ask` |
+| 10 | `validateQuotedNewline` | QUOTED_NEWLINE | Misparsing | 引号内 `\n` 后跟 `#` 前缀行时 `ask`（对基于行的检查隐藏参数） |
+| 11 | `validateCarriageReturn` | - | Misparsing | 命令中出现 `\r` 时 `ask`（shell-quote 将 CR 视为 token 边界，bash 不视为——解析器差异） |
+| 12 | `validateNewlines` | NEWLINES | Non-misparsing | 非引号内换行后跟非空白字符时 `ask`（不包括 `\<newline>` 续行） |
+| 13 | `validateIFSInjection` | IFS_INJECTION | Misparsing | `$IFS` 或 `${...IFS...}` 模式时 `ask` |
+| 14 | `validateProcEnvironAccess` | PROC_ENVIRON_ACCESS | Misparsing | 访问 `/proc/*/environ` 时 `ask` |
+| 15 | `validateDangerousPatterns` | DANGEROUS_PATTERNS_COMMAND_SUBSTITUTION | Misparsing | 反引号（未转义）+ 12 种替换模式：`<()` `>()` `=()` Zsh `=cmd` 展开、`$()` `${}` `$[]` `~[]` `(e:` `(+` `}\s*always\s*{` `<#`（PowerShell） |
+| 16 | `validateRedirections` | DANGEROUS_PATTERNS_INPUT_REDIRECTION / OUTPUT_REDIRECTION | Non-misparsing | 完全去引号内容中出现 `<` 或 `>` 时 `ask`（剥离 `>/dev/null` 和 `2>&1` 之后） |
+| 17 | `validateBackslashEscapedWhitespace` | BACKSLASH_ESCAPED_WHITESPACE | Misparsing | 可能改变解析的 `\<whitespace>` 模式时 `ask` |
+| 18 | `validateBackslashEscapedOperators` | BACKSLASH_ESCAPED_OPERATORS | Misparsing | `\;` `\|` `\&` `\<` `\>` 时 `ask`——splitCommand 将 `\;` 规范化为裸 `;`，导致双重解析 bug |
+| 19 | `validateUnicodeWhitespace` | UNICODE_WHITESPACE | Misparsing | `     -          　 ﻿` 时 `ask` |
+| 20 | `validateMidWordHash` | MID_WORD_HASH | Misparsing | `\S#`（非空白后跟 `#`）时 `ask`——shell-quote 视为注释开始，bash 视为字面量 |
+| 21 | `validateBraceExpansion` | BRACE_EXPANSION | Misparsing | 3 个子检查：(1) 最外层深度未转义 `{` 带 `,`/`..` -> 花括号展开；(2) 去除引号后多出 `}`（引号花括号混淆）；(3) 非引号 `{..}` 上下文中出现引号花括号字符 `'{'` |
+| 22 | `validateZshDangerousCommands` | ZSH_DANGEROUS_COMMANDS | Misparsing | 阻断 18 条 Zsh 命令：`zmodload em emulate sysopen sysread syswrite sysseek zpty ztcp zsocket mapfile zf_rm zf_mv zf_ln zf_chmod zf_chown zf_mkdir zf_rmdir zf_chgrp`；同时阻断 `fc -e` |
+| 23 | `validateMalformedTokenInjection` | MALFORMED_TOKEN_INJECTION | Misparsing | 命令同时包含 `;`/`&&`/`\|\|` 操作符和未平衡 token 分隔符时 `ask`（来自 HackerOne 审查的 eval 绕过） |
 
-### 2.3 Pre-Processing Guards (before validators run)
+### 2.3 预处理守卫（在 validator 运行之前）
 
-**Control characters** (check before anything else):
+**控制字符**（在其他任何检查之前）：
 ```typescript
 const CONTROL_CHAR_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/
-// Excludes tab (0x09), newline (0x0A), carriage return (0x0D)
-// Bash silently drops null bytes and ignores most control chars
+// 排除 tab（0x09）、换行（0x0A）、回车（0x0D）
+// Bash 静默丢弃 null 字节并忽略大多数控制字符
 ```
 
-**Shell-quote single-quote bug** (check before shell-quote parsing):
+**Shell-quote 单引号 bug**（在 shell-quote 解析之前检查）：
 ```typescript
 if (hasShellQuoteSingleQuoteBug(command)) {
   return { behavior: 'ask', ... }
 }
-// Detects backslash patterns inside single quotes that shell-quote mishandles
+// 检测单引号内 shell-quote 错误处理的反射杠模式
 ```
 
-**Heredoc stripping** (runs before quote extraction):
+**Heredoc 剥离**（在引号提取之前运行）：
 ```typescript
 const { processedCommand } = extractHeredocs(command, { quotedOnly: true })
-// Only strips bodies of quoted/escaped delimiters (<<'EOF', <<\EOF)
-// Unquoted heredocs (<<EOF) kept intact -- their bodies may have $() expansion
+// 仅剥离带引号/转义定界符的正文（<<'EOF'、<<\EOF）
+// 非引号 heredocs（<<EOF）保持原样——其正文可能含有 $() 展开
 ```
 
-### 2.4 Misparsing vs Non-Misparsing Classification
+### 2.4 Misparsing 与 Non-Misparsing 分类
 
-A critical distinction in the pipeline:
+管道中的关键区分：
 
-- **Misparsing validators** (21 of 23): their `ask` results carry `isBashSecurityCheckForMisparsing: true`. The bashPermissions gate **blocks** these early -- no allowlist rule can override a misparsing concern. This is because the security parser itself cannot reliably determine what the command does.
+- **Misparsing validator**（23 个中的 21 个）：它们的 `ask` 结果带有 `isBashSecurityCheckForMisparsing: true`。bashPermissions 入口**提前阻断**它们——没有 allowlist 规则可以覆盖 misparsing 问题。因为安全解析器本身无法可靠判断命令的行为。
 
-- **Non-misparsing validators** (2 of 23): `validateNewlines` and `validateRedirections`. These patterns are correctly parsed by both shell-quote and bash. Their `ask` results go through the standard permission flow (allowlist rules can auto-approve).
+- **Non-misparsing validator**（23 个中的 2 个）：`validateNewlines` 和 `validateRedirections`。这些模式被 shell-quote 和 bash 正确解析。它们的 `ask` 结果走标准权限流程（allowlist 规则可以自动批准）。
 
-- **Deferred non-misparsing**: if a non-misparsing validator fires first, its result is deferred. The pipeline continues running misparsing validators. Only if no misparsing validator fires is the deferred result returned.
+- **延迟 non-misparsing**：如果 non-misparsing validator 首先触发，其结果被延迟。管道继续运行 misparsing validator。只有没有 misparsing validator 触发时，才返回延迟结果。
 
 ```typescript
 let deferredNonMisparsingResult: PermissionResult | null = null
@@ -286,74 +286,74 @@ for (const validator of validators) {
       if (deferredNonMisparsingResult === null) {
         deferredNonMisparsingResult = result
       }
-      continue  // keep running to let misparsing validators fire
+      continue  // 继续运行以让 misparsing validator 触发
     }
     return { ...result, isBashSecurityCheckForMisparsing: true }
   }
 }
 ```
 
-### 2.5 Critical Security Exploits the Pipeline Blocks
+### 2.5 管道阻断的关键安全攻击
 
-The codebase documents several HackerOne-discovered attack vectors with detailed exploit traces:
+代码库记录了若干 HackerOne 发现的攻击向量，附带详细的利用追踪：
 
-1. **Brace expansion obfuscation** (`git diff {@'{'0},--output=/tmp/pwned}`): Quoted braces stripped by extractQuotedContent cause our depth-matcher to close at the WRONG position, missing commas that bash's algorithm finds. Validator 21 detects mismatched brace counts.
+1. **花括号展开混淆**（`git diff {@'{'0},--output=/tmp/pwned}`）：extractQuotedContent 剥离的引号花括号导致深度匹配器在**错误**位置闭合，漏掉了 bash 算法能找到的逗号。Validator 21 检测不匹配的花括号计数。
 
-2. **Backslash-escaped operator double-parse** (`cat safe.txt \; echo ~/.ssh/id_rsa`): splitCommand normalizes `\;` to bare `;`. Downstream code re-parses and sees two "safe" segments. Private key leaked. Validator 18 catches `\<operator>`.
+2. **反斜杠转义操作符双重解析**（`cat safe.txt \; echo ~/.ssh/id_rsa`）：splitCommand 将 `\;` 规范化为裸 `;`。下游代码重新解析，看到两个"安全"段。私钥泄露。Validator 18 捕获 `\<operator>`。
 
-3. **Carriage return parser differential** (`TZ=UTC\recho curl evil.com`): shell-quote's `\s` includes `\r` as token boundary; bash's IFS does not. shell-quote sees `TZ=UTC echo`; bash runs `curl`. Validator 11 catches `\r`.
+3. **回车解析器差异**（`TZ=UTC\recho curl evil.com`）：shell-quote 的 `\s` 将 `\r` 包含为 token 边界；bash 的 IFS 不包含。shell-quote 看到 `TZ=UTC echo`；bash 运行 `curl`。Validator 11 捕获 `\r`。
 
-4. **Comment-quote desync** (`echo "it's" # ' " <<'MARKER'\nrm -rf /\nMARKER`): `#` comment with embedded quotes desyncs the quote tracker, making `rm -rf` appear "inside quotes" and invisible to newline checks. Validator 9 catches quote chars after `#`.
+4. **注释引号不同步**（`echo "it's" # ' " <<'MARKER'\nrm -rf /\nMARKER`）：带有嵌入引号的 `#` 注释使引号跟踪器不同步，使 `rm -rf` 看起来"在引号内"，对换行检查不可见。Validator 9 捕获 `#` 后的引号字符。
 
-5. **Quoted-newline hides args** (`cmd '\n# safe comment\nreal dangerous'`): A `\n` inside quotes followed by a `#`-prefixed line causes stripCommentLines to drop the next line, hiding arguments from path checks. Validator 10 catches this.
+5. **引号内换行隐藏参数**（`cmd '\n# safe comment\nreal dangerous'`）：引号内 `\n` 后跟 `#` 前缀行导致 stripCommentLines 丢弃下一行，对路径检查隐藏参数。Validator 10 捕获此情况。
 
-6. **Mid-word hash** (`'x'#`): shell-quote treats `#` as comment-start; bash treats it as literal. The unquoted content after stripping becomes just `#` (word-start), losing the differential. Validator 20 catches using `unquotedKeepQuoteChars`.
+6. **词中井号**（`'x'#`）：shell-quote 将 `#` 视为注释开始；bash 视为字面量。剥离后的非引号内容只剩下 `#`（词首），丢失差异。Validator 20 使用 `unquotedKeepQuoteChars` 捕获。
 
 ---
 
-## 3. AgentHub Security Check Implementation (Go)
+## 3. AgentHub 安全检查实现（Go）
 
-### 3.1 Core Types
+### 3.1 核心类型
 
 ```go
 // packages/security/bash_security.go
 
-// SecurityViolation represents a detected security concern.
+// SecurityViolation 表示检测到的安全问题。
 type SecurityViolation struct {
     CheckID      SecurityCheckID
     SubID        int
-    Pattern      string // human-readable pattern description
-    IsMisparsing bool   // true if parser differential, blocks allowlist override
+    Pattern      string // 人类可读的模式描述
+    IsMisparsing bool   // true 表示解析器差异，阻断 allowlist 覆盖
     Severity     Severity
 }
 
 type Severity string
 
 const (
-    SeverityLow    Severity = "low"    // non-misparsing, allowlist can override
-    SeverityMedium Severity = "medium" // misparsing concern
-    SeverityHigh   Severity = "high"   // confirmed bypass vector
-    SeverityBlock  Severity = "block"  // always deny
+    SeverityLow    Severity = "low"    // non-misparsing，allowlist 可覆盖
+    SeverityMedium Severity = "medium" // misparsing 问题
+    SeverityHigh   Severity = "high"   // 已确认绕过向量
+    SeverityBlock  Severity = "block"  // 始终拒绝
 )
 
-// CheckContext carries the parsed command state for validators.
+// CheckContext 携带 validator 所需的已解析命令状态。
 type CheckContext struct {
     OriginalCommand      string
     BaseCommand          string
-    UnquotedContent      string // double quotes stripped
-    FullyUnquotedContent string // all quotes stripped, safe redirections removed
-    FullyUnquotedPreStrip string // before stripSafeRedirections
-    UnquotedKeepQuoteChars string // quotes preserved, content stripped
-    TreeSitterAST        *TreeSitterAnalysis // optional AST for authoritative parsing
+    UnquotedContent      string // 双引号已剥离
+    FullyUnquotedContent string // 所有引号已剥离，安全重定向已移除
+    FullyUnquotedPreStrip string // stripSafeRedirections 之前
+    UnquotedKeepQuoteChars string // 引号保留，内容已剥离
+    TreeSitterAST        *TreeSitterAnalysis // 可选 AST 用于权威解析
 }
 
-// SecurityValidator is a single security check.
+// SecurityValidator 是一次安全检查。
 type SecurityValidator func(cmd string, ctx CheckContext) *SecurityViolation
 ```
 
-### 3.2 Validator Implementations
+### 3.2 Validator 实现
 
-#### Check 1: Empty Command (early-allow)
+#### 检查 1：空命令（early-allow）
 
 ```go
 func ValidateEmpty(ctx CheckContext) *SecurityViolation {
@@ -364,7 +364,7 @@ func ValidateEmpty(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-#### Check 2: Incomplete Commands (early-ask)
+#### 检查 2：不完整命令（early-ask）
 
 ```go
 func ValidateIncompleteCommands(ctx CheckContext) *SecurityViolation {
@@ -394,7 +394,7 @@ func ValidateIncompleteCommands(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-#### Check 3-4: Heredoc & Git Commit (early-allow/ask)
+#### 检查 3-4：Heredoc 与 Git Commit（early-allow/ask）
 
 ```go
 var heredocInSubstitution = regexp.MustCompile(`\$\(.*<<`)
@@ -404,13 +404,13 @@ func ValidateSafeCommandSubstitution(ctx CheckContext) *SecurityViolation {
         return nil
     }
     if isSafeHeredoc(ctx.OriginalCommand) {
-        return nil // early-allow: safe heredoc pattern
+        return nil // early-allow：安全 heredoc 模式
     }
-    return nil // fall through to main validators
+    return nil // 交由主 validator 处理
 }
 
 func ValidateGitCommit(ctx CheckContext) *SecurityViolation {
-    // Ask if commit message (-m) contains $() or backtick substitution
+    // 如果 commit message（-m）包含 $() 或反引号替换则 ask
     if gitCommitRe.MatchString(ctx.OriginalCommand) {
         if containsSubstitution(ctx.UnquotedContent) {
             return &SecurityViolation{
@@ -424,7 +424,7 @@ func ValidateGitCommit(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-#### Check 5: JQ Dangerous Functions
+#### 检查 5：JQ 危险函数
 
 ```go
 var jqSystemFuncRe = regexp.MustCompile(`\b(system|env|input_filename)\b`)
@@ -452,7 +452,7 @@ func ValidateJqCommand(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-#### Check 6: Obfuscated Flags (ANSI-C quoting, empty-quote bypass)
+#### 检查 6：混淆 Flags（ANSI-C 引用、空引号绕过）
 
 ```go
 var ansiCQuoteRe = regexp.MustCompile(`\$'[^']*'`)
@@ -461,7 +461,7 @@ var emptyQuoteDashRe = regexp.MustCompile(`(?m)(?:^|\s)(?:''|"")+\s*-`)
 var conjugateDashRe = regexp.MustCompile(`([\x27\x22]{2,})\s{0,8}-`)
 
 func ValidateObfuscatedFlags(ctx CheckContext) *SecurityViolation {
-    // echo is safe
+    // echo 是安全的
     hasOps, _ := regexp.MatchString(`[|&;]`, ctx.OriginalCommand)
     if ctx.BaseCommand == "echo" && !hasOps {
         return nil
@@ -487,7 +487,7 @@ func ValidateObfuscatedFlags(ctx CheckContext) *SecurityViolation {
             IsMisparsing: true, Severity: SeverityHigh,
         }
     }
-    // Quote concatenation obfuscation: \"\"\"\\s{0,8}-
+    // 引号拼接混淆：\"\"\"\\s{0,8}-
     if conjugateDashRe.MatchString(ctx.OriginalCommand) {
         return &SecurityViolation{
             CheckID: CheckObfuscatedFlags, SubID: 8,
@@ -499,7 +499,7 @@ func ValidateObfuscatedFlags(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-#### Checks 7-8: Shell Metacharacters & Dangerous Variables
+#### 检查 7-8：Shell 元字符与危险变量
 
 ```go
 var quotedMetacharRe = regexp.MustCompile(`(?:^|\s)["'][^"']*[;&][^"']*["'](?:\s|$)`)
@@ -522,15 +522,15 @@ func ValidateDangerousVariables(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-#### Checks 9-11: Comment Desync, Quoted Newline, Carriage Return
+#### 检查 9-11：注释不同步、引号内换行、回车
 
 ```go
 func ValidateCommentQuoteDesync(ctx CheckContext) *SecurityViolation {
     if ctx.TreeSitterAST != nil {
-        return nil // AST is authoritative, no desync possible
+        return nil // AST 是权威的，不可能不同步
     }
-    // Scan for unquoted # followed by quote char on same line
-    // Detailed quote-state machine (see Section 2.5, attack #4)
+    // 扫描：同一行内非引号 # 后跟引号字符
+    // 详细引号状态机（见第 2.5 节，攻击 #4）
     ...
 }
 
@@ -539,7 +539,7 @@ func ValidateQuotedNewline(ctx CheckContext) *SecurityViolation {
        !strings.Contains(ctx.OriginalCommand, "#") {
         return nil
     }
-    // Scan: \n inside quotes, next line starts with # -> ask
+    // 扫描：引号内 \n，下一行以 # 开头 -> ask
     ...
 }
 
@@ -548,14 +548,14 @@ func ValidateCarriageReturn(ctx CheckContext) *SecurityViolation {
         return nil
     }
     return &SecurityViolation{
-        CheckID: CheckControlCharacters, // reuses control char ID
+        CheckID: CheckControlCharacters, // 复用控制字符 ID
         Pattern: "carriage return causes parser differential",
         IsMisparsing: true, Severity: SeverityHigh,
     }
 }
 ```
 
-#### Check 12: Newlines (non-misparsing)
+#### 检查 12：换行（non-misparsing）
 
 ```go
 var looksLikeCommandRe = regexp.MustCompile(`(?<![\s]\\)[\n\r]\s*\S`)
@@ -575,7 +575,7 @@ func ValidateNewlines(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-#### Check 13: IFS Injection
+#### 检查 13：IFS 注入
 
 ```go
 var ifsInjectionRe = regexp.MustCompile(`\$IFS|\$\{[^}]*IFS`)
@@ -592,7 +592,7 @@ func ValidateIFSInjection(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-#### Check 14: /proc/*/environ Access
+#### 检查 14：/proc/*/environ 访问
 
 ```go
 var procEnvironRe = regexp.MustCompile(`/proc/.*/environ`)
@@ -609,7 +609,7 @@ func ValidateProcEnvironAccess(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-#### Check 15: Command Substitution Patterns (12 patterns + backtick)
+#### 检查 15：命令替换模式（12 种模式 + 反引号）
 
 ```go
 var commandSubstitutionPatterns = []struct {
@@ -631,7 +631,7 @@ var commandSubstitutionPatterns = []struct {
 }
 
 func hasUnescapedBacktick(content string) bool {
-    // State machine: skip backslash-escaped chars, detect bare `
+    // 状态机：跳过反斜杠转义字符，检测裸 `
     ...
 }
 
@@ -656,7 +656,7 @@ func ValidateDangerousPatterns(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-#### Checks 16-18: Redirections, Backslash Escapes
+#### 检查 16-18：重定向、反斜杠转义
 
 ```go
 func ValidateRedirections(ctx CheckContext) *SecurityViolation {
@@ -692,12 +692,12 @@ func ValidateBackslashEscapedOperators(ctx CheckContext) *SecurityViolation {
     return nil
 }
 
-// hasBackslashEscapedOperator: state machine tracking single/double quote state,
-// detects \<operator> outside double quotes (safe inside double quotes).
-// Critical: backslash check runs BEFORE quote toggle (see Section 2.5, attack #2).
+// hasBackslashEscapedOperator：跟踪单/双引号状态的状态机，
+// 检测双引号外的 \<operator>（在双引号内是安全的）。
+// 关键：反斜杠检查在引号切换之前运行（见第 2.5 节，攻击 #2）。
 ```
 
-#### Checks 19-21: Unicode, Mid-Word Hash, Brace Expansion
+#### 检查 19-21：Unicode、词中井号、花括号展开
 
 ```go
 var unicodeWSRe = regexp.MustCompile(
@@ -708,7 +708,7 @@ func ValidateUnicodeWhitespace(ctx CheckContext) *SecurityViolation { ... }
 var midWordHashRe = regexp.MustCompile(`\S(?<!\$\{)#`)
 
 func ValidateMidWordHash(ctx CheckContext) *SecurityViolation {
-    // Check original + continuation-joined versions
+    // 检查原始版本和续行合并版本
     joined := joinLineContinuations(ctx.UnquotedKeepQuoteChars)
     if midWordHashRe.MatchString(ctx.UnquotedKeepQuoteChars) ||
        midWordHashRe.MatchString(joined) {
@@ -723,7 +723,7 @@ func ValidateMidWordHash(ctx CheckContext) *SecurityViolation {
 
 func ValidateBraceExpansion(ctx CheckContext) *SecurityViolation {
     content := ctx.FullyUnquotedPreStrip
-    // Sub-2: Mismatched brace counts after quote stripping
+    // 子项-2：去除引号后花括号计数不匹配
     open, close := countUnescapedBraces(content)
     if open > 0 && close > open {
         return &SecurityViolation{
@@ -732,7 +732,7 @@ func ValidateBraceExpansion(ctx CheckContext) *SecurityViolation {
             IsMisparsing: true, Severity: SeverityHigh,
         }
     }
-    // Sub-3: Quoted brace inside unquoted brace context
+    // 子项-3：非引号花括号上下文中出现引号花括号
     if open > 0 && quotedBraceRe.MatchString(ctx.OriginalCommand) {
         return &SecurityViolation{
             CheckID: CheckBraceExpansion, SubID: 3,
@@ -740,7 +740,7 @@ func ValidateBraceExpansion(ctx CheckContext) *SecurityViolation {
             IsMisparsing: true, Severity: SeverityHigh,
         }
     }
-    // Sub-1: Scan for {a,b} or {a..b} at outermost nesting level
+    // 子项-1：在最外层嵌套级别扫描 {a,b} 或 {a..b}
     if hasBraceExpansion(content) {
         return &SecurityViolation{
             CheckID: CheckBraceExpansion, SubID: 1,
@@ -752,7 +752,7 @@ func ValidateBraceExpansion(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-#### Check 22: Zsh Dangerous Commands (18 commands + fc -e)
+#### 检查 22：Zsh 危险命令（18 条命令 + fc -e）
 
 ```go
 var zshDangerousCommands = map[string]bool{
@@ -773,7 +773,7 @@ func ExtractBaseCommand(trimmed string) string {
     for _, tok := range tokens {
         if strings.ContainsRune(tok, '=') &&
            regexp.MustCompile(`^[A-Za-z_]\w*=`).MatchString(tok) {
-            continue // env var assignment
+            continue // 环境变量赋值
         }
         if zshPrecommandModifiers[tok] {
             continue
@@ -804,13 +804,13 @@ func ValidateZshDangerousCommands(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-#### Check 23: Malformed Token Injection (eval bypass)
+#### 检查 23：畸形 Token 注入（eval 绕过）
 
 ```go
 func ValidateMalformedTokenInjection(ctx CheckContext) *SecurityViolation {
     tokens := tryParseShellCommand(ctx.OriginalCommand)
     if tokens == nil {
-        return nil // handled elsewhere
+        return nil // 由其他地方处理
     }
     hasCommandSeparator := false
     for _, t := range tokens {
@@ -833,11 +833,11 @@ func ValidateMalformedTokenInjection(ctx CheckContext) *SecurityViolation {
 }
 ```
 
-### 3.3 Pipeline Orchestrator (Go)
+### 3.3 管道编排器（Go）
 
 ```go
-// SecurityPipeline runs all validators in order, returning the first blocking result.
-// Mirrors the CC priority: early-allow -> misparsing -> deferred non-misparsing.
+// SecurityPipeline 按顺序运行所有 validator，返回第一个阻断结果。
+// 镜像 CC 优先级：early-allow -> misparsing -> deferred non-misparsing。
 type SecurityPipeline struct {
     EarlyValidators     []SecurityValidator
     MisparsingValidators []SecurityValidator
@@ -881,7 +881,7 @@ func NewSecurityPipeline() *SecurityPipeline {
 }
 
 func (p *SecurityPipeline) Evaluate(command string) *SecurityViolation {
-    // Pre-processing: control characters
+    // 预处理：控制字符
     if p.ControlCharRe.MatchString(command) {
         return &SecurityViolation{
             CheckID: CheckControlCharacters,
@@ -890,10 +890,10 @@ func (p *SecurityPipeline) Evaluate(command string) *SecurityViolation {
         }
     }
 
-    // Pre-processing: extract heredocs (quoted-only)
+    // 预处理：提取 heredocs（仅引号类型）
     processedCmd := extractHeredocs(command, true)
 
-    // Build context
+    // 构建上下文
     baseCmd := strings.Split(processedCmd, " ")[0]
     withDQ, fullyUQ, keepQC := extractQuotedContent(processedCmd, baseCmd == "jq")
     fullyUQStripped := stripSafeRedirections(fullyUQ)
@@ -907,38 +907,38 @@ func (p *SecurityPipeline) Evaluate(command string) *SecurityViolation {
         UnquotedKeepQuoteChars: keepQC,
     }
 
-    // Early validators (allow -> return nil)
+    // Early validators（allow -> 返回 nil）
     for _, v := range p.EarlyValidators {
         result := v(command, ctx)
         if result != nil {
             if result.Severity == SeverityLow {
-                return nil // early-allow (safe heredoc, empty cmd, safe git)
+                return nil // early-allow（安全 heredoc、空命令、安全 git）
             }
             return result
         }
     }
 
-    // Main validators with deferred non-misparsing
+    // 主 validator，含延迟 non-misparsing
     var deferred *SecurityViolation
     for _, v := range p.MisparsingValidators {
         if result := v(command, ctx); result != nil {
-            return result // misparsing -> block immediately
+            return result // misparsing -> 立即阻断
         }
     }
     for _, v := range p.NonMisparsingValidators {
         if result := v(command, ctx); result != nil {
-            deferred = result // non-misparsing -> defer
+            deferred = result // non-misparsing -> 延迟
         }
     }
     if deferred != nil {
         return deferred
     }
 
-    return nil // safe
+    return nil // 安全
 }
 ```
 
-### 3.4 SecurityCheckID Enum (Go)
+### 3.4 SecurityCheckID 枚举（Go）
 
 ```go
 type SecurityCheckID int
@@ -972,37 +972,37 @@ const (
 
 ---
 
-## 4. Timeout & Backgrounding Strategy
+## 4. 超时与后台化策略
 
-### 4.1 Claude Code Constants
+### 4.1 Claude Code 常量
 
 ```typescript
 // BashTool.tsx
-const PROGRESS_THRESHOLD_MS = 2000;           // show progress after 2s
-const ASSISTANT_BLOCKING_BUDGET_MS = 15_000;  // auto-background after 15s in assistant mode
+const PROGRESS_THRESHOLD_MS = 2000;           // 2s 后显示进度
+const ASSISTANT_BLOCKING_BUDGET_MS = 15_000;  // assistant 模式下 15s 后自动后台化
 
 // BashTool/prompt.ts
-export function getDefaultTimeoutMs(): number { return 120_000 } // 2 min
-export function getMaxTimeoutMs(): number { return 600_000 }     // 10 min
+export function getDefaultTimeoutMs(): number { return 120_000 } // 2 分钟
+export function getMaxTimeoutMs(): number { return 600_000 }     // 10 分钟
 ```
 
-### 4.2 Backgrounding Flow
+### 4.2 后台化流程
 
 ```
 Command starts
   |
-  +-- 2s (PROGRESS_THRESHOLD_MS): if still running, show progress UI
+  +-- 2s (PROGRESS_THRESHOLD_MS): 如果仍在运行，显示进度 UI
   |
-  +-- 15s (ASSISTANT_BLOCKING_BUDGET_MS): if in Kairos/assistant mode,
-  |     auto-background the command. Command continues running;
-  |     the agent gets a backgroundTaskId and can keep working.
+  +-- 15s (ASSISTANT_BLOCKING_BUDGET_MS): 如果在 Kairos/assistant 模式，
+  |     命令自动后台化。命令继续运行；
+  |     agent 获得 backgroundTaskId，可以继续工作。
   |
-  +-- 120s (default timeout): if configuredn't, kill the command.
+  +-- 120s (default timeout): 如果被配置，终止命令。
   |
-  +-- 600s (max timeout): hard limit; SIGKILL.
+  +-- 600s (max timeout): 硬限制；SIGKILL。
 ```
 
-Background results notification:
+后台结果通知：
 ```typescript
 backgroundInfo = `Command exceeded the assistant-mode blocking budget (${
   ASSISTANT_BLOCKING_BUDGET_MS / 1000}s) and was moved to the background
@@ -1010,28 +1010,28 @@ backgroundInfo = `Command exceeded the assistant-mode blocking budget (${
   when it completes. Output is being written to: ${outputPath}.`
 ```
 
-### 4.3 AgentHub Timeout Strategy
+### 4.3 AgentHub 超时策略
 
 ```go
 // packages/executor/timeout.go
 
 type TimeoutConfig struct {
-    ProgressThreshold time.Duration // 2s  — show "Running..." feedback
-    BlockingBudget    time.Duration // 15s — auto-background after this
-    DefaultTimeout    time.Duration // 120s — default timeout
-    MaxTimeout        time.Duration // 600s — user-specified max
+    ProgressThreshold time.Duration // 2s  — 显示"Running..."反馈
+    BlockingBudget    time.Duration // 15s — 此后自动后台化
+    DefaultTimeout    time.Duration // 120s — 默认超时
+    MaxTimeout        time.Duration // 600s — 用户指定的最大值
 }
 
 type TimeoutStrategy int
 
 const (
-    TimeoutStrategyDefault     TimeoutStrategy = iota // 120s timeout, 15s bg
-    TimeoutStrategyInteractive                        // shorter: 30s bg
-    TimeoutStrategyBatch                              // longer: 300s timeout
-    TimeoutStrategyBackground                         // no blocking budget
+    TimeoutStrategyDefault     TimeoutStrategy = iota // 120s 超时，15s 后台化
+    TimeoutStrategyInteractive                        // 更短：30s 后台化
+    TimeoutStrategyBatch                              // 更长：300s 超时
+    TimeoutStrategyBackground                         // 无阻断预算
 )
 
-// BackgroundContext holds the state for a moved-to-background task.
+// BackgroundContext 保存已转入后台任务的状态。
 type BackgroundContext struct {
     TaskID        string
     Command       string
@@ -1059,7 +1059,7 @@ type BackgroundResult struct {
 }
 ```
 
-### 4.4 Timeout Enforcement in the Executor
+### 4.4 Executor 中的超时执行
 
 ```go
 func (e *Executor) runWithTimeout(
@@ -1067,7 +1067,7 @@ func (e *Executor) runWithTimeout(
     call ToolCall,
     cfg TimeoutConfig,
 ) (*ToolResult, error) {
-    // Create sub-context with timeout
+    // 创建带超时的子上下文
     timeout := call.Timeout
     if timeout == 0 {
         timeout = cfg.DefaultTimeout
@@ -1078,11 +1078,11 @@ func (e *Executor) runWithTimeout(
     execCtx, cancel := context.WithTimeout(ctx, timeout)
     defer cancel()
 
-    // Progress notification after threshold
+    // 超过阈值后发出进度通知
     progressTimer := time.NewTimer(cfg.ProgressThreshold)
     defer progressTimer.Stop()
 
-    // Auto-background timer (assistant mode only)
+    // 自动后台化定时器（仅 assistant 模式）
     bgTimer := time.NewTimer(cfg.BlockingBudget)
     defer bgTimer.Stop()
 
@@ -1105,10 +1105,10 @@ func (e *Executor) runWithTimeout(
         case err := <-errCh:
             return nil, err
         case <-progressTimer.C:
-            // Emit progress event to stream
+            // 向流发出进度事件
             e.emitProgress(call, "still running...")
         case <-bgTimer.C:
-            // Move to background
+            // 转入后台
             return e.moveToBackground(ctx, call, execCtx, resultCh, errCh), nil
         case <-execCtx.Done():
             return nil, execCtx.Err()
@@ -1119,9 +1119,9 @@ func (e *Executor) runWithTimeout(
 
 ---
 
-## 5. AgentHub PolicyEngine Design
+## 5. AgentHub PolicyEngine 设计
 
-### 5.1 Architecture
+### 5.1 架构
 
 ```
 Agent CLI requests tool execution
@@ -1132,10 +1132,10 @@ Agent CLI requests tool execution
   |
   +-- Pre-check: SecurityPipeline.Evaluate(command) -> violation?
   |     |
-  |     +-- SeverityBlock? -> DENY (no user prompt)
-  |     +-- SeverityHigh? -> marked as mandatory ask
+  |     +-- SeverityBlock? -> DENY（不提示用户）
+  |     +-- SeverityHigh? -> 标记为强制 ask
   |
-  +-- Rule evaluation (priority-ordered)
+  +-- Rule evaluation（按优先级排序）
   |     for each PolicyRule (sorted by Priority):
   |       if rule.Match matches toolCall:
   |         return rule.Action
@@ -1150,16 +1150,16 @@ Agent CLI requests tool execution
         apply decision to tool execution
 ```
 
-### 5.2 PolicyEngine Interface & Implementation
+### 5.2 PolicyEngine 接口与实现
 
 ```go
 // packages/security/policy_engine.go
 
-// PolicyEngine evaluates tool calls against configured rules and security checks.
-// Rules are ordered by priority; first match wins (stop processing).
-// Security pipeline runs before rules for blocking violations.
+// PolicyEngine 根据配置的规则和安全检查评估工具调用。
+// 规则按优先级排序；首个匹配即胜出（停止处理）。
+// 安全管道在规则之前运行，以处理阻断性违规。
 type PolicyEngine struct {
-    rules             []PolicyRule        // sorted by Priority
+    rules             []PolicyRule        // 按 Priority 排序
     securityPipeline  *SecurityPipeline
     riskPatterns      []HighRiskPattern
     decisionCache     map[string]*CachedDecision // toolCallID -> decision
@@ -1182,21 +1182,21 @@ type CachedDecision struct {
     ExpiresAt time.Time
 }
 
-// Evaluate determines the decision for a tool call.
-// Flow:
-//   1. BypassPermissions mode: auto-allow (read-only check still runs)
-//   2. Plan mode: allow only read-only tools
-//   3. Check cached decisions (per-thread, per-session scope)
-//   4. Run security pipeline on bash commands
-//   5. Match against high-risk patterns (auto-deny patterns)
-//   6. Evaluate policy rules in priority order
-//   7. Default behavior based on ToolDescriptor
+// Evaluate 确定工具调用的决策。
+// 流程：
+//   1. BypassPermissions 模式：自动允许（仍运行只读检查）
+//   2. Plan 模式：仅允许只读工具
+//   3. 检查缓存决策（per-thread、per-session 作用域）
+//   4. 对 bash 命令运行安全管道
+//   5. 匹配高风险模式（自动拒绝模式）
+//   6. 按优先级顺序评估 policy rules
+//   7. 基于 ToolDescriptor 的默认行为
 func (pe *PolicyEngine) Evaluate(
     toolCall ToolCall,
     ctx EvalContext,
 ) *ApprovalDecision {
 
-    // Fast path: bypass mode
+    // 快速路径：bypass 模式
     if ctx.PermissionMode == "bypassPermissions" {
         if toolCall.IsReadOnly {
             return &ApprovalDecision{
@@ -1206,7 +1206,7 @@ func (pe *PolicyEngine) Evaluate(
                 Scope:   ScopeOnce,
             }
         }
-        // Write tools in bypass still auto-accepted (user opted in)
+        // bypass 模式下的写入工具仍然自动接受（用户选择加入）
         return &ApprovalDecision{
             Type:    DecisionAccept,
             Reason:  "bypassPermissions mode",
@@ -1215,7 +1215,7 @@ func (pe *PolicyEngine) Evaluate(
         }
     }
 
-    // Plan mode: only read-only allowed
+    // Plan 模式：仅允许只读
     if ctx.PermissionMode == "plan" && !toolCall.IsReadOnly {
         return &ApprovalDecision{
             Type:    DecisionDecline,
@@ -1225,12 +1225,12 @@ func (pe *PolicyEngine) Evaluate(
         }
     }
 
-    // Cache lookup
+    // 缓存查找
     if d := pe.lookupCache(toolCall, ctx); d != nil {
         return d
     }
 
-    // Security pipeline (bash commands only)
+    // 安全管道（仅 bash 命令）
     if toolCall.ToolName == "bash" || toolCall.ToolName == "powershell" {
         cmd, ok := toolCall.Input["command"].(string)
         if ok {
@@ -1245,20 +1245,20 @@ func (pe *PolicyEngine) Evaluate(
                         Scope:     ScopeOnce,
                     }
                 case SeverityHigh:
-                    // Mandatory user approval (bypasses allowlist)
+                    // 强制用户审批（绕过 allowlist）
                     return &ApprovalDecision{
-                        Type:      DecisionAccept, // will be overridden by ASK_USER in Edge
+                        Type:      DecisionAccept, // 将在 Edge 中被 ASK_USER 覆盖
                         Reason:    fmt.Sprintf("security concern: %s", violation.Pattern),
                         DecidedBy: "system",
                         Scope:     ScopeOnce,
-                        // SecurityViolation is attached for UI to display
+                        // SecurityViolation 附加用于 UI 展示
                     }
                 }
             }
         }
     }
 
-    // High-risk pattern match (auto-deny patterns)
+    // 高风险模式匹配（自动拒绝模式）
     for _, pattern := range pe.riskPatterns {
         if pattern.Matches(toolCall) && pattern.AutoDeny {
             return &ApprovalDecision{
@@ -1270,7 +1270,7 @@ func (pe *PolicyEngine) Evaluate(
         }
     }
 
-    // Policy rule evaluation (priority order, first match wins)
+    // Policy rule 评估（优先级顺序，首个匹配即胜出）
     for _, rule := range pe.rules {
         if !rule.Enabled {
             continue
@@ -1294,7 +1294,7 @@ func (pe *PolicyEngine) Evaluate(
                 Scope:     ScopeOnce,
             }
         case PolicyAskUser:
-            // Falls through to default behavior
+            // 落到默认行为
             break
         case PolicyEscalate:
             return &ApprovalDecision{
@@ -1302,12 +1302,12 @@ func (pe *PolicyEngine) Evaluate(
                 Reason:    "escalated to admin",
                 DecidedBy: "system",
                 Scope:     ScopeOnce,
-                // escalates to admin approval flow
+                // 升级到管理员审批流程
             }
         }
     }
 
-    // Default behavior
+    // 默认行为
     if toolCall.RequiresApproval {
         return &ApprovalDecision{
             Type:      DecisionAccept,
@@ -1317,7 +1317,7 @@ func (pe *PolicyEngine) Evaluate(
         }
     }
 
-    // Auto-allow
+    // 自动允许
     return &ApprovalDecision{
         Type:      DecisionAccept,
         Reason:    "auto-allowed (no rules matched, low risk)",
@@ -1326,7 +1326,7 @@ func (pe *PolicyEngine) Evaluate(
     }
 }
 
-// matchRule checks if a policy rule matches the given tool call and context.
+// matchRule 检查 policy rule 是否匹配给定的工具调用和上下文。
 func (pe *PolicyEngine) matchRule(
     rule PolicyRule,
     toolCall ToolCall,
@@ -1334,14 +1334,14 @@ func (pe *PolicyEngine) matchRule(
 ) bool {
     match := rule.Match
 
-    // Tool pattern match (glob)
+    // 工具模式匹配（glob）
     if match.ToolPattern != "" {
         if !globMatch(match.ToolPattern, toolCall.ToolName) {
             return false
         }
     }
 
-    // Tool input key match
+    // 工具输入键匹配
     if match.ToolInputKey != "" {
         val, ok := toolCall.Input[match.ToolInputKey].(string)
         if !ok {
@@ -1354,7 +1354,7 @@ func (pe *PolicyEngine) matchRule(
         }
     }
 
-    // Path pattern match
+    // 路径模式匹配
     if match.PathPattern != "" {
         path, _ := toolCall.Input["file_path"].(string)
         if !globMatch(match.PathPattern, path) {
@@ -1362,14 +1362,14 @@ func (pe *PolicyEngine) matchRule(
         }
     }
 
-    // Risk level match
+    // 风险级别匹配
     if match.RiskLevel != nil {
         if toolCall.RiskLevel != *match.RiskLevel {
             return false
         }
     }
 
-    // Agent match
+    // Agent 匹配
     if match.AgentID != "" && match.AgentID != ctx.AgentID {
         return false
     }
@@ -1384,7 +1384,7 @@ func (pe *PolicyEngine) lookupCache(
     pe.mu.RLock()
     defer pe.mu.RUnlock()
 
-    // Check per-session scope
+    // 检查 per-session 作用域
     key := fmt.Sprintf("session:%s:%s", ctx.SessionID, toolCall.ToolName)
     if cached, ok := pe.decisionCache[key]; ok {
         if cached.Scope == ScopeSession &&
@@ -1393,7 +1393,7 @@ func (pe *PolicyEngine) lookupCache(
         }
     }
 
-    // Check per-thread scope
+    // 检查 per-thread 作用域
     key = fmt.Sprintf("thread:%s:%s:%s", ctx.SessionID,
         ctx.TurnID, toolCall.ToolName)
     if cached, ok := pe.decisionCache[key]; ok {
@@ -1424,40 +1424,40 @@ func (pe *PolicyEngine) ListRules(
 func (pe *PolicyEngine) RecordDecision(decision *ApprovalDecision) error {
     pe.mu.Lock()
     defer pe.mu.Unlock()
-    // Cache decisions with per-session/per-thread scope
+    // 缓存 per-session/per-thread 作用域的决策
     ...
     return nil
 }
 ```
 
-### 5.3 PolicyRule Priority System
+### 5.3 PolicyRule 优先级体系
 
 ```go
-// Priority values match CC's 9-source priority system:
-// Lower number = higher priority (checked first)
+// 优先级值匹配 CC 的 9 源优先级系统：
+// 数字越小 = 优先级越高（先检查）
 
 const (
     PriorityCLIFlag        = 0   // --approve-bash, --dangerously-skip-permissions
-    PrioritySessionRule    = 100 // user approved "for this session" during runtime
+    PrioritySessionRule    = 100 // 用户在运行时批准"本次会话"
     PriorityUserSettings   = 200 // ~/.agenthub/settings.json
-    PriorityProjectLocal   = 300 // .agenthub/rules.json (project-local)
-    PriorityAgentConfig    = 400 // per-agent configuration
-    PriorityTeamPolicy     = 500 // team-level policy from Hub
-    PriorityEnterprisePolicy = 600 // organization-wide policy
-    PrioritySystemDefault  = 700 // built-in high-risk patterns
-    PriorityCatchAll       = 1000 // default allow/deny
+    PriorityProjectLocal   = 300 // .agenthub/rules.json（项目本地）
+    PriorityAgentConfig    = 400 // 逐 agent 配置
+    PriorityTeamPolicy     = 500 // 来自 Hub 的团队级策略
+    PriorityEnterprisePolicy = 600 // 组织级策略
+    PrioritySystemDefault  = 700 // 内置高风险模式
+    PriorityCatchAll       = 1000 // 默认 allow/deny
 )
 ```
 
-### 5.4 HighRiskPattern Matcher
+### 5.4 HighRiskPattern 匹配器
 
 ```go
 type HighRiskPattern struct {
     ID          string
     Name        string
-    Pattern     string // regex
+    Pattern     string // 正则表达式
     Category    ApprovalKind
-    AutoDeny    bool   // true = deny without user prompt
+    AutoDeny    bool   // true = 无需用户提示即拒绝
     Description string
 }
 
@@ -1491,7 +1491,7 @@ var defaultHighRiskPatterns = []HighRiskPattern{
     {
         ID: "write-outside-workspace",
         Name: "Write outside workspace",
-        Pattern: `^/[^w]`, // simplistic placeholder
+        Pattern: `^/[^w]`, // 简化占位
         Category: ApprovalFileWrite,
         AutoDeny: true,
         Description: "Writing outside workspace root",
@@ -1533,9 +1533,9 @@ var defaultHighRiskPatterns = []HighRiskPattern{
 
 ---
 
-## 6. Integration: Runner Executor + PolicyEngine
+## 6. 集成：Runner Executor + PolicyEngine
 
-### 6.1 End-to-End Tool Execution Flow
+### 6.1 端到端工具执行流程
 
 ```go
 // packages/executor/runner_executor.go
@@ -1562,7 +1562,7 @@ func (e *RunnerExecutor) ExecuteTurn(
 
         for _, batch := range batches {
             for _, call := range batch.Blocks {
-                // 1. Security & Policy evaluation
+                // 1. 安全与策略评估
                 decision := e.policyEngine.Evaluate(call, EvalContext{
                     SessionID:      turn.SessionID,
                     TurnID:         turn.TurnID,
@@ -1581,7 +1581,7 @@ func (e *RunnerExecutor) ExecuteTurn(
                     continue
                 }
 
-                // 2. Execute with timeout
+                // 2. 带超时执行
                 result, err := e.runWithTimeout(ctx, call, e.timeout)
                 if err != nil {
                     results <- ToolResult{
@@ -1592,7 +1592,7 @@ func (e *RunnerExecutor) ExecuteTurn(
                     continue
                 }
 
-                // 3. Record permission decision for caching
+                // 3. 记录权限决策以供缓存
                 if decision.Scope == ScopeThread || decision.Scope == ScopeSession {
                     e.policyEngine.RecordDecision(decision)
                 }
@@ -1606,17 +1606,17 @@ func (e *RunnerExecutor) ExecuteTurn(
 }
 ```
 
-### 6.2 PermissionBroker Integration (Adapter SDK)
+### 6.2 PermissionBroker 集成（适配器 SDK）
 
-The `PermissionBroker` interface (from `design-adapter-sdk.md`) bridges the runner's policy engine with the underlying agent CLI:
+`PermissionBroker` 接口（来自 `design-adapter-sdk.md`）在 runner 的策略引擎与底层 agent CLI 之间建立桥梁：
 
 ```go
-// When the agent adapter emits a permission request:
+// 当 agent adapter 发出权限请求时：
 func (a *Adapter) ResolvePermission(
     ctx context.Context,
     req ToolPermissionRequest,
 ) (*PermissionDecision, error) {
-    // Map to PolicyEngine.Evaluate
+    // 映射到 PolicyEngine.Evaluate
     toolCall := ToolCall{
         ID:       req.ToolCallID,
         ToolName: req.ToolName,
@@ -1634,26 +1634,26 @@ func (a *Adapter) ResolvePermission(
 
 ---
 
-## 7. Summary: Key Design Decisions
+## 7. 总结：关键设计决策
 
-| Aspect | Claude Code (TypeScript) | AgentHub (Go) |
+| 方面 | Claude Code（TypeScript） | AgentHub（Go） |
 |--------|--------------------------|---------------|
-| **Partitioning** | Adjacent read-only tools merged into concurrent batches | Same: `PartitionToolCalls()` |
-| **Concurrency cap** | 10 (env: `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY`) | 10 (configurable) |
-| **Context flow** | Serial: immediate; Concurrent: queued after batch | Same: batch-completion barrier |
-| **Security checks** | 23 validators in ordered pipeline | 23 validators in `SecurityPipeline` |
-| **Misparsing gate** | `isBashSecurityCheckForMisparsing` flag blocks early | `SecurityViolation.IsMisparsing` |
-| **Heredoc handling** | Line-based matching replicating bash behavior | Same: `extractHeredocs()` |
-| **Timeout** | 120s default, 600s max, 15s auto-bg | Same: `TimeoutConfig` struct |
-| **Policy engine** | 9-source priority, first match wins | Same: `PolicyEngine` with priority-ordered rules |
-| **Permission cache** | per-session, per-thread scoped | `CachedDecision` with session/thread keys |
-| **High-risk patterns** | 8 built-in patterns | 7 built-in patterns (extensible) |
+| **分区** | 相邻只读工具合并为并发批次 | 相同：`PartitionToolCalls()` |
+| **并发上限** | 10（环境变量：`CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY`） | 10（可配置） |
+| **上下文流转** | 串行：即时；并发：批次后排队 | 相同：批次完成屏障 |
+| **安全检查** | 23 个 validator 组成有序管道 | 23 个 validator 在 `SecurityPipeline` 中 |
+| **Misparsing 门控** | `isBashSecurityCheckForMisparsing` 标志提前阻断 | `SecurityViolation.IsMisparsing` |
+| **Heredoc 处理** | 基于行的匹配，复现 bash 行为 | 相同：`extractHeredocs()` |
+| **超时** | 默认 120s，最大 600s，15s 自动后台化 | 相同：`TimeoutConfig` 结构体 |
+| **策略引擎** | 9 源优先级，首个匹配即胜出 | 相同：`PolicyEngine` 优先级排序规则 |
+| **权限缓存** | per-session、per-thread 作用域 | `CachedDecision` 含 session/thread 键 |
+| **高风险模式** | 8 个内置模式 | 7 个内置模式（可扩展） |
 
-### Files Output
+### 输出文件
 
-- `packages/security/bash_security.go` -- 23 security validators
-- `packages/security/security_pipeline.go` -- Pipeline orchestrator
-- `packages/security/policy_engine.go` -- PolicyEngine interface + implementation
+- `packages/security/bash_security.go` -- 23 个安全 validator
+- `packages/security/security_pipeline.go` -- 管道编排器
+- `packages/security/policy_engine.go` -- PolicyEngine 接口 + 实现
 - `packages/executor/orchestrator.go` -- PartitionToolCalls + Executor
 - `packages/executor/timeout.go` -- TimeoutConfig + BackgroundContext
-- `packages/executor/runner_executor.go` -- RunnerExecutor integrating PolicyEngine
+- `packages/executor/runner_executor.go` -- 集成 PolicyEngine 的 RunnerExecutor

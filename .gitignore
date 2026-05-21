@@ -32,6 +32,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Local agent worktrees
+.claude/worktrees/
+
 # Cloned reference repos (at repo root only)
 /reference/
 /chat-verify/

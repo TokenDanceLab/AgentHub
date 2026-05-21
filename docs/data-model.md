@@ -1,10 +1,10 @@
-# AgentHub Data Model
+# AgentHub 数据模型
 
-Date: 2026-05-21
+日期：2026-05-21
 
-## Core Shape
+## 核心形态
 
-AgentHub should not model coding-agent work as plain chat messages only. It uses a richer model:
+AgentHub 不应把 coding-agent 工作建模为纯聊天消息。它使用更丰富的模型：
 
 ```text
 Project
@@ -15,19 +15,19 @@ Project
                   -> Artifact
 ```
 
-## Concepts
+## 概念
 
-| Concept | Meaning |
+| 概念 | 含义 |
 |---|---|
-| Project | Local or remote workspace root |
-| Conversation | IM shell: direct/group conversation and authority boundary |
-| Thread | Task branch inside a conversation |
-| Turn | One user/agent execution round |
-| AgentRun | Runtime execution of an agent turn |
-| Item | Streamed unit inside a turn |
-| Artifact | Durable output such as diff, log, preview, file |
+| Project | 本地或远程 workspace 根目录 |
+| Conversation | IM 外壳：单聊/群聊会话和权威边界 |
+| Thread | 会话内的任务分支 |
+| Turn | 一轮用户或 agent 执行 |
+| AgentRun | 一次 agent turn 的运行时执行 |
+| Item | turn 内的流式单元 |
+| Artifact | 持久化产出物，如 diff、日志、preview、文件 |
 
-## Type Sketch
+## 类型速写
 
 ```ts
 type Project = {
@@ -87,14 +87,14 @@ type Item = {
 }
 ```
 
-## Mapping
+## 映射
 
 ```text
-Conversation = IM shell
-Thread       = task branch
-Turn         = one interaction/execution round
-Item         = streamed event inside the turn
-Artifact     = durable output addressable from UI
+Conversation = IM 外壳
+Thread       = 任务分支
+Turn         = 一次交互/执行轮次
+Item         = turn 内的流式事件
+Artifact     = 可从 UI 寻址的持久化产出物
 ```
 
-This supports IM-style interaction while preserving coding-agent execution detail.
+这套模型在保留 coding-agent 执行细节的同时，支持 IM 风格的交互。

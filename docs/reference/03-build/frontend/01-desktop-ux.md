@@ -1,12 +1,12 @@
-# AgentHub Desktop Command Center -- UI/UX Engineering Specification
+# AgentHub 桌面指挥中心 —— UI/UX 工程规格
 
-> Based on: `cross-analysis-im-ux.md`, `opcode.md`, `cloudcli.md`, `claude-code-viewer.md`, `librechat.md`, `architecture.md`, `product-model.md`, `data-model.md`, `authority.md`, `README.md`
-> Date: 2026-05-21
-> Status: Draft v1.0
+> 基于：`cross-analysis-im-ux.md`、`opcode.md`、`cloudcli.md`、`claude-code-viewer.md`、`librechat.md`、`architecture.md`、`product-model.md`、`data-model.md`、`authority.md`、`README.md`
+> 日期：2026-05-21
+> 状态：Draft v1.0
 
 ---
 
-## 1. Component Tree (Complete Nested Hierarchy with Props Interfaces)
+## 1. 组件树（完整嵌套层级与 Props 接口）
 
 ```
 App  (ZustandProvider + ThemeProvider + TabContext + PluginsContext)
@@ -236,11 +236,11 @@ App  (ZustandProvider + ThemeProvider + TabContext + PluginsContext)
 
 ---
 
-## 2. State Management Design (Zustand Stores)
+## 2. 状态管理设计（Zustand Store）
 
-### 2.1 Store Architecture
+### 2.1 Store 架构
 
-Following opcode's Zustand v5 + `subscribeWithSelector` + CloudCLI's dual-cache pattern, with LibreChat's message-tree model:
+遵循 opcode 的 Zustand v5 + `subscribeWithSelector` + CloudCLI 的双缓存模式，并结合 LibreChat 的消息树模型：
 
 ```
 WebSocket Events ──→ EdgeEventBus ──→ Store Actions ──→ React re-render
@@ -250,9 +250,9 @@ REST API (history) ──→ Store Loaders ──→ merged (deduped)
 TanStack Query ──→ Server State (cache + invalidation on WS events)
 ```
 
-### 2.2 Store Definitions
+### 2.2 Store 定义
 
-#### 2.2.1 `projectStore` -- Project & Workspace
+#### 2.2.1 `projectStore` -- 项目与工作区
 
 ```ts
 // src/stores/projectStore.ts
@@ -290,7 +290,7 @@ interface ProjectActions {
 // )
 ```
 
-#### 2.2.2 `threadStore` -- Thread Tree & Message Tree
+#### 2.2.2 `threadStore` -- Thread 树与消息树
 
 ```ts
 // src/stores/threadStore.ts
@@ -356,7 +356,7 @@ interface ThreadActions {
 type ForkMode = 'DIRECT_PATH' | 'INCLUDE_BRANCHES' | 'TARGET_LEVEL' | 'DEFAULT'
 ```
 
-#### 2.2.3 `runStore` -- AgentRun Lifecycle
+#### 2.2.3 `runStore` -- AgentRun 生命周期
 
 ```ts
 // src/stores/runStore.ts
@@ -394,7 +394,7 @@ interface RunOptions {
 type RunStatus = 'queued' | 'starting' | 'running' | 'awaiting_approval' | 'completed' | 'failed' | 'cancelled'
 ```
 
-#### 2.2.4 `diffStore` -- Diff & Git State
+#### 2.2.4 `diffStore` -- Diff 与 Git 状态
 
 ```ts
 // src/stores/diffStore.ts
@@ -486,7 +486,7 @@ type PushError = 'NO_UPSTREAM' | 'NON_FAST_FORWARD' | 'AUTH_FAILED' | 'NETWORK_E
 type PullError = 'CONFLICT' | 'UNSTAGED_CHANGES' | 'AUTH_FAILED' | 'NETWORK_ERROR'
 ```
 
-#### 2.2.5 `previewStore` -- Artifact & Preview
+#### 2.2.5 `previewStore` -- Artifact 与预览
 
 ```ts
 // src/stores/previewStore.ts
@@ -544,7 +544,7 @@ interface AgentComparison {
 }
 ```
 
-#### 2.2.6 `approvalStore` -- Permission & Approval
+#### 2.2.6 `approvalStore` -- 权限与审批
 
 ```ts
 // src/stores/approvalStore.ts
@@ -584,7 +584,7 @@ interface ApprovalRequest {
 }
 ```
 
-#### 2.2.7 `uiStore` -- Layout & Panel State
+#### 2.2.7 `uiStore` -- 布局与面板状态
 
 ```ts
 // src/stores/uiStore.ts
@@ -638,7 +638,7 @@ interface UIActions {
 type View = 'welcome' | 'chat' | 'settings'
 ```
 
-#### 2.2.8 `connectionStore` -- Edge/WS Connection
+#### 2.2.8 `connectionStore` -- Edge/WS 连接
 
 ```ts
 // src/stores/connectionStore.ts
@@ -665,7 +665,7 @@ interface ConnectionActions {
 }
 ```
 
-#### 2.2.9 `searchStore` -- Global Search (FTS5)
+#### 2.2.9 `searchStore` -- 全局搜索（FTS5）
 
 ```ts
 // src/stores/searchStore.ts
@@ -699,7 +699,7 @@ interface SearchResult {
 }
 ```
 
-#### 2.2.10 `pluginStore` -- Plugin Registry
+#### 2.2.10 `pluginStore` -- 插件注册表
 
 ```ts
 // src/stores/pluginStore.ts
@@ -758,7 +758,7 @@ interface PluginContext {
 }
 ```
 
-### 2.3 WebSocket Event → Store Data Flow
+### 2.3 WebSocket 事件到 Store 的数据流
 
 ```
 Edge Server (Go) ──WebSocket──→ wsClient.ts (browser)
@@ -779,95 +779,94 @@ Edge Server (Go) ──WebSocket──→ wsClient.ts (browser)
             React re-render (MessageTree)
 ```
 
-**WebSocket Event Types → Store Mapping**:
+**WebSocket 事件类型到 Store 的映射**：
 
-| WS Event | Store | Action |
+| WS 事件 | Store | Action |
 |----------|-------|--------|
 | `message.created` | `threadStore` | `appendMessage()` → `buildTree()` |
 | `message.streaming` | `threadStore` | `updateStreamingMessage()` |
 | `message.streaming_done` | `threadStore` | `updateStreamingMessage(msgId, null, true)` |
-| `run.started` | `runStore` | `startRun()` sets status |
+| `run.started` | `runStore` | `startRun()` 设置状态 |
 | `run.status_changed` | `runStore` | `updateRunStatus()` |
 | `run.item` | `runStore` / `threadStore` | `attachRunOutput()` + `appendMessage()` |
 | `run.completed` / `run.failed` | `runStore` | `completeRun()` / `failRun()` |
 | `permission.requested` | `approvalStore` | `addApprovalRequest()` |
-| `permission.resolved` | `approvalStore` | remove from pending, push to history |
-| `artifact.created` | `previewStore` | `openArtifact()` or notification |
-| `artifact.updated` | `previewStore` | update version list |
+| `permission.resolved` | `approvalStore` | 从 pending 移除，推入 history |
+| `artifact.created` | `previewStore` | `openArtifact()` 或通知 |
+| `artifact.updated` | `previewStore` | 更新版本列表 |
 | `workspace.changed` | `projectStore` | `refreshWorkspaceStatus()` |
-| `session.changed` | `threadStore` | `loadMessages()` if active thread affected |
+| `session.changed` | `threadStore` | 如活跃 thread 受影响则 `loadMessages()` |
 | `edge.connection_status` | `connectionStore` | `setEdgeStatus()` / `setWsLatency()` |
 | `edge.pong` | `connectionStore` | `setWsLatency(Date.now() - sentAt)` |
 
 ---
 
-## 3. Key Interaction Flows (with State Transition Tables)
+## 3. 关键交互流程（含状态转换表）
 
-### 3.1 User Sends @mention Message → Agent Reply (Full Frontend Flow)
+### 3.1 用户发送 @mention 消息 → Agent 回复（完整前端流程）
 
 ```
-Step  State Before            User/System Action                  State After
+步骤  状态                      用户/系统动作                            动作后状态
 ────  ──────────────────────  ─────────────────────────────────  ──────────────────────
- 1    Thread active, idle     User types "@ClaudeCode write..."    ComposeArea has text
-                               in ComposeArea.textarea
- 2    Text entered             User presses Enter (or clicks       ─
-                               SendButton)
- 3    ─                       ComposeArea.onSubmit() called        ─
- 4    ─                       Optimistic: append User Message      threadStore.messageCache[id]=msg
-                               to messageCache + buildTree()       threadStore.activeThread.now has user msg
- 5    ─                       Reset ComposeArea.textarea           ComposeArea empty
+ 1    Thread 活跃，空闲         用户在 ComposeArea.textarea         ComposeArea 中有文本
+                                中键入 "@ClaudeCode write..."
+ 2    文本已输入                 用户按 Enter（或点击 SendButton）    ─
+ 3    ─                       ComposeArea.onSubmit() 被调用         ─
+ 4    ─                       乐观更新：将用户 Message             threadStore.messageCache[id]=msg
+                                追加到 messageCache + buildTree()   threadStore.activeThread 现在包含用户消息
+ 5    ─                       重置 ComposeArea.textarea            ComposeArea 置空
  6    ─                       POST /api/threads/:id/messages       ─
-                               → Edge Server
- 7    ─                       Edge: persist message                ─
- 8    ─                       Edge: local-orchestrator dispatch    ─
- 9    ─                       Edge → Runner: POST /runs/new        ─
- 10   Thread active,          Runner: spawn claude child_process   runStore.startRun() → status="starting"
-      running                  Edge → WS: run.started              threadStore.streamingThreads.add(id)
- 11   running                 Runner stdout: content_block_start   Edge → WS: run.item(content_block)
-                                                                → threadStore.appendMessage(agentMsg)
- 12   running                 Runner stdout: content_block_delta   Edge → WS: message.streaming
-                                                                → threadStore.updateStreamingMessage()
- 13   running                 (streaming continues...)             UI: MessageBubble text grows,
-                                                                   cursor blinks at end, auto-scroll
- 14   running                 Runner stdout: tool_use (Read)       Edge → WS: run.item(tool_use)
-                                                                → threadStore.appendMessage(toolMsg)
-                                                                   UI: ToolUseCard appears, collapsed
- 15   running                 Runner stdout: tool_result           Edge → WS: run.item(tool_result)
-                                                                   UI: ToolResult under ToolUseCard (L2)
- 16   running                 Runner stdout: content_block_stop    Edge → WS: message.streaming_done
-                                                                   UI: cursor stops, final formatting
- 17   running                 Runner: process exits code 0         Edge → WS: run.completed
-                                                                → runStore.completeRun()
- 18   idle                    ─                                    UI: StopButton → SendButton,
-                                                                   streamingThreads.delete(id)
-                                                                   RunIndicator → green check then gone
+                                → Edge Server
+ 7    ─                       Edge：持久化消息                      ─
+ 8    ─                       Edge：local-orchestrator 分发         ─
+ 9    ─                       Edge → Runner：POST /runs/new        ─
+ 10   Thread 活跃，运行中        Runner：spawn claude 子进程          runStore.startRun() → status="starting"
+                                Edge → WS：run.started              threadStore.streamingThreads.add(id)
+ 11   运行中                    Runner stdout：content_block_start   Edge → WS：run.item(content_block)
+                                                                  → threadStore.appendMessage(agentMsg)
+ 12   运行中                    Runner stdout：content_block_delta   Edge → WS：message.streaming
+                                                                  → threadStore.updateStreamingMessage()
+ 13   运行中                    （流式持续……）                       UI：MessageBubble 文本增长，
+                                                                    光标在末尾闪烁，自动滚动
+ 14   运行中                    Runner stdout：tool_use (Read)      Edge → WS：run.item(tool_use)
+                                                                  → threadStore.appendMessage(toolMsg)
+                                                                    UI：ToolUseCard 出现，折叠状态
+ 15   运行中                    Runner stdout：tool_result           Edge → WS：run.item(tool_result)
+                                                                    UI：ToolResult 显示在 ToolUseCard 下（L2）
+ 16   运行中                    Runner stdout：content_block_stop    Edge → WS：message.streaming_done
+                                                                    UI：光标停止，最终格式化
+ 17   运行中                    Runner：进程退出 code 0               Edge → WS：run.completed
+                                                                  → runStore.completeRun()
+ 18   空闲                      ─                                    UI：StopButton → SendButton，
+                                                                    streamingThreads.delete(id)
+                                                                    RunIndicator → 绿色勾，然后消失
 ```
 
-**Optimistic UI State Machine**:
+**乐观 UI 状态机**：
 
-| Transition | Local State | Server Confirmation | Conflict Resolution |
+| 转换 | 本地状态 | 服务端确认 | 冲突解决 |
 |------------|-------------|---------------------|---------------------|
-| User sends message | `id: "local_<uuid>"`, status: "sending" | `id: "<server-id>"` arrives via WS `message.created` | Replace `local_*` with server id; update cache key |
-| Send fails | Show retry banner + red dot on message | N/A | Offer [Retry] [Delete] [Edit & Resend] |
-| Send timeout (10s) | Show "sending..." spinner persistent | N/A | Same as fail after 30s hard timeout |
+| 用户发送消息 | `id: "local_<uuid>"`，status: "sending" | `id: "<server-id>"` 通过 WS `message.created` 到达 | 用 server id 替换 `local_*`；更新缓存 key |
+| 发送失败 | 显示重试横幅 + 消息上的红色圆点 | 不适用 | 提供 [Retry] [Delete] [Edit & Resend] |
+| 发送超时（10s） | 持续显示 "sending..." 旋转图标 | 不适用 | 30s 硬超时后与失败相同 |
 
-### 3.2 Diff Card: Display → Apply/Discard Interaction State Machine
+### 3.2 Diff Card：显示 → 应用/丢弃交互状态机
 
 ```
-States:
-  IDLE          DiffCard not shown
-  VIEWING       DiffCard visible, user reading diff
-  EXPANDED      User clicked "View Full Diff" → RightPanel Diff tab opened
-  APPLYING      User clicked [Apply], executing
-  APPLIED       Apply successful, with [Undo] option
-  APPLY_FAILED  Apply error, with retry
-  DISCARDED     User clicked [Discard]
-  COMMENTING    User has comment form open on a specific line
+状态：
+  IDLE          DiffCard 未显示
+  VIEWING       DiffCard 可见，用户正在阅读 diff
+  EXPANDED      用户点击了 "View Full Diff" → RightPanel Diff 标签页已打开
+  APPLYING      用户点击了 [Apply]，正在执行
+  APPLIED       Apply 成功，有 [Undo] 选项
+  APPLY_FAILED  Apply 出错，可重试
+  DISCARDED     用户点击了 [Discard]
+  COMMENTING    用户在某一行打开了评论表单
 
   ┌──────────┐
   │  IDLE     │◄──────── (diffCard.dismissed / navigate away)
   └─────┬─────┘
-        │ ToolUseCard.expand() → tool_result contains diff
+        │ ToolUseCard.expand() → tool_result 包含 diff
         ▼
   ┌──────────┐
   │ VIEWING   │────────────────────────────────────┐
@@ -876,10 +875,10 @@ States:
     │   │ [Expand to RightPanel]                   │ [Discard]
     │   ▼                                         ▼
     │  ┌────────────┐                     ┌────────────┐
-    │  │ EXPANDED    │                     │ DISCARDED   │──→ IDLE (after notification)
+    │  │ EXPANDED    │                     │ DISCARDED   │──→ IDLE（通知后）
     │  └──┬──┬───────┘                     └────────────┘
     │     │  │
-    │     │  │ [Apply] (from RightPanel or inline)
+    │     │  │ [Apply]（来自 RightPanel 或内联）
     │     │  ▼
     │     │ ┌──────────┐
     │     │ │ APPLYING  │
@@ -892,7 +891,7 @@ States:
     │     │ │ APPLIED   │   │ APPLY_FAILED │──[Retry]──→ APPLYING
     │     │ └────┬──────┘   └──────────────┘
     │     │      │
-    │     │   [Undo] (5s window)
+    │     │   [Undo]（5s 窗口）
     │     │      │
     │     │      ▼
     │     │   VIEWING
@@ -901,7 +900,7 @@ States:
     │     │
     │     ▼
     │  ┌────────────┐
-    │  │ COMMENTING  │──[Submit]──→ VIEWING (comment saved)
+    │  │ COMMENTING  │──[Submit]──→ VIEWING（评论已保存）
     │  └────────────┘
     │
     [Apply from inline]
@@ -909,122 +908,122 @@ States:
     └──→ APPLYING
 ```
 
-**Apply/Discard UI States per DiffCard**:
+**每个 DiffCard 的 Apply/Discard UI 状态**：
 
-| Component State | DiffFooter buttons | Color accent |
+| 组件状态 | DiffFooter 按钮 | 颜色标记 |
 |-----------------|-------------------|--------------|
-| `pending` (default) | [Apply] [Discard] [View Full] | DiffCard: yellow left border (unapplied change) |
-| `applying` | spinner "Applying..." | Animating pulse |
-| `applied` | green check "Applied" + [Undo (5s)] | DiffCard: green left border, then fade to gray |
-| `apply_failed` | red "Failed" + [Retry] [Discard] | DiffCard: red left border |
-| `discarded` | "Discarded" grayed out | DiffCard: gray left border, opacity reduced |
-| `commented` | comment count badge on line | No border change |
+| `pending`（默认） | [Apply] [Discard] [View Full] | DiffCard：黄色左边框（未应用的变更） |
+| `applying` | 旋转图标 "Applying..." | 动画脉冲 |
+| `applied` | 绿色勾 "Applied" + [Undo (5s)] | DiffCard：绿色左边框，随后渐变为灰色 |
+| `apply_failed` | 红色 "Failed" + [Retry] [Discard] | DiffCard：红色左边框 |
+| `discarded` | "Discarded" 置灰 | DiffCard：灰色左边框，降低不透明度 |
+| `commented` | 行上显示评论计数徽章 | 边框不变 |
 
-### 3.3 Progressive Disclosure -- Four-Layer Expansion (Claude Code Viewer Pattern)
+### 3.3 渐进展开 -- 四层展开（Claude Code Viewer 模式）
 
 ```
-Layer 0: Always Visible
-  ├── User Message text (full, always expanded)
-  └── Agent Message text (Markdown, always expanded)
+Layer 0：始终可见
+  ├── 用户消息文本（完整，始终展开）
+  └── Agent 消息文本（Markdown，始终展开）
         │
-        │ [Click "Thinking (collapsed)" button ↓]
+        │ [点击 "Thinking (collapsed)" 按钮 ↓]
         ▼
-Layer 1: Thinking Block (default collapsed)
-  └── ThinkingContent (dimmed text, max-h-48 scrollable)
+Layer 1：Thinking Block（默认折叠）
+  └── ThinkingContent（暗淡文本，max-h-48 可滚动）
         │
-        │ Auto-expands when tool_use is present in message
+        │ 消息中存在 tool_use 时自动展开
         ▼
-Layer 2: Tool Use Block (default collapsed)
-  ├── ToolHeader: icon + toolName + param summary (visible)
+Layer 2：Tool Use Block（默认折叠）
+  ├── ToolHeader：图标 + toolName + 参数摘要（可见）
   │   │
-  │   │ [Click to expand ↓]
+  │   │ [点击展开 ↓]
   │   ▼
-  ├── ToolParams: full JSON (expandable code block)
-  └── ToolResult: (only rendered when L2 expanded)
+  ├── ToolParams：完整 JSON（可展开代码块）
+  └── ToolResult：（仅当 L2 展开时渲染）
       │
-      │ If tool is "Task" (subagent):
+      │ 如果工具是 "Task"（子 agent）：
       ▼
-Layer 3: Subagent Sidechain (default collapsed inside L2)
-  ├── SidechainHeader: "code-reviewer: 3 tools, 2 findings"
+Layer 3：Subagent Sidechain（默认在 L2 内部折叠）
+  ├── SidechainHeader："code-reviewer：3 个工具，2 个发现"
   │   │
-  │   │ [Click to expand ↓]
+  │   │ [点击展开 ↓]
   │   ▼
-  └── SidechainMessages: recursive MessageNode for subagent
+  └── SidechainMessages：子 agent 的递归 MessageNode
         │
-        │ Subagent's own tool_use blocks:
+        │ 子 agent 自身的 tool_use 块：
         ▼
-Layer 4: Nested Tool Details (inside subagent, L3 must be expanded)
-  └── ToolUseCard (recursive, same L1-L2 pattern)
+Layer 4：嵌套工具详情（在子 agent 内部，L3 必须先展开）
+  └── ToolUseCard（递归，与 L1-L2 相同的模式）
 ```
 
-**State Transition Table for Progressive Disclosure**:
+**渐进展开状态转换表**：
 
-| Current State | Trigger | Next State | Animation |
+| 当前状态 | 触发条件 | 下一状态 | 动画 |
 |--------------|---------|------------|-----------|
-| `L0: text visible` | Message has thinking block | `L1: thinking_visible` (collapsed) | Instant mount, `max-h-0` → `max-h-12` for toggle button |
-| `L1: collapsed` | Click toggle | `L1: expanded` | `max-h-0` → `max-h-48`, fade-in 150ms |
-| `L1: expanded` | Click toggle | `L1: collapsed` | `max-h-48` → `max-h-0`, fade-out 100ms |
-| `L1: any` | Message has tool_use | `L2: tool_visible` (collapsed) | Instant mount |
-| `L2: collapsed` | Click tool header | `L2: expanded` | Slide-down ToolParams, then ToolResult renders |
-| `L2: expanded` | Click tool header | `L2: collapsed` | Slide-up, unmount ToolResult |
-| `L2: expanded` | Tool is "Task" + agent session exists | `L3: sidechain_visible` (collapsed) | Show "Expand subagent" button |
-| `L3: collapsed` | Click "Expand subagent" | `L3: expanded` | Slide-down SidechainMessages |
-| `L3: expanded` | Click collapse | `L3: collapsed` | Slide-up |
-| `L3: expanded` | Subagent has tool_use blocks | `L4: nested_tool` (collapsed) | Same as L1→L2 recursively |
+| `L0：文本可见` | 消息有 thinking block | `L1：thinking_visible`（折叠） | 即时挂载，切换按钮 `max-h-0` → `max-h-12` |
+| `L1：折叠` | 点击切换 | `L1：展开` | `max-h-0` → `max-h-48`，淡入 150ms |
+| `L1：展开` | 点击切换 | `L1：折叠` | `max-h-48` → `max-h-0`，淡出 100ms |
+| `L1：任意` | 消息有 tool_use | `L2：tool_visible`（折叠） | 即时挂载 |
+| `L2：折叠` | 点击工具头部 | `L2：展开` | 下滑 ToolParams，然后渲染 ToolResult |
+| `L2：展开` | 点击工具头部 | `L2：折叠` | 上滑，卸载 ToolResult |
+| `L2：展开` | 工具为 "Task" 且 agent session 存在 | `L3：sidechain_visible`（折叠） | 显示 "Expand subagent" 按钮 |
+| `L3：折叠` | 点击 "Expand subagent" | `L3：展开` | 下滑 SidechainMessages |
+| `L3：展开` | 点击折叠 | `L3：折叠` | 上滑 |
+| `L3：展开` | 子 agent 有 tool_use 块 | `L4：nested_tool`（折叠） | 与 L1→L2 相同的递归行为 |
 
-**Auto-Expand Rules**:
-- When user navigates to an active thread: expand L0, collapse all L1-L4
-- When user clicks "View Diff" link from message: auto-expand L2 for that specific tool_use, then jump to RightPanel Diff tab
-- When a new tool_use arrives via streaming: L2 starts collapsed, user clicks to expand
-- When a run is "awaiting_approval": ApprovalCard at L0, always visible, pulse animation
+**自动展开规则**：
+- 用户导航至活跃 thread 时：展开 L0，折叠所有 L1-L4
+- 用户从消息点击 "View Diff" 链接时：自动展开该特定 tool_use 的 L2，然后跳转到 RightPanel Diff 标签页
+- 通过流式传输到达的新 tool_use：L2 初始折叠，用户点击展开
+- 当 run 处于 "awaiting_approval" 时：ApprovalCard 在 L0，始终可见，脉冲动画
 
-### 3.4 Thread Fork — Interaction Flow
+### 3.4 Thread Fork —— 交互流程
 
 ```
-State: User is viewing Thread A, at message M5 (which has 3 siblings)
+状态：用户正在查看 Thread A，位于消息 M5（有 3 个兄弟节点）
 
-  1. User right-clicks M5 → [Fork Here]
-  2. ForkDialog opens
-     ├── Mode selector (radio group):
-     │   [○] DIRECT_PATH (only messages from root to M5)
-     │   [○] INCLUDE_BRANCHES (all siblings, full tree)
-     │   [ ] TARGET_LEVEL (all messages at M5's depth)
-     │   [ ] DEFAULT (from M5 onward only)
-     ├── Target project (dropdown, default: same project)
+  1. 用户右键点击 M5 → [Fork Here]
+  2. ForkDialog 打开
+     ├── 模式选择器（radio group）：
+     │   [○] DIRECT_PATH（仅从根到 M5 的消息）
+     │   [○] INCLUDE_BRANCHES（所有兄弟节点，完整树）
+     │   [ ] TARGET_LEVEL（M5 所在深度的所有消息）
+     │   [ ] DEFAULT（仅 M5 之后的消息）
+     ├── 目标项目（dropdown，默认：同一项目）
      └── [Cancel] [Create Fork]
-  3. User selects DIRECT_PATH + clicks [Create Fork]
+  3. 用户选择 DIRECT_PATH + 点击 [Create Fork]
   4. threadStore.forkThread(threadA_id, M5_id, 'DIRECT_PATH')
      → POST /api/threads/:id/fork { fromMessageId, mode }
-     → Edge: creates new threadB, copies message tree path
-     → Edge: WS → threadStore: threadB appears in sidebar
-  5. UI: navigate to threadB, show fork source banner:
-     "Forked from Thread A / Message #5 · DIRECT_PATH mode"
-     Banner has [Open Original Thread] link
-  6. ThreadB now active, ComposeArea ready for new prompt
+     → Edge：创建新 threadB，复制消息树路径
+     → Edge：WS → threadStore：threadB 出现在左侧栏
+  5. UI：导航至 threadB，显示 fork 源横幅：
+     "Forked from Thread A / Message #5 · DIRECT_PATH 模式"
+     横幅带有 [Open Original Thread] 链接
+  6. ThreadB 现在活跃，ComposeArea 等待新提示
 ```
 
-### 3.5 Global Search (Ctrl+K) Flow
+### 3.5 全局搜索（Ctrl+K）流程
 
 ```
-State: idle
+状态：空闲
 
-  1. User presses Ctrl+K
-  2. searchDialogOpen = true, SearchInput auto-focused
-  3. User types "auth login" (debounced 200ms)
+  1. 用户按下 Ctrl+K
+  2. searchDialogOpen = true，SearchInput 自动聚焦
+  3. 用户键入 "auth login"（防抖 200ms）
   4. searchStore.search("auth login")
-     → Edge: FTS5 query across all threads in active project
-     → Returns SearchResult[] sorted by BM25 score
-  5. UI: SearchResults render, no navigation yet
-  6. User clicks result or presses Enter
-  7. Close dialog, navigate to target thread + scroll to message
-  8. In-page search highlight applied (DOM TreeWalker) for the query text
+     → Edge：对活跃项目中所有 thread 执行 FTS5 查询
+     → 返回按 BM25 分数排序的 SearchResult[]
+  5. UI：SearchResults 渲染，尚未导航
+  6. 用户点击结果或按 Enter
+  7. 关闭对话框，导航至目标 thread + 滚动到对应消息
+  8. 页内搜索高亮（DOM TreeWalker）应用查询文本
 ```
 
 ---
 
-## 4. Mobile Adaptation Strategy
+## 4. 移动端适配策略
 
-### 4.1 Breakpoint: 768px (Single Breakpoint, CloudCLI Pattern)
+### 4.1 断点：768px（单一断点，CloudCLI 模式）
 
 ```ts
 // src/hooks/useIsMobile.ts
@@ -1043,30 +1042,30 @@ const useIsMobile = (breakpoint = 768): boolean => {
 }
 ```
 
-### 4.2 Three-Column → Single-Column Transformation
+### 4.2 三栏到单栏转换
 
 ```
 Desktop (>768px):                         Mobile (<=768px):
 ┌──────┬──────────────┬──────────┐        ┌─────────────────────┐
-│ Side │ Center Chat  │ Right    │        │ ChatHeader (w/      │
-│ bar  │              │ Panel    │        │  hamburger + tabs)  │
+│ Side │ Center Chat  │ Right    │        │ ChatHeader（含       │
+│ bar  │              │ Panel    │        │  汉堡菜单 + 标签页）  │
 │      │              │          │        ├─────────────────────┤
 │      │              │          │        │                     │
 │      │              │          │        │  Center Chat        │
-│      │              │          │        │  (full width,       │
-│      │              │          │        │   MessageTree)      │
+│      │              │          │        │  （全宽，            │
+│      │              │          │        │   MessageTree）      │
 │      │              │          │        │                     │
 │      │              │          │        ├─────────────────────┤
 │      │              │          │        │ ComposeArea         │
-│      │              │          │        │ (sticky bottom,     │
-│      │              │          │        │  keyboard-adapted)  │
+│      │              │          │        │ （底部固定，          │
+│      │              │          │        │  适配键盘）          │
 └──────┴──────────────┴──────────┘        └─────────────────────┘
 
-Sidebar  → Drawer overlay (swipe from left, backdrop blur)
-RightPanel → Bottom Sheet (swipe up from bottom, drag handle)
+Sidebar  → Drawer 覆盖层（从左侧滑入，背景模糊）
+RightPanel → Bottom Sheet（从底部上滑，拖拽手柄）
 ```
 
-### 4.3 Sidebar → Drawer Overlay (Mobile)
+### 4.3 Sidebar → Drawer 覆盖层（移动端）
 
 ```tsx
 // src/components/layout/MobileDrawer.tsx
@@ -1101,7 +1100,7 @@ const MobileDrawer: React.FC<{
 }
 ```
 
-### 4.4 RightPanel → Bottom Sheet (Mobile)
+### 4.4 RightPanel → Bottom Sheet（移动端）
 
 ```tsx
 // src/components/layout/MobileBottomSheet.tsx
@@ -1169,7 +1168,7 @@ const MobileBottomSheet: React.FC<{
 }
 ```
 
-### 4.5 iOS Keyboard Adaptation (visualViewport Pattern, 13 lines)
+### 4.5 iOS 键盘适配（visualViewport 模式，13 行）
 
 ```tsx
 // src/hooks/useKeyboardHeight.ts
@@ -1190,7 +1189,7 @@ const useKeyboardHeight = () => {
 }
 ```
 
-Applied in ComposeArea CSS:
+应用于 ComposeArea CSS：
 ```css
 .compose-area-container {
   position: sticky;
@@ -1199,9 +1198,9 @@ Applied in ComposeArea CSS:
 }
 ```
 
-### 4.6 PWA Offline Strategy
+### 4.6 PWA 离线策略
 
-**manifest.json** (in `apps/web/public/`):
+**manifest.json**（位于 `apps/web/public/`）：
 ```json
 {
   "name": "AgentHub Desktop",
@@ -1217,7 +1216,7 @@ Applied in ComposeArea CSS:
 }
 ```
 
-**Service Worker** (`apps/web/src/sw.ts`):
+**Service Worker**（`apps/web/src/sw.ts`）：
 ```ts
 // Strategy: Network-first with offline fallback (Claude Code Viewer pattern)
 
@@ -1237,31 +1236,31 @@ const isPWA = () => {
 }
 ```
 
-**Offline Capabilities**:
-| Feature | Online | Offline (P0 Desktop) |
+**离线能力**：
+| 功能 | 在线 | 离线（P0 桌面） |
 |---------|--------|----------------------|
-| View thread history | REST from Edge | Read from SQLite (Edge local-store) |
-| Send message | WS to Edge → Runner | WS to localhost Edge (always available) |
-| Diff panel | Git commands local | Same (local repo) |
-| File tree | Edge local filesystem | Same |
-| Preview | Edge localhost | Same |
-| Search (FTS5) | Edge SQLite | Same (local DB) |
-| Hub sync | Active when online | Queued, syncs on reconnect |
-| Plugin marketplace | Network required | Local plugins still work |
+| 查看 thread 历史 | 来自 Edge 的 REST | 从 SQLite 读取（Edge local-store） |
+| 发送消息 | WS 到 Edge → Runner | WS 到本地 Edge（始终可用） |
+| Diff 面板 | Git 命令本地 | 相同（本地仓库） |
+| 文件树 | Edge 本地文件系统 | 相同 |
+| 预览 | Edge localhost | 相同 |
+| 搜索（FTS5） | Edge SQLite | 相同（本地数据库） |
+| Hub 同步 | 在线时活跃 | 排队，重连时同步 |
+| 插件市场 | 需要网络 | 本地插件仍可工作 |
 
-**Offline indicator**: ConnectionStore.edgeStatus banner:
-- Green dot "Connected to Edge" — normal
-- Yellow dot "Connecting..." — momentary
-- Red banner "Edge disconnected — offline mode" — show when reconnection fails, non-intrusive
-- Auto-reconnect: exponential backoff (1s, 2s, 4s, 8s, max 30s)
+**离线指示器**：ConnectionStore.edgeStatus 横幅：
+- 绿色圆点 "Connected to Edge" —— 正常
+- 黄色圆点 "Connecting..." —— 瞬时
+- 红色横幅 "Edge disconnected — offline mode" —— 重连失败时显示，非侵入式
+- 自动重连：指数退避（1s, 2s, 4s, 8s, max 30s）
 
 ---
 
-## 5. Data Flow Summary (End-to-End)
+## 5. 数据流汇总（端到端）
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                          FRONTEND (React)                            │
+│                          前端（React）                               │
 │                                                                      │
 │  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐        │
 │  │Zustand   │   │Zustand   │   │Zustand   │   │Zustand   │  ...    │
@@ -1273,7 +1272,7 @@ const isPWA = () => {
 │                       │               │                              │
 │                 ┌─────┴──────┐  ┌─────┴──────┐                       │
 │                 │ WS Client  │  │ REST Client│                       │
-│                 │ (real-time)│  │ (history)  │                       │
+│                 │ （实时）     │  │ （历史）    │                       │
 │                 └─────┬──────┘  └─────┬──────┘                       │
 └───────────────────────┼───────────────┼──────────────────────────────┘
                         │               │
@@ -1281,50 +1280,50 @@ const isPWA = () => {
                         │   :3210        │   :3210
                         │               │
 ┌───────────────────────┼───────────────┼──────────────────────────────┐
-│                    EDGE SERVER (Go)                                  │
-│  local-api (REST)    local-ws (WS)    local-store (SQLite)           │
-│  hub-client (P1+)    sync-client      runner-manager                 │
+│                    EDGE SERVER（Go）                                  │
+│  local-api（REST）   local-ws（WS）   local-store（SQLite）          │
+│  hub-client（P1+）   sync-client       runner-manager                 │
 └───────────────────────┼──────────────────────────────────────────────┘
                         │
                   POST /runs
                         │
 ┌───────────────────────┼──────────────────────────────────────────────┐
-│                    RUNNER (Go)                                       │
-│  executor (child_process)  adapters (claude-code/codex/opencode)     │
-│  workspace (worktree)      diff       preview      logs              │
+│                    RUNNER（Go）                                       │
+│  executor（child_process） adapters（claude-code/codex/opencode）    │
+│  workspace（worktree）     diff       preview      logs               │
 └───────────────────────┼──────────────────────────────────────────────┘
                         │
                   child_process.spawn
                         │
 ┌───────────────────────┼──────────────────────────────────────────────┐
-│                 AGENT CLI (claude / codex / opencode)                │
+│                 AGENT CLI（claude / codex / opencode）                │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 6. Port & URL Conventions
+## 6. 端口与 URL 约定
 
-| Component | Address | Protocol |
+| 组件 | 地址 | 协议 |
 |-----------|---------|----------|
-| Web UI (dev) | `http://127.0.0.1:3000` | HTTP |
-| Web UI WS (dev) | `ws://127.0.0.1:3000/ws` | WebSocket (Vite proxy → Edge) |
+| Web UI（开发） | `http://127.0.0.1:3000` | HTTP |
+| Web UI WS（开发） | `ws://127.0.0.1:3000/ws` | WebSocket（Vite 代理 → Edge） |
 | Edge API | `http://127.0.0.1:3210` | REST |
-| Edge WS | `ws://127.0.0.1:3210/ws` | WebSocket (primary real-time) |
-| Runner | `http://127.0.0.1:39731` | REST (Edge only) |
-| Preview Range | `http://127.0.0.1:5100-5199` | HTTP (dev servers) |
-| Hub (dev) | `http://127.0.0.1:3211` | REST + WS |
+| Edge WS | `ws://127.0.0.1:3210/ws` | WebSocket（主实时通道） |
+| Runner | `http://127.0.0.1:39731` | REST（仅 Edge 使用） |
+| 预览端口范围 | `http://127.0.0.1:5100-5199` | HTTP（开发服务器） |
+| Hub（开发） | `http://127.0.0.1:3211` | REST + WS |
 
 ---
 
-## 7. References
+## 7. 参考文献
 
-- `cross-analysis-im-ux.md` -- 4-core-area interaction design
-- `opcode.md` -- Tauri desktop architecture, checkpoint UI, Zustand stores
-- `cloudcli.md` -- Mobile 768px breakpoint, Drawer overlay, PWA, plugin system
-- `claude-code-viewer.md` -- Progressive Disclosure, DiffViewer + comments, FTS5, RightPanel tabs
-- `librechat.md` -- Message tree buildTree(), SiblingSwitch, Fork 4 modes, Artifacts
-- `architecture.md` -- Hub-Edge-Runner topology, P0 Desktop priority
-- `product-model.md` -- Product layers: Command Center → IM → Hub
-- `data-model.md` -- Project/Conversation/Thread/Turn/Item/Artifact types
-- `authority.md` -- Conversation/Execution/Artifact/Memory authority model
+- `cross-analysis-im-ux.md` -- 四核心区域交互设计
+- `opcode.md` -- Tauri 桌面架构、checkpoint UI、Zustand store
+- `cloudcli.md` -- 移动端 768px 断点、Drawer 覆盖层、PWA、插件系统
+- `claude-code-viewer.md` -- 渐进展开、DiffViewer + 评论、FTS5、RightPanel 标签页
+- `librechat.md` -- 消息树 buildTree()、SiblingSwitch、Fork 四种模式、Artifacts
+- `architecture.md` -- Hub-Edge-Runner 拓扑、P0 桌面优先级
+- `product-model.md` -- 产品层级：指挥中心 → IM → Hub
+- `data-model.md` -- Project/Conversation/Thread/Turn/Item/Artifact 类型
+- `authority.md` -- Conversation/Execution/Artifact/Memory authority 模型

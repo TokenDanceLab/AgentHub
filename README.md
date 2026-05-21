@@ -2,13 +2,13 @@
 
 # AgentHub
 
-## IM-native Multi-Agent Collaboration Platform
+## IM 形态的多 Agent 协作平台
 
-Chat with AI Agents like teammates. @mention them, create group chats, watch code, diffs, and previews unfold inline.
+像用飞书/微信一样，拉群组织 Claude Code、Codex、OpenCode 等 AI Agent 协作完成网页、代码和部署。
 
-[中文文档](README_ZH.md) &nbsp;·&nbsp; [Architecture](docs/architecture.md) &nbsp;·&nbsp; [Research](docs/reference/)
+[English](README_EN.md) &nbsp;·&nbsp; [架构文档](docs/architecture.md) &nbsp;·&nbsp; [调研索引](docs/reference/)
 
-<img src="https://img.shields.io/badge/status-research-blue?style=flat-square" alt="status">
+<img src="https://img.shields.io/badge/状态-调研中-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.24+-00ADD8?style=flat-square&logo=go" alt="go">
 <img src="https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react" alt="react">
 <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="license">
@@ -17,15 +17,15 @@ Chat with AI Agents like teammates. @mention them, create group chats, watch cod
 
 <br>
 
-## What is AgentHub
+## 这是什么
 
-AgentHub turns AI coding agents into IM contacts. Instead of switching between terminals and IDEs, you chat with Claude Code, Codex, and OpenCode in a group chat — like you chat with teammates on Feishu or Slack.
+AgentHub 把 AI 编程 Agent 变成了 IM 联系人。你可以像在飞书群里 @同事一样，在群聊中 @ClaudeCode 写代码、@Codex 做审查、@Reviewer 提建议——所有交互都在一个聊天线程中完成。
 
-**vs. existing tools**: Most Claude Code GUIs are single-player chat shells. AgentHub is a multi-agent collaboration platform — plan with an orchestrator, code with Claude Code, review with a reviewer agent, all in one conversation thread.
+**与现有工具的区别**：大多数 Claude Code GUI 是单人聊天壳。AgentHub 是多 Agent 协作平台——Orchestrator 规划、Claude Code 实现、Reviewer 审查，在同一个群聊中流转。
 
 <br>
 
-## Architecture
+## 架构
 
 ```
 Desktop UI ─→ Edge Server ─→ Runner ─→ Claude Code / Codex / OpenCode
@@ -33,109 +33,112 @@ Desktop UI ─→ Edge Server ─→ Runner ─→ Claude Code / Codex / OpenCod
               Hub Server
 ```
 
-| Component | Dir | Responsibility |
-|-----------|-----|---------------|
-| **Hub Server** | `services/hub-server/` | Central IM: users, contacts, groups, message routing, multi-device sync, Edge relay |
-| **Edge Server** | `services/edge-server/` | Local node: projects, memory, context, runner management, syncs to Hub |
-| **Runner** | `services/runner/` | Executor: workspace, process lifecycle, Agent CLI adapters, diff/preview/logs |
-| **Web UI** | `apps/web/` | React IM interface: sidebar, message tree, diff cards, preview panel |
+| 组件 | 目录 | 职责 |
+|------|------|------|
+| **Hub Server** | `services/hub-server/` | 中心 IM：用户、联系人、群聊、消息路由、多端同步、Edge 中继 |
+| **Edge Server** | `services/edge-server/` | 本地节点：项目、记忆、上下文、Runner 管理、同步到 Hub |
+| **Runner** | `services/runner/` | 执行器：workspace、进程管理、Agent CLI 适配、Diff/预览/日志 |
+| **Web UI** | `apps/web/` | React IM 界面：侧边栏、消息树、Diff 卡片、预览面板 |
 
-> Every machine that runs a Runner is an **Edge Node** — your laptop, a remote server, or a cloud VM.
+> 任何能运行 Runner 的机器都是 **Edge Node**——你的笔记本、远程服务器、云端 VM。
 
 <br>
 
-## Demo Flow
+## 演示流程
 
 ```
-You: @ClaudeCode build a login page with email and OAuth
+你：@ClaudeCode 做一个带邮箱和 OAuth 的登录页
 
-Orchestrator: Task split into 3 steps — scaffold, implement, review
+Orchestrator: 任务拆成 3 步——脚手架、实现、审查
 
-Claude Code: Created src/LoginPage.tsx with form validation
-             [View Diff] [Apply] [Preview]
+Claude Code: 已创建 LoginPage.tsx，含表单验证
+             [查看 Diff] [应用] [预览]
 
-Reviewer: Found missing loading state. Suggested edge-case handling.
+Reviewer: 缺少 loading 状态。建议补充边界处理。
 
-Claude Code: Fixed. Added useFormStatus() and error boundary.
+Claude Code: 已修复。添加了 useFormStatus() 和 error boundary。
 
-Orchestrator: Done. Preview running at http://localhost:5173
-              [Deploy] [Share] [Archive]
+Orchestrator: 完成。预览地址 http://localhost:5173
+              [部署] [分享] [归档]
 ```
 
 <br>
 
-## Product Layers
+## 产品分层
 
-| Layer | Description | Phase |
-|-------|------------|:-----:|
-| **Desktop Command Center** | Local project, thread, agent lifecycle, worktree, diff, approval, preview | P0 |
-| **IM Collaboration** | Direct chat, group chat, @Agent, orchestrator, multi-agent review, agent progress cards | P1 |
-| **Hub Network** | Accounts, friends, groups, multi-device sync, Edge relay, team memory | P2-P4 |
+| 层 | 描述 | 阶段 |
+|----|------|:---:|
+| **Desktop Command Center** | 本地项目、线程、Agent 生命周期、工作树、Diff、审批、预览 | P0 |
+| **IM Collaboration** | 单聊、群聊、@Agent、Orchestrator、多 Agent 审查、Agent 进度卡片 | P1 |
+| **Hub Network** | 账号、好友、群聊、多端同步、Edge 中继、团队记忆 | P2-P4 |
 
 <br>
 
-## Tech Stack
+## 技术栈
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 19 + TypeScript + Vite + shadcn/ui |
+| 层 | 技术 |
+|----|------|
+| 前端 | React 19 + TypeScript + Vite + shadcn/ui |
 | Hub / Edge / Runner | Go 1.24 |
-| Desktop | Tauri 2 |
-| Mobile | PWA |
-| Realtime | WebSocket (coder/websocket) |
-| Database | SQLite + FTS5 (modernc.org/sqlite) |
-| Protocol | Protobuf + Buf + Connect-RPC |
-| Editor | Monaco Editor |
+| 桌面端 | Tauri 2 |
+| 移动端 | PWA |
+| 实时通信 | WebSocket (coder/websocket) |
+| 数据库 | SQLite + FTS5 (modernc.org/sqlite) |
+| 协议 | Protobuf + Buf + Connect-RPC |
+| 编辑器 | Monaco Editor |
 
 <br>
 
-## Quick Start
+## 快速开始
 
 ```bash
-# Edge Server (local node)
+# Edge Server（本地节点）
 cd services/edge-server && go run ./cmd/main.go
 
-# Runner (agent executor)
+# Runner（Agent 执行器）
 cd services/runner && go run ./cmd/main.go
 
 # Web UI
 cd apps/web && pnpm dev
 ```
 
-> P0 does not require Hub Server. Edge + Runner work offline.
+> P0 阶段不需要 Hub Server。Edge + Runner 可离线独立运行。
 
 <br>
 
-## Project Structure
+## 项目结构
 
 ```
 AgentHub/
-├── apps/                   # React frontends (web, desktop, mobile)
-├── services/               # Go backends (hub-server, edge-server, runner)
-├── packages/               # shared Go + TS libraries
-├── proto/                  # Protobuf schema, the single protocol source
-├── docs/                   # architecture + reference docs
-│   └── reference/          # 68 research documents, including Multica Tier-0 reference
+├── apps/                   # React 前端（web、desktop、mobile）
+├── services/               # Go 后端（hub-server、edge-server、runner）
+├── packages/               # 共享 Go + TS 库
+├── proto/                  # Protobuf Schema（唯一协议源）
+├── docs/                   # 架构 + 调研文档
+│   └── reference/          # 69 份调研和工程规格文档，包含 Multica Tier-0 参考
 ├── .githooks/              # commit-msg + prepare-commit-msg
-└── .agenthub/              # project memory and rules
+└── .agenthub/              # 项目记忆和规则
 ```
 
 <br>
 
-## Documentation
+## 文档导航
 
-| Document | Description |
-|----------|------------|
-| [Architecture](docs/architecture.md) | Hub-Edge-Runner topology, deployment modes, sync protocol |
-| [Glossary](docs/glossary.md) | Plain-language terms for Hub, Edge, Runner, AgentRun, artifacts and protocol |
-| [Project Management](docs/project-management.md) | Milestones, labels and issue grouping rules |
-| [Research Index](docs/reference/) | 68 cross-repo deep-dive documents, organized for Agent navigation |
-| [Implementation Roadmap](docs/reference/04-plan/01-research-to-implementation.md) | P0 minimal system, priority matrix, research-to-code mapping |
-| [Protocol Schema](docs/reference/03-build/backend/13-protobuf-schema.md) | 6 .proto files + buf.gen.yaml |
+| 文档 | 描述 |
+|------|------|
+| [架构文档](docs/architecture.md) | Hub-Edge-Runner 拓扑、部署模式、同步协议 |
+| [术语表](docs/glossary.md) | 用白话解释 Hub、Edge、Runner、AgentRun、产物和协议源头 |
+| [项目管理](docs/project-management.md) | 里程碑、标签和 issue 聚合规则 |
+| [文档语言规则](docs/language-policy.md) | 哪些文档中文优先，哪些内容保留英文 |
+| [中文化路线图](docs/chinese-documentation-roadmap.md) | 交给 DeepSeek 等低成本模型分批翻译和校对的执行清单 |
+| [DeepSeek 交接文档](docs/deepseek-handoff.md) | 可直接复制给 DeepSeek 执行的任务说明和验收要求 |
+| [调研索引](docs/reference/) | 69 份跨仓库深度分析和工程规格，Agent 友好的四层结构 |
+| [实现路线图](docs/reference/04-plan/01-research-to-implementation.md) | P0 最小系统、优先级矩阵、调研到代码映射 |
+| [Protocol Schema](docs/reference/03-build/backend/13-protobuf-schema.md) | 6 个 .proto 文件 + buf.gen.yaml |
 
 <br>
 
-## References
+## 参考项目
 
 - [Claude Code Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview)
 - [OpenAI Codex CLI](https://github.com/openai/codex)
@@ -148,5 +151,5 @@ AgentHub/
 ---
 
 <div align="center">
-<a href="README_ZH.md">中文文档</a> &nbsp;·&nbsp; <a href="docs/architecture.md">Architecture</a> &nbsp;·&nbsp; <a href="docs/reference/">Research</a>
+<a href="README_EN.md">English</a> &nbsp;·&nbsp; <a href="docs/architecture.md">架构文档</a> &nbsp;·&nbsp; <a href="docs/reference/">调研索引</a>
 </div>

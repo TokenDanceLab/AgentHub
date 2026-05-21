@@ -1,84 +1,84 @@
-# AgentHub Product Model
+# AgentHub 产品模型
 
-Date: 2026-05-21
+日期：2026-05-21
 
-## Positioning
+## 定位
 
-AgentHub combines:
+AgentHub 整合了以下产品形态：
 
 ```text
-Codex-App-style local agent command center
-+ Multica-style managed agent lifecycle
-+ IM-style multi-agent collaboration
-+ Hub-Edge-Runner network topology
+Codex-App 风格的本地 agent 命令中心
++ Multica 风格的 managed agent 生命周期
++ IM 风格的多 Agent 协作
++ Hub-Edge-Runner 网络拓扑
 ```
 
-Codex App is a reference for local coding-agent product mechanics: project threads, turns, items, worktree isolation, diff review, approvals and context construction. Multica is the highest-priority reference for agent identity, runtime registration, task lifecycle, progress reporting, blocker reporting, skills and team operations. AgentHub keeps the local command-center experience, adds managed agent lifecycle, then puts the main interaction into multi-agent IM and Hub networking.
+Codex App 是本地 coding-agent 产品机制的参考：project threads、turn、item、worktree 隔离、diff review、approval 和上下文构造。Multica 是 agent 身份、runtime 注册、任务生命周期、进度上报、blocker 上报、skills 和团队协作的最高优先级参考。AgentHub 保留本地命令中心的体验，增加 managed agent 生命周期，然后把主要交互放入多 Agent IM 和 Hub 网络。
 
-## Reference Priority
+## 参考优先级
 
-| Reference | Use For | Boundary |
+| 参考 | 用途 | 边界 |
 |---|---|---|
-| ByteDance brief | Product requirement authority: IM, group chat, `@Agent`, Orchestrator and deliverable records | Competition material is authoritative for the product scenario |
-| Multica | Agent as teammate, agent profile, runtime/daemon lifecycle, task queue, progress/blocker reporting, skills, polished frontend structure | Do not become Issue/Board-first; AgentHub starts from Conversation / Thread / Artifact |
-| Codex App | Local command-center mechanics: thread, turn, item, worktree, diff, approval, context | Do not lock to one agent ecosystem |
-| Emdash / Orca / Jean | Desktop workbench, worktree, remote machine, diff/preview, mobile control | Use as workflow references, not product positioning |
+| ByteDance 简报 | 产品需求权威：IM、群聊、`@Agent`、Orchestrator 和交付物记录 | 比赛材料是产品场景的权威 |
+| Multica | Agent 作为队友、agent profile、runtime/daemon 生命周期、任务队列、进度/blocker 上报、skills、前端结构 | 不要变成 Issue/Board 优先；AgentHub 以 Conversation / Thread / Artifact 为起点 |
+| Codex App | 本地命令中心机制：thread、turn、item、worktree、diff、approval、context | 不要锁定单一 agent 生态 |
+| Emdash / Orca / Jean | Desktop 工作台、worktree、远程机器、diff/preview、移动控制 | 用作工作流参考，不是产品定位 |
 
-## Product Layers
+## 产品分层
 
 ### 1. Desktop Command Center
 
-P0/P1 core.
+P0/P1 核心。
 
-Responsibilities:
+职责：
 
-- local project management
-- project threads
-- AgentRun lifecycle
-- agent profile and runtime status
-- Runner execution
-- worktree isolation
+- 本地项目管理
+- 项目 thread
+- AgentRun 生命周期
+- agent profile 和 runtime 状态
+- Runner 执行
+- worktree 隔离
 - diff review
 - apply / discard
-- approval cards
+- approval 卡片
 - preview
-- `.agenthub/AGENTS.md` and project rules
+- `.agenthub/AGENTS.md` 和项目规则
 
 ### 2. IM Collaboration
 
-P1/P2 enhancement.
+P1/P2 增强。
 
-Responsibilities:
+职责：
 
-- direct chat
-- group chat
+- 单聊
+- 群聊
 - `@Agent`
 - Orchestrator
-- multi-agent review
-- progress / blocker cards in the conversation
-- multiple turns in one thread
-- multiple agents discussing one artifact
+- 多 Agent 审查
+- 会话中的进度/blocker 卡片
+- 同一 thread 中的多轮对话
+- 多个 Agent 围绕同一 artifact 讨论
 
 ### 3. Hub Network
 
-P2/P3/P4 long-term layer.
+P2/P3/P4 长期层。
 
-Responsibilities:
+职责：
 
-- auth
-- friends
-- groups
-- multi-device sync
-- Edge relay
+- 认证
+- 好友
+- 群组
+- 多端同步
+- Edge 中继
 - Cloud Edge
-- team memory
-- permission audit
+- 团队 memory
+- 权限审计
 
-## Product Statement
+## 产品声明
 
 ```text
-AgentHub Desktop is a Go-based local multi-agent command center.
-AgentHub Hub is the IM, sync, relay and team collaboration extension.
+AgentHub Desktop 是基于 Go 的本地多 Agent 命令中心。
+AgentHub Hub 是 IM、同步、中继和团队协作扩展。
 ```
 
-P0 should feel like a mature local coding-agent workstation, not just a chat bot.
+P0 应该给人成熟本地 coding-agent 工作站的体验，而不只是聊天机器人。

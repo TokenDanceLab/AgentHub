@@ -1,14 +1,14 @@
 # AgentHub Agent Loop
 
-Date: 2026-05-21
+日期：2026-05-21
 
-## Runtime Choice
+## 运行时选型
 
-Hub Server, Edge Server and Runner are implemented in **Go**.
+Hub Server、Edge Server 和 Runner 使用 **Go** 实现。
 
-TypeScript is used for UI and generated client types only. AgentHub may reference Codex App product ideas, but the backend runtime is Go from P0.
+TypeScript 只用于 UI 和生成的客户端类型。AgentHub 可以引用 Codex App 的产品思路，但后端运行时从 P0 起就是 Go。
 
-## Local P0 Loop
+## 本地 P0 循环
 
 ```text
 Desktop UI
@@ -17,33 +17,33 @@ Desktop UI
   -> Claude Code / Codex / OpenCode
 ```
 
-Flow:
+流程：
 
-1. User creates a Thread.
-2. Edge creates a Turn and AgentRun.
-3. Edge builds context from project memory, recent Items and current request.
-4. Runner creates a worktree for the run.
-5. Runner starts the selected CLI Agent.
-6. Runner streams stdout/stderr and structured events as Items.
-7. Runner detects file changes and creates diff artifacts.
-8. Edge indexes artifacts and emits ServerEvents to UI.
-9. User reviews diff and approvals.
-10. Edge tells Runner to apply or discard the patch/worktree.
+1. 用户创建 Thread。
+2. Edge 创建 Turn 和 AgentRun。
+3. Edge 从项目 memory、最近的 Item 和当前请求构造上下文。
+4. Runner 为本次 run 创建 worktree。
+5. Runner 启动选定的 CLI Agent。
+6. Runner 以 Item 形式流式输出 stdout/stderr 和结构化事件。
+7. Runner 检测文件变更并生成 diff artifact。
+8. Edge 索引 artifact 并向 UI 发送 ServerEvent。
+9. 用户审查 diff 和审批。
+10. Edge 通知 Runner apply 或 discard patch/worktree。
 
-## JSON-RPC Direction
+## JSON-RPC 方向
 
-AgentHub protocol is proto-first, but runtime communication uses JSON-RPC style request/response/notification envelopes where appropriate.
+AgentHub 协议是 proto-first，但运行时通信在合适位置使用 JSON-RPC 风格的 request/response/notification 信封。
 
 ```text
 UI <-> Edge      JSON-RPC over WebSocket
 Edge <-> Runner  JSON-RPC over local HTTP/WebSocket/stdio
 Edge <-> Hub     JSON-RPC over reverse WSS
-Hub <-> Web      JSON-RPC over WebSocket + REST for simple reads
+Hub <-> Web      JSON-RPC over WebSocket + REST 处理简单读操作
 ```
 
-P0 can use local WebSocket/HTTP between Edge and Runner, but method names should match the long-term JSON-RPC surface.
+P0 可以在 Edge 和 Runner 之间使用本地 WebSocket/HTTP，但方法名应与长期 JSON-RPC surface 保持一致。
 
-## Key Methods
+## 关键方法
 
 ```text
 project/list
@@ -75,27 +75,27 @@ hub/connect
 hub/sync
 ```
 
-## Go Service Boundaries
+## Go 服务边界
 
-Edge owns:
+Edge 拥有：
 
-- Project / Thread / Turn metadata.
-- Context building.
-- Approval policy decisions.
-- Runner selection.
-- Artifact index.
+- Project / Thread / Turn 元数据。
+- 上下文构造。
+- 审批策略决策。
+- Runner 选择。
+- Artifact 索引。
 
-Runner owns:
+Runner 拥有：
 
-- CLI process lifecycle.
-- Worktree lifecycle.
-- Raw logs.
-- Diff generation.
-- Preview process lifecycle.
+- CLI 进程生命周期。
+- Worktree 生命周期。
+- 原始日志。
+- Diff 生成。
+- Preview 进程生命周期。
 
-Hub owns:
+Hub 拥有：
 
-- Remote delivery.
-- Sync.
-- Relay.
-- Cloud/Web conversation authority.
+- 远程投递。
+- 同步。
+- 中继。
+- Cloud/Web 会话权威。
