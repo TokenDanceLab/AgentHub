@@ -63,7 +63,7 @@ The branch workflow is intentionally small because the team has three people.
 
 | Branch | Rule |
 |---|---|
-| `master` | Stable mainline. Keep it readable, demoable and easy to continue from. |
+| `master` | Protected stable mainline. Keep it readable, demoable and easy to continue from. |
 | short working branches | Use for code, protocol, service layout, UI and risky docs changes. |
 | long-lived personal branches | Do not use. They hide integration problems. |
 
@@ -89,7 +89,16 @@ Merge policy:
 - link the relevant issue
 - squash merge short branches
 - delete branches after merge
-- direct `master` commits are only for small low-risk docs/process cleanup
+- direct `master` commits are only for maintainers/admins doing small low-risk docs/process cleanup
+
+Current GitHub protection on `master`:
+
+- pull request path required
+- required approving reviews: `0`
+- required status checks: none
+- admins can bypass for emergencies
+- force pushes disabled
+- branch deletion disabled
 
 ## Current M0 Issues
 

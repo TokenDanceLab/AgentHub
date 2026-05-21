@@ -13,7 +13,8 @@ Keep AgentHub branch and PR management simple enough for a three-person team whi
 ## Key decisions
 - Decision: use a lightweight trunk-based workflow. Reason: `master` stays easy to understand and demo from, while short branches keep work reviewable. Alternative considered: GitFlow with develop/release/hotfix branches, rejected as too much process for three people.
 - Decision: branch names are lowercase kebab-case with a small prefix set. Reason: predictable names help humans and agents route work without extra ceremony. Alternative considered: per-person long-lived branches, rejected because they hide integration problems.
-- Decision: code and protocol work should go through PR; tiny docs/process cleanups may be direct only when low risk. Reason: implementation needs review, but docs-only cleanup should not require artificial overhead.
+- Decision: code and protocol work should go through PR; tiny docs/process cleanups may be direct only for maintainers/admins when low risk. Reason: implementation needs review, but docs-only cleanup should not require artificial overhead.
+- Decision: enable the lightest useful GitHub protection on `master`: PR path required, zero required approving reviews, no CI requirement, admins can bypass, force-push and branch deletion disabled. Reason: this prevents accidental destructive pushes without making a three-person team wait on process.
 
 ## Surfaced assumptions
 - GitHub currently has architecture issues and labels, but no branch workflow issue.
@@ -22,5 +23,6 @@ Keep AgentHub branch and PR management simple enough for a three-person team whi
 
 ## Out of scope
 - Full release branch policy.
-- Automated GitHub branch protection setup.
+- Required CI checks.
+- Required reviewer count.
 - Required multi-reviewer approval.
