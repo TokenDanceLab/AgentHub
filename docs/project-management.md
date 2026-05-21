@@ -57,6 +57,40 @@ Avoid:
 - duplicate issues for Hub, Edge and Runner when the problem is one shared protocol contract
 - labels without acceptance criteria
 
+## Branch Workflow
+
+The branch workflow is intentionally small because the team has three people.
+
+| Branch | Rule |
+|---|---|
+| `master` | Stable mainline. Keep it readable, demoable and easy to continue from. |
+| short working branches | Use for code, protocol, service layout, UI and risky docs changes. |
+| long-lived personal branches | Do not use. They hide integration problems. |
+
+Branch naming:
+
+```text
+<type>/<short-topic>
+```
+
+Allowed types:
+
+- `feat/`
+- `fix/`
+- `docs/`
+- `chore/`
+- `refactor/`
+- `spike/`
+- `codex/`
+
+Merge policy:
+
+- use PRs for code, protocol and service layout changes
+- link the relevant issue
+- squash merge short branches
+- delete branches after merge
+- direct `master` commits are only for small low-risk docs/process cleanup
+
 ## Current M0 Issues
 
 | # | Issue | Purpose |
