@@ -1,6 +1,8 @@
 # AgentHub 调研文档索引
 
 > 68 份文档，按"Agent 需要什么"分类。Agent 读文档路径：**Learn → Decide → Build → Plan**。
+>
+> 语言规则：本目录服务于 Agent 和实现阶段，也要逐步中文化。翻译按 [中文化路线图](../chinese-documentation-roadmap.md) 分批执行，保留代码、路径、协议字段和必要英文原文。完整规则见 [文档语言规则](../language-policy.md)。
 
 ## 01-learn — 了解别人怎么做
 
@@ -117,4 +119,6 @@
 我要对齐比赛材料 → ../research/bytedance.md + 01-learn/web-research/04-agent-command-center-2026.md
 我要看术语白话解释 → ../glossary.md
 我要管理 GitHub issues → ../project-management.md
+我要判断文档该用中文还是英文 → ../language-policy.md
+我要执行文档中文化 → ../chinese-documentation-roadmap.md
 ```
