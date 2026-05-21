@@ -6,7 +6,7 @@
 ## 1. go.mod
 
 ```go
-module github.com/maintainer/AgentHub
+module github.com/TokenDanceLab/AgentHub
 
 go 1.24.0
 
@@ -179,7 +179,7 @@ managed:
   enabled: true
   override:
     - file_option: go_package_prefix
-      value: github.com/maintainer/AgentHub/gen/go
+      value: github.com/TokenDanceLab/AgentHub/gen/go
 
 plugins:
   - remote: buf.build/protocolbuffers/go:v1.37.0
