@@ -371,7 +371,7 @@ ChatDev 的 `BaseConfig.child_routes()` + `ConfigFieldSpec` 机制非常适合 A
 - AgentHub 的 adapter 定义、workspace 配置、runner 参数都可以用同样的模式
 
 **B. YAML 配置驱动 + Visual Canvas**
-ChatDev 证明了一个关键设计：**YAML 是 SSOT，Canvas 是编辑器**。AgentHub 可以采用同样的策略：
+ChatDev 证明了一个关键设计：**YAML 是唯一事实源，Canvas 是编辑器**。AgentHub 可以采用同样的策略：
 - `docs/reference/chatdev.md` 类似 `yaml_instance/` -- 存储 workflow 定义
 - 前端 VueFlow 画布读取 YAML，编辑后写回 YAML
 - 这与 AgentHub 已有设计报告中的方向一致

@@ -122,7 +122,7 @@ Project
         ├── Turn 3 [checkpoint_id=C]   ← 当前
         └── ...
               │
-              ├── events.jsonl          ← EventStore SSOT (append-only)
+              ├── events.jsonl          ← EventStore 唯一事实源 (append-only)
               │     ├── {"v":2, "type":"thread_created", ...}
               │     ├── {"v":2, "type":"turn_started", "turn_id":"T1", ...}
               │     ├── {"v":2, "type":"turn_completed", "turn_id":"T1", "checkpoint_id":"A"}
@@ -163,7 +163,7 @@ Undo(turn_id=T3, target_turn_id=T1):
   6. 重置 Thread.CurrentTurnID → null（等待下一个 Turn）
 ```
 
-**关键决策**：T2+T3 的 events **不物理删除**。JSONL append-only 的不可变性是 Event Sourcing 的核心保证——删除是对 SSOT 的破坏。`turn_undone` 作为补偿事件标记逻辑状态，与 `turn_cancelled` 同为终止事件。
+**关键决策**：T2+T3 的 events **不物理删除**。JSONL append-only 的不可变性是 Event Sourcing 的核心保证——删除是对唯一事实源的破坏。`turn_undone` 作为补偿事件标记逻辑状态，与 `turn_cancelled` 同为终止事件。
 
 ### 4.4 Fork (Thread 级分支)
 
@@ -239,7 +239,7 @@ Fork 从 Turn 2 开始：
 
 | 优先级 | 功能 | 来源 | 说明 |
 |--------|------|------|------|
-| P0 | EventStore JSONL + append-only `turn_undone` 事件 | Kanna + Opcode | Undo 的 SSOT 基础，补偿事件而非物理删除 |
+| P0 | EventStore JSONL + append-only `turn_undone` 事件 | Kanna + Opcode | Undo 的唯一事实源基础，补偿事件而非物理删除 |
 | P0 | content_pool 文件快照 (SHA-256 + zstd) | Opcode | 文件级回滚的去重存储 |
 | P0 | `restore_checkpoint(checkpoint_id)` 文件恢复 | Opcode manager.rs:452-599 | 核心 Undo 逻辑 |
 | P1 | Thread Fork (INCLUDE_BRANCHES + DIRECT_PATH) | LibreChat fork.js | Thread 级分支探索 |

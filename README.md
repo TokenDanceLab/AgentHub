@@ -127,6 +127,8 @@ AgentHub/
 | Document | Description |
 |----------|------------|
 | [Architecture](docs/architecture.md) | Hub-Edge-Runner topology, deployment modes, sync protocol |
+| [Glossary](docs/glossary.md) | Plain-language terms for Hub, Edge, Runner, AgentRun, artifacts and protocol |
+| [Project Management](docs/project-management.md) | Milestones, labels and issue grouping rules |
 | [Research Index](docs/reference/) | 68 cross-repo deep-dive documents, organized for Agent navigation |
 | [Implementation Roadmap](docs/reference/04-plan/01-research-to-implementation.md) | P0 minimal system, priority matrix, research-to-code mapping |
 | [Protocol Schema](docs/reference/03-build/backend/13-protobuf-schema.md) | 6 .proto files + buf.gen.yaml |

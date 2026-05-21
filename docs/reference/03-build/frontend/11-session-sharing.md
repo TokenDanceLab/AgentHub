@@ -1,6 +1,6 @@
 # AgentHub Session Sharing & Multi-User Collaboration
 
-> 基于: design-data-portability.md (JSONL SSOT / ShareView / Fork 分享),
+> 基于: design-data-portability.md (JSONL 唯一事实源 / ShareView / Fork 分享),
 > design-protocol.md (ConversationAuthority + Hub-Edge sync + PermissionVisibility),
 > cross-analysis-orchestration.md (@mention 群聊 + 消息树 + cycle detection),
 > librechat.md (Multi-Tab Sync / Fork / Session 管理)
@@ -84,7 +84,7 @@ editor 可发消息、@Agent、Fork。核心挑战：多用户消息同步 + Age
 |-------------|-------------|-----------|---------|
 | **edge** | 协作者消息 relay 到 owner Edge | Agent 在 owner Edge Runner 执行 | Hub broadcast 到所有在线协作者 |
 | **hub** | 所有协作者直写 Hub EventStore | Hub 调度到可用 Edge | Hub broadcast |
-| **hybrid** | Hub 为 SSOT, Edge 同步 | Hub 调度 | Hub broadcast + Edge seq-sync |
+| **hybrid** | Hub 为唯一事实源, Edge 同步 | Hub 调度 | Hub broadcast + Edge seq-sync |
 
 ### 4.2 多用户消息同步
 
@@ -191,7 +191,7 @@ Share 记录存储在 Hub，不写入 Edge EventStore。`token` 建 unique index
 | 决策 | 选择 | 依据 |
 |------|------|------|
 | Authority 不因分享迁移 | 分享 = 授权参与，非移交所有权 | revoke 后无所有权黑洞 |
-| 评论不写入主 EventStore | 独立 `share_comments` 表 | 不污染 SSOT，revoke cascade clean |
+| 评论不写入主 EventStore | 独立 `share_comments` 表 | 不污染唯一事实源，revoke cascade clean |
 | editor 必须注册用户 | 匿名不可 editor | 需 Edge 身份接收 relay；可审计 |
 | Artifact 按需懒加载 | 非主动全量同步 | 节省带宽，大文件直取 object-storage |
 | Fork 冲突：先到先得+双方可见 | 不静默丢弃 | 消息树天然多分支，SiblingSwitch 对比 |

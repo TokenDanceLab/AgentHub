@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document defines the complete Go type layer for AgentHub's protocol package. It is the single source of truth for type definitions before code generation. Every field carries a source comment tracing its origin.
+This document defines the complete Go type layer proposed for AgentHub's protocol package before `.proto` files are finalized. The authoritative protocol source is `proto/agenthub/v1`; this document is a design reference for the Go-facing shapes and every field carries a source comment tracing its origin.
 
 Package layout:
 

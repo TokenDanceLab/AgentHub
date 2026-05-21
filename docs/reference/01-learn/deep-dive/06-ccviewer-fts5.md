@@ -86,7 +86,7 @@ for (const suffix of ["", "-wal", "-shm"]) {
 return initDbAtPath(dbPath);
 ```
 
-**对 AgentHub 的价值**：FTS5 索引是可重建的（JSONL 是 SSOT），因此 DB 损坏时直接删除重建比修复更简单可靠。
+**对 AgentHub 的价值**：FTS5 索引是可重建的（JSONL 是唯一事实源），因此 DB 损坏时直接删除重建比修复更简单可靠。
 
 ---
 
@@ -369,7 +369,7 @@ const extractAssistantText = (entry) => {
 ### 5.2 设计权衡
 
 **Claude Code Viewer 选择独立 FTS5 表的原因**：
-- Session JSONL 文件是外部 SSOT，不在 SQLite 中持久化
+- Session JSONL 文件是外部唯一事实源，不在 SQLite 中持久化
 - 每个 session sync 时全量替换 FTS 条目，不需要增量触发器
 - 独立的 FTS5 表使得 schema 变更时不需要处理基表迁移
 - DELETE + INSERT 对单 session（几百条消息）的性能开销可忽略
@@ -389,7 +389,7 @@ const extractAssistantText = (entry) => {
 4. **手动 snippet 提取**：`indexOf(queryLower) -> slice(matchIndex - 50, +150)`
 5. **`fts.rank` 的 `ORDER BY rank`**：不需要 `ORDER BY rank ASC`，因为 rank 本身就是越小越相关
 6. **FTS5 表不纳入 ORM migration**：用原生 SQL exec 管理
-7. **DB 损坏时重建**：因为 SSOT 在 JSONL，索引重建成本低
+7. **DB 损坏时重建**：因为唯一事实源在 JSONL，索引重建成本低
 
 ---
 

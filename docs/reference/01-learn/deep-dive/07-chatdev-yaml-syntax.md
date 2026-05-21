@@ -565,7 +565,7 @@ AgentConfig.child_routes()
       ChildKey("runner", "openai"): OpenAIRunnerConfig}
 ```
 
-#### C. YAML 是 SSOT + Canvas 是编辑器
+#### C. YAML 是唯一事实源 + Canvas 是编辑器
 
 ChatDev 的核心设计哲学：YAML 文件是单一事实来源（可 Git diff/merge），VueFlow 画布是编辑器。AgentHub 的 Agent 群聊配置应采用同样的策略：
 - `agents.yaml` 定义 Agent 池

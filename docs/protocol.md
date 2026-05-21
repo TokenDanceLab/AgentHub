@@ -26,7 +26,7 @@ packages/protocol/
     generated/
 ```
 
-P0 can start with hand-written schema files and generated types can be added once the first event shapes stabilize. The schema remains the contract even before generation is automated.
+P0 can start with hand-written `.proto` files and generated types can be added once the first event shapes stabilize. The proto files remain the contract even before generation is automated.
 
 ## Protocol Surfaces
 
