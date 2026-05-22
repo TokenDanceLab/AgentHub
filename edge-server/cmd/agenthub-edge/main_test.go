@@ -21,6 +21,9 @@ func TestBuildConfigDefaultsToMemoryStore(t *testing.T) {
 	if cfg.StoreFile != "" {
 		t.Fatalf("StoreFile = %q, want empty", cfg.StoreFile)
 	}
+	if cfg.RunnerProfile != "" {
+		t.Fatalf("RunnerProfile = %q, want empty", cfg.RunnerProfile)
+	}
 	if cfg.RunnerCommand != "" {
 		t.Fatalf("RunnerCommand = %q, want empty", cfg.RunnerCommand)
 	}
@@ -67,6 +70,85 @@ func TestBuildConfigParsesStoreFile(t *testing.T) {
 	}
 	if got, want := []string(cfg.RunnerEnv), []string{"AGENTHUB_PROFILE_RUN={{run.id}}", "AGENTHUB_PROFILE_THREAD={{run.threadId}}"}; strings.Join(got, "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("RunnerEnv = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildConfigAppliesRunnerProfilePreset(t *testing.T) {
+	cfg, err := buildConfig([]string{"--runner-profile", "agenthub-runner-mock"})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.RunnerProfile != "agenthub-runner-mock" {
+		t.Fatalf("RunnerProfile = %q, want preset name", cfg.RunnerProfile)
+	}
+	if cfg.RunnerCommand != "agenthub-runner" {
+		t.Fatalf("RunnerCommand = %q, want preset command", cfg.RunnerCommand)
+	}
+	if got, want := []string(cfg.RunnerArgs), []string{"--mock"}; strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("RunnerArgs = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildConfigRunnerProfileAllowsCommandOverride(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--runner-profile", "agenthub-runner-mock",
+		"--runner-command", "custom-runner",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.RunnerCommand != "custom-runner" {
+		t.Fatalf("RunnerCommand = %q, want custom command", cfg.RunnerCommand)
+	}
+	if got, want := []string(cfg.RunnerArgs), []string{"--mock"}; strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("RunnerArgs = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildConfigRunnerProfilePreservesUserArgOrder(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--runner-profile", "agenthub-runner-mock",
+		"--runner-arg", "--addr=127.0.0.1:0",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if got, want := []string(cfg.RunnerArgs), []string{"--mock", "--addr=127.0.0.1:0"}; strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("RunnerArgs = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildConfigRunnerProfileValidatesUserEnvTemplate(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--runner-profile", "agenthub-runner-mock",
+		"--runner-env", "PROFILE_RUN={{run.id}}",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if got, want := []string(cfg.RunnerEnv), []string{"PROFILE_RUN={{run.id}}"}; strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("RunnerEnv = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildConfigRunnerProfileRejectsInvalidUserEnvTemplate(t *testing.T) {
+	_, err := buildConfig([]string{
+		"--runner-profile", "agenthub-runner-mock",
+		"--runner-env", "BAD={{unknown}}",
+	})
+	if err == nil || !strings.Contains(err.Error(), "--runner-env") || !strings.Contains(err.Error(), "unknown placeholder") {
+		t.Fatalf("buildConfig error = %v, want runner env unknown placeholder error", err)
+	}
+}
+
+func TestBuildConfigRejectsUnknownRunnerProfile(t *testing.T) {
+	_, err := buildConfig([]string{"--runner-profile", "missing-profile"})
+	if err == nil || !strings.Contains(err.Error(), "unknown --runner-profile") {
+		t.Fatalf("buildConfig error = %v, want unknown runner profile error", err)
 	}
 }
 
