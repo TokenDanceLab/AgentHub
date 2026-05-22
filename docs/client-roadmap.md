@@ -1,31 +1,51 @@
 # AgentHub 客户端路线图
 
-本文是客户端方向的 M1 执行计划，面向负责 Desktop、Runner、Local Edge 调度的开发者和 Agent。它不是新的长期架构文档；客户端端到端链路跑通后，本文可移动到 `docs/archive/`，长期规则回收进 `docs/implementation-guide.md`。
+本文是客户端方向的开发路线图，面向负责 **Desktop、Runner、Local Edge 调度** 的开发者和 Agent。
 
-## 1. 目标
+当前客户端工作固定在集成分支：
 
-客户端 M1 的目标是打通第一条本地端到端链路：
+```text
+feat/client-dev
+```
+
+本分支用于持续集成客户端链路，不再回到早期的 A/B/C 三条实验分支上开发。`docs/client-handoff.md` 是给接手 Agent、DeepSeek 和 UI 同学看的客户端操作手册，当前阶段保留在 `docs/`，不要误当成对外产品文档。
+
+## 1. 当前判断
+
+客户端 M1 的主链路已经成立：
 
 ```text
 Tauri Desktop
   -> Local Edge Server
   -> Mock Runner
   -> WebSocket events
-  -> Desktop UI 显示状态和输出
+  -> Desktop UI
 ```
 
-完成标准：
+当前状态：
 
-- Desktop 可以启动或连接 Local Edge。
-- `GET /v1/health` 返回正常。
-- `GET /v1/runners` 能看到 mock runner 在线。
-- `POST /v1/runs` 可以启动一次 mock run。
-- UI 能通过 `/v1/events` 看到 `run.started`、`run.output.batch`、`run.finished`。
-- 不依赖 Hub Server、真实 Claude Code、真实 Codex 或 OpenCode。
+| 项 | 状态 |
+|---|---|
+| Local Edge Foundation | 已合入 `feat/client-dev` |
+| Mock Runner | 已合入 `feat/client-dev` |
+| Desktop Shell | 已合入 `feat/client-dev` |
+| Shared TS types | 已合入 `feat/client-dev` |
+| i18n 基础设施 | 已合入 `feat/client-dev` |
+| 本地 smoke 脚本 | 已合入 `feat/client-dev` |
+| Playwright e2e / a11y | 已合入 `feat/client-dev` |
+| 图标和视觉稿 | 交给前端 UI 同学处理，不作为客户端工程收口门槛 |
+| PR #26 | Ready for review，指向 `master`，CI `validate` 已通过 |
+
+结论：
+
+- `feat/client-dev` 是客户端继续开发的正确分支。
+- 当前不应再开新的客户端集成分支。
+- 客户端 M1 的工程收口已提交并推送。
+- 后续开发应从 M2 开始，优先做 Edge 本地数据层和 EventStore；Desktop 启动编排可作为并行辅助任务。
 
 ## 2. 接口边界
 
-本阶段不继续大范围扩 API。客户端先按现有契约实现：
+客户端先按现有契约推进，不另起协议：
 
 | 类型 | 接口或事件 | 用途 |
 |---|---|---|
@@ -39,297 +59,220 @@ Tauri Desktop
 | Event | `run.output.batch` | stdout/stderr 聚合输出 |
 | Event | `run.finished` / `run.failed` | Run 结束 |
 
-如果实现时发现字段不够，先在当前任务 PR 中改 `api/openapi.yaml` 或 `api/events.md`，并在 PR 说明里写明影响前端、后端还是客户端。
+接口不够时按顺序处理：
 
-## 3. Worktree 规则
+1. 先改 `api/openapi.yaml` 或 `api/events.md`。
+2. 再改 Go 服务和 TypeScript 调用。
+3. PR 说明写清影响：前端、后端、客户端。
 
-项目级 worktree 固定使用：
+## 3. 当前分支开发规则
 
-```text
-.worktrees/
-```
+客户端集成期默认在 `feat/client-dev` 上继续开发。只有出现互不相干的大任务，才从 `master` 或 `feat/client-dev` 新切短分支。
 
-该目录只存本地并行开发副本，不进入 git。创建前确认：
-
-```powershell
-git switch master
-git pull --ff-only
-git check-ignore .worktrees/
-```
-
-创建模板：
-
-```powershell
-git worktree add .worktrees/client-edge-foundation -b feat/client-edge-foundation
-git worktree add .worktrees/client-runner-mock -b feat/client-runner-mock
-git worktree add .worktrees/client-desktop-shell -b feat/client-desktop-shell
-```
-
-清理模板：
-
-```powershell
-git worktree remove .worktrees/client-edge-foundation
-git branch -d feat/client-edge-foundation
-```
-
-## 4. 交给 DeepSeek 的执行方式
-
-把本文作为 DeepSeek 的主任务说明。DeepSeek 接手后应当：
-
-1. 在每个 worktree 内先读 `AGENTS.md`、本文、`api/README.md`、`api/openapi.yaml`、`api/events.md`。
-2. 每个 worktree 只处理自己的写入范围，不跨范围改文件。
-3. 可以在单个 worktree 内并行调度子 Agent，例如一个写实现、一个写测试、一个做 review，但最终由该 worktree 的主 Agent 统一检查和提交。
-4. 子 Agent 不能修改未分配文件，不能跨 worktree 操作。
-5. 每个 worktree 至少运行本任务列出的检查命令。
-6. 每个 worktree 完成后 push 分支并开 PR，PR 正文中文为主，列出验证命令。
-7. 发现 API 不够时，不要私自发明另一套协议；先改 `api/`，再实现。
-
-推荐给 DeepSeek 的总提示：
-
-```text
-你负责 AgentHub 客户端方向的一个 worktree。先读 AGENTS.md 和 docs/client-roadmap.md。严格遵守当前 worktree 的写入范围。可以调度子 Agent 做代码、测试、review，但所有子 Agent 只能在当前 worktree 内工作。完成后运行验证命令，提交中文 commit，push 分支并创建 PR。
-```
-
-## 5. 并行任务拆分
-
-### A. Local Edge Foundation
-
-分支：
-
-```text
-feat/client-edge-foundation
-```
-
-worktree：
-
-```text
-.worktrees/client-edge-foundation
-```
-
-写入范围：
-
-```text
-edge-server/**
-api/openapi.yaml
-api/events.md
-docs/client-roadmap.md
-```
-
-目标：
-
-- 建立 Go module 和最小 Edge 进程。
-- 提供 `GET /v1/health`。
-- 提供 `/v1/events` WebSocket event stream。
-- 提供内存 event bus，支持 seq 和 cursor 的基础结构。
-- 提供 `GET /v1/runners` 的 mock 数据来源。
-
-建议文件：
-
-```text
-edge-server/go.mod
-edge-server/cmd/agenthub-edge/main.go
-edge-server/internal/httpserver/server.go
-edge-server/internal/events/bus.go
-edge-server/internal/runners/registry.go
-edge-server/internal/api/handlers.go
-edge-server/internal/api/handlers_test.go
-```
-
-验收：
-
-```powershell
-cd edge-server
-go test ./...
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210
-```
-
-另开终端：
-
-```powershell
-curl http://127.0.0.1:3210/v1/health
-curl http://127.0.0.1:3210/v1/runners
-```
-
-PR 完成条件：
-
-- Go 测试通过。
-- health 和 runners 返回稳定 JSON。
-- WebSocket endpoint 可以连接，即使还没有真实事件。
-
-### B. Mock Runner
-
-分支：
-
-```text
-feat/client-runner-mock
-```
-
-worktree：
-
-```text
-.worktrees/client-runner-mock
-```
-
-写入范围：
-
-```text
-runner/**
-docs/client-roadmap.md
-```
-
-目标：
-
-- 建立 Go module 和最小 Runner 进程。
-- Runner 支持 mock run：启动后输出固定的 stdout/stderr chunk。
-- Runner 有清晰的内部状态：idle / running / stopping / stopped。
-- 先不接真实 Claude Code、Codex、OpenCode。
-
-建议文件：
-
-```text
-runner/go.mod
-runner/cmd/agenthub-runner/main.go
-runner/internal/run/mock.go
-runner/internal/run/mock_test.go
-runner/internal/process/state.go
-runner/internal/process/state_test.go
-```
-
-验收：
-
-```powershell
-cd runner
-go test ./...
-go run ./cmd/agenthub-runner --mock
-```
-
-PR 完成条件：
-
-- mock runner 可以单独运行。
-- 测试覆盖状态转换和取消逻辑。
-- README 说明如何启动 mock runner。
-
-### C. Desktop Shell
-
-分支：
-
-```text
-feat/client-desktop-shell
-```
-
-worktree：
-
-```text
-.worktrees/client-desktop-shell
-```
-
-写入范围：
+本分支允许修改：
 
 ```text
 app/desktop/**
 app/shared/**
-README.md
+edge-server/**
+runner/**
+scripts/client-smoke.ps1
 docs/client-roadmap.md
+docs/client-handoff.md
+api/openapi.yaml
+api/events.md
 ```
 
-目标：
+敏感规则：
 
-- 建立最小 Tauri Desktop 壳。
-- Desktop 启动时显示 Local Edge 连接状态。
-- 能配置或默认连接 `http://127.0.0.1:3210`。
-- 能显示 runners 列表。
-- 能订阅 `/v1/events` 并把事件追加到简单日志面板。
+- 不提交 `.worktrees/`。
+- 不提交本机绝对路径、账号、密钥、服务器地址、真实 Agent token。
+- 不提交真实项目 workspace 内容。
+- 不把 `docs/client-handoff.md` 写成长期制度；它只记录当前客户端接手方式。
 
-建议文件：
+## 4. M1 收口：客户端可验证版本
 
-```text
-app/desktop/package.json
-app/desktop/src-tauri/tauri.conf.json
-app/desktop/src-tauri/Cargo.toml
-app/desktop/src/main.tsx
-app/desktop/src/App.tsx
-app/desktop/src/api/edgeClient.ts
-app/desktop/src/api/eventClient.ts
-app/shared/README.md
-```
+目标：把 `feat/client-dev` 收成一个可以被同学拉下来继续开发的稳定版本。
 
-验收：
+### M1.1 已完成范围
+
+当前已完成：
+
+- Desktop e2e 测试：`app/desktop/e2e/**`
+- Playwright 配置：`app/desktop/playwright.config.ts`
+- a11y 语义增强：`StatusBar`、`RunnerList`、`EventLog`
+- `docs/client-handoff.md` 更新
+- `scripts/client-smoke.ps1` 支持自启动并清理 Edge
+- PR #26 正文已同步 M1 范围、验证命令和后续建议
+
+保留边界：
+
+- 图标、配色、布局精修交给前端 UI 方向；客户端分支只保证结构清晰、可测试、可替换。
+- 真实 Agent CLI、Project/Thread 持久化、Diff/Approval/Preview 不属于 M1。
+
+M1 验证命令：
 
 ```powershell
-cd app/desktop
-pnpm install
+git diff --check
+
+cd edge-server
+go test ./...
+
+cd ..\runner
+go test ./...
+
+cd ..\app\desktop
+pnpm test
 pnpm build
-pnpm tauri dev
-```
+pnpm test:e2e
 
-PR 完成条件：
-
-- Desktop 壳能启动。
-- Local Edge 不在线时显示 offline，不崩溃。
-- Local Edge 在线时能显示 health 和 runner 状态。
-
-### D. Integration Smoke
-
-分支：
-
-```text
-feat/client-local-smoke
-```
-
-这个分支不并行，等 A/B/C 合并到 `master` 后再做。
-
-写入范围：
-
-```text
-scripts/**
-docs/client-roadmap.md
-README.md
-```
-
-目标：
-
-- 增加一个本地冒烟流程，串起 Edge、Runner、Desktop。
-- 明确 Windows PowerShell 跑法。
-- 把可以自动化的检查放进脚本；无法自动化的 UI 检查写清手动步骤。
-
-验收：
-
-```powershell
-.\scripts\setup.ps1
+cd ..\..
 .\scripts\client-smoke.ps1
 ```
 
-## 6. 合并顺序
+如果本机没有 Playwright Chromium：
 
-推荐顺序：
+```powershell
+cd app\desktop
+pnpm exec playwright install chromium
+```
 
-1. `feat/client-edge-foundation`
-2. `feat/client-runner-mock`
-3. `feat/client-desktop-shell`
-4. `feat/client-local-smoke`
+### M1.2 PR 状态
 
-前三个可以并行开发，但合并时按上面顺序处理，减少冲突。`client-desktop-shell` 在合并前需要 rebase 最新 `master`，因为它依赖 Edge 的实际返回格式。
+当前 PR：
 
-## 7. 不做什么
+- PR #26：`feat(client): 客户端 M1 集成分支 (Edge + Runner + Desktop)`。
+- 状态：Ready for review。
+- 合并前只需确认 `git status --short --branch` 干净、`gh pr checks 26` 通过，并由负责同学完成最终 review。
 
-本阶段不做：
+## 5. M2：Desktop 启动编排
 
-- Hub 登录、好友、群聊。
-- 真实 Claude Code / Codex / OpenCode 适配。
-- worktree diff/apply/discard 完整链路。
-- 权限审批完整策略。
-- Cloud Edge / Hub relay。
-- 大范围 API 重构。
+目标：让 Desktop 不只是“连接已启动的 Edge”，而是逐步具备本地应用该有的启动体验。
 
-这些不是放弃，而是等本地端到端链路跑通后再进入下一轮。
+优先级：
 
-## 8. Review 清单
+1. Desktop 检测 Edge 是否在线。
+2. Edge 不在线时给出明确状态和启动入口。
+3. Tauri 侧能启动 Local Edge 进程。
+4. Edge 启动失败时展示错误，不让 UI 卡死。
+5. Desktop 关闭时按策略处理 Edge：跟随退出或保持后台运行。
 
-每个 PR 至少检查：
+建议拆分：
 
-- 是否只改了分配范围内的文件。
+| 任务 | 写入范围 |
+|---|---|
+| Desktop sidecar spike | `app/desktop/src-tauri/**`、`app/desktop/src/**` |
+| Edge process lifecycle | `app/desktop/src-tauri/**`、`edge-server/**` |
+| UI 状态面板 | `app/desktop/src/**` |
+
+M2 不要求一次解决自动更新、安装包、系统托盘。
+
+## 6. M3：真实 Runner 入口
+
+目标：从 Mock Runner 走向真实 Agent CLI 适配，但先只接一个。
+
+优先级：
+
+1. Runner 增加 adapter 接口。
+2. 先接 Codex CLI 或 Claude Code 二选一。
+3. stdout/stderr 继续转换成 `run.output.batch`。
+4. 进程退出码映射成 `run.finished` 或 `run.failed`。
+5. 取消 run 能停止子进程。
+
+建议写入范围：
+
+```text
+runner/**
+edge-server/**
+api/openapi.yaml
+api/events.md
+app/shared/**
+app/desktop/src/**
+```
+
+验收重点：
+
+- Agent CLI 不存在时有清晰错误。
+- 不把用户本机 token、配置路径、历史命令写进日志。
+- 取消任务不会留下孤儿进程。
+
+## 7. M4：Project / Worktree / Diff
+
+目标：开始接近 AgentHub 的真实产品形态。
+
+优先级：
+
+1. Project 列表和打开本地项目。
+2. 每个 run 创建独立工作区或 worktree。
+3. 检测 changed files。
+4. 生成 diff。
+5. Desktop 展示 changed files 和 diff。
+6. Apply / Discard 先走最小闭环。
+
+接口需要提前补充：
+
+```text
+GET /v1/projects
+POST /v1/projects
+GET /v1/threads
+POST /v1/threads
+GET /v1/runs/{runId}/artifacts
+GET /v1/artifacts/{artifactId}
+POST /v1/artifacts/{artifactId}:apply
+POST /v1/artifacts/{artifactId}:discard
+```
+
+这部分必须先改 `api/`，再实现 UI 和 Go 服务。
+
+## 8. 交给 DeepSeek / 子 Agent 的方式
+
+DeepSeek 或其他 Agent 接手客户端任务时，主 Agent 必须给出任务卡：
+
+```text
+目标：
+分支：
+允许修改：
+必须阅读：
+不能修改：
+验证命令：
+提交要求：
+```
+
+默认必须阅读：
+
+```text
+AGENTS.md
+docs/client-roadmap.md
+docs/client-handoff.md
+api/README.md
+api/openapi.yaml
+api/events.md
+```
+
+子 Agent 规则：
+
+- 一个子 Agent 只做一个清晰任务。
+- 子 Agent 不跨越允许修改范围。
+- 子 Agent 不直接合并分支。
+- 主 Agent 负责最终 review、测试、提交和 PR 说明。
+
+## 9. Review 清单
+
+每次提交前至少检查：
+
+- 是否仍在正确分支。
 - 是否没有提交 `.worktrees/`、密钥、本机路径、真实服务器配置。
 - 是否先更新了必要的 `api/` 契约。
-- 是否有基本测试或 smoke 步骤。
-- 是否能被另一个同学按 README/PR 描述复现。
-- 是否同步了 `docs/client-roadmap.md` 中对应任务状态或备注。
+- 是否运行了对应测试。
+- 是否同步了 `docs/client-handoff.md` 或本路线图中的状态。
+- 是否能让另一个同学按文档复现。
+
+## 10. 当前下一步
+
+当前最应该做：
+
+1. 保持 PR #26 可 review：不要把 UI 视觉稿、真实 Agent adapter 或 Hub 能力混进 M1。
+2. 合并前再跑一次 `gh pr checks 26` 和必要的本地 smoke。
+3. 合并后从 `master` 或 `feat/client-dev` 新切短分支进入 M2。
+4. M2 优先实现 Edge 本地数据层：Project/Thread/Run/Item store、EventStore、cursor 恢复和 REST snapshot。
+5. Desktop 启动编排可并行推进，但不能替代 M2 的数据可恢复验收。

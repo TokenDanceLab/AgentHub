@@ -12,6 +12,7 @@ test-results/
 
 # Go
 *.exe
+*.exe~
 *.test
 *.out
 vendor/
@@ -67,6 +68,7 @@ yarn-error.log*
 
 # Local machine and agent state
 .worktrees/
+docs/review/
 .agenthub-runtime/
 .agenthub/memory/
 .agenthub/local/

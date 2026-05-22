@@ -18,7 +18,40 @@ Desktop UI -> Edge Server -> Runner -> Claude Code / Codex / OpenCode
 - Hub 负责账号、IM、多端同步、中继和权限。
 - UI 只负责交互，不直接控制 Agent CLI。
 
-## 2. 组件职责
+## 2. 当前 P0/M1 本地拓扑
+
+当前仓库处于客户端 M1 收口阶段，已跑通本地 mock 链路：
+
+```text
+Desktop Web UI
+  -> Local Edge Server
+  -> Mock Run
+  -> WebSocket events
+  -> Desktop EventLog
+```
+
+完整 P0 的本地拓扑是：
+
+```text
+Desktop App
+  ├─ Desktop UI
+  ├─ Local Edge Server
+  ├─ Local Runner
+  └─ Agent CLI
+       ├─ Claude Code
+       ├─ Codex
+       └─ OpenCode
+```
+
+P0 边界：
+
+- Hub Server 不是 P0 运行依赖。
+- Web/Mobile 不是 P0 执行入口。
+- Desktop UI 默认只连接本机 Local Edge。
+- Edge 才能启动 Runner，UI 不直接启动 Agent CLI。
+- Runner 只在授权 workspace 或 worktree 内执行。
+
+## 3. 组件职责
 
 | 组件 | 目录 | 职责 |
 |---|---|---|
@@ -28,7 +61,7 @@ Desktop UI -> Edge Server -> Runner -> Claude Code / Codex / OpenCode
 | Runner | `runner/` | Agent CLI 进程、workspace、日志、Diff、Preview |
 | API Contract | `api/` | REST API 和 WebSocket event 契约 |
 
-## 3. 通信方式
+## 4. 通信方式
 
 当前主协议是：
 
@@ -47,7 +80,14 @@ REST JSON API + WebSocket typed events
 
 Protobuf、Connect-RPC、JSON-RPC 不是当前主线；只作为未来可选或局部 bridge 方案。
 
-## 4. 三条数据线
+安全边界：
+
+- WebSocket 只投递事件，不承载普通查询或命令。
+- UI 不能绕过 Edge 直接访问远程 Runner。
+- Runner 不默认读取用户全盘、本机密钥、浏览器数据或系统配置。
+- 日志和事件不应包含 token、cookie、私钥、真实服务器隐私。
+
+## 5. 三条数据线
 
 ### 控制线
 
@@ -63,11 +103,11 @@ UI -> Hub -> Edge -> Runner
 负责实时输出和状态变化：
 
 ```text
-Runner -> Edge -> UI
-Edge -> Hub -> Web/Mobile
+Runner -> Edge EventStore -> Edge WebSocket Bus -> UI
+Edge EventStore -> Hub Sync -> Web/Mobile
 ```
 
-事件格式见 `api/events.md`。
+当前 `edge-server/internal/events/bus.go` 是内存投递组件：负责 seq、短历史 replay 和 WebSocket fanout。它不是完整持久 EventStore。M2 需要把 EventStore 落到 Edge 本地存储。
 
 ### 同步线
 
@@ -79,14 +119,36 @@ Edge EventStore -> Hub Sync -> other devices
 
 P0 只要求本地 EventStore 语义清楚，不要求 Hub 完整实现。
 
-## 5. 权威模型
+## 6. EventStore 和恢复语义
 
-系统必须区分两类权威：
+P0/M2 的 EventStore 语义：
+
+1. Edge 先把事件持久化到 EventStore，再投递到 WebSocket。
+2. `seq` 是单个 Edge EventStore 内的单调递增序号。
+3. UI 断线重连时带上 `cursor`，Edge replay `seq > cursor` 的事件。
+4. 如果 cursor 太旧、历史被清理或 Edge 无法 replay，UI 拉 REST snapshot 重建状态。
+5. Edge 重启后，Project、Thread、Run、Item、Artifact 的关键状态必须能从本地 store 恢复。
+
+最小恢复路径：
+
+| 场景 | 恢复方式 |
+|---|---|
+| WebSocket 断线 | UI 用最后的 `seq` 作为 cursor 重连 |
+| cursor 过期 | UI 拉 Project/Thread/Run/Item REST snapshot |
+| Edge 重启 | Edge 从本地 store 恢复 snapshot，再继续分配 seq |
+| Runner 崩溃 | Edge 将 Run 标为 failed，并记录 error Item |
+| 慢订阅者丢事件 | WebSocket Bus 可丢短实时事件，UI 通过 snapshot 校正 |
+
+## 7. 权威模型
+
+系统必须区分多类权威：
 
 | 权威 | 含义 |
 |---|---|
 | Conversation Authority | 谁负责消息主序列 |
 | Execution Authority | 谁负责实际执行 AgentRun |
+| Artifact Authority | 谁负责产物索引、读取和应用 |
+| Memory Authority | 谁负责项目规则、摘要和上下文 |
 
 示例：
 
@@ -96,7 +158,21 @@ Web 远控本机：Conversation Authority = Hub，Execution Authority = Desktop 
 云端执行：Conversation Authority = Hub，Execution Authority = Cloud Edge / Runner
 ```
 
-## 6. 数据模型主线
+### P0 数据权威表
+
+| 数据 | P0 写入方 | P0 存储位置 | 未来同步关系 |
+|---|---|---|---|
+| Project | Edge | Edge 本地 store | Hub 可同步元数据 |
+| Conversation | Edge | Edge 本地 store | Hub 可成为云端主序列 |
+| Thread | Edge | Edge 本地 store | Hub 同步摘要和状态 |
+| Turn / AgentRun | Edge | Edge 本地 store | Hub 同步状态镜像 |
+| Item | Edge | Edge EventStore / item store | Hub 同步消息和摘要 |
+| Artifact | Runner 生成，Edge 索引 | workspace + Edge artifact index | Hub 同步 metadata，可按需缓存内容 |
+| Approval | Edge 生成，UI 决策 | Edge 本地 store | Hub 可远程审批 |
+| Preview | Runner 启动，Edge 路由 | Edge preview registry | Hub 可代理远程访问 |
+| Memory | Edge Context Builder | `.agenthub/` + Edge 本地 store | Hub 可同步团队 memory |
+
+## 8. 数据模型主线
 
 ```text
 Project
@@ -115,17 +191,20 @@ Project
 - Item 是过程事件或消息。
 - Artifact 是可审查产物，例如 Diff、文件、预览地址。
 
-## 7. 部署阶段
+REST snapshot 至少应能按 Project、Thread、Run、Item、Artifact 重建 UI 状态。WebSocket event 负责增量，REST snapshot 负责校正和恢复。
+
+## 9. 部署阶段
 
 | 阶段 | 拓扑 |
 |---|---|
-| P0 | Desktop UI -> Local Edge -> Local Runner |
+| M1 | Desktop UI -> Local Edge -> Mock Run -> WebSocket events |
+| P0 | Desktop UI -> Local Edge -> Local Runner -> Agent CLI |
 | P1 | Local Edge + 多 Agent Thread |
 | P2 | Edge <-> Hub 同步，Web/Mobile 查看和审批 |
 | P3 | Hub Relay -> Desktop/Cloud Edge -> Runner |
 | P4 | 完整团队 IM 和云端协作 |
 
-## 8. 文档分层
+## 10. 文档分层
 
 主文档只保留三份：
 
@@ -136,7 +215,6 @@ Project
 深度材料保留在：
 
 - `docs/reference/`
-- `docs/research/`
 - `docs/archive/`
 
-新增实现前，先看主文档；需要细节时再查 archive/reference。
+`docs/research/` 若保留，只作为旧研究草稿或未整理材料，不作为常规阅读入口。新增实现前，先看主文档；需要细节时再查 `docs/reference/`，历史方案再查 `docs/archive/`。
