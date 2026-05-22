@@ -47,6 +47,30 @@ Runtime: Go.
 - Edge <-> Hub：REST sync API + reverse WebSocket relay，处理注册、同步、中继和命令投递。
 - Hub -> Edge：`message.deliver`、`run.start`、`run.stop`、`preview.request`。
 
+## 当前可运行骨架
+
+本分支先提供内存态 Hub Server 骨架，方便前端、客户端和后端同学对齐 REST 入口，不代表最终存储实现。
+
+```powershell
+go run ./hub-server/cmd/agenthub-hub
+```
+
+当前 handler：
+
+| Endpoint | 说明 |
+|---|---|
+| `GET /v1/health` | 返回 `hub-server`、版本和健康状态。 |
+| `POST /v1/edges:register` | 注册 Edge，内存态保存。 |
+| `GET /v1/edges` | 列出已注册 Edge。 |
+| `GET /v1/edges/{edgeId}` | 查询 Edge。 |
+| `POST /v1/edges/{edgeId}:heartbeat` | 更新 Edge 心跳状态。 |
+| `POST /v1/sync/events:upload` | 上传符合 `api/events.md` 的 EventEnvelope。 |
+| `GET /v1/sync/events?pageCursor=...` | 拉取已上传同步事件。 |
+| `POST /v1/sync/ack` | 确认同步游标。 |
+| `GET /v1/sync/state` | 查询当前内存态同步状态。 |
+
+后续持久化时，优先替换 `hubserver.EdgeRegistry` 和 `hubserver.SyncStore` 的实现，handler 层尽量保持稳定。
+
 ## 需求文档
 
 - [Hub Server 需求文档](../../docs/reference/03-build/backend/16-hub-server-requirements.md)
