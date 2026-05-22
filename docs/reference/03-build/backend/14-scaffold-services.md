@@ -291,7 +291,8 @@ AgentHub/
 ├── .github/workflows/ci.yml
 ├── api/
 │   ├── openapi.yaml
-│   └── events.schema.json
+│   ├── events.md
+│   └── conventions.md
 ├── app/
 │   ├── desktop/
 │   ├── web/

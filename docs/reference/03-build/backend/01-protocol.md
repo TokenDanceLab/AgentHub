@@ -1,7 +1,7 @@
 # AgentHub 协议层 -- 完整类型设计
 
 > 生成日期：2026-05-21
-> 2026-05-22 更新：本文是早期 Go 类型和协议建模参考，不是当前主协议入口。当前主协议采用 REST JSON API + WebSocket typed events，契约入口为 `api/openapi.yaml`、`api/events.schema.json` 和 `docs/protocol.md`。
+> 2026-05-22 更新：本文是早期 Go 类型和协议建模参考，不是当前主协议入口。当前主协议采用 REST JSON API + WebSocket typed events，契约入口为 `api/openapi.yaml`、`api/events.md` 和 `api/conventions.md`。
 > 来源：cross-analysis-adapters.md, cross-analysis-orchestration.md, cross-analysis-sandbox-tools.md, cross-analysis-im-ux.md, architecture.md, data-model.md, authority.md, approvals.md, protocol.md
 > 历史目标：`packages/protocol/go/generated/`（用于代码生成的手写参考类型；当前不再作为目录规划）
 

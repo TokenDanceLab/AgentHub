@@ -2,7 +2,12 @@
 
 > 69 份文档，按"Agent 需要什么"分类。Agent 读文档路径：**Learn → Decide → Build → Plan**。
 >
-> 语言规则：本目录服务于 Agent 和实现阶段，也要逐步中文化。翻译按 [中文化路线图](../chinese-documentation-roadmap.md) 分批执行，保留代码、路径、协议字段和必要英文原文。完整规则见 [文档语言规则](../language-policy.md)。
+> 当前入口：同学和评审先看三份主文档，Agent 需要细节时再进入本目录。
+>
+> - [产品需求文档](../product-requirements.md)
+> - [系统架构文档](../system-architecture.md)
+> - [功能实现文档](../implementation-guide.md)
+> - [API 契约](../../api/)
 
 ## 01-learn — 了解别人怎么做
 
@@ -111,17 +116,17 @@
 
 ```
 我要写 Adapter → 03-build/backend/01-protocol.md + 04-adapter-sdk.md + 02-decide/01-adapters.md
-我要写 API/事件契约 → ../../api/README.md + ../../api/openapi.yaml + ../../api/events.schema.json + ../protocol.md
+我要写 API/事件契约 → ../../api/README.md + ../../api/openapi.yaml + ../../api/events.md + ../implementation-guide.md
 我要写 EventStore → 03-build/backend/03-eventstore-memory.md + 01-learn/deep-dive/06-ccviewer-fts5.md
 我要写前端消息流 → 03-build/frontend/01-desktop-ux.md + 02-decide/06-realtime-sync.md + 03-build/backend/15-websocket-reliability.md
 我要做安全设计 → 02-decide/07-permission-models.md + 03-build/backend/08-error-handling.md + 01-learn/deep-dive/04-claude-code-tool-security.md
 我要写工作台/worktree/diff → 01-learn/web-research/04-agent-command-center-2026.md + 03-build/backend/12-workspace-lifecycle.md + 03-build/frontend/01-desktop-ux.md
-我要写 Hub Server IM/好友/群聊 → 03-build/backend/16-hub-server-requirements.md + 03-build/backend/02-go-services.md + ../architecture.md
+我要写 Hub Server IM/好友/群聊 → 03-build/backend/16-hub-server-requirements.md + 03-build/backend/02-go-services.md + ../system-architecture.md
 我要了解竞品 → 01-learn/web-research/02-competitive-2026.md + 01-learn/web-research/04-agent-command-center-2026.md
 我要定位 Multica → 01-learn/deep-dive/12-multica-product-ui.md + 01-learn/web-research/04-agent-command-center-2026.md + ../../reference/multica/README.md + ../../reference/multica/docs/product-overview.md
 我要对齐比赛材料 → ../research/bytedance.md + 01-learn/web-research/04-agent-command-center-2026.md
-我要看术语白话解释 → ../glossary.md
-我要管理 GitHub issues → ../project-management.md
-我要判断文档该用中文还是英文 → ../language-policy.md
-我要执行文档中文化 → ../chinese-documentation-roadmap.md
+我要看历史术语解释 → ../archive/glossary.md
+我要看历史 issue 管理方案 → ../archive/project-management.md
+我要判断当前文档入口 → ../product-requirements.md + ../system-architecture.md + ../implementation-guide.md
+我要看旧版细分方案 → ../archive/
 ```
