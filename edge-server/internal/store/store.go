@@ -105,6 +105,68 @@ func New() *Store {
 	}
 }
 
+func (s *Store) snapshot() fileSnapshot {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return fileSnapshot{
+		Projects:     copyMap(s.projects),
+		Threads:      copyMap(s.threads),
+		Runs:         copyMap(s.runs),
+		Items:        copyMap(s.items),
+		ProjectOrder: append([]string(nil), s.projectOrder...),
+		ThreadOrder:  append([]string(nil), s.threadOrder...),
+		RunOrder:     append([]string(nil), s.runOrder...),
+		ItemOrder:    append([]string(nil), s.itemOrder...),
+	}
+}
+
+func (s *Store) applySnapshot(snapshot fileSnapshot) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.projects = copyMap(snapshot.Projects)
+	s.threads = copyMap(snapshot.Threads)
+	s.runs = copyMap(snapshot.Runs)
+	s.items = copyMap(snapshot.Items)
+	s.projectOrder = normalizeOrder(snapshot.ProjectOrder, s.projects)
+	s.threadOrder = normalizeOrder(snapshot.ThreadOrder, s.threads)
+	s.runOrder = normalizeOrder(snapshot.RunOrder, s.runs)
+	s.itemOrder = normalizeOrder(snapshot.ItemOrder, s.items)
+}
+
+func copyMap[K comparable, V any](source map[K]V) map[K]V {
+	copied := make(map[K]V, len(source))
+	for key, value := range source {
+		copied[key] = value
+	}
+	return copied
+}
+
+func normalizeOrder[V any](order []string, items map[string]V) []string {
+	normalized := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, id := range order {
+		if _, ok := items[id]; !ok {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		normalized = append(normalized, id)
+		seen[id] = struct{}{}
+	}
+
+	missing := make([]string, 0, len(items)-len(seen))
+	for id := range items {
+		if _, ok := seen[id]; !ok {
+			missing = append(missing, id)
+		}
+	}
+	sort.Strings(missing)
+	return append(normalized, missing...)
+}
+
 func (s *Store) CreateProject(id, name string) Project {
 	s.mu.Lock()
 	defer s.mu.Unlock()
