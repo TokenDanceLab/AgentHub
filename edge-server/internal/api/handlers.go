@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/store"
@@ -23,6 +24,7 @@ type Handler struct {
 	Bus      *events.Bus
 	Registry *runners.Registry
 	Store    *store.Store
+	Executor lifecycle.RunExecutor
 }
 
 var upgrader = websocket.Upgrader{
@@ -58,6 +60,7 @@ func ensureStore(h *Handler) *store.Store {
 		h.Store = store.New()
 	}
 	h.ensureDefaults()
+	h.ensureExecutor()
 	return h.Store
 }
 
@@ -67,6 +70,12 @@ func (h *Handler) ensureDefaults() {
 	}
 	h.Store.CreateProject("proj_local", "Local Project")
 	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Local Thread")
+}
+
+func (h *Handler) ensureExecutor() {
+	if h.Executor == nil && h.Bus != nil && h.Store != nil {
+		h.Executor = lifecycle.NewMockExecutor(h.Bus, h.Store)
+	}
 }
 
 func acceptedResponse(data map[string]any) map[string]any {
@@ -296,68 +305,17 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		Content:   "Run queued",
 	})
 
-	// Run mock flow in background.
-	go h.mockRunFlow(runID, scope)
+	if h.Executor == nil {
+		h.ensureExecutor()
+	}
+	if h.Executor != nil {
+		if err := h.Executor.Start(run); err != nil {
+			writeJSON(w, http.StatusInternalServerError, errorResponse("EXECUTOR_START_FAILED", "failed to start run executor"))
+			return
+		}
+	}
 
 	writeJSON(w, http.StatusAccepted, acceptedResponse(runToResponse(run)))
-}
-
-func (h *Handler) mockRunFlow(runID string, scope map[string]any) {
-	// 100ms delay then emit run.started
-	time.Sleep(100 * time.Millisecond)
-	run, _ := ensureStore(h).SetRunStatus(runID, "started")
-	h.Bus.Publish("run.started", scope, runToResponse(run))
-
-	// Emit a few output.batch events
-	time.Sleep(50 * time.Millisecond)
-	h.Bus.Publish("run.output.batch", scope, map[string]any{
-		"runId":  runID,
-		"stream": "stdout",
-		"chunks": []map[string]any{
-			{"offset": 0, "text": "Initializing mock runner...\n"},
-		},
-	})
-
-	time.Sleep(50 * time.Millisecond)
-	h.Bus.Publish("run.output.batch", scope, map[string]any{
-		"runId":  runID,
-		"stream": "stdout",
-		"chunks": []map[string]any{
-			{"offset": 29, "text": "Executing mock task step 1/3...\n"},
-		},
-	})
-
-	time.Sleep(50 * time.Millisecond)
-	h.Bus.Publish("run.output.batch", scope, map[string]any{
-		"runId":  runID,
-		"stream": "stdout",
-		"chunks": []map[string]any{
-			{"offset": 60, "text": "Executing mock task step 2/3...\n"},
-		},
-	})
-
-	time.Sleep(50 * time.Millisecond)
-	h.Bus.Publish("run.output.batch", scope, map[string]any{
-		"runId":  runID,
-		"stream": "stderr",
-		"chunks": []map[string]any{
-			{"offset": 0, "text": "Warning: mock task is running in simulation mode\n"},
-		},
-	})
-
-	time.Sleep(50 * time.Millisecond)
-	h.Bus.Publish("run.output.batch", scope, map[string]any{
-		"runId":  runID,
-		"stream": "stdout",
-		"chunks": []map[string]any{
-			{"offset": 91, "text": "Executing mock task step 3/3...\n"},
-		},
-	})
-
-	// Emit run.finished
-	time.Sleep(50 * time.Millisecond)
-	run, _ = h.Store.SetRunStatus(runID, "finished")
-	h.Bus.Publish("run.finished", scope, runToResponse(run))
 }
 
 // ---------------------------------------------------------------------------
@@ -371,8 +329,27 @@ func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 	}
 	// Extract runId from path: /v1/runs/{runId}:cancel
 	runID := extractRunID(r.URL.Path, ":cancel")
+	if h.Executor == nil {
+		ensureStore(h)
+	}
+	if h.Executor != nil {
+		result := h.Executor.Cancel(runID)
+		if result.Found {
+			writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
+				"runId":  runID,
+				"status": result.Status,
+			}))
+			return
+		}
+	}
 	if h.Store != nil {
-		h.Store.SetRunStatus(runID, "cancelling")
+		if run, ok := h.Store.GetRun(runID); ok {
+			writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
+				"runId":  runID,
+				"status": run.Status,
+			}))
+			return
+		}
 	}
 	writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
 		"runId":  runID,
@@ -485,15 +462,7 @@ func decodeOptionalJSON(r *http.Request, dst any) error {
 }
 
 func runToResponse(run store.Run) map[string]any {
-	return map[string]any{
-		"runId":      run.ID,
-		"projectId":  run.ProjectID,
-		"threadId":   run.ThreadID,
-		"status":     run.Status,
-		"createdAt":  run.CreatedAt,
-		"startedAt":  run.StartedAt,
-		"finishedAt": run.FinishedAt,
-	}
+	return lifecycle.RunResponse(run)
 }
 
 // RegisterRoutes registers all routes on the given mux.
