@@ -11,7 +11,7 @@ Chat with AI Agents like teammates. @mention them, create group chats, watch cod
 <img src="https://img.shields.io/badge/status-research-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.24+-00ADD8?style=flat-square&logo=go" alt="go">
 <img src="https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react" alt="react">
-<img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="license">
+<img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square" alt="license">
 
 </div>
 
