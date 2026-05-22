@@ -272,6 +272,108 @@ func TestGetRunAndThreadItemsAfterPostRun(t *testing.T) {
 	}
 }
 
+func TestPostThreadMessageCreatesItem(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/messages", strings.NewReader(`{"content":"hello from user"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
+	}
+
+	var item store.Item
+	if err := json.NewDecoder(rec.Body).Decode(&item); err != nil {
+		t.Fatalf("failed to decode item body: %v", err)
+	}
+	if !strings.HasPrefix(item.ID, "item_") {
+		t.Fatalf("item ID = %q, want item_ prefix", item.ID)
+	}
+	if item.ProjectID != "proj_local" || item.ThreadID != "thread_local" {
+		t.Fatalf("item scope = %#v, want default project/thread", item)
+	}
+	if item.Type != "user_message" || item.Role != "user" || item.Status != "created" {
+		t.Fatalf("item metadata = %#v, want user_message/user/created", item)
+	}
+	if item.Content != "hello from user" {
+		t.Fatalf("item content = %q, want request content", item.Content)
+	}
+
+	stored, ok := h.Store.GetItem(item.ID)
+	if !ok {
+		t.Fatalf("item %q was not stored", item.ID)
+	}
+	if stored.Content != item.Content {
+		t.Fatalf("stored item content = %q, want %q", stored.Content, item.Content)
+	}
+}
+
+func TestPostThreadMessageUsesRequestedRole(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/messages", strings.NewReader(`{"role":"assistant","content":"agent reply"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
+	}
+	var item store.Item
+	if err := json.NewDecoder(rec.Body).Decode(&item); err != nil {
+		t.Fatalf("failed to decode item body: %v", err)
+	}
+	if item.Role != "assistant" {
+		t.Fatalf("item role = %q, want assistant", item.Role)
+	}
+}
+
+func TestPostThreadMessageRejectsEmptyContent(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/messages", strings.NewReader(`{"content":"  "}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST empty content status = %d, want 400", rec.Code)
+	}
+}
+
+func TestPostThreadMessageRejectsUnknownThread(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/threads/thread_missing/messages", strings.NewReader(`{"content":"hello"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("POST unknown thread status = %d, want 404", rec.Code)
+	}
+}
+
+func TestPostThreadMessageRejectsInvalidJSON(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/messages", strings.NewReader(`{"content":`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST invalid JSON status = %d, want 400", rec.Code)
+	}
+}
+
 func TestPostRunsMethodNotAllowed(t *testing.T) {
 	h := newTestHandler()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs", nil)
@@ -604,6 +706,46 @@ func TestPostRunsGeneratesEvents(t *testing.T) {
 		}
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("timed out waiting for run.started event")
+	}
+}
+
+func TestPostThreadMessageGeneratesEvents(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	_, ch, _ := h.Bus.Subscribe(0)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/messages", strings.NewReader(`{"content":"hello events"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/threads/thread_local/messages status = %d, want 201", rec.Code)
+	}
+
+	var messageCreated any
+	for _, wantType := range []string{"message.created", "item.created"} {
+		select {
+		case evt := <-ch:
+			if evt.Type != wantType {
+				t.Fatalf("event type = %q, want %q", evt.Type, wantType)
+			}
+			if evt.Scope["projectId"] != "proj_local" || evt.Scope["threadId"] != "thread_local" {
+				t.Fatalf("event scope = %#v, want project/thread", evt.Scope)
+			}
+			itemID, ok := evt.Scope["itemId"].(string)
+			if !ok || !strings.HasPrefix(itemID, "item_") {
+				t.Fatalf("event itemId = %#v, want item_ prefix", evt.Scope["itemId"])
+			}
+			if wantType == "message.created" {
+				messageCreated = evt.Payload
+			}
+		case <-time.After(500 * time.Millisecond):
+			t.Fatalf("timed out waiting for %s event", wantType)
+		}
+	}
+	if messageCreated == nil {
+		t.Fatal("message.created payload was not captured")
 	}
 }
 
