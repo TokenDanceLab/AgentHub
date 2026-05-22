@@ -93,18 +93,25 @@ Orchestrator: Done. Preview running at http://localhost:5173
 
 ## Quick Start
 
+The repository is ready for implementation. Runtime commands will be added with the P0 code PRs. After cloning, initialize local development first:
+
 ```bash
-# Edge Server (local node)
-cd edge-server && go run ./cmd/main.go
-
-# Runner (agent executor)
-cd runner && go run ./cmd/main.go
-
-# Web UI
-cd app/web && pnpm dev
+./scripts/setup.sh
 ```
 
-> P0 does not require Hub Server. Edge + Runner work offline.
+Windows PowerShell:
+
+```powershell
+.\scripts\setup.ps1
+```
+
+To clone core reference repositories:
+
+```powershell
+.\scripts\setup.ps1 -Reference core
+```
+
+> P0 targets Desktop UI -> Local Edge -> Local Runner. Concrete run commands will be added with frontend, backend and client implementation PRs.
 
 <br>
 
@@ -125,8 +132,7 @@ AgentHub/
 ├── edge-server/            # local Edge: projects, context, Runner management
 ├── runner/                 # executor: Agent CLI, workspace, diff, preview, logs
 ├── api/                    # REST API and WebSocket event contracts
-├── scripts/
-└── .agenthub/              # project memory and rules
+└── scripts/                # local setup, git hooks and reference sync scripts
 ```
 
 Docker files are colocated with the module that needs them, such as `hub-server/Dockerfile`, `edge-server/compose.yaml`, or `runner/Dockerfile`. A root `compose.yaml` is only for optional cross-module local orchestration.

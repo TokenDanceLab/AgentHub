@@ -93,18 +93,25 @@ Orchestrator: 完成。预览地址 http://localhost:5173
 
 ## 快速开始
 
+当前仓库已进入实现准备阶段，运行入口会随 P0 代码 PR 补上。首次克隆后先做本地开发初始化：
+
 ```bash
-# Edge Server（本地节点）
-cd edge-server && go run ./cmd/main.go
-
-# Runner（Agent 执行器）
-cd runner && go run ./cmd/main.go
-
-# Web UI
-cd app/web && pnpm dev
+./scripts/setup.sh
 ```
 
-> P0 阶段不需要 Hub Server。Edge + Runner 可离线独立运行。
+Windows PowerShell：
+
+```powershell
+.\scripts\setup.ps1
+```
+
+需要参考仓库源码时：
+
+```powershell
+.\scripts\setup.ps1 -Reference core
+```
+
+> P0 阶段目标是 Desktop UI -> Local Edge -> Local Runner。具体启动命令随前端、后端、客户端代码落地后补充。
 
 <br>
 
@@ -125,8 +132,7 @@ AgentHub/
 ├── edge-server/            # 本地 Edge：项目、上下文、Runner 管理
 ├── runner/                 # 执行器：Agent CLI、workspace、diff、preview、logs
 ├── api/                    # REST API 和 WebSocket event 契约
-├── scripts/
-└── .agenthub/              # 项目记忆和规则
+└── scripts/                # 本地 setup、git hooks、reference 同步脚本
 ```
 
 Docker 配置不再放根级 `docker/`。如果某个模块需要容器化，就在对应模块内放自己的 `Dockerfile`、`compose.yaml` 或部署说明；只有需要一键联调多个模块时，才考虑新增根级 `compose.yaml`。
