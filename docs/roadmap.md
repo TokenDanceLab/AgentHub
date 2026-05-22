@@ -4,7 +4,7 @@
 
 ## 当前总目标
 
-推进 M2 Edge 本地数据层，让前端、后端、客户端三条线能围绕稳定的 Project / Thread / Run / Item / Event 模型并行开发。当前客户端 PR #30 已提供内存态最小实现，`feat/client-thread-messages-delicious233` 已补 message/item 写入链路，`feat/client-run-lifecycle-delicious233` 已抽出 Runner lifecycle 边界，`feat/client-store-boundary-delicious233` 已抽象 Edge store 接口边界，`feat/client-store-persistence-delicious233` 已提供轻量 JSON 文件持久化实现，下一步重点是真实 Runner adapter。
+推进 M2 Edge 本地数据层，让前端、后端、客户端三条线能围绕稳定的 Project / Thread / Run / Item / Event 模型并行开发。当前客户端 PR #30 已提供内存态最小实现，`feat/client-thread-messages-delicious233` 已补 message/item 写入链路，`feat/client-run-lifecycle-delicious233` 已抽出 Runner lifecycle 边界，`feat/client-store-boundary-delicious233` 已抽象 Edge store 接口边界，`feat/client-store-persistence-delicious233` 已提供轻量 JSON 文件持久化实现，`feat/client-edge-store-file-flag-delicious233` 已接入 Edge 启动参数 `--store-file`，下一步重点是真实 Runner adapter。
 
 ## 路线图分层
 
@@ -25,7 +25,7 @@
 ## 里程碑
 
 - [x] M1 客户端本地链路：Desktop Shell + Local Edge + Mock Runner + smoke test。
-- [ ] M2 Edge 本地数据层：Project / Thread / Run / Item / EventStore。最小内存实现已在 PR #30，message/item 写入链路、Runner lifecycle 边界、store 接口边界和轻量 JSON 文件持久化实现已补齐，SQLite 仍是后续可选评估项。
+- [ ] M2 Edge 本地数据层：Project / Thread / Run / Item / EventStore。最小内存实现已在 PR #30，message/item 写入链路、Runner lifecycle 边界、store 接口边界、轻量 JSON 文件持久化实现和 `--store-file` 启动参数已补齐，SQLite 仍是后续可选评估项。
 - [ ] M3 真实 Runner：CLI Agent 进程、取消、日志、错误映射。
 - [ ] M4 Workspace 能力：worktree、diff、preview、artifact、approval。
 - [ ] M5 Hub 协作链路：Edge-Hub sync、远程查看、远程审批。
@@ -34,7 +34,7 @@
 
 - 前端：从 Mock 数据过渡到真实 REST / WebSocket client，承接 UI 同学设计。
 - 后端：实现 Hub Server、Edge-Hub 通信、账号/群聊/同步/中继能力。
-- 客户端：PR #30 推进 Edge 本地数据层，`feat/client-thread-messages-delicious233` 补齐 message/item 写入链路，`feat/client-run-lifecycle-delicious233` 和 `feat/client-store-boundary-delicious233` 分别补齐 lifecycle/store 可替换边界，`feat/client-store-persistence-delicious233` 增加轻量 JSON 文件持久化 store，后续继续做真实 Runner adapter。
+- 客户端：PR #30 推进 Edge 本地数据层，`feat/client-thread-messages-delicious233` 补齐 message/item 写入链路，`feat/client-run-lifecycle-delicious233` 和 `feat/client-store-boundary-delicious233` 分别补齐 lifecycle/store 可替换边界，`feat/client-store-persistence-delicious233` 增加轻量 JSON 文件持久化 store，`feat/client-edge-store-file-flag-delicious233` 将文件 store 接入 Edge 启动入口，后续继续做真实 Runner adapter。
 
 ## 验收门槛
 
@@ -48,6 +48,7 @@
 
 - [x] 抽象 Edge store 可替换接口边界。
 - [x] 增加 Edge store 轻量 JSON 文件持久化实现；SQLite 依赖获取问题保留为后续可选评估。
+- [x] 为 Edge 启动入口接入可选 `--store-file <path>`，未传时继续使用内存 store。
 - [x] 在客户端 M2 基础上补 `POST /v1/threads/{threadId}/messages` 到 Item / event 的写入链路。
 - [ ] 将 Runner 真正接入 Edge Run lifecycle，替换 handler 内置 mock flow。
 - [ ] M2 完成后归档或更新 `docs/client-roadmap.md`，避免路线图重复。

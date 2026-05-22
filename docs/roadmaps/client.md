@@ -12,7 +12,7 @@
 
 ## 当前目标
 
-推进 M2 Edge 本地数据层，把 M1 的内存事件流升级为 Project / Thread / Run / Item / Event 模型。当前 PR #30 已完成内存态最小模型，`feat/client-thread-messages-delicious233` 已补 message/item 写入链路，`feat/client-run-lifecycle-delicious233` 已抽出 Edge Run lifecycle executor 边界，`feat/client-store-boundary-delicious233` 已抽象可替换 store 接口，`feat/client-store-persistence-delicious233` 已提供轻量 JSON 文件持久化实现，后续继续补真实 Runner adapter。
+推进 M2 Edge 本地数据层，把 M1 的内存事件流升级为 Project / Thread / Run / Item / Event 模型。当前 PR #30 已完成内存态最小模型，`feat/client-thread-messages-delicious233` 已补 message/item 写入链路，`feat/client-run-lifecycle-delicious233` 已抽出 Edge Run lifecycle executor 边界，`feat/client-store-boundary-delicious233` 已抽象可替换 store 接口，`feat/client-store-persistence-delicious233` 已提供轻量 JSON 文件持久化实现，`feat/client-edge-store-file-flag-delicious233` 已将文件 store 接入 Edge 启动参数，后续继续补真实 Runner adapter。
 
 ## 近期任务
 
@@ -24,6 +24,7 @@
 - [x] 同步 `api/openapi.yaml`。
 - [x] 抽象可替换 store 接口。
 - [x] 实现轻量 JSON 文件持久化 store，验证 Edge 重启后 Project / Thread / Run / Item 可恢复。
+- [x] 接入 Edge 启动参数 `--store-file <path>`，未传参数时仍使用内存 store。
 - [ ] 后续按需要评估 SQLite 持久化方案。
 - [x] 补齐 `POST /v1/threads/{threadId}/messages` 到 Item / event 的写入链路。
 - [x] 抽出 Edge Run lifecycle executor 边界，替换 handler 内置 mock flow。
