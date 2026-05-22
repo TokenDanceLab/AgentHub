@@ -38,7 +38,7 @@ Desktop UI ─→ Edge Server ─→ Runner ─→ Claude Code / Codex / OpenCod
 | 组件 | 目录 | 职责 |
 |------|------|------|
 | **Hub Server** | `hub-server/` | 中心 IM：用户、联系人、群聊、消息路由、多端同步、Edge 中继 |
-| **Edge Server** | `edge-server/` | 本地节点：项目、记忆、上下文、Runner 管理、同步到 Hub |
+| **Edge Server** | `edge-server/` | 本地节点：项目、记忆、上下文、Runner 管理，P2+ 同步到 Hub |
 | **Runner** | `runner/` | 执行器：workspace、进程管理、Agent CLI 适配、Diff/预览/日志 |
 | **Desktop App** | `app/desktop/` | Tauri 桌面端入口，负责本地工作台体验 |
 | **Web App** | `app/web/` | React IM 界面：侧边栏、消息树、Diff 卡片、预览面板 |
@@ -132,7 +132,7 @@ pnpm install
 pnpm dev --port 5199
 ```
 
-浏览器打开 `http://localhost:5199`，可以看到 Edge online/offline、Mock Runner 和 EventLog。
+浏览器打开 `http://localhost:5199`，可以看到 Edge online/offline、Mock Runner 和 EventLog。当前 M1 不包含 Project / Thread 工作台、真实 Agent CLI、Diff、Approval 或 Preview。
 
 ### Desktop 应用构建
 
@@ -165,7 +165,7 @@ cd ..\..
 .\scripts\client-smoke.ps1
 ```
 
-完整 P0 目标仍是 `Desktop UI -> Local Edge -> Local Runner -> Agent CLI`。当前 M1 使用 Mock Run 验证链路，下一步进入 Desktop 启动编排、真实 Runner adapter、Project / Worktree / Diff。
+完整 P0 目标仍是 `Desktop UI -> Local Edge -> Local Runner -> Agent CLI`。当前 M1 使用 Mock Run 验证链路；下一步优先推进 M2 的 Edge 本地数据层和 EventStore，Desktop 启动编排可并行补齐，随后再进入真实 Runner adapter、Project / Worktree / Diff。
 
 <br>
 

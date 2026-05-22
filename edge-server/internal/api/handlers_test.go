@@ -363,6 +363,33 @@ func TestWebSocketUpgrade(t *testing.T) {
 	}
 }
 
+func TestWebSocketOriginPolicy(t *testing.T) {
+	tests := []struct {
+		name   string
+		origin string
+		want   bool
+	}{
+		{"no origin", "", true},
+		{"desktop dev", "http://localhost:5199", true},
+		{"tauri dev", "http://localhost:5173", true},
+		{"loopback", "http://127.0.0.1:5199", true},
+		{"untrusted remote", "https://example.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
+			if tt.origin != "" {
+				req.Header.Set("Origin", tt.origin)
+			}
+			got := upgrader.CheckOrigin(req)
+			if got != tt.want {
+				t.Fatalf("CheckOrigin(%q) = %v, want %v", tt.origin, got, tt.want)
+			}
+		})
+	}
+}
+
 // ── Error path tests ──
 
 func TestGetHealthWrongMethod(t *testing.T) {

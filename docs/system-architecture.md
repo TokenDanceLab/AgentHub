@@ -215,7 +215,6 @@ REST snapshot 至少应能按 Project、Thread、Run、Item、Artifact 重建 UI
 深度材料保留在：
 
 - `docs/reference/`
-- `docs/research/`
 - `docs/archive/`
 
-新增实现前，先看主文档；需要细节时再查 archive/reference。
+`docs/research/` 若保留，只作为旧研究草稿或未整理材料，不作为常规阅读入口。新增实现前，先看主文档；需要细节时再查 `docs/reference/`，历史方案再查 `docs/archive/`。

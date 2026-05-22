@@ -14,6 +14,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/runners"
+	"github.com/agenthub/edge-server/internal/security"
 )
 
 // Handler holds dependencies for HTTP and WebSocket handlers.
@@ -23,7 +24,9 @@ type Handler struct {
 }
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		return security.IsTrustedLocalOrigin(r.Header.Get("Origin"))
+	},
 }
 
 // ---------------------------------------------------------------------------

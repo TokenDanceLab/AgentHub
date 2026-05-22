@@ -6,10 +6,12 @@
 # Usage:
 #   .\scripts\client-smoke.ps1
 #   .\scripts\client-smoke.ps1 -SkipBuild
+#   .\scripts\client-smoke.ps1 -ReuseExistingEdge
 
 [CmdletBinding()]
 param(
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$ReuseExistingEdge
 )
 
 $ErrorActionPreference = "Stop"
@@ -73,6 +75,12 @@ try {
     node --version 2>&1 | Out-Null
     Assert ($LASTEXITCODE -eq 0) "node available"
 
+    $ExistingEdge = Test-EdgeHealth
+    if ($ExistingEdge -and -not $ReuseExistingEdge) {
+        Fail "Edge already running on $EdgeAddr; stop it or pass -ReuseExistingEdge"
+        throw "edge already running on $EdgeAddr"
+    }
+
     # ── Build ──────────────────────────────────────────
 
     if (-not $SkipBuild) {
@@ -104,7 +112,12 @@ try {
 
     Write-Step "Start Edge Server"
     if (Test-EdgeHealth) {
-        Pass "reuse existing Edge on $EdgeAddr"
+        if ($ReuseExistingEdge) {
+            Pass "reuse existing Edge on $EdgeAddr"
+        } else {
+            Fail "Edge already running on $EdgeAddr; stop it or pass -ReuseExistingEdge"
+            throw "edge already running on $EdgeAddr"
+        }
     } else {
         if (-not (Test-Path $EdgeBinary)) {
             Fail "edge binary missing: $EdgeBinary"

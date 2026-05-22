@@ -76,7 +76,7 @@ api/
 | 阶段 | 目标 | 写入范围 | API 影响 | 验收 |
 |---|---|---|---|---|
 | M1 | 收口当前 mock 链路 | `app/desktop/`、`app/shared/`、`edge-server/`、`runner/`、`scripts/client-smoke.ps1` | 保持 `/v1/health`、`/v1/runners`、`/v1/runs`、`/v1/events` 稳定 | Go tests、Vitest、Playwright、client smoke |
-| M2 | Desktop 启动编排 + Edge 本地数据层 | `app/desktop/src-tauri/`、`edge-server/`、`api/` | 补 Project/Thread/Run/Item snapshot schema | Edge 重启可恢复关键状态 |
+| M2 | Edge 本地权威数据层，Desktop 启动编排作为辅助能力 | `edge-server/`、`api/`、`app/desktop/src-tauri/` | 补 Project/Thread/Run/Item snapshot schema | Edge 重启后 Project/Thread/Run/Item/EventStore 可恢复 |
 | M3 | 真实 Runner adapter | `runner/`、`edge-server/`、`api/`、`app/shared/` | 补 run start/cancel/error schema 和 event | 能启动一个真实 Agent CLI，取消后无孤儿进程 |
 | M4 | Project / Worktree / Diff / Apply / Discard / Preview | `edge-server/`、`runner/`、`app/desktop/`、`api/` | 补 artifact、diff、preview、approval schema | 用户能审查并应用或丢弃变更 |
 
@@ -161,7 +161,7 @@ version / id / seq / type / scope / sentAt / payload
 - Agent 生成的代码由对应开发者负责审查、测试和解释。
 - 首次克隆后运行 `.\scripts\setup.ps1` 启用本地 hooks；需要参考仓库时运行 `.\scripts\setup.ps1 -Reference core`。
 - 并行开发使用 `.worktrees/`，具体规则见 `AGENTS.md`。
-- 客户端 M1 继续按 `docs/client-roadmap.md` 和 `docs/client-handoff.md` 推进。
+- 客户端后续继续按 `docs/client-roadmap.md` 和 `docs/client-handoff.md` 推进；M2 的核心验收是 Edge 本地数据可恢复，Desktop 启动编排不能替代这个目标。
 
 PR 说明按影响选择填写：
 

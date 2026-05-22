@@ -128,7 +128,7 @@ Hub Network、Web/Mobile、团队账号和多人 IM 都是 P1+ 能力，不作�
 | 技术架构文档 | `docs/system-architecture.md` |
 | 功能实现文档 | `docs/implementation-guide.md` |
 | API 契约 | `api/` |
-| 调研材料 | `docs/reference/`、`docs/research/`、`docs/archive/` |
+| 调研材料 | `docs/reference/` 为实现阶段主索引，`docs/archive/` 保存旧方案和历史补充 |
 
 最小比赛演示验收：
 

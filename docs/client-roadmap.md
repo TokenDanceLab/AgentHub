@@ -32,16 +32,16 @@ Tauri Desktop
 | Shared TS types | 已合入 `feat/client-dev` |
 | i18n 基础设施 | 已合入 `feat/client-dev` |
 | 本地 smoke 脚本 | 已合入 `feat/client-dev` |
-| Playwright e2e / a11y | 当前工作区已有改动，待复核、测试、提交 |
+| Playwright e2e / a11y | 已合入 `feat/client-dev` |
 | 图标和视觉稿 | 交给前端 UI 同学处理，不作为客户端工程收口门槛 |
-| PR #26 | Draft，指向 `master`，CI validate 已通过旧提交 |
+| PR #26 | Ready for review，指向 `master`，CI `validate` 已通过 |
 
 结论：
 
 - `feat/client-dev` 是客户端继续开发的正确分支。
 - 当前不应再开新的客户端集成分支。
-- 当前未提交改动需要先完成验证，再提交到 `feat/client-dev`。
-- PR #26 是否转 Ready，必须以当前工作区最新验证结果为准。
+- 客户端 M1 的工程收口已提交并推送。
+- 后续开发应从 M2 开始，优先做 Edge 本地数据层和 EventStore；Desktop 启动编排可作为并行辅助任务。
 
 ## 2. 接口边界
 
@@ -92,24 +92,25 @@ api/events.md
 
 ## 4. M1 收口：客户端可验证版本
 
-目标：把当前 `feat/client-dev` 收成一个可以被同学拉下来继续开发的稳定版本。
+目标：把 `feat/client-dev` 收成一个可以被同学拉下来继续开发的稳定版本。
 
-### M1.1 复核当前未提交改动
+### M1.1 已完成范围
 
-当前工作区已有这些方向的改动：
+当前已完成：
 
 - Desktop e2e 测试：`app/desktop/e2e/**`
 - Playwright 配置：`app/desktop/playwright.config.ts`
 - a11y 语义增强：`StatusBar`、`RunnerList`、`EventLog`
 - `docs/client-handoff.md` 更新
+- `scripts/client-smoke.ps1` 支持自启动并清理 Edge
+- PR #26 正文已同步 M1 范围、验证命令和后续建议
 
-处理要求：
+保留边界：
 
-- 先 review diff，确认没有无关文件。
-- e2e 可以跳过在线用例，但文档必须写清 Edge 在线时如何跑完整覆盖。
 - 图标、配色、布局精修交给前端 UI 方向；客户端分支只保证结构清晰、可测试、可替换。
+- 真实 Agent CLI、Project/Thread 持久化、Diff/Approval/Preview 不属于 M1。
 
-验收：
+M1 验证命令：
 
 ```powershell
 git diff --check
@@ -136,21 +137,13 @@ cd app\desktop
 pnpm exec playwright install chromium
 ```
 
-### M1.2 提交并更新 PR #26
+### M1.2 PR 状态
 
-通过验证后：
+当前 PR：
 
-```powershell
-git add app/desktop docs/client-handoff.md docs/client-roadmap.md
-git commit -m "test(client): 补充桌面端 e2e 和可访问性检查"
-git push origin feat/client-dev
-```
-
-然后更新 PR #26：
-
-- 补充 e2e、a11y、handoff 的说明。
-- 补充最新验证命令和结果。
-- 验证通过后再把 Draft 转 Ready。
+- PR #26：`feat(client): 客户端 M1 集成分支 (Edge + Runner + Desktop)`。
+- 状态：Ready for review。
+- 合并前只需确认 `git status --short --branch` 干净、`gh pr checks 26` 通过，并由负责同学完成最终 review。
 
 ## 5. M2：Desktop 启动编排
 
@@ -278,9 +271,8 @@ api/events.md
 
 当前最应该做：
 
-1. Review 当前未提交的 e2e、a11y、handoff 改动。
-2. 跑 M1.1 的验证命令。
-3. 修掉验证失败或文档不准的地方。
-4. 提交到 `feat/client-dev`。
-5. Push 并更新 PR #26。
-6. 验证通过后再决定是否转 Ready。
+1. 保持 PR #26 可 review：不要把 UI 视觉稿、真实 Agent adapter 或 Hub 能力混进 M1。
+2. 合并前再跑一次 `gh pr checks 26` 和必要的本地 smoke。
+3. 合并后从 `master` 或 `feat/client-dev` 新切短分支进入 M2。
+4. M2 优先实现 Edge 本地数据层：Project/Thread/Run/Item store、EventStore、cursor 恢复和 REST snapshot。
+5. Desktop 启动编排可并行推进，但不能替代 M2 的数据可恢复验收。

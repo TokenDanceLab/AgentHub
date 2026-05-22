@@ -10,7 +10,7 @@ cd AgentHub
 git checkout feat/client-dev
 ```
 
-`feat/client-dev` 是客户端集成分支，所有客户端代码在此迭代。该分支有一个 draft PR #26 指向 `master`，本地端到端跑通后合并。
+`feat/client-dev` 是客户端集成分支，所有客户端代码在此迭代。该分支有一个 ready PR #26 指向 `master`，合并前确认 CI 和本地 smoke 仍通过。
 
 ## 2. 本地开发环境
 
@@ -26,7 +26,8 @@ git checkout feat/client-dev
 
 ```powershell
 .\scripts\setup.ps1          # 启用 git hooks
-pnpm install                 # 在 app/desktop 下
+cd app\desktop
+pnpm install
 ```
 
 ## 3. 项目结构
@@ -41,7 +42,15 @@ AgentHub/
 │   │   ├── types.ts         # HealthResponse, Runner, ListResponse, RunInfo
 │   │   ├── events.ts        # EventEnvelope + discriminated union
 │   │   └── errors.ts        # AppError / parseError（按 conventions.md §5）
-│   └── desktop/src/
+│   └── desktop/
+│       ├── e2e/                 # Playwright e2e 测试
+│       │   ├── test-utils.ts    # 共享 helper（isEdgeOnline）
+│       │   ├── health.spec.ts   # StatusBar 测试
+│       │   ├── runners.spec.ts  # RunnerList 测试
+│       │   └── events.spec.ts   # EventLog 测试
+│       ├── playwright.config.ts # Playwright 配置
+│       ├── vitest.config.ts     # Vitest 配置（排除 e2e）
+│       └── src/
 │       ├── config.ts        # EDGE_URL / WS_URL / 轮询间隔 / 事件上限
 │       ├── api/
 │       │   ├── edgeClient.ts    # REST fetch 封装
@@ -57,17 +66,10 @@ AgentHub/
 │       ├── i18n/
 │       │   └── locales/         # zh.json / en.json
 │       ├── styles/tokens.css    # CSS 变量
-│       ├── App.tsx              # 根布局编排（50 行）
-│       ├── e2e/                 # Playwright e2e 测试
-│       │   ├── test-utils.ts    # 共享 helper（isEdgeOnline）
-│       │   ├── health.spec.ts   # StatusBar 测试
-│       │   ├── runners.spec.ts  # RunnerList 测试
-│       │   └── events.spec.ts   # EventLog 测试
-│       ├── playwright.config.ts # Playwright 配置
-│       └── vitest.config.ts     # Vitest 配置（排除 e2e）
+│       └── App.tsx              # 根布局编排
 └── scripts/
     ├── setup.ps1
-    └── client-smoke.ps1         # 26 项自动冒烟
+    └── client-smoke.ps1         # 29 项自动冒烟
 ```
 
 ## 4. 启动方式
@@ -179,10 +181,15 @@ pnpm build
 # 全链路冒烟
 .\scripts\client-smoke.ps1
 
+# 如果你明确要复用已经启动的 Edge
+.\scripts\client-smoke.ps1 -ReuseExistingEdge
+
 # Go 后端（如果你动了 edge-server）
 cd edge-server
 go test ./...
 ```
+
+`client-smoke.ps1` 默认会拒绝复用已有 Edge，避免误测到旧进程。要复用时必须显式加 `-ReuseExistingEdge`。
 
 ### e2e 测试说明
 
@@ -232,6 +239,7 @@ WebSocket 推送的事件（`api/events.md` 定义，`@shared/events` 有 TypeSc
 - [x] Playwright e2e 测试 — 17 条用例覆盖健康检查、Runner 列表、事件流、Mock Run 生命周期
 - [x] Vitest 配置已排除 e2e 目录
 - [x] 冒烟测试 29/29 项通过
+- [x] Local Edge 已限制本地可信 Origin，防止任意网页直接控制本地 mock run
 
 ### 剩余待办
 
@@ -239,5 +247,5 @@ WebSocket 推送的事件（`api/events.md` 定义，`@shared/events` 有 TypeSc
 - [ ] **en.json 翻译**：当前 `en.json` 内容与 `zh.json` 相同，需要写入英文文案
 - [ ] **e2e 覆盖扩展**：目前覆盖了 StatusBar/RunnerList/EventLog 三个组件，后续新增面板应补 e2e
 - [ ] **正式图标和视觉稿**：由前端 UI 同学统一处理，客户端工程分支不抢先提交视觉资产
-- [ ] **合入 master**：分支 `feat/client-dev` 有 draft PR #26，端到端验证通过后合并
+- [ ] **合入 master**：分支 `feat/client-dev` 有 ready PR #26，合并前确认 CI 和本地 smoke
 - [ ] **Playwright CI 容错**：当前 e2e 在 Edge 离线时跳过在线测试（不失败），CI 中需要确保 Edge 在线以拿到完整覆盖
