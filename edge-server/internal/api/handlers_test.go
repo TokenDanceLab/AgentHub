@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -19,6 +21,23 @@ func newTestHandler() *Handler {
 		Registry: runners.NewRegistry(),
 		Store:    store.New(),
 	}
+}
+
+type fakeRunExecutor struct {
+	started []store.Run
+	cancel  lifecycle.CancelResult
+	cancels []string
+	err     error
+}
+
+func (f *fakeRunExecutor) Start(run store.Run) error {
+	f.started = append(f.started, run)
+	return f.err
+}
+
+func (f *fakeRunExecutor) Cancel(runID string) lifecycle.CancelResult {
+	f.cancels = append(f.cancels, runID)
+	return f.cancel
 }
 
 func TestGetHealth(t *testing.T) {
@@ -185,6 +204,8 @@ func TestPostRuns(t *testing.T) {
 
 func TestPostRunsBindsProjectAndThread(t *testing.T) {
 	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
 	h.ensureDefaults()
 	_, err := h.Store.CreateThread("thread_bound", "proj_local", "Bound Thread")
 	if err != nil {
@@ -215,6 +236,80 @@ func TestPostRunsBindsProjectAndThread(t *testing.T) {
 	}
 	if run.ProjectID != "proj_local" || run.ThreadID != "thread_bound" {
 		t.Fatalf("stored run = %#v, want proj_local/thread_bound", run)
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+	if executor.started[0].ID != runID {
+		t.Fatalf("executor started run = %#v, want run %q", executor.started[0], runID)
+	}
+}
+
+func TestPostRunsStartsExecutorAfterQueueingRun(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	_, ch, _ := h.Bus.Subscribe(0)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d", rec.Code)
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+	run := executor.started[0]
+	if run.Status != "queued" {
+		t.Fatalf("executor run status = %q, want queued", run.Status)
+	}
+
+	select {
+	case evt := <-ch:
+		if evt.Type != "run.queued" {
+			t.Fatalf("event type = %q, want run.queued", evt.Type)
+		}
+		if evt.Scope["runId"] != run.ID {
+			t.Fatalf("event runId = %#v, want %q", evt.Scope["runId"], run.ID)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timed out waiting for run.queued event")
+	}
+
+	items := h.Store.ListThreadItems(run.ThreadID)
+	if len(items) != 1 {
+		t.Fatalf("thread items = %d, want initial run item", len(items))
+	}
+	if items[0].RunID != run.ID || items[0].Status != "queued" {
+		t.Fatalf("initial item = %#v, want queued run item", items[0])
+	}
+}
+
+func TestPostRunsReturnsErrorWhenExecutorStartFails(t *testing.T) {
+	h := newTestHandler()
+	h.Executor = &fakeRunExecutor{err: errors.New("start failed")}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rec.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	errObj, ok := body["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("error body = %#v, want error object", body)
+	}
+	if errObj["code"] != "EXECUTOR_START_FAILED" {
+		t.Fatalf("error code = %#v, want EXECUTOR_START_FAILED", errObj["code"])
 	}
 }
 
@@ -406,6 +501,61 @@ func TestPostCancelRun(t *testing.T) {
 
 	if body["runId"] != "run_test123" {
 		t.Errorf("expected runId=run_test123, got %v", body["runId"])
+	}
+}
+
+func TestPostCancelRunUsesExecutor(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{
+		cancel: lifecycle.CancelResult{Found: true, Status: "cancelling"},
+	}
+	h.Executor = executor
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_test123:cancel", nil)
+	rec := httptest.NewRecorder()
+
+	h.PostCancelRun(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d", rec.Code)
+	}
+	if len(executor.cancels) != 1 || executor.cancels[0] != "run_test123" {
+		t.Fatalf("executor cancels = %#v, want run_test123", executor.cancels)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if body["status"] != "cancelling" {
+		t.Fatalf("status = %#v, want cancelling", body["status"])
+	}
+}
+
+func TestPostCancelRunReturnsStoredStatusWhenExecutorCannotCancel(t *testing.T) {
+	h := newTestHandler()
+	h.ensureDefaults()
+	run, err := h.Store.CreateRun("run_finished", "proj_local", "thread_local")
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	run, ok := h.Store.SetRunStatus(run.ID, "finished")
+	if !ok {
+		t.Fatal("SetRunStatus returned ok=false")
+	}
+	h.Executor = &fakeRunExecutor{cancel: lifecycle.CancelResult{Found: false, Status: "not_found"}}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_finished:cancel", nil)
+	rec := httptest.NewRecorder()
+	h.PostCancelRun(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d", rec.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if body["status"] != run.Status {
+		t.Fatalf("status = %#v, want %q", body["status"], run.Status)
 	}
 }
 
@@ -698,7 +848,7 @@ func TestPostRunsGeneratesEvents(t *testing.T) {
 		t.Fatal("timed out waiting for run.queued event")
 	}
 
-	// Second event: run.started (after 100ms delay in mockRunFlow)
+	// Second event: run.started (published by the default mock executor)
 	select {
 	case evt := <-ch:
 		if evt.Type != "run.started" {

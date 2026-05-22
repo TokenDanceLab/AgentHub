@@ -138,3 +138,29 @@ func TestStoreUpdatesRunStatusTimestamps(t *testing.T) {
 		t.Fatalf("finished run = %#v, want status finished and finishedAt", finished)
 	}
 }
+
+func TestStoreSetRunStatusIfDoesNotOverwriteDisallowedStatus(t *testing.T) {
+	s := New()
+	s.CreateProject("proj_test", "Test Project")
+	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread")
+	_, _ = s.CreateRun("run_test", "proj_test", "thread_test")
+	finished, ok := s.SetRunStatus("run_test", "finished")
+	if !ok {
+		t.Fatal("SetRunStatus returned ok=false")
+	}
+
+	got, ok := s.SetRunStatusIf("run_test", "cancelling", "queued", "started")
+	if ok {
+		t.Fatal("SetRunStatusIf returned ok=true for disallowed terminal status")
+	}
+	if got.Status != finished.Status {
+		t.Fatalf("run status = %q, want %q", got.Status, finished.Status)
+	}
+	stored, ok := s.GetRun("run_test")
+	if !ok {
+		t.Fatal("GetRun returned ok=false")
+	}
+	if stored.Status != "finished" {
+		t.Fatalf("stored status = %q, want finished", stored.Status)
+	}
+}

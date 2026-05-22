@@ -228,6 +228,35 @@ func (s *Store) SetRunStatus(id, status string) (Run, bool) {
 	return run, true
 }
 
+func (s *Store) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	run, ok := s.runs[id]
+	if !ok {
+		return Run{}, false
+	}
+	allowed := len(allowedCurrent) == 0
+	for _, current := range allowedCurrent {
+		if run.Status == current {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		return run, false
+	}
+	switch status {
+	case "started":
+		run.StartedAt = nowString()
+	case "finished", "failed", "cancelled":
+		run.FinishedAt = nowString()
+	}
+	run.Status = status
+	s.runs[id] = run
+	return run, true
+}
+
 func (s *Store) CreateItem(item Item) (Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
