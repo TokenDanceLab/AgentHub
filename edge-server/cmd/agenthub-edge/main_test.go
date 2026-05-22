@@ -24,6 +24,9 @@ func TestBuildConfigDefaultsToMemoryStore(t *testing.T) {
 	if cfg.RunnerCommand != "" {
 		t.Fatalf("RunnerCommand = %q, want empty", cfg.RunnerCommand)
 	}
+	if cfg.RunnerWorkDir != "" {
+		t.Fatalf("RunnerWorkDir = %q, want empty", cfg.RunnerWorkDir)
+	}
 	if len(cfg.RunnerArgs) != 0 {
 		t.Fatalf("RunnerArgs = %#v, want empty", cfg.RunnerArgs)
 	}
@@ -34,6 +37,7 @@ func TestBuildConfigParsesStoreFile(t *testing.T) {
 		"--addr", "127.0.0.1:4321",
 		"--store-file", "edge-store.json",
 		"--runner-command", "agenthub-runner",
+		"--runner-workdir", "workspace",
 		"--runner-arg", "--mock",
 		"--runner-arg", "--addr=127.0.0.1:0",
 	})
@@ -50,6 +54,9 @@ func TestBuildConfigParsesStoreFile(t *testing.T) {
 	if cfg.RunnerCommand != "agenthub-runner" {
 		t.Fatalf("RunnerCommand = %q, want parsed command", cfg.RunnerCommand)
 	}
+	if cfg.RunnerWorkDir != "workspace" {
+		t.Fatalf("RunnerWorkDir = %q, want parsed path", cfg.RunnerWorkDir)
+	}
 	if got, want := []string(cfg.RunnerArgs), []string{"--mock", "--addr=127.0.0.1:0"}; strings.Join(got, "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("RunnerArgs = %#v, want %#v", got, want)
 	}
@@ -65,6 +72,13 @@ func TestBuildConfigRejectsUnexpectedArguments(t *testing.T) {
 func TestBuildConfigRejectsRunnerArgsWithoutCommand(t *testing.T) {
 	_, err := buildConfig([]string{"--runner-arg", "--mock"})
 	if err == nil || !strings.Contains(err.Error(), "--runner-arg requires --runner-command") {
+		t.Fatalf("buildConfig error = %v, want runner command requirement", err)
+	}
+}
+
+func TestBuildConfigRejectsRunnerWorkDirWithoutCommand(t *testing.T) {
+	_, err := buildConfig([]string{"--runner-workdir", "workspace"})
+	if err == nil || !strings.Contains(err.Error(), "--runner-workdir requires --runner-command") {
 		t.Fatalf("buildConfig error = %v, want runner command requirement", err)
 	}
 }

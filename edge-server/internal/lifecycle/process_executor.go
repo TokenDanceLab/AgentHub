@@ -21,6 +21,7 @@ type ProcessExecutorConfig struct {
 	Command string
 	Args    []string
 	Env     []string
+	WorkDir string
 }
 
 type ProcessExecutor struct {
@@ -29,6 +30,7 @@ type ProcessExecutor struct {
 	command string
 	args    []string
 	env     []string
+	workDir string
 
 	mu      sync.Mutex
 	running map[string]context.CancelFunc
@@ -44,12 +46,22 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 	if cfg.Command == "" {
 		return nil, ErrProcessCommandRequired
 	}
+	if cfg.WorkDir != "" {
+		info, err := os.Stat(cfg.WorkDir)
+		if err != nil {
+			return nil, fmt.Errorf("process workdir %q is not accessible: %w", cfg.WorkDir, err)
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("process workdir %q is not a directory", cfg.WorkDir)
+		}
+	}
 	return &ProcessExecutor{
 		bus:     bus,
 		store:   store,
 		command: cfg.Command,
 		args:    append([]string(nil), cfg.Args...),
 		env:     append([]string(nil), cfg.Env...),
+		workDir: cfg.WorkDir,
 		running: make(map[string]context.CancelFunc),
 	}, nil
 }
@@ -110,6 +122,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run) {
 	defer e.finish(run.ID)
 
 	cmd := exec.CommandContext(ctx, e.command, e.args...)
+	cmd.Dir = e.workDir
 	cmd.Env = e.envForRun(run)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

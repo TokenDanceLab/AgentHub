@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,43 @@ func TestProcessExecutorRequiresDependencies(t *testing.T) {
 	_, err = NewProcessExecutor(events.NewBus(10), nil, ProcessExecutorConfig{Command: os.Args[0]})
 	if !errors.Is(err, ErrProcessStoreRequired) {
 		t.Fatalf("NewProcessExecutor nil store error = %v, want ErrProcessStoreRequired", err)
+	}
+}
+
+func TestProcessExecutorRejectsInvalidWorkDir(t *testing.T) {
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "not-a-directory")
+	if err := os.WriteFile(filePath, []byte("test"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		workDir string
+		want    string
+	}{
+		{
+			name:    "missing",
+			workDir: filepath.Join(tempDir, "missing"),
+			want:    "is not accessible",
+		},
+		{
+			name:    "file",
+			workDir: filePath,
+			want:    "is not a directory",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
+				Command: os.Args[0],
+				WorkDir: tt.workDir,
+			})
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("NewProcessExecutor error = %v, want containing %q", err, tt.want)
+			}
+		})
 	}
 }
 
@@ -106,6 +144,60 @@ func TestProcessExecutorPublishesOutputAndFinished(t *testing.T) {
 			}
 			if stored.Status != "finished" || stored.StartedAt == "" || stored.FinishedAt == "" {
 				t.Fatalf("stored run = %#v, want finished with timestamps", stored)
+			}
+			return
+		default:
+			t.Fatalf("unexpected event type %q", evt.Type)
+		}
+	}
+}
+
+func TestProcessExecutorRunsCommandInConfiguredWorkDir(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	workDir := filepath.Join(t.TempDir(), "workspace")
+	if err := os.Mkdir(workDir, 0o755); err != nil {
+		t.Fatalf("Mkdir returned error: %v", err)
+	}
+	_, ch, _ := bus.Subscribe(0)
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: os.Args[0],
+		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "pwd"},
+		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+		WorkDir: workDir,
+	})
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	if err := executor.Start(run); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	var stdoutText string
+	for {
+		evt := nextEvent(t, ch)
+		switch evt.Type {
+		case "run.started":
+		case "run.output.batch":
+			payload, ok := evt.Payload.(map[string]any)
+			if !ok {
+				t.Fatalf("output payload = %T, want map", evt.Payload)
+			}
+			if payload["stream"] != "stdout" {
+				continue
+			}
+			chunks, ok := payload["chunks"].([]map[string]any)
+			if !ok || len(chunks) == 0 {
+				t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
+			}
+			text, _ := chunks[0]["text"].(string)
+			stdoutText += text
+		case "run.finished":
+			want := "cwd=" + filepath.Clean(workDir)
+			if !strings.Contains(stdoutText, want) {
+				t.Fatalf("stdout text = %q, want %q", stdoutText, want)
 			}
 			return
 		default:
@@ -270,6 +362,13 @@ func TestProcessExecutorHelper(t *testing.T) {
 		os.Exit(7)
 	case "sleep":
 		time.Sleep(5 * time.Second)
+	case "pwd":
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "getwd: %v\n", err)
+			os.Exit(3)
+		}
+		fmt.Fprintf(os.Stdout, "cwd=%s\n", filepath.Clean(cwd))
 	default:
 		fmt.Fprintf(os.Stderr, "unknown helper mode %q\n", mode)
 		os.Exit(2)
