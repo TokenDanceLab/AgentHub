@@ -17,6 +17,7 @@ type config struct {
 	StoreFile     string
 	RunnerCommand string
 	RunnerArgs    repeatedString
+	RunnerEnv     repeatedString
 	RunnerWorkDir string
 }
 
@@ -51,9 +52,10 @@ func main() {
 	serverConfig := httpserver.Config{Addr: cfg.Addr, Store: repository}
 	if cfg.RunnerCommand != "" {
 		serverConfig.ProcessExecutor = lifecycle.ProcessExecutorConfig{
-			Command: cfg.RunnerCommand,
-			Args:    append([]string(nil), cfg.RunnerArgs...),
-			WorkDir: cfg.RunnerWorkDir,
+			Command:  cfg.RunnerCommand,
+			Args:     append([]string(nil), cfg.RunnerArgs...),
+			ExtraEnv: append([]string(nil), cfg.RunnerEnv...),
+			WorkDir:  cfg.RunnerWorkDir,
 		}
 	}
 
@@ -73,6 +75,7 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.RunnerCommand, "runner-command", "", "local process command to execute for each run; empty uses the mock executor")
 	fs.StringVar(&cfg.RunnerWorkDir, "runner-workdir", "", "working directory for --runner-command; empty inherits the edge process working directory")
 	fs.Var(&cfg.RunnerArgs, "runner-arg", "argument passed to --runner-command; may be repeated")
+	fs.Var(&cfg.RunnerEnv, "runner-env", "environment variable passed to --runner-command as KEY=VALUE; may be repeated")
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
 	}
@@ -80,8 +83,14 @@ func buildConfig(args []string) (config, error) {
 	if cfg.RunnerCommand == "" && len(cfg.RunnerArgs) > 0 {
 		return config{}, fmt.Errorf("--runner-arg requires --runner-command")
 	}
+	if cfg.RunnerCommand == "" && len(cfg.RunnerEnv) > 0 {
+		return config{}, fmt.Errorf("--runner-env requires --runner-command")
+	}
 	if cfg.RunnerCommand == "" && cfg.RunnerWorkDir != "" {
 		return config{}, fmt.Errorf("--runner-workdir requires --runner-command")
+	}
+	if _, err := lifecycle.NewCommandTemplate(nil, cfg.RunnerEnv); err != nil {
+		return config{}, fmt.Errorf("--runner-env: %w", err)
 	}
 	if fs.NArg() != 0 {
 		return config{}, fmt.Errorf("unexpected positional arguments: %v", fs.Args())

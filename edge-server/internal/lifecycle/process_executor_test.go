@@ -206,6 +206,207 @@ func TestProcessExecutorRunsCommandInConfiguredWorkDir(t *testing.T) {
 	}
 }
 
+func TestProcessExecutorExpandsRunPlaceholdersInArgs(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: os.Args[0],
+		Args: []string{
+			"-test.run=TestProcessExecutorHelper",
+			"--",
+			"--run={{run.id}}",
+			"--project={{ run.projectId }}",
+			"--thread={{run.threadId}}",
+			"args",
+		},
+		Env: append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+	})
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	if err := executor.Start(run); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	stdoutText := collectStdoutUntilFinished(t, ch)
+	for _, want := range []string{
+		"--run=" + run.ID,
+		"--project=" + run.ProjectID,
+		"--thread=" + run.ThreadID,
+	} {
+		if !strings.Contains(stdoutText, want) {
+			t.Fatalf("stdout text = %q, want %q", stdoutText, want)
+		}
+	}
+}
+
+func TestProcessExecutorExpandsRunPlaceholdersInEnv(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: os.Args[0],
+		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "env"},
+		Env: append(os.Environ(),
+			"AGENTHUB_PROCESS_EXECUTOR_HELPER=1",
+			"PROFILE_RUN={{run.id}}",
+			"PROFILE_PROJECT={{run.projectId}}",
+			"PROFILE_THREAD={{run.threadId}}",
+		),
+	})
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	if err := executor.Start(run); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	stdoutText := collectStdoutUntilFinished(t, ch)
+	for _, want := range []string{
+		"profileRun=" + run.ID,
+		"profileProject=" + run.ProjectID,
+		"profileThread=" + run.ThreadID,
+	} {
+		if !strings.Contains(stdoutText, want) {
+			t.Fatalf("stdout text = %q, want %q", stdoutText, want)
+		}
+	}
+}
+
+func TestProcessExecutorExpandsRunPlaceholdersInExtraEnv(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: os.Args[0],
+		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "env"},
+		Env:     nil,
+		ExtraEnv: []string{
+			"AGENTHUB_PROCESS_EXECUTOR_HELPER=1",
+			"PROFILE_RUN={{run.id}}",
+			"PROFILE_PROJECT={{run.projectId}}",
+			"PROFILE_THREAD={{run.threadId}}",
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	if err := executor.Start(run); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	stdoutText := collectStdoutUntilFinished(t, ch)
+	for _, want := range []string{
+		"profileRun=" + run.ID,
+		"profileProject=" + run.ProjectID,
+		"profileThread=" + run.ThreadID,
+	} {
+		if !strings.Contains(stdoutText, want) {
+			t.Fatalf("stdout text = %q, want %q", stdoutText, want)
+		}
+	}
+}
+
+func TestProcessExecutorExtraEnvDoesNotTemplateParentEnvironment(t *testing.T) {
+	t.Setenv("AGENTHUB_PARENT_ENV_WITH_BRACES", "{{not.a.template")
+
+	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
+		Command:  os.Args[0],
+		Args:     []string{"-test.run=TestProcessExecutorHelper", "--", "env"},
+		Env:      nil,
+		ExtraEnv: []string{"PROFILE_RUN={{run.id}}"},
+	})
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+}
+
+func TestProcessExecutorNilEnvInheritsParentEnvironment(t *testing.T) {
+	t.Setenv("AGENTHUB_PROCESS_EXECUTOR_HELPER", "1")
+	t.Setenv("AGENTHUB_INHERITED_ENV_FOR_TEST", "expected")
+
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: os.Args[0],
+		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "inherited-env"},
+		Env:     nil,
+	})
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	if err := executor.Start(run); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	stdoutText := collectStdoutUntilFinished(t, ch)
+	if !strings.Contains(stdoutText, "inherited=expected") {
+		t.Fatalf("stdout text = %q, want inherited env value", stdoutText)
+	}
+}
+
+func TestProcessExecutorRejectsUnknownPlaceholder(t *testing.T) {
+	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
+		Command: os.Args[0],
+		Args:    []string{"--bad={{run.workspaceId}}"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "unknown placeholder") {
+		t.Fatalf("NewProcessExecutor error = %v, want unknown placeholder", err)
+	}
+}
+
+func TestProcessExecutorRejectsInvalidEnvTemplate(t *testing.T) {
+	tests := []struct {
+		name string
+		env  []string
+		want string
+	}{
+		{name: "missing equals", env: []string{"PROFILE_RUN"}, want: "KEY=VALUE"},
+		{name: "empty key", env: []string{"=value"}, want: "key is required"},
+		{name: "whitespace in key", env: []string{"PROFILE RUN=value"}, want: "invalid whitespace"},
+		{name: "unknown placeholder", env: []string{"PROFILE_RUN={{run.workspaceId}}"}, want: "unknown placeholder"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
+				Command: os.Args[0],
+				Env:     tt.env,
+			})
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("NewProcessExecutor error = %v, want containing %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestProcessExecutorRedactsEnvTemplateValueInErrors(t *testing.T) {
+	secretValue := "token-secret-should-not-appear"
+	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
+		Command: os.Args[0],
+		Env:     []string{"PROFILE_TOKEN=" + secretValue + "{{run.workspaceId}}"},
+	})
+	if err == nil {
+		t.Fatal("NewProcessExecutor returned nil error for invalid env placeholder")
+	}
+	if strings.Contains(err.Error(), secretValue) {
+		t.Fatalf("NewProcessExecutor error = %q, must not include env value", err.Error())
+	}
+	if !strings.Contains(err.Error(), "PROFILE_TOKEN") || !strings.Contains(err.Error(), "unknown placeholder") {
+		t.Fatalf("NewProcessExecutor error = %q, want key and placeholder error", err.Error())
+	}
+}
+
 func TestProcessExecutorPublishesFailedForNonZeroExit(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()
@@ -369,9 +570,47 @@ func TestProcessExecutorHelper(t *testing.T) {
 			os.Exit(3)
 		}
 		fmt.Fprintf(os.Stdout, "cwd=%s\n", filepath.Clean(cwd))
+	case "args":
+		fmt.Fprintf(os.Stdout, "args=%s\n", strings.Join(os.Args, "\n"))
+	case "env":
+		fmt.Fprintf(os.Stdout, "profileRun=%s\n", os.Getenv("PROFILE_RUN"))
+		fmt.Fprintf(os.Stdout, "profileProject=%s\n", os.Getenv("PROFILE_PROJECT"))
+		fmt.Fprintf(os.Stdout, "profileThread=%s\n", os.Getenv("PROFILE_THREAD"))
+	case "inherited-env":
+		fmt.Fprintf(os.Stdout, "inherited=%s\n", os.Getenv("AGENTHUB_INHERITED_ENV_FOR_TEST"))
 	default:
 		fmt.Fprintf(os.Stderr, "unknown helper mode %q\n", mode)
 		os.Exit(2)
 	}
 	os.Exit(0)
+}
+
+func collectStdoutUntilFinished(t *testing.T, ch <-chan events.EventEnvelope) string {
+	t.Helper()
+
+	var stdoutText string
+	for {
+		evt := nextEvent(t, ch)
+		switch evt.Type {
+		case "run.started":
+		case "run.output.batch":
+			payload, ok := evt.Payload.(map[string]any)
+			if !ok {
+				t.Fatalf("output payload = %T, want map", evt.Payload)
+			}
+			if payload["stream"] != "stdout" {
+				continue
+			}
+			chunks, ok := payload["chunks"].([]map[string]any)
+			if !ok || len(chunks) == 0 {
+				t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
+			}
+			text, _ := chunks[0]["text"].(string)
+			stdoutText += text
+		case "run.finished":
+			return stdoutText
+		default:
+			t.Fatalf("unexpected event type %q", evt.Type)
+		}
+	}
 }
