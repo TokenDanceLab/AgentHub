@@ -18,19 +18,17 @@ var ErrProcessCommandRequired = errors.New("process command is required")
 var ErrProcessStoreRequired = errors.New("process store is required")
 
 type ProcessExecutorConfig struct {
-	Command string
-	Args    []string
-	Env     []string
-	WorkDir string
+	Command  string
+	Args     []string
+	Env      []string
+	ExtraEnv []string
+	WorkDir  string
 }
 
 type ProcessExecutor struct {
 	bus     *events.Bus
 	store   store.RunLifecycleStore
-	command string
-	args    []string
-	env     []string
-	workDir string
+	profile RunnerProfile
 
 	mu      sync.Mutex
 	running map[string]context.CancelFunc
@@ -43,8 +41,9 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 	if store == nil {
 		return nil, ErrProcessStoreRequired
 	}
-	if cfg.Command == "" {
-		return nil, ErrProcessCommandRequired
+	profile, err := NewGenericRunnerProfile(cfg.Command, cfg.Args, cfg.Env, cfg.ExtraEnv, cfg.WorkDir)
+	if err != nil {
+		return nil, err
 	}
 	if cfg.WorkDir != "" {
 		info, err := os.Stat(cfg.WorkDir)
@@ -58,10 +57,7 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 	return &ProcessExecutor{
 		bus:     bus,
 		store:   store,
-		command: cfg.Command,
-		args:    append([]string(nil), cfg.Args...),
-		env:     append([]string(nil), cfg.Env...),
-		workDir: cfg.WorkDir,
+		profile: profile,
 		running: make(map[string]context.CancelFunc),
 	}, nil
 }
@@ -121,9 +117,19 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 func (e *ProcessExecutor) run(ctx context.Context, run store.Run) {
 	defer e.finish(run.ID)
 
-	cmd := exec.CommandContext(ctx, e.command, e.args...)
-	cmd.Dir = e.workDir
-	cmd.Env = e.envForRun(run)
+	args, env, err := e.profile.Template.Expand(RunProcessContext{Run: run})
+	if err != nil {
+		e.publishFailed(run, err)
+		return
+	}
+	_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(RunProcessContext{Run: run})
+	if err != nil {
+		e.publishFailed(run, err)
+		return
+	}
+	cmd := exec.CommandContext(ctx, e.profile.Command, args...)
+	cmd.Dir = e.profile.WorkDir
+	cmd.Env = e.envForRun(run, env, extraEnv)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		e.publishFailed(run, fmt.Errorf("open stdout pipe: %w", err))
@@ -194,13 +200,14 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, strea
 	}
 }
 
-func (e *ProcessExecutor) envForRun(run store.Run) []string {
-	env := e.env
+func (e *ProcessExecutor) envForRun(run store.Run, profileEnv, extraEnv []string) []string {
+	env := profileEnv
 	if env == nil {
 		env = os.Environ()
 	} else {
 		env = append([]string(nil), env...)
 	}
+	env = append(env, extraEnv...)
 	return append(env,
 		"AGENTHUB_RUN_ID="+run.ID,
 		"AGENTHUB_PROJECT_ID="+run.ProjectID,

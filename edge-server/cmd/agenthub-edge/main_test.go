@@ -30,6 +30,9 @@ func TestBuildConfigDefaultsToMemoryStore(t *testing.T) {
 	if len(cfg.RunnerArgs) != 0 {
 		t.Fatalf("RunnerArgs = %#v, want empty", cfg.RunnerArgs)
 	}
+	if len(cfg.RunnerEnv) != 0 {
+		t.Fatalf("RunnerEnv = %#v, want empty", cfg.RunnerEnv)
+	}
 }
 
 func TestBuildConfigParsesStoreFile(t *testing.T) {
@@ -40,6 +43,8 @@ func TestBuildConfigParsesStoreFile(t *testing.T) {
 		"--runner-workdir", "workspace",
 		"--runner-arg", "--mock",
 		"--runner-arg", "--addr=127.0.0.1:0",
+		"--runner-env", "AGENTHUB_PROFILE_RUN={{run.id}}",
+		"--runner-env", "AGENTHUB_PROFILE_THREAD={{run.threadId}}",
 	})
 	if err != nil {
 		t.Fatalf("buildConfig returned error: %v", err)
@@ -60,6 +65,9 @@ func TestBuildConfigParsesStoreFile(t *testing.T) {
 	if got, want := []string(cfg.RunnerArgs), []string{"--mock", "--addr=127.0.0.1:0"}; strings.Join(got, "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("RunnerArgs = %#v, want %#v", got, want)
 	}
+	if got, want := []string(cfg.RunnerEnv), []string{"AGENTHUB_PROFILE_RUN={{run.id}}", "AGENTHUB_PROFILE_THREAD={{run.threadId}}"}; strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("RunnerEnv = %#v, want %#v", got, want)
+	}
 }
 
 func TestBuildConfigRejectsUnexpectedArguments(t *testing.T) {
@@ -73,6 +81,25 @@ func TestBuildConfigRejectsRunnerArgsWithoutCommand(t *testing.T) {
 	_, err := buildConfig([]string{"--runner-arg", "--mock"})
 	if err == nil || !strings.Contains(err.Error(), "--runner-arg requires --runner-command") {
 		t.Fatalf("buildConfig error = %v, want runner command requirement", err)
+	}
+}
+
+func TestBuildConfigRejectsRunnerEnvWithoutCommand(t *testing.T) {
+	_, err := buildConfig([]string{"--runner-env", "AGENTHUB_PROFILE_RUN={{run.id}}"})
+	if err == nil || !strings.Contains(err.Error(), "--runner-env requires --runner-command") {
+		t.Fatalf("buildConfig error = %v, want runner command requirement", err)
+	}
+}
+
+func TestBuildConfigRejectsInvalidRunnerEnv(t *testing.T) {
+	tests := []string{"AGENTHUB_PROFILE_RUN", "=value"}
+	for _, value := range tests {
+		t.Run(value, func(t *testing.T) {
+			_, err := buildConfig([]string{"--runner-command", "agenthub-runner", "--runner-env", value})
+			if err == nil || !strings.Contains(err.Error(), "--runner-env") {
+				t.Fatalf("buildConfig error = %v, want runner env validation error", err)
+			}
+		})
 	}
 }
 
