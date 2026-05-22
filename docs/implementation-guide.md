@@ -129,8 +129,36 @@ version / id / seq / type / scope / sentAt / payload
 - 文档、协议、服务结构变更走 PR。
 - PR 尽量小，能让一个同学一次看完。
 - commit 标题使用 `type(scope): 中文摘要`。
+- 每条实现线至少每天 push 一次工作分支，避免进度只留在本机。
+- 分支继续开发前先 `git fetch origin` 并同步最新 `master`。
+- Agent 生成的代码由对应开发者负责审查、测试和解释。
 
-## 8. 验收命令
+## 8. 测试框架方向
+
+测试框架跟实现一起补，不单独空转搭架子。
+
+| 方向 | 测试重点 | 建议起点 |
+|---|---|---|
+| 前端 UI | API client、store、消息流状态、关键工作台交互 | 单元测试 + 后续 Playwright |
+| 后端开发 | Hub handler、Edge-Hub sync、权限、错误码、事件序号 | Go `testing` + handler/service 测试 |
+| 客户端开发 | Runner 进程、workspace 路径保护、stdout/stderr 事件转换、preview | Go `testing` + 本地 smoke test |
+
+必须覆盖的高风险点：
+
+- 权限和审批分支。
+- 文件路径和 workspace 边界。
+- Runner 命令执行和取消。
+- WebSocket event 序号、重连和重复事件。
+- Edge-Hub 同步的断线恢复。
+
+## 9. 安全边界
+
+- 不提交 `.env`、token、cookie、私钥、真实服务器地址、生产数据库 dump。
+- 示例配置只用 `.env.example` 和占位符。
+- issue、PR、日志、截图里也不能出现真实密钥或服务器隐私。
+- Agent 执行命令前要确认不会上传文件、打印密钥或访问生产数据。
+
+## 10. 验收命令
 
 文档/API 变更至少运行：
 

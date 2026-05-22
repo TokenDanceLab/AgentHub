@@ -26,11 +26,24 @@ Thumbs.db
 # Secrets
 .env
 .env.local
+.env.*
+!.env.example
 *.pem
 *.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
 
 # Logs
 *.log
+
+# Local databases and dumps
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.bak
 
 # Local agent worktrees
 .claude/worktrees/
