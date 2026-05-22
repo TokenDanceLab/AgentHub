@@ -28,7 +28,7 @@ api/
 |---|---|---|
 | 前端 | Web 工作台、IM 流、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` | `docs/reference/03-build/frontend/01-desktop-ux.md`、`docs/reference/01-learn/deep-dive/12-multica-product-ui.md` |
 | 后端 | Hub Server、Edge-Hub 通信、账号/群聊/同步/中继 | `hub-server/`、`edge-server/`、`api/` | `docs/reference/03-build/backend/16-hub-server-requirements.md`、`docs/reference/03-build/backend/02-go-services.md` |
-| 客户端 | Desktop、Runner、Edge 本地调度、Agent CLI、workspace、preview | `app/desktop/`、`runner/`、`edge-server/` | `docs/reference/03-build/backend/12-workspace-lifecycle.md`、`docs/reference/03-build/backend/04-adapter-sdk.md` |
+| 客户端 | Desktop、Runner、Edge 本地调度、Agent CLI、workspace、preview | `app/desktop/`、`runner/`、`edge-server/` | `docs/client-roadmap.md`、`docs/reference/03-build/backend/12-workspace-lifecycle.md`、`docs/reference/03-build/backend/04-adapter-sdk.md` |
 
 ## 3. API Foundation 已定规则
 
@@ -133,6 +133,7 @@ version / id / seq / type / scope / sentAt / payload
 - 分支继续开发前先 `git fetch origin` 并同步最新 `master`。
 - Agent 生成的代码由对应开发者负责审查、测试和解释。
 - 首次克隆后运行 `.\scripts\setup.ps1` 启用本地 hooks；需要参考仓库时运行 `.\scripts\setup.ps1 -Reference core`。
+- 并行开发使用 `.worktrees/`，具体规则见 `AGENTS.md`。客户端并行任务按 `docs/client-roadmap.md` 拆分。
 
 ## 8. 测试框架方向
 
