@@ -35,6 +35,7 @@
 - [x] `cd app/desktop; pnpm install`
 - [x] `cd app/desktop; pnpm test`
 - [x] `cd app/desktop; pnpm build`
+- [x] 主控复验：PR #30 base=`master`、head=`feat/client-m2-edge-data-layer-delicious233`、mergeState=`CLEAN`、GitHub Actions `validate` 通过。
 - [ ] 仓库根目录 `go test ./...`：当前根目录不是 Go module / workspace，命令返回 `pattern ./...: directory prefix . does not contain main module or its selected dependencies`；本轮用 `edge-server` 和 `runner` 两个 Go module 分别验收。
 
 ## 下一步
