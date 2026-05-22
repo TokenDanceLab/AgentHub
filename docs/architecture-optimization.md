@@ -2,6 +2,8 @@
 
 Date: 2026-05-21
 
+> 2026-05-22 更新：仓库已经从 `apps/`、`services/`、`packages/`、`proto/` 扁平化为 `app/`、`hub-server/`、`edge-server/`、`runner/`、`api/`。本文保留为架构优化记录；最新目录和模块边界见 [module-boundaries.md](module-boundaries.md)。
+
 ## 结论
 
 当前 `Hub-Edge-Runner` 方向是对的，优化重点不是把架构一开始收窄，而是把**长期完整模型**和**阶段落地范围**分清楚。
@@ -53,14 +55,14 @@ Client -> Edge / Hub -> RunnerEndpoint -> Agent CLI
 
 ### 3. 目录按未来形态拆得太细
 
-现在 `services/hub-server/internal/*`、`services/edge-server/internal/*`、`services/runner/internal/*` 已经列出大量子模块，但仓库还没有实现代码。过早铺开目录会导致 Codex 生成时分散，三个人也很难并行集成。
+现在 `hub-server/internal/*`、`edge-server/internal/*`、`runner/internal/*` 已经列出大量子模块，但仓库还没有实现代码。过早铺开目录会导致 Codex 生成时分散，三个人也很难并行集成。
 
 优化建议：第一阶段按“可运行纵切”落代码，但目录和接口仍体现长期分层。不要把 Edge 和 Runner 合并成不可拆的单体。
 
 推荐 P0 最小后端模块：
 
 ```text
-services/edge-server/
+edge-server/
   cmd/
   internal/
     api/              # REST + WebSocket
@@ -71,7 +73,7 @@ services/edge-server/
     orchestrator/     # @mention/direct/sequential
     runnerclient/     # local runner client
 
-services/runner/
+runner/
   cmd/
   internal/
     service/          # Runner API
@@ -81,7 +83,7 @@ services/runner/
     artifacts/        # diff/log/preview output
 ```
 
-如果第一阶段只实现本地能力，也应明确 `services/edge-server` 是 Local Edge，而不是最终替代 Hub 的单体。
+如果第一阶段只实现本地能力，也应明确 `edge-server/` 是 Local Edge，而不是最终替代 Hub 的单体。
 
 ## 推荐目标架构
 
@@ -174,7 +176,7 @@ P0 先实现 8 张表即可：
 
 ## Protocol 优先级
 
-现有 README 已经把 `packages/protocol/` 作为共享类型目录，这是正确的。下一步应先定协议，再写 UI 和后端。
+现有 README 已经把 `api/` 作为 REST API 和 WebSocket 事件契约目录，这是正确的。下一步应先定协议，再写 UI 和后端。
 
 建议第一批协议只包含：
 
@@ -297,7 +299,7 @@ P0 不做自动长期记忆写入，先做可解释、可版本管理的 Markdow
 
 ### 第 1 阶段：协议和本地 IM
 
-- 建 `packages/protocol`。
+- 建 `api/` 契约。
 - 建 SQLite schema。
 - 实现 conversation/message/agent CRUD。
 - Web UI 做三栏布局和本地消息流。
@@ -336,8 +338,8 @@ P0 不做自动长期记忆写入，先做可解释、可版本管理的 Markdow
 1. README 使用 `hub-server / edge-server / runner` 命名，并把 Desktop、Cloud Node 都解释成 Edge Node。
 2. 新增 `docs/topology.md`，明确完整拓扑、控制面、数据面、同步面和八种连接场景。
 3. 新增 `docs/protocol.md`，先锁定 Conversation、Message、Run、Artifact、ServerEvent。
-4. 保持 `services/edge-server` 命名，明确它可运行在 Desktop、远程机器或 Cloud 节点上。
-5. 保持 `services/hub-server` 命名，明确它是中心控制面，不是本地 Runner 管理器。
+4. 保持 `edge-server/` 命名，明确它可运行在 Desktop、远程机器或 Cloud 节点上。
+5. 保持 `hub-server/` 命名，明确它是中心控制面，不是本地 Runner 管理器。
 6. 先删除或冻结过细的空目录生成，改为按纵切功能落代码。
 
 ## 最终建议

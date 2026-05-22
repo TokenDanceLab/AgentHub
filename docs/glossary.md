@@ -23,7 +23,9 @@
 | Approval | 用户在高风险动作前做的决定，例如运行命令、写敏感路径或部署。 |
 | Worktree | 一次 AgentRun 专用的隔离 git 工作目录，避免多个 Agent 互相覆盖修改。 |
 | Context Builder | Edge 里的上下文组装组件。Runner 启动 Agent 前，由它把规则、记忆、Thread 历史和当前任务整理成输入。 |
-| 唯一协议源头 | `proto/agenthub/v1` 下的协议文件。Go 和 TypeScript 类型都从这里生成，避免手写两套类型漂移。 |
+| API 契约 | `api/openapi.yaml` 中定义的 REST endpoint、request、response 和错误格式。 |
+| 事件契约 | `api/events.schema.json` 中定义的 WebSocket event envelope 和 payload。 |
+| Typed Event | 有固定 `type`、`id`、`seq`、`payload` schema 的事件。它不是随便传 JSON，而是有结构、有版本、可回放的事件。 |
 | Route Resolver | 连接路径选择器。它决定走本地、SSH/Tailscale 直连，还是 Hub 中继。 |
 | 数据通道 | 传输大数据或高频数据的路径，例如日志、文件、Diff、预览和 artifact 下载。英文文档里可写 `Data Plane`。 |
 | 控制通道 | 传输命令和状态的路径，例如 start run、stop run、approve command、update status。英文文档里可写 `Control Plane`。 |
@@ -35,7 +37,7 @@
 
 ## 推荐叫法
 
-- 写“唯一协议源头”，不要写未解释的英文缩写。
+- 写“API 契约”和“事件契约”，不要写未解释的英文缩写。
 - 谈执行排队时写 `AgentRun queue`。
 - 只有在指持久事件历史时写 `EventStore`；WebSocket 只是投递通道。
 - 不把 Hub Server、Edge Server、Runner 随意改叫 LocalServer、Daemon 或 Worker。

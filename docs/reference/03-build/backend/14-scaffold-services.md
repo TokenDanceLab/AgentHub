@@ -1,7 +1,8 @@
 # AgentHub Go Module 初始化 + CI/CD + 构建配置
 
-> 基于 design-go-services.md + web-research-tech-stack.md
-> 所有文件可直接复制使用
+> 基于 design-go-services.md + web-research-tech-stack.md。
+> 2026-05-22 更新：当前仓库已扁平化为 `hub-server/`、`edge-server/`、`runner/`、`app/`、`api/`。本文中的 Protobuf / Connect-RPC 内容作为未来可选参考，不是 P0 必选依赖。
+> 本文示例需要按当前目录和 REST/WebSocket 协议方向取用，不再整段直接复制。
 
 ## 1. go.mod
 
@@ -16,12 +17,6 @@ require (
 
     // SQLite — 纯 Go 无 CGO, FTS5 内置, 跨平台编译
     modernc.org/sqlite v1.38.0
-
-    // Protobuf — Buf 生成的 Go 代码依赖
-    google.golang.org/protobuf v1.37.0
-
-    // Connect-RPC — gRPC/gRPC-Web/Connect 三协议
-    connectrpc.com/connect v1.19.0
 
     // SSH — 远程 Runner transport
     golang.org/x/crypto v0.35.0
@@ -53,9 +48,9 @@ go.work.sum
 # Build output
 /bin/
 /dist/
-/services/hub/hub
-/services/edge/edge
-/services/runner/runner
+/hub-server/hub-server
+/edge-server/edge-server
+/runner/runner
 
 # Generated code
 gen/
@@ -70,26 +65,26 @@ gen/
 ## 3. Makefile
 
 ```makefile
-.PHONY: all build test lint gen dev clean
+.PHONY: all build test lint dev clean
 
 # ---- Build ----
 build: build-hub build-edge build-runner
 
 build-hub:
-	go build -o bin/hub ./services/hub/cmd/main.go
+	go build -o bin/hub-server ./hub-server/cmd/main.go
 
 build-edge:
-	go build -o bin/edge ./services/edge/cmd/main.go
+	go build -o bin/edge-server ./edge-server/cmd/main.go
 
 build-runner:
-	go build -o bin/runner ./services/runner/cmd/main.go
+	go build -o bin/runner ./runner/cmd/main.go
 
 # ---- Dev (本地开发) ----
 dev:
-	go run ./services/hub/cmd/main.go &
-	go run ./services/edge/cmd/main.go &
-	go run ./services/runner/cmd/main.go &
-	cd apps/web && pnpm dev
+	go run ./hub-server/cmd/main.go &
+	go run ./edge-server/cmd/main.go &
+	go run ./runner/cmd/main.go &
+	cd app/web && pnpm dev
 
 # ---- Test ----
 test:
@@ -101,15 +96,6 @@ test-race:
 # ---- Lint ----
 lint:
 	golangci-lint run ./...
-
-# ---- Codegen ----
-gen: gen-proto gen-sdk-types
-
-gen-proto:
-	buf generate proto/
-
-gen-sdk-types:
-	go run ./scripts/generate-sdk-types.go
 
 # ---- DB ----
 migrate-up:
@@ -157,7 +143,7 @@ issues:
   max-same-issues: 0
 ```
 
-## 5. buf.yaml
+## 5. 可选：buf.yaml
 
 ```yaml
 version: v2
@@ -171,7 +157,7 @@ breaking:
     - FILE
 ```
 
-## 6. buf.gen.yaml
+## 6. 可选：buf.gen.yaml
 
 ```yaml
 version: v2
@@ -231,18 +217,12 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version: '1.24' }
       - run: |
-          go build -o bin/hub ./services/hub/cmd/main.go
-          go build -o bin/edge ./services/edge/cmd/main.go
-          go build -o bin/runner ./services/runner/cmd/main.go
-
-  buf-breaking:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: bufbuild/buf-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          go build -o bin/hub-server ./hub-server/cmd/main.go
+          go build -o bin/edge-server ./edge-server/cmd/main.go
+          go build -o bin/runner ./runner/cmd/main.go
 ```
+
+Protobuf / Buf 校验后续如重新引入，再单独增加 `buf-breaking` job。
 
 ## 8. SQLite 迁移脚本 (`scripts/migrate.go`)
 
@@ -306,30 +286,19 @@ AgentHub/
 ├── go.sum
 ├── go.work                    # gitignored
 ├── Makefile
-├── buf.yaml
-├── buf.gen.yaml
 ├── .golangci.yml
 ├── .gitignore
 ├── .github/workflows/ci.yml
-├── proto/agenthub/v1/*.proto
-├── gen/go/                    # Buf 生成
-├── gen/ts/                    # Buf 生成
-├── services/
-│   ├── hub/cmd/main.go
-│   ├── edge/cmd/main.go
-│   └── runner/cmd/main.go
-├── packages/
-│   ├── protocol/
-│   ├── transport/
-│   ├── im-core/
-│   ├── agent-core/
-│   ├── workspace-core/
-│   ├── approval-core/
-│   ├── sync-core/
-│   ├── memory-core/
-│   ├── artifact-core/
-│   └── adapters/
-├── apps/web/
+├── api/
+│   ├── openapi.yaml
+│   └── events.schema.json
+├── app/
+│   ├── desktop/
+│   ├── web/
+│   └── shared/
+├── hub-server/cmd/main.go
+├── edge-server/cmd/main.go
+├── runner/cmd/main.go
 ├── scripts/migrate.go
 └── docs/
 ```

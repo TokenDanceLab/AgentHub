@@ -5,13 +5,13 @@
 ```mermaid
 graph TB
     subgraph Desktop["Desktop Edge 节点"]
-        UI["apps/web UI"]
-        Edge["services/edge-server<br/>Edge Server"]
-        R["services/runner<br/>Runner"]
+        UI["app/web UI"]
+        Edge["edge-server<br/>Edge Server"]
+        R["runner<br/>Runner"]
     end
 
     subgraph Cloud["云端"]
-        Hub["services/hub-server<br/>Hub Server"]
+        Hub["hub-server<br/>Hub Server"]
     end
 
     subgraph Mobile["移动端"]
@@ -26,7 +26,7 @@ graph TB
 
     UI -->|"localhost"| Edge
     Edge -->|"local transport"| R
-    R -->|"child_process"| Agents
+    R -->|"process"| Agents
     Edge <-->|"reverse WSS<br/>sync/relay"| Hub
     MUI -->|"HTTPS+WSS"| Hub
 ```
@@ -37,7 +37,7 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph Hub["services/hub-server/"]
+    subgraph Hub["hub-server/"]
         Auth["auth/ 登录/OAuth"]
         User["user/ 用户"]
         Device["device/ 设备管理"]
@@ -60,7 +60,7 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph Edge["services/edge-server/"]
+    subgraph Edge["edge-server/"]
         API["local-api/ Desktop UI REST"]
         WS["local-ws/ Desktop UI WebSocket"]
         Store["local-store/ SQLite"]
@@ -82,7 +82,7 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph Runner["services/runner/"]
+    subgraph Runner["runner/"]
         Svc["service/ Runner API"]
         Exec["executor/ 子进程管理"]
         Adapters["adapters/"]
@@ -201,7 +201,7 @@ graph LR
 ```mermaid
 sequenceDiagram
     actor User
-    participant UI as apps/web
+    participant UI as app/web
     participant Hub as Hub Server
     participant Edge as Edge Server
     participant Runner as Runner
@@ -274,21 +274,19 @@ type ExecutionAuthority = {
 
 本地离线时二者通常都在本机 Desktop Edge；Web 远程控制 Desktop 时，Conversation Authority 通常在 Hub，Execution Authority 在目标 Desktop Edge。
 
-## 共享包
+## 模块结构
 
-| 包 | 语言 | 用途 |
-|---|---|---|
-| `packages/protocol/` | Generated TypeScript/Go protocol outputs | 从 `proto/agenthub/v1` 生成 UI/Hub/Edge/Runner 类型，详见 [protocol.md](protocol.md) |
-| `packages/transport/` | Model + interfaces | local / ssh / tailscale / hub-relay 路由模型、resolver 和 client interface |
-| `packages/im-core/` | Go | Conversation/Message/Thread 共享逻辑 |
-| `packages/agent-core/` | Go | Project / Thread / Turn / Item / AgentRun 共享模型 |
-| `packages/workspace-core/` | Go | workspace / worktree / patch 元数据 |
-| `packages/approval-core/` | Go | ApprovalRequest / ApprovalDecision / policy 元数据 |
-| `packages/sync-core/` | Go | EdgeEvent / Sync / Ack / Relay 协议 |
-| `packages/memory-core/` | Go | Memory/ContextBuilder 共享逻辑 |
-| `packages/artifact-core/` | Go | Artifact 类型和索引 |
-| `packages/adapters/` | Go | ClaudeCode/Codex/OpenCode 适配层 |
-| `packages/ui-kit/` | React | 共享 UI 组件 |
+| 模块 | 用途 |
+|---|---|
+| `app/desktop/` | Tauri 桌面端入口。 |
+| `app/web/` | 浏览器 Web UI。 |
+| `app/shared/` | 前端共享组件、状态、API client 和事件 client。 |
+| `hub-server/` | 中心 Hub：账号、IM、群聊、多端同步、Edge 中继。 |
+| `edge-server/` | 本地/远程 Edge：项目、上下文、Runner 管理、EventStore、审批。 |
+| `runner/` | 执行器：Agent CLI、workspace、diff、preview、logs。 |
+| `api/` | REST API 和 WebSocket event 契约。 |
+
+更细的模型归属见 [module-boundaries.md](module-boundaries.md)。
 
 ## 端口
 
@@ -305,9 +303,9 @@ type ExecutionAuthority = {
 - **Hub 是中心控制面**：账号、好友、云端群聊、多端同步、权限和中继由 Hub 负责
 - **Edge 是边缘控制节点**：本地/边缘会话、项目、Memory、Context、Runner、workspace、preview 由 Edge 管理
 - **Runner 只管执行**：不存消息、不管 IM、不做 Memory
-- **Go-first services**：Hub、Edge、Runner 从 P0 起使用 Go 实现，TypeScript 只用于 UI 和生成类型
+- **Go-first services**：Hub、Edge、Runner 从 P0 起使用 Go 实现，TypeScript 主要用于 UI
 - **Desktop Command Center first**：P0 优先 Project / Thread / Worktree / Diff / Approval / Preview，而不是完整 Hub 好友/群聊
-- **Protocol proto-first**：`proto/agenthub/v1` 是唯一协议源头，TypeScript 与 Go 类型均由 Protobuf 生成
+- **协议轻量优先**：P0/P1 使用 REST JSON API + WebSocket typed events，契约入口在 `api/`
 - **Authority 显式建模**：消息写入、执行、Artifact、Memory 的权威归属见 [authority.md](authority.md)
 - **Data Plane 受 Edge 授权**：UI 不直接访问远程 Runner，本地 Fast Path 需要 Edge 短期 token，见 [data-plane.md](data-plane.md)
 - **凡是能跑 Runner 的机器都是 Edge Node**：Desktop、远程电脑、实验室机器、Cloud VM 都统一建模为 Edge

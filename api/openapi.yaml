@@ -1,0 +1,114 @@
+openapi: 3.1.0
+info:
+  title: AgentHub API
+  version: v1
+  description: REST JSON API for AgentHub command and query operations.
+servers:
+  - url: http://127.0.0.1:3210
+    description: Local Edge Server
+paths:
+  /v1/projects:
+    get:
+      summary: List projects
+      responses:
+        "200":
+          description: Project list
+    post:
+      summary: Create or register a project
+      responses:
+        "201":
+          description: Project created
+  /v1/threads:
+    get:
+      summary: List threads
+      responses:
+        "200":
+          description: Thread list
+    post:
+      summary: Create a thread
+      responses:
+        "201":
+          description: Thread created
+  /v1/threads/{threadId}:
+    get:
+      summary: Read a thread
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thread detail
+  /v1/runs:
+    post:
+      summary: Start an AgentRun
+      responses:
+        "202":
+          description: Run accepted
+  /v1/runs/{runId}:cancel:
+    post:
+      summary: Cancel an AgentRun
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Cancel accepted
+  /v1/approvals/{approvalId}:decide:
+    post:
+      summary: Decide an approval request
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Decision recorded
+  /v1/artifacts/{artifactId}:
+    get:
+      summary: Read artifact metadata
+      parameters:
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Artifact metadata
+  /v1/events:
+    get:
+      summary: Open WebSocket event stream
+      description: The handshake and auth surface for typed WebSocket events. Payload schemas live in events.schema.json.
+      responses:
+        "101":
+          description: Switching Protocols
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            traceId:
+              type: string
+            details:
+              type: object
+              additionalProperties: true

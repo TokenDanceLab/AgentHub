@@ -23,8 +23,8 @@ Runtime: Go.
 
 ## 协议面
 
-- UI <-> Hub：Web/Mobile Conversation、设备状态、远程控制。
-- Edge <-> Hub：reverse WSS 注册、同步、中继和命令投递。
+- UI <-> Hub：REST JSON API + WebSocket events，处理 Web/Mobile Conversation、设备状态、远程控制。
+- Edge <-> Hub：REST sync API + reverse WebSocket relay，处理注册、同步、中继和命令投递。
 - Hub -> Edge：`message.deliver`、`run.start`、`run.stop`、`preview.request`。
 
 ## 需求文档
@@ -33,8 +33,6 @@ Runtime: Go.
 
 ## 依赖
 
-- `packages/protocol`
-- `packages/im-core`
-- `packages/sync-core`
-- `packages/artifact-core`
-- `packages/memory-core`
+- `api/` 契约：REST endpoint、WebSocket event、错误格式。
+- `docs/module-boundaries.md`：领域模型和模块职责边界。
+- 后续 Go 共享代码可在本服务内部或根级 Go module 下按实际需要建立，不提前恢复 `packages/`。

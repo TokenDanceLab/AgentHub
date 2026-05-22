@@ -43,7 +43,7 @@
 ### web-research（4 篇 Web 生态调研）
 | # | 文件 | 主题 |
 |---|------|------|
-| 01 | [tech-stack](01-learn/web-research/01-tech-stack.md) | Go/Tauri/WebSocket/SQLite/Buf 选型 |
+| 01 | [tech-stack](01-learn/web-research/01-tech-stack.md) | Go/Tauri/WebSocket/SQLite/Buf 选型参考，当前主协议见 `api/` |
 | 02 | [competitive-2026](01-learn/web-research/02-competitive-2026.md) | Ruflo/Multica/Paperclip 竞品格局 |
 | 03 | [claude-agent-sdk](01-learn/web-research/03-claude-agent-sdk.md) | Claude Agent SDK GA 分析 |
 | 04 | [agent-command-center-2026](01-learn/web-research/04-agent-command-center-2026.md) | Emdash/Orca/Jean/Crush/ECA/Goose 等新增参考综合 |
@@ -65,8 +65,8 @@
 ### backend（16 篇 Go 后端规格）
 | # | 文件 | 内容 |
 |---|------|------|
-| 01 | [protocol](03-build/backend/01-protocol.md) | Go 类型定义：AgentEvent + adapter/sync/orch/approval |
-| 02 | [go-services](03-build/backend/02-go-services.md) | 单 module + 三层分层 + 11 表 + WS Hub |
+| 01 | [protocol](03-build/backend/01-protocol.md) | 早期 Go 类型建模参考；当前主协议入口见 `api/` |
+| 02 | [go-services](03-build/backend/02-go-services.md) | Hub/Edge/Runner 三级 Go 服务拆包参考；目录以当前根目录为准 |
 | 03 | [eventstore-memory](03-build/backend/03-eventstore-memory.md) | JSONL + Snapshot 2MB + FTS5 + 四层 Memory |
 | 04 | [adapter-sdk](03-build/backend/04-adapter-sdk.md) | 7 步开发流程 + 3 种注册模式 + Checklist |
 | 05 | [context-builder](03-build/backend/05-context-builder.md) | 6-step pipeline + 5 子接口（1199行） |
@@ -77,7 +77,7 @@
 | 10 | [graceful-degradation](03-build/backend/10-graceful-degradation.md) | 14 功能 × 4 故障模式 + 4 层重连 |
 | 11 | [model-fallback](03-build/backend/11-model-fallback.md) | 3 层 fallback 链 + circuit breaker |
 | 12 | [workspace-lifecycle](03-build/backend/12-workspace-lifecycle.md) | 4 阶段流水线 + 6 状态机 + WorkspacePool |
-| 13 | [protobuf-schema](03-build/backend/13-protobuf-schema.md) | 6 .proto + buf.gen.yaml |
+| 13 | [protobuf-schema](03-build/backend/13-protobuf-schema.md) | Protobuf / Connect-RPC 方案参考，不是当前 M0 主协议入口 |
 | 14 | [scaffold-services](03-build/backend/14-scaffold-services.md) | go.mod + Makefile + CI + golangci |
 | 15 | [websocket-reliability](03-build/backend/15-websocket-reliability.md) | WebSocket 可靠性、重连、去重、背压 |
 | 16 | [hub-server-requirements](03-build/backend/16-hub-server-requirements.md) | Hub Server 中心 IM、好友、群聊、Agent 元数据、消息和任务路由需求 |
@@ -111,13 +111,14 @@
 
 ```
 我要写 Adapter → 03-build/backend/01-protocol.md + 04-adapter-sdk.md + 02-decide/01-adapters.md
+我要写 API/事件契约 → ../../api/README.md + ../../api/openapi.yaml + ../../api/events.schema.json + ../protocol.md
 我要写 EventStore → 03-build/backend/03-eventstore-memory.md + 01-learn/deep-dive/06-ccviewer-fts5.md
 我要写前端消息流 → 03-build/frontend/01-desktop-ux.md + 02-decide/06-realtime-sync.md + 03-build/backend/15-websocket-reliability.md
 我要做安全设计 → 02-decide/07-permission-models.md + 03-build/backend/08-error-handling.md + 01-learn/deep-dive/04-claude-code-tool-security.md
 我要写工作台/worktree/diff → 01-learn/web-research/04-agent-command-center-2026.md + 03-build/backend/12-workspace-lifecycle.md + 03-build/frontend/01-desktop-ux.md
 我要写 Hub Server IM/好友/群聊 → 03-build/backend/16-hub-server-requirements.md + 03-build/backend/02-go-services.md + ../architecture.md
 我要了解竞品 → 01-learn/web-research/02-competitive-2026.md + 01-learn/web-research/04-agent-command-center-2026.md
-我要定位 Multica → 01-learn/deep-dive/12-multica-product-ui.md + 01-learn/web-research/04-agent-command-center-2026.md + reference/multica/README.md + reference/multica/docs/product-overview.md
+我要定位 Multica → 01-learn/deep-dive/12-multica-product-ui.md + 01-learn/web-research/04-agent-command-center-2026.md + ../../reference/multica/README.md + ../../reference/multica/docs/product-overview.md
 我要对齐比赛材料 → ../research/bytedance.md + 01-learn/web-research/04-agent-command-center-2026.md
 我要看术语白话解释 → ../glossary.md
 我要管理 GitHub issues → ../project-management.md

@@ -30,49 +30,41 @@ Desktop UI
 9. 用户审查 diff 和审批。
 10. Edge 通知 Runner apply 或 discard patch/worktree。
 
-## JSON-RPC 方向
+## REST 命令 + WebSocket 事件流
 
-AgentHub 协议是 proto-first，但运行时通信在合适位置使用 JSON-RPC 风格的 request/response/notification 信封。
+AgentHub 主链路使用 REST JSON API 处理命令和查询，使用 WebSocket typed events 推送实时状态。
 
 ```text
-UI <-> Edge      JSON-RPC over WebSocket
-Edge <-> Runner  JSON-RPC over local HTTP/WebSocket/stdio
-Edge <-> Hub     JSON-RPC over reverse WSS
-Hub <-> Web      JSON-RPC over WebSocket + REST 处理简单读操作
+UI <-> Edge      REST JSON API + WebSocket EventStream
+UI <-> Hub       REST JSON API + WebSocket EventStream
+Edge <-> Hub     REST sync API + reverse WebSocket relay
+Edge <-> Runner  local REST API + typed event stream
 ```
 
-P0 可以在 Edge 和 Runner 之间使用本地 WebSocket/HTTP，但方法名应与长期 JSON-RPC surface 保持一致。
+P0 可以先实现 Edge 本地 REST + WebSocket。Runner 侧可以用本地 HTTP 或进程内调用起步，但对外暴露给 Edge 的事件必须转换为标准 typed events。
 
-## 关键方法
+## 关键接口
 
 ```text
-project/list
-project/open
+GET    /v1/projects
+POST   /v1/projects
+GET    /v1/threads
+POST   /v1/threads
+GET    /v1/threads/{threadId}
+POST   /v1/runs
+POST   /v1/runs/{runId}:cancel
+POST   /v1/approvals/{approvalId}:decide
+GET    /v1/artifacts/{artifactId}
+GET    /v1/events
+```
 
-thread/create
-thread/list
-thread/read
+AgentRun 的典型链路：
 
-turn/start
-turn/interrupt
-turn/resume
-
-item/subscribe
-item/created
-item/updated
-
-approval/decide
-
-artifact/list
-artifact/read
-artifact/apply
-artifact/discard
-
-runner/list
-runner/status
-
-hub/connect
-hub/sync
+```text
+UI POST /v1/runs -> Edge 创建 AgentRun
+UI 订阅 /v1/events -> Edge 推送 run.started / run.output / artifact.created
+Edge 调用 Runner 本地 run API -> Runner 启动 CLI Agent
+Runner event stream -> Edge 持久化并转发给 UI
 ```
 
 ## Go 服务边界

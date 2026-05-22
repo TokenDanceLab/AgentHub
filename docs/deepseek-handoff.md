@@ -21,14 +21,15 @@
 - `docs/*.md`
 - `docs/research/*.md`
 - `docs/reference/**/*.md`
-- `services/*/README.md`
-- `packages/*/README.md`
+- `hub-server/README.md`
+- `edge-server/README.md`
+- `runner/README.md`
+- `api/README.md`
 
 不要处理：
 
 - `reference/**` 下 clone 回来的第三方仓库
 - 代码文件、生成文件、锁文件
-- Protobuf message、field、enum、service 名
 - Go package、TypeScript package、API method、JSON key、CLI 命令
 
 ## 执行顺序
@@ -46,9 +47,9 @@
 要求：
 1. 输出中文技术文档，不要写翻译说明。
 2. 保留 markdown 结构、标题层级、表格、链接和代码块。
-3. 不翻译代码块、路径、命令、Protobuf 字段、API method、JSON key、Go/TS package 名。
+3. 不翻译代码块、路径、命令、API method、JSON key、event type、Go/TS package 名。
 4. 第三方项目名保留英文，例如 Multica、Ruflo、Codex、OpenHands。
-5. 遇到不易懂的英文缩写，改成中文白话，例如“唯一协议源头”。
+5. 遇到不易懂的英文缩写，改成中文白话，例如“API 契约”和“事件契约”。
 6. 不新增“我们的决策过程”之类聊天式内容，只保留结论、规则、结构和接口。
 7. 如果发现旧链接、断链、术语冲突或不确定内容，保留 TODO 并说明原因。
 ```
