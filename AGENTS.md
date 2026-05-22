@@ -27,7 +27,8 @@ Agent 开始写代码前先读：
 1. 本文件
 2. 与任务相关的三份主文档章节
 3. `api/README.md`、`api/openapi.yaml`、`api/events.md`
-4. 最多 1-3 篇相关 `docs/reference/**`，不要把 archive 全部扫一遍
+4. 客户端任务额外读 `docs/client-roadmap.md`
+5. 最多 1-3 篇相关 `docs/reference/**`，不要把 archive 全部扫一遍
 
 `docs/archive/` 是历史方案和旧细分文档，只在追溯背景时读取。`reference/**` 是第三方仓库镜像，默认不改、不翻译。
 
@@ -116,9 +117,21 @@ fix/short-topic
 - 本地提交 hook 放在 `scripts/git-hooks/`。首次克隆后运行 `.\scripts\setup.ps1` 启用。
 - hook 是本地辅助，GitHub Actions 是最低限度的共享检查。
 
+### Worktree 并行开发
+
+- 项目级 worktree 固定放在 `.worktrees/`，该目录已写入 `.gitignore`，不得提交。
+- 每个 worktree 对应一个短分支，例如 `.worktrees/client-edge-foundation` -> `feat/client-edge-foundation`。
+- 创建前从干净 `master` 同步：`git switch master && git pull --ff-only`。
+- 创建命令示例：`git worktree add .worktrees/client-edge-foundation -b feat/client-edge-foundation`。
+- 每个 worktree 必须有明确写入范围，避免多个 Agent 同时改同一批文件。
+- DeepSeek 或其他 Agent 可以在各自 worktree 内再调度子 Agent，但子 Agent 只能在当前 worktree 和指定文件范围内工作。
+- 每个 worktree 完成一个可验收阶段后 push 分支并开 PR；合并后运行 `git worktree remove .worktrees/<name>` 清理。
+- 不在 worktree 里保存密钥、真实服务器配置、私有日志或本机状态。
+
 ## 5. 文档规则
 
 - 主文档只保留三份：产品需求、系统架构、功能实现。
+- `docs/client-roadmap.md` 是客户端 M1 并行开发路线图；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进三份主文档，不要随手新增根级文档。
 - 详细调研放 `docs/reference/`。
