@@ -15,6 +15,7 @@ import (
 type config struct {
 	Addr          string
 	StoreFile     string
+	RunnerProfile string
 	RunnerCommand string
 	RunnerArgs    repeatedString
 	RunnerEnv     repeatedString
@@ -22,6 +23,8 @@ type config struct {
 }
 
 type repeatedString []string
+
+const runnerProfileAgentHubMock = "agenthub-runner-mock"
 
 func (v *repeatedString) String() string {
 	return fmt.Sprint([]string(*v))
@@ -72,11 +75,15 @@ func buildConfig(args []string) (config, error) {
 	cfg := config{}
 	fs.StringVar(&cfg.Addr, "addr", "127.0.0.1:3210", "listen address")
 	fs.StringVar(&cfg.StoreFile, "store-file", "", "JSON store snapshot file path")
-	fs.StringVar(&cfg.RunnerCommand, "runner-command", "", "local process command to execute for each run; empty uses the mock executor")
+	fs.StringVar(&cfg.RunnerProfile, "runner-profile", "", "runner profile preset; supported: "+runnerProfileAgentHubMock)
+	fs.StringVar(&cfg.RunnerCommand, "runner-command", "", "local process executable to run for each run; empty uses the built-in mock executor only when --runner-profile is empty")
 	fs.StringVar(&cfg.RunnerWorkDir, "runner-workdir", "", "working directory for --runner-command; empty inherits the edge process working directory")
 	fs.Var(&cfg.RunnerArgs, "runner-arg", "argument passed to --runner-command; may be repeated")
 	fs.Var(&cfg.RunnerEnv, "runner-env", "environment variable passed to --runner-command as KEY=VALUE; may be repeated")
 	if err := fs.Parse(args); err != nil {
+		return config{}, err
+	}
+	if err := applyRunnerProfile(&cfg); err != nil {
 		return config{}, err
 	}
 	cfg.RunnerCommand = strings.TrimSpace(cfg.RunnerCommand)
@@ -96,6 +103,23 @@ func buildConfig(args []string) (config, error) {
 		return config{}, fmt.Errorf("unexpected positional arguments: %v", fs.Args())
 	}
 	return cfg, nil
+}
+
+func applyRunnerProfile(cfg *config) error {
+	cfg.RunnerProfile = strings.TrimSpace(cfg.RunnerProfile)
+	if cfg.RunnerProfile == "" {
+		return nil
+	}
+	switch cfg.RunnerProfile {
+	case runnerProfileAgentHubMock:
+		if strings.TrimSpace(cfg.RunnerCommand) == "" {
+			cfg.RunnerCommand = "agenthub-runner"
+		}
+		cfg.RunnerArgs = append(repeatedString{"--mock"}, cfg.RunnerArgs...)
+	default:
+		return fmt.Errorf("unknown --runner-profile %q; supported values: agenthub-runner-mock", cfg.RunnerProfile)
+	}
+	return nil
 }
 
 func newStoreFromConfig(cfg config) (store.Repository, error) {

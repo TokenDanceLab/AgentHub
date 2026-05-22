@@ -19,6 +19,22 @@ go build ./cmd/agenthub-runner
 go run ./cmd/agenthub-runner --mock
 ```
 
+### 通过 Edge Runner profile 启动
+
+开发 Edge 本地进程接入时，可以用仓库自带 mock Runner preset：
+
+```powershell
+agenthub-edge --runner-profile agenthub-runner-mock
+```
+
+需要指定本地构建产物或包装脚本时，可以覆盖 command；preset 的 `--mock` 参数仍会保留，后续 `--runner-arg` 会继续追加：
+
+```powershell
+agenthub-edge --runner-profile agenthub-runner-mock --runner-command agenthub-runner --runner-arg --addr=127.0.0.1:0
+```
+
+`--runner-command` 只能填写单个可执行文件名或可执行文件路径，不能填写 `go run ./cmd/agenthub-runner` 这类整串 shell 命令。需要走 `go run` 时，后续应先补 command + args 分离能力，或临时使用脚本 / 包装可执行文件。
+
 ### 可用参数
 
 | 参数 | 默认值 | 说明 |
