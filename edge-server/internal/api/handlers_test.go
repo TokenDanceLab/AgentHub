@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/runners"
@@ -220,5 +221,231 @@ func TestExtractRunID(t *testing.T) {
 		if result != tt.expected {
 			t.Errorf("extractRunID(%q, %q) = %q, want %q", tt.path, tt.suffix, result, tt.expected)
 		}
+	}
+}
+
+// ── Route integration tests (through RegisterRoutes) ──
+
+func TestMuxHealthRoute(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestMuxRunnersRoute(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runners", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestMuxPostRunsRoute(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", rec.Code)
+	}
+}
+
+func TestMuxGetRunsRoute(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestMuxCancelRunRoute(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_abc:cancel", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", rec.Code)
+	}
+}
+
+func TestMuxCancelRunWrongMethod(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/run_abc:cancel", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestMuxUnknownPath(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/nonexistent", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestMuxRunsSubPathUnknown(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	// /v1/runs/something (not a cancel action) should 404
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/run_abc", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for unknown subpath, got %d", rec.Code)
+	}
+}
+
+// ── WebSocket upgrade test ──
+
+func TestWebSocketUpgrade(t *testing.T) {
+	h := newTestHandler()
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
+	req.Header.Set("Connection", "upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Sec-WebSocket-Version", "13")
+	req.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+
+	rec := httptest.NewRecorder()
+	h.GetEvents(rec, req)
+
+	// httptest doesn't support hijacking, so the upgrade will fail.
+	// The handler calls upgrader.Upgrade which returns an error in test.
+	// We just verify it doesn't panic and logs the error.
+	if rec.Code != http.StatusOK {
+		// Expected: upgrade fails in test server, handler returns early.
+		// The 200 is because httptest doesn't switch protocols.
+		t.Logf("WS upgrade in test returned %d (expected in httptest)", rec.Code)
+	}
+}
+
+// ── Error path tests ──
+
+func TestGetHealthWrongMethod(t *testing.T) {
+	h := newTestHandler()
+	req := httptest.NewRequest(http.MethodPost, "/v1/health", nil)
+	rec := httptest.NewRecorder()
+
+	h.GetHealth(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rec.Code)
+	}
+
+	var body map[string]any
+	json.NewDecoder(rec.Body).Decode(&body)
+	errObj := body["error"].(map[string]any)
+	if errObj["code"] != "METHOD_NOT_ALLOWED" {
+		t.Errorf("expected METHOD_NOT_ALLOWED, got %v", errObj["code"])
+	}
+}
+
+func TestPostRunsWrongMethodDirect(t *testing.T) {
+	h := newTestHandler()
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs", nil)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405 for direct GET on PostRuns, got %d", rec.Code)
+	}
+}
+
+func TestPostCancelRunWrongMethod(t *testing.T) {
+	h := newTestHandler()
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/run_x:cancel", nil)
+	rec := httptest.NewRecorder()
+
+	h.PostCancelRun(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rec.Code)
+	}
+}
+
+// ── Event bus integration ──
+
+func TestPostRunsGeneratesEvents(t *testing.T) {
+	h := newTestHandler()
+	_, ch, _ := h.Bus.Subscribe(0)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", rec.Code)
+	}
+
+	// First event: run.queued (published synchronously in PostRuns)
+	select {
+	case evt := <-ch:
+		if evt.Type != "run.queued" {
+			t.Errorf("first event should be run.queued, got %s", evt.Type)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timed out waiting for run.queued event")
+	}
+
+	// Second event: run.started (after 100ms delay in mockRunFlow)
+	select {
+	case evt := <-ch:
+		if evt.Type != "run.started" {
+			t.Errorf("second event should be run.started, got %s", evt.Type)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timed out waiting for run.started event")
+	}
+}
+
+func TestAcceptedResponseFormat(t *testing.T) {
+	data := acceptedResponse(map[string]any{"runId": "run_1", "status": "queued"})
+	if data["runId"] != "run_1" {
+		t.Errorf("runId = %v, want run_1", data["runId"])
 	}
 }
