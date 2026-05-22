@@ -45,10 +45,14 @@ func NewFile(path string) (*FileStore, error) {
 		return nil, err
 	}
 
-	return &FileStore{
+	f := &FileStore{
 		path:  path,
 		store: s,
-	}, nil
+	}
+	if err := f.persist(); err != nil {
+		return nil, fmt.Errorf("verify store snapshot write: %w", err)
+	}
+	return f, nil
 }
 
 func (f *FileStore) LastPersistError() error {

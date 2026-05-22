@@ -1,7 +1,6 @@
 package store
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,7 +10,7 @@ import (
 var _ Repository = (*FileStore)(nil)
 var _ RunLifecycleStore = (*FileStore)(nil)
 
-func TestFileStoreStartsEmptyWhenFileDoesNotExist(t *testing.T) {
+func TestFileStoreStartsEmptyAndCreatesSnapshotWhenFileDoesNotExist(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "store.json")
 
 	s, err := NewFile(path)
@@ -21,8 +20,8 @@ func TestFileStoreStartsEmptyWhenFileDoesNotExist(t *testing.T) {
 	if got := s.ListProjects(); len(got) != 0 {
 		t.Fatalf("ListProjects = %#v, want empty", got)
 	}
-	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("snapshot file exists before first write or stat failed: %v", err)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("snapshot file was not created during startup verification: %v", err)
 	}
 }
 
@@ -98,6 +97,24 @@ func TestFileStoreRejectsBadJSON(t *testing.T) {
 	_, err := NewFile(path)
 	if err == nil {
 		t.Fatal("NewFile returned nil error for bad JSON")
+	}
+}
+
+func TestFileStoreRejectsUnwritableSnapshotPathOnStartup(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "blocker")
+	if err := os.WriteFile(blocker, []byte("not a directory"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	path := filepath.Join(blocker, "edge-store.json")
+
+	_, err := NewFile(path)
+	if err == nil {
+		t.Fatal("NewFile returned nil error for blocked snapshot directory")
+	}
+	if !strings.Contains(err.Error(), "verify store snapshot write") ||
+		!strings.Contains(err.Error(), "create store snapshot directory") {
+		t.Fatalf("NewFile error = %v, want startup write verification directory error", err)
 	}
 }
 
@@ -258,6 +275,9 @@ func TestFileStoreLastPersistErrorTracksSaveFailure(t *testing.T) {
 	s, err := NewFile(path)
 	if err != nil {
 		t.Fatalf("NewFile returned error: %v", err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("Remove returned error: %v", err)
 	}
 	if err := os.Mkdir(path, 0o755); err != nil {
 		t.Fatalf("Mkdir returned error: %v", err)
