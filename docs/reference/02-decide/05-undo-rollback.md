@@ -1,4 +1,4 @@
-# Cross-Analysis: Undo / Rollback / Recovery Mechanisms
+# 交叉分析：Undo / 回滚 / 恢复机制
 
 > 分析日期: 2026-05-20
 > 前置阅读: opcode.md, design-eventstore-memory.md, deep-dive-kanna-orchestrator-mapping.md, librechat.md, deep-dive-librechat-message-tree.md
@@ -173,21 +173,21 @@ Undo(turn_id=T3, target_turn_id=T1):
 
 ```
 Fork(from_thread=T1, from_turn=T3, mode=fork_mode):
-  
+
   模式选择（对齐 LibreChat ForkOptions）：
-  
+
   DIRECT_PATH:
     仅复制根 Turn → T1 → T2 → T3 的直接父链
     新 Thread 只有线性历史，不含兄弟分支
-  
+
   INCLUDE_BRANCHES (推荐默认):
     复制从根到 T3 的所有消息，含所有兄弟分支
     新 Thread 保留完整消息树上下文
-  
+
   TARGET_LEVEL (简化实现):
     复制 T3 所在层级及以上所有 Turn
     不包含更深子孙（如果存在 sub-thread）
-  
+
   Fork 实现：
   1. 创建新 Thread (新 ThreadID)，RootMessageID=turn_b_msg
   2. 创建新 Thread 的 events 流（独立 JSONL）

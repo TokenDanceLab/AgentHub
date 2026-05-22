@@ -1,70 +1,70 @@
-# Cross-Analysis: Unified Agent Adapter Interface
+# 交叉分析：统一 Agent 适配器接口
 
-> Generated: 2026-05-21
-> Sources: claude-code-sdk.md, codex-cli.md, kanna.md, opencode.md
-> AgentHub context: architecture.md, data-model.md, authority.md
+> 生成日期：2026-05-21
+> 数据来源：claude-code-sdk.md, codex-cli.md, kanna.md, opencode.md
+> AgentHub 上下文：architecture.md, data-model.md, authority.md
 
-## 1. Four-Way Comparison Table
+## 1. 四维度对比表
 
-### 1.1 Startup & Process Model
+### 1.1 启动与进程模型
 
-| Dimension | Claude Code SDK | Codex CLI | OpenCode | Kanna (wrapper) |
+| 维度 | Claude Code SDK | Codex CLI | OpenCode | Kanna (wrapper) |
 |---|---|---|---|---|
-| **Binary** | `claude` (Node.js/bun) | `codex` (Rust) | `opencode` (Bun) | Bun HTTP server wrapping CC/Codex |
-| **Non-interactive** | `-p "prompt" --output-format stream-json --verbose` | `codex exec "prompt"` (text-only output) | HTTP REST: `POST /session` + SSE stream | Internal call: agent.send() |
-| **Stream protocol** | NDJSON (public, ~13 msg types) | Internal ResponseEvent/TurnItem (not publicly consumable) | SSE: LLMEvent 16-type tagged union | Unified TranscriptEntry (server-side normalization) |
-| **Embedded mode** | QueryEngine as library (TS import) | Rollout trace replay (read-only history) | OpenCode Client SDK (HTTP + SSE) | N/A (wrapper itself) |
-| **Configuration** | `.mcp.json` + `settings.json` (JSON) | `config.toml` + CLI `-c key=value` | `opencode.toml` | Per-chat provider/model/effort settings |
-| **Language** | TypeScript | Rust | TypeScript (Effect runtime) | TypeScript |
+| **二进制** | `claude` (Node.js/bun) | `codex` (Rust) | `opencode` (Bun) | Bun HTTP server 包装 CC/Codex |
+| **非交互模式** | `-p "prompt" --output-format stream-json --verbose` | `codex exec "prompt"` (纯文本输出) | HTTP REST: `POST /session` + SSE stream | 内部调用: agent.send() |
+| **流协议** | NDJSON（公开，约 13 种消息类型） | 内部 ResponseEvent/TurnItem（不可公开消费） | SSE: LLMEvent 16 种 tagged union | 统一 TranscriptEntry（服务端归一化） |
+| **嵌入模式** | QueryEngine 作为库（TS import） | Rollout trace 回放（只读历史） | OpenCode Client SDK（HTTP + SSE） | 不适用（自身即 wrapper） |
+| **配置** | `.mcp.json` + `settings.json` (JSON) | `config.toml` + CLI `-c key=value` | `opencode.toml` | 按 chat 设置 provider/model/effort |
+| **语言** | TypeScript | Rust | TypeScript（Effect runtime） | TypeScript |
 
-### 1.2 Stream Output Format
+### 1.2 流输出格式
 
-| Dimension | Claude Code | Codex | OpenCode | Kanna |
+| 维度 | Claude Code | Codex | OpenCode | Kanna |
 |---|---|---|---|---|
-| **Transport** | stdout NDJSON (one JSON object per line) | TUI-internal event pipeline (no public stream) | HTTP SSE (Server-Sent Events) | WebSocket JSON snapshots (16ms debounced) |
-| **Top-level message types** | `system_init`, `assistant`, `user` (tool_result), `stream_event`, `result`, `tool_use_summary` | `OutputItemAdded`, `OutputTextDelta`, `Completed`, `ReasoningTextDelta` | `StepStart`, `TextStart/Delta/End`, `ToolInputStart/Delta/End`, `ToolCall`, `StepFinish`, `Finish` | `TranscriptEntry` union: `system_init`, `assistant_text`, `tool_call`, `tool_result`, `result`, `status` |
-| **Tool call encoding** | `assistant` message with `content: [{type:"tool_use",...}]` block | `ResponseItem::FunctionCall` → dispatched to tool handler | `ToolCall` event with codec-based validation | `tool_call` TranscriptEntry with normalized fields |
-| **Thinking/Reasoning** | `thinking` content block inside `assistant` message | `ReasoningTextDelta` stream event | `ReasoningStart/Delta/End` stream events | Stored in transcript, stripped from streamlined output |
-| **Completion signal** | `result` message (`subtype: "success"`, `is_error: bool`, exit code `0|1`) | `Completed { response_id, token_usage, end_turn }` | `Finish` event with stop reason | `result` entry in transcript |
-| **External consumability** | Yes (public protocol) | No (internal only) | Yes (SSE + SDK) | Yes (WebSocket protocol) |
+| **传输** | stdout NDJSON（每行一个 JSON 对象） | TUI 内部事件管道（无公开流） | HTTP SSE（Server-Sent Events） | WebSocket JSON 快照（16ms 去抖） |
+| **顶层消息类型** | `system_init`, `assistant`, `user` (tool_result), `stream_event`, `result`, `tool_use_summary` | `OutputItemAdded`, `OutputTextDelta`, `Completed`, `ReasoningTextDelta` | `StepStart`, `TextStart/Delta/End`, `ToolInputStart/Delta/End`, `ToolCall`, `StepFinish`, `Finish` | `TranscriptEntry` union: `system_init`, `assistant_text`, `tool_call`, `tool_result`, `result`, `status` |
+| **工具调用编码** | `assistant` 消息带 `content: [{type:"tool_use",...}]` 块 | `ResponseItem::FunctionCall` → 分派到 tool handler | `ToolCall` 事件带 codec 校验 | `tool_call` TranscriptEntry 带规范化字段 |
+| **思考/推理** | `thinking` content block 在 `assistant` 消息内 | `ReasoningTextDelta` 流事件 | `ReasoningStart/Delta/End` 流事件 | 存储在 transcript 中，精简输出时剥离 |
+| **完成信号** | `result` 消息（`subtype: "success"`, `is_error: bool`, exit code `0\|1`） | `Completed { response_id, token_usage, end_turn }` | `Finish` 事件带 stop reason | transcript 中的 `result` 条目 |
+| **外部可消费性** | 是（公开协议） | 否（仅内部使用） | 是（SSE + SDK） | 是（WebSocket 协议） |
 
-### 1.3 Permission & Approval Model
+### 1.3 权限与审批模型
 
-| Dimension | Claude Code | Codex | OpenCode | Kanna |
+| 维度 | Claude Code | Codex | OpenCode | Kanna |
 |---|---|---|---|---|
-| **Mode system** | 6 modes: `default`, `acceptEdits`, `bypassPermissions`, `plan`, `auto`, `dontAsk` | Sandbox modes: `Disabled`, `Managed` (file_system + network) | Agent-level rulesets: allow/deny per-tool with GLOB patterns | Delegates to underlying agent + adds tool-specific gating |
-| **Rule granularity** | Per-tool + optional content match: `"Bash(git *)"` | Per-path FileSystemAccessMode: `ReadOnly`/`ReadWrite` | Per-agent tool allow/deny lists with `*` wildcard | Tool-level: only gates `AskUserQuestion` and `ExitPlanMode` |
-| **Rule sources** | 9 sources with priority: user, project, local, enterprise, managed, cliArg, command, session, hooks | config.toml static config | Agent Info + user TOML override | Static config, no multi-source priority |
-| **Hook integration** | `PreToolUse`, `PostToolUse`, `PermissionRequest`, `PermissionDenied` (28 hooks total) | `run_permission_request_hooks()` in ToolOrchestrator | `permission.ask` plugin hook | N/A (delegates) |
-| **Sandbox** | Bash-only sandbox (CLI flag) | OS-level: macOS Seatbelt, Linux Landlock, Windows Restricted Token + WFP | None | Delegates to underlying |
-| **Guardian/Reviewer** | None | Guardian system for high-risk shell commands + `ApprovalsReviewer` role | None (uses ruleset + hook) | N/A |
-| **Escalation** | Denial tracking with threshold fallback | Sandbox escalation on failure: permissive → strict retry | None | N/A |
+| **模式系统** | 6 种模式：`default`, `acceptEdits`, `bypassPermissions`, `plan`, `auto`, `dontAsk` | Sandbox 模式：`Disabled`, `Managed`（file_system + network） | Agent 级 ruleset：按工具 allow/deny 带 GLOB 模式 | 委托给底层 agent + 添加工具级门控 |
+| **规则粒度** | 按工具 + 可选内容匹配：`"Bash(git *)"` | 按路径 FileSystemAccessMode：`ReadOnly`/`ReadWrite` | 按 agent 工具 allow/deny 列表，支持 `*` 通配符 | 工具级：仅门控 `AskUserQuestion` 和 `ExitPlanMode` |
+| **规则来源** | 9 个来源带优先级：user, project, local, enterprise, managed, cliArg, command, session, hooks | config.toml 静态配置 | Agent Info + 用户 TOML 覆盖 | 静态配置，无多来源优先级 |
+| **Hook 集成** | `PreToolUse`, `PostToolUse`, `PermissionRequest`, `PermissionDenied`（共 28 hooks） | `run_permission_request_hooks()` 在 ToolOrchestrator 中 | `permission.ask` plugin hook | 不适用（委托） |
+| **沙箱** | Bash-only sandbox（CLI flag） | OS 级：macOS Seatbelt, Linux Landlock, Windows Restricted Token + WFP | 无 | 委托给底层 |
+| **守护/审查者** | 无 | Guardian 系统用于高风险 shell 命令 + `ApprovalsReviewer` 角色 | 无（使用 ruleset + hook） | 不适用 |
+| **升级** | Denial tracking 带阈值回退 | Sandbox 升级失败时：宽松 → 严格重试 | 无 | 不适用 |
 
-### 1.4 Session / Conversation Management
+### 1.4 Session / 会话管理
 
-| Dimension | Claude Code | Codex | OpenCode | Kanna |
+| 维度 | Claude Code | Codex | OpenCode | Kanna |
 |---|---|---|---|---|
-| **Session identifier** | `session_id` (UUID string) | `SessionId` (shared) + `ThreadId` (per agent) UUID pair | `SessionID` branded string `"ses_..."` + parent_id tree | `chatId` (UUID) + sessionToken (from SDK) |
-| **Session reuse** | `resumeSession(sessionId)` | `codex resume --last` (picker) + rollout recovery | SQLite-backed, explicit fork/abort/summarize API | Auto: reuse sessionToken, detect model/planMode changes |
-| **Fork** | `forkSession()` SDK function: creates branched session from existing | `Fork` with `FullHistory` or `LastNTurns(n)` modes | Fork with `parent_id` reference in SQLite | Copy transcript JSONL + set `pendingForkSessionToken` + native `forkSession` flag |
-| **Persistence** | JSONL `~/.claude/sessions/<id>.jsonl` | Rollout files in `$CODEX_HOME/state/` + thread-store DB | SQLite (`SessionTable` + `PartTable` via Drizzle ORM) | JSONL `transcripts/<chatId>.jsonl` + snapshot.json compaction |
-| **Multi-agent tree** | Subagent via AgentTool (forkSubagent), flat hierarchy | Agent tree: `AgentPath` (/root/child/grandchild), `AgentRegistry` for tracking | Parent-child session tree via `parent_id` | N/A (wraps single-agent sessions) |
-| **Context compaction** | `compact_boundary` system message | `ContextCompaction` TurnItem | `experimental.session.compacting` + `experimental.compaction.autocontinue` hooks | Inherits from underlying agent |
-| **Message queue** | N/A (single-turn API call) | SQ/EQ pattern (Submission Queue / Event Queue) | N/A | `queuedMessagesByChatId` Map + Steer mode (mid-turn message injection) |
+| **会话标识符** | `session_id`（UUID 字符串） | `SessionId`（共享）+ `ThreadId`（per agent）UUID 对 | `SessionID` branded string `"ses_..."` + parent_id 树 | `chatId`（UUID）+ sessionToken（来自 SDK） |
+| **会话复用** | `resumeSession(sessionId)` | `codex resume --last`（选择器）+ rollout 恢复 | SQLite 支持，显式 fork/abort/summarize API | 自动：复用 sessionToken，检测 model/planMode 变更 |
+| **Fork** | `forkSession()` SDK 函数：从已有 session 创建分支 | `Fork` 带 `FullHistory` 或 `LastNTurns(n)` 模式 | Fork 带 `parent_id` 引用在 SQLite 中 | 复制 transcript JSONL + 设置 `pendingForkSessionToken` + 原生 `forkSession` flag |
+| **持久化** | JSONL `~/.claude/sessions/<id>.jsonl` | Rollout 文件在 `$CODEX_HOME/state/` + thread-store DB | SQLite（`SessionTable` + `PartTable` 通过 Drizzle ORM） | JSONL `transcripts/<chatId>.jsonl` + snapshot.json 压缩 |
+| **多 Agent 树** | Subagent 通过 AgentTool（forkSubagent），扁平层级 | Agent tree：`AgentPath`（/root/child/grandchild），`AgentRegistry` 追踪 | 父子 session 树通过 `parent_id` | 不适用（包装单 agent 会话） |
+| **上下文压缩** | `compact_boundary` system message | `ContextCompaction` TurnItem | `experimental.session.compacting` + `experimental.compaction.autocontinue` hooks | 继承自底层 agent |
+| **消息队列** | 不适用（单次 API 调用） | SQ/EQ 模式（Submission Queue / Event Queue） | 不适用 | `queuedMessagesByChatId` Map + Steer 模式（mid-turn 消息注入） |
 
 ---
 
-## 2. AgentHub Unified Adapter Interface (Go)
+## 2. AgentHub 统一适配器接口（Go）
 
-### 2.1 Design Principles
+### 2.1 设计原则
 
-1. **Provider-agnostic**: The interface must abstract over subprocess (CC/Codex) and HTTP (OpenCode) transport equally.
-2. **Common core + extensions**: Every adapter implements the base interface; agent-specific features are behind capability flags and optional extension interfaces.
-3. **Event-driven stream**: All adapters produce a unified `AgentEvent` stream, regardless of internal event encoding.
-4. **Turn-level lifecycle**: The adapter owns the full lifecycle of a single turn (start -> stream -> result/failure -> drain).
-5. **Permission bridge**: AgentHub's approval system intercepts tool calls before they execute, whether by hook (CC), sandbox rule (Codex), or callback (Kanna/OpenCode).
+1. **Provider 无关**：接口必须统一抽象子进程（CC/Codex）和 HTTP（OpenCode）两种传输方式。
+2. **公共核心 + 扩展**：每个适配器实现基础接口；agent 特有功能通过 capability flag 和可选扩展接口暴露。
+3. **事件驱动流**：所有适配器产生统一的 `AgentEvent` 流，无论内部事件编码方式如何。
+4. **Turn 级生命周期**：适配器拥有单个 Turn 的完整生命周期（start → stream → result/failure → drain）。
+5. **权限桥接**：AgentHub 的审批系统在工具执行前拦截工具调用，无论是通过 hook（CC）、sandbox rule（Codex）还是 callback（Kanna/OpenCode）。
 
-### 2.2 Core Interface
+### 2.2 核心接口
 
 ```go
 package adapters
@@ -603,29 +603,29 @@ type AdapterConfig struct {
 }
 ```
 
-### 2.3 Interface Coverage Map
+### 2.3 接口覆盖矩阵
 
-| Adapter Feature | Used by CC | Used by Codex | Used by OpenCode | Used by Kanna | In Core Interface |
+| 适配器功能 | CC 使用 | Codex 使用 | OpenCode 使用 | Kanna 使用 | 核心接口中 |
 |---|---|---|---|---|---|
-| `Start()` | query()/prompt() | codex exec / TUI | POST /session | agent.send() | Yes |
-| `Resume()` | resumeSession() | codex resume | session resume | sessionToken reuse | Yes |
-| `AttachStream()` | NDJSON consumer | RolloutItem replay | SSE consumer | TranscriptEntry push | Yes |
-| `ForkSession()` | forkSession() | fork + agent tree | Fork via SQLite | Copy JSONL + fork flag | Extension: `SessionManager` |
-| `ListSessions()` | listSessions() | list from state DB | Query SQLite | chatsById Map | Extension: `SessionManager` |
-| `Cancel()` | AbortController | Shutdown Op | Abort session | agent.cancel() | Extension: `InteractiveControl` |
-| `SendSteer()` | prependUserMessage() | Op::Interrupt + re-prompt | N/A | message.steer | Extension: `InteractiveControl` |
-| Permission callback | canUseTool() hook + PreToolUse hooks | run_permission_request_hooks | permission.ask hook | Tool gating callback | Extension: `PermissionBroker` |
-| MCP integration | MCP tools merged | MCP name-spaced tools | MCP → AI SDK Tool convert | Built into session | Via `StartRequest.MCPConfig` |
-| Thinking config | thinkingConfig | reasoning effort | Per-agent temperature/topP | Per-chat controls | `StartRequest.Thinking` |
-| Compaction | auto + manual compact_boundary | ContextCompaction TurnItem | session.compacting hook | Inherited | Capability flag only |
+| `Start()` | query()/prompt() | codex exec / TUI | POST /session | agent.send() | 是 |
+| `Resume()` | resumeSession() | codex resume | session resume | sessionToken reuse | 是 |
+| `AttachStream()` | NDJSON consumer | RolloutItem replay | SSE consumer | TranscriptEntry push | 是 |
+| `ForkSession()` | forkSession() | fork + agent tree | Fork via SQLite | Copy JSONL + fork flag | 扩展: `SessionManager` |
+| `ListSessions()` | listSessions() | list from state DB | Query SQLite | chatsById Map | 扩展: `SessionManager` |
+| `Cancel()` | AbortController | Shutdown Op | Abort session | agent.cancel() | 扩展: `InteractiveControl` |
+| `SendSteer()` | prependUserMessage() | Op::Interrupt + re-prompt | 不适用 | message.steer | 扩展: `InteractiveControl` |
+| Permission callback | canUseTool() hook + PreToolUse hooks | run_permission_request_hooks | permission.ask hook | Tool gating callback | 扩展: `PermissionBroker` |
+| MCP 集成 | MCP tools merged | MCP name-spaced tools | MCP → AI SDK Tool convert | Built into session | 通过 `StartRequest.MCPConfig` |
+| Thinking 配置 | thinkingConfig | reasoning effort | Per-agent temperature/topP | Per-chat controls | `StartRequest.Thinking` |
+| Compaction | auto + manual compact_boundary | ContextCompaction TurnItem | session.compacting hook | Inherited | 仅 capability flag |
 
 ---
 
-## 3. Per-Agent Special Handling & Workarounds
+## 3. 各 Agent 特殊处理与变通方案
 
 ### 3.1 Claude Code Adapter
 
-**Subprocess mode (recommended for AgentHub P0):**
+**子进程模式（AgentHub P0 推荐）：**
 
 ```go
 // Spawn claude as child process
@@ -643,31 +643,31 @@ cmd.Stdout = stdoutPipe  // NDJSON stream
 cmd.Stderr = &stderrBuf  // Non-JSON fallback + [stdout-guard] lines
 ```
 
-**Workaround 1 -- stdout guard interference**: In `stream-json` mode, CC installs a `streamJsonStdoutGuard` that redirects ALL non-JSON stdout to stderr with a `[stdout-guard]` prefix. The adapter MUST parse only stdout as NDJSON and collect stderr separately for logging.
+**变通方案 1 —— stdout guard 干扰**：在 `stream-json` 模式下，CC 安装了一个 `streamJsonStdoutGuard`，将所有非 JSON 的 stdout 重定向到 stderr 并加 `[stdout-guard]` 前缀。适配器必须仅解析 stdout 的 NDJSON，并将 stderr 单独收集用于日志。
 
-**Workaround 2 -- exit code interpretation**: Exit code is NOT sufficient to determine success. Must check `result.is_error` in the last NDJSON line. Exit code 0 may still carry errors in `result.errors[]`.
+**变通方案 2 —— exit code 解读**：exit code 不足以判断成功。必须检查最后一行 NDJSON 中的 `result.is_error`。exit code 0 仍可能在 `result.errors[]` 中包含错误。
 
-**Workaround 3 -- verbose flag is mandatory for full events**: Without `--verbose`, only the `result` message is emitted. The adapter should assert or default to `--verbose` when serving AgentHub.
+**变通方案 3 —— verbose flag 是获取完整事件的必要条件**：不加 `--verbose` 时只输出 `result` 消息。适配器应在为 AgentHub 服务时断言或默认使用 `--verbose`。
 
-**Workaround 4 -- MCP startup latency**: MCP server connections are asynchronous. The `system_init` event's tool list may be incomplete on the first turn. Subsequent turns will have the full list after `refreshTools` completes.
+**变通方案 4 —— MCP 启动延迟**：MCP server 连接是异步的。`system_init` 事件的工具列表在第一个 Turn 可能不完整。后续 Turn 在 `refreshTools` 完成后会有完整列表。
 
-**Workaround 5 -- permission mode bypass for headless**: In subprocess mode, permission checks still fire even though there is no TTY. Use `--permission-mode bypassPermissions` to suppress. Alternatively, implement the stdin control protocol's `can_use_tool` request/response loop for fine-grained approval.
+**变通方案 5 —— headless 模式下的 permission mode bypass**：在子进程模式下，即使没有 TTY，权限检查仍会触发。使用 `--permission-mode bypassPermissions` 来抑制。或者实现 stdin 控制协议的 `can_use_tool` request/response 循环来实现细粒度审批。
 
-**Workaround 6 -- thinking content visibility**: Thinking blocks only appear in stream events when `thinkingConfig.type` is `"enabled"` (not `"adaptive"`). Set `Thinking.Type = "enabled"` to expose reasoning in AgentHub.
+**变通方案 6 —— thinking content 可见性**：Thinking blocks 仅在 `thinkingConfig.type` 为 `"enabled"`（而非 `"adaptive"`）时出现在流事件中。设置 `Thinking.Type = "enabled"` 以在 AgentHub 中暴露推理内容。
 
-**Workaround 7 -- streaming tool execution may reorder events**: When `streamingToolExecution` GrowthBook gate is active, tools may execute during API streaming, producing interleaved `tool_use` and `assistant` delta events. The event consumer must handle out-of-order tool call/result pairs.
+**变通方案 7 —— streaming tool execution 可能重排事件**：当 `streamingToolExecution` GrowthBook gate 激活时，工具可能在 API streaming 期间执行，产生交错的 `tool_use` 和 `assistant` delta 事件。事件消费者必须能处理乱序的 tool call/result 对。
 
-**Workaround 8 -- shallow fork for plan mode transitions**: When switching from `plan` to `default` permission mode mid-turn, CC forks internally. The adapter should detect `system/status` events with permission mode changes and note the fork boundary.
+**变通方案 8 —— plan mode 切换时的 shallow fork**：当 mid-turn 从 `plan` 切换到 `default` permission mode 时，CC 内部进行 fork。适配器应检测 permission mode 变更的 `system/status` 事件并记录 fork 边界。
 
 ### 3.2 Codex Adapter
 
-**Primary approach: Exec mode + Rollout Trace replay**
+**主要方式：Exec 模式 + Rollout Trace 回放**
 
-Since Codex has no public stream protocol, the adapter uses a two-phase approach:
-1. Execute via `codex exec <prompt>` -- get final output
-2. Read the rollout trace from `$CODEX_HOME/state/` for the complete event sequence
+由于 Codex 没有公开的流协议，适配器采用两阶段方式：
+1. 通过 `codex exec <prompt>` 执行 —— 获取最终输出
+2. 从 `$CODEX_HOME/state/` 读取 rollout trace 获取完整事件序列
 
-**Workaround 1 -- no streaming output from exec**: `codex exec` returns only the final text. To provide a streaming-like experience, the adapter must read `RolloutItem` entries from the rollout file and replay them as `AgentEvent` sequence. This is post-facto replay, not true real-time streaming.
+**变通方案 1 —— exec 没有流式输出**：`codex exec` 只返回最终文本。要提供类似流式的体验，适配器必须从 rollout 文件读取 `RolloutItem` 条目并将其作为 `AgentEvent` 序列回放。这是事后回放，不是真正的实时流。
 
 ```go
 // Phase 1: Execute (blocks until complete)
@@ -683,16 +683,16 @@ for _, item := range events {
 emit(ResultPayload{Content: string(output), ...})
 ```
 
-**Workaround 2 -- SessionId + ThreadId duality**: Codex uses a shared `SessionId` across the agent tree, with per-agent `ThreadId`. The adapter must map this tree to AgentHub's flat session model:
-- Map `SessionId` to AgentHub `sessionID`
-- Map each `ThreadId` to a separate AgentHub `Turn`
-- Maintain parent-child relationships in AgentHub's Thread model
+**变通方案 2 —— SessionId + ThreadId 双重性**：Codex 在 agent 树中使用共享的 `SessionId`，每个 agent 有独立的 `ThreadId`。适配器必须将此树映射到 AgentHub 的扁平 session 模型：
+- 将 `SessionId` 映射到 AgentHub 的 `sessionID`
+- 将每个 `ThreadId` 映射到独立的 AgentHub `Turn`
+- 在 AgentHub 的 Thread 模型中维护父子关系
 
-**Workaround 3 -- Agent tree events are not a single stream**: Multi-agent operations (spawn/wait/close) produce events across multiple thread streams. The adapter must either:
-- Flatten all agent events into a single merged stream (losing tree topology), or
-- Expose each agent's thread as a separate sub-stream (requires AgentHub to understand agent hierarchy)
+**变通方案 3 —— Agent tree 事件不是单一流**：多 agent 操作（spawn/wait/close）在多个 thread 流中产生事件。适配器必须：
+- 将所有 agent 事件展平为单一合并流（丢失树拓扑），或
+- 将每个 agent 的 thread 作为独立的子流暴露（需要 AgentHub 理解 agent 层级）
 
-**Workaround 4 -- config.toml generation**: Codex requires `$CODEX_HOME/config.toml` to exist before running. The adapter must auto-generate this file from `StartRequest.MCPConfig` and `StartRequest.Model`:
+**变通方案 4 —— config.toml 生成**：Codex 要求 `$CODEX_HOME/config.toml` 在运行前存在。适配器必须从 `StartRequest.MCPConfig` 和 `StartRequest.Model` 自动生成此文件：
 
 ```toml
 [model_providers.openai]
@@ -703,19 +703,19 @@ command = "npx"
 args = ["-y", "@modelcontextprotocol/server-github"]
 ```
 
-**Workaround 5 -- OAuth MCP requires browser interaction**: Codex's MCP OAuth flow may open a browser for authentication. In headless AgentHub environments, this will fail. Disable OAuth MCP servers or use pre-authenticated connections.
+**变通方案 5 —— OAuth MCP 需要浏览器交互**：Codex 的 MCP OAuth 流程可能打开浏览器进行认证。在 headless AgentHub 环境中这将失败。禁用 OAuth MCP server 或使用预认证连接。
 
-**Workaround 6 -- apply command for diffs**: Codex generates file changes but does not apply them automatically in exec mode. Use `codex apply` (alias `codex a`) as a post-exec step to materialize diffs.
+**变通方案 6 —— apply 命令处理 diff**：Codex 生成文件变更但不会在 exec 模式下自动应用。使用 `codex apply`（别名 `codex a`）作为 exec 后步骤来落实 diff。
 
-**Workaround 7 -- Fork mode semantics differ from CC**: `ForkMode.FullHistory` includes the complete parent transcript as initial context (massive token usage). `ForkMode.LastNTurns(n)` is recommended for AgentHub unless preserving full history is explicitly needed.
+**变通方案 7 —— Fork 模式语义与 CC 不同**：`ForkMode.FullHistory` 将完整父 transcript 作为初始上下文（大量 token 消耗）。推荐 AgentHub 使用 `ForkMode.LastNTurns(n)`，除非明确需要保留完整历史。
 
-**Workaround 8 -- sandbox interaction with tools**: When SandboxConfig.Enabled is true, MCP tools and shell commands run within OS sandbox constraints. Tool results may fail with sandbox errors rather than tool-specific errors. The adapter should intercept and classify sandbox-denial vs. tool-failure.
+**变通方案 8 —— sandbox 与工具的交互**：当 `SandboxConfig.Enabled` 为 true 时，MCP 工具和 shell 命令在 OS sandbox 约束内运行。工具结果可能以 sandbox 错误而非工具特定错误返回。适配器应拦截并区分 sandbox-denial 和 tool-failure。
 
 ### 3.3 OpenCode Adapter
 
-**Primary approach: HTTP client against Hono server**
+**主要方式：基于 Hono server 的 HTTP client**
 
-OpenCode runs a local HTTP server (default port 4096). The adapter communicates via REST + SSE.
+OpenCode 运行本地 HTTP server（默认端口 4096）。适配器通过 REST + SSE 通信。
 
 ```go
 // Start OpenCode session
@@ -728,13 +728,13 @@ req.Header.Set("Accept", "text/event-stream")
 resp, err := client.Do(req)
 ```
 
-**Workaround 1 -- server lifecycle management**: The adapter must either:
-- Start `opencode` as a background process before making HTTP calls
-- Connect to an already-running instance
+**变通方案 1 —— server 生命周期管理**：适配器必须：
+- 在发起 HTTP 调用前以后台进程方式启动 `opencode`
+- 或连接到已在运行的实例
 
-Recommended: spawn `opencode` as a child process, wait for health check (poll `GET /health`), then send requests. Stop on session close unless shared.
+推荐：以子进程方式启动 `opencode`，等待 health check（轮询 `GET /health`），然后发送请求。除非共享，否则在 session 关闭时停止。
 
-**Workaround 2 -- Effect runtime error handling**: OpenCode uses Effect for all I/O. Errors are wrapped in Effect's `Cause` type rather than standard Go errors. The adapter should catch HTTP error responses and map `_tag` fields from OpenCode's 10-variant `LLMErrorReason` discriminated union:
+**变通方案 2 —— Effect runtime 错误处理**：OpenCode 对所有 I/O 使用 Effect。错误被包装在 Effect 的 `Cause` 类型中，而非标准 Go error。适配器应捕获 HTTP 错误响应，并从 OpenCode 的 10 变体 `LLMErrorReason` discriminated union 中映射 `_tag` 字段：
 
 ```go
 func mapOpenCodeError(body []byte) error {
@@ -755,108 +755,108 @@ func mapOpenCodeError(body []byte) error {
 }
 ```
 
-**Workaround 3 -- 16 LLMEvent types vs AgentHub's 11**: OpenCode's LLMEvent model (16 types) is more granular than AgentHub's 11 AgentEvent types. The mapping should:
-- Collapse `StepStart/StepFinish/Finish` into lifecycle events
-- Map `TextStart/TextDelta/TextEnd` to `assistant_text` with appropriate Phase
-- Collapse `ReasoningStart/Delta/End` into `reasoning`
-- Map `ToolInputStart/Delta/End/ToolCall/ToolResult/ToolError` into `tool_call` + `tool_result`
+**变通方案 3 —— 16 种 LLMEvent 类型 vs AgentHub 的 11 种**：OpenCode 的 LLMEvent 模型（16 种类型）比 AgentHub 的 11 种 AgentEvent 类型更细粒度。映射应：
+- 将 `StepStart/StepFinish/Finish` 折叠为生命周期事件
+- 将 `TextStart/TextDelta/TextEnd` 映射到带适当 Phase 的 `assistant_text`
+- 将 `ReasoningStart/Delta/End` 折叠为 `reasoning`
+- 将 `ToolInputStart/Delta/End/ToolCall/ToolResult/ToolError` 映射到 `tool_call` + `tool_result`
 
-**Workaround 4 -- Agent Info hardcoding vs. dynamic generation**: OpenCode has 8 hardcoded agents (build, plan, general, explore, scout, compaction, title, summary). The adapter should enumerate these as available sub-agents and expose them in `SubAgentDef[]` within `system_init`. When OpenCode's `Agent.generate()` is used (dynamic generation), the adapter must track the generated agent's lifecycle.
+**变通方案 4 —— Agent Info 硬编码 vs 动态生成**：OpenCode 有 8 个硬编码 agent（build, plan, general, explore, scout, compaction, title, summary）。适配器应枚举这些作为可用 sub-agent，并在 `system_init` 中以 `SubAgentDef[]` 暴露。当 OpenCode 的 `Agent.generate()` 用于动态生成时，适配器必须追踪生成 agent 的生命周期。
 
-**Workaround 5 -- permission model is agent-level, not per-tool-rule**: OpenCode's permissions are defined per-agent (ruleset: allow/deny patterns), not as a global rule engine like CC. The adapter must translate AgentHub's `PermissionMode` + `AllowedTools/DeniedTools` into a custom agent with the appropriate ruleset, or call via the `permission.ask` plugin hook.
+**变通方案 5 —— permission model 是 agent 级而非 per-tool-rule**：OpenCode 的权限按 agent 定义（ruleset: allow/deny patterns），而非像 CC 那样的全局规则引擎。适配器必须将 AgentHub 的 `PermissionMode` + `AllowedTools/DeniedTools` 翻译为带适当 ruleset 的自定义 agent，或通过 `permission.ask` plugin hook 调用。
 
-**Workaround 6 -- SQLite session persistence**: OpenCode stores sessions in SQLite via Drizzle ORM. The adapter can read from this database directly for session listing and message retrieval, but must not write to it (OpenCode owns the schema).
+**变通方案 6 —— SQLite session 持久化**：OpenCode 通过 Drizzle ORM 将 session 存储在 SQLite 中。适配器可直接从此数据库读取 session 列表和消息检索，但不得写入（OpenCode 拥有 schema）。
 
-**Workaround 7 -- OpenAPI SDK generation potential**: OpenCode ships an OpenAPI spec that generates 70+ typed methods. AgentHub could generate a Go client from the same spec for type-safe integration. However, this requires the OpenCode server to be running and accessible.
+**变通方案 7 —— OpenAPI SDK 生成潜力**：OpenCode 内含一个 OpenAPI spec，可生成 70+ 个类型化方法。AgentHub 可从同一 spec 生成 Go client 以实现类型安全集成。但这要求 OpenCode server 正在运行且可访问。
 
-**Workaround 8 -- tool runtime concurrency**: OpenCode's `ToolRuntime` executes tools concurrently (default concurrency=10). Tool results may arrive out of order. The adapter should match results to calls via `ToolCallID`.
+**变通方案 8 —— tool runtime 并发**：OpenCode 的 `ToolRuntime` 并发执行工具（默认 concurrency=10）。工具结果可能无序到达。适配器应通过 `ToolCallID` 匹配结果和调用。
 
-### 3.4 Kanna (Cross-Provider Wrapper Pattern)
+### 3.4 Kanna（跨 Provider Wrapper 模式）
 
-**Note**: Kanna is not a separate Agent CLI but a wrapper that manages both Claude Code and Codex sessions through a unified AgentCoordinator. It is included in this analysis because its architecture directly informs AgentHub's adapter design.
+**注意**：Kanna 不是独立的 Agent CLI，而是一个通过统一 AgentCoordinator 管理 Claude Code 和 Codex session 的 wrapper。它被纳入本分析是因为其架构直接启发 AgentHub 的适配器设计。
 
-**Key patterns AgentHub should adopt from Kanna:**
+**AgentHub 应从 Kanna 采纳的关键模式：**
 
-1. **TranscriptEntry normalization**: Kanna converts both CC's NDJSON messages AND Codex's TurnItems into a single `TranscriptEntry` union type. AgentHub's `AgentEvent` type serves the same purpose.
+1. **TranscriptEntry 归一化**：Kanna 将 CC 的 NDJSON 消息和 Codex 的 TurnItem 统一转换为单一 `TranscriptEntry` union 类型。AgentHub 的 `AgentEvent` 类型服务于相同目的。
 
-2. **writeChain serialization**: Kanna's JSONL append uses `writeChain: Promise.resolve().then(...)` to serialize all writes. AgentHub's Go implementation can use a channel-based write queue or `sync.Mutex` for the same effect.
+2. **writeChain 序列化**：Kanna 的 JSONL 追加使用 `writeChain: Promise.resolve().then(...)` 序列化所有写入。AgentHub 的 Go 实现可使用 channel-based write queue 或 `sync.Mutex` 达到相同效果。
 
-3. **16ms debounce broadcast**: For WebSocket-based UI delivery, batch events within a 16ms window to avoid flooding clients with per-event push. This is a UI-layer concern, not an adapter concern.
+3. **16ms 去抖广播**：对于基于 WebSocket 的 UI 交付，在 16ms 窗口内批处理事件，避免对每个事件都推送导致客户端过载。这是 UI 层面关注点，不是适配器层面关注点。
 
-4. **Snapshot compaction threshold (2MB)**: When JSONL log files exceed 2MB total, compact to a single `snapshot.json`. AgentHub should adopt a similar threshold or make it configurable.
+4. **Snapshot 压缩阈值（2MB）**：当 JSONL 日志文件总计超过 2MB 时，压缩为单个 `snapshot.json`。AgentHub 应采用类似阈值或使其可配置。
 
-5. **Tool gating pattern**: Kanna gates only `AskUserQuestion` and `ExitPlanMode` (pauses stream, waits for user response). All other tools are auto-allowed. AgentHub's `PermissionBroker` interface generalizes this to any tool.
+5. **工具门控模式**：Kanna 仅门控 `AskUserQuestion` 和 `ExitPlanMode`（暂停流，等待用户响应）。其他所有工具自动允许。AgentHub 的 `PermissionBroker` 接口将此泛化到任意工具。
 
-6. **Steer mode**: Kanna's steer mechanism cancels the current turn and restarts with a steered prefix. AgentHub's `InteractiveControl.SendSteer()` generalizes this with an explicit `ReplaceLast` flag.
+6. **Steer 模式**：Kanna 的 steer 机制取消当前 turn 并以 steered 前缀重启。AgentHub 的 `InteractiveControl.SendSteer()` 通过显式 `ReplaceLast` flag 泛化此功能。
 
-7. **Draining indicator**: After the result event, the underlying agent may still run background tasks (compaction, tool cleanup). Kanna tracks this with `drainingStreams` Map and UI indicator. AgentHub should expose `InteractiveControl.Drain()` for the same purpose.
+7. **Draining 指示器**：在 result 事件之后，底层 agent 可能仍在运行后台任务（compaction、工具清理）。Kanna 通过 `drainingStreams` Map 和 UI 指示器追踪此状态。AgentHub 应为相同目的暴露 `InteractiveControl.Drain()`。
 
 ---
 
-## 4. Event Mapping Reference
+## 4. 事件映射参考
 
-### 4.1 Native-to-Unified Event Mapping
+### 4.1 原生到统一事件映射
 
 | AgentHub AgentEvent | Claude Code NDJSON | Codex TurnItem | OpenCode LLMEvent | Kanna TranscriptEntry |
 |---|---|---|---|---|
-| `system_init` | `system_init` | (assembled from session start context) | (assembled from agent Info + tools) | `system_init` |
+| `system_init` | `system_init` | （从 session start context 组装） | （从 agent Info + tools 组装） | `system_init` |
 | `assistant_text` | `assistant` (content_block: text) | `AgentMessage` (phase=Stream/End) | `TextStart/Delta/End` | `assistant_text` |
-| `reasoning` | `assistant` (content_block: thinking) | `Reasoning` | `ReasoningStart/Delta/End` | (stored but stripped) |
+| `reasoning` | `assistant` (content_block: thinking) | `Reasoning` | `ReasoningStart/Delta/End` | （存储但剥离） |
 | `tool_call` | `assistant` (content_block: tool_use) | `McpToolCall` (InProgress) | `ToolInputStart/Delta/End` + `ToolCall` | `tool_call` |
 | `tool_result` | `user` (type: tool_result) | `McpToolCall` (Completed/Failed) | `ToolResult` / `ToolError` | `tool_result` |
-| `tool_progress` | `progress` | (N/A -- implicit) | (N/A -- implicit) | (N/A) |
-| `result` | `result` | `Completed` (final only) | `Finish` | `result` |
-| `system` (compact) | `system` (subtype: compact_boundary) | `ContextCompaction` | (via hook) | `compact_summary` |
-| `system` (retry) | `system` (subtype: api_retry) | (N/A -- internal retry) | (N/A -- RouteExecutor retry) | (N/A) |
-| `stream_event` | `stream_event` (partial) | `OutputTextDelta` | `TextDelta` | (normalized away) |
-| `status_change` | `system` (subtype: status) | (N/A) | (N/A) | `status` |
-| `approval_request` | (via control protocol) | (via Guardian) | (via permission.ask hook) | `ask_user_question` / `exit_plan_mode` |
-| `tool_use_summary` | `tool_use_summary` | (N/A) | (N/A) | (rendered inline) |
-| `user_replay` | `user` (isReplay: true) | `UserMessage` | (N/A) | (N/A) |
+| `tool_progress` | `progress` | （不适用——隐式） | （不适用——隐式） | （不适用） |
+| `result` | `result` | `Completed`（仅最终） | `Finish` | `result` |
+| `system` (compact) | `system` (subtype: compact_boundary) | `ContextCompaction` | （via hook） | `compact_summary` |
+| `system` (retry) | `system` (subtype: api_retry) | （不适用——内部重试） | （不适用——RouteExecutor retry） | （不适用） |
+| `stream_event` | `stream_event` (partial) | `OutputTextDelta` | `TextDelta` | （归一化掉） |
+| `status_change` | `system` (subtype: status) | （不适用） | （不适用） | `status` |
+| `approval_request` | （via control protocol） | （via Guardian） | （via permission.ask hook） | `ask_user_question` / `exit_plan_mode` |
+| `tool_use_summary` | `tool_use_summary` | （不适用） | （不适用） | （内联渲染） |
+| `user_replay` | `user` (isReplay: true) | `UserMessage` | （不适用） | （不适用） |
 
-### 4.2 Tool Name Normalization
+### 4.2 工具名称规范化
 
-All four systems support MCP tools with the `mcp__<server>__<tool>` naming convention. AgentHub should adopt this as the canonical format.
+四个系统都支持 MCP 工具，采用 `mcp__<server>__<tool>` 命名约定。AgentHub 应将此采纳为规范格式。
 
-| Source | Format | Example |
+| 来源 | 格式 | 示例 |
 |---|---|---|
-| CC built-in | `ToolName` | `Bash`, `Read`, `Write`, `Glob`, `Grep`, `WebFetch`, `WebSearch` |
+| CC 内置 | `ToolName` | `Bash`, `Read`, `Write`, `Glob`, `Grep`, `WebFetch`, `WebSearch` |
 | CC MCP | `mcp__<server>__<tool>` | `mcp__github__search_repos` |
-| Codex built-in | `shell_command`, `exec_command`, `apply_patch`, etc. | `shell_command` |
+| Codex 内置 | `shell_command`, `exec_command`, `apply_patch`, 等 | `shell_command` |
 | Codex MCP | `mcp__<server>__<tool>` | `mcp__github__search_repos` |
-| OpenCode built-in | ASCII tool names | `grep`, `glob`, `read`, `bash`, `write`, `edit` |
-| OpenCode MCP | MCP-tool name (no prefix, deduped by server) | `search_repos` (from github server) |
+| OpenCode 内置 | ASCII 工具名 | `grep`, `glob`, `read`, `bash`, `write`, `edit` |
+| OpenCode MCP | MCP-tool 名（无前缀，按 server 去重） | `search_repos`（来自 github server） |
 
-**Action**: AgentHub should normalize all MCP tools to `mcp__<server>__<tool>` format (CC/Codex convention) for consistency.
-
----
-
-## 5. Next Steps for AgentHub
-
-### Immediate (P0)
-
-1. **Implement ClaudeCodeAdapter first** -- The NDJSON protocol is the most mature, publicly defined, and well-documented. It is the lowest-risk adapter to build against.
-
-2. **Build EventStream infrastructure** -- The `AgentEvent` channel + `EventStream` wrapper is shared across all adapters. Implement the consumer side (channel reader, error propagation, cancellation) once.
-
-3. **Define transport abstraction** -- `Start()` in the core interface abstracts over subprocess execution (CC/Codex) and HTTP connection (OpenCode). The transport layer should be a separate concern behind the adapter.
-
-### Short-term (P1)
-
-4. **Implement CodexAdapter with rollout replay** -- Accept that true streaming from Codex requires rollout trace parsing. Build the `parseRolloutItems()` pipeline.
-
-5. **Build PermissionBroker integration** -- Wire CC's stdin control protocol `can_use_tool` to AgentHub's approval engine. This is the critical path for safe tool execution.
-
-6. **Implement OpenCodeAdapter** -- Requires OpenCode server lifecycle management. Lower priority than CC because OpenCode's architecture (Effect runtime, SQLite persistence) is more complex to integrate with Go.
-
-### Future (P2)
-
-7. **Multi-agent tree support** -- Codex's agent tree and OpenCode's parent-child session tree need AgentHub Thread model extensions.
-
-8. **OpenAPI-first SDK generation** -- Generate Go client from OpenCode's OpenAPI spec for type-safe HTTP integration.
-
-9. **Tool Registry unification** -- Build a shared tool registry that translates between CC/Codex/OpenCode tool names so AgentHub users see consistent tool names regardless of backend.
+**行动**：AgentHub 应将所有 MCP 工具规范化为 `mcp__<server>__<tool>` 格式（CC/Codex 约定）以保持一致性。
 
 ---
 
-*Analysis complete. 2026-05-21.*
+## 5. AgentHub 后续步骤
+
+### 立即（P0）
+
+1. **首先实现 ClaudeCodeAdapter** —— NDJSON 协议是最成熟、公开定义且文档完善的。这是风险最低的适配器构建目标。
+
+2. **构建 EventStream 基础设施** —— `AgentEvent` channel + `EventStream` wrapper 跨所有适配器共享。一次性实现消费端（channel reader、错误传播、取消）。
+
+3. **定义 transport 抽象** —— 核心接口中的 `Start()` 抽象了子进程执行（CC/Codex）和 HTTP 连接（OpenCode）。transport 层应是适配器背后的独立关注点。
+
+### 短期（P1）
+
+4. **实现 CodexAdapter 带 rollout 回放** —— 接受 Codex 的真实流需要 rollout trace 解析这一事实。构建 `parseRolloutItems()` 管道。
+
+5. **构建 PermissionBroker 集成** —— 将 CC 的 stdin 控制协议 `can_use_tool` 接入 AgentHub 的审批引擎。这是安全工具执行的关键路径。
+
+6. **实现 OpenCodeAdapter** —— 需要 OpenCode server 生命周期管理。优先级低于 CC，因为 OpenCode 的架构（Effect runtime、SQLite 持久化）与 Go 集成更复杂。
+
+### 远期（P2）
+
+7. **多 Agent 树支持** —— Codex 的 agent tree 和 OpenCode 的父子 session tree 需要 AgentHub Thread 模型扩展。
+
+8. **OpenAPI-first SDK 生成** —— 从 OpenCode 的 OpenAPI spec 生成 Go client 实现类型安全的 HTTP 集成。
+
+9. **Tool Registry 统一** —— 构建共享工具注册表，在 CC/Codex/OpenCode 工具名之间进行翻译，使 AgentHub 用户无论后端是什么都能看到一致的工具名。
+
+---
+
+*分析完成。2026-05-21。*

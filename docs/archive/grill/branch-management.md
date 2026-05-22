@@ -1,28 +1,34 @@
-# Grill: branch management
-Date: 2026-05-21
+# Grill: 分支管理
 
-## Intent
-Keep AgentHub branch and PR management simple enough for a three-person team while still preventing protocol, docs and implementation work from trampling each other.
+日期：2026-05-21
 
-## Constraints
-- Team size is three people.
-- Do not introduce heavy GitFlow.
-- Rules must be visible in project-level `AGENTS.md`.
-- GitHub should track the branch/process work in one aggregated issue.
+## 意图
 
-## Key decisions
-- Decision: use a lightweight trunk-based workflow. Reason: `master` stays easy to understand and demo from, while short branches keep work reviewable. Alternative considered: GitFlow with develop/release/hotfix branches, rejected as too much process for three people.
-- Decision: branch names are lowercase kebab-case with a small prefix set. Reason: predictable names help humans and agents route work without extra ceremony. Alternative considered: per-person long-lived branches, rejected because they hide integration problems.
-- Decision: code and protocol work should go through PR; tiny docs/process cleanups may be direct only for maintainers/admins when low risk. Reason: implementation needs review, but docs-only cleanup should not require artificial overhead.
-- Decision: enable the lightest useful GitHub protection on `master`: PR path required, zero required approving reviews, no CI requirement, admins can bypass, force-push and branch deletion disabled. Reason: this prevents accidental destructive pushes without making a three-person team wait on process.
+为三人团队保持足够简单的 AgentHub 分支和 PR 管理流程，同时防止协议、文档和实现工作互相踩踏。
 
-## Surfaced assumptions
-- GitHub currently has architecture issues and labels, but no branch workflow issue.
-- The team values clarity over strict enterprise controls.
-- Branch protection can be added later when real code and CI exist.
+## 约束
 
-## Out of scope
-- Full release branch policy.
-- Required CI checks.
-- Required reviewer count.
-- Required multi-reviewer approval.
+- 团队规模为三人。
+- 不引入重型 GitFlow。
+- 规则必须在项目级 `AGENTS.md` 中可见。
+- GitHub 应在一个聚合 issue 中追踪分支/流程工作。
+
+## 关键决策
+
+- 决策：采用轻量级主干开发（trunk-based）工作流。原因：`master` 始终保持可理解和可演示，短分支让每次工作可审查。替代方案：带 develop/release/hotfix 分支的 GitFlow，被拒绝因为对三人团队来说流程过重。
+- 决策：分支名采用小写 kebab-case 加少量前缀。原因：可预测的命名帮助人和 Agent 路由工作，无需额外仪式。替代方案：按人的长生命周期分支，被拒绝因为它们隐藏集成问题。
+- 决策：代码和协议工作应通过 PR；微小文档/流程清理在低风险时可由维护者/admin 直接提交。原因：实现需要审查，但纯文档清理不应产生人为开销。
+- 决策：在 `master` 上启用最轻量的 GitHub 保护：要求 PR 路径、零个强制审批、无 CI 要求、admin 可绕过、禁用 force-push 和分支删除。原因：防止意外破坏性推送，同时不让三人团队被流程阻塞。
+
+## 浮现假设
+
+- GitHub 目前有架构 issue 和 label，但没有分支工作流 issue。
+- 团队看重清晰度胜过严格的企业控制。
+- 分支保护可以在有真实代码和 CI 时再补。
+
+## 出界
+
+- 完整发布分支策略。
+- 强制 CI 检查。
+- 强制审查人数。
+- 强制多审查人审批。
