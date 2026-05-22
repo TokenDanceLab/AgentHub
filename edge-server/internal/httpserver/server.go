@@ -13,11 +13,13 @@ import (
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
+	"github.com/agenthub/edge-server/internal/store"
 )
 
 // Config holds server configuration.
 type Config struct {
-	Addr string
+	Addr  string
+	Store store.Repository
 }
 
 // Run starts the HTTP server and blocks until a shutdown signal is received.
@@ -32,6 +34,7 @@ func Run(cfg Config) error {
 	handler := &api.Handler{
 		Bus:      bus,
 		Registry: registry,
+		Store:    cfg.Store,
 	}
 
 	mux := http.NewServeMux()
