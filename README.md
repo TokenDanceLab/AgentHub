@@ -111,6 +111,17 @@ Windows PowerShell：
 .\scripts\setup.ps1 -Reference core
 ```
 
+### Desktop 应用
+
+```powershell
+cd app/desktop
+pnpm install
+pnpm build            # 仅构建前端，无需 Rust 工具链
+pnpm tauri dev        # 启动 Tauri 开发窗口（需要 Rust 和 Tauri CLI）
+```
+
+> `pnpm build` 在任何环境下都能通过。`pnpm tauri dev` 需要安装 [Rust](https://rustup.rs) 和 Tauri 系统依赖。
+
 > P0 阶段目标是 Desktop UI -> Local Edge -> Local Runner。具体启动命令随前端、后端、客户端代码落地后补充。
 
 <br>
