@@ -14,6 +14,26 @@ Runtime: Go.
 - 权限检查、审计记录和远程命令路由。
 - 可选的云端 Artifact 缓存和 Memory 索引。
 
+## 技术栈
+
+| 组件 | 选型 | 说明 |
+|------|------|------|
+| 语言 | Go 1.24 | |
+| HTTP 框架 | chi | 轻量路由，stdlib 增强路由补充 |
+| 数据库 | **PostgreSQL 16** | 中心权威数据源，JSONB + 全文搜索 + 事务 DDL |
+| 缓存/状态 | Redis | Token 黑名单、在线状态、未读数 |
+| 消息队列 | RabbitMQ | Agent 任务异步投递 |
+| WebSocket | coder/websocket | 纯 Go、并发写、内置 Ping/Pong |
+| ORM | Gorm | 迁移 + 查询 |
+
+### 为什么用 PostgreSQL
+
+- **消息内容存 JSONB**：消息 content、Agent capabilities、任务 input/result 均为 JSON，PostgreSQL JSONB 支持 GIN 索引和路径查询，MySQL JSON 本质是文本存储
+- **消息全文搜索**：PG 内置 tsvector + GIN 索引，中文可挂 pg_jieba 扩展
+- **事务 DDL**：新项目 migration 多，PG 改 schema 失败自动回滚，MySQL 隐式提交会导致半截变更
+
+> EdgeServer 使用 SQLite（modernc.org/sqlite + FTS5），Hub ↔ Edge 数据一致性通过 cursor-based 增量同步保证，详见 `docs/reference/03-build/backend/02-go-services.md`
+
 ## 不负责什么
 
 - 不直接运行 Claude Code、Codex 或 OpenCode。

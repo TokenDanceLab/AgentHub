@@ -75,7 +75,12 @@ docs/review/
 .agenthub/runtime/
 .agenthub/secrets/
 .claude/
-.codex/
+.codex/*
+!.codex/
+!.codex/skills/
+.codex/skills/*
+!.codex/skills/set-goal/
+!.codex/skills/set-goal/**
 .cursor/
 .continue/
 

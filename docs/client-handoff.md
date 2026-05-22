@@ -210,6 +210,7 @@ pnpm test
 pnpm build
 
 # 全链路冒烟
+cd ..\..
 .\scripts\client-smoke.ps1
 
 # 如果你明确要复用已经启动的 Edge
