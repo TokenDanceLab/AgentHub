@@ -9,7 +9,58 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-func newExecutorTestRun(t *testing.T, s *store.Store) store.Run {
+type lifecycleOnlyStore struct {
+	runs      map[string]store.Run
+	statusSet []string
+}
+
+func newLifecycleOnlyStore(run store.Run) *lifecycleOnlyStore {
+	return &lifecycleOnlyStore{
+		runs: map[string]store.Run{run.ID: run},
+	}
+}
+
+func (s *lifecycleOnlyStore) GetRun(id string) (store.Run, bool) {
+	run, ok := s.runs[id]
+	return run, ok
+}
+
+func (s *lifecycleOnlyStore) SetRunStatus(id, status string) (store.Run, bool) {
+	run, ok := s.runs[id]
+	if !ok {
+		return store.Run{}, false
+	}
+	run.Status = status
+	switch status {
+	case "started":
+		run.StartedAt = time.Now().UTC().Format(time.RFC3339)
+	case "finished", "failed", "cancelled":
+		run.FinishedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+	s.runs[id] = run
+	s.statusSet = append(s.statusSet, status)
+	return run, true
+}
+
+func (s *lifecycleOnlyStore) SetRunStatusIf(id, status string, allowedCurrent ...string) (store.Run, bool) {
+	run, ok := s.runs[id]
+	if !ok {
+		return store.Run{}, false
+	}
+	allowed := len(allowedCurrent) == 0
+	for _, current := range allowedCurrent {
+		if run.Status == current {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		return run, false
+	}
+	return s.SetRunStatus(id, status)
+}
+
+func newExecutorTestRun(t *testing.T, s store.Repository) store.Run {
 	t.Helper()
 	project := s.CreateProject("proj_test", "Test Project")
 	thread, err := s.CreateThread("thread_test", project.ID, "Test Thread")
@@ -21,6 +72,38 @@ func newExecutorTestRun(t *testing.T, s *store.Store) store.Run {
 		t.Fatalf("CreateRun returned error: %v", err)
 	}
 	return run
+}
+
+func TestMockExecutorAcceptsRunLifecycleStore(t *testing.T) {
+	run := store.Run{
+		ID:        "run_test",
+		ProjectID: "proj_test",
+		ThreadID:  "thread_test",
+		Status:    "queued",
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	lifecycleStore := newLifecycleOnlyStore(run)
+	bus := events.NewBus(100)
+	_, ch, _ := bus.Subscribe(0)
+	executor := NewMockExecutor(bus, lifecycleStore, WithStepDelay(0), WithOutputBatches(nil))
+
+	if err := executor.Start(run); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+	for _, wantType := range []string{"run.started", "run.finished"} {
+		evt := nextEvent(t, ch)
+		if evt.Type != wantType {
+			t.Fatalf("event type = %q, want %q", evt.Type, wantType)
+		}
+	}
+
+	stored, ok := lifecycleStore.GetRun(run.ID)
+	if !ok {
+		t.Fatalf("run %q was not stored", run.ID)
+	}
+	if stored.Status != "finished" {
+		t.Fatalf("stored status = %q, want finished", stored.Status)
+	}
 }
 
 func TestMockExecutorPublishesLifecycleEvents(t *testing.T) {

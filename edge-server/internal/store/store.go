@@ -50,6 +50,38 @@ type Item struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+type Reader interface {
+	GetProject(id string) (Project, bool)
+	ListProjects() []Project
+	GetThread(id string) (Thread, bool)
+	ListThreads(projectID string) []Thread
+	GetRun(id string) (Run, bool)
+	ListRuns(threadID string) []Run
+	GetItem(id string) (Item, bool)
+	ListThreadItems(threadID string) []Item
+}
+
+type Writer interface {
+	CreateProject(id, name string) Project
+	CreateThread(id, projectID, title string) (Thread, error)
+	CreateRun(id, projectID, threadID string) (Run, error)
+	SetRunStatus(id, status string) (Run, bool)
+	SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool)
+	CreateItem(item Item) (Item, error)
+	CreateThreadMessage(itemID, threadID, role, content string) (Item, error)
+}
+
+type Repository interface {
+	Reader
+	Writer
+}
+
+type RunLifecycleStore interface {
+	GetRun(id string) (Run, bool)
+	SetRunStatus(id, status string) (Run, bool)
+	SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool)
+}
+
 type Store struct {
 	mu sync.RWMutex
 

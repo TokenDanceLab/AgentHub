@@ -23,7 +23,7 @@ import (
 type Handler struct {
 	Bus      *events.Bus
 	Registry *runners.Registry
-	Store    *store.Store
+	Store    store.Repository
 	Executor lifecycle.RunExecutor
 }
 
@@ -55,7 +55,7 @@ func errorResponse(code, message string) map[string]any {
 	}
 }
 
-func ensureStore(h *Handler) *store.Store {
+func ensureStore(h *Handler) store.Repository {
 	if h.Store == nil {
 		h.Store = store.New()
 	}
@@ -202,11 +202,12 @@ func (h *Handler) GetThread(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetThreadItems(w http.ResponseWriter, r *http.Request, threadID string) {
-	if _, ok := ensureStore(h).GetThread(threadID); !ok {
+	repository := ensureStore(h)
+	if _, ok := repository.GetThread(threadID); !ok {
 		writeJSON(w, http.StatusNotFound, errorResponse("NOT_FOUND", "thread not found"))
 		return
 	}
-	writeJSON(w, http.StatusOK, listResponse(h.Store.ListThreadItems(threadID)))
+	writeJSON(w, http.StatusOK, listResponse(repository.ListThreadItems(threadID)))
 }
 
 func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, threadID string) {
@@ -295,7 +296,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 
 	// Emit run.queued
 	h.Bus.Publish("run.queued", scope, run)
-	_, _ = h.Store.CreateItem(store.Item{
+	_, _ = ensureStore(h).CreateItem(store.Item{
 		ID:        genID("item_"),
 		ProjectID: run.ProjectID,
 		ThreadID:  run.ThreadID,
@@ -342,8 +343,8 @@ func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if h.Store != nil {
-		if run, ok := h.Store.GetRun(runID); ok {
+	if repository := ensureStore(h); repository != nil {
+		if run, ok := repository.GetRun(runID); ok {
 			writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
 				"runId":  runID,
 				"status": run.Status,

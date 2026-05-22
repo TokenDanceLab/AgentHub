@@ -23,6 +23,16 @@ func newTestHandler() *Handler {
 	}
 }
 
+type recordingRepository struct {
+	store.Repository
+	createProjectCalls int
+}
+
+func (r *recordingRepository) CreateProject(id, name string) store.Project {
+	r.createProjectCalls++
+	return r.Repository.CreateProject(id, name)
+}
+
 type fakeRunExecutor struct {
 	started []store.Run
 	cancel  lifecycle.CancelResult
@@ -167,6 +177,35 @@ func TestProjectThreadRoutes(t *testing.T) {
 	thread := items[0].(map[string]any)
 	if thread["threadId"] != "thread_test" || thread["projectId"] != "proj_test" {
 		t.Fatalf("unexpected thread response: %#v", thread)
+	}
+}
+
+func TestHandlerAcceptsInjectedRepository(t *testing.T) {
+	repository := &recordingRepository{Repository: store.New()}
+	h := &Handler{
+		Bus:      events.NewBus(1000),
+		Registry: runners.NewRegistry(),
+		Store:    repository,
+	}
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects", strings.NewReader(`{"projectId":"proj_injected","name":"Injected"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/projects status = %d, want 201", rec.Code)
+	}
+	if repository.createProjectCalls < 2 {
+		t.Fatalf("CreateProject calls = %d, want defaults plus request through injected repository", repository.createProjectCalls)
+	}
+	project, ok := repository.GetProject("proj_injected")
+	if !ok {
+		t.Fatal("injected repository did not store proj_injected")
+	}
+	if project.Name != "Injected" {
+		t.Fatalf("project name = %q, want Injected", project.Name)
 	}
 }
 
