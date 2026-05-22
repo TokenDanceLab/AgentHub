@@ -20,16 +20,15 @@ api/
 └── events.md
 ```
 
-## 2. 模块分工
+## 2. 三人分工
 
-后续按模块分支并行推进。
+后续按三条实现线并行推进，API 契约作为共享边界，不单独拆一堆文档分支。
 
-| 分支 | 主要文件 | 负责人方向 |
+| 方向 | 主要目标 | 主要目录 | 先读 |
 |---|---|---|
-| `docs/api-im-project` | `api/im-project.md`、`api/openapi.yaml` | Project、Conversation、Thread、Message、Item |
-| `docs/api-execution-runner` | `api/execution-runner.md`、`api/openapi.yaml` | Runner、Run、Approval、Artifact、Preview、Workspace |
-| `docs/api-hub-sync-relay` | `api/hub-sync-relay.md`、`api/openapi.yaml` | Auth、User、Device、Edge、Sync、Relay、Cloud |
-| `docs/api-contract-review` | `api/` 全部 | 命名、错误、事件、权限、分页一致性审查 |
+| 前端 UI 设计 | Web 工作台、IM 流、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` | `docs/reference/03-build/frontend/01-desktop-ux.md`、`docs/reference/01-learn/deep-dive/12-multica-product-ui.md` |
+| 后端开发 | Hub Server、Edge-Hub 通信、账号/群聊/同步/中继 | `hub-server/`、`edge-server/`、`api/` | `docs/reference/03-build/backend/16-hub-server-requirements.md`、`docs/reference/03-build/backend/02-go-services.md` |
+| 客户端开发 | Desktop、Runner、Edge 本地调度、Agent CLI、workspace、preview | `app/desktop/`、`runner/`、`edge-server/` | `docs/reference/03-build/backend/12-workspace-lifecycle.md`、`docs/reference/03-build/backend/04-adapter-sdk.md` |
 
 ## 3. API Foundation 已定规则
 
@@ -39,6 +38,7 @@ api/
 - `api/events.md` 汇总事件信封和事件表。
 - `api/conventions.md` 规定 ID、错误、分页、权限、阶段。
 - 不创建 `api/events.schema.json`，事件契约先用 `api/events.md` 维护，避免过早加重。
+- 每条实现线都可以补 API，但必须先更新 `api/openapi.yaml` 或 `api/events.md`，再写代码。
 
 ## 4. P0 实现顺序
 
@@ -124,8 +124,9 @@ version / id / seq / type / scope / sentAt / payload
 ## 7. 开发规范
 
 - 分支从 `master` 切出。
-- 分支名用 `docs/...`、`feat/...`、`fix/...`。
-- 文档和协议变更走 PR。
+- 三条长期实现分支建议为 `feat/frontend-ui`、`feat/backend-hub-edge`、`feat/client-runner-desktop`。
+- 小修分支用 `docs/...` 或 `fix/...`。
+- 文档、协议、服务结构变更走 PR。
 - PR 尽量小，能让一个同学一次看完。
 - commit 标题使用 `type(scope): 中文摘要`。
 
