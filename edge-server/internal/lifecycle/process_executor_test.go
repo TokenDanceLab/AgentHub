@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -146,6 +147,91 @@ func TestProcessExecutorPublishesOutputAndFinished(t *testing.T) {
 				t.Fatalf("stored run = %#v, want finished with timestamps", stored)
 			}
 			return
+		default:
+			t.Fatalf("unexpected event type %q", evt.Type)
+		}
+	}
+}
+
+func TestProcessExecutorRunsRepositoryMockRunnerWithInjectedContext(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd returned error: %v", err)
+	}
+	runnerDir := filepath.Clean(filepath.Join(cwd, "..", "..", "..", "runner"))
+	goCommand := filepath.Join(runtime.GOROOT(), "bin", "go")
+	if runtime.GOOS == "windows" {
+		goCommand += ".exe"
+	}
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: goCommand,
+		Args:    []string{"run", "./cmd/agenthub-runner", "--mock"},
+		WorkDir: runnerDir,
+	})
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	if err := executor.Start(run); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	var sawStarted bool
+	var sawStdoutBatch bool
+	var stdoutText string
+	for {
+		evt := nextEventWithin(t, ch, 20*time.Second)
+		if evt.Scope["runId"] != run.ID {
+			t.Fatalf("event scope runId = %#v, want %q", evt.Scope["runId"], run.ID)
+		}
+		switch evt.Type {
+		case "run.started":
+			sawStarted = true
+		case "run.output.batch":
+			payload, ok := evt.Payload.(map[string]any)
+			if !ok {
+				t.Fatalf("output payload = %T, want map", evt.Payload)
+			}
+			if payload["runId"] != run.ID {
+				t.Fatalf("output payload runId = %#v, want %q", payload["runId"], run.ID)
+			}
+			if payload["stream"] != "stdout" {
+				continue
+			}
+			chunks, ok := payload["chunks"].([]map[string]any)
+			if !ok || len(chunks) == 0 {
+				t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
+			}
+			sawStdoutBatch = true
+			text, _ := chunks[0]["text"].(string)
+			stdoutText += text
+		case "run.finished":
+			if !sawStarted {
+				t.Fatal("run.finished arrived before run.started")
+			}
+			if !sawStdoutBatch {
+				t.Fatal("run.finished arrived without stdout run.output.batch")
+			}
+			for _, want := range []string{
+				"run=" + run.ID,
+				"project=" + run.ProjectID,
+				"thread=" + run.ThreadID,
+			} {
+				if !strings.Contains(stdoutText, want) {
+					t.Fatalf("stdout text = %q, want %q", stdoutText, want)
+				}
+			}
+			return
+		case "run.failed":
+			t.Fatalf("repository mock runner failed: %#v", evt.Payload)
+		case "run.cancelled":
+			t.Fatalf("repository mock runner was cancelled: %#v", evt.Payload)
 		default:
 			t.Fatalf("unexpected event type %q", evt.Type)
 		}
@@ -612,5 +698,16 @@ func collectStdoutUntilFinished(t *testing.T, ch <-chan events.EventEnvelope) st
 		default:
 			t.Fatalf("unexpected event type %q", evt.Type)
 		}
+	}
+}
+
+func nextEventWithin(t *testing.T, ch <-chan events.EventEnvelope, timeout time.Duration) events.EventEnvelope {
+	t.Helper()
+	select {
+	case evt := <-ch:
+		return evt
+	case <-time.After(timeout):
+		t.Fatalf("timed out after %s waiting for event", timeout)
+		return events.EventEnvelope{}
 	}
 }
