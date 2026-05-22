@@ -29,11 +29,11 @@ Agent 开始写代码前先读：
 
 AgentHub 的开发工作流是“三个开发者，每个开发者可以带一个或多个 Agent”。Agent 是协助者，不是仓库负责人。
 
-| 方向 | 负责范围 | 主要目录 |
+| 部分 | 负责范围 | 主要目录 |
 |---|---|---|
-| 前端 UI 设计 | Web 工作台、IM 交互、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` |
-| 后端开发 | Hub Server、Edge-Hub 通信、账号/群聊/同步/中继 | `hub-server/`、`edge-server/`、`api/` |
-| 客户端开发 | Desktop、Runner、Edge 本地调度、Agent CLI 进程、workspace | `app/desktop/`、`runner/`、`edge-server/` |
+| 前端 | Web 工作台、IM 交互、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` |
+| 后端 | Hub Server、Edge-Hub 通信、账号/群聊/同步/中继 | `hub-server/`、`edge-server/`、`api/` |
+| 客户端 | Desktop、Runner、Edge 本地调度、Agent CLI 进程、workspace | `app/desktop/`、`runner/`、`edge-server/` |
 
 共享边界：
 
@@ -85,9 +85,9 @@ type(scope): 中文摘要
 分支命名用小写：
 
 ```text
-feat/frontend-ui
-feat/backend-hub-edge
-feat/client-runner-desktop
+feat/frontend
+feat/backend
+feat/client
 docs/short-topic
 fix/short-topic
 ```
@@ -101,7 +101,7 @@ fix/short-topic
 - 跨方向改动尽早开 draft PR 或普通 PR，让另外两条线知道接口变化。
 - PR 合并前先同步最新 `master`，解决冲突后再合。
 - 不在共享分支上 force-push；确实需要时先在群里说明。
-- Issue 只保留三条主线任务：前端、后端、客户端。小任务写进对应 issue 或 PR，不额外开一堆 issue。
+- Issue 只保留三部分主线任务：前端、后端、客户端。小任务写进对应 issue 或 PR，不额外开一堆 issue。
 
 ## 5. 文档规则
 

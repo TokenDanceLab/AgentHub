@@ -22,13 +22,13 @@ api/
 
 ## 2. 三人分工
 
-后续按三条实现线并行推进，API 契约作为共享边界，不单独拆一堆文档分支。
+后续按前端、后端、客户端三个部分并行推进，API 契约作为共享边界，不单独拆一堆文档分支。
 
-| 方向 | 主要目标 | 主要目录 | 先读 |
+| 部分 | 主要目标 | 主要目录 | 先读 |
 |---|---|---|
-| 前端 UI 设计 | Web 工作台、IM 流、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` | `docs/reference/03-build/frontend/01-desktop-ux.md`、`docs/reference/01-learn/deep-dive/12-multica-product-ui.md` |
-| 后端开发 | Hub Server、Edge-Hub 通信、账号/群聊/同步/中继 | `hub-server/`、`edge-server/`、`api/` | `docs/reference/03-build/backend/16-hub-server-requirements.md`、`docs/reference/03-build/backend/02-go-services.md` |
-| 客户端开发 | Desktop、Runner、Edge 本地调度、Agent CLI、workspace、preview | `app/desktop/`、`runner/`、`edge-server/` | `docs/reference/03-build/backend/12-workspace-lifecycle.md`、`docs/reference/03-build/backend/04-adapter-sdk.md` |
+| 前端 | Web 工作台、IM 流、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` | `docs/reference/03-build/frontend/01-desktop-ux.md`、`docs/reference/01-learn/deep-dive/12-multica-product-ui.md` |
+| 后端 | Hub Server、Edge-Hub 通信、账号/群聊/同步/中继 | `hub-server/`、`edge-server/`、`api/` | `docs/reference/03-build/backend/16-hub-server-requirements.md`、`docs/reference/03-build/backend/02-go-services.md` |
+| 客户端 | Desktop、Runner、Edge 本地调度、Agent CLI、workspace、preview | `app/desktop/`、`runner/`、`edge-server/` | `docs/reference/03-build/backend/12-workspace-lifecycle.md`、`docs/reference/03-build/backend/04-adapter-sdk.md` |
 
 ## 3. API Foundation 已定规则
 
@@ -124,7 +124,7 @@ version / id / seq / type / scope / sentAt / payload
 ## 7. 开发规范
 
 - 分支从 `master` 切出。
-- 三条长期实现分支建议为 `feat/frontend-ui`、`feat/backend-hub-edge`、`feat/client-runner-desktop`。
+- 三条长期实现分支建议为 `feat/frontend`、`feat/backend`、`feat/client`。
 - 小修分支用 `docs/...` 或 `fix/...`。
 - 文档、协议、服务结构变更走 PR。
 - PR 尽量小，能让一个同学一次看完。
@@ -139,9 +139,9 @@ version / id / seq / type / scope / sentAt / payload
 
 | 方向 | 测试重点 | 建议起点 |
 |---|---|---|
-| 前端 UI | API client、store、消息流状态、关键工作台交互 | 单元测试 + 后续 Playwright |
-| 后端开发 | Hub handler、Edge-Hub sync、权限、错误码、事件序号 | Go `testing` + handler/service 测试 |
-| 客户端开发 | Runner 进程、workspace 路径保护、stdout/stderr 事件转换、preview | Go `testing` + 本地 smoke test |
+| 前端 | API client、store、消息流状态、关键工作台交互 | 单元测试 + 后续 Playwright |
+| 后端 | Hub handler、Edge-Hub sync、权限、错误码、事件序号 | Go `testing` + handler/service 测试 |
+| 客户端 | Runner 进程、workspace 路径保护、stdout/stderr 事件转换、preview | Go `testing` + 本地 smoke test |
 
 必须覆盖的高风险点：
 
