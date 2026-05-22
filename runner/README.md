@@ -29,5 +29,6 @@ Runtime: Go.
 ## 依赖
 
 - `api/` 契约：Runner 相关 request/response 和 event payload。
-- `docs/module-boundaries.md`：领域模型和模块职责边界。
-- Agent CLI 原生协议、NDJSON 或局部 bridge 可以在 `internal/adapters/` 内部实现，不作为 AgentHub 公共协议。
+- `docs/system-architecture.md`：Hub-Edge-Runner 架构和职责边界。
+- `docs/implementation-guide.md`：当前实现顺序和三部分分工。
+- Agent CLI 原生协议、NDJSON 或局部 bridge 可以在 Runner 内部 package 实现，不作为 AgentHub 公共协议。

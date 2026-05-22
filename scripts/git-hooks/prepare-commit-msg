@@ -3,7 +3,7 @@
 # Works on: macOS, Linux, Windows (Git Bash / WSL)
 # Only for: interactive commits (no -m, no -F, no merge, no amend)
 # This template is for commit messages only. GitHub issue and PR text follows
-# the same "English prefix + Chinese content" rule; see docs/project-management.md.
+# the same "English prefix + Chinese content" rule; see AGENTS.md.
 
 MSG_FILE="$1"
 COMMIT_SOURCE="$2"

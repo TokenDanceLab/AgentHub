@@ -124,7 +124,7 @@ version / id / seq / type / scope / sentAt / payload
 ## 7. 开发规范
 
 - 分支从 `master` 切出。
-- 三条长期实现分支建议为 `feat/frontend`、`feat/backend`、`feat/client`。
+- 三个长期 issue 是前端、后端、客户端；代码分支保持短小，例如 `feat/frontend-shell`、`feat/backend-health`、`feat/client-runner-mock`。
 - 小修分支用 `docs/...` 或 `fix/...`。
 - 文档、协议、服务结构变更走 PR。
 - PR 尽量小，能让一个同学一次看完。
@@ -132,10 +132,11 @@ version / id / seq / type / scope / sentAt / payload
 - 每条实现线至少每天 push 一次工作分支，避免进度只留在本机。
 - 分支继续开发前先 `git fetch origin` 并同步最新 `master`。
 - Agent 生成的代码由对应开发者负责审查、测试和解释。
+- 首次克隆后运行 `.\scripts\setup.ps1` 启用本地 hooks；需要参考仓库时运行 `.\scripts\setup.ps1 -Reference core`。
 
 ## 8. 测试框架方向
 
-测试框架跟实现一起补，不单独空转搭架子。
+测试框架跟实现一起补，不单独空转搭架子。GitHub Actions 先只做空白字符检查和 OpenAPI YAML 解析，具体 Go/前端测试随代码落地后再加入。
 
 | 方向 | 测试重点 | 建议起点 |
 |---|---|---|

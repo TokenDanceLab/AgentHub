@@ -5,14 +5,14 @@
 # Format: type(scope): 中文摘要
 # Scope optional. Type/scope stays English; summary is Chinese-first.
 # This hook only validates local commit messages. GitHub issue and PR text
-# follows the same "English prefix + Chinese content" rule; see docs/project-management.md.
+# follows the same "English prefix + Chinese content" rule; see AGENTS.md.
 
 set -euo pipefail
 
 MSG_FILE="$1"
 
-# Strip CR (Windows) and read subject line
-SUBJECT=$(head -1 "$MSG_FILE" | tr -d '\r')
+# Strip UTF-8 BOM and CR (Windows), then read subject line
+SUBJECT=$(head -1 "$MSG_FILE" | sed 's/^\xEF\xBB\xBF//' | tr -d '\r')
 
 # === 1. Allowed types ===
 TYPES="init|feat|fix|docs|refactor|chore|test|perf|ci|revert"

@@ -20,7 +20,7 @@
 | Tier 1 | OpenHands | `reference/OpenHands/` | sandbox、workspace、agent protocol、GUI/CLI/SDK |
 | Tier 1 | Opcode | `reference/opcode/` | Tauri 2 桌面端、checkpoint、diff viewer |
 
-## 已 clone 仓库
+## 参考清单
 
 | 仓库 | 路径 | 用途 |
 |---|---|---|
@@ -62,3 +62,19 @@
 - 工程规格：`docs/reference/03-build/`
 
 新增 clone 后，先补本索引，再补 `docs/reference/README.md` 中的阅读路线。
+
+## 初始化脚本
+
+参考仓库默认不随 AgentHub 一起提交。新成员需要本地参考源码时运行：
+
+```powershell
+.\scripts\setup.ps1 -Reference core
+```
+
+`core` 只克隆最常用参考；需要完整调研源码时运行：
+
+```powershell
+.\scripts\sync-reference.ps1 -Tier all
+```
+
+脚本只同步公开 GitHub 仓库。`reference/claude-code-source/`、`reference/docs/` 这类本机手动资料可以保留在本地，但不能依赖它们作为团队开发的唯一资料源；关键结论要写回 `docs/reference/` 或三份主文档。

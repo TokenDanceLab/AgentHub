@@ -4,7 +4,7 @@
 
 1. 管理员的直接指令
 2. 本文件
-3. `.agenthub/` 项目记忆
+3. `.agenthub/` 本地项目记忆（如果存在）
 4. `docs/reference/` 调研文档
 
 ## 1. 先读什么
@@ -81,24 +81,29 @@ type(scope): 中文摘要
 
 常用 type：
 
+- `init`：项目初始化
 - `feat`：功能
 - `fix`：修复
 - `docs`：文档
 - `refactor`：结构调整
 - `chore`：仓库流程、脚本、依赖
 - `test`：测试
+- `perf`：性能优化
+- `ci`：CI/CD
+- `revert`：回滚
 
 分支命名用小写：
 
 ```text
-feat/frontend
-feat/backend
-feat/client
+feat/frontend-shell
+feat/backend-health
+feat/client-runner-mock
+codex/short-topic
 docs/short-topic
 fix/short-topic
 ```
 
-`master` 是稳定分支。实现、协议和结构调整走 PR；小文档修正可以直接提交，但不确定就走 PR。PR 标题也用 `type(scope): 中文摘要`。
+`codex/` 是 Codex App 自动工作分支前缀，可以用于临时 PR。手工创建分支优先用 `feat/`、`fix/`、`docs/`。`master` 是稳定分支。实现、协议和结构调整走 PR；小文档修正可以直接提交，但不确定就走 PR。PR 标题也用 `type(scope): 中文摘要`。
 
 进度同步：
 
@@ -108,6 +113,8 @@ fix/short-topic
 - PR 合并前先同步最新 `master`，解决冲突后再合。
 - 不在共享分支上 force-push；确实需要时先在群里说明。
 - Issue 只保留三部分主线任务：前端、后端、客户端。小任务写进对应 issue 或 PR，不额外开一堆 issue。
+- 本地提交 hook 放在 `scripts/git-hooks/`。首次克隆后运行 `.\scripts\setup.ps1` 启用。
+- hook 是本地辅助，GitHub Actions 是最低限度的共享检查。
 
 ## 5. 文档规则
 
