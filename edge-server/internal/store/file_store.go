@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -164,17 +165,19 @@ func (f *FileStore) persist() error {
 }
 
 func loadFileSnapshot(path string, s *Store) error {
-	file, err := os.Open(path)
+	content, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("open store snapshot: %w", err)
+		return fmt.Errorf("read store snapshot: %w", err)
 	}
-	defer file.Close()
+	if strings.TrimSpace(string(content)) == "" {
+		return nil
+	}
 
 	var snapshot fileSnapshot
-	decoder := json.NewDecoder(file)
+	decoder := json.NewDecoder(strings.NewReader(string(content)))
 	if err := decoder.Decode(&snapshot); err != nil {
 		return fmt.Errorf("decode store snapshot: %w", err)
 	}

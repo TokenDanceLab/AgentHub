@@ -129,10 +129,10 @@ func (s *Store) applySnapshot(snapshot fileSnapshot) {
 	s.threads = copyMap(snapshot.Threads)
 	s.runs = copyMap(snapshot.Runs)
 	s.items = copyMap(snapshot.Items)
-	s.projectOrder = append([]string(nil), snapshot.ProjectOrder...)
-	s.threadOrder = append([]string(nil), snapshot.ThreadOrder...)
-	s.runOrder = append([]string(nil), snapshot.RunOrder...)
-	s.itemOrder = append([]string(nil), snapshot.ItemOrder...)
+	s.projectOrder = normalizeOrder(snapshot.ProjectOrder, s.projects)
+	s.threadOrder = normalizeOrder(snapshot.ThreadOrder, s.threads)
+	s.runOrder = normalizeOrder(snapshot.RunOrder, s.runs)
+	s.itemOrder = normalizeOrder(snapshot.ItemOrder, s.items)
 }
 
 func copyMap[K comparable, V any](source map[K]V) map[K]V {
@@ -141,6 +141,30 @@ func copyMap[K comparable, V any](source map[K]V) map[K]V {
 		copied[key] = value
 	}
 	return copied
+}
+
+func normalizeOrder[V any](order []string, items map[string]V) []string {
+	normalized := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, id := range order {
+		if _, ok := items[id]; !ok {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		normalized = append(normalized, id)
+		seen[id] = struct{}{}
+	}
+
+	missing := make([]string, 0, len(items)-len(seen))
+	for id := range items {
+		if _, ok := seen[id]; !ok {
+			missing = append(missing, id)
+		}
+	}
+	sort.Strings(missing)
+	return append(normalized, missing...)
 }
 
 func (s *Store) CreateProject(id, name string) Project {

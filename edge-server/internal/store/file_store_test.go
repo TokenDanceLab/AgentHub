@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -100,6 +101,105 @@ func TestFileStoreRejectsBadJSON(t *testing.T) {
 	}
 }
 
+func TestFileStoreTreatsEmptySnapshotAsEmptyStore(t *testing.T) {
+	tests := map[string]string{
+		"zero_bytes": "",
+		"whitespace": " \n\t ",
+	}
+	for name, content := range tests {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "store.json")
+			if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+				t.Fatalf("WriteFile returned error: %v", err)
+			}
+
+			s, err := NewFile(path)
+			if err != nil {
+				t.Fatalf("NewFile returned error: %v", err)
+			}
+			if got := s.ListProjects(); len(got) != 0 {
+				t.Fatalf("ListProjects = %#v, want empty", got)
+			}
+		})
+	}
+}
+
+func TestFileStoreRestoresEmptyJSONObjectAsEmptyStore(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "store.json")
+	if err := os.WriteFile(path, []byte("{}"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	s, err := NewFile(path)
+	if err != nil {
+		t.Fatalf("NewFile returned error: %v", err)
+	}
+	if got := s.ListProjects(); len(got) != 0 {
+		t.Fatalf("ListProjects = %#v, want empty", got)
+	}
+}
+
+func TestFileStoreRejectsTrailingData(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "store.json")
+	if err := os.WriteFile(path, []byte("{} {}"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	_, err := NewFile(path)
+	if err == nil || !strings.Contains(err.Error(), "trailing data") {
+		t.Fatalf("NewFile error = %v, want trailing data error", err)
+	}
+}
+
+func TestFileStoreFillsMissingOrderFromSnapshotMaps(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "store.json")
+	content := []byte(`{
+  "projects": {
+    "proj_a": {"projectId": "proj_a", "name": "A", "status": "active"},
+    "proj_b": {"projectId": "proj_b", "name": "B", "status": "active"}
+  },
+  "threads": {
+    "thread_a": {"threadId": "thread_a", "projectId": "proj_a", "title": "A", "status": "active"},
+    "thread_b": {"threadId": "thread_b", "projectId": "proj_b", "title": "B", "status": "active"}
+  },
+  "runs": {
+    "run_a": {"runId": "run_a", "projectId": "proj_a", "threadId": "thread_a", "status": "queued"},
+    "run_b": {"runId": "run_b", "projectId": "proj_b", "threadId": "thread_b", "status": "queued"}
+  },
+  "items": {
+    "item_a": {"itemId": "item_a", "projectId": "proj_a", "threadId": "thread_a", "type": "event", "status": "created", "createdAt": "2026-05-23T00:00:00Z"},
+    "item_b": {"itemId": "item_b", "projectId": "proj_b", "threadId": "thread_b", "type": "event", "status": "created", "createdAt": "2026-05-23T00:00:00Z"}
+  },
+  "projectOrder": ["proj_b", "missing", "proj_b"],
+  "threadOrder": ["thread_b"],
+  "runOrder": ["run_b"],
+  "itemOrder": ["item_b"]
+}`)
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	s, err := NewFile(path)
+	if err != nil {
+		t.Fatalf("NewFile returned error: %v", err)
+	}
+	if got := s.ListProjects(); len(got) != 2 || got[0].ID != "proj_b" || got[1].ID != "proj_a" {
+		t.Fatalf("ListProjects = %#v, want existing valid order then sorted missing", got)
+	}
+	if got := s.ListThreads(""); len(got) != 2 || got[0].ID != "thread_b" || got[1].ID != "thread_a" {
+		t.Fatalf("ListThreads = %#v, want existing valid order then sorted missing", got)
+	}
+	if got := s.ListRuns(""); len(got) != 2 || got[0].ID != "run_b" || got[1].ID != "run_a" {
+		t.Fatalf("ListRuns = %#v, want existing valid order then sorted missing", got)
+	}
+	if got := s.ListThreadItems("thread_b"); len(got) != 1 || got[0].ID != "item_b" {
+		t.Fatalf("ListThreadItems(thread_b) = %#v, want item_b", got)
+	}
+	if got := s.ListThreadItems("thread_a"); len(got) != 1 || got[0].ID != "item_a" {
+		t.Fatalf("ListThreadItems(thread_a) = %#v, want item_a", got)
+	}
+}
+
 func TestFileStoreDoesNotLeaveTempFilesAfterSave(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "store.json")
@@ -148,5 +248,23 @@ func TestSaveFileSnapshotCleansTempFileAfterReplaceFailure(t *testing.T) {
 	}
 	if info, err := os.Stat(path); err != nil || !info.IsDir() {
 		t.Fatalf("target state changed, stat = %#v, err = %v; want original directory", info, err)
+	}
+}
+
+func TestFileStoreLastPersistErrorTracksSaveFailure(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "store.json")
+
+	s, err := NewFile(path)
+	if err != nil {
+		t.Fatalf("NewFile returned error: %v", err)
+	}
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatalf("Mkdir returned error: %v", err)
+	}
+
+	s.CreateProject("proj_test", "Test Project")
+	if err := s.LastPersistError(); err == nil {
+		t.Fatal("LastPersistError returned nil after persist failure")
 	}
 }
