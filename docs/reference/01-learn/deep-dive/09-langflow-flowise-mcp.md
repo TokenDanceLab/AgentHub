@@ -455,5 +455,5 @@ func ConvertMCPParams(input map[string]any, schema *ToolSchema, toolName string)
 
 ### AgentHub 参考文件
 - `docs/reference/cross-analysis-sandbox-tools.md` -- ToolRegistry 现有设计 (2.3 节)
-- `docs/architecture.md` -- AgentHub 架构总览
-- `docs/agent-loop.md` -- Agent 执行循环
+- `docs/system-architecture.md` -- AgentHub 架构总览
+- `docs/implementation-guide.md` -- Agent 执行和模块实现入口

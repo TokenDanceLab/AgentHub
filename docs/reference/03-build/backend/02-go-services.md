@@ -1,7 +1,7 @@
 # AgentHub Go Services -- 完整工程化设计
 
 > 日期：2026-05-21
-> 2026-05-22 更新：本文是 Go 服务拆包和工程化参考，目录示例里的 `proto/`、`packages/`、`apps/` 已不是当前主线。当前仓库结构以根目录 `hub-server/`、`edge-server/`、`runner/`、`app/`、`api/` 为准，协议入口以 `api/openapi.yaml` 和 `api/events.schema.json` 为准。
+> 2026-05-22 更新：本文是 Go 服务拆包和工程化参考，目录示例里的 `proto/`、`packages/`、`apps/` 已不是当前主线。当前仓库结构以根目录 `hub-server/`、`edge-server/`、`runner/`、`app/`、`api/` 为准，协议入口以 `api/openapi.yaml` 和 `api/events.md` 为准。
 > 基于：architecture.md, cross-analysis-adapters.md, cross-analysis-sandbox-tools.md, cross-analysis-orchestration.md, opencode.md, openhands.md, codex-cli.md
 > Web 调研补充：go project layout 2025/2026, modernc.org/sqlite FTS5, coder/websocket hub, ConnectRPC buf monorepo, Wire vs Fx
 
