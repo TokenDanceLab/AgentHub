@@ -6,12 +6,19 @@ node_modules/
 dist/
 build/
 .next/
+coverage/
+playwright-report/
+test-results/
 
 # Go
 *.exe
 *.test
 *.out
 vendor/
+
+# Rust / Tauri
+target/
+app/desktop/src-tauri/target/
 
 # IDE
 .vscode/
@@ -31,6 +38,8 @@ Thumbs.db
 .envrc
 *.pem
 *.key
+*.crt
+*.cer
 *.p12
 *.pfx
 id_rsa*
@@ -50,12 +59,14 @@ yarn-error.log*
 *.db
 *.sqlite
 *.sqlite3
+*.sqlite-*
 *.dump
 *.bak
 *.backup
 *.sql.gz
 
 # Local machine and agent state
+.agenthub-runtime/
 .agenthub/memory/
 .agenthub/local/
 .agenthub/runtime/

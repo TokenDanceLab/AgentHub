@@ -33,5 +33,6 @@ Runtime: Go.
 ## 依赖
 
 - `api/` 契约：REST endpoint、WebSocket event、错误格式。
-- `docs/module-boundaries.md`：领域模型和模块职责边界。
-- 后续 Go 共享代码可在本服务内部或根级 Go module 下按实际需要建立，不提前恢复 `packages/`。
+- `docs/system-architecture.md`：Hub-Edge-Runner 架构和职责边界。
+- `docs/implementation-guide.md`：当前实现顺序和三部分分工。
+- Go package 按实际代码需要创建，不提前铺空目录。
