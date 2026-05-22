@@ -6,7 +6,7 @@
 
 像用飞书/微信一样，拉群组织 Claude Code、Codex、OpenCode 等 AI Agent 协作完成网页、代码和部署。
 
-[English](README_EN.md) &nbsp;·&nbsp; [架构文档](docs/architecture.md) &nbsp;·&nbsp; [调研索引](docs/reference/)
+[English](README_EN.md) &nbsp;·&nbsp; [产品需求](docs/product-requirements.md) &nbsp;·&nbsp; [系统架构](docs/system-architecture.md) &nbsp;·&nbsp; [API 契约](api/)
 
 <img src="https://img.shields.io/badge/状态-调研中-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.24+-00ADD8?style=flat-square&logo=go" alt="go">
@@ -112,7 +112,10 @@ cd app/web && pnpm dev
 
 ```
 AgentHub/
-├── docs/                   # 架构、调研、比赛材料
+├── docs/                   # 三份主文档 + archive/reference/research
+│   ├── product-requirements.md
+│   ├── system-architecture.md
+│   ├── implementation-guide.md
 │   └── reference/          # 69 份调研和工程规格文档，包含 Multica Tier-0 参考
 ├── app/
 │   ├── desktop/            # Tauri 桌面端入口
@@ -134,17 +137,12 @@ Docker 配置不再放根级 `docker/`。如果某个模块需要容器化，就
 
 | 文档 | 描述 |
 |------|------|
-| [架构文档](docs/architecture.md) | Hub-Edge-Runner 拓扑、部署模式、同步协议 |
-| [术语表](docs/glossary.md) | 用白话解释 Hub、Edge、Runner、AgentRun、产物和协议源头 |
-| [项目管理](docs/project-management.md) | 里程碑、标签和 issue 聚合规则 |
-| [文档语言规则](docs/language-policy.md) | 哪些文档中文优先，哪些内容保留英文 |
-| [中文化路线图](docs/chinese-documentation-roadmap.md) | 交给 DeepSeek 等低成本模型分批翻译和校对的执行清单 |
-| [DeepSeek 交接文档](docs/deepseek-handoff.md) | 可直接复制给 DeepSeek 执行的任务说明和验收要求 |
-| [模块边界](docs/module-boundaries.md) | 扁平化目录后的 Hub、Edge、Runner、App、API 职责 |
+| [产品需求文档](docs/product-requirements.md) | 产品定位、用户、核心体验、阶段目标和比赛交付对应 |
+| [系统架构文档](docs/system-architecture.md) | Hub-Edge-Runner、组件职责、通信方式、权威模型 |
+| [功能实现文档](docs/implementation-guide.md) | 模块分工、API foundation、P0 实现顺序和验收命令 |
 | [API 契约](api/) | REST API 和 WebSocket typed events 的契约入口 |
 | [调研索引](docs/reference/) | 69 份跨仓库深度分析和工程规格，Agent 友好的四层结构 |
-| [实现路线图](docs/reference/04-plan/01-research-to-implementation.md) | P0 最小系统、优先级矩阵、调研到代码映射 |
-| [Protocol Schema 参考](docs/reference/03-build/backend/13-protobuf-schema.md) | Protobuf 方案参考，当前不作为主协议强依赖 |
+| [调研与历史归档](docs/archive/) | 旧版细分架构、协议、memory、workspace 等深度材料 |
 
 <br>
 
@@ -161,5 +159,5 @@ Docker 配置不再放根级 `docker/`。如果某个模块需要容器化，就
 ---
 
 <div align="center">
-<a href="README_EN.md">English</a> &nbsp;·&nbsp; <a href="docs/architecture.md">架构文档</a> &nbsp;·&nbsp; <a href="docs/reference/">调研索引</a>
+<a href="README_EN.md">English</a> &nbsp;·&nbsp; <a href="docs/product-requirements.md">产品需求</a> &nbsp;·&nbsp; <a href="docs/system-architecture.md">系统架构</a> &nbsp;·&nbsp; <a href="api/">API 契约</a>
 </div>

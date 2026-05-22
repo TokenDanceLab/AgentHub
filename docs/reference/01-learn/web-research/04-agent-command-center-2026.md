@@ -198,7 +198,7 @@ AgentHub 建议定义：
 | Orchestrator | 分派和汇总 | 不直接写文件，调度其他 agent |
 | CI | 自动检查 | 无交互，禁止 ask 类操作 |
 
-这应该进入 `docs/approvals.md` 或新增 `docs/modes.md`。
+这应该进入 `docs/implementation-guide.md` 的 Approval 实现章节；如果后续审批模型变复杂，再拆独立文档。
 
 ### 5.3 Aider：repo map 应作为 P1 上下文能力
 

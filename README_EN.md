@@ -6,7 +6,7 @@
 
 Chat with AI Agents like teammates. @mention them, create group chats, watch code, diffs, and previews unfold inline.
 
-[中文文档](README.md) &nbsp;·&nbsp; [Architecture](docs/architecture.md) &nbsp;·&nbsp; [Research](docs/reference/)
+[中文文档](README.md) &nbsp;·&nbsp; [Product Requirements](docs/product-requirements.md) &nbsp;·&nbsp; [System Architecture](docs/system-architecture.md) &nbsp;·&nbsp; [API](api/)
 
 <img src="https://img.shields.io/badge/status-research-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.24+-00ADD8?style=flat-square&logo=go" alt="go">
@@ -112,7 +112,10 @@ cd app/web && pnpm dev
 
 ```
 AgentHub/
-├── docs/                   # architecture, research, competition materials
+├── docs/                   # three primary docs + archive/reference/research
+│   ├── product-requirements.md
+│   ├── system-architecture.md
+│   ├── implementation-guide.md
 │   └── reference/          # 69 research and engineering specification documents, including Multica Tier-0 reference
 ├── app/
 │   ├── desktop/            # Tauri desktop app
@@ -134,17 +137,12 @@ Docker files are colocated with the module that needs them, such as `hub-server/
 
 | Document | Description |
 |----------|------------|
-| [Architecture](docs/architecture.md) | Hub-Edge-Runner topology, deployment modes, sync protocol |
-| [Glossary](docs/glossary.md) | Plain-language terms for Hub, Edge, Runner, AgentRun, artifacts and protocol |
-| [Project Management](docs/project-management.md) | Milestones, labels and issue grouping rules |
-| [Documentation Language Policy](docs/language-policy.md) | Which docs are Chinese-first and which names stay English |
-| [Chinese Documentation Roadmap](docs/chinese-documentation-roadmap.md) | Batch plan for translating AgentHub-owned docs into Chinese |
-| [DeepSeek Handoff](docs/deepseek-handoff.md) | Handoff prompt and acceptance checklist for translation agents |
-| [Module Boundaries](docs/module-boundaries.md) | Responsibilities after flattening the repo layout |
+| [Product Requirements](docs/product-requirements.md) | Product positioning, users, core experience, phases and competition deliverables |
+| [System Architecture](docs/system-architecture.md) | Hub-Edge-Runner, component responsibilities, communication and authority model |
+| [Implementation Guide](docs/implementation-guide.md) | Module ownership, API foundation, P0 implementation order and checks |
 | [API Contract](api/) | REST API and WebSocket typed event contract entrypoint |
 | [Research Index](docs/reference/) | 69 cross-repo research and engineering specification documents, organized for Agent navigation |
-| [Implementation Roadmap](docs/reference/04-plan/01-research-to-implementation.md) | P0 minimal system, priority matrix, research-to-code mapping |
-| [Protocol Schema Reference](docs/reference/03-build/backend/13-protobuf-schema.md) | Protobuf reference, not a required runtime dependency for M0 |
+| [Archive](docs/archive/) | Previous detailed docs for architecture, protocol, memory, workspace and planning |
 
 <br>
 
@@ -161,5 +159,5 @@ Docker files are colocated with the module that needs them, such as `hub-server/
 ---
 
 <div align="center">
-<a href="README.md">中文文档</a> &nbsp;·&nbsp; <a href="docs/architecture.md">Architecture</a> &nbsp;·&nbsp; <a href="docs/reference/">Research</a>
+<a href="README.md">中文文档</a> &nbsp;·&nbsp; <a href="docs/product-requirements.md">Product</a> &nbsp;·&nbsp; <a href="docs/system-architecture.md">Architecture</a> &nbsp;·&nbsp; <a href="api/">API</a>
 </div>

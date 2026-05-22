@@ -405,7 +405,7 @@ return {
 
 ### 5.1 消息树与分支 (借鉴 LibreChat)
 
-AgentHub 的 Conversation Authority 模型 (`docs/authority.md`) 已经定义了消息序列所有权，但**尚未处理 branching/scenario 探索场景**。
+AgentHub 的 Conversation Authority 模型（见 `docs/system-architecture.md`）已经定义了消息序列所有权，但**尚未处理 branching/scenario 探索场景**。
 
 建议:
 1. **消息树数据模型**: 类似 LibreChat 的 `buildTree()`，将消息组织为 `{message, children[]}` 树结构。AgentHub 在 Hub 端自然支持 branching（用户从历史消息重试不同 prompt），在 Edge 端通过 Event 同步复制分支。

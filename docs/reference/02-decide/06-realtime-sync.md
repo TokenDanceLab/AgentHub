@@ -1,4 +1,4 @@
-# Cross-Analysis: Real-Time Collaboration & State Synchronization
+# 交叉分析：实时协作与状态同步
 
 > 分析日期: 2026-05-21
 > 前置阅读: 03-eventstore-memory.md, 02-claude-sdk-impact.md, 01-adapters.md, 07-librechat.md, 05-undo-rollback.md, 03-orchestration.md
@@ -90,7 +90,7 @@ SyncResponse{ Events[] (delta), LatestSeq, Compacted, Snapshot }
 **边界风险**：如果 TurnC 修改了 TurnD 已修改的文件，会产生**语义冲突**（不是同步冲突）。解决方案：
 - Runner 在本地执行 TurnC 前，先检查 SinceSeq 是否落后于 LatestSeq
 - 如果落后 → 先拉取 delta → 检测文件冲突 → 提示用户或自动 merge
-- 这本质上是 git pull --rebase 的语义
+- 这本质上是 `git pull --rebase` 的语义
 
 #### Case 3: Compaction 与 In-Flight Sync 的竞态
 
@@ -194,7 +194,7 @@ AgentHub 不在同一 JSONL 中实现 branching，而是通过 **Thread Fork + T
     Turn1                             Turn1 (复制自 T)
     Turn2 (seq=11-20)                 Turn2 (复制自 T)
     Turn3 (seq=21-30)                 Turn2' (新 Turn，替代 Turn3)
-    
+
 Thread T' 的 metadata 记录:
   fork_from: { thread_id: T, turn_id: Turn2, mode: DIRECT_PATH }
   父 Thread 不变，子 Thread 是独立同步单元
@@ -401,7 +401,7 @@ writeChain 是串行通道（Go channel, buffer=1），保证:
 | `PromptSyncService` | Yjs 集成层（协作编辑时启用） | P2 |
 | Edge 端 `SyncScheduler` | 定期 poll + 指数退避重试 + 离线队列 | P1 |
 | `ConflictDetector` | Turn 执行前检测 seq 落后导致的文件冲突 | P1 |
-| `ThreadFork` 的 Sync 语意 | Fork 后新 Thread 的初始 SinceSeq 设定 | P0 |
+| `ThreadFork` 的 Sync 语义 | Fork 后新 Thread 的初始 SinceSeq 设定 | P0 |
 
 ---
 
@@ -419,4 +419,4 @@ writeChain 是串行通道（Go channel, buffer=1），保证:
 
 ---
 
-*Analysis complete. 2026-05-21.*
+*分析完成。2026-05-21。*

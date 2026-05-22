@@ -36,5 +36,6 @@ Thumbs.db
 .claude/worktrees/
 
 # Cloned reference repos (at repo root only)
-/reference/
+/reference/*
+!/reference/INDEX.md
 /chat-verify/

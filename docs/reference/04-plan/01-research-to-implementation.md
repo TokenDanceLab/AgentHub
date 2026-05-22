@@ -68,7 +68,7 @@ AgentHub/
 ├── Makefile
 ├── api/
 │   ├── openapi.yaml        # REST API 契约
-│   └── events.schema.json  # WebSocket event 契约
+│   └── events.md           # WebSocket event 契约
 ├── edge-server/
 │   ├── cmd/main.go         # 入口: HTTP + WS + Runner管理
 │   └── internal/
@@ -125,7 +125,7 @@ cd app/web && pnpm dev
 | **Progressive Disclosure** | claude-code-viewer.md | 4 层递进展开 |
 | **Fork 机制** | librechat.md | 4 种 Fork 模式 + UUID 重生成 |
 | **MCP 集成** | deep-dive-claude-code-mcp-hooks.md | stdio/sse/streamableHTTP + mcp__命名 |
-| **API/事件契约** | docs/protocol.md + api/ | OpenAPI + JSON Schema + typed events |
+| **API/事件契约** | api/ | OpenAPI + typed events |
 | **Tauri Desktop** | web-research-tech-stack.md | target-triple 命名 + shell plugin sidecar |
 | **Auth (本地)** | deep-dive-claude-code-tool-security.md | Bearer token + 127.0.0.1 绑定 |
 
@@ -135,7 +135,7 @@ cd app/web && pnpm dev
 |------|------|------|------|
 | Agent 接入方式 | CLI headless (P0) + Python SDK (P2) | CLI 最简稳定; SDK 提供更细粒度控制 | impact-analysis-claude-sdk-ga.md |
 | 数据库 | SQLite + FTS5 (modernc.org) | 纯 Go 无 CGO; 嵌入式部署简单 | web-research-tech-stack.md |
-| API 协议 | REST JSON + WebSocket typed events | 三人团队更易调试和落地；后续可按需生成类型 | docs/protocol.md |
+| API 协议 | REST JSON + WebSocket typed events | 三人团队更易调试和落地；后续可按需生成类型 | api/ |
 | WebSocket 库 | coder/websocket | gorilla 已归档; 并发写安全 | web-research-tech-stack.md |
 | 配置格式 | YAML (Agent) + TOML (Runner) | YAML 人类可读; viper 原生支持 | deep-dive-codex-agent-config.md |
 | 沙箱方案 | Git worktree (默认) | 零依赖; <100ms 启动; git 原生 | cross-analysis-sandbox-tools.md |
