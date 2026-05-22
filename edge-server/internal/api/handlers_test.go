@@ -10,12 +10,14 @@ import (
 
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/runners"
+	"github.com/agenthub/edge-server/internal/store"
 )
 
 func newTestHandler() *Handler {
 	return &Handler{
 		Bus:      events.NewBus(1000),
 		Registry: runners.NewRegistry(),
+		Store:    store.New(),
 	}
 }
 
@@ -109,6 +111,46 @@ func TestGetRuns(t *testing.T) {
 	}
 }
 
+func TestProjectThreadRoutes(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects", strings.NewReader(`{"projectId":"proj_test","name":"Test Project"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/projects status = %d, want 201", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/threads", strings.NewReader(`{"threadId":"thread_test","projectId":"proj_test","title":"Test Thread"}`))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/threads status = %d, want 201", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/threads?projectId=proj_test", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/threads status = %d, want 200", rec.Code)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	items := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("expected one thread, got %d", len(items))
+	}
+	thread := items[0].(map[string]any)
+	if thread["threadId"] != "thread_test" || thread["projectId"] != "proj_test" {
+		t.Fatalf("unexpected thread response: %#v", thread)
+	}
+}
+
 func TestPostRuns(t *testing.T) {
 	h := newTestHandler()
 
@@ -132,6 +174,101 @@ func TestPostRuns(t *testing.T) {
 	}
 	if body["status"] != "queued" {
 		t.Errorf("expected status=queued, got %v", body["status"])
+	}
+	if body["projectId"] != "proj_local" {
+		t.Errorf("expected default projectId=proj_local, got %v", body["projectId"])
+	}
+	if body["threadId"] != "thread_local" {
+		t.Errorf("expected default threadId=thread_local, got %v", body["threadId"])
+	}
+}
+
+func TestPostRunsBindsProjectAndThread(t *testing.T) {
+	h := newTestHandler()
+	h.ensureDefaults()
+	_, err := h.Store.CreateThread("thread_bound", "proj_local", "Bound Thread")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_bound"}`))
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d", rec.Code)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if body["projectId"] != "proj_local" || body["threadId"] != "thread_bound" {
+		t.Fatalf("run binding response = %#v, want proj_local/thread_bound", body)
+	}
+
+	runID := body["runId"].(string)
+	run, ok := h.Store.GetRun(runID)
+	if !ok {
+		t.Fatalf("run %q was not stored", runID)
+	}
+	if run.ProjectID != "proj_local" || run.ThreadID != "thread_bound" {
+		t.Fatalf("stored run = %#v, want proj_local/thread_bound", run)
+	}
+}
+
+func TestPostRunsRejectsUnknownThreadBinding(t *testing.T) {
+	h := newTestHandler()
+	h.ensureDefaults()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_missing"}`))
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rec.Code)
+	}
+}
+
+func TestGetRunAndThreadItemsAfterPostRun(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("POST /v1/runs status = %d, want 202", rec.Code)
+	}
+	var runBody map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&runBody); err != nil {
+		t.Fatalf("failed to decode run body: %v", err)
+	}
+	runID := runBody["runId"].(string)
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID, nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/runs/{id} status = %d, want 200", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/threads/thread_local/items", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/threads/thread_local/items status = %d, want 200", rec.Code)
+	}
+	var itemBody map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&itemBody); err != nil {
+		t.Fatalf("failed to decode item body: %v", err)
+	}
+	items := itemBody["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("expected one run item, got %d", len(items))
 	}
 }
 

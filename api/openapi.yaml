@@ -411,11 +411,25 @@ paths:
       tags: [ExecutionRunner]
       operationId: startRun
       summary: Start AgentRun.
+      description: >
+        Starts a local AgentRun. P0 accepts an empty body for Desktop Shell
+        compatibility and falls back to the default local project/thread.
+        New callers should pass projectId and threadId explicitly.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartRunRequest"
       responses:
         "202":
-          $ref: "#/components/responses/Accepted"
+          description: Run accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
 
   /v1/runs/{runId}:
     get:
@@ -1254,6 +1268,36 @@ components:
             details:
               type: object
               additionalProperties: true
+    StartRunRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+          description: Project to bind the run to. Defaults to the local project in P0 compatibility mode.
+        threadId:
+          type: string
+          description: Thread to bind the run to. Defaults to the local thread in P0 compatibility mode.
+    Run:
+      type: object
+      required: [runId, projectId, threadId, status, createdAt]
+      properties:
+        runId:
+          type: string
+        projectId:
+          type: string
+        threadId:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
   responses:
     Ok:
       description: OK.

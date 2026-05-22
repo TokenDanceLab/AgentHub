@@ -169,6 +169,40 @@ func TestHistoryTrimming(t *testing.T) {
 	}
 }
 
+func TestCursorReplayAfterTrimReturnsRetainedEventsAfterCursor(t *testing.T) {
+	b := NewBus(3)
+
+	for i := 0; i < 5; i++ {
+		b.Publish("test", nil, i)
+	}
+
+	_, _, replay := b.Subscribe(2)
+	if len(replay) != 3 {
+		t.Fatalf("replay length = %d, want 3", len(replay))
+	}
+	for i, wantSeq := range []int64{3, 4, 5} {
+		if replay[i].Seq != wantSeq {
+			t.Fatalf("replay[%d].Seq = %d, want %d", i, replay[i].Seq, wantSeq)
+		}
+	}
+}
+
+func TestCursorReplayAfterTrimSkipsTrimmedGap(t *testing.T) {
+	b := NewBus(3)
+
+	for i := 0; i < 5; i++ {
+		b.Publish("test", nil, i)
+	}
+
+	_, _, replay := b.Subscribe(1)
+	if len(replay) != 3 {
+		t.Fatalf("replay length = %d, want retained history length 3", len(replay))
+	}
+	if replay[0].Seq != 3 {
+		t.Fatalf("first replay seq = %d, want first retained seq 3", replay[0].Seq)
+	}
+}
+
 func TestSlowSubscriberDrop(t *testing.T) {
 	b := NewBus(100)
 	// Create a subscriber with a tiny buffer so it drops.
@@ -183,7 +217,7 @@ func TestSlowSubscriberDrop(t *testing.T) {
 
 	// Drain the channel to verify it didn't block publish.
 	count := 0
-	drain:
+drain:
 	for {
 		select {
 		case <-ch:
@@ -200,7 +234,6 @@ func TestSlowSubscriberDrop(t *testing.T) {
 
 func TestConcurrentPublishSubscribe(t *testing.T) {
 	b := NewBus(1000)
-	_, ch, _ := b.Subscribe(0)
 
 	var wg sync.WaitGroup
 	const publishers = 10
@@ -216,21 +249,23 @@ func TestConcurrentPublishSubscribe(t *testing.T) {
 		}()
 	}
 
-	// Collect events while publishers run.
-	received := 0
-	done := make(chan struct{})
-	go func() {
-		for range ch {
-			received++
-		}
-	}()
-	time.Sleep(100 * time.Millisecond)
 	wg.Wait()
-	time.Sleep(100 * time.Millisecond)
-	close(done)
 
-	if received < publishers*eventsPerPub-50 {
-		t.Errorf("received %d events, expected near %d", received, publishers*eventsPerPub)
+	_, _, replay := b.Subscribe(0)
+	if len(replay) != publishers*eventsPerPub {
+		t.Fatalf("history replay length = %d, want %d", len(replay), publishers*eventsPerPub)
+	}
+	seen := make(map[int64]bool, len(replay))
+	for _, evt := range replay {
+		if seen[evt.Seq] {
+			t.Fatalf("duplicate seq %d in replay", evt.Seq)
+		}
+		seen[evt.Seq] = true
+	}
+	for seq := int64(1); seq <= publishers*eventsPerPub; seq++ {
+		if !seen[seq] {
+			t.Fatalf("missing seq %d in replay", seq)
+		}
 	}
 }
 

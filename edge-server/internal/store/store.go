@@ -1,0 +1,290 @@
+package store
+
+import (
+	"errors"
+	"sort"
+	"sync"
+	"time"
+)
+
+var ErrNotFound = errors.New("not found")
+
+type Project struct {
+	ID        string `json:"projectId"`
+	Name      string `json:"name"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type Thread struct {
+	ID        string `json:"threadId"`
+	ProjectID string `json:"projectId"`
+	Title     string `json:"title"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type Run struct {
+	ID         string `json:"runId"`
+	ProjectID  string `json:"projectId"`
+	ThreadID   string `json:"threadId"`
+	Status     string `json:"status"`
+	CreatedAt  string `json:"createdAt"`
+	StartedAt  string `json:"startedAt,omitempty"`
+	FinishedAt string `json:"finishedAt,omitempty"`
+}
+
+type Item struct {
+	ID        string `json:"itemId"`
+	ProjectID string `json:"projectId"`
+	ThreadID  string `json:"threadId"`
+	RunID     string `json:"runId,omitempty"`
+	Type      string `json:"type"`
+	Role      string `json:"role,omitempty"`
+	Status    string `json:"status"`
+	Content   string `json:"content,omitempty"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type Store struct {
+	mu sync.RWMutex
+
+	projects map[string]Project
+	threads  map[string]Thread
+	runs     map[string]Run
+	items    map[string]Item
+
+	projectOrder []string
+	threadOrder  []string
+	runOrder     []string
+	itemOrder    []string
+}
+
+func New() *Store {
+	return &Store{
+		projects: make(map[string]Project),
+		threads:  make(map[string]Thread),
+		runs:     make(map[string]Run),
+		items:    make(map[string]Item),
+	}
+}
+
+func (s *Store) CreateProject(id, name string) Project {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if existing, ok := s.projects[id]; ok {
+		return existing
+	}
+	if name == "" {
+		name = "Local Project"
+	}
+	now := nowString()
+	project := Project{
+		ID:        id,
+		Name:      name,
+		Status:    "active",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	s.projects[id] = project
+	s.projectOrder = append(s.projectOrder, id)
+	return project
+}
+
+func (s *Store) GetProject(id string) (Project, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	project, ok := s.projects[id]
+	return project, ok
+}
+
+func (s *Store) ListProjects() []Project {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	projects := make([]Project, 0, len(s.projectOrder))
+	for _, id := range s.projectOrder {
+		projects = append(projects, s.projects[id])
+	}
+	return projects
+}
+
+func (s *Store) CreateThread(id, projectID, title string) (Thread, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.projects[projectID]; !ok {
+		return Thread{}, ErrNotFound
+	}
+	if existing, ok := s.threads[id]; ok {
+		return existing, nil
+	}
+	if title == "" {
+		title = "New Thread"
+	}
+	now := nowString()
+	thread := Thread{
+		ID:        id,
+		ProjectID: projectID,
+		Title:     title,
+		Status:    "active",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	s.threads[id] = thread
+	s.threadOrder = append(s.threadOrder, id)
+	return thread, nil
+}
+
+func (s *Store) GetThread(id string) (Thread, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	thread, ok := s.threads[id]
+	return thread, ok
+}
+
+func (s *Store) ListThreads(projectID string) []Thread {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	threads := make([]Thread, 0, len(s.threadOrder))
+	for _, id := range s.threadOrder {
+		thread := s.threads[id]
+		if projectID == "" || thread.ProjectID == projectID {
+			threads = append(threads, thread)
+		}
+	}
+	return threads
+}
+
+func (s *Store) CreateRun(id, projectID, threadID string) (Run, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.projects[projectID]; !ok {
+		return Run{}, ErrNotFound
+	}
+	thread, ok := s.threads[threadID]
+	if !ok || thread.ProjectID != projectID {
+		return Run{}, ErrNotFound
+	}
+	if existing, ok := s.runs[id]; ok {
+		return existing, nil
+	}
+	run := Run{
+		ID:        id,
+		ProjectID: projectID,
+		ThreadID:  threadID,
+		Status:    "queued",
+		CreatedAt: nowString(),
+	}
+	s.runs[id] = run
+	s.runOrder = append(s.runOrder, id)
+	return run, nil
+}
+
+func (s *Store) GetRun(id string) (Run, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	run, ok := s.runs[id]
+	return run, ok
+}
+
+func (s *Store) ListRuns(threadID string) []Run {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	runs := make([]Run, 0, len(s.runOrder))
+	for _, id := range s.runOrder {
+		run := s.runs[id]
+		if threadID == "" || run.ThreadID == threadID {
+			runs = append(runs, run)
+		}
+	}
+	return runs
+}
+
+func (s *Store) SetRunStatus(id, status string) (Run, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	run, ok := s.runs[id]
+	if !ok {
+		return Run{}, false
+	}
+	switch status {
+	case "started":
+		run.StartedAt = nowString()
+	case "finished", "failed":
+		run.FinishedAt = nowString()
+	}
+	run.Status = status
+	s.runs[id] = run
+	return run, true
+}
+
+func (s *Store) CreateItem(item Item) (Item, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.projects[item.ProjectID]; !ok {
+		return Item{}, ErrNotFound
+	}
+	thread, ok := s.threads[item.ThreadID]
+	if !ok || thread.ProjectID != item.ProjectID {
+		return Item{}, ErrNotFound
+	}
+	if item.RunID != "" {
+		run, ok := s.runs[item.RunID]
+		if !ok || run.ThreadID != item.ThreadID {
+			return Item{}, ErrNotFound
+		}
+	}
+	if existing, ok := s.items[item.ID]; ok {
+		return existing, nil
+	}
+	if item.Type == "" {
+		item.Type = "event"
+	}
+	if item.Status == "" {
+		item.Status = "created"
+	}
+	now := nowString()
+	item.CreatedAt = now
+	item.UpdatedAt = now
+	s.items[item.ID] = item
+	s.itemOrder = append(s.itemOrder, item.ID)
+	return item, nil
+}
+
+func (s *Store) GetItem(id string) (Item, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	item, ok := s.items[id]
+	return item, ok
+}
+
+func (s *Store) ListThreadItems(threadID string) []Item {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	items := make([]Item, 0, len(s.itemOrder))
+	for _, id := range s.itemOrder {
+		item := s.items[id]
+		if item.ThreadID == threadID {
+			items = append(items, item)
+		}
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].CreatedAt < items[j].CreatedAt
+	})
+	return items
+}
+
+func nowString() string {
+	return time.Now().UTC().Format(time.RFC3339)
+}
