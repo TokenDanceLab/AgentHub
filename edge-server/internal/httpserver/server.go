@@ -11,6 +11,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/store"
@@ -18,8 +19,9 @@ import (
 
 // Config holds server configuration.
 type Config struct {
-	Addr  string
-	Store store.Repository
+	Addr            string
+	Store           store.Repository
+	ProcessExecutor lifecycle.ProcessExecutorConfig
 }
 
 // Run starts the HTTP server and blocks until a shutdown signal is received.
@@ -27,14 +29,27 @@ func Run(cfg Config) error {
 	if cfg.Addr == "" {
 		cfg.Addr = "127.0.0.1:3210"
 	}
+	if cfg.Store == nil {
+		cfg.Store = store.New()
+	}
 
 	bus := events.NewBus(10000)
 	registry := runners.NewRegistry()
+
+	var executor lifecycle.RunExecutor
+	if cfg.ProcessExecutor.Command != "" {
+		processExecutor, err := lifecycle.NewProcessExecutor(bus, cfg.Store, cfg.ProcessExecutor)
+		if err != nil {
+			return err
+		}
+		executor = processExecutor
+	}
 
 	handler := &api.Handler{
 		Bus:      bus,
 		Registry: registry,
 		Store:    cfg.Store,
+		Executor: executor,
 	}
 
 	mux := http.NewServeMux()
