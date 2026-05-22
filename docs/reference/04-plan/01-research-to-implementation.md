@@ -8,11 +8,11 @@
 
 | # | 行动项 | 来源文档 | 理由 |
 |---|--------|----------|------|
-| 1 | `packages/protocol/` — 12 AgentEvent + StartRequest | design-protocol.md | 所有模块的合同 |
-| 2 | `services/runner/` — ClaudeCodeAdapter (CLI headless) | cross-analysis-adapters.md | 最小可行 Agent 执行 |
-| 3 | `services/edge/` — local-api + runner-manager | design-go-services.md | 本地 WebSocket + Runner 管理 |
+| 1 | `api/` — REST API + WebSocket typed events | design-protocol.md | 所有模块的合同 |
+| 2 | `runner/` — ClaudeCodeAdapter (CLI headless) | cross-analysis-adapters.md | 最小可行 Agent 执行 |
+| 3 | `edge-server/` — local-api + runner-manager | design-go-services.md | 本地 WebSocket + Runner 管理 |
 | 4 | SQLite schema + FTS5 索引 | design-eventstore-memory.md | 消息持久化 |
-| 5 | `apps/web/` — 三栏布局 + Thread 消息流 | design-desktop-ux.md | 用户可见的 UI |
+| 5 | `app/web/` — 三栏布局 + Thread 消息流 | design-desktop-ux.md | 用户可见的 UI |
 | 6 | WebSocket Hub (coder/websocket) | scaffold-go-services.md | 实时消息推送 |
 | 7 | Git worktree workspace 隔离 | cross-analysis-sandbox-tools.md | Agent 执行安全隔离 |
 | 8 | `go.mod` + Makefile + CI | scaffold-go-services.md | 可构建的工程 |
@@ -66,26 +66,22 @@
 AgentHub/
 ├── go.mod, go.sum
 ├── Makefile
-├── proto/agenthub/v1/
-│   ├── shared.proto        # ID类型 + Authority
-│   ├── agent.proto         # AgentEvent + StartRequest
-│   └── im.proto            # Message + Thread
-├── packages/
-│   └── protocol/           # 生成的 Go 类型 (gen/go/)
-├── services/
-│   ├── edge/
-│   │   ├── cmd/main.go     # 入口: HTTP + WS + Runner管理
-│   │   └── internal/
-│   │       ├── local_api/   # REST: POST /runs, GET /messages
-│   │       ├── local_ws/    # WebSocket: /ws → UI 推送
-│   │       └── runner_mgr/  # Runner 生命周期管理
-│   └── runner/
-│       ├── cmd/main.go     # 入口: 启动 Agent CLI
-│       └── internal/
-│           ├── executor/    # os/exec + context 子进程管理
-│           ├── adapters/    # ClaudeCodeAdapter (cli -p)
-│           └── workspace/   # git worktree add/remove
-├── apps/web/src/
+├── api/
+│   ├── openapi.yaml        # REST API 契约
+│   └── events.schema.json  # WebSocket event 契约
+├── edge-server/
+│   ├── cmd/main.go         # 入口: HTTP + WS + Runner管理
+│   └── internal/
+│       ├── local_api/      # REST: POST /runs, GET /messages
+│       ├── local_ws/       # WebSocket: /events → UI 推送
+│       └── runner_mgr/     # Runner 生命周期管理
+├── runner/
+│   ├── cmd/main.go         # 入口: 启动 Agent CLI
+│   └── internal/
+│       ├── executor/       # os/exec + context 子进程管理
+│       ├── adapters/       # ClaudeCodeAdapter (cli -p)
+│       └── workspace/      # git worktree add/remove
+├── app/web/src/
 │   ├── App.tsx
 │   ├── components/
 │   │   ├── Sidebar.tsx     # 会话列表
@@ -98,17 +94,17 @@ AgentHub/
 
 ### 启动流程
 ```bash
-# 1. 生成代码
-buf generate proto/
-
-# 2. 初始化 DB
+# 1. 初始化 DB
 go run scripts/migrate.go up
 
-# 3. 启动 Edge + Runner (合并为一个 agenthub binary)
-go run ./services/edge/cmd/main.go  # 内含 Runner 管理
+# 2. 启动 Edge
+go run ./edge-server/cmd/main.go
+
+# 3. 启动 Runner
+go run ./runner/cmd/main.go
 
 # 4. 启动前端
-cd apps/web && pnpm dev
+cd app/web && pnpm dev
 ```
 
 ## 3. 调研→实现映射矩阵
@@ -129,7 +125,7 @@ cd apps/web && pnpm dev
 | **Progressive Disclosure** | claude-code-viewer.md | 4 层递进展开 |
 | **Fork 机制** | librechat.md | 4 种 Fork 模式 + UUID 重生成 |
 | **MCP 集成** | deep-dive-claude-code-mcp-hooks.md | stdio/sse/streamableHTTP + mcp__命名 |
-| **Protobuf 生成** | design-protobuf-schema.md | Buf + connect-go + buf-action CI |
+| **API/事件契约** | docs/protocol.md + api/ | OpenAPI + JSON Schema + typed events |
 | **Tauri Desktop** | web-research-tech-stack.md | target-triple 命名 + shell plugin sidecar |
 | **Auth (本地)** | deep-dive-claude-code-tool-security.md | Bearer token + 127.0.0.1 绑定 |
 
@@ -139,7 +135,7 @@ cd apps/web && pnpm dev
 |------|------|------|------|
 | Agent 接入方式 | CLI headless (P0) + Python SDK (P2) | CLI 最简稳定; SDK 提供更细粒度控制 | impact-analysis-claude-sdk-ga.md |
 | 数据库 | SQLite + FTS5 (modernc.org) | 纯 Go 无 CGO; 嵌入式部署简单 | web-research-tech-stack.md |
-| RPC 框架 | Protobuf + Buf + connect-go | 三协议兼容; 代码生成成熟 | web-research-tech-stack.md |
+| API 协议 | REST JSON + WebSocket typed events | 三人团队更易调试和落地；后续可按需生成类型 | docs/protocol.md |
 | WebSocket 库 | coder/websocket | gorilla 已归档; 并发写安全 | web-research-tech-stack.md |
 | 配置格式 | YAML (Agent) + TOML (Runner) | YAML 人类可读; viper 原生支持 | deep-dive-codex-agent-config.md |
 | 沙箱方案 | Git worktree (默认) | 零依赖; <100ms 启动; git 原生 | cross-analysis-sandbox-tools.md |

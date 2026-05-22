@@ -144,8 +144,8 @@ GitHub 模板：
 
 | # | Issue | 目的 |
 |---|---|---|
-| 1 | M0: 冻结唯一协议源头、事件分类和类型信封 | 防止 Go 服务和 TypeScript UI 的协议漂移。 |
-| 2 | M0: 对齐 Go 服务布局、module 策略和包归属 | 让 `services/` 和 `packages/` 的 Go 导入关系可落地。 |
+| 1 | M0: 冻结 REST API、事件流和类型契约 | 防止 Go 服务和 TypeScript UI 的 API/事件结构漂移。 |
+| 2 | M0: 对齐 Go 服务布局、module 策略和包归属 | 让 `hub-server/`、`edge-server/`、`runner/` 的 Go 边界可落地。 |
 | 3 | M0: 锁定 authority、EventStore 和数据通道契约 | 分清消息、运行、产物和大数据路径的归属。 |
 | 4 | M0: 定义审批策略循环和 workspace 隔离契约 | 让危险命令、路径保护、worktree、apply/discard 可控。 |
 | 5 | M0: 对齐前端实时 store 模型和后端协议 | 让 WebSocket events、stores 和生成类型一致。 |
@@ -162,7 +162,7 @@ GitHub 模板：
 
 写 issue 和文档时优先用白话：
 
-- 写“唯一协议源头”，不要只写没有解释的缩写。
+- 写“API 契约”和“事件契约”，不要只写没有解释的缩写。
 - 谈执行调度时写 `AgentRun queue`。
 - 只有在指持久事件历史时才写 `EventStore`；WebSocket 只是投递通道。
 - 只有在 Hub 帮 UI 和 Edge 转发流量时才写 `relay`。

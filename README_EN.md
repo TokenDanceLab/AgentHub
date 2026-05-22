@@ -35,10 +35,12 @@ Desktop UI ─→ Edge Server ─→ Runner ─→ Claude Code / Codex / OpenCod
 
 | Component | Dir | Responsibility |
 |-----------|-----|---------------|
-| **Hub Server** | `services/hub-server/` | Central IM: users, contacts, groups, message routing, multi-device sync, Edge relay |
-| **Edge Server** | `services/edge-server/` | Local node: projects, memory, context, runner management, syncs to Hub |
-| **Runner** | `services/runner/` | Executor: workspace, process lifecycle, Agent CLI adapters, diff/preview/logs |
-| **Web UI** | `apps/web/` | React IM interface: sidebar, message tree, diff cards, preview panel |
+| **Hub Server** | `hub-server/` | Central IM: users, contacts, groups, message routing, multi-device sync, Edge relay |
+| **Edge Server** | `edge-server/` | Local node: projects, memory, context, runner management, syncs to Hub |
+| **Runner** | `runner/` | Executor: workspace, process lifecycle, Agent CLI adapters, diff/preview/logs |
+| **Desktop App** | `app/desktop/` | Tauri desktop entrypoint and local command center |
+| **Web App** | `app/web/` | React IM interface: sidebar, message tree, diff cards, preview panel |
+| **Shared App** | `app/shared/` | Shared frontend components, state, API client and event client |
 
 > Every machine that runs a Runner is an **Edge Node** — your laptop, a remote server, or a cloud VM.
 
@@ -84,7 +86,7 @@ Orchestrator: Done. Preview running at http://localhost:5173
 | Mobile | PWA |
 | Realtime | WebSocket (coder/websocket) |
 | Database | SQLite + FTS5 (modernc.org/sqlite) |
-| Protocol | Protobuf + Buf + Connect-RPC |
+| Protocol | REST JSON API + WebSocket typed events |
 | Editor | Monaco Editor |
 
 <br>
@@ -93,13 +95,13 @@ Orchestrator: Done. Preview running at http://localhost:5173
 
 ```bash
 # Edge Server (local node)
-cd services/edge-server && go run ./cmd/main.go
+cd edge-server && go run ./cmd/main.go
 
 # Runner (agent executor)
-cd services/runner && go run ./cmd/main.go
+cd runner && go run ./cmd/main.go
 
 # Web UI
-cd apps/web && pnpm dev
+cd app/web && pnpm dev
 ```
 
 > P0 does not require Hub Server. Edge + Runner work offline.
@@ -110,15 +112,21 @@ cd apps/web && pnpm dev
 
 ```
 AgentHub/
-├── apps/                   # React frontends (web, desktop, mobile)
-├── services/               # Go backends (hub-server, edge-server, runner)
-├── packages/               # shared Go + TS libraries
-├── proto/                  # Protobuf schema, the single protocol source
-├── docs/                   # architecture + reference docs
+├── docs/                   # architecture, research, competition materials
 │   └── reference/          # 69 research and engineering specification documents, including Multica Tier-0 reference
-├── .githooks/              # commit-msg + prepare-commit-msg
+├── app/
+│   ├── desktop/            # Tauri desktop app
+│   ├── web/                # Web UI
+│   └── shared/             # shared frontend components, state and API client
+├── hub-server/             # central Hub: auth, IM, groups, sync, relay
+├── edge-server/            # local Edge: projects, context, Runner management
+├── runner/                 # executor: Agent CLI, workspace, diff, preview, logs
+├── api/                    # REST API and WebSocket event contracts
+├── scripts/
 └── .agenthub/              # project memory and rules
 ```
+
+Docker files are colocated with the module that needs them, such as `hub-server/Dockerfile`, `edge-server/compose.yaml`, or `runner/Dockerfile`. A root `compose.yaml` is only for optional cross-module local orchestration.
 
 <br>
 
@@ -132,9 +140,11 @@ AgentHub/
 | [Documentation Language Policy](docs/language-policy.md) | Which docs are Chinese-first and which names stay English |
 | [Chinese Documentation Roadmap](docs/chinese-documentation-roadmap.md) | Batch plan for translating AgentHub-owned docs into Chinese |
 | [DeepSeek Handoff](docs/deepseek-handoff.md) | Handoff prompt and acceptance checklist for translation agents |
+| [Module Boundaries](docs/module-boundaries.md) | Responsibilities after flattening the repo layout |
+| [API Contract](api/) | REST API and WebSocket typed event contract entrypoint |
 | [Research Index](docs/reference/) | 69 cross-repo research and engineering specification documents, organized for Agent navigation |
 | [Implementation Roadmap](docs/reference/04-plan/01-research-to-implementation.md) | P0 minimal system, priority matrix, research-to-code mapping |
-| [Protocol Schema](docs/reference/03-build/backend/13-protobuf-schema.md) | 6 .proto files + buf.gen.yaml |
+| [Protocol Schema Reference](docs/reference/03-build/backend/13-protobuf-schema.md) | Protobuf reference, not a required runtime dependency for M0 |
 
 <br>
 
