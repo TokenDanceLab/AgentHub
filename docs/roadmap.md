@@ -4,7 +4,7 @@
 
 ## 当前总目标
 
-推进 M2 Edge 本地数据层，让前端、后端、客户端三条线能围绕稳定的 Project / Thread / Run / Item / Event 模型并行开发。当前客户端 PR #30 已提供内存态最小实现，`feat/client-thread-messages-maintainer` 已补 message/item 写入链路，`feat/client-run-lifecycle-maintainer` 已抽出 Runner lifecycle 边界，`feat/client-store-boundary-maintainer` 已抽象 Edge store 接口边界，`feat/client-store-persistence-maintainer` 已提供轻量 JSON 文件持久化实现，`feat/client-edge-store-file-flag-maintainer` 已接入 Edge 启动参数 `--store-file`，`feat/client-runner-process-adapter-maintainer` 已补本地进程 executor 边界，`feat/client-runner-workdir-maintainer` 已补本地进程工作目录边界，`feat/client-runner-adapter-profile-maintainer` 已补 generic adapter profile / 命令模板最小层，`feat/client-runner-profile-preset-maintainer` 已补 `agenthub-runner-mock` preset 入口，下一步重点是真实 Runner adapter。
+推进 M2 Edge 本地数据层，让前端、后端、客户端三条线能围绕稳定的 Project / Thread / Run / Item / Event 模型并行开发。当前客户端 PR #30 已提供内存态最小实现，`feat/client-thread-messages-maintainer` 已补 message/item 写入链路，`feat/client-run-lifecycle-maintainer` 已抽出 Runner lifecycle 边界，`feat/client-store-boundary-maintainer` 已抽象 Edge store 接口边界，`feat/client-store-persistence-maintainer` 已提供轻量 JSON 文件持久化实现，`feat/client-edge-store-file-flag-maintainer` 已接入 Edge 启动参数 `--store-file`，`feat/client-runner-process-adapter-maintainer` 已补本地进程 executor 边界，`feat/client-runner-workdir-maintainer` 已补本地进程工作目录边界，`feat/client-runner-adapter-profile-maintainer` 已补 generic adapter profile / 命令模板最小层，`feat/client-runner-profile-preset-maintainer` 已补 `agenthub-runner-mock` preset 入口，`feat/client-runner-context-maintainer` 已让仓库自带 Runner mock 读取 Edge 注入的 Run 上下文，下一步重点是真实 Runner adapter。
 
 ## 路线图分层
 
@@ -34,7 +34,7 @@
 
 - 前端：从 Mock 数据过渡到真实 REST / WebSocket client，承接 UI 同学设计。
 - 后端：实现 Hub Server、Edge-Hub 通信、账号/群聊/同步/中继能力。
-- 客户端：PR #30 推进 Edge 本地数据层，`feat/client-thread-messages-maintainer` 补齐 message/item 写入链路，`feat/client-run-lifecycle-maintainer` 和 `feat/client-store-boundary-maintainer` 分别补齐 lifecycle/store 可替换边界，`feat/client-store-persistence-maintainer` 增加轻量 JSON 文件持久化 store，`feat/client-edge-store-file-flag-maintainer` 将文件 store 接入 Edge 启动入口，`feat/client-runner-process-adapter-maintainer` 增加可测试的本地进程 executor，`feat/client-runner-workdir-maintainer` 增加本地进程工作目录配置，`feat/client-runner-adapter-profile-maintainer` 增加可测试的 generic adapter profile / 命令模板最小层，`feat/client-runner-profile-preset-maintainer` 增加可测试的 `agenthub-runner-mock` preset 入口，后续继续做真实 Runner adapter。
+- 客户端：PR #30 推进 Edge 本地数据层，`feat/client-thread-messages-maintainer` 补齐 message/item 写入链路，`feat/client-run-lifecycle-maintainer` 和 `feat/client-store-boundary-maintainer` 分别补齐 lifecycle/store 可替换边界，`feat/client-store-persistence-maintainer` 增加轻量 JSON 文件持久化 store，`feat/client-edge-store-file-flag-maintainer` 将文件 store 接入 Edge 启动入口，`feat/client-runner-process-adapter-maintainer` 增加可测试的本地进程 executor，`feat/client-runner-workdir-maintainer` 增加本地进程工作目录配置，`feat/client-runner-adapter-profile-maintainer` 增加可测试的 generic adapter profile / 命令模板最小层，`feat/client-runner-profile-preset-maintainer` 增加可测试的 `agenthub-runner-mock` preset 入口，`feat/client-runner-context-maintainer` 让 mock Runner stdout 稳定带上 Run / Project / Thread 上下文，后续继续做真实 Runner adapter。
 
 ## 验收门槛
 
@@ -54,6 +54,7 @@
 - [x] 为 Edge 本地进程 executor 增加工作目录配置边界；这只是本地进程 workdir 能力，不是完整真实 Runner adapter。
 - [x] 为 Edge 本地进程 executor 增加 generic adapter profile / 命令模板最小层，支持从 Run 上下文展开 args/env。
 - [x] 为 Edge 启动入口增加 `--runner-profile agenthub-runner-mock` preset，默认使用仓库自带 Runner mock CLI。
+- [x] 让仓库自带 `agenthub-runner --mock` 读取 Edge 注入的 Run / Project / Thread 环境变量，并在 stdout 输出稳定上下文行。
 - [ ] 将 Runner 真正接入 Edge Run lifecycle，替换 handler 内置 mock flow。
 - [ ] M2 完成后归档或更新 `docs/client-roadmap.md`，避免路线图重复。
 - [ ] 为 Runner 真实 CLI adapter 规划最小测试夹具。

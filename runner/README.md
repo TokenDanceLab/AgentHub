@@ -19,6 +19,14 @@ go build ./cmd/agenthub-runner
 go run ./cmd/agenthub-runner --mock
 ```
 
+Mock 模式会读取 Edge ProcessExecutor 注入的最小 Run 上下文：
+
+| 环境变量 | 说明 |
+|---|---|
+| `AGENTHUB_RUN_ID` | 当前 Run ID；为空时兼容使用 `mock-run-1` |
+| `AGENTHUB_PROJECT_ID` | 当前 Project ID；为空时照常输出空值 |
+| `AGENTHUB_THREAD_ID` | 当前 Thread ID；为空时照常输出空值 |
+
 ### 通过 Edge Runner profile 启动
 
 开发 Edge 本地进程接入时，可以用仓库自带 mock Runner preset：
@@ -47,6 +55,9 @@ agenthub-edge --runner-profile agenthub-runner-mock --runner-command agenthub-ru
 ```text
 INFO starting agent runner in mock mode addr=127.0.0.1:3211
 INFO mock run started id=mock-run-1
+run=mock-run-1
+project=
+thread=
 Installing dependencies...
 Building project...
 Running tests...
@@ -55,7 +66,7 @@ INFO mock run finished id=mock-run-1
 INFO mock run completed successfully
 ```
 
-输出之间有约 80ms 间隔，模拟真实 agent 执行过程。
+前三行 stdout 上下文是稳定输出，便于 Edge 的 `run.output.batch` 事件中看到真实 Run / Project / Thread 关联；后续 mock chunk 之间有约 80ms 间隔，模拟真实 agent 执行过程。
 
 ### 运行测试
 
