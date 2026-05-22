@@ -12,7 +12,7 @@
 
 ## 当前目标
 
-推进 M2 Edge 本地数据层，把 M1 的内存事件流升级为 Project / Thread / Run / Item / Event 模型。当前 PR #30 已完成内存态最小模型，后续继续补持久化、message/item 写入和 Runner lifecycle。
+推进 M2 Edge 本地数据层，把 M1 的内存事件流升级为 Project / Thread / Run / Item / Event 模型。当前 PR #30 已完成内存态最小模型，`feat/client-thread-messages-delicious233` 已补 message/item 写入链路，后续继续补持久化和 Runner lifecycle。
 
 ## 近期任务
 
@@ -23,7 +23,7 @@
 - [x] 补齐 Project / Thread / Item 查询接口。
 - [x] 同步 `api/openapi.yaml`。
 - [ ] 抽象可替换 store 接口并评估 SQLite / 文件持久化。
-- [ ] 补齐 `POST /v1/threads/{threadId}/messages` 到 Item / event 的写入链路。
+- [x] 补齐 `POST /v1/threads/{threadId}/messages` 到 Item / event 的写入链路。
 - [ ] 将 Runner 真正接入 Edge Run lifecycle，替换 handler 内置 mock flow。
 - [ ] 细化 Project / Thread / Item 的 OpenAPI 响应 schema。
 
