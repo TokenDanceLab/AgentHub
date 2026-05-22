@@ -39,7 +39,7 @@ export function createEventStream(cursor?: string) {
     ws.onmessage = (event) => {
       try {
         const envelope: EventEnvelope = JSON.parse(event.data as string);
-        lastCursor = envelope.id;
+        lastCursor = String(envelope.seq);
         for (const handler of handlers) {
           handler(envelope);
         }
