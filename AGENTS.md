@@ -14,7 +14,7 @@
 - 代码标识、目录名、协议字段、branch 名、commit message 保持英文。
 - `docs/reference/**` 是 Agent 和实现阶段使用的深度调研资料，也要逐步中文化；翻译时保留代码、路径、协议字段和原仓库专有名词。
 - `reference/**` 是 clone 下来的第三方参考仓库，不属于 AgentHub 自有文档，默认不翻译、不改写。
-- 不要使用未解释缩写。第一次出现时写中文白话解释，例如写“唯一协议源头”。
+- 不要使用未解释缩写。第一次出现时写中文白话解释，例如写“API 契约”和“事件契约”。
 
 完整规则见 `docs/language-policy.md`。
 
@@ -112,7 +112,7 @@ spike/multica-runtime-model
 - PR 控制在一个同学能一次看完的大小。
 - 有对应 GitHub issue 时，在 PR 中链接。
 - 代码 PR 写清验证命令；暂时无法运行时说明原因。
-- 协议 PR 先改 `proto/agenthub/v1`，后续有生成链路后再同步 Go/TypeScript 产物。
+- 协议 PR 先改 `api/openapi.yaml` 或 `api/events.schema.json`，再同步 Go/TypeScript 实现。
 - 纯文档 PR 写清摘要即可。
 - 当前 GitHub 保护要求走 PR，但还不要求 CI 或 approving review。
 
@@ -132,15 +132,18 @@ spike/multica-runtime-model
 
 ```text
 AgentHub/
-├── apps/           # TS frontends (web, desktop, mobile)
-├── services/       # Go backends (hub-server, edge-server, runner)
-├── packages/       # shared Go + TS packages
-├── proto/          # Protobuf schema, 唯一协议源头
 ├── docs/           # product + architecture + reference
+├── app/            # desktop / web / shared frontend
+├── hub-server/     # central Hub service
+├── edge-server/    # local or remote Edge service
+├── runner/         # Agent CLI executor
+├── api/            # REST API + WebSocket event contracts
 ├── scripts/        # build, migration, codegen
 ├── .githooks/      # commit-msg + prepare-commit-msg
 └── .agenthub/      # project memory and rules
 ```
+
+Docker 配置按模块就近放置，例如 `hub-server/Dockerfile` 或 `edge-server/compose.yaml`。不要恢复根级 `docker/` 目录；只有跨模块一键联调时才新增根级 `compose.yaml`。
 
 ## 6. 文档导航
 
@@ -151,7 +154,9 @@ AgentHub/
 - `docs/chinese-documentation-roadmap.md` - 全仓库中文化路线图
 - `docs/deepseek-handoff.md` - 交给 DeepSeek 执行中文化的交接入口
 - `docs/glossary.md` - 白话术语表
+- `docs/module-boundaries.md` - 扁平化目录后的模块职责
 - `docs/project-management.md` - 里程碑、labels、issue 聚合规则
+- `api/README.md` - REST API 和 WebSocket event 契约入口
 - `docs/reference/README.md` - 调研索引和 Agent 阅读路线
 - `docs/reference/01-learn/` - 外部仓库调研和源码提取
 - `docs/reference/02-decide/` - 跨仓库比较和取舍分析
@@ -162,7 +167,7 @@ AgentHub/
 
 - 写代码前先读相关 `docs/reference/` 文档。
 - Adapter 设计遵循 `docs/reference/03-build/backend/04-adapter-sdk.md`。
-- 协议变更先更新 `proto/agenthub/v1`，再生成 Go + TypeScript 类型，最后实现服务和 UI。
+- 协议变更先更新 `api/openapi.yaml` 或 `api/events.schema.json`，再同步 Go + TypeScript 实现。
 - 新调研发现放进合适的 `01-learn/` 或 `02-decide/` 路径。
 - Commit message 使用 `type(scope): 中文摘要` 格式。
 
@@ -175,7 +180,7 @@ AgentHub/
 - 架构、协议、目录结构、分支流程、GitHub issue 管理发生变化。
 - GitHub issue / PR 语言、模板或标题规范发生变化。
 - 新增或调整重要调研结论，例如 Multica、Ruflo、Paperclip、ByteDance 比赛材料。
-- 新增 `docs/*.md`、`docs/reference/**`、`services/*/README.md`、`packages/*/README.md`。
+- 新增 `docs/*.md`、`docs/reference/**`、`hub-server/README.md`、`edge-server/README.md`、`runner/README.md`、`api/README.md`。
 - 发现 README、AGENTS、术语表、项目管理文档互相矛盾。
 - 完成一个 milestone、PR 或大范围文档整理前。
 

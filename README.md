@@ -35,10 +35,12 @@ Desktop UI ─→ Edge Server ─→ Runner ─→ Claude Code / Codex / OpenCod
 
 | 组件 | 目录 | 职责 |
 |------|------|------|
-| **Hub Server** | `services/hub-server/` | 中心 IM：用户、联系人、群聊、消息路由、多端同步、Edge 中继 |
-| **Edge Server** | `services/edge-server/` | 本地节点：项目、记忆、上下文、Runner 管理、同步到 Hub |
-| **Runner** | `services/runner/` | 执行器：workspace、进程管理、Agent CLI 适配、Diff/预览/日志 |
-| **Web UI** | `apps/web/` | React IM 界面：侧边栏、消息树、Diff 卡片、预览面板 |
+| **Hub Server** | `hub-server/` | 中心 IM：用户、联系人、群聊、消息路由、多端同步、Edge 中继 |
+| **Edge Server** | `edge-server/` | 本地节点：项目、记忆、上下文、Runner 管理、同步到 Hub |
+| **Runner** | `runner/` | 执行器：workspace、进程管理、Agent CLI 适配、Diff/预览/日志 |
+| **Desktop App** | `app/desktop/` | Tauri 桌面端入口，负责本地工作台体验 |
+| **Web App** | `app/web/` | React IM 界面：侧边栏、消息树、Diff 卡片、预览面板 |
+| **Shared App** | `app/shared/` | 前端共用组件、状态、API client 和事件 client |
 
 > 任何能运行 Runner 的机器都是 **Edge Node**——你的笔记本、远程服务器、云端 VM。
 
@@ -84,7 +86,7 @@ Orchestrator: 完成。预览地址 http://localhost:5173
 | 移动端 | PWA |
 | 实时通信 | WebSocket (coder/websocket) |
 | 数据库 | SQLite + FTS5 (modernc.org/sqlite) |
-| 协议 | Protobuf + Buf + Connect-RPC |
+| 协议 | REST JSON API + WebSocket typed events |
 | 编辑器 | Monaco Editor |
 
 <br>
@@ -93,13 +95,13 @@ Orchestrator: 完成。预览地址 http://localhost:5173
 
 ```bash
 # Edge Server（本地节点）
-cd services/edge-server && go run ./cmd/main.go
+cd edge-server && go run ./cmd/main.go
 
 # Runner（Agent 执行器）
-cd services/runner && go run ./cmd/main.go
+cd runner && go run ./cmd/main.go
 
 # Web UI
-cd apps/web && pnpm dev
+cd app/web && pnpm dev
 ```
 
 > P0 阶段不需要 Hub Server。Edge + Runner 可离线独立运行。
@@ -110,15 +112,21 @@ cd apps/web && pnpm dev
 
 ```
 AgentHub/
-├── apps/                   # React 前端（web、desktop、mobile）
-├── services/               # Go 后端（hub-server、edge-server、runner）
-├── packages/               # 共享 Go + TS 库
-├── proto/                  # Protobuf Schema（唯一协议源）
-├── docs/                   # 架构 + 调研文档
+├── docs/                   # 架构、调研、比赛材料
 │   └── reference/          # 69 份调研和工程规格文档，包含 Multica Tier-0 参考
-├── .githooks/              # commit-msg + prepare-commit-msg
+├── app/
+│   ├── desktop/            # Tauri 桌面端入口
+│   ├── web/                # Web UI
+│   └── shared/             # 前端共享组件、状态和 API client
+├── hub-server/             # 中心 Hub：账号、IM、群聊、同步、中继
+├── edge-server/            # 本地 Edge：项目、上下文、Runner 管理
+├── runner/                 # 执行器：Agent CLI、workspace、diff、preview、logs
+├── api/                    # REST API 和 WebSocket event 契约
+├── scripts/
 └── .agenthub/              # 项目记忆和规则
 ```
+
+Docker 配置不再放根级 `docker/`。如果某个模块需要容器化，就在对应模块内放自己的 `Dockerfile`、`compose.yaml` 或部署说明；只有需要一键联调多个模块时，才考虑新增根级 `compose.yaml`。
 
 <br>
 
@@ -132,9 +140,11 @@ AgentHub/
 | [文档语言规则](docs/language-policy.md) | 哪些文档中文优先，哪些内容保留英文 |
 | [中文化路线图](docs/chinese-documentation-roadmap.md) | 交给 DeepSeek 等低成本模型分批翻译和校对的执行清单 |
 | [DeepSeek 交接文档](docs/deepseek-handoff.md) | 可直接复制给 DeepSeek 执行的任务说明和验收要求 |
+| [模块边界](docs/module-boundaries.md) | 扁平化目录后的 Hub、Edge、Runner、App、API 职责 |
+| [API 契约](api/) | REST API 和 WebSocket typed events 的契约入口 |
 | [调研索引](docs/reference/) | 69 份跨仓库深度分析和工程规格，Agent 友好的四层结构 |
 | [实现路线图](docs/reference/04-plan/01-research-to-implementation.md) | P0 最小系统、优先级矩阵、调研到代码映射 |
-| [Protocol Schema](docs/reference/03-build/backend/13-protobuf-schema.md) | 6 个 .proto 文件 + buf.gen.yaml |
+| [Protocol Schema 参考](docs/reference/03-build/backend/13-protobuf-schema.md) | Protobuf 方案参考，当前不作为主协议强依赖 |
 
 <br>
 

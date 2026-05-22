@@ -1,7 +1,7 @@
 # AgentHub Hub Server 需求文档
 
 > 本文来自 `origin/server—hub` 分支的 Hub Server 需求草案，已经迁移到统一的 reference 文档区。
-> 它用于描述中心 IM、好友、群聊、Agent 元数据、消息和任务路由需求；具体工程结构、数据库和消息队列选型仍需继续对齐 `docs/architecture.md`、`docs/reference/03-build/backend/02-go-services.md` 和 `proto/agenthub/v1`。
+> 它用于描述中心 IM、好友、群聊、Agent 元数据、消息和任务路由需求；具体工程结构、数据库和消息队列选型仍需继续对齐 `docs/architecture.md`、`docs/module-boundaries.md` 和 `api/`。
 
 ## 1. 项目定位
 

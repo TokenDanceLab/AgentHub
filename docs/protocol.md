@@ -1,215 +1,158 @@
 # AgentHub 协议
 
-日期：2026-05-21
+日期：2026-05-22
 
 ## 原则
 
-AgentHub 使用 **proto-first 协议**。
+AgentHub 当前主协议采用 **REST JSON API + WebSocket typed events**。
 
 ```text
-proto/agenthub/v1      = 唯一协议源头
-packages/protocol/ts   = 生成的 TypeScript 类型
-packages/protocol/go   = 生成的 Go struct
+api/openapi.yaml       = REST API 契约
+api/events.schema.json = WebSocket event 契约
+docs/protocol.md       = 人读说明：接口、事件、错误、版本和兼容规则
 ```
 
-`proto/agenthub/v1` 下的 Protobuf 定义是权威协议定义。TypeScript 和 Go 类型必须从 proto 生成，避免 UI、Hub、Edge 和 Runner 之间类型漂移。OpenAPI / AsyncAPI 文档可以后续生成或派生，但不是主要协议源。
-
-Hub Server、Edge Server 和 Runner 是 Go 服务。TypeScript 协议输出仅供 UI 和客户端代码使用。
-
-## 包布局
-
-```text
-packages/protocol/
-  ts/
-    generated/
-  go/
-    generated/
-```
-
-P0 可以先用手写的 `.proto` 文件，生成类型可以在第一批事件形态稳定后加入。proto 文件始终是契约，即使生成尚未自动化。
+REST API 负责命令和查询，WebSocket 负责实时事件流。Go 服务和 TypeScript 前端都按 `api/` 下的契约实现。Protobuf、Connect-RPC、JSON-RPC 可以作为未来升级或局部 bridge 方案，但不是 M0 主链路的强制依赖。
 
 ## 协议面
 
 | 面 | 方向 | 用途 |
 |---|---|---|
-| UI <-> Edge | Desktop UI 到本地 Edge | 本地会话、本地 run、本地 artifact |
-| UI <-> Hub | Web/Mobile 到 Hub | 云端会话、远程控制、设备状态 |
-| Edge <-> Hub | reverse WSS + sync API | 注册、同步、中继、远程命令 |
-| Edge <-> Runner | local/direct/relay transport | 启动 run、流式事件、取消、读取 artifact |
+| UI <-> Edge | REST JSON API + WebSocket EventStream | Desktop 本地会话、本地 run、本地 artifact |
+| UI <-> Hub | REST JSON API + WebSocket EventStream | Web/Mobile 云端会话、远程控制、设备状态 |
+| Edge <-> Hub | REST sync API + reverse WebSocket relay | 注册、同步、中继、远程命令 |
+| Edge <-> Runner | local REST API + typed event stream | 启动 run、取消、流式事件、读取 artifact |
 
-运行时通信在合适位置使用 JSON-RPC 风格的 request/response/notification 信封：
+## REST API
 
-```text
-UI <-> Edge      JSON-RPC over WebSocket
-Edge <-> Runner  JSON-RPC over local HTTP/WebSocket/stdio
-Edge <-> Hub     JSON-RPC over reverse WSS
-Hub <-> Web      JSON-RPC over WebSocket + REST 处理简单读操作
-```
-
-## Method Surface
+P0/P1 先覆盖这些接口：
 
 ```text
-project/list
-project/open
-
-thread/create
-thread/list
-thread/read
-
-turn/start
-turn/interrupt
-turn/resume
-
-item/subscribe
-item/created
-item/updated
-
-approval/decide
-
-artifact/list
-artifact/read
-artifact/apply
-artifact/discard
-
-runner/list
-runner/status
-
-hub/connect
-hub/sync
+GET    /v1/projects
+POST   /v1/projects
+GET    /v1/threads
+POST   /v1/threads
+GET    /v1/threads/{threadId}
+POST   /v1/runs
+POST   /v1/runs/{runId}:cancel
+POST   /v1/approvals/{approvalId}:decide
+GET    /v1/artifacts/{artifactId}
+GET    /v1/events
 ```
 
-## 核心类型
+`GET /v1/events` 只负责建立 WebSocket 连接、鉴权和恢复参数；具体 event payload 由 `api/events.schema.json` 定义。
+
+## WebSocket Event
+
+实时事件统一使用 event envelope：
+
+```json
+{
+  "version": "v1",
+  "id": "evt_123",
+  "seq": 42,
+  "type": "run.output",
+  "traceId": "trace_abc",
+  "sentAt": "2026-05-22T12:00:00Z",
+  "payload": {
+    "runId": "run_1",
+    "stream": "stdout",
+    "text": "running tests..."
+  }
+}
+```
+
+核心事件：
+
+```text
+message.created
+message.delta
+run.started
+run.output
+run.status.changed
+approval.requested
+artifact.created
+preview.ready
+run.finished
+error
+```
+
+## 错误格式
+
+REST API 错误统一返回：
+
+```json
+{
+  "error": {
+    "code": "approval_required",
+    "message": "需要审批后才能执行该命令",
+    "traceId": "trace_abc",
+    "details": {}
+  }
+}
+```
+
+WebSocket 错误使用 `type=error` 的 event envelope，payload 复用同一套 error object。
+
+## 类型规则
+
+核心 ID 类型保持字符串：
 
 ```ts
-type NodeId = string
+type ProjectId = string
 type ConversationId = string
-type MessageId = string
+type ThreadId = string
+type TurnId = string
 type RunId = string
 type ArtifactId = string
 ```
 
-### Conversation
+核心模型包括：
 
-```ts
-type Conversation = {
-  id: ConversationId
-  type: "direct" | "group"
-  title: string
-  projectId?: string
-  authority: ConversationAuthority
-  execution?: ExecutionAuthority
-  pinned: boolean
-  archived: boolean
-  lastMessageAt: string
-}
+```text
+Project
+Conversation
+Thread
+Turn
+AgentRun
+Item
+Artifact
+ApprovalRequest
+ApprovalDecision
+EdgeEvent
 ```
 
-### Message
+模型归属见 [module-boundaries.md](module-boundaries.md)。
 
-```ts
-type Message = {
-  id: MessageId
-  conversationId: ConversationId
-  senderType: "user" | "agent" | "system" | "runner"
-  senderId: string
-  content: string
-  mentions: string[]
-  status: "sending" | "streaming" | "done" | "failed"
-  artifactIds: ArtifactId[]
-  createdAt: string
-}
+## 版本和兼容
+
+- URL 使用 `/v1/` 前缀。
+- Event envelope 使用 `version: "v1"`。
+- `id` 用于事件唯一标识。
+- `seq` 用于同一 stream 内的顺序、回放和去重。
+- `traceId` 用于串联 UI、Hub、Edge、Runner 的一次请求。
+- 新增字段必须向后兼容；删除或改语义需要升版本。
+
+## JSON-RPC 的位置
+
+JSON-RPC 不作为 UI、Hub、Edge、Runner 主协议。它可以局部用于：
+
+```text
+Go Runner <-> Python/Node sidecar
+Go Runner <-> Claude SDK bridge
+stdio bridge start/cancel/shutdown
 ```
 
-### Runner Command
-
-```ts
-type RunnerCommand =
-  | { type: "run.start"; runId: RunId; agentId: string; workspaceId: string; prompt: string }
-  | { type: "run.cancel"; runId: RunId }
-  | { type: "artifact.read"; artifactId: ArtifactId }
-```
-
-### Runner Event
-
-```ts
-type RunnerEvent =
-  | { type: "run.started"; runId: RunId; runnerId: string; startedAt: string }
-  | { type: "run.output"; runId: RunId; stream: "stdout" | "stderr"; text: string }
-  | { type: "artifact.created"; runId: RunId; artifact: Artifact }
-  | { type: "run.finished"; runId: RunId; status: "succeeded" | "failed" | "cancelled"; endedAt: string }
-```
-
-### Server Event
-
-```ts
-type ServerEvent =
-  | { type: "message.created"; message: Message }
-  | { type: "message.delta"; messageId: MessageId; delta: string }
-  | { type: "run.event"; runId: RunId; event: RunnerEvent }
-  | { type: "artifact.created"; artifact: Artifact }
-```
-
-### Edge Event
-
-```ts
-type EdgeEvent = {
-  id: string
-  edgeId: string
-  seq: number
-  type:
-    | "message.created"
-    | "run.started"
-    | "run.status.changed"
-    | "artifact.created"
-    | "memory.updated"
-    | "summary.updated"
-  payload: unknown
-  createdAt: string
-  syncStatus: "pending" | "synced" | "failed"
-}
-```
-
-### Edge-Hub Relay
-
-```ts
-type EdgeToHubEvent =
-  | { type: "edge.register"; edgeId: string; deviceName: string; capabilities: string[] }
-  | { type: "edge.heartbeat"; edgeId: string; runners: RunnerStatus[] }
-  | { type: "sync.events"; edgeId: string; events: EdgeEvent[] }
-  | { type: "run.event"; edgeId: string; runId: RunId; event: RunnerEvent }
-  | { type: "artifact.metadata"; edgeId: string; artifact: Artifact }
-
-type HubToEdgeCommand =
-  | { type: "run.start"; targetRunnerId: string; command: RunnerCommand }
-  | { type: "run.stop"; runId: RunId }
-  | { type: "message.deliver"; conversationId: ConversationId; message: Message }
-  | { type: "sync.ack"; edgeId: string; lastSeq: number }
-  | { type: "preview.request"; runId: RunId }
-```
-
-## 版本化
-
-每条协议消息最终应携带：
-
-```ts
-type ProtocolEnvelope<T> = {
-  version: "v1"
-  id: string
-  traceId?: string
-  sentAt: string
-  payload: T
-}
-```
-
-P0 本地 API 可以省略信封，但 Edge-Hub relay 应从第一天使用。
+这些 bridge 事件进入 AgentHub 后，必须转换成标准 typed events。
 
 ## P0 范围
 
 P0 只需要：
 
-- UI <-> Edge 消息 API。
-- Edge <-> Runner `run.start`、`run.output`、`artifact.created`、`run.finished`。
+- UI <-> Edge 的 REST API。
+- UI <-> Edge 的 WebSocket event stream。
+- Edge <-> Runner 的 `run.start`、`run.output`、`artifact.created`、`run.finished`。
 - 本地 Artifact 引用。
-- Hub 注册类型的占位定义。
+- Hub 注册和 relay 类型的占位定义。
 
-Hub relay、生成的客户端和完整 OpenAPI/AsyncAPI 自动化可以在本地循环稳定后加入。
+Hub relay、生成客户端和完整 OpenAPI 自动化可以在本地循环稳定后加入。

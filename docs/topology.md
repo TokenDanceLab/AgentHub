@@ -532,46 +532,28 @@ type ArtifactLocation =
 - 小的高价值 artifact 可由 Hub 缓存。
 - Workspace 内容默认不上传。
 
-## 11. 模块复用
+## 11. 模块边界
 
-Hub 和 Edge 不应重复 IM 逻辑。
-
-```text
-packages/im-core
-  conversation model
-  message model
-  thread model
-  mention parser
-
-packages/memory-core
-  project memory
-  conversation summary
-  context builder
-  pinned messages
-
-packages/artifact-core
-  artifact model
-  preview route
-  diff metadata
-```
-
-Edge 使用的包：
+仓库已采用扁平结构，不再保留顶层 `packages/`。共享职责先写入 `docs/module-boundaries.md` 和 `api/` 契约，Go 代码落地后再按实际需要提取内部 package。
 
 ```text
-im-core + memory-core + artifact-core + runner-manager + hub-client
+app/shared      前端共享组件、状态、API client、事件 client
+hub-server      中心账号、IM、群聊、同步、中继
+edge-server     本地项目、上下文、Runner 管理、审批、EventStore
+runner          Agent CLI 执行、workspace、diff、preview、logs
+api             REST API 和 WebSocket event 契约
 ```
 
-Hub 使用的包：
+领域模型归属：
 
 ```text
-im-core + memory-core + artifact-core + auth + sync + relay + device-registry
+Conversation authority 决定 Conversation/Thread 主写入方。
+Execution authority 决定 AgentRun 的目标 Edge/Runner/workspace。
+Artifact 元数据可同步，字节内容按需获取。
+Approval 决策归 Edge，执行等待归 Runner。
 ```
 
-Runner 使用的包：
-
-```text
-protocol + adapters + workspace + artifact-core
-```
+细节见 [module-boundaries.md](module-boundaries.md)。
 
 ## 12. 最终架构声明
 

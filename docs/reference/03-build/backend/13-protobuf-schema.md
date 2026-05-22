@@ -1,5 +1,7 @@
 # AgentHub Protocol Buffers Schema
 
+> 2026-05-22 更新：本文是 Protobuf / Connect-RPC 方案参考，不是当前 M0 主协议入口。当前协议入口为 `api/openapi.yaml`、`api/events.schema.json` 和 `docs/protocol.md`，主链路采用 REST JSON API + WebSocket typed events。
+>
 > 基于 design-protocol.md（1,894 行 Go 类型定义）直接翻译
 > 配合 Buf v2 + connect-go 工作流（见 web-research-tech-stack.md）
 
