@@ -5,6 +5,9 @@ import (
 	"testing"
 )
 
+var _ Repository = (*Store)(nil)
+var _ RunLifecycleStore = (*Store)(nil)
+
 func TestStoreCreatesProjectThreadRunAndItem(t *testing.T) {
 	s := New()
 

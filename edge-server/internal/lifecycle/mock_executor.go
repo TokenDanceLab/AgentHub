@@ -16,7 +16,7 @@ type MockExecutorOption func(*MockExecutor)
 
 type MockExecutor struct {
 	bus       *events.Bus
-	store     *store.Store
+	store     store.RunLifecycleStore
 	stepDelay time.Duration
 	outputs   []OutputBatch
 	failRuns  map[string]error
@@ -30,7 +30,7 @@ type OutputBatch struct {
 	Text   string
 }
 
-func NewMockExecutor(bus *events.Bus, store *store.Store, opts ...MockExecutorOption) *MockExecutor {
+func NewMockExecutor(bus *events.Bus, store store.RunLifecycleStore, opts ...MockExecutorOption) *MockExecutor {
 	e := &MockExecutor{
 		bus:       bus,
 		store:     store,
