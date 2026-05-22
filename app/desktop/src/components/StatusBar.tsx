@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { HealthResponse } from '@shared/types';
 import styles from './StatusBar.module.css';
 
@@ -9,18 +10,20 @@ interface Props {
 }
 
 export default function StatusBar({ online, health, isConnected, error }: Props) {
+  const { t } = useTranslation();
+
   return (
     <>
       <div className={styles.bar}>
         <span className={`${styles.dot} ${online ? styles.dotOnline : styles.dotOffline}`} />
         <span>
           {online
-            ? `Local Edge: Online — ${health?.version ?? 'v1'} (${health?.edgeId ?? '?'})`
-            : 'Local Edge: Offline'}
+            ? t('status.online', { version: health?.version ?? 'v1', edgeId: health?.edgeId ?? '?' })
+            : t('status.offline')}
         </span>
         <span className={styles.spacer} />
         <span className={styles.wsStatus}>
-          WS: {isConnected ? 'Connected' : '—'}
+          {isConnected ? t('status.wsConnected') : t('status.wsDisconnected')}
         </span>
       </div>
       {error && <div className={styles.error}>{error}</div>}

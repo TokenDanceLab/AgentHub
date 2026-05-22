@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { Runner } from '@shared/types';
 import styles from './RunnerList.module.css';
 
@@ -19,12 +20,14 @@ function statusClass(status: string): string {
 }
 
 export default function RunnerList({ runners, online }: Props) {
+  const { t } = useTranslation();
+
   return (
     <div className={styles.sidebar}>
-      <div className={styles.title}>Runners</div>
+      <div className={styles.title}>{t('runner.title')}</div>
       {runners.length === 0 ? (
         <div className={styles.empty}>
-          {online ? 'No runners connected' : 'Waiting for Edge...'}
+          {online ? t('runner.emptyOnline') : t('runner.emptyOffline')}
         </div>
       ) : (
         runners.map((r) => (

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useHealth } from '@/hooks/useHealth';
 import { useRunners } from '@/hooks/useRunners';
 import { useEventStream } from '@/hooks/useEventStream';
@@ -9,6 +10,7 @@ import EventLog from '@/components/EventLog';
 import styles from '@/App.module.css';
 
 export default function App() {
+  const { t } = useTranslation();
   const { online, health } = useHealth();
   const runners = useRunners(online);
   const { events, isConnected, clearEvents } = useEventStream(online);
@@ -20,7 +22,7 @@ export default function App() {
       setError(null);
       console.log('run started:', run.runId);
     } catch (e) {
-      setError(`Failed to start run: ${e}`);
+      setError(t('error.streamError', { message: String(e) }));
     }
   };
 
@@ -35,10 +37,10 @@ export default function App() {
 
       <div className={styles.toolbar}>
         <button className={styles.btn} onClick={handleStartRun} disabled={!online}>
-          Start Mock Run
+          {t('action.startRun')}
         </button>
         <button className={styles.btn} onClick={clearEvents}>
-          Clear Events
+          {t('action.clearEvents')}
         </button>
       </div>
 

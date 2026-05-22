@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { LogEntry } from '@/hooks/useEventStream';
 import styles from './EventLog.module.css';
 
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function EventLog({ events, online }: Props) {
+  const { t } = useTranslation();
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -18,11 +20,11 @@ export default function EventLog({ events, online }: Props) {
 
   return (
     <div className={styles.panel}>
-      <div className={styles.title}>Events</div>
+      <div className={styles.title}>{t('event.title')}</div>
       <div ref={listRef} className={styles.list}>
         {events.length === 0 ? (
           <div className={styles.empty}>
-            {online ? 'Waiting for events...' : 'Start Edge Server to receive events'}
+            {online ? t('event.emptyOnline') : t('event.emptyOffline')}
           </div>
         ) : (
           events.map((e, i) => (
