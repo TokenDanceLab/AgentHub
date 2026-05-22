@@ -105,6 +105,44 @@ func New() *Store {
 	}
 }
 
+func (s *Store) snapshot() fileSnapshot {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return fileSnapshot{
+		Projects:     copyMap(s.projects),
+		Threads:      copyMap(s.threads),
+		Runs:         copyMap(s.runs),
+		Items:        copyMap(s.items),
+		ProjectOrder: append([]string(nil), s.projectOrder...),
+		ThreadOrder:  append([]string(nil), s.threadOrder...),
+		RunOrder:     append([]string(nil), s.runOrder...),
+		ItemOrder:    append([]string(nil), s.itemOrder...),
+	}
+}
+
+func (s *Store) applySnapshot(snapshot fileSnapshot) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.projects = copyMap(snapshot.Projects)
+	s.threads = copyMap(snapshot.Threads)
+	s.runs = copyMap(snapshot.Runs)
+	s.items = copyMap(snapshot.Items)
+	s.projectOrder = append([]string(nil), snapshot.ProjectOrder...)
+	s.threadOrder = append([]string(nil), snapshot.ThreadOrder...)
+	s.runOrder = append([]string(nil), snapshot.RunOrder...)
+	s.itemOrder = append([]string(nil), snapshot.ItemOrder...)
+}
+
+func copyMap[K comparable, V any](source map[K]V) map[K]V {
+	copied := make(map[K]V, len(source))
+	for key, value := range source {
+		copied[key] = value
+	}
+	return copied
+}
+
 func (s *Store) CreateProject(id, name string) Project {
 	s.mu.Lock()
 	defer s.mu.Unlock()
