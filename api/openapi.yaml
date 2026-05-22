@@ -326,9 +326,23 @@ paths:
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ThreadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateThreadMessageRequest"
       responses:
         "201":
-          $ref: "#/components/responses/Created"
+          description: Message item created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
 
   /v1/items/{itemId}:
     get:
@@ -1277,6 +1291,44 @@ components:
         threadId:
           type: string
           description: Thread to bind the run to. Defaults to the local thread in P0 compatibility mode.
+    CreateThreadMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          description: Message body. Whitespace-only content is rejected by the Edge server.
+        role:
+          type: string
+          default: user
+          description: Message role. Defaults to user when omitted.
+    Item:
+      type: object
+      required: [itemId, projectId, threadId, type, status, createdAt, updatedAt]
+      properties:
+        itemId:
+          type: string
+        projectId:
+          type: string
+        threadId:
+          type: string
+        runId:
+          type: string
+        type:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     Run:
       type: object
       required: [runId, projectId, threadId, status, createdAt]

@@ -200,6 +200,35 @@ func (h *Handler) GetThreadItems(w http.ResponseWriter, r *http.Request, threadI
 	writeJSON(w, http.StatusOK, listResponse(h.Store.ListThreadItems(threadID)))
 }
 
+func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, threadID string) {
+	var req struct {
+		Content string `json:"content"`
+		Role    string `json:"role"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("BAD_REQUEST", "invalid json body"))
+		return
+	}
+	if strings.TrimSpace(req.Content) == "" {
+		writeJSON(w, http.StatusBadRequest, errorResponse("BAD_REQUEST", "content is required"))
+		return
+	}
+
+	item, err := ensureStore(h).CreateThreadMessage(genID("item_"), threadID, req.Role, req.Content)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errorResponse("NOT_FOUND", "thread not found"))
+		return
+	}
+	scope := map[string]any{
+		"projectId": item.ProjectID,
+		"threadId":  item.ThreadID,
+		"itemId":    item.ID,
+	}
+	h.Bus.Publish("message.created", scope, item)
+	h.Bus.Publish("item.created", scope, item)
+	writeJSON(w, http.StatusCreated, item)
+}
+
 func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 	itemID := strings.TrimPrefix(r.URL.Path, "/v1/items/")
 	if item, ok := ensureStore(h).GetItem(itemID); ok {
@@ -503,6 +532,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		if strings.HasSuffix(r.URL.Path, "/items") && r.Method == http.MethodGet {
 			threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/items")
 			h.GetThreadItems(w, r, threadID)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/messages") && r.Method == http.MethodPost {
+			threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/messages")
+			h.PostThreadMessage(w, r, threadID)
 			return
 		}
 		if r.Method == http.MethodGet {

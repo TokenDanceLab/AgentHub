@@ -45,6 +45,45 @@ func TestStoreCreatesProjectThreadRunAndItem(t *testing.T) {
 	}
 }
 
+func TestStoreCreatesThreadMessageItem(t *testing.T) {
+	s := New()
+	project := s.CreateProject("proj_test", "Test Project")
+	thread, err := s.CreateThread("thread_test", project.ID, "Test Thread")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+
+	item, err := s.CreateThreadMessage("item_msg", thread.ID, "", "hello")
+	if err != nil {
+		t.Fatalf("CreateThreadMessage returned error: %v", err)
+	}
+	if item.ProjectID != project.ID || item.ThreadID != thread.ID {
+		t.Fatalf("message item scope = %#v, want project/thread binding", item)
+	}
+	if item.Type != "user_message" {
+		t.Fatalf("item type = %q, want user_message", item.Type)
+	}
+	if item.Role != "user" {
+		t.Fatalf("item role = %q, want user", item.Role)
+	}
+	if item.Status != "created" {
+		t.Fatalf("item status = %q, want created", item.Status)
+	}
+	if item.Content != "hello" {
+		t.Fatalf("item content = %q, want hello", item.Content)
+	}
+}
+
+func TestStoreRejectsThreadMessageForMissingThread(t *testing.T) {
+	s := New()
+	s.CreateProject("proj_test", "Test Project")
+
+	_, err := s.CreateThreadMessage("item_msg", "thread_missing", "user", "hello")
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("CreateThreadMessage error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestStoreRejectsRunForMissingThread(t *testing.T) {
 	s := New()
 	s.CreateProject("proj_test", "Test Project")

@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -259,6 +260,28 @@ func (s *Store) CreateItem(item Item) (Item, error) {
 	s.items[item.ID] = item
 	s.itemOrder = append(s.itemOrder, item.ID)
 	return item, nil
+}
+
+func (s *Store) CreateThreadMessage(itemID, threadID, role, content string) (Item, error) {
+	s.mu.RLock()
+	thread, ok := s.threads[threadID]
+	s.mu.RUnlock()
+	if !ok {
+		return Item{}, ErrNotFound
+	}
+	role = strings.TrimSpace(role)
+	if role == "" {
+		role = "user"
+	}
+	return s.CreateItem(Item{
+		ID:        itemID,
+		ProjectID: thread.ProjectID,
+		ThreadID:  thread.ID,
+		Type:      "user_message",
+		Role:      role,
+		Status:    "created",
+		Content:   content,
+	})
 }
 
 func (s *Store) GetItem(id string) (Item, bool) {
