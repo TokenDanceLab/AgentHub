@@ -28,8 +28,8 @@
 - [x] 中文化 `.codex/skills/set-goal/`。
 - [x] 同步 `AGENTS.md` 的路线图路径说明。
 - [x] 运行文档和 API 最小校验。
-- [ ] 提交当前仓库治理增量。
-- [ ] 推送分支并创建 PR 到 `master`。
+- [x] 提交当前仓库治理增量。
+- [x] 推送分支并创建 PR 到 `master`。
 
 ## 验收记录
 
@@ -37,3 +37,4 @@
 - 通过：`python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"`
 - 已检查：`git status --short --branch`
 - 已检查：只放行 `.codex/skills/set-goal/**`，未放行其它 `.codex` 本机状态。
+- PR：`https://github.com/TokenDanceLab/AgentHub/pull/27`
