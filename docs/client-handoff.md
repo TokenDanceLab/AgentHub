@@ -28,6 +28,8 @@ git checkout feat/client-dev
 .\scripts\setup.ps1          # 启用 git hooks
 cd app\desktop
 pnpm install
+cd ..\web
+pnpm install
 ```
 
 ## 3. 项目结构
@@ -67,6 +69,13 @@ AgentHub/
 │       │   └── locales/         # zh.json / en.json
 │       ├── styles/tokens.css    # CSS 变量
 │       └── App.tsx              # 根布局编排
+│   └── web/
+│       ├── src/config.ts        # Web Edge URL / 轮询间隔 / 事件上限
+│       ├── src/api/             # Web REST 和 WebSocket client
+│       ├── src/hooks/           # health / runners / workbench events
+│       ├── src/state/           # Web 工作台事件折叠 reducer
+│       ├── src/components/      # 三栏工作台 shell
+│       └── src/__tests__/       # Web 单元测试
 └── scripts/
     ├── setup.ps1
     └── client-smoke.ps1         # 29 项自动冒烟
@@ -90,7 +99,24 @@ pnpm dev --port 5199
 
 不需要启动 Tauri 壳，浏览器里就是完整功能。
 
-### 4.2 带 Tauri 壳
+### 4.2 Web 工作台架构预览
+
+`app/web` 是独立的 React Web 工作台入口，用于推进三栏 IM 工作台、Diff/Preview/Logs 面板和后续 Web/PWA 形态。当前 Web 入口复用 Local Edge 的 health、runners、runs 和 WebSocket events，不另起协议。
+
+```powershell
+# 终端 1: 启动 Edge
+cd edge-server
+go run ./cmd/agenthub-edge
+
+# 终端 2: 启动 Web 工作台
+cd app/web
+pnpm install
+pnpm dev
+```
+
+浏览器打开 `http://127.0.0.1:5180`。当前 Web 工作台包含可替换的三栏架构 shell；正式视觉稿和面板细节仍由前端 UI 同学继续设计。
+
+### 4.3 带 Tauri 壳
 
 ```powershell
 # 先启动 Edge Server
@@ -102,7 +128,7 @@ cd app/desktop
 pnpm tauri dev
 ```
 
-### 4.3 跑 Mock Runner（可选）
+### 4.4 跑 Mock Runner（可选）
 
 ```powershell
 cd runner
@@ -178,6 +204,11 @@ pnpm test:e2e:ui    # 带 UI 模式
 # TypeScript + Vite 构建
 pnpm build
 
+# Web 工作台
+cd ..\web
+pnpm test
+pnpm build
+
 # 全链路冒烟
 .\scripts\client-smoke.ps1
 
@@ -203,10 +234,12 @@ E2e 测试位于 `app/desktop/e2e/`，共 17 条用例，分 online/offline 两�
 
 ## 8. 数据流速查
 
-```
-config.ts → api/ → hooks/ → App → components(props)
-                                ↑
-                           i18n/locales/
+```text
+Desktop: config.ts → api/ → hooks/ → App → components(props)
+                                      ↑
+                                 i18n/locales/
+
+Web:     config.ts → api/ → hooks/ → state reducer → App → WorkbenchShell(props)
 ```
 
 - `useHealth()` — 每 5s 调 `GET /v1/health`，返回 `{ online, health }`
@@ -216,6 +249,7 @@ config.ts → api/ → hooks/ → App → components(props)
   - 断线自动重连（1s → 2s → 4s → max 30s），cursor 用 seq 去重
   - 事件日志上限 1000 条
 - 组件**零状态逻辑**，所有数据通过 props 传入
+- `app/web` 的 `reduceWorkbenchEvent()` 负责把 WebSocket events 折叠成工作台状态，避免 WebSocket 成为第二个前端数据库。
 
 ## 9. 事件类型速查
 
@@ -240,9 +274,11 @@ WebSocket 推送的事件（`api/events.md` 定义，`@shared/events` 有 TypeSc
 - [x] Vitest 配置已排除 e2e 目录
 - [x] 冒烟测试 29/29 项通过
 - [x] Local Edge 已限制本地可信 Origin，防止任意网页直接控制本地 mock run
+- [x] Web 工作台架构切片 — `app/web` 已有 React/Vite 入口、三栏 shell、Web API/event client、事件状态 reducer 和单元测试
 
 ### 剩余待办
 
+- [ ] **Web 视觉落地**：把 UI 同学的设计接入 `app/web/src/components/` 和 `app/web/src/styles/`
 - [ ] **CI 集成**：Playwright e2e 跑在 GitHub Actions 需要 Chromium 安装步骤 + Edge 后台启动
 - [ ] **en.json 翻译**：当前 `en.json` 内容与 `zh.json` 相同，需要写入英文文案
 - [ ] **e2e 覆盖扩展**：目前覆盖了 StatusBar/RunnerList/EventLog 三个组件，后续新增面板应补 e2e

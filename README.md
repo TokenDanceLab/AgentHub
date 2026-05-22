@@ -134,6 +134,18 @@ pnpm dev --port 5199
 
 浏览器打开 `http://localhost:5199`，可以看到 Edge online/offline、Mock Runner 和 EventLog。当前 M1 不包含 Project / Thread 工作台、真实 Agent CLI、Diff、Approval 或 Preview。
 
+### Web 工作台架构预览
+
+`app/web` 是三栏 IM 工作台的独立 Web 入口，当前用于承接前端 UI 设计和后续 PWA 形态。它复用同一个 Local Edge，不新增协议。
+
+```powershell
+cd app/web
+pnpm install
+pnpm dev
+```
+
+浏览器打开 `http://127.0.0.1:5180`，可以看到 Project/Thread 导航、IM 运行流和 Diff/Preview/Logs 检查面板的架构骨架。
+
 ### Desktop 应用构建
 
 ```powershell
