@@ -32,7 +32,8 @@ Tauri Desktop
 | Shared TS types | 已合入 `feat/client-dev` |
 | i18n 基础设施 | 已合入 `feat/client-dev` |
 | 本地 smoke 脚本 | 已合入 `feat/client-dev` |
-| Playwright e2e / a11y / 图标 | 当前工作区已有改动，待复核、测试、提交 |
+| Playwright e2e / a11y | 当前工作区已有改动，待复核、测试、提交 |
+| 图标和视觉稿 | 交给前端 UI 同学处理，不作为客户端工程收口门槛 |
 | PR #26 | Draft，指向 `master`，CI validate 已通过旧提交 |
 
 结论：
@@ -100,14 +101,13 @@ api/events.md
 - Desktop e2e 测试：`app/desktop/e2e/**`
 - Playwright 配置：`app/desktop/playwright.config.ts`
 - a11y 语义增强：`StatusBar`、`RunnerList`、`EventLog`
-- Tauri 图标替换：`app/desktop/src-tauri/icons/**`
 - `docs/client-handoff.md` 更新
 
 处理要求：
 
 - 先 review diff，确认没有无关文件。
 - e2e 可以跳过在线用例，但文档必须写清 Edge 在线时如何跑完整覆盖。
-- 图标如果只是占位图，文档里标为“占位图”，不要写成正式品牌资源。
+- 图标、配色、布局精修交给前端 UI 方向；客户端分支只保证结构清晰、可测试、可替换。
 
 验收：
 
@@ -148,7 +148,7 @@ git push origin feat/client-dev
 
 然后更新 PR #26：
 
-- 补充 e2e、a11y、图标、handoff 的说明。
+- 补充 e2e、a11y、handoff 的说明。
 - 补充最新验证命令和结果。
 - 验证通过后再把 Draft 转 Ready。
 
@@ -278,7 +278,7 @@ api/events.md
 
 当前最应该做：
 
-1. Review 当前未提交的 e2e、a11y、图标、handoff 改动。
+1. Review 当前未提交的 e2e、a11y、handoff 改动。
 2. 跑 M1.1 的验证命令。
 3. 修掉验证失败或文档不准的地方。
 4. 提交到 `feat/client-dev`。

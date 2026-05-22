@@ -57,7 +57,14 @@ AgentHub/
 │       ├── i18n/
 │       │   └── locales/         # zh.json / en.json
 │       ├── styles/tokens.css    # CSS 变量
-│       └── App.tsx              # 根布局编排（50 行）
+│       ├── App.tsx              # 根布局编排（50 行）
+│       ├── e2e/                 # Playwright e2e 测试
+│       │   ├── test-utils.ts    # 共享 helper（isEdgeOnline）
+│       │   ├── health.spec.ts   # StatusBar 测试
+│       │   ├── runners.spec.ts  # RunnerList 测试
+│       │   └── events.spec.ts   # EventLog 测试
+│       ├── playwright.config.ts # Playwright 配置
+│       └── vitest.config.ts     # Vitest 配置（排除 e2e）
 └── scripts/
     ├── setup.ps1
     └── client-smoke.ps1         # 26 项自动冒烟
@@ -157,10 +164,17 @@ go run ./cmd/agenthub-runner --mock
 ## 7. 验收命令
 
 ```powershell
-# 前端
+# 单元测试
 cd app/desktop
-pnpm test       # 30 个单元测试
-pnpm build      # TypeScript + Vite 构建
+pnpm test           # 30 个单元测试 (vitest)
+
+# 端到端测试 (Playwright)
+pnpm exec playwright install chromium  # 首次需要安装浏览器
+pnpm test:e2e       # e2e 测试（自动启动 Vite，需 Edge 在线才能跑全部）
+pnpm test:e2e:ui    # 带 UI 模式
+
+# TypeScript + Vite 构建
+pnpm build
 
 # 全链路冒烟
 .\scripts\client-smoke.ps1
@@ -169,6 +183,16 @@ pnpm build      # TypeScript + Vite 构建
 cd edge-server
 go test ./...
 ```
+
+### e2e 测试说明
+
+E2e 测试位于 `app/desktop/e2e/`，共 17 条用例，分 online/offline 两组：
+
+- **离线测试**：Edge 不在线时运行，验证 Offline 提示、红色状态点
+- **在线测试**：Edge 在线时运行，验证 Runner 列表、事件流、Mock Run 生命周期
+- 测试会自动检测 Edge 状态，不在线时跳过在线用例（不报错）
+
+最佳实践：先启动 Edge，跑一轮完整测试；再停止 Edge，跑一轮离线测试。CI 中应确保 Edge 在线以获得完整覆盖。
 
 ## 8. 数据流速查
 
@@ -197,9 +221,23 @@ WebSocket 推送的事件（`api/events.md` 定义，`@shared/events` 有 TypeSc
 | `run.output` / `run.output.batch` | stdout/stderr 聚合输出 |
 | `error` | 事件流错误 |
 
-## 10. 后续任务
+## 10. 完成状态与后续任务
 
-- 把 `app/desktop/src-tauri/icons/` 里的占位图标换成正式图标
-- UI 组件加 a11y 属性（`aria-label` 等）
-- 补 Playwright 端到端测试
-- 完成 D. Integration Smoke 的 `feat/client-local-smoke` → 合入 `master`
+### 已完成（2026-05-22）
+
+- [x] a11y 属性 — 三个组件均已添加语义角色、ARIA 属性：
+  - StatusBar: `role="status"` `aria-atomic="true"`, 错误横幅 `role="alert"`
+  - RunnerList: `<nav>` + `<ul>`/`<li>` 语义标签, runner 状态 `aria-label`
+  - EventLog: `<section>` + `role="log"`, 事件行 `aria-label`
+- [x] Playwright e2e 测试 — 17 条用例覆盖健康检查、Runner 列表、事件流、Mock Run 生命周期
+- [x] Vitest 配置已排除 e2e 目录
+- [x] 冒烟测试 29/29 项通过
+
+### 剩余待办
+
+- [ ] **CI 集成**：Playwright e2e 跑在 GitHub Actions 需要 Chromium 安装步骤 + Edge 后台启动
+- [ ] **en.json 翻译**：当前 `en.json` 内容与 `zh.json` 相同，需要写入英文文案
+- [ ] **e2e 覆盖扩展**：目前覆盖了 StatusBar/RunnerList/EventLog 三个组件，后续新增面板应补 e2e
+- [ ] **正式图标和视觉稿**：由前端 UI 同学统一处理，客户端工程分支不抢先提交视觉资产
+- [ ] **合入 master**：分支 `feat/client-dev` 有 draft PR #26，端到端验证通过后合并
+- [ ] **Playwright CI 容错**：当前 e2e 在 Edge 离线时跳过在线测试（不失败），CI 中需要确保 Edge 在线以拿到完整覆盖

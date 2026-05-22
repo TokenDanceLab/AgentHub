@@ -39,7 +39,7 @@ export default function App() {
         <button className={styles.btn} onClick={handleStartRun} disabled={!online}>
           {t('action.startRun')}
         </button>
-        <button className={styles.btn} onClick={clearEvents}>
+        <button className={styles.btn} onClick={clearEvents} aria-label={t('action.clearEvents')}>
           {t('action.clearEvents')}
         </button>
       </div>

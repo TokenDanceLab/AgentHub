@@ -23,6 +23,7 @@ $RunnerBinary = Join-Path $Root "runner/agenthub-runner-tmp.exe"
 $Passed = 0
 $Failed = 0
 $EdgeProc = $null
+$StartedEdge = $false
 
 function Write-Step([string]$text) {
     Write-Host "`n=== $text ===" -ForegroundColor Cyan
@@ -40,6 +41,15 @@ function Fail([string]$text) {
 
 function Assert($condition, [string]$label) {
     if ($condition) { Pass $label } else { Fail $label }
+}
+
+function Test-EdgeHealth() {
+    try {
+        $health = Invoke-RestMethod -Uri "$EdgeUrl/v1/health" -TimeoutSec 2
+        return ($health.status -eq "ok" -and $health.version -eq "v1")
+    } catch {
+        return $false
+    }
 }
 
 Push-Location $Root
@@ -93,11 +103,33 @@ try {
     # ── Edge Server ────────────────────────────────────
 
     Write-Step "Start Edge Server"
-    $EdgeProc = Start-Process -FilePath $EdgeBinary -ArgumentList "--addr", $EdgeAddr -PassThru -WindowStyle Hidden
-    Start-Sleep -Seconds 2
+    if (Test-EdgeHealth) {
+        Pass "reuse existing Edge on $EdgeAddr"
+    } else {
+        if (-not (Test-Path $EdgeBinary)) {
+            Fail "edge binary missing: $EdgeBinary"
+            throw "edge binary missing"
+        }
+
+        $EdgeProc = Start-Process -FilePath $EdgeBinary -ArgumentList "--addr", $EdgeAddr -PassThru -WindowStyle Hidden
+        $StartedEdge = $true
+
+        $ready = $false
+        for ($i = 0; $i -lt 20; $i++) {
+            Start-Sleep -Milliseconds 250
+            if ($EdgeProc.HasExited) { break }
+            if (Test-EdgeHealth) {
+                $ready = $true
+                break
+            }
+        }
+        Assert ($ready) "Edge process ready (PID $($EdgeProc.Id))"
+    }
 
     try {
-        Assert (-not $EdgeProc.HasExited) "Edge process alive (PID $($EdgeProc.Id))"
+        if ($StartedEdge) {
+            Assert (-not $EdgeProc.HasExited) "Edge process alive (PID $($EdgeProc.Id))"
+        }
 
         # Health
         Write-Step "GET /v1/health"
@@ -150,20 +182,26 @@ try {
         try {
             $ws = New-Object System.Net.WebSockets.ClientWebSocket
             $ct = (New-Object System.Threading.CancellationTokenSource).Token
-            $ws.ConnectAsync([Uri]"ws://$EdgeAddr/v1/events", $ct).Wait(5000)
+            $connectedFrame = $ws.ConnectAsync([Uri]"ws://$EdgeAddr/v1/events", $ct).Wait(5000)
+            Assert ($connectedFrame) "WS connect completed"
             Assert ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) "WS connected"
 
             if ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
                 $buf = New-Object byte[] 4096
                 $seg = [System.ArraySegment[byte]]::new($buf)
-                $ws.ReceiveAsync($seg, $ct).Wait(5000)
-                $received = [System.Text.Encoding]::UTF8.GetString($buf, 0, $seg.Count)
-                Assert ($received.Length -gt 0) "received event data ($($received.Length) bytes)"
-                $preview = $received.Substring(0, [Math]::Min(120, $received.Length))
-                Write-Host "    first event: $preview" -ForegroundColor DarkGray
+                $receiveTask = $ws.ReceiveAsync($seg, $ct)
+                $receivedFrame = $receiveTask.Wait(5000)
+                Assert ($receivedFrame) "received WS frame"
+                if ($receivedFrame) {
+                    $result = $receiveTask.Result
+                    $received = [System.Text.Encoding]::UTF8.GetString($buf, 0, $result.Count)
+                    Assert ($received.Length -gt 0) "received event data ($($received.Length) bytes)"
+                    $preview = $received.Substring(0, [Math]::Min(120, $received.Length))
+                    Write-Host "    first event: $preview" -ForegroundColor DarkGray
+                }
             }
 
-            $ws.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "", $ct).Wait(2000)
+            $null = $ws.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "", $ct).Wait(2000)
         } catch {
             Fail "WebSocket: $_"
         }
@@ -195,7 +233,7 @@ try {
         } finally { Pop-Location }
 
     } finally {
-        if ($EdgeProc -and -not $EdgeProc.HasExited) {
+        if ($StartedEdge -and $EdgeProc -and -not $EdgeProc.HasExited) {
             Write-Step "Stop Edge Server"
             Stop-Process -Id $EdgeProc.Id -Force -ErrorAction SilentlyContinue
         }

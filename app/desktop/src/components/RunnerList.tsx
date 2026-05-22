@@ -23,22 +23,27 @@ export default function RunnerList({ runners, online }: Props) {
   const { t } = useTranslation();
 
   return (
-    <div className={styles.sidebar}>
+    <nav className={styles.sidebar} aria-label={t('runner.title')}>
       <div className={styles.title}>{t('runner.title')}</div>
       {runners.length === 0 ? (
         <div className={styles.empty}>
           {online ? t('runner.emptyOnline') : t('runner.emptyOffline')}
         </div>
       ) : (
-        runners.map((r) => (
-          <div key={r.id} className={styles.item}>
-            <div className={styles.itemName}>{r.name || r.id}</div>
-            <div className={`${styles.itemStatus} ${statusClass(r.status)}`}>
-              {r.status}
-            </div>
-          </div>
-        ))
+        <ul className={styles.list}>
+          {runners.map((r) => (
+            <li key={r.id} className={styles.item}>
+              <div className={styles.itemName}>{r.name || r.id}</div>
+              <div
+                className={`${styles.itemStatus} ${statusClass(r.status)}`}
+                aria-label={`${r.name || r.id}: ${r.status}`}
+              >
+                {r.status}
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
-    </div>
+    </nav>
   );
 }
