@@ -22,6 +22,7 @@ var DefaultOutputChunks = []string{
 // MockRun represents a simulated agent execution.
 type MockRun struct {
 	id           string
+	context      RunContext
 	state        *process.StateMachine
 	outputChunks []string
 	chunkDelay   time.Duration
@@ -52,10 +53,20 @@ func WithWriter(w io.Writer) MockRunOption {
 	}
 }
 
+// WithRunContext sets the Edge-injected run context for mock output.
+func WithRunContext(ctx RunContext) MockRunOption {
+	return func(m *MockRun) {
+		m.context = normalizeRunContext(ctx)
+		m.id = m.context.RunID
+	}
+}
+
 // NewMockRun creates a new MockRun with the given ID and options.
 func NewMockRun(id string, opts ...MockRunOption) *MockRun {
+	ctx := normalizeRunContext(RunContext{RunID: id})
 	m := &MockRun{
-		id:           id,
+		id:           ctx.RunID,
+		context:      ctx,
 		state:        process.NewStateMachine(),
 		outputChunks: DefaultOutputChunks,
 		chunkDelay:   80 * time.Millisecond,
@@ -67,6 +78,12 @@ func NewMockRun(id string, opts ...MockRunOption) *MockRun {
 	return m
 }
 
+// NewMockRunFromContext creates a mock run from Edge-injected context.
+func NewMockRunFromContext(ctx RunContext, opts ...MockRunOption) *MockRun {
+	ctx = normalizeRunContext(ctx)
+	return NewMockRun(ctx.RunID, append([]MockRunOption{WithRunContext(ctx)}, opts...)...)
+}
+
 // Start begins the mock run simulation.
 // It transitions from idle to running, outputs chunks with delays,
 // then transitions to finished.
@@ -76,6 +93,10 @@ func (m *MockRun) Start() error {
 	}
 
 	slog.Info("mock run started", "id", m.id)
+
+	fmt.Fprintf(m.writer, "run=%s\n", m.context.RunID)
+	fmt.Fprintf(m.writer, "project=%s\n", m.context.ProjectID)
+	fmt.Fprintf(m.writer, "thread=%s\n", m.context.ThreadID)
 
 	for _, chunk := range m.outputChunks {
 		fmt.Fprintln(m.writer, chunk)

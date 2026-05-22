@@ -22,9 +22,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("starting agent runner in mock mode", "addr", *addr)
+	ctx := run.ContextFromEnv()
+	slog.Info("starting agent runner in mock mode", "addr", *addr, "runID", ctx.RunID)
 
-	m := run.NewMockRun("mock-run-1")
+	m := run.NewMockRunFromContext(ctx)
 	if err := m.Start(); err != nil {
 		slog.Error("mock run failed", "error", err)
 		os.Exit(1)
