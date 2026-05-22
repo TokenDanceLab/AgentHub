@@ -10,19 +10,18 @@ import (
 )
 
 var ErrRunFailed = errors.New("mock run failed")
+var ErrRunAlreadyStarted = errors.New("run already started")
 
 type MockExecutorOption func(*MockExecutor)
 
 type MockExecutor struct {
-	bus        *events.Bus
-	store      *store.Store
-	stepDelay  time.Duration
-	outputs    []OutputBatch
-	failRuns   map[string]error
-	mu         sync.Mutex
-	cancels    map[string]chan struct{}
-	done       map[string]chan struct{}
-	doneClosed map[string]bool
+	bus       *events.Bus
+	store     *store.Store
+	stepDelay time.Duration
+	outputs   []OutputBatch
+	failRuns  map[string]error
+	mu        sync.Mutex
+	cancels   map[string]chan struct{}
 }
 
 type OutputBatch struct {
@@ -43,10 +42,8 @@ func NewMockExecutor(bus *events.Bus, store *store.Store, opts ...MockExecutorOp
 			{Stream: "stderr", Offset: 0, Text: "Warning: mock task is running in simulation mode\n"},
 			{Stream: "stdout", Offset: 91, Text: "Executing mock task step 3/3...\n"},
 		},
-		failRuns:   make(map[string]error),
-		cancels:    make(map[string]chan struct{}),
-		done:       make(map[string]chan struct{}),
-		doneClosed: make(map[string]bool),
+		failRuns: make(map[string]error),
+		cancels:  make(map[string]chan struct{}),
 	}
 	for _, opt := range opts {
 		opt(e)
@@ -76,24 +73,40 @@ func WithFailedRun(runID string, err error) MockExecutorOption {
 }
 
 func (e *MockExecutor) Start(run store.Run) error {
+	current, ok := e.store.GetRun(run.ID)
+	if ok && current.Status != "queued" {
+		return ErrRunAlreadyStarted
+	}
+
 	cancelCh := make(chan struct{})
-	doneCh := make(chan struct{})
 	e.mu.Lock()
+	if _, ok := e.cancels[run.ID]; ok {
+		e.mu.Unlock()
+		return ErrRunAlreadyStarted
+	}
 	e.cancels[run.ID] = cancelCh
-	e.done[run.ID] = doneCh
-	e.doneClosed[run.ID] = false
 	e.mu.Unlock()
 
-	go e.run(run, cancelCh, doneCh)
+	go e.run(run, cancelCh)
 	return nil
 }
 
 func (e *MockExecutor) Cancel(runID string) CancelResult {
+	run, ok := e.store.GetRun(runID)
+	if !ok {
+		return CancelResult{Found: false, Status: "not_found"}
+	}
+	switch run.Status {
+	case "queued", "started":
+	default:
+		return CancelResult{Run: run, Found: true, Status: run.Status}
+	}
+
 	e.mu.Lock()
 	cancelCh, ok := e.cancels[runID]
 	if !ok {
 		e.mu.Unlock()
-		return CancelResult{Found: false, Status: "not_found"}
+		return CancelResult{Found: false, Status: "not_running"}
 	}
 	select {
 	case <-cancelCh:
@@ -102,15 +115,18 @@ func (e *MockExecutor) Cancel(runID string) CancelResult {
 	}
 	e.mu.Unlock()
 
-	run, ok := e.store.SetRunStatus(runID, "cancelling")
+	run, ok = e.store.SetRunStatusIf(runID, "cancelling", "queued", "started")
 	if !ok {
+		if current, found := e.store.GetRun(runID); found {
+			return CancelResult{Run: current, Found: true, Status: current.Status}
+		}
 		return CancelResult{Found: false, Status: "not_found"}
 	}
 	return CancelResult{Run: run, Found: true, Status: run.Status}
 }
 
-func (e *MockExecutor) run(run store.Run, cancelCh <-chan struct{}, doneCh chan struct{}) {
-	defer e.finish(run.ID, doneCh)
+func (e *MockExecutor) run(run store.Run, cancelCh <-chan struct{}) {
+	defer e.finish(run.ID)
 
 	if e.sleepOrCancelled(cancelCh, e.stepDelay) {
 		e.publishCancelled(run)
@@ -191,13 +207,9 @@ func (e *MockExecutor) publishCancelled(run store.Run) {
 	}
 }
 
-func (e *MockExecutor) finish(runID string, doneCh chan struct{}) {
+func (e *MockExecutor) finish(runID string) {
 	e.mu.Lock()
 	delete(e.cancels, runID)
-	if !e.doneClosed[runID] {
-		close(doneCh)
-		e.doneClosed[runID] = true
-	}
 	e.mu.Unlock()
 }
 

@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -82,6 +83,20 @@ func TestMockExecutorPublishesFailedEvent(t *testing.T) {
 	}
 }
 
+func TestMockExecutorRejectsDuplicateStart(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	executor := NewMockExecutor(bus, s, WithStepDelay(50*time.Millisecond))
+
+	if err := executor.Start(run); err != nil {
+		t.Fatalf("first Start returned error: %v", err)
+	}
+	if err := executor.Start(run); !errors.Is(err, ErrRunAlreadyStarted) {
+		t.Fatalf("second Start error = %v, want ErrRunAlreadyStarted", err)
+	}
+}
+
 func TestMockExecutorCancelPublishesCancelledEvent(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()
@@ -118,6 +133,43 @@ func TestMockExecutorCancelMissingRun(t *testing.T) {
 	result := executor.Cancel("run_missing")
 	if result.Found || result.Status != "not_found" {
 		t.Fatalf("Cancel missing result = %#v, want not_found", result)
+	}
+}
+
+func TestMockExecutorCancelTerminalRunDoesNotRegressStatus(t *testing.T) {
+	for _, terminalStatus := range []string{"finished", "failed", "cancelled"} {
+		t.Run(terminalStatus, func(t *testing.T) {
+			bus := events.NewBus(100)
+			s := store.New()
+			run := newExecutorTestRun(t, s)
+			terminalRun, ok := s.SetRunStatus(run.ID, terminalStatus)
+			if !ok {
+				t.Fatal("SetRunStatus returned ok=false")
+			}
+			_, ch, _ := bus.Subscribe(0)
+			executor := NewMockExecutor(bus, s, WithStepDelay(0))
+
+			result := executor.Cancel(run.ID)
+			if !result.Found || result.Status != terminalStatus {
+				t.Fatalf("Cancel result = %#v, want terminal status %q", result, terminalStatus)
+			}
+			if result.Run.Status != terminalRun.Status {
+				t.Fatalf("result run status = %q, want %q", result.Run.Status, terminalRun.Status)
+			}
+
+			stored, ok := s.GetRun(run.ID)
+			if !ok {
+				t.Fatalf("run %q was not stored", run.ID)
+			}
+			if stored.Status != terminalStatus {
+				t.Fatalf("stored status = %q, want %q", stored.Status, terminalStatus)
+			}
+			select {
+			case evt := <-ch:
+				t.Fatalf("unexpected event after terminal cancel: %s", evt.Type)
+			case <-time.After(50 * time.Millisecond):
+			}
+		})
 	}
 }
 

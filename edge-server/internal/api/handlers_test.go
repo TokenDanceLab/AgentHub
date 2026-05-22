@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -284,6 +285,31 @@ func TestPostRunsStartsExecutorAfterQueueingRun(t *testing.T) {
 	}
 	if items[0].RunID != run.ID || items[0].Status != "queued" {
 		t.Fatalf("initial item = %#v, want queued run item", items[0])
+	}
+}
+
+func TestPostRunsReturnsErrorWhenExecutorStartFails(t *testing.T) {
+	h := newTestHandler()
+	h.Executor = &fakeRunExecutor{err: errors.New("start failed")}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rec.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	errObj, ok := body["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("error body = %#v, want error object", body)
+	}
+	if errObj["code"] != "EXECUTOR_START_FAILED" {
+		t.Fatalf("error code = %#v, want EXECUTOR_START_FAILED", errObj["code"])
 	}
 }
 
