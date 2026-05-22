@@ -278,20 +278,18 @@ PR 完成条件：
 - Local Edge 不在线时显示 offline，不崩溃。
 - Local Edge 在线时能显示 health 和 runner 状态。
 
-### D. Integration Smoke
+### D. Integration Smoke ✅ (已完成，直接在 `feat/client-dev` 上实现)
 
 分支：
 
 ```text
-feat/client-local-smoke
+feat/client-dev（客户端集成分支，A/B/C 已合入）
 ```
-
-这个分支不并行，等 A/B/C 合并到 `master` 后再做。
 
 写入范围：
 
 ```text
-scripts/**
+scripts/client-smoke.ps1
 docs/client-roadmap.md
 README.md
 ```
