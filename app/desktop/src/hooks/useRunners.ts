@@ -1,7 +1,8 @@
 // Runners polling hook. Only fetches when Edge is online.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { fetchRunners, Runner } from '@/api/edgeClient';
+import { fetchRunners } from '@/api/edgeClient';
+import type { Runner } from '@shared/types';
 import { RUNNERS_POLL_MS } from '@/config';
 
 export function useRunners(online: boolean): Runner[] {
@@ -15,7 +16,7 @@ export function useRunners(online: boolean): Runner[] {
       if (!mountedRef.current) return;
       setRunners(res.items ?? []);
     } catch {
-      // Edge may not have runners ready yet — silently skip.
+      // Edge may not have runners ready yet.
     }
   }, [online]);
 

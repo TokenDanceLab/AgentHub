@@ -1,8 +1,8 @@
 // WebSocket event stream hook.
-// Creates a new stream when Edge comes online, tears it down when offline.
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createEventStream, EventEnvelope } from '@/api/eventClient';
+import { createEventStream } from '@/api/eventClient';
+import type { EventEnvelope } from '@shared/events';
 import { EVENT_LOG_MAX } from '@/config';
 
 export interface LogEntry {
@@ -19,16 +19,15 @@ export interface EventStreamState {
   clearEvents: () => void;
 }
 
-function summarize(event: EventEnvelope): string {
-  const p = event.payload ?? {};
+function summarize(payload: Record<string, unknown>): string {
   const parts: string[] = [];
-  if (p.runId) parts.push(`run=${p.runId}`);
-  if (p.runnerId) parts.push(`runner=${p.runnerId}`);
-  if (p.stream) parts.push(`stream=${p.stream}`);
-  if (typeof p.text === 'string') parts.push(`"${p.text.slice(0, 60)}"`);
-  if (Array.isArray(p.chunks)) parts.push(`chunks=${p.chunks.length}`);
-  if (p.status) parts.push(`status=${p.status}`);
-  if (typeof p.message === 'string') parts.push(p.message);
+  if (payload.runId) parts.push(`run=${payload.runId}`);
+  if (payload.runnerId) parts.push(`runner=${payload.runnerId}`);
+  if (payload.stream) parts.push(`stream=${payload.stream}`);
+  if (typeof payload.text === 'string') parts.push(`"${payload.text.slice(0, 60)}"`);
+  if (Array.isArray(payload.chunks)) parts.push(`chunks=${payload.chunks.length}`);
+  if (payload.status) parts.push(`status=${payload.status}`);
+  if (typeof payload.message === 'string') parts.push(payload.message);
   return parts.join(' ');
 }
 
@@ -53,7 +52,7 @@ export function useEventStream(online: boolean): EventStreamState {
       setIsConnected(connected);
     });
 
-    const unsubEvents = stream.subscribe((event) => {
+    const unsubEvents = stream.subscribe((event: EventEnvelope) => {
       if (!mountedRef.current) return;
       if (event.type === 'error') {
         console.warn('Event stream error:', event.payload?.message);
@@ -65,7 +64,7 @@ export function useEventStream(online: boolean): EventStreamState {
         {
           seq: event.seq,
           type: event.type,
-          summary: summarize(event),
+          summary: summarize(event.payload),
           sentAt: event.sentAt,
           id: event.id,
         },

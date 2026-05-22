@@ -1,12 +1,23 @@
-# AgentHub Shared
+# @agenthub/shared
 
-`app/shared/` 是前端和桌面的共享目录。
+`app/shared/` 是 Desktop 和 Web 工作台的共享类型与工具包。
 
-计划放入：
+## 内容
 
-- 共享 TypeScript 类型定义（从 `api/` 自动生成或手动维护）
-- 共享 API client（REST 和 WebSocket event stream）
-- 共享 React 组件（状态指示器、Diff 卡片、审批面板等）
-- 共享状态管理 hooks 和 context
+| 模块 | 路径 | 说明 |
+|---|---|---|
+| `@shared/types` | `src/types.ts` | REST API 响应类型：HealthResponse, Runner, ListResponse, RunInfo |
+| `@shared/events` | `src/events.ts` | WebSocket 事件类型与 discriminated union |
+| `@shared/errors` | `src/errors.ts` | `api/conventions.md` §5 错误格式解析（AppError, parseError） |
 
-当前 Desktop Shell 阶段，共享内容尚未抽取；Desktop 和未来的 Web 端各自保有独立副本。两端的 API client 稳定后统一迁移到本目录。
+## 使用
+
+Desktop 和 Web 通过 `@shared/*` 路径别名导入：
+
+```typescript
+import type { HealthResponse, Runner } from '@shared/types';
+import type { EventEnvelope } from '@shared/events';
+import { parseError } from '@shared/errors';
+```
+
+新增通用类型先放这里，两端一起维护。

@@ -2,20 +2,9 @@
 // Manages connection lifecycle, cursor-based replay, and exponential backoff.
 
 import { WS_URL } from '@/config';
+import type { EventEnvelope } from '@shared/events';
 
-// ── Types ──────────────────────────────────────────
-
-export interface EventEnvelope {
-  version: string;
-  id: string;
-  seq: number;
-  type: string;
-  scope: Record<string, unknown>;
-  traceId?: string;
-  sentAt: string;
-  payload: Record<string, unknown>;
-}
-
+export type { EventEnvelope };
 export type EventHandler = (event: EventEnvelope) => void;
 export type StatusHandler = (connected: boolean) => void;
 
@@ -25,12 +14,10 @@ interface StreamHandle {
   close(): void;
 }
 
-// ── Implementation ─────────────────────────────────
-
 export function createEventStream(cursor?: string): StreamHandle {
   let ws: WebSocket | null = null;
-  let handlers: EventHandler[] = [];
-  let statusHandlers: StatusHandler[] = [];
+  const handlers: EventHandler[] = [];
+  const statusHandlers: StatusHandler[] = [];
   let reconnectDelay = 1000;
   const MAX_RECONNECT_DELAY = 30000;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -43,7 +30,6 @@ export function createEventStream(cursor?: string): StreamHandle {
 
   function connect() {
     if (closed) return;
-
     const url = lastCursor
       ? `${WS_URL}?cursor=${encodeURIComponent(lastCursor)}`
       : WS_URL;
@@ -57,7 +43,7 @@ export function createEventStream(cursor?: string): StreamHandle {
 
     ws.onmessage = (event) => {
       try {
-        const envelope: EventEnvelope = JSON.parse(event.data as string);
+        const envelope = JSON.parse(event.data as string) as EventEnvelope;
         lastCursor = String(envelope.seq);
         for (const handler of handlers) handler(envelope);
       } catch (e) {
@@ -71,7 +57,7 @@ export function createEventStream(cursor?: string): StreamHandle {
     };
 
     ws.onerror = () => {
-      // onclose will fire after this, which triggers reconnect
+      // onclose will fire after this, triggering reconnect
     };
   }
 
@@ -89,14 +75,16 @@ export function createEventStream(cursor?: string): StreamHandle {
     subscribe(handler: EventHandler): () => void {
       handlers.push(handler);
       return () => {
-        handlers = handlers.filter((h) => h !== handler);
+        const idx = handlers.indexOf(handler);
+        if (idx >= 0) handlers.splice(idx, 1);
       };
     },
 
     onStatusChange(handler: StatusHandler): () => void {
       statusHandlers.push(handler);
       return () => {
-        statusHandlers = statusHandlers.filter((h) => h !== handler);
+        const idx = statusHandlers.indexOf(handler);
+        if (idx >= 0) statusHandlers.splice(idx, 1);
       };
     },
 
@@ -110,8 +98,8 @@ export function createEventStream(cursor?: string): StreamHandle {
         ws.close();
         ws = null;
       }
-      handlers = [];
-      statusHandlers = [];
+      handlers.length = 0;
+      statusHandlers.length = 0;
     },
   };
 }

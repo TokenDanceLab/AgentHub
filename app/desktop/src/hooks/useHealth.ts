@@ -1,7 +1,8 @@
 // Health polling hook. Periodically checks Edge availability.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { fetchHealth, HealthResponse } from '@/api/edgeClient';
+import { fetchHealth } from '@/api/edgeClient';
+import type { HealthResponse } from '@shared/types';
 import { HEALTH_POLL_MS } from '@/config';
 
 export interface HealthState {

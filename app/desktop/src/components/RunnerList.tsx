@@ -1,4 +1,4 @@
-import { Runner } from '@/api/edgeClient';
+import type { Runner } from '@shared/types';
 import styles from './RunnerList.module.css';
 
 interface Props {
