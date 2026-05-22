@@ -5,14 +5,29 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/agenthub/edge-server/internal/httpserver"
+	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
 type config struct {
-	Addr      string
-	StoreFile string
+	Addr          string
+	StoreFile     string
+	RunnerCommand string
+	RunnerArgs    repeatedString
+}
+
+type repeatedString []string
+
+func (v *repeatedString) String() string {
+	return fmt.Sprint([]string(*v))
+}
+
+func (v *repeatedString) Set(value string) error {
+	*v = append(*v, value)
+	return nil
 }
 
 func main() {
@@ -32,7 +47,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := httpserver.Run(httpserver.Config{Addr: cfg.Addr, Store: repository}); err != nil {
+	serverConfig := httpserver.Config{Addr: cfg.Addr, Store: repository}
+	if cfg.RunnerCommand != "" {
+		serverConfig.ProcessExecutor = lifecycle.ProcessExecutorConfig{
+			Command: cfg.RunnerCommand,
+			Args:    append([]string(nil), cfg.RunnerArgs...),
+		}
+	}
+
+	if err := httpserver.Run(serverConfig); err != nil {
 		slog.Error("server exited with error", "err", err)
 		os.Exit(1)
 	}
@@ -45,8 +68,14 @@ func buildConfig(args []string) (config, error) {
 	cfg := config{}
 	fs.StringVar(&cfg.Addr, "addr", "127.0.0.1:3210", "listen address")
 	fs.StringVar(&cfg.StoreFile, "store-file", "", "JSON store snapshot file path")
+	fs.StringVar(&cfg.RunnerCommand, "runner-command", "", "local process command to execute for each run; empty uses the mock executor")
+	fs.Var(&cfg.RunnerArgs, "runner-arg", "argument passed to --runner-command; may be repeated")
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
+	}
+	cfg.RunnerCommand = strings.TrimSpace(cfg.RunnerCommand)
+	if cfg.RunnerCommand == "" && len(cfg.RunnerArgs) > 0 {
+		return config{}, fmt.Errorf("--runner-arg requires --runner-command")
 	}
 	if fs.NArg() != 0 {
 		return config{}, fmt.Errorf("unexpected positional arguments: %v", fs.Args())
