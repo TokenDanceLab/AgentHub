@@ -181,8 +181,18 @@ docs/client-roadmap.md
 
 - 建立 Go module 和最小 Runner 进程。
 - Runner 支持 mock run：启动后输出固定的 stdout/stderr chunk。
-- Runner 有清晰的内部状态：idle / running / stopping / stopped。
+- Runner 有清晰的内部状态：idle / running / finished / stopping / stopped。
 - 先不接真实 Claude Code、Codex、OpenCode。
+
+实现状态：
+
+- [x] Go module `runner/`，仅标准库依赖。
+- [x] `runner/cmd/agenthub-runner/main.go`：入口，支持 `--mock` 和 `--addr` 参数。
+- [x] `runner/internal/run/mock.go`：MockRun，含 Start/Cancel/State/ID 方法。
+- [x] `runner/internal/run/mock_test.go`：覆盖输出、状态转换、取消、并发安全。
+- [x] `runner/internal/process/state.go`：状态机，idle/running/finished/stopping/stopped。
+- [x] `runner/internal/process/state_test.go`：覆盖有效/无效转换、并发读写。
+- [x] `runner/README.md`：构建、运行、参数说明和预期输出。
 
 建议文件：
 
