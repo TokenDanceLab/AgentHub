@@ -2,8 +2,8 @@
 // Creates a new stream when Edge comes online, tears it down when offline.
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createEventStream, EventEnvelope } from '../api/eventClient';
-import { EVENT_LOG_MAX } from '../config';
+import { createEventStream, EventEnvelope } from '@/api/eventClient';
+import { EVENT_LOG_MAX } from '@/config';
 
 export interface LogEntry {
   seq: number;
@@ -55,7 +55,10 @@ export function useEventStream(online: boolean): EventStreamState {
 
     const unsubEvents = stream.subscribe((event) => {
       if (!mountedRef.current) return;
-      if (event.type === 'error') return;
+      if (event.type === 'error') {
+        console.warn('Event stream error:', event.payload?.message);
+        return;
+      }
       setIsConnected(true);
       setEvents((prev) => [
         ...prev.slice(-(EVENT_LOG_MAX - 1)),

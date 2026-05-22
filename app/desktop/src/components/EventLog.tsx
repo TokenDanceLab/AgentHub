@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { LogEntry } from '../hooks/useEventStream';
+import { LogEntry } from '@/hooks/useEventStream';
 import styles from './EventLog.module.css';
 
 interface Props {

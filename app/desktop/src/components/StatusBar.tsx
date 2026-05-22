@@ -1,4 +1,4 @@
-import { HealthResponse } from '../api/edgeClient';
+import { HealthResponse } from '@/api/edgeClient';
 import styles from './StatusBar.module.css';
 
 interface Props {

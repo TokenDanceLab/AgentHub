@@ -1,7 +1,7 @@
 // WebSocket event stream client.
 // Manages connection lifecycle, cursor-based replay, and exponential backoff.
 
-import { WS_URL } from '../config';
+import { WS_URL } from '@/config';
 
 // ── Types ──────────────────────────────────────────
 

@@ -1,8 +1,8 @@
 // Runners polling hook. Only fetches when Edge is online.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { fetchRunners, Runner } from '../api/edgeClient';
-import { RUNNERS_POLL_MS } from '../config';
+import { fetchRunners, Runner } from '@/api/edgeClient';
+import { RUNNERS_POLL_MS } from '@/config';
 
 export function useRunners(online: boolean): Runner[] {
   const [runners, setRunners] = useState<Runner[]>([]);
@@ -21,17 +21,17 @@ export function useRunners(online: boolean): Runner[] {
 
   useEffect(() => {
     mountedRef.current = true;
-    if (online) {
-      load();
-      const id = setInterval(load, RUNNERS_POLL_MS);
-      return () => {
-        mountedRef.current = false;
-        clearInterval(id);
-      };
-    } else {
+    if (!online) {
       setRunners([]);
+      return () => { mountedRef.current = false; };
     }
-    return () => { mountedRef.current = false; };
+
+    load();
+    const id = setInterval(load, RUNNERS_POLL_MS);
+    return () => {
+      mountedRef.current = false;
+      clearInterval(id);
+    };
   }, [online, load]);
 
   return runners;

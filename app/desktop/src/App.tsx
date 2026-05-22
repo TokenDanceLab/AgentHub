@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useHealth } from './hooks/useHealth';
-import { useRunners } from './hooks/useRunners';
-import { useEventStream } from './hooks/useEventStream';
-import { startRun } from './api/edgeClient';
-import StatusBar from './components/StatusBar';
-import RunnerList from './components/RunnerList';
-import EventLog from './components/EventLog';
-import styles from './App.module.css';
+import { useHealth } from '@/hooks/useHealth';
+import { useRunners } from '@/hooks/useRunners';
+import { useEventStream } from '@/hooks/useEventStream';
+import { startRun } from '@/api/edgeClient';
+import StatusBar from '@/components/StatusBar';
+import RunnerList from '@/components/RunnerList';
+import EventLog from '@/components/EventLog';
+import styles from '@/App.module.css';
 
 export default function App() {
   const { online, health } = useHealth();
