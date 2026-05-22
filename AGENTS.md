@@ -27,6 +27,8 @@ Agent 开始写代码前先读：
 
 ## 2. 三人分工
 
+AgentHub 的开发工作流是“三个开发者，每个开发者可以带一个或多个 Agent”。Agent 是协助者，不是仓库负责人。
+
 | 方向 | 负责范围 | 主要目录 |
 |---|---|---|
 | 前端 UI 设计 | Web 工作台、IM 交互、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` |
@@ -38,6 +40,7 @@ Agent 开始写代码前先读：
 - API 契约写在 `api/`。
 - Edge Server 同时连接前端、Hub 和 Runner，改动前先看 `docs/system-architecture.md`。
 - 跨两个方向的改动先在 PR 描述里写清楚影响面。
+- 开发者必须审查自己 Agent 生成的代码、文档和命令输出；不要把未看懂的 Agent 改动直接合入。
 
 ## 3. 技术主线
 
@@ -49,6 +52,20 @@ Agent 开始写代码前先读：
 - Protobuf、Connect-RPC、JSON-RPC 只作为历史参考，不是当前主线。
 
 ## 4. Git 规则
+
+开始工作前先同步：
+
+```powershell
+git switch master
+git pull --ff-only
+```
+
+已有功能分支继续开发前：
+
+```powershell
+git fetch origin
+git rebase origin/master
+```
 
 Commit message 使用英文 type/scope + 中文摘要：
 
@@ -77,6 +94,15 @@ fix/short-topic
 
 `master` 是稳定分支。实现、协议和结构调整走 PR；小文档修正可以直接提交，但不确定就走 PR。PR 标题也用 `type(scope): 中文摘要`。
 
+进度同步：
+
+- 每个开发者至少在一天结束前 push 当前分支。
+- 完成一个可说明的小阶段就 push，不要把多天工作只留在本机。
+- 跨方向改动尽早开 draft PR 或普通 PR，让另外两条线知道接口变化。
+- PR 合并前先同步最新 `master`，解决冲突后再合。
+- 不在共享分支上 force-push；确实需要时先在群里说明。
+- Issue 只保留三条主线任务：前端、后端、客户端。小任务写进对应 issue 或 PR，不额外开一堆 issue。
+
 ## 5. 文档规则
 
 - 主文档只保留三份：产品需求、系统架构、功能实现。
@@ -87,7 +113,23 @@ fix/short-topic
 - 不使用未解释缩写。第一次出现时写白话解释。
 - 修改目录、协议、分工后，同步 `README.md`、本文件和相关主文档。
 
-## 6. 验证
+## 6. 安全和隐私
+
+禁止提交或粘贴：
+
+- `.env`、API key、token、cookie、私钥、证书、SSH 配置。
+- 真实服务器 IP、内网地址、数据库连接串、生产账号。
+- 生产数据库 dump、用户数据、聊天记录、日志中的敏感字段。
+- GitHub issue、PR、commit message 中也不要写上述内容。
+
+执行规则：
+
+- 需要示例配置时只提交 `.env.example`，值用占位符。
+- 日志和错误截图提交前先检查是否含 token、路径、账号、服务器信息。
+- Agent 运行命令前，先确认命令不会上传本地文件、打印密钥或访问生产数据。
+- 如果误提交敏感信息，立即停止继续推送，通知维护者，旋转密钥，再清理历史。
+
+## 7. 验证和测试
 
 文档或 API 变更至少运行：
 
@@ -103,9 +145,21 @@ git status --short --branch
 go test ./...
 ```
 
+Go 服务测试要求：
+
+- 新增核心逻辑要有同包 `*_test.go`。
+- Hub/Edge/Runner 的接口边界优先写 handler 或 service 层测试。
+- 涉及权限、路径、命令执行、同步序号的逻辑必须有失败用例。
+
 有前端代码后追加：
 
 ```powershell
 pnpm test
 pnpm build
 ```
+
+前端和客户端测试要求：
+
+- 前端状态转换和 API client 要有单元测试。
+- 关键 UI 流程后续用 Playwright 覆盖：新建 Thread、启动 Run、查看 Diff、Approval、Preview。
+- Desktop/Runner 改动至少提供本地 smoke test 步骤；无法自动化时写在 PR 验收里。
