@@ -9,6 +9,12 @@
 
 ## 1. 先读什么
 
+文档职责：
+
+- `README.md` 是对外展示页，给评审、同学和新读者快速了解项目，不放细碎开发约束。
+- `README_EN.md` 是英文补充入口，只保留对外介绍。
+- `AGENTS.md` 是给开发者和 Agent 的开发规范、开发风格和流程约束；每个 Agent 开始工作前必须读。
+
 人类同学先读：
 
 1. `README.md`
@@ -29,11 +35,11 @@ Agent 开始写代码前先读：
 
 AgentHub 的开发工作流是“三个开发者，每个开发者可以带一个或多个 Agent”。Agent 是协助者，不是仓库负责人。
 
-| 方向 | 负责范围 | 主要目录 |
+| 部分 | 负责范围 | 主要目录 |
 |---|---|---|
-| 前端 UI 设计 | Web 工作台、IM 交互、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` |
-| 后端开发 | Hub Server、Edge-Hub 通信、账号/群聊/同步/中继 | `hub-server/`、`edge-server/`、`api/` |
-| 客户端开发 | Desktop、Runner、Edge 本地调度、Agent CLI 进程、workspace | `app/desktop/`、`runner/`、`edge-server/` |
+| 前端 | Web 工作台、IM 交互、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` |
+| 后端 | Hub Server、Edge-Hub 通信、账号/群聊/同步/中继 | `hub-server/`、`edge-server/`、`api/` |
+| 客户端 | Desktop、Runner、Edge 本地调度、Agent CLI 进程、workspace | `app/desktop/`、`runner/`、`edge-server/` |
 
 共享边界：
 
@@ -85,9 +91,9 @@ type(scope): 中文摘要
 分支命名用小写：
 
 ```text
-feat/frontend-ui
-feat/backend-hub-edge
-feat/client-runner-desktop
+feat/frontend
+feat/backend
+feat/client
 docs/short-topic
 fix/short-topic
 ```
@@ -101,32 +107,38 @@ fix/short-topic
 - 跨方向改动尽早开 draft PR 或普通 PR，让另外两条线知道接口变化。
 - PR 合并前先同步最新 `master`，解决冲突后再合。
 - 不在共享分支上 force-push；确实需要时先在群里说明。
-- Issue 只保留三条主线任务：前端、后端、客户端。小任务写进对应 issue 或 PR，不额外开一堆 issue。
+- Issue 只保留三部分主线任务：前端、后端、客户端。小任务写进对应 issue 或 PR，不额外开一堆 issue。
 
 ## 5. 文档规则
 
 - 主文档只保留三份：产品需求、系统架构、功能实现。
+- AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进三份主文档，不要随手新增根级文档。
 - 详细调研放 `docs/reference/`。
 - 历史方案、旧审查、旧计划放 `docs/archive/`。
-- 文档中文为主；代码标识、路径、API 字段、命令保留英文。
+- 文档、issue、PR 正文中文为主；代码标识、路径、API 字段、命令保留英文。
 - 不使用未解释缩写。第一次出现时写白话解释。
 - 修改目录、协议、分工后，同步 `README.md`、本文件和相关主文档。
+- 不在文档中依赖个人本机绝对路径、私人服务器、私人账号或不可公开的环境。
+- 如果别人克隆仓库后需要某个配置或命令才能开发，把它写进 `README.md`、三份主文档或 `.env.example`。
 
 ## 6. 安全和隐私
 
 禁止提交或粘贴：
 
 - `.env`、API key、token、cookie、私钥、证书、SSH 配置。
-- 真实服务器 IP、内网地址、数据库连接串、生产账号。
+- 真实服务器 IP、内网地址、数据库连接串、生产账号、个人路径。
 - 生产数据库 dump、用户数据、聊天记录、日志中的敏感字段。
 - GitHub issue、PR、commit message 中也不要写上述内容。
+- 本机 Agent 记忆和运行状态，例如 `.agenthub/memory/`、`.claude/`、`.codex/`。
 
 执行规则：
 
 - 需要示例配置时只提交 `.env.example`，值用占位符。
 - 日志和错误截图提交前先检查是否含 token、路径、账号、服务器信息。
 - Agent 运行命令前，先确认命令不会上传本地文件、打印密钥或访问生产数据。
+- 不要因为“本机能跑”就把私有配置写死进代码；需要配置项时写成环境变量或本地配置文件，并提供公开示例。
+- 新增本地生成目录、缓存、数据库、日志、私钥或 Agent 状态目录时，先更新 `.gitignore`。
 - 如果误提交敏感信息，立即停止继续推送，通知维护者，旋转密钥，再清理历史。
 
 ## 7. 验证和测试
