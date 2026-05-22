@@ -8,7 +8,7 @@
 
 [English](README_EN.md) &nbsp;·&nbsp; [产品需求](docs/product-requirements.md) &nbsp;·&nbsp; [系统架构](docs/system-architecture.md) &nbsp;·&nbsp; [API 契约](api/)
 
-<img src="https://img.shields.io/badge/状态-客户端_M1_收口中-blue?style=flat-square" alt="status">
+<img src="https://img.shields.io/badge/状态-调研中-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.24+-00ADD8?style=flat-square&logo=go" alt="go">
 <img src="https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react" alt="react">
 <img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square" alt="license">
@@ -23,8 +23,6 @@ AgentHub 把 AI 编程 Agent 变成了 IM 联系人。你可以像在飞书群�
 
 **与现有工具的区别**：大多数 Claude Code GUI 是单人聊天壳。AgentHub 是多 Agent 协作平台——Orchestrator 规划、Claude Code 实现、Reviewer 审查，在同一个群聊中流转。
 
-当前仓库处于 **客户端 M1 收口** 阶段：已经跑通 Local Edge、Mock Run、WebSocket events 和 Desktop EventLog 的本地 mock 链路；完整 P0 还需要补齐 Project / Thread / Item 持久化、真实 Runner adapter、Diff / Artifact、Apply / Discard、Approval 和 Preview。
-
 <br>
 
 ## 架构
@@ -38,7 +36,7 @@ Desktop UI ─→ Edge Server ─→ Runner ─→ Claude Code / Codex / OpenCod
 | 组件 | 目录 | 职责 |
 |------|------|------|
 | **Hub Server** | `hub-server/` | 中心 IM：用户、联系人、群聊、消息路由、多端同步、Edge 中继 |
-| **Edge Server** | `edge-server/` | 本地节点：项目、记忆、上下文、Runner 管理，P2+ 同步到 Hub |
+| **Edge Server** | `edge-server/` | 本地节点：项目、记忆、上下文、Runner 管理、同步到 Hub |
 | **Runner** | `runner/` | 执行器：workspace、进程管理、Agent CLI 适配、Diff/预览/日志 |
 | **Desktop App** | `app/desktop/` | Tauri 桌面端入口，负责本地工作台体验 |
 | **Web App** | `app/web/` | React IM 界面：侧边栏、消息树、Diff 卡片、预览面板 |
@@ -49,8 +47,6 @@ Desktop UI ─→ Edge Server ─→ Runner ─→ Claude Code / Codex / OpenCod
 <br>
 
 ## 演示流程
-
-下面是目标体验，不代表当前 M1 已全部完成。当前 M1 只覆盖 mock run 和事件日志展示。
 
 ```
 你：@ClaudeCode 做一个带邮箱和 OAuth 的登录页
@@ -97,7 +93,7 @@ Orchestrator: 完成。预览地址 http://localhost:5173
 
 ## 快速开始
 
-首次克隆后先做本地开发初始化：
+当前仓库已进入实现准备阶段，运行入口会随 P0 代码 PR 补上。首次克隆后先做本地开发初始化：
 
 ```bash
 ./scripts/setup.sh
@@ -115,57 +111,7 @@ Windows PowerShell：
 .\scripts\setup.ps1 -Reference core
 ```
 
-### 当前 M1 本地链路
-
-终端 1：启动 Local Edge。
-
-```powershell
-cd edge-server
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210
-```
-
-终端 2：启动 Desktop Web UI。日常开发优先用 Vite，避免每次都启动 Tauri 壳。
-
-```powershell
-cd app/desktop
-pnpm install
-pnpm dev --port 5199
-```
-
-浏览器打开 `http://localhost:5199`，可以看到 Edge online/offline、Mock Runner 和 EventLog。当前 M1 不包含 Project / Thread 工作台、真实 Agent CLI、Diff、Approval 或 Preview。
-
-### Desktop 应用构建
-
-```powershell
-cd app/desktop
-pnpm install
-pnpm build            # 仅构建前端，无需 Rust 工具链
-pnpm tauri dev        # 启动 Tauri 开发窗口（需要 Rust 和 Tauri CLI）
-```
-
-> `pnpm build` 只构建前端，不需要 Rust 工具链。`pnpm tauri dev` 需要安装 [Rust](https://rustup.rs) 和 Tauri 系统依赖。
-
-### 当前验证命令
-
-```powershell
-git diff --check
-
-cd edge-server
-go test ./...
-
-cd ..\runner
-go test ./...
-
-cd ..\app\desktop
-pnpm test
-pnpm build
-pnpm test:e2e
-
-cd ..\..
-.\scripts\client-smoke.ps1
-```
-
-完整 P0 目标仍是 `Desktop UI -> Local Edge -> Local Runner -> Agent CLI`。当前 M1 使用 Mock Run 验证链路；下一步优先推进 M2 的 Edge 本地数据层和 EventStore，Desktop 启动编排可并行补齐，随后再进入真实 Runner adapter、Project / Worktree / Diff。
+> P0 阶段目标是 Desktop UI -> Local Edge -> Local Runner。具体启动命令随前端、后端、客户端代码落地后补充。
 
 <br>
 
@@ -199,8 +145,7 @@ Docker 配置不再放根级 `docker/`。如果某个模块需要容器化，就
 |------|------|
 | [产品需求文档](docs/product-requirements.md) | 产品定位、用户、核心体验、阶段目标和比赛交付对应 |
 | [系统架构文档](docs/system-architecture.md) | Hub-Edge-Runner、组件职责、通信方式、权威模型 |
-| [功能实现文档](docs/implementation-guide.md) | 三人分工、M1-M4 阶段路线、API 更新规则和验收命令 |
-| [客户端路线图](docs/client-roadmap.md) | 客户端 M1-M4 阶段、当前分支、下一步任务 |
+| [功能实现文档](docs/implementation-guide.md) | 模块分工、API foundation、P0 实现顺序和验收命令 |
 | [API 契约](api/) | REST API 和 WebSocket typed events 的契约入口 |
 | [调研索引](docs/reference/) | 69 份跨仓库深度分析和工程规格，Agent 友好的四层结构 |
 | [调研与历史归档](docs/archive/) | 旧版细分架构、协议、memory、workspace 等深度材料 |

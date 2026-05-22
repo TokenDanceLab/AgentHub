@@ -12,7 +12,6 @@ test-results/
 
 # Go
 *.exe
-*.exe~
 *.test
 *.out
 vendor/
@@ -68,19 +67,13 @@ yarn-error.log*
 
 # Local machine and agent state
 .worktrees/
-docs/review/
 .agenthub-runtime/
 .agenthub/memory/
 .agenthub/local/
 .agenthub/runtime/
 .agenthub/secrets/
 .claude/
-.codex/*
-!.codex/
-!.codex/skills/
-.codex/skills/*
-!.codex/skills/set-goal/
-!.codex/skills/set-goal/**
+.codex/
 .cursor/
 .continue/
 

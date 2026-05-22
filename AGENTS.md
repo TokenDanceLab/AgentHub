@@ -26,12 +26,10 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 
 1. 先读本文件。
 2. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
-3. 如果用户要求 `set-goal`、持续推进、自我迭代、worktree/subagent 分发或交叉 review，必须先加载 `.codex/skills/set-goal/SKILL.md`，再按其中 `references/` 执行。
-4. 只读相关主文档章节：产品不清读 `docs/product-requirements.md`；边界不清读 `docs/system-architecture.md`；实现顺序不清读 `docs/implementation-guide.md`。
-5. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
-6. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
-7. 客户端 M1 任务读 `docs/client-roadmap.md`。
-8. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
+3. 只读相关主文档章节：产品不清读 `docs/product-requirements.md`；边界不清读 `docs/system-architecture.md`；实现顺序不清读 `docs/implementation-guide.md`。
+4. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
+5. 客户端 M1 任务读 `docs/client-roadmap.md`。
+6. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
 
 `docs/archive/` 只在追溯旧方案时读。`reference/**` 是第三方源码镜像，默认不改、不翻译、不全文扫描。
 
@@ -60,14 +58,6 @@ AgentHub 的开发工作流是“三个开发者，每个开发者可以带一�
 - 主 Agent 负责拆解、验收、提交和 PR；subagent 只负责被分配的窄任务。
 - subagent 提示必须包含：目标、允许修改的路径、必须阅读的文档、必须运行的检查、隐私红线。
 - subagent 不自行扩大范围；发现范围不够，停下交回主 Agent。
-
-### 仓库级 Skill
-
-- 仓库只提交白名单 skill：`.codex/skills/set-goal/`。
-- 用户调用 `set-goal`，或要求持续推进、自我迭代、自己 review、交叉 review、worktree/subagent 分发时，必须先读 `.codex/skills/set-goal/SKILL.md`。
-- `.codex/skills/set-goal/references/` 已内嵌 Agent 开发 Loop、路线图驱动、review、验证和 git 收口规则；不要假设外部同名 skill 一定可用。
-- `docs/roadmap.md` 和 `docs/roadmaps/` 是持续开发台账，用来记录当前目标、方向任务、分支进展、验证和下一步；不要把详细方案写成第二套主文档。
-- 除白名单 skill 外，`.codex/` 的本机状态、缓存、会话记录和个人配置不得提交。
 
 ## 3. 技术主线
 
@@ -151,7 +141,6 @@ fix/short-topic
 ## 5. 文档规则
 
 - 主文档只保留三份：产品需求、系统架构、功能实现。
-- `docs/roadmap.md` 和 `docs/roadmaps/` 只记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
 - `docs/client-roadmap.md` 是客户端 M1 并行开发路线图；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进三份主文档，不要随手新增根级文档。
@@ -171,7 +160,7 @@ fix/short-topic
 - 真实服务器 IP、内网地址、数据库连接串、生产账号、个人路径。
 - 生产数据库 dump、用户数据、聊天记录、日志中的敏感字段。
 - GitHub issue、PR、commit message 中也不要写上述内容。
-- 本机 Agent 记忆和运行状态，例如 `.agenthub/memory/`、`.claude/`、`.codex/`；仓库级 `.codex/skills/set-goal/` 是唯一例外。
+- 本机 Agent 记忆和运行状态，例如 `.agenthub/memory/`、`.claude/`、`.codex/`。
 
 执行规则：
 
