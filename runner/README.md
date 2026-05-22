@@ -4,6 +4,49 @@ Runner 是 Agent CLI 进程的执行节点。
 
 Runtime: Go.
 
+## 快速开始
+
+### 构建
+
+```powershell
+cd runner
+go build ./cmd/agenthub-runner
+```
+
+### 运行 Mock 模式
+
+```powershell
+go run ./cmd/agenthub-runner --mock
+```
+
+### 可用参数
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--mock` | `false` | 启用 mock 模式，模拟一次 agent 执行 |
+| `--addr` | `127.0.0.1:3211` | Runner HTTP 监听地址（mock 模式下暂不使用） |
+
+### Mock 模式预期输出
+
+```text
+INFO starting agent runner in mock mode addr=127.0.0.1:3211
+INFO mock run started id=mock-run-1
+Installing dependencies...
+Building project...
+Running tests...
+All tests passed!
+INFO mock run finished id=mock-run-1
+INFO mock run completed successfully
+```
+
+输出之间有约 80ms 间隔，模拟真实 agent 执行过程。
+
+### 运行测试
+
+```powershell
+go test ./...
+```
+
 ## 职责
 
 - 启动、监控和停止 Claude Code / Codex / OpenCode 进程。

@@ -1,0 +1,15 @@
+{
+  "status.online": "Local Edge: Online — {{version}} ({{edgeId}})",
+  "status.offline": "Local Edge: Offline",
+  "status.wsConnected": "WS: Connected",
+  "status.wsDisconnected": "WS: —",
+  "runner.title": "Runners",
+  "runner.emptyOnline": "No runners connected",
+  "runner.emptyOffline": "Waiting for Edge...",
+  "event.title": "Events",
+  "event.emptyOnline": "Waiting for events...",
+  "event.emptyOffline": "Start Edge Server to receive events",
+  "action.startRun": "Start Mock Run",
+  "action.clearEvents": "Clear Events",
+  "error.streamError": "Event stream error: {{message}}"
+}

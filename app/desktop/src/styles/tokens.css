@@ -1,0 +1,47 @@
+:root {
+  /* ── Palette ─────────────────────────────── */
+  --color-bg:        #0f1117;
+  --color-surface:   #161b22;
+  --color-border:    #21262d;
+  --color-border-subtle: #1a1d24;
+  --color-text:      #e1e4e8;
+  --color-text-muted: #8b949e;
+  --color-text-dim:  #484f58;
+  --color-accent:    #79c0ff;
+  --color-success:   #3fb950;
+  --color-danger:    #f85149;
+  --color-danger-bg: #490202;
+
+  /* ── Typography ──────────────────────────── */
+  --font-ui:    system-ui, -apple-system, sans-serif;
+  --font-mono:  'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  --font-size-xs:  11px;
+  --font-size-sm:  12px;
+  --font-size-md:  13px;
+
+  /* ── Spacing ─────────────────────────────── */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+
+  /* ── Layout ──────────────────────────────── */
+  --sidebar-width: 260px;
+  --statusbar-height: 36px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-md);
+  -webkit-font-smoothing: antialiased;
+}
