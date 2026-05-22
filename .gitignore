@@ -28,15 +28,23 @@ Thumbs.db
 .env.local
 .env.*
 !.env.example
+.envrc
 *.pem
 *.key
 *.p12
 *.pfx
 id_rsa*
 id_ed25519*
+secrets/
+private/
+*.secret.*
 
 # Logs
 *.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Local databases and dumps
 *.db
@@ -44,9 +52,18 @@ id_ed25519*
 *.sqlite3
 *.dump
 *.bak
+*.backup
+*.sql.gz
 
-# Local agent worktrees
-.claude/worktrees/
+# Local machine and agent state
+.agenthub/memory/
+.agenthub/local/
+.agenthub/runtime/
+.agenthub/secrets/
+.claude/
+.codex/
+.cursor/
+.continue/
 
 # Cloned reference repos (at repo root only)
 /reference/*
