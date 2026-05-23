@@ -4,6 +4,7 @@ import { Plus, MessageSquare, Pencil, Trash2, Check, X } from 'lucide-react';
 import type { ThreadInfo } from '@shared/types';
 import { renameThread, deleteThread } from '@/api/edgeClient';
 import { useThreadStore } from '@/stores/threadStore';
+import { useToast } from '@/contexts/ToastContext';
 import styles from './ThreadPanel.module.css';
 
 /** ThreadInfo with optional count metadata the Edge may return. */
@@ -44,6 +45,7 @@ function relativeTime(
 
 export default memo(function ThreadPanel({ threads, online, selectedId, onSelect, onCreate }: Props) {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const [query, setQuery] = useState('');
 
   // Inline rename state
@@ -90,9 +92,11 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
       storeRenameThread(editingId, title);
       setEditingId(null);
       setActionError(null);
+      showToast('success', t('toast.threadRenamed'));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setActionError(msg);
+      showToast('error', msg);
     }
   };
 
@@ -120,9 +124,11 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
       storeRemoveThread(threadId);
       setDeletingId(null);
       setActionError(null);
+      showToast('success', t('toast.threadDeleted'));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setActionError(msg);
+      showToast('error', msg);
     }
   };
 
