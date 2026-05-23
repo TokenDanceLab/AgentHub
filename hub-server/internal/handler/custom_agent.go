@@ -1,18 +1,27 @@
 package handler
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
 )
 
-type CustomAgentHandler struct {
-	service *service.AgentService
+// CustomAgentService is the subset of *service.AgentService used by CustomAgentHandler.
+type CustomAgentService interface {
+	CreateCustomAgent(ctx context.Context, ownerID, name, avatarURL, agentType, systemPrompt, capabilityTags, toolWhitelist, modelParams string) (*model.CustomAgent, error)
+	ListCustomAgents(ctx context.Context, ownerID string) ([]model.CustomAgent, error)
+	UpdateCustomAgent(ctx context.Context, ownerID string, ca *model.CustomAgent) error
+	DeleteCustomAgent(ctx context.Context, ownerID, id string) error
 }
 
-func NewCustomAgentHandler(s *service.AgentService) *CustomAgentHandler {
+type CustomAgentHandler struct {
+	service CustomAgentService
+}
+
+func NewCustomAgentHandler(s CustomAgentService) *CustomAgentHandler {
 	return &CustomAgentHandler{service: s}
 }
 

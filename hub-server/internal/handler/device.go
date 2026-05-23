@@ -4,14 +4,19 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/model"
 )
 
-type DeviceHandler struct {
-	deviceService *service.DeviceService
+// DeviceService is the subset of *service.DeviceService used by DeviceHandler.
+type DeviceService interface {
+	Register(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error)
 }
 
-func NewDeviceHandler(deviceService *service.DeviceService) *DeviceHandler {
+type DeviceHandler struct {
+	deviceService DeviceService
+}
+
+func NewDeviceHandler(deviceService DeviceService) *DeviceHandler {
 	return &DeviceHandler{deviceService: deviceService}
 }
 

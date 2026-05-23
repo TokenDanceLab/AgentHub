@@ -1,17 +1,33 @@
 package handler
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/service"
 )
 
-type ContactHandler struct {
-	service *service.ContactService
+// ContactService is the subset of *service.ContactService used by ContactHandler.
+type ContactService interface {
+	SearchUser(ctx context.Context, currentUserID, targetID string) (*service.SearchResult, error)
+	SendFriendRequest(ctx context.Context, userID, friendID, message string) error
+	ListFriendRequests(ctx context.Context, userID string) ([]service.RequestInfo, error)
+	AcceptFriendRequest(ctx context.Context, userID, requestID string) error
+	RejectFriendRequest(ctx context.Context, userID, requestID string) error
+	ListContacts(ctx context.Context, userID string) ([]service.ContactInfo, error)
+	RemoveContact(ctx context.Context, currentUserID, friendUserID string) error
+	BlockContact(ctx context.Context, currentUserID, targetUserID string) error
+	UnblockContact(ctx context.Context, currentUserID, targetUserID string) error
+	UpdateRemark(ctx context.Context, currentUserID, friendUserID, remark string) error
 }
 
-func NewContactHandler(s *service.ContactService) *ContactHandler {
+type ContactHandler struct {
+	service ContactService
+}
+
+func NewContactHandler(s ContactService) *ContactHandler {
 	return &ContactHandler{service: s}
 }
 
