@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-24
+最后更新：2026-05-24（M5 批次完成）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -30,24 +30,27 @@
 | **P3** | Bundle 分析 + React.lazy 拆分 + 权限事件管道 | 3/3 | 2026-05 |
 | **M3b** | AgentHook 接口 + 消息树 + 安全管道 + Task dispatched + Context Budget + 流式增量解析 | 6/6 | 2026-05 |
 | **M4** | Hub 骨架 + OpenCode E2E + Codex E2E + 环境隔离 + auth middleware + 权限门控升级 + 响应式布局 | 8/8 | 2026-05 |
+| **M5** | **工程基础收敛**：Edge race/metrics/tests/P2 + Hub 安全/DI全5阶段/测试12包/P2 + Desktop 虚拟滚动/高亮/空状态/@mention/tablet + CI增强 | 27/27 | 2026-05-24 |
 
-### 1.3 关键差距（来自审计报告）
+### 1.3 关键差距（来自审计报告 — M5 已全部修复）
+
+> 以下 P0-P2 项在 M5 批次（2026-05-24）中全部修复，保留作为记录。
 
 参考：`docs/review/edge-server-audit.md`、`docs/review/hub-server-audit.md`、`docs/review/hub-server-testing.md`、`docs/review/backend-engineering-standards.md`
 
-| 严重度 | 层面 | 核心问题 | 报告索引 |
-|:--:|------|------|:--:|
-| **P0** | Edge | ProcessExecutor race condition（并发 Cancel 找不到 cancel func） | edge S1 |
-| **P0** | Edge | 零可观测性（无 Prometheus、health check 浅） | edge S2 |
-| **P0** | Hub | JWT secret 硬编码在 config.yaml，pprof :6060 无认证 | hub P0-1, P0-2 |
-| **P0** | Hub | EventBus panic 静默丢弃（recover 无日志） | hub P0-3 |
-| **P0** | Hub | 零单元测试在 CI 中运行（`-short` 跳过全部） | testing report |
-| **P1** | Hub | 全局单例 `config.Cfg`/`repository.DB`/`cache.RDB` | hub P1-2, P1-3 |
-| **P1** | Hub | go.mod 声明 `go 1.25.6`（不存在版本） | standards 2.1 |
-| **P1** | Hub | DeviceHandler 绕过 service 层直接操作 DB | hub P1-1 |
-| **P1** | Edge | runnerctx 包覆盖率仅 17.3%，control_protocol 覆盖率 0% | edge S3, S4 |
-| **P1** | Desktop | 无 TanStack Query、无状态机、受控输入闪烁、无虚拟滚动 | client.md P0 |
-| **P2** | Hub | 两个 N+1 查询 + jsonb 无验证 + 无速率限制 | hub P2-1/2/3, P1-4 |
+| 严重度 | 层面 | 核心问题 | 报告索引 | 状态 |
+|:--:|------|------|:--:|:--:|
+| **P0** | Edge | ProcessExecutor race condition | edge S1 | ✅ M5 |
+| **P0** | Edge | 零可观测性（无 Prometheus、health check 浅） | edge S2 | ✅ M5 |
+| **P0** | Hub | JWT secret 硬编码，pprof :6060 无认证 | hub P0-1, P0-2 | ✅ M5 |
+| **P0** | Hub | EventBus panic 静默丢弃 | hub P0-3 | ✅ M5 |
+| **P0** | Hub | 零单元测试在 CI 中运行 | testing report | ✅ M5 |
+| **P1** | Hub | 全局单例 `config.Cfg`/`repository.DB`/`cache.RDB` | hub P1-2, P1-3 | ✅ M5 |
+| **P1** | Hub | go.mod 版本号错误 | standards 2.1 | ✅ M5 |
+| **P1** | Hub | DeviceHandler 绕过 service 层 | hub P1-1 | ✅ M5 |
+| **P1** | Edge | runnerctx 17.3%，control_protocol 0% | edge S3, S4 | ✅ M5 |
+| **P1** | Desktop | 无虚拟滚动 | client.md P0 | ✅ M5 |
+| **P2** | Hub | N+1 查询 + jsonb 无验证 + 无速率限制 | hub P2-1/2/3, P1-4 | ✅ M5 |
 
 ---
 
