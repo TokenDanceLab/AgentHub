@@ -1,28 +1,177 @@
+/* ═══════════════════════════════════════════════════════════════════
+   DiffViewer — GitHub-style unified diff with file tree sidebar
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Layout ─────────────────────────────────────────────────────── */
 .root {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 0;
+  min-height: 200px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .root {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+}
+
+.diffPanel {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  padding: var(--space-sm);
+  overflow-y: auto;
+  min-width: 0;
 }
 
 .empty {
-  padding: var(--space-md);
+  padding: var(--space-xl) var(--space-md);
   color: var(--muted-foreground);
   font-size: var(--font-size-sm);
   text-align: center;
 }
 
-/* ── File Section ─────── */
+/* ── File Tree Sidebar ──────────────────────────────────────────── */
+.fileTree {
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fileTreeHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.fileTreeTitle {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--foreground);
+}
+
+.fileTreeStats {
+  display: flex;
+  gap: var(--space-xs);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+  font-family: var(--font-mono);
+}
+
+.fileTreeActions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.miniBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+.miniBtn:hover {
+  background: var(--hover-overlay);
+  color: var(--foreground);
+}
+
+.fileTreeList {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-xs) 0;
+}
+
+.fileTreeItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: 4px var(--space-md);
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+  text-align: left;
+}
+.fileTreeItem:hover {
+  background: var(--hover-overlay);
+}
+.fileTreeItemActive {
+  background: color-mix(in oklch, var(--primary) 8%, transparent);
+  border-left: 2px solid var(--primary);
+  padding-left: calc(var(--space-md) - 2px);
+}
+
+.fileTreeIcon {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+.fileTreePath {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Status badges ────────────────────────────────────────────────── */
+.statusBadge {
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.statusAdded {
+  background: var(--diff-added-bg);
+  color: var(--diff-added-border);
+}
+.statusDeleted {
+  background: var(--diff-removed-bg);
+  color: var(--diff-removed-border);
+}
+.statusModified {
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+
+/* ── File Section ─────────────────────────────────────────────────── */
 .fileSection {
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
 .fileHeader {
   display: flex;
   align-items: center;
+  background: var(--card);
   position: sticky;
   top: 0;
+  z-index: var(--z-sticky);
 }
 
 .fileHeaderBtn {
@@ -31,9 +180,9 @@
   gap: var(--space-sm);
   flex: 1;
   min-width: 0;
-  padding: 6px var(--space-md);
+  padding: var(--space-xs) var(--space-md);
   border: none;
-  background: var(--background);
+  background: transparent;
   color: var(--foreground);
   font-size: var(--font-size-xs);
   font-family: var(--font-mono);
@@ -41,112 +190,193 @@
   transition: background var(--duration-fast);
 }
 .fileHeaderBtn:hover {
-  background: var(--card);
+  background: var(--hover-overlay);
 }
 
 .filePath {
   font-weight: var(--font-weight-medium);
   flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileChangeStats {
+  display: flex;
+  gap: var(--space-sm);
 }
 
 .addedCount {
   color: var(--diff-added-border);
   font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-2xs);
 }
 .deletedCount {
   color: var(--diff-removed-border);
   font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-2xs);
 }
 
 .chevron {
-  font-size: 10px;
-  transition: transform var(--duration-fast);
-  opacity: 0.4;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 .chevronDown {
   transform: rotate(90deg);
 }
 
-/* ── Status badges ─────── */
-.statusAdded {
-  padding: 1px 4px;
-  border-radius: 2px;
-  background: var(--diff-added-bg);
-  color: var(--diff-added-border);
-  font-size: 10px;
-  font-weight: var(--font-weight-medium);
-}
-.statusDeleted {
-  padding: 1px 4px;
-  border-radius: 2px;
-  background: var(--diff-removed-bg);
-  color: var(--diff-removed-border);
-  font-size: 10px;
-  font-weight: var(--font-weight-medium);
-}
-.statusModified {
-  padding: 1px 4px;
-  border-radius: 2px;
-  background: color-mix(in oklch, var(--primary) 15%, transparent);
-  color: var(--primary);
-  font-size: 10px;
-  font-weight: var(--font-weight-medium);
-}
-
-/* ── File body ─────────── */
+/* ── File body ────────────────────────────────────────────────────── */
 .fileBody {
   border-top: 1px solid var(--border);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
+  tab-size: 4;
 }
 
-/* ── Hunk ──────────────── */
+/* ── Hunk ─────────────────────────────────────────────────────────── */
+.hunk {
+  border-bottom: 1px solid var(--border);
+}
+.hunk:last-child {
+  border-bottom: none;
+}
+
 .hunkHeader {
-  padding: 2px var(--space-md);
-  background: color-mix(in oklch, var(--primary) 8%, transparent);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-xs) var(--space-md);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklch, var(--primary) 6%, transparent);
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: var(--font-size-2xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+.hunkHeader:hover {
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
+}
+
+.hunkChevron {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  transition: transform var(--duration-fast);
+}
+.hunkChevronDown {
+  transform: rotate(90deg);
+}
+
+.hunkHeaderText {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Diff rows ────────────────────────────────────────────────────── */
+.lineAdded,
+.lineDeleted,
+.lineContext {
+  display: flex;
+  min-height: 20px;
 }
 
 .lineAdded {
   background: var(--diff-added-bg);
-  display: flex;
 }
 .lineDeleted {
   background: var(--diff-removed-bg);
-  display: flex;
-}
-.lineContext {
-  display: flex;
 }
 
-.lineNum {
-  width: 40px;
+/* GitHub-style left accent bar */
+.lineAdded::before,
+.lineDeleted::before {
+  content: '';
+  width: 4px;
+  flex-shrink: 0;
+}
+.lineAdded::before {
+  background: var(--diff-added-border);
+}
+.lineDeleted::before {
+  background: var(--diff-removed-border);
+}
+
+.lineAdded:hover {
+  background: color-mix(in oklch, var(--diff-added-bg) 80%, var(--hover-overlay));
+}
+.lineDeleted:hover {
+  background: color-mix(in oklch, var(--diff-removed-bg) 80%, var(--hover-overlay));
+}
+.lineContext:hover {
+  background: var(--hover-overlay);
+}
+
+/* ── Line number gutters ──────────────────────────────────────────── */
+.lineNumOld,
+.lineNumNew {
+  width: 48px;
+  min-width: 48px;
+  padding: 0 var(--space-sm);
   text-align: right;
-  padding-right: var(--space-sm);
+  color: var(--muted-foreground);
+  opacity: 0.45;
+  user-select: none;
+  flex-shrink: 0;
+}
+.lineNumNew {
+  border-right: 1px solid var(--border);
+}
+
+.lineAdded .lineNumOld,
+.lineAdded .lineNumNew,
+.lineDeleted .lineNumOld,
+.lineDeleted .lineNumNew {
+  opacity: 0.65;
+}
+
+/* ── Line sign (+, -) ─────────────────────────────────────────────── */
+.lineSign {
+  width: 20px;
+  min-width: 20px;
+  text-align: center;
   color: var(--muted-foreground);
   opacity: 0.5;
   user-select: none;
   flex-shrink: 0;
 }
+.lineAdded .lineSign {
+  color: var(--diff-added-border);
+  opacity: 0.85;
+}
+.lineDeleted .lineSign {
+  color: var(--diff-removed-border);
+  opacity: 0.85;
+}
 
+/* ── Line content ─────────────────────────────────────────────────── */
 .lineContent {
   flex: 1;
   white-space: pre;
   overflow-x: auto;
-  padding-right: var(--space-md);
+  padding: 0 var(--space-md);
 }
 
-/* ── Accept / Reject actions ── */
+/* ── Accept/Reject actions ────────────────────────────────────────── */
 .actionBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  margin-left: 2px;
+  margin-right: var(--space-xs);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -182,13 +412,13 @@
   border-color: var(--diff-removed-border);
 }
 
-/* ── File-level accept / reject visual states ── */
+/* ── File-level accept/reject states ──────────────────────────────── */
 .fileAccepted {
-  opacity: 0.65;
+  opacity: 0.6;
 }
 
 .fileRejected {
-  opacity: 0.45;
+  opacity: 0.4;
 }
 .fileRejected .filePath {
   text-decoration: line-through;
