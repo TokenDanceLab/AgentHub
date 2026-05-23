@@ -1,1350 +1,1519 @@
-const pageHtml: string = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AgentHub | Agent Square</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg: #edf6ff;
-      --bg-soft: #f7fbff;
-      --ink: #172033;
-      --muted: #5f6f86;
-      --line: rgba(133, 153, 184, 0.22);
-      --blue: #1769e8;
-      --cyan: #08a7cf;
-      --purple: #7457e8;
-      --green: #1d9b67;
-      --amber: #d98718;
-      --glass: rgba(255, 255, 255, 0.72);
-      --glass-border: rgba(255, 255, 255, 0.7);
-      --shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      overflow: hidden;
-      color: var(--ink);
-      background:
-        radial-gradient(circle at 14% 10%, rgba(8, 167, 207, 0.16), transparent 28%),
-        radial-gradient(circle at 78% 4%, rgba(116, 87, 232, 0.14), transparent 30%),
-        linear-gradient(135deg, var(--bg-soft), var(--bg));
-      font-family: "Hanken Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-
-    button,
-    input,
-    select {
-      font: inherit;
-    }
-
-    button {
-      cursor: pointer;
-    }
-
-    #particle-canvas {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      width: 100vw;
-      height: 100vh;
-      pointer-events: none;
-    }
-
-    .page {
-      position: relative;
-      z-index: 1;
-      height: 100vh;
-      padding: 22px;
-    }
-
-    .workspace {
-      display: grid;
-      grid-template-columns: 232px minmax(0, 1fr) 316px;
-      gap: 18px;
-      max-width: 1440px;
-      height: calc(100vh - 44px);
-      margin: 0 auto;
-    }
-
-    .glass {
-      background: var(--glass);
-      border: 1px solid var(--glass-border);
-      border-radius: 12px;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(28px) saturate(160%);
-      -webkit-backdrop-filter: blur(28px) saturate(160%);
-    }
-
-    .sidebar,
-    .main,
-    .drawer {
-      display: flex;
-      min-height: 0;
-      flex-direction: column;
-    }
-
-    .sidebar,
-    .drawer {
-      gap: 16px;
-      overflow: auto;
-      padding: 18px;
-    }
-
-    .main {
-      gap: 16px;
-      overflow: hidden;
-    }
-
-    h1,
-    h2,
-    h3,
-    p {
-      margin: 0;
-    }
-
-    h1 {
-      font-size: 27px;
-      line-height: 1.1;
-      letter-spacing: 0;
-    }
-
-    h2 {
-      font-size: 16px;
-      line-height: 1.25;
-      letter-spacing: 0;
-    }
-
-    h3 {
-      font-size: 15px;
-      line-height: 1.25;
-      letter-spacing: 0;
-    }
-
-    .muted {
-      color: var(--muted);
-    }
-
-    .tiny {
-      font-size: 11px;
-      line-height: 1.35;
-      letter-spacing: 0;
-    }
-
-    .small {
-      font-size: 12px;
-      line-height: 1.45;
-      letter-spacing: 0;
-    }
-
-    .label {
-      font-size: 11px;
-      font-weight: 800;
-      line-height: 1.2;
-      letter-spacing: 0;
-      text-transform: uppercase;
-    }
-
-    .material-symbols-outlined {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 18px;
-      height: 18px;
-      overflow: hidden;
-      font-size: 18px;
-      line-height: 1;
-      vertical-align: middle;
-      font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .brand-mark,
-    .icon-tile,
-    .agent-logo,
-    .avatar,
-    .icon-button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex: 0 0 auto;
-    }
-
-    .brand-mark {
-      width: 38px;
-      height: 38px;
-      color: #fff;
-      border-radius: 10px;
-      background: linear-gradient(135deg, var(--blue), var(--cyan));
-      box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
-    }
-
-    .truncate {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .sidebar-section,
-    .drawer-section {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .section-head,
-    .mini-row,
-    .card-head,
-    .card-actions,
-    .topbar,
-    .toolbar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
-    }
-
-    .section-head,
-    .mini-row,
-    .topbar {
-      justify-content: space-between;
-    }
-
-    .nav-list,
-    .category-list,
-    .activity-list,
-    .tool-list,
-    .agent-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      min-width: 0;
-    }
-
-    .nav-item,
-    .category-button,
-    .activity-row,
-    .tool-row,
-    .metric-card {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 0;
-      padding: 10px;
-      border: 1px solid transparent;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.46);
-      color: var(--ink);
-    }
-
-    .nav-item.active,
-    .category-button.active {
-      border-color: rgba(23, 105, 232, 0.2);
-      background: rgba(23, 105, 232, 0.1);
-      color: #1459c7;
-    }
-
-    .category-button {
-      width: 100%;
-      justify-content: space-between;
-      text-align: left;
-    }
-
-    .icon-tile,
-    .agent-logo {
-      width: 34px;
-      height: 34px;
-      color: var(--blue);
-      border-radius: 10px;
-      background: rgba(23, 105, 232, 0.1);
-    }
-
-    .icon-tile.cyan,
-    .agent-logo.cyan {
-      color: #087f9e;
-      background: rgba(8, 167, 207, 0.11);
-    }
-
-    .icon-tile.purple,
-    .agent-logo.purple {
-      color: #6044d7;
-      background: rgba(116, 87, 232, 0.11);
-    }
-
-    .icon-tile.green,
-    .agent-logo.green {
-      color: #15744b;
-      background: rgba(29, 155, 103, 0.11);
-    }
-
-    .avatar {
-      width: 34px;
-      height: 34px;
-      color: #fff;
-      border: 2px solid rgba(255, 255, 255, 0.82);
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--purple), var(--cyan));
-      font-size: 12px;
-      font-weight: 800;
-      box-shadow: 0 8px 20px rgba(23, 105, 232, 0.16);
-    }
-
-    .pill,
-    .tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      min-height: 24px;
-      padding: 5px 9px;
-      border: 1px solid rgba(23, 105, 232, 0.13);
-      border-radius: 999px;
-      background: rgba(23, 105, 232, 0.08);
-      color: #1459c7;
-      font-size: 11px;
-      font-weight: 800;
-      white-space: nowrap;
-    }
-
-    .pill.cyan,
-    .tag.cyan {
-      border-color: rgba(8, 167, 207, 0.18);
-      background: rgba(8, 167, 207, 0.1);
-      color: #087f9e;
-    }
-
-    .pill.purple,
-    .tag.purple {
-      border-color: rgba(116, 87, 232, 0.18);
-      background: rgba(116, 87, 232, 0.1);
-      color: #6044d7;
-    }
-
-    .pill.green,
-    .tag.green {
-      border-color: rgba(29, 155, 103, 0.2);
-      background: rgba(29, 155, 103, 0.11);
-      color: #15744b;
-    }
-
-    .status-dot {
-      display: inline-flex;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 0 4px rgba(29, 155, 103, 0.12);
-    }
-
-    .topbar {
-      padding: 18px 20px;
-      min-height: 104px;
-    }
-
-    .toolbar {
-      justify-content: flex-end;
-      flex-wrap: wrap;
-      margin-left: auto;
-    }
-
-    .search {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      width: min(340px, 100%);
-      min-height: 38px;
-      padding: 8px 11px;
-      border: 1px solid rgba(255, 255, 255, 0.68);
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.58);
-      color: var(--muted);
-    }
-
-    .search input {
-      width: 100%;
-      min-width: 0;
-      padding: 0;
-      border: 0;
-      outline: 0;
-      background: transparent;
-      color: var(--ink);
-    }
-
-    .select {
-      min-height: 38px;
-      padding: 8px 34px 8px 11px;
-      border: 1px solid rgba(255, 255, 255, 0.68);
-      border-radius: 8px;
-      outline: 0;
-      background: rgba(255, 255, 255, 0.62);
-      color: var(--ink);
-      font-size: 12px;
-      font-weight: 800;
-    }
-
-    .button,
-    .icon-button {
-      border: 1px solid rgba(23, 105, 232, 0.14);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.62);
-      color: var(--ink);
-      box-shadow: 0 8px 18px rgba(26, 40, 80, 0.08);
-    }
-
-    .button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      min-height: 38px;
-      padding: 9px 12px;
-      font-size: 12px;
-      font-weight: 800;
-      line-height: 1;
-      white-space: nowrap;
-    }
-
-    .button.primary {
-      border-color: transparent;
-      color: #fff;
-      background: linear-gradient(135deg, var(--blue), var(--cyan));
-      box-shadow: 0 10px 22px rgba(23, 105, 232, 0.23);
-    }
-
-    .button.ghost,
-    .icon-button {
-      box-shadow: none;
-    }
-
-    .icon-button {
-      width: 34px;
-      height: 34px;
-      padding: 0;
-    }
-
-    .icon-button.is-favorite,
-    .icon-button.is-favorite .material-symbols-outlined {
-      color: #fff;
-      border-color: transparent;
-      background: linear-gradient(135deg, var(--purple), var(--blue));
-      font-variation-settings: "FILL" 1, "wght" 600, "GRAD" 0, "opsz" 24;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(120px, 1fr));
-      gap: 10px;
-    }
-
-    .metric-card {
-      align-items: flex-start;
-      padding: 12px;
-    }
-
-    .metric-card strong {
-      display: block;
-      margin-bottom: 4px;
-      font-size: 20px;
-      line-height: 1;
-    }
-
-    .market {
-      display: flex;
-      min-height: 0;
-      flex-direction: column;
-      gap: 12px;
-      overflow: hidden;
-      padding: 16px;
-    }
-
-    .market-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      min-width: 0;
-    }
-
-    .agent-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(230px, 1fr));
-      gap: 14px;
-      overflow: auto;
-      padding: 2px 4px 6px 2px;
-    }
-
-    .agent-card {
-      display: flex;
-      min-height: 238px;
-      flex-direction: column;
-      gap: 12px;
-      padding: 15px;
-      border-radius: 12px;
-      transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
-    }
-
-    .agent-card:hover {
-      transform: translateY(-2px);
-      border-color: rgba(23, 105, 232, 0.24);
-      box-shadow: 0 22px 54px rgba(26, 40, 80, 0.16);
-    }
-
-    .card-head {
-      justify-content: space-between;
-      align-items: flex-start;
-    }
-
-    .card-title {
-      display: flex;
-      min-width: 0;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .card-copy {
-      min-height: 58px;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.45;
-    }
-
-    .tag-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .card-actions {
-      justify-content: space-between;
-      margin-top: auto;
-    }
-
-    .card-actions .button {
-      flex: 1;
-    }
-
-    .agent-card.installed {
-      border-color: rgba(29, 155, 103, 0.28);
-    }
-
-    .drawer {
-      position: relative;
-    }
-
-    .drawer-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .drawer-hero {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .drawer-hero .agent-logo {
-      width: 44px;
-      height: 44px;
-    }
-
-    .tool-row,
-    .activity-row {
-      align-items: flex-start;
-      background: rgba(255, 255, 255, 0.52);
-    }
-
-    .progress {
-      width: 100%;
-      height: 7px;
-      overflow: hidden;
-      border-radius: 999px;
-      background: rgba(23, 105, 232, 0.11);
-    }
-
-    .progress span {
-      display: block;
-      height: 100%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, var(--blue), var(--cyan), var(--purple));
-    }
-
-    .confirm-bar {
-      position: fixed;
-      left: 50%;
-      bottom: 22px;
-      z-index: 5;
-      display: none;
-      align-items: center;
-      gap: 12px;
-      width: min(520px, calc(100vw - 44px));
-      padding: 12px 14px;
-      transform: translateX(-50%);
-    }
-
-    .confirm-bar.show {
-      display: flex;
-    }
-
-    .spacer {
-      flex: 1 1 auto;
-    }
-
-    @media (max-width: 1180px) {
-      .workspace {
-        grid-template-columns: 220px minmax(0, 1fr);
-      }
-
-      .drawer {
-        display: none;
-      }
-
-      .agent-grid {
-        grid-template-columns: repeat(2, minmax(230px, 1fr));
-      }
-    }
-
-    @media (max-width: 820px) {
-      body {
-        overflow: auto;
-      }
-
-      .page {
-        height: auto;
-        min-height: 100vh;
-        padding: 14px;
-      }
-
-      .workspace {
-        display: flex;
-        height: auto;
-        flex-direction: column;
-      }
-
-      .topbar,
-      .market-head {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-
-      .toolbar,
-      .search {
-        width: 100%;
-      }
-
-      .stats,
-      .agent-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .market,
-      .agent-grid {
-        overflow: visible;
-      }
-    }
-  </style>
-</head>
-<body>
-  <canvas id="particle-canvas" aria-hidden="true"></canvas>
-  <div class="page">
-    <div class="workspace">
-      <aside class="sidebar glass">
-        <div class="brand">
-          <div class="brand-mark"><span class="material-symbols-outlined">hub</span></div>
-          <div class="truncate">
-            <p class="label muted">AgentHub</p>
-            <h2>Agent Square</h2>
-          </div>
-        </div>
-
-        <section class="sidebar-section">
-          <div class="section-head">
-            <h3>Navigation</h3>
-            <span class="pill cyan"><span class="status-dot"></span>Local</span>
-          </div>
-          <div class="nav-list">
-            <div class="nav-item active">
-              <div class="icon-tile"><span class="material-symbols-outlined">storefront</span></div>
-              <div class="truncate">
-                <strong class="small">Marketplace</strong>
-                <p class="tiny muted truncate">Browse installable agents</p>
-              </div>
-            </div>
-            <div class="nav-item">
-              <div class="icon-tile cyan"><span class="material-symbols-outlined">dashboard</span></div>
-              <div class="truncate">
-                <strong class="small">Workspace</strong>
-                <p class="tiny muted truncate">4 agents added</p>
-              </div>
-            </div>
-            <div class="nav-item">
-              <div class="icon-tile purple"><span class="material-symbols-outlined">bookmark</span></div>
-              <div class="truncate">
-                <strong class="small">Favorites</strong>
-                <p class="tiny muted truncate">Saved for review</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="sidebar-section">
-          <div class="section-head">
-            <h3>Categories</h3>
-            <span class="tiny muted">Preview filters</span>
-          </div>
-          <div class="category-list" id="category-list">
-            <button class="category-button active" data-category="All" type="button"><span>All agents</span><span class="pill">6</span></button>
-            <button class="category-button" data-category="Engineering" type="button"><span>Engineering</span><span class="pill cyan">2</span></button>
-            <button class="category-button" data-category="Design" type="button"><span>Design</span><span class="pill purple">1</span></button>
-            <button class="category-button" data-category="Operations" type="button"><span>Operations</span><span class="pill green">2</span></button>
-            <button class="category-button" data-category="Research" type="button"><span>Research</span><span class="pill">1</span></button>
-          </div>
-        </section>
-
-        <div class="spacer"></div>
-        <section class="sidebar-section glass" style="padding: 12px;">
-          <div class="mini-row">
-            <span class="label muted">Workspace slots</span>
-            <strong class="small">4 / 8</strong>
-          </div>
-          <div class="progress"><span style="width: 50%"></span></div>
-          <p class="small muted">Static preview state only. Install buttons do not call a backend.</p>
-        </section>
-      </aside>
-
-      <main class="main">
-        <header class="topbar glass">
-          <div>
-            <p class="label muted">Agent market</p>
-            <h1>Find the right specialist before a run starts</h1>
-            <p class="small muted">Search, compare, favorite, and stage agents for the workspace without leaving the workbench.</p>
-          </div>
-          <div class="toolbar">
-            <label class="search">
-              <span class="material-symbols-outlined">search</span>
-              <input id="agent-search" aria-label="Search agents" placeholder="Search agents or skills" />
-            </label>
-            <select class="select" id="sort-select" aria-label="Sort agents">
-              <option value="popular">Most installed</option>
-              <option value="rating">Highest rated</option>
-              <option value="recent">Recently updated</option>
-            </select>
-            <button class="button ghost" type="button"><span class="material-symbols-outlined">tune</span>Filters</button>
-          </div>
-        </header>
-
-        <section class="stats">
-          <div class="metric-card glass">
-            <div class="icon-tile"><span class="material-symbols-outlined">smart_toy</span></div>
-            <div>
-              <strong>6</strong>
-              <span class="small muted">Curated agents</span>
-            </div>
-          </div>
-          <div class="metric-card glass">
-            <div class="icon-tile cyan"><span class="material-symbols-outlined">download_done</span></div>
-            <div>
-              <strong>4</strong>
-              <span class="small muted">Workspace ready</span>
-            </div>
-          </div>
-          <div class="metric-card glass">
-            <div class="icon-tile purple"><span class="material-symbols-outlined">favorite</span></div>
-            <div>
-              <strong id="favorite-count">1</strong>
-              <span class="small muted">Favorites</span>
-            </div>
-          </div>
-          <div class="metric-card glass">
-            <div class="icon-tile green"><span class="material-symbols-outlined">verified</span></div>
-            <div>
-              <strong>98%</strong>
-              <span class="small muted">Policy checks</span>
-            </div>
-          </div>
-        </section>
-
-        <section class="market glass">
-          <div class="market-head">
-            <div>
-              <p class="label muted">Agent catalog</p>
-              <h2>Installable specialists</h2>
-            </div>
-            <span class="pill cyan" id="result-count">Showing 6 agents</span>
-          </div>
-
-          <div class="agent-grid" id="agent-grid">
-            <article class="agent-card glass installed" data-agent="refactor" data-category="Engineering" data-title="Code Refactor Pro" data-search="code refactor pro engineering typescript react performance architecture" data-installs="14820" data-rating="4.9" data-updated="6">
-              <div class="card-head">
-                <div class="card-title">
-                  <div class="agent-logo"><span class="material-symbols-outlined">code_blocks</span></div>
-                  <div class="truncate">
-                    <h3 class="truncate">Code Refactor Pro</h3>
-                    <p class="tiny muted truncate">Engineering</p>
-                  </div>
-                </div>
-                <button class="icon-button is-favorite" data-favorite="refactor" type="button" aria-label="Toggle favorite"><span class="material-symbols-outlined">favorite</span></button>
-              </div>
-              <p class="card-copy">Modernizes front-end and Go service modules while keeping reviewable diffs and local style rules visible.</p>
-              <div class="tag-row">
-                <span class="tag">TypeScript</span>
-                <span class="tag cyan">Go</span>
-                <span class="tag purple">Review</span>
-              </div>
-              <div class="mini-row">
-                <span class="small muted">4.9 rating</span>
-                <span class="small muted">14.8k installs</span>
-              </div>
-              <div class="card-actions">
-                <button class="button primary" data-install="refactor" type="button"><span class="material-symbols-outlined">check_circle</span>Added</button>
-                <button class="button ghost" data-detail="refactor" type="button"><span class="material-symbols-outlined">open_in_new</span>Details</button>
-              </div>
-            </article>
-
-            <article class="agent-card glass" data-agent="designer" data-category="Design" data-title="Interface Critic" data-search="interface critic design accessibility figma layout states" data-installs="9360" data-rating="4.8" data-updated="3">
-              <div class="card-head">
-                <div class="card-title">
-                  <div class="agent-logo purple"><span class="material-symbols-outlined">palette</span></div>
-                  <div class="truncate">
-                    <h3 class="truncate">Interface Critic</h3>
-                    <p class="tiny muted truncate">Design</p>
-                  </div>
-                </div>
-                <button class="icon-button" data-favorite="designer" type="button" aria-label="Toggle favorite"><span class="material-symbols-outlined">favorite</span></button>
-              </div>
-              <p class="card-copy">Audits tool surfaces for visual hierarchy, responsive density, component states, and accessibility issues.</p>
-              <div class="tag-row">
-                <span class="tag purple">UI audit</span>
-                <span class="tag">A11y</span>
-                <span class="tag cyan">Layout</span>
-              </div>
-              <div class="mini-row">
-                <span class="small muted">4.8 rating</span>
-                <span class="small muted">9.3k installs</span>
-              </div>
-              <div class="card-actions">
-                <button class="button primary" data-install="designer" type="button"><span class="material-symbols-outlined">add</span>Add</button>
-                <button class="button ghost" data-detail="designer" type="button"><span class="material-symbols-outlined">open_in_new</span>Details</button>
-              </div>
-            </article>
-
-            <article class="agent-card glass" data-agent="qa" data-category="Engineering" data-title="QA Flow Builder" data-search="qa flow builder engineering playwright unit tests smoke checks" data-installs="12840" data-rating="4.7" data-updated="9">
-              <div class="card-head">
-                <div class="card-title">
-                  <div class="agent-logo cyan"><span class="material-symbols-outlined">fact_check</span></div>
-                  <div class="truncate">
-                    <h3 class="truncate">QA Flow Builder</h3>
-                    <p class="tiny muted truncate">Engineering</p>
-                  </div>
-                </div>
-                <button class="icon-button" data-favorite="qa" type="button" aria-label="Toggle favorite"><span class="material-symbols-outlined">favorite</span></button>
-              </div>
-              <p class="card-copy">Creates targeted smoke checks and regression plans for UI flows, command output, and API contracts.</p>
-              <div class="tag-row">
-                <span class="tag cyan">Playwright</span>
-                <span class="tag">Unit tests</span>
-                <span class="tag green">Smoke</span>
-              </div>
-              <div class="mini-row">
-                <span class="small muted">4.7 rating</span>
-                <span class="small muted">12.8k installs</span>
-              </div>
-              <div class="card-actions">
-                <button class="button primary" data-install="qa" type="button"><span class="material-symbols-outlined">add</span>Add</button>
-                <button class="button ghost" data-detail="qa" type="button"><span class="material-symbols-outlined">open_in_new</span>Details</button>
-              </div>
-            </article>
-
-            <article class="agent-card glass" data-agent="ops" data-category="Operations" data-title="Runbook Operator" data-search="runbook operator operations incident checklist deploy monitor" data-installs="8700" data-rating="4.6" data-updated="2">
-              <div class="card-head">
-                <div class="card-title">
-                  <div class="agent-logo green"><span class="material-symbols-outlined">terminal</span></div>
-                  <div class="truncate">
-                    <h3 class="truncate">Runbook Operator</h3>
-                    <p class="tiny muted truncate">Operations</p>
-                  </div>
-                </div>
-                <button class="icon-button" data-favorite="ops" type="button" aria-label="Toggle favorite"><span class="material-symbols-outlined">favorite</span></button>
-              </div>
-              <p class="card-copy">Turns incident notes into stepwise commands, checkpoints, rollback prompts, and operator handoff notes.</p>
-              <div class="tag-row">
-                <span class="tag green">Runbook</span>
-                <span class="tag">Deploy</span>
-                <span class="tag cyan">Monitor</span>
-              </div>
-              <div class="mini-row">
-                <span class="small muted">4.6 rating</span>
-                <span class="small muted">8.7k installs</span>
-              </div>
-              <div class="card-actions">
-                <button class="button primary" data-install="ops" type="button"><span class="material-symbols-outlined">add</span>Add</button>
-                <button class="button ghost" data-detail="ops" type="button"><span class="material-symbols-outlined">open_in_new</span>Details</button>
-              </div>
-            </article>
-
-            <article class="agent-card glass" data-agent="research" data-category="Research" data-title="Evidence Synthesizer" data-search="evidence synthesizer research citations source analysis summary" data-installs="10320" data-rating="4.9" data-updated="5">
-              <div class="card-head">
-                <div class="card-title">
-                  <div class="agent-logo purple"><span class="material-symbols-outlined">travel_explore</span></div>
-                  <div class="truncate">
-                    <h3 class="truncate">Evidence Synthesizer</h3>
-                    <p class="tiny muted truncate">Research</p>
-                  </div>
-                </div>
-                <button class="icon-button" data-favorite="research" type="button" aria-label="Toggle favorite"><span class="material-symbols-outlined">favorite</span></button>
-              </div>
-              <p class="card-copy">Groups sources into claims, caveats, contradictions, and concise handoff notes for project decisions.</p>
-              <div class="tag-row">
-                <span class="tag purple">Sources</span>
-                <span class="tag">Citations</span>
-                <span class="tag cyan">Summary</span>
-              </div>
-              <div class="mini-row">
-                <span class="small muted">4.9 rating</span>
-                <span class="small muted">10.3k installs</span>
-              </div>
-              <div class="card-actions">
-                <button class="button primary" data-install="research" type="button"><span class="material-symbols-outlined">add</span>Add</button>
-                <button class="button ghost" data-detail="research" type="button"><span class="material-symbols-outlined">open_in_new</span>Details</button>
-              </div>
-            </article>
-
-            <article class="agent-card glass" data-agent="release" data-category="Operations" data-title="Release Steward" data-search="release steward operations changelog validation branch pr checklist" data-installs="7600" data-rating="4.5" data-updated="8">
-              <div class="card-head">
-                <div class="card-title">
-                  <div class="agent-logo"><span class="material-symbols-outlined">rocket_launch</span></div>
-                  <div class="truncate">
-                    <h3 class="truncate">Release Steward</h3>
-                    <p class="tiny muted truncate">Operations</p>
-                  </div>
-                </div>
-                <button class="icon-button" data-favorite="release" type="button" aria-label="Toggle favorite"><span class="material-symbols-outlined">favorite</span></button>
-              </div>
-              <p class="card-copy">Collects branch status, validation commands, changelog points, and merge readiness into one release card.</p>
-              <div class="tag-row">
-                <span class="tag">PR</span>
-                <span class="tag cyan">Validation</span>
-                <span class="tag green">Changelog</span>
-              </div>
-              <div class="mini-row">
-                <span class="small muted">4.5 rating</span>
-                <span class="small muted">7.6k installs</span>
-              </div>
-              <div class="card-actions">
-                <button class="button primary" data-install="release" type="button"><span class="material-symbols-outlined">add</span>Add</button>
-                <button class="button ghost" data-detail="release" type="button"><span class="material-symbols-outlined">open_in_new</span>Details</button>
-              </div>
-            </article>
-          </div>
-        </section>
-      </main>
-
-      <aside class="drawer glass" id="detail-drawer">
-        <div class="drawer-header">
-          <div>
-            <p class="label muted">Agent detail</p>
-            <h2 id="drawer-title">Code Refactor Pro</h2>
-          </div>
-          <button class="icon-button" id="drawer-close" type="button" aria-label="Close detail"><span class="material-symbols-outlined">close</span></button>
-        </div>
-
-        <section class="drawer-section">
-          <div class="drawer-hero">
-            <div class="agent-logo" id="drawer-logo"><span class="material-symbols-outlined">code_blocks</span></div>
-            <div>
-              <span class="pill cyan" id="drawer-category">Engineering</span>
-              <p class="small muted" id="drawer-short">Modernizes code with project rules.</p>
-            </div>
-          </div>
-          <p class="small muted" id="drawer-description">Modernizes front-end and Go service modules while keeping reviewable diffs and local style rules visible.</p>
-          <div class="mini-row">
-            <span class="small muted">Rating</span>
-            <strong class="small" id="drawer-rating">4.9 / 5</strong>
-          </div>
-          <div class="mini-row">
-            <span class="small muted">Installs</span>
-            <strong class="small" id="drawer-installs">14.8k</strong>
-          </div>
-        </section>
-
-        <section class="drawer-section">
-          <div class="section-head">
-            <h3>Expected output</h3>
-            <span class="pill purple">Preview</span>
-          </div>
-          <div class="tool-list" id="drawer-tools">
-            <div class="tool-row">
-              <div class="icon-tile"><span class="material-symbols-outlined">difference</span></div>
-              <div>
-                <strong class="small">Reviewable patch</strong>
-                <p class="tiny muted">Scoped diff with local conventions respected.</p>
-              </div>
-            </div>
-            <div class="tool-row">
-              <div class="icon-tile cyan"><span class="material-symbols-outlined">checklist</span></div>
-              <div>
-                <strong class="small">Validation notes</strong>
-                <p class="tiny muted">Commands and residual risk are surfaced.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="drawer-section">
-          <div class="section-head">
-            <h3>Visible states</h3>
-            <span class="pill green"><span class="status-dot"></span>Ready</span>
-          </div>
-          <div class="activity-list">
-            <div class="activity-row">
-              <div class="icon-tile purple"><span class="material-symbols-outlined">favorite</span></div>
-              <div>
-                <strong class="small">Favorite state</strong>
-                <p class="tiny muted">Heart buttons toggle the saved visual state.</p>
-              </div>
-            </div>
-            <div class="activity-row">
-              <div class="icon-tile green"><span class="material-symbols-outlined">download_done</span></div>
-              <div>
-                <strong class="small">Workspace add state</strong>
-                <p class="tiny muted">Install buttons reveal a confirmation bar.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-      </aside>
-    </div>
-  </div>
-
-  <div class="confirm-bar glass" id="confirm-bar">
-    <div class="icon-tile green"><span class="material-symbols-outlined">download_done</span></div>
-    <div class="truncate">
-      <strong class="small" id="confirm-title">Agent added to workspace</strong>
-      <p class="tiny muted truncate">This is a local preview state. No API request was sent.</p>
-    </div>
-  </div>
-
-  <script>
-    (function () {
-      var agentData = {
-        refactor: {
-          title: "Code Refactor Pro",
-          category: "Engineering",
-          icon: "code_blocks",
-          tone: "",
-          short: "Modernizes code with project rules.",
-          description: "Modernizes front-end and Go service modules while keeping reviewable diffs and local style rules visible.",
-          rating: "4.9 / 5",
-          installs: "14.8k",
-          tools: [
-            ["difference", "Reviewable patch", "Scoped diff with local conventions respected.", ""],
-            ["checklist", "Validation notes", "Commands and residual risk are surfaced.", "cyan"]
-          ]
-        },
-        designer: {
-          title: "Interface Critic",
-          category: "Design",
-          icon: "palette",
-          tone: "purple",
-          short: "Reviews layout, states, and accessibility.",
-          description: "Audits tool surfaces for visual hierarchy, responsive density, component states, and accessibility issues.",
-          rating: "4.8 / 5",
-          installs: "9.3k",
-          tools: [
-            ["layers", "Hierarchy pass", "Flags unclear grouping and nested card problems.", "purple"],
-            ["accessibility_new", "Accessibility pass", "Checks labels, contrast, and keyboard-visible states.", ""]
-          ]
-        },
-        qa: {
-          title: "QA Flow Builder",
-          category: "Engineering",
-          icon: "fact_check",
-          tone: "cyan",
-          short: "Builds targeted checks for risky flows.",
-          description: "Creates targeted smoke checks and regression plans for UI flows, command output, and API contracts.",
-          rating: "4.7 / 5",
-          installs: "12.8k",
-          tools: [
-            ["rule", "Test plan", "Maps visible UI states to focused checks.", "cyan"],
-            ["play_circle", "Smoke steps", "Keeps manual verification steps concise.", "green"]
-          ]
-        },
-        ops: {
-          title: "Runbook Operator",
-          category: "Operations",
-          icon: "terminal",
-          tone: "green",
-          short: "Turns incidents into safe operating steps.",
-          description: "Turns incident notes into stepwise commands, checkpoints, rollback prompts, and operator handoff notes.",
-          rating: "4.6 / 5",
-          installs: "8.7k",
-          tools: [
-            ["terminal", "Command plan", "Sequences routine commands with checkpoints.", "green"],
-            ["undo", "Rollback prompts", "Keeps recovery steps visible before execution.", ""]
-          ]
-        },
-        research: {
-          title: "Evidence Synthesizer",
-          category: "Research",
-          icon: "travel_explore",
-          tone: "purple",
-          short: "Condenses sources into decision notes.",
-          description: "Groups sources into claims, caveats, contradictions, and concise handoff notes for project decisions.",
-          rating: "4.9 / 5",
-          installs: "10.3k",
-          tools: [
-            ["format_quote", "Claim map", "Separates evidence from inference.", "purple"],
-            ["source", "Source trail", "Keeps citation context attached.", "cyan"]
-          ]
-        },
-        release: {
-          title: "Release Steward",
-          category: "Operations",
-          icon: "rocket_launch",
-          tone: "",
-          short: "Collects release readiness into one card.",
-          description: "Collects branch status, validation commands, changelog points, and merge readiness into one release card.",
-          rating: "4.5 / 5",
-          installs: "7.6k",
-          tools: [
-            ["merge", "Merge summary", "Highlights branch and validation state.", ""],
-            ["newspaper", "Changelog draft", "Turns work notes into release bullets.", "cyan"]
-          ]
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+type AgentCategory = 'Engineering' | 'Design' | 'Operations' | 'Research';
+
+type SortMode = 'popular' | 'rating' | 'recent';
+
+type ViewMode = 'all' | 'favorites' | 'installed';
+
+type Agent = {
+  id: string;
+  name: string;
+  category: AgentCategory;
+  icon: string;
+  tone: 'blue' | 'cyan' | 'purple' | 'green';
+  summary: string;
+  description: string;
+  tags: string[];
+  installs: number;
+  favoriteCount: number;
+  rating: number;
+  updatedDaysAgo: number;
+  outputs: string[];
+};
+
+type Confirmation = {
+  actionAgentId?: string;
+  id: string;
+  message: string;
+  title: string;
+};
+
+const agents: Agent[] = [
+  {
+    id: 'refactor',
+    name: 'Code Refactor Pro',
+    category: 'Engineering',
+    icon: 'code_blocks',
+    tone: 'blue',
+    summary: 'Modernizes front-end and Go service modules while keeping reviewable diffs visible.',
+    description:
+      'Best for code cleanup passes where the workspace needs scoped patches, local conventions, and clear validation notes before review.',
+    tags: ['TypeScript', 'Go', 'Review'],
+    installs: 14820,
+    favoriteCount: 1824,
+    rating: 4.9,
+    updatedDaysAgo: 6,
+    outputs: ['Scoped patch plan', 'Validation checklist', 'Risk notes'],
+  },
+  {
+    id: 'designer',
+    name: 'Interface Critic',
+    category: 'Design',
+    icon: 'palette',
+    tone: 'purple',
+    summary: 'Audits tool surfaces for hierarchy, responsive density, and component states.',
+    description:
+      'Reviews a workbench page like a product surface: layout rhythm, accessible labels, empty states, and responsive clipping.',
+    tags: ['UI audit', 'A11y', 'Layout'],
+    installs: 9360,
+    favoriteCount: 1211,
+    rating: 4.8,
+    updatedDaysAgo: 3,
+    outputs: ['Visual hierarchy pass', 'A11y notes', 'Responsive risks'],
+  },
+  {
+    id: 'qa',
+    name: 'QA Flow Builder',
+    category: 'Engineering',
+    icon: 'fact_check',
+    tone: 'cyan',
+    summary: 'Creates focused checks for UI flows, command output, and API contract edges.',
+    description:
+      'Useful when a page or workflow needs a compact smoke plan with the right assertions and a clean handoff for testers.',
+    tags: ['Playwright', 'Unit tests', 'Smoke'],
+    installs: 12840,
+    favoriteCount: 1506,
+    rating: 4.7,
+    updatedDaysAgo: 9,
+    outputs: ['Smoke scenarios', 'State matrix', 'Manual QA steps'],
+  },
+  {
+    id: 'ops',
+    name: 'Runbook Operator',
+    category: 'Operations',
+    icon: 'terminal',
+    tone: 'green',
+    summary: 'Turns incidents and release notes into commands, checkpoints, and rollback prompts.',
+    description:
+      'Pairs well with deployment work because it keeps routine operations, checks, and escalation notes in one readable sequence.',
+    tags: ['Runbook', 'Deploy', 'Monitor'],
+    installs: 8700,
+    favoriteCount: 984,
+    rating: 4.6,
+    updatedDaysAgo: 2,
+    outputs: ['Command sequence', 'Rollback prompts', 'Operator handoff'],
+  },
+  {
+    id: 'research',
+    name: 'Evidence Synthesizer',
+    category: 'Research',
+    icon: 'travel_explore',
+    tone: 'purple',
+    summary: 'Groups sources into claims, caveats, contradictions, and decision notes.',
+    description:
+      'Helps teams move from raw references to compact conclusions while preserving the difference between evidence and inference.',
+    tags: ['Sources', 'Citations', 'Summary'],
+    installs: 10320,
+    favoriteCount: 1398,
+    rating: 4.9,
+    updatedDaysAgo: 5,
+    outputs: ['Claim map', 'Source trail', 'Decision summary'],
+  },
+  {
+    id: 'release',
+    name: 'Release Steward',
+    category: 'Operations',
+    icon: 'rocket_launch',
+    tone: 'blue',
+    summary: 'Collects branch status, validation commands, changelog points, and merge readiness.',
+    description:
+      'Keeps release coordination visible across branch status, test evidence, review notes, and handoff copy.',
+    tags: ['PR', 'Validation', 'Changelog'],
+    installs: 7600,
+    favoriteCount: 862,
+    rating: 4.5,
+    updatedDaysAgo: 8,
+    outputs: ['Release checklist', 'Changelog draft', 'Merge summary'],
+  },
+];
+
+const categories: Array<AgentCategory | 'All'> = ['All', 'Engineering', 'Design', 'Operations', 'Research'];
+
+const initialFavoriteIds = new Set<string>(['refactor']);
+const initialInstalledIds = new Set<string>(['refactor']);
+const workspaceLimit = 8;
+
+const sortLabels: Record<SortMode, string> = {
+  popular: 'Most installed',
+  rating: 'Highest rated',
+  recent: 'Recently updated',
+};
+
+const viewModeLabels: Record<ViewMode, string> = {
+  all: 'All agents',
+  favorites: 'Only favorites',
+  installed: 'Only added',
+};
+
+function formatInstalls(installs: number): string {
+  return `${(installs / 1000).toFixed(1)}k`;
+}
+
+function cx(...classes: Array<string | false | null | undefined>): string {
+  return classes.filter(Boolean).join(' ');
+}
+
+function ParticleCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext('2d');
+
+    if (!canvas || !context) {
+      return;
+    }
+
+    type Particle = {
+      alpha: number;
+      hue: number;
+      radius: number;
+      velocityX: number;
+      velocityY: number;
+      x: number;
+      y: number;
+    };
+
+    let animationFrame = 0;
+    let height = 0;
+    let width = 0;
+    let particles: Particle[] = [];
+
+    const createParticle = (index: number): Particle => ({
+      alpha: 0.16 + Math.random() * 0.18,
+      hue: index % 2 === 0 ? 196 : 211,
+      radius: 1.4 + Math.random() * 2.4,
+      velocityX: -0.16 + Math.random() * 0.32,
+      velocityY: -0.14 - Math.random() * 0.42,
+      x: Math.random() * width,
+      y: Math.random() * height,
+    });
+
+    const resize = () => {
+      const ratio = window.devicePixelRatio || 1;
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * ratio);
+      canvas.height = Math.floor(height * ratio);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      particles = Array.from({ length: 56 }, (_, index) => createParticle(index));
+    };
+
+    const draw = () => {
+      animationFrame = window.requestAnimationFrame(draw);
+      context.clearRect(0, 0, width, height);
+
+      particles.forEach((particle, index) => {
+        particle.x += particle.velocityX;
+        particle.y += particle.velocityY;
+
+        if (particle.y < -16) {
+          particle.y = height + 16;
+          particle.x = Math.random() * width;
         }
-      };
 
-      var canvas = document.getElementById("particle-canvas");
-      var ctx = canvas.getContext("2d");
-      var particles = [];
-      var particleCount = 56;
-      var width = 0;
-      var height = 0;
-      var frame = 0;
-
-      function resizeCanvas() {
-        var ratio = window.devicePixelRatio || 1;
-        width = window.innerWidth;
-        height = window.innerHeight;
-        canvas.width = Math.floor(width * ratio);
-        canvas.height = Math.floor(height * ratio);
-        canvas.style.width = width + "px";
-        canvas.style.height = height + "px";
-        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-      }
-
-      function makeParticle(index) {
-        return {
-          x: Math.random() * width,
-          y: Math.random() * height,
-          r: 1.4 + Math.random() * 2.4,
-          vx: -0.16 + Math.random() * 0.32,
-          vy: -0.14 - Math.random() * 0.42,
-          hue: index % 2 === 0 ? 196 : 211,
-          alpha: 0.16 + Math.random() * 0.18
-        };
-      }
-
-      function seedParticles() {
-        particles = [];
-        for (var i = 0; i < particleCount; i += 1) {
-          particles.push(makeParticle(i));
+        if (particle.x < -16) {
+          particle.x = width + 16;
         }
-      }
 
-      function drawParticles() {
-        frame = window.requestAnimationFrame(drawParticles);
-        ctx.clearRect(0, 0, width, height);
-        for (var i = 0; i < particles.length; i += 1) {
-          var p = particles[i];
-          p.x += p.vx;
-          p.y += p.vy;
-          if (p.y < -16) {
-            p.y = height + 16;
-            p.x = Math.random() * width;
-          }
-          if (p.x < -16) {
-            p.x = width + 16;
-          }
-          if (p.x > width + 16) {
-            p.x = -16;
-          }
-          ctx.beginPath();
-          ctx.fillStyle = "hsla(" + p.hue + ", 84%, 48%, " + p.alpha + ")";
-          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-          ctx.fill();
+        if (particle.x > width + 16) {
+          particle.x = -16;
+        }
 
-          for (var j = i + 1; j < particles.length; j += 1) {
-            var q = particles[j];
-            var dx = p.x - q.x;
-            var dy = p.y - q.y;
-            var distance = Math.sqrt(dx * dx + dy * dy);
-            if (distance < 124) {
-              ctx.beginPath();
-              ctx.strokeStyle = "rgba(23, 105, 232, " + ((1 - distance / 124) * 0.06) + ")";
-              ctx.lineWidth = 1;
-              ctx.moveTo(p.x, p.y);
-              ctx.lineTo(q.x, q.y);
-              ctx.stroke();
-            }
+        context.beginPath();
+        context.fillStyle = `hsla(${particle.hue}, 84%, 48%, ${particle.alpha})`;
+        context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+        context.fill();
+
+        for (let nextIndex = index + 1; nextIndex < particles.length; nextIndex += 1) {
+          const nextParticle = particles[nextIndex];
+          const dx = particle.x - nextParticle.x;
+          const dy = particle.y - nextParticle.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < 124) {
+            context.beginPath();
+            context.strokeStyle = `rgba(23, 105, 232, ${(1 - distance / 124) * 0.06})`;
+            context.lineWidth = 1;
+            context.moveTo(particle.x, particle.y);
+            context.lineTo(nextParticle.x, nextParticle.y);
+            context.stroke();
           }
         }
-      }
+      });
+    };
 
-      function setDrawer(agentId) {
-        var agent = agentData[agentId];
-        if (!agent) {
-          return;
+    resize();
+    draw();
+    window.addEventListener('resize', resize);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return <canvas aria-hidden="true" className="asr-particle-canvas" ref={canvasRef} />;
+}
+
+export function AgentSquarePageInteractive() {
+  const [activeCategory, setActiveCategory] = useState<AgentCategory | 'All'>('All');
+  const [detailAgentId, setDetailAgentId] = useState<string | null>(agents[0].id);
+  const [isDetailOpen, setIsDetailOpen] = useState(true);
+  const [favoriteIds, setFavoriteIds] = useState(initialFavoriteIds);
+  const [installedIds, setInstalledIds] = useState(initialInstalledIds);
+  const [query, setQuery] = useState('');
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>('popular');
+  const [viewMode, setViewMode] = useState<ViewMode>('all');
+
+  const detailAgent = isDetailOpen ? agents.find((agent) => agent.id === detailAgentId) ?? null : null;
+  const hasActiveFilters = activeCategory !== 'All' || query.trim().length > 0 || viewMode !== 'all';
+  const workspaceIsFull = installedIds.size >= workspaceLimit;
+
+  const filteredAgents = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    return agents
+      .filter((agent) => activeCategory === 'All' || agent.category === activeCategory)
+      .filter((agent) => {
+        if (viewMode === 'favorites') {
+          return favoriteIds.has(agent.id);
         }
-        var logo = document.getElementById("drawer-logo");
-        document.getElementById("drawer-title").textContent = agent.title;
-        document.getElementById("drawer-category").textContent = agent.category;
-        document.getElementById("drawer-short").textContent = agent.short;
-        document.getElementById("drawer-description").textContent = agent.description;
-        document.getElementById("drawer-rating").textContent = agent.rating;
-        document.getElementById("drawer-installs").textContent = agent.installs;
-        logo.className = "agent-logo " + agent.tone;
-        logo.innerHTML = '<span class="material-symbols-outlined">' + agent.icon + "</span>";
 
-        var tools = document.getElementById("drawer-tools");
-        tools.innerHTML = "";
-        agent.tools.forEach(function (tool) {
-          var row = document.createElement("div");
-          row.className = "tool-row";
-          row.innerHTML = '<div class="icon-tile ' + tool[3] + '"><span class="material-symbols-outlined">' + tool[0] + '</span></div><div><strong class="small">' + tool[1] + '</strong><p class="tiny muted">' + tool[2] + '</p></div>';
-          tools.appendChild(row);
-        });
+        if (viewMode === 'installed') {
+          return installedIds.has(agent.id);
+        }
+
+        return true;
+      })
+      .filter((agent) => {
+        if (!normalizedQuery) {
+          return true;
+        }
+
+        const haystack = [agent.name, agent.category, agent.summary, ...agent.tags].join(' ').toLowerCase();
+        return haystack.includes(normalizedQuery);
+      })
+      .sort((firstAgent, secondAgent) => {
+        if (sortMode === 'rating') {
+          return secondAgent.rating - firstAgent.rating || secondAgent.installs - firstAgent.installs;
+        }
+
+        if (sortMode === 'recent') {
+          return firstAgent.updatedDaysAgo - secondAgent.updatedDaysAgo || secondAgent.rating - firstAgent.rating;
+        }
+
+        const firstInstalls = getDisplayInstalls(firstAgent.id);
+        const secondInstalls = getDisplayInstalls(secondAgent.id);
+        return secondInstalls - firstInstalls || secondAgent.rating - firstAgent.rating;
+      });
+  }, [activeCategory, favoriteIds, installedIds, query, sortMode, viewMode]);
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<AgentCategory | 'All', number>([['All', agents.length]]);
+
+    categories.forEach((category) => {
+      if (category !== 'All') {
+        counts.set(
+          category,
+          agents.filter((agent) => agent.category === category).length,
+        );
+      }
+    });
+
+    return counts;
+  }, []);
+
+  function getDisplayInstalls(agentId: string): number {
+    const agent = agents.find((currentAgent) => currentAgent.id === agentId);
+
+    if (!agent) {
+      return 0;
+    }
+
+    return agent.installs + (installedIds.has(agentId) && !initialInstalledIds.has(agentId) ? 1 : 0);
+  }
+
+  function getDisplayFavoriteCount(agentId: string): number {
+    const agent = agents.find((currentAgent) => currentAgent.id === agentId);
+
+    if (!agent) {
+      return 0;
+    }
+
+    if (favoriteIds.has(agentId) && !initialFavoriteIds.has(agentId)) {
+      return agent.favoriteCount + 1;
+    }
+
+    if (!favoriteIds.has(agentId) && initialFavoriteIds.has(agentId)) {
+      return Math.max(agent.favoriteCount - 1, 0);
+    }
+
+    return agent.favoriteCount;
+  }
+
+  function clearFilters() {
+    setActiveCategory('All');
+    setQuery('');
+    setViewMode('all');
+    setConfirmation({
+      id: `clear-${Date.now()}`,
+      message: 'The catalog is back to the full local preview set.',
+      title: 'Filters cleared',
+    });
+  }
+
+  function openAgentDetails(agentId: string) {
+    setDetailAgentId(agentId);
+    setIsDetailOpen(true);
+  }
+
+  function toggleFavorite(agentId: string) {
+    const agent = agents.find((currentAgent) => currentAgent.id === agentId);
+    const wasFavorite = favoriteIds.has(agentId);
+
+    setFavoriteIds((currentFavoriteIds) => {
+      const nextFavoriteIds = new Set(currentFavoriteIds);
+
+      if (nextFavoriteIds.has(agentId)) {
+        nextFavoriteIds.delete(agentId);
+      } else {
+        nextFavoriteIds.add(agentId);
       }
 
-      function updateFavoriteCount() {
-        document.getElementById("favorite-count").textContent = String(document.querySelectorAll("[data-favorite].is-favorite").length);
-      }
+      return nextFavoriteIds;
+    });
 
-      function showConfirmation(title) {
-        var bar = document.getElementById("confirm-bar");
-        document.getElementById("confirm-title").textContent = title + " added to workspace";
-        bar.classList.add("show");
-        window.clearTimeout(showConfirmation.timer);
-        showConfirmation.timer = window.setTimeout(function () {
-          bar.classList.remove("show");
-        }, 2600);
-      }
-
-      function applyFilters() {
-        var activeCategory = document.querySelector(".category-button.active").getAttribute("data-category");
-        var query = document.getElementById("agent-search").value.trim().toLowerCase();
-        var grid = document.getElementById("agent-grid");
-        var cards = Array.prototype.slice.call(grid.querySelectorAll(".agent-card"));
-        var sortValue = document.getElementById("sort-select").value;
-        var visible = 0;
-
-        cards.sort(function (a, b) {
-          if (sortValue === "rating") {
-            return Number(b.getAttribute("data-rating")) - Number(a.getAttribute("data-rating"));
-          }
-          if (sortValue === "recent") {
-            return Number(a.getAttribute("data-updated")) - Number(b.getAttribute("data-updated"));
-          }
-          return Number(b.getAttribute("data-installs")) - Number(a.getAttribute("data-installs"));
-        });
-
-        cards.forEach(function (card) {
-          var matchesCategory = activeCategory === "All" || card.getAttribute("data-category") === activeCategory;
-          var matchesQuery = !query || card.getAttribute("data-search").indexOf(query) >= 0;
-          var shouldShow = matchesCategory && matchesQuery;
-          card.style.display = shouldShow ? "flex" : "none";
-          if (shouldShow) {
-            visible += 1;
-          }
-          grid.appendChild(card);
-        });
-
-        document.getElementById("result-count").textContent = "Showing " + visible + " agents";
-      }
-
-      document.querySelectorAll("[data-favorite]").forEach(function (button) {
-        button.addEventListener("click", function () {
-          button.classList.toggle("is-favorite");
-          updateFavoriteCount();
-        });
+    if (agent) {
+      setConfirmation({
+        actionAgentId: agent.id,
+        id: `favorite-${agent.id}-${Date.now()}`,
+        message: `${formatInstalls(getDisplayFavoriteCount(agent.id) + (wasFavorite ? -1 : 1))} local saves are now shown on the card.`,
+        title: wasFavorite ? `${agent.name} removed from favorites` : `${agent.name} saved`,
       });
+    }
+  }
 
-      document.querySelectorAll("[data-install]").forEach(function (button) {
-        button.addEventListener("click", function () {
-          var card = button.closest(".agent-card");
-          var title = card.getAttribute("data-title");
-          card.classList.add("installed");
-          button.innerHTML = '<span class="material-symbols-outlined">check_circle</span>Added';
-          showConfirmation(title);
-        });
+  function installAgent(agentId: string) {
+    const agent = agents.find((currentAgent) => currentAgent.id === agentId);
+
+    if (!agent) {
+      return;
+    }
+
+    if (installedIds.has(agentId)) {
+      openAgentDetails(agentId);
+      setConfirmation({
+        actionAgentId: agentId,
+        id: `installed-${agentId}-${Date.now()}`,
+        message: 'This agent is already staged in the current workspace.',
+        title: `${agent.name} already added`,
       });
+      return;
+    }
 
-      document.querySelectorAll("[data-detail]").forEach(function (button) {
-        button.addEventListener("click", function () {
-          setDrawer(button.getAttribute("data-detail"));
-        });
+    if (workspaceIsFull) {
+      setConfirmation({
+        actionAgentId: agentId,
+        id: `full-${agentId}-${Date.now()}`,
+        message: `The workspace limit is ${workspaceLimit} local agents. Remove one before adding another.`,
+        title: 'Workspace is full',
       });
+      return;
+    }
 
-      document.querySelectorAll(".category-button").forEach(function (button) {
-        button.addEventListener("click", function () {
-          document.querySelectorAll(".category-button").forEach(function (item) {
-            item.classList.remove("active");
-          });
-          button.classList.add("active");
-          applyFilters();
-        });
-      });
+    setInstalledIds((currentInstalledIds) => {
+      const nextInstalledIds = new Set(currentInstalledIds);
+      nextInstalledIds.add(agentId);
+      return nextInstalledIds;
+    });
+    openAgentDetails(agentId);
+    setConfirmation({
+      actionAgentId: agentId,
+      id: `add-${agentId}-${Date.now()}`,
+      message: `${installedIds.size + 1} of ${workspaceLimit} workspace slots are now staged.`,
+      title: `${agent.name} added to workspace`,
+    });
+  }
 
-      document.getElementById("agent-search").addEventListener("input", applyFilters);
-      document.getElementById("sort-select").addEventListener("change", applyFilters);
-      document.getElementById("drawer-close").addEventListener("click", function () {
-        setDrawer("refactor");
-      });
-
-      resizeCanvas();
-      seedParticles();
-      drawParticles();
-      window.addEventListener("resize", function () {
-        window.cancelAnimationFrame(frame);
-        resizeCanvas();
-        seedParticles();
-        drawParticles();
-      });
-    })();
-  </script>
-</body>
-</html>
-`;
-
-export function AgentSquarePage() {
   return (
-    <iframe
-      title="Agent Square"
-      srcDoc={pageHtml}
-      sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-      style={{ width: "100%", height: "100vh", border: 0, display: "block" }}
-    />
+    <div className="asr-root">
+      <style>{styles}</style>
+      <ParticleCanvas />
+
+      <div className="asr-page">
+        <div className="asr-workspace">
+          <aside className="asr-sidebar asr-glass">
+            <div className="asr-brand">
+              <div className="asr-brand-mark">
+                <span className="material-symbols-outlined">hub</span>
+              </div>
+              <div className="asr-truncate">
+                <p className="asr-label asr-muted">AgentHub</p>
+                <h2>Agent Square</h2>
+              </div>
+            </div>
+
+            <section className="asr-stack">
+              <div className="asr-section-head">
+                <h3>Navigation</h3>
+                <span className="asr-pill asr-pill-cyan">
+                  <span className="asr-status-dot" />
+                  Local
+                </span>
+              </div>
+
+              <div className="asr-nav-list">
+                <button
+                  className={cx('asr-nav-item', viewMode === 'all' && 'asr-active')}
+                  onClick={() => setViewMode('all')}
+                  type="button"
+                >
+                  <div className="asr-icon-tile">
+                    <span className="material-symbols-outlined">storefront</span>
+                  </div>
+                  <div className="asr-truncate">
+                    <strong className="asr-small">Marketplace</strong>
+                    <p className="asr-tiny asr-muted asr-truncate">Browse installable agents</p>
+                  </div>
+                </button>
+
+                <button
+                  className={cx('asr-nav-item', viewMode === 'installed' && 'asr-active')}
+                  onClick={() => setViewMode('installed')}
+                  type="button"
+                >
+                  <div className="asr-icon-tile asr-cyan">
+                    <span className="material-symbols-outlined">dashboard</span>
+                  </div>
+                  <div className="asr-truncate">
+                    <strong className="asr-small">Workspace</strong>
+                    <p className="asr-tiny asr-muted asr-truncate">{installedIds.size} agents added</p>
+                  </div>
+                </button>
+
+                <button
+                  className={cx('asr-nav-item', viewMode === 'favorites' && 'asr-active')}
+                  onClick={() => setViewMode('favorites')}
+                  type="button"
+                >
+                  <div className="asr-icon-tile asr-purple">
+                    <span className="material-symbols-outlined">bookmark</span>
+                  </div>
+                  <div className="asr-truncate">
+                    <strong className="asr-small">Favorites</strong>
+                    <p className="asr-tiny asr-muted asr-truncate">{favoriteIds.size} saved agents</p>
+                  </div>
+                </button>
+              </div>
+            </section>
+
+            <section className="asr-stack">
+              <div className="asr-section-head">
+                <h3>Categories</h3>
+                <span className="asr-tiny asr-muted">Preview filters</span>
+              </div>
+              <div className="asr-category-list">
+                {categories.map((category) => (
+                  <button
+                    className={cx('asr-category-button', activeCategory === category && 'asr-active')}
+                    key={category}
+                    onClick={() => setActiveCategory(category)}
+                    type="button"
+                  >
+                    <span>{category === 'All' ? 'All agents' : category}</span>
+                    <span className={cx('asr-pill', category === 'Engineering' && 'asr-pill-cyan', category === 'Design' && 'asr-pill-purple', category === 'Operations' && 'asr-pill-green')}>
+                      {categoryCounts.get(category)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="asr-sidebar-card asr-glass">
+              <div className="asr-mini-row">
+                <span className="asr-label asr-muted">Workspace slots</span>
+                <strong className="asr-small">{installedIds.size} / {workspaceLimit}</strong>
+              </div>
+              <div className="asr-progress">
+                <span style={{ width: `${Math.min((installedIds.size / workspaceLimit) * 100, 100)}%` }} />
+              </div>
+              <p className="asr-small asr-muted">Added agents are staged for the current workspace.</p>
+            </section>
+          </aside>
+
+          <main className="asr-main">
+            <header className="asr-topbar asr-glass">
+              <div>
+                <p className="asr-label asr-muted">Agent market</p>
+                <h1>Find the right specialist before a run starts</h1>
+                <p className="asr-small asr-muted">Search, compare, favorite, and stage agents for the workspace.</p>
+              </div>
+
+              <div className="asr-toolbar">
+                <label className="asr-search">
+                  <span className="material-symbols-outlined">search</span>
+                  <input
+                    aria-label="Search agents"
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search agents or skills"
+                    value={query}
+                  />
+                </label>
+
+                <select
+                  aria-label="Sort agents"
+                  className="asr-select"
+                  onChange={(event) => setSortMode(event.target.value as SortMode)}
+                  value={sortMode}
+                >
+                  {(Object.keys(sortLabels) as SortMode[]).map((mode) => (
+                    <option key={mode} value={mode}>
+                      {sortLabels[mode]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </header>
+
+            <section className="asr-stats">
+              <div className="asr-metric-card asr-glass">
+                <div className="asr-icon-tile">
+                  <span className="material-symbols-outlined">smart_toy</span>
+                </div>
+                <div>
+                  <strong>{agents.length}</strong>
+                  <span className="asr-small asr-muted">Curated agents</span>
+                </div>
+              </div>
+              <div className="asr-metric-card asr-glass">
+                <div className="asr-icon-tile asr-cyan">
+                  <span className="material-symbols-outlined">download_done</span>
+                </div>
+                <div>
+                  <strong>{installedIds.size}</strong>
+                  <span className="asr-small asr-muted">Workspace ready</span>
+                </div>
+              </div>
+              <div className="asr-metric-card asr-glass">
+                <div className="asr-icon-tile asr-purple">
+                  <span className="material-symbols-outlined">favorite</span>
+                </div>
+                <div>
+                  <strong>{favoriteIds.size}</strong>
+                  <span className="asr-small asr-muted">Favorites</span>
+                </div>
+              </div>
+              <div className="asr-metric-card asr-glass">
+                <div className="asr-icon-tile asr-green">
+                  <span className="material-symbols-outlined">verified</span>
+                </div>
+                <div>
+                  <strong>98%</strong>
+                  <span className="asr-small asr-muted">Policy checks</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="asr-market asr-glass">
+              <div className="asr-market-head">
+                <div>
+                  <p className="asr-label asr-muted">Agent catalog</p>
+                  <h2>Installable specialists</h2>
+                </div>
+                <div className="asr-filter-summary">
+                  <span className="asr-pill asr-pill-cyan">Showing {filteredAgents.length} agents</span>
+                  <span className="asr-pill">{viewModeLabels[viewMode]}</span>
+                  <button className="asr-button asr-ghost" disabled={!hasActiveFilters} onClick={clearFilters} type="button">
+                    <span className="material-symbols-outlined">filter_alt_off</span>
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              {filteredAgents.length > 0 ? (
+                <div className="asr-agent-grid">
+                  {filteredAgents.map((agent) => {
+                  const isFavorite = favoriteIds.has(agent.id);
+                  const isInstalled = installedIds.has(agent.id);
+                  const isAddDisabled = isInstalled || (workspaceIsFull && !isInstalled);
+
+                  return (
+                    <article className={cx('asr-agent-card asr-glass', isInstalled && 'asr-installed')} key={agent.id}>
+                      <div className="asr-card-head">
+                        <div className="asr-card-title">
+                          <div className={cx('asr-agent-logo', `asr-${agent.tone}`)}>
+                            <span className="material-symbols-outlined">{agent.icon}</span>
+                          </div>
+                          <div className="asr-truncate">
+                            <h3 className="asr-truncate">{agent.name}</h3>
+                            <p className="asr-tiny asr-muted asr-truncate">{agent.category}</p>
+                          </div>
+                        </div>
+                        <button
+                          aria-label={isFavorite ? `Unfavorite ${agent.name}` : `Favorite ${agent.name}`}
+                          className={cx('asr-icon-button', isFavorite && 'asr-is-favorite')}
+                          onClick={() => toggleFavorite(agent.id)}
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined">favorite</span>
+                        </button>
+                      </div>
+
+                      <p className="asr-card-copy">{agent.summary}</p>
+
+                      <div className="asr-tag-row">
+                        {agent.tags.map((tag, tagIndex) => (
+                          <span className={cx('asr-tag', tagIndex === 1 && 'asr-tag-cyan', tagIndex === 2 && 'asr-tag-purple')} key={tag}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="asr-mini-row">
+                        <span className="asr-small asr-muted">{agent.rating.toFixed(1)} rating</span>
+                        <span className="asr-small asr-muted">{formatInstalls(getDisplayInstalls(agent.id))} installs</span>
+                      </div>
+
+                      <div className="asr-mini-row">
+                        <span className="asr-small asr-muted">{formatInstalls(getDisplayFavoriteCount(agent.id))} saves</span>
+                        <span className={cx('asr-pill', isInstalled ? 'asr-pill-green' : 'asr-pill-cyan')}>
+                          {isInstalled ? 'Added' : 'Available'}
+                        </span>
+                      </div>
+
+                      <div className="asr-card-actions">
+                        <button
+                          className={cx('asr-button asr-primary', isInstalled && 'asr-button-success')}
+                          disabled={isAddDisabled}
+                          onClick={() => installAgent(agent.id)}
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined">{isInstalled ? 'check_circle' : 'add'}</span>
+                          {isInstalled ? 'Added' : 'Add'}
+                        </button>
+                        <button className="asr-button asr-ghost" onClick={() => openAgentDetails(agent.id)} type="button">
+                          <span className="material-symbols-outlined">open_in_new</span>
+                          Details
+                        </button>
+                      </div>
+                    </article>
+                  );
+                  })}
+                </div>
+              ) : (
+                <div className="asr-empty-state">
+                  <div className="asr-icon-tile asr-purple">
+                    <span className="material-symbols-outlined">search_off</span>
+                  </div>
+                  <div>
+                    <h3>No agents match this view</h3>
+                    <p className="asr-small asr-muted">Try another category, remove the search text, or clear the local filters.</p>
+                  </div>
+                  <button className="asr-button asr-primary" disabled={!hasActiveFilters} onClick={clearFilters} type="button">
+                    <span className="material-symbols-outlined">filter_alt_off</span>
+                    Clear filters
+                  </button>
+                </div>
+              )}
+            </section>
+          </main>
+
+          <aside className="asr-drawer asr-glass">
+            {detailAgent ? (
+              <>
+                <div className="asr-drawer-header">
+                  <div>
+                    <p className="asr-label asr-muted">Agent detail</p>
+                    <h2>{detailAgent.name}</h2>
+                  </div>
+                  <button className="asr-icon-button" onClick={() => setIsDetailOpen(false)} type="button" aria-label="Close detail drawer">
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+
+                <section className="asr-stack">
+                  <div className="asr-drawer-hero">
+                    <div className={cx('asr-agent-logo', `asr-${detailAgent.tone}`)}>
+                      <span className="material-symbols-outlined">{detailAgent.icon}</span>
+                    </div>
+                    <div>
+                      <span className="asr-pill asr-pill-cyan">{detailAgent.category}</span>
+                      <p className="asr-small asr-muted">{detailAgent.summary}</p>
+                    </div>
+                  </div>
+                  <p className="asr-small asr-muted">{detailAgent.description}</p>
+                  <div className="asr-mini-row">
+                    <span className="asr-small asr-muted">Rating</span>
+                    <strong className="asr-small">{detailAgent.rating.toFixed(1)} / 5</strong>
+                  </div>
+                  <div className="asr-mini-row">
+                    <span className="asr-small asr-muted">Installs</span>
+                    <strong className="asr-small">{formatInstalls(getDisplayInstalls(detailAgent.id))}</strong>
+                  </div>
+                  <div className="asr-mini-row">
+                    <span className="asr-small asr-muted">Favorites</span>
+                    <strong className="asr-small">{formatInstalls(getDisplayFavoriteCount(detailAgent.id))}</strong>
+                  </div>
+                </section>
+
+                <section className="asr-stack">
+                  <div className="asr-section-head">
+                    <h3>Expected output</h3>
+                    <span className="asr-pill asr-pill-purple">Preview</span>
+                  </div>
+                  <div className="asr-tool-list">
+                    {detailAgent.outputs.map((output, outputIndex) => (
+                      <div className="asr-tool-row" key={output}>
+                        <div className={cx('asr-icon-tile', outputIndex === 1 && 'asr-cyan', outputIndex === 2 && 'asr-purple')}>
+                          <span className="material-symbols-outlined">{outputIndex === 0 ? 'difference' : outputIndex === 1 ? 'checklist' : 'notes'}</span>
+                        </div>
+                        <div>
+                          <strong className="asr-small">{output}</strong>
+                          <p className="asr-tiny asr-muted">Visible in the workspace handoff after staging.</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="asr-stack">
+                  <div className="asr-section-head">
+                    <h3>Workspace state</h3>
+                    <span className={cx('asr-pill', installedIds.has(detailAgent.id) ? 'asr-pill-green' : 'asr-pill-cyan')}>
+                      {installedIds.has(detailAgent.id) ? 'Added' : 'Available'}
+                    </span>
+                  </div>
+                  <div className="asr-activity-list">
+                    <div className="asr-activity-row">
+                      <div className="asr-icon-tile asr-purple">
+                        <span className="material-symbols-outlined">favorite</span>
+                      </div>
+                      <div>
+                        <strong className="asr-small">{favoriteIds.has(detailAgent.id) ? 'Saved to favorites' : 'Not favorited'}</strong>
+                        <p className="asr-tiny asr-muted">Favorite state updates immediately on the card.</p>
+                      </div>
+                    </div>
+                    <div className="asr-activity-row">
+                      <div className="asr-icon-tile asr-green">
+                        <span className="material-symbols-outlined">download_done</span>
+                      </div>
+                      <div>
+                        <strong className="asr-small">{installedIds.has(detailAgent.id) ? 'Ready in workspace' : 'Ready to add'}</strong>
+                        <p className="asr-tiny asr-muted">Install state changes the card action and summary count.</p>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </>
+            ) : (
+              <div className="asr-drawer-empty">
+                <div className="asr-icon-tile asr-cyan">
+                  <span className="material-symbols-outlined">ads_click</span>
+                </div>
+                <h2>Select an agent</h2>
+                <p className="asr-small asr-muted">Open details from any visible card to compare output, rating, install count, and workspace state.</p>
+              </div>
+            )}
+          </aside>
+        </div>
+      </div>
+
+      {confirmation ? (
+        <div className="asr-confirm-bar asr-glass" role="status">
+          <div className={cx('asr-icon-tile', confirmation.actionAgentId ? 'asr-green' : 'asr-cyan')}>
+            <span className="material-symbols-outlined">{confirmation.actionAgentId ? 'download_done' : 'tune'}</span>
+          </div>
+          <div className="asr-truncate">
+            <strong className="asr-small">{confirmation.title}</strong>
+            <p className="asr-tiny asr-muted asr-truncate">{confirmation.message}</p>
+          </div>
+          <button className="asr-button asr-ghost" onClick={() => setConfirmation(null)} type="button">
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
-export default AgentSquarePage;
+const styles = `
+  @import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap");
+  @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
+
+  .asr-root {
+    --asr-bg: #edf6ff;
+    --asr-bg-soft: #f7fbff;
+    --asr-ink: #172033;
+    --asr-muted: #5f6f86;
+    --asr-line: rgba(133, 153, 184, 0.22);
+    --asr-blue: #1769e8;
+    --asr-cyan: #08a7cf;
+    --asr-purple: #7457e8;
+    --asr-green: #1d9b67;
+    --asr-glass: rgba(255, 255, 255, 0.72);
+    --asr-glass-border: rgba(255, 255, 255, 0.7);
+    --asr-shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
+    min-height: 100vh;
+    color: var(--asr-ink);
+    background:
+      radial-gradient(circle at 14% 10%, rgba(8, 167, 207, 0.16), transparent 28%),
+      radial-gradient(circle at 78% 4%, rgba(116, 87, 232, 0.14), transparent 30%),
+      linear-gradient(135deg, var(--asr-bg-soft), var(--asr-bg));
+    font-family: "Hanken Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow: hidden;
+  }
+
+  .asr-root *,
+  .asr-root *::before,
+  .asr-root *::after {
+    box-sizing: border-box;
+  }
+
+  .asr-root button,
+  .asr-root input,
+  .asr-root select {
+    font: inherit;
+  }
+
+  .asr-root button {
+    cursor: pointer;
+  }
+
+  .asr-root button:disabled {
+    cursor: not-allowed;
+  }
+
+  .asr-root h1,
+  .asr-root h2,
+  .asr-root h3,
+  .asr-root p {
+    margin: 0;
+  }
+
+  .asr-root h1 {
+    font-size: 27px;
+    line-height: 1.1;
+    letter-spacing: 0;
+  }
+
+  .asr-root h2 {
+    font-size: 16px;
+    line-height: 1.25;
+    letter-spacing: 0;
+  }
+
+  .asr-root h3 {
+    font-size: 15px;
+    line-height: 1.25;
+    letter-spacing: 0;
+  }
+
+  .asr-particle-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+  }
+
+  .asr-page {
+    position: relative;
+    z-index: 1;
+    height: 100vh;
+    padding: 22px;
+  }
+
+  .asr-workspace {
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr) 316px;
+    gap: 18px;
+    max-width: 1440px;
+    height: calc(100vh - 44px);
+    margin: 0 auto;
+  }
+
+  .asr-glass {
+    background: var(--asr-glass);
+    border: 1px solid var(--asr-glass-border);
+    border-radius: 12px;
+    box-shadow: var(--asr-shadow);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
+
+  .asr-sidebar,
+  .asr-main,
+  .asr-drawer {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .asr-sidebar,
+  .asr-drawer {
+    gap: 16px;
+    overflow: auto;
+    padding: 18px;
+  }
+
+  .asr-main {
+    gap: 16px;
+    overflow: hidden;
+  }
+
+  .asr-muted {
+    color: var(--asr-muted);
+  }
+
+  .asr-tiny {
+    font-size: 11px;
+    line-height: 1.35;
+    letter-spacing: 0;
+  }
+
+  .asr-small {
+    font-size: 12px;
+    line-height: 1.45;
+    letter-spacing: 0;
+  }
+
+  .asr-label {
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  .asr-root .material-symbols-outlined {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    overflow: hidden;
+    font-size: 18px;
+    line-height: 1;
+    vertical-align: middle;
+    font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
+  }
+
+  .asr-brand,
+  .asr-section-head,
+  .asr-mini-row,
+  .asr-card-head,
+  .asr-card-actions,
+  .asr-topbar,
+  .asr-toolbar,
+  .asr-market-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .asr-brand {
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--asr-line);
+  }
+
+  .asr-section-head,
+  .asr-mini-row,
+  .asr-topbar,
+  .asr-market-head {
+    justify-content: space-between;
+  }
+
+  .asr-brand-mark,
+  .asr-icon-tile,
+  .asr-agent-logo,
+  .asr-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  .asr-brand-mark {
+    width: 38px;
+    height: 38px;
+    color: #fff;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--asr-blue), var(--asr-cyan));
+    box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
+  }
+
+  .asr-truncate {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .asr-stack,
+  .asr-nav-list,
+  .asr-category-list,
+  .asr-tool-list,
+  .asr-activity-list {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .asr-nav-item,
+  .asr-category-button,
+  .asr-tool-row,
+  .asr-activity-row,
+  .asr-metric-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.46);
+    color: var(--asr-ink);
+  }
+
+  .asr-active {
+    border-color: rgba(23, 105, 232, 0.2);
+    background: rgba(23, 105, 232, 0.1);
+    color: #1459c7;
+  }
+
+  .asr-nav-item {
+    width: 100%;
+    text-align: left;
+  }
+
+  .asr-category-button {
+    width: 100%;
+    justify-content: space-between;
+    text-align: left;
+  }
+
+  .asr-icon-tile,
+  .asr-agent-logo {
+    width: 34px;
+    height: 34px;
+    color: var(--asr-blue);
+    border-radius: 10px;
+    background: rgba(23, 105, 232, 0.1);
+  }
+
+  .asr-agent-logo {
+    width: 40px;
+    height: 40px;
+  }
+
+  .asr-cyan {
+    color: #087f9e;
+    background: rgba(8, 167, 207, 0.11);
+  }
+
+  .asr-purple {
+    color: #6044d7;
+    background: rgba(116, 87, 232, 0.11);
+  }
+
+  .asr-green {
+    color: #15744b;
+    background: rgba(29, 155, 103, 0.11);
+  }
+
+  .asr-blue {
+    color: var(--asr-blue);
+    background: rgba(23, 105, 232, 0.1);
+  }
+
+  .asr-pill,
+  .asr-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+    padding: 5px 9px;
+    border: 1px solid rgba(23, 105, 232, 0.13);
+    border-radius: 999px;
+    background: rgba(23, 105, 232, 0.08);
+    color: #1459c7;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .asr-pill-cyan,
+  .asr-tag-cyan {
+    border-color: rgba(8, 167, 207, 0.18);
+    background: rgba(8, 167, 207, 0.1);
+    color: #087f9e;
+  }
+
+  .asr-pill-purple,
+  .asr-tag-purple {
+    border-color: rgba(116, 87, 232, 0.18);
+    background: rgba(116, 87, 232, 0.1);
+    color: #6044d7;
+  }
+
+  .asr-pill-green {
+    border-color: rgba(29, 155, 103, 0.2);
+    background: rgba(29, 155, 103, 0.11);
+    color: #15744b;
+  }
+
+  .asr-status-dot {
+    display: inline-flex;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--asr-green);
+    box-shadow: 0 0 0 4px rgba(29, 155, 103, 0.12);
+  }
+
+  .asr-sidebar-card {
+    margin-top: auto;
+    padding: 12px;
+  }
+
+  .asr-progress {
+    width: 100%;
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(23, 105, 232, 0.11);
+  }
+
+  .asr-progress span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--asr-blue), var(--asr-cyan), var(--asr-purple));
+  }
+
+  .asr-topbar {
+    min-height: 104px;
+    padding: 18px 20px;
+  }
+
+  .asr-toolbar {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-left: auto;
+  }
+
+  .asr-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: min(340px, 100%);
+    min-height: 38px;
+    padding: 8px 11px;
+    border: 1px solid rgba(255, 255, 255, 0.68);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.58);
+    color: var(--asr-muted);
+  }
+
+  .asr-search input {
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--asr-ink);
+  }
+
+  .asr-select {
+    min-height: 38px;
+    padding: 8px 34px 8px 11px;
+    border: 1px solid rgba(255, 255, 255, 0.68);
+    border-radius: 8px;
+    outline: 0;
+    background: rgba(255, 255, 255, 0.62);
+    color: var(--asr-ink);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .asr-button,
+  .asr-icon-button {
+    border: 1px solid rgba(23, 105, 232, 0.14);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.62);
+    color: var(--asr-ink);
+    box-shadow: 0 8px 18px rgba(26, 40, 80, 0.08);
+  }
+
+  .asr-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 9px 12px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .asr-primary {
+    border-color: transparent;
+    color: #fff;
+    background: linear-gradient(135deg, var(--asr-blue), var(--asr-cyan));
+    box-shadow: 0 10px 22px rgba(23, 105, 232, 0.23);
+  }
+
+  .asr-button-success {
+    background: linear-gradient(135deg, var(--asr-green), var(--asr-cyan));
+  }
+
+  .asr-ghost,
+  .asr-icon-button {
+    box-shadow: none;
+  }
+
+  .asr-button:disabled,
+  .asr-icon-button:disabled {
+    opacity: 0.62;
+  }
+
+  .asr-icon-button {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+  }
+
+  .asr-is-favorite,
+  .asr-is-favorite .material-symbols-outlined {
+    color: #fff;
+    border-color: transparent;
+    background: linear-gradient(135deg, var(--asr-purple), var(--asr-blue));
+    font-variation-settings: "FILL" 1, "wght" 600, "GRAD" 0, "opsz" 24;
+  }
+
+  .asr-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .asr-metric-card {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .asr-metric-card strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .asr-market {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 12px;
+    overflow: hidden;
+    padding: 16px;
+  }
+
+  .asr-filter-summary {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .asr-agent-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(230px, 1fr));
+    gap: 14px;
+    overflow: auto;
+    padding: 2px 4px 6px 2px;
+  }
+
+  .asr-agent-card {
+    display: flex;
+    min-height: 238px;
+    flex-direction: column;
+    gap: 12px;
+    padding: 15px;
+    border-radius: 12px;
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  }
+
+  .asr-agent-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(23, 105, 232, 0.24);
+    box-shadow: 0 22px 54px rgba(26, 40, 80, 0.16);
+  }
+
+  .asr-card-head {
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .asr-card-title {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .asr-card-copy {
+    min-height: 58px;
+    color: var(--asr-muted);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .asr-tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .asr-card-actions {
+    justify-content: space-between;
+    margin-top: auto;
+  }
+
+  .asr-card-actions .asr-button {
+    flex: 1;
+  }
+
+  .asr-installed {
+    border-color: rgba(29, 155, 103, 0.28);
+  }
+
+  .asr-empty-state,
+  .asr-drawer-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 240px;
+    flex-direction: column;
+    gap: 12px;
+    padding: 28px;
+    border: 1px dashed rgba(23, 105, 232, 0.22);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.42);
+    text-align: center;
+  }
+
+  .asr-drawer-empty {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .asr-drawer-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--asr-line);
+  }
+
+  .asr-drawer-hero {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .asr-drawer-hero .asr-agent-logo {
+    width: 44px;
+    height: 44px;
+  }
+
+  .asr-tool-row,
+  .asr-activity-row {
+    align-items: flex-start;
+    background: rgba(255, 255, 255, 0.52);
+  }
+
+  .asr-confirm-bar {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: min(560px, calc(100vw - 44px));
+    padding: 12px 14px;
+    transform: translateX(-50%);
+  }
+
+  @media (max-width: 1180px) {
+    .asr-workspace {
+      grid-template-columns: 220px minmax(0, 1fr);
+    }
+
+    .asr-drawer {
+      display: none;
+    }
+
+    .asr-agent-grid {
+      grid-template-columns: repeat(2, minmax(230px, 1fr));
+    }
+  }
+
+  @media (max-width: 820px) {
+    .asr-root {
+      overflow: auto;
+    }
+
+    .asr-page {
+      height: auto;
+      min-height: 100vh;
+      padding: 14px;
+    }
+
+    .asr-workspace {
+      display: flex;
+      height: auto;
+      flex-direction: column;
+    }
+
+    .asr-topbar,
+    .asr-market-head {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .asr-filter-summary {
+      justify-content: flex-start;
+    }
+
+    .asr-toolbar,
+    .asr-search {
+      width: 100%;
+    }
+
+    .asr-stats,
+    .asr-agent-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .asr-market,
+    .asr-agent-grid {
+      overflow: visible;
+    }
+  }
+`;
+
+export default AgentSquarePageInteractive;
