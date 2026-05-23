@@ -135,22 +135,21 @@ fix/short-topic
 ### 当前活跃分支 (2026-05-23)
 
 ```
-Remote (6):
-  origin/master                            ← 稳定（skill 基础设施已上线）
-  origin/dev/delicious233                  ← 主 dev: P1 交互体验推进中
+Remote:
+  origin/master                            ← 稳定
+  origin/dev/delicious233                  ← 主 dev: P0-P3 全部完成, M4 推进中
   origin/dev/trump                         ← Trump dev
   origin/feat/trump-webui                  ← Web 工作区
-  origin/docs/dev-loop-skill-master        ← 已合并删除
   origin/feat/backend-foundation           ← 后台预留 (dormant)
 
-本地 worktree: dev/delicious233
+本地: dev/delicious233 + 1 worktree (feat-trump-webui)
 ```
 
 合并方向：`feat/* → dev/delicious233 → master`
 
 开发引擎：`.agents/skills/dev-loop/` — 模型分配(opus/sonnet/haiku) + 标准循环 + 交叉审查
 
-当前 P1 进度：P0 级 3/3 ✅ | P1 级 2/4（ThreadPanel/DiffViewer ✅, ChatView/AgentList ❌）
+当前 P0-P3 全部完成，M4 推进中。详细进度见 `docs/roadmap.md`。
 
 进度同步：
 
