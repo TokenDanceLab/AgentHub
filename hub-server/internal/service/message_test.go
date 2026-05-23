@@ -179,7 +179,7 @@ func TestSendMessage_Success(t *testing.T) {
 		WithArgs("sess-1", "msg-1", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	// InsertMessage + TouchSessionLastMessage inside explicit db.Transaction
+	// db.Transaction wraps InsertMessage + TouchSessionLastMessage
 	mock.ExpectBegin()
 	mock.ExpectExec(sqlmInsertMsg).
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -217,6 +217,7 @@ func TestSendMessage_SuccessNonText(t *testing.T) {
 		WithArgs("sess-1", "msg-c", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
+	// db.Transaction wraps InsertMessage + TouchSessionLastMessage
 	mock.ExpectBegin()
 	mock.ExpectExec(sqlmInsertMsg).
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -326,11 +327,9 @@ func TestRecallMessage_SuccessAsSender(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
 			AddRow("mem-1", "sess-1", "user", "user-1", "member"))
 
-	mock.ExpectBegin()
 	mock.ExpectExec(sqlmUpdateMsg).
 		WithArgs(true, "msg-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectCommit()
 
 	svc := &MessageService{db: db, bus: newTestBus(t)}
 	err := svc.RecallMessage(context.Background(), "msg-1", "user-1")
@@ -352,11 +351,9 @@ func TestRecallMessage_SuccessAsOwner(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
 			AddRow("mem-1", "sess-1", "user", "user-1", "owner"))
 
-	mock.ExpectBegin()
 	mock.ExpectExec(sqlmUpdateMsg).
 		WithArgs(true, "msg-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectCommit()
 
 	svc := &MessageService{db: db, bus: newTestBus(t)}
 	err := svc.RecallMessage(context.Background(), "msg-1", "user-1")
@@ -410,10 +407,8 @@ func TestPinMessage_DuplicatePin(t *testing.T) {
 		WithArgs("sess-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
 
-	mock.ExpectBegin()
 	mock.ExpectExec(sqlmInsertPin).
 		WillReturnError(errors.New("duplicate key value violates unique constraint"))
-	mock.ExpectRollback()
 
 	svc := &MessageService{db: db}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-1")
@@ -433,10 +428,8 @@ func TestPinMessage_Success(t *testing.T) {
 		WithArgs("sess-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
 
-	mock.ExpectBegin()
 	mock.ExpectExec(sqlmInsertPin).
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
 
 	svc := &MessageService{db: db, bus: newTestBus(t)}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-1")
@@ -468,11 +461,9 @@ func TestUnpinMessage_Success(t *testing.T) {
 		WithArgs("sess-1", "user", "user-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
-	mock.ExpectBegin()
 	mock.ExpectExec(sqlmDeletePin).
 		WithArgs("sess-1", "msg-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectCommit()
 
 	svc := &MessageService{db: db, bus: newTestBus(t)}
 	err := svc.UnpinMessage(context.Background(), "user-1", "sess-1", "msg-1")
@@ -543,11 +534,9 @@ func TestMarkRead_Success(t *testing.T) {
 		WithArgs("sess-1", "user", "user-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
-	mock.ExpectBegin()
 	mock.ExpectExec(sqlmUpdateMember).
 		WithArgs(42, "sess-1", "user", "user-1", 42).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectCommit()
 
 	svc := &MessageService{db: db, bus: newTestBus(t)}
 	err := svc.MarkRead(context.Background(), "user-1", "sess-1", 42)

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -10,14 +11,23 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
 )
 
-type AttachmentHandler struct {
-	service *service.AttachmentService
+// AttachmentService is the subset of *service.AttachmentService used by AttachmentHandler.
+type AttachmentService interface {
+	ProbeAttachment(ctx context.Context, hash string) (*model.Attachment, error)
+	SaveAttachment(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64) (*model.Attachment, error)
+	GetAttachmentByID(ctx context.Context, id string) (*model.Attachment, error)
+	MaxUploadSize() int64
 }
 
-func NewAttachmentHandler(s *service.AttachmentService) *AttachmentHandler {
+type AttachmentHandler struct {
+	service AttachmentService
+}
+
+func NewAttachmentHandler(s AttachmentService) *AttachmentHandler {
 	return &AttachmentHandler{service: s}
 }
 

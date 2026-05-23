@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -9,11 +10,25 @@ import (
 	"github.com/agenthub/hub-server/internal/service"
 )
 
-type MessageHandler struct {
-	service *service.MessageService
+// MessageService is the subset of *service.MessageService used by MessageHandler.
+type MessageService interface {
+	SendMessage(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error)
+	GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error)
+	GetMessagesIncremental(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error)
+	RecallMessage(ctx context.Context, msgID, userID string) error
+	PinMessage(ctx context.Context, userID, sessionID, msgID string) error
+	UnpinMessage(ctx context.Context, userID, sessionID, msgID string) error
+	ListPinnedMessages(ctx context.Context, userID, sessionID string) ([]service.MessageResponse, error)
+	ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
+	MarkRead(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
+	SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
 }
 
-func NewMessageHandler(s *service.MessageService) *MessageHandler {
+type MessageHandler struct {
+	service MessageService
+}
+
+func NewMessageHandler(s MessageService) *MessageHandler {
 	return &MessageHandler{service: s}
 }
 
