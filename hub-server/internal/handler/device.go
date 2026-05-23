@@ -1,23 +1,18 @@
 package handler
 
 import (
-	"encoding/json"
-	"time"
-
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service"
 )
 
 type DeviceHandler struct {
-	db *gorm.DB
+	deviceService *service.DeviceService
 }
 
-func NewDeviceHandler(db *gorm.DB) *DeviceHandler {
-	return &DeviceHandler{db: db}
+func NewDeviceHandler(deviceService *service.DeviceService) *DeviceHandler {
+	return &DeviceHandler{deviceService: deviceService}
 }
 
 type registerDeviceReq struct {
@@ -36,18 +31,8 @@ func (h *DeviceHandler) Register(c *gin.Context) {
 	userID := c.GetString("user_id")
 	deviceType := c.GetString("device_type")
 
-	capsBytes, _ := json.Marshal(req.Capabilities)
-
-	device := &model.Device{
-		ID:           req.DeviceID,
-		UserID:       userID,
-		DeviceType:   deviceType,
-		AppVersion:   req.AppVersion,
-		Capabilities: string(capsBytes),
-		LastActiveAt: time.Now(),
-	}
-
-	if err := repository.UpsertDevice(h.db, device); err != nil {
+	device, err := h.deviceService.Register(req.DeviceID, userID, deviceType, req.AppVersion, req.Capabilities)
+	if err != nil {
 		Fail(c, errcode.ErrInternal)
 		return
 	}

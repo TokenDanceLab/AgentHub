@@ -12,9 +12,16 @@ import (
 	"github.com/agenthub/hub-server/internal/httpserver"
 )
 
+func getEnv(key, def string) string {
+	if v, ok := os.LookupEnv(key); ok {
+		return v
+	}
+	return def
+}
+
 func main() {
-	addr := flag.String("addr", "127.0.0.1:4210", "listen address")
-	jwtSecret := flag.String("jwt-secret", "", "JWT secret for auth token validation")
+	addr := flag.String("addr", getEnv("AGENTHUB_ADDR", "127.0.0.1:4210"), "listen address")
+	jwtSecret := flag.String("jwt-secret", getEnv("AGENTHUB_JWT_SECRET", ""), "JWT secret for auth token validation")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
