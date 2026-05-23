@@ -219,6 +219,15 @@ jobs:
       - name: Build Web
         run: pnpm --filter @agenthub/web build
 
+  # ── Secret Detection ─────────────────────────
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+
   # ── Validation ───────────────────────────────
   validate:
     runs-on: ubuntu-latest
