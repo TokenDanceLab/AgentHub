@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Menu, X, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Menu, X, PanelRightClose, PanelRightOpen, Bot } from 'lucide-react';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
-import { useIsMobile } from '@/hooks/useMediaQuery';
+import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { startRun, cancelRun, fetchAgents, fetchHealth, decidePermission as decidePermissionRest } from '@/api/edgeClient';
 import { useThreads } from '@/api/threadQueries';
 import type { AgentInfo, ThreadInfo, StartRunRequest } from '@shared/types';
@@ -41,6 +41,8 @@ export default function App() {
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online);
   const { t } = useTranslation();
   const isMobile = useIsMobile();
+
+  const isTablet = useIsTablet();
 
   // ── Edge disconnected banner state ──
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -95,19 +97,21 @@ export default function App() {
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileRunDetailOpen, setMobileRunDetailOpen] = useState(false);
+  const [tabletAgentOpen, setTabletAgentOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
 
   // Search → scroll state
   const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Close mobile panels on desktop resize
+  // Close mobile/tablet panels on desktop resize
   useEffect(() => {
-    if (!isMobile) {
+    if (!isMobile && !isTablet) {
       setMobileSidebarOpen(false);
       setMobileRunDetailOpen(false);
+      setTabletAgentOpen(false);
     }
-  }, [isMobile]);
+  }, [isMobile, isTablet]);
 
   // Escape key closes mobile overlays / modals; ? opens keyboard shortcut help
   useEffect(() => {
@@ -119,6 +123,7 @@ export default function App() {
       if (e.key === 'Escape') {
         setMobileSidebarOpen(false);
         setMobileRunDetailOpen(false);
+        setTabletAgentOpen(false);
       }
       if (e.key === '?' && !isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
@@ -292,6 +297,7 @@ export default function App() {
   // Stable callbacks for memoized presentational components
   const handleSelectAgent = useCallback((agent: AgentInfo) => {
     setSelectedAgentId(agent.id);
+    setTabletAgentOpen(false);
   }, []);
 
   const handleSelectThread = useCallback(
@@ -390,23 +396,35 @@ export default function App() {
         </div>
       )}
 
-      {/* Mobile header bar with toggles */}
-      {isMobile && (
+      {/* Mobile/Tablet header bar with toggles */}
+      {(isMobile || isTablet) && (
         <div className={styles.mobileToolbar}>
-          <button
-            className={styles.mobileToggle}
-            onClick={() => { setMobileSidebarOpen((v) => !v); setMobileRunDetailOpen(false); }}
-            aria-label={mobileSidebarOpen ? t('nav.closeSidebar') : t('nav.openSidebar')}
-            aria-expanded={mobileSidebarOpen}
-          >
-            {mobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+          {isMobile && (
+            <button
+              className={styles.mobileToggle}
+              onClick={() => { setMobileSidebarOpen((v) => !v); setMobileRunDetailOpen(false); }}
+              aria-label={mobileSidebarOpen ? t('nav.closeSidebar') : t('nav.openSidebar')}
+              aria-expanded={mobileSidebarOpen}
+            >
+              {mobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          )}
+          {isTablet && (
+            <button
+              className={styles.mobileToggle}
+              onClick={() => { setTabletAgentOpen((v) => !v); setMobileRunDetailOpen(false); }}
+              aria-label={tabletAgentOpen ? t('agent.close') : t('agent.open')}
+              aria-expanded={tabletAgentOpen}
+            >
+              {tabletAgentOpen ? <X size={20} /> : <Bot size={20} />}
+            </button>
+          )}
           <span className={styles.mobileTitle}>
             {selectedThread?.title ?? 'AgentHub'}
           </span>
           <button
             className={styles.mobileToggle}
-            onClick={() => { setMobileRunDetailOpen((v) => !v); setMobileSidebarOpen(false); }}
+            onClick={() => { setMobileRunDetailOpen((v) => !v); setMobileSidebarOpen(false); setTabletAgentOpen(false); }}
             aria-label={mobileRunDetailOpen ? t('run.close') : t('run.open')}
             aria-expanded={mobileRunDetailOpen}
           >
@@ -434,6 +452,15 @@ export default function App() {
           />
         )}
 
+        {/* Agent panel overlay backdrop (tablet) */}
+        {tabletAgentOpen && (
+          <div
+            className={styles.overlay}
+            onClick={() => setTabletAgentOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
         <div
           className={`${styles.sidebarWrapper} ${mobileSidebarOpen ? styles.sidebarOpen : ''}`}
           style={isMobile ? undefined : { width: sidebarWidth, flexShrink: 0 }}
@@ -445,10 +472,41 @@ export default function App() {
           />
         </div>
 
+        {/* Agent panel overlay (tablet) — slides in from left */}
+        <div
+          className={`${styles.agentOverlayWrapper} ${tabletAgentOpen ? styles.agentOverlayOpen : ''}`}
+        >
+          {agents.length === 0 && online ? (
+            <div className={styles.skeletonAgentList} aria-busy="true" aria-label="Loading agents">
+              {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className={styles.skeletonAgentItem}>
+                  <SkeletonCircle width={8} height={8} />
+                  <div className={styles.skeletonAgentInfo}>
+                    <SkeletonLine width={`${55 + (i % 3) * 10}%`} height="14px" />
+                    <SkeletonLine width={`${35 + (i % 4) * 8}%`} height="10px" />
+                    <div className={styles.skeletonAgentTags}>
+                      <SkeletonLine width="42px" height="14px" />
+                      <SkeletonLine width="50px" height="14px" />
+                      <SkeletonLine width="36px" height="14px" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <AgentList
+              agents={agents}
+              online={online}
+              selectedId={selectedAgentId}
+              onSelect={handleSelectAgent}
+            />
+          )}
+        </div>
+
         {!isMobile && <ResizeHandle direction="horizontal" onResize={handleSidebarResize} />}
 
         <div className={styles.center}>
-          {!isMobile && (
+          {!isMobile && !isTablet && (
             <div className={styles.centerSidebar}>
               {agents.length === 0 && online ? (
                 <div className={styles.skeletonAgentList} aria-busy="true" aria-label="Loading agents">
