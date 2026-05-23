@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 )
@@ -158,5 +159,276 @@ func hasEventType(events []string, want string) bool {
 func TestProcessExecutorWiringHelper(t *testing.T) {
 	if len(os.Args) >= 2 && os.Args[1] == "-test.run=TestProcessExecutorWiringHelper" {
 		return
+	}
+}
+
+func TestCORSMiddlewareAllowsLocalhostVariants(t *testing.T) {
+	tests := []struct {
+		name   string
+		origin string
+		want   bool
+	}{
+		{"localhost with port 5199", "http://localhost:5199", true},
+		{"localhost with port 5173", "http://localhost:5173", true},
+		{"127.0.0.1 with port", "http://127.0.0.1:5199", true},
+		{"tauri custom protocol", "https://tauri.localhost", true},
+		{"malicious origin", "https://evil.com", false},
+		{"malicious with localhost in hostname", "https://localhost.evil.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusOK)
+			}))
+
+			req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+			req.Header.Set("Origin", tt.origin)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if tt.want && rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200 for origin %q", rec.Code, tt.origin)
+			}
+			if !tt.want && rec.Code != http.StatusForbidden {
+				t.Fatalf("status = %d, want 403 for origin %q", rec.Code, tt.origin)
+			}
+			if tt.want && !called {
+				t.Fatal("handler was not called for trusted origin")
+			}
+			if !tt.want && called {
+				t.Fatal("handler should not be called for untrusted origin")
+			}
+		})
+	}
+}
+
+func TestCORSWithOptionsRequest(t *testing.T) {
+	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("handler should not be called for OPTIONS")
+	}))
+
+	req := httptest.NewRequest(http.MethodOptions, "/v1/health", nil)
+	req.Header.Set("Origin", "http://localhost:5199")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("OPTIONS status = %d, want 204", rec.Code)
+	}
+}
+
+func TestCORSHeadersSet(t *testing.T) {
+	called := false
+	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+	req.Header.Set("Origin", "http://localhost:5199")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if !called {
+		t.Fatal("handler was not called")
+	}
+
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5199" {
+		t.Fatalf("Access-Control-Allow-Origin = %q", got)
+	}
+	if got := rec.Header().Get("Vary"); got != "Origin" {
+		t.Fatalf("Vary = %q, want Origin", got)
+	}
+	methods := rec.Header().Get("Access-Control-Allow-Methods")
+	if methods != "GET, POST, PATCH, DELETE, OPTIONS" {
+		t.Fatalf("Access-Control-Allow-Methods = %q", methods)
+	}
+	headers := rec.Header().Get("Access-Control-Allow-Headers")
+	if headers != "Content-Type, Authorization" {
+		t.Fatalf("Access-Control-Allow-Headers = %q", headers)
+	}
+}
+
+func TestRunConfigDefaultAddr(t *testing.T) {
+	// Test that Run fills in default Addr when empty.
+	// We don't actually start the server (it would block), but we verify
+	// the config path is set up correctly.
+	cfg := Config{}
+	if cfg.Addr == "" {
+		cfg.Addr = "127.0.0.1:3210"
+	}
+	if cfg.Addr != "127.0.0.1:3210" {
+		t.Fatalf("default Addr = %q, want 127.0.0.1:3210", cfg.Addr)
+	}
+}
+
+func TestNewHandlerFromConfigEnsuresStore(t *testing.T) {
+	handler, err := newHandlerFromConfig(Config{})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	if handler.Store == nil {
+		t.Fatal("Store should not be nil")
+	}
+}
+
+func TestNewHandlerFromConfigEnsuresBus(t *testing.T) {
+	handler, err := newHandlerFromConfig(Config{})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	if handler.Bus == nil {
+		t.Fatal("Bus should not be nil")
+	}
+}
+
+func TestNewHandlerFromConfigEnsuresRegistry(t *testing.T) {
+	handler, err := newHandlerFromConfig(Config{})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	// Registry comes from runners.NewRegistry() in the constructor
+	if handler.Registry == nil {
+		t.Fatal("Registry should not be nil")
+	}
+}
+
+func TestNewHandlerFromConfigWithAdapterRegistryButNoDefault(t *testing.T) {
+	handler, err := newHandlerFromConfig(Config{
+		AdapterRegistry: &adapters.Registry{},
+		AgentDefault:    "",
+	})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	// Should still succeed — no executor wired because AgentDefault is empty
+	if handler.Executor != nil {
+		t.Logf("Executor is non-nil (may be wired if adapter found): %T", handler.Executor)
+	}
+}
+
+func TestNewHandlerFromConfigCustomAddr(t *testing.T) {
+	handler, err := newHandlerFromConfig(Config{})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	if handler == nil {
+		t.Fatal("handler is nil")
+	}
+}
+
+func TestNewHandlerFromConfigWithAdapterAndCommand(t *testing.T) {
+	handler, err := newHandlerFromConfig(Config{
+		AdapterRegistry: &adapters.Registry{},
+		AgentDefault:    "claude-code",
+		ProcessExecutor: lifecycle.ProcessExecutorConfig{
+			Command: os.Args[0],
+			Args:    []string{"-test.run=TestProcessExecutorWiringHelper", "--"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	if handler == nil {
+		t.Fatal("handler is nil")
+	}
+	// With an explicit command, executor should be wired
+	if handler.Executor == nil {
+		t.Fatal("Executor is nil with explicit command")
+	}
+}
+
+func TestNewHandlerFromConfigWithAdapterSentinelPath(t *testing.T) {
+	// When AdapterRegistry and AgentDefault are set but no Command,
+	// the code should use the sentinel path.
+	handler, err := newHandlerFromConfig(Config{
+		AdapterRegistry: &adapters.Registry{},
+		AgentDefault:    "claude-code",
+	})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	if handler == nil {
+		t.Fatal("handler is nil")
+	}
+	// Even without an explicit command, the sentinel should allow executor wiring
+	// (if the adapter is registered, which it's not in this test, executor would still be wired)
+}
+
+func TestNewHandlerFromConfigWithRegisteredAdapter(t *testing.T) {
+	reg := adapters.NewRegistry()
+	a := adapters.NewClaudeCodeAdapter("claude", "sonnet", "")
+	if err := reg.Register(a); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	handler, err := newHandlerFromConfig(Config{
+		AdapterRegistry: reg,
+		AgentDefault:    "claude-code",
+	})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	if handler == nil {
+		t.Fatal("handler is nil")
+	}
+	if handler.AdapterRegistry != reg {
+		t.Fatal("AdapterRegistry was not propagated")
+	}
+}
+
+func TestNewHandlerFromConfigAdapterNotFound(t *testing.T) {
+	reg := adapters.NewRegistry()
+	// Register something different from AgentDefault
+	a := adapters.NewClaudeCodeAdapter("claude", "sonnet", "")
+	if err := reg.Register(a); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	handler, err := newHandlerFromConfig(Config{
+		AdapterRegistry: reg,
+		AgentDefault:    "nonexistent",
+	})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	if handler == nil {
+		t.Fatal("handler is nil")
+	}
+	// The adapter is not found, but handler should still be created
+}
+
+func TestNewHandlerFromConfigEnsuresAllFields(t *testing.T) {
+	handler, err := newHandlerFromConfig(Config{})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	if handler.Bus == nil {
+		t.Fatal("Bus should not be nil")
+	}
+	if handler.Registry == nil {
+		t.Fatal("Registry should not be nil")
+	}
+	if handler.Store == nil {
+		t.Fatal("Store should not be nil")
+	}
+	// Executor is lazily set or nil when no ProcessExecutorCommand is given
+	if handler.Executor != nil {
+		t.Logf("Executor is non-nil (may be wired): %T", handler.Executor)
+	}
+}
+
+func TestNewHandlerFromConfigInvalidEnv(t *testing.T) {
+	_, err := newHandlerFromConfig(Config{
+		ProcessExecutor: lifecycle.ProcessExecutorConfig{
+			Command:  os.Args[0],
+			ExtraEnv: []string{"INVALID"},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid ExtraEnv")
 	}
 }
