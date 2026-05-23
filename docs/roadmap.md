@@ -69,10 +69,22 @@ feat/trump-webui          ← Web 前端（Trump）
 - [x] 真实 Agent 集成 E2E：scripts/integration-e2e.ps1（启动edge→POST run→WebSocket验证）
 
 ### M4 候选（Workspace + 协作）
-- [ ] 权限门控升级：Desktop 主动批准/拒绝（替换 auto-approve，需 channel 协调）
+- [x] Hub Server 骨架：Go module + 18 REST 路由 + health check（stub 响应，待后端开发）
+- [ ] OpenCode E2E 修复：集成测试 PASS（1 text + 1 result），HTTP 路径待调试（可能 API key 问题）
+- [ ] Codex E2E：二进制可用但未实测（需额度）
+- [ ] cc-switch provider 映射集成：当前 model_config 硬编码别名，未读 CLI settings
+- [ ] 权限门控升级：Desktop 主动批准/拒绝
 - [ ] Web 前端集成：feat/trump-webui → dev/delicious233 合并
-- [ ] Hub Server 基础：账号/群聊/同步/中继（后端开发者负责）
 - [ ] 响应式布局 + 移动端适配
+
+## 实测状态 (2026-05-23)
+
+| Agent | E2E 集成测试 | 单元测试 | 事件覆盖 |
+|-------|------------|---------|---------|
+| Claude Code | ✅ 5/5 pass | ✅ 24 NDJSON fixtures | 20+ types |
+| OpenCode | ⚠️ 集成测试 pass, HTTP E2E 2/5 | ✅ 12 tests | 16 types |
+| Codex | ❌ 未实测 | ✅ fixture tests | 9 item types |
+| Hub Server | ✅ 骨架可运行 | — | 18 routes |
 
 ## 验收
 
