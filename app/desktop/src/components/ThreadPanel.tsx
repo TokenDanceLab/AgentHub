@@ -4,7 +4,7 @@ import { Plus, MessageSquare, Pencil, Trash2, Check, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ThreadInfo } from '@shared/types';
 import { useThreads, useRenameThread, useDeleteThread } from '@/api/threadQueries';
-import { useToast } from '@/contexts/ToastContext';
+import { useToastStore } from '@/stores/toastStore';
 import EmptyState from './EmptyState';
 import styles from './ThreadPanel.module.css';
 
@@ -44,7 +44,7 @@ function relativeTime(
 
 export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props) {
   const { t } = useTranslation();
-  const { showToast } = useToast();
+  const addToast = useToastStore((s) => s.addToast);
   const queryClient = useQueryClient();
 
   // TanStack Query — server state
@@ -94,11 +94,11 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
       await renameMutation.mutateAsync({ threadId: editingId, title });
       setEditingId(null);
       setActionError(null);
-      showToast('success', t('toast.threadRenamed'));
+      addToast({ type: 'success', message: t('toast.threadRenamed') });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setActionError(msg);
-      showToast('error', msg);
+      addToast({ type: 'error', message: msg });
     }
   };
 
@@ -125,11 +125,11 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
       await deleteMutation.mutateAsync(threadId);
       setDeletingId(null);
       setActionError(null);
-      showToast('success', t('toast.threadDeleted'));
+      addToast({ type: 'success', message: t('toast.threadDeleted') });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setActionError(msg);
-      showToast('error', msg);
+      addToast({ type: 'error', message: msg });
     }
   };
 
