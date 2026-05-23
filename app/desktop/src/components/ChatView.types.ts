@@ -9,6 +9,8 @@ export interface ChatMessage {
   timestamp: string;
   blocks: MessageBlock[];
   parentId?: string;
+  /** Agent display name — shown with avatar in agent messages */
+  agentName?: string;
 }
 
 // ── Message Block types ───────────────────────

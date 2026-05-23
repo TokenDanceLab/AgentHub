@@ -171,16 +171,16 @@ describe('ChatView', () => {
     expect(details?.className).toContain('removed');
   });
 
-  it('shows streaming cursor when isStreaming=true', () => {
+  it('shows stream progress bar when isStreaming=true', () => {
     const msg = makeAgentTextMessage('typing...');
     const { container } = render(<ChatView messages={[msg]} isStreaming={true} />);
-    const cursor = container.querySelector('[class*="cursor"]');
-    expect(cursor).toBeInTheDocument();
+    const bar = container.querySelector('[class*="streamProgress"]');
+    expect(bar).toBeInTheDocument();
   });
 
-  it('does not show streaming cursor when isStreaming=false', () => {
+  it('does not show stream progress bar when isStreaming=false', () => {
     const { container } = render(<ChatView messages={[]} />);
-    const cursor = container.querySelector('[class*="cursor"]');
-    expect(cursor).not.toBeInTheDocument();
+    const bar = container.querySelector('[class*="streamProgress"]');
+    expect(bar).not.toBeInTheDocument();
   });
 });

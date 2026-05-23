@@ -11,5 +11,6 @@
     "noEmit": true,
     "lib": ["ES2021", "DOM"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/__tests__", "src/events.test.ts"]
 }

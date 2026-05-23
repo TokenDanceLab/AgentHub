@@ -40,6 +40,7 @@ interface State {
   isStreaming: boolean;
   currentRun: RunState | null;
   permissionRequests: PermissionRequestItem[];
+  agentName: string;
 }
 
 type Action =
@@ -72,8 +73,8 @@ function mergeBlock(blocks: MessageBlock[], block: MessageBlock): MessageBlock[]
   return [...blocks, block];
 }
 
-function newAgentMessage(id: string, timestamp: string): ChatMessage {
-  return { id, role: 'agent', timestamp, blocks: [] };
+function newAgentMessage(id: string, timestamp: string, agentName?: string): ChatMessage {
+  return { id, role: 'agent', timestamp, blocks: [], agentName };
 }
 
 function capMessages(messages: ChatMessage[]): ChatMessage[] {
@@ -129,6 +130,7 @@ function processEvent(state: State, event: EventEnvelope): State {
   let { messages } = state;
   let { currentRun } = state;
   let { isStreaming } = state;
+  let { agentName } = state;
 
   switch (event.type) {
     case 'run.queued': {
@@ -165,6 +167,7 @@ function processEvent(state: State, event: EventEnvelope): State {
         },
       ];
       isStreaming = true;
+      agentName = '';
       break;
     }
 
@@ -181,6 +184,7 @@ function processEvent(state: State, event: EventEnvelope): State {
       } else {
         messages = [...messages, { id: event.id, role: 'system', timestamp: ts, blocks: [block] }];
       }
+      agentName = (event.payload.model as string) || '';
       break;
     }
 
@@ -194,7 +198,7 @@ function processEvent(state: State, event: EventEnvelope): State {
       if (last && last.role === 'agent') {
         messages = [...messages.slice(0, -1), { ...last, blocks: mergeBlock(last.blocks, block) }];
       } else {
-        const msg = newAgentMessage(event.id, ts);
+        const msg = newAgentMessage(event.id, ts, agentName);
         msg.blocks = [block];
         messages = [...messages, msg];
       }
@@ -219,7 +223,7 @@ function processEvent(state: State, event: EventEnvelope): State {
       if (last && last.role === 'agent') {
         messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
       } else {
-        const msg = newAgentMessage(event.id, ts);
+        const msg = newAgentMessage(event.id, ts, agentName);
         msg.blocks = [block];
         messages = [...messages, msg];
       }
@@ -235,7 +239,7 @@ function processEvent(state: State, event: EventEnvelope): State {
       if (last && last.role === 'agent') {
         messages = [...messages.slice(0, -1), { ...last, blocks: mergeBlock(last.blocks, block) }];
       } else {
-        const msg = newAgentMessage(event.id, ts);
+        const msg = newAgentMessage(event.id, ts, agentName);
         msg.blocks = [block];
         messages = [...messages, msg];
       }
@@ -270,7 +274,7 @@ function processEvent(state: State, event: EventEnvelope): State {
       if (last && last.role === 'agent') {
         messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
       } else {
-        const msg = newAgentMessage(event.id, ts);
+        const msg = newAgentMessage(event.id, ts, agentName);
         msg.blocks = [block];
         messages = [...messages, msg];
       }
@@ -332,7 +336,7 @@ function processEvent(state: State, event: EventEnvelope): State {
       if (last && last.role === 'agent') {
         messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
       } else {
-        const msg = newAgentMessage(event.id, ts);
+        const msg = newAgentMessage(event.id, ts, agentName);
         msg.blocks = [block];
         messages = [...messages, msg];
       }
@@ -353,7 +357,7 @@ function processEvent(state: State, event: EventEnvelope): State {
       if (last && last.role === 'agent') {
         messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
       } else {
-        const msg = newAgentMessage(event.id, ts);
+        const msg = newAgentMessage(event.id, ts, agentName);
         msg.blocks = [block];
         messages = [...messages, msg];
       }
@@ -495,7 +499,7 @@ function processEvent(state: State, event: EventEnvelope): State {
 
   messages = capMessages(messages);
 
-  return { ...state, messages, isStreaming, currentRun };
+  return { ...state, messages, isStreaming, currentRun, agentName };
 }
 
 function reducer(state: State, action: Action): State {
@@ -503,7 +507,7 @@ function reducer(state: State, action: Action): State {
     case 'EVENT_RECEIVED':
       return processEvent(state, action.event);
     case 'CLEAR_MESSAGES':
-      return { messages: [], isConnected: state.isConnected, isStreaming: false, currentRun: null, permissionRequests: [] };
+      return { messages: [], isConnected: state.isConnected, isStreaming: false, currentRun: null, permissionRequests: [], agentName: state.agentName };
     case 'SET_CONNECTED':
       return { ...state, isConnected: action.connected };
     case 'RESOLVE_PERMISSION': {
@@ -525,6 +529,7 @@ const initialState: State = {
   isStreaming: false,
   currentRun: null,
   permissionRequests: [],
+  agentName: '',
 };
 
 export function useChatMessages(online: boolean): ChatState {
