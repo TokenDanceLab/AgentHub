@@ -62,7 +62,7 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 	}
 	defer file.Close()
 
-	if header.Size > service.GetMaxUploadSize() {
+	if header.Size > h.service.MaxUploadSize() {
 		Fail(c, errcode.AttachTooLarge)
 		return
 	}
