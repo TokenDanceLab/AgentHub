@@ -75,10 +75,10 @@ feat/trump-webui          ← Web 前端（Trump）
 |---|--------|------|:--:|
 | 1 | AgentHook 接口（6 核心 hook） | Claude Code + OpenCode | ✅ |
 | 2 | 消息树渲染（ThreadPanel tree） | LibreChat buildTree | ⏳ |
-| 3 | 安全管道（23 检查 → Go） | Claude Code deep-dive | ⏳ |
+| 3 | 安全管道（23 检查 → Go） | Claude Code deep-dive | ✅ |
 | 4 | Task 状态: dispatched | Multica | ✅ |
 | 5 | Context Budget 模型 | Claude Code + LibreChat | ✅ |
-| 6 | 流式增量解析器 | Kanna drainingStreams | ⏳ |
+| 6 | 流式增量解析器 | Kanna drainingStreams | ✅ |
 
 ### M4 候选（Workspace + 协作）
 - [x] Hub Server 骨架：Go module + 18 REST 路由 + health check（stub 响应，待后端开发）
