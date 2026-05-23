@@ -79,12 +79,12 @@ feat/trump-webui          ← Web 前端（Trump）
 
 ## 实测状态 (2026-05-23)
 
-| Agent | E2E 集成测试 | 单元测试 | 事件覆盖 |
-|-------|------------|---------|---------|
-| Claude Code | ✅ 5/5 pass | ✅ 24 NDJSON fixtures | 20+ types |
-| OpenCode | ⚠️ 集成测试 pass, HTTP E2E 2/5 | ✅ 12 tests | 16 types |
-| Codex | ❌ 未实测 | ✅ fixture tests | 9 item types |
-| Hub Server | ✅ 骨架可运行 | — | 18 routes |
+| Agent | E2E 集成测试 | 单元测试 | 事件覆盖 | 备注 |
+|-------|------------|---------|---------|------|
+| Claude Code | ✅ 5/5 pass | ✅ 24 fixtures | 20+ types | 全链路验证通过 |
+| OpenCode | ✅ 进程正常退出 | ✅ 12 tests | 16 types | stdin 死锁已修复，需 API key 配置 |
+| Codex | ❌ 未实测 | ✅ fixture tests | 9 item types | 需额度 |
+| Hub Server | ✅ 骨架可运行 | — | 18 routes | 待后端开发 |
 
 ## 验收
 
