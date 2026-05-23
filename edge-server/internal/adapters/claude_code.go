@@ -131,6 +131,8 @@ func (a *ClaudeCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, s
 	if stdin != nil {
 		parser.WithControlHandler(NewEventEmittingPermissionHandler(emitter), stdin)
 	}
+	// Wire security hooks into the parse pipeline (23-check safety validation).
+	parser.WithHooks(HookChain{NewSecurityHook()})
 	return parser.Parse(ctx, stdout)
 }
 
