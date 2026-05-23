@@ -16,10 +16,15 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
+// authCache is the subset of *cache.Client methods used by AuthService.
+type authCache interface {
+	Invalidate(ctx context.Context, keys ...string) error
+}
+
 type AuthService struct {
 	db          *gorm.DB
 	jwtCfg      config.JWTConfig
-	cacheClient *cache.Client
+	cacheClient authCache
 }
 
 func NewAuthService(db *gorm.DB, jwtCfg config.JWTConfig, cacheClient *cache.Client) *AuthService {
