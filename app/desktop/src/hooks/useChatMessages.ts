@@ -3,7 +3,7 @@
 import { useReducer, useEffect, useRef, useCallback } from 'react';
 import { createEventStream } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
-import type { ChatMessage, MessageBlock } from '@/components/ChatView.types';
+import type { ChatMessage, MessageBlock, ToolResultBlock } from '@/components/ChatView.types';
 
 const MAX_MESSAGES = 500;
 const MAX_OUTPUT_TEXT = 20000;
@@ -165,25 +165,18 @@ function processEvent(state: State, event: EventEnvelope): State {
     }
 
     case 'run.agent.tool_call': {
-      const block: MessageBlock = {
-        kind: 'tool_call',
-        callId: event.payload.callId as string,
-        toolName: event.payload.toolName as string,
-        input: event.payload.input as Record<string, unknown>,
-        status: event.payload.status as string,
-      };
+      const callId = event.payload.callId as string;
+      const toolName = event.payload.toolName as string;
+      const input = event.payload.input as Record<string, unknown>;
+      const status = (event.payload.status ?? 'running') as 'pending' | 'running' | 'completed' | 'failed';
+      const block: MessageBlock = { kind: 'tool_use', callId, toolName, input, status, children: [] };
       const runId = event.payload.runId as string;
       if (runId && currentRun && currentRun.runId === runId) {
         currentRun = {
           ...currentRun,
           toolCalls: [
             ...currentRun.toolCalls,
-            {
-              callId: block.callId,
-              toolName: block.toolName,
-              status: block.status,
-              timestamp: ts,
-            },
+            { callId, toolName, status, timestamp: ts },
           ],
         };
       }
@@ -199,31 +192,30 @@ function processEvent(state: State, event: EventEnvelope): State {
     }
 
     case 'run.agent.tool_result': {
-      const block: MessageBlock = {
-        kind: 'tool_result',
-        callId: event.payload.callId as string,
-        toolName: event.payload.toolName as string,
+      const callId = event.payload.callId as string;
+      const resultBlock: ToolResultBlock = {
+        kind: 'generic_result',
         output: typeof event.payload.output === 'string'
           ? event.payload.output
           : JSON.stringify(event.payload.output),
       };
-      // Update tool call status
       if (currentRun) {
         currentRun = {
           ...currentRun,
           toolCalls: currentRun.toolCalls.map((tc) =>
-            tc.callId === block.callId ? { ...tc, status: 'completed' } : tc,
+            tc.callId === callId ? { ...tc, status: 'completed' } : tc,
           ),
         };
       }
-      const last = messages[messages.length - 1];
-      if (last && last.role === 'agent') {
-        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
-      } else {
-        const msg = newAgentMessage(event.id, ts);
-        msg.blocks = [block];
-        messages = [...messages, msg];
-      }
+      // Nest result as child of matching tool_use block
+      messages = messages.map((msg) => ({
+        ...msg,
+        blocks: msg.blocks.map((b) =>
+          b.kind === 'tool_use' && b.callId === callId
+            ? { ...b, children: [...(b.children ?? []), resultBlock], status: 'completed' as const }
+            : b,
+        ),
+      }));
       break;
     }
 
