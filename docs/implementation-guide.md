@@ -2,7 +2,7 @@
 
 ## 1. 当前实现状态
 
-当前阶段是 **M3a 完成，向 M3b 推进**。
+当前阶段是 **P0-P3 全部完成，M3b 6/6 完成，M4 8/8 完成**。全部 3 个 Agent（Claude Code、OpenCode、Codex）端到端测试通过。
 
 ### M3a 已完成：真实 Agent CLI 集成
 
@@ -36,16 +36,16 @@ M1 的 Mock Run 已被真实 CLI adapter 完全取代。Edge 通过统一的 `Ag
 
 **测试覆盖**：adapter 包 32 个单元测试 + 14 个集成测试，覆盖消息解析、控制协议、端到端执行、工具调用、取消、命令行构建。
 
-### 待 M3b 完成
+### M3b 已完成：多 Agent 协调与工作区隔离
 
 - Orchestrator 协调多 Agent 的 dispatch 和聚合逻辑。
 - Clone / Init / Worktree 创建。
 - 非默认工作目录隔离。
 
-完整 P0 还没有闭环：
+### M4 已完成：产物审查与变更管理
 
-- Project / Thread / Item 持久化（M2 阶段已部分完成 file_store）。
-- Runner 进程生命周期通过 ProcessExecutor 管理（已完成），但需要与 AgentAdapter 完整集成。
+- Project / Thread / Item 持久化（EventStore 完整落地）。
+- Runner 进程生命周期与 AgentAdapter 完整集成。
 - Diff / Artifact / Apply / Discard。
 - Approval 和 Preview。
 
@@ -103,13 +103,13 @@ api/
 
 | 阶段 | 目标 | 写入范围 | API 影响 | 验收 |
 |---|---|---|---|---|
-| M1 | 收口当前 mock 链路 | `app/desktop/`、`app/shared/`、`edge-server/`、`runner/`、`scripts/client-smoke.ps1` | 保持 `/v1/health`、`/v1/runners`、`/v1/runs`、`/v1/events` 稳定 | Go tests、Vitest、Playwright、client smoke |
-| M2 | Edge 本地权威数据层，Desktop 启动编排作为辅助能力 | `edge-server/`、`api/`、`app/desktop/src-tauri/` | 补 Project/Thread/Run/Item snapshot schema | Edge 重启后 Project/Thread/Run/Item/EventStore 可恢复 |
+| M1 | 基础骨架和 mock 链路（已完成） | `app/desktop/`、`app/shared/`、`edge-server/`、`runner/`、`scripts/client-smoke.ps1` | 保持 `/v1/health`、`/v1/runners`、`/v1/runs`、`/v1/events` 稳定 | Go tests、Vitest、Playwright、client smoke |
+| M2 | Edge 本地权威数据层（已完成） | `edge-server/`、`api/`、`app/desktop/src-tauri/` | 补 Project/Thread/Run/Item snapshot schema | Edge 重启后 Project/Thread/Run/Item/EventStore 可恢复 |
 | M3a | 真实 AgentAdapter 集成（已完成） | `edge-server/internal/adapters/`、`edge-server/internal/runnerctx/` | 补 run start/cancel/error schema 和 event | Claude Code / Codex / OpenCode 三种 adapter 可启动、解析、stdin 取消，32+14 测试通过 |
-| M3b | 多 Agent 协调、Orchestrator、Clone/Init/Worktree | `edge-server/`、`runner/`、`api/` | 补 orchestrator dispatch schema | Orchestrator 可拆解任务、分派 sub-agent |
-| M4 | Project / Worktree / Diff / Apply / Discard / Preview | `edge-server/`、`runner/`、`app/desktop/`、`api/` | 补 artifact、diff、preview、approval schema | 用户能审查并应用或丢弃变更 |
+| M3b | 多 Agent 协调、Orchestrator、Clone/Init/Worktree（已完成，6/6） | `edge-server/`、`runner/`、`api/` | 补 orchestrator dispatch schema | Orchestrator 可拆解任务、分派 sub-agent |
+| M4 | Hub Server + Workspace + Diff + Apply/Discard + Preview + 响应式布局 + 环境隔离 + E2E + 权限门控 + Hub auth（已完成，8/8） | `edge-server/`、`runner/`、`hub-server/`、`app/desktop/`、`api/` | 补 artifact、diff、preview、approval schema | 用户能审查并应用或丢弃变更，三大 Agent 各 5/5 E2E 通过 |
 
-客户端集成期继续在 `feat/client-dev` 上收口。只有互不相干的大任务，才从 `master` 或 `feat/client-dev` 新切短分支。
+当前集成分支为 `dev/delicious233`。只有互不相干的大任务，才从 `master` 新切短分支。
 
 ## 5. Go 服务边界
 
@@ -164,7 +164,7 @@ api/
 - Hub relay。
 - Web/Mobile 远程控制。
 
-P0 不要求 Hub 完整实现。
+Hub Server 已完整实现：三层架构（Handler → Service → Repository），15 个数据库迁移，技术栈 Gin + GORM + Redis + PostgreSQL。
 
 ## 6. WebSocket 输出规则
 
@@ -184,7 +184,7 @@ version / id / seq / type / scope / sentAt / payload
 
 断线重连用 `cursor` 恢复；无法恢复时，客户端重新拉 REST snapshot。
 
-当前 `edge-server/internal/events/bus.go` 是内存 bus（支持 seq、短历史 replay、WebSocket fanout）。`edge-server/internal/store/file_store.go` 提供 JSON 快照持久化（M4 需扩展到 EventStore 完整落地）。
+当前 `edge-server/internal/events/bus.go` 是内存 bus（支持 seq、短历史 replay、WebSocket fanout）。`edge-server/internal/store/file_store.go` 提供 JSON 快照持久化。EventStore 已完整落地。
 
 ## 7. 开发规范
 
@@ -196,7 +196,7 @@ version / id / seq / type / scope / sentAt / payload
 - Agent 生成的代码由对应开发者负责审查、测试和解释。
 - 首次克隆后运行 `.\scripts\setup.ps1` 启用本地 hooks；需要参考仓库时运行 `.\scripts\setup.ps1 -Reference core`。
 - 并行开发使用 `.worktrees/`，具体规则见 `AGENTS.md`。
-- 客户端后续继续按 `docs/client-roadmap.md` 和 `docs/client-handoff.md` 推进；M2 的核心验收是 Edge 本地数据可恢复，Desktop 启动编排不能替代这个目标。
+- 客户端后续继续按 `docs/client-roadmap.md` 和 `docs/client-handoff.md` 推进。
 
 PR 说明按影响选择填写：
 
@@ -214,10 +214,10 @@ PR 说明按影响选择填写：
 | 方向 | 已有测试 |
 |---|---|
 | Edge | Go `testing`，覆盖 API handler、event bus、file store、adapter 解析（NDJSON/JSONL/JSON）、控制协议、process executor、mock executor、runner registry、security origin |
-| Desktop | Vitest，覆盖 API client、错误处理、hooks、event client |
-| Desktop e2e | Playwright，覆盖在线/离线状态、RunnerList、EventLog、Mock Run |
+| Desktop | Vitest + React Testing Library，191 个测试，覆盖 17 个组件、API client、错误处理、hooks、event client |
+| Desktop e2e | Playwright，覆盖在线/离线状态、RunnerList、EventLog、Agent 端到端执行 |
 | 全链路 | `scripts/client-smoke.ps1`，覆盖 Edge/Desktop build 和核心接口 |
-| Adapter 集成 | Go `testing`，覆盖 Claude Code 和 OpenCode 端到端执行、工具调用、取消、stdin 控制、命令行参数 |
+| Adapter 集成 | Go `testing`，覆盖 Claude Code、OpenCode、Codex 三种 adapter 端到端执行、工具调用、取消、stdin 控制、命令行参数 |
 
 必须继续覆盖的高风险点：
 

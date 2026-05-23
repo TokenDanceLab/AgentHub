@@ -1,10 +1,26 @@
 # AgentHub 参考项目调研文档
 
-> 18 个参考项目，按项目分类。Agent 路径：**Projects → Cross-Comparison → Planning**。
+> 21 个参考项目，按问题域检索。Agent 路径：**按需求查找 → 直接进入相关文档**。
 
 ---
 
-## projects/ — 按参考仓库分类（18 个项目）
+## 按问题找
+
+| 我要做什么 | 入口文档 |
+|------------|----------|
+| 了解全貌（18 项目矩阵 + 模式收敛） | `cross-comparison/00-synthesis.md` |
+| 学习最佳实践汇总 | `cross-comparison/10-best-practices-playbook.md` |
+| 借鉴 UI 设计 | `projects/multica/` · `projects/opencode/` · `projects/lobehub/` |
+| 研究安全架构 | `projects/claude-code-sdk/` · `cross-comparison/07-permission-models.md` |
+| 设计 Agent 适配器 | `cross-comparison/01-adapters.md` |
+| 研究 IM 消息树/Fork | `cross-comparison/02-im-ux.md` |
+| 对比编排策略 | `cross-comparison/03-orchestration.md` |
+| 沙箱和 Tool 架构 | `cross-comparison/04-sandbox-tools.md` |
+| WebSocket/EventStore 同步 | `cross-comparison/06-realtime-sync.md` |
+| 权限审批模型 | `cross-comparison/07-permission-models.md` |
+| UI 美化方案 | `cross-comparison/08-ui-beautify-plan.md` |
+
+---
 
 | 项目 | 目录 | 文件 | 重点 |
 |------|------|:--:|------|

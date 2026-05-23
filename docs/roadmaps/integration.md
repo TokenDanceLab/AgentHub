@@ -1,7 +1,7 @@
 # Hub Server + Edge Server + Desktop 集成分析
 
 > 生成于 2026-05-24，基于对全部三个代码库的完整源码审查。
-> 分支：`dev/delicious233` 目标：`master`
+> 分支：`dev/delicious233`
 
 ---
 
