@@ -110,18 +110,26 @@ func TestGetOrLoad_SingleflightDedup(t *testing.T) {
 	var wg sync.WaitGroup
 	results := make([]int, 10)
 
-	// Barrier: ensure all goroutines reach sf.Do before any loader runs.
+	// Phase 1: release all goroutines simultaneously.
 	barrier := make(chan struct{})
 	var start sync.WaitGroup
 	start.Add(10)
+
+	// Phase 2: all goroutines wait until everyone is at the GetOrLoad call.
+	var ready sync.WaitGroup
+	ready.Add(10)
 
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			start.Done()       // signal: we are ready
-			<-barrier          // wait for the starting gun
+			start.Done()
+			<-barrier
+
+			ready.Done()
+			ready.Wait() // all goroutines now calling GetOrLoad together
 			v, err := GetOrLoad(c, ctx, "sf-key", 30*time.Second, func(ctx context.Context) (int, error) {
+				time.Sleep(100 * time.Millisecond) // keep sf.Do open for others to join
 				lc.inc()
 				return 42, nil
 			})
@@ -129,7 +137,7 @@ func TestGetOrLoad_SingleflightDedup(t *testing.T) {
 			results[idx] = v
 		}(i)
 	}
-	start.Wait() // all goroutines are ready
+	start.Wait()
 	close(barrier)
 	wg.Wait()
 
