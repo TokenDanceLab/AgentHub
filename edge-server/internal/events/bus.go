@@ -121,3 +121,11 @@ func (b *Bus) Unsubscribe(subID int64) {
 		}
 	}
 }
+
+// HistoryLen returns the current number of events retained in the bus history.
+// Exposed for Prometheus metrics (edge_event_bus_depth gauge).
+func (b *Bus) HistoryLen() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.history)
+}
