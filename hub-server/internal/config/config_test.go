@@ -73,7 +73,7 @@ upload:
 }
 
 func TestLoadMissingFile(t *testing.T) {
-	t.Setenv("AGENTHUB_JWT_SECRET", "some-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "some-secret-value")
 	_, err := Load("/nonexistent/path/to/config.yaml")
 	if err == nil {
 		t.Fatal("expected error for missing config file, got nil")
@@ -132,6 +132,22 @@ jwt:
 	}
 }
 
+func TestJWTSecretTooShortRejected(t *testing.T) {
+	yaml := `
+jwt:
+  access_ttl: 15m
+  refresh_ttl: 720h
+`
+	path := writeTempConfig(t, yaml)
+
+	// Env var set but too short — must be rejected.
+	t.Setenv("AGENTHUB_JWT_SECRET", "short")
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for JWT secret shorter than 16 chars, got nil")
+	}
+}
+
 func TestJWTSecretHardcodedDefaultWithEnvOverride(t *testing.T) {
 	// Config file has the hardcoded default, but env var provides a real secret.
 	yaml := `
@@ -160,14 +176,14 @@ jwt:
   refresh_ttl: 720h
 `
 	path := writeTempConfig(t, yaml)
-	t.Setenv("AGENTHUB_JWT_SECRET", "env-only-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "env-only-secret!!")
 
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.JWT.Secret != "env-only-secret" {
-		t.Errorf("JWT.Secret = %q, want %q", cfg.JWT.Secret, "env-only-secret")
+	if cfg.JWT.Secret != "env-only-secret!!" {
+		t.Errorf("JWT.Secret = %q, want %q", cfg.JWT.Secret, "env-only-secret!!")
 	}
 }
 
@@ -247,7 +263,7 @@ upload:
 
 func TestEnvOverrideServerPort(t *testing.T) {
 	path := writeTempConfig(t, validJWTYAML)
-	t.Setenv("AGENTHUB_JWT_SECRET", "override-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "override-secret!!")
 	t.Setenv("AGENTHUB_SERVER_PORT", "9999")
 
 	cfg, err := Load(path)
@@ -393,7 +409,7 @@ server:
   port: 3000
 `
 	path := writeTempConfig(t, yaml)
-	t.Setenv("AGENTHUB_JWT_SECRET", "bare-min-secret")
+	t.Setenv("AGENTHUB_JWT_SECRET", "bare-min-secret!!")
 
 	cfg, err := Load(path)
 	if err != nil {
