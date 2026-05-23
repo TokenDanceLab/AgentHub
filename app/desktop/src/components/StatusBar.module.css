@@ -80,3 +80,10 @@
 .pulse {
   animation: statusbarPulse 1.2s ease-in-out infinite;
 }
+
+/* ── Reconnecting text ── */
+
+.reconnecting {
+  color: #d97706;
+  font-style: italic;
+}
