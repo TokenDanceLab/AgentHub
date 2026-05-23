@@ -153,10 +153,25 @@ func (s *ContactService) ListFriendRequests(ctx context.Context, userID string) 
 		return nil, err
 	}
 
+	if len(requests) == 0 {
+		return []RequestInfo{}, nil
+	}
+
+	// Collect sender IDs for batch query (P2-1: fix N+1)
+	senderIDs := make([]string, 0, len(requests))
+	for _, r := range requests {
+		senderIDs = append(senderIDs, r.UserID)
+	}
+
+	users, err := repository.GetUsersByIDs(s.db, senderIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	result := make([]RequestInfo, 0, len(requests))
 	for _, r := range requests {
-		sender, err := repository.GetUserByID(s.db, r.UserID)
-		if err != nil {
+		sender, ok := users[r.UserID]
+		if !ok {
 			continue
 		}
 		result = append(result, RequestInfo{
@@ -221,10 +236,25 @@ func (s *ContactService) ListContacts(ctx context.Context, userID string) ([]Con
 		return nil, err
 	}
 
+	if len(friends) == 0 {
+		return []ContactInfo{}, nil
+	}
+
+	// Collect friend IDs for batch query (P2-2: fix N+1)
+	friendIDs := make([]string, 0, len(friends))
+	for _, f := range friends {
+		friendIDs = append(friendIDs, f.FriendID)
+	}
+
+	users, err := repository.GetUsersByIDs(s.db, friendIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	result := make([]ContactInfo, 0, len(friends))
 	for _, f := range friends {
-		friend, err := repository.GetUserByID(s.db, f.FriendID)
-		if err != nil {
+		friend, ok := users[f.FriendID]
+		if !ok {
 			continue
 		}
 		online, _ := s.cacheClient.IsOnline(ctx, friend.ID)
