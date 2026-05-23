@@ -15,8 +15,8 @@ import (
 // it to break down user requests, identify sub-tasks, and coordinate other agents.
 // Edge listens for orchestrator events to spawn sub-agent runs.
 type OrchestratorAdapter struct {
-	inner             *ClaudeCodeAdapter
-	systemPrompt      string
+	inner        *ClaudeCodeAdapter
+	systemPrompt string
 }
 
 // NewOrchestratorAdapter creates an orchestrator wrapping a Claude Code instance.
@@ -61,6 +61,11 @@ func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 	parser := NewNDJSONStreamParser(emitter, run)
 	return parser.Parse(ctx, stdout)
 }
+
+// NeedsStdin returns false — the orchestrator delegates to Claude Code which
+// needs stdin, but the orchestrator adapter itself does NOT use stdin in its
+// ParseStream. The inner Claude Code adapter handles stdin independently.
+func (a *OrchestratorAdapter) NeedsStdin() bool { return false }
 
 // DefaultOrchestratorPrompt returns the built-in orchestrator system prompt
 // instructing Claude Code how to coordinate multiple sub-agents.
