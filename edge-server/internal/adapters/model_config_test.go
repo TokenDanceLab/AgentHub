@@ -11,7 +11,7 @@ func TestResolveModelAlias(t *testing.T) {
 		{"claude-code", "sonnet", "claude-sonnet-4-6"},
 		{"claude-code", "opus", "claude-opus-4-7"},
 		{"codex", "gpt-5", "gpt-5.3-codex"},
-		{"opencode", "sonnet", "anthropic/claude-sonnet-4-6"},
+		{"opencode", "sonnet", "newapi/deepseek-v4-pro"},
 		// Passthrough for unknown model
 		{"claude-code", "custom-model", "custom-model"},
 		// Passthrough for unknown agent
@@ -76,9 +76,9 @@ func TestResolveModelWithDefault(t *testing.T) {
 		t.Errorf("got %q, want gpt-5.3-codex (default)", got)
 	}
 
-	// opencode has no default model
+	// opencode default
 	got = ResolveModelWithDefault("opencode", "")
-	if got != "" {
-		t.Errorf("got %q, want empty (opencode has no default)", got)
+	if got != "newapi/deepseek-v4-pro" {
+		t.Errorf("got %q, want newapi/deepseek-v4-pro (opencode default)", got)
 	}
 }

@@ -252,3 +252,197 @@ func TestNewStoreFromConfigReturnsFileStoreErrors(t *testing.T) {
 		t.Fatalf("newStoreFromConfig error = %v, want clear store file decode error", err)
 	}
 }
+
+// --- buildAdapterRegistry tests ---
+
+func TestBuildAdapterRegistryEmpty(t *testing.T) {
+	reg := buildAdapterRegistry(config{})
+	if reg == nil {
+		t.Fatal("buildAdapterRegistry should not return nil")
+	}
+	adapters := reg.List()
+	if len(adapters) != 0 {
+		t.Fatalf("expected 0 adapters with empty config, got %d", len(adapters))
+	}
+}
+
+func TestBuildAdapterRegistryWithClaudeCode(t *testing.T) {
+	reg := buildAdapterRegistry(config{
+		ClaudeCodePath: "claude",
+		AgentModel:     "sonnet",
+	})
+	if reg == nil {
+		t.Fatal("buildAdapterRegistry should not return nil")
+	}
+	a, ok := reg.Get("claude-code")
+	if !ok {
+		t.Fatal("claude-code adapter should be registered")
+	}
+	if a.Metadata().ID != "claude-code" {
+		t.Fatalf("adapter ID = %q, want claude-code", a.Metadata().ID)
+	}
+}
+
+func TestBuildAdapterRegistryWithCodex(t *testing.T) {
+	reg := buildAdapterRegistry(config{
+		CodexPath: "codex",
+	})
+	if reg == nil {
+		t.Fatal("buildAdapterRegistry should not return nil")
+	}
+	a, ok := reg.Get("codex")
+	if !ok {
+		t.Fatal("codex adapter should be registered")
+	}
+	if a.Metadata().ID != "codex" {
+		t.Fatalf("adapter ID = %q, want codex", a.Metadata().ID)
+	}
+}
+
+func TestBuildAdapterRegistryWithOpenCode(t *testing.T) {
+	reg := buildAdapterRegistry(config{
+		OpenCodePath: "opencode",
+	})
+	if reg == nil {
+		t.Fatal("buildAdapterRegistry should not return nil")
+	}
+	a, ok := reg.Get("opencode")
+	if !ok {
+		t.Fatal("opencode adapter should be registered")
+	}
+	if a.Metadata().ID != "opencode" {
+		t.Fatalf("adapter ID = %q, want opencode", a.Metadata().ID)
+	}
+}
+
+func TestBuildAdapterRegistryAllAdapters(t *testing.T) {
+	reg := buildAdapterRegistry(config{
+		ClaudeCodePath: "claude",
+		CodexPath:      "codex",
+		OpenCodePath:   "opencode",
+	})
+	adapters := reg.List()
+	if len(adapters) != 3 {
+		t.Fatalf("expected 3 adapters, got %d", len(adapters))
+	}
+}
+
+// --- applyRunnerProfile additional profile tests ---
+
+func TestBuildConfigRunnerProfileAppliesCodexPreset(t *testing.T) {
+	cfg, err := buildConfig([]string{"--runner-profile", "codex"})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.RunnerCommand != "codex" {
+		t.Fatalf("RunnerCommand = %q, want codex", cfg.RunnerCommand)
+	}
+	if cfg.AgentDefault != "codex" {
+		t.Fatalf("AgentDefault = %q, want codex", cfg.AgentDefault)
+	}
+}
+
+func TestBuildConfigRunnerProfileAppliesOpenCodePreset(t *testing.T) {
+	cfg, err := buildConfig([]string{"--runner-profile", "opencode"})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.RunnerCommand != "opencode" {
+		t.Fatalf("RunnerCommand = %q, want opencode", cfg.RunnerCommand)
+	}
+	if cfg.AgentDefault != "opencode" {
+		t.Fatalf("AgentDefault = %q, want opencode", cfg.AgentDefault)
+	}
+}
+
+func TestBuildConfigRunnerProfileCodexPreservesCommandOverride(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--runner-profile", "codex",
+		"--runner-command", "custom-codex",
+		"--agent-default", "custom-agent",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.RunnerCommand != "custom-codex" {
+		t.Fatalf("RunnerCommand = %q, want custom-codex", cfg.RunnerCommand)
+	}
+	if cfg.AgentDefault != "custom-agent" {
+		t.Fatalf("AgentDefault = %q, want custom-agent", cfg.AgentDefault)
+	}
+}
+
+func TestBuildConfigRunnerProfileOpenCodePreservesCommandOverride(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--runner-profile", "opencode",
+		"--runner-command", "custom-opencode",
+		"--agent-default", "custom-agent",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.RunnerCommand != "custom-opencode" {
+		t.Fatalf("RunnerCommand = %q, want custom-opencode", cfg.RunnerCommand)
+	}
+	if cfg.AgentDefault != "custom-agent" {
+		t.Fatalf("AgentDefault = %q, want custom-agent", cfg.AgentDefault)
+	}
+}
+
+func TestRepeatedString(t *testing.T) {
+	var rs repeatedString
+	if rs.String() != "[]" {
+		t.Fatalf("String() = %q, want []", rs.String())
+	}
+
+	if err := rs.Set("first"); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if err := rs.Set("second"); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	if got := rs.String(); got != "[first second]" {
+		t.Fatalf("String() = %q, want [first second]", got)
+	}
+
+	if len(rs) != 2 {
+		t.Fatalf("len = %d, want 2", len(rs))
+	}
+	if rs[0] != "first" || rs[1] != "second" {
+		t.Fatalf("values = %v, want [first second]", []string(rs))
+	}
+}
+
+func TestBuildConfigAgentFlags(t *testing.T) {
+	cfg, err := buildConfig([]string{
+		"--claude-code-path", "/usr/local/bin/claude",
+		"--codex-path", "/usr/local/bin/codex",
+		"--opencode-path", "/usr/local/bin/opencode",
+		"--agent-model", "claude-sonnet-4-6",
+		"--agent-default", "claude-code",
+	})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	if cfg.ClaudeCodePath != "/usr/local/bin/claude" {
+		t.Fatalf("ClaudeCodePath = %q", cfg.ClaudeCodePath)
+	}
+	if cfg.CodexPath != "/usr/local/bin/codex" {
+		t.Fatalf("CodexPath = %q", cfg.CodexPath)
+	}
+	if cfg.OpenCodePath != "/usr/local/bin/opencode" {
+		t.Fatalf("OpenCodePath = %q", cfg.OpenCodePath)
+	}
+	if cfg.AgentModel != "claude-sonnet-4-6" {
+		t.Fatalf("AgentModel = %q", cfg.AgentModel)
+	}
+	if cfg.AgentDefault != "claude-code" {
+		t.Fatalf("AgentDefault = %q", cfg.AgentDefault)
+	}
+}

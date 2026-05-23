@@ -432,3 +432,73 @@ func TestNewHandlerFromConfigInvalidEnv(t *testing.T) {
 		t.Fatal("expected error for invalid ExtraEnv")
 	}
 }
+
+// --- Run tests ---
+
+func TestRunReturnsErrorForInvalidConfig(t *testing.T) {
+	// newHandlerFromConfig will fail on invalid ExtraEnv, Run should propagate the error.
+	err := Run(Config{
+		Addr: "127.0.0.1:3211",
+		ProcessExecutor: lifecycle.ProcessExecutorConfig{
+			Command:  os.Args[0],
+			ExtraEnv: []string{"INVALID"},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error from Run with invalid config")
+	}
+}
+
+func TestRunServerStartAndServeHTTP(t *testing.T) {
+	// Start Run in a goroutine on a random port to exercise the full server
+	// startup path. We verify the server does not exit with an error.
+	// On platforms without signal support, the server goroutine will leak;
+	// that is acceptable for a test (random port, no conflicts).
+	errCh := make(chan error, 1)
+	started := make(chan struct{})
+	go func() {
+		close(started)
+		errCh <- Run(Config{
+			Addr: "127.0.0.1:0", // random available port
+		})
+	}()
+
+	// Wait for the goroutine to actually start
+	<-started
+	time.Sleep(300 * time.Millisecond)
+
+	// Try to send interrupt — if it works (Unix), Run returns cleanly.
+	if err := sendInterrupt(); err != nil {
+		// Signal not supported on this platform (e.g., Windows without proper syscall).
+		// Verify the goroutine hasn't exited with an error yet —
+		// the server should be running, blocked on the signal channel.
+		select {
+		case err := <-errCh:
+			t.Fatalf("Run exited unexpectedly: %v", err)
+		default:
+			t.Log("Server goroutine running as expected on platform without signal support")
+		}
+		return
+	}
+
+	// Wait for graceful shutdown
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("Run returned error: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run did not return within timeout")
+	}
+}
+
+// sendInterrupt sends an interrupt to the current process.
+// Returns nil if the signal was sent successfully, or an error if
+// the platform does not support sending signals to the current process.
+func sendInterrupt() error {
+	p, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		return err
+	}
+	return p.Signal(os.Interrupt)
+}
