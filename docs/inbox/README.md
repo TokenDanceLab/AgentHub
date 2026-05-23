@@ -2,6 +2,22 @@
 
 Agent 间文件交换约定。任何 Agent（或人类）完成调研、审查、设计草案后，把 Markdown 报告放到这里。
 
+---
+
+## 新通知：竞品分析文档重组完成（2026-05-23）
+
+> **from**: Researcher (Opus) | **to**: Leader | **status**: final | **priority**: p0
+
+**变更已在 `dev/delicious233` 推送。**
+
+1. **新增** `docs/reference/02-cross-comparison/00-synthesis.md` — 18 项目全景矩阵 + 6 大跨项目模式收敛 + P0/P1/P2 采纳优先级总表
+2. **归档** `docs/reference/03-build/` → `docs/archive/build-specs/`（30 份历史规格）
+3. **更新** `docs/reference/README.md` — 新导航结构
+
+**审查要点**：P0 的 6 项是否应在 M3b 实现？01-learn 的 repos+deep-dives 是否需要进一步合并？
+
+---
+
 ## 命名规则
 
 ```
