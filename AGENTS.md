@@ -139,7 +139,7 @@ Remote:
   origin/master                            ← 稳定
   origin/dev/maintainer                  ← 主 dev: P0-P3 全部完成, M4 推进中
   origin/dev/contributor-b                         ← contributor-b dev
-  origin/feat/contributor-b-webui                  ← Web 工作区
+  origin/feat/contributor-b-webui                  ← Web 前端 UI 预览（mock data，清理后即可合入）
   origin/feat/backend-foundation           ← 后台预留 (dormant)
 
 本地: dev/maintainer + 1 worktree (feat-contributor-b-webui)
