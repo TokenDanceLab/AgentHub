@@ -1,0 +1,57 @@
+{
+  "projects": {
+    "proj_local": {
+      "projectId": "proj_local",
+      "name": "Local Project",
+      "status": "active",
+      "createdAt": "2026-05-23T06:33:22Z",
+      "updatedAt": "2026-05-23T06:33:22Z"
+    }
+  },
+  "threads": {
+    "thread_local": {
+      "threadId": "thread_local",
+      "projectId": "proj_local",
+      "title": "Local Thread",
+      "status": "active",
+      "createdAt": "2026-05-23T06:33:22Z",
+      "updatedAt": "2026-05-23T06:33:22Z"
+    }
+  },
+  "runs": {
+    "run_492c6ebca3f1b1cb": {
+      "runId": "run_492c6ebca3f1b1cb",
+      "projectId": "proj_local",
+      "threadId": "thread_local",
+      "status": "finished",
+      "createdAt": "2026-05-23T06:35:42Z",
+      "startedAt": "2026-05-23T06:35:42Z",
+      "finishedAt": "2026-05-23T06:35:42Z"
+    }
+  },
+  "items": {
+    "item_59501db393834daa": {
+      "itemId": "item_59501db393834daa",
+      "projectId": "proj_local",
+      "threadId": "thread_local",
+      "runId": "run_492c6ebca3f1b1cb",
+      "type": "run",
+      "status": "queued",
+      "content": "Run queued",
+      "createdAt": "2026-05-23T06:35:42Z",
+      "updatedAt": "2026-05-23T06:35:42Z"
+    }
+  },
+  "projectOrder": [
+    "proj_local"
+  ],
+  "threadOrder": [
+    "thread_local"
+  ],
+  "runOrder": [
+    "run_492c6ebca3f1b1cb"
+  ],
+  "itemOrder": [
+    "item_59501db393834daa"
+  ]
+}
