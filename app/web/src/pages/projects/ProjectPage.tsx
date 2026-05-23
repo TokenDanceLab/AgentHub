@@ -212,6 +212,8 @@ const pageStyles = `
     height: 38px;
     flex: 0 0 auto;
     border-radius: 10px;
+    font-size: 16px;
+    line-height: 1;
     box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
   }
 
