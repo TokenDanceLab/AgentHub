@@ -1,7 +1,7 @@
 # AgentHub 竞品二次对比研究 — 跨项目模式收敛与采纳路线图
 
-> 分析日期：2026-05-23
-> 数据来源：18 份单仓库深度报告 + 12 份源码深度分析 + 4 份 Web 生态调研
+> 分析日期：2026-05-24
+> 数据来源：18 份项目深度报告 + 3 份 Web 生态调研 + 10 篇跨项目对比
 > 当前阶段：M3b（多 Agent 协调）→ M4（Project/Worktree/Diff）
 
 ---
@@ -74,7 +74,7 @@ OpenHands、Codex、Claude Code、OpCode 按风险等级提供不同隔离级别
 | L2 Process | OpenHands ProcessSandbox | 进程级 | <500ms | 安装依赖/脚本 |
 | L3 Container | OpenHands DockerSandbox | OS 级 | 1-5s | 不可信代码 |
 
-详见 [02-decide/04-sandbox-tools.md](02-decide/04-sandbox-tools.md)。
+详见 [04-sandbox-tools.md](04-sandbox-tools.md)。
 
 ### 2.4 流式协议双模
 
@@ -192,5 +192,4 @@ Claude Code Viewer、Kanna、CloudCLI 将密集信息分层展示：
 
 ---
 
-> **下一步**：按 P0 优先级逐项在 M3b 实现。专题分析见 `02-decide/` 各维度文档。
-> **本分支**：`docs/reference-analysis` — 完整变更见本分支的 git log。
+> **下一步**：按 P0 优先级逐项在 M3b 实现。专题分析见各维度文档。
