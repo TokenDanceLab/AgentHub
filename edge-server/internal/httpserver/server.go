@@ -13,6 +13,7 @@ import (
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/store"
@@ -39,6 +40,8 @@ func Run(cfg Config) error {
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
+	// Expose Prometheus metrics on /metrics for Prometheus scraping.
+	mux.Handle("/metrics", handler.Metrics.Handler())
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
@@ -79,6 +82,11 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	bus := events.NewBus(10000)
 	reg := runners.NewRegistry()
 
+	// Prometheus metrics wired to bus depth
+	edgeMetrics := metrics.New(func() float64 {
+		return float64(bus.HistoryLen())
+	})
+
 	var executor lifecycle.RunExecutor
 	hasAdapter := cfg.AdapterRegistry != nil && cfg.AgentDefault != ""
 	if cfg.ProcessExecutor.Command != "" || hasAdapter {
@@ -99,6 +107,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		if err != nil {
 			return nil, err
 		}
+		processExecutor.SetMetrics(edgeMetrics)
 		executor = processExecutor
 	}
 
@@ -108,6 +117,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		Store:           cfg.Store,
 		Executor:        executor,
 		AdapterRegistry: cfg.AdapterRegistry,
+		Metrics:         edgeMetrics,
 	}, nil
 }
 
