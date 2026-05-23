@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"gorm.io/gorm"
 
@@ -12,10 +13,16 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
+// contactCache is the subset of *cache.Client methods used by ContactService.
+type contactCache interface {
+	Invalidate(ctx context.Context, keys ...string) error
+	IsOnline(ctx context.Context, userID string) (bool, error)
+}
+
 type ContactService struct {
 	db          *gorm.DB
 	bus         *Bus
-	cacheClient *cache.Client
+	cacheClient contactCache
 }
 
 func NewContactService(db *gorm.DB, bus *Bus, cacheClient *cache.Client) *ContactService {
@@ -172,6 +179,7 @@ func (s *ContactService) ListFriendRequests(ctx context.Context, userID string) 
 	for _, r := range requests {
 		sender, ok := users[r.UserID]
 		if !ok {
+			slog.Debug("friend request sender not found in batch lookup", "sender_id", r.UserID, "request_id", r.ID)
 			continue
 		}
 		result = append(result, RequestInfo{

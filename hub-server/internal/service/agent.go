@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"time"
 
 	"gorm.io/gorm"
@@ -16,11 +17,18 @@ import (
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
+// agentCache is the subset of *cache.Client methods used by AgentService.
+type agentCache interface {
+	GetRoute(ctx context.Context, userID, deviceType string) (string, error)
+	PushPendingTask(ctx context.Context, userID, taskJSON string) error
+	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
+}
+
 type AgentService struct {
 	db          *gorm.DB
 	bus         *Bus
 	mgr         *ws.Manager
-	cacheClient *cache.Client
+	cacheClient agentCache
 }
 
 func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client) *AgentService {
@@ -283,6 +291,23 @@ func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) er
 	return nil
 }
 
+// allocateSeq returns the next message sequence number for a session.
+// It tries Redis INCR first and falls back to the DB row-level lock.
+func (s *AgentService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	seq, err := s.cacheClient.AllocateSeq(ctx, sessionID)
+	if err == nil {
+		return seq, nil
+	}
+	slog.Warn("redis seq allocation failed, falling back to DB", "session_id", sessionID, "error", err)
+	var fallbackSeq int64
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		var txErr error
+		fallbackSeq, txErr = repository.AllocateSeqID(tx, sessionID)
+		return txErr
+	})
+	return fallbackSeq, err
+}
+
 // HandleTaskAck marks a task as running.
 func (s *AgentService) HandleTaskAck(ctx context.Context, taskID string) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
@@ -331,12 +356,13 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, taskID, payload str
 	}
 	msg.SessionID = ai.SessionID
 
+	seq, err := s.allocateSeq(ctx, ai.SessionID)
+	if err != nil {
+		return err
+	}
+	msg.SeqID = seq
+
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		seq, err := repository.AllocateSeqID(tx, ai.SessionID)
-		if err != nil {
-			return err
-		}
-		msg.SeqID = seq
 		return repository.InsertMessage(tx, msg)
 	})
 	if err != nil {
@@ -377,12 +403,13 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, taskID, finalContent 
 			ContentType: model.ContentTypeText,
 			Content:     finalContent,
 		}
+		seq, err := s.allocateSeq(ctx, ai.SessionID)
+		if err != nil {
+			return err
+		}
+		msg.SeqID = seq
+
 		err = s.db.Transaction(func(tx *gorm.DB) error {
-			seq, err := repository.AllocateSeqID(tx, ai.SessionID)
-			if err != nil {
-				return err
-			}
-			msg.SeqID = seq
 			return repository.InsertMessage(tx, msg)
 		})
 		if err != nil {
@@ -401,7 +428,6 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, taskID, finalContent 
 
 	return nil
 }
-
 // HandleTaskFail marks a task as failed.
 func (s *AgentService) HandleTaskFail(ctx context.Context, taskID, errMsg string) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
