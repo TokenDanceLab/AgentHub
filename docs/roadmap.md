@@ -398,17 +398,9 @@ Hub 调度（远程）:
 
 ##### 待实施
 
-- [ ] **Hub 覆盖率阈值 40% → 60%（硬阻断）** `[0.5d]`
-  - 文件：`.github/workflows/checks.yml:133-141`
-  - 方案：`echo "::warning"` → `echo "::error"` + `exit 1`
-
-- [ ] **Hub Server golangci-lint 项目级配置** `[1d]`
-  - 新增：`hub-server/.golangci.yml`
-  - 方案：以 `edge-server/.golangci.yml` 为基线，启用 `gosec`，添加 hub 特有排除项
-
-- [ ] **密钥检测（gitleaks）** `[0.5d]`
-  - 新增：`.github/workflows/checks.yml` 添加 gitleaks job
-  - 验收：误提交 `.env` / API key 时 CI 阻断
+- [x] **Hub 覆盖率阈值 40% → 60%（硬阻断）** `[0.5d]` ✅ M5
+- [x] **Hub Server golangci-lint 项目级配置** `[1d]` ✅ M5
+- [x] **密钥检测（gitleaks）** `[0.5d]` ✅ M5
 
 - [ ] **Docker 镜像构建 + 推送** `[1d]`
   - 新增：`.github/workflows/checks.yml` 添加 docker job
