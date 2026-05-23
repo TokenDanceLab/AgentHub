@@ -1,3 +1,5 @@
+> 状态: 🔄 进行中 — Desktop UI 基础框架已建立，IM 完整 UX 待后续迭代
+
 # AgentHub IM 聊天产品层 -- 跨仓库综合设计建议
 
 > 基于 4 份调研报告：`librechat.md` / `cloudcli.md` / `claude-code-viewer.md` / `claude-code-webui.md`

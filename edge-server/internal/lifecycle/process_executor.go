@@ -8,7 +8,9 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/events"
@@ -34,7 +36,7 @@ type ProcessExecutor struct {
 	adapter    adapters.AgentAdapter // default adapter; may be nil (raw stdout capture)
 	adapterReg *adapters.Registry    // per-run adapter resolution; may be nil
 
-	mu     sync.Mutex
+	mu      sync.Mutex
 	running map[string]context.CancelFunc
 	stdins  map[string]io.Writer // runID → stdin (for adapter-aware interrupt)
 }
@@ -70,6 +72,10 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 	}, nil
 }
 
+// defaultRunTimeout is the hard deadline for any agent run. A hung subprocess
+// should not block the executor goroutine forever.
+const defaultRunTimeout = 30 * time.Minute
+
 func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	current, ok := e.store.GetRun(run.ID)
 	if !ok {
@@ -79,7 +85,7 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 		return ErrRunAlreadyStarted
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), defaultRunTimeout)
 	e.mu.Lock()
 	if _, ok := e.running[run.ID]; ok {
 		e.mu.Unlock()
@@ -149,14 +155,20 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if adapter != nil {
 		// Adapter mode: BuildCommand provides full command configuration
 		cmdPath, args, env, workDir = adapter.BuildCommand(adapters.RunProcessContext{
-			Run:          runCtx.Run,
-			Prompt:       runCtx.Prompt,
-			AgentID:      runCtx.AgentID,
-			Model:        runCtx.Model,
-			WorkDir:      runCtx.WorkDir,
-			SessionID:    runCtx.SessionID,
-			ContinueLast: runCtx.ContinueLast,
-			ForkSession:  runCtx.ForkSession,
+			Run:               runCtx.Run,
+			Prompt:            runCtx.Prompt,
+			AgentID:           runCtx.AgentID,
+			Model:             runCtx.Model,
+			WorkDir:           runCtx.WorkDir,
+			SessionID:         runCtx.SessionID,
+			ContinueLast:      runCtx.ContinueLast,
+			ForkSession:       runCtx.ForkSession,
+			ReasoningEffort:   runCtx.ReasoningEffort,
+			MaxThinkingTokens: runCtx.MaxThinkingTokens,
+			PermissionMode:    runCtx.PermissionMode,
+			IncludePartial:    runCtx.IncludePartial,
+			AgentName:         runCtx.AgentName,
+			Budget:            runCtx.Budget,
 		})
 	} else {
 		// Profile mode: use configured command template
@@ -189,7 +201,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		return
 	}
 	var stdin io.WriteCloser
-	if adapter != nil {
+	if adapter != nil && adapter.NeedsStdin() {
 		stdin, err = cmd.StdinPipe()
 		if err != nil {
 			e.publishFailed(run, fmt.Errorf("open stdin pipe: %w", err))
@@ -210,7 +222,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// If context was cancelled after Start but before we checked, kill the child.
 	if ctx.Err() != nil {
 		if cmd.Process != nil {
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 		}
 		e.publishCancelled(run)
 		return
@@ -225,9 +237,15 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	wg.Add(1)
 	go e.publishOutput(&wg, run, "stderr", stderr)
 
+	// Inject context budget for token tracking in stream parsers.
+	parserCtx := ctx
+	if runCtx.Budget != nil {
+		parserCtx = context.WithValue(ctx, adapters.CtxBudgetKey, runCtx.Budget)
+	}
+
 	if adapter != nil {
 		wg.Add(1)
-		go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, ctx)
+		go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx)
 	} else {
 		// Raw capture: stdout goes to run.output.batch events
 		wg.Add(1)
@@ -276,17 +294,24 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, strea
 }
 
 // envForRun builds the environment for a child process.
-// nil env inherits the full parent environment via os.Environ(); a non-nil
-// (possibly empty) env replaces it entirely. This distinction is intentional
-// and tested — do not change without updating TestProcessExecutorNilEnvInheritsParentEnvironment.
+// When profileEnv is nil the child receives a minimal sanitized environment
+// (only whitelisted parent vars + extraEnv + AGENTHUB_* runtime vars).
+// A non-nil profileEnv is used verbatim as the base (administrator-configured).
 func (e *ProcessExecutor) envForRun(run store.Run, profileEnv, extraEnv []string) []string {
-	env := profileEnv
-	if env == nil {
-		env = os.Environ()
+	var env []string
+	if profileEnv == nil {
+		env = SanitizedEnv(nil, extraEnv)
 	} else {
-		env = append([]string(nil), env...)
+		// Administrator explicitly configured the environment — respect it,
+		// but still warn about any sensitive-looking variables it includes.
+		for _, kv := range profileEnv {
+			key, _, _ := strings.Cut(kv, "=")
+			if IsSensitiveEnvKey(key) {
+				slog.Warn("sensitive env var present in explicitly configured agent environment", "key", key)
+			}
+		}
+		env = append(append([]string(nil), profileEnv...), extraEnv...)
 	}
-	env = append(env, extraEnv...)
 	return append(env,
 		"AGENTHUB_RUN_ID="+run.ID,
 		"AGENTHUB_PROJECT_ID="+run.ProjectID,

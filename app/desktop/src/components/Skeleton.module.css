@@ -1,0 +1,36 @@
+/* ═════════════════════════════════════════════════════════════════════
+   Skeleton loading placeholders — shimmer animation
+   Uses CSS animation (not JS-driven) for perceived performance.
+   ═════════════════════════════════════════════════════════════════════ */
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+
+.base {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 25%,
+    var(--border) 50%,
+    var(--muted) 75%
+  );
+  background-size: 400px 100%;
+  animation: skeletonShimmer 1.5s ease-in-out infinite;
+}
+
+.line {
+  border-radius: var(--radius-sm);
+}
+
+.block {
+  border-radius: var(--radius-md);
+}
+
+.circle {
+  border-radius: 50%;
+}

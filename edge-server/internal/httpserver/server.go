@@ -41,10 +41,12 @@ func Run(cfg Config) error {
 	handler.RegisterRoutes(mux)
 
 	srv := &http.Server{
-		Addr:         cfg.Addr,
-		Handler:      corsMiddleware(mux),
+		Addr:    cfg.Addr,
+		Handler: corsMiddleware(mux),
+		// WriteTimeout=0: WebSocket connections are long-lived and manage their
+		// own deadlines. HTTP handlers are short-lived REST calls.
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 0,
 		IdleTimeout:  60 * time.Second,
 	}
 
@@ -78,7 +80,14 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	reg := runners.NewRegistry()
 
 	var executor lifecycle.RunExecutor
-	if cfg.ProcessExecutor.Command != "" {
+	hasAdapter := cfg.AdapterRegistry != nil && cfg.AgentDefault != ""
+	if cfg.ProcessExecutor.Command != "" || hasAdapter {
+		execCfg := cfg.ProcessExecutor
+		if execCfg.Command == "" && hasAdapter {
+			// No static command configured; the adapter's BuildCommand supplies the real path.
+			// Use a sentinel value so NewProcessExecutor passes the non-empty check.
+			execCfg.Command = "agenthub-adapter-sentinel"
+		}
 		// Resolve the default agent adapter if configured
 		var agentAdapter adapters.AgentAdapter
 		if cfg.AdapterRegistry != nil && cfg.AgentDefault != "" {
@@ -86,7 +95,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 				agentAdapter = a
 			}
 		}
-		processExecutor, err := lifecycle.NewProcessExecutor(bus, cfg.Store, cfg.ProcessExecutor, agentAdapter, cfg.AdapterRegistry)
+		processExecutor, err := lifecycle.NewProcessExecutor(bus, cfg.Store, execCfg, agentAdapter, cfg.AdapterRegistry)
 		if err != nil {
 			return nil, err
 		}

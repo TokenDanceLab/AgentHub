@@ -1,0 +1,166 @@
+.root {
+  word-break: break-word;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+/* ── Headings ───────────────────────────────── */
+
+.root h1,
+.root h2,
+.root h3,
+.root h4,
+.root h5,
+.root h6 {
+  margin: 0.75em 0 0.25em;
+  font-weight: var(--font-weight-semibold, 600);
+  line-height: 1.3;
+}
+
+.root h1 {
+  font-size: 1.25em;
+}
+
+.root h2 {
+  font-size: 1.15em;
+}
+
+.root h3 {
+  font-size: 1.05em;
+}
+
+.root h4,
+.root h5,
+.root h6 {
+  font-size: 1em;
+  opacity: 0.9;
+}
+
+/* ── Paragraphs & lists ─────────────────────── */
+
+.root p {
+  margin: 0.25em 0;
+}
+
+.root ul,
+.root ol {
+  margin: 0.25em 0;
+  padding-left: 1.5em;
+}
+
+.root li {
+  margin-bottom: 0.125em;
+}
+
+.root li > ul,
+.root li > ol {
+  margin-top: 0.125em;
+}
+
+/* ── Links ──────────────────────────────────── */
+
+.root a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.root a:hover {
+  opacity: 0.8;
+}
+
+/* ── Inline formatting ──────────────────────── */
+
+.root strong {
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.root em {
+  font-style: italic;
+}
+
+.root del {
+  opacity: 0.5;
+}
+
+/* ── Blockquotes ────────────────────────────── */
+
+.root blockquote {
+  margin: 0.5em 0;
+  padding: 0.25em 0.75em;
+  border-left: 3px solid var(--primary);
+  opacity: 0.85;
+}
+
+.root blockquote p {
+  margin: 0.25em 0;
+}
+
+/* ── Horizontal rule ────────────────────────── */
+
+.root hr {
+  margin: 0.75em 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Images ─────────────────────────────────── */
+
+.root img {
+  max-width: 100%;
+  border-radius: var(--radius-sm, 4px);
+}
+
+/* ── Tables ─────────────────────────────────── */
+
+.root table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.9em;
+  width: 100%;
+}
+
+.root th,
+.root td {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.root th {
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+  font-weight: var(--font-weight-medium, 500);
+}
+
+.root tr:nth-child(even) td {
+  background: color-mix(in oklch, var(--foreground) 3%, transparent);
+}
+
+/* ── Inline code ────────────────────────────── */
+
+.inlineCode {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+/* ── Code block wrapper ─────────────────────── */
+
+.codeBlockWrapper {
+  margin: 0.5em 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  overflow: hidden;
+}
+
+.codeLang {
+  display: block;
+  padding: 2px 10px;
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  opacity: 0.7;
+}
