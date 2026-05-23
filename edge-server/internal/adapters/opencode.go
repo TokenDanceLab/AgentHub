@@ -119,6 +119,10 @@ func (a *OpenCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, std
 	return scanner.Err()
 }
 
+// NeedsStdin returns false — OpenCode runs in batch mode with the prompt
+// passed as a CLI argument, so it does NOT read stdin.
+func (a *OpenCodeAdapter) NeedsStdin() bool { return false }
+
 func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
 	// Forward sessionID to scope if present
 	if evt.SessionID != "" {

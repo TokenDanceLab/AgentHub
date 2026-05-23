@@ -199,7 +199,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		return
 	}
 	var stdin io.WriteCloser
-	if adapter != nil {
+	if adapter != nil && adapter.NeedsStdin() {
 		stdin, err = cmd.StdinPipe()
 		if err != nil {
 			e.publishFailed(run, fmt.Errorf("open stdin pipe: %w", err))
