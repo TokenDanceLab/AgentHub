@@ -25,6 +25,11 @@ func NewClient(rdb *redis.Client) *Client {
 	return &Client{rdb: rdb}
 }
 
+// GetRDB returns the underlying Redis client for advanced operations (e.g., rate limiting).
+func (c *Client) GetRDB() *redis.Client {
+	return c.rdb
+}
+
 // GetOrLoad is a generic helper that performs cache-aside with singleflight
 // deduplication. It is a package-level function (not a method) because Go does
 // not support generic methods. Pass a *Client explicitly.
@@ -181,4 +186,25 @@ func (c *Client) PeekSeq(ctx context.Context, sessionID string) (int64, error) {
 // PoolStats exposes the underlying Redis connection pool statistics.
 func (c *Client) PoolStats() *redis.PoolStats {
 	return c.rdb.PoolStats()
+}
+
+// ── Rate limiting ──────────────────────────────────────────────────────
+
+// CheckRateLimit implements a simple sliding-window counter.  It atomically
+// increments the counter for key, sets a 60-second TTL on first access, and
+// returns whether the count exceeds the supplied limit.
+func (c *Client) CheckRateLimit(ctx context.Context, key string, limit int64) (count int64, exceeded bool, err error) {
+	count, err = c.rdb.Incr(ctx, "ratelimit:"+key).Result()
+	if err != nil {
+		return 0, false, err
+	}
+	// Set expiry only when the key is brand-new (count == 1).
+	if count == 1 {
+		// Use a 60-second window; the TTL is never refreshed on subsequent
+		// requests, so the whole counter expires one minute after the very
+		// first request in each time window.
+		_ = c.rdb.Expire(ctx, "ratelimit:"+key, 60*time.Second).Err()
+	}
+	exceeded = count > limit
+	return
 }

@@ -50,6 +50,7 @@ type App struct {
 	AgentService        *service.AgentService
 	AttachmentService   *service.AttachmentService
 	NotificationService *service.NotificationService
+	DeviceService       *service.DeviceService
 
 	// Handler layer
 	AuthHandler         *handler.AuthHandler
@@ -114,10 +115,11 @@ func (a *App) Run(ctx context.Context) error {
 	a.SessionService = service.NewSessionService(a.DB, a.CacheClient)
 	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)
 	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient)
+	a.DeviceService = service.NewDeviceService(a.DB)
 
 	// Handler layer
 	a.AuthHandler = handler.NewAuthHandler(a.AuthService)
-	a.DeviceHandler = handler.NewDeviceHandler(a.DB)
+	a.DeviceHandler = handler.NewDeviceHandler(a.DeviceService)
 	a.ContactHandler = handler.NewContactHandler(a.ContactService)
 	a.SessionHandler = handler.NewSessionHandler(a.SessionService)
 	a.MessageHandler = handler.NewMessageHandler(a.MessageService)
@@ -208,7 +210,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 func (a *App) setupRouter() *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	router.SetupRoutes(r, a.Config.JWT.Secret,
+	router.SetupRoutes(r, a.Config.JWT.Secret, a.CacheClient,
 		a.AuthHandler, a.WebSocketHandler, a.DeviceHandler,
 		a.ContactHandler, a.SessionHandler, a.MessageHandler,
 		a.AgentHandler, a.CustomAgentHandler,

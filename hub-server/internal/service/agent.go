@@ -13,6 +13,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/ws"
+	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
 type AgentService struct {
@@ -75,10 +76,15 @@ func (s *AgentService) UpdateCustomAgent(ctx context.Context, ownerID string, ca
 		return errcode.AgentNotFound
 	}
 	ca.OwnerUserID = ownerID
-if ca.CapabilityTags == "" {
-		ca.CapabilityTags = existing.CapabilityTags }
-	if ca.ToolWhitelist == "" { ca.ToolWhitelist = existing.ToolWhitelist }
-	if ca.ModelParams == "" { ca.ModelParams = existing.ModelParams }
+	if ca.CapabilityTags == "" {
+		ca.CapabilityTags = existing.CapabilityTags
+	}
+	if ca.ToolWhitelist == "" {
+		ca.ToolWhitelist = existing.ToolWhitelist
+	}
+	if ca.ModelParams == "" {
+		ca.ModelParams = existing.ModelParams
+	}
 	ca.CreatedAt = existing.CreatedAt
 	return repository.UpdateCustomAgent(s.db, ca)
 }
@@ -268,10 +274,10 @@ func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) er
 	_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusCancelled, "")
 
 	s.bus.Publish(ctx, Event{Type: "agent.cancel", Payload: map[string]string{
-		"task_id":            taskID,
-		"agent_instance_id":  task.AgentInstanceID,
-		"session_id":         task.AgentInstanceID, // will be resolved from agent instance
-		"triggered_by":       task.TriggeredByUserID,
+		"task_id":           taskID,
+		"agent_instance_id": task.AgentInstanceID,
+		"session_id":        task.AgentInstanceID, // will be resolved from agent instance
+		"triggered_by":      task.TriggeredByUserID,
 	}})
 
 	return nil
@@ -314,6 +320,7 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, taskID, payload str
 		SessionID:   "", // will be set from agent instance
 		SenderType:  model.SenderTypeAgent,
 		SenderID:    task.AgentInstanceID,
+		ClientMsgID: uuidv7.Must(),
 		ContentType: model.ContentTypeText,
 		Content:     payload,
 	}
@@ -366,6 +373,7 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, taskID, finalContent 
 			SessionID:   ai.SessionID,
 			SenderType:  model.SenderTypeAgent,
 			SenderID:    task.AgentInstanceID,
+			ClientMsgID: uuidv7.Must(),
 			ContentType: model.ContentTypeText,
 			Content:     finalContent,
 		}

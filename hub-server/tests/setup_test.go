@@ -69,7 +69,8 @@ func TestMain(m *testing.M) {
 	wsHandler := handler.NewWebSocketHandler(mgr, cfg.JWT.Secret)
 	authService := service.NewAuthService(db, cfg.JWT, cacheClient)
 	authHandler := handler.NewAuthHandler(authService)
-	deviceHandler := handler.NewDeviceHandler(db)
+	deviceService := service.NewDeviceService(db)
+		deviceHandler := handler.NewDeviceHandler(deviceService)
 	contactService := service.NewContactService(db, bus, cacheClient)
 	contactHandler := handler.NewContactHandler(contactService)
 	sessionService := service.NewSessionService(db, cacheClient)
@@ -86,7 +87,7 @@ func TestMain(m *testing.M) {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
-	router.SetupRoutes(r, cfg.JWT.Secret, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler)
+	router.SetupRoutes(r, cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler)
 
 	ts = httptest.NewServer(r)
 	client = ts.Client()
