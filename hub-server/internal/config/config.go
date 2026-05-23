@@ -62,8 +62,6 @@ type UploadConfig struct {
 	MaxSize int64  `mapstructure:"max_size"`
 }
 
-var Cfg *Config
-
 func Load(configPath string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigFile(configPath)
@@ -80,14 +78,12 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	Cfg = &cfg
-
 	// P0-1: Explicitly override JWT secret with env var (belt-and-suspenders on top of viper AutomaticEnv).
 	if envSecret := os.Getenv("AGENTHUB_JWT_SECRET"); envSecret != "" {
 		cfg.JWT.Secret = envSecret
 	}
 
-	// P0-1: JWT secret must be set via AGENTHUB_JWT_SECRET env var; reject hardcoded defaults.
+	// P0-1: Reject hardcoded default JWT secrets.
 	if cfg.JWT.Secret == "" || cfg.JWT.Secret == "dev-secret-change-in-production" {
 		if os.Getenv("AGENTHUB_JWT_SECRET") == "" {
 			return nil, errors.New("JWT secret must be set via AGENTHUB_JWT_SECRET environment variable; hardcoded defaults are rejected")
