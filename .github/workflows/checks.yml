@@ -51,6 +51,44 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+  # ── Go: Hub Server ──────────────────────────
+  go-hub:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build
+        run: go build ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          working-directory: hub-server
+          version: latest
+          args: --timeout=5m
+
+      - name: Test (unit only, skip integration)
+        run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
+
+      - name: Coverage check
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          THRESHOLD=40
+          echo "Coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "::warning::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
   # ── Frontend: Desktop ────────────────────────
   frontend-desktop:
     runs-on: ubuntu-latest
