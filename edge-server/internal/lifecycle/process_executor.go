@@ -1,4 +1,4 @@
-package lifecycle
+﻿package lifecycle
 
 import (
 	"context"
@@ -167,6 +167,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			PermissionMode:    runCtx.PermissionMode,
 			IncludePartial:    runCtx.IncludePartial,
 			AgentName:         runCtx.AgentName,
+			Budget:            runCtx.Budget,
 		})
 	} else {
 		// Profile mode: use configured command template
@@ -235,9 +236,15 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	wg.Add(1)
 	go e.publishOutput(&wg, run, "stderr", stderr)
 
+	// Inject context budget for token tracking in stream parsers.
+	parserCtx := ctx
+	if runCtx.Budget != nil {
+		parserCtx = context.WithValue(ctx, adapters.CtxBudgetKey, runCtx.Budget)
+	}
+
 	if adapter != nil {
 		wg.Add(1)
-		go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, ctx)
+		go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx)
 	} else {
 		// Raw capture: stdout goes to run.output.batch events
 		wg.Add(1)
