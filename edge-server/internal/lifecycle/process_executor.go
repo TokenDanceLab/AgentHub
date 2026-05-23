@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"sync"
@@ -27,16 +28,17 @@ type ProcessExecutorConfig struct {
 }
 
 type ProcessExecutor struct {
-	bus     *events.Bus
-	store   store.RunLifecycleStore
-	profile RunnerProfile
-	adapter adapters.AgentAdapter // nil = raw stdout capture
+	bus        *events.Bus
+	store      store.RunLifecycleStore
+	profile    RunnerProfile
+	adapter    adapters.AgentAdapter // default adapter; may be nil (raw stdout capture)
+	adapterReg *adapters.Registry    // per-run adapter resolution; may be nil
 
 	mu      sync.Mutex
 	running map[string]context.CancelFunc
 }
 
-func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter) (*ProcessExecutor, error) {
+func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter, adapterReg *adapters.Registry) (*ProcessExecutor, error) {
 	if bus == nil {
 		return nil, ErrProcessBusRequired
 	}
@@ -57,15 +59,16 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		}
 	}
 	return &ProcessExecutor{
-		bus:     bus,
-		store:   store,
-		profile: profile,
-		adapter: adapter,
-		running: make(map[string]context.CancelFunc),
+		bus:        bus,
+		store:      store,
+		profile:    profile,
+		adapter:    adapter,
+		adapterReg: adapterReg,
+		running:    make(map[string]context.CancelFunc),
 	}, nil
 }
 
-func (e *ProcessExecutor) Start(run store.Run) error {
+func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	current, ok := e.store.GetRun(run.ID)
 	if !ok {
 		return store.ErrNotFound
@@ -84,7 +87,8 @@ func (e *ProcessExecutor) Start(run store.Run) error {
 	e.running[run.ID] = cancel
 	e.mu.Unlock()
 
-	go e.run(ctx, run)
+	runCtx.Run = run
+	go e.run(ctx, run, runCtx)
 	return nil
 }
 
@@ -117,21 +121,52 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	return CancelResult{Run: run, Found: true, Status: run.Status}
 }
 
-func (e *ProcessExecutor) run(ctx context.Context, run store.Run) {
+func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProcessContext) {
 	defer e.finish(run.ID)
 
-	args, env, err := e.profile.Template.Expand(RunProcessContext{Run: run})
+	// Resolve adapter for this run: explicit agentID first, then default
+	adapter := e.adapter
+	if e.adapterReg != nil {
+		if resolved, err := e.adapterReg.Resolve(runCtx.AgentID); err == nil {
+			adapter = resolved
+		}
+	}
+
+	var cmdPath string
+	var args, env []string
+	var workDir string
+
+	if adapter != nil {
+		// Adapter mode: BuildCommand provides full command configuration
+		cmdPath, args, env, workDir = adapter.BuildCommand(adapters.RunProcessContext{
+			Run:          runCtx.Run,
+			Prompt:       runCtx.Prompt,
+			AgentID:      runCtx.AgentID,
+			Model:        runCtx.Model,
+			WorkDir:      runCtx.WorkDir,
+			SessionID:    runCtx.SessionID,
+			ContinueLast: runCtx.ContinueLast,
+			ForkSession:  runCtx.ForkSession,
+		})
+	} else {
+		// Profile mode: use configured command template
+		var err error
+		args, env, err = e.profile.Template.Expand(runCtx)
+		if err != nil {
+			e.publishFailed(run, err)
+			return
+		}
+		cmdPath = e.profile.Command
+		workDir = e.profile.WorkDir
+	}
+
+	_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
 	if err != nil {
 		e.publishFailed(run, err)
 		return
 	}
-	_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(RunProcessContext{Run: run})
-	if err != nil {
-		e.publishFailed(run, err)
-		return
-	}
-	cmd := exec.CommandContext(ctx, e.profile.Command, args...)
-	cmd.Dir = e.profile.WorkDir
+	cmd := exec.CommandContext(ctx, cmdPath, args...)
+	cmd.Dir = workDir
 	cmd.Env = e.envForRun(run, env, extraEnv)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -143,12 +178,28 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run) {
 		e.publishFailed(run, fmt.Errorf("open stderr pipe: %w", err))
 		return
 	}
+	var stdin io.WriteCloser
+	if adapter != nil {
+		stdin, err = cmd.StdinPipe()
+		if err != nil {
+			e.publishFailed(run, fmt.Errorf("open stdin pipe: %w", err))
+			return
+		}
+	}
 	if err := cmd.Start(); err != nil {
 		if ctx.Err() != nil {
 			e.publishCancelled(run)
 			return
 		}
 		e.publishFailed(run, err)
+		return
+	}
+	// If context was cancelled after Start but before we checked, kill the child.
+	if ctx.Err() != nil {
+		if cmd.Process != nil {
+			cmd.Process.Kill()
+		}
+		e.publishCancelled(run)
 		return
 	}
 
@@ -161,10 +212,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run) {
 	wg.Add(1)
 	go e.publishOutput(&wg, run, "stderr", stderr)
 
-	if e.adapter != nil {
-		// Structured parsing: adapter translates CLI protocol to typed events
+	if adapter != nil {
 		wg.Add(1)
-		go e.publishStructuredOutput(&wg, run, stdout)
+		go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, ctx)
 	} else {
 		// Raw capture: stdout goes to run.output.batch events
 		wg.Add(1)
@@ -212,6 +262,10 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, strea
 	}
 }
 
+// envForRun builds the environment for a child process.
+// nil env inherits the full parent environment via os.Environ(); a non-nil
+// (possibly empty) env replaces it entirely. This distinction is intentional
+// and tested — do not change without updating TestProcessExecutorNilEnvInheritsParentEnvironment.
 func (e *ProcessExecutor) envForRun(run store.Run, profileEnv, extraEnv []string) []string {
 	env := profileEnv
 	if env == nil {
@@ -261,11 +315,11 @@ func (e *ProcessExecutor) finish(runID string) {
 
 // publishStructuredOutput uses the configured AgentAdapter to parse the CLI's
 // native protocol and emit typed events to the bus.
-func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.Run, stdout io.Reader) {
+func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.Run, stdout io.Reader, stdin io.Writer, adapter adapters.AgentAdapter, ctx context.Context) {
 	defer wg.Done()
 	emitter := &busEventEmitter{bus: e.bus}
-	if err := e.adapter.ParseStream(context.Background(), stdout, nil, emitter, run); err != nil {
-		// Structured parse errors are non-fatal; raw stderr is still captured
+	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
+		slog.Warn("structured output parse error", "runId", run.ID, "err", err)
 	}
 }
 

@@ -136,14 +136,29 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `preview.stopped` | P1 | 预览停止 |
 | `run.finished` | P0 | AgentRun 正常结束 |
 | `run.failed` | P0 | AgentRun 失败 |
+| `run.cancelled` | P1 | AgentRun 已取消（已实现，补文档） |
 | `run.agent.text_delta` | P0 | Agent 流式文本增量（CLI-agnostic） |
 | `run.agent.text_block` | P0 | Agent 完整文本块 |
 | `run.agent.thinking` | P0 | Agent 思考/推理内容（可折叠显示） |
 | `run.agent.tool_call` | P0 | Agent 请求工具调用 |
 | `run.agent.tool_result` | P0 | 工具调用执行结果 |
-| `run.agent.file_change` | P0 | 文件变更（创建/修改/删除 + diff） |
+| `run.agent.file_change` | P0 | 文件变更，payload: `{ path, kind: "created"\|"modified"\|"deleted", diff? }` |
 | `run.agent.session_init` | P0 | Agent 会话初始化（模型、工具列表、权限模式） |
 | `run.agent.result` | P0 | Agent 执行结束（成功/失败、token 用量） |
+| `run.agent.compact_boundary` | P1 | 上下文压缩边界 |
+| `run.agent.api_retry` | P1 | API 重试通知 |
+| `run.agent.task_started` | P1 | 子代理任务启动 |
+| `run.agent.task_progress` | P1 | 子代理任务进度 |
+| `run.agent.task_notification` | P1 | 子代理任务完成/失败 |
+| `run.agent.session_state_changed` | P1 | 会话状态变更（idle/running/requires_action） |
+| `run.agent.hook_started` | P1 | Hook 执行开始 |
+| `run.agent.hook_progress` | P1 | Hook 执行输出 |
+| `run.agent.hook_response` | P1 | Hook 执行完成 |
+| `run.agent.tool_use_summary` | P1 | 批量工具调用摘要 |
+| `run.agent.auth_status` | P1 | 认证状态变更 |
+| `run.agent.rate_limit` | P1 | 速率限制通知 |
+| `run.agent.permission_requested` | P1 | Agent 请求权限审批 |
+| `run.agent.permission_decided` | P1 | 权限审批结果 |
 
 ### Hub / Sync / Relay
 

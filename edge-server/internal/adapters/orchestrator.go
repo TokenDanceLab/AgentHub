@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"io"
+	"strings"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -16,17 +17,16 @@ import (
 type OrchestratorAdapter struct {
 	inner             *ClaudeCodeAdapter
 	systemPrompt      string
-	subAgentAvailable []string // agent IDs the orchestrator can dispatch to
 }
 
 // NewOrchestratorAdapter creates an orchestrator wrapping a Claude Code instance.
 // systemPrompt is the orchestrator instruction text.
-// subAgents lists agent IDs available for dispatch (e.g., ["claude-code", "codex"]).
+// subAgents lists agent IDs available for dispatch (used only in prompt construction).
 func NewOrchestratorAdapter(claudePath, model, systemPrompt string, subAgents []string) *OrchestratorAdapter {
+	_ = subAgents // reserved for future sub-agent dispatch interception
 	return &OrchestratorAdapter{
-		inner:             NewClaudeCodeAdapter(claudePath, model, "bypassPermissions"),
-		systemPrompt:      systemPrompt,
-		subAgentAvailable: subAgents,
+		inner:        NewClaudeCodeAdapter(claudePath, model, "bypassPermissions"),
+		systemPrompt: systemPrompt,
 	}
 }
 
@@ -93,12 +93,5 @@ func formatAgentList(agents []string) string {
 	if len(agents) == 0 {
 		return "none"
 	}
-	result := ""
-	for i, a := range agents {
-		if i > 0 {
-			result += ", "
-		}
-		result += a
-	}
-	return result
+	return strings.Join(agents, ", ")
 }

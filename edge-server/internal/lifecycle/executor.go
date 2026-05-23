@@ -4,7 +4,7 @@ import "github.com/agenthub/edge-server/internal/store"
 
 // RunExecutor owns state transitions after a run has been queued by the API.
 type RunExecutor interface {
-	Start(run store.Run) error
+	Start(run store.Run, ctx RunProcessContext) error
 	Cancel(runID string) CancelResult
 }
 

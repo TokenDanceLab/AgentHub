@@ -386,8 +386,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListResponse"
-        "200":
-          $ref: "#/components/responses/List"
 
   /v1/runners/{runnerId}:
     get:
@@ -1321,6 +1319,15 @@ components:
         model:
           type: string
           description: Model override for this run (e.g. claude-sonnet-4-6).
+        sessionId:
+          type: string
+          description: Resume a specific session by ID (Claude Code --resume, OpenCode --session).
+        continue:
+          type: boolean
+          description: Continue the most recent session (Claude Code --continue, OpenCode --continue).
+        fork:
+          type: boolean
+          description: Fork session before continuing (Claude Code --fork-session, OpenCode --fork).
     AgentInfo:
       type: object
       required: [id, name, status]
