@@ -160,6 +160,7 @@ function conversationMatchesQuery(conversation: ConversationSnapshot, query: str
 }
 
 const pageStyles = `
+  @import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap");
   @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..24,400,0,0");
 
   .pc-page {
@@ -171,7 +172,7 @@ const pageStyles = `
       radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.14), transparent 30%),
       linear-gradient(135deg, #f7fbff, #edf6ff);
     color: #172033;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 
   .pc-particles {
