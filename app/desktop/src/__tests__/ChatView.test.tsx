@@ -11,7 +11,12 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-import { describe, it, expect } from 'vitest';
+vi.mock('@/contexts/ToastContext', () => ({
+  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
+  useToast: () => ({ showToast: vi.fn() }),
+}));
+
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import ChatView from '@/components/ChatView';

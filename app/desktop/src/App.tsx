@@ -11,6 +11,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
 import { useRunStore } from '@/stores/runStore';
+import { useShallow } from 'zustand/shallow';
 import StatusBar from '@/components/StatusBar';
 import ThreadPanel from '@/components/ThreadPanel';
 import AgentList from '@/components/AgentList';
@@ -21,6 +22,7 @@ import PermissionDialog from '@/components/PermissionDialog';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import ShortcutHelp from '@/components/ShortcutHelp';
 import { SkeletonLine, SkeletonCircle } from '@/components/Skeleton';
+import { useToast } from '@/contexts/ToastContext';
 import styles from '@/App.module.css';
 
 // ── Lazy-loaded heavy components ──────────────
@@ -44,22 +46,45 @@ export default function App() {
   const [lastEdgeError, setLastEdgeError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const wasOnlineRef = useRef(false);
+  const { showToast } = useToast();
 
-  // Zustand stores
-  const sidebarWidth = useUIStore((s) => s.sidebarWidth);
-  const rightPanelWidth = useUIStore((s) => s.rightPanelWidth);
-  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
-  const setRightPanelWidth = useUIStore((s) => s.setRightPanelWidth);
-  const setOnline = useConnectionStore((s) => s.setOnline);
-  const setConnected = useConnectionStore((s) => s.setConnected);
-  const threads = useThreadStore((s) => s.threads);
-  const selectedThreadId = useThreadStore((s) => s.selectedThreadId);
-  const setThreads = useThreadStore((s) => s.setThreads);
-  const selectThread = useThreadStore((s) => s.selectThread);
-  const runStoreSetCurrentRun = useRunStore((s) => s.setCurrentRun);
-  const runStoreSetStreaming = useRunStore((s) => s.setIsStreaming);
-  const isStreaming = useRunStore((s) => s.isStreaming);
-  const runStoreClear = useRunStore((s) => s.clear);
+  // Zustand stores — batched with useShallow to minimize re-renders
+  const { sidebarWidth, rightPanelWidth, setSidebarWidth, setRightPanelWidth } = useUIStore(
+    useShallow((s) => ({
+      sidebarWidth: s.sidebarWidth,
+      rightPanelWidth: s.rightPanelWidth,
+      setSidebarWidth: s.setSidebarWidth,
+      setRightPanelWidth: s.setRightPanelWidth,
+    })),
+  );
+  const { setOnline, setConnected, wsLatency } = useConnectionStore(
+    useShallow((s) => ({
+      setOnline: s.setOnline,
+      setConnected: s.setConnected,
+      wsLatency: s.wsLatency,
+    })),
+  );
+  const { threads, selectedThreadId, setThreads, selectThread } = useThreadStore(
+    useShallow((s) => ({
+      threads: s.threads,
+      selectedThreadId: s.selectedThreadId,
+      setThreads: s.setThreads,
+      selectThread: s.selectThread,
+    })),
+  );
+  const {
+    setCurrentRun: runStoreSetCurrentRun,
+    setIsStreaming: runStoreSetStreaming,
+    isStreaming,
+    clear: runStoreClear,
+  } = useRunStore(
+    useShallow((s) => ({
+      isStreaming: s.isStreaming,
+      setCurrentRun: s.setCurrentRun,
+      setIsStreaming: s.setIsStreaming,
+      clear: s.clear,
+    })),
+  );
 
   // Local state (lightweight, not worth a store yet)
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -125,6 +150,17 @@ export default function App() {
     // Only react to online transitions; lastEdgeError is read inside via closure
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online]);
+
+  // Toast on Edge connect/disconnect transitions
+  const prevOnlineRef = useRef(false);
+  useEffect(() => {
+    if (online && !prevOnlineRef.current) {
+      showToast('success', t('toast.connected'));
+    } else if (!online && prevOnlineRef.current) {
+      showToast('error', t('toast.disconnected'));
+    }
+    prevOnlineRef.current = online;
+  }, [online, showToast, t]);
 
   const handleRetryEdge = useCallback(async () => {
     setRetrying(true);
@@ -195,6 +231,25 @@ export default function App() {
       clearInterval(id);
     };
   }, [online, setThreads]);
+
+  // Toast when a new thread appears (detected via polling)
+  const prevThreadIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!online || threads.length === 0) {
+      prevThreadIdsRef.current = new Set();
+      return;
+    }
+    const currentIds = new Set(threads.map((th) => th.threadId));
+    const wasInitial = prevThreadIdsRef.current.size === 0;
+    if (!wasInitial) {
+      for (const th of threads) {
+        if (!prevThreadIdsRef.current.has(th.threadId)) {
+          showToast('success', t('toast.threadCreated'));
+        }
+      }
+    }
+    prevThreadIdsRef.current = currentIds;
+  }, [threads, online, showToast, t]);
 
   const selectedThread = threads.find((th) => th.threadId === selectedThreadId);
 
@@ -338,7 +393,7 @@ export default function App() {
 
   return (
     <div className={styles.root}>
-      <StatusBar online={online} health={health} isConnected={isConnected} error={lastEdgeError} />
+      <StatusBar online={online} health={health} isConnected={isConnected} error={lastEdgeError} wsLatency={wsLatency} />
 
       {!online && !bannerDismissed && (
         <div className={styles.banner} role="alert">
@@ -557,6 +612,7 @@ export default function App() {
         isStreaming={isStreaming}
         onCancel={handleCancel}
         disabled={!online}
+        threadId={selectedThreadId ?? undefined}
       />
       <Suspense fallback={null}>
         <SearchDialog messages={allMessages} onSelect={handleSearchSelect} />

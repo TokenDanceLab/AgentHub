@@ -36,6 +36,11 @@ vi.mock('@/stores/threadStore', () => ({
   },
 }));
 
+vi.mock('@/contexts/ToastContext', () => ({
+  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
+  useToast: () => ({ showToast: vi.fn() }),
+}));
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
