@@ -532,6 +532,7 @@ export default function App() {
                 toolCalls={currentRun?.toolCalls ?? []}
                 changedFiles={currentRun?.changedFiles ?? []}
                 outputText={currentRun?.outputText ?? ''}
+                chatMessages={allMessages}
               />
             </Suspense>
           </ErrorBoundary>
