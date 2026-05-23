@@ -46,12 +46,12 @@ feat/trump-webui          ← Web 前端（Trump）
 
 基于参考项目（OpenCode UI/Goose/LibreChat/Claude Code WebUI）的 UX 审计结果。
 
-### P0 级（阻塞核心体验）
+### 核心体验（原 P0 级）
 - [x] ChatView: Markdown 渲染 + 代码语法高亮（react-markdown + PrismLight 12语言）
 - [x] PromptInput: 多行 textarea + Stop 按钮（Enter发送/Shift+Enter换行）
 - [x] RunDetail: Cancel/Abort 按钮 + token 用量展示（haiku agent 实现）
 
-### P1 级（成熟聊天产品标配）✅ (全部完成 4/4)
+### 聊天标配（原 P1 级）✅ (全部完成 4/4)
 - [x] ThreadPanel: 重命名/删除 + 消息/运行计数（sonnet agent）
 - [x] DiffViewer: 单块 Accept/Reject 交互（haiku agent）
 - [x] ChatView: 消息操作 — 复制/重试/删除 hover 按钮（haiku agent）
