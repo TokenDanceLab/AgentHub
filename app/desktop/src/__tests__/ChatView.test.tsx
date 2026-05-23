@@ -16,6 +16,26 @@ vi.mock('@/contexts/ToastContext', () => ({
   useToast: () => ({ showToast: vi.fn() }),
 }));
 
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count }: { count: number }) => {
+    // No-op virtualizer: render all items at their natural positions
+    const items = Array.from({ length: count }, (_, i) => ({
+      key: `vitem-${i}`,
+      index: i,
+      start: 0,
+      size: 0,
+      end: 0,
+      measureElement: () => {},
+    }));
+    return {
+      getVirtualItems: () => items,
+      getTotalSize: () => 0,
+      measureElement: () => {},
+      scrollToIndex: () => {},
+    };
+  },
+}));
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
