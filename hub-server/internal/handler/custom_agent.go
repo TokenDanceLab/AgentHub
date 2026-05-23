@@ -34,6 +34,15 @@ func (h *CustomAgentHandler) Create(c *gin.Context) {
 		return
 	}
 	userID := c.GetString("user_id")
+	// Pre-validate jsonb fields before DB insert.
+	if err := (&model.CustomAgent{
+		CapabilityTags: req.CapabilityTags,
+		ToolWhitelist:  req.ToolWhitelist,
+		ModelParams:    req.ModelParams,
+	}).Validate(); err != nil {
+		FailWithMessage(c, errcode.ErrBadRequest, err.Error())
+		return
+	}
 	ca, err := h.service.CreateCustomAgent(c.Request.Context(), userID, req.Name, req.AvatarURL, req.AgentType, req.SystemPrompt, req.CapabilityTags, req.ToolWhitelist, req.ModelParams)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
@@ -85,6 +94,11 @@ func (h *CustomAgentHandler) Update(c *gin.Context) {
 		CapabilityTags: req.CapabilityTags,
 		ToolWhitelist:  req.ToolWhitelist,
 		ModelParams:    req.ModelParams,
+	}
+	// Pre-validate jsonb fields before DB update.
+	if err := ca.Validate(); err != nil {
+		FailWithMessage(c, errcode.ErrBadRequest, err.Error())
+		return
 	}
 	if err := h.service.UpdateCustomAgent(c.Request.Context(), userID, ca); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
