@@ -58,7 +58,8 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 
 	// Reasoning effort
 	if ctx.ReasoningEffort != "" {
-		args = append(args, "-c", "model_reasoning_effort="+ctx.ReasoningEffort)
+		effort := ResolveReasoningEffort("codex", ctx.ReasoningEffort)
+		args = append(args, "-c", "model_reasoning_effort="+effort)
 	}
 
 	// Sandbox based on permission mode
@@ -79,11 +80,7 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 		workDir = "."
 	}
 
-	env := []string{
-		"AGENTHUB_RUN_ID=" + ctx.Run.ID,
-		"AGENTHUB_PROJECT_ID=" + ctx.Run.ProjectID,
-		"AGENTHUB_THREAD_ID=" + ctx.Run.ThreadID,
-	}
+	var env []string // runtime vars set by process executor
 
 	return a.binaryPath, args, env, workDir
 }

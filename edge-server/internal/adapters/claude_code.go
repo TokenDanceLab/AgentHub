@@ -82,7 +82,8 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 
 	// Reasoning effort & thinking budget
 	if ctx.ReasoningEffort != "" {
-		args = append(args, "--reasoning-effort", ctx.ReasoningEffort)
+		effort := ResolveReasoningEffort("claude-code", ctx.ReasoningEffort)
+		args = append(args, "--reasoning-effort", effort)
 	}
 	if ctx.MaxThinkingTokens > 0 {
 		args = append(args, "--max-thinking-tokens", fmt.Sprintf("%d", ctx.MaxThinkingTokens))
@@ -115,15 +116,7 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	}
 	args = append(args, "--add-dir", workDir)
 
-	// Inject AgentHub context as env vars for the agent to consume
-	env := []string{
-		"AGENTHUB_RUN_ID=" + ctx.Run.ID,
-		"AGENTHUB_PROJECT_ID=" + ctx.Run.ProjectID,
-		"AGENTHUB_THREAD_ID=" + ctx.Run.ThreadID,
-		"AGENTHUB_AGENT_ID=" + ctx.AgentID,
-	}
-
-	return a.binaryPath, args, env, workDir
+	return a.binaryPath, args, nil, workDir
 }
 
 func (a *ClaudeCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {

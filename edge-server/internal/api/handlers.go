@@ -474,10 +474,13 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			default:
 			}
-			_, _, err := conn.ReadMessage()
+			mt, msg, err := conn.ReadMessage()
 			if err != nil {
 				break
 			}
+			// Inbound messages from the client are discarded by design
+			// (the server pushes events; the client only sends close/pong).
+			slog.Debug("websocket inbound message discarded", "messageType", mt, "size", len(msg))
 		}
 	}()
 
