@@ -434,7 +434,7 @@ func (e *ProcessExecutor) finish(runID string) {
 // native protocol and emit typed events to the bus.
 func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.Run, stdout io.Reader, stdin io.Writer, adapter adapters.AgentAdapter, ctx context.Context) {
 	defer wg.Done()
-	var emitter adapters.EventEmitter = &busEventEmitter{bus: e.bus}
+	var emitter adapters.EventEmitter = adapters.NewBusEventEmitter(e.bus)
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
@@ -449,15 +449,6 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
 		slog.Error("structured output parse error", "runId", run.ID, "err", err)
 	}
-}
-
-// busEventEmitter adapts events.Bus to the adapters.EventEmitter interface.
-type busEventEmitter struct {
-	bus *events.Bus
-}
-
-func (e *busEventEmitter) Emit(eventType string, scope map[string]any, payload any) {
-	e.bus.Publish(eventType, scope, payload)
 }
 
 // budgetAwareEmitter wraps an EventEmitter to emit run.agent.context_warning
