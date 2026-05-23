@@ -226,7 +226,7 @@ const workbenchStyles = `
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.09em;
-  line-height: normal;
+  line-height: 1.236;
 }
 
 .wb-section-label {
