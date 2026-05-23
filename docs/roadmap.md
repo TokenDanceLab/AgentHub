@@ -57,14 +57,14 @@ feat/trump-webui          ← Web 前端（Trump）
 - [x] ChatView: 消息操作 — 复制/重试/删除 hover 按钮（haiku agent）
 - [x] AgentList: 搜索过滤 + 描述 + 彩色能力标签 + 匹配高亮（haiku agent）
 
-### P2 级（打磨）
-- [x] StatusBar: 延迟指示器(绿<50ms/黄<200ms/红) + 错误徽标 + 重连脉冲（haiku agent）
-- [x] 加载骨架屏 + shimmer 动画（haiku agent: SkeletonLine/Block/Circle, aria-busy）
-- [x] 错误处理 UX: Edge 断连横幅(重试/忽略) + ErrorBoundary Retry + 重连指示（haiku agent）
-- [ ] 全局暗/亮主题切换 + CSS 变量体系
+### P2 级（打磨）✅ (全部完成 4/4)
+- [x] StatusBar: 延迟指示器 + 错误徽标 + 重连脉冲（haiku agent）
+- [x] 加载骨架屏 + shimmer 动画（haiku agent）
+- [x] 错误处理 UX: Edge 断连横幅 + ErrorBoundary Retry（haiku agent）
+- [x] 全局暗/亮主题切换 + CSS 变量体系 + ThemeContext（sonnet agent）
 
 ### P3 级（性能 + 健壮）
-- [ ] Bundle 分析 + 路由 lazy load + React.memo 审计（sonnet agent 进行中）
+- [x] Bundle 分析 + React.lazy 拆分 + React.memo 审计（sonnet agent）
 - [ ] 权限门控：工具调用需 Desktop 确认（替换 auto-approve）
 - [ ] 真实 Agent 集成 E2E：Claude Code/OpenCode 端到端跑通
 
