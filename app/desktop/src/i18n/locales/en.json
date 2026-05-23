@@ -4,6 +4,8 @@
   "status.wsConnected": "WS: Connected",
   "status.wsDisconnected": "WS: —",
   "agent.title": "Agents",
+  "agent.open": "Open agent panel",
+  "agent.close": "Close agent panel",
   "agent.emptyOnline": "No agents available",
   "agent.emptyOffline": "Waiting for Edge...",
   "agent.capability.streaming": "Streaming",
