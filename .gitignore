@@ -76,11 +76,12 @@ docs/review/
 .agenthub/secrets/
 .claude/
 .codex/*
-!.codex/
-!.codex/skills/
-.codex/skills/*
-!.codex/skills/dev-loop/
-!.codex/skills/dev-loop/**
+.agents/*
+!.agents/
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/dev-loop/
+!.agents/skills/dev-loop/**
 .cursor/
 .continue/
 
@@ -88,3 +89,4 @@ docs/review/
 /reference/*
 !/reference/INDEX.md
 /chat-verify/
+test_store.json
