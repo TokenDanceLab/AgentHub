@@ -160,6 +160,10 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 	return scanner.Err()
 }
 
+// NeedsStdin returns false — Codex uses JSONL output via --json flag
+// and does NOT require bidirectional stdin communication.
+func (a *CodexAdapter) NeedsStdin() bool { return false }
+
 // --- Event types ---
 
 // codexExecEvent represents a single JSONL line from codex exec --json output.
