@@ -296,12 +296,12 @@ const pageStyles = `
   }
 
   .pc-title .pc-brand-sub {
-    margin: 0;
+    margin: 4px 0 0;
     color: #667085;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.09em;
-    line-height: normal;
+    line-height: 1.236;
   }
 
   .pc-icon-button,

@@ -1007,7 +1007,7 @@ const styles = `
   }
 
   .asr-title .asr-brand-sub {
-    margin: 0;
+    margin: 4px 0 0;
     color: var(--asr-muted);
     font-size: 11px;
     font-weight: 800;
