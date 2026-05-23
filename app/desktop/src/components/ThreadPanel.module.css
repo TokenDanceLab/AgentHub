@@ -124,3 +124,131 @@
   font-size: var(--font-size-xs);
   opacity: 0.4;
 }
+
+.count {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── action error banner ──────────────────── */
+
+.actionError {
+  margin: 0 var(--space-md);
+  padding: 4px 8px;
+  font-size: var(--font-size-xs);
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  border-radius: 4px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* ── normal thread row ────────────────────── */
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.itemRow .item {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── action buttons (edit / delete) ──────── */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding-right: var(--space-xs);
+}
+
+.itemRow:hover .actions {
+  opacity: 1;
+}
+
+.actionBtn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--foreground);
+  opacity: 0.5;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: opacity 0.1s, background 0.1s;
+  flex-shrink: 0;
+}
+
+.actionBtn:hover {
+  opacity: 0.9;
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+}
+
+.deleteConfirm {
+  color: #ef4444;
+  gap: 4px;
+  width: auto;
+  padding: 0 6px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-sans);
+}
+
+.deleteConfirm:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* ── inline edit row ──────────────────────── */
+
+.editRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--primary) 8%, transparent);
+}
+
+.editIcon {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.editInput {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  outline: none;
+}
+
+/* ── delete confirmation row ──────────────── */
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+}
+
+.confirmText {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: #ef4444;
+  font-weight: 500;
+}
