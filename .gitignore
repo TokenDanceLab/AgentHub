@@ -88,3 +88,4 @@ docs/review/
 /reference/*
 !/reference/INDEX.md
 /chat-verify/
+test_store.json
