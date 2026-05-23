@@ -11,6 +11,11 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('lucide-react', () => {
+  const Stub = () => null;
+  return new Proxy({}, { get: () => Stub });
+});
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
