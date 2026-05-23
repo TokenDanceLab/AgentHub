@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/events"
@@ -70,6 +71,10 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 	}, nil
 }
 
+// defaultRunTimeout is the hard deadline for any agent run. A hung subprocess
+// should not block the executor goroutine forever.
+const defaultRunTimeout = 30 * time.Minute
+
 func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	current, ok := e.store.GetRun(run.ID)
 	if !ok {
@@ -79,7 +84,7 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 		return ErrRunAlreadyStarted
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), defaultRunTimeout)
 	e.mu.Lock()
 	if _, ok := e.running[run.ID]; ok {
 		e.mu.Unlock()
