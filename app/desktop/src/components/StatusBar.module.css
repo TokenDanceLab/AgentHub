@@ -18,10 +18,65 @@
   font-size: var(--font-size-xs);
 }
 
-.error {
-  padding: 6px var(--space-lg);
-  background: color-mix(in oklch, var(--destructive) 15%, transparent);
-  color: var(--destructive);
-  font-size: var(--font-size-sm);
-  border-bottom: 1px solid var(--destructive);
+/* ── Latency indicator ── */
+
+.latency {
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  margin-left: 2px;
+}
+
+.latencyGood {
+  color: var(--color-success);
+}
+
+.latencyWarn {
+  color: #d97706;
+}
+
+.latencyBad {
+  color: var(--color-danger);
+}
+
+.latencyNone {
+  color: var(--muted-foreground);
+}
+
+/* ── Error badge ── */
+
+.errorBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.errorBadge:hover {
+  opacity: 0.85;
+}
+
+/* ── Pulse animation (reconnecting) ── */
+
+@keyframes statusbarPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.pulse {
+  animation: statusbarPulse 1.2s ease-in-out infinite;
 }
