@@ -23,7 +23,7 @@ import PermissionDialog from '@/components/PermissionDialog';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import ShortcutHelp from '@/components/ShortcutHelp';
 import { SkeletonLine, SkeletonCircle } from '@/components/Skeleton';
-import { BrandingSection } from '@shared/components';
+import { BrandingSection, PageShell } from '@shared/components';
 import { useToast } from '@/contexts/ToastContext';
 import styles from '@/App.module.css';
 
@@ -435,21 +435,25 @@ export default function App() {
           />
         )}
 
-        <div
-          className={`${styles.sidebarWrapper} ${mobileSidebarOpen ? styles.sidebarOpen : ''}`}
-          style={isMobile ? undefined : { width: sidebarWidth, flexShrink: 0 }}
+        <PageShell
+          sidebar={
+            <>
+              <div
+                className={`${styles.sidebarWrapper} ${mobileSidebarOpen ? styles.sidebarOpen : ''}`}
+                style={isMobile ? undefined : { width: sidebarWidth, flexShrink: 0 }}
+              >
+                <BrandingSection title="AgentHub" subtitle="Workbench" className={styles.sidebarBrand} />
+                <ThreadPanel
+                  online={online}
+                  selectedId={selectedThreadId ?? undefined}
+                  onSelect={handleSelectThread}
+                />
+              </div>
+              {!isMobile && <ResizeHandle direction="horizontal" onResize={handleSidebarResize} />}
+            </>
+          }
         >
-          <BrandingSection title="AgentHub" subtitle="Workbench" className={styles.sidebarBrand} />
-          <ThreadPanel
-            online={online}
-            selectedId={selectedThreadId ?? undefined}
-            onSelect={handleSelectThread}
-          />
-        </div>
-
-        {!isMobile && <ResizeHandle direction="horizontal" onResize={handleSidebarResize} />}
-
-        <div className={styles.center}>
+          <div className={styles.center}>
           {!isMobile && (
             <div className={styles.centerSidebar}>
               {agents.length === 0 && online ? (
@@ -573,6 +577,7 @@ export default function App() {
             </Suspense>
           </ErrorBoundary>
         </div>
+      </PageShell>
       </div>
 
       <PromptInput
