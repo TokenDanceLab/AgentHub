@@ -87,3 +87,25 @@
   color: #d97706;
   font-style: italic;
 }
+
+/* ── Theme toggle button ── */
+
+.themeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.themeBtn:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}

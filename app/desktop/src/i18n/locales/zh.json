@@ -49,5 +49,7 @@
   "banner.disconnected": "本地 Edge 连接已断开",
   "banner.retry": "重试",
   "banner.dismiss": "关闭",
-  "status.reconnecting": "重连中..."
+  "status.reconnecting": "重连中...",
+  "theme.light": "切换到亮色主题",
+  "theme.dark": "切换到暗色主题"
 }

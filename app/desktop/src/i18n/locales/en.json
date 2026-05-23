@@ -49,5 +49,7 @@
   "banner.disconnected": "Local Edge disconnected",
   "banner.retry": "Retry",
   "banner.dismiss": "Dismiss",
-  "status.reconnecting": "Reconnecting..."
+  "status.reconnecting": "Reconnecting...",
+  "theme.light": "Switch to light theme",
+  "theme.dark": "Switch to dark theme"
 }
