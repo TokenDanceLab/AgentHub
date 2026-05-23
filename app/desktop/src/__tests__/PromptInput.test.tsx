@@ -61,7 +61,7 @@ describe('PromptInput', () => {
     const input = screen.getByPlaceholderText('prompt.placeholder');
     fireEvent.change(input, { target: { value: 'Hello world' } });
 
-    const sendBtn = screen.getByText('action.startRun');
+    const sendBtn = screen.getByRole('button', { name: 'action.startRun' });
     fireEvent.click(sendBtn);
 
     expect(onSend).toHaveBeenCalledTimes(1);
@@ -98,7 +98,7 @@ describe('PromptInput', () => {
       />,
     );
 
-    const sendBtn = screen.getByText('action.startRun');
+    const sendBtn = screen.getByRole('button', { name: 'action.startRun' });
     fireEvent.click(sendBtn);
 
     expect(onSend).not.toHaveBeenCalled();
@@ -246,7 +246,7 @@ describe('PromptInput', () => {
       />,
     );
 
-    const sendBtn = screen.getByText('action.startRun');
+    const sendBtn = screen.getByRole('button', { name: 'action.startRun' });
     expect(sendBtn).toBeDisabled();
   });
 
@@ -263,7 +263,7 @@ describe('PromptInput', () => {
     const input = screen.getByPlaceholderText('prompt.placeholder');
     fireEvent.change(input, { target: { value: 'Hi' } });
 
-    const sendBtn = screen.getByText('action.startRun');
+    const sendBtn = screen.getByRole('button', { name: 'action.startRun' });
     expect(sendBtn).not.toBeDisabled();
   });
 });

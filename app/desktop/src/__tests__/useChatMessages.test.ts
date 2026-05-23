@@ -41,6 +41,8 @@ describe('useChatMessages', () => {
           statusHandler = null;
         };
       }),
+      send: vi.fn(),
+      getLatency: vi.fn(() => -1),
       close: vi.fn(),
     });
   });

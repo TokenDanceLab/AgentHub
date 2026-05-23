@@ -10,10 +10,13 @@ import (
 	"time"
 
 	"github.com/agenthub/hub-server/internal/api"
+	"github.com/agenthub/hub-server/internal/auth"
 )
 
 type Config struct {
-	Addr string
+	Addr          string
+	JWTSecret     string
+	AuthSkipPaths []string
 }
 
 func Run(cfg Config) error {
@@ -25,9 +28,14 @@ func Run(cfg Config) error {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
+	// Wrap mux with auth middleware. Health check always skips auth.
+	skipPaths := append([]string{"/v1/health"}, cfg.AuthSkipPaths...)
+	authMiddleware := auth.NewMiddleware(cfg.JWTSecret, skipPaths...)
+	wrappedHandler := authMiddleware.Authenticate(mux)
+
 	srv := &http.Server{
 		Addr:         cfg.Addr,
-		Handler:      mux,
+		Handler:      wrappedHandler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 0, // WebSocket compatible
 		IdleTimeout:  60 * time.Second,
