@@ -67,3 +67,20 @@ export async function cancelRun(runId: string): Promise<RunInfo> {
   if (!res.ok) throw await parseError(res);
   return res.json();
 }
+
+export async function renameThread(threadId: string, title: string): Promise<ThreadInfo> {
+  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) throw await parseError(res);
+  return res.json();
+}
+
+export async function deleteThread(threadId: string): Promise<void> {
+  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw await parseError(res);
+}
