@@ -130,28 +130,22 @@ fix/short-topic
 ### 当前活跃分支 (2026-05-23)
 
 ```
-Remote (7):
-  origin/master                            ← 稳定
-  origin/dev/maintainer                  ← 主 dev (maintainer)
+Remote (6):
+  origin/master                            ← 稳定（skill 基础设施已上线）
+  origin/dev/maintainer                  ← 主 dev: P1 交互体验推进中
   origin/dev/contributor-b                         ← contributor-b dev
-  origin/feat/desktop-sidecar              ← Desktop 工作区
-  origin/feat/edge-adapters                ← Edge 工作区 (已合入 dev)
   origin/feat/contributor-b-webui                  ← Web 工作区
+  origin/docs/dev-loop-skill-master        ← 已合并删除
   origin/feat/backend-foundation           ← 后台预留 (dormant)
 
-Local worktrees:
-  .worktrees/feat-desktop-sidecar          ← Desktop
-  .worktrees/feat-edge-adapters            ← Edge
-  .worktrees/feat-contributor-b-webui              ← Web
+本地 worktree: dev/maintainer
 ```
 
-合并方向：`feat/* → dev/maintainer → dev/contributor-b → (review) → dev/maintainer → master`
+合并方向：`feat/* → dev/maintainer → master`
 
-写死规则：
-- `dev/maintainer` 保持 maintainer 的设计和代码风格
-- `dev/contributor-b` 由 maintainer 控制合入质量
-- `feat/contributor-b-webui` 用正确工程方式落地 contributor-b 的视觉概念
-- 已删除的旧分支：`feat/frontend-page-preview`、`feat/frontend-webui`、`feat/client-openapi-im-schemas-maintainer`
+开发引擎：`.codex/skills/dev-loop/` — 模型分配(opus/sonnet/haiku) + 标准循环 + 交叉审查
+
+当前 P1 进度：P0 级 3/3 ✅ | P1 级 2/4（ThreadPanel/DiffViewer ✅, ChatView/AgentList ❌）
 
 进度同步：
 
@@ -250,7 +244,7 @@ pnpm build
 
 | 模块 | 最低覆盖率 | 当前 |
 |------|-----------|------|
-| edge-server | 60% | ~45%（adapters 包集成测试不计入 CI） |
+| edge-server | 70% | 72.0%（CI 强制阻断） |
 | app/desktop | 不做硬性要求 | 123 tests |
 | app/web | 不做硬性要求 | build 通过即可 |
 
