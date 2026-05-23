@@ -63,19 +63,6 @@ type AgentCapabilities struct {
 
 // --- Unified event types emitted by all adapters ---
 
-type AgentEventType string
-
-const (
-	EventTextDelta   AgentEventType = "agent.text.delta"
-	EventTextBlock   AgentEventType = "agent.text.block"
-	EventThinking    AgentEventType = "agent.thinking"
-	EventToolCall    AgentEventType = "agent.tool.call"
-	EventToolResult  AgentEventType = "agent.tool.result"
-	EventFileChange  AgentEventType = "agent.file.change"
-	EventSessionInit AgentEventType = "agent.session.init"
-	EventResult      AgentEventType = "agent.result"
-)
-
 // Bus event type strings (prefixed with "run.").
 const (
 	BusEventTextDelta           = "run.agent.text_delta"
