@@ -69,6 +69,11 @@ func UpdateSessionNextSeq(db *gorm.DB, sessionID string, nextSeq int64) error {
 		Update("next_seq", nextSeq).Error
 }
 
+func TouchSessionLastMessage(db *gorm.DB, sessionID string) error {
+	return db.Model(&model.Session{}).Where("id = ?", sessionID).
+		Update("last_message_at", gorm.Expr("NOW()")).Error
+}
+
 func SearchSessions(db *gorm.DB, userID, q string) ([]SessionWithMeta, error) {
 	var result []SessionWithMeta
 	err := db.Raw(`

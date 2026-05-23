@@ -5,15 +5,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"net/http/pprof"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/agenthub/server-hub/internal/cache"
 	"github.com/agenthub/server-hub/internal/config"
 	"github.com/agenthub/server-hub/internal/handler"
 	"github.com/agenthub/server-hub/internal/log"
+	"github.com/agenthub/server-hub/internal/metrics"
 	"github.com/agenthub/server-hub/internal/model"
 	"github.com/agenthub/server-hub/internal/repository"
 	"github.com/agenthub/server-hub/internal/router"
@@ -22,6 +28,7 @@ import (
 )
 
 var mgr *ws.Manager
+var bus *service.Bus
 
 func main() {
 	cfg, err := config.Load("configs/config.yaml")
@@ -30,7 +37,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	if cfg.Server.LogLevel == "debug" {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	log.Init(&cfg.Server)
+	defer log.Sync()
 
 	if err := repository.InitDB(&cfg.DB); err != nil {
 		slog.Error("failed to init database", "error", err)
@@ -47,17 +61,42 @@ func main() {
 		os.Exit(1)
 	}
 
+	go func() {
+		ctx := context.Background()
+		var sessions []model.Session
+		if err := repository.DB.Select("id, next_seq").Where("next_seq > 0").Find(&sessions).Error; err != nil {
+			slog.Warn("failed to query sessions for seq sync", "error", err)
+			return
+		}
+		count := 0
+		for _, sess := range sessions {
+			if err := cache.InitSeqIfAbsent(ctx, sess.ID, sess.NextSeq); err != nil {
+				slog.Warn("failed to init seq in redis", "session_id", sess.ID, "error", err)
+			} else {
+				count++
+			}
+		}
+		slog.Info("legacy session seq sync completed", "total", len(sessions), "synced", count)
+	}()
+
 	mgr = ws.NewManager()
 	mgr.OnRouteSet = onRouteSet
 	mgr.OnRouteDel = onRouteDel
 	mgr.ResolveMembers = func(sessionID string) []string {
-		members, err := repository.ListActiveMembers(repository.DB, sessionID)
+		ctx := context.Background()
+		ids, err := cache.GetOrLoad(ctx, "session:members:"+sessionID, 5*time.Minute, func(ctx context.Context) ([]string, error) {
+			members, err := repository.ListActiveMembers(repository.DB, sessionID)
+			if err != nil {
+				return nil, err
+			}
+			ids := make([]string, len(members))
+			for i, m := range members {
+				ids[i] = m.MemberID
+			}
+			return ids, nil
+		})
 		if err != nil {
 			return nil
-		}
-		ids := make([]string, len(members))
-		for i, m := range members {
-			ids[i] = m.MemberID
 		}
 		return ids
 	}
@@ -83,7 +122,8 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	deviceHandler := handler.NewDeviceHandler(repository.DB)
 
-	bus := service.NewBus()
+	bus = service.NewBus()
+	defer bus.Close()
 
 	notificationService := service.NewNotificationService(repository.DB, mgr)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
@@ -244,14 +284,88 @@ func main() {
 		}
 	}()
 
-	r := gin.Default()
+	// Register prometheus metrics and start admin HTTP server for pprof + /metrics
+	metrics.Register()
+
+	adminPort := cfg.Server.AdminPort
+	if adminPort == 0 {
+		adminPort = 6060
+	}
+	adminMux := http.NewServeMux()
+	adminMux.HandleFunc("/debug/pprof/", pprof.Index)
+	adminMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	adminMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	adminMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	adminMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	adminMux.Handle("/metrics", promhttp.Handler())
+	adminSrv := &http.Server{
+		Addr:              fmt.Sprintf(":%d", adminPort),
+		Handler:           adminMux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	go func() {
+		slog.Info("admin server starting", "port", adminPort)
+		if err := adminSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("admin server failed", "error", err)
+		}
+	}()
+
+	// Periodic metrics collection
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if sqlDB, err := repository.DB.DB(); err == nil {
+				stats := sqlDB.Stats()
+				metrics.DBPoolInUse.Set(float64(stats.InUse))
+			}
+			metrics.WSConnections.Set(float64(mgr.Count()))
+			metrics.RedisPoolHits.Set(float64(cache.RDB.PoolStats().Hits))
+			metrics.EventBusQueueLen.Set(float64(bus.Running()))
+		}
+	}()
+
+	r := gin.New()
+	r.Use(gin.Recovery())
 	router.SetupRoutes(r, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler)
 
-	slog.Info("server starting", "port", cfg.Server.Port)
-	if err := r.Run(fmt.Sprintf(":%d", cfg.Server.Port)); err != nil {
-		slog.Error("server failed", "error", err)
-		os.Exit(1)
+	srv := &http.Server{
+		Addr:              fmt.Sprintf(":%d", cfg.Server.Port),
+		Handler:           r,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
+
+	go func() {
+		slog.Info("server starting", "port", cfg.Server.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	slog.Info("shutting down servers...")
+
+	ctxShutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctxShutdown); err != nil {
+		slog.Error("server shutdown failed", "error", err)
+	}
+	if err := adminSrv.Shutdown(ctxShutdown); err != nil {
+		slog.Error("admin server shutdown failed", "error", err)
+	}
+
+	slog.Info("servers exited")
 }
 
 func onRouteSet(userID, deviceType, connID, oldConnID string, wasOffline bool) {

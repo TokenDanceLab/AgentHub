@@ -13,11 +13,27 @@ import (
 var RDB *redis.Client
 
 func InitRedis(cfg *config.RedisConfig) error {
+	poolSize := cfg.PoolSize
+	if poolSize == 0 {
+		poolSize = 100
+	}
+	minIdleConns := cfg.MinIdleConns
+	if minIdleConns == 0 {
+		minIdleConns = 10
+	}
+
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     cfg.Addr(),
-		Password: cfg.Password,
-		DB:       cfg.DB,
-		PoolSize: 10,
+		Addr:            cfg.Addr(),
+		Password:        cfg.Password,
+		DB:              cfg.DB,
+		PoolSize:        poolSize,
+		MinIdleConns:    minIdleConns,
+		MaxRetries:      3,
+		DialTimeout:     2 * time.Second,
+		ReadTimeout:     1 * time.Second,
+		WriteTimeout:    1 * time.Second,
+		PoolTimeout:     4 * time.Second,
+		ConnMaxIdleTime: 10 * time.Minute,
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

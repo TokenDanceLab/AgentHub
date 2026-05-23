@@ -3,11 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
+	"golang.org/x/sync/errgroup"
+	"log/slog"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/server-hub/internal/cache"
 	"github.com/agenthub/server-hub/internal/errcode"
 	"github.com/agenthub/server-hub/pkg/uuidv7"
 	"github.com/agenthub/server-hub/internal/model"
@@ -23,6 +26,21 @@ type MessageService struct {
 
 func NewMessageService(db *gorm.DB, bus *Bus) *MessageService {
 	return &MessageService{db: db, bus: bus}
+}
+
+func (s *MessageService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	seq, err := cache.AllocateSeq(ctx, sessionID)
+	if err == nil {
+		return seq, nil
+	}
+	slog.Warn("redis seq allocation failed, falling back to DB", "session_id", sessionID, "error", err)
+	var fallbackSeq int64
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		var txErr error
+		fallbackSeq, txErr = repository.AllocateSeqID(tx, sessionID)
+		return txErr
+	})
+	return fallbackSeq, err
 }
 
 type SendMessageRequest struct {
@@ -131,13 +149,17 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 		ReplyToMsgID: req.ReplyToMsgID,
 	}
 
+	seq, err := s.allocateSeq(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	msg.SeqID = seq
+
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		seq, err := repository.AllocateSeqID(tx, sessionID)
-		if err != nil {
+		if err := repository.InsertMessage(tx, msg); err != nil {
 			return err
 		}
-		msg.SeqID = seq
-		return repository.InsertMessage(tx, msg)
+		return repository.TouchSessionLastMessage(tx, sessionID)
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique") {
@@ -390,6 +412,7 @@ func (s *MessageService) ListPinnedMessages(ctx context.Context, userID, session
 }
 
 func (s *MessageService) ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error {
+	// Source message access check
 	msg, err := repository.GetMessageByID(s.db, msgID)
 	if err != nil {
 		return errcode.MsgNotFound
@@ -400,62 +423,86 @@ func (s *MessageService) ForwardMessage(ctx context.Context, userID, msgID strin
 		return errcode.SessionNotMember
 	}
 
+	// Concurrent forwarding with concurrency limit 8
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(8)
+
 	for _, sessionID := range targetSessionIDs {
-		active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
+		sid := sessionID
+		g.Go(func() error {
+			return s.forwardOne(ctx, userID, msg, sid)
+		})
+	}
+
+	return g.Wait()
+}
+
+func (s *MessageService) forwardOne(ctx context.Context, userID string, msg *model.Message, sessionID string) error {
+	// Validate membership
+	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
+	if err != nil {
+		return err
+	}
+	if !active {
+		return errcode.SessionNotMember
+	}
+
+	// Validate session
+	session, err := repository.GetSessionByID(s.db, sessionID)
+	if err != nil {
+		return errcode.SessionNotFound
+	}
+	if session.Dissolved {
+		return errcode.SessionDissolved
+	}
+
+	// Private session: check not blocked
+	if session.Type == model.SessionTypePrivate {
+		other, err := repository.GetOtherMemberInPrivate(s.db, sessionID, userID)
 		if err != nil {
 			return err
 		}
-		if !active {
-			return errcode.SessionNotMember
-		}
-
-		session, err := repository.GetSessionByID(s.db, sessionID)
-		if err != nil {
-			return errcode.SessionNotFound
-		}
-		if session.Dissolved {
-			return errcode.SessionDissolved
-		}
-
-		if session.Type == model.SessionTypePrivate {
-			other, err := repository.GetOtherMemberInPrivate(s.db, sessionID, userID)
+		if other != nil {
+			blocked, err := repository.IsBlockedBy(s.db, other.MemberID, userID)
 			if err != nil {
 				return err
 			}
-			if other != nil {
-				blocked, err := repository.IsBlockedBy(s.db, other.MemberID, userID)
-				if err != nil {
-					return err
-				}
-				if blocked {
-					return errcode.MsgBlockedByReceiver
-				}
+			if blocked {
+				return errcode.MsgBlockedByReceiver
 			}
 		}
-
-		forwarded := &model.Message{
-			SessionID:   sessionID,
-				ClientMsgID: uuidv7.Must(),
-			SenderType:  model.SenderTypeUser,
-			SenderID:    userID,
-			ContentType: msg.ContentType,
-			Content:     msg.Content,
-		}
-
-		err = s.db.Transaction(func(tx *gorm.DB) error {
-			seq, err := repository.AllocateSeqID(tx, sessionID)
-			if err != nil {
-				return err
-			}
-			forwarded.SeqID = seq
-			return repository.InsertMessage(tx, forwarded)
-		})
-		if err != nil {
-			return fmt.Errorf("forward to session %s: %w", sessionID, err)
-		}
-
-		s.bus.Publish(ctx, Event{Type: "message.new", Payload: forwarded})
 	}
+
+	// Allocate seq (uses Stage 5 Redis INCR with DB fallback)
+	seq, err := s.allocateSeq(ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("allocate seq for session %s: %w", sessionID, err)
+	}
+
+	// Construct forwarded message
+	forwarded := &model.Message{
+		SessionID:   sessionID,
+		ClientMsgID: uuidv7.Must(),
+		SenderType:  model.SenderTypeUser,
+		SenderID:    userID,
+		ContentType: msg.ContentType,
+		Content:     msg.Content,
+		SeqID:       seq,
+	}
+
+	// Insert + touch session
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if err := repository.InsertMessage(tx, forwarded); err != nil {
+			return err
+		}
+		return repository.TouchSessionLastMessage(tx, sessionID)
+	})
+	if err != nil {
+		return fmt.Errorf("forward to session %s: %w", sessionID, err)
+	}
+
+	// Publish event
+	s.bus.Publish(ctx, Event{Type: "message.new", Payload: forwarded})
 
 	return nil
 }

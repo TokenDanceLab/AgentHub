@@ -51,6 +51,12 @@ func NewManager() *Manager {
 	}
 }
 
+func (m *Manager) Count() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.conns)
+}
+
 func NewConn(ws *websocket.Conn) *Conn {
 	return &Conn{
 		W:    ws,
