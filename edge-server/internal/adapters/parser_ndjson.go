@@ -17,6 +17,7 @@ import (
 type NDJSONStreamParser struct {
 	emitter        EventEmitter
 	run            store.Run
+	ctx            context.Context    // set by Parse(); used for control_request context propagation
 	seq            int64
 	toolNames      map[string]string // toolUseID → toolName (for file_change detection)
 	controlHandler ControlHandler    // nil = control messages ignored
@@ -37,6 +38,7 @@ func (p *NDJSONStreamParser) WithControlHandler(handler ControlHandler, stdin io
 
 // Parse reads NDJSON from r until EOF or ctx cancellation.
 func (p *NDJSONStreamParser) Parse(ctx context.Context, r io.Reader) error {
+	p.ctx = ctx
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 256*1024), 10*1024*1024) // 10MB max line
 
@@ -73,7 +75,7 @@ func (p *NDJSONStreamParser) parseLine(line []byte) {
 		if p.controlHandler != nil && p.stdin != nil {
 			var ctrlMsg ControlMessage
 			if err := json.Unmarshal(line, &ctrlMsg); err == nil {
-				_ = p.controlHandler.HandleControlRequest(context.TODO(), p.stdin, ctrlMsg)
+				_ = p.controlHandler.HandleControlRequest(p.ctx, p.stdin, ctrlMsg)
 			}
 		}
 		return
