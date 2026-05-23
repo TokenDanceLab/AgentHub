@@ -33,6 +33,30 @@ func (b *ContextBudget) IsExhausted() bool {
 	return b.UsedTokens.Load() >= b.MaxTokens-b.ReservedTokens
 }
 
+// ShouldCompact returns true when token usage exceeds 85% of the usable
+// budget, signalling that auto-compaction should be triggered soon.
+func (b *ContextBudget) ShouldCompact() bool {
+	usable := b.MaxTokens - b.ReservedTokens
+	if usable <= 0 {
+		return true
+	}
+	return float64(b.UsedTokens.Load())/float64(usable) >= 0.85
+}
+
+// UsagePercent returns the current usage as a percentage (0-100) of the
+// usable token budget.
+func (b *ContextBudget) UsagePercent() float64 {
+	usable := b.MaxTokens - b.ReservedTokens
+	if usable <= 0 {
+		return 100
+	}
+	pct := float64(b.UsedTokens.Load()) / float64(usable) * 100
+	if pct > 100 {
+		return 100
+	}
+	return pct
+}
+
 // Remaining returns the number of tokens left before exhaustion.
 // Never returns a negative value.
 func (b *ContextBudget) Remaining() int64 {

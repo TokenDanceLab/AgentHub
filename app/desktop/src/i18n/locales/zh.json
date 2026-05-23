@@ -85,6 +85,7 @@
   "welcome.suggestion3": "解释这个项目的架构",
   "toast.copied": "已复制到剪贴板",
   "toast.error": "发生错误",
+  "toast.threadCreated": "线程已创建",
   "toast.threadRenamed": "线程已重命名",
   "toast.threadDeleted": "线程已删除",
   "toast.renameFailed": "重命名失败",
