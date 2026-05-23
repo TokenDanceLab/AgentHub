@@ -20,6 +20,12 @@ interface Props {
   onCreate: () => void;
 }
 
+/** Human-readable fallback when a thread has no title. */
+function getDisplayTitle(th: ThreadInfo, t: (k: string) => string): string {
+  if (th.title?.trim()) return th.title;
+  return t('thread.untitled');
+}
+
 export default function ThreadPanel({ threads, online, selectedId, onSelect, onCreate }: Props) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -56,7 +62,7 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
   const handleStartEdit = (e: React.MouseEvent, th: ThreadInfo) => {
     e.stopPropagation();
     setEditingId(th.threadId);
-    setEditTitle(th.title || th.threadId.slice(0, 12));
+    setEditTitle(th.title || '');
     setActionError(null);
   };
 
@@ -86,9 +92,9 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
 
   // ── delete handlers ────────────────────────
 
-  const handleStartDelete = (e: React.MouseEvent) => {
+  const handleStartDelete = (e: React.MouseEvent, threadId: string) => {
     e.stopPropagation();
-    setDeletingId((e.currentTarget as HTMLElement).dataset.threadId ?? null);
+    setDeletingId(threadId);
     setActionError(null);
   };
 
@@ -114,8 +120,8 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
   const formatCount = (th: ThreadInfoExt): string | null => {
     const runs = th.runCount;
     const msgs = th.itemCount;
-    if (msgs !== undefined && msgs > 0) return `${msgs} msgs`;
-    if (runs !== undefined && runs > 0) return `${runs} runs`;
+    const count = msgs ?? runs;
+    if (count != null && count > 0) return t('thread.messages', { count });
     return null;
   };
 
@@ -197,7 +203,7 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
                     onClick={() => handleConfirmDelete(th.threadId)}
                   >
                     <Trash2 size={14} />
-                    {t('thread.confirm')}
+                    {t('thread.delete')}
                   </button>
                   <button
                     className={styles.actionBtn}
@@ -219,7 +225,7 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
                 >
                   <MessageSquare size={14} />
                   <div className={styles.itemInfo}>
-                    <div className={styles.name}>{th.title || th.threadId.slice(0, 12)}</div>
+                    <div className={styles.name}>{getDisplayTitle(th, t)}</div>
                     <div className={styles.meta}>
                       {new Date(th.updatedAt).toLocaleDateString()}
                       {count && <span className={styles.count}>{` · ${count}`}</span>}
@@ -237,8 +243,7 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
                   </button>
                   <button
                     className={styles.actionBtn}
-                    onClick={handleStartDelete}
-                    data-thread-id={th.threadId}
+                    onClick={(e) => handleStartDelete(e, th.threadId)}
                     title={t('thread.delete')}
                     aria-label={t('thread.delete')}
                   >

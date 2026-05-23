@@ -21,8 +21,16 @@
 .fileHeader {
   display: flex;
   align-items: center;
+  position: sticky;
+  top: 0;
+}
+
+.fileHeaderBtn {
+  display: flex;
+  align-items: center;
   gap: var(--space-sm);
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 6px var(--space-md);
   border: none;
   background: var(--background);
@@ -31,10 +39,8 @@
   font-family: var(--font-mono);
   cursor: pointer;
   transition: background var(--duration-fast);
-  position: sticky;
-  top: 0;
 }
-.fileHeader:hover {
+.fileHeaderBtn:hover {
   background: var(--card);
 }
 
@@ -130,4 +136,60 @@
   white-space: pre;
   overflow-x: auto;
   padding-right: var(--space-md);
+}
+
+/* ── Accept / Reject actions ── */
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin-left: 2px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    border-color var(--duration-fast),
+    color var(--duration-fast);
+  flex-shrink: 0;
+}
+
+.acceptBtn {
+  color: var(--diff-added-border);
+}
+.acceptBtn:hover {
+  background: var(--diff-added-bg);
+  border-color: var(--diff-added-border);
+}
+.acceptBtnActive {
+  background: var(--diff-added-bg);
+  border-color: var(--diff-added-border);
+}
+
+.rejectBtn {
+  color: var(--diff-removed-border);
+}
+.rejectBtn:hover {
+  background: var(--diff-removed-bg);
+  border-color: var(--diff-removed-border);
+}
+.rejectBtnActive {
+  background: var(--diff-removed-bg);
+  border-color: var(--diff-removed-border);
+}
+
+/* ── File-level accept / reject visual states ── */
+.fileAccepted {
+  opacity: 0.65;
+}
+
+.fileRejected {
+  opacity: 0.45;
+}
+.fileRejected .filePath {
+  text-decoration: line-through;
 }

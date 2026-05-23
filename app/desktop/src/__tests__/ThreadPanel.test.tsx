@@ -61,7 +61,7 @@ describe('ThreadPanel', () => {
     expect(screen.getByText('Second Thread')).toBeInTheDocument();
   });
 
-  it('shows truncated threadId as title when title is empty', () => {
+  it('shows fallback title when thread title is empty', () => {
     const threads = [makeThread({ threadId: 'thread-with-very-long-id-12345', title: '' })];
     render(
       <ThreadPanel
@@ -72,8 +72,8 @@ describe('ThreadPanel', () => {
         onCreate={vi.fn()}
       />,
     );
-    // Should show first 12 chars of threadId ("thread-with-" = 12 characters)
-    expect(screen.getByText('thread-with-')).toBeInTheDocument();
+    // Should show i18n fallback instead of raw threadId
+    expect(screen.getByText('thread.untitled')).toBeInTheDocument();
   });
 
   it('highlights selected thread', () => {
