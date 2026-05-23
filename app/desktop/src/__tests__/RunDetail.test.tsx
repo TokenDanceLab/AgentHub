@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import RunDetail from '@/components/RunDetail';
+import { RunState } from '@/utils/runStateMachine';
 import type { RunInfo } from '@shared/types';
 
 function makeRun(overrides: Partial<RunInfo> = {}): RunInfo {
@@ -22,7 +23,7 @@ function makeRun(overrides: Partial<RunInfo> = {}): RunInfo {
     runId: 'run-test-001',
     projectId: 'proj-1',
     threadId: 'thread-1',
-    status: 'running',
+    status: RunState.RUNNING,
     ...overrides,
   };
 }
@@ -34,33 +35,41 @@ describe('RunDetail', () => {
   });
 
   it('shows run status with color coding for running', () => {
-    const run = makeRun({ status: 'running' });
+    const run = makeRun({ status: RunState.RUNNING });
     render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);
-    const statusEl = screen.getByText('run.status.running');
+    const statusEl = screen.getByText('run.status.RUNNING');
     expect(statusEl).toBeInTheDocument();
     expect(statusEl.className).toContain('statusRunning');
   });
 
-  it('shows run status with color coding for finished', () => {
-    const run = makeRun({ status: 'finished' });
+  it('shows run status with color coding for completed', () => {
+    const run = makeRun({ status: RunState.COMPLETED });
     render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);
-    const statusEl = screen.getByText('run.status.finished');
+    const statusEl = screen.getByText('run.status.COMPLETED');
     expect(statusEl).toBeInTheDocument();
     expect(statusEl.className).toContain('statusDone');
   });
 
   it('shows run status with color coding for failed', () => {
-    const run = makeRun({ status: 'failed' });
+    const run = makeRun({ status: RunState.FAILED });
     render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);
-    const statusEl = screen.getByText('run.status.failed');
+    const statusEl = screen.getByText('run.status.FAILED');
     expect(statusEl).toBeInTheDocument();
     expect(statusEl.className).toContain('statusFailed');
   });
 
-  it('shows run status for queued', () => {
-    const run = makeRun({ status: 'queued' });
+  it('shows cancelled status as failed style', () => {
+    const run = makeRun({ status: RunState.CANCELLED });
     render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);
-    const statusEl = screen.getByText('run.status.queued');
+    const statusEl = screen.getByText('run.status.CANCELLED');
+    expect(statusEl).toBeInTheDocument();
+    expect(statusEl.className).toContain('statusFailed');
+  });
+
+  it('shows IDLE status in pending style', () => {
+    const run = makeRun({ status: RunState.IDLE });
+    render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);
+    const statusEl = screen.getByText('run.status.IDLE');
     expect(statusEl).toBeInTheDocument();
     expect(statusEl.className).toContain('statusPending');
   });
@@ -73,7 +82,7 @@ describe('RunDetail', () => {
   });
 
   it('shows output text in pre block', () => {
-    const run = makeRun({ status: 'finished' });
+    const run = makeRun({ status: RunState.COMPLETED });
     render(
       <RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="Hello stdout output" />,
     );
@@ -90,7 +99,7 @@ describe('RunDetail', () => {
   });
 
   it('shows tool calls list', () => {
-    const run = makeRun({ status: 'running' });
+    const run = makeRun({ status: RunState.RUNNING });
     const toolCalls = [
       {
         callId: 'call-1',
@@ -117,7 +126,7 @@ describe('RunDetail', () => {
   });
 
   it('shows changed files list', () => {
-    const run = makeRun({ status: 'running' });
+    const run = makeRun({ status: RunState.RUNNING });
     const changedFiles = [
       { path: '/src/test.ts', action: 'created', timestamp: '2025-01-01T00:00:00Z' },
       { path: '/src/config.ts', action: 'modified', timestamp: '2025-01-01T00:00:01Z' },
@@ -139,5 +148,34 @@ describe('RunDetail', () => {
     const run = makeRun();
     render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);
     expect(screen.getByText('run.title')).toBeInTheDocument();
+  });
+
+  it('shows cancel button when running', () => {
+    const run = makeRun({ status: RunState.RUNNING });
+    const onCancel = () => {};
+    render(
+      <RunDetail
+        run={run}
+        toolCalls={[]}
+        changedFiles={[]}
+        outputText=""
+        onCancel={onCancel}
+      />,
+    );
+    expect(screen.getByText('action.cancelRun')).toBeInTheDocument();
+  });
+
+  it('hides cancel button when completed', () => {
+    const run = makeRun({ status: RunState.COMPLETED });
+    render(
+      <RunDetail
+        run={run}
+        toolCalls={[]}
+        changedFiles={[]}
+        outputText=""
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.queryByText('action.cancelRun')).not.toBeInTheDocument();
   });
 });

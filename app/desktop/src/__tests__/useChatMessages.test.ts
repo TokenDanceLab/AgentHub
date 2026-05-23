@@ -20,6 +20,7 @@ import { createEventStream } from '@/api/eventClient';
 import { cancelRun } from '@/api/edgeClient';
 import { useToastStore } from '@/stores/toastStore';
 import { useChatMessages } from '@/hooks/useChatMessages';
+import { RunState } from '@/utils/runStateMachine';
 import type { EventEnvelope } from '@shared/events';
 
 function makeEvent(type: string, payload: Record<string, unknown> = {}): EventEnvelope {
@@ -120,7 +121,7 @@ describe('useChatMessages', () => {
     expect(result.current.isStreaming).toBe(true);
     expect(result.current.currentRun).toMatchObject({
       runId: 'run-1',
-      status: 'running',
+      status: RunState.RUNNING,
     });
   });
 
@@ -212,14 +213,14 @@ describe('useChatMessages', () => {
     act(() => {
       eventHandler!(makeEvent('run.started', { runId: 'run-1', status: 'running' }));
     });
-    expect(result.current.currentRun?.status).toBe('running');
+    expect(result.current.currentRun?.status).toBe(RunState.RUNNING);
     expect(result.current.isStreaming).toBe(true);
 
     act(() => {
       eventHandler!(makeEvent('run.finished', { runId: 'run-1', status: 'finished' }));
     });
 
-    expect(result.current.currentRun?.status).toBe('finished');
+    expect(result.current.currentRun?.status).toBe(RunState.COMPLETED);
     expect(result.current.isStreaming).toBe(false);
   });
 
@@ -229,13 +230,13 @@ describe('useChatMessages', () => {
     act(() => {
       eventHandler!(makeEvent('run.started', { runId: 'run-1', status: 'running' }));
     });
-    expect(result.current.currentRun?.status).toBe('running');
+    expect(result.current.currentRun?.status).toBe(RunState.RUNNING);
 
     act(() => {
       eventHandler!(makeEvent('run.failed', { runId: 'run-1', status: 'failed' }));
     });
 
-    expect(result.current.currentRun?.status).toBe('failed');
+    expect(result.current.currentRun?.status).toBe(RunState.FAILED);
     expect(result.current.isStreaming).toBe(false);
   });
 
@@ -251,7 +252,7 @@ describe('useChatMessages', () => {
       eventHandler!(makeEvent('run.finished', { runId: 'run-other', status: 'finished' }));
     });
 
-    expect(result.current.currentRun?.status).toBe('running');
+    expect(result.current.currentRun?.status).toBe(RunState.RUNNING);
   });
 
   it('creates thinking blocks', () => {
