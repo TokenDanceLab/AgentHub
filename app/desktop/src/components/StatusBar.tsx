@@ -20,11 +20,18 @@ export default function StatusBar({ online, health, isConnected, error }: Props)
   const { t } = useTranslation();
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [errorCount, setErrorCount] = useState(0);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const prevErrorRef = useRef<string | null>(null);
   const prevOnlineRef = useRef(online);
 
-  // Track previous online for reconnecting detection
+  // Track reconnecting state: true when online goes from true→false
   useEffect(() => {
+    const wasOnline = prevOnlineRef.current;
+    if (online) {
+      setIsReconnecting(false);
+    } else if (wasOnline) {
+      setIsReconnecting(true);
+    }
     prevOnlineRef.current = online;
   }, [online]);
 
@@ -68,8 +75,6 @@ export default function StatusBar({ online, health, isConnected, error }: Props)
         : latencyMs < LATENCY_YELLOW
           ? styles.latencyWarn
           : styles.latencyBad;
-
-  const isReconnecting = !online && prevOnlineRef.current;
 
   return (
     <div className={styles.bar} role="status" aria-atomic="true">
