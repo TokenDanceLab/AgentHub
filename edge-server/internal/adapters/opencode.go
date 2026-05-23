@@ -190,11 +190,10 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 			})
 		}
 	case "step_finish":
+		result := map[string]any{"success": true}
 		if evt.Part != nil {
-			result := map[string]any{
-				"success": evt.Part.Reason == "stop",
-				"reason":  evt.Part.Reason,
-			}
+			result["success"] = evt.Part.Reason == "stop" || evt.Part.Reason == ""
+			result["reason"] = evt.Part.Reason
 			if evt.Part.Tokens != nil {
 				result["usage"] = map[string]any{
 					"inputTokens":      evt.Part.Tokens.Input,
@@ -208,8 +207,8 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 			if evt.Part.Cost > 0 {
 				result["cost"] = evt.Part.Cost
 			}
-			emitter.Emit(BusEventResult, scope, result)
 		}
+		emitter.Emit(BusEventResult, scope, result)
 		emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
 			"state": "idle",
 		})
