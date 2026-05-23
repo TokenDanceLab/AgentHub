@@ -32,7 +32,11 @@ func Fail(c *gin.Context, e *errcode.Error) {
 }
 
 func FailWithMessage(c *gin.Context, e *errcode.Error, message string) {
-	c.JSON(e.HTTPStatus, Response{
+	status := e.HTTPStatus
+	if status == 0 {
+		status = http.StatusInternalServerError
+	}
+	c.JSON(status, Response{
 		Code:    e.Code,
 		Message: message,
 	})
