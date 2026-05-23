@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
-	"time"
 
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
@@ -81,7 +80,6 @@ func (p *NDJSONStreamParser) parseLine(line []byte) {
 		"threadId":  p.run.ThreadID,
 		"runId":     p.run.ID,
 	}
-	now := time.Now().UnixMilli()
 
 	switch msg.Type {
 	case "control_request":
@@ -184,7 +182,6 @@ func (p *NDJSONStreamParser) parseLine(line []byte) {
 
 	default:
 		slog.Debug("ndjson: unhandled message type", "type", msg.Type)
-		_ = now
 	}
 }
 
@@ -288,13 +285,15 @@ func (p *NDJSONStreamParser) emitToolResult(scope map[string]any, msg *claudeSDK
 	}
 	for _, block := range msg.Message.Content {
 		if block.Type == "tool_result" {
+			toolName := p.toolNames[block.ToolUseID]
 			p.emit(scope, BusEventToolResult, map[string]any{
-				"callId":  block.ToolUseID,
-				"content": block.Content,
-				"isError": block.IsError,
+				"callId":   block.ToolUseID,
+				"toolName": toolName,
+				"content":  block.Content,
+				"isError":  block.IsError,
 			})
 			// Emit file_change for Write/Edit tools
-			if toolName := p.toolNames[block.ToolUseID]; isFileModifyingTool(toolName) {
+			if isFileModifyingTool(toolName) {
 				p.emit(scope, BusEventFileChange, map[string]any{
 					"callId":   block.ToolUseID,
 					"toolName": toolName,
@@ -407,7 +406,7 @@ func (p *NDJSONStreamParser) emitHookResponse(scope map[string]any, msg *claudeS
 }
 
 func isFileModifyingTool(name string) bool {
-	return name == "Write" || name == "Edit"
+	return name == "Write" || name == "Edit" || name == "NotebookEdit"
 }
 
 func (p *NDJSONStreamParser) emit(scope map[string]any, eventType string, payload map[string]any) {
