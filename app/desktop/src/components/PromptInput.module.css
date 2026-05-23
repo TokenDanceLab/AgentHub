@@ -39,31 +39,6 @@
   padding: var(--space-sm) var(--space-md);
 }
 
-.agentBtn {
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--primary);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-sans);
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.agentBtn:hover {
-  background: var(--hover-overlay);
-}
-
-.agentBtn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 .textarea {
   flex: 1;
   padding: 6px 10px;
@@ -200,44 +175,20 @@
   cursor: not-allowed;
 }
 
-.selector {
-  position: absolute;
-  bottom: 100%;
-  left: var(--space-md);
-  margin-bottom: 4px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  padding: var(--space-xs);
-  min-width: 200px;
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 10;
-}
+/* ── Selected agent badge ───────────────── */
 
-.option {
-  display: flex;
+.selectedAgentBadge {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
-  width: 100%;
-  padding: var(--space-sm) var(--space-md);
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--foreground);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-sans);
-  cursor: pointer;
-  text-align: left;
-}
-
-.option:hover {
-  background: var(--border);
-}
-
-.optionSelected {
-  background: color-mix(in oklch, var(--primary) 15%, transparent);
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in oklch, var(--primary) 30%, transparent);
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
+  color: var(--primary);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ── Responsive: Mobile (< 768px) ──────── */
@@ -267,13 +218,6 @@
     flex-wrap: wrap;
   }
 
-  .agentBtn {
-    font-size: var(--font-size-xs);
-    padding: 6px 10px;
-    min-height: var(--touch-target-min, 44px);
-    order: 1;
-  }
-
   .textarea {
     order: 2;
     flex: 1 1 100%;
@@ -292,17 +236,10 @@
     height: var(--touch-target-min, 44px);
   }
 
-  .selector {
-    left: var(--space-sm);
-    right: var(--space-sm);
-    min-width: auto;
-    max-width: none;
-  }
-
-  .option {
-    padding: var(--space-sm);
-    min-height: var(--touch-target-min, 44px);
-    font-size: var(--font-size-sm);
+  .selectedAgentBadge {
+    order: 1;
+    font-size: var(--font-size-xs);
+    padding: 4px 10px;
   }
 }
 
