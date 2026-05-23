@@ -1,9 +1,9 @@
 import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, MessageSquare, Pencil, Trash2, Check, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { ThreadInfo } from '@shared/types';
-import { renameThread, deleteThread } from '@/api/edgeClient';
-import { useThreadStore } from '@/stores/threadStore';
+import { useThreads, useRenameThread, useDeleteThread } from '@/api/threadQueries';
 import { useToast } from '@/contexts/ToastContext';
 import styles from './ThreadPanel.module.css';
 
@@ -14,11 +14,9 @@ interface ThreadInfoExt extends ThreadInfo {
 }
 
 interface Props {
-  threads: ThreadInfo[];
   online: boolean;
   selectedId?: string;
   onSelect: (thread: ThreadInfo) => void;
-  onCreate: () => void;
 }
 
 /** Human-readable fallback when a thread has no title. */
@@ -43,9 +41,17 @@ function relativeTime(
   return new Date(dateStr).toLocaleDateString();
 }
 
-export default memo(function ThreadPanel({ threads, online, selectedId, onSelect, onCreate }: Props) {
+export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props) {
   const { t } = useTranslation();
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
+
+  // TanStack Query — server state
+  const { data } = useThreads();
+  const threads = data?.items ?? [];
+  const renameMutation = useRenameThread();
+  const deleteMutation = useDeleteThread();
+
   const [query, setQuery] = useState('');
 
   // Inline rename state
@@ -56,10 +62,6 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
 
   // Delete confirmation state
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  // Store helpers
-  const storeRemoveThread = useThreadStore((s) => s.removeThread);
-  const storeRenameThread = useThreadStore((s) => s.renameThread);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return threads;
@@ -88,8 +90,7 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
     if (!editingId || !editTitle.trim()) return;
     const title = editTitle.trim();
     try {
-      await renameThread(editingId, title);
-      storeRenameThread(editingId, title);
+      await renameMutation.mutateAsync({ threadId: editingId, title });
       setEditingId(null);
       setActionError(null);
       showToast('success', t('toast.threadRenamed'));
@@ -120,8 +121,7 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
 
   const handleConfirmDelete = async (threadId: string) => {
     try {
-      await deleteThread(threadId);
-      storeRemoveThread(threadId);
+      await deleteMutation.mutateAsync(threadId);
       setDeletingId(null);
       setActionError(null);
       showToast('success', t('toast.threadDeleted'));
@@ -135,6 +135,13 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
   const handleCancelDelete = () => {
     setDeletingId(null);
     setActionError(null);
+  };
+
+  // ── create handler ─────────────────────────
+
+  const handleCreate = () => {
+    // Invalidate queries so Edge-synced threads refresh
+    queryClient.invalidateQueries({ queryKey: ['threads'] });
   };
 
   // ── helpers ────────────────────────────────
@@ -155,7 +162,7 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
         <span className={styles.title}>{t('thread.title')}</span>
         <button
           className={styles.createBtn}
-          onClick={onCreate}
+          onClick={handleCreate}
           disabled={!online}
           title={t('thread.create')}
         >
