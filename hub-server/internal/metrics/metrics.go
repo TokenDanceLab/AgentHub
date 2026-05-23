@@ -11,6 +11,7 @@ var (
 	HTTPRequestsTotal *prometheus.CounterVec
 	HTTPDuration      *prometheus.HistogramVec
 	WSConnections     prometheus.Gauge
+	WSDroppedFrames   prometheus.Counter
 	DBPoolInUse       prometheus.Gauge
 	RedisPoolHits     prometheus.Gauge
 	EventBusQueueLen  prometheus.Gauge
@@ -45,6 +46,13 @@ func Register() {
 			},
 		)
 
+		WSDroppedFrames = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "ws_dropped_frames_total",
+				Help: "Total number of WebSocket frames dropped due to full send buffer.",
+			},
+		)
+
 		DBPoolInUse = prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "db_pool_in_use",
@@ -76,6 +84,7 @@ func Register() {
 		prometheus.MustRegister(HTTPRequestsTotal)
 		prometheus.MustRegister(HTTPDuration)
 		prometheus.MustRegister(WSConnections)
+		prometheus.MustRegister(WSDroppedFrames)
 		prometheus.MustRegister(DBPoolInUse)
 		prometheus.MustRegister(RedisPoolHits)
 		prometheus.MustRegister(EventBusQueueLen)
