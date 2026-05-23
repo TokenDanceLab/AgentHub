@@ -242,3 +242,55 @@ pnpm build
 - 前端状态转换和 API client 要有单元测试。
 - 关键 UI 流程后续用 Playwright 覆盖：新建 Thread、启动 Run、查看 Diff、Approval、Preview。
 - Desktop/Runner 改动至少提供本地 smoke test 步骤；无法自动化时写在 PR 验收里。
+
+## 8. 质量治理
+
+### 测试覆盖率
+
+| 模块 | 最低覆盖率 | 当前 |
+|------|-----------|------|
+| edge-server | 60% | ~45%（adapters 包集成测试不计入 CI） |
+| app/desktop | 不做硬性要求 | 123 tests |
+| app/web | 不做硬性要求 | build 通过即可 |
+
+- CI 使用 `go test -short` 跳过需要真实 CLI 的集成测试。
+- 新增 adapter 功能必须补同包 `*_test.go`。
+- 修改 shared types 必须同步更新所有消费者的测试。
+
+### CI 触发规则
+
+| 触发条件 | CI 行为 |
+|----------|---------|
+| push 到 `master` | 全量：Go test + pnpm test + pnpm build + YAML 校验 |
+| push 到 `dev/*` | 全量 |
+| PR 到 `master` / `dev/*` | 全量 |
+| push 到 `feat/*` | **不触发**（仅在开 PR 后触发） |
+
+### 分支治理
+
+```
+master                    ← 稳定发布。CI 必须全绿才能合入。
+dev/delicious233          ← 主开发。所有 feat/* 的合入目标。
+dev/trump                 ← Web 前端合并中继。
+feat/*                    ← 功能分支。开 PR 到 dev 时触发 CI。
+```
+
+规则：
+- `master` 禁止直接 push，必须通过 PR。
+- `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + `pnpm build`。
+- `feat/*` 合并前需要 rebase 到最新 `dev`，解决冲突后再开 PR。
+- 删除已合并的 `feat/*` 分支和对应的 worktree。
+- worktree 放在 `.worktrees/`，已在 `.gitignore`，严禁提交。
+
+### 提交规范
+
+```
+type(scope): 中文摘要
+
+type: init|feat|fix|docs|refactor|chore|test|perf|ci|revert
+scope: client|edge|api|docs|desktop|web
+```
+
+- 摘要不超过 50 字。
+- 不要写 "added"、"fixed" 等英文动词——用中文。
+- hook 脚本在 `scripts/git-hooks/commit-msg`，clone 后运行 `scripts/setup.ps1` 启用。

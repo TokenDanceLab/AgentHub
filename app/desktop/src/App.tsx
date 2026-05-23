@@ -108,10 +108,12 @@ export default function App() {
   const selectedThread = threads.find((th) => th.threadId === selectedThreadId);
 
   const handleSend = useCallback(
-    async (prompt: string, agentId?: string) => {
+    async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string }) => {
       try {
         const req: StartRunRequest = { prompt };
         if (agentId) req.agentId = agentId;
+        if (opts?.model) req.model = opts.model;
+        if (opts?.reasoningEffort) req.reasoningEffort = opts.reasoningEffort;
         if (selectedThread) req.threadId = selectedThread.threadId;
         setUserMessages((prev) => [
           ...prev,
