@@ -8,9 +8,11 @@ export type { EventEnvelope };
 export type EventHandler = (event: EventEnvelope) => void;
 export type StatusHandler = (connected: boolean) => void;
 
-interface StreamHandle {
+export interface StreamHandle {
   subscribe(handler: EventHandler): () => void;
   onStatusChange(handler: StatusHandler): () => void;
+  /** Send a JSON message through the WebSocket to the Edge server. */
+  send(data: Record<string, unknown>): void;
   close(): void;
 }
 
@@ -98,6 +100,12 @@ export function createEventStream(cursor?: string): StreamHandle {
       }
       handlers.length = 0;
       statusHandlers.length = 0;
+    },
+
+    send(data: Record<string, unknown>): void {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(data));
+      }
     },
   };
 }
