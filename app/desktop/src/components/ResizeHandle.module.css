@@ -13,3 +13,10 @@
   width: 4px;
   cursor: col-resize;
 }
+
+/* ── Hide on mobile ─────────────────────── */
+@media (max-width: 767px) {
+  .handle {
+    display: none;
+  }
+}

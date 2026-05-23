@@ -109,3 +109,30 @@
   color: var(--foreground);
   background: var(--muted);
 }
+
+/* ═══════════════════════════════════════════════════════
+   Mobile (< 768px): compact status bar
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .bar {
+    padding: var(--space-xs) var(--space-md);
+    gap: var(--space-xs);
+    font-size: var(--font-size-xs);
+    height: 36px;
+    min-height: 36px;
+  }
+
+  .wsStatus {
+    display: none;
+  }
+
+  .latency {
+    display: none;
+  }
+
+  .errorBadge {
+    min-width: 16px;
+    height: 16px;
+    font-size: 10px;
+  }
+}
