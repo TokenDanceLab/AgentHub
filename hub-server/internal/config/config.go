@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -79,5 +81,18 @@ func Load(configPath string) (*Config, error) {
 	}
 
 	Cfg = &cfg
+
+	// P0-1: Explicitly override JWT secret with env var (belt-and-suspenders on top of viper AutomaticEnv).
+	if envSecret := os.Getenv("AGENTHUB_JWT_SECRET"); envSecret != "" {
+		cfg.JWT.Secret = envSecret
+	}
+
+	// P0-1: JWT secret must be set via AGENTHUB_JWT_SECRET env var; reject hardcoded defaults.
+	if cfg.JWT.Secret == "" || cfg.JWT.Secret == "dev-secret-change-in-production" {
+		if os.Getenv("AGENTHUB_JWT_SECRET") == "" {
+			return nil, errors.New("JWT secret must be set via AGENTHUB_JWT_SECRET environment variable; hardcoded defaults are rejected")
+		}
+	}
+
 	return &cfg, nil
 }
