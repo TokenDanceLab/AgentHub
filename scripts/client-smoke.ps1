@@ -26,6 +26,7 @@ $Passed = 0
 $Failed = 0
 $EdgeProc = $null
 $StartedEdge = $false
+$RunnerContextCheckRequired = -not $ReuseExistingEdge
 
 function Write-Step([string]$text) {
     Write-Host "`n=== $text ===" -ForegroundColor Cyan
@@ -51,6 +52,194 @@ function Test-EdgeHealth() {
         return ($health.status -eq "ok" -and $health.version -eq "v1")
     } catch {
         return $false
+    }
+}
+
+function Format-ProcessArgument([string]$Value) {
+    if ($null -eq $Value) {
+        return '""'
+    }
+    if ($Value -notmatch '[\s"]') {
+        return $Value
+    }
+    return '"' + ($Value -replace '"', '\"') + '"'
+}
+
+function Start-EdgeProcess([string[]]$Arguments) {
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = $EdgeBinary
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.Arguments = (($Arguments | ForEach-Object { Format-ProcessArgument $_ }) -join " ")
+    return [System.Diagnostics.Process]::Start($psi)
+}
+
+function Invoke-RunnerMock() {
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = $RunnerBinary
+    $psi.Arguments = "--mock"
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $stdout = $proc.StandardOutput.ReadToEnd()
+    $stderr = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+
+    return [pscustomobject]@{
+        ExitCode = $proc.ExitCode
+        Output = "$stdout`n$stderr"
+    }
+}
+
+function Receive-WebSocketText([System.Net.WebSockets.ClientWebSocket]$ws, [int]$TimeoutMs) {
+    $cts = [System.Threading.CancellationTokenSource]::new()
+    $cts.CancelAfter($TimeoutMs)
+    $buffer = New-Object byte[] 65536
+    $segment = [System.ArraySegment[byte]]::new($buffer)
+    $stream = [System.IO.MemoryStream]::new()
+    try {
+        do {
+            $result = $ws.ReceiveAsync($segment, $cts.Token).GetAwaiter().GetResult()
+            if ($result.MessageType -eq [System.Net.WebSockets.WebSocketMessageType]::Close) {
+                return $null
+            }
+            if ($result.Count -gt 0) {
+                $stream.Write($buffer, 0, $result.Count)
+            }
+        } while (-not $result.EndOfMessage)
+
+        if ($stream.Length -eq 0) {
+            return $null
+        }
+        return [System.Text.Encoding]::UTF8.GetString($stream.ToArray())
+    } catch [System.OperationCanceledException] {
+        return $null
+    } finally {
+        $stream.Dispose()
+        $cts.Dispose()
+    }
+}
+
+function Read-RunOutputText($event) {
+    if ($event.type -ne "run.output.batch") {
+        return ""
+    }
+    if ($event.payload.runId -ne $script:CurrentRunId) {
+        return ""
+    }
+    if ($event.payload.stream -ne "stdout") {
+        return ""
+    }
+
+    $text = ""
+    foreach ($chunk in @($event.payload.chunks)) {
+        if ($null -ne $chunk.text) {
+            $text += [string]$chunk.text
+        }
+    }
+    return $text
+}
+
+function Test-WebSocketRunOutput([string]$RunId, [bool]$AssertRunnerContext) {
+    $script:CurrentRunId = $RunId
+    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+    $cursor = 0
+    $receivedAny = $false
+    $seenCurrentRunEvent = $false
+    $seenCurrentRunTypes = @()
+    $stdout = ""
+    $preview = ""
+
+    while ([DateTime]::UtcNow -lt $deadline) {
+        $ws = New-Object System.Net.WebSockets.ClientWebSocket
+        $connectCts = [System.Threading.CancellationTokenSource]::new()
+        $connectCts.CancelAfter(5000)
+        try {
+            $uri = "ws://$EdgeAddr/v1/events?cursor=$cursor"
+            $null = $ws.ConnectAsync([Uri]$uri, $connectCts.Token).GetAwaiter().GetResult()
+            Assert ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) "WS connected"
+
+            while ([DateTime]::UtcNow -lt $deadline -and $ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
+                $raw = Receive-WebSocketText $ws 5000
+                if ([string]::IsNullOrWhiteSpace($raw)) {
+                    break
+                }
+
+                $receivedAny = $true
+                if ($preview -eq "") {
+                    $preview = $raw.Substring(0, [Math]::Min(120, $raw.Length))
+                }
+
+                $event = $raw | ConvertFrom-Json
+                if ($null -ne $event.seq) {
+                    $cursor = [int64]$event.seq
+                }
+
+                $eventRunId = $null
+                if ($null -ne $event.scope -and $null -ne $event.scope.runId) {
+                    $eventRunId = [string]$event.scope.runId
+                } elseif ($null -ne $event.payload -and $null -ne $event.payload.runId) {
+                    $eventRunId = [string]$event.payload.runId
+                }
+                if ($eventRunId -eq $RunId) {
+                    $seenCurrentRunEvent = $true
+                    $seenCurrentRunTypes += [string]$event.type
+                }
+
+                $stdout += Read-RunOutputText $event
+                if ($AssertRunnerContext) {
+                    if ($stdout.Contains("run=$RunId") -and
+                        $stdout.Contains("project=proj_local") -and
+                        $stdout.Contains("thread=thread_local")) {
+                        Assert $true "Runner stdout context includes run/project/thread"
+                        Write-Host "    matched run.output.batch for $RunId" -ForegroundColor DarkGray
+                        return
+                    }
+                } else {
+                    if ($seenCurrentRunEvent) {
+                        Assert $true "received WS frame for current run"
+                        if ($preview -ne "") {
+                            Write-Host "    first event: $preview" -ForegroundColor DarkGray
+                        }
+                        Write-Host "    current run events: $($seenCurrentRunTypes -join ', ')" -ForegroundColor DarkGray
+                        Write-Host "    skipped Runner context assertion: -ReuseExistingEdge runner configuration is unknown" -ForegroundColor DarkGray
+                        return
+                    }
+                }
+            }
+        } finally {
+            $connectCts.Dispose()
+            if ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open -or
+                $ws.State -eq [System.Net.WebSockets.WebSocketState]::CloseReceived) {
+                $closeCts = [System.Threading.CancellationTokenSource]::new()
+                $closeCts.CancelAfter(2000)
+                try {
+                    $null = $ws.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "", $closeCts.Token).GetAwaiter().GetResult()
+                } catch {
+                } finally {
+                    $closeCts.Dispose()
+                }
+            }
+            $ws.Dispose()
+        }
+    }
+
+    Assert $receivedAny "received WS frame"
+    Assert $seenCurrentRunEvent "received WS frame for current run"
+    if ($seenCurrentRunTypes.Count -gt 0) {
+        Write-Host "    current run events: $($seenCurrentRunTypes -join ', ')" -ForegroundColor DarkGray
+    }
+    if ($AssertRunnerContext) {
+        Assert $false "Runner stdout context includes run/project/thread"
+        if ($stdout -ne "") {
+            $seen = $stdout.Substring(0, [Math]::Min(200, $stdout.Length))
+            Write-Host "    stdout seen: $seen" -ForegroundColor DarkGray
+        } else {
+            Write-Host "    stdout seen: <empty>" -ForegroundColor DarkGray
+        }
     }
 }
 
@@ -123,8 +312,12 @@ try {
             Fail "edge binary missing: $EdgeBinary"
             throw "edge binary missing"
         }
+        if (-not (Test-Path $RunnerBinary)) {
+            Fail "runner binary missing: $RunnerBinary; run .\scripts\client-smoke.ps1 without -SkipBuild first or build runner/cmd/agenthub-runner"
+            throw "runner binary missing"
+        }
 
-        $EdgeProc = Start-Process -FilePath $EdgeBinary -ArgumentList "--addr", $EdgeAddr -PassThru -WindowStyle Hidden
+        $EdgeProc = Start-EdgeProcess @("--addr", $EdgeAddr, "--runner-command", $RunnerBinary, "--runner-arg", "--mock")
         $StartedEdge = $true
 
         $ready = $false
@@ -171,6 +364,7 @@ try {
 
         # POST /v1/runs
         Write-Step "POST /v1/runs"
+        $run = $null
         try {
             $run = Invoke-RestMethod -Uri "$EdgeUrl/v1/runs" -Method Post -TimeoutSec 5
             Assert ($run.runId -match '^run_') "runId prefix ($($run.runId))"
@@ -193,28 +387,11 @@ try {
         # WebSocket
         Write-Step "WebSocket /v1/events"
         try {
-            $ws = New-Object System.Net.WebSockets.ClientWebSocket
-            $ct = (New-Object System.Threading.CancellationTokenSource).Token
-            $connectedFrame = $ws.ConnectAsync([Uri]"ws://$EdgeAddr/v1/events", $ct).Wait(5000)
-            Assert ($connectedFrame) "WS connect completed"
-            Assert ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) "WS connected"
-
-            if ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
-                $buf = New-Object byte[] 4096
-                $seg = [System.ArraySegment[byte]]::new($buf)
-                $receiveTask = $ws.ReceiveAsync($seg, $ct)
-                $receivedFrame = $receiveTask.Wait(5000)
-                Assert ($receivedFrame) "received WS frame"
-                if ($receivedFrame) {
-                    $result = $receiveTask.Result
-                    $received = [System.Text.Encoding]::UTF8.GetString($buf, 0, $result.Count)
-                    Assert ($received.Length -gt 0) "received event data ($($received.Length) bytes)"
-                    $preview = $received.Substring(0, [Math]::Min(120, $received.Length))
-                    Write-Host "    first event: $preview" -ForegroundColor DarkGray
-                }
+            if ($null -eq $run -or [string]::IsNullOrWhiteSpace($run.runId)) {
+                Fail "WebSocket: POST /v1/runs did not return a runId"
+            } else {
+                Test-WebSocketRunOutput $run.runId $RunnerContextCheckRequired
             }
-
-            $null = $ws.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "", $ct).Wait(2000)
         } catch {
             Fail "WebSocket: $_"
         }
@@ -224,10 +401,14 @@ try {
         Write-Step "Mock Runner"
         Push-Location "$Root/runner"
         try {
-            $out = & $RunnerBinary --mock 2>&1
-            Assert ($LASTEXITCODE -eq 0) "runner exit 0"
-            Assert ($out -match "Installing") "output chunk: Installing"
-            Assert ($out -match "All tests passed") "output chunk: All tests passed"
+            if (-not (Test-Path $RunnerBinary)) {
+                Fail "runner binary missing: $RunnerBinary"
+                throw "runner binary missing"
+            }
+            $runnerResult = Invoke-RunnerMock
+            Assert ($runnerResult.ExitCode -eq 0) "runner exit 0"
+            Assert ($runnerResult.Output -match "Installing") "output chunk: Installing"
+            Assert ($runnerResult.Output -match "All tests passed") "output chunk: All tests passed"
         } finally { Pop-Location }
 
         # ── Go tests ────────────────────────────────────
