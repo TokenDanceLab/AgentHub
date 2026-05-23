@@ -68,13 +68,13 @@ feat/trump-webui          ← Web 前端（Trump）
 - [x] 权限事件管道：permission_requested/decided 事件 emit，Desktop 被动观察（自动批准，完整门控延迟到 M4）
 - [x] 真实 Agent 集成 E2E：scripts/integration-e2e.ps1（启动edge→POST run→WebSocket验证）
 
-### M3b 多 Agent 协调（研究员 P0 建议，进行中）
+### M3b 多 Agent 协调（研究员 P0 建议 ✅ 全部完成 6/6）
 基于 `docs/reference/02-cross-comparison/00-synthesis.md` 的 18 项目全景分析。
 
 | # | 采纳项 | 来源 | 状态 |
 |---|--------|------|:--:|
 | 1 | AgentHook 接口（6 核心 hook） | Claude Code + OpenCode | ✅ |
-| 2 | 消息树渲染（ThreadPanel tree） | LibreChat buildTree | ⏳ |
+| 2 | 消息树渲染（ThreadPanel tree） | LibreChat buildTree | ✅ |
 | 3 | 安全管道（23 检查 → Go） | Claude Code deep-dive | ✅ |
 | 4 | Task 状态: dispatched | Multica | ✅ |
 | 5 | Context Budget 模型 | Claude Code + LibreChat | ✅ |
