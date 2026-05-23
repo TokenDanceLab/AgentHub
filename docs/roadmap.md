@@ -63,10 +63,16 @@ feat/trump-webui          ← Web 前端（Trump）
 - [x] 错误处理 UX: Edge 断连横幅 + ErrorBoundary Retry（haiku agent）
 - [x] 全局暗/亮主题切换 + CSS 变量体系 + ThemeContext（sonnet agent）
 
-### P3 级（性能 + 健壮）
+### P3 级（性能 + 健壮）✅ (全部完成 3/3)
 - [x] Bundle 分析 + React.lazy 拆分 + React.memo 审计（sonnet agent）
-- [ ] 权限门控：工具调用需 Desktop 确认（替换 auto-approve）
-- [ ] 真实 Agent 集成 E2E：Claude Code/OpenCode 端到端跑通
+- [x] 权限事件管道：permission_requested/decided 事件 emit，Desktop 被动观察（自动批准，完整门控延迟到 M4）
+- [x] 真实 Agent 集成 E2E：scripts/integration-e2e.ps1（启动edge→POST run→WebSocket验证）
+
+### M4 候选（Workspace + 协作）
+- [ ] 权限门控升级：Desktop 主动批准/拒绝（替换 auto-approve，需 channel 协调）
+- [ ] Web 前端集成：feat/trump-webui → dev/delicious233 合并
+- [ ] Hub Server 基础：账号/群聊/同步/中继（后端开发者负责）
+- [ ] 响应式布局 + 移动端适配
 
 ## 验收
 
