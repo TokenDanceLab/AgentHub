@@ -99,6 +99,7 @@ const (
 	BusEventPermissionDecided   = "run.agent.permission_decided"
 	BusEventSessionMetrics      = "run.agent.session_metrics"
 	BusEventContextUsage        = "run.agent.context_usage"
+	BusEventContextWarning      = "run.agent.context_warning"
 )
 
 // Context keys for adapter-level context propagation.

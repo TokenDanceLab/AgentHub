@@ -157,7 +157,7 @@ export default function App() {
     if (online && !prevOnlineRef.current) {
       showToast('success', t('toast.connected'));
     } else if (!online && prevOnlineRef.current) {
-      showToast('error', t('toast.disconnected'));
+      showToast('warning', t('toast.disconnected'));
     }
     prevOnlineRef.current = online;
   }, [online, showToast, t]);

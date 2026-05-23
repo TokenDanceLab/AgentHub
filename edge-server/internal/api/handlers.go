@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -369,6 +370,10 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			IncludePartial:    req.IncludePartial,
 		}
 		if err := h.Executor.Start(run, runCtx); err != nil {
+			if errors.Is(err, lifecycle.ErrTooManyConcurrentRuns) {
+				writeJSON(w, http.StatusTooManyRequests, errorResponse("too_many_concurrent_runs", err.Error()))
+				return
+			}
 			writeJSON(w, http.StatusInternalServerError, errorResponse("executor_start_failed", fmt.Sprintf("failed to start run executor: %v", err)))
 			return
 		}
