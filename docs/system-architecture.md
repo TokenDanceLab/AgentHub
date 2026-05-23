@@ -2,12 +2,12 @@
 
 ## 1. 总体架构
 
-AgentHub 采用 Hub-Edge-Runner 架构。
+AgentHub 采用三层架构：Desktop（React 19 + Tauri 客户端）、Edge Server（本地 Agent 运行时）、Hub Server（云端 IM 后端）。
 
 ```text
-Desktop UI -> Edge Server -> Runner -> Claude Code / Codex / OpenCode
-                   ⇅
-              Hub Server
+Desktop (React 19 + Tauri) → Edge Server → AgentAdapter → Claude Code / Codex / OpenCode
+                                     ⇅
+                                Hub Server (Gin + GORM + Redis + PostgreSQL)
 ```
 
 核心原则：
@@ -18,9 +18,9 @@ Desktop UI -> Edge Server -> Runner -> Claude Code / Codex / OpenCode
 - Hub 负责账号、IM、多端同步、中继和权限。
 - UI 只负责交互，不直接控制 Agent CLI。
 
-## 2. 当前 M3a 本地拓扑
+## 2. 当前已完成拓扑
 
-M3a 已完成真实 Agent CLI 集成，通过统一的 AgentAdapter 接口对接三种 CLI：
+P0-P3 已全部完成，M4 8/8 已交付。真实 Agent CLI 集成通过统一 AgentAdapter 接口对接三种 CLI：
 
 ```text
 Desktop Web UI
@@ -67,7 +67,7 @@ Edge 通过 AgentAdapter 接口直接调用各 CLI 的原生协议：
 
 adapter 包包含 32 个单元测试（覆盖 24 种 NDJSON 消息类型解析、控制协议、边界情况）和 14 个集成测试（覆盖 Claude Code 和 OpenCode 的端到端执行、工具调用、取消、stdin 控制、命令行参数构建）。
 
-完整 P0 的本地拓扑是：
+当前本地拓扑（P0-P3 已全部完成）：
 
 ```text
 Desktop App
@@ -80,9 +80,9 @@ Desktop App
        └─ OpenCode
 ```
 
-P0 边界：
+当前架构边界：
 
-- Hub Server 不是 P0 运行依赖。
+- Hub Server 已完整实现（三层架构，15 migrations，Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。
 - Web/Mobile 不是 P0 执行入口。
 - Desktop UI 默认只连接本机 Local Edge。
 - Edge 才能启动 Runner，UI 不直接启动 Agent CLI。
@@ -144,7 +144,7 @@ Agent CLI -> Edge EventStore -> Edge WebSocket Bus -> UI
 Edge EventStore -> Hub Sync -> Web/Mobile
 ```
 
-当前 `edge-server/internal/events/bus.go` 是内存投递组件：负责 seq、短历史 replay 和 WebSocket fanout。它不是完整持久 EventStore。M2 需要把 EventStore 落到 Edge 本地存储。
+`edge-server/internal/events/bus.go` 是内存投递组件，负责 seq、短历史 replay 和 WebSocket fanout。EventStore 已完整落地到 Edge 本地存储。
 
 ### 同步线
 
@@ -154,11 +154,11 @@ Edge EventStore -> Hub Sync -> Web/Mobile
 Edge EventStore -> Hub Sync -> other devices
 ```
 
-P0 只要求本地 EventStore 语义清楚，不要求 Hub 完整实现。
+本地 EventStore 语义已完整实现。Hub Server 也已完整实现（三层架构，15 migrations，Gin + GORM + Redis + PostgreSQL），提供账号、IM、多端同步和中继能力。
 
 ## 6. EventStore 和恢复语义
 
-P0/M2 的 EventStore 语义：
+EventStore 语义（已完整实现）：
 
 1. Edge 先把事件持久化到 EventStore，再投递到 WebSocket。
 2. `seq` 是单个 Edge EventStore 内的单调递增序号。
@@ -195,7 +195,7 @@ Web 远控本机：Conversation Authority = Hub，Execution Authority = Desktop 
 云端执行：Conversation Authority = Hub，Execution Authority = Cloud Edge / AgentAdapter
 ```
 
-### P0 数据权威表
+### 数据权威表
 
 | 数据 | P0 写入方 | P0 存储位置 | 未来同步关系 |
 |---|---|---|---|
@@ -232,17 +232,18 @@ REST snapshot 至少应能按 Project、Thread、Run、Item、Artifact 重建 UI
 
 ## 9. 部署阶段
 
-| 阶段 | 拓扑 |
-|---|---|
-| M1 | Desktop UI -> Local Edge -> Mock Run -> WebSocket events |
-| M2 | Edge 本地持久化，EventStore 恢复，Desktop 启动编排 |
-| M3a | 真实 AgentAdapter 集成：ClaudeCode / Codex / OpenCode CLI |
-| M3b | 多 Agent 协调、Orchestrator、sub-agent spawn |
-| P0 | Desktop UI -> Local Edge -> Local Runner -> Agent CLI (完整闭环) |
-| P1 | Local Edge + 多 Agent Thread |
-| P2 | Edge <-> Hub 同步，Web/Mobile 查看和审批 |
-| P3 | Hub Relay -> Desktop/Cloud Edge -> Runner |
-| P4 | 完整团队 IM 和云端协作 |
+| 阶段 | 拓扑 | 状态 |
+|---|---|:--:|
+| M1 | Desktop UI -> Local Edge -> Mock Run -> WebSocket events | ✅ |
+| M2 | Edge 本地持久化，EventStore 恢复，Desktop 启动编排 | ✅ |
+| M3a | 真实 AgentAdapter 集成：ClaudeCode / Codex / OpenCode CLI | ✅ |
+| M3b | 多 Agent 协调、Orchestrator、sub-agent spawn | ✅ |
+| M4 | Hub Server、响应式布局、环境隔离、E2E、权限门控、Hub auth | ✅ |
+| P0 | Desktop UI -> Local Edge -> Local Runner -> Agent CLI (完整闭环) | ✅ |
+| P1 | Local Edge + 多 Agent Thread | 已完成 |
+| P2 | Edge <-> Hub 同步，Web/Mobile 查看和审批 | 已完成 |
+| P3 | Hub Relay -> Desktop/Cloud Edge -> Runner | 已完成 |
+| P4 | 完整团队 IM 和云端协作 | 规划中 |
 
 ## 10. 文档分层
 
