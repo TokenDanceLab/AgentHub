@@ -14,12 +14,14 @@ import (
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
 var ErrProcessBusRequired = errors.New("process event bus is required")
 var ErrProcessCommandRequired = errors.New("process command is required")
 var ErrProcessStoreRequired = errors.New("process store is required")
+var ErrTooManyConcurrentRuns = errors.New("too many concurrent runs")
 
 type ProcessExecutorConfig struct {
 	Command  string
@@ -36,9 +38,12 @@ type ProcessExecutor struct {
 	adapter    adapters.AgentAdapter // default adapter; may be nil (raw stdout capture)
 	adapterReg *adapters.Registry    // per-run adapter resolution; may be nil
 
-	mu      sync.Mutex
-	running map[string]context.CancelFunc
-	stdins  map[string]io.Writer // runID → stdin (for adapter-aware interrupt)
+	maxConcurrentRuns int // maximum concurrent runs; 0 means use default (5)
+
+	mu         sync.Mutex
+	running    map[string]context.CancelFunc
+	stdins     map[string]io.Writer                    // runID → stdin (for adapter-aware interrupt)
+	runOutputs map[string]*runnerctx.RunOutputStore    // runID → temp log for output persistence & replay
 }
 
 func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter, adapterReg *adapters.Registry) (*ProcessExecutor, error) {
@@ -62,13 +67,15 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		}
 	}
 	return &ProcessExecutor{
-		bus:        bus,
-		store:      store,
-		profile:    profile,
-		adapter:    adapter,
-		adapterReg: adapterReg,
-		running:    make(map[string]context.CancelFunc),
-		stdins:     make(map[string]io.Writer),
+		bus:               bus,
+		store:             store,
+		profile:           profile,
+		adapter:           adapter,
+		adapterReg:        adapterReg,
+		maxConcurrentRuns: 5,
+		running:           make(map[string]context.CancelFunc),
+		stdins:            make(map[string]io.Writer),
+		runOutputs:        make(map[string]*runnerctx.RunOutputStore),
 	}, nil
 }
 
@@ -85,13 +92,24 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 		return ErrRunAlreadyStarted
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultRunTimeout)
 	e.mu.Lock()
+	max := e.maxConcurrentRuns
+	if max <= 0 {
+		max = 5
+	}
+	if len(e.running) >= max {
+		e.mu.Unlock()
+		return ErrTooManyConcurrentRuns
+	}
 	if _, ok := e.running[run.ID]; ok {
 		e.mu.Unlock()
-		cancel()
 		return ErrRunAlreadyStarted
 	}
+	e.running[run.ID] = nil // placeholder, updated after context creation
+	e.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultRunTimeout)
+	e.mu.Lock()
 	e.running[run.ID] = cancel
 	e.mu.Unlock()
 
@@ -233,9 +251,19 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		e.bus.Publish("run.started", runScope(started), RunResponse(started))
 	}
 
+	// Create temp file for run output persistence & replay
+	outStore, err := runnerctx.NewRunOutputStore(run.ID)
+	if err != nil {
+		slog.Warn("process: failed to create run output store", "runId", run.ID, "err", err)
+	} else {
+		e.mu.Lock()
+		e.runOutputs[run.ID] = outStore
+		e.mu.Unlock()
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go e.publishOutput(&wg, run, "stderr", stderr)
+	go e.publishOutput(&wg, run, outStore, "stderr", stderr)
 
 	// Inject context budget for token tracking in stream parsers.
 	parserCtx := ctx
@@ -249,7 +277,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	} else {
 		// Raw capture: stdout goes to run.output.batch events
 		wg.Add(1)
-		go e.publishOutput(&wg, run, "stdout", stdout)
+		go e.publishOutput(&wg, run, outStore, "stdout", stdout)
 	}
 
 	waitErr := cmd.Wait()
@@ -269,7 +297,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	}
 }
 
-func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, stream string, reader io.Reader) {
+func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outStore *runnerctx.RunOutputStore, stream string, reader io.Reader) {
 	defer wg.Done()
 
 	buf := make([]byte, 32*1024)
@@ -278,6 +306,7 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, strea
 		n, err := reader.Read(buf)
 		if n > 0 {
 			text := string(buf[:n])
+			if outStore != nil { outStore.Write(text) }
 			e.bus.Publish("run.output.batch", runScope(run), map[string]any{
 				"runId":  run.ID,
 				"stream": stream,
@@ -322,10 +351,12 @@ func (e *ProcessExecutor) envForRun(run store.Run, profileEnv, extraEnv []string
 func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 	failed, ok := e.store.SetRunStatusIf(run.ID, "failed", "queued", "started")
 	if ok {
+		exitCode := ExitCodeFromErr(err)
+		classified := ClassifyError(err, exitCode)
 		e.bus.Publish("run.failed", runScope(failed), map[string]any{
 			"runId":  failed.ID,
 			"status": failed.Status,
-			"error":  err.Error(),
+			"error":  classified,
 		})
 	}
 }
@@ -349,6 +380,12 @@ func (e *ProcessExecutor) finish(runID string) {
 	e.mu.Lock()
 	delete(e.running, runID)
 	delete(e.stdins, runID)
+	if s, ok := e.runOutputs[runID]; ok {
+		if err := s.Close(); err != nil {
+			slog.Warn("process: failed to close output store", "runId", runID, "err", err)
+		}
+		delete(e.runOutputs, runID)
+	}
 	e.mu.Unlock()
 }
 
@@ -356,7 +393,18 @@ func (e *ProcessExecutor) finish(runID string) {
 // native protocol and emit typed events to the bus.
 func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.Run, stdout io.Reader, stdin io.Writer, adapter adapters.AgentAdapter, ctx context.Context) {
 	defer wg.Done()
-	emitter := &busEventEmitter{bus: e.bus}
+	var emitter adapters.EventEmitter = &busEventEmitter{bus: e.bus}
+
+	// Wrap emitter with budget monitoring: emits run.agent.context_warning
+	// when token usage exceeds the auto-compaction threshold (85%).
+	if budget, ok := ctx.Value(adapters.CtxBudgetKey).(*runnerctx.ContextBudget); ok && budget != nil {
+		emitter = &budgetAwareEmitter{
+			inner:     emitter,
+			budget:    budget,
+			scope:     runScope(run),
+		}
+	}
+
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
 		slog.Error("structured output parse error", "runId", run.ID, "err", err)
 	}
@@ -369,4 +417,33 @@ type busEventEmitter struct {
 
 func (e *busEventEmitter) Emit(eventType string, scope map[string]any, payload any) {
 	e.bus.Publish(eventType, scope, payload)
+}
+
+// budgetAwareEmitter wraps an EventEmitter to emit run.agent.context_warning
+// when the context budget first crosses the 85% auto-compaction threshold.
+// It suppresses duplicate warnings for the same run.
+type budgetAwareEmitter struct {
+	inner  adapters.EventEmitter
+	budget *runnerctx.ContextBudget
+	scope  map[string]any
+	mu     sync.Mutex
+	warned bool
+}
+
+func (e *budgetAwareEmitter) Emit(eventType string, scope map[string]any, payload any) {
+	e.inner.Emit(eventType, scope, payload)
+
+	if eventType == adapters.BusEventContextWarning {
+		return // Prevent recursive emission
+	}
+
+	e.mu.Lock()
+	if !e.warned && e.budget.ShouldCompact() {
+		e.warned = true
+		e.inner.Emit(adapters.BusEventContextWarning, e.scope, map[string]any{
+			"usagePercent": e.budget.UsagePercent(),
+			"threshold":    85.0,
+		})
+	}
+	e.mu.Unlock()
 }
