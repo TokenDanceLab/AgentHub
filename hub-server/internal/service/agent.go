@@ -16,13 +16,14 @@ import (
 )
 
 type AgentService struct {
-	db  *gorm.DB
-	bus *Bus
-	mgr *ws.Manager
+	db          *gorm.DB
+	bus         *Bus
+	mgr         *ws.Manager
+	cacheClient *cache.Client
 }
 
-func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager) *AgentService {
-	return &AgentService{db: db, bus: bus, mgr: mgr}
+func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client) *AgentService {
+	return &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: cacheClient}
 }
 
 // CustomAgent CRUD
@@ -232,7 +233,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	payload, _ := json.Marshal(dp)
 
 	// try to push to inviter's edge (desktop) via WebSocket
-	connID, err := cache.GetRoute(ctx, ai.InviterUserID, "desktop")
+	connID, err := s.cacheClient.GetRoute(ctx, ai.InviterUserID, "desktop")
 	if err == nil && connID != "" {
 		frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
 		s.mgr.PushToConn(connID, frame)
@@ -241,7 +242,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	}
 
 	// offline: push to Redis pending queue
-	_ = cache.PushPendingTask(ctx, ai.InviterUserID, string(payload))
+	_ = s.cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload))
 }
 
 // CancelTask cancels a pending task by its ID.
