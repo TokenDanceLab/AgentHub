@@ -83,7 +83,7 @@ feat/trump-webui          ← Web 前端（Trump）
 | Agent | E2E 集成测试 | 单元测试 | 事件覆盖 | 备注 |
 |-------|------------|---------|---------|------|
 | Claude Code | ✅ 5/5 pass | ✅ 24 fixtures | 20+ types | 全链路验证通过 |
-| OpenCode | ✅ 进程正常退出 | ✅ 12 tests | 16 types | stdin 死锁已修复，需 API key 配置 |
+| OpenCode | ✅ 4/5 pass | ✅ 12 tests | 16 types | session_init+text_delta+finished, result 事件 schema 微调 |
 | Codex | ❌ 未实测 | ✅ fixture tests | 9 item types | 需额度 |
 | Hub Server | ✅ 骨架可运行 | — | 18 routes | 待后端开发 |
 
