@@ -80,7 +80,8 @@ try {
 
 Write-Host "[5/6] Creating run..." -ForegroundColor Yellow
 $Model = if ($Agent -eq "claude-code") { "claude-haiku-4-5" }
-         else { $null }  # OpenCode/Codex use their own defaults
+         elseif ($Agent -eq "opencode") { "sonnet" }
+         else { $null }  # Codex uses its own defaults
 $Body = @{
   projectId = "proj_e2e"
   threadId  = "thread_e2e"
