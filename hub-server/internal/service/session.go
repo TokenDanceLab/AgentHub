@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/server-hub/internal/cache"
 	"github.com/agenthub/server-hub/internal/errcode"
 	"github.com/agenthub/server-hub/internal/model"
 	"github.com/agenthub/server-hub/internal/repository"
@@ -78,6 +80,10 @@ func (s *SessionService) CreatePrivateSession(ctx context.Context, currentUserID
 		return nil, err
 	}
 
+	if err := cache.InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
+		slog.Warn("failed to init seq in redis", "session_id", session.ID, "error", err)
+	}
+
 	return &CreateSessionResponse{SessionID: session.ID, Type: model.SessionTypePrivate, Created: true}, nil
 }
 
@@ -120,6 +126,10 @@ func (s *SessionService) CreateGroupSession(ctx context.Context, ownerUserID, na
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if err := cache.InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
+		slog.Warn("failed to init seq in redis", "session_id", session.ID, "error", err)
 	}
 
 	return &CreateSessionResponse{SessionID: session.ID, Type: model.SessionTypeGroup, Created: true}, nil
@@ -212,7 +222,11 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 			SessionID: sessionID, MemberType: model.MemberTypeUser, MemberID: mid, Role: model.MemberRoleMember,
 		})
 	}
-	return repository.BatchCreateMembers(s.db, members)
+	if err := repository.BatchCreateMembers(s.db, members); err != nil {
+		return err
+	}
+	cache.Invalidate(ctx, "session:members:"+sessionID)
+	return nil
 }
 
 func (s *SessionService) RemoveGroupMember(ctx context.Context, currentUserID, sessionID, targetUserID string) error {
@@ -237,7 +251,11 @@ func (s *SessionService) RemoveGroupMember(ctx context.Context, currentUserID, s
 		return errcode.SessionNotMember
 	}
 
-	return repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, targetUserID)
+	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, targetUserID); err != nil {
+		return err
+	}
+	cache.Invalidate(ctx, "session:members:"+sessionID)
+	return nil
 }
 
 func (s *SessionService) LeaveGroup(ctx context.Context, currentUserID, sessionID string) error {
@@ -276,7 +294,11 @@ func (s *SessionService) LeaveGroup(ctx context.Context, currentUserID, sessionI
 		_ = repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeAgent, agent.ID)
 	}
 
-	return repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID)
+	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID); err != nil {
+		return err
+	}
+	cache.Invalidate(ctx, "session:members:"+sessionID)
+	return nil
 }
 
 func (s *SessionService) TransferGroupOwnership(ctx context.Context, currentUserID, sessionID, newOwnerID string) error {
@@ -301,7 +323,11 @@ func (s *SessionService) TransferGroupOwnership(ctx context.Context, currentUser
 		return errcode.SessionNotMember
 	}
 
-	return repository.TransferOwnership(s.db, sessionID, currentUserID, newOwnerID)
+	if err := repository.TransferOwnership(s.db, sessionID, currentUserID, newOwnerID); err != nil {
+		return err
+	}
+	cache.Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
+	return nil
 }
 
 func (s *SessionService) DissolveGroup(ctx context.Context, currentUserID, sessionID string) error {
@@ -322,7 +348,11 @@ func (s *SessionService) DissolveGroup(ctx context.Context, currentUserID, sessi
 	}
 
 	session.Dissolved = true
-	return repository.UpdateSession(s.db, session)
+	if err := repository.UpdateSession(s.db, session); err != nil {
+		return err
+	}
+	cache.Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
+	return nil
 }
 
 func (s *SessionService) UpdateGroupInfo(ctx context.Context, currentUserID, sessionID string, name, avatarURL, announcement *string) error {
@@ -348,7 +378,11 @@ func (s *SessionService) UpdateGroupInfo(ctx context.Context, currentUserID, ses
 	if announcement != nil {
 		session.Announcement = *announcement
 	}
-	return repository.UpdateSession(s.db, session)
+	if err := repository.UpdateSession(s.db, session); err != nil {
+		return err
+	}
+	cache.Invalidate(ctx, "session:meta:"+sessionID)
+	return nil
 }
 
 func (s *SessionService) UpdateMemberSettings(ctx context.Context, currentUserID, sessionID string, pinned, archived, muted *bool) error {

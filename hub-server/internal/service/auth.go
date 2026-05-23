@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
+	"github.com/agenthub/server-hub/internal/cache"
 	"github.com/agenthub/server-hub/internal/config"
 	"github.com/agenthub/server-hub/internal/errcode"
 	"github.com/agenthub/server-hub/internal/jwtutil"
@@ -163,6 +164,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID, nickname, avata
 	if err := repository.UpdateUser(s.db, user); err != nil {
 		return nil, err
 	}
+	cache.Invalidate(ctx, "user:profile:"+userID)
 	return user, nil
 }
 
@@ -189,5 +191,6 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID, oldPassword, n
 		return err
 	}
 
+	cache.Invalidate(ctx, "user:profile:"+userID)
 	return repository.RevokeAllUserTokens(s.db, userID)
 }
