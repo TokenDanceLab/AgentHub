@@ -86,24 +86,20 @@ describe('ChatView', () => {
       blocks: [{ kind: 'thinking', content: 'Let me think about this...' }],
     };
     render(<ChatView messages={[msg]} />);
-    // The summary should show "chat.thinking" translation key
-    expect(screen.getByText('chat.thinking')).toBeInTheDocument();
-    // Content is inside <details> which starts collapsed
-    const details = screen.getByText('chat.thinking').closest('details');
-    expect(details).toBeInTheDocument();
-    expect(details).not.toHaveAttribute('open');
-    // The thinking content text should still be in the DOM (just hidden by details)
-    expect(screen.getByText('Let me think about this...')).toBeInTheDocument();
+    // The toggle button should show "Thinking"
+    expect(screen.getByText('Thinking')).toBeInTheDocument();
+    // Content is conditionally rendered (NOT in DOM when collapsed)
+    expect(screen.queryByText('Let me think about this...')).not.toBeInTheDocument();
   });
 
-  it('renders tool_call blocks with status', () => {
+  it('renders tool_use blocks with status', () => {
     const msg: ChatMessage = {
       id: 'msg-tool-1',
       role: 'agent',
       timestamp: new Date().toISOString(),
       blocks: [
         {
-          kind: 'tool_call',
+          kind: 'tool_use',
           callId: 'call-1',
           toolName: 'read_file',
           input: { path: '/test.txt' },
@@ -112,9 +108,8 @@ describe('ChatView', () => {
       ],
     };
     render(<ChatView messages={[msg]} />);
-    // The tool_call renders a summary with the translated toolCall key
-    expect(screen.getByText(/chat.toolCall/)).toBeInTheDocument();
-    // The status text is rendered directly (not translated)
+    // The toggle button should show tool name and status
+    expect(screen.getByText('read_file')).toBeInTheDocument();
     expect(screen.getByText('completed')).toBeInTheDocument();
   });
 
@@ -133,10 +128,10 @@ describe('ChatView', () => {
       ],
     };
     render(<ChatView messages={[msg]} />);
-    // The translation key for fileChange should appear
-    expect(screen.getByText(/chat.fileChange/)).toBeInTheDocument();
-    // The "added" class should be present on the <details> element for created action
-    const details = screen.getByText(/chat.fileChange/).closest('details');
+    // The action should be in the summary
+    expect(screen.getByText(/created/)).toBeInTheDocument();
+    // The "added" class on the <details> element for created action
+    const details = screen.getByText(/created/).closest('details');
     expect(details?.className).toContain('added');
   });
 
@@ -154,7 +149,7 @@ describe('ChatView', () => {
       ],
     };
     render(<ChatView messages={[msg]} />);
-    const details = screen.getByText(/chat.fileChange/).closest('details');
+    const details = screen.getByText(/modified/).closest('details');
     expect(details?.className).toContain('modified');
   });
 
@@ -172,7 +167,7 @@ describe('ChatView', () => {
       ],
     };
     render(<ChatView messages={[msg]} />);
-    const details = screen.getByText(/chat.fileChange/).closest('details');
+    const details = screen.getByText(/deleted/).closest('details');
     expect(details?.className).toContain('removed');
   });
 
