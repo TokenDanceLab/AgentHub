@@ -74,6 +74,10 @@ func (s *AgentService) UpdateCustomAgent(ctx context.Context, ownerID string, ca
 		return errcode.AgentNotFound
 	}
 	ca.OwnerUserID = ownerID
+if ca.CapabilityTags == "" {
+		ca.CapabilityTags = existing.CapabilityTags }
+	if ca.ToolWhitelist == "" { ca.ToolWhitelist = existing.ToolWhitelist }
+	if ca.ModelParams == "" { ca.ModelParams = existing.ModelParams }
 	ca.CreatedAt = existing.CreatedAt
 	return repository.UpdateCustomAgent(s.db, ca)
 }

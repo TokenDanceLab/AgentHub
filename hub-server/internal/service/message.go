@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/server-hub/internal/errcode"
+	"github.com/agenthub/server-hub/pkg/uuidv7"
 	"github.com/agenthub/server-hub/internal/model"
 	"github.com/agenthub/server-hub/internal/repository"
 )
@@ -434,6 +435,7 @@ func (s *MessageService) ForwardMessage(ctx context.Context, userID, msgID strin
 
 		forwarded := &model.Message{
 			SessionID:   sessionID,
+				ClientMsgID: uuidv7.Must(),
 			SenderType:  model.SenderTypeUser,
 			SenderID:    userID,
 			ContentType: msg.ContentType,
