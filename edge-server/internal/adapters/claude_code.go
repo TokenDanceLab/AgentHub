@@ -83,8 +83,16 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	}
 
 	// Reasoning effort & thinking budget
+	if ctx.ReasoningEffort != "" {
+		args = append(args, "--reasoning-effort", ctx.ReasoningEffort)
+	}
 	if ctx.MaxThinkingTokens > 0 {
 		args = append(args, "--max-thinking-tokens", fmt.Sprintf("%d", ctx.MaxThinkingTokens))
+	}
+
+	// Fast mode
+	if ctx.FastMode {
+		args = append(args, "--fast")
 	}
 
 	// Include partial stream_event deltas
