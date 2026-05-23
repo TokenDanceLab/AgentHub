@@ -25,20 +25,10 @@ func NewClient(rdb *redis.Client) *Client {
 	return &Client{rdb: rdb}
 }
 
-// ── Deprecated compatibility ──────────────────────────────────────────
-// During Phase 1-2 migration, package-level functions delegate to this
-// instance. Set by InitRedis. Removed in Phase 5.
-
-var defaultClient *Client
-
-// SetDefaultClient sets the fallback client used by deprecated package-level
-// functions. Called automatically by InitRedis.
-func SetDefaultClient(c *Client) { defaultClient = c }
-
-// getOrLoad is a generic helper that performs cache-aside with singleflight
-// deduplication. It cannot be a Client method because Go does not support
-// generic methods. Pass a *Client explicitly.
-func getOrLoad[T any](c *Client, ctx context.Context, key string, ttl time.Duration, loader func(context.Context) (T, error)) (T, error) {
+// GetOrLoad is a generic helper that performs cache-aside with singleflight
+// deduplication. It is a package-level function (not a method) because Go does
+// not support generic methods. Pass a *Client explicitly.
+func GetOrLoad[T any](c *Client, ctx context.Context, key string, ttl time.Duration, loader func(context.Context) (T, error)) (T, error) {
 	data, err := c.rdb.Get(ctx, key).Bytes()
 	if err == nil {
 		var v T
