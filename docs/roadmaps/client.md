@@ -12,7 +12,7 @@
 
 ## 当前目标
 
-推进 M2 Edge 本地数据层，把 M1 的内存事件流升级为 Project / Thread / Run / Item / Event 模型。当前 PR #30 已完成内存态最小模型，`feat/client-thread-messages-delicious233` 已补 message/item 写入链路，`feat/client-run-lifecycle-delicious233` 已抽出 Edge Run lifecycle executor 边界，`feat/client-store-boundary-delicious233` 已抽象可替换 store 接口，`feat/client-store-persistence-delicious233` 已提供轻量 JSON 文件持久化实现，`feat/client-edge-store-file-flag-delicious233` 已将文件 store 接入 Edge 启动参数，`feat/client-runner-process-adapter-delicious233` 已补本地进程 executor 边界，`feat/client-runner-workdir-delicious233` 已补本地进程工作目录配置边界，`feat/client-runner-adapter-profile-delicious233` 已补 generic adapter profile / 命令模板最小层，`feat/client-runner-profile-preset-delicious233` 已补仓库自带 mock Runner preset 入口，`feat/client-runner-context-delicious233` 已补 Runner mock 读取 Edge 注入上下文的最小契约，`feat/client-runner-edge-smoke-delicious233` 已补 Edge ProcessExecutor 启动仓库 Runner mock CLI 的集成测试，`feat/client-httpserver-runner-wiring-delicious233` 已补 HTTP server 到 ProcessExecutor 的装配测试，后续继续补真实 Runner adapter。
+推进 M2 Edge 本地数据层，把 M1 的内存事件流升级为 Project / Thread / Run / Item / Event 模型。当前 PR #30 已完成内存态最小模型，`feat/client-thread-messages-delicious233` 已补 message/item 写入链路，`feat/client-run-lifecycle-delicious233` 已抽出 Edge Run lifecycle executor 边界，`feat/client-store-boundary-delicious233` 已抽象可替换 store 接口，`feat/client-store-persistence-delicious233` 已提供轻量 JSON 文件持久化实现，`feat/client-edge-store-file-flag-delicious233` 已将文件 store 接入 Edge 启动参数，`feat/client-runner-process-adapter-delicious233` 已补本地进程 executor 边界，`feat/client-runner-workdir-delicious233` 已补本地进程工作目录配置边界，`feat/client-runner-adapter-profile-delicious233` 已补 generic adapter profile / 命令模板最小层，`feat/client-runner-profile-preset-delicious233` 已补仓库自带 mock Runner preset 入口，`feat/client-runner-context-delicious233` 已补 Runner mock 读取 Edge 注入上下文的最小契约，`feat/client-runner-edge-smoke-delicious233` 已补 Edge ProcessExecutor 启动仓库 Runner mock CLI 的集成测试，`feat/client-httpserver-runner-wiring-delicious233` 已补 HTTP server 到 ProcessExecutor 的装配测试，`feat/client-smoke-runner-context-delicious233` 已补本地 smoke 对 Edge -> Runner mock 上下文输出的验证，后续继续补真实 Runner adapter。
 
 ## 近期任务
 
@@ -35,6 +35,7 @@
 - [x] 增加 Runner mock 上下文读取边界，覆盖 `AGENTHUB_RUN_ID` 默认值、env 注入 run ID 和 stdout 上下文输出。
 - [x] 增加 Edge ProcessExecutor 到仓库 Runner mock CLI 的集成测试，覆盖真实 env 注入、stdout event 聚合、Run / Project / Thread 上下文输出和完成事件。
 - [x] 增加 Edge HTTP server 到 ProcessExecutor 的装配测试，覆盖配置进程 executor 后 `POST /v1/runs` 能看到 started / finished 事件。
+- [x] 补强 `scripts/client-smoke.ps1`，默认自启动 Edge 时使用 Runner mock binary，并验证当前 run 的 stdout 包含 Run / Project / Thread 上下文。
 - [ ] 将真实 Runner adapter 接入 Edge Run lifecycle。
 - [ ] 细化 Project / Thread / Item 的 OpenAPI 响应 schema。
 
@@ -53,4 +54,4 @@
 - [x] `cd app/desktop; pnpm test`
 - [x] `cd app/desktop; pnpm build`
 - [ ] `pnpm test:e2e`
-- [ ] `.\scripts\client-smoke.ps1`
+- [x] `.\scripts\client-smoke.ps1`
