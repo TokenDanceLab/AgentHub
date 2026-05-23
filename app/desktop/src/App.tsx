@@ -4,7 +4,7 @@ import { Menu, X, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile } from '@/hooks/useMediaQuery';
-import { startRun, cancelRun, fetchAgents, fetchThreads, fetchHealth } from '@/api/edgeClient';
+import { startRun, cancelRun, fetchAgents, fetchThreads, fetchHealth, decidePermission as decidePermissionRest } from '@/api/edgeClient';
 import type { AgentInfo, ThreadInfo, StartRunRequest } from '@shared/types';
 import type { ChatMessage } from '@/components/ChatView.types';
 import { useUIStore } from '@/stores/uiStore';
@@ -17,6 +17,7 @@ import AgentList from '@/components/AgentList';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ResizeHandle from '@/components/ResizeHandle';
 import PromptInput from '@/components/PromptInput';
+import PermissionDialog from '@/components/PermissionDialog';
 import { SkeletonLine, SkeletonCircle } from '@/components/Skeleton';
 import styles from '@/App.module.css';
 
@@ -32,7 +33,7 @@ const MAX_RIGHT = 600;
 
 export default function App() {
   const { online, health } = useHealth();
-  const { messages, isConnected, currentRun } = useChatMessages(online);
+  const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online);
   const { t } = useTranslation();
   const isMobile = useIsMobile();
 
@@ -262,6 +263,20 @@ export default function App() {
       setMobileSidebarOpen(false);
     },
     [selectThread],
+  );
+
+  // ── Permission gate ──
+  const handleDecidePermission = useCallback(
+    (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
+      // 1. Update local state and send via WebSocket
+      decidePermission(requestId, decision, reason);
+      // 2. Also notify Edge via REST (fallback if WebSocket send is not processed)
+      const runId = currentRun?.runId ?? '';
+      decidePermissionRest({ requestId, decision, reason, runId }).catch((e: unknown) => {
+        console.error('Failed to send permission decision via REST:', e);
+      });
+    },
+    [decidePermission, currentRun?.runId],
   );
 
   const allMessages = [...userMessages, ...messages];
@@ -496,6 +511,7 @@ export default function App() {
       <Suspense fallback={null}>
         <SearchDialog messages={allMessages} onSelect={handleSearchSelect} />
       </Suspense>
+      <PermissionDialog requests={permissionRequests} onDecide={handleDecidePermission} />
     </div>
   );
 }

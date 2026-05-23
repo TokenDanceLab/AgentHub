@@ -84,3 +84,21 @@ export async function deleteThread(threadId: string): Promise<void> {
   });
   if (!res.ok) throw await parseError(res);
 }
+
+// ── Permission gating ────────────────────────
+
+export interface PermissionDecideRequest {
+  runId: string;
+  requestId: string;
+  decision: 'allow' | 'deny';
+  reason?: string;
+}
+
+export async function decidePermission(req: PermissionDecideRequest): Promise<void> {
+  const res = await fetch(`${BASE}/v1/permissions/decide`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) throw await parseError(res);
+}

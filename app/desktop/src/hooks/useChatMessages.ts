@@ -2,6 +2,7 @@
 
 import { useReducer, useEffect, useRef, useCallback } from 'react';
 import { createEventStream } from '@/api/eventClient';
+import type { StreamHandle } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
 import type { ChatMessage, MessageBlock, ToolResultBlock } from '@/components/ChatView.types';
 
@@ -23,20 +24,34 @@ interface RunState {
   tasks: Array<{ taskId: string; description: string; status: string; summary?: string }>;
 }
 
+export interface PermissionRequestItem {
+  requestId: string;
+  runId: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  decision?: 'allow' | 'deny';
+  reason?: string;
+  timestamp: string;
+}
+
 interface State {
   messages: ChatMessage[];
   isConnected: boolean;
   isStreaming: boolean;
   currentRun: RunState | null;
+  permissionRequests: PermissionRequestItem[];
 }
 
 type Action =
   | { type: 'EVENT_RECEIVED'; event: EventEnvelope }
   | { type: 'CLEAR_MESSAGES' }
-  | { type: 'SET_CONNECTED'; connected: boolean };
+  | { type: 'SET_CONNECTED'; connected: boolean }
+  | { type: 'RESOLVE_PERMISSION'; requestId: string; decision: 'allow' | 'deny'; reason?: string };
 
 export interface ChatState extends State {
   clearMessages: () => void;
+  /** Submit a user decision for a pending permission request. */
+  decidePermission: (requestId: string, decision: 'allow' | 'deny', reason?: string) => void;
 }
 
 function mergeBlock(blocks: MessageBlock[], block: MessageBlock): MessageBlock[] {
@@ -441,6 +456,39 @@ function processEvent(state: State, event: EventEnvelope): State {
       break;
     }
 
+    case 'run.agent.permission_requested': {
+      const reqId = event.payload.requestId as string;
+      const runId = event.payload.runId as string;
+      const toolName = event.payload.toolName as string;
+      const toolInput = (event.payload.toolInput ?? event.payload.input ?? {}) as Record<string, unknown>;
+      const existingIdx = state.permissionRequests.findIndex((r) => r.requestId === reqId);
+      const item: PermissionRequestItem = {
+        requestId: reqId,
+        runId,
+        toolName,
+        toolInput,
+        timestamp: ts,
+      };
+      let reqs: PermissionRequestItem[];
+      if (existingIdx >= 0) {
+        reqs = [...state.permissionRequests];
+        reqs[existingIdx] = item;
+      } else {
+        reqs = [...state.permissionRequests, item];
+      }
+      return { ...state, permissionRequests: reqs.slice(-50) };
+    }
+
+    case 'run.agent.permission_decided': {
+      const reqId = event.payload.requestId as string;
+      const decision = event.payload.decision as 'allow' | 'deny';
+      const reason = event.payload.reason as string | undefined;
+      const reqs = state.permissionRequests.map((r) =>
+        r.requestId === reqId ? { ...r, decision, reason } : r,
+      );
+      return { ...state, permissionRequests: reqs };
+    }
+
     default:
       break;
   }
@@ -455,9 +503,17 @@ function reducer(state: State, action: Action): State {
     case 'EVENT_RECEIVED':
       return processEvent(state, action.event);
     case 'CLEAR_MESSAGES':
-      return { messages: [], isConnected: state.isConnected, isStreaming: false, currentRun: null };
+      return { messages: [], isConnected: state.isConnected, isStreaming: false, currentRun: null, permissionRequests: [] };
     case 'SET_CONNECTED':
       return { ...state, isConnected: action.connected };
+    case 'RESOLVE_PERMISSION': {
+      const reqs = state.permissionRequests.map((r) =>
+        r.requestId === action.requestId
+          ? { ...r, decision: action.decision, reason: action.reason }
+          : r,
+      );
+      return { ...state, permissionRequests: reqs };
+    }
     default:
       return state;
   }
@@ -468,15 +524,33 @@ const initialState: State = {
   isConnected: false,
   isStreaming: false,
   currentRun: null,
+  permissionRequests: [],
 };
 
 export function useChatMessages(online: boolean): ChatState {
   const [state, dispatch] = useReducer(reducer, initialState);
   const mountedRef = useRef(true);
+  const streamRef = useRef<StreamHandle | null>(null);
 
   const clearMessages = useCallback(() => {
     dispatch({ type: 'CLEAR_MESSAGES' });
   }, []);
+
+  const decidePermission = useCallback(
+    (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
+      // Send decision to Edge via WebSocket
+      const stream = streamRef.current;
+      if (stream) {
+        stream.send({
+          type: 'run.agent.permission_decide',
+          payload: { requestId, decision, reason },
+        });
+      }
+      // Update local state
+      dispatch({ type: 'RESOLVE_PERMISSION', requestId, decision, reason });
+    },
+    [],
+  );
 
   useEffect(() => {
     mountedRef.current = true;
@@ -486,6 +560,7 @@ export function useChatMessages(online: boolean): ChatState {
     }
 
     const stream = createEventStream();
+    streamRef.current = stream;
 
     stream.onStatusChange((connected) => {
       if (!mountedRef.current) return;
@@ -499,9 +574,10 @@ export function useChatMessages(online: boolean): ChatState {
 
     return () => {
       mountedRef.current = false;
+      streamRef.current = null;
       stream.close();
     };
   }, [online]);
 
-  return { ...state, clearMessages };
+  return { ...state, clearMessages, decidePermission };
 }
