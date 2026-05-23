@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
-import { startRun, fetchAgents, fetchThreads } from '@/api/edgeClient';
+import { startRun, cancelRun, fetchAgents, fetchThreads } from '@/api/edgeClient';
 import type { AgentInfo, StartRunRequest } from '@shared/types';
 import type { ChatMessage } from '@/components/ChatView.types';
 import { useUIStore } from '@/stores/uiStore';
@@ -41,6 +41,7 @@ export default function App() {
   const selectThread = useThreadStore((s) => s.selectThread);
   const runStoreSetCurrentRun = useRunStore((s) => s.setCurrentRun);
   const runStoreSetStreaming = useRunStore((s) => s.setIsStreaming);
+  const isStreaming = useRunStore((s) => s.isStreaming);
   const runStoreClear = useRunStore((s) => s.clear);
 
   // Local state (lightweight, not worth a store yet)
@@ -144,6 +145,17 @@ export default function App() {
     [selectedThread],
   );
 
+  const handleCancel = useCallback(async () => {
+    const run = useRunStore.getState().currentRun;
+    if (run?.runId) {
+      try {
+        await cancelRun(run.runId);
+      } catch (e) {
+        console.error('Failed to cancel run:', e);
+      }
+    }
+  }, []);
+
   const handleCreateThread = useCallback(async () => {
     try {
       const res = await fetchThreads();
@@ -195,7 +207,7 @@ export default function App() {
           </div>
 
           <ErrorBoundary>
-            <ChatView messages={allMessages} isStreaming={useRunStore.getState().isStreaming} />
+            <ChatView messages={allMessages} isStreaming={isStreaming} />
           </ErrorBoundary>
         </div>
 
@@ -227,6 +239,8 @@ export default function App() {
         selectedAgentId={selectedAgentId}
         onSelectAgent={setSelectedAgentId}
         onSend={handleSend}
+        isStreaming={isStreaming}
+        onCancel={handleCancel}
         disabled={!online}
       />
       <SearchDialog />

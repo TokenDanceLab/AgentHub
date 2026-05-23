@@ -64,7 +64,7 @@
   cursor: not-allowed;
 }
 
-.input {
+.textarea {
   flex: 1;
   padding: 6px 10px;
   border: 1px solid var(--border);
@@ -74,10 +74,20 @@
   font-size: var(--font-size-sm);
   font-family: var(--font-sans);
   outline: none;
+  resize: none;
+  overflow-y: auto;
+  min-height: calc(1.5em + 14px);
+  max-height: calc(8 * 1.5em + 14px);
+  line-height: 1.5;
 }
 
-.input:focus {
+.textarea:focus {
   border-color: var(--primary);
+}
+
+.textarea:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .sendBtn {
@@ -101,6 +111,32 @@
 }
 
 .sendBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stopBtn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-danger, #dc2626);
+  color: #fff;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.stopBtn:hover {
+  opacity: 0.85;
+}
+
+.stopBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }

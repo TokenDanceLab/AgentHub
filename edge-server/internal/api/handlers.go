@@ -458,6 +458,9 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	defer heartbeat.Stop()
 
 	// Read goroutine to detect close and handle pong.
+	// done signals the read loop to exit when write loop returns.
+	done := make(chan struct{})
+	defer close(done)
 	go func() {
 		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		conn.SetPongHandler(func(string) error {
@@ -465,6 +468,11 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 			return nil
 		})
 		for {
+			select {
+			case <-done:
+				return
+			default:
+			}
 			_, _, err := conn.ReadMessage()
 			if err != nil {
 				break
@@ -512,6 +520,8 @@ func decodeOptionalJSON(r *http.Request, dst any) error {
 	if r.ContentLength == 0 {
 		return nil
 	}
+	// Limit request body to 1MB to prevent memory exhaustion.
+	r.Body = http.MaxBytesReader(nil, r.Body, 1<<20)
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(dst); err != nil {
 		return err

@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
+import MarkdownRenderer from './MarkdownRenderer';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -206,7 +207,7 @@ function BlockRenderer({
 }) {
   switch (block.kind) {
     case 'text':
-      return <div className={styles.text}>{block.content}</div>;
+      return <MarkdownRenderer content={block.content} />;
 
     case 'code':
       return (
