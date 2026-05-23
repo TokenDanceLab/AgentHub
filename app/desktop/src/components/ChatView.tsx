@@ -1,5 +1,6 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Copy, RefreshCw, Trash2, ArrowDown } from 'lucide-react';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -350,12 +351,34 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
   const scrollRef = useRef<HTMLDivElement>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
-  const { scrollToBottom, isNearBottom } = useAutoScroll(scrollRef, {
-    messages,
-    isStreaming: isStreaming ?? false,
+  // ── Virtualizer ──────────────────────────────
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 200,
+    overscan: 5,
+    getItemKey: (index: number) => messages[index].id,
   });
 
-  // Show scroll-to-bottom indicator when streaming and user has scrolled up
+  // Stable refs so the callback closure always sees latest values
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+
+  const { scrollToBottom, isNearBottom } = useAutoScroll(
+    scrollRef,
+    { messages, isStreaming: isStreaming ?? false },
+    {
+      scrollToBottomFn: () => {
+        const len = messagesRef.current.length;
+        if (len > 0) {
+          virtualizerRef.current.scrollToIndex(len - 1, { align: 'end' });
+        }
+      },
+    },
+  );
+
   const showScrollIndicator = isStreaming && !isNearBottom;
 
   const handleCopy = useCallback(async (msg: ChatMessage) => {
@@ -379,7 +402,6 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
       const rt = relativeTime(msg.timestamp);
       return (
         <div
-          key={msg.id}
           className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
         >
           {msg.role === 'agent' && msg.agentName && (
@@ -441,6 +463,10 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
     [t, isStreaming, lastMsg?.id, copiedMessageId, handleCopy, onRetry, onDelete],
   );
 
+  const handleScrollToBottom = useCallback(() => {
+    scrollToBottom(true);
+  }, [scrollToBottom]);
+
   return (
     <div className={styles.root}>
       <div
@@ -451,7 +477,28 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
       >
         {messages.length === 0 ? (
           <div className={styles.empty}>{t('chat.empty')}</div>
-        ) : messages.map(renderMessage)}
+        ) : (
+          <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative', flexShrink: 0 }}>
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const msg = messages[virtualRow.index];
+              const isLast = virtualRow.index === messages.length - 1;
+              return (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  className={styles.virtualItem}
+                  style={{
+                    transform: `translateY(${virtualRow.start}px)`,
+                    paddingBottom: isLast ? 0 : undefined,
+                  }}
+                >
+                  {renderMessage(msg)}
+                </div>
+              );
+            })}
+          </div>
+        )}
         {isStreaming &&
           (lastMsgHasText ? (
             <div className={styles.streamProgress} />
@@ -464,11 +511,10 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
           ))}
       </div>
 
-      {/* Scroll-to-bottom floating indicator */}
       {showScrollIndicator && (
         <button
           className={styles.scrollToBottomBtn}
-          onClick={() => scrollToBottom(true)}
+          onClick={handleScrollToBottom}
           title={t('chat.scrollToBottom')}
           aria-label={t('chat.scrollToBottom')}
         >
