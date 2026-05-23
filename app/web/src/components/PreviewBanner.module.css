@@ -1,0 +1,29 @@
+/* ═════════════════════════════════════════════════════════════════════
+   PreviewBanner — Persistent amber banner for preview-mode pages
+   Uses CSS tokens exclusively: no hardcoded hex values
+   ═════════════════════════════════════════════════════════════════════ */
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  background: color-mix(in oklch, var(--warning) 14%, transparent);
+  border-bottom: 1px solid color-mix(in oklch, var(--warning) 28%, transparent);
+  color: var(--warning-foreground);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+  flex-shrink: 0;
+}
+
+.icon {
+  font-size: var(--font-size-base);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.text strong {
+  font-weight: var(--font-weight-medium);
+}
