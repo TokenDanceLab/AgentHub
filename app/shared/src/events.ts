@@ -28,10 +28,11 @@ export interface RunnerEvent extends EventEnvelope {
 // ── Run lifecycle events ──────────────────────
 
 export interface RunLifecycleEvent extends EventEnvelope {
-  type: 'run.queued' | 'run.started' | 'run.finished' | 'run.failed';
+  type: 'run.queued' | 'run.started' | 'run.finished' | 'run.failed' | 'run.cancelled';
   payload: {
     runId: string;
     status: string;
+    error?: string;
     createdAt?: string;
     startedAt?: string;
     finishedAt?: string;
@@ -101,7 +102,7 @@ export interface AgentToolCallEvent extends EventEnvelope {
     callId: string;
     toolName: string;
     input: Record<string, unknown>;
-    status: 'pending' | 'running' | 'completed' | 'failed';
+    status: 'pending' | 'started' | 'in_progress' | 'running' | 'completed' | 'failed';
     [key: string]: unknown;
   };
 }
@@ -112,7 +113,7 @@ export interface AgentToolResultEvent extends EventEnvelope {
     runId: string;
     callId: string;
     toolName: string;
-    output: unknown;
+    content: unknown;
     [key: string]: unknown;
   };
 }
@@ -121,9 +122,10 @@ export interface AgentFileChangeEvent extends EventEnvelope {
   type: 'run.agent.file_change';
   payload: {
     runId: string;
-    path: string;
-    action: 'created' | 'modified' | 'deleted';
-    diff?: string;
+    callId: string;
+    toolName: string;
+    content: string;
+    isError: boolean;
     [key: string]: unknown;
   };
 }
@@ -145,9 +147,13 @@ export interface AgentResultEvent extends EventEnvelope {
     runId: string;
     success: boolean;
     error?: string;
-    tokenUsage?: {
-      input: number;
-      output: number;
+    usage?: {
+      inputTokens?: number;
+      outputTokens?: number;
+      input?: number;
+      output?: number;
+      total?: number;
+      [key: string]: unknown;
     };
     [key: string]: unknown;
   };
