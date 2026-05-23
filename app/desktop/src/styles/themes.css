@@ -7,7 +7,7 @@
 :root {
   /* Semantic Colors */
   --background: oklch(0.12 0.008 260);
-  --foreground: oklch(0.92 0.005 260);
+  --foreground: oklch(0.92 0.005 260); /* → text-strong */
   --card: oklch(0.16 0.008 260);
   --card-foreground: oklch(0.92 0.005 260);
   --popover: oklch(0.16 0.008 260);
@@ -17,7 +17,7 @@
   --secondary: oklch(0.18 0.008 260);
   --secondary-foreground: oklch(0.92 0.005 260);
   --muted: oklch(0.18 0.008 260);
-  --muted-foreground: oklch(0.55 0.012 260);
+  --muted-foreground: oklch(0.55 0.012 260); /* → text-weak */
   --accent: oklch(0.18 0.008 260);
   --accent-foreground: oklch(0.92 0.005 260);
   --destructive: oklch(0.65 0.22 25);
@@ -69,12 +69,21 @@
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.2);
   --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.3);
+
+  /* Surface Layers */
+  --surface-base: oklch(0.14 0.006 260);
+  --surface-raised: oklch(0.17 0.007 260);
+  --surface-raised-hover: oklch(0.20 0.007 260);
+  --surface-overlay: oklch(0.22 0.008 260);
+
+  /* Hover Overlay */
+  --hover-overlay: oklch(1 0 0 / 0.06);
 }
 
 /* ── Light Theme ─────────────────────────────────────────────────────── */
 [data-theme='light'] {
   --background: oklch(0.985 0.002 260);
-  --foreground: oklch(0.14 0.005 260);
+  --foreground: oklch(0.14 0.005 260); /* → text-strong */
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.14 0.005 260);
   --popover: oklch(1 0 0);
@@ -84,7 +93,7 @@
   --secondary: oklch(0.965 0.003 260);
   --secondary-foreground: oklch(0.21 0.006 286);
   --muted: oklch(0.965 0.003 260);
-  --muted-foreground: oklch(0.55 0.012 260);
+  --muted-foreground: oklch(0.55 0.012 260); /* → text-weak */
   --accent: oklch(0.965 0.003 260);
   --accent-foreground: oklch(0.21 0.006 286);
   --destructive: oklch(0.58 0.24 27);
@@ -128,4 +137,13 @@
 
   --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.08);
+
+  /* Surface Layers */
+  --surface-base: oklch(0.98 0.002 260);
+  --surface-raised: oklch(1.0 0 0);
+  --surface-raised-hover: oklch(0.96 0.003 260);
+  --surface-overlay: oklch(0.94 0.004 260);
+
+  /* Hover Overlay */
+  --hover-overlay: oklch(1 0 0 / 0.06);
 }
