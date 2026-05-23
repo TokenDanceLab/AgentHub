@@ -1,8 +1,10 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Send, Circle, Square } from 'lucide-react';
+import { Send, Circle, Square } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
 import { useInputDraft } from '@/hooks/useInputDraft';
+import { useMention } from '@/hooks/useMention';
+import MentionPopover from '@/components/MentionPopover';
 import styles from './PromptInput.module.css';
 
 const COMMON_MODELS = [
@@ -30,7 +32,6 @@ interface Props {
   isStreaming?: boolean;
   onCancel?: () => void;
   disabled?: boolean;
-  /** Optional thread ID for draft persistence. When provided, input text is saved/restored via localStorage. */
   threadId?: string;
 }
 
@@ -52,12 +53,23 @@ export default function PromptInput({
   const { t } = useTranslation();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [promptLength, setPromptLength] = useState(0);
-  const [showAgentSelector, setShowAgentSelector] = useState(false);
   const [model, setModel] = useState<string>('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
   const [textareaFocused, setTextareaFocused] = useState(false);
 
   const models = useMemo(() => extractModels(agents), [agents]);
+
+  const {
+    isOpen: mentionOpen,
+    query: mentionQuery,
+    position: mentionPosition,
+    selectedIndex: mentionIndex,
+    filteredAgents: mentionFiltered,
+    handleInput: mentionHandleInput,
+    handleKeyDown: mentionHandleKeyDown,
+    selectAgent: mentionSelectAgent,
+    closeMention,
+  } = useMention({ agents, onSelectAgent });
 
   const { restore: restoreDraft, save: saveDraft, flush: flushDraft, clear: clearDraft } =
     useInputDraft(threadId);
@@ -68,14 +80,12 @@ export default function PromptInput({
     if (!ta) return;
     restoreDraft(ta);
     setPromptLength(ta.value.length);
-    // Restore also handles auto-resize inside the hook
     return () => {
-      // Flush pending draft for the old threadId before switching
       if (ta) flushDraft(ta.value, threadId);
     };
   }, [threadId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Flush draft on unmount (cleanup)
+  // Flush draft on unmount
   useEffect(() => {
     return () => {
       const ta = inputRef.current;
@@ -83,7 +93,7 @@ export default function PromptInput({
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-resize textarea and track character count on input
+  // Auto-resize textarea, track character count, detect @mention on input
   useEffect(() => {
     const ta = inputRef.current;
     if (!ta) return;
@@ -93,16 +103,16 @@ export default function PromptInput({
       ta.style.height = 'auto';
       ta.style.height = ta.scrollHeight + 'px';
       saveDraft(ta.value);
+      mentionHandleInput();
     };
 
     ta.addEventListener('input', handleUpdate);
-    // Also listen for 'change' so test simulated events update promptLength
     ta.addEventListener('change', handleUpdate);
     return () => {
       ta.removeEventListener('input', handleUpdate);
       ta.removeEventListener('change', handleUpdate);
     };
-  }, []);
+  }, [mentionHandleInput]);
 
   const handleSend = useCallback(() => {
     const ta = inputRef.current;
@@ -113,54 +123,40 @@ export default function PromptInput({
     if (model) opts.model = model;
     if (reasoningEffort) opts.reasoningEffort = reasoningEffort;
     onSend(trimmed, selectedAgentId, opts.model || opts.reasoningEffort ? opts : undefined);
-    // Clear input
     ta.value = '';
     ta.style.height = 'auto';
     setPromptLength(0);
-    setShowAgentSelector(false);
+    closeMention();
     clearDraft();
-  }, [selectedAgentId, model, reasoningEffort, onSend, clearDraft]);
+  }, [selectedAgentId, model, reasoningEffort, onSend, clearDraft, closeMention]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Delegate to mention handler first; if consumed, skip default Enter handling
+      if (mentionHandleKeyDown(e)) return;
+
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSend();
       }
     },
-    [handleSend],
+    [handleSend, mentionHandleKeyDown],
   );
 
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
 
   return (
     <div className={styles.root}>
-      {showAgentSelector && (
-        <div className={styles.selector} role="listbox" aria-label={t('prompt.agentSelector')}>
-          {agents.map((a) => (
-            <button
-              key={a.id}
-              className={`${styles.option} ${a.id === selectedAgentId ? styles.optionSelected : ''}`}
-              onClick={() => {
-                onSelectAgent(a.id);
-                setShowAgentSelector(false);
-                inputRef.current?.focus();
-              }}
-              role="option"
-              aria-selected={a.id === selectedAgentId}
-            >
-              <Circle
-                size={8}
-                fill="currentColor"
-                style={{
-                  color: a.status === 'available' ? 'var(--color-success)' : 'var(--color-danger)',
-                }}
-              />
-              <span>{a.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {/* @mention inline popover */}
+      <MentionPopover
+        agents={mentionFiltered}
+        isOpen={mentionOpen}
+        query={mentionQuery}
+        position={mentionPosition}
+        selectedIndex={mentionIndex}
+        onSelect={mentionSelectAgent}
+        onClose={closeMention}
+      />
 
       <div className={styles.configRow}>
         <select
@@ -195,15 +191,21 @@ export default function PromptInput({
       </div>
 
       <div className={styles.bar}>
-        <button
-          className={styles.agentBtn}
-          onClick={() => setShowAgentSelector((v) => !v)}
-          disabled={disabled || agents.length === 0}
-          title={t('prompt.agentSelector')}
-        >
-          {selectedAgent ? `@${selectedAgent.name}` : '@Agent'}
-          <ChevronDown size={14} />
-        </button>
+        {selectedAgent && (
+          <span className={styles.selectedAgentBadge}>
+            <Circle
+              size={8}
+              fill="currentColor"
+              style={{
+                color:
+                  selectedAgent.status === 'available'
+                    ? 'var(--color-success)'
+                    : 'var(--color-danger)',
+              }}
+            />
+            @{selectedAgent.name}
+          </span>
+        )}
 
         <div className={styles.inputWrapper}>
           <textarea
