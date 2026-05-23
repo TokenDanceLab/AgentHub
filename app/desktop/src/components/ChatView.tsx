@@ -8,7 +8,7 @@ import CodeBlock from './CodeBlock';
 import EmptyState from './EmptyState';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
-import { useToast } from '@/contexts/ToastContext';
+import { useToastStore } from '@/stores/toastStore';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -344,7 +344,7 @@ function extractMessageText(msg: ChatMessage): string {
 // ── ChatView ────────────────────────────────
 export default function ChatView({ messages, isStreaming, onRetry, onDelete }: Props) {
   const { t } = useTranslation();
-  const { showToast } = useToast();
+  const addToast = useToastStore((s) => s.addToast);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
@@ -383,12 +383,12 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
     try {
       await navigator.clipboard.writeText(text);
       setCopiedMessageId(msg.id);
-      showToast('success', t('toast.copied'));
+      addToast({ type: 'success', message: t('toast.copied') });
       setTimeout(() => setCopiedMessageId(null), 1500);
     } catch {
-      showToast('error', t('toast.error'));
+      addToast({ type: 'error', message: t('toast.error') });
     }
-  }, [showToast, t]);
+  }, [addToast, t]);
 
   const lastMsg = messages[messages.length - 1];
   const lastMsgHasText =

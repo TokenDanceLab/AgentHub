@@ -30,9 +30,15 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('@/contexts/ToastContext', () => ({
-  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
-  useToast: () => ({ showToast: vi.fn() }),
+vi.mock('@/stores/toastStore', () => ({
+  useToastStore: (selector: any) => {
+    const state = {
+      toasts: [],
+      addToast: vi.fn(),
+      removeToast: vi.fn(),
+    };
+    return selector ? selector(state) : state;
+  },
 }));
 
 vi.mock('@/api/threadQueries', () => ({

@@ -23,7 +23,7 @@ import PermissionDialog from '@/components/PermissionDialog';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import ShortcutHelp from '@/components/ShortcutHelp';
 import { SkeletonLine, SkeletonCircle } from '@/components/Skeleton';
-import { useToast } from '@/contexts/ToastContext';
+import { useToastStore } from '@/stores/toastStore';
 import styles from '@/App.module.css';
 
 // ── Lazy-loaded heavy components ──────────────
@@ -49,7 +49,7 @@ export default function App() {
   const [lastEdgeError, setLastEdgeError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const wasOnlineRef = useRef(false);
-  const { showToast } = useToast();
+  const addToast = useToastStore((s) => s.addToast);
 
   // TanStack Query — replaces setInterval polling for threads
   const { data: threadData } = useThreads();
@@ -163,12 +163,12 @@ export default function App() {
   const prevOnlineRef = useRef(false);
   useEffect(() => {
     if (online && !prevOnlineRef.current) {
-      showToast('success', t('toast.connected'));
+      addToast({ type: 'success', message: t('toast.connected') });
     } else if (!online && prevOnlineRef.current) {
-      showToast('warning', t('toast.disconnected'));
+      addToast({ type: 'warning', message: t('toast.disconnected') });
     }
     prevOnlineRef.current = online;
-  }, [online, showToast, t]);
+  }, [online, addToast, t]);
 
   const handleRetryEdge = useCallback(async () => {
     setRetrying(true);
@@ -229,12 +229,12 @@ export default function App() {
     if (!wasInitial) {
       for (const th of threads) {
         if (!prevThreadIdsRef.current.has(th.threadId)) {
-          showToast('success', t('toast.threadCreated'));
+          addToast({ type: 'success', message: t('toast.threadCreated') });
         }
       }
     }
     prevThreadIdsRef.current = currentIds;
-  }, [threads, online, showToast, t]);
+  }, [threads, online, addToast, t]);
 
   const selectedThread = threads.find((th) => th.threadId === selectedThreadId);
 
