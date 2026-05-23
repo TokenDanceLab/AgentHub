@@ -32,7 +32,13 @@ function extractModels(agents: AgentInfo[]): string[] {
   return [...new Set([...fromAgents, ...COMMON_MODELS])];
 }
 
-export default function PromptInput({ agents, selectedAgentId, onSelectAgent, onSend, disabled }: Props) {
+export default function PromptInput({
+  agents,
+  selectedAgentId,
+  onSelectAgent,
+  onSend,
+  disabled,
+}: Props) {
   const { t } = useTranslation();
   const [prompt, setPrompt] = useState('');
   const [showAgentSelector, setShowAgentSelector] = useState(false);
@@ -81,7 +87,13 @@ export default function PromptInput({ agents, selectedAgentId, onSelectAgent, on
               role="option"
               aria-selected={a.id === selectedAgentId}
             >
-              <Circle size={8} fill="currentColor" style={{ color: a.status === 'available' ? 'var(--color-success)' : 'var(--color-danger)' }} />
+              <Circle
+                size={8}
+                fill="currentColor"
+                style={{
+                  color: a.status === 'available' ? 'var(--color-success)' : 'var(--color-danger)',
+                }}
+              />
               <span>{a.name}</span>
             </button>
           ))}
@@ -98,7 +110,9 @@ export default function PromptInput({ agents, selectedAgentId, onSelectAgent, on
         >
           <option value="">{t('prompt.model')}</option>
           {models.map((m) => (
-            <option key={m} value={m}>{m}</option>
+            <option key={m} value={m}>
+              {m}
+            </option>
           ))}
         </select>
 
@@ -111,7 +125,9 @@ export default function PromptInput({ agents, selectedAgentId, onSelectAgent, on
         >
           <option value="">{t('prompt.reasoning')}</option>
           {REASONING_EFFORTS.map((r) => (
-            <option key={r} value={r}>{r}</option>
+            <option key={r} value={r}>
+              {r}
+            </option>
           ))}
         </select>
       </div>

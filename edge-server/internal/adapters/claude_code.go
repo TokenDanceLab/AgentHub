@@ -26,10 +26,10 @@ type ClaudeCodeAdapter struct {
 // model and permissionMode serve as defaults when the run context does not specify them.
 func NewClaudeCodeAdapter(binaryPath, model, permissionMode string) *ClaudeCodeAdapter {
 	return &ClaudeCodeAdapter{
-		binaryPath:      binaryPath,
-		model:           model,
-		permissionMode:  permissionMode,
-		maxTurns:        50,
+		binaryPath:     binaryPath,
+		model:          model,
+		permissionMode: permissionMode,
+		maxTurns:       50,
 	}
 }
 

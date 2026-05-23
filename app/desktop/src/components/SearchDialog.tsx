@@ -4,7 +4,8 @@ import { useSearchStore, type SearchResult } from '@/stores/searchStore';
 import styles from './SearchDialog.module.css';
 
 export default function SearchDialog() {
-  const { open, query, results, selectedIndex, closeDialog, setQuery, setSelectedIndex } = useSearchStore();
+  const { open, query, results, selectedIndex, closeDialog, setQuery, setSelectedIndex } =
+    useSearchStore();
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Ctrl+K to open
@@ -27,22 +28,40 @@ export default function SearchDialog() {
 
   // Simple client-side search (mock — will integrate with FTS5 later)
   useEffect(() => {
-    if (!query.trim()) { useSearchStore.getState().setResults([]); return; }
+    if (!query.trim()) {
+      useSearchStore.getState().setResults([]);
+      return;
+    }
     // TODO: Replace with Edge FTS5 query
     const mock: SearchResult[] = [
-      { id: '1', type: 'thread', title: query, snippet: `Thread containing "${query}"`, threadId: 't1' },
+      {
+        id: '1',
+        type: 'thread',
+        title: query,
+        snippet: `Thread containing "${query}"`,
+        threadId: 't1',
+      },
     ];
     useSearchStore.getState().setResults(mock);
   }, [query]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(Math.min(selectedIndex + 1, results.length - 1)); }
-    if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex(Math.max(selectedIndex - 1, 0)); }
-    if (e.key === 'Enter' && results[selectedIndex]) {
-      // TODO: Navigate to result
-      closeDialog();
-    }
-  }, [selectedIndex, results, setSelectedIndex, closeDialog]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(Math.min(selectedIndex + 1, results.length - 1));
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(Math.max(selectedIndex - 1, 0));
+      }
+      if (e.key === 'Enter' && results[selectedIndex]) {
+        // TODO: Navigate to result
+        closeDialog();
+      }
+    },
+    [selectedIndex, results, setSelectedIndex, closeDialog],
+  );
 
   if (!open) return null;
 
@@ -71,7 +90,10 @@ export default function SearchDialog() {
         {results.length > 0 && (
           <div className={styles.results}>
             {results.map((r, i) => (
-              <div key={r.id} className={`${styles.item} ${i === selectedIndex ? styles.selected : ''}`}>
+              <div
+                key={r.id}
+                className={`${styles.item} ${i === selectedIndex ? styles.selected : ''}`}
+              >
                 <span className={styles.itemIcon}>{icons[r.type]}</span>
                 <div className={styles.itemContent}>
                   <span className={styles.itemTitle}>{r.title}</span>

@@ -22,5 +22,5 @@ export const useThreadStore = create<ThreadState>()(
     setThreads: (threads) => set({ threads }),
     selectThread: (id) => set({ selectedThreadId: id }),
     setSearchQuery: (q) => set({ searchQuery: q }),
-  }))
+  })),
 );

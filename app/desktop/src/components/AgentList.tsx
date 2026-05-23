@@ -39,12 +39,21 @@ export default function AgentList({ agents, online, selectedId, onSelect }: Prop
                 onClick={() => onSelect?.(a)}
                 aria-pressed={a.id === selectedId}
               >
-                <Circle size={8} fill="currentColor" style={{ color: a.status === 'available' ? 'var(--color-success)' : 'var(--color-danger)' }} />
+                <Circle
+                  size={8}
+                  fill="currentColor"
+                  style={{
+                    color:
+                      a.status === 'available' ? 'var(--color-success)' : 'var(--color-danger)',
+                  }}
+                />
                 <div className={styles.info}>
                   <div className={styles.name}>{a.name}</div>
                   <div className={styles.tags}>
                     {capabilityLabels(a.capabilities, t).map((label) => (
-                      <span key={label} className={styles.tag}>{label}</span>
+                      <span key={label} className={styles.tag}>
+                        {label}
+                      </span>
                     ))}
                   </div>
                 </div>

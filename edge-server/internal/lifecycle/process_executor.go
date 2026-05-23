@@ -34,7 +34,7 @@ type ProcessExecutor struct {
 	adapter    adapters.AgentAdapter // default adapter; may be nil (raw stdout capture)
 	adapterReg *adapters.Registry    // per-run adapter resolution; may be nil
 
-	mu     sync.Mutex
+	mu      sync.Mutex
 	running map[string]context.CancelFunc
 	stdins  map[string]io.Writer // runID → stdin (for adapter-aware interrupt)
 }
@@ -215,7 +215,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// If context was cancelled after Start but before we checked, kill the child.
 	if ctx.Err() != nil {
 		if cmd.Process != nil {
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 		}
 		e.publishCancelled(run)
 		return

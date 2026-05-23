@@ -45,7 +45,9 @@
   color: var(--muted-foreground);
   font-size: var(--font-size-xs);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .tab:hover {

@@ -105,7 +105,9 @@ describe('useChatMessages', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     act(() => {
-      eventHandler!(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'Hello', offset: 0 }));
+      eventHandler!(
+        makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'Hello', offset: 0 }),
+      );
     });
 
     expect(result.current.messages).toHaveLength(1);
@@ -121,11 +123,15 @@ describe('useChatMessages', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     act(() => {
-      eventHandler!(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'Hello ', offset: 0 }));
+      eventHandler!(
+        makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'Hello ', offset: 0 }),
+      );
     });
 
     act(() => {
-      eventHandler!(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'World', offset: 6 }));
+      eventHandler!(
+        makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'World', offset: 6 }),
+      );
     });
 
     expect(result.current.messages).toHaveLength(1);
@@ -146,13 +152,15 @@ describe('useChatMessages', () => {
     });
 
     act(() => {
-      eventHandler!(makeEvent('run.agent.tool_call', {
-        runId: 'run-1',
-        callId: 'call-1',
-        toolName: 'read_file',
-        input: { path: '/test.txt' },
-        status: 'pending',
-      }));
+      eventHandler!(
+        makeEvent('run.agent.tool_call', {
+          runId: 'run-1',
+          callId: 'call-1',
+          toolName: 'read_file',
+          input: { path: '/test.txt' },
+          status: 'pending',
+        }),
+      );
     });
 
     // Should have 2 messages: system (from run.started) + agent (from tool_call)
@@ -272,7 +280,9 @@ describe('useChatMessages', () => {
 
     // Now another agent event should create a NEW agent message (not merge with previous)
     act(() => {
-      eventHandler!(makeEvent('run.agent.text_delta', { runId: 'run-2', content: 'Fresh', offset: 0 }));
+      eventHandler!(
+        makeEvent('run.agent.text_delta', { runId: 'run-2', content: 'Fresh', offset: 0 }),
+      );
     });
 
     expect(result.current.messages).toHaveLength(3); // agent, system, agent
@@ -287,11 +297,13 @@ describe('useChatMessages', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     act(() => {
-      eventHandler!(makeEvent('run.agent.text_block', {
-        runId: 'run-1',
-        content: 'markdown text',
-        contentType: 'markdown',
-      }));
+      eventHandler!(
+        makeEvent('run.agent.text_block', {
+          runId: 'run-1',
+          content: 'markdown text',
+          contentType: 'markdown',
+        }),
+      );
     });
 
     expect(result.current.messages[0].blocks[0]).toMatchObject({
@@ -304,12 +316,14 @@ describe('useChatMessages', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     act(() => {
-      eventHandler!(makeEvent('run.agent.text_block', {
-        runId: 'run-1',
-        content: 'const x = 1;',
-        contentType: 'code',
-        language: 'typescript',
-      }));
+      eventHandler!(
+        makeEvent('run.agent.text_block', {
+          runId: 'run-1',
+          content: 'const x = 1;',
+          contentType: 'code',
+          language: 'typescript',
+        }),
+      );
     });
 
     expect(result.current.messages[0].blocks[0]).toMatchObject({
@@ -323,12 +337,14 @@ describe('useChatMessages', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     act(() => {
-      eventHandler!(makeEvent('run.agent.session_init', {
-        runId: 'run-1',
-        model: 'claude-sonnet',
-        tools: ['read_file'],
-        permissionMode: 'auto',
-      }));
+      eventHandler!(
+        makeEvent('run.agent.session_init', {
+          runId: 'run-1',
+          model: 'claude-sonnet',
+          tools: ['read_file'],
+          permissionMode: 'auto',
+        }),
+      );
     });
 
     expect(result.current.messages[0].blocks[0]).toMatchObject({
@@ -343,23 +359,27 @@ describe('useChatMessages', () => {
 
     // First create a tool_use block
     act(() => {
-      eventHandler!(makeEvent('run.agent.tool_call', {
-        runId: 'run-1',
-        callId: 'call-1',
-        toolName: 'read_file',
-        input: { path: '/test' },
-        status: 'running',
-      }));
+      eventHandler!(
+        makeEvent('run.agent.tool_call', {
+          runId: 'run-1',
+          callId: 'call-1',
+          toolName: 'read_file',
+          input: { path: '/test' },
+          status: 'running',
+        }),
+      );
     });
 
     // Then create the tool_result
     act(() => {
-      eventHandler!(makeEvent('run.agent.tool_result', {
-        runId: 'run-1',
-        callId: 'call-1',
-        toolName: 'read_file',
-        output: 'file contents here',
-      }));
+      eventHandler!(
+        makeEvent('run.agent.tool_result', {
+          runId: 'run-1',
+          callId: 'call-1',
+          toolName: 'read_file',
+          output: 'file contents here',
+        }),
+      );
     });
 
     const block = result.current.messages[0].blocks[0] as any;
@@ -380,23 +400,27 @@ describe('useChatMessages', () => {
     });
 
     act(() => {
-      eventHandler!(makeEvent('run.agent.tool_call', {
-        runId: 'run-1',
-        callId: 'call-1',
-        toolName: 'read_file',
-        input: {},
-        status: 'pending',
-      }));
+      eventHandler!(
+        makeEvent('run.agent.tool_call', {
+          runId: 'run-1',
+          callId: 'call-1',
+          toolName: 'read_file',
+          input: {},
+          status: 'pending',
+        }),
+      );
     });
     expect(result.current.currentRun?.toolCalls[0].status).toBe('pending');
 
     act(() => {
-      eventHandler!(makeEvent('run.agent.tool_result', {
-        runId: 'run-1',
-        callId: 'call-1',
-        toolName: 'read_file',
-        output: 'content',
-      }));
+      eventHandler!(
+        makeEvent('run.agent.tool_result', {
+          runId: 'run-1',
+          callId: 'call-1',
+          toolName: 'read_file',
+          output: 'content',
+        }),
+      );
     });
     expect(result.current.currentRun?.toolCalls[0].status).toBe('completed');
   });
@@ -405,15 +429,17 @@ describe('useChatMessages', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     act(() => {
-      eventHandler!(makeEvent('run.agent.file_change', {
-        runId: 'run-1',
-        path: '/src/test.ts',
-        action: 'created',
-        diff: '+new line',
-        callId: 'toolu_1',
-        toolName: 'Write',
-        content: 'File written',
-      }));
+      eventHandler!(
+        makeEvent('run.agent.file_change', {
+          runId: 'run-1',
+          path: '/src/test.ts',
+          action: 'created',
+          diff: '+new line',
+          callId: 'toolu_1',
+          toolName: 'Write',
+          content: 'File written',
+        }),
+      );
     });
 
     expect(result.current.messages[0].blocks[0]).toMatchObject({
@@ -429,22 +455,26 @@ describe('useChatMessages', () => {
 
     // Need a currentRun first
     act(() => {
-      eventHandler!(makeEvent('run.agent.file_change', {
-        runId: 'no-match',
-        path: '/ignored.ts',
-        action: 'created',
-      }));
+      eventHandler!(
+        makeEvent('run.agent.file_change', {
+          runId: 'no-match',
+          path: '/ignored.ts',
+          action: 'created',
+        }),
+      );
     });
     // No currentRun, so no files tracked
     expect(result.current.currentRun).toBeNull();
 
     // Now simulate having a run
     act(() => {
-      eventHandler!(makeEvent('run.agent.file_change', {
-        runId: 'run-1',
-        path: '/src/test.ts',
-        action: 'created',
-      }));
+      eventHandler!(
+        makeEvent('run.agent.file_change', {
+          runId: 'run-1',
+          path: '/src/test.ts',
+          action: 'created',
+        }),
+      );
     });
     // Still no currentRun because we never had a run.started with match
     expect(result.current.currentRun).toBeNull();
@@ -454,11 +484,13 @@ describe('useChatMessages', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     act(() => {
-      eventHandler!(makeEvent('run.agent.result', {
-        runId: 'run-1',
-        success: true,
-        usage: { inputTokens: 100, outputTokens: 50 },
-      }));
+      eventHandler!(
+        makeEvent('run.agent.result', {
+          runId: 'run-1',
+          success: true,
+          usage: { inputTokens: 100, outputTokens: 50 },
+        }),
+      );
     });
 
     expect(result.current.messages[0].blocks[0]).toMatchObject({
@@ -472,11 +504,13 @@ describe('useChatMessages', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     act(() => {
-      eventHandler!(makeEvent('run.agent.result', {
-        runId: 'run-1',
-        success: false,
-        error: 'Something went wrong',
-      }));
+      eventHandler!(
+        makeEvent('run.agent.result', {
+          runId: 'run-1',
+          success: false,
+          error: 'Something went wrong',
+        }),
+      );
     });
 
     expect(result.current.messages[0].blocks[0]).toMatchObject({
@@ -494,14 +528,16 @@ describe('useChatMessages', () => {
     });
 
     act(() => {
-      eventHandler!(makeEvent('run.output.batch', {
-        runId: 'run-1',
-        stream: 'stdout',
-        chunks: [
-          { offset: 0, text: 'Hello ' },
-          { offset: 6, text: 'World' },
-        ],
-      }));
+      eventHandler!(
+        makeEvent('run.output.batch', {
+          runId: 'run-1',
+          stream: 'stdout',
+          chunks: [
+            { offset: 0, text: 'Hello ' },
+            { offset: 6, text: 'World' },
+          ],
+        }),
+      );
     });
 
     expect(result.current.currentRun?.outputText).toBe('Hello World');
@@ -512,7 +548,9 @@ describe('useChatMessages', () => {
 
     act(() => {
       eventHandler!(makeEvent('run.started', { runId: 'run-1', status: 'running' }));
-      eventHandler!(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'Hello', offset: 0 }));
+      eventHandler!(
+        makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'Hello', offset: 0 }),
+      );
     });
 
     expect(result.current.messages.length).toBeGreaterThan(0);
