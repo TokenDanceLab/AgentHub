@@ -61,14 +61,9 @@ AgentHub 的开发工作流是“三个开发者，每个开发者可以带一�
 - subagent 提示必须包含：目标、允许修改的路径、必须阅读的文档、必须运行的检查、隐私红线。
 - subagent 不自行扩大范围；发现范围不够，停下交回主 Agent。
 
-### Agent 间文件通信
-
-其他 Agent（或人类）通过 `docs/inbox/` 投递报告。规则见 `docs/inbox/README.md`。
-dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，处理后归档到 `docs/reference/`。
-
 ### 仓库级 Skill
 
-- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`。
+- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`。
 - 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）必须先读 `.agents/skills/dev-loop/SKILL.md`。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
 - `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
@@ -135,21 +130,22 @@ fix/short-topic
 ### 当前活跃分支 (2026-05-23)
 
 ```
-Remote:
-  origin/master                            ← 稳定
-  origin/dev/delicious233                  ← 主 dev: P0-P3 全部完成, M4 推进中
+Remote (6):
+  origin/master                            ← 稳定（skill 基础设施已上线）
+  origin/dev/delicious233                  ← 主 dev: P1 交互体验推进中
   origin/dev/trump                         ← Trump dev
   origin/feat/trump-webui                  ← Web 工作区
+  origin/docs/dev-loop-skill-master        ← 已合并删除
   origin/feat/backend-foundation           ← 后台预留 (dormant)
 
-本地: dev/delicious233 + 1 worktree (feat-trump-webui)
+本地 worktree: dev/delicious233
 ```
 
 合并方向：`feat/* → dev/delicious233 → master`
 
 开发引擎：`.agents/skills/dev-loop/` — 模型分配(opus/sonnet/haiku) + 标准循环 + 交叉审查
 
-当前 P0-P3 全部完成，M4 推进中。详细进度见 `docs/roadmap.md`。
+当前 P1 进度：P0 级 3/3 ✅ | P1 级 2/4（ThreadPanel/DiffViewer ✅, ChatView/AgentList ❌）
 
 进度同步：
 
