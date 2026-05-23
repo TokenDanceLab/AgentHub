@@ -34,19 +34,32 @@
   position: sticky;
   top: 0;
 }
-.fileHeader:hover { background: var(--card); }
+.fileHeader:hover {
+  background: var(--card);
+}
 
-.filePath { font-weight: var(--font-weight-medium); flex: 1; }
+.filePath {
+  font-weight: var(--font-weight-medium);
+  flex: 1;
+}
 
-.addedCount { color: var(--diff-added-border); font-weight: var(--font-weight-medium); }
-.deletedCount { color: var(--diff-removed-border); font-weight: var(--font-weight-medium); }
+.addedCount {
+  color: var(--diff-added-border);
+  font-weight: var(--font-weight-medium);
+}
+.deletedCount {
+  color: var(--diff-removed-border);
+  font-weight: var(--font-weight-medium);
+}
 
 .chevron {
   font-size: 10px;
   transition: transform var(--duration-fast);
   opacity: 0.4;
 }
-.chevronDown { transform: rotate(90deg); }
+.chevronDown {
+  transform: rotate(90deg);
+}
 
 /* ── Status badges ─────── */
 .statusAdded {

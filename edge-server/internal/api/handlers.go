@@ -302,18 +302,18 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		ProjectID        string `json:"projectId"`
-		ThreadID         string `json:"threadId"`
-		Prompt           string `json:"prompt"`
-		AgentID          string `json:"agentId"`
-		Model            string `json:"model"`
-		SessionID        string `json:"sessionId"`
-		Continue         bool   `json:"continue"`
-		Fork             bool   `json:"fork"`
-		ReasoningEffort  string `json:"reasoningEffort"`
-		MaxThinkingTokens int   `json:"maxThinkingTokens"`
-		PermissionMode   string `json:"permissionMode"`
-		IncludePartial   bool   `json:"includePartial"`
+		ProjectID         string `json:"projectId"`
+		ThreadID          string `json:"threadId"`
+		Prompt            string `json:"prompt"`
+		AgentID           string `json:"agentId"`
+		Model             string `json:"model"`
+		SessionID         string `json:"sessionId"`
+		Continue          bool   `json:"continue"`
+		Fork              bool   `json:"fork"`
+		ReasoningEffort   string `json:"reasoningEffort"`
+		MaxThinkingTokens int    `json:"maxThinkingTokens"`
+		PermissionMode    string `json:"permissionMode"`
+		IncludePartial    bool   `json:"includePartial"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
@@ -459,9 +459,9 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 
 	// Read goroutine to detect close and handle pong.
 	go func() {
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		conn.SetPongHandler(func(string) error {
-			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 			return nil
 		})
 		for {

@@ -12,7 +12,13 @@ interface RunState {
   runId: string;
   status: string;
   outputText: string;
-  toolCalls: Array<{ callId: string; toolName: string; status: string; timestamp: string; output?: string }>;
+  toolCalls: Array<{
+    callId: string;
+    toolName: string;
+    status: string;
+    timestamp: string;
+    output?: string;
+  }>;
   changedFiles: Array<{ path: string; action: string; timestamp: string }>;
   tasks: Array<{ taskId: string; description: string; status: string; summary?: string }>;
 }
@@ -38,20 +44,14 @@ function mergeBlock(blocks: MessageBlock[], block: MessageBlock): MessageBlock[]
   if (block.kind === 'text') {
     const last = blocks[blocks.length - 1];
     if (last && last.kind === 'text') {
-      return [
-        ...blocks.slice(0, -1),
-        { kind: 'text', content: last.content + block.content },
-      ];
+      return [...blocks.slice(0, -1), { kind: 'text', content: last.content + block.content }];
     }
   }
   // For thinking: merge into the last thinking block
   if (block.kind === 'thinking') {
     const last = blocks[blocks.length - 1];
     if (last && last.kind === 'thinking') {
-      return [
-        ...blocks.slice(0, -1),
-        { kind: 'thinking', content: last.content + block.content },
-      ];
+      return [...blocks.slice(0, -1), { kind: 'thinking', content: last.content + block.content }];
     }
   }
   return [...blocks, block];
@@ -75,7 +75,10 @@ function capOutputText(text: string): string {
   return text;
 }
 
-function extractPathFromContent(content: string | undefined, toolName: string | undefined): string | undefined {
+function extractPathFromContent(
+  content: string | undefined,
+  _toolName: string | undefined,
+): string | undefined {
   if (!content) return undefined;
   // Claude Code Write tool output patterns:
   // "Wrote contents to /absolute/path/to/file"
@@ -93,7 +96,9 @@ function extractPathFromContent(content: string | undefined, toolName: string | 
   return undefined;
 }
 
-function mapUsageToTokenUsage(usage: Record<string, unknown> | undefined): { input: number; output: number } | undefined {
+function mapUsageToTokenUsage(
+  usage: Record<string, unknown> | undefined,
+): { input: number; output: number } | undefined {
   if (!usage) return undefined;
   // NDJSON: {inputTokens, outputTokens}
   // Codex: {input_tokens, output_tokens}
@@ -127,7 +132,14 @@ function processEvent(state: State, event: EventEnvelope): State {
 
     case 'run.started': {
       const rid = event.payload.runId as string;
-      currentRun = { runId: rid, status: 'running', outputText: '', toolCalls: [], changedFiles: [], tasks: [] };
+      currentRun = {
+        runId: rid,
+        status: 'running',
+        outputText: '',
+        toolCalls: [],
+        changedFiles: [],
+        tasks: [],
+      };
       messages = [
         ...messages,
         {
@@ -184,9 +196,7 @@ function processEvent(state: State, event: EventEnvelope): State {
 
     case 'run.agent.text_block': {
       const block: MessageBlock = {
-        kind: (event.payload.contentType as MessageBlock['kind']) === 'code'
-          ? 'code'
-          : 'text',
+        kind: (event.payload.contentType as MessageBlock['kind']) === 'code' ? 'code' : 'text',
         content: event.payload.content as string,
         language: event.payload.language as string | undefined,
       };
@@ -221,16 +231,24 @@ function processEvent(state: State, event: EventEnvelope): State {
       const callId = event.payload.callId as string;
       const toolName = event.payload.toolName as string;
       const input = event.payload.input as Record<string, unknown>;
-      const status = (event.payload.status ?? 'running') as 'pending' | 'running' | 'completed' | 'failed';
-      const block: MessageBlock = { kind: 'tool_use', callId, toolName, input, status, children: [] };
+      const status = (event.payload.status ?? 'running') as
+        | 'pending'
+        | 'running'
+        | 'completed'
+        | 'failed';
+      const block: MessageBlock = {
+        kind: 'tool_use',
+        callId,
+        toolName,
+        input,
+        status,
+        children: [],
+      };
       const runId = event.payload.runId as string;
       if (runId && currentRun && currentRun.runId === runId) {
         currentRun = {
           ...currentRun,
-          toolCalls: [
-            ...currentRun.toolCalls,
-            { callId, toolName, status, timestamp: ts },
-          ],
+          toolCalls: [...currentRun.toolCalls, { callId, toolName, status, timestamp: ts }],
         };
       }
       const last = messages[messages.length - 1];
@@ -247,9 +265,7 @@ function processEvent(state: State, event: EventEnvelope): State {
     case 'run.agent.tool_result': {
       const callId = event.payload.callId as string;
       const rawOutput = event.payload.output ?? event.payload.content;
-      const outputStr = typeof rawOutput === 'string'
-        ? rawOutput
-        : JSON.stringify(rawOutput);
+      const outputStr = typeof rawOutput === 'string' ? rawOutput : JSON.stringify(rawOutput);
       const resultBlock: ToolResultBlock = {
         kind: 'generic_result',
         output: outputStr,
@@ -280,8 +296,9 @@ function processEvent(state: State, event: EventEnvelope): State {
       const content = event.payload.content as string | undefined;
       const toolName = event.payload.toolName as string | undefined;
       const filePath = (event.payload.path as string) ?? extractPathFromContent(content, toolName);
-      const action = (event.payload.action as 'created' | 'modified' | 'deleted')
-        ?? (toolName === 'Write' ? 'created' : 'modified');
+      const action =
+        (event.payload.action as 'created' | 'modified' | 'deleted') ??
+        (toolName === 'Write' ? 'created' : 'modified');
       if (!filePath) break;
       const block: MessageBlock = {
         kind: 'file_change',
@@ -308,7 +325,9 @@ function processEvent(state: State, event: EventEnvelope): State {
     }
 
     case 'run.agent.result': {
-      const rawTokenUsage = event.payload.tokenUsage ?? mapUsageToTokenUsage(event.payload.usage as Record<string, unknown> | undefined);
+      const rawTokenUsage =
+        event.payload.tokenUsage ??
+        mapUsageToTokenUsage(event.payload.usage as Record<string, unknown> | undefined);
       const block: MessageBlock = {
         kind: 'result',
         success: event.payload.success as boolean,
@@ -331,7 +350,14 @@ function processEvent(state: State, event: EventEnvelope): State {
       if (currentRun) {
         currentRun = {
           ...currentRun,
-          tasks: [...currentRun.tasks, { taskId: tid, description: (event.payload.description as string) || '', status: 'running' }],
+          tasks: [
+            ...currentRun.tasks,
+            {
+              taskId: tid,
+              description: (event.payload.description as string) || '',
+              status: 'running',
+            },
+          ],
         };
       }
       break;
@@ -343,7 +369,13 @@ function processEvent(state: State, event: EventEnvelope): State {
         currentRun = {
           ...currentRun,
           tasks: currentRun.tasks.map((t) =>
-            t.taskId === tid ? { ...t, description: (event.payload.description as string) || t.description, status: 'running' } : t,
+            t.taskId === tid
+              ? {
+                  ...t,
+                  description: (event.payload.description as string) || t.description,
+                  status: 'running',
+                }
+              : t,
           ),
         };
       }
@@ -356,7 +388,13 @@ function processEvent(state: State, event: EventEnvelope): State {
         currentRun = {
           ...currentRun,
           tasks: currentRun.tasks.map((t) =>
-            t.taskId === tid ? { ...t, status: (event.payload.status as string) || 'completed', summary: (event.payload.summary as string) || '' } : t,
+            t.taskId === tid
+              ? {
+                  ...t,
+                  status: (event.payload.status as string) || 'completed',
+                  summary: (event.payload.summary as string) || '',
+                }
+              : t,
           ),
         };
       }

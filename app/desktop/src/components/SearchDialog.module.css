@@ -68,7 +68,9 @@
   transition: background var(--duration-fast);
 }
 .item:hover,
-.selected { background: var(--accent); }
+.selected {
+  background: var(--accent);
+}
 
 .itemIcon {
   color: var(--muted-foreground);

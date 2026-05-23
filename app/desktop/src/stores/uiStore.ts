@@ -23,7 +23,10 @@ export const useUIStore = create<UIState>()(
     setTheme: (t) => {
       set({ theme: t });
       const root = document.documentElement;
-      root.classList.toggle('dark', t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches));
+      root.classList.toggle(
+        'dark',
+        t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches),
+      );
     },
-  }))
+  })),
 );

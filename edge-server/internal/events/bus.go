@@ -27,12 +27,12 @@ type subscriber struct {
 // Bus is an in-memory event bus with monotonic sequence numbers and
 // support for cursor-based replay.
 type Bus struct {
-	mu          sync.Mutex
-	seq         int64
-	history     []EventEnvelope
-	subs        []subscriber
-	nextSubID   int64
-	maxHistory  int
+	mu         sync.Mutex
+	seq        int64
+	history    []EventEnvelope
+	subs       []subscriber
+	nextSubID  int64
+	maxHistory int
 }
 
 // NewBus creates a new event bus with the given maximum history size.

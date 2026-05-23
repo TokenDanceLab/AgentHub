@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"sync"
 )
 
 // ControlHandler receives control messages from the CLI's stdout and can respond on stdin.
@@ -19,7 +18,7 @@ type ControlHandler interface {
 
 // ControlMessage represents a control_request or control_response on stdout.
 type ControlMessage struct {
-	Type      string          `json:"type"`                // "control_request", "control_response", "control_cancel_request"
+	Type      string          `json:"type"` // "control_request", "control_response", "control_cancel_request"
 	RequestID string          `json:"request_id,omitempty"`
 	Request   json.RawMessage `json:"request,omitempty"`
 	Response  json.RawMessage `json:"response,omitempty"`
@@ -27,24 +26,24 @@ type ControlMessage struct {
 
 // ControlRequestInner is the inner request payload.
 type ControlRequestInner struct {
-	Subtype          string           `json:"subtype"`
-	ToolName         string           `json:"tool_name,omitempty"`
-	Input            any              `json:"input,omitempty"`
-	ToolUseID        string           `json:"tool_use_id,omitempty"`
-	PermissionSuggestions []any       `json:"permission_suggestions,omitempty"`
-	AgentID          string           `json:"agent_id,omitempty"`
-	Description      string           `json:"description,omitempty"`
-	TaskID           string           `json:"task_id,omitempty"`
-	Mode             string           `json:"mode,omitempty"`
-	Model            string           `json:"model,omitempty"`
-	MaxThinkingTokens *int            `json:"max_thinking_tokens,omitempty"`
+	Subtype               string `json:"subtype"`
+	ToolName              string `json:"tool_name,omitempty"`
+	Input                 any    `json:"input,omitempty"`
+	ToolUseID             string `json:"tool_use_id,omitempty"`
+	PermissionSuggestions []any  `json:"permission_suggestions,omitempty"`
+	AgentID               string `json:"agent_id,omitempty"`
+	Description           string `json:"description,omitempty"`
+	TaskID                string `json:"task_id,omitempty"`
+	Mode                  string `json:"mode,omitempty"`
+	Model                 string `json:"model,omitempty"`
+	MaxThinkingTokens     *int   `json:"max_thinking_tokens,omitempty"`
 }
 
 // ControlResponseInner is the response to a control_request.
 type ControlResponseInner struct {
 	Subtype            string `json:"subtype"`
 	RequestID          string `json:"request_id,omitempty"`
-	Behavior           string `json:"behavior,omitempty"`           // "allow", "deny"
+	Behavior           string `json:"behavior,omitempty"` // "allow", "deny"
 	UpdatedInput       any    `json:"updatedInput,omitempty"`
 	Message            string `json:"message,omitempty"`
 	Interrupt          bool   `json:"interrupt,omitempty"`
@@ -73,7 +72,6 @@ type PermissionDecision struct {
 // For production, use EventEmittingPermissionHandler which emits events to the bus
 // and allows Desktop to make the decision.
 type DefaultPermissionHandler struct {
-	mu sync.Mutex
 	emitter EventEmitter // nil = silent auto-approve; non-nil = emit permission events
 }
 

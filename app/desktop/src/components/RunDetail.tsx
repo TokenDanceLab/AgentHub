@@ -53,6 +53,19 @@ function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
 export default function RunDetail({ run, toolCalls, changedFiles, outputText, diffs }: Props) {
   const { t } = useTranslation();
 
+  const defaultTab: TabId = outputText
+    ? 'output'
+    : toolCalls.length > 0
+      ? 'toolCalls'
+      : 'fileChanges';
+  const [selectedTab, setSelectedTab] = useState<TabId>(defaultTab);
+
+  useEffect(() => {
+    const handler = () => setSelectedTab('fileChanges');
+    window.addEventListener('agenthub:open-diff', handler);
+    return () => window.removeEventListener('agenthub:open-diff', handler);
+  }, []);
+
   if (!run) {
     return (
       <div className={styles.panel}>
@@ -63,23 +76,14 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
   }
 
   const statusKey = `run.status.${run.status}`;
-  const statusClass = run.status === 'finished'
-    ? styles.statusDone
-    : run.status === 'failed'
-      ? styles.statusFailed
-      : run.status === 'running'
-        ? styles.statusRunning
-        : styles.statusPending;
-
-  const defaultTab: TabId = outputText ? 'output' : toolCalls.length > 0 ? 'toolCalls' : 'fileChanges';
-  const [selectedTab, setSelectedTab] = useState<TabId>(defaultTab);
-
-  // Listen for agenthub:open-diff → switch to fileChanges tab
-  useEffect(() => {
-    const handler = () => setSelectedTab('fileChanges');
-    window.addEventListener('agenthub:open-diff', handler);
-    return () => window.removeEventListener('agenthub:open-diff', handler);
-  }, []);
+  const statusClass =
+    run.status === 'finished'
+      ? styles.statusDone
+      : run.status === 'failed'
+        ? styles.statusFailed
+        : run.status === 'running'
+          ? styles.statusRunning
+          : styles.statusPending;
 
   const hasOutput = !!outputText;
   const hasToolCalls = toolCalls.length > 0;
@@ -87,12 +91,17 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
 
   // Resolve the effective tab to display (falls back if the selected tab has no data)
   const activeTab: TabId =
-    (selectedTab === 'output' && hasOutput) ? 'output' :
-    (selectedTab === 'toolCalls' && hasToolCalls) ? 'toolCalls' :
-    (selectedTab === 'fileChanges' && hasFileChanges) ? 'fileChanges' :
-    hasOutput ? 'output' :
-    hasToolCalls ? 'toolCalls' :
-    'fileChanges';
+    selectedTab === 'output' && hasOutput
+      ? 'output'
+      : selectedTab === 'toolCalls' && hasToolCalls
+        ? 'toolCalls'
+        : selectedTab === 'fileChanges' && hasFileChanges
+          ? 'fileChanges'
+          : hasOutput
+            ? 'output'
+            : hasToolCalls
+              ? 'toolCalls'
+              : 'fileChanges';
 
   const hasAnyContent = hasOutput || hasToolCalls || hasFileChanges;
 
@@ -135,9 +144,7 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
           </div>
 
           <div className={styles.tabContent}>
-            {activeTab === 'output' && (
-              <pre className={styles.output}>{outputText}</pre>
-            )}
+            {activeTab === 'output' && <pre className={styles.output}>{outputText}</pre>}
             {activeTab === 'toolCalls' && (
               <div className={styles.list}>
                 {toolCalls.map((tc) => (
@@ -145,8 +152,8 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
                 ))}
               </div>
             )}
-            {activeTab === 'fileChanges' && (
-              diffs && diffs.length > 0 ? (
+            {activeTab === 'fileChanges' &&
+              (diffs && diffs.length > 0 ? (
                 <DiffViewer files={diffs} />
               ) : (
                 <div className={styles.list}>
@@ -157,8 +164,7 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
                     </div>
                   ))}
                 </div>
-              )
-            )}
+              ))}
           </div>
         </>
       )}

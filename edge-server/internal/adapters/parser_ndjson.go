@@ -96,6 +96,18 @@ func (p *NDJSONStreamParser) parseLine(line []byte) {
 		case "task_progress":
 			p.emitTaskProgress(scope, &msg)
 		case "task_notification":
+			// Re-extract status/summary: TaskStatus/TaskSummary use json:"-" to avoid
+			// tag conflict with StatusField (system/status), so we parse them here.
+			var taskMsg struct {
+				Status  string `json:"status"`
+				Summary string `json:"summary"`
+			}
+			if err := json.Unmarshal(line, &taskMsg); err == nil {
+				msg.TaskStatus = taskMsg.Status
+				if taskMsg.Summary != "" {
+					msg.TaskSummary = taskMsg.Summary
+				}
+			}
 			p.emitTaskNotification(scope, &msg)
 		case "session_state_changed":
 			p.emitSessionStateChanged(scope, &msg)
@@ -285,8 +297,8 @@ func (p *NDJSONStreamParser) emitCompactBoundary(scope map[string]any, msg *clau
 
 func (p *NDJSONStreamParser) emitStatusChange(scope map[string]any, msg *claudeSDKMessage) {
 	payload := map[string]any{}
-	if msg.TaskStatus != "" {
-		payload["status"] = msg.TaskStatus
+	if msg.StatusField != "" {
+		payload["status"] = msg.StatusField
 	}
 	if msg.PermissionMode != "" {
 		payload["permissionMode"] = msg.PermissionMode
@@ -315,19 +327,19 @@ func (p *NDJSONStreamParser) emitTaskStarted(scope map[string]any, msg *claudeSD
 
 func (p *NDJSONStreamParser) emitTaskProgress(scope map[string]any, msg *claudeSDKMessage) {
 	p.emit(scope, BusEventTaskProgress, map[string]any{
-		"taskId":        msg.TaskID,
-		"description":   msg.TaskDescription,
-		"lastToolName":  msg.LastToolName,
-		"usage":         msg.TaskUsage,
+		"taskId":       msg.TaskID,
+		"description":  msg.TaskDescription,
+		"lastToolName": msg.LastToolName,
+		"usage":        msg.TaskUsage,
 	})
 }
 
 func (p *NDJSONStreamParser) emitTaskNotification(scope map[string]any, msg *claudeSDKMessage) {
 	p.emit(scope, BusEventTaskNotification, map[string]any{
-		"taskId":    msg.TaskID,
-		"status":    msg.TaskStatus,
-		"summary":   msg.TaskSummary,
-		"usage":     msg.TaskUsage,
+		"taskId":  msg.TaskID,
+		"status":  msg.TaskStatus,
+		"summary": msg.TaskSummary,
+		"usage":   msg.TaskUsage,
 	})
 }
 
@@ -390,10 +402,10 @@ type claudeSDKMessage struct {
 	Version        string   `json:"version,omitempty"`
 
 	// result fields
-	DurationMs int64       `json:"duration_ms,omitempty"`
-	NumTurns   int         `json:"num_turns,omitempty"`
+	DurationMs int64        `json:"duration_ms,omitempty"`
+	NumTurns   int          `json:"num_turns,omitempty"`
 	Usage      *claudeUsage `json:"usage,omitempty"`
-	Errors     []string    `json:"errors,omitempty"`
+	Errors     []string     `json:"errors,omitempty"`
 
 	// tool_progress fields
 	ToolUseID      string  `json:"tool_use_id,omitempty"`
@@ -421,16 +433,16 @@ type claudeSDKMessage struct {
 	StatusField string `json:"status,omitempty"`
 
 	// api_retry fields
-	RetryAttempt    int    `json:"attempt,omitempty"`
-	RetryMaxRetries int    `json:"max_retries,omitempty"`
-	RetryDelayMs    int    `json:"retry_delay_ms,omitempty"`
-	RetryErrorStatus any   `json:"error_status,omitempty"`
+	RetryAttempt     int `json:"attempt,omitempty"`
+	RetryMaxRetries  int `json:"max_retries,omitempty"`
+	RetryDelayMs     int `json:"retry_delay_ms,omitempty"`
+	RetryErrorStatus any `json:"error_status,omitempty"`
 
 	// task_started/progress/notification fields (shared fields; no json tags to avoid
 	// conflicts with result's usage/summary — these are manually extracted)
 	TaskDescription string `json:"description,omitempty"`
 	TaskType        string `json:"task_type,omitempty"`
-	TaskStatus      string `json:"status,omitempty"`
+	TaskStatus      string `json:"-"`
 	TaskSummary     string `json:"-"`
 	TaskUsage       any    `json:"-"`
 	LastToolName    string `json:"last_tool_name,omitempty"`
@@ -455,7 +467,7 @@ type claudeRateLimitInfo struct {
 }
 
 type claudeContentMessage struct {
-	Role    string            `json:"role"`
+	Role    string               `json:"role"`
 	Content []claudeContentBlock `json:"content"`
 }
 
@@ -472,9 +484,9 @@ type claudeContentBlock struct {
 }
 
 type claudeStreamEvent struct {
-	Type         string                `json:"type"`
-	Delta        *claudeDelta          `json:"delta,omitempty"`
-	ContentBlock *claudeContentBlock   `json:"content_block,omitempty"`
+	Type         string              `json:"type"`
+	Delta        *claudeDelta        `json:"delta,omitempty"`
+	ContentBlock *claudeContentBlock `json:"content_block,omitempty"`
 }
 
 type claudeDelta struct {

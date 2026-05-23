@@ -36,9 +36,7 @@ export default function EventLog({ events, online }: Props) {
               <span className={styles.seq}>[{e.seq}]</span>
               <span className={styles.type}>{e.type}</span>
               {e.summary && <span className={styles.summary}>{e.summary}</span>}
-              <div className={styles.ts}>
-                {new Date(e.sentAt).toLocaleTimeString()}
-              </div>
+              <div className={styles.ts}>{new Date(e.sentAt).toLocaleTimeString()}</div>
             </div>
           ))
         )}

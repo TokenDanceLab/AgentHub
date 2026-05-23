@@ -193,10 +193,10 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 			}
 			if evt.Part.Tokens != nil {
 				result["usage"] = map[string]any{
-					"inputTokens":     evt.Part.Tokens.Input,
-					"outputTokens":    evt.Part.Tokens.Output,
-					"reasoningTokens": evt.Part.Tokens.Reasoning,
-					"totalTokens":     evt.Part.Tokens.Total,
+					"inputTokens":      evt.Part.Tokens.Input,
+					"outputTokens":     evt.Part.Tokens.Output,
+					"reasoningTokens":  evt.Part.Tokens.Reasoning,
+					"totalTokens":      evt.Part.Tokens.Total,
 					"cacheReadTokens":  evt.Part.Tokens.Cache.Read,
 					"cacheWriteTokens": evt.Part.Tokens.Cache.Write,
 				}
@@ -229,10 +229,10 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 		})
 	case "task_progress":
 		emitter.Emit(BusEventTaskProgress, scope, map[string]any{
-			"taskId":        evt.TaskID,
-			"description":   evt.TaskDescription,
-			"lastToolName":  evt.LastToolName,
-			"usage":         evt.TaskUsage,
+			"taskId":       evt.TaskID,
+			"description":  evt.TaskDescription,
+			"lastToolName": evt.LastToolName,
+			"usage":        evt.TaskUsage,
 		})
 	case "task_complete":
 		emitter.Emit(BusEventTaskNotification, scope, map[string]any{
@@ -254,20 +254,20 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 // --- OpenCode JSON event schemas ---
 
 type opencodeEvent struct {
-	Type         string          `json:"type"`
-	Timestamp    int64           `json:"timestamp,omitempty"`
-	SessionID    string          `json:"sessionID,omitempty"`
-	Part         *opencodePart   `json:"part,omitempty"`
-	ErrorMessage string          `json:"error,omitempty"`
-	Model        string          `json:"model,omitempty"`
-	Provider     string          `json:"provider,omitempty"`
-	Tools        []string        `json:"tools,omitempty"`
-	TaskID       string          `json:"taskId,omitempty"`
-	TaskDescription string       `json:"taskDescription,omitempty"`
-	TaskType     string          `json:"taskType,omitempty"`
-	TaskSummary  string          `json:"taskSummary,omitempty"`
-	TaskUsage    any             `json:"taskUsage,omitempty"`
-	LastToolName string          `json:"lastToolName,omitempty"`
+	Type            string        `json:"type"`
+	Timestamp       int64         `json:"timestamp,omitempty"`
+	SessionID       string        `json:"sessionID,omitempty"`
+	Part            *opencodePart `json:"part,omitempty"`
+	ErrorMessage    string        `json:"error,omitempty"`
+	Model           string        `json:"model,omitempty"`
+	Provider        string        `json:"provider,omitempty"`
+	Tools           []string      `json:"tools,omitempty"`
+	TaskID          string        `json:"taskId,omitempty"`
+	TaskDescription string        `json:"taskDescription,omitempty"`
+	TaskType        string        `json:"taskType,omitempty"`
+	TaskSummary     string        `json:"taskSummary,omitempty"`
+	TaskUsage       any           `json:"taskUsage,omitempty"`
+	LastToolName    string        `json:"lastToolName,omitempty"`
 }
 
 type opencodePart struct {

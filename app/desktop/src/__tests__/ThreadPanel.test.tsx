@@ -62,9 +62,7 @@ describe('ThreadPanel', () => {
   });
 
   it('shows truncated threadId as title when title is empty', () => {
-    const threads = [
-      makeThread({ threadId: 'thread-with-very-long-id-12345', title: '' }),
-    ];
+    const threads = [makeThread({ threadId: 'thread-with-very-long-id-12345', title: '' })];
     render(
       <ThreadPanel
         threads={threads}
@@ -177,9 +175,7 @@ describe('ThreadPanel', () => {
   });
 
   it('shows empty state when search has no matches', () => {
-    const threads = [
-      makeThread({ threadId: 't1', title: 'Alpha' }),
-    ];
+    const threads = [makeThread({ threadId: 't1', title: 'Alpha' })];
     render(
       <ThreadPanel
         threads={threads}

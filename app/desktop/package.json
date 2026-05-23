@@ -11,7 +11,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --check src",
+    "format:fix": "prettier --write src",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.5.0",
@@ -24,6 +29,7 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "@tauri-apps/cli": "^2.5.0",
     "@testing-library/jest-dom": "^6.9.1",
@@ -31,8 +37,13 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.4.0",
+    "eslint": "^10.4.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
     "jsdom": "^29.1.1",
+    "prettier": "^3.8.3",
     "typescript": "~5.8.0",
+    "typescript-eslint": "^8.59.4",
     "vite": "^6.3.0",
     "vitest": "^4.1.7"
   }

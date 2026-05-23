@@ -26,7 +26,12 @@ export type MessageBlock =
     }
   | { kind: 'file_change'; path: string; action: 'created' | 'modified' | 'deleted'; diff?: string }
   | { kind: 'session_init'; model?: string; tools?: string[]; permissionMode?: string }
-  | { kind: 'result'; success: boolean; error?: string; tokenUsage?: { input: number; output: number } };
+  | {
+      kind: 'result';
+      success: boolean;
+      error?: string;
+      tokenUsage?: { input: number; output: number };
+    };
 
 // Tool result subtypes (nested under tool_use, 参考: Cline DiffEditRow 双格式)
 export type ToolResultBlock =

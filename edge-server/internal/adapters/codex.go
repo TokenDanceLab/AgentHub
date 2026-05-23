@@ -364,7 +364,7 @@ func (a *CodexAdapter) emitThinking(raw json.RawMessage, scope map[string]any, e
 func (a *CodexAdapter) emitToolCallFromItem(raw json.RawMessage, scope map[string]any, emitter EventEmitter, status string) {
 	payload := map[string]any{"status": status}
 	var base itemBase
-	json.Unmarshal(raw, &base)
+	_ = json.Unmarshal(raw, &base)
 	payload["callId"] = base.ID
 
 	switch base.Type {
@@ -372,7 +372,7 @@ func (a *CodexAdapter) emitToolCallFromItem(raw json.RawMessage, scope map[strin
 		var item struct {
 			Command string `json:"command"`
 		}
-		json.Unmarshal(raw, &item)
+		_ = json.Unmarshal(raw, &item)
 		payload["toolName"] = "shell_command"
 		payload["input"] = map[string]any{"command": item.Command}
 	case "mcp_tool_call":
@@ -381,7 +381,7 @@ func (a *CodexAdapter) emitToolCallFromItem(raw json.RawMessage, scope map[strin
 			Tool      string          `json:"tool"`
 			Arguments json.RawMessage `json:"arguments"`
 		}
-		json.Unmarshal(raw, &item)
+		_ = json.Unmarshal(raw, &item)
 		payload["toolName"] = "mcp__" + item.Server + "__" + item.Tool
 		if item.Arguments != nil {
 			var args any
@@ -394,7 +394,7 @@ func (a *CodexAdapter) emitToolCallFromItem(raw json.RawMessage, scope map[strin
 			Query  string `json:"query"`
 			Action string `json:"action"`
 		}
-		json.Unmarshal(raw, &item)
+		_ = json.Unmarshal(raw, &item)
 		payload["toolName"] = "web_search"
 		payload["input"] = map[string]any{"query": item.Query, "action": item.Action}
 		payload["kind"] = "web_search"
@@ -405,7 +405,7 @@ func (a *CodexAdapter) emitToolCallFromItem(raw json.RawMessage, scope map[strin
 func (a *CodexAdapter) emitToolResultFromItem(raw json.RawMessage, scope map[string]any, emitter EventEmitter) {
 	payload := map[string]any{}
 	var base itemBase
-	json.Unmarshal(raw, &base)
+	_ = json.Unmarshal(raw, &base)
 	payload["callId"] = base.ID
 
 	switch base.Type {
@@ -416,7 +416,7 @@ func (a *CodexAdapter) emitToolResultFromItem(raw json.RawMessage, scope map[str
 			AggregatedOutput string `json:"aggregated_output"`
 			Status           string `json:"status"`
 		}
-		json.Unmarshal(raw, &item)
+		_ = json.Unmarshal(raw, &item)
 		payload["toolName"] = "shell_command"
 		payload["output"] = item.AggregatedOutput
 		if item.ExitCode != nil {
@@ -431,7 +431,7 @@ func (a *CodexAdapter) emitToolResultFromItem(raw json.RawMessage, scope map[str
 			Result    json.RawMessage `json:"result"`
 			ItemError *codexItemError `json:"error"`
 		}
-		json.Unmarshal(raw, &item)
+		_ = json.Unmarshal(raw, &item)
 		payload["toolName"] = "mcp__" + item.Server + "__" + item.Tool
 		payload["status"] = item.Status
 		if item.Result != nil {
@@ -448,7 +448,7 @@ func (a *CodexAdapter) emitToolResultFromItem(raw json.RawMessage, scope map[str
 			Query  string `json:"query"`
 			Action string `json:"action"`
 		}
-		json.Unmarshal(raw, &item)
+		_ = json.Unmarshal(raw, &item)
 		payload["toolName"] = "web_search"
 		payload["kind"] = "web_search"
 		payload["output"] = map[string]any{"query": item.Query, "action": item.Action}
@@ -486,12 +486,12 @@ func (a *CodexAdapter) emitFileChange(raw json.RawMessage, scope map[string]any,
 
 func (a *CodexAdapter) emitToolProgress(raw json.RawMessage, scope map[string]any, emitter EventEmitter) {
 	var base itemBase
-	json.Unmarshal(raw, &base)
+	_ = json.Unmarshal(raw, &base)
 
 	payload := map[string]any{
-		"callId":  base.ID,
+		"callId":    base.ID,
 		"toolUseId": base.ID,
-		"status":  "in_progress",
+		"status":    "in_progress",
 	}
 
 	switch base.Type {
@@ -500,7 +500,7 @@ func (a *CodexAdapter) emitToolProgress(raw json.RawMessage, scope map[string]an
 			Command          string `json:"command"`
 			AggregatedOutput string `json:"aggregated_output"`
 		}
-		json.Unmarshal(raw, &item)
+		_ = json.Unmarshal(raw, &item)
 		payload["toolName"] = "shell_command"
 		payload["output"] = item.AggregatedOutput
 	case "mcp_tool_call":
@@ -508,7 +508,7 @@ func (a *CodexAdapter) emitToolProgress(raw json.RawMessage, scope map[string]an
 			Server string `json:"server"`
 			Tool   string `json:"tool"`
 		}
-		json.Unmarshal(raw, &item)
+		_ = json.Unmarshal(raw, &item)
 		payload["toolName"] = "mcp__" + item.Server + "__" + item.Tool
 	}
 	emitter.Emit(BusEventToolCall, scope, payload)
