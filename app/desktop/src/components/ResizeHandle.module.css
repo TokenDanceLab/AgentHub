@@ -1,0 +1,15 @@
+.handle {
+  flex-shrink: 0;
+  background: transparent;
+  transition: background 0.15s;
+  z-index: 5;
+}
+
+.handle:hover {
+  background: var(--primary);
+}
+
+.horizontal {
+  width: 4px;
+  cursor: col-resize;
+}

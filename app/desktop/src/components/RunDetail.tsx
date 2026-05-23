@@ -1,0 +1,123 @@
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { RunInfo } from '@shared/types';
+import styles from './RunDetail.module.css';
+
+interface Props {
+  run: RunInfo | null;
+  toolCalls: Array<{ callId: string; toolName: string; status: string; timestamp: string }>;
+  changedFiles: Array<{ path: string; action: string; timestamp: string }>;
+  outputText: string;
+}
+
+type TabId = 'output' | 'toolCalls' | 'fileChanges';
+
+export default function RunDetail({ run, toolCalls, changedFiles, outputText }: Props) {
+  const { t } = useTranslation();
+
+  if (!run) {
+    return (
+      <div className={styles.panel}>
+        <div className={styles.title}>{t('run.title')}</div>
+        <div className={styles.empty}>No active run</div>
+      </div>
+    );
+  }
+
+  const statusKey = `run.status.${run.status}`;
+  const statusClass = run.status === 'finished'
+    ? styles.statusDone
+    : run.status === 'failed'
+      ? styles.statusFailed
+      : run.status === 'running'
+        ? styles.statusRunning
+        : styles.statusPending;
+
+  const defaultTab: TabId = outputText ? 'output' : toolCalls.length > 0 ? 'toolCalls' : 'fileChanges';
+  const [selectedTab, setSelectedTab] = useState<TabId>(defaultTab);
+
+  const hasOutput = !!outputText;
+  const hasToolCalls = toolCalls.length > 0;
+  const hasFileChanges = changedFiles.length > 0;
+
+  // Resolve the effective tab to display (falls back if the selected tab has no data)
+  const activeTab: TabId =
+    (selectedTab === 'output' && hasOutput) ? 'output' :
+    (selectedTab === 'toolCalls' && hasToolCalls) ? 'toolCalls' :
+    (selectedTab === 'fileChanges' && hasFileChanges) ? 'fileChanges' :
+    hasOutput ? 'output' :
+    hasToolCalls ? 'toolCalls' :
+    'fileChanges';
+
+  const hasAnyContent = hasOutput || hasToolCalls || hasFileChanges;
+
+  return (
+    <aside className={styles.panel} aria-label={t('run.title')}>
+      <div className={styles.title}>{t('run.title')}</div>
+
+      <div className={styles.section}>
+        <span className={`${styles.status} ${statusClass}`}>{t(statusKey)}</span>
+        {run.runId && <span className={styles.runId}>{run.runId.slice(0, 12)}</span>}
+      </div>
+
+      {hasAnyContent && (
+        <>
+          <div className={styles.tabs}>
+            {outputText && (
+              <button
+                className={`${styles.tab} ${selectedTab === 'output' ? styles.tabActive : ''}`}
+                onClick={() => setSelectedTab('output')}
+              >
+                {t('run.output')}
+              </button>
+            )}
+            {toolCalls.length > 0 && (
+              <button
+                className={`${styles.tab} ${selectedTab === 'toolCalls' ? styles.tabActive : ''}`}
+                onClick={() => setSelectedTab('toolCalls')}
+              >
+                {t('run.toolCalls')} ({toolCalls.length})
+              </button>
+            )}
+            {changedFiles.length > 0 && (
+              <button
+                className={`${styles.tab} ${selectedTab === 'fileChanges' ? styles.tabActive : ''}`}
+                onClick={() => setSelectedTab('fileChanges')}
+              >
+                {t('run.fileChanges')} ({changedFiles.length})
+              </button>
+            )}
+          </div>
+
+          <div className={styles.tabContent}>
+            {activeTab === 'output' && (
+              <pre className={styles.output}>{outputText}</pre>
+            )}
+            {activeTab === 'toolCalls' && (
+              <div className={styles.list}>
+                {toolCalls.map((tc) => (
+                  <div key={tc.callId} className={styles.item}>
+                    <span className={tc.status === 'completed' ? styles.success : styles.pending}>
+                      {tc.toolName}
+                    </span>
+                    <span className={styles.itemTs}>{new Date(tc.timestamp).toLocaleTimeString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {activeTab === 'fileChanges' && (
+              <div className={styles.list}>
+                {changedFiles.map((f) => (
+                  <div key={f.path} className={styles.item}>
+                    <code className={styles.filePath}>{f.path}</code>
+                    <span className={styles.action}>{f.action}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </aside>
+  );
+}
