@@ -2,12 +2,16 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -16,22 +20,41 @@ import (
 
 // SQL substrings used for matching (QueryMatcherFunc with strings.Contains)
 const (
-	sqlcUserByID       = `FROM "users" WHERE id =`
-	sqlcUsersByIDs     = `FROM "users" WHERE id IN`
-	sqlcFriendshipBetween = `FROM "friendships" WHERE (user_id`
-	sqlcFriendshipByID = `FROM "friendships" WHERE id =`
-	sqlcFriendshipByUF = `FROM "friendships" WHERE user_id = $1 AND friend_id = $2`
-	sqlcFriendshipsByUser = `FROM "friendships" WHERE user_id = $1 AND status = $2`
-	sqlcPendingReqs    = `FROM "friendships" WHERE friend_id = $1 AND status = $2`
-	sqlcInsertFriend   = `INSERT INTO "friendships"`
-	sqlcUpdateFriend   = `UPDATE "friendships" SET`
-	sqlcDeleteFriend   = `DELETE FROM "friendships" WHERE`
+	sqlcUserByID           = `FROM "users" WHERE id =`
+	sqlcUsersByIDs         = `FROM "users" WHERE id IN`
+	sqlcFriendshipBetween  = `FROM "friendships" WHERE (user_id`
+	sqlcFriendshipByID     = `FROM "friendships" WHERE id =`
+	sqlcFriendshipByUF     = `FROM "friendships" WHERE user_id = $1 AND friend_id = $2`
+	sqlcFriendshipsByUser  = `FROM "friendships" WHERE user_id = $1 AND status = $2`
+	sqlcPendingReqs        = `FROM "friendships" WHERE friend_id = $1 AND status = $2`
+	sqlcInsertFriend       = `INSERT INTO "friendships"`
+	sqlcUpdateFriend       = `UPDATE "friendships" SET`
+	sqlcDeleteFriend       = `DELETE FROM "friendships" WHERE`
 )
+
+func newMockDBContact(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
+	t.Helper()
+	sqlDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherFunc(
+		func(expectedSQL, actualSQL string) error {
+			if strings.Contains(actualSQL, expectedSQL) {
+				return nil
+			}
+			return fmt.Errorf("expected SQL to contain %q, got %q", expectedSQL, actualSQL)
+		},
+	)))
+	require.NoError(t, err)
+	gormDB, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
+		SkipDefaultTransaction: true,
+		PrepareStmt:            false,
+	})
+	require.NoError(t, err)
+	return gormDB, mock, sqlDB
+}
 
 // ==================== SearchUser ====================
 
 func TestSearchUser_SelfSearch(t *testing.T) {
-	db, _, sqlDB := newMockDB(t)
+	db, _, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	svc := NewContactService(db, nil, nil)
@@ -40,7 +63,7 @@ func TestSearchUser_SelfSearch(t *testing.T) {
 }
 
 func TestSearchUser_NotFound(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -54,7 +77,7 @@ func TestSearchUser_NotFound(t *testing.T) {
 }
 
 func TestSearchUser_Stranger(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -76,7 +99,7 @@ func TestSearchUser_Stranger(t *testing.T) {
 }
 
 func TestSearchUser_Friend(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -97,7 +120,7 @@ func TestSearchUser_Friend(t *testing.T) {
 }
 
 func TestSearchUser_PendingSent(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -118,7 +141,7 @@ func TestSearchUser_PendingSent(t *testing.T) {
 }
 
 func TestSearchUser_PendingReceived(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -139,7 +162,7 @@ func TestSearchUser_PendingReceived(t *testing.T) {
 }
 
 func TestSearchUser_Blocked(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -161,7 +184,7 @@ func TestSearchUser_Blocked(t *testing.T) {
 // ==================== SendFriendRequest ====================
 
 func TestSendFriendRequest_SelfRequest(t *testing.T) {
-	db, _, sqlDB := newMockDB(t)
+	db, _, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	svc := NewContactService(db, nil, nil)
@@ -170,7 +193,7 @@ func TestSendFriendRequest_SelfRequest(t *testing.T) {
 }
 
 func TestSendFriendRequest_TargetNotFound(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -184,7 +207,7 @@ func TestSendFriendRequest_TargetNotFound(t *testing.T) {
 }
 
 func TestSendFriendRequest_AlreadyFriends(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -204,7 +227,7 @@ func TestSendFriendRequest_AlreadyFriends(t *testing.T) {
 }
 
 func TestSendFriendRequest_BlockedByTarget(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -224,7 +247,7 @@ func TestSendFriendRequest_BlockedByTarget(t *testing.T) {
 }
 
 func TestSendFriendRequest_Success(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -246,7 +269,7 @@ func TestSendFriendRequest_Success(t *testing.T) {
 }
 
 func TestSendFriendRequest_PendingAlready(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -268,7 +291,7 @@ func TestSendFriendRequest_PendingAlready(t *testing.T) {
 // ==================== AcceptFriendRequest ====================
 
 func TestAcceptFriendRequest_NotFound(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipByID).
@@ -282,7 +305,7 @@ func TestAcceptFriendRequest_NotFound(t *testing.T) {
 }
 
 func TestAcceptFriendRequest_WrongReceiver(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipByID).
@@ -297,7 +320,7 @@ func TestAcceptFriendRequest_WrongReceiver(t *testing.T) {
 }
 
 func TestAcceptFriendRequest_AlreadyAccepted(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipByID).
@@ -312,7 +335,7 @@ func TestAcceptFriendRequest_AlreadyAccepted(t *testing.T) {
 }
 
 func TestAcceptFriendRequest_Success(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipByID).
@@ -338,7 +361,7 @@ func TestAcceptFriendRequest_Success(t *testing.T) {
 // ==================== RejectFriendRequest ====================
 
 func TestRejectFriendRequest_NotFound(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipByID).
@@ -352,7 +375,7 @@ func TestRejectFriendRequest_NotFound(t *testing.T) {
 }
 
 func TestRejectFriendRequest_Success(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipByID).
@@ -373,7 +396,7 @@ func TestRejectFriendRequest_Success(t *testing.T) {
 // ==================== RemoveContact ====================
 
 func TestRemoveContact_NotFound(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipByUF).
@@ -387,7 +410,7 @@ func TestRemoveContact_NotFound(t *testing.T) {
 }
 
 func TestRemoveContact_Success(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipByUF).
@@ -411,7 +434,7 @@ func TestRemoveContact_Success(t *testing.T) {
 // ==================== BlockContact ====================
 
 func TestBlockContact_SelfBlock(t *testing.T) {
-	db, _, sqlDB := newMockDB(t)
+	db, _, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	svc := NewContactService(db, nil, nil)
@@ -420,7 +443,7 @@ func TestBlockContact_SelfBlock(t *testing.T) {
 }
 
 func TestBlockContact_TargetNotFound(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -434,7 +457,7 @@ func TestBlockContact_TargetNotFound(t *testing.T) {
 }
 
 func TestBlockContact_Success(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcUserByID).
@@ -460,7 +483,7 @@ func TestBlockContact_Success(t *testing.T) {
 // ==================== UnblockContact ====================
 
 func TestUnblockContact_NotFoundOrNotBlocked(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipByUF).
@@ -474,7 +497,7 @@ func TestUnblockContact_NotFoundOrNotBlocked(t *testing.T) {
 }
 
 func TestUnblockContact_NotBlockedStatus(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipByUF).
@@ -489,7 +512,7 @@ func TestUnblockContact_NotBlockedStatus(t *testing.T) {
 }
 
 func TestUnblockContact_Success(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipByUF).
@@ -510,7 +533,7 @@ func TestUnblockContact_Success(t *testing.T) {
 // ==================== ListContacts ====================
 
 func TestListContacts_Empty(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipsByUser).
@@ -525,7 +548,7 @@ func TestListContacts_Empty(t *testing.T) {
 }
 
 func TestListContacts_WithFriends(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipsByUser).
@@ -555,7 +578,7 @@ func TestListContacts_WithFriends(t *testing.T) {
 // ==================== UpdateRemark ====================
 
 func TestUpdateRemark(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectExec(sqlcUpdateFriend).
@@ -571,7 +594,7 @@ func TestUpdateRemark(t *testing.T) {
 // ==================== ListFriendRequests ====================
 
 func TestListFriendRequests_Empty(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcPendingReqs).
@@ -586,7 +609,7 @@ func TestListFriendRequests_Empty(t *testing.T) {
 }
 
 func TestListFriendRequests_WithRequests(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
 	now := time.Now()
