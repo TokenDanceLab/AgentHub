@@ -14,6 +14,7 @@ interface RunState {
   outputText: string;
   toolCalls: Array<{ callId: string; toolName: string; status: string; timestamp: string; output?: string }>;
   changedFiles: Array<{ path: string; action: string; timestamp: string }>;
+  tasks: Array<{ taskId: string; description: string; status: string; summary?: string }>;
 }
 
 interface State {
@@ -126,7 +127,7 @@ function processEvent(state: State, event: EventEnvelope): State {
 
     case 'run.started': {
       const rid = event.payload.runId as string;
-      currentRun = { runId: rid, status: 'running', outputText: '', toolCalls: [], changedFiles: [] };
+      currentRun = { runId: rid, status: 'running', outputText: '', toolCalls: [], changedFiles: [], tasks: [] };
       messages = [
         ...messages,
         {
@@ -321,6 +322,43 @@ function processEvent(state: State, event: EventEnvelope): State {
         const msg = newAgentMessage(event.id, ts);
         msg.blocks = [block];
         messages = [...messages, msg];
+      }
+      break;
+    }
+
+    case 'run.agent.task_started': {
+      const tid = event.payload.taskId as string;
+      if (currentRun) {
+        currentRun = {
+          ...currentRun,
+          tasks: [...currentRun.tasks, { taskId: tid, description: (event.payload.description as string) || '', status: 'running' }],
+        };
+      }
+      break;
+    }
+
+    case 'run.agent.task_progress': {
+      const tid = event.payload.taskId as string;
+      if (currentRun) {
+        currentRun = {
+          ...currentRun,
+          tasks: currentRun.tasks.map((t) =>
+            t.taskId === tid ? { ...t, description: (event.payload.description as string) || t.description, status: 'running' } : t,
+          ),
+        };
+      }
+      break;
+    }
+
+    case 'run.agent.task_notification': {
+      const tid = event.payload.taskId as string;
+      if (currentRun) {
+        currentRun = {
+          ...currentRun,
+          tasks: currentRun.tasks.map((t) =>
+            t.taskId === tid ? { ...t, status: (event.payload.status as string) || 'completed', summary: (event.payload.summary as string) || '' } : t,
+          ),
+        };
       }
       break;
     }
