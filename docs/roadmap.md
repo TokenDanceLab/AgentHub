@@ -88,7 +88,7 @@ feat/trump-webui          ← Web 前端（Trump）
 - [ ] Hub auth middleware：在 stub 转真实实现前必须接入
 - [ ] 权限门控升级：Desktop 主动批准/拒绝
 - [ ] Web 前端集成：feat/trump-webui → dev/delicious233 合并
-- [ ] 响应式布局 + 移动端适配
+- [x] 响应式布局 + 移动端适配
 
 ## 实测状态 (2026-05-23)
 
