@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -20,9 +21,10 @@ type NDJSONStreamParser struct {
 	ctx            context.Context    // set by Parse(); used for control_request context propagation
 	seq            int64
 	toolNames      map[string]string // toolUseID → toolName (for file_change detection)
-	controlHandler ControlHandler    // nil = control messages ignored
-	stdin          io.Writer         // nil = control responses not written
-	hooks          HookChain         // AgentHook middleware (P0 #1 from researcher)
+	controlHandler ControlHandler          // nil = control messages ignored
+	stdin          io.Writer               // nil = control responses not written
+	hooks          HookChain               // AgentHook middleware (P0 #1 from researcher)
+	budget         *runnerctx.ContextBudget // nil = no budget tracking
 }
 
 // NewNDJSONStreamParser creates a parser that emits events via the given emitter.
@@ -46,6 +48,10 @@ func (p *NDJSONStreamParser) WithHooks(hooks HookChain) *NDJSONStreamParser {
 // Parse reads NDJSON from r until EOF or ctx cancellation.
 func (p *NDJSONStreamParser) Parse(ctx context.Context, r io.Reader) error {
 	p.ctx = ctx
+	// Extract budget from context for token tracking (nil = no tracking).
+	if budget, ok := ctx.Value(CtxBudgetKey).(*runnerctx.ContextBudget); ok {
+		p.budget = budget
+	}
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 256*1024), 10*1024*1024) // 10MB max line
 
@@ -254,6 +260,10 @@ func (p *NDJSONStreamParser) parseResult(scope map[string]any, msg *claudeSDKMes
 		payload["usage"] = map[string]any{
 			"inputTokens":  msg.Usage.InputTokens,
 			"outputTokens": msg.Usage.OutputTokens,
+		}
+		// Track cumulative token consumption for context budget.
+		if p.budget != nil {
+			p.budget.Track(int(msg.Usage.InputTokens + msg.Usage.OutputTokens))
 		}
 	}
 	if !success {
