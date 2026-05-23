@@ -1,0 +1,104 @@
+linters-settings:
+  cyclop:
+    max-complexity: 21
+  gocyclo:
+    min-complexity: 20
+  gocognit:
+    min-complexity: 30
+  goconst:
+    min-len: 4
+    min-occurrences: 5
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: increment-decrement
+      - name: var-naming
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+
+linters:
+  enable:
+    # Security
+    - gosec
+    # Bugs
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    # Style
+    - gosimple
+    - gofmt
+    - misspell
+    - revive
+    - unconvert
+    - whitespace
+    # Complexity
+    - cyclop
+    - gocyclo
+    - gocognit
+    - goconst
+    # Performance
+    - prealloc
+
+run:
+  timeout: 5m
+  tests: true
+
+issues:
+  exclude-rules:
+    # Test files: relax complexity and unused param checks
+    - path: _test\.go
+      linters:
+        - cyclop
+        - gocyclo
+        - gocognit
+        - goconst
+        - errcheck
+    # Gin handlers are inherently complex with request/response logic
+    - path: internal/handler/.*\.go
+      linters:
+        - gocognit
+    # Router setup files register many routes
+    - path: internal/router/router\.go
+      linters:
+        - gocognit
+    # WebSocket manager is a complex multiplexer
+    - path: internal/ws/manager\.go
+      linters:
+        - cyclop
+        - gocyclo
+        - gocognit
+    # Repository migration is a sequence of DDL statements
+    - path: internal/repository/migrate\.go
+      linters:
+        - gocognit
+    # Server bootstrap wires many dependencies
+    - path: internal/httpserver/server\.go
+      linters:
+        - gocognit
+    # context-as-argument: ctx last is a deliberate choice
+    - linters:
+        - revive
+      text: "context-as-argument"
+    # Deprecated API usage may be intentional during migration
+    - linters:
+        - staticcheck
+      text: "SA1019"
+  exclude-dirs:
+    - reference
+    - vendor
+    - node_modules
+    - tests
+  exclude-dirs-use-default: true
