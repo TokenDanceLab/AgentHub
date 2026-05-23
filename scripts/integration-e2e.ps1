@@ -79,12 +79,15 @@ try {
 }
 
 Write-Host "[5/6] Creating run..." -ForegroundColor Yellow
+$Model = if ($Agent -eq "opencode") { "anthropic/claude-haiku-4-5" }
+         elseif ($Agent -eq "claude-code") { "claude-haiku-4-5" }
+         else { "" }
 $Body = @{
   projectId = "proj_e2e"
   threadId  = "thread_e2e"
   prompt    = "reply with just the word ok and nothing else"
-  model     = "claude-haiku-4-5"
 } | ConvertTo-Json
+if ($Model) { $Body = (@{projectId="proj_e2e"; threadId="thread_e2e"; prompt="reply with just the word ok and nothing else"; model=$Model} | ConvertTo-Json) }
 
 try {
   $Run = Invoke-RestMethod "$BaseUrl/v1/runs" -Method Post -Body $Body `
@@ -144,6 +147,12 @@ function Assert($Name, $Condition) {
 }
 
 Write-Host "`n=== Results ===" -ForegroundColor Cyan
+
+# Show all event types for debugging
+$EventTypes = $Events | Group-Object type | Sort-Object Count -Descending
+foreach ($et in $EventTypes) {
+  Write-Host "  $($et.Count)x $($et.Name)" -ForegroundColor DarkGray
+}
 
 $TextDeltas = $Events | Where-Object { $_.type -eq "run.agent.text_delta" }
 $TextBlocks = $Events | Where-Object { $_.type -eq "run.agent.text_block" }
