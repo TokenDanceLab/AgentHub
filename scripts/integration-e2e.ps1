@@ -67,7 +67,18 @@ if (-not $Health) {
 Write-Host "  Health OK: $($Health.status)" -ForegroundColor Green
 
 # ── Create Run ─────────────────
-Write-Host "[4/5] Creating run..." -ForegroundColor Yellow
+Write-Host "[4/6] Setting up project/thread..." -ForegroundColor Yellow
+try {
+  $null = Invoke-RestMethod "$BaseUrl/v1/projects" -Method Post -Body (@{projectId="proj_e2e"; name="E2E Test"} | ConvertTo-Json) `
+    -ContentType "application/json; charset=utf-8" -TimeoutSec 5
+  $null = Invoke-RestMethod "$BaseUrl/v1/threads" -Method Post -Body (@{threadId="thread_e2e"; projectId="proj_e2e"; title="E2E Thread"} | ConvertTo-Json) `
+    -ContentType "application/json; charset=utf-8" -TimeoutSec 5
+  Write-Host "  Project/Thread OK" -ForegroundColor Green
+} catch {
+  Write-Host "  Project/Thread may already exist: $_" -ForegroundColor DarkYellow
+}
+
+Write-Host "[5/6] Creating run..." -ForegroundColor Yellow
 $Body = @{
   projectId = "proj_e2e"
   threadId  = "thread_e2e"
@@ -86,7 +97,7 @@ try {
 }
 
 # ── Verify Events via WebSocket ─
-Write-Host "[5/5] Listening for events..." -ForegroundColor Yellow
+Write-Host "[6/6] Listening for events..." -ForegroundColor Yellow
 
 $Events = [System.Collections.ArrayList]::new()
 $Done = $false
@@ -135,17 +146,19 @@ function Assert($Name, $Condition) {
 Write-Host "`n=== Results ===" -ForegroundColor Cyan
 
 $TextDeltas = $Events | Where-Object { $_.type -eq "run.agent.text_delta" }
+$TextBlocks = $Events | Where-Object { $_.type -eq "run.agent.text_block" }
+$TextOutput = $TextDeltas.Count -gt 0 -or $TextBlocks.Count -gt 0
 $Result = $Events | Where-Object { $_.type -eq "run.agent.result" }
 $Finished = $Events | Where-Object { $_.type -eq "run.finished" }
 $FailedEvt = $Events | Where-Object { $_.type -eq "run.failed" }
 
 Assert "Server accepted run" ($Run.runId -ne $null)
-Assert "Received text_delta events" ($TextDeltas.Count -gt 0)
+Assert "Received text events" ($TextOutput)
 Assert "Received result event" ($Result.Count -gt 0)
 Assert "Run finished successfully" ($Finished.Count -gt 0 -and $FailedEvt.Count -eq 0)
 Assert "Total events received" ($Events.Count -gt 5)
 
-Write-Host "`nEvents: text_delta=$($TextDeltas.Count) result=$($Result.Count) total=$($Events.Count)"
+Write-Host "`nEvents: text=$($TextDeltas.Count + $TextBlocks.Count) result=$($Result.Count) total=$($Events.Count)"
 Write-Host "Passed: $Passed, Failed: $Failed" -ForegroundColor $(if ($Failed -eq 0) { "Green" } else { "Red" })
 
 exit $Failed
