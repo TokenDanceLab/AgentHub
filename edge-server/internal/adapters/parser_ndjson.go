@@ -22,6 +22,7 @@ type NDJSONStreamParser struct {
 	toolNames      map[string]string // toolUseID → toolName (for file_change detection)
 	controlHandler ControlHandler    // nil = control messages ignored
 	stdin          io.Writer         // nil = control responses not written
+	hooks          HookChain         // AgentHook middleware (P0 #1 from researcher)
 }
 
 // NewNDJSONStreamParser creates a parser that emits events via the given emitter.
@@ -33,6 +34,12 @@ func NewNDJSONStreamParser(emitter EventEmitter, run store.Run) *NDJSONStreamPar
 func (p *NDJSONStreamParser) WithControlHandler(handler ControlHandler, stdin io.Writer) *NDJSONStreamParser {
 	p.controlHandler = handler
 	p.stdin = stdin
+	return p
+}
+
+// WithHooks sets the AgentHook chain. Hooks run before/after tool use, on errors, etc.
+func (p *NDJSONStreamParser) WithHooks(hooks HookChain) *NDJSONStreamParser {
+	p.hooks = hooks
 	return p
 }
 
@@ -394,7 +401,27 @@ func isFileModifyingTool(name string) bool {
 }
 
 func (p *NDJSONStreamParser) emit(scope map[string]any, eventType string, payload map[string]any) {
+	// Run AgentHook PreToolUse before tool calls
+	if eventType == BusEventToolCall && len(p.hooks) > 0 {
+		toolName, _ := payload["toolName"].(string)
+		input, _ := payload["input"].(map[string]any)
+		if modified, block, reason := p.hooks.RunPreToolUse(p.ctx, toolName, input); block {
+			payload["input"] = modified
+			payload["status"] = "blocked"
+			payload["blockReason"] = reason
+		} else if len(modified) > 0 {
+			payload["input"] = modified
+		}
+	}
+
 	p.emitter.Emit(eventType, scope, payload)
+
+	// Run AgentHook PostToolUse after tool results
+	if eventType == BusEventToolResult && len(p.hooks) > 0 {
+		toolName, _ := payload["toolName"].(string)
+		output, _ := payload["content"].(string)
+		payload["content"] = p.hooks.RunPostToolUse(p.ctx, toolName, output)
+	}
 }
 
 // --- Claude SDK message schemas (subset used for parsing) ---
