@@ -1,11 +1,11 @@
-# Hub Server + Edge Server + Desktop Integration Analysis
+# Hub Server + Edge Server + Desktop 集成分析
 
-> Generated 2026-05-24 from full source review of all three codebases.
-> Branch: `dev/delicious233` target: `master`
+> 生成于 2026-05-24，基于对全部三个代码库的完整源码审查。
+> 分支：`dev/delicious233` 目标：`master`
 
 ---
 
-## 1. Architecture Diagram
+## 1. 架构图
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -48,410 +48,406 @@
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Key double-connection pattern**: The Desktop connects to BOTH:
-1. **Edge Server** (local, `127.0.0.1:3210`): for agent execution lifecycle events via
-   WebSocket (`/v1/events`), plus REST for runs/threads. No auth.
-2. **Hub Server** (remote, `:8080`): for IM (sessions, messages, contacts), auth,
-   receiving `agent.dispatch` tasks, and reporting task progress callbacks. JWT auth.
+**关键双连接模式**：Desktop 同时连接两个服务：
+1. **Edge Server**（本地，`127.0.0.1:3210`）：通过 WebSocket（`/v1/events`）获取 Agent 执行生命周期事件，以及通过 REST 管理 runs/threads。无认证。
+2. **Hub Server**（远程，`:8080`）：用于 IM（会话、消息、联系人）、认证、接收 `agent.dispatch` 任务并上报任务进度回调。JWT 认证。
 
 ---
 
-## 2. API Surface Comparison
+## 2. API 接口对比
 
-### Hub Server Routes (from `hub-server/internal/router/router.go`)
+### Hub Server 路由（来自 `hub-server/internal/router/router.go`）
 
-| Group | Method | Path | Auth | Device | Purpose |
+| 路由组 | 方法 | 路径 | 认证 | 设备 | 用途 |
 |-------|--------|------|------|--------|---------|
-| **Health** | GET | `/health` | No | Any | Liveness |
-| **Auth** | POST | `/client/auth/register` | No | Any | Register |
-| **Auth** | POST | `/client/auth/login` | No | Any | Login (returns JWT) |
-| **Auth** | POST | `/client/auth/refresh` | No | Any | Refresh token |
-| **Auth** | POST | `/client/auth/logout` | JWT | Any | Logout |
-| **Auth** | GET | `/client/auth/me` | JWT | Any | Current user |
-| **Auth** | PUT | `/client/auth/profile` | JWT | Any | Update profile |
-| **Auth** | PUT | `/client/auth/password` | JWT | Any | Change pwd |
-| **WS** | GET | `/client/ws` | Frame | Any | IM + dispatch |
-| **Contacts** | GET/POST/DELETE | `/client/contacts/*` | JWT | Any | Friend mgmt |
-| **Sessions** | GET/POST/PUT/DELETE | `/client/sessions/*` | JWT | Any | IM sessions |
-| **Messages** | POST/GET | `/client/sessions/:id/messages*` | JWT | Any | Chat messages |
-| **Messages** | POST/DELETE | `/client/messages/:id/*` | JWT | Any | Recall/pin/fwd |
-| **Attachments** | POST/GET | `/client/attachments/*` | JWT | Any | File up/down |
-| **Notifications** | GET/POST | `/client/notifications/*` | JWT | Any | Notif mgmt |
-| **Edge** | POST | `/edge/devices/register` | JWT | desktop | Register device |
-| **Edge** | POST | `/edge/agent-tasks/:id/ack` | JWT | desktop | Task ack |
-| **Edge** | POST | `/edge/agent-tasks/:id/stream` | JWT | desktop | Stream output |
-| **Edge** | POST | `/edge/agent-tasks/:id/done` | JWT | desktop | Task done |
-| **Edge** | POST | `/edge/agent-tasks/:id/fail` | JWT | desktop | Task fail |
-| **Web** | POST | `/web/agent-tasks` | JWT | web | Trigger task |
-| **Web** | POST | `/web/agent-tasks/:id/cancel` | JWT | web | Cancel task |
-| **Web** | GET/POST/PUT/DELETE | `/web/custom-agents*` | JWT | web | Custom agent CRUD |
+| **Health** | GET | `/health` | 否 | 任意 | 存活检查 |
+| **Auth** | POST | `/client/auth/register` | 否 | 任意 | 注册 |
+| **Auth** | POST | `/client/auth/login` | 否 | 任意 | 登录（返回 JWT） |
+| **Auth** | POST | `/client/auth/refresh` | 否 | 任意 | 刷新令牌 |
+| **Auth** | POST | `/client/auth/logout` | JWT | 任意 | 登出 |
+| **Auth** | GET | `/client/auth/me` | JWT | 任意 | 当前用户 |
+| **Auth** | PUT | `/client/auth/profile` | JWT | 任意 | 更新个人资料 |
+| **Auth** | PUT | `/client/auth/password` | JWT | 任意 | 修改密码 |
+| **WS** | GET | `/client/ws` | 帧 | 任意 | IM + 调度 |
+| **Contacts** | GET/POST/DELETE | `/client/contacts/*` | JWT | 任意 | 好友管理 |
+| **Sessions** | GET/POST/PUT/DELETE | `/client/sessions/*` | JWT | 任意 | IM 会话 |
+| **Messages** | POST/GET | `/client/sessions/:id/messages*` | JWT | 任意 | 聊天消息 |
+| **Messages** | POST/DELETE | `/client/messages/:id/*` | JWT | 任意 | 撤回/置顶/转发 |
+| **Attachments** | POST/GET | `/client/attachments/*` | JWT | 任意 | 文件上传/下载 |
+| **Notifications** | GET/POST | `/client/notifications/*` | JWT | 任意 | 通知管理 |
+| **Edge** | POST | `/edge/devices/register` | JWT | desktop | 注册设备 |
+| **Edge** | POST | `/edge/agent-tasks/:id/ack` | JWT | desktop | 任务确认 |
+| **Edge** | POST | `/edge/agent-tasks/:id/stream` | JWT | desktop | 流式输出 |
+| **Edge** | POST | `/edge/agent-tasks/:id/done` | JWT | desktop | 任务完成 |
+| **Edge** | POST | `/edge/agent-tasks/:id/fail` | JWT | desktop | 任务失败 |
+| **Web** | POST | `/web/agent-tasks` | JWT | web | 触发任务 |
+| **Web** | POST | `/web/agent-tasks/:id/cancel` | JWT | web | 取消任务 |
+| **Web** | GET/POST/PUT/DELETE | `/web/custom-agents*` | JWT | web | 自定义 Agent CRUD |
 
-### Edge Server Routes (from `edge-server/internal/api/handlers.go`)
+### Edge Server 路由（来自 `edge-server/internal/api/handlers.go`）
 
-| Method | Path | Purpose |
+| 方法 | 路径 | 用途 |
 |--------|------|---------|
-| GET | `/v1/health` | Liveness |
-| GET | `/v1/runners` | List runners |
-| GET | `/v1/agents` | List agent adapters |
-| GET/POST | `/v1/projects` | Project list/create |
-| GET | `/v1/projects/:id` | Get project |
-| GET/POST | `/v1/threads` | Thread list/create |
-| GET | `/v1/threads/:id` | Get thread |
-| GET | `/v1/threads/:id/items` | Thread items |
-| POST | `/v1/threads/:id/messages` | Post message |
-| GET | `/v1/items/:id` | Get item |
-| GET/POST | `/v1/runs` | Run list/start |
-| POST | `/v1/runs/:id:cancel` | Cancel run |
-| GET | `/v1/runs/:id` | Get run |
-| GET (WS) | `/v1/events` | Event stream |
-| POST | `/v1/permissions/decide` | Permission gate |
+| GET | `/v1/health` | 存活检查 |
+| GET | `/v1/runners` | 列出 Runner |
+| GET | `/v1/agents` | 列出 Agent 适配器 |
+| GET/POST | `/v1/projects` | 项目列表/创建 |
+| GET | `/v1/projects/:id` | 获取项目 |
+| GET/POST | `/v1/threads` | 线程列表/创建 |
+| GET | `/v1/threads/:id` | 获取线程 |
+| GET | `/v1/threads/:id/items` | 线程项 |
+| POST | `/v1/threads/:id/messages` | 发布消息 |
+| GET | `/v1/items/:id` | 获取项 |
+| GET/POST | `/v1/runs` | 运行列表/启动 |
+| POST | `/v1/runs/:id:cancel` | 取消运行 |
+| GET | `/v1/runs/:id` | 获取运行 |
+| GET (WS) | `/v1/events` | 事件流 |
+| POST | `/v1/permissions/decide` | 权限门控 |
 
-### Relationship: Complement, NOT Duplicate
+### 关系：互补，而非重复
 
-Hub and Edge serve completely different domains with one connection point:
+Hub 和 Edge 服务于完全不同的领域，只有一个连接点：
 
-- **Hub**: Remote cloud service for IM, auth, multi-user coordination, agent task dispatch
-- **Edge**: Local machine service for agent execution, process management, event streaming
-- **Connection**: Hub dispatches agent tasks to Desktop, Desktop delegates execution to Edge,
-  Desktop reports results back to Hub
+- **Hub**：远程云服务，用于 IM、认证、多用户协调、Agent 任务调度
+- **Edge**：本地机器服务，用于 Agent 执行、进程管理、事件流
+- **连接**：Hub 向 Desktop 调度 Agent 任务，Desktop 委托 Edge 执行，Desktop 将结果回报给 Hub
 
-The only API shape similarity is both have WebSocket + REST. Their endpoint paths,
-data models, and event schemas are entirely disjoint.
+唯一相似的 API 特征是两者都提供 WebSocket + REST。它们的端点路径、数据模型和事件模式完全不同。
 
 ---
 
-## 3. WebSocket Protocol Comparison
+## 3. WebSocket 协议对比
 
-| Feature | Hub WS (`/client/ws`) | Edge WS (`/v1/events`) |
+| 特性 | Hub WS（`/client/ws`） | Edge WS（`/v1/events`） |
 |---------|----------------------|------------------------|
-| **Library** | `coder/websocket` (via Gin) | `gorilla/websocket` (raw) |
-| **Auth** | JWT auth frame within 5 seconds | None (trusted local origin) |
-| **Event Format** | `{ "type": "message.new", "payload": {...} }` | `{ "version": "v1", "id": "...", "seq": 123, "type": "...", "scope": {...}, "payload": {...} }` |
-| **C2S Messages** | `auth`, `typing` | `permission_decide` |
-| **S2C Events** | `message.{new,recall,pin,unpin,read}`, `agent.{dispatch,done,failed,cancel,timeout}`, `device.{online,offline,kicked}`, `notification.new`, `session.*`, `friend.*` | `runner.{online,offline}`, `run.{queued,started,finished,failed,cancelled}`, `run.agent.{text_delta,text_block,thinking,tool_call,tool_result,file_change,session_init,result,task_dispatched,permission_requested,permission_decided}`, `run.output{,.batch}`, `error` |
-| **Replay** | None (needs REST sync for missed) | Cursor-based (`?cursor=<seq>`) with full history replay |
-| **Heartbeat** | Server ping every 30s, 2 misses → disconnect | Server ping every 30s |
-| **Connection lifecycle** | Gin handler goroutine per conn | Dedicated write goroutine + read goroutine |
+| **库** | `coder/websocket`（通过 Gin） | `gorilla/websocket`（原生） |
+| **认证** | 5 秒内发送 JWT auth 帧 | 无（受信任的本地来源） |
+| **事件格式** | `{ "type": "message.new", "payload": {...} }` | `{ "version": "v1", "id": "...", "seq": 123, "type": "...", "scope": {...}, "payload": {...} }` |
+| **客户端→服务器消息** | `auth`、`typing` | `permission_decide` |
+| **服务器→客户端事件** | `message.{new,recall,pin,unpin,read}`、`agent.{dispatch,done,failed,cancel,timeout}`、`device.{online,offline,kicked}`、`notification.new`、`session.*`、`friend.*` | `runner.{online,offline}`、`run.{queued,started,finished,failed,cancelled}`、`run.agent.{text_delta,text_block,thinking,tool_call,tool_result,file_change,session_init,result,task_dispatched,permission_requested,permission_decided}`、`run.output{,.batch}`、`error` |
+| **回放** | 无（错过时需通过 REST 同步） | 基于游标（`?cursor=<seq>`），完整历史回放 |
+| **心跳** | 服务器每 30s ping，2 次丢失 → 断开 | 服务器每 30s ping |
+| **连接生命周期** | 每个连接一个 Gin handler goroutine | 专用写 goroutine + 读 goroutine |
 
-**Key difference**: Hub WS is a **firehose** (all events pushed, no replay). Edge WS is a **replayable event log** (monotonic seq, cursor-based catch-up). A Desktop connecting to Hub will need a separate mechanism (REST sync API `/client/sessions/:id/messages/sync`) to catch up on missed messages.
+**关键差异**：Hub WS 是**消防水管**（所有事件推送，无回放）。Edge WS 是**可回放的事件日志**（单调 seq，基于游标的追补）。Desktop 连接到 Hub 后，需要单独的机制（REST 同步 API `/client/sessions/:id/messages/sync`）来追补错过的消息。
 
 ---
 
-## 4. Data Model Mapping
+## 4. 数据模型映射
 
-### Hub Models (PostgreSQL/GORM)
+### Hub 模型（PostgreSQL/GORM）
 
-Located at `hub-server/internal/model/`:
+位于 `hub-server/internal/model/`：
 
-| Model | Table | Key Fields |
+| 模型 | 表 | 关键字段 |
 |-------|-------|------------|
-| `User` | users | `id`, `username`, `password_hash`, `nickname`, `avatar_url` |
-| `Session` | sessions | `id`, `type` (private/group), `name`, `owner_user_id`, `next_seq`, `dissolved` |
-| `SessionMember` | session_members | `id`, `session_id`, `member_type` (user/agent_instance), `member_id`, `role`, `pinned`, `archived`, `muted`, `last_read_seq`, `left_at` |
-| `Message` | messages | `id`, `session_id`, `seq_id`, `client_msg_id`, `sender_type` (user/agent), `sender_id`, `content_type`, `content` (JSONB), `reply_to_message_id`, `recalled` |
-| `AgentInstance` | agent_instances | `id`, `agent_type`, `custom_agent_id`, `session_id`, `inviter_user_id`, `display_name` |
-| `PendingAgentTask` | pending_agent_tasks | `id`, `agent_instance_id`, `triggered_by_user_id`, `trigger_message_id`, `status` (queued/dispatched/running/done/failed/timeout/cancelled), `expire_at` |
-| `CustomAgent` | custom_agents | `id`, `owner_user_id`, `name`, `agent_type`, `system_prompt`, `capability_tags`, `tool_whitelist`, `model_params` |
-| `Device` | devices | `id`, `user_id`, `device_type`, `app_version`, `capabilities` (JSONB) |
-| `Friendship` | friendships | `id`, `user_id`, `friend_id`, `status` (pending/accepted/rejected/blocked), `remark` |
-| `MessagePin` | message_pins | `id`, `session_id`, `message_id`, `pinned_by_user_id` |
+| `User` | users | `id`、`username`、`password_hash`、`nickname`、`avatar_url` |
+| `Session` | sessions | `id`、`type`（private/group）、`name`、`owner_user_id`、`next_seq`、`dissolved` |
+| `SessionMember` | session_members | `id`、`session_id`、`member_type`（user/agent_instance）、`member_id`、`role`、`pinned`、`archived`、`muted`、`last_read_seq`、`left_at` |
+| `Message` | messages | `id`、`session_id`、`seq_id`、`client_msg_id`、`sender_type`（user/agent）、`sender_id`、`content_type`、`content`（JSONB）、`reply_to_message_id`、`recalled` |
+| `AgentInstance` | agent_instances | `id`、`agent_type`、`custom_agent_id`、`session_id`、`inviter_user_id`、`display_name` |
+| `PendingAgentTask` | pending_agent_tasks | `id`、`agent_instance_id`、`triggered_by_user_id`、`trigger_message_id`、`status`（queued/dispatched/running/done/failed/timeout/cancelled）、`expire_at` |
+| `CustomAgent` | custom_agents | `id`、`owner_user_id`、`name`、`agent_type`、`system_prompt`、`capability_tags`、`tool_whitelist`、`model_params` |
+| `Device` | devices | `id`、`user_id`、`device_type`、`app_version`、`capabilities`（JSONB） |
+| `Friendship` | friendships | `id`、`user_id`、`friend_id`、`status`（pending/accepted/rejected/blocked）、`remark` |
+| `MessagePin` | message_pins | `id`、`session_id`、`message_id`、`pinned_by_user_id` |
 
-### Edge Models (In-Memory)
+### Edge 模型（内存）
 
-Located at `edge-server/internal/store/`. No database -- in-memory maps:
+位于 `edge-server/internal/store/`。无数据库 — 使用内存 map：
 
-| Concept | Key Fields |
+| 概念 | 关键字段 |
 |---------|------------|
-| `Project` | `ID`, `Name`, `CreatedAt` |
-| `Thread` | `ID`, `ProjectID`, `Title`, `Status`, `CreatedAt`, `UpdatedAt` |
-| `Item` | `ID`, `ProjectID`, `ThreadID`, `RunID`, `Type`, `Role`, `Status`, `Content` |
-| `Run` | `ID`, `ProjectID`, `ThreadID`, `Status`, `Prompt`, `AgentID`, `Model`, `SessionID`, `CreatedAt`, `StartedAt`, `FinishedAt` |
-| `Runner` | `ID`, `Name`, `Status`, `Capabilities` |
+| `Project` | `ID`、`Name`、`CreatedAt` |
+| `Thread` | `ID`、`ProjectID`、`Title`、`Status`、`CreatedAt`、`UpdatedAt` |
+| `Item` | `ID`、`ProjectID`、`ThreadID`、`RunID`、`Type`、`Role`、`Status`、`Content` |
+| `Run` | `ID`、`ProjectID`、`ThreadID`、`Status`、`Prompt`、`AgentID`、`Model`、`SessionID`、`CreatedAt`、`StartedAt`、`FinishedAt` |
+| `Runner` | `ID`、`Name`、`Status`、`Capabilities` |
 
-### Mapping Table
+### 映射表
 
-| Hub Concept | Edge Concept | Desktop Type | Alignment |
+| Hub 概念 | Edge 概念 | Desktop 类型 | 对齐情况 |
 |-------------|-------------|--------------|-----------|
-| `Session` (chat room) | `Project` + `Thread` (work context) | `ThreadInfo` | Different: Hub organizes around conversations; Edge organizes around projects. Can be **bridged**: Hub Session maps to Edge Project+Thread via SessionID. |
-| `Message` (chat msg with seq) | `Item` (thread item) | `ChatMessage` (blocks) | Different shape but compatible direction. Hub Message.content is JSONB text; Edge Item is typed (run/output/message). Hub `sender_type=agent` messages correspond to Edge `run.agent.*` events. |
-| `AgentInstance` | Agent adapter (`adapters.AgentAdapter`) | `AgentInfo` | Hub has instance-per-session (invited into group). Edge has adapter-per-agent-type (all runs share). Hub: "which agent in this chat?", Edge: "which binary to execute?" |
-| `PendingAgentTask` (queued→dispatched→running→done/failed) | `Run` (queued→started→finished/failed) | `RunInfo` (status) | **Direct parallel**. Hub task status tracks the external lifecycle; Edge run status tracks the internal execution. Desktop bridges them. |
-| `CustomAgent` (system_prompt, tool_whitelist, model_params) | N/A (Edge uses static adapter config) | N/A | Hub has customizable agents; Edge agents are fixed adapters. Hub custom agents configure WHAT Edge should run. |
-| `Device` (user device registration) | N/A (single-machine) | N/A | Hub tracks multi-device; Edge is single-instance. Hub Device tells Hub WHICH desktop connection to dispatch to. |
-| `Friendship` (social) | N/A | N/A | Hub-only social feature. |
-| `User` (account) | N/A (no auth) | N/A | Hub-only account system. |
+| `Session`（聊天室） | `Project` + `Thread`（工作上下文） | `ThreadInfo` | 不同：Hub 围绕会话组织；Edge 围绕项目组织。可通过 SessionID **桥接**：Hub Session 映射到 Edge Project+Thread。 |
+| `Message`（带 seq 的聊天消息） | `Item`（线程项） | `ChatMessage`（块） | 结构不同但方向兼容。Hub Message.content 是 JSONB 文本；Edge Item 是带类型的（run/output/message）。Hub `sender_type=agent` 消息对应 Edge `run.agent.*` 事件。 |
+| `AgentInstance` | Agent 适配器（`adapters.AgentAdapter`） | `AgentInfo` | Hub 有按会话的实例（被邀请到群组中）。Edge 有按 Agent 类型的适配器（所有 run 共享）。Hub："此聊天中哪个 agent？"，Edge："执行哪个二进制？" |
+| `PendingAgentTask`（queued→dispatched→running→done/failed） | `Run`（queued→started→finished/failed） | `RunInfo`（status） | **直接对应**。Hub 任务状态追踪外部生命周期；Edge run 状态追踪内部执行。Desktop 桥接二者。 |
+| `CustomAgent`（system_prompt、tool_whitelist、model_params） | 不适用（Edge 使用静态适配器配置） | 不适用 | Hub 有可自定义的 Agent；Edge Agent 是固定适配器。Hub 自定义 Agent 配置 Edge 应运行什么。 |
+| `Device`（用户设备注册） | 不适用（单机） | 不适用 | Hub 追踪多设备；Edge 是单实例。Hub Device 告诉 Hub 调度到哪个 Desktop 连接。 |
+| `Friendship`（社交） | 不适用 | 不适用 | Hub 独有的社交功能。 |
+| `User`（账户） | 不适用（无认证） | 不适用 | Hub 独有的账户系统。 |
 
-### Event Type Mapping (Key Bridges)
+### 事件类型映射（关键桥梁）
 
-| Hub WS Frame Type | Edge EventEnvelope Type | Desktop Handler | Bridge Needed? |
+| Hub WS 帧类型 | Edge EventEnvelope 类型 | Desktop 处理器 | 需要桥接？ |
 |-------------------|------------------------|-----------------|----------------|
-| `agent.dispatch` (→ desktop) | → triggers `POST /v1/runs` | → `startRun()` in `edgeClient.ts` | **Yes** -- Desktop must translate dispatch payload → Edge run request |
-| Agent runs → generates | `run.agent.text_delta` | `useChatMessages.ts` renders | Already works (Edge→Desktop) |
-| Agent runs → generates | `run.agent.result` | `useChatMessages.ts` renders | Already works |
-| Desktop calls → | `POST /edge/agent-tasks/:id/stream` (→ Hub) | → broadcasts `message.new` on Hub | **Yes** -- Desktop must forward Edge output to Hub |
-| Desktop calls → | `POST /edge/agent-tasks/:id/done` (→ Hub) | → broadcasts `agent.done` on Hub | **Yes** -- Desktop must signal completion to Hub |
-| Hub `message.new` | N/A (Edge has no IM) | Must render IM messages | **Yes** -- New UI for IM messages |
-| Hub `notification.new` | N/A | Must render notifications | **Yes** -- New UI for notifications |
-| Hub `device.online`/`device.offline` | N/A | Must show presence | **Yes** -- New UI for presence |
-| Edge `run.agent.permission_requested` | Desktop renders permission dialog | Desktop sends `permission_decide` to Edge | Already works (Edge→Desktop→Edge loop) |
+| `agent.dispatch`（→ desktop） | → 触发 `POST /v1/runs` | → `startRun()` 在 `edgeClient.ts` 中 | **是** — Desktop 必须将 dispatch 载荷翻译为 Edge run 请求 |
+| Agent runs → 生成 | `run.agent.text_delta` | `useChatMessages.ts` 渲染 | 已生效（Edge→Desktop） |
+| Agent runs → 生成 | `run.agent.result` | `useChatMessages.ts` 渲染 | 已生效 |
+| Desktop 调用 → | `POST /edge/agent-tasks/:id/stream`（→ Hub） | → 在 Hub 上广播 `message.new` | **是** — Desktop 必须将 Edge 输出转发到 Hub |
+| Desktop 调用 → | `POST /edge/agent-tasks/:id/done`（→ Hub） | → 在 Hub 上广播 `agent.done` | **是** — Desktop 必须向 Hub 通知完成 |
+| Hub `message.new` | 不适用（Edge 无 IM） | 必须渲染 IM 消息 | **是** — 需要新的 IM 消息 UI |
+| Hub `notification.new` | 不适用 | 必须渲染通知 | **是** — 需要新的通知 UI |
+| Hub `device.online`/`device.offline` | 不适用 | 必须显示在线状态 | **是** — 需要新的在线状态 UI |
+| Edge `run.agent.permission_requested` | Desktop 渲染权限对话框 | Desktop 向 Edge 发送 `permission_decide` | 已生效（Edge→Desktop→Edge 循环） |
 
 ---
 
-## 5. Auth Integration Plan
+## 5. 认证集成方案
 
-### Current State
-- **Hub**: JWT auth with claims `{user_id, device_type, device_id, exp}`. Device type gates access (`web` → `/web/*`, `desktop` → `/edge/*`).
-- **Edge**: No auth. CORS restricts to trusted local origins (`http://localhost:*`, `http://127.0.0.1:*`, `tauri://*`).
-- **Desktop**: No auth. Talks directly to local Edge.
+### 当前状态
+- **Hub**：JWT 认证，claims 为 `{user_id, device_type, device_id, exp}`。按设备类型限制访问（`web` → `/web/*`、`desktop` → `/edge/*`）。
+- **Edge**：无认证。CORS 限制为受信任的本地来源（`http://localhost:*`、`http://127.0.0.1:*`、`tauri://*`）。
+- **Desktop**：无认证。直接与本地 Edge 通信。
 
-### Integration Path
+### 集成路径
 
-The Desktop needs to become an authenticated Hub client while remaining a direct Edge client:
+Desktop 需要成为经过认证的 Hub 客户端，同时保持为直接的 Edge 客户端：
 
 ```
-Desktop Auth Flow:
-1. User logs in → POST /client/auth/login with device_type="desktop"
-2. Store JWT access_token + refresh_token
-3. All Hub REST calls: Authorization: Bearer <access_token>
-4. Hub WS: send auth frame {type: "auth", payload: {access_token: "..."}}
-5. Token refresh: POST /client/auth/refresh before expiry (900s)
-6. Edge calls: unchanged (no auth needed for local)
+Desktop 认证流程：
+1. 用户登录 → POST /client/auth/login，带 device_type="desktop"
+2. 存储 JWT access_token + refresh_token
+3. 所有 Hub REST 调用：Authorization: Bearer <access_token>
+4. Hub WS：发送 auth 帧 {type: "auth", payload: {access_token: "..."}}
+5. 令牌刷新：在过期前调用 POST /client/auth/refresh（900s）
+6. Edge 调用：不变（本地无需认证）
 ```
 
-**New Desktop module needed**: `app/desktop/src/api/hubAuth.ts`
+**需要新增的 Desktop 模块**：`app/desktop/src/api/hubAuth.ts`
 - `login(username, password, deviceId) → tokens`
 - `getStoredToken() → string | null`
-- `refreshToken() → void` (called on 401 or timer)
+- `refreshToken() → void`（收到 401 或定时器触发时调用）
 - `logout() → void`
 
 ---
 
-## 6. Desktop Integration Changes
+## 6. Desktop 集成变更
 
-### New Files Needed
+### 需要新增的文件
 
-1. **`app/desktop/src/api/hubClient.ts`** -- REST client for Hub Server
-   - `login()`, `register()`, `refreshToken()`, `logout()`, `getMe()`
-   - `listSessions()`, `createPrivateSession()`, `createGroupSession()`
-   - `getMessages(sessionId, beforeSeq)`, `sendMessage(sessionId, content)`
-   - `listContacts()`, `searchUser()`, `sendFriendRequest()`
+1. **`app/desktop/src/api/hubClient.ts`** — Hub Server 的 REST 客户端
+   - `login()`、`register()`、`refreshToken()`、`logout()`、`getMe()`
+   - `listSessions()`、`createPrivateSession()`、`createGroupSession()`
+   - `getMessages(sessionId, beforeSeq)`、`sendMessage(sessionId, content)`
+   - `listContacts()`、`searchUser()`、`sendFriendRequest()`
    - `registerDevice(deviceId, capabilities)`
-   - `ackTask(taskId)`, `streamTask(taskId, content)`, `doneTask(taskId, finalContent)`, `failTask(taskId, error)`
+   - `ackTask(taskId)`、`streamTask(taskId, content)`、`doneTask(taskId, finalContent)`、`failTask(taskId, error)`
 
-2. **`app/desktop/src/api/hubWS.ts`** -- WebSocket client for Hub
-   - Different protocol: auth frame, no cursor replay, different event types
-   - `connect(token)` → sends auth frame, receives `auth.ok`/`auth.fail`
-   - `subscribe(handler)` → receives Hub WS Frame events
-   - Reconnect logic (similar to `eventClient.ts` but with auth re-handshake)
+2. **`app/desktop/src/api/hubWS.ts`** — Hub 的 WebSocket 客户端
+   - 不同协议：auth 帧、无游标回放、不同的事件类型
+   - `connect(token)` → 发送 auth 帧，收到 `auth.ok`/`auth.fail`
+   - `subscribe(handler)` → 接收 Hub WS 帧事件
+   - 重连逻辑（类似 `eventClient.ts`，但需要重新进行 auth 握手）
 
-3. **`app/desktop/src/hooks/useHubIntegration.ts`** -- Bridge between Hub and Edge
-   - Listens for Hub `agent.dispatch` events
-   - Translates `dispatchPayload` → `StartRunRequest` for Edge
-   - Calls `startRun()` via `edgeClient.ts`
-   - Subscribes to Edge events for this run
-   - Forwards `run.agent.text_delta` → `streamTask()` to Hub
-   - On `run.agent.result` → `doneTask()` or `failTask()` to Hub
-   - Maps `runId` ↔ `taskId` for bidirectional tracking
+3. **`app/desktop/src/hooks/useHubIntegration.ts`** — Hub 和 Edge 之间的桥梁
+   - 监听 Hub `agent.dispatch` 事件
+   - 将 `dispatchPayload` 翻译为 Edge 的 `StartRunRequest`
+   - 通过 `edgeClient.ts` 调用 `startRun()`
+   - 订阅此次运行的 Edge 事件
+   - 将 `run.agent.text_delta` 转发为 Hub 的 `streamTask()`
+   - 在 `run.agent.result` 时向 Hub 调用 `doneTask()` 或 `failTask()`
+   - 映射 `runId` ↔ `taskId` 以进行双向追踪
 
-### Files to Modify
+### 需要修改的文件
 
-1. **`app/desktop/src/config.ts`** -- Add Hub URL
+1. **`app/desktop/src/config.ts`** — 添加 Hub URL
    ```
    export const HUB_URL = 'http://<hub-host>:8080';
    export const HUB_WS_URL = 'ws://<hub-host>:8080/client/ws';
    ```
 
-2. **`app/desktop/src/api/edgeClient.ts`** -- Add `StartRunRequest.sessionId` mapping
-   - The `sessionId` field in `StartRunRequest` already exists (`PostRuns` handler line 311: `SessionID`).
-   - When bridging Hub→Edge, set `sessionId` to Hub's `SessionID` so Edge runs are associated with Hub sessions.
+2. **`app/desktop/src/api/edgeClient.ts`** — 添加 `StartRunRequest.sessionId` 映射
+   - `StartRunRequest` 中的 `sessionId` 字段已存在（`PostRuns` handler 第 311 行：`SessionID`）。
+   - 在桥接 Hub→Edge 时，将 `sessionId` 设为 Hub 的 `SessionID`，以便 Edge run 与 Hub 会话关联。
 
-3. **`app/shared/src/events.ts`** -- No changes needed (Edge events stay the same)
+3. **`app/shared/src/events.ts`** — 无需变更（Edge 事件保持不变）
 
-4. **`app/shared/src/types.ts`** -- Add Hub-specific types
-   - `HubSession`, `HubMessage`, `HubContact`, `HubUser`, `HubDispatchPayload`
-
----
-
-## 7. Integration Plan -- Staged Approach
-
-### Stage 1: Desktop Auth + Hub REST Client (effort: 3 days)
-**Goal**: Desktop can authenticate with Hub and call REST APIs.
-
-**Files**:
-- NEW `app/desktop/src/api/hubClient.ts` -- typed REST wrappers
-- NEW `app/desktop/src/api/hubAuth.ts` -- token management
-- MODIFY `app/desktop/src/config.ts` -- add `HUB_URL`
-
-**Tasks**:
-1. Implement `hubAuth.ts`: login, token storage (localStorage), refresh timer
-2. Implement `hubClient.ts`: auth endpoints (login, refresh, me)
-3. Add Hub connection status to StatusBar
-
-**Validation**: Desktop can log in, see user info, maintain session.
+4. **`app/shared/src/types.ts`** — 添加 Hub 特定类型
+   - `HubSession`、`HubMessage`、`HubContact`、`HubUser`、`HubDispatchPayload`
 
 ---
 
-### Stage 2: Hub WebSocket Client (effort: 2 days)
-**Goal**: Desktop establishes authenticated Hub WS, receives events.
+## 7. 集成方案 — 分阶段实施
 
-**Files**:
-- NEW `app/desktop/src/api/hubWS.ts` -- Hub WS client with auth frame protocol
-- NEW `app/shared/src/hubEvents.ts` -- Hub WS event types
+### 阶段 1：Desktop 认证 + Hub REST 客户端（工作量：3 天）
+**目标**：Desktop 能够认证 Hub 并调用 REST API。
 
-**Tasks**:
-1. Implement `hubWS.ts`: connect with auth frame, parse Frame messages
-2. Define Hub event types: `message.new`, `agent.dispatch`, `notification.new`, etc.
-3. Create `useHubEventStream` hook
-4. Add Hub connection indicator to StatusBar
+**文件**：
+- 新增 `app/desktop/src/api/hubClient.ts` — 带类型的 REST 封装
+- 新增 `app/desktop/src/api/hubAuth.ts` — 令牌管理
+- 修改 `app/desktop/src/config.ts` — 添加 `HUB_URL`
 
-**Validation**: Desktop receives Hub events (login from Web, see events in console).
+**任务**：
+1. 实现 `hubAuth.ts`：登录、令牌存储（localStorage）、刷新定时器
+2. 实现 `hubClient.ts`：认证端点（login、refresh、me）
+3. 在 StatusBar 中添加 Hub 连接状态
 
----
-
-### Stage 3: Agent Task Bridge (effort: 4 days)
-**Goal**: Desktop receives agent.dispatch from Hub, executes via Edge, reports back.
-
-**Files**:
-- NEW `app/desktop/src/hooks/useHubIntegration.ts` -- Hub↔Edge bridge
-- MODIFY `edge-server/internal/api/handlers.go` -- No changes needed (existing APIs suffice)
-
-**Tasks**:
-1. Listen for Hub `agent.dispatch` events
-2. Parse `dispatchPayload` → extract agent_type, session_id, system_prompt, etc.
-3. Create Edge Project+Thread for the Hub session (or use existing)
-4. Call `startRun()` with appropriate prompt and agent config
-5. Map Edge `run.agent.*` events → Hub `streamTask()` calls
-6. Map Edge `run.agent.result` → Hub `doneTask()` or `failTask()`
-7. Handle task cancellation (Hub `agent.cancel` → Edge `cancelRun()`)
-8. Register device with Hub on startup (`POST /edge/devices/register`)
-
-**Validation**: Web triggers agent → Desktop receives dispatch → Edge runs → Web sees agent messages in chat.
+**验证**：Desktop 可以登录、查看用户信息、维持会话。
 
 ---
 
-### Stage 4: IM UI in Desktop (effort: 5 days)
-**Goal**: Desktop renders chat sessions, messages, contacts like a full IM client.
+### 阶段 2：Hub WebSocket 客户端（工作量：2 天）
+**目标**：Desktop 建立经过认证的 Hub WS 连接，接收事件。
 
-**Files**:
-- NEW `app/desktop/src/components/ChatView/*` -- IM UI components
-- NEW `app/desktop/src/hooks/useHubSessions.ts`
-- NEW `app/desktop/src/hooks/useHubMessages.ts`
+**文件**：
+- 新增 `app/desktop/src/api/hubWS.ts` — 含 auth 帧协议的 Hub WS 客户端
+- 新增 `app/shared/src/hubEvents.ts` — Hub WS 事件类型
 
-**Tasks**:
-1. Session list sidebar (list sessions, create private/group, search)
-2. Message view (chat bubble UI with agent vs user distinction)
-3. Message input (text, code, file upload via Hub attachments API)
-4. Contact management (search, add friend, block)
-5. Notification overlay (friend requests, agent done, mentions)
-6. Presence indicators (online/offline from device events)
-7. Incremental message sync (REST `/sync` + WS `message.new`)
+**任务**：
+1. 实现 `hubWS.ts`：通过 auth 帧连接、解析 Frame 消息
+2. 定义 Hub 事件类型：`message.new`、`agent.dispatch`、`notification.new` 等
+3. 创建 `useHubEventStream` hook
+4. 在 StatusBar 中添加 Hub 连接指示器
 
-**Validation**: Desktop can fully participate in IM conversations, see agent outputs, manage contacts.
+**验证**：Desktop 接收到 Hub 事件（从 Web 登录，在控制台看到事件）。
 
 ---
 
-### Stage 5: Device and Sync Hardening (effort: 3 days)
-**Goal**: Robust multi-device experience, offline resilience.
+### 阶段 3：Agent 任务桥接（工作量：4 天）
+**目标**：Desktop 从 Hub 接收 agent.dispatch，通过 Edge 执行，回报结果。
 
-**Tasks**:
-1. Message sync reconciliation (seq-based, handle gaps)
-2. Offline task queue (if Desktop starts offline, pull pending tasks on connect)
-3. Graceful disconnect/reconnect (clear auth state, re-handshake)
-4. Device capabilities reporting (tell Hub which agent types Desktop supports)
-5. Permission gating integration (Hub agent.dispatch includes permission requirements)
-6. Token refresh robustness (handle 401 on WS, re-auth)
+**文件**：
+- 新增 `app/desktop/src/hooks/useHubIntegration.ts` — Hub↔Edge 桥接
+- 修改 `edge-server/internal/api/handlers.go` — 无需变更（现有 API 足够）
 
-**Validation**: Kill Desktop, send messages from Web, reconnect Desktop -- all messages and tasks sync correctly.
+**任务**：
+1. 监听 Hub `agent.dispatch` 事件
+2. 解析 `dispatchPayload` → 提取 agent_type、session_id、system_prompt 等
+3. 为 Hub 会话创建 Edge Project+Thread（或使用已有）
+4. 使用适当的 prompt 和 agent 配置调用 `startRun()`
+5. 将 Edge `run.agent.*` 事件映射为 Hub `streamTask()` 调用
+6. 将 Edge `run.agent.result` 映射为 Hub `doneTask()` 或 `failTask()`
+7. 处理任务取消（Hub `agent.cancel` → Edge `cancelRun()`）
+8. 在启动时向 Hub 注册设备（`POST /edge/devices/register`）
 
----
-
-### Stage 6: Edge Server Hardening (effort: 2 days)
-**Goal**: Edge server can run as a system service, handle concurrent runs.
-
-**Files**:
-- MODIFY `edge-server/internal/store/` -- optional persistent store
-- MODIFY `edge-server/internal/lifecycle/` -- concurrent run support
-
-**Tasks**:
-1. Ensure multiple concurrent runs work (one per thread)
-2. Add run cleanup (stale runs, resource limits)
-3. Optional: persist run history across restarts
-4. Health check includes runner status
+**验证**：Web 触发 Agent → Desktop 收到调度 → Edge 运行 → Web 在聊天中看到 Agent 消息。
 
 ---
 
-## 8. Estimated Effort Summary
+### 阶段 4：Desktop 中的 IM UI（工作量：5 天）
+**目标**：Desktop 像完整的 IM 客户端一样渲染聊天会话、消息和联系人。
 
-| Stage | Description | Effort | Dependencies |
+**文件**：
+- 新增 `app/desktop/src/components/ChatView/*` — IM UI 组件
+- 新增 `app/desktop/src/hooks/useHubSessions.ts`
+- 新增 `app/desktop/src/hooks/useHubMessages.ts`
+
+**任务**：
+1. 会话列表侧边栏（列出会话、创建私聊/群组、搜索）
+2. 消息视图（聊天气泡 UI，区分 Agent 和用户）
+3. 消息输入（文本、代码、通过 Hub 附件 API 上传文件）
+4. 联系人管理（搜索、添加好友、屏蔽）
+5. 通知浮层（好友请求、Agent 完成、@提及）
+6. 在线状态指示器（从设备事件获取 online/offline）
+7. 增量消息同步（REST `/sync` + WS `message.new`）
+
+**验证**：Desktop 可以完全参与 IM 会话，查看 Agent 输出，管理联系人。
+
+---
+
+### 阶段 5：设备与同步强化（工作量：3 天）
+**目标**：稳健的多设备体验，离线容错。
+
+**任务**：
+1. 消息同步对账（基于 seq，处理缺口）
+2. 离线任务队列（如 Desktop 离线启动，连接后拉取待处理任务）
+3. 优雅断开/重连（清除认证状态，重新握手）
+4. 设备能力上报（告知 Hub Desktop 支持的 Agent 类型）
+5. 权限门控集成（Hub agent.dispatch 包含权限要求）
+6. 令牌刷新鲁棒性（WS 收到 401 时重新认证）
+
+**验证**：关闭 Desktop，从 Web 发送消息，重连 Desktop — 所有消息和任务正确同步。
+
+---
+
+### 阶段 6：Edge Server 强化（工作量：2 天）
+**目标**：Edge Server 可以作为系统服务运行，处理并发 run。
+
+**文件**：
+- 修改 `edge-server/internal/store/` — 可选的持久化 store
+- 修改 `edge-server/internal/lifecycle/` — 并发 run 支持
+
+**任务**：
+1. 确保多个并发 run 正常工作（每个线程一个）
+2. 添加 run 清理（过期 run、资源限制）
+3. 可选：在重启后持久化 run 历史
+4. 健康检查包含 runner 状态
+
+---
+
+## 8. 工作量估算汇总
+
+| 阶段 | 描述 | 工作量 | 依赖 |
 |-------|-------------|--------|-------------|
-| 1 | Hub Auth + REST Client | 3 days | None |
-| 2 | Hub WebSocket Client | 2 days | Stage 1 |
-| 3 | Agent Task Bridge | 4 days | Stage 1, 2 |
-| 4 | IM UI in Desktop | 5 days | Stage 1, 2, 3 |
-| 5 | Device & Sync Hardening | 3 days | Stage 1-4 |
-| 6 | Edge Server Hardening | 2 days | Stage 3 |
-| **Total** | | **~19 days** | |
+| 1 | Hub 认证 + REST 客户端 | 3 天 | 无 |
+| 2 | Hub WebSocket 客户端 | 2 天 | 阶段 1 |
+| 3 | Agent 任务桥接 | 4 天 | 阶段 1、2 |
+| 4 | Desktop 中的 IM UI | 5 天 | 阶段 1、2、3 |
+| 5 | 设备与同步强化 | 3 天 | 阶段 1-4 |
+| 6 | Edge Server 强化 | 2 天 | 阶段 3 |
+| **总计** | | **约 19 天** | |
 
 ---
 
-## 9. Key Architectural Decisions / Risks
+## 9. 关键架构决策 / 风险
 
-### A. Dual WS Connection
-The Desktop will maintain TWO WebSocket connections concurrently: one to Hub (IM + dispatch) and one to Edge (agent events). This is intentional -- Hub and Edge serve different roles. However, connection lifecycle management becomes critical. If either connection drops, the bridge between them breaks.
+### A. 双 WS 连接
+Desktop 将同时维护两个 WebSocket 连接：一个到 Hub（IM + 调度），一个到 Edge（Agent 事件）。这是有意为之 — Hub 和 Edge 承担不同的角色。然而，连接生命周期管理变得至关重要。如果任意一端断开，它们之间的桥梁就会断裂。
 
-**Mitigation**: HubIntegration hook tracks both connection states. On Hub disconnect, Edge runs continue locally but cannot report back. On Edge disconnect, Hub dispatch tasks queue in Redis (already implemented) and retry on reconnect.
+**缓解措施**：HubIntegration hook 追踪两个连接状态。Hub 断开时，Edge 的 run 继续本地执行，但无法回报结果。Edge 断开时，Hub 调度任务在 Redis 中排队（已实现），重连后重试。
 
-### B. Event Translation Overhead
-The Desktop must translate between two event schemas:
+### B. 事件翻译开销
+Desktop 必须在两个事件模式之间翻译：
 - Hub `agent.dispatch` payload → Edge `StartRunRequest`
 - Edge `run.agent.text_delta` → Hub `streamTask(taskId, content)`
 - Edge `run.agent.result` → Hub `doneTask(taskId, finalContent)`
 
-This translation is straightforward (field remapping) but must be correct and complete.
+此翻译是直接的（字段重映射），但必须正确且完整。
 
-### C. Session/Thread Mapping
-Hub's Session (chat room) and Edge's Project+Thread (work context) are different abstractions. The bridge needs to decide: one Edge Thread per Hub Session, or one per agent task?
+### C. Session/Thread 映射
+Hub 的 Session（聊天室）和 Edge 的 Project+Thread（工作上下文）是不同的抽象。桥接需要决定：每个 Hub Session 对应一个 Edge Thread，还是每个 Agent 任务对应一个？
 
-**Recommendation**: One Edge Project per Hub Session (use `sessionId` in `StartRunRequest`), one Edge Thread per Hub task invocation. This gives clean isolation of agent runs within a chat context.
+**建议**：每个 Hub Session 对应一个 Edge Project（在 `StartRunRequest` 中使用 `sessionId`），每个 Hub 任务调用对应一个 Edge Thread。这为聊天上下文中的 Agent 运行提供了清晰的隔离。
 
-### D. No Auth on Edge
-Edge currently has no authentication because it was designed for local-only use. If in the future Edge needs to be accessible from other machines on the network, auth must be added (JWT validation with Hub-issued tokens, or an API key).
+### D. Edge 无认证
+Edge 目前没有认证，因为它被设计为仅限本地使用。如果未来 Edge 需要被网络上其他机器访问，必须添加认证（使用 Hub 颁发的令牌进行 JWT 验证，或使用 API 密钥）。
 
 ---
 
-## 10. Files Referenced
+## 10. 引用文件
 
 ### Hub Server
-- `D:\Code\AgentHub\hub-server\internal\router\router.go` -- All routes
-- `D:\Code\AgentHub\hub-server\internal\handler\auth.go` -- Auth handler
-- `D:\Code\AgentHub\hub-server\internal\handler\agent.go` -- Agent handler + edge callbacks
-- `D:\Code\AgentHub\hub-server\internal\handler\device.go` -- Device registration
-- `D:\Code\AgentHub\hub-server\internal\handler\session.go` -- Session handler
-- `D:\Code\AgentHub\hub-server\internal\handler\message.go` -- Message handler
-- `D:\Code\AgentHub\hub-server\internal\handler\response.go` -- Response helpers
-- `D:\Code\AgentHub\hub-server\internal\handler\ws.go` -- WebSocket handler
-- `D:\Code\AgentHub\hub-server\internal\service\agent.go` -- Agent service + dispatch
-- `D:\Code\AgentHub\hub-server\internal\service\eventbus.go` -- Internal event bus
-- `D:\Code\AgentHub\hub-server\internal\service\message.go` -- Message service
-- `D:\Code\AgentHub\hub-server\internal\service\session.go` -- Session service
-- `D:\Code\AgentHub\hub-server\internal\model\*.go` -- All data models
-- `D:\Code\AgentHub\hub-server\internal\ws\frame.go` -- WS frame types
-- `D:\Code\AgentHub\hub-server\internal\ws\manager.go` -- WS connection manager
-- `D:\Code\AgentHub\hub-server\internal\middleware\auth.go` -- JWT auth middleware
-- `D:\Code\AgentHub\hub-server\internal\middleware\device_type.go` -- Device type gate
-- `D:\Code\AgentHub\hub-server\cmd\server-hub\main.go` -- Server wiring
-- `D:\Code\AgentHub\hub-server\docs\Server-Hub API接口文档.md` -- API docs
+- `hub-server/internal/router/router.go` — 所有路由
+- `hub-server/internal/handler/auth.go` — 认证处理器
+- `hub-server/internal/handler/agent.go` — Agent 处理器 + Edge 回调
+- `hub-server/internal/handler/device.go` — 设备注册
+- `hub-server/internal/handler/session.go` — 会话处理器
+- `hub-server/internal/handler/message.go` — 消息处理器
+- `hub-server/internal/handler/response.go` — 响应辅助
+- `hub-server/internal/handler/ws.go` — WebSocket 处理器
+- `hub-server/internal/service/agent.go` — Agent 服务 + 调度
+- `hub-server/internal/service/eventbus.go` — 内部事件总线
+- `hub-server/internal/service/message.go` — 消息服务
+- `hub-server/internal/service/session.go` — 会话服务
+- `hub-server/internal/model/*.go` — 所有数据模型
+- `hub-server/internal/ws/frame.go` — WS 帧类型
+- `hub-server/internal/ws/manager.go` — WS 连接管理器
+- `hub-server/internal/middleware/auth.go` — JWT 认证中间件
+- `hub-server/internal/middleware/device_type.go` — 设备类型门控
+- `hub-server/cmd/server-hub/main.go` — 服务器组装
+- `hub-server/docs/Server-Hub API接口文档.md` — API 文档
 
 ### Edge Server
-- `D:\Code\AgentHub\edge-server\internal\api\handlers.go` -- REST + WS handlers
-- `D:\Code\AgentHub\edge-server\internal\events\bus.go` -- Event bus with cursor replay
-- `D:\Code\AgentHub\edge-server\internal\httpserver\server.go` -- Server wiring
+- `edge-server/internal/api/handlers.go` — REST + WS 处理器
+- `edge-server/internal/events/bus.go` — 含游标回放的事件总线
+- `edge-server/internal/httpserver/server.go` — 服务器组装
 
 ### Desktop
-- `D:\Code\AgentHub\app\desktop\src\config.ts` -- URLs config
-- `D:\Code\AgentHub\app\desktop\src\api\eventClient.ts` -- Edge WS client
-- `D:\Code\AgentHub\app\desktop\src\api\edgeClient.ts` -- Edge REST client
-- `D:\Code\AgentHub\app\desktop\src\hooks\useEventStream.ts` -- Event log hook
-- `D:\Code\AgentHub\app\desktop\src\hooks\useChatMessages.ts` -- Agent event → UI
-- `D:\Code\AgentHub\app\shared\src\events.ts` -- Event type definitions
-- `D:\Code\AgentHub\app\shared\src\types.ts` -- REST type definitions
+- `app/desktop/src/config.ts` — URL 配置
+- `app/desktop/src/api/eventClient.ts` — Edge WS 客户端
+- `app/desktop/src/api/edgeClient.ts` — Edge REST 客户端
+- `app/desktop/src/hooks/useEventStream.ts` — 事件日志 hook
+- `app/desktop/src/hooks/useChatMessages.ts` — Agent 事件 → UI
+- `app/shared/src/events.ts` — 事件类型定义
+- `app/shared/src/types.ts` — REST 类型定义
