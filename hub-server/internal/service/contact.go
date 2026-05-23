@@ -172,18 +172,15 @@ func (s *ContactService) ListFriendRequests(ctx context.Context, userID string) 
 }
 
 func (s *ContactService) AcceptFriendRequest(ctx context.Context, userID, requestID string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		r, err := repository.GetFriendshipByID(tx, requestID)
-		if err != nil {
-			return errcode.FriendRequestNotFound
-		}
-		if r.FriendID != userID {
-			return errcode.FriendRequestNotFound
-		}
-		if r.Status != model.StatusPending {
-			return errcode.FriendRequestNotFound
-		}
+	r, err := repository.GetFriendshipByID(s.db, requestID)
+	if err != nil {
+		return errcode.FriendRequestNotFound
+	}
+	if r.FriendID != userID || r.Status != model.StatusPending {
+		return errcode.FriendRequestNotFound
+	}
 
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := repository.UpdateFriendshipByID(tx, r.ID, model.StatusAccepted); err != nil {
 			return err
 		}
@@ -194,7 +191,12 @@ func (s *ContactService) AcceptFriendRequest(ctx context.Context, userID, reques
 			Status:   model.StatusAccepted,
 		}
 		return repository.UpsertFriendship(tx, reciprocal)
-	})
+	}); err != nil {
+		return err
+	}
+
+	cache.Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
+	return nil
 }
 
 func (s *ContactService) RejectFriendRequest(ctx context.Context, userID, requestID string) error {
@@ -205,7 +207,11 @@ func (s *ContactService) RejectFriendRequest(ctx context.Context, userID, reques
 	if r.FriendID != userID || r.Status != model.StatusPending {
 		return errcode.FriendRequestNotFound
 	}
-	return s.db.Delete(r).Error
+	if err := s.db.Delete(r).Error; err != nil {
+		return err
+	}
+	cache.Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
+	return nil
 }
 
 func (s *ContactService) ListContacts(ctx context.Context, userID string) ([]ContactInfo, error) {
@@ -239,7 +245,11 @@ func (s *ContactService) RemoveContact(ctx context.Context, currentUserID, frien
 	if err != nil {
 		return errcode.FriendRequestNotFound
 	}
-	return repository.DeleteFriendshipPair(s.db, currentUserID, friendUserID)
+	if err := repository.DeleteFriendshipPair(s.db, currentUserID, friendUserID); err != nil {
+		return err
+	}
+	cache.Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+friendUserID)
+	return nil
 }
 
 func (s *ContactService) BlockContact(ctx context.Context, currentUserID, targetUserID string) error {
@@ -252,7 +262,7 @@ func (s *ContactService) BlockContact(ctx context.Context, currentUserID, target
 		return errcode.UserNotFound
 	}
 
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("(user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)",
 			currentUserID, targetUserID, targetUserID, currentUserID).Delete(&model.Friendship{}).Error; err != nil {
 			return err
@@ -260,7 +270,11 @@ func (s *ContactService) BlockContact(ctx context.Context, currentUserID, target
 		return repository.CreateFriendship(tx, &model.Friendship{
 			UserID: currentUserID, FriendID: targetUserID, Status: model.StatusBlocked,
 		})
-	})
+	}); err != nil {
+		return err
+	}
+	cache.Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
+	return nil
 }
 
 func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targetUserID string) error {
@@ -268,7 +282,11 @@ func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targ
 	if err != nil || f.Status != model.StatusBlocked {
 		return errcode.FriendRequestNotFound
 	}
-	return s.db.Delete(f).Error
+	if err := s.db.Delete(f).Error; err != nil {
+		return err
+	}
+	cache.Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
+	return nil
 }
 
 func (s *ContactService) UpdateRemark(ctx context.Context, currentUserID, friendUserID, remark string) error {

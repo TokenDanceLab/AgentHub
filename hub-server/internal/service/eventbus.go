@@ -2,7 +2,11 @@ package service
 
 import (
 	"context"
+	"log/slog"
 	"sync"
+	"sync/atomic"
+
+	"github.com/panjf2000/ants/v2"
 )
 
 type Event struct {
@@ -15,11 +19,25 @@ type EventHandler func(ctx context.Context, event Event)
 type Bus struct {
 	mu       sync.RWMutex
 	handlers map[string][]EventHandler
+	pending  atomic.Int64
+	pool     *ants.Pool
 }
 
 func NewBus() *Bus {
-	return &Bus{handlers: make(map[string][]EventHandler)}
+	pool, err := ants.NewPool(1024,
+		ants.WithNonblocking(false),
+		ants.WithPanicHandler(func(p interface{}) {
+			slog.Error("eventbus panic", "panic", p)
+		}),
+	)
+	if err != nil {
+		panic(err)
+	}
+	return &Bus{handlers: make(map[string][]EventHandler), pool: pool}
 }
+
+func (b *Bus) Pending() int64  { return b.pending.Load() }
+func (b *Bus) Running() int    { return b.pool.Running() }
 
 func (b *Bus) Subscribe(eventType string, handler EventHandler) {
 	b.mu.Lock()
@@ -35,9 +53,22 @@ func (b *Bus) Publish(ctx context.Context, event Event) {
 	b.mu.RUnlock()
 
 	for _, h := range handlers {
-		go func(handler EventHandler) {
-			defer func() { recover() }()
-			handler(ctx, event)
-		}(h)
+		h := h
+		b.pending.Add(1)
+		err := b.pool.Submit(func() {
+			defer func() {
+				recover()
+				b.pending.Add(-1)
+			}()
+			h(ctx, event)
+		})
+		if err != nil {
+			b.pending.Add(-1)
+			slog.Error("eventbus submit failed", "error", err)
+		}
 	}
+}
+
+func (b *Bus) Close() {
+	b.pool.Release()
 }

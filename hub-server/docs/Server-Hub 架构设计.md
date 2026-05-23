@@ -28,7 +28,7 @@ web 发起的 agent 任务没有本地 runner 可用,hub 负责查找该用户�
 ┌─────────┐                ┌──────────────┐
 │   web   │ ─── WS/HTTP ──►│  server-hub  │
 └─────────┘                │              │
-                           │   (本模块)   │
+                           │   (本模块)    │
 ┌─────────┐                │              │
 │server-edge ─── WS/HTTP ─►│              │
 └─────────┘                └──────────────┘
@@ -56,7 +56,8 @@ web 发起的 agent 任务没有本地 runner 可用,hub 负责查找该用户�
 | WebSocket | coder/websocket | 现代 API,context 友好 |
 | 数据库迁移 | golang-migrate | SQL 文件版本化 |
 | 配置管理 | viper + YAML + env 覆盖 | 多环境配置 |
-| 日志 | log/slog (Go 标准库) | 结构化 JSON 输出 |
+| 日志 | zap + zapslog (slog API 不变) | 异步写入、文件滚动、结构化 JSON |
+| 监控 | Prometheus + pprof | 指标采集与性能分析 |
 | 密码哈希 | bcrypt (cost=10) | 业界标准 |
 | ID 生成 | UUIDv7 | 时间有序,分页友好 |
 | API 文档 | swaggo/swag | 注释驱动生成 OpenAPI |
@@ -83,16 +84,16 @@ web 发起的 agent 任务没有本地 runner 可用,hub 负责查找该用户�
 │  └──────────────────────────────────────────┘  │
 │                        ▼                       │
 │  ┌──────────────────────────────────────────┐  │
-│  │           Handler 层(参数校验)          │  │
+│  │           Handler 层(参数校验)             │  │
 │  └──────────────────────────────────────────┘  │
 │                        ▼                       │
 │  ┌──────────────────────────────────────────┐  │
-│  │        Service 层(业务逻辑+事务)        │  │
+│  │        Service 层(业务逻辑+事务)           │  │
 │  └──────────────────────────────────────────┘  │
 │                        ▼                       │
 │  ┌─────────────┬────────────────┬───────────┐  │
 │  │ Repository  │  WS Manager    │ EventBus  │  │
-│  │  (GORM)     │ (连接路由)     │ (内存队列)│  │
+│  │  (GORM)     │ (连接路由)      │ (内存队列)  │  │
 │  └──────┬──────┴────────┬───────┴─────┬─────┘  │
 └─────────┼───────────────┼─────────────┼────────┘
           ▼               ▼             ▼
@@ -101,11 +102,12 @@ web 发起的 agent 任务没有本地 runner 可用,hub 负责查找该用户�
 
 ### 3.2 关键内部组件
 
-- **HTTP Server**:Gin 路由 + 中间件 + handler
+- **HTTP Server**:Gin 路由 + 中间件 + handler，配置 ReadHeaderTimeout(5s)/ReadTimeout(30s)/WriteTimeout(60s)/IdleTimeout(120s)，支持 SIGTERM 优雅停机
+- **Admin Server**:独立端口（默认 6060），暴露 `/debug/pprof/`（CPU/heap/goroutine profile）和 `/metrics`（Prometheus 指标）
 - **WS Manager**:维护所有活跃 WebSocket 连接,提供"按 user_id / device_type / session_id 推送"能力
-- **EventBus**:进程内事件总线(channel 实现),消息写库后通过 EventBus 触发广播,解耦 Service 与 WS
+- **EventBus**:进程内事件总线（ants 协程池实现，1024 worker），消息写库后通过 EventBus 触发广播，解耦 Service 与 WS
 - **Repository**:GORM 封装的数据访问层
-- **Cache**:Redis 客户端封装(go-redis)
+- **Cache**:Redis 客户端封装（go-redis），包含设备路由、序列号分配（INCR）、业务数据缓存（JSON + singleflight）
 
 ---
 
@@ -179,19 +181,23 @@ web 发起的 agent 任务没有本地 runner 可用,hub 负责查找该用户�
 
 **seq_id 策略**:
 - **会话内单调递增**(不是全局)
-- 实现:每个 session 在 PostgreSQL 里有一个原子计数器,写消息时事务内递增
+- 实现:每个 session 在 Redis 中使用 `INCR session:seq:{sessionID}` 原子递增，DB 唯一索引 `(session_id, seq_id)` 兜底
+- Redis 不可用时自动 fallback 到 PostgreSQL 行锁路径（`UPDATE sessions SET next_seq = next_seq + 1`）
+- 新会话创建时通过 `SetNX` 初始化 seq key；旧会话在启动时从 DB 同步到 Redis
 - 客户端按 (session_id, seq_id) 排序,跨会话不可比
 
 **写入流程**:
 ```
 1. handler 接收请求,校验参数和权限
-2. service 开事务:
-   a. UPDATE sessions SET next_seq = next_seq + 1 WHERE id = ? RETURNING next_seq
-   b. INSERT INTO messages (..., seq_id = next_seq, ...)
-   c. UPDATE session_members SET last_message_at = NOW() WHERE session_id = ?
-3. 事务提交后,通过 EventBus 触发广播
-4. WS Manager 找到该 session 所有在线成员,推 message.new 事件
-5. 接收方按 client_msg_id 去重,按 seq_id 排序展示
+2. service 先通过 Redis INCR 分配 seq_id:
+   a. Redis INCR session:seq:{sessionID} → 获得 seq_id
+   b. 若 Redis 不可用:fallback 到 DB 行锁路径（UPDATE sessions SET next_seq = next_seq + 1 RETURNING next_seq）
+3. 开 DB 事务:
+   a. INSERT INTO messages (..., seq_id = 上一步分配的seq, ...)
+   b. UPDATE sessions SET last_message_at = NOW() WHERE id = ?
+4. 事务提交后,通过 EventBus（ants 协程池）触发广播
+5. WS Manager 找到该 session 所有在线成员,推 message.new 事件
+6. 接收方按 client_msg_id 去重,按 seq_id 排序展示
 ```
 
 ### 4.6 消息高级操作
@@ -213,6 +219,7 @@ web 发起的 agent 任务没有本地 runner 可用,hub 负责查找该用户�
 
 **转发**:
 - 新消息保留原发送者标识(content 里存原 sender)
+- 并发转发：使用 errgroup 并发处理多个目标会话（并发度限制 8），任一失败取消其余
 - 不可链式撤回(撤原消息不影响转发副本)
 
 **已读回执**:
@@ -394,7 +401,7 @@ web 发起的 agent 任务没有本地 runner 可用,hub 负责查找该用户�
 | dissolved | boolean | NOT NULL DEFAULT false | 是否已解散 |
 | created_at | timestamptz | NOT NULL DEFAULT NOW() | |
 
-`next_seq` 是会话内 seq_id 的原子计数器,写消息时事务内 `UPDATE ... SET next_seq = next_seq + 1 RETURNING next_seq`。
+`next_seq` 是会话内 seq_id 的计数器，实际分配通过 Redis `INCR session:seq:{id}` 完成，PostgreSQL 中的值作为 fallback 和启动时的种子数据。
 
 ### 5.5 session_members(会话成员)
 
@@ -752,19 +759,32 @@ recover → log → cors → rate-limit → auth → device_type_check → handl
 
 ## 8. Redis 用途
 
-只放易失数据,key 规范如下:
+### 8.1 易失数据（路由 / 状态）
 
 | Key | 类型 | TTL | 用途 |
 | --- | --- | --- | --- |
 | `device_route:{user_id}` | Hash | 永久(下线时 HDEL) | `{web: conn_id, desktop: conn_id}` |
-| `heartbeat:{conn_id}` | String | 60s | 心跳时间戳 |
-| `typing:{session_id}:{user_id}` | String | 5s | typing 状态 |
 | `pending_tasks:{user_id}` | List | 永久 | edge 离线时的 agent 任务队列 |
-| `session_token:{token_hash}` | String | 30 天 | refresh_token 反查 |
-| `rate_limit:{user_id}:{action}` | String | 滑动窗口 | 发消息频率限制 |
 | `kicked:{conn_id}` | String | 60s | 踢前标记,避免重连竞态 |
 
-不放 Redis 的:消息历史、会话列表、未读数(直接查 PG 索引足够)。
+### 8.2 持久化数据（需 AOF 保证不丢失）
+
+| Key | 类型 | TTL | 用途 |
+| --- | --- | --- | --- |
+| `session:seq:{sessionID}` | String (int64) | 永久 | 会话 seq 计数器（Redis INCR 分配，DB 唯一索引兜底） |
+
+### 8.3 业务数据缓存（可丢失，有 TTL）
+
+| Key | 类型 | TTL | 用途 |
+| --- | --- | --- | --- |
+| `session:members:{sessionID}` | String (JSON) | 5min (±10%) | 会话活跃成员列表缓存 |
+| `session:meta:{sessionID}` | String (JSON) | 10min (±10%) | 会话元数据缓存 |
+| `user:profile:{userID}` | String (JSON) | 30min (±10%) | 用户基本信息缓存 |
+| `user:friends:{userID}` | String (JSON) | 10min (±10%) | 用户好友 ID 列表缓存 |
+
+缓存层通过 `GetOrLoad[T]` 泛型函数实现 cache-through 模式，内嵌 `singleflight` 防止缓存击穿。
+写入路径在数据变更后调用 `Invalidate` 主动失效对应 key。
+Redis 不可用时自动降级为直查数据库，不阻塞业务。
 
 ---
 
@@ -789,6 +809,9 @@ server-hub/
 │   │   ├── agent.go
 │   │   ├── notification.go
 │   │   ├── attachment.go
+│   │   ├── device.go
+│   │   ├── custom_agent.go
+│   │   ├── response.go
 │   │   └── ws.go
 │   ├── service/                 # 业务逻辑
 │   │   ├── auth.go
@@ -800,31 +823,41 @@ server-hub/
 │   │   ├── attachment.go
 │   │   └── eventbus.go
 │   ├── repository/              # GORM 数据访问
+│   │   ├── db.go
+│   │   ├── migrate.go
 │   │   ├── user.go
 │   │   ├── friendship.go
+│   │   ├── device.go
 │   │   ├── session.go
+│   │   ├── session_member.go
 │   │   ├── message.go
 │   │   ├── agent.go
-│   │   └── ...
+│   │   ├── notification.go
+│   │   ├── attachment.go
+│   │   └── refresh_token.go
 │   ├── model/                   # GORM 模型 + DTO
 │   │   ├── user.go
 │   │   ├── session.go
+│   │   ├── session_member.go
 │   │   ├── message.go
 │   │   └── ...
 │   ├── middleware/              # Gin 中间件
 │   │   ├── auth.go
-│   │   ├── log.go
-│   │   ├── recover.go
-│   │   ├── cors.go
-│   │   └── ratelimit.go
+│   │   ├── device_type.go
+│   │   ├── metrics.go           # Prometheus HTTP 指标采集
+│   │   └── access_log.go        # 结构化访问日志
+│   ├── metrics/                 # Prometheus 指标定义
+│   │   └── metrics.go
 │   ├── ws/                      # WebSocket 管理
 │   │   ├── manager.go           # 连接管理
-│   │   ├── hub.go               # 推送路由
 │   │   └── frame.go             # 帧编解码
 │   ├── cache/                   # Redis 封装
-│   │   ├── route.go
-│   │   ├── heartbeat.go
-│   │   └── pending_task.go
+│   │   ├── redis.go             # 连接池初始化
+│   │   ├── route.go             # 设备路由
+│   │   ├── seq.go               # 序列号分配 (INCR)
+│   │   └── data.go              # 业务数据缓存 (GetOrLoad + singleflight)
+│   ├── log/                     # 日志初始化 (zap + zapslog)
+│   │   └── log.go
 │   ├── errcode/                 # 错误码常量
 │   │   └── codes.go
 │   ├── jwtutil/                 # JWT 工具
@@ -899,6 +932,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes --appendfsync everysec
     ports:
       - "6379:6379"
     volumes:
@@ -933,6 +967,8 @@ volumes:
 ```
 
 迁移可作为 entrypoint 一部分:容器启动时先执行 `migrate up` 再启服务。
+
+**Admin 端口**:服务同时监听 `admin_port`（默认 6060），提供 `/debug/pprof/`（性能分析）和 `/metrics`（Prometheus 指标）。生产环境应配置防火墙仅允许内网访问该端口。
 
 ---
 
