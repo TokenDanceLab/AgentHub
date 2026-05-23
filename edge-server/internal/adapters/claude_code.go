@@ -133,3 +133,7 @@ func (a *ClaudeCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, s
 	}
 	return parser.Parse(ctx, stdout)
 }
+
+// NeedsStdin returns true — Claude Code uses stdin for the control protocol
+// (interrupt, permission responses).
+func (a *ClaudeCodeAdapter) NeedsStdin() bool { return true }

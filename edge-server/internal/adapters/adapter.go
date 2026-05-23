@@ -34,6 +34,12 @@ type AgentAdapter interface {
 	// It returns when the stream ends or ctx is cancelled.
 	// stdin is provided for protocols that require bidirectional communication.
 	ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error
+
+	// NeedsStdin reports whether this adapter requires a writable stdin pipe
+	// for bidirectional communication (e.g. control protocol, permission responses).
+	// When false, the process executor will NOT open stdin, avoiding deadlocks
+	// with CLIs that block on stdin read when a pipe is attached.
+	NeedsStdin() bool
 }
 
 // EventEmitter abstracts the event bus so adapters don't couple to it directly.
