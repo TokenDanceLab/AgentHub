@@ -1,16 +1,30 @@
 package handler
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
 )
 
-type AuthHandler struct {
-	service *service.AuthService
+// AuthService is the subset of *service.AuthService used by AuthHandler.
+type AuthService interface {
+	Register(ctx context.Context, username, password, nickname string) (*model.User, error)
+	Login(ctx context.Context, username, password, deviceType, deviceID string) (*service.LoginResponse, error)
+	RefreshToken(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error)
+	Logout(ctx context.Context, userID, deviceID string) error
+	GetMe(ctx context.Context, userID string) (*model.User, error)
+	UpdateProfile(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error)
+	ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error
 }
 
-func NewAuthHandler(s *service.AuthService) *AuthHandler {
+type AuthHandler struct {
+	service AuthService
+}
+
+func NewAuthHandler(s AuthService) *AuthHandler {
 	return &AuthHandler{service: s}
 }
 
