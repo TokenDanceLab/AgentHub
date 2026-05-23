@@ -1,107 +1,91 @@
-/* ── Root Layout ───────────────────────────────────────────────────── */
 .root {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  background: var(--background);
-  color: var(--foreground);
+  height: 100vh;
+  min-width: 960px;
+  overflow: hidden;
+  background: #f7f8fb;
+  color: #172033;
+  font-family:
+    Inter,
+    "Segoe UI",
+    Arial,
+    sans-serif;
 }
 
-/* ── Header / Brand ────────────────────────────────────────────────── */
-.header {
+.toolbar {
   display: flex;
-  flex-direction: column;
-  border-bottom: 1px solid var(--border);
-  background: var(--card);
+  align-items: center;
+  gap: 24px;
+  height: 56px;
+  padding: 0 20px;
+  border-bottom: 1px solid #d8deea;
+  background: #ffffff;
   flex-shrink: 0;
 }
 
 .brand {
-  padding: var(--space-md) var(--space-xl);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-medium);
-  color: var(--primary);
-  letter-spacing: 0.01em;
-}
-
-/* ── Tab Bar ───────────────────────────────────────────────────────── */
-.tabBar {
-  display: flex;
-  gap: 0;
-  padding: 0 var(--space-lg);
-}
-
-.tab {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-lg);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
-  font-family: var(--font-sans);
-  color: var(--muted-foreground);
+  gap: 10px;
+  min-width: 220px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.brandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #005faa;
+  color: #ffffff;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  overflow-x: auto;
+}
+
+.tab,
+.activeTab {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
+  color: #48556a;
   cursor: pointer;
-  transition:
-    color 100ms,
-    border-color 100ms;
+  font: inherit;
+  font-size: 13px;
   white-space: nowrap;
 }
 
 .tab:hover {
-  color: var(--foreground);
+  background: #eef3fa;
+  color: #172033;
 }
 
-/* Active tab — highlighted with semantic token, not hardcoded */
-.tabActive {
-  color: var(--primary);
-  font-weight: var(--font-weight-medium);
-  border-bottom-color: var(--primary);
+.activeTab {
+  border-color: #b8c8dc;
+  background: #e8f1fb;
+  color: #004f90;
+  font-weight: 700;
 }
 
-/* ── Content Area ──────────────────────────────────────────────────── */
-.content {
+.preview {
   flex: 1;
-  display: flex;
+  min-height: 0;
   overflow: hidden;
 }
 
-.loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: var(--space-2xl);
-  font-size: var(--font-size-sm);
-  color: var(--muted-foreground);
-}
-
-/* ── Placeholder (page not yet implemented) ────────────────────────── */
-.placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  gap: var(--space-lg);
-  padding: var(--space-2xl);
-}
-
-.placeholderIcon {
-  color: var(--muted-foreground);
-  opacity: 0.4;
-}
-
-.placeholderTitle {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-medium);
-  color: var(--foreground);
-}
-
-.placeholderText {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
-  color: var(--muted-foreground);
+.preview iframe {
+  height: 100% !important;
 }
