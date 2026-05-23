@@ -1,0 +1,105 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* ── Card ────────────────────────────────────────────────── */
+.card {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 64px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xl);
+  padding: 10px;
+  background: oklch(1 0 0 / 0.45);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+  transition: border-color var(--duration-fast, 150ms), background var(--duration-fast, 150ms);
+}
+
+.card:hover {
+  background: oklch(1 0 0 / 0.62);
+}
+
+/* ── Active ──────────────────────────────────────────────── */
+.active {
+  border-color: oklch(0.55 0.16 255 / 0.28);
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.16 255 / 0.12),
+    oklch(0.6 0.12 230 / 0.08)
+  );
+}
+
+/* ── Avatar ──────────────────────────────────────────────── */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--brand), var(--info));
+  color: oklch(1 0 0);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  box-shadow: 0 10px 22px oklch(0.55 0.16 255 / 0.24);
+}
+
+/* ── Body ────────────────────────────────────────────────── */
+.body {
+  min-width: 0;
+}
+
+.body h3 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
+}
+
+.body p {
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Meta ────────────────────────────────────────────────── */
+.meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* ── Unread Badge ────────────────────────────────────────── */
+.unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--brand);
+  color: var(--primary-foreground);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── Empty ───────────────────────────────────────────────── */
+.empty {
+  border-radius: var(--radius-xl);
+  padding: 14px var(--space-lg);
+  background: oklch(1 0 0 / 0.55);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+}
