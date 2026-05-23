@@ -1,4 +1,6 @@
 // Builds ChatMessage objects from WebSocket agent events.
+// P0-1: Uses RunState enum for typed status values.
+// Status transitions are validated in runStore; invalid jumps are logged here as warnings.
 
 import { useReducer, useEffect, useRef, useCallback } from 'react';
 import { createEventStream } from '@/api/eventClient';
@@ -7,6 +9,7 @@ import type { EventEnvelope } from '@shared/events';
 import type { ChatMessage, MessageBlock, ToolResultBlock } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useToastStore } from '@/stores/toastStore';
+import { RunState } from '@/utils/runStateMachine';
 import { cancelRun } from '@/api/edgeClient';
 
 const MAX_MESSAGES = 500;
@@ -26,9 +29,9 @@ function hashSignature(toolName: string, input: Record<string, unknown> | undefi
   return `${toolName}:${args}`;
 }
 
-interface RunState {
+interface RunStateData {
   runId: string;
-  status: string;
+  status: RunState;
   outputText: string;
   toolCalls: Array<{
     callId: string;
@@ -55,7 +58,7 @@ interface State {
   messages: ChatMessage[];
   isConnected: boolean;
   isStreaming: boolean;
-  currentRun: RunState | null;
+  currentRun: RunStateData | null;
   permissionRequests: PermissionRequestItem[];
   agentName: string;
 }
@@ -168,7 +171,7 @@ function processEvent(state: State, event: EventEnvelope): State {
       const rid = event.payload.runId as string;
       currentRun = {
         runId: rid,
-        status: 'running',
+        status: RunState.RUNNING,
         outputText: '',
         toolCalls: [],
         changedFiles: [],
@@ -441,7 +444,12 @@ function processEvent(state: State, event: EventEnvelope): State {
       isStreaming = false;
       const rid = event.payload.runId as string;
       if (currentRun && currentRun.runId === rid) {
-        currentRun = { ...currentRun, status: 'finished' };
+        if (currentRun.status !== RunState.COMPLETED) {
+          console.warn(
+            `[useChatMessages] run.finished: unexpected status ${currentRun.status} → ${RunState.COMPLETED}`,
+          );
+        }
+        currentRun = { ...currentRun, status: RunState.COMPLETED };
       }
       break;
     }
@@ -450,7 +458,12 @@ function processEvent(state: State, event: EventEnvelope): State {
       isStreaming = false;
       const rid = event.payload.runId as string;
       if (currentRun && currentRun.runId === rid) {
-        currentRun = { ...currentRun, status: 'failed' };
+        if (currentRun.status !== RunState.RUNNING && currentRun.status !== RunState.STREAMING) {
+          console.warn(
+            `[useChatMessages] run.failed: unexpected status ${currentRun.status} → ${RunState.FAILED}`,
+          );
+        }
+        currentRun = { ...currentRun, status: RunState.FAILED };
       }
       break;
     }
@@ -459,7 +472,16 @@ function processEvent(state: State, event: EventEnvelope): State {
       isStreaming = false;
       const rid = event.payload.runId as string;
       if (currentRun && currentRun.runId === rid) {
-        currentRun = { ...currentRun, status: 'cancelled' };
+        if (
+          currentRun.status !== RunState.RUNNING &&
+          currentRun.status !== RunState.STREAMING &&
+          currentRun.status !== RunState.WAITING_FOR_INPUT
+        ) {
+          console.warn(
+            `[useChatMessages] run.cancelled: unexpected status ${currentRun.status} → ${RunState.CANCELLED}`,
+          );
+        }
+        currentRun = { ...currentRun, status: RunState.CANCELLED };
       }
       break;
     }

@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { RunInfo } from '@shared/types';
 import type { FileDiff, ChatMessage } from './ChatView.types';
 import type { SessionMetrics } from '@shared/context/breakdown';
+import { RunState } from '@/utils/runStateMachine';
+import { RunStateMachine } from '@/utils/runStateMachine';
 import DiffViewer from './DiffViewer';
 import ContextUsage from './ContextUsage';
 import styles from './RunDetail.module.css';
@@ -133,13 +135,17 @@ export default function RunDetail({
     );
   }
 
+  // Normalize legacy status strings → RunState enum values
+  const resolvedStatus = RunStateMachine.fromLegacyStatus(run.status);
   const statusKey = `run.status.${run.status}`;
   const statusClass =
-    run.status === 'finished'
+    resolvedStatus === RunState.COMPLETED
       ? styles.statusDone
-      : run.status === 'failed'
+      : resolvedStatus === RunState.FAILED || resolvedStatus === RunState.CANCELLED
         ? styles.statusFailed
-        : run.status === 'running'
+        : resolvedStatus === RunState.RUNNING ||
+            resolvedStatus === RunState.STREAMING ||
+            resolvedStatus === RunState.WAITING_FOR_INPUT
           ? styles.statusRunning
           : styles.statusPending;
 
@@ -163,6 +169,13 @@ export default function RunDetail({
 
   const hasAnyContent = hasOutput || hasToolCalls || hasFileChanges;
 
+  // Show cancel button while the run is active (not terminal, not IDLE)
+  const isActive =
+    resolvedStatus !== RunState.COMPLETED &&
+    resolvedStatus !== RunState.FAILED &&
+    resolvedStatus !== RunState.CANCELLED &&
+    resolvedStatus !== RunState.IDLE;
+
   return (
     <aside className={styles.panel} aria-label={t('run.title')}>
       <div className={styles.title}>{t('run.title')}</div>
@@ -172,7 +185,7 @@ export default function RunDetail({
         {run.runId && <span className={styles.runId}>{run.runId.slice(0, 12)}</span>}
       </div>
 
-      {onCancel && run.status === 'running' && (
+      {onCancel && isActive && (
         <div className={styles.section}>
           <button className={styles.cancelButton} onClick={onCancel}>
             {t('action.cancelRun')}
