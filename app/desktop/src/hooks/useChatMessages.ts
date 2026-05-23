@@ -6,9 +6,25 @@ import type { StreamHandle } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
 import type { ChatMessage, MessageBlock, ToolResultBlock } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
+import { useToastStore } from '@/stores/toastStore';
+import { cancelRun } from '@/api/edgeClient';
 
 const MAX_MESSAGES = 500;
 const MAX_OUTPUT_TEXT = 20000;
+
+const LOOP_WARN_AT = 3;
+const LOOP_CANCEL_AT = 5;
+
+interface LoopEntry {
+  count: number;
+  warned: boolean;
+  cancelled: boolean;
+}
+
+function hashSignature(toolName: string, input: Record<string, unknown> | undefined): string {
+  const args = input ? JSON.stringify(input, Object.keys(input ?? {}).sort()) : '{}';
+  return `${toolName}:${args}`;
+}
 
 interface RunState {
   runId: string;
@@ -558,6 +574,10 @@ export function useChatMessages(online: boolean): ChatState {
     [],
   );
 
+  // Loop detector — persists across renders, resets per run
+  const loopDetectorRef = useRef(new Map<string, LoopEntry>());
+  const currentRunIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     mountedRef.current = true;
     if (!online) {
@@ -575,6 +595,47 @@ export function useChatMessages(online: boolean): ChatState {
 
     stream.subscribe((event: EventEnvelope) => {
       if (!mountedRef.current) return;
+
+      // ── Tool call loop detection ──
+      if (event.type === 'run.agent.tool_call') {
+        const toolName = event.payload.toolName as string;
+        const input = event.payload.input as Record<string, unknown> | undefined;
+        const runId = event.payload.runId as string;
+
+        if (runId && runId === currentRunIdRef.current) {
+          const sig = hashSignature(toolName, input);
+          const entry = loopDetectorRef.current.get(sig) || {
+            count: 0,
+            warned: false,
+            cancelled: false,
+          };
+          entry.count++;
+
+          if (entry.count >= LOOP_CANCEL_AT && !entry.cancelled) {
+            entry.cancelled = true;
+            cancelRun(runId).catch(() => {});
+            useToastStore.getState().addToast({
+              type: 'error',
+              message: `Loop detected: "${toolName}" called ${entry.count} times with same args. Run cancelled.`,
+            });
+          } else if (entry.count >= LOOP_WARN_AT && !entry.warned) {
+            entry.warned = true;
+            useToastStore.getState().addToast({
+              type: 'warning',
+              message: `Loop warning: "${toolName}" called ${entry.count} times with same args.`,
+            });
+          }
+
+          loopDetectorRef.current.set(sig, entry);
+        }
+      }
+
+      // Reset loop detector on new run
+      if (event.type === 'run.started') {
+        currentRunIdRef.current = event.payload.runId as string;
+        loopDetectorRef.current.clear();
+      }
+
       dispatch({ type: 'EVENT_RECEIVED', event });
     });
 

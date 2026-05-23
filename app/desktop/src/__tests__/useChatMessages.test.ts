@@ -2,9 +2,23 @@ vi.mock('@/api/eventClient', () => ({
   createEventStream: vi.fn(),
 }));
 
+vi.mock('@/api/edgeClient', () => ({
+  cancelRun: vi.fn(),
+}));
+
+vi.mock('@/stores/toastStore', () => ({
+  useToastStore: {
+    getState: vi.fn(() => ({
+      addToast: vi.fn(),
+    })),
+  },
+}));
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { createEventStream } from '@/api/eventClient';
+import { cancelRun } from '@/api/edgeClient';
+import { useToastStore } from '@/stores/toastStore';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import type { EventEnvelope } from '@shared/events';
 
@@ -28,6 +42,13 @@ describe('useChatMessages', () => {
     eventHandler = null;
     statusHandler = null;
     vi.mocked(createEventStream).mockClear();
+    vi.mocked(cancelRun).mockClear();
+    vi.mocked(cancelRun).mockResolvedValue({
+      id: 'run-1',
+      status: 'cancelled',
+    } as any);
+    const addToast = vi.fn();
+    vi.mocked(useToastStore.getState).mockReturnValue({ addToast } as any);
     vi.mocked(createEventStream).mockReturnValue({
       subscribe: vi.fn((handler) => {
         eventHandler = handler;
@@ -564,5 +585,139 @@ describe('useChatMessages', () => {
 
     expect(result.current.messages).toEqual([]);
     expect(result.current.currentRun).toBeNull();
+  });
+
+  // ── Loop detection ──
+
+  describe('loop detection', () => {
+    function toolCallEvent(runId: string, toolName: string, input: Record<string, unknown>) {
+      return makeEvent('run.agent.tool_call', {
+        runId,
+        callId: `call-${toolName}-${Math.random().toString(36).slice(2, 6)}`,
+        toolName,
+        input,
+        status: 'running',
+      });
+    }
+
+    it('shows warning toast on 3rd identical tool+args call', () => {
+      renderHook(() => useChatMessages(true));
+
+      act(() => {
+        eventHandler!(makeEvent('run.started', { runId: 'run-1', status: 'running' }));
+      });
+
+      act(() => { eventHandler!(toolCallEvent('run-1', 'read_file', { path: '/x.ts' })); });
+      act(() => { eventHandler!(toolCallEvent('run-1', 'read_file', { path: '/x.ts' })); });
+      act(() => { eventHandler!(toolCallEvent('run-1', 'read_file', { path: '/x.ts' })); });
+
+      const addToast = vi.mocked(useToastStore.getState)().addToast;
+      expect(addToast).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'warning' }),
+      );
+      expect(cancelRun).not.toHaveBeenCalled();
+    });
+
+    it('cancels run on 5th identical tool+args call', () => {
+      renderHook(() => useChatMessages(true));
+
+      act(() => {
+        eventHandler!(makeEvent('run.started', { runId: 'run-1', status: 'running' }));
+      });
+
+      for (let i = 0; i < 5; i++) {
+        act(() => { eventHandler!(toolCallEvent('run-1', 'bash', { cmd: 'ls' })); });
+      }
+
+      const addToast = vi.mocked(useToastStore.getState)().addToast;
+      expect(addToast).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error' }),
+      );
+      expect(cancelRun).toHaveBeenCalledWith('run-1');
+    });
+
+    it('warns only once before cancel threshold', () => {
+      renderHook(() => useChatMessages(true));
+
+      act(() => {
+        eventHandler!(makeEvent('run.started', { runId: 'run-1', status: 'running' }));
+      });
+
+      // 5 identical calls
+      for (let i = 0; i < 5; i++) {
+        act(() => { eventHandler!(toolCallEvent('run-1', 'grep', { pattern: 'foo' })); });
+      }
+
+      const addToastFn = vi.mocked(useToastStore.getState)().addToast;
+      // Only 1 warning (at 3rd) + 1 error (at 5th)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const calls = (addToastFn as any).mock.calls as any[];
+      const warningCalls = calls.filter(
+        (c: any[]) => c[0].type === 'warning',
+      );
+      const errorCalls = calls.filter(
+        (c: any[]) => c[0].type === 'error',
+      );
+      expect(warningCalls).toHaveLength(1);
+      expect(errorCalls).toHaveLength(1);
+    });
+
+    it('does not trigger for different arguments', () => {
+      renderHook(() => useChatMessages(true));
+
+      act(() => {
+        eventHandler!(makeEvent('run.started', { runId: 'run-1', status: 'running' }));
+      });
+
+      act(() => { eventHandler!(toolCallEvent('run-1', 'read_file', { path: '/a.ts' })); });
+      act(() => { eventHandler!(toolCallEvent('run-1', 'read_file', { path: '/b.ts' })); });
+      act(() => { eventHandler!(toolCallEvent('run-1', 'read_file', { path: '/c.ts' })); });
+      act(() => { eventHandler!(toolCallEvent('run-1', 'read_file', { path: '/d.ts' })); });
+      act(() => { eventHandler!(toolCallEvent('run-1', 'read_file', { path: '/e.ts' })); });
+
+      const addToast = vi.mocked(useToastStore.getState)().addToast;
+      expect(addToast).not.toHaveBeenCalled();
+      expect(cancelRun).not.toHaveBeenCalled();
+    });
+
+    it('resets detector when a new run starts', () => {
+      renderHook(() => useChatMessages(true));
+
+      act(() => {
+        eventHandler!(makeEvent('run.started', { runId: 'run-1', status: 'running' }));
+      });
+
+      // 2 calls (below warning threshold)
+      act(() => { eventHandler!(toolCallEvent('run-1', 'read_file', { path: '/x.ts' })); });
+      act(() => { eventHandler!(toolCallEvent('run-1', 'read_file', { path: '/x.ts' })); });
+
+      // New run starts — resets detector
+      act(() => {
+        eventHandler!(makeEvent('run.started', { runId: 'run-2', status: 'running' }));
+      });
+
+      // 3 calls with same tool+args on new run — should trigger warning (fresh count)
+      act(() => { eventHandler!(toolCallEvent('run-2', 'read_file', { path: '/x.ts' })); });
+      act(() => { eventHandler!(toolCallEvent('run-2', 'read_file', { path: '/x.ts' })); });
+      act(() => { eventHandler!(toolCallEvent('run-2', 'read_file', { path: '/x.ts' })); });
+
+      const addToast = vi.mocked(useToastStore.getState)().addToast;
+      expect(addToast).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'warning' }),
+      );
+    });
+
+    it('ignores tool calls when no current run exists', () => {
+      renderHook(() => useChatMessages(true));
+
+      // No run.started, so currentRunIdRef is null — loop detection skipped
+      for (let i = 0; i < 10; i++) {
+        act(() => { eventHandler!(toolCallEvent('run-orphan', 'write', { path: '/x.ts' })); });
+      }
+
+      const addToast = vi.mocked(useToastStore.getState)().addToast;
+      expect(addToast).not.toHaveBeenCalled();
+      expect(cancelRun).not.toHaveBeenCalled();
+    });
   });
 });
