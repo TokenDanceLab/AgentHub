@@ -25,6 +25,7 @@
 /* ── Message bubbles ─────────────────────── */
 
 .message {
+  position: relative;
   max-width: 85%;
   padding: var(--space-sm) var(--space-md);
   border-radius: 8px;
@@ -452,5 +453,74 @@
 @keyframes blink {
   50% {
     opacity: 0;
+  }
+}
+
+/* ── Message action bar ──────────────────── */
+
+.actionBar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+  z-index: 1;
+}
+
+.message:hover .actionBar {
+  opacity: 1;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+
+.actionBtn:hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+
+.copyToast {
+  position: absolute;
+  top: -22px;
+  right: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 11px;
+  pointer-events: none;
+  z-index: 10;
+  animation: toastFade 1.5s ease-out forwards;
+}
+
+@keyframes toastFade {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
   }
 }

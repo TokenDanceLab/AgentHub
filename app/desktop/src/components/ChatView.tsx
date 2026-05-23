@@ -1,5 +1,6 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Copy, RefreshCw, Trash2 } from 'lucide-react';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import styles from './ChatView.module.css';
@@ -9,6 +10,8 @@ export type { ChatMessage, MessageBlock };
 interface Props {
   messages: ChatMessage[];
   isStreaming?: boolean;
+  onRetry?: (messageId: string) => void;
+  onDelete?: (messageId: string) => void;
 }
 
 // ── Tool icons ───────────────────────────────
@@ -253,16 +256,57 @@ function BlockRenderer({
   }
 }
 
+// ── Message text extraction (for copy) ──────
+function extractMessageText(msg: ChatMessage): string {
+  return msg.blocks
+    .map((block) => {
+      switch (block.kind) {
+        case 'text':
+          return block.content;
+        case 'code':
+          return block.content;
+        case 'thinking':
+          return block.content;
+        case 'tool_use':
+          return `[${block.toolName}] ${summarizeInput(block.input)}`;
+        case 'file_change':
+          return `[${block.action}] ${block.path}`;
+        case 'session_init':
+          return `Session: ${block.model ?? 'unknown'}`;
+        case 'result':
+          return block.success
+            ? `Result: success (tokens in=${block.tokenUsage?.input ?? '?'} out=${block.tokenUsage?.output ?? '?'})`
+            : `Result: failed — ${block.error ?? 'unknown error'}`;
+        default:
+          return '';
+      }
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
 // ── ChatView ────────────────────────────────
-export default function ChatView({ messages, isStreaming }: Props) {
+export default function ChatView({ messages, isStreaming, onRetry, onDelete }: Props) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isStreaming]);
+
+  const handleCopy = useCallback(async (msg: ChatMessage) => {
+    const text = extractMessageText(msg);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageId(msg.id);
+      setTimeout(() => setCopiedMessageId(null), 1500);
+    } catch {
+      // clipboard write failed — silently ignore
+    }
+  }, []);
 
   return (
     <div className={styles.root}>
@@ -275,6 +319,36 @@ export default function ChatView({ messages, isStreaming }: Props) {
               key={msg.id}
               className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
             >
+              <div className={styles.actionBar}>
+                <button
+                  className={styles.actionBtn}
+                  title="Copy"
+                  onClick={() => handleCopy(msg)}
+                >
+                  <Copy size={14} />
+                </button>
+                {onRetry && (
+                  <button
+                    className={styles.actionBtn}
+                    title="Retry"
+                    onClick={() => onRetry(msg.id)}
+                  >
+                    <RefreshCw size={14} />
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    className={styles.actionBtn}
+                    title="Delete"
+                    onClick={() => onDelete(msg.id)}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+              {copiedMessageId === msg.id && (
+                <span className={styles.copyToast}>Copied!</span>
+              )}
               {msg.blocks.map((block, i) => (
                 <BlockRenderer key={i} block={block} t={t} />
               ))}
