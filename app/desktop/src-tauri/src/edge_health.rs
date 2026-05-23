@@ -11,7 +11,7 @@ pub struct EdgeHealthPayload {
 }
 
 pub fn spawn_health_check(app: AppHandle, edge: SharedEdgeManager) {
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let mut was_online = false;
         loop {
             time::sleep(Duration::from_secs(5)).await;

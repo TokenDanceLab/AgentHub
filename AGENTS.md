@@ -126,6 +126,29 @@ fix/short-topic
 
 `codex/` 是 Codex App 自动工作分支前缀，可以用于临时 PR。手工创建分支优先用 `feat/`、`fix/`、`docs/`。`master` 是稳定分支。实现、协议和结构调整走 PR；小文档修正可以直接提交，但不确定就走 PR。PR 标题也用 `type(scope): 中文摘要`。
 
+### 当前活跃分支 (2026-05-23)
+
+```
+dev/maintainer          ← 主 dev 分支（maintainer）: Desktop M3 + Edge + 共享类型
+dev/contributor-b                 ← contributor-b dev 分支（从 maintainer 切出）: Web 前端 + 同步 Desktop
+
+feat/desktop-sidecar      ← Desktop 工作区（Tauri + React）→ 合入 dev/maintainer
+feat/edge-adapters        ← Edge AgentAdapter 工作区 → 已合入 dev/maintainer
+feat/contributor-b-webui          ← contributor-b Web 工作区 → 合入 dev/contributor-b → 再合入 dev/maintainer
+
+feat/frontend-page-preview ← contributor-b 旧原型（归档，不再使用）
+feat/frontend-webui        ← contributor-b 旧原型（归档，不再使用）
+feat/backend-foundation    ← 后端预留
+```
+
+合并方向：`feat/* → dev/maintainer → dev/contributor-b → (review后) → dev/maintainer → master`
+
+写死规则：
+- `dev/maintainer` 保持 maintainer 的设计和代码风格
+- `dev/contributor-b` 由 maintainer 控制合入质量
+- `feat/contributor-b-webui` 是帮 contributor-b 用正确工程方式落地的版本
+- 旧 `feat/frontend-*` 分支归档保留，不得继续开发
+
 进度同步：
 
 - 每个开发者至少在一天结束前 push 当前分支。
