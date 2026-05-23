@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { Circle, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useState, useMemo, memo } from 'react';
 import type { AgentInfo } from '@shared/types';
+import { StatusBadge } from '@shared/components';
+import type { StatusVariant } from '@shared/components';
 import styles from './AgentList.module.css';
 
 interface Props {
@@ -33,6 +35,14 @@ const capColorClass: Record<string, string> = {
   thinkingVisible: styles.tagThinking,
   multiTurn: styles.tagMultiTurn,
 };
+
+function agentStatusVariant(status: string): StatusVariant {
+  switch (status) {
+    case 'available': return 'online';
+    case 'busy': return 'running';
+    default: return 'offline';
+  }
+}
 
 export default memo(function AgentList({ agents, online, selectedId, onSelect }: Props) {
   const { t } = useTranslation();
@@ -92,14 +102,7 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
                 onClick={() => onSelect?.(a)}
                 aria-pressed={a.id === selectedId}
               >
-                <Circle
-                  size={8}
-                  fill="currentColor"
-                  style={{
-                    color:
-                      a.status === 'available' ? 'var(--color-success)' : 'var(--color-danger)',
-                  }}
-                />
+                <StatusBadge status={agentStatusVariant(a.status)} className={styles.statusDot} />
                 <div className={styles.info}>
                   <div className={styles.name}>{highlightMatch(a.name)}</div>
                   {a.description && (

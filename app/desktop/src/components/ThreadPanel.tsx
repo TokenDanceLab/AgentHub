@@ -1,12 +1,12 @@
-import { useState, useMemo, useRef, useEffect, memo } from 'react';
+import { useState, useMemo, useRef, useEffect, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, MessageSquare, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ThreadInfo } from '@shared/types';
+import { ConversationList } from '@shared/components';
+import type { ConversationData } from '@shared/components';
 import { useThreads, useRenameThread, useDeleteThread } from '@/api/threadQueries';
 import { useToast } from '@/contexts/ToastContext';
-// TODO: Migrate inline list to ConversationList from @shared/components
-// import { ConversationList } from '@shared/components';
 import styles from './ThreadPanel.module.css';
 
 /** ThreadInfo with optional count metadata the Edge may return. */
@@ -156,6 +156,35 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
     return null;
   };
 
+  // Map threads to ConversationData for the shared component
+  const conversationData: ConversationData[] = useMemo(
+    () =>
+      filtered.map((th) => {
+        const ext = th as ThreadInfoExt;
+        const count = formatCount(ext);
+        const lastMsg = [relativeTime(th.updatedAt, t), count].filter(Boolean).join(' · ');
+        const hasUnread =
+          ext.runCount != null && ext.runCount > 0 && th.threadId !== selectedId;
+        return {
+          id: th.threadId,
+          name: getDisplayTitle(th, t),
+          lastMessage: lastMsg || t('thread.untitled'),
+          unread: hasUnread ? 1 : 0,
+        };
+      }),
+    [filtered, t, selectedId],
+  );
+
+  const handleSelectId = useCallback(
+    (id: string) => {
+      const thread = threads.find((th) => th.threadId === id);
+      if (thread) onSelect(thread);
+    },
+    [threads, onSelect],
+  );
+
+  const selectedThread = threads.find((th) => th.threadId === selectedId);
+
   // ── render ─────────────────────────────────
 
   return (
@@ -181,118 +210,88 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
 
       {actionError && <div className={styles.actionError}>{actionError}</div>}
 
-      {filtered.length === 0 ? (
-        <div className={styles.empty}>{t('thread.empty')}</div>
-      ) : (
-        <ul className={styles.list}>
-          {filtered.map((th) => {
-            const ext = th as ThreadInfoExt;
-            const count = formatCount(ext);
+      {/* Inline edit row — rendered outside ConversationList */}
+      {editingId && (
+        <div className={styles.editRow}>
+          <input
+            ref={editInputRef}
+            className={styles.editInput}
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onKeyDown={handleEditKeyDown}
+            onBlur={handleSaveEdit}
+          />
+          <button
+            className={styles.actionBtn}
+            onClick={handleSaveEdit}
+            title={t('thread.save')}
+            aria-label={t('thread.save')}
+          >
+            <Check size={14} />
+          </button>
+          <button
+            className={styles.actionBtn}
+            onClick={handleCancelEdit}
+            title={t('thread.cancel')}
+            aria-label={t('thread.cancel')}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
-            if (th.threadId === editingId) {
-              // ── inline editing row ──────────
-              return (
-                <li key={th.threadId} className={styles.editRow}>
-                  <MessageSquare size={14} className={styles.editIcon} />
-                  <input
-                    ref={editInputRef}
-                    className={styles.editInput}
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    onKeyDown={handleEditKeyDown}
-                    onBlur={handleSaveEdit}
-                  />
-                  <button
-                    className={styles.actionBtn}
-                    onClick={handleSaveEdit}
-                    title={t('thread.save')}
-                    aria-label={t('thread.save')}
-                  >
-                    <Check size={14} />
-                  </button>
-                  <button
-                    className={styles.actionBtn}
-                    onClick={handleCancelEdit}
-                    title={t('thread.cancel')}
-                    aria-label={t('thread.cancel')}
-                  >
-                    <X size={14} />
-                  </button>
-                </li>
-              );
-            }
+      {/* Delete confirmation row — rendered outside ConversationList */}
+      {deletingId && (
+        <div className={styles.confirmRow}>
+          <span className={styles.confirmText}>{t('thread.confirmDelete')}</span>
+          <button
+            className={`${styles.actionBtn} ${styles.deleteConfirm}`}
+            onClick={() => handleConfirmDelete(deletingId)}
+          >
+            <Trash2 size={14} />
+            {t('thread.delete')}
+          </button>
+          <button
+            className={styles.actionBtn}
+            onClick={handleCancelDelete}
+            title={t('thread.cancel')}
+            aria-label={t('thread.cancel')}
+          >
+            <X size={14} />
+            {t('thread.cancel')}
+          </button>
+        </div>
+      )}
 
-            if (th.threadId === deletingId) {
-              // ── delete confirmation row ─────
-              return (
-                <li key={th.threadId} className={styles.confirmRow}>
-                  <span className={styles.confirmText}>
-                    {t('thread.confirmDelete')}
-                  </span>
-                  <button
-                    className={`${styles.actionBtn} ${styles.deleteConfirm}`}
-                    onClick={() => handleConfirmDelete(th.threadId)}
-                  >
-                    <Trash2 size={14} />
-                    {t('thread.delete')}
-                  </button>
-                  <button
-                    className={styles.actionBtn}
-                    onClick={handleCancelDelete}
-                    title={t('thread.cancel')}
-                    aria-label={t('thread.cancel')}
-                  >
-                    <X size={14} />
-                    {t('thread.cancel')}
-                  </button>
-                </li>
-              );
-            }
+      <ConversationList
+        conversations={conversationData}
+        activeId={selectedId}
+        onSelect={handleSelectId}
+        className={styles.conversationList}
+      />
 
-            // ── normal row ────────────────────
-            const displayTitle = getDisplayTitle(th, t);
-            const hasUnread = ext.runCount != null && ext.runCount > 0 && th.threadId !== selectedId;
-
-            return (
-              <li key={th.threadId} className={styles.itemRow}>
-                <button
-                  className={`${styles.item} ${th.threadId === selectedId ? styles.selected : ''}`}
-                  onClick={() => onSelect(th)}
-                >
-                  {hasUnread && <span className={styles.unreadDot} />}
-                  <MessageSquare size={14} />
-                  <div className={styles.itemInfo}>
-                    <div className={styles.name} title={displayTitle}>{displayTitle}</div>
-                    <div className={styles.meta}>
-                      {relativeTime(th.updatedAt, t)}
-                      {count && <span className={styles.count}>{` · ${count}`}</span>}
-                    </div>
-                  </div>
-                </button>
-                <div className={styles.actions}>
-                  <button
-                    className={styles.actionBtn}
-                    onClick={(e) => handleStartEdit(e, th)}
-                    title={t('thread.rename')}
-                    aria-label={t('thread.rename')}
-                    disabled={!online}
-                  >
-                    <Pencil size={12} />
-                  </button>
-                  <button
-                    className={styles.actionBtn}
-                    onClick={(e) => handleStartDelete(e, th.threadId)}
-                    title={t('thread.delete')}
-                    aria-label={t('thread.delete')}
-                    disabled={!online}
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+      {/* Per-item actions for selected thread */}
+      {selectedThread && !editingId && !deletingId && (
+        <div className={styles.actions}>
+          <button
+            className={styles.actionBtn}
+            onClick={(e) => handleStartEdit(e, selectedThread)}
+            title={t('thread.rename')}
+            aria-label={t('thread.rename')}
+            disabled={!online}
+          >
+            <Pencil size={12} />
+          </button>
+          <button
+            className={styles.actionBtn}
+            onClick={(e) => handleStartDelete(e, selectedThread.threadId)}
+            title={t('thread.delete')}
+            aria-label={t('thread.delete')}
+            disabled={!online}
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
       )}
     </nav>
   );
