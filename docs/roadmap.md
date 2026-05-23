@@ -2,37 +2,9 @@
 
 最后更新：2026-05-23
 
-## Agent 接入策略
-
-### 分层原则
-
-```
-第一层（Native Adapter）— 主力，深度掌控
-  条件：协议公开或有参考源码
-  做法：读取 CLI 源码/协议 → 完整 Native Adapter → 全量事件 + 双向控制
-  
-第二层（ACP Adapter）— 备选，广度覆盖
-  条件：Agent 支持 ACP (Agent Client Protocol)
-  做法：一个 ACP Adapter → 批量接入所有 ACP 兼容 Agent
-  限制：仅 7-8 种基础事件，无子代理/压缩/diff/权限细节
-```
-
-**ACP 不替代 Native Adapter。** ACP 只能拿到 agent_message_chunk、tool_call、usage_update 等基础事件，缺少子代理生命周期（task_started/progress/notification）、文件 diff、上下文压缩通知、API 重试详情、hook 事件、速率限制等 Claude Code 的完整能力。
-
-### Agent 接入优先级
-
-| 优先级 | Agent | 路线 | 开源 | 理由 |
-|--------|-------|------|------|------|
-| P0 done | Claude Code | Native (NDJSON + stdin) | 协议公开 | 主力 agent，已实现 24 消息类型 + 控制协议 |
-| P0 active | OpenCode | Native (`--format json` → SSE/ACP) | MIT | 多 Provider，ACP 双通道 |
-| P1 | Goose | Native (Rust, ACP + 原生) | Apache 2.0 | 架构最像 AgentHub，Provider trait + SessionEventBus |
-| P1 | Aider | Native (edit-format 策略) | Apache 2.0 | 独特 diff 策略模式，终端优先 |
-| P2 | Roo-Code | 借鉴 (class hierarchy) | Apache 2.0 | tool call start/delta/end 流生命周期 |
-| P2 | mindfs | 借鉴 (Pool + ACP) | 未标注 | Pool 路由模式、Stream Hub replay |
-| 备选 | Gemini CLI | ACP | Google | 走 ACP 通用 adapter |
-| 备选 | Cursor/Cline/Copilot 等 | ACP | 各开源 | 走 ACP 通用 adapter，不逐一适配 |
-
 ## 当前总目标
+
+推进 M2 Edge 本地数据层，让前端、后端、客户端三条线能围绕稳定的 Project / Thread / Run / Item / Event 模型并行开发。当前客户端 PR #30 已提供内存态最小实现，`feat/client-thread-messages-delicious233` 已补 message/item 写入链路，`feat/client-run-lifecycle-delicious233` 已抽出 Runner lifecycle 边界，`feat/client-store-boundary-delicious233` 已抽象 Edge store 接口边界，`feat/client-store-persistence-delicious233` 已提供轻量 JSON 文件持久化实现，`feat/client-edge-store-file-flag-delicious233` 已接入 Edge 启动参数 `--store-file`，`feat/client-runner-process-adapter-delicious233` 已补本地进程 executor 边界，`feat/client-runner-workdir-delicious233` 已补本地进程工作目录边界，`feat/client-runner-adapter-profile-delicious233` 已补 generic adapter profile / 命令模板最小层，`feat/client-runner-profile-preset-delicious233` 已补 `agenthub-runner-mock` preset 入口，`feat/client-runner-context-delicious233` 已让仓库自带 Runner mock 读取 Edge 注入的 Run 上下文，`feat/client-runner-edge-smoke-delicious233` 已补 Edge ProcessExecutor 启动仓库 Runner mock CLI 的集成测试，`feat/client-httpserver-runner-wiring-delicious233` 已补 Edge HTTP server 将 ProcessExecutor 装配进 Handler 的测试，`feat/client-smoke-runner-context-delicious233` 已补本地 smoke 对 Edge -> Runner mock 上下文输出的验证，`dbd4583` 已实现 AgentAdapter 层，删除 Runner 二进制，Edge 直接对接 CLI 原生协议。当前重点是增强各 adapter，对标 Claude Desktop 的能力完备度。
 
 推进 M2 Edge 本地数据层，让前端、后端、客户端三条线能围绕稳定的 Project / Thread / Run / Item / Event 模型并行开发。当前客户端 PR #30 已提供内存态最小实现，`feat/client-thread-messages-delicious233` 已补 message/item 写入链路，`feat/client-run-lifecycle-delicious233` 已抽出 Runner lifecycle 边界，`feat/client-store-boundary-delicious233` 已抽象 Edge store 接口边界，`feat/client-store-persistence-delicious233` 已提供轻量 JSON 文件持久化实现，`feat/client-edge-store-file-flag-delicious233` 已接入 Edge 启动参数 `--store-file`，`feat/client-runner-process-adapter-delicious233` 已补本地进程 executor 边界，`feat/client-runner-workdir-delicious233` 已补本地进程工作目录边界，`feat/client-runner-adapter-profile-delicious233` 已补 generic adapter profile / 命令模板最小层，`feat/client-runner-profile-preset-delicious233` 已补 `agenthub-runner-mock` preset 入口，`feat/client-runner-context-delicious233` 已让仓库自带 Runner mock 读取 Edge 注入的 Run 上下文，`feat/client-runner-edge-smoke-delicious233` 已补 Edge ProcessExecutor 启动仓库 Runner mock CLI 的集成测试，`feat/client-httpserver-runner-wiring-delicious233` 已补 Edge HTTP server 将 ProcessExecutor 装配进 Handler 的测试，`feat/client-smoke-runner-context-delicious233` 已补本地 smoke 对 Edge -> Runner mock 上下文输出的验证，`dbd4583` 已实现 AgentAdapter 层，删除 Runner 二进制，Edge 直接对接 CLI 原生协议。当前重点是增强各 adapter，对标 Claude Desktop 的能力完备度。
 
@@ -100,3 +72,38 @@
 - [x] 将 Runner 真正接入 Edge Run lifecycle，替换 handler 内置 mock flow。（`dbd4583` 已实现 AgentAdapter 层）
 - [ ] M2 完成后归档或更新 `docs/client-roadmap.md`，避免路线图重复。
 - [ ] 为 Runner 真实 CLI adapter 规划最小测试夹具。（已纳入 M3a Phase 6）
+
+## 远期：多 Agent 接入
+
+> 不属于当前 M2/M3 范围，仅记录策略和优先级。当前聚焦 Claude Code + OpenCode 两个主力 agent。
+
+### 分层原则
+
+**Native Adapter（主力）** — 读取 CLI 源码/协议，完整 Native Adapter，全量事件 + 双向控制
+**ACP Adapter（备选）** — 一个通用 ACP Adapter 批量接入所有 ACP 兼容 Agent，仅 7-8 种基础事件
+
+ACP 不替代 Native。缺少子代理生命周期、文件 diff、上下文压缩、API 重试、hook、速率限制等完整能力。
+
+### 接入优先级
+
+| 优先级 | Agent | 路线 | 来源 | 备注 |
+|--------|-------|------|------|------|
+| P0 done | Claude Code | Native | Anthropic | 主力，已完成 |
+| P0 active | OpenCode | Native | `anomalyco/opencode` | 多 Provider |
+| P1 | Goose | Native | `block/goose` | 架构最像 AgentHub |
+| P1 | Aider | Native | `aider-ai/aider` | edit-format 策略 |
+| P2 | Kimi CLI | ACP/Native | Moonshot | `kimi acp` |
+| P2 | Qwen CLI | ACP/Native | Alibaba | `qwen --acp` |
+| P2 | GLM CLI | 待调研 | Zhipu | 协议待确认 |
+| P2 | Trae CLI | 待调研 | ByteDance | 协议待确认 |
+| P2 | Gemini CLI | ACP | Google | `gemini --experimental-acp` |
+| 备选 | Cursor/Cline/Copilot 等 | ACP | 各开源 | 通用 ACP adapter 批量覆盖 |
+
+### 参考研究覆盖
+
+14 个开源项目已被深度分析，产出 5 份学习报告：
+- `docs/reference/01-learn/repos/13-codex-cli.md`
+- `docs/reference/01-learn/repos/14-claude-code-sdk.md`
+- `docs/reference/01-learn/repos/15-goose-architecture.md`
+- `docs/reference/01-learn/repos/16-kanna-patterns.md`
+- `docs/reference/01-learn/repos/17-mindfs-architecture.md` (生成中)
