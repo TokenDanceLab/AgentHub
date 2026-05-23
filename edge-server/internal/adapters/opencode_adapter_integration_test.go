@@ -213,6 +213,36 @@ func TestOpenCodeBuildCommandArgs(t *testing.T) {
 			t.Error("--fork not in args")
 		}
 	})
+
+	t.Run("permission_bypass", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:            run,
+			Prompt:         "hi",
+			PermissionMode: "bypassPermissions",
+		})
+		hasBypass := false
+		for _, a := range args {
+			if a == "--dangerously-skip-permissions" {
+				hasBypass = true
+			}
+		}
+		if !hasBypass {
+			t.Error("--dangerously-skip-permissions not in args when PermissionMode is bypassPermissions")
+		}
+	})
+
+	t.Run("permission_default_no_flag", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:            run,
+			Prompt:         "hi",
+			PermissionMode: "default",
+		})
+		for _, a := range args {
+			if a == "--dangerously-skip-permissions" {
+				t.Error("--dangerously-skip-permissions should not be present for default PermissionMode")
+			}
+		}
+	})
 }
 
 // parseOpenCodeLines feeds JSON lines through the adapter's ParseStream for unit testing.

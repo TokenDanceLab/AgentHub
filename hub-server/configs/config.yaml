@@ -1,0 +1,25 @@
+server:
+  port: 8080
+  log_level: info
+  log_file: ""
+  admin_port: 6060
+db:
+  host: localhost
+  port: 5432
+  user: agenthub
+  password: dev_password
+  name: agenthub
+redis:
+  host: localhost
+  port: 6380
+  password: ""
+  db: 0
+  pool_size: 100
+  min_idle_conns: 10
+jwt:
+  secret: dev-secret-change-in-production
+  access_ttl: 15m
+  refresh_ttl: 720h
+upload:
+  dir: ./uploads
+  max_size: 10485760

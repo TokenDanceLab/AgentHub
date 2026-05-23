@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Send, Circle, Square } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
+import { useInputDraft } from '@/hooks/useInputDraft';
 import styles from './PromptInput.module.css';
 
 const COMMON_MODELS = [
@@ -13,6 +14,8 @@ const COMMON_MODELS = [
 
 const REASONING_EFFORTS = ['low', 'medium', 'high', 'max'] as const;
 type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+const MAX_CHARS = 4000;
 
 interface SendOptions {
   model?: string;
@@ -27,6 +30,8 @@ interface Props {
   isStreaming?: boolean;
   onCancel?: () => void;
   disabled?: boolean;
+  /** Optional thread ID for draft persistence. When provided, input text is saved/restored via localStorage. */
+  threadId?: string;
 }
 
 function extractModels(agents: AgentInfo[]): string[] {
@@ -42,35 +47,79 @@ export default function PromptInput({
   isStreaming = false,
   onCancel,
   disabled,
+  threadId,
 }: Props) {
   const { t } = useTranslation();
-  const [prompt, setPrompt] = useState('');
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [promptLength, setPromptLength] = useState(0);
   const [showAgentSelector, setShowAgentSelector] = useState(false);
   const [model, setModel] = useState<string>('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [textareaFocused, setTextareaFocused] = useState(false);
 
   const models = useMemo(() => extractModels(agents), [agents]);
 
-  // Auto-resize textarea based on content
+  const { restore: restoreDraft, save: saveDraft, flush: flushDraft, clear: clearDraft } =
+    useInputDraft(threadId);
+
+  // Restore draft on mount / threadId change
   useEffect(() => {
-    const el = textareaRef.current;
-    if (el) {
-      el.style.height = 'auto';
-      el.style.height = el.scrollHeight + 'px';
-    }
-  }, [prompt]);
+    const ta = inputRef.current;
+    if (!ta) return;
+    restoreDraft(ta);
+    setPromptLength(ta.value.length);
+    // Restore also handles auto-resize inside the hook
+    return () => {
+      // Flush pending draft for the old threadId before switching
+      if (ta) flushDraft(ta.value, threadId);
+    };
+  }, [threadId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Flush draft on unmount (cleanup)
+  useEffect(() => {
+    return () => {
+      const ta = inputRef.current;
+      if (ta) flushDraft(ta.value);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-resize textarea and track character count on input
+  useEffect(() => {
+    const ta = inputRef.current;
+    if (!ta) return;
+
+    const handleUpdate = () => {
+      setPromptLength(ta.value.length);
+      ta.style.height = 'auto';
+      ta.style.height = ta.scrollHeight + 'px';
+      saveDraft(ta.value);
+    };
+
+    ta.addEventListener('input', handleUpdate);
+    // Also listen for 'change' so test simulated events update promptLength
+    ta.addEventListener('change', handleUpdate);
+    return () => {
+      ta.removeEventListener('input', handleUpdate);
+      ta.removeEventListener('change', handleUpdate);
+    };
+  }, []);
 
   const handleSend = useCallback(() => {
-    const trimmed = prompt.trim();
+    const ta = inputRef.current;
+    if (!ta) return;
+    const trimmed = ta.value.trim();
     if (!trimmed) return;
     const opts: SendOptions = {};
     if (model) opts.model = model;
     if (reasoningEffort) opts.reasoningEffort = reasoningEffort;
     onSend(trimmed, selectedAgentId, opts.model || opts.reasoningEffort ? opts : undefined);
-    setPrompt('');
+    // Clear input
+    ta.value = '';
+    ta.style.height = 'auto';
+    setPromptLength(0);
     setShowAgentSelector(false);
-  }, [prompt, selectedAgentId, model, reasoningEffort, onSend]);
+    clearDraft();
+  }, [selectedAgentId, model, reasoningEffort, onSend, clearDraft]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -95,7 +144,7 @@ export default function PromptInput({
               onClick={() => {
                 onSelectAgent(a.id);
                 setShowAgentSelector(false);
-                textareaRef.current?.focus();
+                inputRef.current?.focus();
               }}
               role="option"
               aria-selected={a.id === selectedAgentId}
@@ -156,34 +205,46 @@ export default function PromptInput({
           <ChevronDown size={14} />
         </button>
 
-        <textarea
-          ref={textareaRef}
-          className={styles.textarea}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={t('prompt.placeholder')}
-          disabled={disabled}
-          rows={1}
-        />
+        <div className={styles.inputWrapper}>
+          <textarea
+            ref={inputRef}
+            className={styles.textarea}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setTextareaFocused(true)}
+            onBlur={() => setTextareaFocused(false)}
+            placeholder={t('prompt.placeholder')}
+            disabled={disabled}
+            rows={1}
+          />
+          <div className={styles.inputFooter}>
+            <span className={styles.enterHint}>
+              <kbd className={styles.shortcutKey}>{textareaFocused ? 'Shift+Enter' : 'Enter'}</kbd>
+            </span>
+            <span className={styles.charCount}>
+              {promptLength}/{MAX_CHARS}
+            </span>
+          </div>
+        </div>
 
         {isStreaming ? (
           <button
             className={styles.stopBtn}
             onClick={onCancel}
             disabled={disabled}
+            aria-label={t('action.cancelRun')}
+            title={t('action.cancelRun')}
           >
-            <Square size={12} fill="currentColor" />
-            {t('action.cancelRun')}
+            <Square size={16} fill="currentColor" />
           </button>
         ) : (
           <button
             className={styles.sendBtn}
             onClick={handleSend}
-            disabled={disabled || !prompt.trim()}
+            disabled={disabled || promptLength === 0}
+            aria-label={t('action.startRun')}
+            title={t('action.startRun')}
           >
-            <Send size={14} />
-            {t('action.startRun')}
+            <Send size={16} />
           </button>
         )}
       </div>

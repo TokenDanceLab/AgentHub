@@ -116,6 +116,7 @@ func isWhitelistedEnvKey(key string) bool {
 		"HOME", "USER", "LOGNAME",
 		// Executable search
 		"PATH",
+			"TMPDIR", "TEMPDIR",
 		// Locale
 		"LANG",
 		// Shell and terminal

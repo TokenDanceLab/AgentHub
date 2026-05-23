@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RunInfo } from '@shared/types';
-import type { FileDiff } from './ChatView.types';
+import type { FileDiff, ChatMessage } from './ChatView.types';
+import type { SessionMetrics } from '@shared/context/breakdown';
 import DiffViewer from './DiffViewer';
+import ContextUsage from './ContextUsage';
 import styles from './RunDetail.module.css';
 
 interface ToolCallEntry {
@@ -13,29 +15,61 @@ interface ToolCallEntry {
   output?: string;
 }
 
-/** Extract input/output token counts from NDJSON or OpenCode usage payloads. */
-function extractTokens(
-  usage: Record<string, unknown> | undefined,
-): { input: number; output: number } | null {
-  if (!usage) return null;
-  const input = (usage.inputTokens ?? usage.input_tokens ?? usage.input) as number | undefined;
-  const output = (usage.outputTokens ?? usage.output_tokens ?? usage.output) as number | undefined;
-  if (input == null && output == null) return null;
-  return { input: Number(input ?? 0), output: Number(output ?? 0) };
-}
-
-type RunWithUsage = RunInfo & { usage?: Record<string, unknown> };
-
 interface Props {
-  run: RunWithUsage | null;
+  run: RunInfo | null;
   toolCalls: ToolCallEntry[];
   changedFiles: Array<{ path: string; action: string; timestamp: string }>;
   outputText: string;
   diffs?: FileDiff[];
   onCancel?: () => void;
+  /** Chat messages from the current session, used for context breakdown visualization. */
+  chatMessages?: ChatMessage[];
 }
 
 type TabId = 'output' | 'toolCalls' | 'fileChanges';
+
+/** Build SessionMetrics from chat messages by extracting token data from result blocks. */
+function buildMetrics(chatMessages: ChatMessage[] | undefined): SessionMetrics | null {
+  if (!chatMessages || chatMessages.length === 0) return null;
+
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let model: string | undefined;
+
+  for (const msg of chatMessages) {
+    for (const block of msg.blocks) {
+      if (block.kind === 'result' && block.tokenUsage) {
+        inputTokens += block.tokenUsage.input;
+        outputTokens += block.tokenUsage.output;
+      }
+      if (block.kind === 'session_init' && block.model) {
+        model = block.model;
+      }
+    }
+  }
+
+  const totalTokens = inputTokens + outputTokens;
+  if (totalTokens === 0) return null;
+
+  // Flatten to simple {role, content} for the breakdown algorithm
+  const flatMessages = chatMessages.map((msg) => ({
+    role: msg.role,
+    content: msg.blocks
+      .filter(
+        (b) => b.kind === 'text' || b.kind === 'thinking' || b.kind === 'code',
+      )
+      .map((b) => ('content' in b ? (b.content as string) : ''))
+      .join('\n'),
+  }));
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    model,
+    messages: flatMessages,
+  };
+}
 
 function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
   const [expanded, setExpanded] = useState(false);
@@ -64,8 +98,18 @@ function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
   );
 }
 
-export default function RunDetail({ run, toolCalls, changedFiles, outputText, diffs, onCancel }: Props) {
+export default function RunDetail({
+  run,
+  toolCalls,
+  changedFiles,
+  outputText,
+  diffs,
+  onCancel,
+  chatMessages,
+}: Props) {
   const { t } = useTranslation();
+
+  const metrics = useMemo(() => buildMetrics(chatMessages), [chatMessages]);
 
   const defaultTab: TabId = outputText
     ? 'output'
@@ -136,23 +180,7 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
         </div>
       )}
 
-      {run.usage &&
-        (() => {
-          const tokens = extractTokens(run.usage!);
-          if (!tokens) return null;
-          return (
-            <div className={styles.section}>
-              <div className={styles.usageRow}>
-                <span className={styles.usageLabel}>Input</span>
-                <span className={styles.usageValue}>{tokens.input.toLocaleString()}</span>
-              </div>
-              <div className={styles.usageRow}>
-                <span className={styles.usageLabel}>Output</span>
-                <span className={styles.usageValue}>{tokens.output.toLocaleString()}</span>
-              </div>
-            </div>
-          );
-        })()}
+      <ContextUsage metrics={metrics} />
 
       {hasAnyContent && (
         <>

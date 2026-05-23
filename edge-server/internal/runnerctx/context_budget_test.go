@@ -180,3 +180,120 @@ func TestConcurrentTrackAndRead(t *testing.T) {
 		t.Fatalf("UsedTokens = %d, want %d", used, expected)
 	}
 }
+
+// --- ShouldCompact tests ---
+
+func TestShouldCompactWhenBelowThreshold(t *testing.T) {
+	b := NewContextBudget(100_000)
+	// usable = 90000; 84% = 75600, below 85% threshold
+	b.Track(75600)
+	if b.ShouldCompact() {
+		t.Fatal("ShouldCompact = true, want false (below 85% threshold)")
+	}
+}
+
+func TestShouldCompactExactlyAtThreshold(t *testing.T) {
+	b := NewContextBudget(100_000)
+	// usable = 90000; 85% = 76500
+	b.Track(76500)
+	if !b.ShouldCompact() {
+		t.Fatal("ShouldCompact = false, want true (exactly at 85% threshold)")
+	}
+}
+
+func TestShouldCompactWhenAboveThreshold(t *testing.T) {
+	b := NewContextBudget(100_000)
+	// 90% of usable
+	b.Track(81000)
+	if !b.ShouldCompact() {
+		t.Fatal("ShouldCompact = false, want true (above 85% threshold)")
+	}
+}
+
+func TestShouldCompactWhenExhausted(t *testing.T) {
+	b := NewContextBudget(100_000)
+	b.Track(90000) // exactly at limit
+	if !b.ShouldCompact() {
+		t.Fatal("ShouldCompact = false, want true (exhausted implies compact)")
+	}
+}
+
+func TestShouldCompactWithSmallBudget(t *testing.T) {
+	// Budget smaller than reserved -> usable <= 0 -> ShouldCompact always true
+	b := NewContextBudget(5_000)
+	if !b.ShouldCompact() {
+		t.Fatal("ShouldCompact = false, want true when usable <= 0")
+	}
+}
+
+// --- UsagePercent tests ---
+
+func TestUsagePercentZero(t *testing.T) {
+	b := NewContextBudget(100_000)
+	pct := b.UsagePercent()
+	if pct != 0.0 {
+		t.Fatalf("UsagePercent = %f, want 0.0", pct)
+	}
+}
+
+func TestUsagePercentHalf(t *testing.T) {
+	b := NewContextBudget(100_000)
+	// usable = 90000; 50% = 45000
+	b.Track(45000)
+	pct := b.UsagePercent()
+	if pct != 50.0 {
+		t.Fatalf("UsagePercent = %f, want 50.0", pct)
+	}
+}
+
+func TestUsagePercentHundred(t *testing.T) {
+	b := NewContextBudget(100_000)
+	b.Track(90000) // exactly at limit
+	pct := b.UsagePercent()
+	if pct != 100.0 {
+		t.Fatalf("UsagePercent = %f, want 100.0", pct)
+	}
+}
+
+func TestUsagePercentOverHundred(t *testing.T) {
+	b := NewContextBudget(100_000)
+	b.Track(200_000) // way over
+	pct := b.UsagePercent()
+	if pct != 100.0 {
+		t.Fatalf("UsagePercent = %f, want 100.0 (clamped)", pct)
+	}
+}
+
+func TestUsagePercentSmallBudget(t *testing.T) {
+	b := NewContextBudget(5_000)
+	// usable <= 0 -> returns 100
+	pct := b.UsagePercent()
+	if pct != 100.0 {
+		t.Fatalf("UsagePercent = %f, want 100.0 when usable <= 0", pct)
+	}
+}
+
+// --- EstimateTokens tests ---
+
+func TestEstimateTokens(t *testing.T) {
+	tests := []struct {
+		name  string
+		chars int
+		want  int
+	}{
+		{"zero", 0, 0},
+		{"one", 1, 1},
+		{"four", 4, 1},
+		{"five", 5, 2},
+		{"hundred", 100, 25},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := EstimateTokens(tt.chars)
+			if got != tt.want {
+				t.Fatalf("EstimateTokens(%d) = %d, want %d", tt.chars, got, tt.want)
+			}
+		})
+	}
+}
+

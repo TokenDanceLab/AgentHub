@@ -165,8 +165,8 @@ func TestOpenCodeAdapterNeedsStdin(t *testing.T) {
 
 func TestOrchestratorAdapterNeedsStdin(t *testing.T) {
 	a := NewOrchestratorAdapter("claude", "sonnet", "You are an orchestrator", nil)
-	if a.NeedsStdin() {
-		t.Fatal("Orchestrator adapter should not need stdin")
+	if !a.NeedsStdin() {
+		t.Fatal("Orchestrator adapter should need stdin (delegates to inner Claude Code)")
 	}
 }
 
