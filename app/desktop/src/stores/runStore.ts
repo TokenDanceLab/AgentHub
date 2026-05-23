@@ -36,13 +36,13 @@ export const useRunStore = create<RunStore>()(
       set((s) =>
         s.currentRun
           ? { currentRun: { ...s.currentRun, outputText: s.currentRun.outputText + text } }
-          : {}
+          : {},
       ),
     addToolCall: (tc) =>
       set((s) =>
         s.currentRun
           ? { currentRun: { ...s.currentRun, toolCalls: [...s.currentRun.toolCalls, tc] } }
-          : {}
+          : {},
       ),
     updateToolCallStatus: (callId, status) =>
       set((s) =>
@@ -51,19 +51,19 @@ export const useRunStore = create<RunStore>()(
               currentRun: {
                 ...s.currentRun,
                 toolCalls: s.currentRun.toolCalls.map((t) =>
-                  t.callId === callId ? { ...t, status } : t
+                  t.callId === callId ? { ...t, status } : t,
                 ),
               },
             }
-          : {}
+          : {},
       ),
     addFileChange: (fc) =>
       set((s) =>
         s.currentRun
           ? { currentRun: { ...s.currentRun, changedFiles: [...s.currentRun.changedFiles, fc] } }
-          : {}
+          : {},
       ),
     setIsStreaming: (v) => set({ isStreaming: v }),
     clear: () => set({ currentRun: null, isStreaming: false }),
-  }))
+  })),
 );

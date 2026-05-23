@@ -45,20 +45,14 @@ describe('AgentList', () => {
   });
 
   it('renders list of agents with names', () => {
-    const agents = [
-      makeAgent({ id: 'a1', name: 'Alpha' }),
-      makeAgent({ id: 'a2', name: 'Beta' }),
-    ];
+    const agents = [makeAgent({ id: 'a1', name: 'Alpha' }), makeAgent({ id: 'a2', name: 'Beta' })];
     render(<AgentList agents={agents} online={true} />);
     expect(screen.getByText('Alpha')).toBeInTheDocument();
     expect(screen.getByText('Beta')).toBeInTheDocument();
   });
 
   it('highlights selected agent', () => {
-    const agents = [
-      makeAgent({ id: 'a1', name: 'Alpha' }),
-      makeAgent({ id: 'a2', name: 'Beta' }),
-    ];
+    const agents = [makeAgent({ id: 'a1', name: 'Alpha' }), makeAgent({ id: 'a2', name: 'Beta' })];
     render(<AgentList agents={agents} online={true} selectedId="a1" />);
     const buttons = screen.getAllByRole('button');
     const selectedBtn = buttons.find((btn) => btn.textContent?.includes('Alpha'));
@@ -67,10 +61,7 @@ describe('AgentList', () => {
   });
 
   it('does not highlight non-selected agents', () => {
-    const agents = [
-      makeAgent({ id: 'a1', name: 'Alpha' }),
-      makeAgent({ id: 'a2', name: 'Beta' }),
-    ];
+    const agents = [makeAgent({ id: 'a1', name: 'Alpha' }), makeAgent({ id: 'a2', name: 'Beta' })];
     render(<AgentList agents={agents} online={true} selectedId="a1" />);
     const notSelectedBtn = screen.getByText('Beta').closest('button');
     expect(notSelectedBtn?.className).not.toContain('selected');
