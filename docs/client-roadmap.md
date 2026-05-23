@@ -2,17 +2,21 @@
 
 本文是客户端方向的开发路线图，面向负责 **Desktop、Runner、Local Edge 调度** 的开发者和 Agent。
 
-当前客户端工作固定在集成分支：
+## 当前分支结构 (2026-05-23)
 
-```text
-feat/client-dev
+```
+dev/delicious233          ← 主 dev: Desktop M3 + Edge + 共享类型
+feat/desktop-sidecar      ← Desktop 工作区（Tauri v2 + React）
+feat/edge-adapters        ← Edge AgentAdapter 工作区（已合入 dev）
 ```
 
-本分支用于持续集成客户端链路，不再回到早期的 A/B/C 三条实验分支上开发。`docs/client-handoff.md` 是给接手 Agent、DeepSeek 和 UI 同学看的客户端操作手册，当前阶段保留在 `docs/`，不要误当成对外产品文档。
+合并方向：`feat/* → dev/delicious233 → master`
 
-## 1. 当前判断
+详细分支管理见 `AGENTS.md` 和 `docs/roadmap.md`。
 
-客户端 M1 的主链路已经成立：
+## 1. 当前状态
+
+Desktop M3.1 已完成：
 
 ```text
 Tauri Desktop
@@ -269,10 +273,7 @@ api/events.md
 
 ## 10. 当前下一步
 
-当前最应该做：
-
-1. 保持 PR #26 可 review：不要把 UI 视觉稿、真实 Agent adapter 或 Hub 能力混进 M1。
-2. 合并前再跑一次 `gh pr checks 26` 和必要的本地 smoke。
-3. 合并后从 `master` 或 `feat/client-dev` 新切短分支进入 M2。
-4. M2 优先实现 Edge 本地数据层：Project/Thread/Run/Item store、EventStore、cursor 恢复和 REST snapshot。
-5. Desktop 启动编排可并行推进，但不能替代 M2 的数据可恢复验收。
+1. 继续在 `feat/desktop-sidecar` 上推进 Desktop M3.2（EventStore JSONL 持久化）
+2. 完成 M3 后进入 M4（权限桥接 + 工作区隔离 + 收口）
+3. 所有 feature 分支合入 `dev/delicious233`，最终合 `master`
+4. Web 前端在 `feat/trump-webui` 上继续开发，经 `dev/trump` review 后合入 `dev/delicious233`
