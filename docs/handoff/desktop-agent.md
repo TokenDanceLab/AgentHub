@@ -10,7 +10,7 @@
 6. `docs/client-handoff.md` — 客户端操作手册
 7. `api/openapi.yaml` — REST API 契约
 8. `api/events.md` — WebSocket 事件契约
-9. `C:\Users\Ding\.claude\plans\structured-imagining-pinwheel.md` — 完整架构方案
+9. `~/.claude/plans/structured-imagining-pinwheel.md` — 完整架构方案
 
 ## 仓库和分支
 
