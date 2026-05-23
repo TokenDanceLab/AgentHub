@@ -1108,9 +1108,9 @@ const styles = `
     gap: 10px;
     min-width: 0;
     padding: 10px;
-    border: 1px solid transparent;
+    border: 1px solid rgba(255, 255, 255, 0.64);
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.46);
+    background: rgba(255, 255, 255, 0.5);
     color: var(--asr-ink);
   }
 
@@ -1169,15 +1169,17 @@ const styles = `
   .asr-tag {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     min-height: 24px;
-    padding: 5px 9px;
+    padding: 4px 9px;
     border: 1px solid rgba(23, 105, 232, 0.13);
     border-radius: 999px;
     background: rgba(23, 105, 232, 0.08);
     color: #1459c7;
     font-size: 11px;
     font-weight: 800;
+    line-height: 1;
     white-space: nowrap;
   }
 
@@ -1473,7 +1475,7 @@ const styles = `
   .asr-tool-row,
   .asr-activity-row {
     align-items: flex-start;
-    background: rgba(255, 255, 255, 0.52);
+    background: rgba(255, 255, 255, 0.5);
   }
 
   .asr-confirm-bar {
