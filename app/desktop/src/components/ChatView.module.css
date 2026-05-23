@@ -1,0 +1,245 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  background: var(--background);
+}
+
+.stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.empty {
+  margin: auto;
+  color: var(--foreground);
+  opacity: 0.4;
+  font-size: var(--font-size-sm);
+}
+
+/* ── Message bubbles ─────────────────────── */
+
+.message {
+  max-width: 85%;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 8px;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.userMsg {
+  align-self: flex-end;
+  background: color-mix(in oklch, var(--primary) 20%, transparent);
+  border: 1px solid color-mix(in oklch, var(--primary) 30%, transparent);
+}
+
+.agentMsg {
+  align-self: flex-start;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+
+.systemMsg {
+  align-self: center;
+  background: transparent;
+  border: none;
+  opacity: 0.5;
+  font-size: var(--font-size-xs);
+  max-width: 100%;
+}
+
+/* ── Text ────────────────────────────────── */
+
+.text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Code ────────────────────────────────── */
+
+.codeBlock {
+  position: relative;
+  margin: var(--space-xs) 0;
+  padding: var(--space-sm);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  overflow-x: auto;
+}
+
+.codeLang {
+  position: absolute;
+  top: 2px;
+  right: 8px;
+  font-size: 10px;
+  opacity: 0.5;
+  text-transform: uppercase;
+}
+
+/* ── Thinking ────────────────────────────── */
+
+.thinking {
+  margin: var(--space-xs) 0;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+}
+
+.thinking summary {
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  opacity: 0.6;
+  user-select: none;
+}
+
+.thinkingContent {
+  margin-top: var(--space-xs);
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
+  white-space: pre-wrap;
+}
+
+/* ── Tool call ───────────────────────────── */
+
+.toolCard {
+  margin: var(--space-xs) 0;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--primary) 5%, transparent);
+}
+
+.toolCard summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  user-select: none;
+}
+
+.toolLabel {
+  font-weight: 500;
+}
+
+.toolStatus {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--border);
+}
+
+.toolDone {
+  background: color-mix(in oklch, var(--success) 20%, transparent);
+  color: var(--success);
+}
+
+.toolInput,
+.toolOutput {
+  margin-top: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--background);
+  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* ── File change ─────────────────────────── */
+
+.fileCard {
+  margin: var(--space-xs) 0;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 4px;
+  border-left: 3px solid var(--border);
+}
+
+.fileCard summary {
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  font-family: var(--font-mono);
+  user-select: none;
+}
+
+.added {
+  border-left-color: var(--success);
+}
+
+.removed {
+  border-left-color: var(--destructive);
+}
+
+.modified {
+  border-left-color: var(--primary);
+}
+
+.diff {
+  margin-top: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--background);
+  border-radius: 3px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+/* ── Session init ────────────────────────── */
+
+.sessionInit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
+}
+
+.permBadge {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--border);
+  font-size: 10px;
+}
+
+/* ── Result ──────────────────────────────── */
+
+.result {
+  font-size: var(--font-size-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 4px;
+}
+
+.resultSuccess {
+  background: color-mix(in oklch, var(--success) 15%, transparent);
+  color: var(--success);
+}
+
+.resultFailed {
+  background: color-mix(in oklch, var(--destructive) 15%, transparent);
+  color: var(--destructive);
+}
+
+/* ── Streaming cursor ────────────────────── */
+
+.cursor {
+  align-self: flex-start;
+  width: 8px;
+  height: 16px;
+  background: var(--primary);
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
