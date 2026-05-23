@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Send, Circle, Square } from 'lucide-react';
+import { ChevronDown, Square } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
+import { ChatInput, StatusBadge } from '@shared/components';
 import { useInputDraft } from '@/hooks/useInputDraft';
 import styles from './PromptInput.module.css';
 
@@ -50,86 +51,49 @@ export default function PromptInput({
   threadId,
 }: Props) {
   const { t } = useTranslation();
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [promptLength, setPromptLength] = useState(0);
+  const [prompt, setPrompt] = useState('');
   const [showAgentSelector, setShowAgentSelector] = useState(false);
   const [model, setModel] = useState<string>('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
-  const [textareaFocused, setTextareaFocused] = useState(false);
 
   const models = useMemo(() => extractModels(agents), [agents]);
 
-  const { restore: restoreDraft, save: saveDraft, flush: flushDraft, clear: clearDraft } =
+  const { save: saveDraft, flush: flushDraft, clear: clearDraft } =
     useInputDraft(threadId);
 
   // Restore draft on mount / threadId change
   useEffect(() => {
-    const ta = inputRef.current;
-    if (!ta) return;
-    restoreDraft(ta);
-    setPromptLength(ta.value.length);
-    // Restore also handles auto-resize inside the hook
+    if (!threadId) return;
+    const saved = localStorage.getItem(`ah:draft:${threadId}`);
+    if (saved) setPrompt(saved);
     return () => {
-      // Flush pending draft for the old threadId before switching
-      if (ta) flushDraft(ta.value, threadId);
+      flushDraft(prompt, threadId);
     };
   }, [threadId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Flush draft on unmount (cleanup)
+  // Flush draft on unmount
   useEffect(() => {
     return () => {
-      const ta = inputRef.current;
-      if (ta) flushDraft(ta.value);
+      flushDraft(prompt);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-resize textarea and track character count on input
+  // Persist prompt changes to draft
   useEffect(() => {
-    const ta = inputRef.current;
-    if (!ta) return;
-
-    const handleUpdate = () => {
-      setPromptLength(ta.value.length);
-      ta.style.height = 'auto';
-      ta.style.height = ta.scrollHeight + 'px';
-      saveDraft(ta.value);
-    };
-
-    ta.addEventListener('input', handleUpdate);
-    // Also listen for 'change' so test simulated events update promptLength
-    ta.addEventListener('change', handleUpdate);
-    return () => {
-      ta.removeEventListener('input', handleUpdate);
-      ta.removeEventListener('change', handleUpdate);
-    };
-  }, []);
+    saveDraft(prompt);
+  }, [prompt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSend = useCallback(() => {
-    const ta = inputRef.current;
-    if (!ta) return;
-    const trimmed = ta.value.trim();
+    const trimmed = prompt.trim();
     if (!trimmed) return;
     const opts: SendOptions = {};
     if (model) opts.model = model;
     if (reasoningEffort) opts.reasoningEffort = reasoningEffort;
     onSend(trimmed, selectedAgentId, opts.model || opts.reasoningEffort ? opts : undefined);
-    // Clear input
-    ta.value = '';
-    ta.style.height = 'auto';
-    setPromptLength(0);
+    setPrompt('');
     setShowAgentSelector(false);
     clearDraft();
-  }, [selectedAgentId, model, reasoningEffort, onSend, clearDraft]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    },
-    [handleSend],
-  );
+  }, [prompt, selectedAgentId, model, reasoningEffort, onSend, clearDraft]);
 
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
 
@@ -144,17 +108,13 @@ export default function PromptInput({
               onClick={() => {
                 onSelectAgent(a.id);
                 setShowAgentSelector(false);
-                inputRef.current?.focus();
               }}
               role="option"
               aria-selected={a.id === selectedAgentId}
             >
-              <Circle
-                size={8}
-                fill="currentColor"
-                style={{
-                  color: a.status === 'available' ? 'var(--color-success)' : 'var(--color-danger)',
-                }}
+              <StatusBadge
+                status={a.status === 'available' ? 'online' : 'offline'}
+                className={styles.agentStatusDot}
               />
               <span>{a.name}</span>
             </button>
@@ -205,28 +165,22 @@ export default function PromptInput({
           <ChevronDown size={14} />
         </button>
 
-        <div className={styles.inputWrapper}>
-          <textarea
-            ref={inputRef}
-            className={styles.textarea}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setTextareaFocused(true)}
-            onBlur={() => setTextareaFocused(false)}
+        <div className={styles.chatInputWrapper}>
+          <ChatInput
+            value={prompt}
+            onChange={setPrompt}
+            onSend={handleSend}
             placeholder={t('prompt.placeholder')}
             disabled={disabled}
-            rows={1}
           />
           <div className={styles.inputFooter}>
-            <span className={styles.enterHint}>
-              <kbd className={styles.shortcutKey}>{textareaFocused ? 'Shift+Enter' : 'Enter'}</kbd>
-            </span>
             <span className={styles.charCount}>
-              {promptLength}/{MAX_CHARS}
+              {prompt.length}/{MAX_CHARS}
             </span>
           </div>
         </div>
 
-        {isStreaming ? (
+        {isStreaming && (
           <button
             className={styles.stopBtn}
             onClick={onCancel}
@@ -235,16 +189,6 @@ export default function PromptInput({
             title={t('action.cancelRun')}
           >
             <Square size={16} fill="currentColor" />
-          </button>
-        ) : (
-          <button
-            className={styles.sendBtn}
-            onClick={handleSend}
-            disabled={disabled || promptLength === 0}
-            aria-label={t('action.startRun')}
-            title={t('action.startRun')}
-          >
-            <Send size={16} />
           </button>
         )}
       </div>
