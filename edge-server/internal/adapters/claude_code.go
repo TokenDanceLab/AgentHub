@@ -131,7 +131,7 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 func (a *ClaudeCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
 	parser := NewNDJSONStreamParser(emitter, run)
 	if stdin != nil {
-		parser.WithControlHandler(&DefaultPermissionHandler{}, stdin)
+		parser.WithControlHandler(NewEventEmittingPermissionHandler(emitter), stdin)
 	}
 	return parser.Parse(ctx, stdout)
 }

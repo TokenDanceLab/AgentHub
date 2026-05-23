@@ -161,24 +161,32 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 }
 
 // codexExecEvent represents a single JSONL line from codex exec --json output.
+//
+// The outer "type" field discriminates the event (thread.started, turn.started,
+// turn.completed, turn.failed, item.started, item.completed, item.updated, error).
+// For item.* events, the "item" field contains a nested object with its own "type"
+// field (agent_message, reasoning, command_execution, file_change, mcp_tool_call,
+// collab_tool_call, web_search, todo_list, error).
+//
+// Reference: codex-rs/exec/src/exec_events.rs — ThreadEvent / ThreadItem / ThreadItemDetails
 type codexExecEvent struct {
-	Type    string          `json:"type"`
-	Content string          `json:"content,omitempty"`
-	Tool    *codexToolEvent `json:"tool,omitempty"`
-	Error   string          `json:"error,omitempty"`
-	Usage   *codexUsage     `json:"usage,omitempty"`
+	Type     string          `json:"type"`
+	ThreadID string          `json:"thread_id,omitempty"`
+	Usage    *codexUsage     `json:"usage,omitempty"`
+	Item     json.RawMessage `json:"item,omitempty"`
+	Message  string          `json:"message,omitempty"`
+	Error    *codexError     `json:"error,omitempty"` // nested error on turn.failed
 }
 
-type codexToolEvent struct {
-	Name   string `json:"name"`
-	CallID string `json:"call_id,omitempty"`
-	Input  any    `json:"input,omitempty"`
-	Output string `json:"output,omitempty"`
+type codexError struct {
+	Message string `json:"message"`
 }
 
 type codexUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	InputTokens           int64 `json:"input_tokens"`
+	CachedInputTokens     int64 `json:"cached_input_tokens"`
+	OutputTokens          int64 `json:"output_tokens"`
+	ReasoningOutputTokens int64 `json:"reasoning_output_tokens"`
 }
 
 func (a *CodexAdapter) dispatchCodexEvent(scope map[string]any, emitter EventEmitter, evt *codexExecEvent) {
