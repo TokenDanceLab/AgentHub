@@ -23,21 +23,32 @@ feat/trump-webui          ← Web 前端（Trump）
 - [x] stdin 控制协议 + cancel
 - [x] OpenCode --format json 解析
 - [x] 模型选择 + 推理强度 + alias
-- [ ] OpenCode 集成测试
+- [x] Codex 全事件覆盖（thread/turn/item 9种类型）
+- [x] OpenCode 全事件覆盖（tool_result/permission/file/session/task）
+- [x] 权限通知 Desktop（permission_requested/decided）
+- [x] 集成 smoke test 17/17 通过
+- [x] OpenCode 集成测试
+- [ ] CI `-short` 标记：集成测试在 CI 正确跳过
 - [ ] 打通 Edge → Desktop WebSocket 事件投递验证
 
 ### Desktop（Leader + Agent）
-- [ ] 消费 run.agent.text_delta → ChatView 实时打字
-- [ ] 消费 run.agent.tool_call → ToolUseBlock 卡片
-- [ ] 消费 run.agent.tool_result → tool result 渲染
-- [ ] 消费 run.agent.file_change → DiffCard 内联
-- [ ] 消费 run.agent.result → 完成状态 + token 用量
-- [ ] 消费 run.agent.task_* → 子代理事件
+- [x] 共享类型修复（4 阻塞不匹配）
+- [x] ChatView 消费 run.agent.text_delta → 实时打字
+- [x] ChatView 消费 run.agent.tool_call → ToolUseBlock 卡片
+- [x] ChatView 消费 run.agent.tool_result → tool result 渲染
+- [x] ChatView 消费 run.agent.file_change → FileChangeBlock
+- [x] RunDetail Output/ToolCalls/FileChanges 标签页
+- [x] RunDetail text_delta 累积到 outputText
+- [x] 12/12 测试文件全部通过 (123 tests)
+- [ ] PromptInput 模型选择器（model + reasoningEffort）
 - [ ] POST /v1/runs 请求中带 model/reasoningEffort
+- [ ] 消费 run.agent.task_* → 子代理事件
 
 ### Docs
-- [ ] archive/ 加归档标记
-- [ ] 02-decide/ 03-build/ 标注实现状态
+- [x] archive/ 清理 7 份过时文档
+- [x] 02-decide/ 03-build/ 添加实现状态标记
+- [x] 18 份参考报告（01-learn/repos/01~18）
+- [x] AGENTS.md 质量治理规则
 
 ## 验收
 

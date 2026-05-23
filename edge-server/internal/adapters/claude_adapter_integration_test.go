@@ -12,6 +12,9 @@ import (
 
 func claudePath(t *testing.T) string {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	path := os.Getenv("CLAUDE_PATH")
 	if path == "" {
 		path = "claude"
