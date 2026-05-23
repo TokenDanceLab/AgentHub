@@ -72,5 +72,13 @@
   "perm.showInput": "显示输入",
   "perm.hideInput": "隐藏输入",
   "perm.allow": "允许",
-  "perm.deny": "拒绝"
+  "perm.deny": "拒绝",
+  "welcome.title": "欢迎使用 AgentHub",
+  "welcome.subtitle": "在本地运行 AI 编程代理",
+  "welcome.description": "创建线程以开始与 AI 代理协作",
+  "welcome.createThread": "创建线程",
+  "welcome.suggestionsLabel": "试试这些示例：",
+  "welcome.suggestion1": "用 Express 构建一个 REST API",
+  "welcome.suggestion2": "重构一个 React 组件",
+  "welcome.suggestion3": "解释这个项目的架构"
 }

@@ -72,5 +72,13 @@
   "perm.showInput": "Show input",
   "perm.hideInput": "Hide input",
   "perm.allow": "Allow",
-  "perm.deny": "Deny"
+  "perm.deny": "Deny",
+  "welcome.title": "AgentHub",
+  "welcome.subtitle": "Run AI coding agents locally",
+  "welcome.description": "Create a thread to start collaborating with AI agents",
+  "welcome.createThread": "Create Thread",
+  "welcome.suggestionsLabel": "Try an example:",
+  "welcome.suggestion1": "Build a REST API with Express",
+  "welcome.suggestion2": "Refactor a React component",
+  "welcome.suggestion3": "Explain the architecture of this project"
 }

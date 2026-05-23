@@ -316,6 +316,8 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
   }, []);
 
   const lastMsg = messages[messages.length - 1];
+  const lastMsgHasText =
+    lastMsg?.role === 'agent' && lastMsg.blocks.some((b) => b.kind === 'text');
 
   return (
     <div className={styles.root}>
@@ -367,7 +369,16 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
             </div>
           ))
         )}
-        {isStreaming && <div className={styles.cursor} />}
+        {isStreaming &&
+          (lastMsgHasText ? (
+            <div className={styles.cursor} />
+          ) : (
+            <div className={styles.typingDots}>
+              <span />
+              <span />
+              <span />
+            </div>
+          ))}
       </div>
     </div>
   );
