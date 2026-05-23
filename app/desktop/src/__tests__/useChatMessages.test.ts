@@ -410,6 +410,9 @@ describe('useChatMessages', () => {
         path: '/src/test.ts',
         action: 'created',
         diff: '+new line',
+        callId: 'toolu_1',
+        toolName: 'Write',
+        content: 'File written',
       }));
     });
 
@@ -454,7 +457,7 @@ describe('useChatMessages', () => {
       eventHandler!(makeEvent('run.agent.result', {
         runId: 'run-1',
         success: true,
-        tokenUsage: { input: 100, output: 50 },
+        usage: { inputTokens: 100, outputTokens: 50 },
       }));
     });
 

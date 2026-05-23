@@ -125,6 +125,58 @@
   font-size: var(--font-size-xs);
 }
 
+/* Tool call items with expandable output */
+.toolCallItem {
+  border-bottom: 1px solid var(--border);
+}
+
+.toolCallItem:last-child {
+  border-bottom: none;
+}
+
+.toolCallHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  text-align: left;
+}
+
+.toolCallHeader:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.toolCallOutput {
+  margin: 2px 0 6px;
+  padding: var(--space-xs);
+  background: var(--background);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  max-height: 160px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.chevron {
+  display: inline-block;
+  font-size: 10px;
+  transition: transform 0.15s ease;
+  opacity: 0.5;
+  margin-left: auto;
+}
+
+.chevronDown {
+  transform: rotate(90deg);
+}
+
 .success {
   color: var(--success);
 }
