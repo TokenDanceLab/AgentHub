@@ -20,6 +20,7 @@ func (s *stubAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []s
 func (s *stubAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
 	return nil
 }
+func (s *stubAdapter) NeedsStdin() bool { return false }
 
 func TestRegistryRegisterAndGet(t *testing.T) {
 	r := NewRegistry()
