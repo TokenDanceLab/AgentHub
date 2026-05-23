@@ -186,7 +186,7 @@
   display: grid;
   min-width: 0;
   border: 1px solid #e0e6ef;
-  border-radius: 7px;
+  border-radius: 10px;
   background: #ffffff;
   color: #172033;
 }
@@ -378,16 +378,16 @@
 .iconButton,
 .panelTab,
 .activePanelTab {
-  border-radius: 7px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 800;
 }
 
 .primaryButton {
   min-height: 34px;
-  border: 1px solid #1f6feb;
+  border: 1px solid #1688dc;
   padding: 0 12px;
-  background: #1f6feb;
+  background: linear-gradient(135deg, #1769e8, #08a7cf);
   color: #ffffff;
 }
 
