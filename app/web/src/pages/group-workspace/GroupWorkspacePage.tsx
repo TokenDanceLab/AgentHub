@@ -278,6 +278,17 @@ const styles = `
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }
 
+.gwr-brand .gwr-title h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.gwr-brand .gwr-title .gwr-brand-sub {
+  margin: 4px 0 0;
+}
+
 .gwr-mark,
 .gwr-icon,
 .gwr-avatar {
@@ -293,7 +304,9 @@ const styles = `
   border-radius: 10px;
   background: linear-gradient(135deg, var(--gwr-blue), var(--gwr-cyan));
   box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
+  font-size: 16px;
   font-weight: 900;
+  line-height: 1;
 }
 
 .gwr-section-head,
@@ -761,7 +774,7 @@ const styles = `
   align-items: flex-start;
 }
 
-@media (max-width: 1160px) {
+@media (max-width: 1180px) {
   .gwr-shell {
     grid-template-columns: 220px minmax(0, 1fr);
   }
@@ -775,7 +788,7 @@ const styles = `
   }
 }
 
-@media (max-width: 840px) {
+@media (max-width: 820px) {
   .group-workspace-react {
     min-height: 100vh;
     overflow: auto;

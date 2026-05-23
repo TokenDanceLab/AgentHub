@@ -1072,7 +1072,9 @@ const styles = `
     place-items: center;
     flex: 0 0 auto;
     color: #fff;
+    font-size: 16px;
     font-weight: 900;
+    line-height: 1;
     border-radius: 10px;
     background: linear-gradient(135deg, var(--asr-blue), var(--asr-cyan));
     box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);

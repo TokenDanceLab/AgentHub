@@ -51,6 +51,8 @@
 .workspacePanel {
   position: relative;
   z-index: 1;
+  min-width: 0;
+  max-width: 100%;
   min-height: 0;
   border: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: 12px;
@@ -123,11 +125,25 @@
 .brandMark {
   width: 38px;
   height: 38px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
   border-radius: 10px;
   background: linear-gradient(135deg, #1769e8, #08a7cf);
   color: #ffffff;
-  font-size: 12px;
+  font-family:
+    "Hanken Grotesk",
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Arial,
+    sans-serif;
+  font-size: 16px;
   font-weight: 900;
+  line-height: 1;
   box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
 }
 
@@ -619,11 +635,13 @@
 .activePanelTab {
   min-height: 32px;
   border: 0;
-  padding: 0 6px;
+  padding: 0 8px;
   overflow: hidden;
   background: transparent;
   color: #526176;
-  font-size: 10.5px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -746,7 +764,7 @@
   font-size: 13px;
 }
 
-@media (max-width: 1220px) {
+@media (max-width: 1180px) {
   .workbench {
     grid-template-columns: 240px minmax(420px, 1fr) 340px;
     gap: 12px;
@@ -771,16 +789,36 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 820px) {
   .workbench {
     height: auto;
     min-height: 100%;
     grid-template-columns: 1fr;
+    width: 100%;
+    max-width: 100%;
     overflow: auto;
+    padding: 12px;
   }
 
+  .leftRail,
   .threadSurface {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     overflow: visible;
+  }
+
+  .workspacePanel {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .threadHeader,
+  .approvalCard,
+  .workspaceHeader {
+    flex-wrap: wrap;
   }
 
   .messageArea,
@@ -788,7 +826,17 @@
     grid-template-columns: 1fr;
   }
 
-  .workspacePanel {
-    display: flex;
+  .workspaceTabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .fileRow,
+  .runnerRow {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .fileRow .badge,
+  .runnerRow .badge {
+    justify-self: start;
   }
 }
