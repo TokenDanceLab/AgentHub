@@ -130,13 +130,14 @@ jobs:
       - name: Test (unit only, skip integration)
         run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
 
-      - name: Coverage check (overall, soft)
+      - name: Coverage check (overall, hard)
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           THRESHOLD=40
           echo "Overall coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
           if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
-            echo "::warning::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold (need more unit tests outside tests/)"
+            echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
+            exit 1
           fi
 
       - name: Coverage per-package minimums
