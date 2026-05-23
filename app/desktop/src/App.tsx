@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Menu, X, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 import { startRun, cancelRun, fetchAgents, fetchThreads, fetchHealth } from '@/api/edgeClient';
 import type { AgentInfo, ThreadInfo, StartRunRequest } from '@shared/types';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -32,6 +34,7 @@ export default function App() {
   const { online, health } = useHealth();
   const { messages, isConnected, currentRun } = useChatMessages(online);
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
 
   // ── Edge disconnected banner state ──
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -59,10 +62,20 @@ export default function App() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>();
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileRunDetailOpen, setMobileRunDetailOpen] = useState(false);
 
   // Search → scroll state
   const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Close mobile panels on desktop resize
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileSidebarOpen(false);
+      setMobileRunDetailOpen(false);
+    }
+  }, [isMobile]);
 
   // Sync health hook → connection store
   useEffect(() => {
@@ -234,6 +247,7 @@ export default function App() {
   const handleSelectThread = useCallback(
     (thread: ThreadInfo) => {
       selectThread(thread.threadId);
+      setMobileSidebarOpen(false);
     },
     [selectThread],
   );
@@ -282,8 +296,54 @@ export default function App() {
         </div>
       )}
 
+      {/* Mobile header bar with toggles */}
+      {isMobile && (
+        <div className={styles.mobileToolbar}>
+          <button
+            className={styles.mobileToggle}
+            onClick={() => { setMobileSidebarOpen((v) => !v); setMobileRunDetailOpen(false); }}
+            aria-label={mobileSidebarOpen ? t('nav.closeSidebar') : t('nav.openSidebar')}
+            aria-expanded={mobileSidebarOpen}
+          >
+            {mobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          <span className={styles.mobileTitle}>
+            {selectedThread?.title ?? 'AgentHub'}
+          </span>
+          <button
+            className={styles.mobileToggle}
+            onClick={() => { setMobileRunDetailOpen((v) => !v); setMobileSidebarOpen(false); }}
+            aria-label={mobileRunDetailOpen ? t('run.close') : t('run.open')}
+            aria-expanded={mobileRunDetailOpen}
+          >
+            {mobileRunDetailOpen ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}
+          </button>
+        </div>
+      )}
+
       <div className={styles.body}>
-        <div style={{ width: sidebarWidth, flexShrink: 0 }}>
+        {/* Sidebar overlay backdrop */}
+        {mobileSidebarOpen && (
+          <div
+            className={styles.overlay}
+            onClick={() => setMobileSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Right panel overlay backdrop */}
+        {mobileRunDetailOpen && (
+          <div
+            className={styles.overlay}
+            onClick={() => setMobileRunDetailOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        <div
+          className={`${styles.sidebarWrapper} ${mobileSidebarOpen ? styles.sidebarOpen : ''}`}
+          style={isMobile ? undefined : { width: sidebarWidth, flexShrink: 0 }}
+        >
           <ThreadPanel
             threads={threads}
             online={online}
@@ -293,38 +353,40 @@ export default function App() {
           />
         </div>
 
-        <ResizeHandle direction="horizontal" onResize={handleSidebarResize} />
+        {!isMobile && <ResizeHandle direction="horizontal" onResize={handleSidebarResize} />}
 
         <div className={styles.center}>
-          <div className={styles.centerSidebar}>
-            {agents.length === 0 && online ? (
-              <div className={styles.skeletonAgentList} aria-busy="true" aria-label="Loading agents">
-                {Array.from({ length: 5 }, (_, i) => (
-                  <div key={i} className={styles.skeletonAgentItem}>
-                    <SkeletonCircle width={8} height={8} />
-                    <div className={styles.skeletonAgentInfo}>
-                      <SkeletonLine width={`${55 + (i % 3) * 10}%`} height="14px" />
-                      <SkeletonLine width={`${35 + (i % 4) * 8}%`} height="10px" />
-                      <div className={styles.skeletonAgentTags}>
-                        <SkeletonLine width="42px" height="14px" />
-                        <SkeletonLine width="50px" height="14px" />
-                        <SkeletonLine width="36px" height="14px" />
+          {!isMobile && (
+            <div className={styles.centerSidebar}>
+              {agents.length === 0 && online ? (
+                <div className={styles.skeletonAgentList} aria-busy="true" aria-label="Loading agents">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <div key={i} className={styles.skeletonAgentItem}>
+                      <SkeletonCircle width={8} height={8} />
+                      <div className={styles.skeletonAgentInfo}>
+                        <SkeletonLine width={`${55 + (i % 3) * 10}%`} height="14px" />
+                        <SkeletonLine width={`${35 + (i % 4) * 8}%`} height="10px" />
+                        <div className={styles.skeletonAgentTags}>
+                          <SkeletonLine width="42px" height="14px" />
+                          <SkeletonLine width="50px" height="14px" />
+                          <SkeletonLine width="36px" height="14px" />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <AgentList
-                agents={agents}
-                online={online}
-                selectedId={selectedAgentId}
-                onSelect={handleSelectAgent}
-              />
-            )}
-          </div>
+                  ))}
+                </div>
+              ) : (
+                <AgentList
+                  agents={agents}
+                  online={online}
+                  selectedId={selectedAgentId}
+                  onSelect={handleSelectAgent}
+                />
+              )}
+            </div>
+          )}
 
-          <div ref={chatContainerRef}>
+          <div ref={chatContainerRef} className={styles.chatWrapper}>
           <ErrorBoundary>
             {messages.length === 0 && isStreaming ? (
               <div className={styles.skeletonChat} aria-busy="true" aria-label="Generating response">
@@ -375,9 +437,12 @@ export default function App() {
           </div>
         </div>
 
-        <ResizeHandle direction="horizontal" onResize={handleRightResize} />
+        {!isMobile && <ResizeHandle direction="horizontal" onResize={handleRightResize} />}
 
-        <div style={{ width: rightPanelWidth, flexShrink: 0 }}>
+        <div
+          className={`${styles.rightPanelWrapper} ${mobileRunDetailOpen ? styles.rightPanelOpen : ''}`}
+          style={isMobile ? undefined : { width: rightPanelWidth, flexShrink: 0 }}
+        >
           <ErrorBoundary>
             <Suspense
               fallback={

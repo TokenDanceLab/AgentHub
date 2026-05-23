@@ -51,5 +51,12 @@
   "banner.dismiss": "关闭",
   "status.reconnecting": "重连中...",
   "theme.light": "切换到亮色主题",
-  "theme.dark": "切换到暗色主题"
+  "theme.dark": "切换到暗色主题",
+  "nav.openSidebar": "打开侧边栏",
+  "nav.closeSidebar": "关闭侧边栏",
+  "run.open": "打开运行详情",
+  "run.close": "关闭运行详情",
+  "chat.viewFullDiff": "查看完整差异",
+  "prompt.model": "模型",
+  "prompt.reasoning": "推理强度"
 }

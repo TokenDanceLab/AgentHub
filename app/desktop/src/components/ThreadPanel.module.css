@@ -257,3 +257,124 @@
   color: #ef4444;
   font-weight: 500;
 }
+
+/* ── Responsive: Tablet (768px - 1023px) ─ */
+
+@media (max-width: 1023px) {
+  .sidebar {
+    min-width: 180px;
+    max-width: 220px;
+  }
+
+  .name {
+    font-size: var(--font-size-xs);
+  }
+
+  .meta {
+    display: none; /* hide date/count metadata on compact sidebar */
+  }
+
+  .actions {
+    opacity: 1; /* always visible on touch devices */
+  }
+
+  .actionBtn {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* ── Responsive: Mobile (< 768px) ──────── */
+
+@media (max-width: 767px) {
+  .sidebar {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+    height: 100%;
+    border-right: none;
+  }
+
+  .header {
+    padding: var(--space-sm);
+  }
+
+  .title {
+    font-size: var(--font-size-sm);
+  }
+
+  .createBtn {
+    width: var(--touch-target-min, 44px);
+    height: var(--touch-target-min, 44px);
+  }
+
+  .search {
+    margin: var(--space-xs) var(--space-sm);
+    padding: 8px 12px;
+    font-size: 16px; /* prevent iOS zoom */
+    min-height: var(--touch-target-min, 44px);
+  }
+
+  .list {
+    padding: 0 var(--space-xs);
+  }
+
+  .item {
+    padding: var(--space-sm);
+    gap: var(--space-sm);
+    min-height: var(--touch-target-min, 44px);
+    align-items: center;
+  }
+
+  .name {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .meta {
+    display: block;
+    font-size: var(--font-size-xs);
+  }
+
+  /* Action buttons always visible with larger touch targets */
+  .actions {
+    opacity: 1;
+    gap: var(--space-xs);
+  }
+
+  .actionBtn {
+    width: var(--touch-target-min, 44px);
+    height: var(--touch-target-min, 44px);
+  }
+
+  .actionBtn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Edit row */
+  .editRow {
+    padding: var(--space-xs) var(--space-sm);
+    flex-wrap: wrap;
+  }
+
+  .editInput {
+    font-size: 16px;
+    padding: 6px 8px;
+  }
+
+  /* Confirm row */
+  .confirmRow {
+    padding: var(--space-xs) var(--space-sm);
+    flex-wrap: wrap;
+  }
+
+  .confirmText {
+    font-size: var(--font-size-xs);
+  }
+
+  /* Item row full-width touch target */
+  .itemRow {
+    gap: 4px;
+  }
+}
