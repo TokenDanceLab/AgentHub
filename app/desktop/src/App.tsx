@@ -60,6 +60,10 @@ export default function App() {
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>();
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
 
+  // Search → scroll state
+  const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
   // Sync health hook → connection store
   useEffect(() => {
     setOnline(online, health);
@@ -197,6 +201,10 @@ export default function App() {
     }
   }, []);
 
+  const handleSearchSelect = useCallback((messageId: string) => {
+    setScrollToMessageId(messageId);
+  }, []);
+
   const handleCreateThread = useCallback(async () => {
     try {
       const res = await fetchThreads();
@@ -231,6 +239,20 @@ export default function App() {
   );
 
   const allMessages = [...userMessages, ...messages];
+
+  // Scroll to a message when SearchDialog selects one
+  useEffect(() => {
+    if (!scrollToMessageId) return;
+    const idx = allMessages.findIndex((m) => m.id === scrollToMessageId);
+    if (idx < 0) return;
+    // ChatView renders messages inside [role="log"] in array order
+    const log = chatContainerRef.current?.querySelector('[role="log"]');
+    if (log && log.children[idx]) {
+      (log.children[idx] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    setScrollToMessageId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollToMessageId]);
 
   return (
     <div className={styles.root}>
@@ -302,6 +324,7 @@ export default function App() {
             )}
           </div>
 
+          <div ref={chatContainerRef}>
           <ErrorBoundary>
             {messages.length === 0 && isStreaming ? (
               <div className={styles.skeletonChat} aria-busy="true" aria-label="Generating response">
@@ -349,6 +372,7 @@ export default function App() {
               </Suspense>
             )}
           </ErrorBoundary>
+          </div>
         </div>
 
         <ResizeHandle direction="horizontal" onResize={handleRightResize} />
@@ -393,7 +417,7 @@ export default function App() {
         disabled={!online}
       />
       <Suspense fallback={null}>
-        <SearchDialog />
+        <SearchDialog messages={allMessages} onSelect={handleSearchSelect} />
       </Suspense>
     </div>
   );

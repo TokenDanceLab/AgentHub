@@ -109,6 +109,13 @@
   flex-shrink: 0;
 }
 
+.timestamp {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .empty {
   padding: var(--space-xl);
   text-align: center;
