@@ -28,7 +28,7 @@ type recordingRepository struct {
 	createProjectCalls int
 }
 
-func (r *recordingRepository) CreateProject(id, name string) store.Project {
+func (r *recordingRepository) CreateProject(id, name string) (store.Project, error) {
 	r.createProjectCalls++
 	return r.Repository.CreateProject(id, name)
 }

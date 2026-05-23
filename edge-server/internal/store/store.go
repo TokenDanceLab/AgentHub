@@ -9,6 +9,7 @@ import (
 )
 
 var ErrNotFound = errors.New("not found")
+var ErrProjectExists = errors.New("project already exists")
 
 type Project struct {
 	ID        string `json:"projectId"`
@@ -62,7 +63,7 @@ type Reader interface {
 }
 
 type Writer interface {
-	CreateProject(id, name string) Project
+	CreateProject(id, name string) (Project, error)
 	CreateThread(id, projectID, title string) (Thread, error)
 	CreateRun(id, projectID, threadID string) (Run, error)
 	SetRunStatus(id, status string) (Run, bool)
@@ -167,12 +168,12 @@ func normalizeOrder[V any](order []string, items map[string]V) []string {
 	return append(normalized, missing...)
 }
 
-func (s *Store) CreateProject(id, name string) Project {
+func (s *Store) CreateProject(id, name string) (Project, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if existing, ok := s.projects[id]; ok {
-		return existing
+		return existing, ErrProjectExists
 	}
 	if name == "" {
 		name = "Local Project"
@@ -187,7 +188,7 @@ func (s *Store) CreateProject(id, name string) Project {
 	}
 	s.projects[id] = project
 	s.projectOrder = append(s.projectOrder, id)
-	return project
+	return project, nil
 }
 
 func (s *Store) GetProject(id string) (Project, bool) {
