@@ -92,6 +92,8 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 		return ErrRunAlreadyStarted
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), defaultRunTimeout)
+
 	e.mu.Lock()
 	max := e.maxConcurrentRuns
 	if max <= 0 {
@@ -99,17 +101,14 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	}
 	if len(e.running) >= max {
 		e.mu.Unlock()
+		cancel()
 		return ErrTooManyConcurrentRuns
 	}
 	if _, ok := e.running[run.ID]; ok {
 		e.mu.Unlock()
+		cancel()
 		return ErrRunAlreadyStarted
 	}
-	e.running[run.ID] = nil // placeholder, updated after context creation
-	e.mu.Unlock()
-
-	ctx, cancel := context.WithTimeout(context.Background(), defaultRunTimeout)
-	e.mu.Lock()
 	e.running[run.ID] = cancel
 	e.mu.Unlock()
 
