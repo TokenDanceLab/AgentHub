@@ -14,9 +14,15 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
+// sessionCache is the subset of *cache.Client methods used by SessionService.
+type sessionCache interface {
+	Invalidate(ctx context.Context, keys ...string) error
+	InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error
+}
+
 type SessionService struct {
 	db          *gorm.DB
-	cacheClient *cache.Client
+	cacheClient sessionCache
 }
 
 func NewSessionService(db *gorm.DB, cacheClient *cache.Client) *SessionService {

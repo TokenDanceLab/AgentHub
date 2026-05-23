@@ -20,10 +20,15 @@ import (
 
 const maxPinsPerSession = 50
 
+// messageCache is the subset of *cache.Client methods used by MessageService.
+type messageCache interface {
+	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
+}
+
 type MessageService struct {
 	db          *gorm.DB
 	bus         *Bus
-	cacheClient *cache.Client
+	cacheClient messageCache
 }
 
 func NewMessageService(db *gorm.DB, bus *Bus, cacheClient *cache.Client) *MessageService {
