@@ -1,3 +1,5 @@
+> 📦 已归档 — Protobuf/Connect-RPC 为历史方案，当前主线为 REST JSON + WebSocket
+
 # AgentHub Protocol Buffers Schema
 
 > 2026-05-22 更新：本文是 Protobuf / Connect-RPC 方案参考，不是当前 M0 主协议入口。当前协议入口为 `api/openapi.yaml`、`api/events.md` 和 `api/conventions.md`，主链路采用 REST JSON API + WebSocket typed events。

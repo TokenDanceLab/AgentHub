@@ -161,7 +161,14 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 				"reason":  evt.Part.Reason,
 			}
 			if evt.Part.Tokens != nil {
-				result["usage"] = evt.Part.Tokens
+				result["usage"] = map[string]any{
+				"inputTokens":     evt.Part.Tokens.Input,
+				"outputTokens":    evt.Part.Tokens.Output,
+				"reasoningTokens": evt.Part.Tokens.Reasoning,
+				"totalTokens":     evt.Part.Tokens.Total,
+				"cacheReadTokens":  evt.Part.Tokens.Cache.Read,
+				"cacheWriteTokens": evt.Part.Tokens.Cache.Write,
+			}
 			}
 			if evt.Part.Cost > 0 {
 				result["cost"] = evt.Part.Cost
