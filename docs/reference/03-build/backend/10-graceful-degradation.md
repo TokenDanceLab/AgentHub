@@ -1,3 +1,5 @@
+> 状态: ⏳ 计划中 — 优雅降级/韧性策略未在 M1-M4 范围，设计预留
+
 # AgentHub 优雅降级与韧性策略
 
 > 综合自：`design-error-handling.md`（37 ErrorCode + retry）、`design-observability.md`（health checks + heartbeats）、

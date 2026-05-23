@@ -1,3 +1,5 @@
+> 状态: ✅ 已落地 — go.mod/Makefile/CI/.golangci.yml 已配置并运行
+
 # AgentHub Go Module 初始化 + CI/CD + 构建配置
 
 > 基于 design-go-services.md + web-research-tech-stack.md。

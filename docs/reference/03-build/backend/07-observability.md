@@ -1,3 +1,5 @@
+> 状态: 🔄 进行中 — 基础 /healthz 端点已实现，slog/指标/成本追踪待后续
+
 # AgentHub Observability -- 监控与可观测性方案
 
 > 日期：2026-05-21

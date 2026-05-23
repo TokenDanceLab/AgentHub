@@ -1,3 +1,5 @@
+> 状态: ⏳ 计划中 — 模型路由/fallback 未实现，M3 真实 adapter 接入后启用
+
 # 设计：模型 Fallback 与 Provider 降级
 
 > 生成日期：2026-05-21

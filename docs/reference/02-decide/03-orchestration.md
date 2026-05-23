@@ -1,3 +1,5 @@
+> 状态: ⏳ 计划中 — P1+ 多 Agent 调度，当前未实现
+
 # AgentHub Orchestrator 跨仓库综合分析
 
 > 基于 `langflow.md`、`flowise.md`、`chatdev.md`、`librechat.md` 四份调研报告

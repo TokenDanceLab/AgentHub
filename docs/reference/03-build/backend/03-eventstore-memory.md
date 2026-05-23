@@ -1,3 +1,5 @@
+> 状态: 🔄 进行中 — M1 内存 bus 已实现，持久 EventStore 列入 M2
+
 # AgentHub EventStore & Memory -- 最终设计
 
 > 基于 8 仓库深度对比，为 AgentHub 持久化层提供最终决策。

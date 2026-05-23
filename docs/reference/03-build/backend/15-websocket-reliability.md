@@ -1,3 +1,5 @@
+> 状态: 🔄 进行中 — M1 基础 WebSocket bus 已实现，可靠投递/重连策略待 M2+
+
 # AgentHub WebSocket Reliability -- 跨仓库深度分析
 
 > 分析日期: 2026-05-21
