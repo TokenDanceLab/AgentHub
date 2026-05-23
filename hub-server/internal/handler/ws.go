@@ -84,7 +84,13 @@ func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
 		return
 	}
 
-	accessToken, _ := payload["access_token"].(string)
+	accessToken, ok := payload["access_token"].(string)
+	if !ok || accessToken == "" {
+		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthFail, map[string]string{"reason": "missing access_token"}))
+		time.Sleep(100 * time.Millisecond)
+		conn.Close()
+		return
+	}
 
 	claims, err := jwtutil.ParseToken(accessToken, h.jwtSecret)
 	if err != nil {
