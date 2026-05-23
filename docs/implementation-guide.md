@@ -149,7 +149,7 @@ version / id / seq / type / scope / sentAt / payload
 
 断线重连用 `cursor` 恢复；无法恢复时，客户端重新拉 REST snapshot。
 
-当前 `edge-server/internal/events/bus.go` 是内存 bus，只能支撑 M1。M2 需要把 EventStore 落到 Edge 本地存储。
+当前 `edge-server/internal/events/bus.go` 是内存 bus（支持 seq、短历史 replay、WebSocket fanout）。M4 需要把 EventStore 落到 Edge 本地存储。
 
 ## 7. 开发规范
 
