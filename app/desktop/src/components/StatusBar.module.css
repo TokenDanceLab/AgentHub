@@ -3,27 +3,10 @@
   align-items: center;
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-lg);
-  border-bottom: 1px solid var(--color-border);
-  font-size: var(--font-size-md);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-sm);
   flex-shrink: 0;
   height: var(--statusbar-height);
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.dotOnline {
-  background: var(--color-success);
-  box-shadow: 0 0 4px var(--color-success);
-}
-
-.dotOffline {
-  background: var(--color-danger);
-  box-shadow: 0 0 4px var(--color-danger);
 }
 
 .spacer {
@@ -31,14 +14,14 @@
 }
 
 .wsStatus {
-  color: var(--color-text-dim);
+  color: var(--muted-foreground);
   font-size: var(--font-size-xs);
 }
 
 .error {
   padding: 6px var(--space-lg);
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
+  background: color-mix(in oklch, var(--destructive) 15%, transparent);
+  color: var(--destructive);
   font-size: var(--font-size-sm);
-  border-bottom: 1px solid var(--color-danger);
+  border-bottom: 1px solid var(--destructive);
 }
