@@ -58,12 +58,12 @@ type SendMessageRequest struct {
 }
 
 type ReplyToInfo struct {
-	ID           string `json:"id"`
-	SenderID     string `json:"sender_id"`
-	ContentType  string `json:"content_type"`
-	Content      string `json:"content"`
-	Recalled     bool   `json:"recalled"`
-	CreatedAt    string `json:"created_at"`
+	ID          string `json:"id"`
+	SenderID    string `json:"sender_id"`
+	ContentType string `json:"content_type"`
+	Content     string `json:"content"`
+	Recalled    bool   `json:"recalled"`
+	CreatedAt   string `json:"created_at"`
 }
 
 type MessageResponse struct {

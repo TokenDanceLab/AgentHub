@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/service"
 )
@@ -71,7 +72,7 @@ func (h *MessageHandler) GetMessages(c *gin.Context) {
 		beforeSeq = parsed
 	}
 
-	limit := 50
+	limit := config.DefaultPaginationLimit
 	if limitStr != "" {
 		parsed, err := strconv.Atoi(limitStr)
 		if err != nil {
@@ -110,7 +111,7 @@ func (h *MessageHandler) GetIncrementalMessages(c *gin.Context) {
 		afterSeq = parsed
 	}
 
-	limit := 50
+	limit := config.DefaultPaginationLimit
 	if limitStr != "" {
 		parsed, err := strconv.Atoi(limitStr)
 		if err != nil {

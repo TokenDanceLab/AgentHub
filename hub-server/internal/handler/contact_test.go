@@ -12,16 +12,16 @@ import (
 )
 
 type mockContactService struct {
-	searchUserFn        func(ctx context.Context, currentUserID, targetID string) (*service.SearchResult, error)
-	sendFriendRequestFn func(ctx context.Context, userID, friendID, message string) error
-	listFriendRequestsFn func(ctx context.Context, userID string) ([]service.RequestInfo, error)
+	searchUserFn          func(ctx context.Context, currentUserID, targetID string) (*service.SearchResult, error)
+	sendFriendRequestFn   func(ctx context.Context, userID, friendID, message string) error
+	listFriendRequestsFn  func(ctx context.Context, userID string) ([]service.RequestInfo, error)
 	acceptFriendRequestFn func(ctx context.Context, userID, requestID string) error
 	rejectFriendRequestFn func(ctx context.Context, userID, requestID string) error
-	listContactsFn       func(ctx context.Context, userID string) ([]service.ContactInfo, error)
-	removeContactFn      func(ctx context.Context, currentUserID, friendUserID string) error
-	blockContactFn       func(ctx context.Context, currentUserID, targetUserID string) error
-	unblockContactFn     func(ctx context.Context, currentUserID, targetUserID string) error
-	updateRemarkFn       func(ctx context.Context, currentUserID, friendUserID, remark string) error
+	listContactsFn        func(ctx context.Context, userID string) ([]service.ContactInfo, error)
+	removeContactFn       func(ctx context.Context, currentUserID, friendUserID string) error
+	blockContactFn        func(ctx context.Context, currentUserID, targetUserID string) error
+	unblockContactFn      func(ctx context.Context, currentUserID, targetUserID string) error
+	updateRemarkFn        func(ctx context.Context, currentUserID, friendUserID, remark string) error
 }
 
 func (m *mockContactService) SearchUser(ctx context.Context, currentUserID, targetID string) (*service.SearchResult, error) {

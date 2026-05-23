@@ -49,7 +49,7 @@ func (h *AttachmentHandler) Probe(c *gin.Context) {
 	}
 
 	OK(c, gin.H{
-		"exists":      a != nil,
+		"exists":     a != nil,
 		"attachment": a,
 	})
 }

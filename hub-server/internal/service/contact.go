@@ -145,9 +145,9 @@ func (s *ContactService) SendFriendRequest(ctx context.Context, userID, friendID
 
 	if s.bus != nil {
 		s.bus.Publish(ctx, Event{Type: "friend.request", Payload: map[string]interface{}{
-			"sender_id":  userID,
+			"sender_id":   userID,
 			"receiver_id": friendID,
-			"message":    message,
+			"message":     message,
 		}})
 	}
 

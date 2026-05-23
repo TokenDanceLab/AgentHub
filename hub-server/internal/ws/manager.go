@@ -7,10 +7,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/coder/websocket"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
+	"github.com/coder/websocket"
 )
+
+const sendBufSize = 256
 
 type Conn struct {
 	ID         string
@@ -61,7 +63,7 @@ func (m *Manager) Count() int {
 func NewConn(ws *websocket.Conn) *Conn {
 	return &Conn{
 		W:    ws,
-		Send: make(chan []byte, 64),
+		Send: make(chan []byte, sendBufSize),
 	}
 }
 
