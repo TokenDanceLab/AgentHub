@@ -207,41 +207,6 @@ Remote:
 - 新增本地生成目录、缓存、数据库、日志、私钥或 Agent 状态目录时，先更新 `.gitignore`。
 - 如果误提交敏感信息，立即停止继续推送，通知维护者，旋转密钥，再清理历史。
 
-### 文档规范
-
-**文档分层：**
-
-| 层级 | 目录 | 内容 | 读者 |
-|------|------|------|------|
-| **项目事实** | `docs/roadmap.md` | 全局路线图，唯一进度台账 | 全员 |
-| **产品** | `docs/product-requirements.md` | 产品定位和需求 | 全员 |
-| **架构** | `docs/system-architecture.md` | 系统设计和拓扑 | 开发者 |
-| **实现** | `docs/implementation-guide.md` | 开发规范和流程 | 开发者 |
-| **客户端** | `docs/roadmaps/client.md` | Desktop 路线图 | 前端 |
-| **集成** | `docs/roadmaps/integration.md` | Hub↔Edge 对接方案 | 后端 |
-| **设计规格** | `docs/design/` | 架构细节/参考模式（长文） | 开发者 |
-| **参考研究** | `docs/reference/` | 21 项目竞品分析，按问题检索 | 按需查阅 |
-| **审计报告** | `docs/review/` | 代码/测试/工程审计 | 开发者 |
-| **收件箱** | `docs/inbox/` | Agent 间通信，本地不提交 | Agent |
-
-**命名和格式：**
-- 文件名用小写和连字符：`product-requirements.md`
-- 中文优先，代码标识保持英文
-- 每个文件开头标注最后更新日期
-- 不写绝对路径（`D:\Code\AgentHub\...`）
-- 不写 `target: master`（合并目标统一 `dev/delicious233`）
-
-**路线图规范：**
-- `docs/roadmap.md` 是全局台账，所有进度在这里登记
-- roadmap 只写：目标 + 任务清单 + 验收命令 + 依赖
-- 详细设计、代码片段、伪代码放 `docs/design/`
-- 竞品引用、采纳映射放 `docs/reference/`
-
-**禁止：**
-- 同一事实出现在多个文档中（如 README 底部和 roadmap 各写一遍进度）
-- 用 "M1"/"M3a"/"mock run" 等过时阶段名描述当前状态
-- 文档中写本机路径或个人信息
-
 ## 7. 验证和测试
 
 文档或 API 变更至少运行：
@@ -303,13 +268,10 @@ pnpm build
 ### 分支治理
 
 ```
-master                    ← 稳定发布。严重过期（-176 commits），待 Q2 验收后从 dev/delicious233 强制同步。
-dev/delicious233          ← ★ 主开发分支。唯一事实源。所有 feat/* 和 sync/* 的合入目标。
-dev/johnny                ← Hub 后端（严重过期 -176）。已由 sync/johnny-full (PR #52) 替代。
-dev/trump                 ← Trump 的 Web 前端分支。不要合并到我们的分支。
-feat/trump-webui          ← 废弃。Trump 实际工作在 feat/frontend-page-preview。
-feat/frontend-page-preview ← Trump 当前活跃分支。不要合并。
-sync/johnny-full          ← Johnny 最新同步分支。PR #52 目标。定期从 dev/delicious233 更新。
+master                    ← 稳定发布。CI 必须全绿才能合入。
+dev/delicious233          ← 主开发。所有 feat/* 的合入目标。
+dev/trump                 ← Web 前端合并中继。
+feat/*                    ← 功能分支。开 PR 到 dev 时触发 CI。
 ```
 
 规则：
