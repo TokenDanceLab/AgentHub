@@ -18,4 +18,16 @@ type RunProcessContext struct {
 	SessionID    string // Specific session to resume
 	ContinueLast bool   // Resume most recent session
 	ForkSession  bool   // Fork before continuing
+
+	// Reasoning & thinking budget
+	ReasoningEffort   string // "low"|"medium"|"high"|"max" (Claude Code), "minimal"|"low"|"medium"|"high"|"xhigh" (Codex)
+	MaxThinkingTokens int    // Claude Code --max-thinking-tokens
+
+	// Permission & partial messages
+	PermissionMode string // Claude Code --permission-mode (default/acceptEdits/bypassPermissions/plan/dontAsk)
+	IncludePartial bool   // Claude Code --include-partial-messages for stream_event deltas
+	FastMode       bool   // Claude Code fast mode
+
+	// OpenCode agent mode
+	AgentName string // OpenCode --agent (build, plan, etc.)
 }
