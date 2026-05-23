@@ -1,3 +1,8 @@
+vi.mock('lucide-react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('lucide-react')>();
+  return { ...actual };
+});
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, vars?: Record<string, unknown>) => {
@@ -63,7 +68,7 @@ function makeAgentTextMessage(content: string, id = 'msg-agent-1'): ChatMessage 
 describe('ChatView', () => {
   it('renders empty state when messages array is empty', () => {
     render(<ChatView messages={[]} />);
-    expect(screen.getByText('chat.empty')).toBeInTheDocument();
+    expect(screen.getByText('chat.emptyTitle')).toBeInTheDocument();
   });
 
   it('renders user messages on the right side', () => {
@@ -98,9 +103,8 @@ describe('ChatView', () => {
     };
     render(<ChatView messages={[msg]} />);
     expect(screen.getByText('typescript')).toBeInTheDocument();
-    // The code content is rendered inside a <code> element
-    const codeEl = screen.getByText('console.log("hi")');
-    expect(codeEl.tagName).toBe('CODE');
+    // Code content is rendered inside the SyntaxHighlighter
+    expect(screen.getByText('console.log("hi")')).toBeInTheDocument();
   });
 
   it('renders thinking blocks collapsed by default', () => {

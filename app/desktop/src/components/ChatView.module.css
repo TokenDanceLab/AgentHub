@@ -181,6 +181,50 @@
   text-transform: uppercase;
 }
 
+/* ── Highlighted Code Block ───────────────── */
+
+.codeBlockHighlighted {
+  margin: var(--space-xs) 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.codeBlockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.codeLangBadge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  text-transform: lowercase;
+}
+
+.copyBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+
+.copyBtn:hover {
+  background: color-mix(in oklch, var(--foreground) 12%, transparent);
+  color: var(--foreground);
+}
+
 /* ── Thinking ────────────────────────────── */
 
 .thinking {
