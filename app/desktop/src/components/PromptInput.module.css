@@ -110,6 +110,10 @@
   opacity: 0.9;
 }
 
+.sendBtn:active {
+  transform: scale(0.96);
+}
+
 .sendBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -134,6 +138,10 @@
 
 .stopBtn:hover {
   opacity: 0.85;
+}
+
+.stopBtn:active {
+  transform: scale(0.96);
 }
 
 .stopBtn:disabled {
