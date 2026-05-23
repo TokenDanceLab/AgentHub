@@ -49,9 +49,13 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 
 	args := []string{"run", "--format", "json"}
 
-	// Model: if it contains "/", pass as provider/model; otherwise pass as-is
+	// Model: resolve aliases, then pass as provider/model to OpenCode
 	if ctx.Model != "" {
-		args = append(args, "-m", ctx.Model)
+		resolved := ResolveModel("opencode", ctx.Model)
+		if resolved == "" {
+			resolved = ctx.Model
+		}
+		args = append(args, "-m", resolved)
 	}
 
 	// Reasoning effort: --thinking enables thinking, --variant sets effort level
