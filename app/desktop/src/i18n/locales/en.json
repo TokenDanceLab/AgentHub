@@ -85,6 +85,7 @@
   "welcome.suggestion3": "Explain the architecture of this project",
   "toast.copied": "Copied to clipboard",
   "toast.error": "An error occurred",
+  "toast.threadCreated": "Thread created",
   "toast.threadRenamed": "Thread renamed",
   "toast.threadDeleted": "Thread deleted",
   "toast.renameFailed": "Failed to rename thread",

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -15,13 +16,14 @@ var ErrRunAlreadyStarted = errors.New("run already started")
 type MockExecutorOption func(*MockExecutor)
 
 type MockExecutor struct {
-	bus       *events.Bus
-	store     store.RunLifecycleStore
-	stepDelay time.Duration
-	outputs   []OutputBatch
-	failRuns  map[string]error
-	mu        sync.Mutex
-	cancels   map[string]chan struct{}
+	bus        *events.Bus
+	store      store.RunLifecycleStore
+	stepDelay  time.Duration
+	outputs    []OutputBatch
+	failRuns   map[string]error
+	mu         sync.Mutex
+	cancels    map[string]chan struct{}
+	runOutputs map[string]*runnerctx.RunOutputStore
 }
 
 type OutputBatch struct {
@@ -42,8 +44,9 @@ func NewMockExecutor(bus *events.Bus, store store.RunLifecycleStore, opts ...Moc
 			{Stream: "stderr", Offset: 0, Text: "Warning: mock task is running in simulation mode\n"},
 			{Stream: "stdout", Offset: 91, Text: "Executing mock task step 3/3...\n"},
 		},
-		failRuns: make(map[string]error),
-		cancels:  make(map[string]chan struct{}),
+		failRuns:   make(map[string]error),
+		cancels:    make(map[string]chan struct{}),
+		runOutputs: make(map[string]*runnerctx.RunOutputStore),
 	}
 	for _, opt := range opts {
 		opt(e)
@@ -139,6 +142,13 @@ func (e *MockExecutor) run(run store.Run, cancelCh <-chan struct{}) {
 	}
 	e.bus.Publish("run.started", runScope(started), RunResponse(started))
 
+	outStore, err := runnerctx.NewRunOutputStore(run.ID)
+	if err == nil {
+		e.mu.Lock()
+		e.runOutputs[run.ID] = outStore
+		e.mu.Unlock()
+	}
+
 	if err := e.failureFor(run.ID); err != nil {
 		failed, ok := e.store.SetRunStatus(run.ID, "failed")
 		if ok {
@@ -155,6 +165,9 @@ func (e *MockExecutor) run(run store.Run, cancelCh <-chan struct{}) {
 		if e.sleepOrCancelled(cancelCh, e.stepDelay) {
 			e.publishCancelled(run)
 			return
+		}
+		if outStore != nil {
+			outStore.Write(output.Text)
 		}
 		e.bus.Publish("run.output.batch", runScope(run), map[string]any{
 			"runId":  run.ID,
@@ -210,6 +223,10 @@ func (e *MockExecutor) publishCancelled(run store.Run) {
 func (e *MockExecutor) finish(runID string) {
 	e.mu.Lock()
 	delete(e.cancels, runID)
+	if s, ok := e.runOutputs[runID]; ok {
+		s.Close()
+		delete(e.runOutputs, runID)
+	}
 	e.mu.Unlock()
 }
 
