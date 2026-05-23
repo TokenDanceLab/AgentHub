@@ -9,7 +9,7 @@
 ## 工作区
 
 ```
-dev/maintainer          ← 主 dev（Leader）: ROADMAP + 架构决策
+dev/maintainer          ← 主 dev（maintainer）: ROADMAP + 架构决策
 feat/contributor-b-webui          ← Web 前端（contributor-b）
 ```
 
@@ -17,7 +17,7 @@ feat/contributor-b-webui          ← Web 前端（contributor-b）
 
 ## P0 冲刺任务 ✅ (全部完成 27/27)
 
-### Edge（Leader + Agent）
+### Edge（maintainer + Agent）
 - [x] Claude Code NDJSON 24 消息类型
 - [x] stdin 控制协议 + cancel
 - [x] OpenCode --format json 解析
@@ -30,7 +30,7 @@ feat/contributor-b-webui          ← Web 前端（contributor-b）
 - [x] CI `-short` 标记：集成测试在 CI 正确跳过
 - [x] 打通 Edge → Desktop WebSocket 事件投递验证
 
-### Desktop（Leader + Agent）
+### Desktop（maintainer + Agent）
 - [x] 共享类型修复 + ChatView 实时打字 + ToolUseBlock + FileChangeBlock
 - [x] RunDetail 标签页 + text_delta 累积 + 模型选择器
 - [x] 12/12 测试文件全部通过 (123 tests)
