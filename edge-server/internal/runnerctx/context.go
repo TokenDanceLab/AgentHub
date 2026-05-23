@@ -30,4 +30,7 @@ type RunProcessContext struct {
 
 	// OpenCode agent mode
 	AgentName string // OpenCode --agent (build, plan, etc.)
+
+	// Context budget tracking (in-memory, per-run)
+	Budget *ContextBudget
 }
