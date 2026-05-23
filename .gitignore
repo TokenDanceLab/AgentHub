@@ -99,6 +99,10 @@ docs/review/
 docs/inbox/*
 !docs/inbox/README.md
 
+# Review reports — cross-review and audit outputs
+docs/review/*
+!docs/review/README.md
+
 # Cloned reference repos (at repo root only)
 /reference/*
 !/reference/INDEX.md
