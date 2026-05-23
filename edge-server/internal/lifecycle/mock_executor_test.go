@@ -62,7 +62,7 @@ func (s *lifecycleOnlyStore) SetRunStatusIf(id, status string, allowedCurrent ..
 
 func newExecutorTestRun(t *testing.T, s store.Repository) store.Run {
 	t.Helper()
-	project := s.CreateProject("proj_test", "Test Project")
+	project, _ := s.CreateProject("proj_test", "Test Project")
 	thread, err := s.CreateThread("thread_test", project.ID, "Test Thread")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
