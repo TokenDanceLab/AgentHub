@@ -20,10 +20,12 @@ interface Props {
 const TOOL_ICONS: Record<string, string> = {
   Read: '📖',
   Write: '✏️',
-  Edit: '📝',
-  Bash: '>_',
+  Edit: '✏️',
+  Bash: '⚡',
   Grep: '🔍',
   Glob: '📂',
+  WebFetch: '🌐',
+  WebSearch: '🌐',
   Task: '🤖',
   TodoWrite: '✅',
 };
@@ -35,7 +37,54 @@ function summarizeInput(input: Record<string, unknown>): string {
   if (typeof input.command === 'string') parts.push(input.command.slice(0, 60));
   if (typeof input.description === 'string') parts.push(input.description.slice(0, 60));
   const str = parts.join(' ');
-  return str.length > 80 ? str.slice(0, 80) + '...' : str;
+  return str.length > 40 ? str.slice(0, 40) + '...' : str;
+}
+
+// ── Relative time formatter ──────────────────
+function relativeTime(timestamp: string): { relative: string; exact: string } {
+  const now = Date.now();
+  const then = new Date(timestamp).getTime();
+  const diff = now - then;
+
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  const exact = new Date(timestamp).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+  if (minutes < 1) return { relative: 'Just now', exact };
+  if (minutes < 60) return { relative: `${minutes} min ago`, exact };
+  if (hours < 24) return { relative: `${hours}h ago`, exact };
+  if (days === 1) return { relative: 'Yesterday', exact };
+  if (days < 7) return { relative: `${days}d ago`, exact };
+
+  const shortDate = new Date(timestamp).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+  return { relative: shortDate, exact };
+}
+
+// ── Status badge class resolver ──────────────
+function toolStatusClass(status: string): string {
+  switch (status) {
+    case 'pending':
+      return styles.toolStatusPending;
+    case 'running':
+      return styles.toolStatusRunning;
+    case 'completed':
+      return styles.toolStatusDone;
+    case 'failed':
+      return styles.toolStatusFailed;
+    default:
+      return '';
+  }
 }
 
 // ── ThinkingBlock ───────────────────────────
@@ -80,7 +129,7 @@ function ToolUseBlock({ block }: { block: Extract<MessageBlock, { kind: 'tool_us
         <span className={styles.toolName}>{block.toolName}</span>
         <span className={styles.toolParamSummary}>{summarizeInput(block.input)}</span>
         <span
-          className={`${styles.toolStatus} ${block.status === 'completed' ? styles.toolDone : block.status === 'running' ? styles.toolRunning : ''}`}
+          className={`${styles.toolStatus} ${toolStatusClass(block.status)}`}
         >
           {block.status}
         </span>
@@ -322,6 +371,73 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
   const lastMsgHasText =
     lastMsg?.role === 'agent' && lastMsg.blocks.some((b) => b.kind === 'text');
 
+  const renderMessage = useCallback(
+    (msg: ChatMessage) => {
+      const rt = relativeTime(msg.timestamp);
+      return (
+        <div
+          key={msg.id}
+          className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
+        >
+          {msg.role === 'agent' && msg.agentName && (
+            <div className={styles.agentAvatar}>
+              <div className={styles.avatarCircle}>
+                {msg.agentName.charAt(0).toUpperCase()}
+              </div>
+              <span className={styles.agentNameLabel}>{msg.agentName}</span>
+            </div>
+          )}
+
+          <span
+            className={styles.timestamp}
+            title={rt.exact}
+            aria-label={rt.exact}
+          >
+            {rt.relative}
+          </span>
+
+          <div className={styles.actionBar}>
+            <button
+              className={styles.actionBtn}
+              title="Copy"
+              onClick={() => handleCopy(msg)}
+            >
+              <Copy size={14} />
+            </button>
+            {onRetry && (
+              <button
+                className={styles.actionBtn}
+                title="Retry"
+                onClick={() => onRetry(msg.id)}
+              >
+                <RefreshCw size={14} />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                className={styles.actionBtn}
+                title="Delete"
+                onClick={() => onDelete(msg.id)}
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+          {copiedMessageId === msg.id && (
+            <span className={styles.copyToast}>Copied!</span>
+          )}
+          {msg.blocks.map((block, i) => {
+            if (block.kind === 'text' && isStreaming && msg.id === lastMsg?.id) {
+              return <StreamingTextBlock key={i} content={block.content} isStreaming={true} />;
+            }
+            return <BlockRenderer key={i} block={block} t={t} />;
+          })}
+        </div>
+      );
+    },
+    [t, isStreaming, lastMsg?.id, copiedMessageId, handleCopy, onRetry, onDelete],
+  );
+
   return (
     <div className={styles.root}>
       <div
@@ -332,54 +448,10 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
       >
         {messages.length === 0 ? (
           <div className={styles.empty}>{t('chat.empty')}</div>
-        ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
-            >
-              <div className={styles.actionBar}>
-                <button
-                  className={styles.actionBtn}
-                  title="Copy"
-                  onClick={() => handleCopy(msg)}
-                >
-                  <Copy size={14} />
-                </button>
-                {onRetry && (
-                  <button
-                    className={styles.actionBtn}
-                    title="Retry"
-                    onClick={() => onRetry(msg.id)}
-                  >
-                    <RefreshCw size={14} />
-                  </button>
-                )}
-                {onDelete && (
-                  <button
-                    className={styles.actionBtn}
-                    title="Delete"
-                    onClick={() => onDelete(msg.id)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-              {copiedMessageId === msg.id && (
-                <span className={styles.copyToast}>Copied!</span>
-              )}
-              {msg.blocks.map((block, i) => {
-                if (block.kind === 'text' && isStreaming && msg.id === lastMsg?.id) {
-                  return <StreamingTextBlock key={i} content={block.content} isStreaming={true} />;
-                }
-                return <BlockRenderer key={i} block={block} t={t} />;
-              })}
-            </div>
-          ))
-        )}
+        ) : messages.map(renderMessage)}
         {isStreaming &&
           (lastMsgHasText ? (
-            <div className={styles.cursor} />
+            <div className={styles.streamProgress} />
           ) : (
             <div className={styles.typingDots}>
               <span />

@@ -86,7 +86,8 @@
   align-items: center;
   gap: var(--space-sm);
   width: 100%;
-  padding: var(--space-sm) var(--space-md);
+  min-height: 36px;
+  padding: 5px var(--space-md);
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -95,15 +96,15 @@
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
   text-align: left;
-  transition: background-color 0.15s ease;
 }
 
 .item:hover {
-  background: color-mix(in oklch, var(--primary) 10%, transparent);
+  background: var(--hover-overlay);
 }
 
 .selected {
-  background: color-mix(in oklch, var(--primary) 15%, transparent);
+  box-shadow: inset 3px 0 0 var(--primary);
+  background: var(--surface-raised);
 }
 
 .itemInfo {
@@ -123,12 +124,22 @@
 
 .meta {
   font-size: var(--font-size-xs);
-  opacity: 0.4;
+  color: var(--text-weaker);
 }
 
 .count {
   opacity: 0.7;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── unread dot ───────────────────────────── */
+
+.unreadDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
 }
 
 /* ── action error banner ──────────────────── */

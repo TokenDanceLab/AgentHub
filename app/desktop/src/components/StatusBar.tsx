@@ -12,12 +12,13 @@ interface Props {
   health: HealthResponse | null;
   isConnected: boolean;
   error: string | null;
+  projectPath?: string;
 }
 
 const LATENCY_GREEN = 50; // ms
 const LATENCY_YELLOW = 200; // ms
 
-export default memo(function StatusBar({ online, health, isConnected, error }: Props) {
+export default memo(function StatusBar({ online, health, isConnected, error, projectPath }: Props) {
   const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
@@ -107,6 +108,14 @@ export default memo(function StatusBar({ online, health, isConnected, error }: P
         </span>
       )}
       <span className={styles.spacer} />
+      {projectPath && (
+        <>
+          <span className={styles.separator} aria-hidden="true" />
+          <span className={styles.projectPath} title={projectPath}>
+            {projectPath}
+          </span>
+        </>
+      )}
       {isConnected ? <Wifi size={14} /> : <WifiOff size={14} />}
       <span
         className={styles.wsStatus}

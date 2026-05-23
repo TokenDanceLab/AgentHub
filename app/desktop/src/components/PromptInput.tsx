@@ -14,6 +14,8 @@ const COMMON_MODELS = [
 const REASONING_EFFORTS = ['low', 'medium', 'high', 'max'] as const;
 type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
+const MAX_CHARS = 4000;
+
 interface SendOptions {
   model?: string;
   reasoningEffort?: ReasoningEffort;
@@ -49,6 +51,7 @@ export default function PromptInput({
   const [model, setModel] = useState<string>('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [textareaFocused, setTextareaFocused] = useState(false);
 
   const models = useMemo(() => extractModels(agents), [agents]);
 
@@ -156,34 +159,48 @@ export default function PromptInput({
           <ChevronDown size={14} />
         </button>
 
-        <textarea
-          ref={textareaRef}
-          className={styles.textarea}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={t('prompt.placeholder')}
-          disabled={disabled}
-          rows={1}
-        />
+        <div className={styles.inputWrapper}>
+          <textarea
+            ref={textareaRef}
+            className={styles.textarea}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setTextareaFocused(true)}
+            onBlur={() => setTextareaFocused(false)}
+            placeholder={t('prompt.placeholder')}
+            disabled={disabled}
+            rows={1}
+          />
+          <div className={styles.inputFooter}>
+            <span className={styles.enterHint}>
+              <kbd className={styles.shortcutKey}>{textareaFocused ? 'Shift+Enter' : 'Enter'}</kbd>
+            </span>
+            <span className={styles.charCount}>
+              {prompt.length}/{MAX_CHARS}
+            </span>
+          </div>
+        </div>
 
         {isStreaming ? (
           <button
             className={styles.stopBtn}
             onClick={onCancel}
             disabled={disabled}
+            aria-label={t('action.cancelRun')}
+            title={t('action.cancelRun')}
           >
-            <Square size={12} fill="currentColor" />
-            {t('action.cancelRun')}
+            <Square size={16} fill="currentColor" />
           </button>
         ) : (
           <button
             className={styles.sendBtn}
             onClick={handleSend}
             disabled={disabled || !prompt.trim()}
+            aria-label={t('action.startRun')}
+            title={t('action.startRun')}
           >
-            <Send size={14} />
-            {t('action.startRun')}
+            <Send size={16} />
           </button>
         )}
       </div>

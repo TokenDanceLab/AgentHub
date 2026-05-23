@@ -65,6 +65,28 @@
   opacity: 0.85;
 }
 
+/* ── Separator ── */
+
+.separator {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+/* ── Project path ── */
+
+.projectPath {
+  font-size: var(--font-size-xs);
+  color: var(--text-weaker);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+  user-select: none;
+}
+
 /* ── Pulse animation (reconnecting) ── */
 
 @keyframes statusbarPulse {
