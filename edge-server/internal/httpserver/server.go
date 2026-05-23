@@ -41,10 +41,12 @@ func Run(cfg Config) error {
 	handler.RegisterRoutes(mux)
 
 	srv := &http.Server{
-		Addr:         cfg.Addr,
-		Handler:      corsMiddleware(mux),
+		Addr:    cfg.Addr,
+		Handler: corsMiddleware(mux),
+		// WriteTimeout=0: WebSocket connections are long-lived and manage their
+		// own deadlines. HTTP handlers are short-lived REST calls.
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 0,
 		IdleTimeout:  60 * time.Second,
 	}
 

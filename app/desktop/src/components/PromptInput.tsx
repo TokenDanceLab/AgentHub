@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Send, Circle } from 'lucide-react';
+import { ChevronDown, Send, Circle, Square } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
 import styles from './PromptInput.module.css';
 
@@ -24,6 +24,8 @@ interface Props {
   selectedAgentId?: string;
   onSelectAgent: (agentId: string) => void;
   onSend: (prompt: string, agentId?: string, opts?: SendOptions) => void;
+  isStreaming?: boolean;
+  onCancel?: () => void;
   disabled?: boolean;
 }
 
@@ -37,6 +39,8 @@ export default function PromptInput({
   selectedAgentId,
   onSelectAgent,
   onSend,
+  isStreaming = false,
+  onCancel,
   disabled,
 }: Props) {
   const { t } = useTranslation();
@@ -44,9 +48,18 @@ export default function PromptInput({
   const [showAgentSelector, setShowAgentSelector] = useState(false);
   const [model, setModel] = useState<string>('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const models = useMemo(() => extractModels(agents), [agents]);
+
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    }
+  }, [prompt]);
 
   const handleSend = useCallback(() => {
     const trimmed = prompt.trim();
@@ -82,7 +95,7 @@ export default function PromptInput({
               onClick={() => {
                 onSelectAgent(a.id);
                 setShowAgentSelector(false);
-                inputRef.current?.focus();
+                textareaRef.current?.focus();
               }}
               role="option"
               aria-selected={a.id === selectedAgentId}
@@ -143,24 +156,36 @@ export default function PromptInput({
           <ChevronDown size={14} />
         </button>
 
-        <input
-          ref={inputRef}
-          className={styles.input}
+        <textarea
+          ref={textareaRef}
+          className={styles.textarea}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('prompt.placeholder')}
           disabled={disabled}
+          rows={1}
         />
 
-        <button
-          className={styles.sendBtn}
-          onClick={handleSend}
-          disabled={disabled || !prompt.trim()}
-        >
-          <Send size={14} />
-          {t('action.startRun')}
-        </button>
+        {isStreaming ? (
+          <button
+            className={styles.stopBtn}
+            onClick={onCancel}
+            disabled={disabled}
+          >
+            <Square size={12} fill="currentColor" />
+            {t('action.cancelRun')}
+          </button>
+        ) : (
+          <button
+            className={styles.sendBtn}
+            onClick={handleSend}
+            disabled={disabled || !prompt.trim()}
+          >
+            <Send size={14} />
+            {t('action.startRun')}
+          </button>
+        )}
       </div>
     </div>
   );
