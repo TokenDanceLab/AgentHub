@@ -107,3 +107,31 @@ func UpdateLastReadSeq(db *gorm.DB, sessionID, memberID string, seq int64) error
 			sessionID, model.MemberTypeUser, memberID, seq).
 		Update("last_read_seq", seq).Error
 }
+
+// ReactivateMember clears left_at for a soft-deleted member, effectively re-adding them.
+func ReactivateMember(db *gorm.DB, sessionID, memberType, memberID string, role string) error {
+	result := db.Model(&model.SessionMember{}).
+		Where("session_id = ? AND member_type = ? AND member_id = ? AND left_at IS NOT NULL",
+			sessionID, memberType, memberID).
+		Updates(map[string]interface{}{
+			"left_at":   nil,
+			"role":      role,
+			"joined_at": time.Now(),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// IsMemberSoftDeleted checks if a member exists but has left (soft-deleted).
+func IsMemberSoftDeleted(db *gorm.DB, sessionID, memberType, memberID string) (bool, error) {
+	var count int64
+	err := db.Model(&model.SessionMember{}).
+		Where("session_id = ? AND member_type = ? AND member_id = ? AND left_at IS NOT NULL",
+			sessionID, memberType, memberID).Count(&count).Error
+	return count > 0, err
+}

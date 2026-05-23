@@ -218,12 +218,22 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 
 	members := make([]*model.SessionMember, 0, len(memberIDs))
 	for _, mid := range memberIDs {
+		// Reactivate soft-deleted members instead of creating duplicates.
+		softDeleted, _ := repository.IsMemberSoftDeleted(s.db, sessionID, model.MemberTypeUser, mid)
+		if softDeleted {
+			if err := repository.ReactivateMember(s.db, sessionID, model.MemberTypeUser, mid, model.MemberRoleMember); err != nil {
+				return err
+			}
+			continue
+		}
 		members = append(members, &model.SessionMember{
 			SessionID: sessionID, MemberType: model.MemberTypeUser, MemberID: mid, Role: model.MemberRoleMember,
 		})
 	}
-	if err := repository.BatchCreateMembers(s.db, members); err != nil {
-		return err
+	if len(members) > 0 {
+		if err := repository.BatchCreateMembers(s.db, members); err != nil {
+			return err
+		}
 	}
 	cache.Invalidate(ctx, "session:members:"+sessionID)
 	return nil
