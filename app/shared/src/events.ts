@@ -206,6 +206,17 @@ export interface AgentPermissionDecidedEvent extends EventEnvelope {
   };
 }
 
+export interface AgentPermissionDecideEvent extends EventEnvelope {
+  type: 'run.agent.permission_decide';
+  payload: {
+    runId: string;
+    requestId: string;
+    decision: 'allow' | 'deny';
+    reason?: string;
+    [key: string]: unknown;
+  };
+}
+
 // ── Union ─────────────────────────────────────
 
 export type AnyEvent =
@@ -224,5 +235,6 @@ export type AnyEvent =
   | AgentTaskDispatchedEvent
   | AgentPermissionRequestedEvent
   | AgentPermissionDecidedEvent
+  | AgentPermissionDecideEvent
   | ErrorEvent
   | EventEnvelope;

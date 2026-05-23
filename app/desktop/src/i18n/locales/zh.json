@@ -58,5 +58,19 @@
   "run.close": "关闭运行详情",
   "chat.viewFullDiff": "查看完整差异",
   "prompt.model": "模型",
-  "prompt.reasoning": "推理强度"
+  "prompt.reasoning": "推理强度",
+  "perm.title": "权限门控",
+  "perm.pending": "{{count}} 个工具等待审批",
+  "perm.lastDecided": "最近决策",
+  "perm.history": "权限历史",
+  "perm.dismissAll": "全部关闭",
+  "perm.collapse": "折叠",
+  "perm.dismiss": "关闭",
+  "perm.awaiting": "等待中",
+  "perm.allowed": "已允许",
+  "perm.denied": "已拒绝",
+  "perm.showInput": "显示输入",
+  "perm.hideInput": "隐藏输入",
+  "perm.allow": "允许",
+  "perm.deny": "拒绝"
 }
