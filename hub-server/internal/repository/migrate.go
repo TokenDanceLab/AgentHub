@@ -13,11 +13,19 @@ import (
 )
 
 func RunMigrations(cfg *config.DBConfig) error {
+	return runMigrations(cfg, "file://migrations")
+}
+
+func RunMigrationsFrom(cfg *config.DBConfig, sourceURL string) error {
+	return runMigrations(cfg, sourceURL)
+}
+
+func runMigrations(cfg *config.DBConfig, sourceURL string) error {
 	password := url.QueryEscape(cfg.Password)
 	pgURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 		cfg.User, password, cfg.Host, cfg.Port, cfg.Name)
 
-	m, err := migrate.New("file://migrations", pgURL)
+	m, err := migrate.New(sourceURL, pgURL)
 	if err != nil {
 		return fmt.Errorf("failed to create migrate instance: %w", err)
 	}

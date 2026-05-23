@@ -73,6 +73,7 @@ func SetupRoutes(r *gin.Engine, authHandler *handler.AuthHandler, wsHandler *han
 			sessions.POST("/:id/agents", agentHandler.AddAgentToSession)
 
 			sessions.GET("/:id/messages/search", messageHandler.SearchSessionMessages)
+			sessions.GET("/search", sessionHandler.SearchSessions)
 		}
 
 		messages := client.Group("/messages")
@@ -82,6 +83,7 @@ func SetupRoutes(r *gin.Engine, authHandler *handler.AuthHandler, wsHandler *han
 			messages.POST("/:id/pin", messageHandler.PinMessage)
 			messages.DELETE("/:id/pin", messageHandler.UnpinMessage)
 			messages.POST("/:id/forward", messageHandler.ForwardMessage)
+			messages.GET("/search", messageHandler.SearchMessages)
 		}
 
 		attachments := client.Group("/attachments")
@@ -99,9 +101,6 @@ func SetupRoutes(r *gin.Engine, authHandler *handler.AuthHandler, wsHandler *han
 			notifications.POST("/:id/read", notificationHandler.MarkRead)
 			notifications.POST("/read-all", notificationHandler.ReadAll)
 		}
-
-		client.GET("/sessions/search", sessionHandler.SearchSessions)
-		client.GET("/messages/search", messageHandler.SearchMessages)
 	}
 
 	edge := r.Group("/edge")

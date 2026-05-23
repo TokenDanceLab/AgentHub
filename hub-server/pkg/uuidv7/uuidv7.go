@@ -9,3 +9,4 @@ func New() (string, error) {
 	}
 	return id.String(), nil
 }
+func Must() string { id, _ := New(); return id }
