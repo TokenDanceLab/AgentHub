@@ -10,6 +10,11 @@
     "./types": "./src/types.ts",
     "./events": "./src/events.ts",
     "./errors": "./src/errors.ts",
-    "./tree": "./src/tree.ts"
+    "./tree": "./src/tree.ts",
+    "./diff": "./src/diff.ts"
+  },
+  "dependencies": {
+    "diff": "^8.0.2",
+    "@pierre/diffs": "^1.1.0-beta.18"
   }
 }
