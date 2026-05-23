@@ -44,6 +44,7 @@ func InitRedis(cfg *config.RedisConfig) error {
 	}
 
 	RDB = rdb
+	SetDefaultClient(NewClient(rdb))
 	slog.Info("redis connected", "addr", cfg.Addr())
 	return nil
 }
