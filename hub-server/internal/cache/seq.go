@@ -2,24 +2,19 @@ package cache
 
 import (
 	"context"
-	"strconv"
 )
 
-// AllocateSeq atomically increments and returns the next seq for a session.
+// Deprecated: use Client.AllocateSeq instead. Will be removed in Phase 5.
 func AllocateSeq(ctx context.Context, sessionID string) (int64, error) {
-	return RDB.Incr(ctx, "session:seq:"+sessionID).Result()
+	return defaultClient.AllocateSeq(ctx, sessionID)
 }
 
-// InitSeqIfAbsent initializes the seq key if it doesn't exist (SetNX, no TTL).
+// Deprecated: use Client.InitSeqIfAbsent instead. Will be removed in Phase 5.
 func InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error {
-	return RDB.SetNX(ctx, "session:seq:"+sessionID, seq, 0).Err()
+	return defaultClient.InitSeqIfAbsent(ctx, sessionID, seq)
 }
 
-// PeekSeq returns the current seq value for a session (diagnostics only).
+// Deprecated: use Client.PeekSeq instead. Will be removed in Phase 5.
 func PeekSeq(ctx context.Context, sessionID string) (int64, error) {
-	s, err := RDB.Get(ctx, "session:seq:"+sessionID).Result()
-	if err != nil {
-		return 0, err
-	}
-	return strconv.ParseInt(s, 10, 64)
+	return defaultClient.PeekSeq(ctx, sessionID)
 }
