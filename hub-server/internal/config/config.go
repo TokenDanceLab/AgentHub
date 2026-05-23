@@ -19,10 +19,10 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port     int    `mapstructure:"port"`
-	LogLevel string `mapstructure:"log_level"`
-	LogFile  string `mapstructure:"log_file"`
-	AdminPort int   `mapstructure:"admin_port"`
+	Port      int    `mapstructure:"port"`
+	LogLevel  string `mapstructure:"log_level"`
+	LogFile   string `mapstructure:"log_file"`
+	AdminPort int    `mapstructure:"admin_port"`
 }
 
 type DBConfig struct {
@@ -39,12 +39,12 @@ func (d DBConfig) DSN() string {
 }
 
 type RedisConfig struct {
-	Host        string `mapstructure:"host"`
-	Port        int    `mapstructure:"port"`
-	Password    string `mapstructure:"password"`
-	DB          int    `mapstructure:"db"`
-	PoolSize    int    `mapstructure:"pool_size"`
-	MinIdleConns int   `mapstructure:"min_idle_conns"`
+	Host         string `mapstructure:"host"`
+	Port         int    `mapstructure:"port"`
+	Password     string `mapstructure:"password"`
+	DB           int    `mapstructure:"db"`
+	PoolSize     int    `mapstructure:"pool_size"`
+	MinIdleConns int    `mapstructure:"min_idle_conns"`
 }
 
 func (r RedisConfig) Addr() string {

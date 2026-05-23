@@ -273,12 +273,12 @@ func TestRouteCRUD_TableDriven(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name      string
-		userID    string
-		device    string
-		connID    string
-		wantConn  string
-		wantErr   bool
+		name     string
+		userID   string
+		device   string
+		connID   string
+		wantConn string
+		wantErr  bool
 	}{
 		{"desktop route", "alice", "desktop", "dc-1", "dc-1", false},
 		{"mobile route", "alice", "mobile", "mc-1", "mc-1", false},

@@ -20,16 +20,16 @@ import (
 
 // SQL substrings used for matching (QueryMatcherFunc with strings.Contains)
 const (
-	sqlcUserByID           = `FROM "users" WHERE id =`
-	sqlcUsersByIDs         = `FROM "users" WHERE id IN`
-	sqlcFriendshipBetween  = `FROM "friendships" WHERE (user_id`
-	sqlcFriendshipByID     = `FROM "friendships" WHERE id =`
-	sqlcFriendshipByUF     = `FROM "friendships" WHERE user_id = $1 AND friend_id = $2`
-	sqlcFriendshipsByUser  = `FROM "friendships" WHERE user_id = $1 AND status = $2`
-	sqlcPendingReqs        = `FROM "friendships" WHERE friend_id = $1 AND status = $2`
-	sqlcInsertFriend       = `INSERT INTO "friendships"`
-	sqlcUpdateFriend       = `UPDATE "friendships" SET`
-	sqlcDeleteFriend       = `DELETE FROM "friendships" WHERE`
+	sqlcUserByID          = `FROM "users" WHERE id =`
+	sqlcUsersByIDs        = `FROM "users" WHERE id IN`
+	sqlcFriendshipBetween = `FROM "friendships" WHERE (user_id`
+	sqlcFriendshipByID    = `FROM "friendships" WHERE id =`
+	sqlcFriendshipByUF    = `FROM "friendships" WHERE user_id = $1 AND friend_id = $2`
+	sqlcFriendshipsByUser = `FROM "friendships" WHERE user_id = $1 AND status = $2`
+	sqlcPendingReqs       = `FROM "friendships" WHERE friend_id = $1 AND status = $2`
+	sqlcInsertFriend      = `INSERT INTO "friendships"`
+	sqlcUpdateFriend      = `UPDATE "friendships" SET`
+	sqlcDeleteFriend      = `DELETE FROM "friendships" WHERE`
 )
 
 func newMockDBContact(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
