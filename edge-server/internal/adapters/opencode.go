@@ -107,8 +107,16 @@ func (a *OpenCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, std
 }
 
 func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
+	// Forward sessionID to scope if present
+	if evt.SessionID != "" {
+		scope["sessionId"] = evt.SessionID
+	}
+
 	switch evt.Type {
 	case "step_start":
+		emitter.Emit(BusEventSessionInit, scope, map[string]any{
+			"sessionId": evt.SessionID,
+		})
 		emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
 			"state": "busy",
 		})
@@ -135,11 +143,17 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 		}
 	case "step_finish":
 		if evt.Part != nil {
-			emitter.Emit(BusEventResult, scope, map[string]any{
+			result := map[string]any{
 				"success": evt.Part.Reason == "stop",
 				"reason":  evt.Part.Reason,
-				"usage":   evt.Part.Usage,
-			})
+			}
+			if evt.Part.Tokens != nil {
+				result["usage"] = evt.Part.Tokens
+			}
+			if evt.Part.Cost > 0 {
+				result["cost"] = evt.Part.Cost
+			}
+			emitter.Emit(BusEventResult, scope, result)
 		}
 		emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
 			"state": "idle",
@@ -165,11 +179,27 @@ type opencodeEvent struct {
 }
 
 type opencodePart struct {
-	Text     string `json:"text,omitempty"`
-	CallID   string `json:"callId,omitempty"`
-	ToolName string `json:"toolName,omitempty"`
-	Input    any    `json:"input,omitempty"`
-	State    string `json:"state,omitempty"`
-	Reason   string `json:"reason,omitempty"`
-	Usage    any    `json:"usage,omitempty"`
+	ID       string          `json:"id,omitempty"`
+	Text     string          `json:"text,omitempty"`
+	CallID   string          `json:"callId,omitempty"`
+	ToolName string          `json:"toolName,omitempty"`
+	Input    any             `json:"input,omitempty"`
+	State    string          `json:"state,omitempty"`
+	Reason   string          `json:"reason,omitempty"`
+	Type     string          `json:"type,omitempty"`
+	Tokens   *opencodeTokens `json:"tokens,omitempty"`
+	Cost     float64         `json:"cost,omitempty"`
+}
+
+type opencodeTokens struct {
+	Total     int           `json:"total"`
+	Input     int           `json:"input"`
+	Output    int           `json:"output"`
+	Reasoning int           `json:"reasoning"`
+	Cache     opencodeCache `json:"cache"`
+}
+
+type opencodeCache struct {
+	Write int `json:"write"`
+	Read  int `json:"read"`
 }
