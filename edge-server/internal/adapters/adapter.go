@@ -83,6 +83,7 @@ const (
 	BusEventStatusChange        = "run.agent.status_change"
 	BusEventAPIRetry            = "run.agent.api_retry"
 	BusEventTaskStarted         = "run.agent.task_started"
+	BusEventTaskDispatched      = "run.agent.task_dispatched"
 	BusEventTaskProgress        = "run.agent.task_progress"
 	BusEventTaskNotification    = "run.agent.task_notification"
 	BusEventSessionStateChanged = "run.agent.session_state_changed"
