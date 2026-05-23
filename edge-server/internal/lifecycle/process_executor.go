@@ -439,43 +439,10 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
 	if budget, ok := ctx.Value(adapters.CtxBudgetKey).(*runnerctx.ContextBudget); ok && budget != nil {
-		emitter = &budgetAwareEmitter{
-			inner:     emitter,
-			budget:    budget,
-			scope:     runScope(run),
-		}
+		emitter = adapters.NewBudgetAwareEmitter(emitter, budget, runScope(run))
 	}
 
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
 		slog.Error("structured output parse error", "runId", run.ID, "err", err)
 	}
-}
-
-// budgetAwareEmitter wraps an EventEmitter to emit run.agent.context_warning
-// when the context budget first crosses the 85% auto-compaction threshold.
-// It suppresses duplicate warnings for the same run.
-type budgetAwareEmitter struct {
-	inner  adapters.EventEmitter
-	budget *runnerctx.ContextBudget
-	scope  map[string]any
-	mu     sync.Mutex
-	warned bool
-}
-
-func (e *budgetAwareEmitter) Emit(eventType string, scope map[string]any, payload any) {
-	e.inner.Emit(eventType, scope, payload)
-
-	if eventType == adapters.BusEventContextWarning {
-		return // Prevent recursive emission
-	}
-
-	e.mu.Lock()
-	if !e.warned && e.budget.ShouldCompact() {
-		e.warned = true
-		e.inner.Emit(adapters.BusEventContextWarning, e.scope, map[string]any{
-			"usagePercent": e.budget.UsagePercent(),
-			"threshold":    85.0,
-		})
-	}
-	e.mu.Unlock()
 }

@@ -198,8 +198,8 @@ func TestRedisConfigAddr(t *testing.T) {
 	}
 }
 
-func TestLoadGlobalCfgSet(t *testing.T) {
-	// Load() should also set the global Cfg variable.
+func TestLoadReturnsCorrectConfig(t *testing.T) {
+	// Load() returns the parsed config; no global variable.
 	yaml := `
 jwt:
   access_ttl: 15m
@@ -213,11 +213,11 @@ jwt:
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if Cfg != cfg {
-		t.Fatal("global Cfg variable was not set by Load()")
+	if cfg == nil {
+		t.Fatal("Load() returned nil config")
 	}
-	if Cfg == nil {
-		t.Fatal("global Cfg is nil after Load()")
+	if cfg.JWT.Secret != "global-test-secret" {
+		t.Errorf("JWT.Secret = %q, want %q", cfg.JWT.Secret, "global-test-secret")
 	}
 }
 
