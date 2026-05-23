@@ -1,9 +1,11 @@
 import { useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Copy, RefreshCw, Trash2, ArrowDown } from 'lucide-react';
+import { Copy, RefreshCw, Trash2, ArrowDown, MessageSquare } from 'lucide-react';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
+import CodeBlock from './CodeBlock';
+import EmptyState from './EmptyState';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToast } from '@/contexts/ToastContext';
@@ -272,12 +274,7 @@ function BlockRenderer({
       return <MarkdownRenderer content={block.content} />;
 
     case 'code':
-      return (
-        <pre className={styles.codeBlock}>
-          {block.language && <span className={styles.codeLang}>{block.language}</span>}
-          <code>{block.content}</code>
-        </pre>
-      );
+      return <CodeBlock content={block.content} language={block.language} />;
 
     case 'thinking':
       return <ThinkingBlock content={block.content} />;
@@ -476,7 +473,11 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
         aria-live="polite"
       >
         {messages.length === 0 ? (
-          <div className={styles.empty}>{t('chat.empty')}</div>
+          <EmptyState
+            icon={<MessageSquare size={24} />}
+            title={t('chat.emptyTitle')}
+            description={t('chat.emptyDescription')}
+          />
         ) : (
           <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative', flexShrink: 0 }}>
             {virtualizer.getVirtualItems().map((virtualRow) => {
