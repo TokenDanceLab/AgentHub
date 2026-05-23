@@ -1,0 +1,120 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.empty {
+  padding: var(--space-md);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+/* ── File Section ─────── */
+.fileSection {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.fileHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 6px var(--space-md);
+  border: none;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+  position: sticky;
+  top: 0;
+}
+.fileHeader:hover { background: var(--card); }
+
+.filePath { font-weight: var(--font-weight-medium); flex: 1; }
+
+.addedCount { color: var(--diff-added-border); font-weight: var(--font-weight-medium); }
+.deletedCount { color: var(--diff-removed-border); font-weight: var(--font-weight-medium); }
+
+.chevron {
+  font-size: 10px;
+  transition: transform var(--duration-fast);
+  opacity: 0.4;
+}
+.chevronDown { transform: rotate(90deg); }
+
+/* ── Status badges ─────── */
+.statusAdded {
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: var(--diff-added-bg);
+  color: var(--diff-added-border);
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+}
+.statusDeleted {
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: var(--diff-removed-bg);
+  color: var(--diff-removed-border);
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+}
+.statusModified {
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: color-mix(in oklch, var(--primary) 15%, transparent);
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── File body ─────────── */
+.fileBody {
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* ── Hunk ──────────────── */
+.hunkHeader {
+  padding: 2px var(--space-md);
+  background: color-mix(in oklch, var(--primary) 8%, transparent);
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.lineAdded {
+  background: var(--diff-added-bg);
+  display: flex;
+}
+.lineDeleted {
+  background: var(--diff-removed-bg);
+  display: flex;
+}
+.lineContext {
+  display: flex;
+}
+
+.lineNum {
+  width: 40px;
+  text-align: right;
+  padding-right: var(--space-sm);
+  color: var(--muted-foreground);
+  opacity: 0.5;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.lineContent {
+  flex: 1;
+  white-space: pre;
+  overflow-x: auto;
+  padding-right: var(--space-md);
+}

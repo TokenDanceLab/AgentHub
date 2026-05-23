@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RunInfo } from '@shared/types';
+import type { FileDiff } from './ChatView.types';
+import DiffViewer from './DiffViewer';
 import styles from './RunDetail.module.css';
 
 interface Props {
@@ -8,11 +10,12 @@ interface Props {
   toolCalls: Array<{ callId: string; toolName: string; status: string; timestamp: string }>;
   changedFiles: Array<{ path: string; action: string; timestamp: string }>;
   outputText: string;
+  diffs?: FileDiff[];
 }
 
 type TabId = 'output' | 'toolCalls' | 'fileChanges';
 
-export default function RunDetail({ run, toolCalls, changedFiles, outputText }: Props) {
+export default function RunDetail({ run, toolCalls, changedFiles, outputText, diffs }: Props) {
   const { t } = useTranslation();
 
   if (!run) {
@@ -35,6 +38,13 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText }: 
 
   const defaultTab: TabId = outputText ? 'output' : toolCalls.length > 0 ? 'toolCalls' : 'fileChanges';
   const [selectedTab, setSelectedTab] = useState<TabId>(defaultTab);
+
+  // Listen for agenthub:open-diff → switch to fileChanges tab
+  useEffect(() => {
+    const handler = () => setSelectedTab('fileChanges');
+    window.addEventListener('agenthub:open-diff', handler);
+    return () => window.removeEventListener('agenthub:open-diff', handler);
+  }, []);
 
   const hasOutput = !!outputText;
   const hasToolCalls = toolCalls.length > 0;
@@ -106,14 +116,18 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText }: 
               </div>
             )}
             {activeTab === 'fileChanges' && (
-              <div className={styles.list}>
-                {changedFiles.map((f) => (
-                  <div key={f.path} className={styles.item}>
-                    <code className={styles.filePath}>{f.path}</code>
-                    <span className={styles.action}>{f.action}</span>
-                  </div>
-                ))}
-              </div>
+              diffs && diffs.length > 0 ? (
+                <DiffViewer files={diffs} />
+              ) : (
+                <div className={styles.list}>
+                  {changedFiles.map((f) => (
+                    <div key={f.path} className={styles.item}>
+                      <code className={styles.filePath}>{f.path}</code>
+                      <span className={styles.action}>{f.action}</span>
+                    </div>
+                  ))}
+                </div>
+              )
             )}
           </div>
         </>
