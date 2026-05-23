@@ -370,7 +370,7 @@ Hub 调度（远程）:
 
 - [x] **P0-4: 性能基础** `[2d]`
   - ✅ 虚拟滚动：`@tanstack/react-virtual`（M5 完成，`ChatView.tsx` + `useAutoScroll.ts`）
-  - [ ] App.tsx 视图注册表拆分：新建 `viewRegistry.ts`，从 500+ 行拆分
+  - ✅ App.tsx 视图注册表拆分（`viewRegistry.ts` + `Slot` 模式，651→531 行）
 
 ##### Quick Wins（<1 天 / 项）
 
