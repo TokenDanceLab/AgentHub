@@ -75,7 +75,7 @@ func (h *Handler) ensureDefaults() {
 	if h.Store == nil {
 		return
 	}
-	h.Store.CreateProject("proj_local", "Local Project")
+	_, _ = h.Store.CreateProject("proj_local", "Local Project")
 	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Local Thread")
 }
 
@@ -197,7 +197,11 @@ func (h *Handler) PostProjects(w http.ResponseWriter, r *http.Request) {
 	if req.ProjectID == "" {
 		req.ProjectID = genID("proj_")
 	}
-	project := ensureStore(h).CreateProject(req.ProjectID, req.Name)
+	project, err := ensureStore(h).CreateProject(req.ProjectID, req.Name)
+	if errors.Is(err, store.ErrProjectExists) {
+		writeJSON(w, http.StatusOK, project)
+		return
+	}
 	h.Bus.Publish("project.created", map[string]any{"projectId": project.ID}, project)
 	writeJSON(w, http.StatusCreated, project)
 }
