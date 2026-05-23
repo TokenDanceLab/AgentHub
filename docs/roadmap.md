@@ -85,7 +85,7 @@ feat/trump-webui          ← Web 前端（Trump）
 - [x] OpenCode E2E：5/5 pass — text_delta + session_init + result + finished 全链路
 - [ ] Codex E2E：二进制可用但未实测（需额度）
 - [x] 环境隔离：envForRun 传递完整父进程环境给 Agent CLI（MEDIUM，已知风险）
-- [ ] Hub auth middleware：在 stub 转真实实现前必须接入
+- [x] Hub auth middleware：JWT Bearer 令牌验证 + 路由跳过（hub-server）
 - [x] 权限门控升级：Desktop 主动批准/拒绝 + 60s 超时自动拒绝
 - [ ] Web 前端集成：feat/trump-webui → dev/delicious233 合并
 - [x] 响应式布局 + 移动端适配
