@@ -1,495 +1,1175 @@
-const pageHtml: string = [
-  "<!DOCTYPE html>",
-  "",
-  "<html lang=\"en\"><head>",
-  "<meta charset=\"utf-8\"/>",
-  "<meta content=\"width=device-width, initial-scale=1.0\" name=\"viewport\"/>",
-  "<title>AetherFlow | Nexus Core Chat</title>",
-  "<script src=\"https://cdn.tailwindcss.com?plugins=forms,container-queries\"></script>",
-  "<script id=\"tailwind-config\">",
-  "    tailwind.config = {",
-  "        darkMode: \"class\",",
-  "        theme: {",
-  "            extend: {",
-  "                \"colors\": {",
-  "                    \"on-tertiary-container\": \"#ffffff\",",
-  "                    \"surface-tint\": \"#0060ab\",",
-  "                    \"outline-variant\": \"#c0c7d4\",",
-  "                    \"on-background\": \"#1a1c1c\",",
-  "                    \"secondary-fixed\": \"#ecdcff\",",
-  "                    \"on-surface-variant\": \"#404752\",",
-  "                    \"on-primary-fixed\": \"#001c39\",",
-  "                    \"tertiary\": \"#006a5c\",",
-  "                    \"surface\": \"#f9f9f9\",",
-  "                    \"outline\": \"#717783\",",
-  "                    \"on-primary-container\": \"#ffffff\",",
-  "                    \"surface-container-high\": \"#e8e8e8\",",
-  "                    \"tertiary-fixed\": \"#91f4e1\",",
-  "                    \"inverse-primary\": \"#a3c9ff\",",
-  "                    \"surface-container\": \"#eeeeee\",",
-  "                    \"on-secondary\": \"#ffffff\",",
-  "                    \"background\": \"#f9f9f9\",",
-  "                    \"secondary-container\": \"#9040ff\",",
-  "                    \"on-tertiary\": \"#ffffff\",",
-  "                    \"on-primary\": \"#ffffff\",",
-  "                    \"on-error-container\": \"#93000a\",",
-  "                    \"tertiary-fixed-dim\": \"#75d8c5\",",
-  "                    \"on-tertiary-fixed-variant\": \"#005046\",",
-  "                    \"surface-bright\": \"#f9f9f9\",",
-  "                    \"inverse-on-surface\": \"#f1f1f1\",",
-  "                    \"error\": \"#ba1a1a\",",
-  "                    \"on-secondary-container\": \"#fdf6ff\",",
-  "                    \"secondary-fixed-dim\": \"#d6baff\",",
-  "                    \"secondary\": \"#7615e6\",",
-  "                    \"inverse-surface\": \"#2f3131\",",
-  "                    \"surface-dim\": \"#dadada\",",
-  "                    \"surface-container-lowest\": \"#ffffff\",",
-  "                    \"on-tertiary-fixed\": \"#00201b\",",
-  "                    \"on-primary-fixed-variant\": \"#004883\",",
-  "                    \"on-secondary-fixed\": \"#270057\",",
-  "                    \"surface-variant\": \"#e2e2e2\",",
-  "                    \"tertiary-container\": \"#0a8575\",",
-  "                    \"primary-fixed-dim\": \"#a3c9ff\",",
-  "                    \"on-surface\": \"#1a1c1c\",",
-  "                    \"surface-container-highest\": \"#e2e2e2\",",
-  "                    \"primary\": \"#005faa\",",
-  "                    \"primary-container\": \"#0078d4\",",
-  "                    \"error-container\": \"#ffdad6\",",
-  "                    \"on-error\": \"#ffffff\",",
-  "                    \"on-secondary-fixed-variant\": \"#5f00c0\",",
-  "                    \"surface-container-low\": \"#f3f3f3\",",
-  "                    \"primary-fixed\": \"#d3e3ff\"",
-  "                },",
-  "                \"borderRadius\": {",
-  "                    \"DEFAULT\": \"0.25rem\",",
-  "                    \"lg\": \"0.5rem\",",
-  "                    \"xl\": \"0.75rem\",",
-  "                    \"full\": \"9999px\"",
-  "                },",
-  "                \"spacing\": {",
-  "                    \"max-width\": \"1440px\",",
-  "                    \"margin-desktop\": \"48px\",",
-  "                    \"margin-mobile\": \"16px\",",
-  "                    \"unit\": \"4px\",",
-  "                    \"gutter\": \"24px\",",
-  "                    \"stack-sm\": \"8px\",",
-  "                    \"stack-md\": \"16px\",",
-  "                    \"stack-lg\": \"24px\",",
-  "                    \"stack-xl\": \"32px\"",
-  "                },",
-  "                \"fontFamily\": {",
-  "                    \"label-md\": [\"Hanken Grotesk\"],",
-  "                    \"headline-lg-mobile\": [\"Hanken Grotesk\"],",
-  "                    \"headline-lg\": [\"Hanken Grotesk\"],",
-  "                    \"headline-md\": [\"Hanken Grotesk\"],",
-  "                    \"label-sm\": [\"Hanken Grotesk\"],",
-  "                    \"display\": [\"Hanken Grotesk\"],",
-  "                    \"body-lg\": [\"Hanken Grotesk\"],",
-  "                    \"body-md\": [\"Hanken Grotesk\"]",
-  "                },",
-  "                \"fontSize\": {",
-  "                    \"label-caps\": [\"12px\", { \"lineHeight\": \"1.4\", \"letterSpacing\": \"0.05em\", \"fontWeight\": \"600\" }],",
-  "                    \"display-lg\": [\"24px\", { \"lineHeight\": \"1.2\", \"fontWeight\": \"700\" }],",
-  "                    \"body-md\": [\"16px\", { \"lineHeight\": \"1.5\", \"fontWeight\": \"400\" }]",
-  "                }",
-  "            }",
-  "        }",
-  "    }",
-  "</script>",
-  "<link href=\"https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;display=swap\" rel=\"stylesheet\"/>",
-  "<link href=\"https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap\" rel=\"stylesheet\"/>",
-  "<style>",
-  "    body {",
-  "        background-color: #f3f3f3; /* surface-container-low */",
-  "        overflow: hidden;",
-  "        font-family: 'Hanken Grotesk', sans-serif;",
-  "    }",
-  "",
-  "    .dewdrop-card {",
-  "        background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);",
-  "        backdrop-filter: blur(64px) saturate(150%);",
-  "        -webkit-backdrop-filter: blur(64px) saturate(150%);",
-  "        border: 1.5px solid transparent;",
-  "        background-clip: padding-box;",
-  "        box-shadow: ",
-  "            0 20px 40px -10px rgba(0, 120, 212, 0.15),",
-  "            0 10px 20px -5px rgba(0, 120, 212, 0.1),",
-  "            inset 2px 2px 4px rgba(255, 255, 255, 0.6),",
-  "            inset -2px -2px 4px rgba(255, 255, 255, 0.1);",
-  "        position: relative;",
-  "        transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);",
-  "    }",
-  "    ",
-  "    .dewdrop-card::after {",
-  "        content: '';",
-  "        position: absolute;",
-  "        inset: 0;",
-  "        border-radius: inherit;",
-  "        padding: 1.5px;",
-  "        background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.2) 30%, rgba(255, 255, 255, 0) 100%);",
-  "        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);",
-  "        -webkit-mask-composite: xor;",
-  "        mask-composite: exclude;",
-  "        pointer-events: none;",
-  "    }",
-  "",
-  "    .dewdrop-card::before {",
-  "        content: '';",
-  "        position: absolute;",
-  "        top: 6px;",
-  "        left: 6px;",
-  "        width: 16px;",
-  "        height: 16px;",
-  "        border-radius: 50%;",
-  "        background: radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 70%);",
-  "        pointer-events: none;",
-  "        z-index: 10;",
-  "    }",
-  "",
-  "    .dewdrop-card:hover {",
-  "        transform: translateY(-4px) scale(1.01);",
-  "        box-shadow: ",
-  "            0 30px 50px -12px rgba(0, 120, 212, 0.2),",
-  "            inset 2px 2px 5px rgba(255, 255, 255, 0.8),",
-  "            inset -2px -2px 5px rgba(255, 255, 255, 0.2);",
-  "        background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.1) 100%);",
-  "    }",
-  "",
-  "    .dewdrop-panel {",
-  "        background: rgba(255, 255, 255, 0.1);",
-  "        backdrop-filter: blur(64px) saturate(150%);",
-  "        -webkit-backdrop-filter: blur(64px) saturate(150%);",
-  "        border: 1.5px solid rgba(255, 255, 255, 0.1);",
-  "        border-top-color: rgba(255, 255, 255, 0.8);",
-  "        border-left-color: rgba(255, 255, 255, 0.6);",
-  "        box-shadow: ",
-  "            0 20px 50px -10px rgba(0, 120, 212, 0.12),",
-  "            inset 1px 1px 2px rgba(255, 255, 255, 0.7),",
-  "            inset -1px -1px 2px rgba(255, 255, 255, 0.1);",
-  "        position: relative;",
-  "        overflow: hidden;",
-  "    }",
-  "",
-  "    .dewdrop-panel::before {",
-  "        content: '';",
-  "        position: absolute;",
-  "        top: 0;",
-  "        left: 0;",
-  "        width: 120px;",
-  "        height: 120px;",
-  "        background: radial-gradient(circle at 0 0, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0) 70%);",
-  "        pointer-events: none;",
-  "    }",
-  "",
-  "    .user-bubble {",
-  "        background-color: #0078d4; /* primary-container */",
-  "        color: #ffffff;",
-  "        border: none;",
-  "        box-shadow: 0 4px 15px rgba(0, 120, 212, 0.2);",
-  "    }",
-  "    ",
-  "    .luminous-button {",
-  "        background: #0078d4;",
-  "        transition: all 0.3s ease;",
-  "        box-shadow: 0 4px 15px rgba(0, 120, 212, 0.4);",
-  "    }",
-  "    .luminous-button:hover {",
-  "        background: #005faa;",
-  "        transform: scale(1.02);",
-  "        box-shadow: 0 6px 20px rgba(0, 120, 212, 0.6);",
-  "    }",
-  "",
-  "    .agent-chip-cyan { border-left: 4px solid #005faa; }",
-  "    .agent-chip-violet { border-left: 4px solid #7615e6; }",
-  "    .agent-chip-teal { border-left: 4px solid #0a8575; }",
-  "",
-  "    .custom-scrollbar::-webkit-scrollbar {",
-  "        width: 4px;",
-  "    }",
-  "    .custom-scrollbar::-webkit-scrollbar-track {",
-  "        background: transparent;",
-  "    }",
-  "    .custom-scrollbar::-webkit-scrollbar-thumb {",
-  "        background: rgba(0, 0, 0, 0.1);",
-  "        border-radius: 10px;",
-  "    }",
-  "    .material-symbols-outlined {",
-  "        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;",
-  "    }",
-  "    ",
-  "    /* Antigravity particles */",
-  "    .particles-container {",
-  "        position: absolute;",
-  "        inset: 0;",
-  "        overflow: hidden;",
-  "        z-index: 0;",
-  "        pointer-events: none;",
-  "    }",
-  "    .particle {",
-  "        position: absolute;",
-  "        background: radial-gradient(circle, rgba(0, 120, 212, 0.15) 0%, rgba(0, 120, 212, 0) 70%);",
-  "        border-radius: 50%;",
-  "        animation: float-up infinite linear;",
-  "    }",
-  "    @keyframes float-up {",
-  "        0% { transform: translateY(100vh) scale(0.5); opacity: 0; }",
-  "        50% { opacity: 1; }",
-  "        100% { transform: translateY(-20vh) scale(1.5); opacity: 0; }",
-  "    }",
-  "</style>",
-  "</head>",
-  "<body class=\"bg-surface-container-low flex items-center justify-center min-h-screen\">",
-  "<div class=\"particles-container\">",
-  "<div class=\"particle\" style=\"width: 100px; height: 100px; left: 10%; animation-duration: 25s; animation-delay: 0s;\"></div>",
-  "<div class=\"particle\" style=\"width: 150px; height: 150px; left: 30%; animation-duration: 35s; animation-delay: -5s;\"></div>",
-  "<div class=\"particle\" style=\"width: 80px; height: 80px; left: 60%; animation-duration: 20s; animation-delay: -10s;\"></div>",
-  "<div class=\"particle\" style=\"width: 200px; height: 200px; left: 80%; animation-duration: 40s; animation-delay: -15s;\"></div>",
-  "<div class=\"particle\" style=\"width: 120px; height: 120px; left: 40%; animation-duration: 30s; animation-delay: -20s;\"></div>",
-  "</div>",
-  "<div class=\"w-[1280px] h-[1024px] bg-surface-container-low/50 relative overflow-hidden shadow-2xl flex flex-col z-10\">",
-  "<aside class=\"dewdrop-panel rounded-r-[32px] absolute left-0 top-0 h-full flex flex-col p-6 z-40 w-64 mix-blend-normal border-r border-white/20\">",
-  "<div class=\"mb-10 mt-2\">",
-  "<a class=\"flex items-center gap-2 text-on-surface-variant hover:text-primary-container transition-colors font-label-caps text-label-caps mb-8 cursor-pointer\" href=\"#\">",
-  "<span class=\"material-symbols-outlined text-[18px]\" data-icon=\"arrow_back\">arrow_back</span>",
-  "Dashboard",
-  "</a>",
-  "<h1 class=\"font-display-lg text-display-lg text-primary-container\">Data Sync</h1>",
-  "<p class=\"font-label-caps text-label-caps text-on-surface-variant mt-2 tracking-widest uppercase\">Workspace</p>",
-  "</div>",
-  "<nav class=\"flex-1 space-y-8\">",
-  "<div>",
-  "<h3 class=\"font-label-caps text-label-caps text-on-surface-variant mb-3 uppercase tracking-widest\">Project Context</h3>",
-  "<div class=\"space-y-2\">",
-  "<a class=\"flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ease-in-out bg-primary/10 text-primary-container border-l-2 border-primary-container cursor-pointer\" href=\"#\">",
-  "<span class=\"material-symbols-outlined text-[18px]\" data-icon=\"description\">description</span>",
-  "<span class=\"font-label-caps text-label-caps\">Legacy Migration</span>",
-  "</a>",
-  "<a class=\"flex items-center gap-3 px-4 py-2.5 rounded-xl transition-colors duration-200 ease-in-out text-on-surface-variant hover:bg-black/5 hover:text-on-surface cursor-pointer\" href=\"#\">",
-  "<span class=\"material-symbols-outlined text-[18px]\" data-icon=\"rule\">rule</span>",
-  "<span class=\"font-label-caps text-label-caps\">Mapping Rules</span>",
-  "</a>",
-  "</div>",
-  "</div>",
-  "<div>",
-  "<h3 class=\"font-label-caps text-label-caps text-on-surface-variant mb-3 uppercase tracking-widest\">Agent Participants</h3>",
-  "<div class=\"space-y-2\">",
-  "<div class=\"flex items-center gap-3 px-4 py-2 rounded-xl\">",
-  "<div class=\"w-2 h-2 rounded-full bg-primary-container\"></div>",
-  "<span class=\"font-label-caps text-label-caps text-on-surface\">DataAgent Alpha</span>",
-  "</div>",
-  "<div class=\"flex items-center gap-3 px-4 py-2 rounded-xl\">",
-  "<div class=\"w-2 h-2 rounded-full bg-secondary animate-pulse\"></div>",
-  "<span class=\"font-label-caps text-label-caps text-on-surface\">CodeSmith</span>",
-  "</div>",
-  "<div class=\"flex items-center gap-3 px-4 py-2 rounded-xl\">",
-  "<div class=\"w-2 h-2 rounded-full bg-tertiary-container\"></div>",
-  "<span class=\"font-label-caps text-label-caps text-on-surface\">Security-Core</span>",
-  "</div>",
-  "</div>",
-  "</div>",
-  "</nav>",
-  "<div class=\"mt-auto space-y-2 pt-6 border-t border-white/40\">",
-  "<a class=\"flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-black/5 cursor-pointer rounded-xl\" href=\"#\">",
-  "<span class=\"material-symbols-outlined\" data-icon=\"description\">description</span>",
-  "<span class=\"font-label-caps text-label-caps\">Docs</span>",
-  "</a>",
-  "<a class=\"flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-black/5 cursor-pointer rounded-xl\" href=\"#\">",
-  "<span class=\"material-symbols-outlined\" data-icon=\"help\">help</span>",
-  "<span class=\"font-label-caps text-label-caps\">Help</span>",
-  "</a>",
-  "</div>",
-  "</aside>",
-  "<main class=\"ml-64 flex flex-col h-full overflow-hidden relative z-10\">",
-  "<header class=\"dewdrop-panel rounded-b-[32px] mx-6 mt-4 flex justify-between items-center px-10 h-20 z-50 shrink-0 mix-blend-normal\">",
-  "<div class=\"flex items-center gap-8\">",
-  "<span class=\"font-display-lg text-display-lg text-primary-container\">AetherFlow</span>",
-  "<div class=\"relative group hidden lg:block\">",
-  "<span class=\"absolute inset-y-0 left-3 flex items-center text-on-surface-variant\">",
-  "<span class=\"material-symbols-outlined text-sm\" data-icon=\"search\">search</span>",
-  "</span>",
-  "<input class=\"bg-white/50 border border-white/40 rounded-full py-2 pl-10 pr-4 text-body-md font-body-md focus:outline-none focus:ring-2 focus:ring-primary-container/50 w-64 text-on-surface placeholder:text-on-surface-variant transition-all duration-300\" placeholder=\"Search interactions...\" type=\"text\"/>",
-  "</div>",
-  "</div>",
-  "<div class=\"flex items-center gap-6\">",
-  "<div class=\"flex gap-2\">",
-  "<button class=\"text-on-surface-variant hover:text-primary-container transition-colors p-2 rounded-full hover:bg-white/20\">",
-  "<span class=\"material-symbols-outlined\" data-icon=\"notifications\">notifications</span>",
-  "</button>",
-  "<button class=\"text-on-surface-variant hover:text-primary-container transition-colors p-2 rounded-full hover:bg-white/20\">",
-  "<span class=\"material-symbols-outlined\" data-icon=\"settings\">settings</span>",
-  "</button>",
-  "</div>",
-  "<div class=\"h-10 w-10 rounded-full border border-primary-container/30 p-0.5\">",
-  "<img alt=\"User profile avatar\" class=\"h-full w-full rounded-full object-cover\" src=\"https://lh3.googleusercontent.com/aida-public/AB6AXuDTeH4B0RZkTnjwt4EZYasnHKlEKdyQwm2ULQMC4svgQxu_5qk5CN9WIvYet0yscp9Jf7vkHKFvL9P8p_aHiwX9Ew-_v-m4Z13y2YIbunSYp3rh11mRKVSq2gvSaR_iuuj-4Nw3PGYYmec366lOiQv7Fhn70koEWL1uABR385pkJtjGqvllYIjHkKvITebodVdErjXBl8ML7VH8V2HrldXe86UqszPWKW8Re_D-AtG-LBMTRlpXmEfZzOwOt6D1OnJRJ0mXtF-Tji1-\"/>",
-  "</div>",
-  "</div>",
-  "</header>",
-  "<section class=\"flex flex-1 overflow-hidden relative p-6 pt-4 gap-6\">",
-  "<div class=\"flex-1 flex flex-col relative overflow-hidden\">",
-  "<div class=\"flex-1 overflow-y-auto pr-4 custom-scrollbar space-y-stack-lg pb-4\">",
-  "<div class=\"flex justify-center my-stack-lg\">",
-  "<span class=\"dewdrop-card px-6 py-2 rounded-full text-xs font-label-caps text-on-surface-variant uppercase tracking-widest\">Task Initiated: Cross-System Data Synchronization</span>",
-  "</div>",
-  "<!-- Agent Interaction Flow -->",
-  "<div class=\"flex gap-stack-md max-w-3xl\">",
-  "<img alt=\"DataAgent Alpha\" class=\"w-10 h-10 rounded-full border border-primary/20 mt-6 shrink-0\" src=\"https://lh3.googleusercontent.com/aida-public/AB6AXuC0hoKb87qpZX_LrHuGrfAYKlQhCNztPk-82pCU5vfhXoRxp3onuB4iEiIhBNUPVd-IYkfryYjhmNZosROMUk3emLka3w-BWdHp1qVgNOndgCHHZWYE_qexSuYR3EF9GUvd40wfCPYZPB3gZH1WVEUjjo4fbYodSm_kunbvhyqAv69TFji-sF_n44ydIL_q93QuFy9LGrV3jejFdkHMBddaSxAVrmYrGWKlsGNVaYy5Y7yL09VaT8a1vnEEyD1ElcqBc81xeVci01AE\"/>",
-  "<div class=\"flex flex-col gap-1 w-full\">",
-  "<span class=\"font-label-caps text-label-caps text-primary-container ml-2\">DataAgent Alpha</span>",
-  "<div class=\"dewdrop-card p-6 rounded-[32px] rounded-tl-none agent-chip-cyan\">",
-  "<p class=\"text-body-md font-body-md text-on-surface\">I've extracted the core schemas from the legacy database. However, there are several unstructured fields that need mapping. @CodeSmith, can you generate a parsing script for these JSON blobs?</p>",
-  "</div>",
-  "<span class=\"text-[10px] text-on-surface-variant mt-1 ml-2\">10:42 AM</span>",
-  "</div>",
-  "</div>",
-  "<div class=\"flex gap-stack-md max-w-3xl\">",
-  "<img alt=\"CodeSmith\" class=\"w-10 h-10 rounded-full border border-secondary/20 mt-6 shrink-0\" src=\"https://lh3.googleusercontent.com/aida-public/AB6AXuBmY1YtYaBEuAYfsBPi1cOUw05uKxIWtMT3iL6FxImFctFftPUk6yuu762egMrPt__U0UIlCuM-BmVkf1orTy-YNDTK7cIL4Nqumh-6_DOgzNmb-htDEetEKdrU2wJX8CJzhgYhZRqBi7IUPrR1qSIOl_VMXkp-o2M4Hu54CGMeCfN9Tra2yHDCCG7qJGsUgANtl8aW83e-sXHSwrQp2DPcc1XAgpBnCzxbvWuowZrYQ5-VInhmNPeCL5FyEa_oZaX9aTAVyhKgxsyk\"/>",
-  "<div class=\"flex flex-col gap-1 w-full\">",
-  "<span class=\"font-label-caps text-label-caps text-secondary ml-2\">CodeSmith</span>",
-  "<div class=\"dewdrop-card p-6 rounded-[32px] rounded-tl-none agent-chip-violet\">",
-  "<p class=\"text-body-md font-body-md text-on-surface\">On it. Analyzing the schema structure...</p>",
-  "<div class=\"mt-4 p-4 bg-black/5 rounded-2xl border border-black/5\">",
-  "<div class=\"flex justify-between items-center mb-2\">",
-  "<span class=\"text-[10px] uppercase font-bold text-secondary flex items-center gap-1\">",
-  "<span class=\"material-symbols-outlined text-[14px]\">code</span> Generating Python Parser",
-  "                    </span>",
-  "<span class=\"text-[10px] text-on-surface-variant\">In Progress</span>",
-  "</div>",
-  "<div class=\"h-1.5 bg-black/10 rounded-full overflow-hidden\">",
-  "<div class=\"h-full bg-secondary w-[45%] rounded-full animate-pulse\"></div>",
-  "</div>",
-  "</div>",
-  "</div>",
-  "<span class=\"text-[10px] text-on-surface-variant mt-1 ml-2\">10:43 AM</span>",
-  "</div>",
-  "</div>",
-  "<div class=\"flex gap-stack-md max-w-3xl ml-auto flex-row-reverse\">",
-  "<div class=\"w-10 h-10 rounded-full border border-tertiary-container/20 bg-tertiary-container/10 flex items-center justify-center mt-6 shrink-0\">",
-  "<span class=\"material-symbols-outlined text-tertiary-container\" data-icon=\"policy\" style=\"font-variation-settings: 'FILL' 1;\">policy</span>",
-  "</div>",
-  "<div class=\"flex flex-col items-end gap-1 w-full\">",
-  "<span class=\"font-label-caps text-label-caps text-tertiary-container mr-2\">Security-Core</span>",
-  "<div class=\"dewdrop-card p-6 rounded-[32px] rounded-tr-none agent-chip-teal text-right bg-tertiary-container/5\">",
-  "<p class=\"text-body-md font-body-md text-on-surface\">Warning: Detected PII in the unstructured fields. Ensure the parsing script includes data masking for fields: `user_email`, `phone_ext` before synchronization.</p>",
-  "</div>",
-  "<span class=\"text-[10px] text-on-surface-variant mt-1 mr-2\">10:44 AM • Security Override</span>",
-  "</div>",
-  "</div>",
-  "<div class=\"flex gap-stack-md max-w-3xl\">",
-  "<img alt=\"CodeSmith\" class=\"w-10 h-10 rounded-full border border-secondary/20 mt-6 shrink-0\" src=\"https://lh3.googleusercontent.com/aida-public/AB6AXuBmY1YtYaBEuAYfsBPi1cOUw05uKxIWtMT3iL6FxImFctFftPUk6yuu762egMrPt__U0UIlCuM-BmVkf1orTy-YNDTK7cIL4Nqumh-6_DOgzNmb-htDEetEKdrU2wJX8CJzhgYhZRqBi7IUPrR1qSIOl_VMXkp-o2M4Hu54CGMeCfN9Tra2yHDCCG7qJGsUgANtl8aW83e-sXHSwrQp2DPcc1XAgpBnCzxbvWuowZrYQ5-VInhmNPeCL5FyEa_oZaX9aTAVyhKgxsyk\"/>",
-  "<div class=\"flex flex-col gap-1 w-full\">",
-  "<span class=\"font-label-caps text-label-caps text-secondary ml-2\">CodeSmith</span>",
-  "<div class=\"dewdrop-card p-6 rounded-[32px] rounded-tl-none agent-chip-violet\">",
-  "<p class=\"text-body-md font-body-md text-on-surface\">Acknowledged @Security-Core. Script updated with RegEx masking. Executing test run against staging environment.</p>",
-  "</div>",
-  "<span class=\"text-[10px] text-on-surface-variant mt-1 ml-2\">10:45 AM</span>",
-  "</div>",
-  "</div>",
-  "</div>",
-  "<!-- Input Area -->",
-  "<div class=\"mt-4 relative shrink-0\">",
-  "<div class=\"dewdrop-card rounded-[32px] p-6 flex flex-col gap-4\">",
-  "<div class=\"flex items-center gap-2 px-2 border-b border-white/20 pb-4\">",
-  "<button class=\"p-1.5 rounded-lg hover:bg-black/5 text-on-surface-variant hover:text-primary-container transition-colors\">",
-  "<span class=\"material-symbols-outlined text-[20px]\" data-icon=\"alternate_email\">alternate_email</span>",
-  "</button>",
-  "<button class=\"p-1.5 rounded-lg hover:bg-black/5 text-on-surface-variant hover:text-primary-container transition-colors\">",
-  "<span class=\"material-symbols-outlined text-[20px]\" data-icon=\"attachment\">attachment</span>",
-  "</button>",
-  "<button class=\"p-1.5 rounded-lg hover:bg-black/5 text-on-surface-variant hover:text-primary-container transition-colors\">",
-  "<span class=\"material-symbols-outlined text-[20px]\" data-icon=\"code\">code</span>",
-  "</button>",
-  "<div class=\"h-5 w-px bg-white/40 mx-2\"></div>",
-  "<div class=\"flex gap-2 flex-wrap\">",
-  "<span class=\"bg-primary/10 text-primary-container px-3 py-1 rounded-full text-xs font-bold\">@DataAgent Alpha</span>",
-  "<span class=\"bg-secondary/10 text-secondary px-3 py-1 rounded-full text-xs font-bold\">@CodeSmith</span>",
-  "<span class=\"bg-tertiary-container/10 text-tertiary-container px-3 py-1 rounded-full text-xs font-bold\">@Security-Core</span>",
-  "</div>",
-  "</div>",
-  "<div class=\"flex items-end gap-6 px-2\">",
-  "<textarea class=\"flex-1 bg-transparent border-none focus:ring-0 text-body-md font-body-md resize-none custom-scrollbar placeholder:text-on-surface-variant text-on-surface py-2\" placeholder=\"Send instruction or context to the agent group...\" rows=\"2\"></textarea>",
-  "<button class=\"luminous-button px-8 py-3 rounded-2xl text-on-primary font-bold text-body-md flex items-center gap-2 active:scale-95 mb-1\">",
-  "<span class=\"\">Coordinate</span>",
-  "<span class=\"material-symbols-outlined\" data-icon=\"group_work\" style=\"font-variation-settings: 'FILL' 1;\">group_work</span>",
-  "</button>",
-  "</div>",
-  "</div>",
-  "</div>",
-  "</div>",
-  "<!-- Right Sidebar -->",
-  "<aside class=\"w-80 dewdrop-panel rounded-[32px] flex flex-col p-6 gap-6 mix-blend-normal shrink-0 border-l border-white/20\">",
-  "<div>",
-  "<h3 class=\"font-label-caps text-label-caps text-on-surface-variant mb-6 flex items-center gap-2 uppercase tracking-widest\">",
-  "<span class=\"w-2 h-2 bg-primary-container rounded-full animate-pulse\"></span>Active Agents (3)",
-  "          </h3>",
-  "<div class=\"space-y-4\">",
-  "<div class=\"dewdrop-card p-4 rounded-2xl flex items-center gap-4 cursor-pointer\">",
-  "<img alt=\"DataAgent Alpha\" class=\"w-12 h-12 rounded-full object-cover border-2 border-primary-container/30 shrink-0\" src=\"https://lh3.googleusercontent.com/aida-public/AB6AXuC0hoKb87qpZX_LrHuGrfAYKlQhCNztPk-82pCU5vfhXoRxp3onuB4iEiIhBNUPVd-IYkfryYjhmNZosROMUk3emLka3w-BWdHp1qVgNOndgCHHZWYE_qexSuYR3EF9GUvd40wfCPYZPB3gZH1WVEUjjo4fbYodSm_kunbvhyqAv69TFji-sF_n44ydIL_q93QuFy9LGrV3jejFdkHMBddaSxAVrmYrGWKlsGNVaYy5Y7yL09VaT8a1vnEEyD1ElcqBc81xeVci01AE\"/>",
-  "<div class=\"flex-1 min-w-0\">",
-  "<div class=\"flex justify-between items-center mb-1\">",
-  "<span class=\"text-body-md font-bold text-primary-container truncate\">DataAgent Alpha</span>",
-  "<span class=\"text-[10px] text-green-600 font-bold tracking-wider shrink-0\">IDLE</span>",
-  "</div>",
-  "<p class=\"text-xs text-on-surface-variant truncate\">Schema Extraction</p>",
-  "</div>",
-  "</div>",
-  "<div class=\"dewdrop-card p-4 rounded-2xl flex items-center gap-4 cursor-pointer\">",
-  "<img alt=\"CodeSmith\" class=\"w-12 h-12 rounded-full object-cover border-2 border-secondary/30 shrink-0\" src=\"https://lh3.googleusercontent.com/aida-public/AB6AXuBmY1YtYaBEuAYfsBPi1cOUw05uKxIWtMT3iL6FxImFctFftPUk6yuu762egMrPt__U0UIlCuM-BmVkf1orTy-YNDTK7cIL4Nqumh-6_DOgzNmb-htDEetEKdrU2wJX8CJzhgYhZRqBi7IUPrR1qSIOl_VMXkp-o2M4Hu54CGMeCfN9Tra2yHDCCG7qJGsUgANtl8aW83e-sXHSwrQp2DPcc1XAgpBnCzxbvWuowZrYQ5-VInhmNPeCL5FyEa_oZaX9aTAVyhKgxsyk\"/>",
-  "<div class=\"flex-1 min-w-0\">",
-  "<div class=\"flex justify-between items-center mb-1\">",
-  "<span class=\"text-body-md font-bold text-secondary truncate\">CodeSmith</span>",
-  "<span class=\"text-[10px] text-secondary font-bold tracking-wider animate-pulse shrink-0\">BUSY</span>",
-  "</div>",
-  "<p class=\"text-xs text-on-surface-variant truncate\">Testing Script...</p>",
-  "</div>",
-  "</div>",
-  "<div class=\"dewdrop-card p-4 rounded-2xl flex items-center gap-4 cursor-pointer\">",
-  "<div class=\"w-12 h-12 rounded-full bg-tertiary-container/10 border-2 border-tertiary-container/30 flex items-center justify-center shrink-0\">",
-  "<span class=\"material-symbols-outlined text-tertiary-container\" data-icon=\"policy\">policy</span>",
-  "</div>",
-  "<div class=\"flex-1 min-w-0\">",
-  "<div class=\"flex justify-between items-center mb-1\">",
-  "<span class=\"text-body-md font-bold text-tertiary-container truncate\">Security-Core</span>",
-  "<span class=\"text-[10px] text-green-600 font-bold tracking-wider shrink-0\">READY</span>",
-  "</div>",
-  "<p class=\"text-xs text-on-surface-variant truncate\">Compliance Monitoring</p>",
-  "</div>",
-  "</div>",
-  "</div>",
-  "</div>",
-  "<div class=\"mt-auto space-y-4\">",
-  "<div class=\"dewdrop-card rounded-[32px] p-6\">",
-  "<h4 class=\"font-label-caps text-label-caps text-on-surface mb-4 uppercase tracking-widest flex items-center gap-2\">",
-  "<span class=\"material-symbols-outlined text-[16px]\">dataset</span> Shared Workspace",
-  "            </h4>",
-  "<div class=\"space-y-3\">",
-  "<div class=\"flex items-center justify-between text-xs p-2 hover:bg-black/5 rounded-lg cursor-pointer transition-colors\">",
-  "<span class=\"flex items-center gap-2 text-on-surface\"><span class=\"material-symbols-outlined text-[14px] text-primary-container\">description</span> legacy_schema.json</span>",
-  "<span class=\"text-on-surface-variant\">1.2mb</span>",
-  "</div>",
-  "<div class=\"flex items-center justify-between text-xs p-2 hover:bg-black/5 rounded-lg cursor-pointer transition-colors\">",
-  "<span class=\"flex items-center gap-2 text-on-surface\"><span class=\"material-symbols-outlined text-[14px] text-secondary\">code</span> parser_v2.py</span>",
-  "<span class=\"text-on-surface-variant\">4kb</span>",
-  "</div>",
-  "</div>",
-  "</div>",
-  "<div class=\"dewdrop-card rounded-[32px] p-6\">",
-  "<h4 class=\"font-label-caps text-label-caps text-on-surface mb-4 uppercase tracking-widest\">Orchestration</h4>",
-  "<div class=\"flex items-center justify-between mb-2\">",
-  "<span class=\"text-xs text-on-surface-variant\">Task Completion</span>",
-  "<span class=\"text-xs font-bold text-primary-container\">65%</span>",
-  "</div>",
-  "<div class=\"h-1.5 bg-black/10 rounded-full overflow-hidden mb-6\">",
-  "<div class=\"h-full bg-primary-container w-[65%] rounded-full\"></div>",
-  "</div>",
-  "<button class=\"w-full py-3 rounded-2xl border border-white/40 text-xs font-label-caps text-on-surface hover:bg-white/50 transition-all shadow-sm\">View Dependency Graph</button>",
-  "</div>",
-  "</div>",
-  "</aside>",
-  "</section>",
-  "</main>",
-  "</div>",
-  "</body></html>"
-].join("\n");
+const pageHtml: string = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentHub | Group Workspace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #edf6ff;
+      --bg-2: #f7fbff;
+      --ink: #172033;
+      --muted: #647084;
+      --line: rgba(143, 160, 190, 0.22);
+      --blue: #1769e8;
+      --cyan: #08a7cf;
+      --purple: #7457e8;
+      --teal: #0f9f9a;
+      --green: #1f9b64;
+      --orange: #d97817;
+      --glass: rgba(255, 255, 255, 0.72);
+      --glass-border: rgba(255, 255, 255, 0.7);
+      --shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      min-width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
+        radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.14), transparent 30%),
+        linear-gradient(135deg, var(--bg-2), var(--bg));
+      font-family: "Hanken Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    #particle-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      padding: 22px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr) 340px;
+      gap: 18px;
+      max-width: 1440px;
+      height: calc(100vh - 44px);
+      margin: 0 auto;
+    }
+
+    .glass {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(28px) saturate(160%);
+      -webkit-backdrop-filter: blur(28px) saturate(160%);
+    }
+
+    .panel {
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .sidebar,
+    .rightbar,
+    .main {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .sidebar,
+    .rightbar {
+      padding: 18px;
+      gap: 16px;
+    }
+
+    .main {
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 18px 20px;
+      min-height: 96px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .eyebrow {
+      margin: 0 0 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 24px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 15px;
+      line-height: 1.25;
+    }
+
+    h3 {
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .tiny {
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .small {
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .material-symbols-outlined {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      overflow: hidden;
+      font-size: 18px;
+      line-height: 1;
+      vertical-align: middle;
+      font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand-mark,
+    .icon-tile,
+    .avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      color: #fff;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
+      box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 24px;
+      padding: 5px 9px;
+      border: 1px solid rgba(23, 105, 232, 0.13);
+      border-radius: 999px;
+      background: rgba(23, 105, 232, 0.08);
+      color: #1459c7;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .pill.cyan {
+      border-color: rgba(8, 167, 207, 0.18);
+      background: rgba(8, 167, 207, 0.1);
+      color: #087f9e;
+    }
+
+    .pill.purple {
+      border-color: rgba(116, 87, 232, 0.18);
+      background: rgba(116, 87, 232, 0.1);
+      color: #6044d7;
+    }
+
+    .pill.green {
+      border-color: rgba(31, 155, 100, 0.2);
+      background: rgba(31, 155, 100, 0.11);
+      color: #15744b;
+    }
+
+    .nav-list,
+    .member-list,
+    .file-list,
+    .activity-list,
+    .check-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .nav-item,
+    .member-row,
+    .file-row,
+    .activity-row,
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      padding: 10px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.44);
+    }
+
+    .nav-item.active {
+      border-color: rgba(23, 105, 232, 0.2);
+      background: rgba(23, 105, 232, 0.1);
+      color: #1459c7;
+    }
+
+    .icon-tile {
+      width: 32px;
+      height: 32px;
+      color: var(--blue);
+      border-radius: 9px;
+      background: rgba(23, 105, 232, 0.1);
+    }
+
+    .icon-tile.cyan {
+      color: #087f9e;
+      background: rgba(8, 167, 207, 0.11);
+    }
+
+    .icon-tile.purple {
+      color: #6044d7;
+      background: rgba(116, 87, 232, 0.11);
+    }
+
+    .icon-tile.green {
+      color: #15744b;
+      background: rgba(31, 155, 100, 0.11);
+    }
+
+    .avatar {
+      position: relative;
+      width: 34px;
+      height: 34px;
+      color: #fff;
+      border: 2px solid rgba(255, 255, 255, 0.82);
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: 0 8px 20px rgba(23, 105, 232, 0.16);
+    }
+
+    .avatar.purple {
+      background: linear-gradient(135deg, var(--purple), #a06bff);
+    }
+
+    .avatar.teal {
+      background: linear-gradient(135deg, var(--teal), var(--cyan));
+    }
+
+    .avatar.blue {
+      background: linear-gradient(135deg, #2857e8, #46b8ff);
+    }
+
+    .avatar::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      bottom: 0;
+      width: 9px;
+      height: 9px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      background: #25c06d;
+    }
+
+    .avatar.away::after {
+      background: #d99a24;
+    }
+
+    .truncate {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .spacer {
+      flex: 1 1 auto;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 9px 12px;
+      border: 1px solid rgba(23, 105, 232, 0.14);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.62);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+      box-shadow: 0 8px 18px rgba(26, 40, 80, 0.08);
+    }
+
+    .button.primary {
+      border-color: transparent;
+      color: #fff;
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
+      box-shadow: 0 10px 22px rgba(23, 105, 232, 0.23);
+    }
+
+    .button.ghost {
+      box-shadow: none;
+    }
+
+    .button-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: min(320px, 100%);
+      padding: 9px 11px;
+      border: 1px solid rgba(255, 255, 255, 0.68);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.58);
+      color: var(--muted);
+    }
+
+    .search input {
+      width: 100%;
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--ink);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(92px, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .stat strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(290px, 0.75fr);
+      gap: 16px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .column,
+    .feed {
+      min-height: 0;
+      overflow: hidden;
+      padding: 16px;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      height: calc(100% - 34px);
+      min-height: 0;
+    }
+
+    .lane {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+      min-height: 0;
+      padding: 12px;
+      border: 1px solid rgba(143, 160, 190, 0.14);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    .lane-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .task-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.68);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.68);
+      box-shadow: 0 10px 26px rgba(26, 40, 80, 0.08);
+    }
+
+    .task-meta,
+    .mini-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .progress {
+      width: 100%;
+      height: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(23, 105, 232, 0.11);
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--blue), var(--cyan), var(--purple));
+    }
+
+    .feed {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .activity-list {
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .activity-row {
+      align-items: flex-start;
+      background: rgba(255, 255, 255, 0.52);
+    }
+
+    .activity-copy {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .activity-copy p {
+      margin-top: 4px;
+    }
+
+    .composer {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: auto;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.68);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.56);
+    }
+
+    .composer-tools {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .tool-buttons {
+      display: flex;
+      gap: 6px;
+    }
+
+    .icon-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border: 1px solid rgba(23, 105, 232, 0.11);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.7);
+      color: var(--muted);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 54px;
+      resize: none;
+      padding: 10px;
+      border: 1px solid rgba(143, 160, 190, 0.18);
+      border-radius: 10px;
+      outline: 0;
+      background: rgba(255, 255, 255, 0.48);
+      color: var(--ink);
+    }
+
+    .rightbar {
+      overflow: auto;
+    }
+
+    .approval {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid rgba(23, 105, 232, 0.16);
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(23, 105, 232, 0.1), rgba(8, 167, 207, 0.08));
+    }
+
+    .sync-card {
+      padding: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.68);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.52);
+    }
+
+    .file-row {
+      align-items: flex-start;
+      padding: 11px;
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .check-row {
+      align-items: flex-start;
+      padding: 9px 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .check-row + .check-row {
+      border-top: 1px solid var(--line);
+    }
+
+    .status-dot {
+      display: inline-flex;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(31, 155, 100, 0.12);
+    }
+
+    .status-dot.cyan {
+      background: var(--cyan);
+      box-shadow: 0 0 0 4px rgba(8, 167, 207, 0.13);
+    }
+
+    .status-dot.purple {
+      background: var(--purple);
+      box-shadow: 0 0 0 4px rgba(116, 87, 232, 0.13);
+    }
+
+    @media (max-width: 1160px) {
+      .workspace {
+        grid-template-columns: 220px minmax(0, 1fr);
+      }
+
+      .rightbar {
+        display: none;
+      }
+
+      .content-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    @media (max-width: 840px) {
+      body {
+        overflow: auto;
+      }
+
+      .page {
+        height: auto;
+        min-height: 100vh;
+        padding: 14px;
+      }
+
+      .workspace {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+      }
+
+      .sidebar,
+      .rightbar {
+        display: flex;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .stats,
+      .board {
+        grid-template-columns: 1fr;
+      }
+
+      .column,
+      .feed,
+      .rightbar {
+        overflow: visible;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="particle-canvas" aria-hidden="true"></canvas>
+  <div class="page">
+    <div class="workspace">
+      <aside class="sidebar panel glass">
+        <div class="brand">
+          <div class="brand-mark"><span class="material-symbols-outlined">hub</span></div>
+          <div class="truncate">
+            <p class="eyebrow">AgentHub</p>
+            <h2>Group Workspace</h2>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title">
+            <h3>Spaces</h3>
+            <span class="pill cyan"><span class="status-dot cyan"></span>Live</span>
+          </div>
+          <div class="nav-list">
+            <div class="nav-item active">
+              <div class="icon-tile"><span class="material-symbols-outlined">sync_alt</span></div>
+              <div class="truncate">
+                <strong class="small">Legacy Migration</strong>
+                <p class="tiny muted truncate">Cross-system sync</p>
+              </div>
+            </div>
+            <div class="nav-item">
+              <div class="icon-tile purple"><span class="material-symbols-outlined">rule</span></div>
+              <div class="truncate">
+                <strong class="small">Mapping Review</strong>
+                <p class="tiny muted truncate">2 approvals open</p>
+              </div>
+            </div>
+            <div class="nav-item">
+              <div class="icon-tile cyan"><span class="material-symbols-outlined">folder_shared</span></div>
+              <div class="truncate">
+                <strong class="small">Shared Files</strong>
+                <p class="tiny muted truncate">12 documents</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title">
+            <h3>Members</h3>
+            <span class="tiny muted">4 online</span>
+          </div>
+          <div class="member-list">
+            <div class="member-row">
+              <div class="avatar blue">DA</div>
+              <div class="truncate">
+                <strong class="small">DataAgent Alpha</strong>
+                <p class="tiny muted truncate">Schema extraction ready</p>
+              </div>
+            </div>
+            <div class="member-row">
+              <div class="avatar purple">CS</div>
+              <div class="truncate">
+                <strong class="small">CodeSmith</strong>
+                <p class="tiny muted truncate">Parser tests running</p>
+              </div>
+            </div>
+            <div class="member-row">
+              <div class="avatar teal">SC</div>
+              <div class="truncate">
+                <strong class="small">Security-Core</strong>
+                <p class="tiny muted truncate">PII guard enabled</p>
+              </div>
+            </div>
+            <div class="member-row">
+              <div class="avatar away">XM</div>
+              <div class="truncate">
+                <strong class="small">Xavier</strong>
+                <p class="tiny muted truncate">Reviewing changes</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="spacer"></div>
+        <div class="sync-card">
+          <div class="mini-row">
+            <span class="eyebrow">Workspace Health</span>
+            <span class="pill green">Stable</span>
+          </div>
+          <p class="small muted">All visible states are local preview data. No API is connected.</p>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar glass">
+          <div>
+            <p class="eyebrow">Legacy Migration Room</p>
+            <h1>Shared operations cockpit</h1>
+            <p class="small muted">Members, tasks, files, approvals, and sync status stay visible in one working surface.</p>
+          </div>
+          <div class="button-group">
+            <label class="search">
+              <span class="material-symbols-outlined">search</span>
+              <input aria-label="Search workspace" placeholder="Search tasks, files, members" />
+            </label>
+            <button class="button ghost" type="button"><span class="material-symbols-outlined">ios_share</span>Export</button>
+            <button class="button primary" type="button"><span class="material-symbols-outlined">group_work</span>Coordinate</button>
+          </div>
+        </header>
+
+        <section class="stats">
+          <div class="stat glass">
+            <strong>4</strong>
+            <span class="small muted">Online members</span>
+          </div>
+          <div class="stat glass">
+            <strong>7</strong>
+            <span class="small muted">Shared tasks</span>
+          </div>
+          <div class="stat glass">
+            <strong>12</strong>
+            <span class="small muted">Workspace files</span>
+          </div>
+          <div class="stat glass">
+            <strong>82%</strong>
+            <span class="small muted">Sync readiness</span>
+          </div>
+        </section>
+
+        <section class="content-grid">
+          <div class="column glass">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Shared Task Board</p>
+                <h2>Current coordination plan</h2>
+              </div>
+              <span class="pill purple"><span class="material-symbols-outlined">bolt</span>Auto assigned</span>
+            </div>
+            <div class="board">
+              <div class="lane">
+                <div class="lane-head">
+                  <h3>Backlog</h3>
+                  <span class="pill">2</span>
+                </div>
+                <article class="task-card">
+                  <div class="task-meta">
+                    <span class="pill cyan">File mapping</span>
+                    <span class="tiny muted">Due today</span>
+                  </div>
+                  <h3>Confirm legacy field aliases</h3>
+                  <p class="small muted">Resolve conflicting aliases before parser merge.</p>
+                  <div class="mini-row">
+                    <span class="tiny muted">Owner: DataAgent</span>
+                    <span class="avatar blue">DA</span>
+                  </div>
+                </article>
+                <article class="task-card">
+                  <div class="task-meta">
+                    <span class="pill purple">Docs</span>
+                    <span class="tiny muted">Queued</span>
+                  </div>
+                  <h3>Update handoff notes</h3>
+                  <p class="small muted">Add accepted masking rules to shared notes.</p>
+                </article>
+              </div>
+
+              <div class="lane">
+                <div class="lane-head">
+                  <h3>In progress</h3>
+                  <span class="pill cyan">3</span>
+                </div>
+                <article class="task-card">
+                  <div class="task-meta">
+                    <span class="pill purple">Script</span>
+                    <span class="tiny muted">45 min</span>
+                  </div>
+                  <h3>Generate masked parser</h3>
+                  <p class="small muted">CodeSmith is applying PII rules from Security-Core.</p>
+                  <div class="progress"><span style="width: 68%"></span></div>
+                  <div class="mini-row">
+                    <span class="tiny muted">Owner: CodeSmith</span>
+                    <span class="avatar purple">CS</span>
+                  </div>
+                </article>
+                <article class="task-card">
+                  <div class="task-meta">
+                    <span class="pill green">Sync</span>
+                    <span class="tiny muted">Running</span>
+                  </div>
+                  <h3>Stage dry-run snapshot</h3>
+                  <p class="small muted">Preview channel has the latest schema payload.</p>
+                </article>
+              </div>
+
+              <div class="lane">
+                <div class="lane-head">
+                  <h3>Review</h3>
+                  <span class="pill green">2</span>
+                </div>
+                <article class="task-card">
+                  <div class="task-meta">
+                    <span class="pill">Approval</span>
+                    <span class="tiny muted">Waiting</span>
+                  </div>
+                  <h3>Approve parser v2</h3>
+                  <p class="small muted">Diff is ready with masking checks and sample output.</p>
+                  <button class="button primary" type="button"><span class="material-symbols-outlined">verified</span>Approve preview</button>
+                </article>
+                <article class="task-card">
+                  <div class="task-meta">
+                    <span class="pill cyan">Security</span>
+                    <span class="tiny muted">Passed</span>
+                  </div>
+                  <h3>Validate redaction policy</h3>
+                  <p class="small muted">Email and phone extension fields are masked.</p>
+                </article>
+              </div>
+            </div>
+          </div>
+
+          <aside class="feed glass">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Activity Flow</p>
+                <h2>Workspace pulse</h2>
+              </div>
+              <span class="pill green"><span class="status-dot"></span>Synced</span>
+            </div>
+            <div class="activity-list">
+              <div class="activity-row">
+                <div class="icon-tile cyan"><span class="material-symbols-outlined">dataset</span></div>
+                <div class="activity-copy">
+                  <strong class="small">DataAgent Alpha added legacy_schema.json</strong>
+                  <p class="small muted">Schema map is attached to the shared file area.</p>
+                  <span class="tiny muted">10:42</span>
+                </div>
+              </div>
+              <div class="activity-row">
+                <div class="icon-tile purple"><span class="material-symbols-outlined">code_blocks</span></div>
+                <div class="activity-copy">
+                  <strong class="small">CodeSmith generated parser_v2.py</strong>
+                  <p class="small muted">The task card moved to review after test output arrived.</p>
+                  <span class="tiny muted">10:47</span>
+                </div>
+              </div>
+              <div class="activity-row">
+                <div class="icon-tile green"><span class="material-symbols-outlined">policy</span></div>
+                <div class="activity-copy">
+                  <strong class="small">Security-Core approved masking rules</strong>
+                  <p class="small muted">PII fields are flagged before any sync action is exposed.</p>
+                  <span class="tiny muted">10:51</span>
+                </div>
+              </div>
+              <div class="activity-row">
+                <div class="icon-tile"><span class="material-symbols-outlined">assignment_ind</span></div>
+                <div class="activity-copy">
+                  <strong class="small">Xavier assigned final review</strong>
+                  <p class="small muted">Approval card is now visible in the right rail.</p>
+                  <span class="tiny muted">10:55</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="composer">
+              <div class="composer-tools">
+                <div class="tool-buttons">
+                  <button class="icon-button" type="button" aria-label="Mention"><span class="material-symbols-outlined">alternate_email</span></button>
+                  <button class="icon-button" type="button" aria-label="Attach file"><span class="material-symbols-outlined">attach_file</span></button>
+                  <button class="icon-button" type="button" aria-label="Create task"><span class="material-symbols-outlined">add_task</span></button>
+                </div>
+                <span class="pill cyan">@group</span>
+              </div>
+              <textarea aria-label="Workspace message" placeholder="Send a coordination note to this workspace..."></textarea>
+              <div class="mini-row">
+                <span class="tiny muted">Draft command only. No backend call.</span>
+                <button class="button primary" type="button"><span class="material-symbols-outlined">send</span>Send</button>
+              </div>
+            </div>
+          </aside>
+        </section>
+      </main>
+
+      <aside class="rightbar panel glass">
+        <section>
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Approval</p>
+              <h2>Parser v2 ready</h2>
+            </div>
+            <span class="pill purple">Review</span>
+          </div>
+          <div class="approval">
+            <div class="mini-row">
+              <strong class="small">Visible state: Awaiting approval</strong>
+              <span class="pill">Open</span>
+            </div>
+            <p class="small muted">Parser diff is staged, security checks passed, and sync remains locked until approval.</p>
+            <div class="button-group">
+              <button class="button ghost" type="button"><span class="material-symbols-outlined">edit_note</span>Request edits</button>
+              <button class="button primary" type="button"><span class="material-symbols-outlined">check_circle</span>Approve</button>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Sync Status</p>
+              <h2>Shared snapshot</h2>
+            </div>
+            <span class="pill green">82%</span>
+          </div>
+          <div class="sync-card">
+            <div class="mini-row">
+              <span class="small muted">Dry-run readiness</span>
+              <strong class="small">82%</strong>
+            </div>
+            <div class="progress" style="margin: 10px 0 12px"><span style="width: 82%"></span></div>
+            <div class="check-list">
+              <div class="check-row">
+                <span class="status-dot cyan"></span>
+                <div>
+                  <strong class="small">Files indexed</strong>
+                  <p class="tiny muted">12 workspace files available.</p>
+                </div>
+              </div>
+              <div class="check-row">
+                <span class="status-dot purple"></span>
+                <div>
+                  <strong class="small">Assignments visible</strong>
+                  <p class="tiny muted">Owners are shown on task cards.</p>
+                </div>
+              </div>
+              <div class="check-row">
+                <span class="status-dot"></span>
+                <div>
+                  <strong class="small">Security passed</strong>
+                  <p class="tiny muted">Masking guard is active.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Shared Files</p>
+              <h2>Workspace documents</h2>
+            </div>
+            <button class="icon-button" type="button" aria-label="Add file"><span class="material-symbols-outlined">add</span></button>
+          </div>
+          <div class="file-list">
+            <div class="file-row">
+              <div class="icon-tile cyan"><span class="material-symbols-outlined">description</span></div>
+              <div class="truncate">
+                <strong class="small truncate">legacy_schema.json</strong>
+                <p class="tiny muted truncate">Added by DataAgent Alpha</p>
+              </div>
+              <span class="tiny muted">1.2 MB</span>
+            </div>
+            <div class="file-row">
+              <div class="icon-tile purple"><span class="material-symbols-outlined">code</span></div>
+              <div class="truncate">
+                <strong class="small truncate">parser_v2.py</strong>
+                <p class="tiny muted truncate">Generated by CodeSmith</p>
+              </div>
+              <span class="tiny muted">4 KB</span>
+            </div>
+            <div class="file-row">
+              <div class="icon-tile green"><span class="material-symbols-outlined">shield</span></div>
+              <div class="truncate">
+                <strong class="small truncate">masking_rules.md</strong>
+                <p class="tiny muted truncate">Approved by Security-Core</p>
+              </div>
+              <span class="tiny muted">18 KB</span>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var canvas = document.getElementById("particle-canvas");
+      var ctx = canvas.getContext("2d");
+      var particles = [];
+      var particleCount = 56;
+      var width = 0;
+      var height = 0;
+      var frame = 0;
+
+      function resize() {
+        var ratio = window.devicePixelRatio || 1;
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = Math.floor(width * ratio);
+        canvas.height = Math.floor(height * ratio);
+        canvas.style.width = width + "px";
+        canvas.style.height = height + "px";
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      }
+
+      function makeParticle(index) {
+        return {
+          x: Math.random() * width,
+          y: Math.random() * height,
+          r: 1.6 + Math.random() * 2.6,
+          vx: -0.18 + Math.random() * 0.36,
+          vy: -0.18 - Math.random() * 0.48,
+          hue: index % 3 === 0 ? 196 : 210,
+          alpha: 0.18 + Math.random() * 0.2
+        };
+      }
+
+      function seed() {
+        particles = [];
+        for (var i = 0; i < particleCount; i += 1) {
+          particles.push(makeParticle(i));
+        }
+      }
+
+      function draw() {
+        frame = window.requestAnimationFrame(draw);
+        ctx.clearRect(0, 0, width, height);
+
+        for (var i = 0; i < particles.length; i += 1) {
+          var p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.y < -16) {
+            p.y = height + 16;
+            p.x = Math.random() * width;
+          }
+          if (p.x < -16) {
+            p.x = width + 16;
+          }
+          if (p.x > width + 16) {
+            p.x = -16;
+          }
+
+          ctx.beginPath();
+          ctx.fillStyle = "hsla(" + p.hue + ", 84%, 48%, " + p.alpha + ")";
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+
+          for (var j = i + 1; j < particles.length; j += 1) {
+            var q = particles[j];
+            var dx = p.x - q.x;
+            var dy = p.y - q.y;
+            var distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < 126) {
+              ctx.beginPath();
+              ctx.strokeStyle = "rgba(23, 105, 232, " + ((1 - distance / 126) * 0.07) + ")";
+              ctx.lineWidth = 1;
+              ctx.moveTo(p.x, p.y);
+              ctx.lineTo(q.x, q.y);
+              ctx.stroke();
+            }
+          }
+        }
+      }
+
+      resize();
+      seed();
+      draw();
+      window.addEventListener("resize", function () {
+        window.cancelAnimationFrame(frame);
+        resize();
+        seed();
+        draw();
+      });
+    })();
+  </script>
+</body>
+</html>
+`;
 
 export function GroupWorkspacePage() {
   return (
