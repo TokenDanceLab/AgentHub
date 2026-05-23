@@ -83,7 +83,7 @@ feat/trump-webui          ← Web 前端（Trump）
 ### M4 候选（Workspace + 协作）
 - [x] Hub Server 骨架：Go module + 18 REST 路由 + health check（stub 响应，待后端开发）
 - [x] OpenCode E2E：5/5 pass — text_delta + session_init + result + finished 全链路
-- [ ] Codex E2E：二进制可用但未实测（需额度）
+- [x] Codex E2E：gpt-5.5 全链路 — session_init + text_block + result + finished (30 events)
 - [x] 环境隔离：envForRun 传递完整父进程环境给 Agent CLI（MEDIUM，已知风险）
 - [x] Hub auth middleware：JWT Bearer 令牌验证 + 路由跳过（hub-server）
 - [x] 权限门控升级：Desktop 主动批准/拒绝 + 60s 超时自动拒绝
@@ -96,7 +96,7 @@ feat/trump-webui          ← Web 前端（Trump）
 |-------|------------|---------|---------|------|
 | Claude Code | ✅ 5/5 pass | ✅ 24 fixtures | 20+ types | 全链路验证通过 |
 | OpenCode | ✅ 5/5 pass | ✅ 12 tests | 16 types | 全链路验证通过 — newapi/deepseek-v4-pro |
-| Codex | ❌ 未实测 | ✅ fixture tests | 9 item types | 需额度 |
+| Codex | ✅ 3/3 pass | ✅ fixture tests | 9 item types | 全链路验证通过 — gpt-5.5 |
 | Hub Server | ✅ 骨架可运行 | — | 18 routes | 待后端开发 |
 
 ## 验收
