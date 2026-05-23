@@ -90,5 +90,10 @@ func Load(configPath string) (*Config, error) {
 		}
 	}
 
+	// Enforce minimum JWT secret length.
+	if len(cfg.JWT.Secret) < 16 {
+		return nil, fmt.Errorf("JWT secret too short: minimum 16 characters required (got %d)", len(cfg.JWT.Secret))
+	}
+
 	return &cfg, nil
 }
