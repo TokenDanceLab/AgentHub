@@ -1,22 +1,21 @@
-# AgentHub 路线图 — P0 集成冲刺
+# AgentHub 路线图 — P0 集成冲刺 → P1 交互体验
 
 最后更新：2026-05-23
 
 ## 当前总目标
 
-**打通 Edge→Desktop→Web 全链路。** 比赛 Demo 必须展示 IM 聊天式交互：用户在 Desktop 输入 prompt → Edge 调度 Agent CLI → 实时事件流回 Desktop UI → 产物（Diff/Preview）内联展示。
+**P0 已全部完成。P1 聚焦交互体验：** 在 P0 完整事件管道基础上，将 UI 从"能用"提升到"同类产品水平"——Markdown 渲染、代码语法高亮、多行输入、Stop 按钮、Diff 交互。
 
 ## 工作区
 
 ```
 dev/delicious233          ← 主 dev（Leader）: ROADMAP + 架构决策
-feat/p0-integration       ← P0 集成（new!）: Edge + Desktop 端到端
 feat/trump-webui          ← Web 前端（Trump）
 ```
 
 合并方向：`feat/* → dev/delicious233 → master`
 
-## P0 冲刺任务
+## P0 冲刺任务 ✅ (全部完成 27/27)
 
 ### Edge（Leader + Agent）
 - [x] Claude Code NDJSON 24 消息类型
@@ -32,23 +31,36 @@ feat/trump-webui          ← Web 前端（Trump）
 - [x] 打通 Edge → Desktop WebSocket 事件投递验证
 
 ### Desktop（Leader + Agent）
-- [x] 共享类型修复（4 阻塞不匹配）
-- [x] ChatView 消费 run.agent.text_delta → 实时打字
-- [x] ChatView 消费 run.agent.tool_call → ToolUseBlock 卡片
-- [x] ChatView 消费 run.agent.tool_result → tool result 渲染
-- [x] ChatView 消费 run.agent.file_change → FileChangeBlock
-- [x] RunDetail Output/ToolCalls/FileChanges 标签页
-- [x] RunDetail text_delta 累积到 outputText
+- [x] 共享类型修复 + ChatView 实时打字 + ToolUseBlock + FileChangeBlock
+- [x] RunDetail 标签页 + text_delta 累积 + 模型选择器
 - [x] 12/12 测试文件全部通过 (123 tests)
-- [x] PromptInput 模型选择器（model + reasoningEffort）
-- [x] POST /v1/runs 请求中带 model/reasoningEffort
 - [x] 消费 run.agent.task_* → 子代理事件
 
-### Docs
-- [x] archive/ 清理 7 份过时文档
-- [x] 02-decide/ 03-build/ 添加实现状态标记
-- [x] 18 份参考报告（01-learn/repos/01~18）
-- [x] AGENTS.md 质量治理规则
+### 工程基础
+- [x] Go: .golangci.yml 22 规则 + ESLint/Prettier + typecheck
+- [x] CI: lint + typecheck + coverage 72%（阈值 70%）
+- [x] .codex/skills/cross-review 项目级 skill
+- [x] 18 份参考报告
+
+## P1 交互体验（进行中）
+
+基于参考项目（OpenCode UI/Goose/LibreChat/Claude Code WebUI）的 UX 审计结果。
+
+### P0 级（阻塞核心体验）
+- [ ] ChatView: Markdown 渲染 + 代码语法高亮（subagent: markdown-renderer）
+- [ ] PromptInput: 多行 textarea + Stop 按钮（subagent: prompt-ux）
+- [ ] RunDetail: Cancel/Abort 按钮 + token 用量展示
+
+### P1 级（成熟聊天产品标配）
+- [ ] ThreadPanel: 重命名/删除 + 消息/运行计数
+- [ ] DiffViewer: 单块 Accept/Reject 交互
+- [ ] ChatView: 消息操作（复制/重试/编辑/删除）
+- [ ] AgentList: 搜索过滤 + 描述面板
+
+### P2 级（打磨）
+- [ ] PromptInput: 文件附件 + 斜杠命令 + 输入历史
+- [ ] 全局暗/亮主题切换
+- [ ] StatusBar: 延迟指示器 + 错误徽标
 
 ## 验收
 
