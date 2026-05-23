@@ -129,25 +129,28 @@ fix/short-topic
 ### 当前活跃分支 (2026-05-23)
 
 ```
-dev/delicious233          ← 主 dev 分支（Delicious233）: Desktop M3 + Edge + 共享类型
-dev/trump                 ← Trump dev 分支（从 delicious233 切出）: Web 前端 + 同步 Desktop
+Remote (7):
+  origin/master                            ← 稳定
+  origin/dev/delicious233                  ← 主 dev (Delicious233)
+  origin/dev/trump                         ← Trump dev
+  origin/feat/desktop-sidecar              ← Desktop 工作区
+  origin/feat/edge-adapters                ← Edge 工作区 (已合入 dev)
+  origin/feat/trump-webui                  ← Web 工作区
+  origin/feat/backend-foundation           ← 后台预留 (dormant)
 
-feat/desktop-sidecar      ← Desktop 工作区（Tauri + React）→ 合入 dev/delicious233
-feat/edge-adapters        ← Edge AgentAdapter 工作区 → 已合入 dev/delicious233
-feat/trump-webui          ← Trump Web 工作区 → 合入 dev/trump → 再合入 dev/delicious233
-
-feat/frontend-page-preview ← Trump 旧原型（归档，不再使用）
-feat/frontend-webui        ← Trump 旧原型（归档，不再使用）
-feat/backend-foundation    ← 后端预留
+Local worktrees:
+  .worktrees/feat-desktop-sidecar          ← Desktop
+  .worktrees/feat-edge-adapters            ← Edge
+  .worktrees/feat-trump-webui              ← Web
 ```
 
-合并方向：`feat/* → dev/delicious233 → dev/trump → (review后) → dev/delicious233 → master`
+合并方向：`feat/* → dev/delicious233 → dev/trump → (review) → dev/delicious233 → master`
 
 写死规则：
 - `dev/delicious233` 保持 Delicious233 的设计和代码风格
 - `dev/trump` 由 Delicious233 控制合入质量
-- `feat/trump-webui` 是帮 Trump 用正确工程方式落地的版本
-- 旧 `feat/frontend-*` 分支归档保留，不得继续开发
+- `feat/trump-webui` 用正确工程方式落地 Trump 的视觉概念
+- 已删除的旧分支：`feat/frontend-page-preview`、`feat/frontend-webui`、`feat/client-openapi-im-schemas-delicious233`
 
 进度同步：
 
