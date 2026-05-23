@@ -14,6 +14,7 @@ var (
 	DBPoolInUse       prometheus.Gauge
 	RedisPoolHits     prometheus.Gauge
 	EventBusQueueLen  prometheus.Gauge
+	EventBusPanics    prometheus.Counter
 
 	once sync.Once
 )
@@ -65,12 +66,20 @@ func Register() {
 			},
 		)
 
+		EventBusPanics = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "eventbus_panics_total",
+				Help: "Total number of panics recovered in the event bus.",
+			},
+		)
+
 		prometheus.MustRegister(HTTPRequestsTotal)
 		prometheus.MustRegister(HTTPDuration)
 		prometheus.MustRegister(WSConnections)
 		prometheus.MustRegister(DBPoolInUse)
 		prometheus.MustRegister(RedisPoolHits)
 		prometheus.MustRegister(EventBusQueueLen)
+		prometheus.MustRegister(EventBusPanics)
 		// Built-in collectors may already be registered; ignore if so.
 		prometheus.Register(collectors.NewGoCollector())
 		prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))

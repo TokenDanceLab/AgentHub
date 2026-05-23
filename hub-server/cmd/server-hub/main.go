@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -35,6 +36,11 @@ func main() {
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
+	}
+
+	// P0-1: Warn if JWT secret is insecure (hardcoded default or too short).
+	if cfg.JWT.Secret == "" || cfg.JWT.Secret == "dev-secret-change-in-production" || len(cfg.JWT.Secret) < 16 {
+		slog.Warn("JWT secret is insecure: using default or too short, set AGENTHUB_JWT_SECRET environment variable")
 	}
 
 	if cfg.Server.LogLevel == "debug" {
@@ -298,9 +304,15 @@ func main() {
 	adminMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	adminMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	adminMux.Handle("/metrics", promhttp.Handler())
+	pprofUser := os.Getenv("AGENTHUB_PPROF_USER")
+	pprofPass := os.Getenv("AGENTHUB_PPROF_PASS")
+	adminHandler := http.Handler(adminMux)
+	if pprofUser != "" && pprofPass != "" {
+		adminHandler = pprofBasicAuth(adminMux, pprofUser, pprofPass)
+	}
 	adminSrv := &http.Server{
-		Addr:              fmt.Sprintf(":%d", adminPort),
-		Handler:           adminMux,
+		Addr:              fmt.Sprintf("127.0.0.1:%d", adminPort),
+		Handler:           adminHandler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
@@ -437,4 +449,16 @@ func broadcastOnlineStatus(ctx context.Context, userID string, online bool) {
 			mgr.PushToUser(friendID, frame)
 		}
 	}
+}
+
+func pprofBasicAuth(next http.Handler, user, pass string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, p, ok := r.BasicAuth()
+		if !ok || subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 || subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="pprof"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

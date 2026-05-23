@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/panjf2000/ants/v2"
 )
 
@@ -27,7 +29,8 @@ func NewBus() *Bus {
 	pool, err := ants.NewPool(1024,
 		ants.WithNonblocking(false),
 		ants.WithPanicHandler(func(p interface{}) {
-			slog.Error("eventbus panic", "panic", p)
+			metrics.EventBusPanics.Inc()
+			slog.Error("eventbus panic recovered", "error", p, "stack", string(debug.Stack()))
 		}),
 	)
 	if err != nil {
@@ -57,7 +60,10 @@ func (b *Bus) Publish(ctx context.Context, event Event) {
 		b.pending.Add(1)
 		err := b.pool.Submit(func() {
 			defer func() {
-				recover()
+				if r := recover(); r != nil {
+					metrics.EventBusPanics.Inc()
+					slog.Error("eventbus panic recovered", "error", r, "stack", string(debug.Stack()))
+				}
 				b.pending.Add(-1)
 			}()
 			h(ctx, event)
