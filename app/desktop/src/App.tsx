@@ -18,6 +18,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import ResizeHandle from '@/components/ResizeHandle';
 import PromptInput from '@/components/PromptInput';
 import PermissionDialog from '@/components/PermissionDialog';
+import WelcomeScreen from '@/components/WelcomeScreen';
 import { SkeletonLine, SkeletonCircle } from '@/components/Skeleton';
 import styles from '@/App.module.css';
 
@@ -281,6 +282,36 @@ export default function App() {
 
   const allMessages = [...userMessages, ...messages];
 
+  const handleRetry = useCallback((messageId: string) => {
+    const msg = allMessages.find((m) => m.id === messageId);
+    if (!msg) return;
+    const prompt = msg.blocks.find((b) => b.kind === 'text')?.content;
+    if (prompt) handleSend(prompt, selectedAgentId);
+  }, [allMessages, handleSend, selectedAgentId]);
+
+  const handleDelete = useCallback((messageId: string) => {
+    setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
+  }, []);
+
+  // ── Welcome screen callbacks ──
+  const handleWelcomeCreateThread = useCallback(() => {
+    // Focus the prompt input so the user can start typing
+    const textarea = document.querySelector<HTMLTextAreaElement>(
+      'textarea[placeholder*="Type a message"]',
+    );
+    if (textarea) {
+      textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => textarea.focus(), 150);
+    }
+  }, []);
+
+  const handleWelcomeSendMessage = useCallback(
+    (message: string) => {
+      handleSend(message);
+    },
+    [handleSend],
+  );
+
   // Scroll to a message when SearchDialog selects one
   useEffect(() => {
     if (!scrollToMessageId) return;
@@ -414,6 +445,13 @@ export default function App() {
           )}
 
           <div ref={chatContainerRef} className={styles.chatWrapper}>
+            {allMessages.length === 0 && threads.length === 0 && isConnected ? (
+              <WelcomeScreen
+                online={isConnected}
+                onCreateThread={handleWelcomeCreateThread}
+                onSendMessage={handleWelcomeSendMessage}
+              />
+            ) : (
           <ErrorBoundary>
             {messages.length === 0 && isStreaming ? (
               <div className={styles.skeletonChat} aria-busy="true" aria-label="Generating response">
@@ -457,10 +495,11 @@ export default function App() {
                   </div>
                 }
               >
-                <ChatView messages={allMessages} isStreaming={isStreaming} />
+                <ChatView messages={allMessages} isStreaming={isStreaming} onRetry={handleRetry} onDelete={handleDelete} />
               </Suspense>
             )}
           </ErrorBoundary>
+            )}
           </div>
         </div>
 
