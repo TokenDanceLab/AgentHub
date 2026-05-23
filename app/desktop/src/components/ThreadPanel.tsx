@@ -208,6 +208,8 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
                   <button
                     className={styles.actionBtn}
                     onClick={handleCancelDelete}
+                    title={t('thread.cancel')}
+                    aria-label={t('thread.cancel')}
                   >
                     <X size={14} />
                     {t('thread.cancel')}
@@ -238,6 +240,7 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
                     onClick={(e) => handleStartEdit(e, th)}
                     title={t('thread.rename')}
                     aria-label={t('thread.rename')}
+                    disabled={!online}
                   >
                     <Pencil size={12} />
                   </button>
@@ -246,6 +249,7 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
                     onClick={(e) => handleStartDelete(e, th.threadId)}
                     title={t('thread.delete')}
                     aria-label={t('thread.delete')}
+                    disabled={!online}
                   >
                     <Trash2 size={12} />
                   </button>
