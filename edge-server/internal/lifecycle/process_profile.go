@@ -20,7 +20,11 @@ type CommandTemplate struct {
 }
 
 type RunProcessContext struct {
-	Run store.Run
+	Run     store.Run
+	Prompt  string // User message content ({{run.prompt}})
+	AgentID string // Agent adapter ID ({{agent.id}})
+	Model   string // Model override ({{agent.model}})
+	WorkDir string // Working directory ({{run.workdir}})
 }
 
 func NewGenericRunnerProfile(command string, args, env, extraEnv []string, workDir string) (RunnerProfile, error) {
@@ -141,7 +145,7 @@ func expandPlaceholders(value string, ctx RunProcessContext) (string, error) {
 			return "", fmt.Errorf("unterminated placeholder")
 		}
 		name := strings.TrimSpace(value[:end])
-		replacement, ok := runPlaceholderValue(name, ctx.Run)
+		replacement, ok := runPlaceholderValue(name, ctx)
 		if !ok {
 			return "", fmt.Errorf("unknown placeholder %q", name)
 		}
@@ -150,14 +154,22 @@ func expandPlaceholders(value string, ctx RunProcessContext) (string, error) {
 	}
 }
 
-func runPlaceholderValue(name string, run store.Run) (string, bool) {
+func runPlaceholderValue(name string, ctx RunProcessContext) (string, bool) {
 	switch name {
 	case "run.id":
-		return run.ID, true
+		return ctx.Run.ID, true
 	case "run.projectId":
-		return run.ProjectID, true
+		return ctx.Run.ProjectID, true
 	case "run.threadId":
-		return run.ThreadID, true
+		return ctx.Run.ThreadID, true
+	case "run.prompt":
+		return ctx.Prompt, true
+	case "agent.id":
+		return ctx.AgentID, true
+	case "agent.model":
+		return ctx.Model, true
+	case "run.workdir":
+		return ctx.WorkDir, true
 	default:
 		return "", false
 	}

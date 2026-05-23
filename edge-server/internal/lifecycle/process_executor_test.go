@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -15,18 +14,18 @@ import (
 )
 
 func TestProcessExecutorRequiresCommand(t *testing.T) {
-	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{})
+	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{}, nil)
 	if !errors.Is(err, ErrProcessCommandRequired) {
 		t.Fatalf("NewProcessExecutor error = %v, want ErrProcessCommandRequired", err)
 	}
 }
 
 func TestProcessExecutorRequiresDependencies(t *testing.T) {
-	_, err := NewProcessExecutor(nil, store.New(), ProcessExecutorConfig{Command: os.Args[0]})
+	_, err := NewProcessExecutor(nil, store.New(), ProcessExecutorConfig{Command: os.Args[0]}, nil)
 	if !errors.Is(err, ErrProcessBusRequired) {
 		t.Fatalf("NewProcessExecutor nil bus error = %v, want ErrProcessBusRequired", err)
 	}
-	_, err = NewProcessExecutor(events.NewBus(10), nil, ProcessExecutorConfig{Command: os.Args[0]})
+	_, err = NewProcessExecutor(events.NewBus(10), nil, ProcessExecutorConfig{Command: os.Args[0]}, nil)
 	if !errors.Is(err, ErrProcessStoreRequired) {
 		t.Fatalf("NewProcessExecutor nil store error = %v, want ErrProcessStoreRequired", err)
 	}
@@ -61,7 +60,7 @@ func TestProcessExecutorRejectsInvalidWorkDir(t *testing.T) {
 			_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
 				Command: os.Args[0],
 				WorkDir: tt.workDir,
-			})
+			}, nil)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("NewProcessExecutor error = %v, want containing %q", err, tt.want)
 			}
@@ -153,27 +152,17 @@ func TestProcessExecutorPublishesOutputAndFinished(t *testing.T) {
 	}
 }
 
-func TestProcessExecutorRunsRepositoryMockRunnerWithInjectedContext(t *testing.T) {
+func TestProcessExecutorRunsCommandWithInjectedContext(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()
 	run := newExecutorTestRun(t, s)
 	_, ch, _ := bus.Subscribe(0)
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd returned error: %v", err)
-	}
-	runnerDir := filepath.Clean(filepath.Join(cwd, "..", "..", "..", "runner"))
-	goCommand := filepath.Join(runtime.GOROOT(), "bin", "go")
-	if runtime.GOOS == "windows" {
-		goCommand += ".exe"
-	}
-
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
-		Command: goCommand,
-		Args:    []string{"run", "./cmd/agenthub-runner", "--mock"},
-		WorkDir: runnerDir,
-	})
+		Command: os.Args[0],
+		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "success"},
+		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+	}, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
@@ -252,7 +241,7 @@ func TestProcessExecutorRunsCommandInConfiguredWorkDir(t *testing.T) {
 		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "pwd"},
 		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
 		WorkDir: workDir,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
@@ -308,7 +297,7 @@ func TestProcessExecutorExpandsRunPlaceholdersInArgs(t *testing.T) {
 			"args",
 		},
 		Env: append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
@@ -343,7 +332,7 @@ func TestProcessExecutorExpandsRunPlaceholdersInEnv(t *testing.T) {
 			"PROFILE_PROJECT={{run.projectId}}",
 			"PROFILE_THREAD={{run.threadId}}",
 		),
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
@@ -379,7 +368,7 @@ func TestProcessExecutorExpandsRunPlaceholdersInExtraEnv(t *testing.T) {
 			"PROFILE_PROJECT={{run.projectId}}",
 			"PROFILE_THREAD={{run.threadId}}",
 		},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
@@ -408,7 +397,7 @@ func TestProcessExecutorExtraEnvDoesNotTemplateParentEnvironment(t *testing.T) {
 		Args:     []string{"-test.run=TestProcessExecutorHelper", "--", "env"},
 		Env:      nil,
 		ExtraEnv: []string{"PROFILE_RUN={{run.id}}"},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
@@ -426,7 +415,7 @@ func TestProcessExecutorNilEnvInheritsParentEnvironment(t *testing.T) {
 		Command: os.Args[0],
 		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "inherited-env"},
 		Env:     nil,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
@@ -445,7 +434,7 @@ func TestProcessExecutorRejectsUnknownPlaceholder(t *testing.T) {
 	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
 		Command: os.Args[0],
 		Args:    []string{"--bad={{run.workspaceId}}"},
-	})
+	}, nil)
 	if err == nil || !strings.Contains(err.Error(), "unknown placeholder") {
 		t.Fatalf("NewProcessExecutor error = %v, want unknown placeholder", err)
 	}
@@ -468,7 +457,7 @@ func TestProcessExecutorRejectsInvalidEnvTemplate(t *testing.T) {
 			_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
 				Command: os.Args[0],
 				Env:     tt.env,
-			})
+			}, nil)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("NewProcessExecutor error = %v, want containing %q", err, tt.want)
 			}
@@ -481,7 +470,7 @@ func TestProcessExecutorRedactsEnvTemplateValueInErrors(t *testing.T) {
 	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
 		Command: os.Args[0],
 		Env:     []string{"PROFILE_TOKEN=" + secretValue + "{{run.workspaceId}}"},
-	})
+	}, nil)
 	if err == nil {
 		t.Fatal("NewProcessExecutor returned nil error for invalid env placeholder")
 	}
@@ -534,7 +523,7 @@ func TestProcessExecutorPublishesFailedWhenCommandCannotStart(t *testing.T) {
 	s := store.New()
 	run := newExecutorTestRun(t, s)
 	_, ch, _ := bus.Subscribe(0)
-	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{Command: "agenthub-missing-command-for-test"})
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{Command: "agenthub-missing-command-for-test"}, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
@@ -625,7 +614,7 @@ func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleS
 		Command: os.Args[0],
 		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", mode},
 		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
