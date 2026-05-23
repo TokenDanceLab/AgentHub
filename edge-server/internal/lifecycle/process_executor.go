@@ -74,7 +74,7 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		profile:           profile,
 		adapter:           adapter,
 		adapterReg:        adapterReg,
-		maxConcurrentRuns: 5,
+		maxConcurrentRuns: defaultMaxConcurrentRuns,
 		running:           make(map[string]context.CancelFunc),
 		stdins:            make(map[string]io.Writer),
 		runOutputs:        make(map[string]*runnerctx.RunOutputStore),
@@ -84,6 +84,11 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 // defaultRunTimeout is the hard deadline for any agent run. A hung subprocess
 // should not block the executor goroutine forever.
 const defaultRunTimeout = 30 * time.Minute
+
+const (
+	defaultMaxConcurrentRuns = 5
+	defaultReadBufferSize    = 32 * 1024
+)
 
 // SetMetrics attaches Prometheus instrumentation to this executor.
 // It is safe to call with nil to disable metrics.
@@ -103,7 +108,7 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	e.mu.Lock()
 	max := e.maxConcurrentRuns
 	if max <= 0 {
-		max = 5
+		max = defaultMaxConcurrentRuns
 	}
 	if len(e.running) >= max {
 		e.mu.Unlock()
@@ -336,7 +341,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outStore *runnerctx.RunOutputStore, stream string, reader io.Reader) {
 	defer wg.Done()
 
-	buf := make([]byte, 32*1024)
+	buf := make([]byte, defaultReadBufferSize)
 	offset := 0
 	for {
 		n, err := reader.Read(buf)
