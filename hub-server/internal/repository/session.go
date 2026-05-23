@@ -4,7 +4,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/agenthub/server-hub/internal/model"
+	"github.com/agenthub/hub-server/internal/model"
 )
 
 func CreateSession(db *gorm.DB, session *model.Session) error {

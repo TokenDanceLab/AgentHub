@@ -5,7 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/agenthub/server-hub/pkg/uuidv7"
+	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
 const (

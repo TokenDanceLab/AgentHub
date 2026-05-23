@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/agenthub/server-hub/internal/config"
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/redis/go-redis/v9"
 )
 

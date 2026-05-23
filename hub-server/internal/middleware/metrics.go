@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/agenthub/server-hub/internal/metrics"
+	"github.com/agenthub/hub-server/internal/metrics"
 )
 
 func PrometheusMiddleware() gin.HandlerFunc {

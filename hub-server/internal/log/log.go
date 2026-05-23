@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/agenthub/server-hub/internal/config"
+	"github.com/agenthub/hub-server/internal/config"
 )
 
 var logger *zap.Logger

@@ -5,7 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/agenthub/server-hub/internal/model"
+	"github.com/agenthub/hub-server/internal/model"
 )
 
 func InsertMessage(db *gorm.DB, msg *model.Message) error {

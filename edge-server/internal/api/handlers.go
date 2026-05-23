@@ -3,7 +3,9 @@ package api
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -12,7 +14,9 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/store"
@@ -20,9 +24,11 @@ import (
 
 // Handler holds dependencies for HTTP and WebSocket handlers.
 type Handler struct {
-	Bus      *events.Bus
-	Registry *runners.Registry
-	Store    *store.Store
+	Bus             *events.Bus
+	Registry        *runners.Registry
+	Store           store.Repository
+	Executor        lifecycle.RunExecutor
+	AdapterRegistry *adapters.Registry // nil if no agent adapters configured
 }
 
 var upgrader = websocket.Upgrader{
@@ -49,15 +55,17 @@ func errorResponse(code, message string) map[string]any {
 		"error": map[string]any{
 			"code":    code,
 			"message": message,
+			"traceId": genID("trace_"),
 		},
 	}
 }
 
-func ensureStore(h *Handler) *store.Store {
+func ensureStore(h *Handler) store.Repository {
 	if h.Store == nil {
 		h.Store = store.New()
 	}
 	h.ensureDefaults()
+	h.ensureExecutor()
 	return h.Store
 }
 
@@ -67,6 +75,12 @@ func (h *Handler) ensureDefaults() {
 	}
 	h.Store.CreateProject("proj_local", "Local Project")
 	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Local Thread")
+}
+
+func (h *Handler) ensureExecutor() {
+	if h.Executor == nil && h.Bus != nil && h.Store != nil {
+		h.Executor = lifecycle.NewMockExecutor(h.Bus, h.Store)
+	}
 }
 
 func acceptedResponse(data map[string]any) map[string]any {
@@ -97,7 +111,7 @@ func genID(prefix string) string {
 
 func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("METHOD_NOT_ALLOWED", "method not allowed"))
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -130,7 +144,7 @@ func (h *Handler) PostProjects(w http.ResponseWriter, r *http.Request) {
 		Name      string `json:"name"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("BAD_REQUEST", "invalid json body"))
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
 		return
 	}
 	if req.ProjectID == "" {
@@ -147,7 +161,7 @@ func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, project)
 		return
 	}
-	writeJSON(w, http.StatusNotFound, errorResponse("NOT_FOUND", "project not found"))
+	writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project not found"))
 }
 
 func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
@@ -162,7 +176,7 @@ func (h *Handler) PostThreads(w http.ResponseWriter, r *http.Request) {
 		Title     string `json:"title"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("BAD_REQUEST", "invalid json body"))
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
 		return
 	}
 	if req.ProjectID == "" {
@@ -173,7 +187,7 @@ func (h *Handler) PostThreads(w http.ResponseWriter, r *http.Request) {
 	}
 	thread, err := ensureStore(h).CreateThread(req.ThreadID, req.ProjectID, req.Title)
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, errorResponse("NOT_FOUND", "project not found"))
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project not found"))
 		return
 	}
 	h.Bus.Publish("thread.created", map[string]any{
@@ -189,15 +203,45 @@ func (h *Handler) GetThread(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, thread)
 		return
 	}
-	writeJSON(w, http.StatusNotFound, errorResponse("NOT_FOUND", "thread not found"))
+	writeJSON(w, http.StatusNotFound, errorResponse("not_found", "thread not found"))
 }
 
 func (h *Handler) GetThreadItems(w http.ResponseWriter, r *http.Request, threadID string) {
-	if _, ok := ensureStore(h).GetThread(threadID); !ok {
-		writeJSON(w, http.StatusNotFound, errorResponse("NOT_FOUND", "thread not found"))
+	repository := ensureStore(h)
+	if _, ok := repository.GetThread(threadID); !ok {
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "thread not found"))
 		return
 	}
-	writeJSON(w, http.StatusOK, listResponse(h.Store.ListThreadItems(threadID)))
+	writeJSON(w, http.StatusOK, listResponse(repository.ListThreadItems(threadID)))
+}
+
+func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, threadID string) {
+	var req struct {
+		Content string `json:"content"`
+		Role    string `json:"role"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
+		return
+	}
+	if strings.TrimSpace(req.Content) == "" {
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "content is required"))
+		return
+	}
+
+	item, err := ensureStore(h).CreateThreadMessage(genID("item_"), threadID, req.Role, req.Content)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "thread not found"))
+		return
+	}
+	scope := map[string]any{
+		"projectId": item.ProjectID,
+		"threadId":  item.ThreadID,
+		"itemId":    item.ID,
+	}
+	h.Bus.Publish("message.created", scope, item)
+	h.Bus.Publish("item.created", scope, item)
+	writeJSON(w, http.StatusCreated, item)
 }
 
 func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
@@ -206,7 +250,38 @@ func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, item)
 		return
 	}
-	writeJSON(w, http.StatusNotFound, errorResponse("NOT_FOUND", "item not found"))
+	writeJSON(w, http.StatusNotFound, errorResponse("not_found", "item not found"))
+}
+
+// ---------------------------------------------------------------------------
+// GET /v1/agents
+// ---------------------------------------------------------------------------
+
+func (h *Handler) GetAgents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
+		return
+	}
+	if h.AdapterRegistry == nil {
+		writeJSON(w, http.StatusOK, listResponse([]any{}))
+		return
+	}
+	metadataList := h.AdapterRegistry.List()
+	agents := make([]map[string]any, 0, len(metadataList))
+	for _, m := range metadataList {
+		info := map[string]any{
+			"id":          m.ID,
+			"name":        m.Name,
+			"description": m.Description,
+			"version":     m.Version,
+			"status":      "available",
+		}
+		if a, ok := h.AdapterRegistry.Get(m.ID); ok {
+			info["capabilities"] = a.Capabilities()
+		}
+		agents = append(agents, info)
+	}
+	writeJSON(w, http.StatusOK, listResponse(agents))
 }
 
 // ---------------------------------------------------------------------------
@@ -224,16 +299,26 @@ func (h *Handler) GetRuns(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("METHOD_NOT_ALLOWED", "method not allowed"))
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
 		return
 	}
 
 	var req struct {
-		ProjectID string `json:"projectId"`
-		ThreadID  string `json:"threadId"`
+		ProjectID         string `json:"projectId"`
+		ThreadID          string `json:"threadId"`
+		Prompt            string `json:"prompt"`
+		AgentID           string `json:"agentId"`
+		Model             string `json:"model"`
+		SessionID         string `json:"sessionId"`
+		Continue          bool   `json:"continue"`
+		Fork              bool   `json:"fork"`
+		ReasoningEffort   string `json:"reasoningEffort"`
+		MaxThinkingTokens int    `json:"maxThinkingTokens"`
+		PermissionMode    string `json:"permissionMode"`
+		IncludePartial    bool   `json:"includePartial"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse("BAD_REQUEST", "invalid json body"))
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
 		return
 	}
 	if req.ProjectID == "" {
@@ -246,7 +331,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	runID := genID("run_")
 	run, err := ensureStore(h).CreateRun(runID, req.ProjectID, req.ThreadID)
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, errorResponse("NOT_FOUND", "project or thread not found"))
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project or thread not found"))
 		return
 	}
 	scope := map[string]any{
@@ -257,7 +342,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 
 	// Emit run.queued
 	h.Bus.Publish("run.queued", scope, run)
-	_, _ = h.Store.CreateItem(store.Item{
+	_, _ = ensureStore(h).CreateItem(store.Item{
 		ID:        genID("item_"),
 		ProjectID: run.ProjectID,
 		ThreadID:  run.ThreadID,
@@ -267,68 +352,34 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		Content:   "Run queued",
 	})
 
-	// Run mock flow in background.
-	go h.mockRunFlow(runID, scope)
+	if h.Executor == nil {
+		h.ensureExecutor()
+	}
+	if h.Executor != nil {
+		runCtx := lifecycle.RunProcessContext{
+			Run:               run,
+			Prompt:            req.Prompt,
+			AgentID:           req.AgentID,
+			Model:             req.Model,
+			SessionID:         req.SessionID,
+			ContinueLast:      req.Continue,
+			ForkSession:       req.Fork,
+			ReasoningEffort:   req.ReasoningEffort,
+			MaxThinkingTokens: req.MaxThinkingTokens,
+			PermissionMode:    req.PermissionMode,
+			IncludePartial:    req.IncludePartial,
+		}
+		if err := h.Executor.Start(run, runCtx); err != nil {
+			if errors.Is(err, lifecycle.ErrTooManyConcurrentRuns) {
+				writeJSON(w, http.StatusTooManyRequests, errorResponse("too_many_concurrent_runs", err.Error()))
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, errorResponse("executor_start_failed", fmt.Sprintf("failed to start run executor: %v", err)))
+			return
+		}
+	}
 
 	writeJSON(w, http.StatusAccepted, acceptedResponse(runToResponse(run)))
-}
-
-func (h *Handler) mockRunFlow(runID string, scope map[string]any) {
-	// 100ms delay then emit run.started
-	time.Sleep(100 * time.Millisecond)
-	run, _ := ensureStore(h).SetRunStatus(runID, "started")
-	h.Bus.Publish("run.started", scope, runToResponse(run))
-
-	// Emit a few output.batch events
-	time.Sleep(50 * time.Millisecond)
-	h.Bus.Publish("run.output.batch", scope, map[string]any{
-		"runId":  runID,
-		"stream": "stdout",
-		"chunks": []map[string]any{
-			{"offset": 0, "text": "Initializing mock runner...\n"},
-		},
-	})
-
-	time.Sleep(50 * time.Millisecond)
-	h.Bus.Publish("run.output.batch", scope, map[string]any{
-		"runId":  runID,
-		"stream": "stdout",
-		"chunks": []map[string]any{
-			{"offset": 29, "text": "Executing mock task step 1/3...\n"},
-		},
-	})
-
-	time.Sleep(50 * time.Millisecond)
-	h.Bus.Publish("run.output.batch", scope, map[string]any{
-		"runId":  runID,
-		"stream": "stdout",
-		"chunks": []map[string]any{
-			{"offset": 60, "text": "Executing mock task step 2/3...\n"},
-		},
-	})
-
-	time.Sleep(50 * time.Millisecond)
-	h.Bus.Publish("run.output.batch", scope, map[string]any{
-		"runId":  runID,
-		"stream": "stderr",
-		"chunks": []map[string]any{
-			{"offset": 0, "text": "Warning: mock task is running in simulation mode\n"},
-		},
-	})
-
-	time.Sleep(50 * time.Millisecond)
-	h.Bus.Publish("run.output.batch", scope, map[string]any{
-		"runId":  runID,
-		"stream": "stdout",
-		"chunks": []map[string]any{
-			{"offset": 91, "text": "Executing mock task step 3/3...\n"},
-		},
-	})
-
-	// Emit run.finished
-	time.Sleep(50 * time.Millisecond)
-	run, _ = h.Store.SetRunStatus(runID, "finished")
-	h.Bus.Publish("run.finished", scope, runToResponse(run))
 }
 
 // ---------------------------------------------------------------------------
@@ -337,13 +388,32 @@ func (h *Handler) mockRunFlow(runID string, scope map[string]any) {
 
 func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("METHOD_NOT_ALLOWED", "method not allowed"))
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
 		return
 	}
 	// Extract runId from path: /v1/runs/{runId}:cancel
 	runID := extractRunID(r.URL.Path, ":cancel")
-	if h.Store != nil {
-		h.Store.SetRunStatus(runID, "cancelling")
+	if h.Executor == nil {
+		ensureStore(h)
+	}
+	if h.Executor != nil {
+		result := h.Executor.Cancel(runID)
+		if result.Found {
+			writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
+				"runId":  runID,
+				"status": result.Status,
+			}))
+			return
+		}
+	}
+	if repository := ensureStore(h); repository != nil {
+		if run, ok := repository.GetRun(runID); ok {
+			writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
+				"runId":  runID,
+				"status": run.Status,
+			}))
+			return
+		}
 	}
 	writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
 		"runId":  runID,
@@ -394,17 +464,28 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	defer heartbeat.Stop()
 
 	// Read goroutine to detect close and handle pong.
+	// done signals the read loop to exit when write loop returns.
+	done := make(chan struct{})
+	defer close(done)
 	go func() {
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		conn.SetPongHandler(func(string) error {
-			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 			return nil
 		})
 		for {
-			_, _, err := conn.ReadMessage()
+			select {
+			case <-done:
+				return
+			default:
+			}
+			mt, msg, err := conn.ReadMessage()
 			if err != nil {
 				break
 			}
+			// Inbound messages from the client are discarded by design
+			// (the server pushes events; the client only sends close/pong).
+			slog.Debug("websocket inbound message discarded", "messageType", mt, "size", len(msg))
 		}
 	}()
 
@@ -448,6 +529,9 @@ func decodeOptionalJSON(r *http.Request, dst any) error {
 	if r.ContentLength == 0 {
 		return nil
 	}
+	// Limit request body to 1MB to prevent memory exhaustion.
+	// Use io.LimitReader instead of http.MaxBytesReader to avoid needing a ResponseWriter.
+	r.Body = io.NopCloser(io.LimitReader(r.Body, 1<<20))
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(dst); err != nil {
 		return err
@@ -456,15 +540,44 @@ func decodeOptionalJSON(r *http.Request, dst any) error {
 }
 
 func runToResponse(run store.Run) map[string]any {
-	return map[string]any{
-		"runId":      run.ID,
-		"projectId":  run.ProjectID,
-		"threadId":   run.ThreadID,
-		"status":     run.Status,
-		"createdAt":  run.CreatedAt,
-		"startedAt":  run.StartedAt,
-		"finishedAt": run.FinishedAt,
+	return lifecycle.RunResponse(run)
+}
+
+// ---------------------------------------------------------------------------
+// POST /v1/permissions/decide  (Desktop permission gate)
+// ---------------------------------------------------------------------------
+
+func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
+		return
 	}
+
+	var req struct {
+		RunID     string `json:"runId"`
+		RequestID string `json:"requestId"`
+		Decision  string `json:"decision"`
+		Reason    string `json:"reason,omitempty"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
+		return
+	}
+	if req.Decision != "allow" && req.Decision != "deny" {
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "decision must be 'allow' or 'deny'"))
+		return
+	}
+
+	scope := map[string]any{"runId": req.RunID}
+	h.Bus.Publish("run.agent.permission_decided", scope, map[string]any{
+		"runId":     req.RunID,
+		"requestId": req.RequestID,
+		"decision":  req.Decision,
+		"reason":    req.Reason,
+	})
+
+	slog.Info("permission decided by Desktop", "requestId", req.RequestID, "decision", req.Decision)
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 }
 
 // RegisterRoutes registers all routes on the given mux.
@@ -472,6 +585,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	ensureStore(h)
 	mux.HandleFunc("/v1/health", h.GetHealth)
 	mux.HandleFunc("/v1/runners", h.GetRunners)
+	mux.HandleFunc("/v1/agents", h.GetAgents)
 	mux.HandleFunc("/v1/projects", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -479,7 +593,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		case http.MethodPost:
 			h.PostProjects(w, r)
 		default:
-			writeJSON(w, http.StatusMethodNotAllowed, errorResponse("METHOD_NOT_ALLOWED", "method not allowed"))
+			writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
 		}
 	})
 	mux.HandleFunc("/v1/projects/", func(w http.ResponseWriter, r *http.Request) {
@@ -487,7 +601,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			h.GetProject(w, r)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("METHOD_NOT_ALLOWED", "method not allowed"))
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
 	})
 	mux.HandleFunc("/v1/threads", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -496,7 +610,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		case http.MethodPost:
 			h.PostThreads(w, r)
 		default:
-			writeJSON(w, http.StatusMethodNotAllowed, errorResponse("METHOD_NOT_ALLOWED", "method not allowed"))
+			writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
 		}
 	})
 	mux.HandleFunc("/v1/threads/", func(w http.ResponseWriter, r *http.Request) {
@@ -505,18 +619,23 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			h.GetThreadItems(w, r, threadID)
 			return
 		}
+		if strings.HasSuffix(r.URL.Path, "/messages") && r.Method == http.MethodPost {
+			threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), "/messages")
+			h.PostThreadMessage(w, r, threadID)
+			return
+		}
 		if r.Method == http.MethodGet {
 			h.GetThread(w, r)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("METHOD_NOT_ALLOWED", "method not allowed"))
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
 	})
 	mux.HandleFunc("/v1/items/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.GetItem(w, r)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("METHOD_NOT_ALLOWED", "method not allowed"))
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
 	})
 	mux.HandleFunc("/v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -525,7 +644,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		case http.MethodPost:
 			h.PostRuns(w, r)
 		default:
-			writeJSON(w, http.StatusMethodNotAllowed, errorResponse("METHOD_NOT_ALLOWED", "method not allowed"))
+			writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
 		}
 	})
 	mux.HandleFunc("/v1/runs/", func(w http.ResponseWriter, r *http.Request) {
@@ -540,10 +659,17 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 				writeJSON(w, http.StatusOK, runToResponse(run))
 				return
 			}
-			writeJSON(w, http.StatusNotFound, errorResponse("NOT_FOUND", "run not found"))
+			writeJSON(w, http.StatusNotFound, errorResponse("not_found", "run not found"))
 			return
 		}
-		writeJSON(w, http.StatusNotFound, errorResponse("NOT_FOUND", "not found"))
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "not found"))
 	})
 	mux.HandleFunc("/v1/events", h.GetEvents)
+	mux.HandleFunc("/v1/permissions/decide", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			h.PostPermissionDecide(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
+	})
 }

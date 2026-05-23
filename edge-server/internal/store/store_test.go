@@ -5,6 +5,9 @@ import (
 	"testing"
 )
 
+var _ Repository = (*Store)(nil)
+var _ RunLifecycleStore = (*Store)(nil)
+
 func TestStoreCreatesProjectThreadRunAndItem(t *testing.T) {
 	s := New()
 
@@ -42,6 +45,45 @@ func TestStoreCreatesProjectThreadRunAndItem(t *testing.T) {
 	}
 	if item.ID != "item_test" {
 		t.Fatalf("item ID = %q, want item_test", item.ID)
+	}
+}
+
+func TestStoreCreatesThreadMessageItem(t *testing.T) {
+	s := New()
+	project := s.CreateProject("proj_test", "Test Project")
+	thread, err := s.CreateThread("thread_test", project.ID, "Test Thread")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+
+	item, err := s.CreateThreadMessage("item_msg", thread.ID, "", "hello")
+	if err != nil {
+		t.Fatalf("CreateThreadMessage returned error: %v", err)
+	}
+	if item.ProjectID != project.ID || item.ThreadID != thread.ID {
+		t.Fatalf("message item scope = %#v, want project/thread binding", item)
+	}
+	if item.Type != "user_message" {
+		t.Fatalf("item type = %q, want user_message", item.Type)
+	}
+	if item.Role != "user" {
+		t.Fatalf("item role = %q, want user", item.Role)
+	}
+	if item.Status != "created" {
+		t.Fatalf("item status = %q, want created", item.Status)
+	}
+	if item.Content != "hello" {
+		t.Fatalf("item content = %q, want hello", item.Content)
+	}
+}
+
+func TestStoreRejectsThreadMessageForMissingThread(t *testing.T) {
+	s := New()
+	s.CreateProject("proj_test", "Test Project")
+
+	_, err := s.CreateThreadMessage("item_msg", "thread_missing", "user", "hello")
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("CreateThreadMessage error = %v, want ErrNotFound", err)
 	}
 }
 
@@ -97,5 +139,31 @@ func TestStoreUpdatesRunStatusTimestamps(t *testing.T) {
 	}
 	if finished.Status != "finished" || finished.FinishedAt == "" {
 		t.Fatalf("finished run = %#v, want status finished and finishedAt", finished)
+	}
+}
+
+func TestStoreSetRunStatusIfDoesNotOverwriteDisallowedStatus(t *testing.T) {
+	s := New()
+	s.CreateProject("proj_test", "Test Project")
+	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread")
+	_, _ = s.CreateRun("run_test", "proj_test", "thread_test")
+	finished, ok := s.SetRunStatus("run_test", "finished")
+	if !ok {
+		t.Fatal("SetRunStatus returned ok=false")
+	}
+
+	got, ok := s.SetRunStatusIf("run_test", "cancelling", "queued", "started")
+	if ok {
+		t.Fatal("SetRunStatusIf returned ok=true for disallowed terminal status")
+	}
+	if got.Status != finished.Status {
+		t.Fatalf("run status = %q, want %q", got.Status, finished.Status)
+	}
+	stored, ok := s.GetRun("run_test")
+	if !ok {
+		t.Fatal("GetRun returned ok=false")
+	}
+	if stored.Status != "finished" {
+		t.Fatalf("stored status = %q, want finished", stored.Status)
 	}
 }

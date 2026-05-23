@@ -3,8 +3,8 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/agenthub/server-hub/internal/errcode"
-	"github.com/agenthub/server-hub/internal/service"
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/service"
 )
 
 type AgentHandler struct {

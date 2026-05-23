@@ -15,16 +15,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/agenthub/server-hub/internal/cache"
-	"github.com/agenthub/server-hub/internal/config"
-	"github.com/agenthub/server-hub/internal/handler"
-	"github.com/agenthub/server-hub/internal/log"
-	"github.com/agenthub/server-hub/internal/metrics"
-	"github.com/agenthub/server-hub/internal/model"
-	"github.com/agenthub/server-hub/internal/repository"
-	"github.com/agenthub/server-hub/internal/router"
-	"github.com/agenthub/server-hub/internal/service"
-	"github.com/agenthub/server-hub/internal/ws"
+	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/handler"
+	"github.com/agenthub/hub-server/internal/log"
+	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/router"
+	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/ws"
 )
 
 var mgr *ws.Manager

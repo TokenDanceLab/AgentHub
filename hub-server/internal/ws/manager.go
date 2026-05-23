@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/agenthub/server-hub/pkg/uuidv7"
+	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
 type Conn struct {

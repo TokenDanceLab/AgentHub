@@ -2,10 +2,147 @@ name: checks
 
 on:
   pull_request:
+    branches: [master, dev/delicious233, dev/trump]
   push:
-    branches: [master]
+    branches: [master, dev/delicious233, dev/trump]
+
+env:
+  GO_VERSION: "1.24"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10"
 
 jobs:
+  # ── Go: Edge Server ──────────────────────────
+  go-edge:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: edge-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build
+        run: go build ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          working-directory: edge-server
+          version: latest
+          args: --timeout=5m
+
+      - name: Test (unit only, skip integration)
+        run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
+
+      - name: Coverage check
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          THRESHOLD=70
+          echo "Coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+  # ── Go: Hub Server ──────────────────────────
+  go-hub:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build
+        run: go build ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          working-directory: hub-server
+          version: latest
+          args: --timeout=5m
+
+      - name: Test (unit only, skip integration)
+        run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
+
+      - name: Coverage check
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          THRESHOLD=40
+          echo "Coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "::warning::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+  # ── Frontend: Desktop ────────────────────────
+  frontend-desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared types
+        run: pnpm --filter @agenthub/shared build
+
+      - name: Type check
+        run: pnpm --filter @agenthub/desktop typecheck
+
+      - name: Lint
+        run: pnpm --filter @agenthub/desktop lint --max-warnings 10
+
+      - name: Test Desktop
+        run: pnpm --filter @agenthub/desktop test:run
+
+  # ── Frontend: Web ────────────────────────────
+  frontend-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Web
+        run: pnpm --filter @agenthub/web build
+
+  # ── Validation ───────────────────────────────
   validate:
     runs-on: ubuntu-latest
     steps:

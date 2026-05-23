@@ -4,7 +4,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/agenthub/server-hub/internal/model"
+	"github.com/agenthub/hub-server/internal/model"
 )
 
 func UpsertDevice(db *gorm.DB, device *model.Device) error {

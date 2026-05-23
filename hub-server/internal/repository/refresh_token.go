@@ -4,7 +4,7 @@ import (
 	"errors"
 	"gorm.io/gorm"
 
-	"github.com/agenthub/server-hub/internal/model"
+	"github.com/agenthub/hub-server/internal/model"
 )
 
 func UpsertRefreshToken(db *gorm.DB, rt *model.RefreshToken) error {

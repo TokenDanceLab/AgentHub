@@ -7,10 +7,10 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/agenthub/server-hub/internal/config"
-	"github.com/agenthub/server-hub/internal/errcode"
-	"github.com/agenthub/server-hub/internal/model"
-	"github.com/agenthub/server-hub/internal/repository"
+	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/repository"
 )
 
 type AttachmentService struct {

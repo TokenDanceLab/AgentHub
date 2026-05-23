@@ -1,4 +1,4 @@
-module github.com/agenthub/server-hub
+module github.com/agenthub/hub-server
 
 go 1.25.6
 

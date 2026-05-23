@@ -1,53 +1,108 @@
-# AgentHub 路线图
+# AgentHub 路线图 — P0 集成冲刺 → P1 交互体验
 
 最后更新：2026-05-23
 
 ## 当前总目标
 
-推进 M2 Edge 本地数据层，让前端、后端、客户端三条线能围绕稳定的 Project / Thread / Run / Item / Event 模型并行开发。当前客户端 PR #30 已提供内存态最小实现，下一步重点是持久化、message/item 写入和 Runner lifecycle 解耦。
+**P0 已全部完成。P1 聚焦交互体验：** 在 P0 完整事件管道基础上，将 UI 从"能用"提升到"同类产品水平"——Markdown 渲染、代码语法高亮、多行输入、Stop 按钮、Diff 交互。
 
-## 路线图分层
+## 工作区
 
-- 总路线图：`docs/roadmap.md`
-- 前端路线图：`docs/roadmaps/frontend.md`
-- 后端路线图：`docs/roadmaps/backend.md`
-- 客户端路线图：`docs/roadmaps/client.md`
-- 分支路线图：`docs/roadmaps/branches/<branch-name>.md`
+```
+dev/delicious233          ← 主 dev（Delicious233）: ROADMAP + 架构决策
+feat/trump-webui          ← Web 前端（Trump）
+```
 
-## 基本原则
+合并方向：`feat/* → dev/delicious233 → master`
 
-- Go 优先：Hub Server、Edge Server、Runner 使用 Go。
-- 协议简单：REST JSON API + WebSocket typed events 是当前主线。
-- 中文优先：README、AGENTS、issue、PR 和项目文档中文为主；代码标识保持英文。
-- 隐私安全：本机状态、密钥、真实服务器信息和个人路径不进仓库。
-- 渐进式加载：先读 `AGENTS.md` 和任务相关主文档，不全文扫描调研资料。
+## P0 冲刺任务 ✅ (全部完成 27/27)
 
-## 里程碑
+### Edge（Delicious233 + Agent）
+- [x] Claude Code NDJSON 24 消息类型
+- [x] stdin 控制协议 + cancel
+- [x] OpenCode --format json 解析
+- [x] 模型选择 + 推理强度 + alias
+- [x] Codex 全事件覆盖（thread/turn/item 9种类型）
+- [x] OpenCode 全事件覆盖（tool_result/permission/file/session/task）
+- [x] 权限通知 Desktop（permission_requested/decided）
+- [x] 集成 smoke test 17/17 通过
+- [x] OpenCode 集成测试
+- [x] CI `-short` 标记：集成测试在 CI 正确跳过
+- [x] 打通 Edge → Desktop WebSocket 事件投递验证
 
-- [x] M1 客户端本地链路：Desktop Shell + Local Edge + Mock Runner + smoke test。
-- [ ] M2 Edge 本地数据层：Project / Thread / Run / Item / EventStore。最小内存实现已在 PR #30，持久化和 Runner lifecycle 仍待完成。
-- [ ] M3 真实 Runner：CLI Agent 进程、取消、日志、错误映射。
-- [ ] M4 Workspace 能力：worktree、diff、preview、artifact、approval。
-- [ ] M5 Hub 协作链路：Edge-Hub sync、远程查看、远程审批。
+### Desktop（Delicious233 + Agent）
+- [x] 共享类型修复 + ChatView 实时打字 + ToolUseBlock + FileChangeBlock
+- [x] RunDetail 标签页 + text_delta 累积 + 模型选择器
+- [x] 12/12 测试文件全部通过 (123 tests)
+- [x] 消费 run.agent.task_* → 子代理事件
 
-## 当前活跃方向
+### 工程基础
+- [x] Go: .golangci.yml 22 规则 + ESLint/Prettier + typecheck
+- [x] CI: lint + typecheck + coverage 72%（阈值 70%）
+- [x] .codex/skills/cross-review 项目级 skill
+- [x] 18 份参考报告
 
-- 前端：从 Mock 数据过渡到真实 REST / WebSocket client，承接 UI 同学设计。
-- 后端：实现 Hub Server、Edge-Hub 通信、账号/群聊/同步/中继能力。
-- 客户端：PR #30 推进 Edge 本地数据层，后续继续做持久化、message/item 写入和真实 Runner lifecycle。
+## P1 交互体验（进行中）
 
-## 验收门槛
+基于参考项目（OpenCode UI/Goose/LibreChat/Claude Code WebUI）的 UX 审计结果。
 
-- [ ] 当前分支路线图已更新。
-- [ ] 相关方向路线图已更新。
-- [ ] 测试或确定性检查已运行。
-- [ ] API 或事件变化已同步 `api/`。
-- [ ] `git status --short --branch` 已检查。
+### 核心体验（原 P0 级）
+- [x] ChatView: Markdown 渲染 + 代码语法高亮（react-markdown + PrismLight 12语言）
+- [x] PromptInput: 多行 textarea + Stop 按钮（Enter发送/Shift+Enter换行）
+- [x] RunDetail: Cancel/Abort 按钮 + token 用量展示（haiku agent 实现）
 
-## 待办池
+### 聊天标配（原 P1 级）✅ (全部完成 4/4)
+- [x] ThreadPanel: 重命名/删除 + 消息/运行计数（sonnet agent）
+- [x] DiffViewer: 单块 Accept/Reject 交互（haiku agent）
+- [x] ChatView: 消息操作 — 复制/重试/删除 hover 按钮（haiku agent）
+- [x] AgentList: 搜索过滤 + 描述 + 彩色能力标签 + 匹配高亮（haiku agent）
 
-- [ ] 评估 Edge store 的 SQLite 依赖获取问题和可替代方案。
-- [ ] 在客户端 M2 基础上补 `POST /v1/threads/{threadId}/messages` 到 Item / event 的写入链路。
-- [ ] 将 Runner 真正接入 Edge Run lifecycle，替换 handler 内置 mock flow。
-- [ ] M2 完成后归档或更新 `docs/client-roadmap.md`，避免路线图重复。
-- [ ] 为 Runner 真实 CLI adapter 规划最小测试夹具。
+### P2 级（打磨）✅ (全部完成 4/4)
+- [x] StatusBar: 延迟指示器 + 错误徽标 + 重连脉冲（haiku agent）
+- [x] 加载骨架屏 + shimmer 动画（haiku agent）
+- [x] 错误处理 UX: Edge 断连横幅 + ErrorBoundary Retry（haiku agent）
+- [x] 全局暗/亮主题切换 + CSS 变量体系 + ThemeContext（sonnet agent）
+
+### P3 级（性能 + 健壮）✅ (全部完成 3/3)
+- [x] Bundle 分析 + React.lazy 拆分 + React.memo 审计（sonnet agent）
+- [x] 权限事件管道：permission_requested/decided 事件 emit，Desktop 被动观察（自动批准，完整门控延迟到 M4）
+- [x] 真实 Agent 集成 E2E：scripts/integration-e2e.ps1（启动edge→POST run→WebSocket验证）
+
+### M3b 多 Agent 协调（研究员 P0 建议 ✅ 全部完成 6/6）
+基于 `docs/reference/02-cross-comparison/00-synthesis.md` 的 18 项目全景分析。
+
+| # | 采纳项 | 来源 | 状态 |
+|---|--------|------|:--:|
+| 1 | AgentHook 接口（6 核心 hook） | Claude Code + OpenCode | ✅ |
+| 2 | 消息树渲染（ThreadPanel tree） | LibreChat buildTree | ✅ |
+| 3 | 安全管道（23 检查 → Go） | Claude Code deep-dive | ✅ |
+| 4 | Task 状态: dispatched | Multica | ✅ |
+| 5 | Context Budget 模型 | Claude Code + LibreChat | ✅ |
+| 6 | 流式增量解析器 | Kanna drainingStreams | ✅ |
+
+### M4 候选（Workspace + 协作）
+- [x] Hub Server 骨架：Go module + 18 REST 路由 + health check（stub 响应，待后端开发）
+- [x] OpenCode E2E：5/5 pass — text_delta + session_init + result + finished 全链路
+- [x] Codex E2E：gpt-5.5 全链路 — session_init + text_block + result + finished (30 events)
+- [x] 环境隔离：envForRun 传递完整父进程环境给 Agent CLI（MEDIUM，已知风险）
+- [x] Hub auth middleware：JWT Bearer 令牌验证 + 路由跳过（hub-server）
+- [x] 权限门控升级：Desktop 主动批准/拒绝 + 60s 超时自动拒绝
+- [ ] Web 前端集成：feat/trump-webui → dev/delicious233 合并
+- [x] 响应式布局 + 移动端适配
+
+## 实测状态 (2026-05-23)
+
+| Agent | E2E 集成测试 | 单元测试 | 事件覆盖 | 备注 |
+|-------|------------|---------|---------|------|
+| Claude Code | ✅ 5/5 pass | ✅ 24 fixtures | 20+ types | 全链路验证通过 |
+| OpenCode | ✅ 5/5 pass | ✅ 12 tests | 16 types | 全链路验证通过 — newapi/deepseek-v4-pro |
+| Codex | ✅ 3/3 pass | ✅ fixture tests | 9 item types | 全链路验证通过 — gpt-5.5 |
+| Hub Server | ✅ 全功能三层架构 | ✅ auth/builder 单元 | 40+ REST + WS | Johnny 合入 — Gin/GORM/Redis/PG + 15 migration |
+
+## 验收
+
+- [ ] Desktop 启动 Edge → 发送 prompt → 看到 Claude Code 实时打字
+- [ ] tool call 卡片正确渲染（tool_use → tool_result）
+- [ ] Diff 在 ChatView 内联展示
+- [ ] 102 测试通过
+- [ ] client-smoke.ps1 全链路

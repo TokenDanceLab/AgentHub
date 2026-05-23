@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"github.com/agenthub/server-hub/internal/model"
+	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
 )
 

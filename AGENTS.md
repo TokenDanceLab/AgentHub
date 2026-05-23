@@ -26,7 +26,7 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 
 1. 先读本文件。
 2. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
-3. 如果用户要求 `set-goal`、持续推进、自我迭代、worktree/subagent 分发或交叉 review，必须先加载 `.codex/skills/set-goal/SKILL.md`，再按其中 `references/` 执行。
+3. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
 4. 只读相关主文档章节：产品不清读 `docs/product-requirements.md`；边界不清读 `docs/system-architecture.md`；实现顺序不清读 `docs/implementation-guide.md`。
 5. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
 6. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
@@ -61,13 +61,19 @@ AgentHub 的开发工作流是“三个开发者，每个开发者可以带一�
 - subagent 提示必须包含：目标、允许修改的路径、必须阅读的文档、必须运行的检查、隐私红线。
 - subagent 不自行扩大范围；发现范围不够，停下交回主 Agent。
 
+### Agent 间文件通信
+
+其他 Agent（或人类）通过 `docs/inbox/` 投递报告。规则见 `docs/inbox/README.md`。
+dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，处理后归档到 `docs/reference/`。
+
 ### 仓库级 Skill
 
-- 仓库只提交白名单 skill：`.codex/skills/set-goal/`。
-- 用户调用 `set-goal`，或要求持续推进、自我迭代、自己 review、交叉 review、worktree/subagent 分发时，必须先读 `.codex/skills/set-goal/SKILL.md`。
-- `.codex/skills/set-goal/references/` 已内嵌 Agent 开发 Loop、路线图驱动、review、验证和 git 收口规则；不要假设外部同名 skill 一定可用。
+- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`。
+- 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）必须先读 `.agents/skills/dev-loop/SKILL.md`。
+- 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
+- `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
 - `docs/roadmap.md` 和 `docs/roadmaps/` 是持续开发台账，用来记录当前目标、方向任务、分支进展、验证和下一步；不要把详细方案写成第二套主文档。
-- 除白名单 skill 外，`.codex/` 的本机状态、缓存、会话记录和个人配置不得提交。
+- 除白名单 skill 外，`.agents/`、`.codex/`、`.claude/` 的本机状态、缓存、会话记录和个人配置不得提交。
 
 ## 3. 技术主线
 
@@ -126,6 +132,25 @@ fix/short-topic
 
 `codex/` 是 Codex App 自动工作分支前缀，可以用于临时 PR。手工创建分支优先用 `feat/`、`fix/`、`docs/`。`master` 是稳定分支。实现、协议和结构调整走 PR；小文档修正可以直接提交，但不确定就走 PR。PR 标题也用 `type(scope): 中文摘要`。
 
+### 当前活跃分支 (2026-05-23)
+
+```
+Remote:
+  origin/master                            ← 稳定
+  origin/dev/delicious233                  ← 主 dev: P0-P3 全部完成, M4 推进中
+  origin/dev/trump                         ← Trump dev
+  origin/feat/trump-webui                  ← Web 工作区
+  origin/feat/backend-foundation           ← 后台预留 (dormant)
+
+本地: dev/delicious233 + 1 worktree (feat-trump-webui)
+```
+
+合并方向：`feat/* → dev/delicious233 → master`
+
+开发引擎：`.agents/skills/dev-loop/` — 模型分配(opus/sonnet/haiku) + 标准循环 + 交叉审查
+
+当前 P0-P3 全部完成，M4 推进中。详细进度见 `docs/roadmap.md`。
+
 进度同步：
 
 - 每个开发者至少在一天结束前 push 当前分支。
@@ -171,7 +196,7 @@ fix/short-topic
 - 真实服务器 IP、内网地址、数据库连接串、生产账号、个人路径。
 - 生产数据库 dump、用户数据、聊天记录、日志中的敏感字段。
 - GitHub issue、PR、commit message 中也不要写上述内容。
-- 本机 Agent 记忆和运行状态，例如 `.agenthub/memory/`、`.claude/`、`.codex/`；仓库级 `.codex/skills/set-goal/` 是唯一例外。
+- 本机 Agent 记忆和运行状态，例如 `.agenthub/memory/`、`.claude/`、`.codex/`、`.agents/`；仓库级 `.agents/skills/dev-loop/` 是唯一例外。
 
 执行规则：
 
@@ -216,3 +241,55 @@ pnpm build
 - 前端状态转换和 API client 要有单元测试。
 - 关键 UI 流程后续用 Playwright 覆盖：新建 Thread、启动 Run、查看 Diff、Approval、Preview。
 - Desktop/Runner 改动至少提供本地 smoke test 步骤；无法自动化时写在 PR 验收里。
+
+## 8. 质量治理
+
+### 测试覆盖率
+
+| 模块 | 最低覆盖率 | 当前 |
+|------|-----------|------|
+| edge-server | 70% | 72.0%（CI 强制阻断） |
+| app/desktop | 不做硬性要求 | 123 tests |
+| app/web | 不做硬性要求 | build 通过即可 |
+
+- CI 使用 `go test -short` 跳过需要真实 CLI 的集成测试。
+- 新增 adapter 功能必须补同包 `*_test.go`。
+- 修改 shared types 必须同步更新所有消费者的测试。
+
+### CI 触发规则
+
+| 触发条件 | CI 行为 |
+|----------|---------|
+| push 到 `master` | 全量：Go test + pnpm test + pnpm build + YAML 校验 |
+| push 到 `dev/*` | 全量 |
+| PR 到 `master` / `dev/*` | 全量 |
+| push 到 `feat/*` | **不触发**（仅在开 PR 后触发） |
+
+### 分支治理
+
+```
+master                    ← 稳定发布。CI 必须全绿才能合入。
+dev/delicious233          ← 主开发。所有 feat/* 的合入目标。
+dev/trump                 ← Web 前端合并中继。
+feat/*                    ← 功能分支。开 PR 到 dev 时触发 CI。
+```
+
+规则：
+- `master` 禁止直接 push，必须通过 PR。
+- `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + `pnpm build`。
+- `feat/*` 合并前需要 rebase 到最新 `dev`，解决冲突后再开 PR。
+- 删除已合并的 `feat/*` 分支和对应的 worktree。
+- worktree 放在 `.worktrees/`，已在 `.gitignore`，严禁提交。
+
+### 提交规范
+
+```
+type(scope): 中文摘要
+
+type: init|feat|fix|docs|refactor|chore|test|perf|ci|revert
+scope: client|edge|api|docs|desktop|web
+```
+
+- 摘要不超过 50 字。
+- 不要写 "added"、"fixed" 等英文动词——用中文。
+- hook 脚本在 `scripts/git-hooks/commit-msg`，clone 后运行 `scripts/setup.ps1` 启用。

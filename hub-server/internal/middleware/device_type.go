@@ -4,8 +4,8 @@ import (
 	"slices"
 
 	"github.com/gin-gonic/gin"
-	"github.com/agenthub/server-hub/internal/errcode"
-	"github.com/agenthub/server-hub/internal/handler"
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/handler"
 )
 
 func DeviceTypeCheck(allowedTypes ...string) gin.HandlerFunc {

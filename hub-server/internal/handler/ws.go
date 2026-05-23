@@ -8,8 +8,8 @@ import (
 	"github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 
-	"github.com/agenthub/server-hub/internal/jwtutil"
-	"github.com/agenthub/server-hub/internal/ws"
+	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/ws"
 )
 
 type WebSocketHandler struct {

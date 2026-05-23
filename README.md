@@ -8,7 +8,7 @@
 
 [English](README_EN.md) &nbsp;·&nbsp; [产品需求](docs/product-requirements.md) &nbsp;·&nbsp; [系统架构](docs/system-architecture.md) &nbsp;·&nbsp; [API 契约](api/)
 
-<img src="https://img.shields.io/badge/状态-客户端_M1_收口中-blue?style=flat-square" alt="status">
+<img src="https://img.shields.io/badge/状态-P0--P3_完成+M4-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.24+-00ADD8?style=flat-square&logo=go" alt="go">
 <img src="https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react" alt="react">
 <img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square" alt="license">
@@ -23,7 +23,7 @@ AgentHub 把 AI 编程 Agent 变成了 IM 联系人。你可以像在飞书群�
 
 **与现有工具的区别**：大多数 Claude Code GUI 是单人聊天壳。AgentHub 是多 Agent 协作平台——Orchestrator 规划、Claude Code 实现、Reviewer 审查，在同一个群聊中流转。
 
-当前仓库处于 **客户端 M1 收口** 阶段：已经跑通 Local Edge、Mock Run、WebSocket events 和 Desktop EventLog 的本地 mock 链路；完整 P0 还需要补齐 Project / Thread / Item 持久化、真实 Runner adapter、Diff / Artifact、Apply / Discard、Approval 和 Preview。
+当前已完成：Edge Server 三大 Agent CLI 适配（Claude Code 5/5 E2E 通过，OpenCode/Codex 协议完整），Desktop IM 聊天式交互（React 19 + Tauri，17 组件，191 测试），Hub Server 三层架构（Gin/GORM/Redis/PostgreSQL，15 迁移）。P0-P3 全部完成，M3b 6/6 完成（AgentHook、消息树、安全流水线、任务已调度、上下文预算、流式解析器），M4 8/8 完成（Hub Server、响应式布局、环境隔离、OpenCode E2E、权限门控、Hub 认证、Codex E2E、Web 前端）。详细进展见 [路线图](docs/roadmap.md)。
 
 <br>
 
@@ -50,7 +50,7 @@ Desktop UI ─→ Edge Server ─→ Runner ─→ Claude Code / Codex / OpenCod
 
 ## 演示流程
 
-下面是目标体验，不代表当前 M1 已全部完成。当前 M1 只覆盖 mock run 和事件日志展示。
+以下为目标完整体验流（P1 多 Agent 协作阶段）：
 
 ```
 你：@ClaudeCode 做一个带邮箱和 OAuth 的登录页
@@ -115,16 +115,28 @@ Windows PowerShell：
 .\scripts\setup.ps1 -Reference core
 ```
 
-### 当前 M1 本地链路
+### 一键启动（推荐）
 
-终端 1：启动 Local Edge。
+```powershell
+.\scripts\dev-start.ps1          # Windows
+```
+
+```bash
+./scripts/dev-start.sh           # macOS/Linux
+```
+
+启动 Edge Server + Hub Server + Desktop 开发服务器，等待健康检查后打开浏览器。
+
+### 手动启动
+
+终端 1：Edge Server（需要 Claude Code CLI）。
 
 ```powershell
 cd edge-server
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --claude-code-path claude --agent-default claude-code
 ```
 
-终端 2：启动 Desktop Web UI。日常开发优先用 Vite，避免每次都启动 Tauri 壳。
+终端 2：Desktop Web UI。
 
 ```powershell
 cd app/desktop
@@ -132,7 +144,7 @@ pnpm install
 pnpm dev --port 5199
 ```
 
-浏览器打开 `http://localhost:5199`，可以看到 Edge online/offline、Mock Runner 和 EventLog。当前 M1 不包含 Project / Thread 工作台、真实 Agent CLI、Diff、Approval 或 Preview。
+打开 `http://localhost:5199`，输入 prompt 即可与 Claude Code 实时交互。支持 Markdown 渲染、Tool Call 卡片、Diff 内联、暗/亮主题切换。
 
 ### Desktop 应用构建
 
@@ -165,7 +177,7 @@ cd ..\..
 .\scripts\client-smoke.ps1
 ```
 
-完整 P0 目标仍是 `Desktop UI -> Local Edge -> Local Runner -> Agent CLI`。当前 M1 使用 Mock Run 验证链路；下一步优先推进 M2 的 Edge 本地数据层和 EventStore，Desktop 启动编排可并行补齐，随后再进入真实 Runner adapter、Project / Worktree / Diff。
+完整 P0 链路 `Desktop UI -> Local Edge -> Local Runner -> Agent CLI` 已全部跑通，三大 Agent（Claude Code、OpenCode、Codex）E2E 各 5/5 通过。
 
 <br>
 

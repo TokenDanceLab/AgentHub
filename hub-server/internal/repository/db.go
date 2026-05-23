@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/agenthub/server-hub/internal/config"
+	"github.com/agenthub/hub-server/internal/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
