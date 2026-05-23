@@ -129,25 +129,28 @@ fix/short-topic
 ### 当前活跃分支 (2026-05-23)
 
 ```
-dev/maintainer          ← 主 dev 分支（maintainer）: Desktop M3 + Edge + 共享类型
-dev/contributor-b                 ← contributor-b dev 分支（从 maintainer 切出）: Web 前端 + 同步 Desktop
+Remote (7):
+  origin/master                            ← 稳定
+  origin/dev/maintainer                  ← 主 dev (maintainer)
+  origin/dev/contributor-b                         ← contributor-b dev
+  origin/feat/desktop-sidecar              ← Desktop 工作区
+  origin/feat/edge-adapters                ← Edge 工作区 (已合入 dev)
+  origin/feat/contributor-b-webui                  ← Web 工作区
+  origin/feat/backend-foundation           ← 后台预留 (dormant)
 
-feat/desktop-sidecar      ← Desktop 工作区（Tauri + React）→ 合入 dev/maintainer
-feat/edge-adapters        ← Edge AgentAdapter 工作区 → 已合入 dev/maintainer
-feat/contributor-b-webui          ← contributor-b Web 工作区 → 合入 dev/contributor-b → 再合入 dev/maintainer
-
-feat/frontend-page-preview ← contributor-b 旧原型（归档，不再使用）
-feat/frontend-webui        ← contributor-b 旧原型（归档，不再使用）
-feat/backend-foundation    ← 后端预留
+Local worktrees:
+  .worktrees/feat-desktop-sidecar          ← Desktop
+  .worktrees/feat-edge-adapters            ← Edge
+  .worktrees/feat-contributor-b-webui              ← Web
 ```
 
-合并方向：`feat/* → dev/maintainer → dev/contributor-b → (review后) → dev/maintainer → master`
+合并方向：`feat/* → dev/maintainer → dev/contributor-b → (review) → dev/maintainer → master`
 
 写死规则：
 - `dev/maintainer` 保持 maintainer 的设计和代码风格
 - `dev/contributor-b` 由 maintainer 控制合入质量
-- `feat/contributor-b-webui` 是帮 contributor-b 用正确工程方式落地的版本
-- 旧 `feat/frontend-*` 分支归档保留，不得继续开发
+- `feat/contributor-b-webui` 用正确工程方式落地 contributor-b 的视觉概念
+- 已删除的旧分支：`feat/frontend-page-preview`、`feat/frontend-webui`、`feat/client-openapi-im-schemas-maintainer`
 
 进度同步：
 
