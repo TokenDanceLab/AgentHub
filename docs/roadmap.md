@@ -82,7 +82,7 @@ feat/trump-webui          ← Web 前端（Trump）
 
 ### M4 候选（Workspace + 协作）
 - [x] Hub Server 骨架：Go module + 18 REST 路由 + health check（stub 响应，待后端开发）
-- [ ] OpenCode E2E：stdin 死锁已修复，进程正常退出（需 API key 配置）
+- [x] OpenCode E2E：5/5 pass — text_delta + session_init + result + finished 全链路
 - [ ] Codex E2E：二进制可用但未实测（需额度）
 - [x] 环境隔离：envForRun 传递完整父进程环境给 Agent CLI（MEDIUM，已知风险）
 - [ ] Hub auth middleware：在 stub 转真实实现前必须接入
@@ -95,7 +95,7 @@ feat/trump-webui          ← Web 前端（Trump）
 | Agent | E2E 集成测试 | 单元测试 | 事件覆盖 | 备注 |
 |-------|------------|---------|---------|------|
 | Claude Code | ✅ 5/5 pass | ✅ 24 fixtures | 20+ types | 全链路验证通过 |
-| OpenCode | ✅ 4/5 pass | ✅ 12 tests | 16 types | session_init+text_delta+finished, result 事件 schema 微调 |
+| OpenCode | ✅ 5/5 pass | ✅ 12 tests | 16 types | 全链路验证通过 — newapi/deepseek-v4-pro |
 | Codex | ❌ 未实测 | ✅ fixture tests | 9 item types | 需额度 |
 | Hub Server | ✅ 骨架可运行 | — | 18 routes | 待后端开发 |
 
