@@ -83,7 +83,7 @@ Desktop App
 当前架构边界：
 
 - Hub Server 已完整实现（三层架构，15 migrations，Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。
-- Web/Mobile 不是 P0 执行入口。
+- Web/Mobile 可通过 Hub 远程查看和审批。
 - Desktop UI 默认只连接本机 Local Edge。
 - Edge 才能启动 Runner，UI 不直接启动 Agent CLI。
 - Runner 只在授权 workspace 或 worktree 内执行。
@@ -197,7 +197,7 @@ Web 远控本机：Conversation Authority = Hub，Execution Authority = Desktop 
 
 ### 数据权威表
 
-| 数据 | P0 写入方 | P0 存储位置 | 未来同步关系 |
+| 数据 | 写入方 | 存储位置 | 同步关系 |
 |---|---|---|---|
 | Project | Edge | Edge 本地 store | Hub 可同步元数据 |
 | Conversation | Edge | Edge 本地 store | Hub 可成为云端主序列 |
