@@ -10,9 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var RDB *redis.Client
-
-func InitRedis(cfg *config.RedisConfig) error {
+func InitRedis(cfg *config.RedisConfig) (*redis.Client, error) {
 	poolSize := cfg.PoolSize
 	if poolSize == 0 {
 		poolSize = 100
@@ -40,11 +38,9 @@ func InitRedis(cfg *config.RedisConfig) error {
 	defer cancel()
 
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		return fmt.Errorf("failed to ping redis: %w", err)
+		return nil, fmt.Errorf("failed to ping redis: %w", err)
 	}
 
-	RDB = rdb
-	SetDefaultClient(NewClient(rdb))
 	slog.Info("redis connected", "addr", cfg.Addr())
-	return nil
+	return rdb, nil
 }

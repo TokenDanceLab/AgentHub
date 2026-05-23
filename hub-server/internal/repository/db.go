@@ -11,9 +11,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-var DB *gorm.DB
-
-func InitDB(cfg *config.DBConfig) error {
+func InitDB(cfg *config.DBConfig) (*gorm.DB, error) {
 	gormLog := gormlogger.New(
 		slog.NewLogLogger(slog.Default().Handler(), slog.LevelInfo),
 		gormlogger.Config{
@@ -30,12 +28,12 @@ func InitDB(cfg *config.DBConfig) error {
 		PrepareStmt:            true,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to connect database: %w", err)
+		return nil, fmt.Errorf("failed to connect database: %w", err)
 	}
 
 	sqlDB, err := db.DB()
 	if err != nil {
-		return fmt.Errorf("failed to get underlying sql.DB: %w", err)
+		return nil, fmt.Errorf("failed to get underlying sql.DB: %w", err)
 	}
 
 	sqlDB.SetMaxIdleConns(10)
@@ -43,10 +41,9 @@ func InitDB(cfg *config.DBConfig) error {
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	if err := sqlDB.Ping(); err != nil {
-		return fmt.Errorf("failed to ping database: %w", err)
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	DB = db
 	slog.Info("database connected", "host", cfg.Host, "port", cfg.Port, "name", cfg.Name)
-	return nil
+	return db, nil
 }

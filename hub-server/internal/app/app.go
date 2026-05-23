@@ -224,7 +224,7 @@ func (a *App) setupWSManager() {
 	a.mgr.OnRouteDel = a.onRouteDel
 	a.mgr.ResolveMembers = func(sessionID string) []string {
 		ctx := context.Background()
-		ids, err := cache.GetOrLoad(ctx, "session:members:"+sessionID, 5*time.Minute, func(ctx context.Context) ([]string, error) {
+		ids, err := cache.GetOrLoad(a.CacheClient, ctx, "session:members:"+sessionID, 5*time.Minute, func(ctx context.Context) ([]string, error) {
 			members, err := repository.ListActiveMembers(a.DB, sessionID)
 			if err != nil {
 				return nil, err
@@ -481,7 +481,7 @@ func (a *App) syncLegacySeqs() {
 	}
 	count := 0
 	for _, sess := range sessions {
-		if err := cache.InitSeqIfAbsent(ctx, sess.ID, sess.NextSeq); err != nil {
+		if err := a.CacheClient.InitSeqIfAbsent(ctx, sess.ID, sess.NextSeq); err != nil {
 			slog.Warn("failed to init seq in redis", "session_id", sess.ID, "error", err)
 		} else {
 			count++
@@ -496,7 +496,7 @@ func (a *App) onRouteSet(userID, deviceType, connID, oldConnID string, wasOfflin
 	ctx := context.Background()
 
 	if oldConnID != "" && oldConnID != connID {
-		cache.MarkKicked(ctx, oldConnID)
+		a.CacheClient.MarkKicked(ctx, oldConnID)
 		a.mgr.PushToConn(oldConnID, ws.NewFrame(ws.TypeDeviceKicked, map[string]string{
 			"reason": "logged_in_elsewhere",
 		}))
@@ -505,7 +505,7 @@ func (a *App) onRouteSet(userID, deviceType, connID, oldConnID string, wasOfflin
 		}
 	}
 
-	cache.SetRoute(ctx, userID, deviceType, connID)
+	a.CacheClient.SetRoute(ctx, userID, deviceType, connID)
 
 	if wasOffline {
 		go a.broadcastOnlineStatus(ctx, userID, true)
@@ -517,7 +517,7 @@ func (a *App) onRouteSet(userID, deviceType, connID, oldConnID string, wasOfflin
 }
 
 func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
-	tasks, err := cache.PopPendingTasks(ctx, userID)
+	tasks, err := a.CacheClient.PopPendingTasks(ctx, userID)
 	if err != nil || len(tasks) == 0 {
 		return
 	}
@@ -532,10 +532,10 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 func (a *App) onRouteDel(userID, deviceType, connID string) {
 	ctx := context.Background()
 
-	kicked, _ := cache.IsKicked(ctx, connID)
+	kicked, _ := a.CacheClient.IsKicked(ctx, connID)
 	if !kicked {
-		cache.DeleteRoute(ctx, userID, deviceType)
-		online, _ := cache.IsOnline(ctx, userID)
+		a.CacheClient.DeleteRoute(ctx, userID, deviceType)
+		online, _ := a.CacheClient.IsOnline(ctx, userID)
 		if !online {
 			go a.broadcastOnlineStatus(ctx, userID, false)
 		}
@@ -557,7 +557,7 @@ func (a *App) broadcastOnlineStatus(ctx context.Context, userID string, online b
 
 	frame := ws.NewFrame(eventType, map[string]string{"user_id": userID})
 	for _, friendID := range friendIDs {
-		if online, _ := cache.IsOnline(ctx, friendID); online {
+		if online, _ := a.CacheClient.IsOnline(ctx, friendID); online {
 			a.mgr.PushToUser(friendID, frame)
 		}
 	}

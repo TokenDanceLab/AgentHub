@@ -18,7 +18,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := repository.InitDB(&cfg.DB); err != nil {
+	db, err := repository.InitDB(&cfg.DB)
+	if err != nil {
 		slog.Error("failed to init database", "error", err)
 		os.Exit(1)
 	}
@@ -28,13 +29,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := cache.InitRedis(&cfg.Redis); err != nil {
+	rdb, err := cache.InitRedis(&cfg.Redis)
+	if err != nil {
 		slog.Error("failed to init redis", "error", err)
 		os.Exit(1)
 	}
-	cacheClient := cache.NewClient(cache.RDB)
+	cacheClient := cache.NewClient(rdb)
 
-	application := app.New(cfg, repository.DB, cacheClient)
+	application := app.New(cfg, db, cacheClient)
 	if err := application.Run(context.Background()); err != nil {
 		slog.Error("application exited with error", "error", err)
 		os.Exit(1)
