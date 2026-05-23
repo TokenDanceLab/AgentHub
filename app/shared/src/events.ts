@@ -161,6 +161,18 @@ export interface AgentResultEvent extends EventEnvelope {
 
 // ── Error event ───────────────────────────────
 
+export interface AgentTaskDispatchedEvent extends EventEnvelope {
+  type: 'run.agent.task_dispatched';
+  payload: {
+    runId: string;
+    taskId: string;
+    toolUseId?: string;
+    description?: string;
+    taskType?: string;
+    [key: string]: unknown;
+  };
+}
+
 export interface ErrorEvent extends EventEnvelope {
   type: 'error';
   payload: {
@@ -209,6 +221,7 @@ export type AnyEvent =
   | AgentFileChangeEvent
   | AgentSessionInitEvent
   | AgentResultEvent
+  | AgentTaskDispatchedEvent
   | AgentPermissionRequestedEvent
   | AgentPermissionDecidedEvent
   | ErrorEvent
