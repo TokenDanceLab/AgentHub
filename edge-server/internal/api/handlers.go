@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -302,14 +303,18 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		ProjectID string `json:"projectId"`
-		ThreadID  string `json:"threadId"`
-		Prompt    string `json:"prompt"`
-		AgentID   string `json:"agentId"`
-		Model     string `json:"model"`
-		SessionID string `json:"sessionId"`
-		Continue  bool   `json:"continue"`
-		Fork      bool   `json:"fork"`
+		ProjectID         string `json:"projectId"`
+		ThreadID          string `json:"threadId"`
+		Prompt            string `json:"prompt"`
+		AgentID           string `json:"agentId"`
+		Model             string `json:"model"`
+		SessionID         string `json:"sessionId"`
+		Continue          bool   `json:"continue"`
+		Fork              bool   `json:"fork"`
+		ReasoningEffort   string `json:"reasoningEffort"`
+		MaxThinkingTokens int    `json:"maxThinkingTokens"`
+		PermissionMode    string `json:"permissionMode"`
+		IncludePartial    bool   `json:"includePartial"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
@@ -351,13 +356,17 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.Executor != nil {
 		runCtx := lifecycle.RunProcessContext{
-			Run:          run,
-			Prompt:       req.Prompt,
-			AgentID:      req.AgentID,
-			Model:        req.Model,
-			SessionID:    req.SessionID,
-			ContinueLast: req.Continue,
-			ForkSession:  req.Fork,
+			Run:               run,
+			Prompt:            req.Prompt,
+			AgentID:           req.AgentID,
+			Model:             req.Model,
+			SessionID:         req.SessionID,
+			ContinueLast:      req.Continue,
+			ForkSession:       req.Fork,
+			ReasoningEffort:   req.ReasoningEffort,
+			MaxThinkingTokens: req.MaxThinkingTokens,
+			PermissionMode:    req.PermissionMode,
+			IncludePartial:    req.IncludePartial,
 		}
 		if err := h.Executor.Start(run, runCtx); err != nil {
 			writeJSON(w, http.StatusInternalServerError, errorResponse("executor_start_failed", "failed to start run executor"))
@@ -450,13 +459,21 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	defer heartbeat.Stop()
 
 	// Read goroutine to detect close and handle pong.
+	// done signals the read loop to exit when write loop returns.
+	done := make(chan struct{})
+	defer close(done)
 	go func() {
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		conn.SetPongHandler(func(string) error {
-			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 			return nil
 		})
 		for {
+			select {
+			case <-done:
+				return
+			default:
+			}
 			_, _, err := conn.ReadMessage()
 			if err != nil {
 				break
@@ -504,6 +521,9 @@ func decodeOptionalJSON(r *http.Request, dst any) error {
 	if r.ContentLength == 0 {
 		return nil
 	}
+	// Limit request body to 1MB to prevent memory exhaustion.
+	// Use io.LimitReader instead of http.MaxBytesReader to avoid needing a ResponseWriter.
+	r.Body = io.NopCloser(io.LimitReader(r.Body, 1<<20))
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(dst); err != nil {
 		return err

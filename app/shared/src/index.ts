@@ -17,3 +17,6 @@ export type {
 } from './events';
 
 export { parseError, isErrorResponse, AppError } from './errors';
+
+export { buildTree, flattenTree } from './tree';
+export type { TreeNode } from './tree';

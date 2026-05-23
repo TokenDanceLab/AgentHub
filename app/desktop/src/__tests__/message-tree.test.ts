@@ -1,9 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { buildTree, flattenActivePath, getDirectPath, getIncludeBranches } from '@/lib/message-tree';
+import {
+  buildTree,
+  flattenActivePath,
+  getDirectPath,
+  getIncludeBranches,
+} from '@/lib/message-tree';
 import type { FlatItem } from '@/lib/message-tree';
 
 const m = (id: string, parentId: string | null, text = id): FlatItem => ({
-  itemId: id, parentId, role: 'user' as const, text, timestamp: new Date().toISOString(),
+  itemId: id,
+  parentId,
+  role: 'user' as const,
+  text,
+  timestamp: new Date().toISOString(),
 });
 
 describe('buildTree', () => {

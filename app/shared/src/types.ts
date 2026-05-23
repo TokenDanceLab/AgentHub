@@ -60,6 +60,7 @@ export interface StartRunRequest {
   prompt?: string;
   agentId?: string;
   model?: string;
+  reasoningEffort?: string;
 }
 
 // ── Thread types ────────────────────────────────

@@ -12,7 +12,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import PromptInput from '@/components/PromptInput';
 import type { AgentInfo } from '@shared/types';
@@ -65,7 +65,7 @@ describe('PromptInput', () => {
     fireEvent.click(sendBtn);
 
     expect(onSend).toHaveBeenCalledTimes(1);
-    expect(onSend).toHaveBeenCalledWith('Hello world', undefined);
+    expect(onSend).toHaveBeenCalledWith('Hello world', undefined, undefined);
   });
 
   it('calls onSend on Enter key', () => {
@@ -84,7 +84,7 @@ describe('PromptInput', () => {
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
 
     expect(onSend).toHaveBeenCalledTimes(1);
-    expect(onSend).toHaveBeenCalledWith('Test message', undefined);
+    expect(onSend).toHaveBeenCalledWith('Test message', undefined, undefined);
   });
 
   it('does NOT call onSend when input is empty', () => {
@@ -183,17 +183,9 @@ describe('PromptInput', () => {
   });
 
   it('highlights selected agent in selector', () => {
-    const agents = [
-      makeAgent({ id: 'a1', name: 'Alpha' }),
-      makeAgent({ id: 'a2', name: 'Beta' }),
-    ];
+    const agents = [makeAgent({ id: 'a1', name: 'Alpha' }), makeAgent({ id: 'a2', name: 'Beta' })];
     render(
-      <PromptInput
-        agents={agents}
-        selectedAgentId="a2"
-        onSelectAgent={vi.fn()}
-        onSend={vi.fn()}
-      />,
+      <PromptInput agents={agents} selectedAgentId="a2" onSelectAgent={vi.fn()} onSend={vi.fn()} />,
     );
 
     // Open the selector
@@ -209,10 +201,7 @@ describe('PromptInput', () => {
 
   it('calls onSelectAgent when an agent is selected from the dropdown', () => {
     const onSelectAgent = vi.fn();
-    const agents = [
-      makeAgent({ id: 'a1', name: 'Alpha' }),
-      makeAgent({ id: 'a2', name: 'Beta' }),
-    ];
+    const agents = [makeAgent({ id: 'a1', name: 'Alpha' }), makeAgent({ id: 'a2', name: 'Beta' })];
     render(
       <PromptInput
         agents={agents}
@@ -226,8 +215,9 @@ describe('PromptInput', () => {
     const agentBtn = screen.getByText('@Agent');
     fireEvent.click(agentBtn);
 
-    // Click on Alpha
-    fireEvent.click(screen.getByText('Alpha'));
+    // Click on Alpha inside the agent listbox (not the model select)
+    const listbox = screen.getByRole('listbox');
+    fireEvent.click(within(listbox).getByText('Alpha'));
 
     expect(onSelectAgent).toHaveBeenCalledWith('a1');
   });
@@ -236,19 +226,14 @@ describe('PromptInput', () => {
     const onSend = vi.fn();
     const agents = [makeAgent({ id: 'a1', name: 'Alpha' })];
     render(
-      <PromptInput
-        agents={agents}
-        selectedAgentId="a1"
-        onSelectAgent={vi.fn()}
-        onSend={onSend}
-      />,
+      <PromptInput agents={agents} selectedAgentId="a1" onSelectAgent={vi.fn()} onSend={onSend} />,
     );
 
     const input = screen.getByPlaceholderText('prompt.placeholder');
     fireEvent.change(input, { target: { value: 'Do something' } });
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
 
-    expect(onSend).toHaveBeenCalledWith('Do something', 'a1');
+    expect(onSend).toHaveBeenCalledWith('Do something', 'a1', undefined);
   });
 
   it('disables send button when input is empty', () => {
