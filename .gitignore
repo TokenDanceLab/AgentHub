@@ -84,6 +84,8 @@ docs/review/
 !.agents/skills/dev-loop/**
 !.agents/skills/test-coverage/
 !.agents/skills/test-coverage/**
+!.agents/skills/pre-push/
+!.agents/skills/pre-push/**
 .cursor/
 .continue/
 
