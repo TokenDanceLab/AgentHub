@@ -19,6 +19,7 @@ import ResizeHandle from '@/components/ResizeHandle';
 import PromptInput from '@/components/PromptInput';
 import PermissionDialog from '@/components/PermissionDialog';
 import WelcomeScreen from '@/components/WelcomeScreen';
+import ShortcutHelp from '@/components/ShortcutHelp';
 import { SkeletonLine, SkeletonCircle } from '@/components/Skeleton';
 import styles from '@/App.module.css';
 
@@ -66,6 +67,7 @@ export default function App() {
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileRunDetailOpen, setMobileRunDetailOpen] = useState(false);
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
 
   // Search → scroll state
   const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
@@ -79,12 +81,20 @@ export default function App() {
     }
   }, [isMobile]);
 
-  // Escape key closes mobile overlays (keyboard accessibility)
+  // Escape key closes mobile overlays / modals; ? opens keyboard shortcut help
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't capture shortcuts when user is typing in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
+
       if (e.key === 'Escape') {
         setMobileSidebarOpen(false);
         setMobileRunDetailOpen(false);
+      }
+      if (e.key === '?' && !isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setShortcutHelpOpen((v) => !v);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -552,6 +562,7 @@ export default function App() {
         <SearchDialog messages={allMessages} onSelect={handleSearchSelect} />
       </Suspense>
       <PermissionDialog requests={permissionRequests} onDecide={handleDecidePermission} />
+      <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
     </div>
   );
 }

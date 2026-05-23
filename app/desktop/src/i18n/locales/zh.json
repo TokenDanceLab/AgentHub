@@ -82,5 +82,17 @@
   "welcome.suggestionsLabel": "试试这些示例：",
   "welcome.suggestion1": "用 Express 构建一个 REST API",
   "welcome.suggestion2": "重构一个 React 组件",
-  "welcome.suggestion3": "解释这个项目的架构"
+  "welcome.suggestion3": "解释这个项目的架构",
+  "toast.copied": "已复制到剪贴板",
+  "toast.error": "发生错误",
+  "shortcut.title": "键盘快捷键",
+  "shortcut.search": "搜索消息",
+  "shortcut.send": "发送消息",
+  "shortcut.newline": "添加换行",
+  "shortcut.close": "关闭 / 取消",
+  "shortcut.help": "显示快捷键",
+  "time.justNow": "刚刚",
+  "time.minutesAgo": "{{count}}分钟前",
+  "time.hoursAgo": "{{count}}小时前",
+  "time.daysAgo": "{{count}}天前"
 }

@@ -82,5 +82,17 @@
   "welcome.suggestionsLabel": "Try an example:",
   "welcome.suggestion1": "Build a REST API with Express",
   "welcome.suggestion2": "Refactor a React component",
-  "welcome.suggestion3": "Explain the architecture of this project"
+  "welcome.suggestion3": "Explain the architecture of this project",
+  "toast.copied": "Copied to clipboard",
+  "toast.error": "An error occurred",
+  "shortcut.title": "Keyboard Shortcuts",
+  "shortcut.search": "Search messages",
+  "shortcut.send": "Send message",
+  "shortcut.newline": "Add newline",
+  "shortcut.close": "Close / Dismiss",
+  "shortcut.help": "Show shortcuts",
+  "time.justNow": "just now",
+  "time.minutesAgo": "{{count}}m ago",
+  "time.hoursAgo": "{{count}}h ago",
+  "time.daysAgo": "{{count}}d ago"
 }

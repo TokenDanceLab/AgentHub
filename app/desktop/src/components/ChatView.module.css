@@ -12,7 +12,7 @@
   padding: var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-xl);
 }
 
 .empty {
@@ -26,6 +26,9 @@
 
 .message {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
   max-width: 85%;
   padding: var(--space-sm) var(--space-md);
   border-radius: 8px;
@@ -75,6 +78,74 @@
   max-width: 100%;
 }
 
+/* ── Hover overlay ─────────────────────────── */
+.message::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--hover-overlay);
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.message:hover::after {
+  opacity: 1;
+}
+
+/* Ensure message content sits above the overlay */
+.message > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Agent avatar + name ──────────────────── */
+.agentAvatar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+.avatarCircle {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  flex-shrink: 0;
+}
+
+.agentNameLabel {
+  font-size: var(--font-size-xs);
+  color: var(--text-weaker);
+  white-space: nowrap;
+}
+
+/* ── Timestamp ────────────────────────────── */
+.timestamp {
+  position: absolute;
+  bottom: var(--space-xs);
+  right: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-weaker);
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.message:hover .timestamp {
+  opacity: 1;
+}
+
 /* ── Text ────────────────────────────────── */
 
 .text {
@@ -114,54 +185,7 @@
   background: color-mix(in oklch, var(--foreground) 5%, transparent);
 }
 
-.thinking summary {
-  cursor: pointer;
-  font-size: var(--font-size-xs);
-  opacity: 0.6;
-  user-select: none;
-}
-
-.thinkingContent {
-  margin-top: var(--space-xs);
-  font-size: var(--font-size-xs);
-  opacity: 0.7;
-  white-space: pre-wrap;
-}
-
 /* ── Tool call ───────────────────────────── */
-
-.toolCard {
-  margin: var(--space-xs) 0;
-  padding: var(--space-xs) var(--space-sm);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: color-mix(in oklch, var(--primary) 5%, transparent);
-}
-
-.toolCard summary {
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  font-size: var(--font-size-xs);
-  user-select: none;
-}
-
-.toolLabel {
-  font-weight: 500;
-}
-
-.toolStatus {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: var(--border);
-}
-
-.toolDone {
-  background: color-mix(in oklch, var(--success) 20%, transparent);
-  color: var(--success);
-}
 
 .toolInput,
 .toolOutput {
@@ -342,13 +366,31 @@
   background: var(--border);
   flex-shrink: 0;
 }
-.toolDone {
+
+.toolStatusPending {
+  background: var(--border);
+  color: var(--muted-foreground);
+}
+
+.toolStatusRunning {
+  background: color-mix(in oklch, var(--warning) 20%, transparent);
+  color: var(--warning);
+  animation: statusPulse 1.5s ease-in-out infinite;
+}
+
+.toolStatusDone {
   background: color-mix(in oklch, var(--success) 20%, transparent);
   color: var(--success);
 }
-.toolRunning {
-  background: color-mix(in oklch, var(--primary) 20%, transparent);
-  color: var(--primary);
+
+.toolStatusFailed {
+  background: color-mix(in oklch, var(--destructive) 20%, transparent);
+  color: var(--destructive);
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .toolUseBody {
@@ -515,6 +557,32 @@
 .actionBtn:hover {
   background: var(--border);
   color: var(--foreground);
+}
+
+/* ── Streaming progress bar ──────────────── */
+
+.streamProgress {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--primary) 50%,
+    transparent 100%
+  );
+  animation: progressSweep 1.5s ease-in-out infinite;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+@keyframes progressSweep {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Message hover enhancement ───────────── */
+
+.agentMsg:hover {
+  background: var(--surface-raised-hover);
 }
 
 /* ── Typing indicator ────────────────────── */
