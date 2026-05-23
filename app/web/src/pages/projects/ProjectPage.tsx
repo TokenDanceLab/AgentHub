@@ -864,7 +864,7 @@ const pageStyles = `
     resize: vertical;
   }
 
-  @media (max-width: 1080px) {
+  @media (max-width: 1180px) {
     .projectReactShell {
       grid-template-columns: 1fr;
     }
@@ -887,7 +887,7 @@ const pageStyles = `
     }
   }
 
-  @media (max-width: 720px) {
+  @media (max-width: 820px) {
     .projectReactRoot {
       overflow: auto;
     }

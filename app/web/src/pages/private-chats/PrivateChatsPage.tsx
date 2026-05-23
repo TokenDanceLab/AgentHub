@@ -820,7 +820,7 @@ const pageStyles = `
     font-size: 13px;
   }
 
-  @media (max-width: 1120px) {
+  @media (max-width: 1180px) {
     .pc-shell {
       grid-template-columns: 260px minmax(0, 1fr);
     }
@@ -834,7 +834,7 @@ const pageStyles = `
     }
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 820px) {
     .pc-page {
       overflow: auto;
     }
