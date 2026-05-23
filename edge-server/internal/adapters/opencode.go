@@ -259,19 +259,33 @@ type opencodeEvent struct {
 	SessionID    string          `json:"sessionID,omitempty"`
 	Part         *opencodePart   `json:"part,omitempty"`
 	ErrorMessage string          `json:"error,omitempty"`
+	Model        string          `json:"model,omitempty"`
+	Provider     string          `json:"provider,omitempty"`
+	Tools        []string        `json:"tools,omitempty"`
+	TaskID       string          `json:"taskId,omitempty"`
+	TaskDescription string       `json:"taskDescription,omitempty"`
+	TaskType     string          `json:"taskType,omitempty"`
+	TaskSummary  string          `json:"taskSummary,omitempty"`
+	TaskUsage    any             `json:"taskUsage,omitempty"`
+	LastToolName string          `json:"lastToolName,omitempty"`
 }
 
 type opencodePart struct {
-	ID       string          `json:"id,omitempty"`
-	Text     string          `json:"text,omitempty"`
-	CallID   string          `json:"callId,omitempty"`
-	ToolName string          `json:"toolName,omitempty"`
-	Input    any             `json:"input,omitempty"`
-	State    string          `json:"state,omitempty"`
-	Reason   string          `json:"reason,omitempty"`
-	Type     string          `json:"type,omitempty"`
-	Tokens   *opencodeTokens `json:"tokens,omitempty"`
-	Cost     float64         `json:"cost,omitempty"`
+	ID        string          `json:"id,omitempty"`
+	Text      string          `json:"text,omitempty"`
+	CallID    string          `json:"callId,omitempty"`
+	ToolName  string          `json:"toolName,omitempty"`
+	Input     any             `json:"input,omitempty"`
+	State     string          `json:"state,omitempty"`
+	Reason    string          `json:"reason,omitempty"`
+	Type      string          `json:"type,omitempty"`
+	Tokens    *opencodeTokens `json:"tokens,omitempty"`
+	Cost      float64         `json:"cost,omitempty"`
+	Output    string          `json:"output,omitempty"`
+	Status    string          `json:"status,omitempty"`
+	ToolInput any             `json:"toolInput,omitempty"`
+	Path      string          `json:"path,omitempty"`
+	Operation string          `json:"operation,omitempty"`
 }
 
 type opencodeTokens struct {
