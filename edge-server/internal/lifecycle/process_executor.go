@@ -34,8 +34,9 @@ type ProcessExecutor struct {
 	adapter    adapters.AgentAdapter // default adapter; may be nil (raw stdout capture)
 	adapterReg *adapters.Registry    // per-run adapter resolution; may be nil
 
-	mu      sync.Mutex
+	mu     sync.Mutex
 	running map[string]context.CancelFunc
+	stdins  map[string]io.Writer // runID → stdin (for adapter-aware interrupt)
 }
 
 func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter, adapterReg *adapters.Registry) (*ProcessExecutor, error) {
@@ -65,6 +66,7 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		adapter:    adapter,
 		adapterReg: adapterReg,
 		running:    make(map[string]context.CancelFunc),
+		stdins:     make(map[string]io.Writer),
 	}, nil
 }
 
@@ -103,7 +105,15 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 		return CancelResult{Run: run, Found: true, Status: run.Status}
 	}
 
+	// Send adapter-specific interrupt via stdin before canceling context.
+	// This allows Claude Code to clean up gracefully (finish current API call,
+	// flush session state) rather than being killed by SIGTERM.
 	e.mu.Lock()
+	if stdin, ok := e.stdins[runID]; ok {
+		if err := adapters.WriteInterrupt(stdin, "interrupt-"+runID); err != nil {
+			slog.Debug("process: interrupt write failed", "runId", runID, "err", err)
+		}
+	}
 	cancel, ok := e.running[runID]
 	e.mu.Unlock()
 	if !ok {
@@ -185,6 +195,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			e.publishFailed(run, fmt.Errorf("open stdin pipe: %w", err))
 			return
 		}
+		e.mu.Lock()
+		e.stdins[run.ID] = stdin
+		e.mu.Unlock()
 	}
 	if err := cmd.Start(); err != nil {
 		if ctx.Err() != nil {
@@ -310,6 +323,7 @@ func (e *ProcessExecutor) runStatus(runID string) string {
 func (e *ProcessExecutor) finish(runID string) {
 	e.mu.Lock()
 	delete(e.running, runID)
+	delete(e.stdins, runID)
 	e.mu.Unlock()
 }
 
