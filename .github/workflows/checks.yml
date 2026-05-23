@@ -8,6 +8,8 @@ on:
 
 env:
   GO_VERSION: "1.24"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10"
 
 jobs:
   # ── Go: Edge Server ──────────────────────────
@@ -26,16 +28,24 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          working-directory: edge-server
+          version: latest
+          args: --timeout=5m
+
       - name: Test (unit only, skip integration)
         run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
 
       - name: Coverage check
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          THRESHOLD=60
+          THRESHOLD=70
           echo "Coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
           if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
-            echo "::warning::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
+            echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
+            exit 1
           fi
 
       - name: Vet
@@ -49,11 +59,11 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -62,6 +72,12 @@ jobs:
 
       - name: Build shared types
         run: pnpm --filter @agenthub/shared build
+
+      - name: Type check
+        run: pnpm --filter @agenthub/desktop typecheck
+
+      - name: Lint
+        run: pnpm --filter @agenthub/desktop lint --max-warnings 10
 
       - name: Test Desktop
         run: pnpm --filter @agenthub/desktop test:run
@@ -74,11 +90,11 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 

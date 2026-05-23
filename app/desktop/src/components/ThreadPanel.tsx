@@ -26,7 +26,12 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
     <nav className={styles.sidebar} aria-label={t('thread.title')}>
       <div className={styles.header}>
         <span className={styles.title}>{t('thread.title')}</span>
-        <button className={styles.createBtn} onClick={onCreate} disabled={!online} title={t('thread.create')}>
+        <button
+          className={styles.createBtn}
+          onClick={onCreate}
+          disabled={!online}
+          title={t('thread.create')}
+        >
           <Plus size={16} />
         </button>
       </div>
@@ -51,9 +56,7 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
                 <MessageSquare size={14} />
                 <div className={styles.itemInfo}>
                   <div className={styles.name}>{th.title || th.threadId.slice(0, 12)}</div>
-                  <div className={styles.meta}>
-                    {new Date(th.updatedAt).toLocaleDateString()}
-                  </div>
+                  <div className={styles.meta}>{new Date(th.updatedAt).toLocaleDateString()}</div>
                 </div>
               </button>
             </li>

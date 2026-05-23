@@ -183,17 +183,9 @@ describe('PromptInput', () => {
   });
 
   it('highlights selected agent in selector', () => {
-    const agents = [
-      makeAgent({ id: 'a1', name: 'Alpha' }),
-      makeAgent({ id: 'a2', name: 'Beta' }),
-    ];
+    const agents = [makeAgent({ id: 'a1', name: 'Alpha' }), makeAgent({ id: 'a2', name: 'Beta' })];
     render(
-      <PromptInput
-        agents={agents}
-        selectedAgentId="a2"
-        onSelectAgent={vi.fn()}
-        onSend={vi.fn()}
-      />,
+      <PromptInput agents={agents} selectedAgentId="a2" onSelectAgent={vi.fn()} onSend={vi.fn()} />,
     );
 
     // Open the selector
@@ -209,10 +201,7 @@ describe('PromptInput', () => {
 
   it('calls onSelectAgent when an agent is selected from the dropdown', () => {
     const onSelectAgent = vi.fn();
-    const agents = [
-      makeAgent({ id: 'a1', name: 'Alpha' }),
-      makeAgent({ id: 'a2', name: 'Beta' }),
-    ];
+    const agents = [makeAgent({ id: 'a1', name: 'Alpha' }), makeAgent({ id: 'a2', name: 'Beta' })];
     render(
       <PromptInput
         agents={agents}
@@ -237,12 +226,7 @@ describe('PromptInput', () => {
     const onSend = vi.fn();
     const agents = [makeAgent({ id: 'a1', name: 'Alpha' })];
     render(
-      <PromptInput
-        agents={agents}
-        selectedAgentId="a1"
-        onSelectAgent={vi.fn()}
-        onSend={onSend}
-      />,
+      <PromptInput agents={agents} selectedAgentId="a1" onSelectAgent={vi.fn()} onSend={onSend} />,
     );
 
     const input = screen.getByPlaceholderText('prompt.placeholder');

@@ -1,7 +1,7 @@
 // Unified diff viewer — collapsible file headers + hunk rendering
 // 参考: CCViewer DiffViewer.tsx (530 lines)
 import { useState } from 'react';
-import type { FileDiff, DiffHunk, DiffLine } from './ChatView.types';
+import type { FileDiff, DiffHunk } from './ChatView.types';
 import styles from './DiffViewer.module.css';
 
 interface Props {
@@ -60,9 +60,11 @@ function HunkRenderer({ hunk }: { hunk: DiffHunk }) {
         <div
           key={j}
           className={
-            line.type === 'added' ? styles.lineAdded
-            : line.type === 'deleted' ? styles.lineDeleted
-            : styles.lineContext
+            line.type === 'added'
+              ? styles.lineAdded
+              : line.type === 'deleted'
+                ? styles.lineDeleted
+                : styles.lineContext
           }
         >
           <span className={styles.lineNum}>{line.oldLineNumber ?? ''}</span>
@@ -79,8 +81,11 @@ function HunkRenderer({ hunk }: { hunk: DiffHunk }) {
 
 function statusClass(status: string): string {
   switch (status) {
-    case 'added': return styles.statusAdded;
-    case 'deleted': return styles.statusDeleted;
-    default: return styles.statusModified;
+    case 'added':
+      return styles.statusAdded;
+    case 'deleted':
+      return styles.statusDeleted;
+    default:
+      return styles.statusModified;
   }
 }

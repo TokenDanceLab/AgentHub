@@ -25,16 +25,26 @@ export default function StatusBar({ online, health, isConnected, error }: Props)
         />
         <span>
           {online
-            ? t('status.online', { version: health?.version ?? 'v1', edgeId: health?.edgeId ?? '?' })
+            ? t('status.online', {
+                version: health?.version ?? 'v1',
+                edgeId: health?.edgeId ?? '?',
+              })
             : t('status.offline')}
         </span>
         <span className={styles.spacer} />
         {isConnected ? <Wifi size={14} /> : <WifiOff size={14} />}
-        <span className={styles.wsStatus} aria-label={isConnected ? t('status.wsConnected') : t('status.wsDisconnected')}>
+        <span
+          className={styles.wsStatus}
+          aria-label={isConnected ? t('status.wsConnected') : t('status.wsDisconnected')}
+        >
           {isConnected ? t('status.wsConnected') : t('status.wsDisconnected')}
         </span>
       </div>
-      {error && <div className={styles.error} role="alert"><AlertCircle size={14} /> {error}</div>}
+      {error && (
+        <div className={styles.error} role="alert">
+          <AlertCircle size={14} /> {error}
+        </div>
+      )}
     </>
   );
 }

@@ -143,7 +143,7 @@ func applyRunnerProfile(cfg *config) error {
 		// Mock executor is the default when no runner command is specified.
 		// The profile exists for backward compatibility; it no longer sets RunnerCommand.
 		if cfg.RunnerCommand == "" && cfg.AgentDefault == "" {
-			// Leave RunnerCommand empty -> MockExecutor will be used as fallback
+			slog.Debug("using mock executor fallback — no runner command or agent configured")
 		}
 	case runnerProfileClaudeCode:
 		if strings.TrimSpace(cfg.RunnerCommand) == "" {

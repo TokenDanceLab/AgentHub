@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { startRun, fetchAgents, fetchThreads } from '@/api/edgeClient';
@@ -26,9 +25,8 @@ const MIN_RIGHT = 240;
 const MAX_RIGHT = 600;
 
 export default function App() {
-  const { t } = useTranslation();
   const { online, health } = useHealth();
-  const { messages, isConnected, currentRun, clearMessages } = useChatMessages(online);
+  const { messages, isConnected, currentRun } = useChatMessages(online);
 
   // Zustand stores
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
@@ -80,11 +78,16 @@ export default function App() {
       try {
         const res = await fetchAgents();
         if (active) setAgents(res.items);
-      } catch { /* Edge may not have /v1/agents yet */ }
+      } catch {
+        /* Edge may not have /v1/agents yet */
+      }
     };
     poll();
     const id = setInterval(poll, 10000);
-    return () => { active = false; clearInterval(id); };
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
   }, [online]);
 
   // Poll threads
@@ -98,17 +101,26 @@ export default function App() {
       try {
         const res = await fetchThreads();
         if (active) setThreads(res.items);
-      } catch { /* Edge may not have threads yet */ }
+      } catch {
+        /* Edge may not have threads yet */
+      }
     };
     poll();
     const id = setInterval(poll, 10000);
-    return () => { active = false; clearInterval(id); };
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
   }, [online, setThreads]);
 
   const selectedThread = threads.find((th) => th.threadId === selectedThreadId);
 
   const handleSend = useCallback(
-    async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string }) => {
+    async (
+      prompt: string,
+      agentId?: string,
+      opts?: { model?: string; reasoningEffort?: string },
+    ) => {
       try {
         const req: StartRunRequest = { prompt };
         if (agentId) req.agentId = agentId;
@@ -133,16 +145,23 @@ export default function App() {
   );
 
   const handleCreateThread = useCallback(async () => {
-    try { const res = await fetchThreads(); setThreads(res.items); } catch { /* ignore */ }
+    try {
+      const res = await fetchThreads();
+      setThreads(res.items);
+    } catch {
+      /* ignore */
+    }
   }, [setThreads]);
 
   const handleSidebarResize = useCallback(
-    (delta: number) => setSidebarWidth(Math.min(MAX_SIDEBAR, Math.max(MIN_SIDEBAR, sidebarWidth + delta))),
+    (delta: number) =>
+      setSidebarWidth(Math.min(MAX_SIDEBAR, Math.max(MIN_SIDEBAR, sidebarWidth + delta))),
     [sidebarWidth, setSidebarWidth],
   );
 
   const handleRightResize = useCallback(
-    (delta: number) => setRightPanelWidth(Math.min(MAX_RIGHT, Math.max(MIN_RIGHT, rightPanelWidth - delta))),
+    (delta: number) =>
+      setRightPanelWidth(Math.min(MAX_RIGHT, Math.max(MIN_RIGHT, rightPanelWidth - delta))),
     [rightPanelWidth, setRightPanelWidth],
   );
 
@@ -150,12 +169,7 @@ export default function App() {
 
   return (
     <div className={styles.root}>
-      <StatusBar
-        online={online}
-        health={health}
-        isConnected={isConnected}
-        error={null}
-      />
+      <StatusBar online={online} health={health} isConnected={isConnected} error={null} />
 
       <div className={styles.body}>
         <div style={{ width: sidebarWidth, flexShrink: 0 }}>
@@ -192,7 +206,12 @@ export default function App() {
             <RunDetail
               run={
                 currentRun
-                  ? { runId: currentRun.runId, projectId: '', threadId: selectedThread?.threadId ?? '', status: currentRun.status }
+                  ? {
+                      runId: currentRun.runId,
+                      projectId: '',
+                      threadId: selectedThread?.threadId ?? '',
+                      status: currentRun.status,
+                    }
                   : null
               }
               toolCalls={currentRun?.toolCalls ?? []}

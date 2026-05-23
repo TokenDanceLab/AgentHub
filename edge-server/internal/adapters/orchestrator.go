@@ -15,8 +15,8 @@ import (
 // it to break down user requests, identify sub-tasks, and coordinate other agents.
 // Edge listens for orchestrator events to spawn sub-agent runs.
 type OrchestratorAdapter struct {
-	inner             *ClaudeCodeAdapter
-	systemPrompt      string
+	inner        *ClaudeCodeAdapter
+	systemPrompt string
 }
 
 // NewOrchestratorAdapter creates an orchestrator wrapping a Claude Code instance.

@@ -20,10 +20,11 @@ describe('useRunners', () => {
   it('fetches runners when online', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({
-        items: [{ id: 'r1', name: 'Mock', status: 'online' }],
-        page: { hasMore: false },
-      }),
+      json: () =>
+        Promise.resolve({
+          items: [{ id: 'r1', name: 'Mock', status: 'online' }],
+          page: { hasMore: false },
+        }),
     } as Response);
 
     const { result } = renderHook(() => useRunners(true));
@@ -38,16 +39,16 @@ describe('useRunners', () => {
   it('clears runners when going offline', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({
-        items: [{ id: 'r1', name: 'Mock', status: 'online' }],
-        page: { hasMore: false },
-      }),
+      json: () =>
+        Promise.resolve({
+          items: [{ id: 'r1', name: 'Mock', status: 'online' }],
+          page: { hasMore: false },
+        }),
     } as Response);
 
-    const { result, rerender } = renderHook(
-      ({ online }) => useRunners(online),
-      { initialProps: { online: true } },
-    );
+    const { result, rerender } = renderHook(({ online }) => useRunners(online), {
+      initialProps: { online: true },
+    });
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);

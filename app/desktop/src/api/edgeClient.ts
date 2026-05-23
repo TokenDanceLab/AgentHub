@@ -13,7 +13,15 @@ import type {
 } from '@shared/types';
 import { parseError } from '@shared/errors';
 
-export type { HealthResponse, Runner, AgentInfo, ListResponse, RunInfo, ThreadInfo, StartRunRequest };
+export type {
+  HealthResponse,
+  Runner,
+  AgentInfo,
+  ListResponse,
+  RunInfo,
+  ThreadInfo,
+  StartRunRequest,
+};
 
 const BASE = EDGE_URL.replace(/\/+$/, '');
 
@@ -53,7 +61,9 @@ export async function startRun(req?: StartRunRequest): Promise<RunInfo> {
 }
 
 export async function cancelRun(runId: string): Promise<RunInfo> {
-  const res = await fetch(`${BASE}/v1/runs/${encodeURIComponent(runId)}:cancel`, { method: 'POST' });
+  const res = await fetch(`${BASE}/v1/runs/${encodeURIComponent(runId)}:cancel`, {
+    method: 'POST',
+  });
   if (!res.ok) throw await parseError(res);
   return res.json();
 }

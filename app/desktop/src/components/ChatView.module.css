@@ -238,7 +238,9 @@
   transition: transform var(--duration-fast) var(--ease-out);
   opacity: 0.5;
 }
-.chevronDown { transform: rotate(90deg); }
+.chevronDown {
+  transform: rotate(90deg);
+}
 
 /* Thinking block */
 .thinkingToggle {
@@ -255,7 +257,9 @@
   opacity: 0.7;
   transition: opacity var(--duration-fast);
 }
-.thinkingToggle:hover { opacity: 1; }
+.thinkingToggle:hover {
+  opacity: 1;
+}
 .thinkingLen {
   margin-left: auto;
   font-size: 10px;
@@ -292,8 +296,14 @@
 .toolUseHeader:hover {
   background: color-mix(in oklch, var(--primary) 14%, transparent);
 }
-.toolIcon { font-size: 14px; flex-shrink: 0; }
-.toolName { font-weight: var(--font-weight-medium); white-space: nowrap; }
+.toolIcon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.toolName {
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
 .toolParamSummary {
   color: var(--foreground);
   opacity: 0.5;
@@ -333,15 +343,21 @@
   cursor: pointer;
   margin-bottom: var(--space-xs);
 }
-.showParamsBtn:hover { color: var(--foreground); }
+.showParamsBtn:hover {
+  color: var(--foreground);
+}
 
 .readResult {
   padding: 4px 0;
   font-size: var(--font-size-xs);
   font-family: var(--font-mono);
 }
-.bashResult { margin-top: var(--space-xs); }
-.toolStderr { color: var(--destructive); }
+.bashResult {
+  margin-top: var(--space-xs);
+}
+.toolStderr {
+  color: var(--destructive);
+}
 .exitCode {
   display: inline-block;
   margin-top: 2px;
@@ -385,7 +401,9 @@
   cursor: pointer;
   font-size: var(--font-size-xs);
 }
-.viewFullDiff:hover { text-decoration: underline; }
+.viewFullDiff:hover {
+  text-decoration: underline;
+}
 
 .diffInline {
   font-family: var(--font-mono);
@@ -404,7 +422,9 @@
   border-left: 3px solid var(--diff-removed-border);
   padding-left: 4px;
 }
-.lineContext { padding-left: 7px; }
+.lineContext {
+  padding-left: 7px;
+}
 .linePrefix {
   display: inline-block;
   width: 16px;
@@ -430,5 +450,7 @@
 }
 
 @keyframes blink {
-  50% { opacity: 0; }
+  50% {
+    opacity: 0;
+  }
 }
