@@ -60,8 +60,11 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 
 	// Reasoning effort: --thinking enables thinking, --variant sets effort level
 	if ctx.ReasoningEffort != "" {
+		effort := ResolveReasoningEffort("opencode", ctx.ReasoningEffort)
 		args = append(args, "--thinking")
-		args = append(args, "--variant", ctx.ReasoningEffort)
+		if effort != "" {
+			args = append(args, "--variant", effort)
+		}
 	}
 
 	// Agent mode (build, plan, etc.)
@@ -86,11 +89,7 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		workDir = "."
 	}
 
-	env := []string{
-		"AGENTHUB_RUN_ID=" + ctx.Run.ID,
-		"AGENTHUB_PROJECT_ID=" + ctx.Run.ProjectID,
-		"AGENTHUB_THREAD_ID=" + ctx.Run.ThreadID,
-	}
+	var env []string // runtime vars set by process executor
 
 	return a.binaryPath, args, env, workDir
 }
