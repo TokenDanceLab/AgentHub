@@ -81,6 +81,8 @@ docs/review/
 .codex/skills/*
 !.codex/skills/set-goal/
 !.codex/skills/set-goal/**
+!.codex/skills/cross-review/
+!.codex/skills/cross-review/**
 .cursor/
 .continue/
 
