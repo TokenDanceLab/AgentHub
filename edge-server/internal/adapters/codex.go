@@ -46,7 +46,7 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 		prompt = "Continue."
 	}
 
-	model := ctx.Model
+	model := ResolveModel("codex", ctx.Model)
 	if model == "" {
 		model = a.model
 	}
