@@ -228,6 +228,11 @@
   background: var(--card);
 }
 
+.sidebarBrand {
+  padding: var(--space-lg) var(--space-lg) var(--space-md);
+  flex-shrink: 0;
+}
+
 /* ── Right panel wrapper ────────────────── */
 
 .rightPanelWrapper {
