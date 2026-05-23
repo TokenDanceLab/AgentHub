@@ -97,6 +97,8 @@ const (
 	// Permission gating events
 	BusEventPermissionRequested = "run.agent.permission_requested"
 	BusEventPermissionDecided   = "run.agent.permission_decided"
+	BusEventSessionMetrics      = "run.agent.session_metrics"
+	BusEventContextUsage        = "run.agent.context_usage"
 )
 
 // Context keys for adapter-level context propagation.

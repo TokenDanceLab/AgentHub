@@ -1,9 +1,10 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Copy, RefreshCw, Trash2 } from 'lucide-react';
+import { Copy, RefreshCw, Trash2, ArrowDown } from 'lucide-react';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useStreamingText } from '@/hooks/useStreamingText';
+import { useAutoScroll } from '@/hooks/useAutoScroll';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -298,11 +299,13 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
   const scrollRef = useRef<HTMLDivElement>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, isStreaming]);
+  const { scrollToBottom, isNearBottom } = useAutoScroll(scrollRef, {
+    messages,
+    isStreaming: isStreaming ?? false,
+  });
+
+  // Show scroll-to-bottom indicator when streaming and user has scrolled up
+  const showScrollIndicator = isStreaming && !isNearBottom;
 
   const handleCopy = useCallback(async (msg: ChatMessage) => {
     const text = extractMessageText(msg);
@@ -321,7 +324,12 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
 
   return (
     <div className={styles.root}>
-      <div ref={scrollRef} className={styles.stream} role="log" aria-live="polite">
+      <div
+        ref={scrollRef}
+        className={styles.stream}
+        role="log"
+        aria-live="polite"
+      >
         {messages.length === 0 ? (
           <div className={styles.empty}>{t('chat.empty')}</div>
         ) : (
@@ -380,6 +388,19 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
             </div>
           ))}
       </div>
+
+      {/* Scroll-to-bottom floating indicator */}
+      {showScrollIndicator && (
+        <button
+          className={styles.scrollToBottomBtn}
+          onClick={() => scrollToBottom(true)}
+          title={t('chat.scrollToBottom')}
+          aria-label={t('chat.scrollToBottom')}
+        >
+          <ArrowDown size={16} />
+          <span>{t('chat.newMessages')}</span>
+        </button>
+      )}
     </div>
   );
 }

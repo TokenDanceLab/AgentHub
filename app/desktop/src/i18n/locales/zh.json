@@ -57,6 +57,8 @@
   "run.open": "打开运行详情",
   "run.close": "关闭运行详情",
   "chat.viewFullDiff": "查看完整差异",
+  "chat.scrollToBottom": "滚动到底部",
+  "chat.newMessages": "新消息",
   "prompt.model": "模型",
   "prompt.reasoning": "推理强度",
   "perm.title": "权限门控",
