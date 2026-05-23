@@ -148,6 +148,37 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 				"status":   evt.Part.State,
 			})
 		}
+	case "tool_result":
+		if evt.Part != nil {
+			emitter.Emit(BusEventToolResult, scope, map[string]any{
+				"callId":   evt.Part.CallID,
+				"toolName": evt.Part.ToolName,
+				"output":   evt.Part.Output,
+				"status":   evt.Part.Status,
+			})
+			if isFileModifyingTool(evt.Part.ToolName) {
+				emitter.Emit(BusEventFileChange, scope, map[string]any{
+					"callId":   evt.Part.CallID,
+					"toolName": evt.Part.ToolName,
+					"content":  evt.Part.Output,
+				})
+			}
+		}
+	case "permission":
+		if evt.Part != nil {
+			emitter.Emit(BusEventStatusChange, scope, map[string]any{
+				"permissionMode":  "ask",
+				"permissionTool":  evt.Part.ToolName,
+				"permissionInput": evt.Part.ToolInput,
+			})
+		}
+	case "file":
+		if evt.Part != nil {
+			emitter.Emit(BusEventFileChange, scope, map[string]any{
+				"path":      evt.Part.Path,
+				"operation": evt.Part.Operation,
+			})
+		}
 	case "reasoning":
 		if evt.Part != nil {
 			emitter.Emit(BusEventThinking, scope, map[string]any{
@@ -162,13 +193,13 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 			}
 			if evt.Part.Tokens != nil {
 				result["usage"] = map[string]any{
-				"inputTokens":     evt.Part.Tokens.Input,
-				"outputTokens":    evt.Part.Tokens.Output,
-				"reasoningTokens": evt.Part.Tokens.Reasoning,
-				"totalTokens":     evt.Part.Tokens.Total,
-				"cacheReadTokens":  evt.Part.Tokens.Cache.Read,
-				"cacheWriteTokens": evt.Part.Tokens.Cache.Write,
-			}
+					"inputTokens":     evt.Part.Tokens.Input,
+					"outputTokens":    evt.Part.Tokens.Output,
+					"reasoningTokens": evt.Part.Tokens.Reasoning,
+					"totalTokens":     evt.Part.Tokens.Total,
+					"cacheReadTokens":  evt.Part.Tokens.Cache.Read,
+					"cacheWriteTokens": evt.Part.Tokens.Cache.Write,
+				}
 			}
 			if evt.Part.Cost > 0 {
 				result["cost"] = evt.Part.Cost
@@ -177,6 +208,38 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 		}
 		emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
 			"state": "idle",
+		})
+	case "session.init":
+		emitter.Emit(BusEventSessionInit, scope, map[string]any{
+			"sessionId": evt.SessionID,
+			"model":     evt.Model,
+			"provider":  evt.Provider,
+			"tools":     evt.Tools,
+		})
+	case "session.error":
+		emitter.Emit(BusEventResult, scope, map[string]any{
+			"success": false,
+			"error":   evt.ErrorMessage,
+		})
+	case "task_start":
+		emitter.Emit(BusEventTaskStarted, scope, map[string]any{
+			"taskId":      evt.TaskID,
+			"description": evt.TaskDescription,
+			"taskType":    evt.TaskType,
+		})
+	case "task_progress":
+		emitter.Emit(BusEventTaskProgress, scope, map[string]any{
+			"taskId":        evt.TaskID,
+			"description":   evt.TaskDescription,
+			"lastToolName":  evt.LastToolName,
+			"usage":         evt.TaskUsage,
+		})
+	case "task_complete":
+		emitter.Emit(BusEventTaskNotification, scope, map[string]any{
+			"taskId":  evt.TaskID,
+			"status":  "completed",
+			"summary": evt.TaskSummary,
+			"usage":   evt.TaskUsage,
 		})
 	case "error":
 		emitter.Emit(BusEventResult, scope, map[string]any{
