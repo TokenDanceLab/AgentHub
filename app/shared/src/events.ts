@@ -62,6 +62,97 @@ export interface RunOutputBatchEvent extends EventEnvelope {
   };
 }
 
+// ── Agent events (run.agent.*) ────────────────
+
+export interface AgentTextDeltaEvent extends EventEnvelope {
+  type: 'run.agent.text_delta';
+  payload: {
+    runId: string;
+    content: string;
+    offset: number;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentTextBlockEvent extends EventEnvelope {
+  type: 'run.agent.text_block';
+  payload: {
+    runId: string;
+    content: string;
+    contentType?: 'markdown' | 'text' | 'code';
+    language?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentThinkingEvent extends EventEnvelope {
+  type: 'run.agent.thinking';
+  payload: {
+    runId: string;
+    content: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentToolCallEvent extends EventEnvelope {
+  type: 'run.agent.tool_call';
+  payload: {
+    runId: string;
+    callId: string;
+    toolName: string;
+    input: Record<string, unknown>;
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentToolResultEvent extends EventEnvelope {
+  type: 'run.agent.tool_result';
+  payload: {
+    runId: string;
+    callId: string;
+    toolName: string;
+    output: unknown;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentFileChangeEvent extends EventEnvelope {
+  type: 'run.agent.file_change';
+  payload: {
+    runId: string;
+    path: string;
+    action: 'created' | 'modified' | 'deleted';
+    diff?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentSessionInitEvent extends EventEnvelope {
+  type: 'run.agent.session_init';
+  payload: {
+    runId: string;
+    model?: string;
+    tools?: string[];
+    permissionMode?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentResultEvent extends EventEnvelope {
+  type: 'run.agent.result';
+  payload: {
+    runId: string;
+    success: boolean;
+    error?: string;
+    tokenUsage?: {
+      input: number;
+      output: number;
+    };
+    [key: string]: unknown;
+  };
+}
+
 // ── Error event ───────────────────────────────
 
 export interface ErrorEvent extends EventEnvelope {
@@ -81,5 +172,13 @@ export type AnyEvent =
   | RunLifecycleEvent
   | RunOutputEvent
   | RunOutputBatchEvent
+  | AgentTextDeltaEvent
+  | AgentTextBlockEvent
+  | AgentThinkingEvent
+  | AgentToolCallEvent
+  | AgentToolResultEvent
+  | AgentFileChangeEvent
+  | AgentSessionInitEvent
+  | AgentResultEvent
   | ErrorEvent
   | EventEnvelope;
