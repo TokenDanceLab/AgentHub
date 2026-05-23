@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import AgentSquarePage from '@/pages/agent-square/AgentSquarePageInteractive';
-import GroupWorkspacePage from '@/pages/group-workspace/GroupWorkspacePageInteractive';
-import PrivateChatsPage from '@/pages/private-chats/PrivateChatsPageInteractive';
-import ProjectPage from '@/pages/projects/ProjectPageInteractive';
-import WorkbenchPage from '@/pages/workbench/WorkbenchPageInteractive';
+import AgentSquarePage from '@/pages/agent-square/AgentSquarePage';
+import GroupWorkspacePage from '@/pages/group-workspace/GroupWorkspacePage';
+import PrivateChatsPage from '@/pages/private-chats/PrivateChatsPage';
+import ProjectPage from '@/pages/projects/ProjectPage';
+import WorkbenchPage from '@/pages/workbench/WorkbenchPage';
 import styles from '@/App.module.css';
 
 type PreviewPage = {
