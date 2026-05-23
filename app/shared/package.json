@@ -12,6 +12,21 @@
     "./errors": "./src/errors.ts",
     "./apiClient": "./src/apiClient.ts",
     "./eventClient": "./src/eventClient.ts",
-    "./mock": "./src/mock.ts"
+    "./mock": "./src/mock.ts",
+    "./components": "./src/components/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.1.0",
+    "jsdom": "^29.1.1",
+    "typescript": "~5.8.0",
+    "vitest": "^4.1.7"
   }
 }
