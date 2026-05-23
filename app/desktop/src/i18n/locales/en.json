@@ -58,5 +58,19 @@
   "run.close": "Close run detail",
   "chat.viewFullDiff": "View full diff",
   "prompt.model": "Model",
-  "prompt.reasoning": "Reasoning effort"
+  "prompt.reasoning": "Reasoning effort",
+  "perm.title": "Permission Gate",
+  "perm.pending": "{{count}} tool(s) awaiting approval",
+  "perm.lastDecided": "Recent decisions",
+  "perm.history": "Permission history",
+  "perm.dismissAll": "Dismiss all",
+  "perm.collapse": "Collapse",
+  "perm.dismiss": "Dismiss",
+  "perm.awaiting": "AWAITING",
+  "perm.allowed": "ALLOWED",
+  "perm.denied": "DENIED",
+  "perm.showInput": "Show input",
+  "perm.hideInput": "Hide input",
+  "perm.allow": "Allow",
+  "perm.deny": "Deny"
 }
