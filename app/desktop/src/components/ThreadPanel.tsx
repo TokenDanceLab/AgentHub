@@ -1,9 +1,10 @@
 import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, MessageSquare, Pencil, Trash2, Check, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { ThreadInfo } from '@shared/types';
-import { renameThread, deleteThread } from '@/api/edgeClient';
-import { useThreadStore } from '@/stores/threadStore';
+import { useThreads, useRenameThread, useDeleteThread } from '@/api/threadQueries';
+import { useToast } from '@/contexts/ToastContext';
 import styles from './ThreadPanel.module.css';
 
 /** ThreadInfo with optional count metadata the Edge may return. */
@@ -13,11 +14,9 @@ interface ThreadInfoExt extends ThreadInfo {
 }
 
 interface Props {
-  threads: ThreadInfo[];
   online: boolean;
   selectedId?: string;
   onSelect: (thread: ThreadInfo) => void;
-  onCreate: () => void;
 }
 
 /** Human-readable fallback when a thread has no title. */
@@ -26,8 +25,33 @@ function getDisplayTitle(th: ThreadInfo, t: (k: string) => string): string {
   return t('thread.untitled');
 }
 
-export default memo(function ThreadPanel({ threads, online, selectedId, onSelect, onCreate }: Props) {
+/** Relative time display (e.g. "3m ago", "2h ago"). Uses i18n for locale. */
+function relativeTime(
+  dateStr: string,
+  t: (k: string, v?: Record<string, unknown>) => string,
+): string {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return t('time.justNow');
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return t('time.minutesAgo', { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t('time.hoursAgo', { count: hours });
+  const days = Math.floor(hours / 24);
+  if (days < 30) return t('time.daysAgo', { count: days });
+  return new Date(dateStr).toLocaleDateString();
+}
+
+export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props) {
   const { t } = useTranslation();
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
+
+  // TanStack Query — server state
+  const { data } = useThreads();
+  const threads = data?.items ?? [];
+  const renameMutation = useRenameThread();
+  const deleteMutation = useDeleteThread();
+
   const [query, setQuery] = useState('');
 
   // Inline rename state
@@ -38,10 +62,6 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
 
   // Delete confirmation state
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  // Store helpers
-  const storeRemoveThread = useThreadStore((s) => s.removeThread);
-  const storeRenameThread = useThreadStore((s) => s.renameThread);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return threads;
@@ -70,13 +90,14 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
     if (!editingId || !editTitle.trim()) return;
     const title = editTitle.trim();
     try {
-      await renameThread(editingId, title);
-      storeRenameThread(editingId, title);
+      await renameMutation.mutateAsync({ threadId: editingId, title });
       setEditingId(null);
       setActionError(null);
+      showToast('success', t('toast.threadRenamed'));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setActionError(msg);
+      showToast('error', msg);
     }
   };
 
@@ -100,19 +121,27 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
 
   const handleConfirmDelete = async (threadId: string) => {
     try {
-      await deleteThread(threadId);
-      storeRemoveThread(threadId);
+      await deleteMutation.mutateAsync(threadId);
       setDeletingId(null);
       setActionError(null);
+      showToast('success', t('toast.threadDeleted'));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setActionError(msg);
+      showToast('error', msg);
     }
   };
 
   const handleCancelDelete = () => {
     setDeletingId(null);
     setActionError(null);
+  };
+
+  // ── create handler ─────────────────────────
+
+  const handleCreate = () => {
+    // Invalidate queries so Edge-synced threads refresh
+    queryClient.invalidateQueries({ queryKey: ['threads'] });
   };
 
   // ── helpers ────────────────────────────────
@@ -133,7 +162,7 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
         <span className={styles.title}>{t('thread.title')}</span>
         <button
           className={styles.createBtn}
-          onClick={onCreate}
+          onClick={handleCreate}
           disabled={!online}
           title={t('thread.create')}
         >
@@ -219,17 +248,21 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
             }
 
             // ── normal row ────────────────────
+            const displayTitle = getDisplayTitle(th, t);
+            const hasUnread = ext.runCount != null && ext.runCount > 0 && th.threadId !== selectedId;
+
             return (
               <li key={th.threadId} className={styles.itemRow}>
                 <button
                   className={`${styles.item} ${th.threadId === selectedId ? styles.selected : ''}`}
                   onClick={() => onSelect(th)}
                 >
+                  {hasUnread && <span className={styles.unreadDot} />}
                   <MessageSquare size={14} />
                   <div className={styles.itemInfo}>
-                    <div className={styles.name}>{getDisplayTitle(th, t)}</div>
+                    <div className={styles.name} title={displayTitle}>{displayTitle}</div>
                     <div className={styles.meta}>
-                      {new Date(th.updatedAt).toLocaleDateString()}
+                      {relativeTime(th.updatedAt, t)}
                       {count && <span className={styles.count}>{` · ${count}`}</span>}
                     </div>
                   </div>

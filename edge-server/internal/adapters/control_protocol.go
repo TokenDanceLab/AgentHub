@@ -152,7 +152,11 @@ func NewEventEmittingPermissionHandler(emitter EventEmitter) *DefaultPermissionH
 
 // WriteInterrupt sends an interrupt control_request to the CLI via stdin.
 func WriteInterrupt(stdin io.Writer, requestID string) error {
-	inner, _ := json.Marshal(ControlRequestInner{Subtype: "interrupt"})
+	inner, err := json.Marshal(ControlRequestInner{Subtype: "interrupt"})
+	if err != nil {
+		slog.Debug("control: marshal interrupt inner failed", "err", err)
+		return err
+	}
 	msg := ControlMessage{
 		Type:      "control_request",
 		RequestID: requestID,
@@ -169,7 +173,11 @@ func WriteInterrupt(stdin io.Writer, requestID string) error {
 
 // WriteSetModel sends a set_model control_request.
 func WriteSetModel(stdin io.Writer, requestID, model string) error {
-	inner, _ := json.Marshal(ControlRequestInner{Subtype: "set_model", Model: model})
+	inner, err := json.Marshal(ControlRequestInner{Subtype: "set_model", Model: model})
+	if err != nil {
+		slog.Debug("control: marshal set_model inner failed", "err", err)
+		return err
+	}
 	msg := ControlMessage{
 		Type:      "control_request",
 		RequestID: requestID,
@@ -186,7 +194,11 @@ func WriteSetModel(stdin io.Writer, requestID, model string) error {
 
 // WriteSetPermissionMode sends a set_permission_mode control_request.
 func WriteSetPermissionMode(stdin io.Writer, requestID, mode string) error {
-	inner, _ := json.Marshal(ControlRequestInner{Subtype: "set_permission_mode", Mode: mode})
+	inner, err := json.Marshal(ControlRequestInner{Subtype: "set_permission_mode", Mode: mode})
+	if err != nil {
+		slog.Debug("control: marshal set_permission_mode inner failed", "err", err)
+		return err
+	}
 	msg := ControlMessage{
 		Type:      "control_request",
 		RequestID: requestID,
@@ -203,7 +215,11 @@ func WriteSetPermissionMode(stdin io.Writer, requestID, mode string) error {
 
 // WriteStopTask sends a stop_task control_request for a sub-agent.
 func WriteStopTask(stdin io.Writer, requestID, taskID string) error {
-	inner, _ := json.Marshal(ControlRequestInner{Subtype: "stop_task", TaskID: taskID})
+	inner, err := json.Marshal(ControlRequestInner{Subtype: "stop_task", TaskID: taskID})
+	if err != nil {
+		slog.Debug("control: marshal stop_task inner failed", "err", err)
+		return err
+	}
 	msg := ControlMessage{
 		Type:      "control_request",
 		RequestID: requestID,

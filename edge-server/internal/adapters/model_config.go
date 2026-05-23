@@ -12,6 +12,7 @@ var ModelAliases = map[string]map[string]string{
 		"gpt-5":       "gpt-5.3-codex",
 		"gpt-5-codex": "gpt-5.3-codex",
 		"gpt-5-mini":  "gpt-5.4-mini",
+		"gpt-5.5":  "gpt-5.5",
 		"o4":          "o4-mini",
 	},
 	"opencode": {
@@ -48,7 +49,7 @@ var ReasoningEfforts = map[string]map[string]string{
 // DefaultModels holds the default model per agent ID.
 var DefaultModels = map[string]string{
 	"claude-code":  "claude-sonnet-4-6",
-	"codex":        "gpt-5.3-codex",
+	"codex":        "gpt-5.5",
 	"opencode":     "newapi/deepseek-v4-pro",
 	"orchestrator": "claude-sonnet-4-6",
 }

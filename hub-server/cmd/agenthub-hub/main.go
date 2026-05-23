@@ -14,6 +14,7 @@ import (
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:4210", "listen address")
+	jwtSecret := flag.String("jwt-secret", "", "JWT secret for auth token validation")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
@@ -22,7 +23,10 @@ func main() {
 
 	slog.Info("hub server starting", "addr", *addr)
 
-	if err := httpserver.Run(httpserver.Config{Addr: *addr}); err != nil {
+	if err := httpserver.Run(httpserver.Config{
+		Addr:      *addr,
+		JWTSecret: *jwtSecret,
+	}); err != nil {
 		slog.Error("hub server exited", "err", err)
 		os.Exit(1)
 	}

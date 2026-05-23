@@ -49,15 +49,22 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 
 	args := []string{"run", "--format", "json"}
 
-	// Model: if it contains "/", pass as provider/model; otherwise pass as-is
+	// Model: resolve aliases, then pass as provider/model to OpenCode
 	if ctx.Model != "" {
-		args = append(args, "-m", ctx.Model)
+		resolved := ResolveModel("opencode", ctx.Model)
+		if resolved == "" {
+			resolved = ctx.Model
+		}
+		args = append(args, "-m", resolved)
 	}
 
 	// Reasoning effort: --thinking enables thinking, --variant sets effort level
 	if ctx.ReasoningEffort != "" {
+		effort := ResolveReasoningEffort("opencode", ctx.ReasoningEffort)
 		args = append(args, "--thinking")
-		args = append(args, "--variant", ctx.ReasoningEffort)
+		if effort != "" {
+			args = append(args, "--variant", effort)
+		}
 	}
 
 	// Agent mode (build, plan, etc.)
@@ -75,6 +82,11 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		args = append(args, "--fork")
 	}
 
+	// Permission mode: bypassPermissions maps to --dangerously-skip-permissions
+	if ctx.PermissionMode == "bypassPermissions" {
+		args = append(args, "--dangerously-skip-permissions")
+	}
+
 	args = append(args, prompt)
 
 	workDir := ctx.WorkDir
@@ -82,11 +94,7 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		workDir = "."
 	}
 
-	env := []string{
-		"AGENTHUB_RUN_ID=" + ctx.Run.ID,
-		"AGENTHUB_PROJECT_ID=" + ctx.Run.ProjectID,
-		"AGENTHUB_THREAD_ID=" + ctx.Run.ThreadID,
-	}
+	var env []string // runtime vars set by process executor
 
 	return a.binaryPath, args, env, workDir
 }
@@ -258,7 +266,6 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 
 type opencodeEvent struct {
 	Type            string        `json:"type"`
-	Timestamp       int64         `json:"timestamp,omitempty"`
 	SessionID       string        `json:"sessionID,omitempty"`
 	Part            *opencodePart `json:"part,omitempty"`
 	ErrorMessage    string        `json:"error,omitempty"`

@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -369,7 +370,11 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			IncludePartial:    req.IncludePartial,
 		}
 		if err := h.Executor.Start(run, runCtx); err != nil {
-			writeJSON(w, http.StatusInternalServerError, errorResponse("executor_start_failed", "failed to start run executor"))
+			if errors.Is(err, lifecycle.ErrTooManyConcurrentRuns) {
+				writeJSON(w, http.StatusTooManyRequests, errorResponse("too_many_concurrent_runs", err.Error()))
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, errorResponse("executor_start_failed", fmt.Sprintf("failed to start run executor: %v", err)))
 			return
 		}
 	}
@@ -474,10 +479,13 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			default:
 			}
-			_, _, err := conn.ReadMessage()
+			mt, msg, err := conn.ReadMessage()
 			if err != nil {
 				break
 			}
+			// Inbound messages from the client are discarded by design
+			// (the server pushes events; the client only sends close/pong).
+			slog.Debug("websocket inbound message discarded", "messageType", mt, "size", len(msg))
 		}
 	}()
 
@@ -533,6 +541,43 @@ func decodeOptionalJSON(r *http.Request, dst any) error {
 
 func runToResponse(run store.Run) map[string]any {
 	return lifecycle.RunResponse(run)
+}
+
+// ---------------------------------------------------------------------------
+// POST /v1/permissions/decide  (Desktop permission gate)
+// ---------------------------------------------------------------------------
+
+func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
+		return
+	}
+
+	var req struct {
+		RunID     string `json:"runId"`
+		RequestID string `json:"requestId"`
+		Decision  string `json:"decision"`
+		Reason    string `json:"reason,omitempty"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
+		return
+	}
+	if req.Decision != "allow" && req.Decision != "deny" {
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "decision must be 'allow' or 'deny'"))
+		return
+	}
+
+	scope := map[string]any{"runId": req.RunID}
+	h.Bus.Publish("run.agent.permission_decided", scope, map[string]any{
+		"runId":     req.RunID,
+		"requestId": req.RequestID,
+		"decision":  req.Decision,
+		"reason":    req.Reason,
+	})
+
+	slog.Info("permission decided by Desktop", "requestId", req.RequestID, "decision", req.Decision)
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 }
 
 // RegisterRoutes registers all routes on the given mux.
@@ -620,4 +665,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "not found"))
 	})
 	mux.HandleFunc("/v1/events", h.GetEvents)
+	mux.HandleFunc("/v1/permissions/decide", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			h.PostPermissionDecide(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
+	})
 }
