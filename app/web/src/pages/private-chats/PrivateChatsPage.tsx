@@ -394,10 +394,10 @@ const pageStyles = `
     gap: 10px;
     align-items: center;
     min-height: 64px;
-    border: 1px solid transparent;
+    border: 1px solid rgba(255, 255, 255, 0.64);
     border-radius: 12px;
     padding: 10px;
-    background: rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.5);
     color: inherit;
     cursor: pointer;
     text-align: left;
@@ -752,10 +752,10 @@ const pageStyles = `
   }
 
   .pc-mini-card {
-    border: 1px solid rgba(132, 155, 190, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.64);
     border-radius: 12px;
     padding: 12px;
-    background: rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.5);
   }
 
   .pc-mini-card h3 {
@@ -789,10 +789,11 @@ const pageStyles = `
   }
 
   .pc-chip {
-    min-height: 28px;
-    padding: 0 9px;
+    min-height: 24px;
+    padding: 4px 9px;
     color: #40516f;
-    font-size: 12px;
+    font-size: 11px;
+    line-height: 1;
     box-shadow: none;
   }
 

@@ -334,9 +334,9 @@ const styles = `
 .gwr-card,
 .gwr-sync,
 .gwr-approval {
-  border: 1px solid rgba(255,255,255,0.68);
+  border: 1px solid rgba(255,255,255,0.64);
   border-radius: 12px;
-  background: rgba(255,255,255,0.52);
+  background: rgba(255,255,255,0.5);
 }
 
 .gwr-nav,
@@ -442,13 +442,14 @@ const styles = `
   justify-content: center;
   gap: 6px;
   min-height: 24px;
-  padding: 5px 9px;
+  padding: 4px 9px;
   border: 1px solid rgba(23,105,232,0.13);
   border-radius: 999px;
   background: rgba(23,105,232,0.08);
   color: #1459c7;
   font-size: 11px;
   font-weight: 800;
+  line-height: 1;
   white-space: nowrap;
 }
 
@@ -560,14 +561,15 @@ const styles = `
 }
 
 .gwr-filter {
-  min-height: 30px;
-  padding: 7px 8px;
+  min-height: 28px;
+  padding: 6px 8px;
   border: 1px solid rgba(23,105,232,0.12);
   border-radius: 8px;
-  background: rgba(255,255,255,0.48);
+  background: rgba(255,255,255,0.5);
   color: var(--gwr-muted);
   font-size: 11px;
   font-weight: 800;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -712,9 +714,9 @@ const styles = `
   gap: 10px;
   margin-top: auto;
   padding: 12px;
-  border: 1px solid rgba(255,255,255,0.68);
+  border: 1px solid rgba(255,255,255,0.64);
   border-radius: 12px;
-  background: rgba(255,255,255,0.56);
+  background: rgba(255,255,255,0.5);
 }
 
 .gwr-composer textarea {

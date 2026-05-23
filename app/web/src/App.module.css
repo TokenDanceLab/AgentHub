@@ -40,10 +40,12 @@
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: #1f6feb;
+  background: linear-gradient(135deg, #2563eb, #0891b2);
   color: #ffffff;
   font-size: 12px;
+  font-weight: 800;
   letter-spacing: 0;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
 }
 
 .tabs {

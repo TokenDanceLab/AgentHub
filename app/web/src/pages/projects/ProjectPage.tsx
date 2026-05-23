@@ -410,8 +410,9 @@ const pageStyles = `
     justify-content: center;
     gap: 8px;
     min-height: 38px;
-    padding: 10px 14px;
+    padding: 9px 14px;
     font-weight: 700;
+    line-height: 1;
   }
 
   .projectPrimaryButton:disabled,
@@ -466,9 +467,9 @@ const pageStyles = `
 
   .projectProgressCard {
     padding: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.64);
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.52);
+    background: rgba(255, 255, 255, 0.5);
   }
 
   .projectStatusRow {
@@ -598,15 +599,16 @@ const pageStyles = `
   }
 
   .projectMiniButton {
-    min-height: 30px;
+    min-height: 28px;
     border: 1px solid rgba(148, 163, 184, 0.25);
     border-radius: 8px;
     padding: 6px 9px;
     color: #334155;
-    background: rgba(255, 255, 255, 0.58);
+    background: rgba(255, 255, 255, 0.5);
     font: inherit;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 800;
+    line-height: 1;
     cursor: pointer;
   }
 
@@ -633,7 +635,7 @@ const pageStyles = `
   .projectRunRow,
   .projectMilestoneRow,
   .projectRiskRow {
-    border: 1px solid rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.64);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.5);
   }
@@ -672,36 +674,44 @@ const pageStyles = `
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 26px;
-    padding: 5px 9px;
+    gap: 6px;
+    min-height: 24px;
+    padding: 4px 9px;
+    border: 1px solid rgba(37, 99, 235, 0.13);
     border-radius: 999px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 800;
+    line-height: 1;
     white-space: nowrap;
   }
 
   .projectPill.blue {
     color: #2563eb;
+    border-color: rgba(37, 99, 235, 0.18);
     background: rgba(37, 99, 235, 0.1);
   }
 
   .projectPill.cyan {
     color: #0891b2;
+    border-color: rgba(8, 145, 178, 0.18);
     background: rgba(8, 145, 178, 0.1);
   }
 
   .projectPill.purple {
     color: #7c3aed;
+    border-color: rgba(124, 58, 237, 0.18);
     background: rgba(124, 58, 237, 0.1);
   }
 
   .projectPill.green {
     color: #059669;
+    border-color: rgba(5, 150, 105, 0.18);
     background: rgba(5, 150, 105, 0.1);
   }
 
   .projectPill.amber {
     color: #d97706;
+    border-color: rgba(217, 119, 6, 0.2);
     background: rgba(217, 119, 6, 0.12);
   }
 
