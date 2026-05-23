@@ -22,7 +22,19 @@ export interface StreamHandle {
   close(): void;
 }
 
-export function createEventStream(cursor?: string): StreamHandle {
+export function createEventStream(cursorOrUrl?: string, opts?: { baseUrl?: string }): StreamHandle {
+  let baseUrl = WS_URL;
+  let cursor: string | undefined;
+
+  // If first arg looks like a URL, use it as base; otherwise treat as cursor
+  if (cursorOrUrl && (cursorOrUrl.startsWith('ws://') || cursorOrUrl.startsWith('wss://'))) {
+    baseUrl = cursorOrUrl;
+  } else {
+    cursor = cursorOrUrl;
+  }
+  if (opts?.baseUrl) {
+    baseUrl = opts.baseUrl;
+  }
   let ws: WebSocket | null = null;
   const handlers: EventHandler[] = [];
   const statusHandlers: StatusHandler[] = [];
@@ -69,7 +81,7 @@ export function createEventStream(cursor?: string): StreamHandle {
 
   function connect() {
     if (closed) return;
-    const url = lastCursor ? `${WS_URL}?cursor=${encodeURIComponent(lastCursor)}` : WS_URL;
+    const url = lastCursor ? `${baseUrl}?cursor=${encodeURIComponent(lastCursor)}` : baseUrl;
 
     ws = new WebSocket(url);
 
