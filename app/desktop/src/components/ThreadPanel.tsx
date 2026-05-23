@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { ThreadInfo } from '@shared/types';
 import { useThreads, useRenameThread, useDeleteThread } from '@/api/threadQueries';
 import { useToast } from '@/contexts/ToastContext';
+import EmptyState from './EmptyState';
 import styles from './ThreadPanel.module.css';
 
 /** ThreadInfo with optional count metadata the Edge may return. */
@@ -180,7 +181,16 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
       {actionError && <div className={styles.actionError}>{actionError}</div>}
 
       {filtered.length === 0 ? (
-        <div className={styles.empty}>{t('thread.empty')}</div>
+        threads.length === 0 ? (
+          <EmptyState
+            icon={<MessageSquare size={24} />}
+            title={t('thread.emptyTitle')}
+            description={t('thread.emptyDescription')}
+            action={{ label: t('thread.emptyAction'), onClick: handleCreate }}
+          />
+        ) : (
+          <div className={styles.empty}>{t('thread.empty')}</div>
+        )
       ) : (
         <ul className={styles.list}>
           {filtered.map((th) => {

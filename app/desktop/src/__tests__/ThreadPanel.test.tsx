@@ -12,6 +12,11 @@ const { mockThreads, mockRenameMutateAsync, mockDeleteMutateAsync } = vi.hoisted
   mockDeleteMutateAsync: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('lucide-react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('lucide-react')>();
+  return { ...actual };
+});
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, vars?: Record<string, unknown>) => {
@@ -76,7 +81,7 @@ describe('ThreadPanel', () => {
 
   it('renders empty state when threads list is empty', () => {
     renderPanel();
-    expect(screen.getByText('thread.empty')).toBeInTheDocument();
+    expect(screen.getByText('thread.emptyTitle')).toBeInTheDocument();
   });
 
   it('renders thread items', () => {
