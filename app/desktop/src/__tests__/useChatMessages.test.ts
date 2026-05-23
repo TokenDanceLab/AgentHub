@@ -137,7 +137,7 @@ describe('useChatMessages', () => {
     });
   });
 
-  it('creates tool_call blocks from tool_call events', () => {
+  it('creates tool_use blocks from tool_call events', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     // Need a run.started first so currentRun is set up for tracking
@@ -160,7 +160,7 @@ describe('useChatMessages', () => {
     expect(result.current.messages[1].role).toBe('agent');
     expect(result.current.messages[1].blocks).toHaveLength(1);
     expect(result.current.messages[1].blocks[0]).toMatchObject({
-      kind: 'tool_call',
+      kind: 'tool_use',
       callId: 'call-1',
       toolName: 'read_file',
       status: 'pending',
@@ -338,9 +338,21 @@ describe('useChatMessages', () => {
     });
   });
 
-  it('creates tool_result block', () => {
+  it('nests tool_result as child of tool_use', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
+    // First create a tool_use block
+    act(() => {
+      eventHandler!(makeEvent('run.agent.tool_call', {
+        runId: 'run-1',
+        callId: 'call-1',
+        toolName: 'read_file',
+        input: { path: '/test' },
+        status: 'running',
+      }));
+    });
+
+    // Then create the tool_result
     act(() => {
       eventHandler!(makeEvent('run.agent.tool_result', {
         runId: 'run-1',
@@ -350,15 +362,16 @@ describe('useChatMessages', () => {
       }));
     });
 
-    expect(result.current.messages[0].blocks[0]).toMatchObject({
-      kind: 'tool_result',
-      callId: 'call-1',
-      toolName: 'read_file',
+    const block = result.current.messages[0].blocks[0] as any;
+    expect(block.kind).toBe('tool_use');
+    expect(block.children).toHaveLength(1);
+    expect(block.children[0]).toMatchObject({
+      kind: 'generic_result',
       output: 'file contents here',
     });
   });
 
-  it('updates tool call status to completed on tool_result', () => {
+  it('updates tool_use status to completed on tool_result', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     // Need a run.started first so currentRun is set up
