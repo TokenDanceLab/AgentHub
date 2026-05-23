@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
 }
 
 .body {
@@ -44,6 +45,15 @@
 
 .btn:hover {
   background: var(--color-border);
+}
+
+/* ── Chat wrapper ───────────────────────── */
+
+.chatWrapper {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Skeleton layouts ──────────────────── */
@@ -106,6 +116,12 @@
   align-self: flex-end;
   background: color-mix(in oklch, var(--primary) 20%, transparent);
   border: 1px solid color-mix(in oklch, var(--primary) 30%, transparent);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 8px;
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
 }
 
 /* ── Edge disconnected banner ── */
@@ -161,4 +177,157 @@
 .bannerBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* ── Mobile toolbar ─────────────────────── */
+
+.mobileToolbar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-md);
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  flex-shrink: 0;
+  height: 44px;
+  min-height: 44px;
+}
+
+.mobileToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.mobileToggle:active {
+  background: var(--border);
+}
+
+.mobileTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+}
+
+/* ── Sidebar wrapper ────────────────────── */
+
+.sidebarWrapper {
+  display: flex;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--card);
+}
+
+/* ── Right panel wrapper ────────────────── */
+
+.rightPanelWrapper {
+  display: flex;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+}
+
+/* ── Overlay backdrop ───────────────────── */
+
+.overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: var(--z-overlay);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Tablet (768px - 1023px)
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 1023px) {
+  .centerSidebar {
+    display: none;
+  }
+
+  .sidebarWrapper {
+    max-width: 220px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Mobile (< 768px)
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .mobileToolbar {
+    display: flex;
+  }
+
+  .body {
+    position: relative;
+  }
+
+  /* Sidebar slides in from the left as an overlay */
+  .sidebarWrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: calc(var(--z-overlay) + 1);
+    transform: translateX(-100%);
+    transition: transform var(--duration-medium) var(--ease-out);
+    width: 280px !important;
+    max-width: 85vw !important;
+    border-right: 1px solid var(--border);
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+  }
+
+  /* Right panel slides up from the bottom as a sheet */
+  .rightPanelWrapper {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 70vh;
+    z-index: calc(var(--z-overlay) + 1);
+    transform: translateY(100%);
+    transition: transform var(--duration-medium) var(--ease-out);
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25);
+  }
+
+  .rightPanelOpen {
+    transform: translateY(0);
+  }
+
+  .overlay {
+    display: block;
+  }
+
+  /* Hide resize handles */
+  .body > [role='separator'] {
+    display: none;
+  }
+
+  /* Compact banner */
+  .banner {
+    padding: var(--space-xs) var(--space-md);
+    font-size: var(--font-size-xs);
+  }
+
+  .bannerMsg {
+    white-space: normal;
+    font-size: var(--font-size-xs);
+  }
 }

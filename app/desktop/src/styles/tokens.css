@@ -79,6 +79,15 @@
   --right-panel-min: 240px;
   --right-panel-max: 600px;
   --statusbar-height: 36px;
+
+  /* ── Responsive Breakpoints (documentation — use in @media) ──────── */
+  /* --bp-tablet: 768px;   tablet / small desktop */
+  /* --bp-desktop: 1024px; full desktop layout */
+  /* Note: CSS custom properties cannot be used inside @media queries,
+     so these are documented here and mirrored in each component's CSS. */
+
+  /* ── Touch Targets (WCAG 2.5.5) ─────────────────────────────────── */
+  --touch-target-min: 44px;
 }
 
 /* ── Global Reset ──────────────────────────────────────────────────── */

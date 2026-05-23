@@ -188,3 +188,96 @@
 .optionSelected {
   background: color-mix(in oklch, var(--primary) 15%, transparent);
 }
+
+/* ── Responsive: Mobile (< 768px) ──────── */
+
+@media (max-width: 767px) {
+  .root {
+    padding: 0;
+  }
+
+  .configRow {
+    padding: var(--space-xs) var(--space-sm) 0;
+    gap: var(--space-xs);
+  }
+
+  .select {
+    flex: 1;
+    min-width: 0;
+    font-size: 16px; /* prevent iOS zoom */
+    padding: 6px 8px;
+    min-height: var(--touch-target-min, 44px);
+  }
+
+  .bar {
+    padding: var(--space-xs) var(--space-sm);
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+  }
+
+  .agentBtn {
+    font-size: var(--font-size-xs);
+    padding: 6px 10px;
+    min-height: var(--touch-target-min, 44px);
+    order: 1;
+  }
+
+  .textarea {
+    order: 2;
+    flex: 1 1 100%;
+    min-width: 100%;
+    min-height: 44px;
+    font-size: 16px; /* prevent iOS zoom */
+    padding: 8px 10px;
+  }
+
+  .sendBtn,
+  .stopBtn {
+    order: 3;
+    min-height: var(--touch-target-min, 44px);
+    min-width: var(--touch-target-min, 44px);
+    padding: 6px 12px;
+    font-size: var(--font-size-xs);
+  }
+
+  .sendBtn span,
+  .stopBtn span {
+    /* keep text visible but compact */
+  }
+
+  .selector {
+    left: var(--space-sm);
+    right: var(--space-sm);
+    min-width: auto;
+    max-width: none;
+  }
+
+  .option {
+    padding: var(--space-sm);
+    min-height: var(--touch-target-min, 44px);
+    font-size: var(--font-size-sm);
+  }
+}
+
+/* ── Responsive: Tablet (768px - 1023px) ─ */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .configRow {
+    padding: var(--space-xs) var(--space-sm) 0;
+  }
+
+  .bar {
+    padding: var(--space-sm);
+    gap: var(--space-xs);
+  }
+
+  .textarea {
+    font-size: var(--font-size-xs);
+  }
+
+  .sendBtn,
+  .stopBtn {
+    padding: 6px 12px;
+    font-size: var(--font-size-xs);
+  }
+}
