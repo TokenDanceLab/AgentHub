@@ -16,6 +16,7 @@ import (
 	"github.com/agenthub/server-hub/internal/config"
 	"github.com/agenthub/server-hub/internal/handler"
 	"github.com/agenthub/server-hub/internal/log"
+	"github.com/agenthub/server-hub/internal/metrics"
 	"github.com/agenthub/server-hub/internal/repository"
 	"github.com/agenthub/server-hub/internal/router"
 	"github.com/agenthub/server-hub/internal/service"
@@ -31,6 +32,7 @@ var (
 
 func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
+	metrics.Register()
 
 	cfg, err := config.Load("../configs/config.yaml")
 	if err != nil {
