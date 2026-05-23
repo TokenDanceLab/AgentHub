@@ -5,15 +5,50 @@ import type { FileDiff } from './ChatView.types';
 import DiffViewer from './DiffViewer';
 import styles from './RunDetail.module.css';
 
+interface ToolCallEntry {
+  callId: string;
+  toolName: string;
+  status: string;
+  timestamp: string;
+  output?: string;
+}
+
 interface Props {
   run: RunInfo | null;
-  toolCalls: Array<{ callId: string; toolName: string; status: string; timestamp: string }>;
+  toolCalls: ToolCallEntry[];
   changedFiles: Array<{ path: string; action: string; timestamp: string }>;
   outputText: string;
   diffs?: FileDiff[];
 }
 
 type TabId = 'output' | 'toolCalls' | 'fileChanges';
+
+function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasOutput = !!tc.output;
+
+  return (
+    <div className={styles.toolCallItem}>
+      <button
+        className={styles.toolCallHeader}
+        onClick={() => hasOutput && setExpanded((v) => !v)}
+        aria-expanded={hasOutput ? expanded : undefined}
+        disabled={!hasOutput}
+      >
+        <span className={tc.status === 'completed' ? styles.success : styles.pending}>
+          {tc.toolName}
+        </span>
+        <span className={styles.itemTs}>{new Date(tc.timestamp).toLocaleTimeString()}</span>
+        {hasOutput && (
+          <span className={styles.chevron + (expanded ? ' ' + styles.chevronDown : '')}>▸</span>
+        )}
+      </button>
+      {expanded && tc.output && (
+        <pre className={styles.toolCallOutput}>{tc.output.slice(0, 5000)}</pre>
+      )}
+    </div>
+  );
+}
 
 export default function RunDetail({ run, toolCalls, changedFiles, outputText, diffs }: Props) {
   const { t } = useTranslation();
@@ -106,12 +141,7 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
             {activeTab === 'toolCalls' && (
               <div className={styles.list}>
                 {toolCalls.map((tc) => (
-                  <div key={tc.callId} className={styles.item}>
-                    <span className={tc.status === 'completed' ? styles.success : styles.pending}>
-                      {tc.toolName}
-                    </span>
-                    <span className={styles.itemTs}>{new Date(tc.timestamp).toLocaleTimeString()}</span>
-                  </div>
+                  <ToolCallItem key={tc.callId} tc={tc} />
                 ))}
               </div>
             )}
