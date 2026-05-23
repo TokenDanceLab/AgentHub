@@ -1,9 +1,15 @@
 package httpserver
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
+	"time"
+
+	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/lifecycle"
 )
 
 func TestCORSMiddlewareAllowsTrustedLocalOrigin(t *testing.T) {
@@ -71,5 +77,86 @@ func TestCORSMiddlewareAllowsNoOrigin(t *testing.T) {
 	}
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
 		t.Fatalf("Access-Control-Allow-Origin = %q, want empty", got)
+	}
+}
+
+func TestNewHandlerFromConfigLeavesDefaultExecutorLazy(t *testing.T) {
+	handler, err := newHandlerFromConfig(Config{})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	if handler.Executor != nil {
+		t.Fatalf("Executor = %T, want nil before handler defaulting", handler.Executor)
+	}
+	if handler.Bus == nil {
+		t.Fatal("Bus is nil")
+	}
+	if handler.Store == nil {
+		t.Fatal("Store is nil")
+	}
+}
+
+func TestNewHandlerFromConfigWiresProcessExecutor(t *testing.T) {
+	handler, err := newHandlerFromConfig(Config{
+		ProcessExecutor: lifecycle.ProcessExecutorConfig{
+			Command: os.Args[0],
+			Args:    []string{"-test.run=TestProcessExecutorWiringHelper", "--"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+
+	if _, ok := handler.Executor.(*lifecycle.ProcessExecutor); !ok {
+		t.Fatalf("Executor = %T, want *lifecycle.ProcessExecutor", handler.Executor)
+	}
+
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewBufferString("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202; body: %s", rec.Code, rec.Body.String())
+	}
+
+	subID, ch, replay := handler.Bus.Subscribe(0)
+	defer handler.Bus.Unsubscribe(subID)
+	eventsSeen := append([]string(nil), eventTypes(replay)...)
+
+	deadline := time.After(10 * time.Second)
+	for !hasEventType(eventsSeen, "run.started") || !hasEventType(eventsSeen, "run.finished") {
+		select {
+		case evt := <-ch:
+			eventsSeen = append(eventsSeen, evt.Type)
+		case <-deadline:
+			t.Fatalf("timed out waiting for process executor events; saw %v", eventsSeen)
+		}
+	}
+}
+
+func eventTypes(envelopes []events.EventEnvelope) []string {
+	types := make([]string, 0, len(envelopes))
+	for _, evt := range envelopes {
+		types = append(types, evt.Type)
+	}
+	return types
+}
+
+func hasEventType(events []string, want string) bool {
+	for _, got := range events {
+		if got == want {
+			return true
+		}
+	}
+	return false
+}
+
+func TestProcessExecutorWiringHelper(t *testing.T) {
+	if len(os.Args) >= 2 && os.Args[1] == "-test.run=TestProcessExecutorWiringHelper" {
+		return
 	}
 }

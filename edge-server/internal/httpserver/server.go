@@ -29,27 +29,9 @@ func Run(cfg Config) error {
 	if cfg.Addr == "" {
 		cfg.Addr = "127.0.0.1:3210"
 	}
-	if cfg.Store == nil {
-		cfg.Store = store.New()
-	}
-
-	bus := events.NewBus(10000)
-	registry := runners.NewRegistry()
-
-	var executor lifecycle.RunExecutor
-	if cfg.ProcessExecutor.Command != "" {
-		processExecutor, err := lifecycle.NewProcessExecutor(bus, cfg.Store, cfg.ProcessExecutor)
-		if err != nil {
-			return err
-		}
-		executor = processExecutor
-	}
-
-	handler := &api.Handler{
-		Bus:      bus,
-		Registry: registry,
-		Store:    cfg.Store,
-		Executor: executor,
+	handler, err := newHandlerFromConfig(cfg)
+	if err != nil {
+		return err
 	}
 
 	mux := http.NewServeMux()
@@ -82,6 +64,31 @@ func Run(cfg Config) error {
 	defer cancel()
 
 	return srv.Shutdown(ctx)
+}
+
+func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
+	if cfg.Store == nil {
+		cfg.Store = store.New()
+	}
+
+	bus := events.NewBus(10000)
+	registry := runners.NewRegistry()
+
+	var executor lifecycle.RunExecutor
+	if cfg.ProcessExecutor.Command != "" {
+		processExecutor, err := lifecycle.NewProcessExecutor(bus, cfg.Store, cfg.ProcessExecutor)
+		if err != nil {
+			return nil, err
+		}
+		executor = processExecutor
+	}
+
+	return &api.Handler{
+		Bus:      bus,
+		Registry: registry,
+		Store:    cfg.Store,
+		Executor: executor,
+	}, nil
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
