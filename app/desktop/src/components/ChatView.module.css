@@ -230,6 +230,195 @@
   color: var(--destructive);
 }
 
+/* ── Progressive Disclosure ───────────────── */
+
+.chevron {
+  display: inline-block;
+  font-size: 10px;
+  transition: transform var(--duration-fast) var(--ease-out);
+  opacity: 0.5;
+}
+.chevronDown { transform: rotate(90deg); }
+
+/* Thinking block */
+.thinkingToggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
+  transition: opacity var(--duration-fast);
+}
+.thinkingToggle:hover { opacity: 1; }
+.thinkingLen {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.5;
+}
+.thinkingContent {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-xs);
+  opacity: 0.65;
+  white-space: pre-wrap;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+/* Tool use block (conditional rendering, no <details>) */
+.toolUseContainer {
+  margin: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.toolUseHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: color-mix(in oklch, var(--primary) 8%, transparent);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  transition: background var(--duration-fast);
+}
+.toolUseHeader:hover {
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+}
+.toolIcon { font-size: 14px; flex-shrink: 0; }
+.toolName { font-weight: var(--font-weight-medium); white-space: nowrap; }
+.toolParamSummary {
+  color: var(--foreground);
+  opacity: 0.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.toolStatus {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.toolDone {
+  background: color-mix(in oklch, var(--success) 20%, transparent);
+  color: var(--success);
+}
+.toolRunning {
+  background: color-mix(in oklch, var(--primary) 20%, transparent);
+  color: var(--primary);
+}
+
+.toolUseBody {
+  padding: var(--space-xs) var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+.showParamsBtn {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  margin-bottom: var(--space-xs);
+}
+.showParamsBtn:hover { color: var(--foreground); }
+
+.readResult {
+  padding: 4px 0;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+}
+.bashResult { margin-top: var(--space-xs); }
+.toolStderr { color: var(--destructive); }
+.exitCode {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: var(--border);
+}
+
+/* ── Diff Card inline ─────────────────────── */
+.diffCard {
+  margin: var(--space-xs) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.diffCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-xs);
+  position: sticky;
+  top: 0;
+}
+.diffAdded {
+  font-weight: var(--font-weight-medium);
+  color: var(--diff-added-border);
+}
+.diffDeleted {
+  font-weight: var(--font-weight-medium);
+  color: var(--diff-removed-border);
+}
+.viewFullDiff {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+}
+.viewFullDiff:hover { text-decoration: underline; }
+
+.diffInline {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 250px;
+  overflow-y: auto;
+}
+.lineAdded {
+  background: var(--diff-added-bg);
+  border-left: 3px solid var(--diff-added-border);
+  padding-left: 4px;
+}
+.lineDeleted {
+  background: var(--diff-removed-bg);
+  border-left: 3px solid var(--diff-removed-border);
+  padding-left: 4px;
+}
+.lineContext { padding-left: 7px; }
+.linePrefix {
+  display: inline-block;
+  width: 16px;
+  text-align: center;
+  opacity: 0.5;
+  user-select: none;
+}
+.diffTruncated {
+  padding: 2px 8px;
+  color: var(--muted-foreground);
+  font-style: italic;
+  font-size: 10px;
+}
+
 /* ── Streaming cursor ────────────────────── */
 
 .cursor {
