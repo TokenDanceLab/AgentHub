@@ -34,6 +34,12 @@ type AgentAdapter interface {
 	// It returns when the stream ends or ctx is cancelled.
 	// stdin is provided for protocols that require bidirectional communication.
 	ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error
+
+	// NeedsStdin reports whether this adapter requires a writable stdin pipe
+	// for bidirectional communication (e.g. control protocol, permission responses).
+	// When false, the process executor will NOT open stdin, avoiding deadlocks
+	// with CLIs that block on stdin read when a pipe is attached.
+	NeedsStdin() bool
 }
 
 // EventEmitter abstracts the event bus so adapters don't couple to it directly.
@@ -63,19 +69,6 @@ type AgentCapabilities struct {
 
 // --- Unified event types emitted by all adapters ---
 
-type AgentEventType string
-
-const (
-	EventTextDelta   AgentEventType = "agent.text.delta"
-	EventTextBlock   AgentEventType = "agent.text.block"
-	EventThinking    AgentEventType = "agent.thinking"
-	EventToolCall    AgentEventType = "agent.tool.call"
-	EventToolResult  AgentEventType = "agent.tool.result"
-	EventFileChange  AgentEventType = "agent.file.change"
-	EventSessionInit AgentEventType = "agent.session.init"
-	EventResult      AgentEventType = "agent.result"
-)
-
 // Bus event type strings (prefixed with "run.").
 const (
 	BusEventTextDelta           = "run.agent.text_delta"
@@ -90,6 +83,7 @@ const (
 	BusEventStatusChange        = "run.agent.status_change"
 	BusEventAPIRetry            = "run.agent.api_retry"
 	BusEventTaskStarted         = "run.agent.task_started"
+	BusEventTaskDispatched      = "run.agent.task_dispatched"
 	BusEventTaskProgress        = "run.agent.task_progress"
 	BusEventTaskNotification    = "run.agent.task_notification"
 	BusEventSessionStateChanged = "run.agent.session_state_changed"
@@ -99,4 +93,15 @@ const (
 	BusEventToolUseSummary      = "run.agent.tool_use_summary"
 	BusEventAuthStatus          = "run.agent.auth_status"
 	BusEventRateLimit           = "run.agent.rate_limit"
+
+	// Permission gating events
+	BusEventPermissionRequested = "run.agent.permission_requested"
+	BusEventPermissionDecided   = "run.agent.permission_decided"
 )
+
+// Context keys for adapter-level context propagation.
+type ctxKey string
+
+// CtxSessionID is used to pass the session ID through context to adapters
+// so the permission handler can include it in permission events.
+const CtxSessionID ctxKey = "agenthub-session-id"

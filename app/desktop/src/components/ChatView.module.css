@@ -25,11 +25,32 @@
 /* ── Message bubbles ─────────────────────── */
 
 .message {
+  position: relative;
   max-width: 85%;
   padding: var(--space-sm) var(--space-md);
   border-radius: 8px;
   font-size: var(--font-size-sm);
   line-height: 1.5;
+  animation: messageIn 0.3s ease-out;
+}
+
+/* ── Responsive: Tablet (768px - 1023px) ─ */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .message {
+    max-width: 90%;
+  }
+}
+
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .userMsg {
@@ -238,7 +259,9 @@
   transition: transform var(--duration-fast) var(--ease-out);
   opacity: 0.5;
 }
-.chevronDown { transform: rotate(90deg); }
+.chevronDown {
+  transform: rotate(90deg);
+}
 
 /* Thinking block */
 .thinkingToggle {
@@ -255,7 +278,9 @@
   opacity: 0.7;
   transition: opacity var(--duration-fast);
 }
-.thinkingToggle:hover { opacity: 1; }
+.thinkingToggle:hover {
+  opacity: 1;
+}
 .thinkingLen {
   margin-left: auto;
   font-size: 10px;
@@ -292,8 +317,14 @@
 .toolUseHeader:hover {
   background: color-mix(in oklch, var(--primary) 14%, transparent);
 }
-.toolIcon { font-size: 14px; flex-shrink: 0; }
-.toolName { font-weight: var(--font-weight-medium); white-space: nowrap; }
+.toolIcon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.toolName {
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
 .toolParamSummary {
   color: var(--foreground);
   opacity: 0.5;
@@ -333,15 +364,21 @@
   cursor: pointer;
   margin-bottom: var(--space-xs);
 }
-.showParamsBtn:hover { color: var(--foreground); }
+.showParamsBtn:hover {
+  color: var(--foreground);
+}
 
 .readResult {
   padding: 4px 0;
   font-size: var(--font-size-xs);
   font-family: var(--font-mono);
 }
-.bashResult { margin-top: var(--space-xs); }
-.toolStderr { color: var(--destructive); }
+.bashResult {
+  margin-top: var(--space-xs);
+}
+.toolStderr {
+  color: var(--destructive);
+}
 .exitCode {
   display: inline-block;
   margin-top: 2px;
@@ -385,7 +422,9 @@
   cursor: pointer;
   font-size: var(--font-size-xs);
 }
-.viewFullDiff:hover { text-decoration: underline; }
+.viewFullDiff:hover {
+  text-decoration: underline;
+}
 
 .diffInline {
   font-family: var(--font-mono);
@@ -404,7 +443,9 @@
   border-left: 3px solid var(--diff-removed-border);
   padding-left: 4px;
 }
-.lineContext { padding-left: 7px; }
+.lineContext {
+  padding-left: 7px;
+}
 .linePrefix {
   display: inline-block;
   width: 16px;
@@ -430,5 +471,200 @@
 }
 
 @keyframes blink {
-  50% { opacity: 0; }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ── Message action bar ──────────────────── */
+
+.actionBar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+  z-index: 1;
+}
+
+.message:hover .actionBar {
+  opacity: 1;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast);
+}
+
+.actionBtn:active {
+  transform: scale(0.96);
+}
+
+.actionBtn:hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+
+/* ── Typing indicator ────────────────────── */
+
+.typingDots {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: var(--space-sm) var(--space-md);
+}
+
+.typingDots span {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+  animation: dotBounce 1.2s ease-in-out infinite both;
+}
+
+.typingDots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typingDots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typingDots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes dotBounce {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.copyToast {
+  position: absolute;
+  top: -22px;
+  right: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 11px;
+  pointer-events: none;
+  z-index: 10;
+  animation: toastFade 1.5s ease-out forwards;
+}
+
+@keyframes toastFade {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Mobile (< 768px)
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .stream {
+    padding: var(--space-sm);
+    gap: var(--space-xs);
+  }
+
+  .message {
+    max-width: 95%;
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .actionBar {
+    opacity: 1; /* always visible on touch */
+  }
+
+  .actionBtn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .toolUseHeader {
+    padding: 8px 10px;
+    min-height: 44px;
+  }
+
+  .toolUseContainer {
+    margin: 2px 0;
+  }
+
+  .diffInline {
+    font-size: 10px;
+    max-height: 180px;
+  }
+
+  .codeBlock {
+    font-size: 11px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .toolParamSummary {
+    display: none; /* hide param summary on mobile to save space */
+  }
+
+  .diffCard {
+    max-width: 100%;
+  }
+
+  .diffCardHeader {
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 10px;
+  }
+
+  .copyToast {
+    top: auto;
+    bottom: -22px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Tablet (768px - 1023px)
+   ═══════════════════════════════════════════════════════ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .message {
+    max-width: 90%;
+  }
+
+  .stream {
+    padding: var(--space-md);
+  }
 }

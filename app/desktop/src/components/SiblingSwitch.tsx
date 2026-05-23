@@ -16,7 +16,12 @@ export default function SiblingSwitch({ siblingIdx, siblingCount, onPrev, onNext
   const isLast = siblingIdx === siblingCount - 1;
 
   return (
-    <div className={styles.root} role="navigation" aria-label="Branch navigation" aria-live="polite">
+    <div
+      className={styles.root}
+      role="navigation"
+      aria-label="Branch navigation"
+      aria-live="polite"
+    >
       <button
         className={`${styles.btn} ${isFirst ? styles.btnDisabled : ''}`}
         onClick={onPrev}

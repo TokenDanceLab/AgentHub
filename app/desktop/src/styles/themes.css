@@ -1,0 +1,131 @@
+/* ═════════════════════════════════════════════════════════════════════
+   AgentHub Theme Variables — Dark (default) & Light
+   Toggled via data-theme attribute on <html>
+   ═════════════════════════════════════════════════════════════════════ */
+
+/* ── Dark Theme (default) ────────────────────────────────────────────── */
+:root {
+  /* Semantic Colors */
+  --background: oklch(0.12 0.008 260);
+  --foreground: oklch(0.92 0.005 260);
+  --card: oklch(0.16 0.008 260);
+  --card-foreground: oklch(0.92 0.005 260);
+  --popover: oklch(0.16 0.008 260);
+  --popover-foreground: oklch(0.92 0.005 260);
+  --primary: oklch(0.75 0.12 260);
+  --primary-foreground: oklch(0.12 0.008 260);
+  --secondary: oklch(0.18 0.008 260);
+  --secondary-foreground: oklch(0.92 0.005 260);
+  --muted: oklch(0.18 0.008 260);
+  --muted-foreground: oklch(0.55 0.012 260);
+  --accent: oklch(0.18 0.008 260);
+  --accent-foreground: oklch(0.92 0.005 260);
+  --destructive: oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.22 0.008 260);
+  --input: oklch(0.22 0.008 260);
+  --ring: oklch(0.55 0.015 260);
+
+  /* Extended Semantic */
+  --success: oklch(0.65 0.16 150);
+  --success-foreground: oklch(0.12 0.008 260);
+  --warning: oklch(0.75 0.16 85);
+  --warning-foreground: oklch(0.12 0.008 260);
+  --info: oklch(0.65 0.12 230);
+  --info-foreground: oklch(0.12 0.008 260);
+
+  /* Legacy aliases (used in components) */
+  --color-success: oklch(0.65 0.16 150);
+  --color-danger: oklch(0.65 0.22 25);
+  --color-border: oklch(0.25 0.008 260);
+
+  /* AgentHub-specific */
+  --brand: oklch(0.7 0.15 255);
+
+  /* Authority */
+  --authority-hub: oklch(0.7 0.16 250);
+  --authority-edge: oklch(0.7 0.16 150);
+  --authority-hybrid: oklch(0.75 0.16 65);
+
+  /* Run Status */
+  --run-queued: oklch(0.45 0.02 260);
+  --run-starting: oklch(0.65 0.13 250);
+  --run-running: oklch(0.65 0.16 150);
+  --run-completed: oklch(0.65 0.16 150);
+  --run-failed: oklch(0.6 0.2 25);
+  --run-cancelled: oklch(0.4 0.02 260);
+
+  /* Diff */
+  --diff-added-bg: oklch(0.18 0.04 150);
+  --diff-added-border: oklch(0.55 0.16 150);
+  --diff-removed-bg: oklch(0.18 0.04 25);
+  --diff-removed-border: oklch(0.55 0.2 25);
+
+  /* Scrollbar */
+  --scrollbar-thumb: oklch(0.3 0.01 260);
+  --scrollbar-thumb-hover: oklch(0.4 0.01 260);
+  --scrollbar-track: transparent;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.2);
+  --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.3);
+}
+
+/* ── Light Theme ─────────────────────────────────────────────────────── */
+[data-theme='light'] {
+  --background: oklch(0.985 0.002 260);
+  --foreground: oklch(0.14 0.005 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.14 0.005 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.14 0.005 260);
+  --primary: oklch(0.21 0.006 286);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.965 0.003 260);
+  --secondary-foreground: oklch(0.21 0.006 286);
+  --muted: oklch(0.965 0.003 260);
+  --muted-foreground: oklch(0.55 0.012 260);
+  --accent: oklch(0.965 0.003 260);
+  --accent-foreground: oklch(0.21 0.006 286);
+  --destructive: oklch(0.58 0.24 27);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.9 0.005 260);
+  --input: oklch(0.9 0.005 260);
+  --ring: oklch(0.62 0.015 260);
+
+  --success: oklch(0.58 0.18 150);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.7 0.18 85);
+  --warning-foreground: oklch(0.14 0.005 260);
+  --info: oklch(0.6 0.12 230);
+  --info-foreground: oklch(0.985 0 0);
+
+  --color-success: oklch(0.58 0.18 150);
+  --color-danger: oklch(0.58 0.24 27);
+  --color-border: oklch(0.85 0.005 260);
+
+  --brand: oklch(0.55 0.16 255);
+
+  --authority-hub: oklch(0.6 0.18 250);
+  --authority-edge: oklch(0.6 0.18 150);
+  --authority-hybrid: oklch(0.65 0.18 65);
+
+  --run-queued: oklch(0.55 0.02 260);
+  --run-starting: oklch(0.62 0.15 250);
+  --run-running: oklch(0.62 0.18 150);
+  --run-completed: oklch(0.58 0.18 150);
+  --run-failed: oklch(0.55 0.22 25);
+  --run-cancelled: oklch(0.5 0.02 260);
+
+  --diff-added-bg: oklch(0.92 0.06 150);
+  --diff-added-border: oklch(0.58 0.18 150);
+  --diff-removed-bg: oklch(0.92 0.06 25);
+  --diff-removed-border: oklch(0.58 0.24 25);
+
+  --scrollbar-thumb: oklch(0.75 0.01 260);
+  --scrollbar-thumb-hover: oklch(0.65 0.01 260);
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.08);
+}

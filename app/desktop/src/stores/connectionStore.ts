@@ -24,5 +24,5 @@ export const useConnectionStore = create<ConnectionState>()(
     setOnline: (v, health) => set({ online: v, health: health ?? null }),
     setConnected: (v) => set({ isConnected: v }),
     setError: (e) => set({ error: e }),
-  }))
+  })),
 );

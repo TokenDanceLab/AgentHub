@@ -5,18 +5,80 @@ import type { FileDiff } from './ChatView.types';
 import DiffViewer from './DiffViewer';
 import styles from './RunDetail.module.css';
 
+interface ToolCallEntry {
+  callId: string;
+  toolName: string;
+  status: string;
+  timestamp: string;
+  output?: string;
+}
+
+/** Extract input/output token counts from NDJSON or OpenCode usage payloads. */
+function extractTokens(
+  usage: Record<string, unknown> | undefined,
+): { input: number; output: number } | null {
+  if (!usage) return null;
+  const input = (usage.inputTokens ?? usage.input_tokens ?? usage.input) as number | undefined;
+  const output = (usage.outputTokens ?? usage.output_tokens ?? usage.output) as number | undefined;
+  if (input == null && output == null) return null;
+  return { input: Number(input ?? 0), output: Number(output ?? 0) };
+}
+
+type RunWithUsage = RunInfo & { usage?: Record<string, unknown> };
+
 interface Props {
-  run: RunInfo | null;
-  toolCalls: Array<{ callId: string; toolName: string; status: string; timestamp: string }>;
+  run: RunWithUsage | null;
+  toolCalls: ToolCallEntry[];
   changedFiles: Array<{ path: string; action: string; timestamp: string }>;
   outputText: string;
   diffs?: FileDiff[];
+  onCancel?: () => void;
 }
 
 type TabId = 'output' | 'toolCalls' | 'fileChanges';
 
-export default function RunDetail({ run, toolCalls, changedFiles, outputText, diffs }: Props) {
+function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasOutput = !!tc.output;
+
+  return (
+    <div className={styles.toolCallItem}>
+      <button
+        className={styles.toolCallHeader}
+        onClick={() => hasOutput && setExpanded((v) => !v)}
+        aria-expanded={hasOutput ? expanded : undefined}
+        disabled={!hasOutput}
+      >
+        <span className={tc.status === 'completed' ? styles.success : styles.pending}>
+          {tc.toolName}
+        </span>
+        <span className={styles.itemTs}>{new Date(tc.timestamp).toLocaleTimeString()}</span>
+        {hasOutput && (
+          <span className={styles.chevron + (expanded ? ' ' + styles.chevronDown : '')}>▸</span>
+        )}
+      </button>
+      {expanded && tc.output && (
+        <pre className={styles.toolCallOutput}>{tc.output.slice(0, 5000)}</pre>
+      )}
+    </div>
+  );
+}
+
+export default function RunDetail({ run, toolCalls, changedFiles, outputText, diffs, onCancel }: Props) {
   const { t } = useTranslation();
+
+  const defaultTab: TabId = outputText
+    ? 'output'
+    : toolCalls.length > 0
+      ? 'toolCalls'
+      : 'fileChanges';
+  const [selectedTab, setSelectedTab] = useState<TabId>(defaultTab);
+
+  useEffect(() => {
+    const handler = () => setSelectedTab('fileChanges');
+    window.addEventListener('agenthub:open-diff', handler);
+    return () => window.removeEventListener('agenthub:open-diff', handler);
+  }, []);
 
   if (!run) {
     return (
@@ -28,23 +90,14 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
   }
 
   const statusKey = `run.status.${run.status}`;
-  const statusClass = run.status === 'finished'
-    ? styles.statusDone
-    : run.status === 'failed'
-      ? styles.statusFailed
-      : run.status === 'running'
-        ? styles.statusRunning
-        : styles.statusPending;
-
-  const defaultTab: TabId = outputText ? 'output' : toolCalls.length > 0 ? 'toolCalls' : 'fileChanges';
-  const [selectedTab, setSelectedTab] = useState<TabId>(defaultTab);
-
-  // Listen for agenthub:open-diff → switch to fileChanges tab
-  useEffect(() => {
-    const handler = () => setSelectedTab('fileChanges');
-    window.addEventListener('agenthub:open-diff', handler);
-    return () => window.removeEventListener('agenthub:open-diff', handler);
-  }, []);
+  const statusClass =
+    run.status === 'finished'
+      ? styles.statusDone
+      : run.status === 'failed'
+        ? styles.statusFailed
+        : run.status === 'running'
+          ? styles.statusRunning
+          : styles.statusPending;
 
   const hasOutput = !!outputText;
   const hasToolCalls = toolCalls.length > 0;
@@ -52,12 +105,17 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
 
   // Resolve the effective tab to display (falls back if the selected tab has no data)
   const activeTab: TabId =
-    (selectedTab === 'output' && hasOutput) ? 'output' :
-    (selectedTab === 'toolCalls' && hasToolCalls) ? 'toolCalls' :
-    (selectedTab === 'fileChanges' && hasFileChanges) ? 'fileChanges' :
-    hasOutput ? 'output' :
-    hasToolCalls ? 'toolCalls' :
-    'fileChanges';
+    selectedTab === 'output' && hasOutput
+      ? 'output'
+      : selectedTab === 'toolCalls' && hasToolCalls
+        ? 'toolCalls'
+        : selectedTab === 'fileChanges' && hasFileChanges
+          ? 'fileChanges'
+          : hasOutput
+            ? 'output'
+            : hasToolCalls
+              ? 'toolCalls'
+              : 'fileChanges';
 
   const hasAnyContent = hasOutput || hasToolCalls || hasFileChanges;
 
@@ -69,6 +127,32 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
         <span className={`${styles.status} ${statusClass}`}>{t(statusKey)}</span>
         {run.runId && <span className={styles.runId}>{run.runId.slice(0, 12)}</span>}
       </div>
+
+      {onCancel && run.status === 'running' && (
+        <div className={styles.section}>
+          <button className={styles.cancelButton} onClick={onCancel}>
+            {t('action.cancelRun')}
+          </button>
+        </div>
+      )}
+
+      {run.usage &&
+        (() => {
+          const tokens = extractTokens(run.usage!);
+          if (!tokens) return null;
+          return (
+            <div className={styles.section}>
+              <div className={styles.usageRow}>
+                <span className={styles.usageLabel}>Input</span>
+                <span className={styles.usageValue}>{tokens.input.toLocaleString()}</span>
+              </div>
+              <div className={styles.usageRow}>
+                <span className={styles.usageLabel}>Output</span>
+                <span className={styles.usageValue}>{tokens.output.toLocaleString()}</span>
+              </div>
+            </div>
+          );
+        })()}
 
       {hasAnyContent && (
         <>
@@ -100,23 +184,16 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
           </div>
 
           <div className={styles.tabContent}>
-            {activeTab === 'output' && (
-              <pre className={styles.output}>{outputText}</pre>
-            )}
+            {activeTab === 'output' && <pre className={styles.output}>{outputText}</pre>}
             {activeTab === 'toolCalls' && (
               <div className={styles.list}>
                 {toolCalls.map((tc) => (
-                  <div key={tc.callId} className={styles.item}>
-                    <span className={tc.status === 'completed' ? styles.success : styles.pending}>
-                      {tc.toolName}
-                    </span>
-                    <span className={styles.itemTs}>{new Date(tc.timestamp).toLocaleTimeString()}</span>
-                  </div>
+                  <ToolCallItem key={tc.callId} tc={tc} />
                 ))}
               </div>
             )}
-            {activeTab === 'fileChanges' && (
-              diffs && diffs.length > 0 ? (
+            {activeTab === 'fileChanges' &&
+              (diffs && diffs.length > 0 ? (
                 <DiffViewer files={diffs} />
               ) : (
                 <div className={styles.list}>
@@ -127,8 +204,7 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
                     </div>
                   ))}
                 </div>
-              )
-            )}
+              ))}
           </div>
         </>
       )}
