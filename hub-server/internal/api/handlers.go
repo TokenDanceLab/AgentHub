@@ -1,5 +1,7 @@
-// Legacy entry point. The canonical server is cmd/server-hub/main.go using internal/app/app.go (DI).
-// This file is retained for reference only.
+// DEPRECATED: This file is part of the legacy Hub Server entry point (cmd/agenthub-hub/main.go).
+// The canonical handler wiring is in internal/app/app.go (DI architecture).
+// Use internal/handler/* for route implementations.
+// This file will be removed in Q3 2026.
 package api
 
 import (
@@ -73,28 +75,50 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 
 // ── Auth & Users ───────────────────────────
 
-func (h *Handler) PostLogin(w http.ResponseWriter, r *http.Request)         { stub(w, r, "POST /v1/auth/login") }
-func (h *Handler) PostRefreshToken(w http.ResponseWriter, r *http.Request)  { stub(w, r, "POST /v1/auth/refresh") }
-func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request)    { stub(w, r, "GET /v1/users/me") }
-func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request)           { stub(w, r, "GET /v1/users/:id") }
+func (h *Handler) PostLogin(w http.ResponseWriter, r *http.Request) {
+	stub(w, r, "POST /v1/auth/login")
+}
+func (h *Handler) PostRefreshToken(w http.ResponseWriter, r *http.Request) {
+	stub(w, r, "POST /v1/auth/refresh")
+}
+func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+	stub(w, r, "GET /v1/users/me")
+}
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) { stub(w, r, "GET /v1/users/:id") }
 
 // ── Contacts & Groups ──────────────────────
 
-func (h *Handler) GetContacts(w http.ResponseWriter, r *http.Request)  { stub(w, r, "GET /v1/contacts") }
-func (h *Handler) PostContact(w http.ResponseWriter, r *http.Request)  { stub(w, r, "POST /v1/contacts") }
-func (h *Handler) GetGroups(w http.ResponseWriter, r *http.Request)    { stub(w, r, "GET /v1/groups") }
-func (h *Handler) PostGroup(w http.ResponseWriter, r *http.Request)    { stub(w, r, "POST /v1/groups") }
+func (h *Handler) GetContacts(w http.ResponseWriter, r *http.Request) { stub(w, r, "GET /v1/contacts") }
+func (h *Handler) PostContact(w http.ResponseWriter, r *http.Request) {
+	stub(w, r, "POST /v1/contacts")
+}
+func (h *Handler) GetGroups(w http.ResponseWriter, r *http.Request) { stub(w, r, "GET /v1/groups") }
+func (h *Handler) PostGroup(w http.ResponseWriter, r *http.Request) { stub(w, r, "POST /v1/groups") }
 
 // ── Device & Edge ──────────────────────────
 
-func (h *Handler) PostDevice(w http.ResponseWriter, r *http.Request)       { stub(w, r, "POST /v1/devices") }
-func (h *Handler) GetDevice(w http.ResponseWriter, r *http.Request)        { stub(w, r, "GET /v1/devices/:id") }
-func (h *Handler) PostEdgeRegister(w http.ResponseWriter, r *http.Request) { stub(w, r, "POST /v1/edges/register") }
-func (h *Handler) PostEdgeHeartbeat(w http.ResponseWriter, r *http.Request) { stub(w, r, "POST /v1/edges/heartbeat") }
+func (h *Handler) PostDevice(w http.ResponseWriter, r *http.Request) { stub(w, r, "POST /v1/devices") }
+func (h *Handler) GetDevice(w http.ResponseWriter, r *http.Request) {
+	stub(w, r, "GET /v1/devices/:id")
+}
+func (h *Handler) PostEdgeRegister(w http.ResponseWriter, r *http.Request) {
+	stub(w, r, "POST /v1/edges/register")
+}
+func (h *Handler) PostEdgeHeartbeat(w http.ResponseWriter, r *http.Request) {
+	stub(w, r, "POST /v1/edges/heartbeat")
+}
 
 // ── Sync & Relay ───────────────────────────
 
-func (h *Handler) PostSyncPull(w http.ResponseWriter, r *http.Request)     { stub(w, r, "POST /v1/sync/pull") }
-func (h *Handler) PostSyncPush(w http.ResponseWriter, r *http.Request)     { stub(w, r, "POST /v1/sync/push") }
-func (h *Handler) PostRelayCommand(w http.ResponseWriter, r *http.Request) { stub(w, r, "POST /v1/relay/command") }
-func (h *Handler) PostRelayMessage(w http.ResponseWriter, r *http.Request) { stub(w, r, "POST /v1/relay/message") }
+func (h *Handler) PostSyncPull(w http.ResponseWriter, r *http.Request) {
+	stub(w, r, "POST /v1/sync/pull")
+}
+func (h *Handler) PostSyncPush(w http.ResponseWriter, r *http.Request) {
+	stub(w, r, "POST /v1/sync/push")
+}
+func (h *Handler) PostRelayCommand(w http.ResponseWriter, r *http.Request) {
+	stub(w, r, "POST /v1/relay/command")
+}
+func (h *Handler) PostRelayMessage(w http.ResponseWriter, r *http.Request) {
+	stub(w, r, "POST /v1/relay/message")
+}

@@ -17,13 +17,13 @@ import (
 
 // mockAuthService implements handler.AuthService.
 type mockAuthService struct {
-	registerFn        func(ctx context.Context, username, password, nickname string) (*model.User, error)
-	loginFn           func(ctx context.Context, username, password, deviceType, deviceID string) (*service.LoginResponse, error)
-	refreshTokenFn    func(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error)
-	logoutFn          func(ctx context.Context, userID, deviceID string) error
-	getMeFn           func(ctx context.Context, userID string) (*model.User, error)
-	updateProfileFn   func(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error)
-	changePasswordFn  func(ctx context.Context, userID, oldPassword, newPassword string) error
+	registerFn       func(ctx context.Context, username, password, nickname string) (*model.User, error)
+	loginFn          func(ctx context.Context, username, password, deviceType, deviceID string) (*service.LoginResponse, error)
+	refreshTokenFn   func(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error)
+	logoutFn         func(ctx context.Context, userID, deviceID string) error
+	getMeFn          func(ctx context.Context, userID string) (*model.User, error)
+	updateProfileFn  func(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error)
+	changePasswordFn func(ctx context.Context, userID, oldPassword, newPassword string) error
 }
 
 func (m *mockAuthService) Register(ctx context.Context, username, password, nickname string) (*model.User, error) {

@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -212,7 +213,7 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 		TriggeredByUserID: userID,
 		TriggerMessageID:  triggerMessageID,
 		Status:            model.TaskStatusQueued,
-		ExpireAt:          time.Now().Add(24 * time.Hour),
+		ExpireAt:          time.Now().Add(config.PendingTaskTTL),
 	}
 	if err := repository.CreatePendingTask(s.db, task); err != nil {
 		return nil, err
@@ -428,6 +429,7 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, taskID, finalContent 
 
 	return nil
 }
+
 // HandleTaskFail marks a task as failed.
 func (s *AgentService) HandleTaskFail(ctx context.Context, taskID, errMsg string) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)

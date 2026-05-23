@@ -3,10 +3,10 @@ package handler
 import (
 	"context"
 
-	"github.com/gin-gonic/gin"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/gin-gonic/gin"
 )
 
 // AuthService is the subset of *service.AuthService used by AuthHandler.

@@ -70,7 +70,7 @@ func TestMain(m *testing.M) {
 	authService := service.NewAuthService(db, cfg.JWT, cacheClient)
 	authHandler := handler.NewAuthHandler(authService)
 	deviceService := service.NewDeviceService(db)
-		deviceHandler := handler.NewDeviceHandler(deviceService)
+	deviceHandler := handler.NewDeviceHandler(deviceService)
 	contactService := service.NewContactService(db, bus, cacheClient)
 	contactHandler := handler.NewContactHandler(contactService)
 	sessionService := service.NewSessionService(db, cacheClient)

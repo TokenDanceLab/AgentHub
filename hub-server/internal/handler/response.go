@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/gin-gonic/gin"
 )
 
 type Response struct {
