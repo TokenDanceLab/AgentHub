@@ -26,7 +26,7 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 
 1. 先读本文件。
 2. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
-3. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.codex/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
+3. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
 4. 只读相关主文档章节：产品不清读 `docs/product-requirements.md`；边界不清读 `docs/system-architecture.md`；实现顺序不清读 `docs/implementation-guide.md`。
 5. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
 6. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
@@ -63,12 +63,12 @@ AgentHub 的开发工作流是“三个开发者，每个开发者可以带一�
 
 ### 仓库级 Skill
 
-- 仓库只提交白名单 skill：`.codex/skills/dev-loop/`。
-- 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）必须先读 `.codex/skills/dev-loop/SKILL.md`。
+- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`。
+- 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）必须先读 `.agents/skills/dev-loop/SKILL.md`。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
-- `.codex/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
+- `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
 - `docs/roadmap.md` 和 `docs/roadmaps/` 是持续开发台账，用来记录当前目标、方向任务、分支进展、验证和下一步；不要把详细方案写成第二套主文档。
-- 除白名单 skill 外，`.codex/` 的本机状态、缓存、会话记录和个人配置不得提交。
+- 除白名单 skill 外，`.agents/`、`.codex/`、`.claude/` 的本机状态、缓存、会话记录和个人配置不得提交。
 
 ## 3. 技术主线
 
@@ -143,7 +143,7 @@ Remote (6):
 
 合并方向：`feat/* → dev/maintainer → master`
 
-开发引擎：`.codex/skills/dev-loop/` — 模型分配(opus/sonnet/haiku) + 标准循环 + 交叉审查
+开发引擎：`.agents/skills/dev-loop/` — 模型分配(opus/sonnet/haiku) + 标准循环 + 交叉审查
 
 当前 P1 进度：P0 级 3/3 ✅ | P1 级 2/4（ThreadPanel/DiffViewer ✅, ChatView/AgentList ❌）
 
@@ -192,7 +192,7 @@ Remote (6):
 - 真实服务器 IP、内网地址、数据库连接串、生产账号、个人路径。
 - 生产数据库 dump、用户数据、聊天记录、日志中的敏感字段。
 - GitHub issue、PR、commit message 中也不要写上述内容。
-- 本机 Agent 记忆和运行状态，例如 `.agenthub/memory/`、`.claude/`、`.codex/`；仓库级 `.codex/skills/dev-loop/` 是唯一例外。
+- 本机 Agent 记忆和运行状态，例如 `.agenthub/memory/`、`.claude/`、`.codex/`、`.agents/`；仓库级 `.agents/skills/dev-loop/` 是唯一例外。
 
 执行规则：
 
