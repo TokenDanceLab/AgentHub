@@ -126,6 +126,29 @@ fix/short-topic
 
 `codex/` 是 Codex App 自动工作分支前缀，可以用于临时 PR。手工创建分支优先用 `feat/`、`fix/`、`docs/`。`master` 是稳定分支。实现、协议和结构调整走 PR；小文档修正可以直接提交，但不确定就走 PR。PR 标题也用 `type(scope): 中文摘要`。
 
+### 当前活跃分支 (2026-05-23)
+
+```
+dev/delicious233          ← 主 dev 分支（Delicious233）: Desktop M3 + Edge + 共享类型
+dev/trump                 ← Trump dev 分支（从 delicious233 切出）: Web 前端 + 同步 Desktop
+
+feat/desktop-sidecar      ← Desktop 工作区（Tauri + React）→ 合入 dev/delicious233
+feat/edge-adapters        ← Edge AgentAdapter 工作区 → 已合入 dev/delicious233
+feat/trump-webui          ← Trump Web 工作区 → 合入 dev/trump → 再合入 dev/delicious233
+
+feat/frontend-page-preview ← Trump 旧原型（归档，不再使用）
+feat/frontend-webui        ← Trump 旧原型（归档，不再使用）
+feat/backend-foundation    ← 后端预留
+```
+
+合并方向：`feat/* → dev/delicious233 → dev/trump → (review后) → dev/delicious233 → master`
+
+写死规则：
+- `dev/delicious233` 保持 Delicious233 的设计和代码风格
+- `dev/trump` 由 Delicious233 控制合入质量
+- `feat/trump-webui` 是帮 Trump 用正确工程方式落地的版本
+- 旧 `feat/frontend-*` 分支归档保留，不得继续开发
+
 进度同步：
 
 - 每个开发者至少在一天结束前 push 当前分支。
