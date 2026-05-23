@@ -205,3 +205,39 @@
   background: var(--border);
   text-transform: uppercase;
 }
+
+.cancelButton {
+  width: 100%;
+  padding: 6px 12px;
+  border: 1px solid var(--destructive);
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--destructive) 15%, transparent);
+  color: var(--destructive);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cancelButton:hover {
+  background: color-mix(in oklch, var(--destructive) 25%, transparent);
+}
+
+.usageRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.usageLabel {
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+  opacity: 0.6;
+}
+
+.usageValue {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}

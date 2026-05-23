@@ -13,12 +13,26 @@ interface ToolCallEntry {
   output?: string;
 }
 
+/** Extract input/output token counts from NDJSON or OpenCode usage payloads. */
+function extractTokens(
+  usage: Record<string, unknown> | undefined,
+): { input: number; output: number } | null {
+  if (!usage) return null;
+  const input = (usage.inputTokens ?? usage.input_tokens ?? usage.input) as number | undefined;
+  const output = (usage.outputTokens ?? usage.output_tokens ?? usage.output) as number | undefined;
+  if (input == null && output == null) return null;
+  return { input: Number(input ?? 0), output: Number(output ?? 0) };
+}
+
+type RunWithUsage = RunInfo & { usage?: Record<string, unknown> };
+
 interface Props {
-  run: RunInfo | null;
+  run: RunWithUsage | null;
   toolCalls: ToolCallEntry[];
   changedFiles: Array<{ path: string; action: string; timestamp: string }>;
   outputText: string;
   diffs?: FileDiff[];
+  onCancel?: () => void;
 }
 
 type TabId = 'output' | 'toolCalls' | 'fileChanges';
@@ -50,7 +64,7 @@ function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
   );
 }
 
-export default function RunDetail({ run, toolCalls, changedFiles, outputText, diffs }: Props) {
+export default function RunDetail({ run, toolCalls, changedFiles, outputText, diffs, onCancel }: Props) {
   const { t } = useTranslation();
 
   const defaultTab: TabId = outputText
@@ -113,6 +127,32 @@ export default function RunDetail({ run, toolCalls, changedFiles, outputText, di
         <span className={`${styles.status} ${statusClass}`}>{t(statusKey)}</span>
         {run.runId && <span className={styles.runId}>{run.runId.slice(0, 12)}</span>}
       </div>
+
+      {onCancel && run.status === 'running' && (
+        <div className={styles.section}>
+          <button className={styles.cancelButton} onClick={onCancel}>
+            {t('action.cancelRun')}
+          </button>
+        </div>
+      )}
+
+      {run.usage &&
+        (() => {
+          const tokens = extractTokens(run.usage!);
+          if (!tokens) return null;
+          return (
+            <div className={styles.section}>
+              <div className={styles.usageRow}>
+                <span className={styles.usageLabel}>Input</span>
+                <span className={styles.usageValue}>{tokens.input.toLocaleString()}</span>
+              </div>
+              <div className={styles.usageRow}>
+                <span className={styles.usageLabel}>Output</span>
+                <span className={styles.usageValue}>{tokens.output.toLocaleString()}</span>
+              </div>
+            </div>
+          );
+        })()}
 
       {hasAnyContent && (
         <>
