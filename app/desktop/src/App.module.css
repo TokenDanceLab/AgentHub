@@ -258,6 +258,49 @@
 
   .sidebarWrapper {
     max-width: 220px !important;
+    padding-left: env(safe-area-inset-left, 0);
+  }
+
+  /* Show compact toolbar at tablet (same bar as mobile) */
+  .mobileToolbar {
+    display: flex;
+  }
+
+  /* Backdrop visible when overlay panels are open at tablet */
+  .overlay {
+    display: block;
+  }
+}
+
+/* ── Agent overlay wrapper (tablet) ────────── */
+
+.agentOverlayWrapper {
+  display: none;
+}
+
+/* Tablet-only: agent panel slides in from the right as overlay */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .agentOverlayWrapper {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 44px; /* clear the toolbar */
+    right: 0;
+    bottom: 0;
+    z-index: calc(var(--z-overlay) + 1);
+    transform: translateX(100%);
+    transition: transform var(--duration-medium) var(--ease-out);
+    width: 300px;
+    max-width: 85vw;
+    background: var(--card);
+    border-left: 1px solid var(--border);
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.25);
+    overflow-y: auto;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .agentOverlayOpen {
+    transform: translateX(0);
   }
 }
 
