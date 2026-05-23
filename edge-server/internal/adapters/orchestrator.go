@@ -62,10 +62,14 @@ func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 	return parser.Parse(ctx, stdout)
 }
 
-// NeedsStdin returns false — the orchestrator delegates to Claude Code which
-// needs stdin, but the orchestrator adapter itself does NOT use stdin in its
-// ParseStream. The inner Claude Code adapter handles stdin independently.
-func (a *OrchestratorAdapter) NeedsStdin() bool { return false }
+// NeedsStdin returns true because the wrapped Claude Code adapter requires
+// stdin for the control protocol (permission requests, interrupts, etc.).
+func (a *OrchestratorAdapter) NeedsStdin() bool {
+	if a.inner != nil {
+		return a.inner.NeedsStdin()
+	}
+	return false
+}
 
 // DefaultOrchestratorPrompt returns the built-in orchestrator system prompt
 // instructing Claude Code how to coordinate multiple sub-agents.

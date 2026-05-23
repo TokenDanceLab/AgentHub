@@ -72,8 +72,8 @@ func TestResolveModelWithDefault(t *testing.T) {
 
 	// codex default
 	got = ResolveModelWithDefault("codex", "")
-	if got != "gpt-5.3-codex" {
-		t.Errorf("got %q, want gpt-5.3-codex (default)", got)
+	if got != "gpt-5.5" {
+		t.Errorf("got %q, want gpt-5.5 (default)", got)
 	}
 
 	// opencode default

@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.100.14",
     "@tauri-apps/api": "^2.5.0",
     "@tauri-apps/plugin-shell": "^2.2.0",
     "i18next": "^26.2.0",

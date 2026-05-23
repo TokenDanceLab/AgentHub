@@ -1,0 +1,164 @@
+package handler
+
+import (
+	"github.com/gin-gonic/gin"
+
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/service"
+)
+
+type AgentHandler struct {
+	service *service.AgentService
+}
+
+func NewAgentHandler(s *service.AgentService) *AgentHandler {
+	return &AgentHandler{service: s}
+}
+
+type addAgentReq struct {
+	AgentType     string `json:"agent_type" binding:"required"`
+	CustomAgentID string `json:"custom_agent_id,omitempty"`
+	DisplayName   string `json:"display_name" binding:"required"`
+}
+
+// AddAgentToSession POST /client/sessions/:id/agents
+func (h *AgentHandler) AddAgentToSession(c *gin.Context) {
+	var req addAgentReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	sessionID := c.Param("id")
+	if err := h.service.AddAgentToSession(c.Request.Context(), userID, sessionID, req.AgentType, req.CustomAgentID, req.DisplayName); err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, nil)
+}
+
+type triggerTaskReq struct {
+	TriggerMessageID string `json:"trigger_message_id" binding:"required"`
+}
+
+// TriggerTask POST /web/agent-tasks
+func (h *AgentHandler) TriggerTask(c *gin.Context) {
+	var req triggerTaskReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	task, err := h.service.TriggerAgentTask(c.Request.Context(), userID, req.TriggerMessageID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, task)
+}
+
+// CancelTask POST /web/agent-tasks/:id/cancel
+func (h *AgentHandler) CancelTask(c *gin.Context) {
+	userID := c.GetString("user_id")
+	taskID := c.Param("id")
+	if err := h.service.CancelTask(c.Request.Context(), userID, taskID); err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, nil)
+}
+
+// TaskAck POST /edge/agent-tasks/:id/ack
+func (h *AgentHandler) TaskAck(c *gin.Context) {
+	taskID := c.Param("id")
+	if err := h.service.HandleTaskAck(c.Request.Context(), taskID); err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, nil)
+}
+
+type taskStreamReq struct {
+	Content string `json:"content" binding:"required"`
+}
+
+// TaskStream POST /edge/agent-tasks/:id/stream
+func (h *AgentHandler) TaskStream(c *gin.Context) {
+	var req taskStreamReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	taskID := c.Param("id")
+	if err := h.service.HandleTaskStream(c.Request.Context(), taskID, req.Content); err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, nil)
+}
+
+type taskDoneReq struct {
+	FinalContent string `json:"final_content"`
+}
+
+// TaskDone POST /edge/agent-tasks/:id/done
+func (h *AgentHandler) TaskDone(c *gin.Context) {
+	var req taskDoneReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	taskID := c.Param("id")
+	if err := h.service.HandleTaskDone(c.Request.Context(), taskID, req.FinalContent); err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, nil)
+}
+
+type taskFailReq struct {
+	Error string `json:"error" binding:"required"`
+}
+
+// TaskFail POST /edge/agent-tasks/:id/fail
+func (h *AgentHandler) TaskFail(c *gin.Context) {
+	var req taskFailReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	taskID := c.Param("id")
+	if err := h.service.HandleTaskFail(c.Request.Context(), taskID, req.Error); err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, nil)
+}

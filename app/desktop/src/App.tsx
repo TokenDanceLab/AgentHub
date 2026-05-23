@@ -4,20 +4,26 @@ import { Menu, X, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile } from '@/hooks/useMediaQuery';
-import { startRun, cancelRun, fetchAgents, fetchThreads, fetchHealth } from '@/api/edgeClient';
+import { startRun, cancelRun, fetchAgents, fetchHealth, decidePermission as decidePermissionRest } from '@/api/edgeClient';
+import { useThreads } from '@/api/threadQueries';
 import type { AgentInfo, ThreadInfo, StartRunRequest } from '@shared/types';
 import type { ChatMessage } from '@/components/ChatView.types';
 import { useUIStore } from '@/stores/uiStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
 import { useRunStore } from '@/stores/runStore';
+import { useShallow } from 'zustand/shallow';
 import StatusBar from '@/components/StatusBar';
 import ThreadPanel from '@/components/ThreadPanel';
 import AgentList from '@/components/AgentList';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ResizeHandle from '@/components/ResizeHandle';
 import PromptInput from '@/components/PromptInput';
+import PermissionDialog from '@/components/PermissionDialog';
+import WelcomeScreen from '@/components/WelcomeScreen';
+import ShortcutHelp from '@/components/ShortcutHelp';
 import { SkeletonLine, SkeletonCircle } from '@/components/Skeleton';
+import { useToast } from '@/contexts/ToastContext';
 import styles from '@/App.module.css';
 
 // ── Lazy-loaded heavy components ──────────────
@@ -32,7 +38,7 @@ const MAX_RIGHT = 600;
 
 export default function App() {
   const { online, health } = useHealth();
-  const { messages, isConnected, currentRun } = useChatMessages(online);
+  const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online);
   const { t } = useTranslation();
   const isMobile = useIsMobile();
 
@@ -41,22 +47,47 @@ export default function App() {
   const [lastEdgeError, setLastEdgeError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const wasOnlineRef = useRef(false);
+  const { showToast } = useToast();
 
-  // Zustand stores
-  const sidebarWidth = useUIStore((s) => s.sidebarWidth);
-  const rightPanelWidth = useUIStore((s) => s.rightPanelWidth);
-  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
-  const setRightPanelWidth = useUIStore((s) => s.setRightPanelWidth);
-  const setOnline = useConnectionStore((s) => s.setOnline);
-  const setConnected = useConnectionStore((s) => s.setConnected);
-  const threads = useThreadStore((s) => s.threads);
-  const selectedThreadId = useThreadStore((s) => s.selectedThreadId);
-  const setThreads = useThreadStore((s) => s.setThreads);
-  const selectThread = useThreadStore((s) => s.selectThread);
-  const runStoreSetCurrentRun = useRunStore((s) => s.setCurrentRun);
-  const runStoreSetStreaming = useRunStore((s) => s.setIsStreaming);
-  const isStreaming = useRunStore((s) => s.isStreaming);
-  const runStoreClear = useRunStore((s) => s.clear);
+  // TanStack Query — replaces setInterval polling for threads
+  const { data: threadData } = useThreads();
+  const threads = threadData?.items ?? [];
+
+  // Zustand stores — batched with useShallow to minimize re-renders
+  const { sidebarWidth, rightPanelWidth, setSidebarWidth, setRightPanelWidth } = useUIStore(
+    useShallow((s) => ({
+      sidebarWidth: s.sidebarWidth,
+      rightPanelWidth: s.rightPanelWidth,
+      setSidebarWidth: s.setSidebarWidth,
+      setRightPanelWidth: s.setRightPanelWidth,
+    })),
+  );
+  const { setOnline, setConnected, wsLatency } = useConnectionStore(
+    useShallow((s) => ({
+      setOnline: s.setOnline,
+      setConnected: s.setConnected,
+      wsLatency: s.wsLatency,
+    })),
+  );
+  const { selectedThreadId, selectThread } = useThreadStore(
+    useShallow((s) => ({
+      selectedThreadId: s.selectedThreadId,
+      selectThread: s.selectThread,
+    })),
+  );
+  const {
+    setCurrentRun: runStoreSetCurrentRun,
+    setIsStreaming: runStoreSetStreaming,
+    isStreaming,
+    clear: runStoreClear,
+  } = useRunStore(
+    useShallow((s) => ({
+      isStreaming: s.isStreaming,
+      setCurrentRun: s.setCurrentRun,
+      setIsStreaming: s.setIsStreaming,
+      clear: s.clear,
+    })),
+  );
 
   // Local state (lightweight, not worth a store yet)
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -64,6 +95,7 @@ export default function App() {
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileRunDetailOpen, setMobileRunDetailOpen] = useState(false);
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
 
   // Search → scroll state
   const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
@@ -77,12 +109,20 @@ export default function App() {
     }
   }, [isMobile]);
 
-  // Escape key closes mobile overlays (keyboard accessibility)
+  // Escape key closes mobile overlays / modals; ? opens keyboard shortcut help
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't capture shortcuts when user is typing in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
+
       if (e.key === 'Escape') {
         setMobileSidebarOpen(false);
         setMobileRunDetailOpen(false);
+      }
+      if (e.key === '?' && !isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setShortcutHelpOpen((v) => !v);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -113,6 +153,17 @@ export default function App() {
     // Only react to online transitions; lastEdgeError is read inside via closure
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online]);
+
+  // Toast on Edge connect/disconnect transitions
+  const prevOnlineRef = useRef(false);
+  useEffect(() => {
+    if (online && !prevOnlineRef.current) {
+      showToast('success', t('toast.connected'));
+    } else if (!online && prevOnlineRef.current) {
+      showToast('warning', t('toast.disconnected'));
+    }
+    prevOnlineRef.current = online;
+  }, [online, showToast, t]);
 
   const handleRetryEdge = useCallback(async () => {
     setRetrying(true);
@@ -161,28 +212,24 @@ export default function App() {
     };
   }, [online]);
 
-  // Poll threads
+  // Toast when a new thread appears (detected via TanStack Query data changes)
+  const prevThreadIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!online) {
-      setThreads([]);
+    if (!online || threads.length === 0) {
+      prevThreadIdsRef.current = new Set();
       return;
     }
-    let active = true;
-    const poll = async () => {
-      try {
-        const res = await fetchThreads();
-        if (active) setThreads(res.items);
-      } catch {
-        /* Edge may not have threads yet */
+    const currentIds = new Set(threads.map((th) => th.threadId));
+    const wasInitial = prevThreadIdsRef.current.size === 0;
+    if (!wasInitial) {
+      for (const th of threads) {
+        if (!prevThreadIdsRef.current.has(th.threadId)) {
+          showToast('success', t('toast.threadCreated'));
+        }
       }
-    };
-    poll();
-    const id = setInterval(poll, 10000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, [online, setThreads]);
+    }
+    prevThreadIdsRef.current = currentIds;
+  }, [threads, online, showToast, t]);
 
   const selectedThread = threads.find((th) => th.threadId === selectedThreadId);
 
@@ -230,15 +277,6 @@ export default function App() {
     setScrollToMessageId(messageId);
   }, []);
 
-  const handleCreateThread = useCallback(async () => {
-    try {
-      const res = await fetchThreads();
-      setThreads(res.items);
-    } catch {
-      /* ignore */
-    }
-  }, [setThreads]);
-
   const handleSidebarResize = useCallback(
     (delta: number) =>
       setSidebarWidth(Math.min(MAX_SIDEBAR, Math.max(MIN_SIDEBAR, sidebarWidth + delta))),
@@ -264,7 +302,51 @@ export default function App() {
     [selectThread],
   );
 
+  // ── Permission gate ──
+  const handleDecidePermission = useCallback(
+    (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
+      // 1. Update local state and send via WebSocket
+      decidePermission(requestId, decision, reason);
+      // 2. Also notify Edge via REST (fallback if WebSocket send is not processed)
+      const runId = currentRun?.runId ?? '';
+      decidePermissionRest({ requestId, decision, reason, runId }).catch((e: unknown) => {
+        console.error('Failed to send permission decision via REST:', e);
+      });
+    },
+    [decidePermission, currentRun?.runId],
+  );
+
   const allMessages = [...userMessages, ...messages];
+
+  const handleRetry = useCallback((messageId: string) => {
+    const msg = allMessages.find((m) => m.id === messageId);
+    if (!msg) return;
+    const prompt = msg.blocks.find((b) => b.kind === 'text')?.content;
+    if (prompt) handleSend(prompt, selectedAgentId);
+  }, [allMessages, handleSend, selectedAgentId]);
+
+  const handleDelete = useCallback((messageId: string) => {
+    setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
+  }, []);
+
+  // ── Welcome screen callbacks ──
+  const handleWelcomeCreateThread = useCallback(() => {
+    // Focus the prompt input so the user can start typing
+    const textarea = document.querySelector<HTMLTextAreaElement>(
+      'textarea[placeholder*="Type a message"]',
+    );
+    if (textarea) {
+      textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => textarea.focus(), 150);
+    }
+  }, []);
+
+  const handleWelcomeSendMessage = useCallback(
+    (message: string) => {
+      handleSend(message);
+    },
+    [handleSend],
+  );
 
   // Scroll to a message when SearchDialog selects one
   useEffect(() => {
@@ -282,7 +364,7 @@ export default function App() {
 
   return (
     <div className={styles.root}>
-      <StatusBar online={online} health={health} isConnected={isConnected} error={lastEdgeError} />
+      <StatusBar online={online} health={health} isConnected={isConnected} error={lastEdgeError} wsLatency={wsLatency} />
 
       {!online && !bannerDismissed && (
         <div className={styles.banner} role="alert">
@@ -357,11 +439,9 @@ export default function App() {
           style={isMobile ? undefined : { width: sidebarWidth, flexShrink: 0 }}
         >
           <ThreadPanel
-            threads={threads}
             online={online}
             selectedId={selectedThreadId ?? undefined}
             onSelect={handleSelectThread}
-            onCreate={handleCreateThread}
           />
         </div>
 
@@ -399,6 +479,13 @@ export default function App() {
           )}
 
           <div ref={chatContainerRef} className={styles.chatWrapper}>
+            {allMessages.length === 0 && threads.length === 0 && isConnected ? (
+              <WelcomeScreen
+                online={isConnected}
+                onCreateThread={handleWelcomeCreateThread}
+                onSendMessage={handleWelcomeSendMessage}
+              />
+            ) : (
           <ErrorBoundary>
             {messages.length === 0 && isStreaming ? (
               <div className={styles.skeletonChat} aria-busy="true" aria-label="Generating response">
@@ -442,10 +529,11 @@ export default function App() {
                   </div>
                 }
               >
-                <ChatView messages={allMessages} isStreaming={isStreaming} />
+                <ChatView messages={allMessages} isStreaming={isStreaming} onRetry={handleRetry} onDelete={handleDelete} />
               </Suspense>
             )}
           </ErrorBoundary>
+            )}
           </div>
         </div>
 
@@ -478,6 +566,7 @@ export default function App() {
                 toolCalls={currentRun?.toolCalls ?? []}
                 changedFiles={currentRun?.changedFiles ?? []}
                 outputText={currentRun?.outputText ?? ''}
+                chatMessages={allMessages}
               />
             </Suspense>
           </ErrorBoundary>
@@ -492,10 +581,13 @@ export default function App() {
         isStreaming={isStreaming}
         onCancel={handleCancel}
         disabled={!online}
+        threadId={selectedThreadId ?? undefined}
       />
       <Suspense fallback={null}>
         <SearchDialog messages={allMessages} onSelect={handleSearchSelect} />
       </Suspense>
+      <PermissionDialog requests={permissionRequests} onDecide={handleDecidePermission} />
+      <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
     </div>
   );
 }
