@@ -4,7 +4,8 @@ import { Menu, X, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile } from '@/hooks/useMediaQuery';
-import { startRun, cancelRun, fetchAgents, fetchThreads, fetchHealth, decidePermission as decidePermissionRest } from '@/api/edgeClient';
+import { startRun, cancelRun, fetchAgents, fetchHealth, decidePermission as decidePermissionRest } from '@/api/edgeClient';
+import { useThreads } from '@/api/threadQueries';
 import type { AgentInfo, ThreadInfo, StartRunRequest } from '@shared/types';
 import type { ChatMessage } from '@/components/ChatView.types';
 import { useUIStore } from '@/stores/uiStore';
@@ -48,6 +49,10 @@ export default function App() {
   const wasOnlineRef = useRef(false);
   const { showToast } = useToast();
 
+  // TanStack Query — replaces setInterval polling for threads
+  const { data: threadData } = useThreads();
+  const threads = threadData?.items ?? [];
+
   // Zustand stores — batched with useShallow to minimize re-renders
   const { sidebarWidth, rightPanelWidth, setSidebarWidth, setRightPanelWidth } = useUIStore(
     useShallow((s) => ({
@@ -64,11 +69,9 @@ export default function App() {
       wsLatency: s.wsLatency,
     })),
   );
-  const { threads, selectedThreadId, setThreads, selectThread } = useThreadStore(
+  const { selectedThreadId, selectThread } = useThreadStore(
     useShallow((s) => ({
-      threads: s.threads,
       selectedThreadId: s.selectedThreadId,
-      setThreads: s.setThreads,
       selectThread: s.selectThread,
     })),
   );
@@ -209,30 +212,7 @@ export default function App() {
     };
   }, [online]);
 
-  // Poll threads
-  useEffect(() => {
-    if (!online) {
-      setThreads([]);
-      return;
-    }
-    let active = true;
-    const poll = async () => {
-      try {
-        const res = await fetchThreads();
-        if (active) setThreads(res.items);
-      } catch {
-        /* Edge may not have threads yet */
-      }
-    };
-    poll();
-    const id = setInterval(poll, 10000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, [online, setThreads]);
-
-  // Toast when a new thread appears (detected via polling)
+  // Toast when a new thread appears (detected via TanStack Query data changes)
   const prevThreadIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!online || threads.length === 0) {
@@ -296,15 +276,6 @@ export default function App() {
   const handleSearchSelect = useCallback((messageId: string) => {
     setScrollToMessageId(messageId);
   }, []);
-
-  const handleCreateThread = useCallback(async () => {
-    try {
-      const res = await fetchThreads();
-      setThreads(res.items);
-    } catch {
-      /* ignore */
-    }
-  }, [setThreads]);
 
   const handleSidebarResize = useCallback(
     (delta: number) =>
@@ -468,11 +439,9 @@ export default function App() {
           style={isMobile ? undefined : { width: sidebarWidth, flexShrink: 0 }}
         >
           <ThreadPanel
-            threads={threads}
             online={online}
             selectedId={selectedThreadId ?? undefined}
             onSelect={handleSelectThread}
-            onCreate={handleCreateThread}
           />
         </div>
 
