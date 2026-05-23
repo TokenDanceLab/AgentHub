@@ -16,10 +16,9 @@ var ModelAliases = map[string]map[string]string{
 	},
 	"opencode": {
 		// OpenCode uses provider/model format — aliases resolve the model part.
-		"sonnet": "anthropic/claude-sonnet-4-6",
-		"opus":   "anthropic/claude-opus-4-7",
-		"haiku":  "anthropic/claude-haiku-4-5",
-		"gpt-5":  "openai/gpt-5.3-codex",
+		"opus":   "newapi/deepseek-v4-pro",
+		"sonnet": "newapi/deepseek-v4-pro",
+		"haiku":  "newapi/deepseek-v4-pro",
 	},
 }
 
@@ -50,7 +49,7 @@ var ReasoningEfforts = map[string]map[string]string{
 var DefaultModels = map[string]string{
 	"claude-code":  "claude-sonnet-4-6",
 	"codex":        "gpt-5.3-codex",
-	"opencode":     "",
+	"opencode":     "newapi/deepseek-v4-pro",
 	"orchestrator": "claude-sonnet-4-6",
 }
 
