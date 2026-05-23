@@ -378,7 +378,7 @@ Hub 调度（远程）:
 - [x] QW-2: 草稿持久化（✅ M5 `useInputDraft.ts` 完成）
 - [x] QW-3: WebSocket 心跳（✅ M5 `eventClient.ts` 完成）
 - [x] QW-4: Zustand selector 粒度优化（✅ M5 `useShallow` 完成）
-- [ ] QW-5: Toast 反馈（新建 `Toast.tsx` 组件）
+- [x] QW-5: Toast 反馈（✅ M5 `Toast.tsx` + `toastStore.ts` Zustand 完成）
 
 ---
 
