@@ -51,11 +51,11 @@ feat/trump-webui          ← Web 前端（Trump）
 - [x] PromptInput: 多行 textarea + Stop 按钮（Enter发送/Shift+Enter换行）
 - [x] RunDetail: Cancel/Abort 按钮 + token 用量展示（haiku agent 实现）
 
-### P1 级（成熟聊天产品标配）
-- [x] ThreadPanel: 重命名/删除 + 消息/运行计数（sonnet agent 实现: inline edit + confirm delete + PATCH/DELETE API）
-- [x] DiffViewer: 单块 Accept/Reject 交互（haiku agent 实现: Check/X toggle + 透明度/删除线反馈）
-- [x] ChatView: 消息操作（复制/重试/删除）→ haiku agent 实现
-- [ ] AgentList: 搜索过滤 + 描述面板 + 标签 → haiku agent 进行中
+### P1 级（成熟聊天产品标配）✅ (全部完成 4/4)
+- [x] ThreadPanel: 重命名/删除 + 消息/运行计数（sonnet agent）
+- [x] DiffViewer: 单块 Accept/Reject 交互（haiku agent）
+- [x] ChatView: 消息操作 — 复制/重试/删除 hover 按钮（haiku agent）
+- [x] AgentList: 搜索过滤 + 描述 + 彩色能力标签 + 匹配高亮（haiku agent）
 
 ### P2 级（打磨）
 - [ ] PromptInput: 文件附件 + 斜杠命令 + 输入历史
