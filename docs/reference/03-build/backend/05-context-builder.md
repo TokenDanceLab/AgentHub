@@ -1,3 +1,5 @@
+> 状态: ⏳ 计划中 — Context Builder 未在 M1-M2 范围，待后续实现
+
 # AgentHub Context Builder -- Final Design
 
 > 基于 7 仓库深度对比（Kanna / LibreChat / Claude Code Viewer / OpenCode / ChatDev / design-eventstore-memory / design-protocol），为 AgentHub 的上下文引擎提供最终设计。

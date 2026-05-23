@@ -1,3 +1,5 @@
+> 状态: ✅ 已落地 — Go test/Vitest/Playwright/smoke 四层测试已覆盖 M1 核心链路
+
 # AgentHub 测试策略
 
 > 日期：2026-05-21

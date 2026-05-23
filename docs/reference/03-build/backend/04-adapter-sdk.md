@@ -1,3 +1,5 @@
+> 状态: ⏳ 计划中 — 真实 adapter 接入列入 M3，当前仅 mock 实现
+
 # AgentHub Adapter SDK——开发者指南
 
 > 生成日期：2026-05-21

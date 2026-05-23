@@ -1,3 +1,5 @@
+> 📦 已归档
+
 # REST JSON + WebSocket 协议迁移计划
 
 > 给后续执行 Agent / 同学使用：本计划只描述协议迁移步骤，不等同于最终协议文档。最终协议说明见 [protocol.md](protocol.md)，契约入口见 [../api/](../api/)。

@@ -1,3 +1,5 @@
+> 状态: 🔄 进行中 — 基础错误码在 API 层已使用，完整 37 ErrorCode 体系待实现
+
 # AgentHub 错误处理与用户反馈 UX 设计
 
 > 综合自：`opencode.md`（LLMErrorReason 10 变体 + RouteExecutor retry）、

@@ -1,3 +1,5 @@
+> 状态: 🔄 进行中 — 基础模块结构已建立 (edge-server/runner/hub-server)，持久化层 M2 推进中
+
 # AgentHub Go Services -- 完整工程化设计
 
 > 日期：2026-05-21

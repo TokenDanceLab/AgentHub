@@ -1,3 +1,5 @@
+> 状态: ⏳ 计划中 — workspace 管理列入 M4
+
 # AgentHub Workspace Lifecycle Design
 
 > 综合分析：OpenHands (SandboxService)、Kanna (AgentCoordinator)、OpenCode (WorkspaceAdapter)、

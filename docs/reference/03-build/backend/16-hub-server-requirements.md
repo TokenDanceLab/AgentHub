@@ -1,3 +1,5 @@
+> 状态: ⏳ 计划中 — Hub Server 为 P0 边界外，P2+ 实现
+
 # AgentHub Hub Server 需求文档
 
 > 本文来自 `origin/server—hub` 分支的 Hub Server 需求草案，已经迁移到统一的 reference 文档区。
