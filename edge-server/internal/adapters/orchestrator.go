@@ -56,20 +56,14 @@ func (a *OrchestratorAdapter) BuildCommand(ctx RunProcessContext) (string, []str
 }
 
 func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
-	// Same NDJSON parsing as Claude Code, with additional event interception
-	// for sub-agent spawning requests.
-	parser := NewNDJSONStreamParser(emitter, run)
-	return parser.Parse(ctx, stdout)
+	// Delegate to inner Claude Code adapter for proper NDJSON parsing with
+	// control handler (permission responses via stdin) and security hooks.
+	return a.inner.ParseStream(ctx, stdout, stdin, emitter, run)
 }
 
-// NeedsStdin returns true because the wrapped Claude Code adapter requires
-// stdin for the control protocol (permission requests, interrupts, etc.).
-func (a *OrchestratorAdapter) NeedsStdin() bool {
-	if a.inner != nil {
-		return a.inner.NeedsStdin()
-	}
-	return false
-}
+// NeedsStdin returns true — the orchestrator spawns Claude Code internally
+// which requires stdin for the control protocol (permission requests, interrupt).
+func (a *OrchestratorAdapter) NeedsStdin() bool { return true }
 
 // DefaultOrchestratorPrompt returns the built-in orchestrator system prompt
 // instructing Claude Code how to coordinate multiple sub-agents.
