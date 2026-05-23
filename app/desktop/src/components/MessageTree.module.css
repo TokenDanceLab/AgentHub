@@ -1,0 +1,66 @@
+.treeRoot {
+  display: flex;
+  flex-direction: column;
+}
+
+.treeNode {
+  display: flex;
+  flex-direction: column;
+}
+
+.treeRow {
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.treeIndent {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+}
+
+.treeSpacer {
+  display: inline-block;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.treeConnector {
+  display: inline-block;
+  width: 20px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Vertical line extending top to bottom */
+.treeConnector::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-color, #d1d5db);
+}
+
+/* Horizontal branch to this node */
+.treeConnector::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 1px;
+  background: var(--border-color, #d1d5db);
+}
+
+/* Last sibling: vertical line stops at the middle */
+.treeConnectorLast::before {
+  bottom: 50%;
+}
+
+.treeContent {
+  flex: 1;
+  min-width: 0;
+}
