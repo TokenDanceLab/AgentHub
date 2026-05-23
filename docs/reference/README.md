@@ -1,13 +1,14 @@
 # AgentHub 调研文档索引
 
-> 69 份文档，按"Agent 需要什么"分类。Agent 读文档路径：**Learn → Decide → Build → Plan**。
+> 按"Agent 需要什么"组织。Agent 路径：**Learn → Compare → Plan**。
 >
-> 当前入口：同学和评审先看三份主文档，Agent 需要细节时再进入本目录。
+> 当前入口：先看三份主文档，需要细节时进入本目录。
 >
 > - [产品需求文档](../product-requirements.md)
 > - [系统架构文档](../system-architecture.md)
 > - [功能实现文档](../implementation-guide.md)
 > - [API 契约](../../api/)
+> - [二次对比研究总报告](02-cross-comparison/00-synthesis.md) — **Start here for cross-project insights**
 
 ## 01-learn — 了解别人怎么做
 
