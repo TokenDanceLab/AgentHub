@@ -17,7 +17,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--duration-fast), border-color var(--duration-fast);
+  transition:
+    background var(--duration-fast),
+    border-color var(--duration-fast);
 }
 .btn:hover:not(:disabled) {
   background: var(--card);

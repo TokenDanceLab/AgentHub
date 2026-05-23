@@ -30,9 +30,7 @@ export function createEventStream(cursor?: string): StreamHandle {
 
   function connect() {
     if (closed) return;
-    const url = lastCursor
-      ? `${WS_URL}?cursor=${encodeURIComponent(lastCursor)}`
-      : WS_URL;
+    const url = lastCursor ? `${WS_URL}?cursor=${encodeURIComponent(lastCursor)}` : WS_URL;
 
     ws = new WebSocket(url);
 

@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os/exec"
-	"strings"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -16,26 +14,20 @@ import (
 // Protocol: NDJSON over stdout (each line a JSON message), stderr for diagnostics.
 type ClaudeCodeAdapter struct {
 	binaryPath     string
-	model          string
-	permissionMode string
+	model          string // default model (fallback when runCtx.Model is empty)
+	permissionMode string // default permission mode (fallback when runCtx.PermissionMode is empty)
 	maxTurns       int
-
-	// Session continuity
-	sessionID     string // specific session ID for --resume
-	continueLast  bool   // --continue (resume most recent session)
-	forkSession   bool   // --fork-session
-	includePartial bool  // --include-partial-messages for stream_event deltas
 }
 
 // NewClaudeCodeAdapter creates a Claude Code adapter.
 // binaryPath is the path to the claude executable.
-// model and permissionMode may be empty (CLI defaults will be used).
+// model and permissionMode serve as defaults when the run context does not specify them.
 func NewClaudeCodeAdapter(binaryPath, model, permissionMode string) *ClaudeCodeAdapter {
 	return &ClaudeCodeAdapter{
-		binaryPath:      binaryPath,
-		model:           model,
-		permissionMode:  permissionMode,
-		maxTurns:        50,
+		binaryPath:     binaryPath,
+		model:          model,
+		permissionMode: permissionMode,
+		maxTurns:       50,
 	}
 }
 
@@ -59,32 +51,6 @@ func (a *ClaudeCodeAdapter) Capabilities() AgentCapabilities {
 	}
 }
 
-// WithSession sets a specific session ID for --resume.
-func (a *ClaudeCodeAdapter) WithSession(sessionID, mode string, fork, includePartial bool) *ClaudeCodeAdapter {
-	if sessionID != "" {
-		a.sessionID = sessionID
-	}
-	if mode != "" {
-		a.permissionMode = mode
-	}
-	a.forkSession = fork
-	a.includePartial = includePartial
-	return a
-}
-
-// WithContinue enables --continue mode (resume most recent session).
-func (a *ClaudeCodeAdapter) WithContinue(fork bool) *ClaudeCodeAdapter {
-	a.continueLast = true
-	a.forkSession = fork
-	return a
-}
-
-// WithPartialMessages enables --include-partial-messages for stream_event deltas.
-func (a *ClaudeCodeAdapter) WithPartialMessages() *ClaudeCodeAdapter {
-	a.includePartial = true
-	return a
-}
-
 func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
 	prompt := ctx.Prompt
 	if prompt == "" {
@@ -98,17 +64,41 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 		fmt.Sprintf("--max-turns=%d", a.maxTurns),
 	}
 
+	// Model: runCtx override first, fallback to adapter default
 	if ctx.Model != "" {
 		args = append(args, "--model", ctx.Model)
 	} else if a.model != "" {
 		args = append(args, "--model", a.model)
 	}
 
-	if a.permissionMode != "" {
-		args = append(args, "--permission-mode", a.permissionMode)
+	// Permission mode: runCtx override first, fallback to adapter default
+	permMode := ctx.PermissionMode
+	if permMode == "" {
+		permMode = a.permissionMode
+	}
+	if permMode != "" {
+		args = append(args, "--permission-mode", permMode)
 	}
 
-	// Session continuity from run context overrides adapter defaults
+	// Reasoning effort & thinking budget
+	if ctx.ReasoningEffort != "" {
+		args = append(args, "--reasoning-effort", ctx.ReasoningEffort)
+	}
+	if ctx.MaxThinkingTokens > 0 {
+		args = append(args, "--max-thinking-tokens", fmt.Sprintf("%d", ctx.MaxThinkingTokens))
+	}
+
+	// Fast mode
+	if ctx.FastMode {
+		args = append(args, "--fast")
+	}
+
+	// Include partial stream_event deltas
+	if ctx.IncludePartial {
+		args = append(args, "--include-partial-messages")
+	}
+
+	// Session continuity from run context
 	if ctx.SessionID != "" {
 		args = append(args, "--resume", ctx.SessionID)
 	} else if ctx.ContinueLast {
@@ -116,21 +106,6 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	}
 	if ctx.ForkSession {
 		args = append(args, "--fork-session")
-	}
-
-	// Session continuity from adapter config (when not overridden by run context)
-	if ctx.SessionID == "" && !ctx.ContinueLast {
-		if a.sessionID != "" {
-			args = append(args, "--resume", a.sessionID)
-		} else if a.continueLast {
-			args = append(args, "--continue")
-		}
-	}
-	if !ctx.ForkSession && a.forkSession {
-		args = append(args, "--fork-session")
-	}
-	if a.includePartial {
-		args = append(args, "--include-partial-messages")
 	}
 
 	// Allow tool access to the working directory
@@ -154,20 +129,13 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 func (a *ClaudeCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
 	parser := NewNDJSONStreamParser(emitter, run)
 	if stdin != nil {
-		parser.WithControlHandler(&DefaultPermissionHandler{}, stdin)
+		parser.WithControlHandler(NewEventEmittingPermissionHandler(emitter), stdin)
 	}
+	// Wire security hooks into the parse pipeline (23-check safety validation).
+	parser.WithHooks(HookChain{NewSecurityHook()})
 	return parser.Parse(ctx, stdout)
 }
 
-// DetectClaudeVersion attempts to get the installed claude version.
-func DetectClaudeVersion(binaryPath string) string {
-	if binaryPath == "" {
-		binaryPath = "claude"
-	}
-	cmd := exec.Command(binaryPath, "--version")
-	out, err := cmd.Output()
-	if err != nil {
-		return "unknown"
-	}
-	return strings.TrimSpace(string(out))
-}
+// NeedsStdin returns true — Claude Code uses stdin for the control protocol
+// (interrupt, permission responses).
+func (a *ClaudeCodeAdapter) NeedsStdin() bool { return true }
