@@ -357,11 +357,11 @@ Hub 调度（远程）:
   - 参考：Multica TanStack Query+Zustand 分离模式，Roo-Code AgentLoopState
   - 实施详情：`docs/design/client-p0-architecture.md#p0-1`
 
-- [ ] **P0-2: 输入体验修复** `[4d]`
-  - 非受控输入迁移：`PromptInput.tsx` `useState` → `useRef + DOM`（0.5d 快赢）
-  - 草稿持久化：新建 `useInputDraft.ts`，localStorage 按 threadId 存储（0.5d 快赢）
-  - 工具调用循环检测：`useChatMessages.ts` 签名去重，3 次警告 5 次拦截
-  - 文件读取去重缓存：`Map<path, {readCount, mtime}>` 缓存
+- [x] **P0-2: 输入体验修复** `[4d]`
+  - ✅ 非受控输入迁移：`PromptInput.tsx` `useState` → `useRef + DOM`
+  - ✅ 草稿持久化：`useInputDraft.ts`，localStorage 按 threadId 存储
+  - ✅ 工具调用循环检测：`LoopDetector` 类，3 次警告 5 次自动取消
+  - ✅ 文件读取去重缓存：`FileReadCache` 类，path+mtime 键
 
 - [x] **P0-3: 连接健壮性** `[3d]`
   - ✅ WebSocket 心跳：10s ping/pong + 15s 超时检测（M5 `eventClient.ts`）
