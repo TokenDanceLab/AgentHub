@@ -15,11 +15,12 @@ import (
 )
 
 type SessionService struct {
-	db *gorm.DB
+	db          *gorm.DB
+	cacheClient *cache.Client
 }
 
-func NewSessionService(db *gorm.DB) *SessionService {
-	return &SessionService{db: db}
+func NewSessionService(db *gorm.DB, cacheClient *cache.Client) *SessionService {
+	return &SessionService{db: db, cacheClient: cacheClient}
 }
 
 type CreateSessionResponse struct {
@@ -80,7 +81,7 @@ func (s *SessionService) CreatePrivateSession(ctx context.Context, currentUserID
 		return nil, err
 	}
 
-	if err := cache.InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
+	if err := s.cacheClient.InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
 		slog.Warn("failed to init seq in redis", "session_id", session.ID, "error", err)
 	}
 
@@ -128,7 +129,7 @@ func (s *SessionService) CreateGroupSession(ctx context.Context, ownerUserID, na
 		return nil, err
 	}
 
-	if err := cache.InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
+	if err := s.cacheClient.InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
 		slog.Warn("failed to init seq in redis", "session_id", session.ID, "error", err)
 	}
 
@@ -235,7 +236,7 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 			return err
 		}
 	}
-	cache.Invalidate(ctx, "session:members:"+sessionID)
+	s.cacheClient.Invalidate(ctx, "session:members:"+sessionID)
 	return nil
 }
 
@@ -264,7 +265,7 @@ func (s *SessionService) RemoveGroupMember(ctx context.Context, currentUserID, s
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, targetUserID); err != nil {
 		return err
 	}
-	cache.Invalidate(ctx, "session:members:"+sessionID)
+	s.cacheClient.Invalidate(ctx, "session:members:"+sessionID)
 	return nil
 }
 
@@ -307,7 +308,7 @@ func (s *SessionService) LeaveGroup(ctx context.Context, currentUserID, sessionI
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID); err != nil {
 		return err
 	}
-	cache.Invalidate(ctx, "session:members:"+sessionID)
+	s.cacheClient.Invalidate(ctx, "session:members:"+sessionID)
 	return nil
 }
 
@@ -336,7 +337,7 @@ func (s *SessionService) TransferGroupOwnership(ctx context.Context, currentUser
 	if err := repository.TransferOwnership(s.db, sessionID, currentUserID, newOwnerID); err != nil {
 		return err
 	}
-	cache.Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
+	s.cacheClient.Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
 	return nil
 }
 
@@ -361,7 +362,7 @@ func (s *SessionService) DissolveGroup(ctx context.Context, currentUserID, sessi
 	if err := repository.UpdateSession(s.db, session); err != nil {
 		return err
 	}
-	cache.Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
+	s.cacheClient.Invalidate(ctx, "session:members:"+sessionID, "session:meta:"+sessionID)
 	return nil
 }
 
@@ -391,7 +392,7 @@ func (s *SessionService) UpdateGroupInfo(ctx context.Context, currentUserID, ses
 	if err := repository.UpdateSession(s.db, session); err != nil {
 		return err
 	}
-	cache.Invalidate(ctx, "session:meta:"+sessionID)
+	s.cacheClient.Invalidate(ctx, "session:meta:"+sessionID)
 	return nil
 }
 

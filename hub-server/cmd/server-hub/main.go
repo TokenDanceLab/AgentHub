@@ -66,6 +66,7 @@ func main() {
 		slog.Error("failed to init redis", "error", err)
 		os.Exit(1)
 	}
+	cacheClient := cache.NewClient(cache.RDB)
 
 	go func() {
 		ctx := context.Background()
@@ -124,7 +125,7 @@ func main() {
 			}
 		}
 	})
-	authService := service.NewAuthService(repository.DB)
+	authService := service.NewAuthService(repository.DB, cfg.JWT, cacheClient)
 	authHandler := handler.NewAuthHandler(authService)
 	deviceHandler := handler.NewDeviceHandler(repository.DB)
 
@@ -134,18 +135,18 @@ func main() {
 	notificationService := service.NewNotificationService(repository.DB, mgr)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 
-	attachmentService := service.NewAttachmentService(repository.DB)
+	attachmentService := service.NewAttachmentService(repository.DB, cfg.Upload)
 	attachmentHandler := handler.NewAttachmentHandler(attachmentService)
 
-	contactService := service.NewContactService(repository.DB, bus)
+	contactService := service.NewContactService(repository.DB, bus, cacheClient)
 	contactHandler := handler.NewContactHandler(contactService)
-	sessionService := service.NewSessionService(repository.DB)
+	sessionService := service.NewSessionService(repository.DB, cacheClient)
 	sessionHandler := handler.NewSessionHandler(sessionService)
 
-	messageService := service.NewMessageService(repository.DB, bus)
+	messageService := service.NewMessageService(repository.DB, bus, cacheClient)
 	messageHandler := handler.NewMessageHandler(messageService)
 
-	agentService := service.NewAgentService(repository.DB, bus, mgr)
+	agentService := service.NewAgentService(repository.DB, bus, mgr, cacheClient)
 	agentHandler := handler.NewAgentHandler(agentService)
 	customAgentHandler := handler.NewCustomAgentHandler(agentService)
 
@@ -335,14 +336,14 @@ func main() {
 				metrics.DBPoolInUse.Set(float64(stats.InUse))
 			}
 			metrics.WSConnections.Set(float64(mgr.Count()))
-			metrics.RedisPoolHits.Set(float64(cache.RDB.PoolStats().Hits))
+			metrics.RedisPoolHits.Set(float64(cacheClient.PoolStats().Hits))
 			metrics.EventBusQueueLen.Set(float64(bus.Running()))
 		}
 	}()
 
 	r := gin.New()
 	r.Use(gin.Recovery())
-	router.SetupRoutes(r, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler)
+	router.SetupRoutes(r, cfg.JWT.Secret, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Server.Port),

@@ -20,16 +20,17 @@ import (
 const maxPinsPerSession = 50
 
 type MessageService struct {
-	db  *gorm.DB
-	bus *Bus
+	db          *gorm.DB
+	bus         *Bus
+	cacheClient *cache.Client
 }
 
-func NewMessageService(db *gorm.DB, bus *Bus) *MessageService {
-	return &MessageService{db: db, bus: bus}
+func NewMessageService(db *gorm.DB, bus *Bus, cacheClient *cache.Client) *MessageService {
+	return &MessageService{db: db, bus: bus, cacheClient: cacheClient}
 }
 
 func (s *MessageService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
-	seq, err := cache.AllocateSeq(ctx, sessionID)
+	seq, err := s.cacheClient.AllocateSeq(ctx, sessionID)
 	if err == nil {
 		return seq, nil
 	}
