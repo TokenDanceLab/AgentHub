@@ -95,6 +95,8 @@ func (p *NDJSONStreamParser) parseLine(line []byte) {
 			p.emitAPIRetry(scope, &msg)
 		case "task_started":
 			p.emitTaskStarted(scope, &msg)
+		case "task_dispatched":
+			p.emitTaskDispatched(scope, &msg)
 		case "task_progress":
 			p.emitTaskProgress(scope, &msg)
 		case "task_notification":
@@ -320,6 +322,15 @@ func (p *NDJSONStreamParser) emitAPIRetry(scope map[string]any, msg *claudeSDKMe
 
 func (p *NDJSONStreamParser) emitTaskStarted(scope map[string]any, msg *claudeSDKMessage) {
 	p.emit(scope, BusEventTaskStarted, map[string]any{
+		"taskId":      msg.TaskID,
+		"toolUseId":   msg.ToolUseID,
+		"description": msg.TaskDescription,
+		"taskType":    msg.TaskType,
+	})
+}
+
+func (p *NDJSONStreamParser) emitTaskDispatched(scope map[string]any, msg *claudeSDKMessage) {
+	p.emit(scope, BusEventTaskDispatched, map[string]any{
 		"taskId":      msg.TaskID,
 		"toolUseId":   msg.ToolUseID,
 		"description": msg.TaskDescription,
