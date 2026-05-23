@@ -17,6 +17,7 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/store"
@@ -29,6 +30,7 @@ type Handler struct {
 	Store           store.Repository
 	Executor        lifecycle.RunExecutor
 	AdapterRegistry *adapters.Registry // nil if no agent adapters configured
+	Metrics         *metrics.EdgeMetrics
 }
 
 var upgrader = websocket.Upgrader{
@@ -114,10 +116,55 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
 		return
 	}
+	status := "ok"
+	checks := map[string]any{}
+
+	// Verify store is readable
+	repository := ensureStore(h)
+	if len(repository.ListProjects()) == 0 {
+		checks["store"] = map[string]any{"status": "degraded", "detail": "no projects found"}
+	} else {
+		checks["store"] = map[string]any{"status": "ok"}
+	}
+
+	// Verify runner registry
+	if len(h.Registry.List()) == 0 {
+		checks["runners"] = map[string]any{"status": "degraded", "detail": "no runners registered"}
+	} else {
+		checks["runners"] = map[string]any{"status": "ok"}
+	}
+
+	// Verify adapter registry (optional)
+	if h.AdapterRegistry != nil {
+		if len(h.AdapterRegistry.List()) == 0 {
+			checks["adapters"] = map[string]any{"status": "degraded", "detail": "no adapters registered"}
+		} else {
+			checks["adapters"] = map[string]any{"status": "ok"}
+		}
+	}
+
+	// Verify executor
+	if h.Executor == nil {
+		checks["executor"] = map[string]any{"status": "degraded", "detail": "no executor configured"}
+		status = "degraded"
+	} else {
+		checks["executor"] = map[string]any{"status": "ok"}
+	}
+
+	// Aggregate: overall is degraded if any check is degraded
+	for _, v := range checks {
+		if c, ok := v.(map[string]any); ok && c["status"] == "degraded" {
+			if status == "ok" {
+				status = "degraded"
+			}
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":  "ok",
+		"status":  status,
 		"version": "v1",
 		"edgeId":  "local",
+		"checks":  checks,
 	})
 }
 
@@ -378,7 +425,6 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
 	writeJSON(w, http.StatusAccepted, acceptedResponse(runToResponse(run)))
 }
 
@@ -425,6 +471,22 @@ func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 // GET /v1/events  (WebSocket)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// GET /v1/metrics  (Prometheus text format)
+// ---------------------------------------------------------------------------
+
+func (h *Handler) GetMetrics(w http.ResponseWriter, r *http.Request) {
+	if h.Metrics == nil {
+		writeJSON(w, http.StatusServiceUnavailable, errorResponse("not_configured", "metrics not configured"))
+		return
+	}
+	h.Metrics.Handler().ServeHTTP(w, r)
+}
+
+// ---------------------------------------------------------------------------
+// GET /v1/events  (WebSocket)
+// ---------------------------------------------------------------------------
+
 func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	// Parse cursor from query.
 	cursorStr := r.URL.Query().Get("cursor")
@@ -445,6 +507,11 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+
+	if h.Metrics != nil {
+		h.Metrics.RecordWSConnect()
+		defer h.Metrics.RecordWSDisconnect()
+	}
 
 	slog.Info("websocket connected", "cursor", cursor)
 
@@ -664,6 +731,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "not found"))
 	})
+	mux.HandleFunc("/v1/metrics", h.GetMetrics)
 	mux.HandleFunc("/v1/events", h.GetEvents)
 	mux.HandleFunc("/v1/permissions/decide", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
