@@ -88,24 +88,31 @@ func main() {
 	}
 }
 
+func getEnv(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return defaultVal
+}
+
 func buildConfig(args []string) (config, error) {
 	fs := flag.NewFlagSet("agenthub-edge", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 
 	cfg := config{}
-	fs.StringVar(&cfg.Addr, "addr", "127.0.0.1:3210", "listen address")
-	fs.StringVar(&cfg.StoreFile, "store-file", "", "JSON store snapshot file path")
-	fs.StringVar(&cfg.RunnerProfile, "runner-profile", "", "runner profile preset; supported: agenthub-runner-mock, claude-code, codex, opencode")
-	fs.StringVar(&cfg.RunnerCommand, "runner-command", "", "local process executable to run for each run; empty uses the built-in mock executor")
-	fs.StringVar(&cfg.RunnerWorkDir, "runner-workdir", "", "working directory for --runner-command; empty inherits the edge process working directory")
+	fs.StringVar(&cfg.Addr, "addr", getEnv("AGENTHUB_ADDR", "127.0.0.1:3210"), "listen address")
+	fs.StringVar(&cfg.StoreFile, "store-file", getEnv("AGENTHUB_STORE_FILE", ""), "JSON store snapshot file path")
+	fs.StringVar(&cfg.RunnerProfile, "runner-profile", getEnv("AGENTHUB_RUNNER_PROFILE", ""), "runner profile preset; supported: agenthub-runner-mock, claude-code, codex, opencode")
+	fs.StringVar(&cfg.RunnerCommand, "runner-command", getEnv("AGENTHUB_RUNNER_COMMAND", ""), "local process executable to run for each run; empty uses the built-in mock executor")
+	fs.StringVar(&cfg.RunnerWorkDir, "runner-workdir", getEnv("AGENTHUB_RUNNER_WORKDIR", ""), "working directory for --runner-command; empty inherits the edge process working directory")
 	fs.Var(&cfg.RunnerArgs, "runner-arg", "argument passed to --runner-command; may be repeated")
 	fs.Var(&cfg.RunnerEnv, "runner-env", "environment variable passed to --runner-command as KEY=VALUE; may be repeated")
 
-	fs.StringVar(&cfg.AgentDefault, "agent-default", "", "default agent adapter ID (claude-code, codex, opencode)")
-	fs.StringVar(&cfg.ClaudeCodePath, "claude-code-path", "claude", "path to claude binary")
-	fs.StringVar(&cfg.CodexPath, "codex-path", "codex", "path to codex binary")
-	fs.StringVar(&cfg.OpenCodePath, "opencode-path", "opencode", "path to opencode binary")
-	fs.StringVar(&cfg.AgentModel, "agent-model", "", "model override for the default agent (e.g. claude-sonnet-4-6)")
+	fs.StringVar(&cfg.AgentDefault, "agent-default", getEnv("AGENTHUB_AGENT_DEFAULT", ""), "default agent adapter ID (claude-code, codex, opencode)")
+	fs.StringVar(&cfg.ClaudeCodePath, "claude-code-path", getEnv("AGENTHUB_CLAUDE_CODE_PATH", "claude"), "path to claude binary")
+	fs.StringVar(&cfg.CodexPath, "codex-path", getEnv("AGENTHUB_CODEX_PATH", "codex"), "path to codex binary")
+	fs.StringVar(&cfg.OpenCodePath, "opencode-path", getEnv("AGENTHUB_OPENCODE_PATH", "opencode"), "path to opencode binary")
+	fs.StringVar(&cfg.AgentModel, "agent-model", getEnv("AGENTHUB_AGENT_MODEL", ""), "model override for the default agent (e.g. claude-sonnet-4-6)")
 
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
