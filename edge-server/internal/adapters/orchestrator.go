@@ -26,7 +26,7 @@ func NewOrchestratorAdapter(claudePath, model, systemPrompt string, subAgents []
 	_ = subAgents // reserved for future sub-agent dispatch interception
 	return &OrchestratorAdapter{
 		inner:        NewClaudeCodeAdapter(claudePath, model, "bypassPermissions"),
-		systemPrompt: systemPrompt,
+		systemPrompt: escapePromptLiteral(systemPrompt),
 	}
 }
 
@@ -92,9 +92,21 @@ Rules:
 `
 }
 
+// escapePromptLiteral escapes backticks and ${} sequences that could be
+// interpreted as template syntax by downstream prompt processing.
+func escapePromptLiteral(s string) string {
+	s = strings.ReplaceAll(s, "`", "\\`")
+	s = strings.ReplaceAll(s, "${", "\\${")
+	return s
+}
+
 func formatAgentList(agents []string) string {
 	if len(agents) == 0 {
 		return "none"
 	}
-	return strings.Join(agents, ", ")
+	escaped := make([]string, len(agents))
+	for i, a := range agents {
+		escaped[i] = escapePromptLiteral(a)
+	}
+	return strings.Join(escaped, ", ")
 }
