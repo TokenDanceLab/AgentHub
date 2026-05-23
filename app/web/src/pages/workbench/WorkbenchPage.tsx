@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
+import { mockRunners, mockRuns, mockThreads, MockEventStream, playRunLifecycle } from '@shared/index';
 
 type PanelMode = 'preview' | 'diff' | 'approval';
 type ApprovalStatus = 'idle' | 'review-requested' | 'handoff-staged' | 'approved';
@@ -8,7 +9,7 @@ type ConfirmationTone = 'info' | 'success' | 'warning';
 
 type Particle = {
   alpha: number;
-  hue: string;
+  hue: number;
   radius: number;
   vx: number;
   vy: number;
@@ -55,77 +56,33 @@ const panelLabels: PanelMode[] = ['preview', 'diff', 'approval'];
 
 const routeOptions = ['Preview verification', 'Diff validation', 'Approval handoff', 'Responsive sweep'];
 
-const initialAgents: AgentCard[] = [
-  {
-    id: 'workbench-worker',
-    initials: 'CW',
-    name: 'Workbench worker',
-    role: 'Refining layout, panel affordances, and visible local states',
-    status: 'Coding',
-    route: 'Preview verification',
-    paused: false,
-    progress: 72,
-  },
-  {
-    id: 'preview-tester',
-    initials: 'VT',
-    name: 'Preview tester',
-    role: 'Checking responsive scan paths and visual balance',
-    status: 'Visual QA',
-    route: 'Responsive sweep',
-    paused: false,
-    progress: 48,
-  },
-  {
-    id: 'coordinator',
-    initials: 'CR',
-    name: 'Coordinator',
-    role: 'Watching write scope, review readiness, and handoff notes',
-    status: 'Review',
-    route: 'Approval handoff',
-    paused: false,
-    progress: 86,
-  },
-];
+const initialAgents: AgentCard[] = mockRunners.map((runner, i) => ({
+  id: runner.id,
+  initials: runner.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2),
+  name: runner.name,
+  role: runner.capabilities ?? 'No capability info',
+  status: runner.status === 'online' ? 'Coding' : 'Offline',
+  route: routeOptions[i % routeOptions.length],
+  paused: runner.status === 'offline',
+  progress: runner.status === 'online' ? 50 + Math.floor(Math.random() * 45) : 0,
+}));
 
-const sessions = [
-  {
-    title: 'Workbench polish',
-    meta: 'UI worker and tester active',
-    status: 'Live',
-  },
-  {
-    title: 'Preview bridge',
-    meta: 'Waiting on interface notes',
-    status: 'Paused',
-  },
-  {
-    title: 'Approval queue',
-    meta: 'Ready for owner review',
-    status: '3 items',
-  },
-];
+const sessions = mockThreads.map((t) => ({
+  title: t.title ?? t.id,
+  meta: `Project ${t.projectId}`,
+  status: t.status === 'active' ? 'Live' : 'Archived',
+}));
 
-const initialActivity: ActivityItem[] = [
-  {
-    id: 'seed-ui-worker',
-    icon: 'design_services',
-    title: 'UI worker tightened the page hierarchy',
-    detail: 'Cards now separate navigation, conversation, and review work without stacking decorative containers inside each other.',
-  },
-  {
-    id: 'seed-contract',
-    icon: 'hub',
-    title: 'Coordinator pinned the page contract',
-    detail: 'No real API calls, no new package dependency, and all changes stay under the workbench page directory.',
-  },
-  {
-    id: 'seed-checks',
-    icon: 'rule',
-    title: 'Tester prepared review checks',
-    detail: 'Diff, preview, and approval affordances are visible at the same time as session progress.',
-  },
-];
+const initialActivity: ActivityItem[] = mockRuns.map((run, i) => ({
+  id: `mock-run-${run.runId}`,
+  icon: run.status === 'running' ? 'play_circle' : run.status === 'finished' ? 'check_circle' : 'schedule',
+  title: `Run ${run.runId.split('_').pop()} — ${run.status}`,
+  detail: run.status === 'running'
+    ? `Agent executing on thread ${run.threadId}`
+    : run.status === 'finished'
+      ? `Completed at ${run.finishedAt ?? 'unknown'}`
+      : `Queued on thread ${run.threadId}, waiting for runner`,
+}));
 
 const approvalCopy: Record<ApprovalStatus, { label: string; detail: string }> = {
   idle: {
@@ -167,10 +124,9 @@ const workbenchStyles = `
   color: var(--ink);
   font-family: "Hanken Grotesk", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background:
-    linear-gradient(135deg, rgba(247, 251, 255, 0.96), rgba(235, 242, 255, 0.92)),
-    linear-gradient(90deg, rgba(25, 103, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(0, 173, 199, 0.05) 1px, transparent 1px);
-  background-size: auto, 44px 44px, 44px 44px;
+    radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
+    radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.14), transparent 30%),
+    linear-gradient(135deg, #f7fbff, #edf6ff);
 }
 
 .wb-react *,
@@ -202,8 +158,8 @@ const workbenchStyles = `
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 18px;
   width: 100%;
   min-height: 100vh;
   padding: 18px;
@@ -229,14 +185,15 @@ const workbenchStyles = `
   display: flex;
   min-height: 0;
   flex-direction: column;
-  padding: 16px;
+  padding: 18px;
 }
 
 .wb-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 4px 2px 18px;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .wb-brand-mark,
@@ -244,30 +201,40 @@ const workbenchStyles = `
   display: grid;
   place-items: center;
   color: #fff;
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .wb-brand-mark {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--blue), var(--cyan) 58%, var(--purple));
-  box-shadow: 0 12px 24px rgba(25, 103, 255, 0.22);
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1769e8, #08a7cf);
+  box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
 }
 
-.wb-brand-title {
+.wb-brand h2 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.25;
+  color: #172033;
 }
 
-.wb-brand-subtitle,
-.wb-section-label {
-  margin: 2px 0 0;
-  color: var(--muted);
-  font-size: 12px;
+.wb-title .wb-brand-sub {
+  margin: 0;
+  color: #667085;
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
+  line-height: normal;
+}
+
+.wb-section-label {
+  margin: 4px 0 0;
+  color: #667085;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
 }
 
@@ -1050,11 +1017,11 @@ function useWorkbenchParticles(canvasRef: RefObject<HTMLCanvasElement | null>) {
         particles.push({
           x: Math.random() * width,
           y: Math.random() * height,
-          radius: 1.2 + Math.random() * 2.2,
-          vx: (Math.random() - 0.5) * 0.18,
-          vy: -0.1 - Math.random() * 0.32,
-          hue: Math.random() > 0.48 ? '0, 173, 199' : '25, 103, 255',
-          alpha: 0.18 + Math.random() * 0.22,
+          radius: 1.6 + Math.random() * 2.6,
+          vx: -0.18 + Math.random() * 0.36,
+          vy: -0.18 - Math.random() * 0.48,
+          hue: index % 3 === 0 ? 196 : 210,
+          alpha: 0.18 + Math.random() * 0.2,
         });
       }
     };
@@ -1066,21 +1033,21 @@ function useWorkbenchParticles(canvasRef: RefObject<HTMLCanvasElement | null>) {
         particle.x += particle.vx;
         particle.y += particle.vy;
 
-        if (particle.y < -18) {
-          particle.y = height + 18;
+        if (particle.y < -16) {
+          particle.y = height + 16;
           particle.x = Math.random() * width;
         }
 
-        if (particle.x < -18) {
-          particle.x = width + 18;
+        if (particle.x < -16) {
+          particle.x = width + 16;
         }
 
-        if (particle.x > width + 18) {
-          particle.x = -18;
+        if (particle.x > width + 16) {
+          particle.x = -16;
         }
 
         context.beginPath();
-        context.fillStyle = `rgba(${particle.hue},${particle.alpha})`;
+        context.fillStyle = `hsla(${particle.hue}, 84%, 48%, ${particle.alpha})`;
         context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
         context.fill();
 
@@ -1090,9 +1057,9 @@ function useWorkbenchParticles(canvasRef: RefObject<HTMLCanvasElement | null>) {
           const dy = particle.y - nextParticle.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
 
-          if (distance < 118) {
+          if (distance < 126) {
             context.beginPath();
-            context.strokeStyle = `rgba(25, 103, 255,${0.055 * (1 - distance / 118)})`;
+            context.strokeStyle = `rgba(23, 105, 232, ${(1 - distance / 126) * 0.07})`;
             context.lineWidth = 1;
             context.moveTo(particle.x, particle.y);
             context.lineTo(nextParticle.x, nextParticle.y);
@@ -1339,7 +1306,7 @@ export function WorkbenchPageInteractive() {
       title: agents[0]?.paused ? 'Resume workbench worker' : 'Pause workbench worker',
       description: 'Toggles the primary agent card between active and paused.',
       shortcut: 'P',
-      run: () => toggleAgentPause('workbench-worker'),
+      run: () => toggleAgentPause(agents[0]?.id ?? ''),
     },
   ], [agents, hasApproved, openDiffPanel, rerouteAgent, requestReview, stageHandoff, toggleAgentPause]);
 
@@ -1372,6 +1339,29 @@ export function WorkbenchPageInteractive() {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [closeCommandPanel, isCommandOpen]);
+
+  // Mock event stream — drives activity feed with simulated runner events.
+  useEffect(() => {
+    const stream = new MockEventStream();
+    const unsub = stream.on((event) => {
+      pushActivity(
+        event.type.includes('output') ? 'terminal' :
+        event.type.includes('finished') ? 'check_circle' :
+        event.type.includes('failed') ? 'error' :
+        event.type.includes('started') ? 'play_circle' :
+        event.type.includes('queued') ? 'schedule' : 'info',
+        event.type,
+        typeof event.payload === 'object' && event.payload && 'text' in event.payload
+          ? String((event.payload as Record<string, unknown>).text).trim().slice(0, 100) || '(binary output)'
+          : JSON.stringify(event.payload).slice(0, 100),
+      );
+    });
+    playRunLifecycle(stream, { stepDelayMs: 800 });
+    return () => {
+      stream.destroy();
+      unsub();
+    };
+  }, [pushActivity]);
 
   const panelContent = useMemo(() => {
     if (activePanel === 'preview') {
@@ -1546,10 +1536,10 @@ export function WorkbenchPageInteractive() {
       <div className="wb-shell">
         <aside className="wb-sidebar wb-glass" aria-label="Workbench navigation">
           <div className="wb-brand">
-            <div className="wb-brand-mark">AH</div>
-            <div>
-              <h1 className="wb-brand-title">AgentHub</h1>
-              <p className="wb-brand-subtitle">Workbench</p>
+            <span className="wb-brand-mark">AH</span>
+            <div className="wb-title">
+              <h2>AGENTHUB</h2>
+              <p className="wb-brand-sub">Workbench</p>
             </div>
           </div>
 

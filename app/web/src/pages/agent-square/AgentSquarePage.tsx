@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { mockRunners } from '@shared/index';
 
 type AgentCategory = 'Engineering' | 'Design' | 'Operations' | 'Research';
 
@@ -126,12 +127,27 @@ const agents: Agent[] = [
     updatedDaysAgo: 8,
     outputs: ['Release checklist', 'Changelog draft', 'Merge summary'],
   },
+  ...mockRunners.map((runner) => ({
+    id: runner.id,
+    name: runner.name,
+    category: 'Engineering' as AgentCategory,
+    icon: runner.status === 'online' ? 'memory' : 'cloud_off',
+    tone: (runner.status === 'online' ? 'cyan' : 'purple') as Agent['tone'],
+    summary: runner.capabilities ?? 'Local runner agent',
+    description: `Runner ${runner.name} — status: ${runner.status}. Capabilities: ${runner.capabilities ?? 'unknown'}.`,
+    tags: [runner.status, ...(runner.capabilities?.split(',') ?? [])],
+    installs: runner.status === 'online' ? 5200 : 800,
+    favoriteCount: runner.status === 'online' ? 340 : 45,
+    rating: runner.status === 'online' ? 4.5 : 3.2,
+    updatedDaysAgo: runner.status === 'online' ? 1 : 12,
+    outputs: ['Run execution', 'Output streaming', 'File artifacts'],
+  })),
 ];
 
 const categories: Array<AgentCategory | 'All'> = ['All', 'Engineering', 'Design', 'Operations', 'Research'];
 
-const initialFavoriteIds = new Set<string>(['refactor']);
-const initialInstalledIds = new Set<string>(['refactor']);
+const initialFavoriteIds = new Set<string>(['refactor', mockRunners[0]?.id].filter(Boolean) as string[]);
+const initialInstalledIds = new Set<string>(['refactor', mockRunners[0]?.id, mockRunners[1]?.id].filter(Boolean) as string[]);
 const workspaceLimit = 8;
 
 const sortLabels: Record<SortMode, string> = {
@@ -181,11 +197,11 @@ function ParticleCanvas() {
     let particles: Particle[] = [];
 
     const createParticle = (index: number): Particle => ({
-      alpha: 0.16 + Math.random() * 0.18,
-      hue: index % 2 === 0 ? 196 : 211,
-      radius: 1.4 + Math.random() * 2.4,
-      velocityX: -0.16 + Math.random() * 0.32,
-      velocityY: -0.14 - Math.random() * 0.42,
+      alpha: 0.18 + Math.random() * 0.2,
+      hue: index % 3 === 0 ? 196 : 210,
+      radius: 1.6 + Math.random() * 2.6,
+      velocityX: -0.18 + Math.random() * 0.36,
+      velocityY: -0.18 - Math.random() * 0.48,
       x: Math.random() * width,
       y: Math.random() * height,
     });
@@ -234,9 +250,9 @@ function ParticleCanvas() {
           const dy = particle.y - nextParticle.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
 
-          if (distance < 124) {
+          if (distance < 126) {
             context.beginPath();
-            context.strokeStyle = `rgba(23, 105, 232, ${(1 - distance / 124) * 0.06})`;
+            context.strokeStyle = `rgba(23, 105, 232, ${(1 - distance / 126) * 0.07})`;
             context.lineWidth = 1;
             context.moveTo(particle.x, particle.y);
             context.lineTo(nextParticle.x, nextParticle.y);
@@ -449,12 +465,10 @@ export function AgentSquarePageInteractive() {
         <div className="asr-workspace">
           <aside className="asr-sidebar asr-glass">
             <div className="asr-brand">
-              <div className="asr-brand-mark">
-                <span className="material-symbols-outlined">hub</span>
-              </div>
-              <div className="asr-truncate">
-                <p className="asr-label asr-muted">AgentHub</p>
-                <h2>Agent Square</h2>
+              <span className="asr-brand-mark">AH</span>
+              <div className="asr-truncate asr-title">
+                <h2>AGENTHUB</h2>
+                <p className="asr-brand-sub">Agent Square</p>
               </div>
             </div>
 
@@ -849,7 +863,7 @@ const styles = `
     --asr-bg: #edf6ff;
     --asr-bg-soft: #f7fbff;
     --asr-ink: #172033;
-    --asr-muted: #5f6f86;
+    --asr-muted: #667085;
     --asr-line: rgba(133, 153, 184, 0.22);
     --asr-blue: #1769e8;
     --asr-cyan: #08a7cf;
@@ -861,9 +875,9 @@ const styles = `
     min-height: 100vh;
     color: var(--asr-ink);
     background:
-      radial-gradient(circle at 14% 10%, rgba(8, 167, 207, 0.16), transparent 28%),
-      radial-gradient(circle at 78% 4%, rgba(116, 87, 232, 0.14), transparent 30%),
-      linear-gradient(135deg, var(--asr-bg-soft), var(--asr-bg));
+      radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
+      radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.14), transparent 30%),
+      linear-gradient(135deg, #f7fbff, #edf6ff);
     font-family: "Hanken Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     overflow: hidden;
   }
@@ -901,10 +915,11 @@ const styles = `
     letter-spacing: 0;
   }
 
-  .asr-root h2 {
-    font-size: 16px;
+  .asr-title h2 {
+    margin: 0;
+    font-size: 15px;
     line-height: 1.25;
-    letter-spacing: 0;
+    color: #172033;
   }
 
   .asr-root h3 {
@@ -926,16 +941,15 @@ const styles = `
     position: relative;
     z-index: 1;
     height: 100vh;
-    padding: 22px;
+    padding: 18px;
   }
 
   .asr-workspace {
     display: grid;
-    grid-template-columns: 232px minmax(0, 1fr) 316px;
+    grid-template-columns: 280px minmax(0, 1fr) 316px;
     gap: 18px;
-    max-width: 1440px;
     height: calc(100vh - 44px);
-    margin: 0 auto;
+    width: 100%;
   }
 
   .asr-glass {
@@ -987,8 +1001,18 @@ const styles = `
     font-size: 11px;
     font-weight: 800;
     line-height: 1.2;
-    letter-spacing: 0;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
+    margin: 0 0 4px;
+  }
+
+  .asr-title .asr-brand-sub {
+    margin: 0;
+    color: var(--asr-muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    line-height: 1.236;
   }
 
   .asr-root .material-symbols-outlined {
@@ -1020,7 +1044,8 @@ const styles = `
 
   .asr-brand {
     padding-bottom: 14px;
-    border-bottom: 1px solid var(--asr-line);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    gap: 10px;
   }
 
   .asr-section-head,
@@ -1043,7 +1068,11 @@ const styles = `
   .asr-brand-mark {
     width: 38px;
     height: 38px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
     color: #fff;
+    font-weight: 900;
     border-radius: 10px;
     background: linear-gradient(135deg, var(--asr-blue), var(--asr-cyan));
     box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
