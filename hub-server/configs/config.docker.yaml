@@ -1,0 +1,21 @@
+server:
+  port: 8080
+  log_level: info
+db:
+  host: postgres
+  port: 5432
+  user: agenthub
+  password: dev_password
+  name: agenthub
+redis:
+  host: redis
+  port: 6379
+  password: ""
+  db: 0
+jwt:
+  secret: dev-secret-change-in-production
+  access_ttl: 15m
+  refresh_ttl: 720h
+upload:
+  dir: ./uploads
+  max_size: 10485760

@@ -1,0 +1,2 @@
+ALTER TABLE messages DROP CONSTRAINT IF EXISTS fk_messages_reply_to;
+DROP TABLE IF EXISTS messages CASCADE;
