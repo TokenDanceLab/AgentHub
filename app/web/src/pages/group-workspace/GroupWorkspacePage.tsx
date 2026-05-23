@@ -233,6 +233,7 @@ const styles = `
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.09em;
+  line-height: 1.236;
 }
 
 .gwr-title h1 {
