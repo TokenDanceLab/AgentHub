@@ -66,7 +66,7 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 
 	// Model: runCtx override first, fallback to adapter default
 	if ctx.Model != "" {
-		args = append(args, "--model", ctx.Model)
+		args = append(args, "--model", ResolveModel("claude-code", ctx.Model))
 	} else if a.model != "" {
 		args = append(args, "--model", a.model)
 	}
