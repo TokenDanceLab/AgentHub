@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
@@ -21,10 +22,11 @@ import (
 
 // Handler holds dependencies for HTTP and WebSocket handlers.
 type Handler struct {
-	Bus      *events.Bus
-	Registry *runners.Registry
-	Store    store.Repository
-	Executor lifecycle.RunExecutor
+	Bus             *events.Bus
+	Registry        *runners.Registry
+	Store           store.Repository
+	Executor        lifecycle.RunExecutor
+	AdapterRegistry *adapters.Registry // nil if no agent adapters configured
 }
 
 var upgrader = websocket.Upgrader{

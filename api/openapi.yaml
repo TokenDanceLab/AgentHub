@@ -366,6 +366,27 @@ paths:
       x-agenthub-owner: Edge
       responses:
         "200":
+          description: Runner list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListResponse"
+
+  /v1/agents:
+    get:
+      tags: [ExecutionRunner]
+      operationId: listAgents
+      summary: List available agent adapters.
+      x-agenthub-phase: P0
+      x-agenthub-owner: Edge
+      responses:
+        "200":
+          description: Agent adapter list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListResponse"
+        "200":
           $ref: "#/components/responses/List"
 
   /v1/runners/{runnerId}:
@@ -1291,6 +1312,38 @@ components:
         threadId:
           type: string
           description: Thread to bind the run to. Defaults to the local thread in P0 compatibility mode.
+        prompt:
+          type: string
+          description: User message or task description passed to the agent.
+        agentId:
+          type: string
+          description: Agent adapter ID (claude-code, codex, opencode, orchestrator). Defaults to the server's --agent-default.
+        model:
+          type: string
+          description: Model override for this run (e.g. claude-sonnet-4-6).
+    AgentInfo:
+      type: object
+      required: [id, name, status]
+      properties:
+        id:
+          type: string
+          description: Agent adapter ID.
+        name:
+          type: string
+          description: Display name.
+        description:
+          type: string
+          description: Human-readable description.
+        version:
+          type: string
+          description: CLI version if detected.
+        status:
+          type: string
+          description: '"available" if the agent CLI is configured and reachable.'
+        capabilities:
+          type: object
+          additionalProperties: true
+          description: Capability flags (streaming, toolCalls, fileChanges, etc.).
     CreateThreadMessageRequest:
       type: object
       required: [content]

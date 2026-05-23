@@ -136,6 +136,14 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `preview.stopped` | P1 | 预览停止 |
 | `run.finished` | P0 | AgentRun 正常结束 |
 | `run.failed` | P0 | AgentRun 失败 |
+| `run.agent.text_delta` | P0 | Agent 流式文本增量（CLI-agnostic） |
+| `run.agent.text_block` | P0 | Agent 完整文本块 |
+| `run.agent.thinking` | P0 | Agent 思考/推理内容（可折叠显示） |
+| `run.agent.tool_call` | P0 | Agent 请求工具调用 |
+| `run.agent.tool_result` | P0 | 工具调用执行结果 |
+| `run.agent.file_change` | P0 | 文件变更（创建/修改/删除 + diff） |
+| `run.agent.session_init` | P0 | Agent 会话初始化（模型、工具列表、权限模式） |
+| `run.agent.result` | P0 | Agent 执行结束（成功/失败、token 用量） |
 
 ### Hub / Sync / Relay
 
