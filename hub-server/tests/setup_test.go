@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,15 +13,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/agenthub/server-hub/internal/cache"
-	"github.com/agenthub/server-hub/internal/config"
-	"github.com/agenthub/server-hub/internal/handler"
-	"github.com/agenthub/server-hub/internal/log"
-	"github.com/agenthub/server-hub/internal/metrics"
-	"github.com/agenthub/server-hub/internal/repository"
-	"github.com/agenthub/server-hub/internal/router"
-	"github.com/agenthub/server-hub/internal/service"
-	"github.com/agenthub/server-hub/internal/ws"
+	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/handler"
+	"github.com/agenthub/hub-server/internal/log"
+	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/router"
+	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/ws"
 )
 
 var (
@@ -31,6 +32,13 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	flag.Parse()
+	// -short skips integration tests that need PostgreSQL/Redis.
+	// CI and local dev use -short for fast feedback without external services.
+	if testing.Short() {
+		os.Exit(0)
+	}
+
 	gin.SetMode(gin.TestMode)
 	metrics.Register()
 
