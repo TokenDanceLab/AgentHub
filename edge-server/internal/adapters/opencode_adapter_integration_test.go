@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/agenthub/edge-server/internal/runnerctx"
@@ -47,7 +48,7 @@ func TestOpenCodeIntegrationBasicPrompt(t *testing.T) {
 	}
 	_ = cmd.Wait()
 
-	// Verify event sequence: step_start → text → step_finish
+	// Verify event sequence: step_start -> text -> step_finish
 	textEvents := emitter.eventsOfType(BusEventTextDelta)
 	resultEvents := emitter.eventsOfType(BusEventResult)
 	stateEvents := emitter.eventsOfType(BusEventSessionStateChanged)
@@ -209,4 +210,169 @@ func TestOpenCodeBuildCommandArgs(t *testing.T) {
 			t.Error("--fork not in args")
 		}
 	})
+}
+
+// parseOpenCodeLines feeds JSON lines through the adapter's ParseStream for unit testing.
+func parseOpenCodeLines(t *testing.T, input string) *mockEmitter {
+	t.Helper()
+	adapter := NewOpenCodeAdapter("opencode")
+	emitter := &mockEmitter{}
+	run := store.Run{ID: "run_test", ProjectID: "proj_test", ThreadID: "thread_test", Status: "started"}
+	ctx := context.Background()
+	if err := adapter.ParseStream(ctx, strings.NewReader(input), nil, emitter, run); err != nil {
+		t.Fatalf("ParseStream failed: %v", err)
+	}
+	return emitter
+}
+
+func TestOpenCodeToolResultEvent(t *testing.T) {
+	input := `{"type":"tool_result","part":{"type":"tool-result","callID":"call_1","toolName":"Read","output":"file contents","status":"completed"}}`
+	emitter := parseOpenCodeLines(t, input)
+
+	events := emitter.eventsOfType(BusEventToolResult)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 tool_result event, got %d", len(events))
+	}
+	if events[0].Payload["callId"] != "call_1" {
+		t.Errorf("callId = %v", events[0].Payload["callId"])
+	}
+	if events[0].Payload["toolName"] != "Read" {
+		t.Errorf("toolName = %v", events[0].Payload["toolName"])
+	}
+	if events[0].Payload["status"] != "completed" {
+		t.Errorf("status = %v", events[0].Payload["status"])
+	}
+}
+
+func TestOpenCodeToolResultTriggersFileChange(t *testing.T) {
+	input := `{"type":"tool_result","part":{"type":"tool-result","callID":"call_2","toolName":"Write","output":"ok","status":"completed"}}`
+	emitter := parseOpenCodeLines(t, input)
+
+	toolResults := emitter.eventsOfType(BusEventToolResult)
+	if len(toolResults) != 1 {
+		t.Fatalf("expected 1 tool_result, got %d", len(toolResults))
+	}
+
+	fileChanges := emitter.eventsOfType(BusEventFileChange)
+	if len(fileChanges) != 1 {
+		t.Fatalf("expected 1 file_change for Write tool, got %d", len(fileChanges))
+	}
+	if fileChanges[0].Payload["toolName"] != "Write" {
+		t.Errorf("toolName = %v", fileChanges[0].Payload["toolName"])
+	}
+}
+
+func TestOpenCodePermissionEvent(t *testing.T) {
+	input := `{"type":"permission","part":{"type":"permission","toolName":"Bash","toolInput":{"command":"rm -rf /"}}}`
+	emitter := parseOpenCodeLines(t, input)
+
+	events := emitter.eventsOfType(BusEventStatusChange)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 status_change event, got %d", len(events))
+	}
+	if events[0].Payload["permissionMode"] != "ask" {
+		t.Errorf("permissionMode = %v", events[0].Payload["permissionMode"])
+	}
+	if events[0].Payload["permissionTool"] != "Bash" {
+		t.Errorf("permissionTool = %v", events[0].Payload["permissionTool"])
+	}
+}
+
+func TestOpenCodeFileEvent(t *testing.T) {
+	input := `{"type":"file","part":{"type":"file","path":"/tmp/test.txt","operation":"write"}}`
+	emitter := parseOpenCodeLines(t, input)
+
+	events := emitter.eventsOfType(BusEventFileChange)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 file_change event, got %d", len(events))
+	}
+	if events[0].Payload["path"] != "/tmp/test.txt" {
+		t.Errorf("path = %v", events[0].Payload["path"])
+	}
+	if events[0].Payload["operation"] != "write" {
+		t.Errorf("operation = %v", events[0].Payload["operation"])
+	}
+}
+
+func TestOpenCodeSessionInitEvent(t *testing.T) {
+	input := `{"type":"session.init","sessionID":"ses_abc","model":"anthropic/claude-sonnet-4-6","provider":"anthropic","tools":["Read","Write","Bash","Glob","Grep"]}`
+	emitter := parseOpenCodeLines(t, input)
+
+	events := emitter.eventsOfType(BusEventSessionInit)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 session_init event, got %d", len(events))
+	}
+	if events[0].Payload["sessionId"] != "ses_abc" {
+		t.Errorf("sessionId = %v", events[0].Payload["sessionId"])
+	}
+	if events[0].Payload["model"] != "anthropic/claude-sonnet-4-6" {
+		t.Errorf("model = %v", events[0].Payload["model"])
+	}
+	if events[0].Payload["provider"] != "anthropic" {
+		t.Errorf("provider = %v", events[0].Payload["provider"])
+	}
+}
+
+func TestOpenCodeSessionErrorEvent(t *testing.T) {
+	input := `{"type":"session.error","error":"authentication failed"}`
+	emitter := parseOpenCodeLines(t, input)
+
+	events := emitter.eventsOfType(BusEventResult)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 result event, got %d", len(events))
+	}
+	if events[0].Payload["success"] != false {
+		t.Errorf("success = %v", events[0].Payload["success"])
+	}
+}
+
+func TestOpenCodeTaskStartEvent(t *testing.T) {
+	input := `{"type":"task_start","taskId":"task_1","taskDescription":"explore the codebase","taskType":"subagent"}`
+	emitter := parseOpenCodeLines(t, input)
+
+	events := emitter.eventsOfType(BusEventTaskStarted)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 task_started event, got %d", len(events))
+	}
+	if events[0].Payload["taskId"] != "task_1" {
+		t.Errorf("taskId = %v", events[0].Payload["taskId"])
+	}
+	if events[0].Payload["taskType"] != "subagent" {
+		t.Errorf("taskType = %v", events[0].Payload["taskType"])
+	}
+}
+
+func TestOpenCodeTaskProgressEvent(t *testing.T) {
+	input := `{"type":"task_progress","taskId":"task_1","taskDescription":"exploring","lastToolName":"Grep"}`
+	emitter := parseOpenCodeLines(t, input)
+
+	events := emitter.eventsOfType(BusEventTaskProgress)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 task_progress event, got %d", len(events))
+	}
+	if events[0].Payload["taskId"] != "task_1" {
+		t.Errorf("taskId = %v", events[0].Payload["taskId"])
+	}
+	if events[0].Payload["lastToolName"] != "Grep" {
+		t.Errorf("lastToolName = %v", events[0].Payload["lastToolName"])
+	}
+}
+
+func TestOpenCodeTaskCompleteEvent(t *testing.T) {
+	input := `{"type":"task_complete","taskId":"task_1","taskSummary":"found 15 matches","taskUsage":{"inputTokens":100,"outputTokens":50}}`
+	emitter := parseOpenCodeLines(t, input)
+
+	events := emitter.eventsOfType(BusEventTaskNotification)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 task_notification event, got %d", len(events))
+	}
+	if events[0].Payload["taskId"] != "task_1" {
+		t.Errorf("taskId = %v", events[0].Payload["taskId"])
+	}
+	if events[0].Payload["status"] != "completed" {
+		t.Errorf("status = %v", events[0].Payload["status"])
+	}
+	if events[0].Payload["summary"] != "found 15 matches" {
+		t.Errorf("summary = %v", events[0].Payload["summary"])
+	}
 }
