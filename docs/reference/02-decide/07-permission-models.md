@@ -1,3 +1,5 @@
+> 状态: 🔄 进行中 — 基础审批请求已实现，完整权限管道待后续
+
 # Agent 权限模型：跨仓库深入对比
 
 > 来源：`01-learn/deep-dive/04-claude-code-tool-security.md`（23 项检查 + 5 层管道）、

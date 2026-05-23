@@ -944,3 +944,348 @@ func TestAcceptedResponseFormat(t *testing.T) {
 		t.Errorf("runId = %v, want run_1", data["runId"])
 	}
 }
+
+// ── Additional route coverage tests ──
+
+func TestMuxGetProjectsRoute(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/projects", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/projects status = %d, want 200", rec.Code)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	items, ok := body["items"].([]any)
+	if !ok {
+		t.Fatalf("expected items array, got %T", body["items"])
+	}
+	// At least proj_local should exist (from ensureDefaults)
+	if len(items) == 0 {
+		t.Fatal("expected at least 1 project")
+	}
+}
+
+func TestMuxPostProjectsRoute(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects", strings.NewReader(`{"projectId":"proj_manual","name":"Manual Project"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/projects status = %d, want 201", rec.Code)
+	}
+
+	var project map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&project); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if project["projectId"] != "proj_manual" {
+		t.Fatalf("projectId = %v, want proj_manual", project["projectId"])
+	}
+}
+
+func TestMuxPostProjectsAutoID(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects", strings.NewReader(`{"name":"Auto ID Project"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/projects (auto ID) status = %d, want 201", rec.Code)
+	}
+
+	var project map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&project); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	id, ok := project["projectId"].(string)
+	if !ok || !strings.HasPrefix(id, "proj_") {
+		t.Fatalf("projectId = %v, want proj_ prefix", project["projectId"])
+	}
+}
+
+func TestMuxPostProjectsBadJSON(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects", strings.NewReader(`{bad`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /v1/projects (bad JSON) status = %d, want 400", rec.Code)
+	}
+}
+
+func TestMuxGetSpecificProject(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/projects/proj_local", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/projects/proj_local status = %d, want 200", rec.Code)
+	}
+}
+
+func TestMuxGetProjectNotFound(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/projects/proj_nonexistent", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /v1/projects/proj_nonexistent status = %d, want 404", rec.Code)
+	}
+}
+
+func TestMuxGetSpecificThread(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/threads/thread_local", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/threads/thread_local status = %d, want 200", rec.Code)
+	}
+}
+
+func TestMuxGetThreadNotFound(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/threads/thread_nonexistent", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /v1/threads/thread_nonexistent status = %d, want 404", rec.Code)
+	}
+}
+
+func TestMuxPostThreadsAutoID(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/threads", strings.NewReader(`{"title":"Auto Thread"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("POST /v1/threads (auto ID) status = %d, want 201", rec.Code)
+	}
+}
+
+func TestMuxPostThreadsBadJSON(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/threads", strings.NewReader(`{bad`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /v1/threads (bad JSON) status = %d, want 400", rec.Code)
+	}
+}
+
+func TestMuxPostThreadsProjectNotFound(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/threads", strings.NewReader(`{"projectId":"proj_nonexistent","title":"Bad Project"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("POST /v1/threads (bad project) status = %d, want 404", rec.Code)
+	}
+}
+
+func TestMuxGetThreadItems(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/threads/thread_local/items", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/threads/thread_local/items status = %d, want 200", rec.Code)
+	}
+}
+
+func TestMuxGetThreadItemsNotFound(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/threads/thread_nonexistent/items", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /v1/threads/thread_nonexistent/items status = %d, want 404", rec.Code)
+	}
+}
+
+func TestMuxGetItem(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	// Create a thread message first so there's an item to fetch
+	h.PostThreadMessage(httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/messages",
+			strings.NewReader(`{"content":"test item"}`)),
+		"thread_local")
+
+	// Get the item via the items endpoint
+	items := h.Store.ListThreadItems("thread_local")
+	if len(items) == 0 {
+		t.Fatal("expected at least one item")
+	}
+	itemID := items[0].ID
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/items/"+itemID, nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/items/%s status = %d, want 200", itemID, rec.Code)
+	}
+}
+
+func TestMuxGetItemNotFound(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/items/item_nonexistent", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /v1/items/item_nonexistent status = %d, want 404", rec.Code)
+	}
+}
+
+func TestMuxGetAgentsEmptyRegistry(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/agents", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /v1/agents status = %d, want 200", rec.Code)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	items, ok := body["items"].([]any)
+	if !ok {
+		t.Fatalf("expected items array, got %T", body["items"])
+	}
+	// AdapterRegistry is nil so we expect empty list
+	if len(items) != 0 {
+		t.Fatalf("expected 0 agents with nil registry, got %d", len(items))
+	}
+}
+
+func TestMuxGetAgentsWrongMethod(t *testing.T) {
+	h := newTestHandler()
+	req := httptest.NewRequest(http.MethodPost, "/v1/agents", nil)
+	rec := httptest.NewRecorder()
+
+	h.GetAgents(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST /v1/agents status = %d, want 405", rec.Code)
+	}
+}
+
+func TestMuxThreadsSubpathWrongMethod(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST /v1/threads/thread_local status = %d, want 405", rec.Code)
+	}
+}
+
+func TestEnsureStoreNilRepoCreatesInMemory(t *testing.T) {
+	h := &Handler{}
+	repo := ensureStore(h)
+	if repo == nil {
+		t.Fatal("ensureStore should create an in-memory store")
+	}
+	if h.Store == nil {
+		t.Fatal("Store should be set by ensureStore")
+	}
+	// Verify defaults were created
+	_, ok := repo.GetProject("proj_local")
+	if !ok {
+		t.Fatal("expected proj_local to be created by defaults")
+	}
+}
+
+func TestGenIDPrefix(t *testing.T) {
+	id := genID("test_")
+	if !strings.HasPrefix(id, "test_") {
+		t.Fatalf("genID = %q, want test_ prefix", id)
+	}
+	if len(id) <= len("test_") {
+		t.Fatalf("genID = %q, expected hex suffix after prefix", id)
+	}
+}
+
+func TestWriteJSONEncodingError(t *testing.T) {
+	// writeJSON with an unencodable value should not panic.
+	// We use a channel which cannot be JSON-encoded.
+	rec := httptest.NewRecorder()
+	writeJSON(rec, http.StatusOK, make(chan int))
+	// Should still have set the status even if encoding fails
+	if rec.Code != http.StatusOK {
+		t.Fatalf("writeJSON status = %d, want 200", rec.Code)
+	}
+}

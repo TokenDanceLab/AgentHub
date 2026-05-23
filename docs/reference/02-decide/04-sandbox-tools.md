@@ -1,3 +1,5 @@
+> 状态: ⏳ 计划中 — workspace 隔离列入 M4，sandbox/tool registry 未实现
+
 # AgentHub Runner Sandbox + Workspace + Tool Registry -- 跨仓库综合设计
 
 > 综合来源：`openhands.md`、`opcode.md`、`dify.md`、`chatdev.md`
