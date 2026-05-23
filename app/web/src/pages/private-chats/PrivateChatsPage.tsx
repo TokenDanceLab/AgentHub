@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { mockThreads, mockMessages, MockEventStream, playMessageStream } from '@shared/index';
 
 type Accent = 'blue' | 'cyan' | 'purple';
 
@@ -49,7 +50,8 @@ type Particle = {
   vx: number;
   vy: number;
   radius: number;
-  color: string;
+  hue: number;
+  alpha: number;
 };
 
 type AttachmentOption = Attachment & {
@@ -70,139 +72,29 @@ type Notice = {
   tone: 'info' | 'success';
 };
 
-const conversations: Conversation[] = [
-  {
-    id: 'mira',
-    name: 'Mira Chen',
-    initials: 'MC',
-    role: 'Frontend page coordinator',
+const conversations: Conversation[] = mockThreads.map((thread, ti) => {
+  const threadMessages = mockMessages.filter((m) => m.threadId === thread.id);
+  const accentOptions: Accent[] = ['blue', 'cyan', 'purple'];
+  return {
+    id: thread.id,
+    name: thread.title ?? `Thread ${thread.id}`,
+    initials: (thread.title ?? 'T').slice(0, 2).toUpperCase(),
+    role: thread.projectId,
     time: '10:42',
-    summary: 'Route map, guard states, and handoff notes',
-    unread: 3,
-    accent: 'blue',
-    messages: [
-      {
-        id: 'mira-1',
-        author: 'You',
-        role: 'Owner',
-        time: '10:24',
-        side: 'right',
-        body: 'Can you sanity-check the private chat layout before I hand it to the page preview branch?',
-      },
-      {
-        id: 'mira-2',
-        author: 'Mira Chen',
-        role: 'Coordinator',
-        time: '10:26',
-        side: 'left',
-        accent: 'blue',
-        body: 'The main issue is density. Keep the left rail focused on people, unread state, and current handoff context.',
-        quote: {
-          title: 'Quoted decision',
-          body: 'Keep this page as a direct-chat work surface. Route previews and real API wiring can come later.',
-        },
-      },
-      {
-        id: 'mira-3',
-        author: 'Mira Chen',
-        role: 'Coordinator',
-        time: '10:31',
-        side: 'left',
-        accent: 'blue',
-        body: 'I tightened the action buttons so icons sit on a fixed grid and never drift into the message title.',
-        attachments: [
-          { name: 'handoff-notes.md', detail: '12 KB' },
-          { name: 'message-layout.png', detail: 'Preview' },
-        ],
-      },
-      {
-        id: 'mira-4',
-        author: 'You',
-        role: 'Owner',
-        time: '10:38',
-        side: 'right',
-        body: 'Good. I am keeping the iframe preview static and adding a React copy for stateful interactions.',
-        code: {
-          file: 'PrivateChatsPageReact.tsx',
-          lines: [
-            'const [activeChatId, setActiveChatId] = useState("mira");',
-            'const [attachmentsOpen, setAttachmentsOpen] = useState(false);',
-            'const [keyedMessages, setKeyedMessages] = useState(["mira-2"]);',
-          ],
-        },
-      },
-    ],
-  },
-  {
-    id: 'devon',
-    name: 'Devon Xu',
-    initials: 'DX',
-    role: 'Diff reviewer',
-    time: '09:58',
-    summary: 'Diff preview is ready for another pass',
-    unread: 0,
-    accent: 'purple',
-    messages: [
-      {
-        id: 'devon-1',
-        author: 'Devon Xu',
-        role: 'Reviewer',
-        time: '09:49',
-        side: 'left',
-        accent: 'purple',
-        body: 'The preview diff now keeps file headers sticky and line gutters aligned. I attached the snippet for the sidebar tabs.',
-        code: {
-          file: 'diff-tabs.tsx',
-          lines: [
-            'const tabs = ["Files", "Diff", "Preview", "Logs"];',
-            'const activeTab = tabs.find((tab) => tab === selectedTab);',
-          ],
-        },
-      },
-      {
-        id: 'devon-2',
-        author: 'You',
-        role: 'Owner',
-        time: '09:58',
-        side: 'right',
-        body: 'Looks good. I will keep this private chat page visually aligned with those tighter tab controls.',
-      },
-    ],
-  },
-  {
-    id: 'aria',
-    name: 'Aria Lin',
-    initials: 'AL',
-    role: 'Client worker',
-    time: '09:31',
-    summary: 'Client runner smoke test notes attached',
-    unread: 1,
-    accent: 'cyan',
-    messages: [
-      {
-        id: 'aria-1',
-        author: 'Aria Lin',
-        role: 'Client worker',
-        time: '09:12',
-        side: 'left',
-        accent: 'cyan',
-        body: 'Runner smoke test notes are attached. No API dependency is needed for the page preview pass.',
-        attachments: [
-          { name: 'runner-smoke.md', detail: '5 checks' },
-          { name: 'edge-local.log', detail: 'redacted' },
-        ],
-      },
-      {
-        id: 'aria-2',
-        author: 'You',
-        role: 'Owner',
-        time: '09:31',
-        side: 'right',
-        body: 'Acknowledged. The React copy will keep all state local for now.',
-      },
-    ],
-  },
-];
+    summary: thread.status === 'active' ? 'Active conversation' : 'Archived',
+    unread: ti === 0 ? 2 : ti === 1 ? 0 : 1,
+    accent: accentOptions[ti % accentOptions.length],
+    messages: threadMessages.map((msg) => ({
+      id: msg.id,
+      author: msg.role === 'user' ? 'You' : 'Agent',
+      role: msg.role === 'user' ? 'Owner' : 'Agent',
+      time: '10:30',
+      side: (msg.role === 'user' ? 'right' : 'left') as 'left' | 'right',
+      body: msg.content,
+      ...(msg.role === 'agent' ? { accent: accentOptions[ti % accentOptions.length] } : {}),
+    })),
+  };
+});
 
 const attachmentOptions: AttachmentOption[] = [
   { id: 'local-context', name: 'local-context.md', detail: 'queued', icon: 'description' },
@@ -275,9 +167,9 @@ const pageStyles = `
     min-height: 100vh;
     overflow: hidden;
     background:
-      radial-gradient(circle at 14% 8%, rgba(37, 99, 235, 0.16), transparent 34%),
-      radial-gradient(circle at 82% 16%, rgba(8, 145, 178, 0.12), transparent 32%),
-      linear-gradient(135deg, #f8fbff 0%, #eef6ff 58%, #f5f3ff 100%);
+      radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
+      radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.14), transparent 30%),
+      linear-gradient(135deg, #f7fbff, #edf6ff);
     color: #172033;
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
@@ -308,8 +200,8 @@ const pageStyles = `
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: 292px minmax(480px, 1fr) 336px;
-    gap: 16px;
+    grid-template-columns: 280px minmax(480px, 1fr) 336px;
+    gap: 18px;
     min-height: 100vh;
     padding: 18px;
   }
@@ -330,6 +222,10 @@ const pageStyles = `
     flex-direction: column;
   }
 
+  .pc-sidebar {
+    padding: 18px;
+  }
+
   .pc-header {
     display: flex;
     align-items: center;
@@ -339,6 +235,26 @@ const pageStyles = `
     border-bottom: 1px solid rgba(134, 157, 190, 0.24);
   }
 
+  .pc-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .pc-brand-mark {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    color: #fff;
+    font-weight: 900;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #1769e8, #08a7cf);
+    box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
+  }
   .pc-chat-header,
   .pc-context-header {
     justify-content: space-between;
@@ -348,29 +264,47 @@ const pageStyles = `
   .pc-title h2 {
     margin: 0;
     color: #172033;
-    font-size: 18px;
-    line-height: 1.2;
+    font-size: 15px;
+    line-height: 1.25;
   }
 
-  .pc-title p {
+  .pc-brand h2 {
+    margin: 0;
+    color: #172033;
+    font-size: 15px;
+    line-height: 1.25;
+  }
+
+  .pc-title .pc-brand-sub {
     margin: 4px 0 0;
     color: #667085;
-    font-size: 12px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
   }
 
   .pc-eyebrow,
   .pc-section-title,
   .pc-meta {
+    margin: 0 0 4px;
     color: #667085;
     font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    font-weight: 800;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
+  }
+
+  .pc-title .pc-brand-sub {
+    margin: 0;
+    color: #667085;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    line-height: normal;
   }
 
   .pc-icon-button,
   .pc-tool-button,
-  .pc-back-button,
   .pc-send-button,
   .pc-chip {
     display: inline-flex;
@@ -384,7 +318,6 @@ const pageStyles = `
     cursor: pointer;
   }
 
-  .pc-back-button,
   .pc-icon-button,
   .pc-tool-button {
     width: 34px;
@@ -940,7 +873,7 @@ export function PrivateChatsPageInteractive() {
   const [activeChatId, setActiveChatId] = useState(conversations[0].id);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [keyOnly, setKeyOnly] = useState(false);
-  const [keyedMessages, setKeyedMessages] = useState<string[]>(['mira-2']);
+  const [keyedMessages, setKeyedMessages] = useState<string[]>(mockMessages.slice(0, 1).map((m) => m.id));
   const [draft, setDraft] = useState('');
   const [localMessages, setLocalMessages] = useState<Record<string, Message[]>>({});
   const [unreadByChat, setUnreadByChat] = useState<Record<string, number>>(initialUnreadByChat);
@@ -1019,6 +952,49 @@ export function PrivateChatsPageInteractive() {
 
   const hasComposerContent = draft.trim().length > 0 || selectedAttachments.length > 0;
 
+  // Mock message stream — simulates streaming agent responses.
+  useEffect(() => {
+    const stream = new MockEventStream();
+    const activeConv = conversations.find((c) => c.id === activeChatId);
+    if (!activeConv) return;
+    const unsub = stream.onType('message.delta', (event) => {
+      if (event.type === 'message.delta') {
+        const delta = String(event.payload.delta ?? '');
+        const msgId = String(event.payload.messageId ?? '');
+        setLocalMessages((prev) => {
+          const existing = prev[msgId] ?? [];
+          const last = existing[existing.length - 1];
+          if (last && last.isDraft) {
+            return {
+              ...prev,
+              [msgId]: [
+                ...existing.slice(0, -1),
+                { ...last, body: last.body + delta },
+              ],
+            };
+          }
+          const draftMsg: Message = {
+            id: msgId,
+            author: 'Agent',
+            role: 'Agent',
+            time: formatClock(),
+            side: 'left',
+            accent: activeConv.accent,
+            body: delta,
+            isDraft: true,
+          };
+          return { ...prev, [msgId]: [...existing, draftMsg] };
+        });
+      }
+    });
+    playMessageStream(stream, {
+      messageId: `stream-${activeChatId}`,
+      threadId: activeChatId,
+      chunkDelayMs: 80,
+    });
+    return () => { stream.destroy(); unsub(); };
+  }, [activeChatId]);
+
   useEffect(() => {
     if (!notice) {
       return;
@@ -1051,10 +1027,11 @@ export function PrivateChatsPageInteractive() {
     const makeParticle = (index: number): Particle => ({
       x: Math.random() * width,
       y: Math.random() * height,
-      vx: (Math.random() - 0.5) * 0.18,
-      vy: (Math.random() - 0.5) * 0.18,
-      radius: 1.4 + Math.random() * 1.8,
-      color: index % 3 === 0 ? '37, 99, 235' : '8, 145, 178',
+      vx: -0.18 + Math.random() * 0.36,
+      vy: -0.18 - Math.random() * 0.48,
+      radius: 1.6 + Math.random() * 2.6,
+      hue: index % 3 === 0 ? 196 : 210,
+      alpha: 0.18 + Math.random() * 0.2,
     });
 
     const resize = () => {
@@ -1081,25 +1058,25 @@ export function PrivateChatsPageInteractive() {
         particle.x += particle.vx;
         particle.y += particle.vy;
 
-        if (particle.x < -20) {
-          particle.x = width + 20;
+        if (particle.x < -16) {
+          particle.x = width + 16;
         }
 
-        if (particle.x > width + 20) {
-          particle.x = -20;
+        if (particle.x > width + 16) {
+          particle.x = -16;
         }
 
-        if (particle.y < -20) {
-          particle.y = height + 20;
+        if (particle.y < -16) {
+          particle.y = height + 16;
         }
 
-        if (particle.y > height + 20) {
-          particle.y = -20;
+        if (particle.y > height + 16) {
+          particle.y = -16;
         }
 
         context.beginPath();
         context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-        context.fillStyle = `rgba(${particle.color}, 0.28)`;
+        context.fillStyle = `hsla(${particle.hue}, 84%, 48%, ${particle.alpha})`;
         context.fill();
 
         for (let nextIndex = index + 1; nextIndex < particles.length; nextIndex += 1) {
@@ -1108,11 +1085,11 @@ export function PrivateChatsPageInteractive() {
           const dy = particle.y - next.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
 
-          if (distance < 128) {
+          if (distance < 126) {
             context.beginPath();
             context.moveTo(particle.x, particle.y);
             context.lineTo(next.x, next.y);
-            context.strokeStyle = `rgba(37, 99, 235, ${(0.1 * (1 - distance / 128)).toFixed(3)})`;
+            context.strokeStyle = `rgba(23, 105, 232, ${(1 - distance / 126) * 0.07})`;
             context.lineWidth = 1;
             context.stroke();
           }
@@ -1248,16 +1225,13 @@ export function PrivateChatsPageInteractive() {
 
       <div className="pc-shell">
         <aside className="pc-sidebar pc-panel pc-glass">
-          <header className="pc-header">
-            <button className="pc-back-button" type="button" aria-label="Back to workspace">
-              <Icon name="arrow_back" />
-            </button>
+          <div className="pc-brand">
+            <span className="pc-brand-mark">AH</span>
             <div className="pc-title">
-              <div className="pc-eyebrow">AgentHub</div>
-              <h1>Private Chats</h1>
-              <p>Direct coordination workspace</p>
+              <h2>AGENTHUB</h2>
+              <p className="pc-brand-sub">Private Chats</p>
             </div>
-          </header>
+          </div>
 
           <div className="pc-search">
             <Icon name="search" />
