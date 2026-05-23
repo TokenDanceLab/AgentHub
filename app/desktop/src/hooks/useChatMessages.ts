@@ -5,6 +5,7 @@ import { createEventStream } from '@/api/eventClient';
 import type { StreamHandle } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
 import type { ChatMessage, MessageBlock, ToolResultBlock } from '@/components/ChatView.types';
+import { useConnectionStore } from '@/stores/connectionStore';
 
 const MAX_MESSAGES = 500;
 const MAX_OUTPUT_TEXT = 20000;
@@ -577,9 +578,17 @@ export function useChatMessages(online: boolean): ChatState {
       dispatch({ type: 'EVENT_RECEIVED', event });
     });
 
+    // QW-3: Poll WebSocket ping-pong latency every 2 s and push to connection store
+    const latencyTimer = setInterval(() => {
+      if (!mountedRef.current) return;
+      const lat = streamRef.current?.getLatency() ?? null;
+      useConnectionStore.getState().setWsLatency(lat);
+    }, 2000);
+
     return () => {
       mountedRef.current = false;
       streamRef.current = null;
+      clearInterval(latencyTimer);
       stream.close();
     };
   }, [online]);
