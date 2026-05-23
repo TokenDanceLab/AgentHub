@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
-	"time"
 
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -17,10 +17,13 @@ import (
 type NDJSONStreamParser struct {
 	emitter        EventEmitter
 	run            store.Run
+	ctx            context.Context    // set by Parse(); used for control_request context propagation
 	seq            int64
 	toolNames      map[string]string // toolUseID → toolName (for file_change detection)
-	controlHandler ControlHandler    // nil = control messages ignored
-	stdin          io.Writer         // nil = control responses not written
+	controlHandler ControlHandler          // nil = control messages ignored
+	stdin          io.Writer               // nil = control responses not written
+	hooks          HookChain               // AgentHook middleware (P0 #1 from researcher)
+	budget         *runnerctx.ContextBudget // nil = no budget tracking
 }
 
 // NewNDJSONStreamParser creates a parser that emits events via the given emitter.
@@ -35,8 +38,19 @@ func (p *NDJSONStreamParser) WithControlHandler(handler ControlHandler, stdin io
 	return p
 }
 
+// WithHooks sets the AgentHook chain. Hooks run before/after tool use, on errors, etc.
+func (p *NDJSONStreamParser) WithHooks(hooks HookChain) *NDJSONStreamParser {
+	p.hooks = hooks
+	return p
+}
+
 // Parse reads NDJSON from r until EOF or ctx cancellation.
 func (p *NDJSONStreamParser) Parse(ctx context.Context, r io.Reader) error {
+	p.ctx = ctx
+	// Extract budget from context for token tracking (nil = no tracking).
+	if budget, ok := ctx.Value(CtxBudgetKey).(*runnerctx.ContextBudget); ok {
+		p.budget = budget
+	}
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 256*1024), 10*1024*1024) // 10MB max line
 
@@ -66,14 +80,13 @@ func (p *NDJSONStreamParser) parseLine(line []byte) {
 		"threadId":  p.run.ThreadID,
 		"runId":     p.run.ID,
 	}
-	now := time.Now().UnixMilli()
 
 	switch msg.Type {
 	case "control_request":
 		if p.controlHandler != nil && p.stdin != nil {
 			var ctrlMsg ControlMessage
 			if err := json.Unmarshal(line, &ctrlMsg); err == nil {
-				_ = p.controlHandler.HandleControlRequest(context.TODO(), p.stdin, ctrlMsg)
+				_ = p.controlHandler.HandleControlRequest(p.ctx, p.stdin, ctrlMsg)
 			}
 		}
 		return
@@ -93,9 +106,23 @@ func (p *NDJSONStreamParser) parseLine(line []byte) {
 			p.emitAPIRetry(scope, &msg)
 		case "task_started":
 			p.emitTaskStarted(scope, &msg)
+		case "task_dispatched":
+			p.emitTaskDispatched(scope, &msg)
 		case "task_progress":
 			p.emitTaskProgress(scope, &msg)
 		case "task_notification":
+			// Re-extract status/summary: TaskStatus/TaskSummary use json:"-" to avoid
+			// tag conflict with StatusField (system/status), so we parse them here.
+			var taskMsg struct {
+				Status  string `json:"status"`
+				Summary string `json:"summary"`
+			}
+			if err := json.Unmarshal(line, &taskMsg); err == nil {
+				msg.TaskStatus = taskMsg.Status
+				if taskMsg.Summary != "" {
+					msg.TaskSummary = taskMsg.Summary
+				}
+			}
 			p.emitTaskNotification(scope, &msg)
 		case "session_state_changed":
 			p.emitSessionStateChanged(scope, &msg)
@@ -155,7 +182,6 @@ func (p *NDJSONStreamParser) parseLine(line []byte) {
 
 	default:
 		slog.Debug("ndjson: unhandled message type", "type", msg.Type)
-		_ = now
 	}
 }
 
@@ -232,6 +258,10 @@ func (p *NDJSONStreamParser) parseResult(scope map[string]any, msg *claudeSDKMes
 			"inputTokens":  msg.Usage.InputTokens,
 			"outputTokens": msg.Usage.OutputTokens,
 		}
+		// Track cumulative token consumption for context budget.
+		if p.budget != nil {
+			p.budget.Track(int(msg.Usage.InputTokens + msg.Usage.OutputTokens))
+		}
 	}
 	if !success {
 		payload["errors"] = msg.Errors
@@ -255,13 +285,15 @@ func (p *NDJSONStreamParser) emitToolResult(scope map[string]any, msg *claudeSDK
 	}
 	for _, block := range msg.Message.Content {
 		if block.Type == "tool_result" {
+			toolName := p.toolNames[block.ToolUseID]
 			p.emit(scope, BusEventToolResult, map[string]any{
-				"callId":  block.ToolUseID,
-				"content": block.Content,
-				"isError": block.IsError,
+				"callId":   block.ToolUseID,
+				"toolName": toolName,
+				"content":  block.Content,
+				"isError":  block.IsError,
 			})
 			// Emit file_change for Write/Edit tools
-			if toolName := p.toolNames[block.ToolUseID]; isFileModifyingTool(toolName) {
+			if isFileModifyingTool(toolName) {
 				p.emit(scope, BusEventFileChange, map[string]any{
 					"callId":   block.ToolUseID,
 					"toolName": toolName,
@@ -285,8 +317,8 @@ func (p *NDJSONStreamParser) emitCompactBoundary(scope map[string]any, msg *clau
 
 func (p *NDJSONStreamParser) emitStatusChange(scope map[string]any, msg *claudeSDKMessage) {
 	payload := map[string]any{}
-	if msg.TaskStatus != "" {
-		payload["status"] = msg.TaskStatus
+	if msg.StatusField != "" {
+		payload["status"] = msg.StatusField
 	}
 	if msg.PermissionMode != "" {
 		payload["permissionMode"] = msg.PermissionMode
@@ -313,21 +345,30 @@ func (p *NDJSONStreamParser) emitTaskStarted(scope map[string]any, msg *claudeSD
 	})
 }
 
+func (p *NDJSONStreamParser) emitTaskDispatched(scope map[string]any, msg *claudeSDKMessage) {
+	p.emit(scope, BusEventTaskDispatched, map[string]any{
+		"taskId":      msg.TaskID,
+		"toolUseId":   msg.ToolUseID,
+		"description": msg.TaskDescription,
+		"taskType":    msg.TaskType,
+	})
+}
+
 func (p *NDJSONStreamParser) emitTaskProgress(scope map[string]any, msg *claudeSDKMessage) {
 	p.emit(scope, BusEventTaskProgress, map[string]any{
-		"taskId":        msg.TaskID,
-		"description":   msg.TaskDescription,
-		"lastToolName":  msg.LastToolName,
-		"usage":         msg.TaskUsage,
+		"taskId":       msg.TaskID,
+		"description":  msg.TaskDescription,
+		"lastToolName": msg.LastToolName,
+		"usage":        msg.TaskUsage,
 	})
 }
 
 func (p *NDJSONStreamParser) emitTaskNotification(scope map[string]any, msg *claudeSDKMessage) {
 	p.emit(scope, BusEventTaskNotification, map[string]any{
-		"taskId":    msg.TaskID,
-		"status":    msg.TaskStatus,
-		"summary":   msg.TaskSummary,
-		"usage":     msg.TaskUsage,
+		"taskId":  msg.TaskID,
+		"status":  msg.TaskStatus,
+		"summary": msg.TaskSummary,
+		"usage":   msg.TaskUsage,
 	})
 }
 
@@ -365,11 +406,31 @@ func (p *NDJSONStreamParser) emitHookResponse(scope map[string]any, msg *claudeS
 }
 
 func isFileModifyingTool(name string) bool {
-	return name == "Write" || name == "Edit"
+	return name == "Write" || name == "Edit" || name == "NotebookEdit"
 }
 
 func (p *NDJSONStreamParser) emit(scope map[string]any, eventType string, payload map[string]any) {
+	// Run AgentHook PreToolUse before tool calls
+	if eventType == BusEventToolCall && len(p.hooks) > 0 {
+		toolName, _ := payload["toolName"].(string)
+		input, _ := payload["input"].(map[string]any)
+		if modified, block, reason := p.hooks.RunPreToolUse(p.ctx, toolName, input); block {
+			payload["input"] = modified
+			payload["status"] = "blocked"
+			payload["blockReason"] = reason
+		} else if len(modified) > 0 {
+			payload["input"] = modified
+		}
+	}
+
 	p.emitter.Emit(eventType, scope, payload)
+
+	// Run AgentHook PostToolUse after tool results
+	if eventType == BusEventToolResult && len(p.hooks) > 0 {
+		toolName, _ := payload["toolName"].(string)
+		output, _ := payload["content"].(string)
+		payload["content"] = p.hooks.RunPostToolUse(p.ctx, toolName, output)
+	}
 }
 
 // --- Claude SDK message schemas (subset used for parsing) ---
@@ -390,10 +451,10 @@ type claudeSDKMessage struct {
 	Version        string   `json:"version,omitempty"`
 
 	// result fields
-	DurationMs int64       `json:"duration_ms,omitempty"`
-	NumTurns   int         `json:"num_turns,omitempty"`
+	DurationMs int64        `json:"duration_ms,omitempty"`
+	NumTurns   int          `json:"num_turns,omitempty"`
 	Usage      *claudeUsage `json:"usage,omitempty"`
-	Errors     []string    `json:"errors,omitempty"`
+	Errors     []string     `json:"errors,omitempty"`
 
 	// tool_progress fields
 	ToolUseID      string  `json:"tool_use_id,omitempty"`
@@ -421,16 +482,16 @@ type claudeSDKMessage struct {
 	StatusField string `json:"status,omitempty"`
 
 	// api_retry fields
-	RetryAttempt    int    `json:"attempt,omitempty"`
-	RetryMaxRetries int    `json:"max_retries,omitempty"`
-	RetryDelayMs    int    `json:"retry_delay_ms,omitempty"`
-	RetryErrorStatus any   `json:"error_status,omitempty"`
+	RetryAttempt     int `json:"attempt,omitempty"`
+	RetryMaxRetries  int `json:"max_retries,omitempty"`
+	RetryDelayMs     int `json:"retry_delay_ms,omitempty"`
+	RetryErrorStatus any `json:"error_status,omitempty"`
 
 	// task_started/progress/notification fields (shared fields; no json tags to avoid
 	// conflicts with result's usage/summary — these are manually extracted)
 	TaskDescription string `json:"description,omitempty"`
 	TaskType        string `json:"task_type,omitempty"`
-	TaskStatus      string `json:"status,omitempty"`
+	TaskStatus      string `json:"-"`
 	TaskSummary     string `json:"-"`
 	TaskUsage       any    `json:"-"`
 	LastToolName    string `json:"last_tool_name,omitempty"`
@@ -455,7 +516,7 @@ type claudeRateLimitInfo struct {
 }
 
 type claudeContentMessage struct {
-	Role    string            `json:"role"`
+	Role    string               `json:"role"`
 	Content []claudeContentBlock `json:"content"`
 }
 
@@ -472,9 +533,9 @@ type claudeContentBlock struct {
 }
 
 type claudeStreamEvent struct {
-	Type         string                `json:"type"`
-	Delta        *claudeDelta          `json:"delta,omitempty"`
-	ContentBlock *claudeContentBlock   `json:"content_block,omitempty"`
+	Type         string              `json:"type"`
+	Delta        *claudeDelta        `json:"delta,omitempty"`
+	ContentBlock *claudeContentBlock `json:"content_block,omitempty"`
 }
 
 type claudeDelta struct {
