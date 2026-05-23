@@ -1328,6 +1328,23 @@ components:
         fork:
           type: boolean
           description: Fork session before continuing (Claude Code --fork-session, OpenCode --fork).
+        reasoningEffort:
+          type: string
+          description: >
+            Reasoning effort level. Claude Code values: low, medium, high, max.
+            Codex values: minimal, low, medium, high, xhigh.
+            OpenCode: passed as --variant for thinking control.
+        maxThinkingTokens:
+          type: integer
+          description: Maximum thinking token budget (Claude Code --max-thinking-tokens).
+        permissionMode:
+          type: string
+          description: >
+            Claude Code permission mode: default, acceptEdits, bypassPermissions, plan, dontAsk.
+            Also mapped to Codex --sandbox level.
+        includePartial:
+          type: boolean
+          description: Include partial stream_event messages for real-time deltas (Claude Code --include-partial-messages).
     AgentInfo:
       type: object
       required: [id, name, status]

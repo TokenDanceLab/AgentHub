@@ -49,10 +49,23 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 
 	args := []string{"run", "--format", "json"}
 
-	model := ctx.Model
-	if model != "" {
-		args = append(args, "-m", model)
+	// Model: if it contains "/", pass as provider/model; otherwise pass as-is
+	if ctx.Model != "" {
+		args = append(args, "-m", ctx.Model)
 	}
+
+	// Reasoning effort: --thinking enables thinking, --variant sets effort level
+	if ctx.ReasoningEffort != "" {
+		args = append(args, "--thinking")
+		args = append(args, "--variant", ctx.ReasoningEffort)
+	}
+
+	// Agent mode (build, plan, etc.)
+	if ctx.AgentName != "" {
+		args = append(args, "--agent", ctx.AgentName)
+	}
+
+	// Session continuity
 	if ctx.SessionID != "" {
 		args = append(args, "--session", ctx.SessionID)
 	} else if ctx.ContinueLast {
