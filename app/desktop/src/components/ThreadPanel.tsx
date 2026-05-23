@@ -1,8 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, MessageSquare } from 'lucide-react';
+import { Plus, MessageSquare, Pencil, Trash2, Check, X } from 'lucide-react';
 import type { ThreadInfo } from '@shared/types';
+import { renameThread, deleteThread } from '@/api/edgeClient';
+import { useThreadStore } from '@/stores/threadStore';
 import styles from './ThreadPanel.module.css';
+
+/** ThreadInfo with optional count metadata the Edge may return. */
+interface ThreadInfoExt extends ThreadInfo {
+  runCount?: number;
+  itemCount?: number;
+}
 
 interface Props {
   threads: ThreadInfo[];
@@ -16,11 +24,102 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
 
+  // Inline rename state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Delete confirmation state
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Store helpers
+  const storeRemoveThread = useThreadStore((s) => s.removeThread);
+  const storeRenameThread = useThreadStore((s) => s.renameThread);
+
   const filtered = useMemo(() => {
     if (!query.trim()) return threads;
     const q = query.toLowerCase();
     return threads.filter((th) => th.title.toLowerCase().includes(q));
   }, [threads, query]);
+
+  // Focus / select edit input whenever editingId changes
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingId]);
+
+  // ── rename handlers ────────────────────────
+
+  const handleStartEdit = (e: React.MouseEvent, th: ThreadInfo) => {
+    e.stopPropagation();
+    setEditingId(th.threadId);
+    setEditTitle(th.title || th.threadId.slice(0, 12));
+    setActionError(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId || !editTitle.trim()) return;
+    const title = editTitle.trim();
+    try {
+      await renameThread(editingId, title);
+      storeRenameThread(editingId, title);
+      setEditingId(null);
+      setActionError(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setActionError(msg);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setActionError(null);
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSaveEdit();
+    else if (e.key === 'Escape') handleCancelEdit();
+  };
+
+  // ── delete handlers ────────────────────────
+
+  const handleStartDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeletingId((e.currentTarget as HTMLElement).dataset.threadId ?? null);
+    setActionError(null);
+  };
+
+  const handleConfirmDelete = async (threadId: string) => {
+    try {
+      await deleteThread(threadId);
+      storeRemoveThread(threadId);
+      setDeletingId(null);
+      setActionError(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setActionError(msg);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeletingId(null);
+    setActionError(null);
+  };
+
+  // ── helpers ────────────────────────────────
+
+  const formatCount = (th: ThreadInfoExt): string | null => {
+    const runs = th.runCount;
+    const msgs = th.itemCount;
+    if (msgs !== undefined && msgs > 0) return `${msgs} msgs`;
+    if (runs !== undefined && runs > 0) return `${runs} runs`;
+    return null;
+  };
+
+  // ── render ─────────────────────────────────
 
   return (
     <nav className={styles.sidebar} aria-label={t('thread.title')}>
@@ -43,24 +142,112 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
         placeholder={t('thread.search')}
       />
 
+      {actionError && <div className={styles.actionError}>{actionError}</div>}
+
       {filtered.length === 0 ? (
         <div className={styles.empty}>{t('thread.empty')}</div>
       ) : (
         <ul className={styles.list}>
-          {filtered.map((th) => (
-            <li key={th.threadId}>
-              <button
-                className={`${styles.item} ${th.threadId === selectedId ? styles.selected : ''}`}
-                onClick={() => onSelect(th)}
-              >
-                <MessageSquare size={14} />
-                <div className={styles.itemInfo}>
-                  <div className={styles.name}>{th.title || th.threadId.slice(0, 12)}</div>
-                  <div className={styles.meta}>{new Date(th.updatedAt).toLocaleDateString()}</div>
+          {filtered.map((th) => {
+            const ext = th as ThreadInfoExt;
+            const count = formatCount(ext);
+
+            if (th.threadId === editingId) {
+              // ── inline editing row ──────────
+              return (
+                <li key={th.threadId} className={styles.editRow}>
+                  <MessageSquare size={14} className={styles.editIcon} />
+                  <input
+                    ref={editInputRef}
+                    className={styles.editInput}
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    onKeyDown={handleEditKeyDown}
+                    onBlur={handleSaveEdit}
+                  />
+                  <button
+                    className={styles.actionBtn}
+                    onClick={handleSaveEdit}
+                    title={t('thread.save')}
+                    aria-label={t('thread.save')}
+                  >
+                    <Check size={14} />
+                  </button>
+                  <button
+                    className={styles.actionBtn}
+                    onClick={handleCancelEdit}
+                    title={t('thread.cancel')}
+                    aria-label={t('thread.cancel')}
+                  >
+                    <X size={14} />
+                  </button>
+                </li>
+              );
+            }
+
+            if (th.threadId === deletingId) {
+              // ── delete confirmation row ─────
+              return (
+                <li key={th.threadId} className={styles.confirmRow}>
+                  <span className={styles.confirmText}>
+                    {t('thread.confirmDelete')}
+                  </span>
+                  <button
+                    className={`${styles.actionBtn} ${styles.deleteConfirm}`}
+                    onClick={() => handleConfirmDelete(th.threadId)}
+                  >
+                    <Trash2 size={14} />
+                    {t('thread.confirm')}
+                  </button>
+                  <button
+                    className={styles.actionBtn}
+                    onClick={handleCancelDelete}
+                  >
+                    <X size={14} />
+                    {t('thread.cancel')}
+                  </button>
+                </li>
+              );
+            }
+
+            // ── normal row ────────────────────
+            return (
+              <li key={th.threadId} className={styles.itemRow}>
+                <button
+                  className={`${styles.item} ${th.threadId === selectedId ? styles.selected : ''}`}
+                  onClick={() => onSelect(th)}
+                >
+                  <MessageSquare size={14} />
+                  <div className={styles.itemInfo}>
+                    <div className={styles.name}>{th.title || th.threadId.slice(0, 12)}</div>
+                    <div className={styles.meta}>
+                      {new Date(th.updatedAt).toLocaleDateString()}
+                      {count && <span className={styles.count}>{` · ${count}`}</span>}
+                    </div>
+                  </div>
+                </button>
+                <div className={styles.actions}>
+                  <button
+                    className={styles.actionBtn}
+                    onClick={(e) => handleStartEdit(e, th)}
+                    title={t('thread.rename')}
+                    aria-label={t('thread.rename')}
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  <button
+                    className={styles.actionBtn}
+                    onClick={handleStartDelete}
+                    data-thread-id={th.threadId}
+                    title={t('thread.delete')}
+                    aria-label={t('thread.delete')}
+                  >
+                    <Trash2 size={12} />
+                  </button>
                 </div>
-              </button>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </nav>
