@@ -45,5 +45,9 @@
   "run.output": "Output",
   "run.toolCalls": "Tool Calls",
   "run.fileChanges": "Changed Files",
-  "error.streamError": "Event stream error: {{message}}"
+  "error.streamError": "Event stream error: {{message}}",
+  "banner.disconnected": "Local Edge disconnected",
+  "banner.retry": "Retry",
+  "banner.dismiss": "Dismiss",
+  "status.reconnecting": "Reconnecting..."
 }

@@ -21,6 +21,12 @@ export default function StatusBar({ online, health, isConnected, error }: Props)
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [errorCount, setErrorCount] = useState(0);
   const prevErrorRef = useRef<string | null>(null);
+  const prevOnlineRef = useRef(online);
+
+  // Track previous online for reconnecting detection
+  useEffect(() => {
+    prevOnlineRef.current = online;
+  }, [online]);
 
   // Measure Edge latency by timing health endpoint round-trips
   useEffect(() => {
@@ -63,7 +69,7 @@ export default function StatusBar({ online, health, isConnected, error }: Props)
           ? styles.latencyWarn
           : styles.latencyBad;
 
-  const isReconnecting = !isConnected;
+  const isReconnecting = !online && prevOnlineRef.current;
 
   return (
     <div className={styles.bar} role="status" aria-atomic="true">
@@ -75,13 +81,15 @@ export default function StatusBar({ online, health, isConnected, error }: Props)
         aria-hidden="true"
         data-testid={online ? 'status-dot-online' : 'status-dot-offline'}
       />
-      <span>
+      <span className={isReconnecting ? styles.reconnecting : undefined}>
         {online
           ? t('status.online', {
               version: health?.version ?? 'v1',
               edgeId: health?.edgeId ?? '?',
             })
-          : t('status.offline')}
+          : isReconnecting
+            ? t('status.reconnecting')
+            : t('status.offline')}
       </span>
       {latencyMs != null && (
         <span

@@ -45,3 +45,120 @@
 .btn:hover {
   background: var(--color-border);
 }
+
+/* ── Skeleton layouts ──────────────────── */
+
+.skeletonAgentList {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-xs);
+  gap: var(--space-xs);
+  min-width: 220px;
+  max-width: 280px;
+  height: 100%;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+}
+
+.skeletonAgentItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 6px;
+}
+
+.skeletonAgentInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.skeletonAgentTags {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.skeletonChat {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+  gap: var(--space-lg);
+  flex: 1;
+  background: var(--background);
+}
+
+.skeletonChatBubble {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.skeletonChatBubbleRight {
+  align-self: flex-end;
+  background: color-mix(in oklch, var(--primary) 20%, transparent);
+  border: 1px solid color-mix(in oklch, var(--primary) 30%, transparent);
+}
+
+/* ── Edge disconnected banner ── */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  background: #fef3c7;
+  border-bottom: 1px solid #f59e0b;
+  color: #92400e;
+  font-size: var(--font-size-sm);
+  flex-shrink: 0;
+}
+
+.bannerIcon {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.bannerMsg {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bannerActions {
+  display: flex;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+
+.bannerBtn {
+  padding: 2px 10px;
+  border: 1px solid #d97706;
+  border-radius: 4px;
+  background: transparent;
+  color: #92400e;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+
+.bannerBtn:hover:not(:disabled) {
+  background: #fde68a;
+}
+
+.bannerBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

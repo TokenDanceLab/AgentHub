@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
-import { startRun, cancelRun, fetchAgents, fetchThreads } from '@/api/edgeClient';
+import { startRun, cancelRun, fetchAgents, fetchThreads, fetchHealth } from '@/api/edgeClient';
 import type { AgentInfo, StartRunRequest } from '@shared/types';
 import type { ChatMessage } from '@/components/ChatView.types';
 import { useUIStore } from '@/stores/uiStore';
@@ -17,6 +18,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import ResizeHandle from '@/components/ResizeHandle';
 import PromptInput from '@/components/PromptInput';
 import SearchDialog from '@/components/SearchDialog';
+import { SkeletonLine, SkeletonCircle } from '@/components/Skeleton';
 import styles from '@/App.module.css';
 
 const MIN_SIDEBAR = 200;
@@ -27,6 +29,13 @@ const MAX_RIGHT = 600;
 export default function App() {
   const { online, health } = useHealth();
   const { messages, isConnected, currentRun } = useChatMessages(online);
+  const { t } = useTranslation();
+
+  // ── Edge disconnected banner state ──
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [lastEdgeError, setLastEdgeError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const wasOnlineRef = useRef(false);
 
   // Zustand stores
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
@@ -57,6 +66,36 @@ export default function App() {
   useEffect(() => {
     setConnected(isConnected);
   }, [isConnected, setConnected]);
+
+  // Banner lifecycle: show when offline after being online; auto-dismiss on reconnect
+  useEffect(() => {
+    if (online) {
+      setBannerDismissed(false);
+      setLastEdgeError(null);
+    } else if (wasOnlineRef.current) {
+      // Transition: online → offline — surface the error
+      if (!lastEdgeError) {
+        setLastEdgeError(t('banner.disconnected'));
+      }
+    }
+    wasOnlineRef.current = online;
+    // Only react to online transitions; lastEdgeError is read inside via closure
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online]);
+
+  const handleRetryEdge = useCallback(async () => {
+    setRetrying(true);
+    try {
+      await fetchHealth();
+      // Success — useHealth will pick it up on its own poll, but give it a moment
+    } catch (e) {
+      setLastEdgeError(
+        e instanceof Error ? e.message : t('banner.disconnected'),
+      );
+    } finally {
+      setRetrying(false);
+    }
+  }, [t]);
 
   // Sync chat messages → run store (Kanna dual-Map pattern)
   useEffect(() => {
@@ -181,7 +220,31 @@ export default function App() {
 
   return (
     <div className={styles.root}>
-      <StatusBar online={online} health={health} isConnected={isConnected} error={null} />
+      <StatusBar online={online} health={health} isConnected={isConnected} error={lastEdgeError} />
+
+      {!online && !bannerDismissed && (
+        <div className={styles.banner} role="alert">
+          <span className={styles.bannerIcon} aria-hidden="true">&#9888;</span>
+          <span className={styles.bannerMsg}>
+            {lastEdgeError ?? t('banner.disconnected')}
+          </span>
+          <span className={styles.bannerActions}>
+            <button
+              className={styles.bannerBtn}
+              onClick={handleRetryEdge}
+              disabled={retrying}
+            >
+              {retrying ? '...' : t('banner.retry')}
+            </button>
+            <button
+              className={styles.bannerBtn}
+              onClick={() => setBannerDismissed(true)}
+            >
+              {t('banner.dismiss')}
+            </button>
+          </span>
+        </div>
+      )}
 
       <div className={styles.body}>
         <div style={{ width: sidebarWidth, flexShrink: 0 }}>
@@ -198,16 +261,58 @@ export default function App() {
 
         <div className={styles.center}>
           <div className={styles.centerSidebar}>
-            <AgentList
-              agents={agents}
-              online={online}
-              selectedId={selectedAgentId}
-              onSelect={(a) => setSelectedAgentId(a.id)}
-            />
+            {agents.length === 0 && online ? (
+              <div className={styles.skeletonAgentList} aria-busy="true" aria-label="Loading agents">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <div key={i} className={styles.skeletonAgentItem}>
+                    <SkeletonCircle width={8} height={8} />
+                    <div className={styles.skeletonAgentInfo}>
+                      <SkeletonLine width={`${55 + (i % 3) * 10}%`} height="14px" />
+                      <SkeletonLine width={`${35 + (i % 4) * 8}%`} height="10px" />
+                      <div className={styles.skeletonAgentTags}>
+                        <SkeletonLine width="42px" height="14px" />
+                        <SkeletonLine width="50px" height="14px" />
+                        <SkeletonLine width="36px" height="14px" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <AgentList
+                agents={agents}
+                online={online}
+                selectedId={selectedAgentId}
+                onSelect={(a) => setSelectedAgentId(a.id)}
+              />
+            )}
           </div>
 
           <ErrorBoundary>
-            <ChatView messages={allMessages} isStreaming={isStreaming} />
+            {messages.length === 0 && isStreaming ? (
+              <div className={styles.skeletonChat} aria-busy="true" aria-label="Generating response">
+                <div className={styles.skeletonChatBubble}>
+                  <SkeletonLine width="90%" height="14px" />
+                  <SkeletonLine width="75%" height="14px" />
+                  <SkeletonLine width="60%" height="14px" />
+                  <SkeletonLine width="45%" height="14px" />
+                </div>
+                <div className={styles.skeletonChatBubbleRight}>
+                  <SkeletonLine width="80%" height="14px" />
+                </div>
+                <div className={styles.skeletonChatBubble}>
+                  <SkeletonLine width="70%" height="14px" />
+                  <SkeletonLine width="55%" height="14px" />
+                  <SkeletonLine width="35%" height="14px" />
+                </div>
+                <div className={styles.skeletonChatBubble}>
+                  <SkeletonLine width="85%" height="14px" />
+                  <SkeletonLine width="65%" height="14px" />
+                </div>
+              </div>
+            ) : (
+              <ChatView messages={allMessages} isStreaming={isStreaming} />
+            )}
           </ErrorBoundary>
         </div>
 

@@ -45,5 +45,9 @@
   "run.output": "Output",
   "run.toolCalls": "Tool Calls",
   "run.fileChanges": "Changed Files",
-  "error.streamError": "Event stream error: {{message}}"
+  "error.streamError": "Event stream error: {{message}}",
+  "banner.disconnected": "本地 Edge 连接已断开",
+  "banner.retry": "重试",
+  "banner.dismiss": "关闭",
+  "status.reconnecting": "重连中..."
 }
