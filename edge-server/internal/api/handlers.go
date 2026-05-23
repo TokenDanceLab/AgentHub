@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -32,9 +31,6 @@ type Handler struct {
 	Executor        lifecycle.RunExecutor
 	AdapterRegistry *adapters.Registry // nil if no agent adapters configured
 	Metrics         *metrics.EdgeMetrics
-
-	runStartTimes map[string]time.Time // runID → start time for duration tracking
-	runAdapters  map[string]string     // runID → agent adapter ID for metrics labels
 }
 
 var upgrader = websocket.Upgrader{
@@ -429,12 +425,6 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if h.Metrics != nil {
-		h.Metrics.RecordRunStart(req.AgentID)
-		h.runStartTimes[run.ID] = time.Now()
-		h.runAdapters[run.ID] = req.AgentID
-	}
-
 	writeJSON(w, http.StatusAccepted, acceptedResponse(runToResponse(run)))
 }
 
@@ -657,60 +647,8 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 }
 
-// StartMetricsTracking subscribes to run completion events and records metrics.
-// It runs in a background goroutine until the context is cancelled.
-func (h *Handler) StartMetricsTracking(ctx context.Context) {
-	if h.Metrics == nil {
-		return
-	}
-	subID, ch, _ := h.Bus.Subscribe(0)
-	defer h.Bus.Unsubscribe(subID)
-	for {
-		select {
-		case evt, ok := <-ch:
-			if !ok {
-				return
-			}
-			switch evt.Type {
-			case "run.finished":
-				h.recordRunCompletion(evt, "finished")
-			case "run.failed":
-				h.recordRunCompletion(evt, "failed")
-			case "run.cancelled":
-				h.recordRunCompletion(evt, "cancelled")
-			}
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (h *Handler) recordRunCompletion(evt events.EventEnvelope, status string) {
-	runID, _ := evt.Scope["runId"].(string)
-	if runID == "" {
-		return
-	}
-	start, ok := h.runStartTimes[runID]
-	if !ok {
-		adapter, _ := h.runAdapters[runID]
-		delete(h.runAdapters, runID)
-		h.Metrics.RecordRunFinish(adapter, status, 0)
-		return
-	}
-	adapter, _ := h.runAdapters[runID]
-	delete(h.runStartTimes, runID)
-	delete(h.runAdapters, runID)
-	h.Metrics.RecordRunFinish(adapter, status, time.Since(start).Seconds())
-}
-
 // RegisterRoutes registers all routes on the given mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	if h.runStartTimes == nil {
-		h.runStartTimes = make(map[string]time.Time)
-	}
-	if h.runAdapters == nil {
-		h.runAdapters = make(map[string]string)
-	}
 	ensureStore(h)
 	mux.HandleFunc("/v1/health", h.GetHealth)
 	mux.HandleFunc("/v1/runners", h.GetRunners)
