@@ -1,0 +1,107 @@
+/* ── Root Layout ───────────────────────────────────────────────────── */
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* ── Header / Brand ────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  flex-shrink: 0;
+}
+
+.brand {
+  padding: var(--space-md) var(--space-xl);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--primary);
+  letter-spacing: 0.01em;
+}
+
+/* ── Tab Bar ───────────────────────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  gap: 0;
+  padding: 0 var(--space-lg);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  font-family: var(--font-sans);
+  color: var(--muted-foreground);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition:
+    color 100ms,
+    border-color 100ms;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--foreground);
+}
+
+/* Active tab — highlighted with semantic token, not hardcoded */
+.tabActive {
+  color: var(--primary);
+  font-weight: var(--font-weight-medium);
+  border-bottom-color: var(--primary);
+}
+
+/* ── Content Area ──────────────────────────────────────────────────── */
+.content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: var(--space-2xl);
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+}
+
+/* ── Placeholder (page not yet implemented) ────────────────────────── */
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: var(--space-lg);
+  padding: var(--space-2xl);
+}
+
+.placeholderIcon {
+  color: var(--muted-foreground);
+  opacity: 0.4;
+}
+
+.placeholderTitle {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--foreground);
+}
+
+.placeholderText {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  color: var(--muted-foreground);
+}
