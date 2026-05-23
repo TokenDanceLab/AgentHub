@@ -18,19 +18,54 @@ Desktop UI -> Edge Server -> Runner -> Claude Code / Codex / OpenCode
 - Hub 负责账号、IM、多端同步、中继和权限。
 - UI 只负责交互，不直接控制 Agent CLI。
 
-## 2. 当前 M3 本地拓扑
+## 2. 当前 M3a 本地拓扑
 
-当前仓库已跑通真实 Agent CLI 集成链路：
+M3a 已完成真实 Agent CLI 集成，通过统一的 AgentAdapter 接口对接三种 CLI：
 
 ```text
 Desktop Web UI
   -> Local Edge Server
-  -> AgentAdapter (Claude Code / Codex / OpenCode)
-  -> NDJSON Parse -> WebSocket events
+  -> AgentAdapter (ClaudeCode / Codex / OpenCode)
+  -> NDJSON / JSONL / JSON Parse -> WebSocket events
   -> Desktop EventLog
 ```
 
-M1 的 Mock Run 已被真实 CLI adapter 取代。Edge 通过 AgentAdapter 直接调用 Claude Code、Codex 和 OpenCode 的原生协议。
+Edge 通过 AgentAdapter 接口直接调用各 CLI 的原生协议：
+
+| Adapter | CLI 协议 | 解析方式 |
+|---|---|---|
+| ClaudeCodeAdapter | `claude -p --output-format stream-json --verbose` | NDJSON 逐行解析，24 种消息类型 |
+| CodexAdapter | `codex exec --json` | JSONL 逐行解析，6 种事件类型 |
+| OpenCodeAdapter | `opencode run --format json` | JSON 逐行解析，7 种事件类型 |
+
+### 关键实现细节
+
+**Claude Code adapter**：
+- stdin 双向控制协议：支持 `can_use_tool`（权限审批）、`interrupt`（取消）、`set_model`、`set_permission_mode`、`stop_task` 控制消息
+- 会话管理：`--resume <sessionId>` 指定会话、`--continue` 继续最近会话、`--fork-session` 分叉会话
+- 模型选择：`--model` + `--reasoning-effort` + `--max-thinking-tokens` + `--fast`
+- 14 种新增 BusEvent 常量：`compact_boundary`、`api_retry`、`task_started`/`task_progress`/`task_notification`、`session_state_changed`、`hook_started`/`hook_progress`/`hook_response`、`tool_use_summary`、`auth_status`、`rate_limit`、`status_change`
+
+**Codex adapter**：
+- `exec --json` 模式，结构化 JSONL 解析
+- 推理强度映射：low→minimal、medium→low、high→high、max→xhigh
+- 权限模式映射到沙箱级别：plan→read-only、bypassPermissions→danger-full-access
+
+**OpenCode adapter**：
+- `run --format json` 结构化 JSON 事件解析
+- 支持 provider/model 格式（`-m anthropic/claude-sonnet-4-6`）
+- 会话管理：`--session`、`--continue`、`--fork`
+- `--agent` 模式选择（build、plan 等）
+- `--thinking` + `--variant` 推理控制
+
+**共享基础设施**：
+- `model_config.go`：跨 adapter 的模型别名映射（Claude: opus/sonnet/haiku；Codex: gpt-5 变体；OpenCode: provider/model 格式）和推理强度映射
+- `runnerctx.RunProcessContext`：API handler → lifecycle executor → agent adapter 之间共享的运行上下文
+- adapter-aware 取消：通过 stdin 发送 `interrupt` 控制消息，各 adapter 可中断运行中的进程
+
+### 测试覆盖
+
+adapter 包包含 32 个单元测试（覆盖 24 种 NDJSON 消息类型解析、控制协议、边界情况）和 14 个集成测试（覆盖 Claude Code 和 OpenCode 的端到端执行、工具调用、取消、stdin 控制、命令行参数构建）。
 
 完整 P0 的本地拓扑是：
 
@@ -200,7 +235,10 @@ REST snapshot 至少应能按 Project、Thread、Run、Item、Artifact 重建 UI
 | 阶段 | 拓扑 |
 |---|---|
 | M1 | Desktop UI -> Local Edge -> Mock Run -> WebSocket events |
-| P0 | Desktop UI -> Local Edge -> Local Runner -> Agent CLI |
+| M2 | Edge 本地持久化，EventStore 恢复，Desktop 启动编排 |
+| M3a | 真实 AgentAdapter 集成：ClaudeCode / Codex / OpenCode CLI |
+| M3b | 多 Agent 协调、Orchestrator、sub-agent spawn |
+| P0 | Desktop UI -> Local Edge -> Local Runner -> Agent CLI (完整闭环) |
 | P1 | Local Edge + 多 Agent Thread |
 | P2 | Edge <-> Hub 同步，Web/Mobile 查看和审批 |
 | P3 | Hub Relay -> Desktop/Cloud Edge -> Runner |

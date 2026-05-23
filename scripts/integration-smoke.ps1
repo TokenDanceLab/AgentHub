@@ -186,10 +186,7 @@ try {
 
     $edgeArgs = @("--addr", $EdgeAddr, "--agent-default", $Agent)
     if ($UseRealAgent) {
-        # Need a runner-command to force ProcessExecutor creation;
-        # the adapter will override the actual command path.
-        $edgeArgs += @("--runner-command", $AgentPath)
-        $edgeArgs += @("--$Agent-path", $AgentPath)
+        $edgeArgs += @("--claude-code-path", $AgentPath)
     }
 
     $EdgeProc = Start-EdgeProcess $edgeArgs
@@ -225,7 +222,7 @@ try {
         try {
             $body = @{
                 projectId = "proj_local"
-                threadId  = "thread_int"
+                threadId  = "thread_local"
                 prompt    = $Prompt
             }
             if ($UseRealAgent) {
