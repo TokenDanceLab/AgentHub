@@ -11,7 +11,12 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-import { describe, it, expect } from 'vitest';
+vi.mock('@/contexts/ToastContext', () => ({
+  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
+  useToast: () => ({ showToast: vi.fn() }),
+}));
+
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import ChatView from '@/components/ChatView';
@@ -171,16 +176,16 @@ describe('ChatView', () => {
     expect(details?.className).toContain('removed');
   });
 
-  it('shows streaming cursor when isStreaming=true', () => {
+  it('shows stream progress bar when isStreaming=true', () => {
     const msg = makeAgentTextMessage('typing...');
     const { container } = render(<ChatView messages={[msg]} isStreaming={true} />);
-    const cursor = container.querySelector('[class*="cursor"]');
-    expect(cursor).toBeInTheDocument();
+    const bar = container.querySelector('[class*="streamProgress"]');
+    expect(bar).toBeInTheDocument();
   });
 
-  it('does not show streaming cursor when isStreaming=false', () => {
+  it('does not show stream progress bar when isStreaming=false', () => {
     const { container } = render(<ChatView messages={[]} />);
-    const cursor = container.querySelector('[class*="cursor"]');
-    expect(cursor).not.toBeInTheDocument();
+    const bar = container.querySelector('[class*="streamProgress"]');
+    expect(bar).not.toBeInTheDocument();
   });
 });

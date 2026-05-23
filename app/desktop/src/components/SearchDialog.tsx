@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { Search, User, Bot } from 'lucide-react';
 import { useSearchStore } from '@/stores/searchStore';
+import { useShallow } from 'zustand/shallow';
 import type { ChatMessage } from '@/components/ChatView.types';
 import styles from './SearchDialog.module.css';
 
@@ -42,7 +43,16 @@ interface ResultItem extends ChatMessage {
 
 export default function SearchDialog({ messages, onSelect }: Props) {
   const { open, query, selectedIndex, closeDialog, setQuery, setSelectedIndex } =
-    useSearchStore();
+    useSearchStore(
+      useShallow((s) => ({
+        open: s.open,
+        query: s.query,
+        selectedIndex: s.selectedIndex,
+        closeDialog: s.closeDialog,
+        setQuery: s.setQuery,
+        setSelectedIndex: s.setSelectedIndex,
+      })),
+    );
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Ctrl+K to open, Esc to close
