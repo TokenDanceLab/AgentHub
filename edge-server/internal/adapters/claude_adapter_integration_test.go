@@ -272,6 +272,112 @@ func TestClaudeCodeBuildCommandArgs(t *testing.T) {
 			t.Error("--fork-session not in args when ForkSession set")
 		}
 	})
+
+	t.Run("reasoning_effort", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:             run,
+			Prompt:          "hello",
+			ReasoningEffort: "high",
+		})
+		hasEffort := false
+		hasValue := false
+		for i, a := range args {
+			if a == "--reasoning-effort" {
+				hasEffort = true
+				if i+1 < len(args) && args[i+1] == "high" {
+					hasValue = true
+				}
+			}
+		}
+		if !hasEffort {
+			t.Error("--reasoning-effort not in args when ReasoningEffort set")
+		}
+		if !hasValue {
+			t.Error("reasoning-effort value missing after flag")
+		}
+	})
+
+	t.Run("max_thinking_tokens", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:               run,
+			Prompt:            "hello",
+			MaxThinkingTokens: 16000,
+		})
+		hasFlag := false
+		hasValue := false
+		for i, a := range args {
+			if a == "--max-thinking-tokens" {
+				hasFlag = true
+				if i+1 < len(args) && args[i+1] == "16000" {
+					hasValue = true
+				}
+			}
+		}
+		if !hasFlag {
+			t.Error("--max-thinking-tokens not in args when MaxThinkingTokens set")
+		}
+		if !hasValue {
+			t.Error("max-thinking-tokens value missing after flag")
+		}
+	})
+
+	t.Run("fast_mode", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:      run,
+			Prompt:   "hello",
+			FastMode: true,
+		})
+		hasFast := false
+		for _, a := range args {
+			if a == "--fast" {
+				hasFast = true
+			}
+		}
+		if !hasFast {
+			t.Error("--fast not in args when FastMode set")
+		}
+	})
+
+	t.Run("include_partial", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:            run,
+			Prompt:         "hello",
+			IncludePartial: true,
+		})
+		hasPartial := false
+		for _, a := range args {
+			if a == "--include-partial-messages" {
+				hasPartial = true
+			}
+		}
+		if !hasPartial {
+			t.Error("--include-partial-messages not in args when IncludePartial set")
+		}
+	})
+
+	t.Run("permission_mode", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:            run,
+			Prompt:         "hello",
+			PermissionMode: "plan",
+		})
+		hasFlag := false
+		hasValue := false
+		for i, a := range args {
+			if a == "--permission-mode" {
+				hasFlag = true
+				if i+1 < len(args) && args[i+1] == "plan" {
+					hasValue = true
+				}
+			}
+		}
+		if !hasFlag {
+			t.Error("--permission-mode not in args when PermissionMode set")
+		}
+		if !hasValue {
+			t.Error("permission-mode value missing after flag")
+		}
+	})
 }
 
 func TestClaudeCodeIntegrationNoBinary(t *testing.T) {
