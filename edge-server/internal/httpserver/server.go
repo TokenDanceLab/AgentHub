@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
@@ -22,6 +23,8 @@ type Config struct {
 	Addr            string
 	Store           store.Repository
 	ProcessExecutor lifecycle.ProcessExecutorConfig
+	AdapterRegistry *adapters.Registry // agent adapter registry; nil = none registered
+	AgentDefault    string             // default agent adapter ID; empty = raw stdout capture
 }
 
 // Run starts the HTTP server and blocks until a shutdown signal is received.
@@ -72,11 +75,18 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	}
 
 	bus := events.NewBus(10000)
-	registry := runners.NewRegistry()
+	reg := runners.NewRegistry()
 
 	var executor lifecycle.RunExecutor
 	if cfg.ProcessExecutor.Command != "" {
-		processExecutor, err := lifecycle.NewProcessExecutor(bus, cfg.Store, cfg.ProcessExecutor)
+		// Resolve the default agent adapter if configured
+		var agentAdapter adapters.AgentAdapter
+		if cfg.AdapterRegistry != nil && cfg.AgentDefault != "" {
+			if a, ok := cfg.AdapterRegistry.Get(cfg.AgentDefault); ok {
+				agentAdapter = a
+			}
+		}
+		processExecutor, err := lifecycle.NewProcessExecutor(bus, cfg.Store, cfg.ProcessExecutor, agentAdapter)
 		if err != nil {
 			return nil, err
 		}
@@ -84,10 +94,11 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	}
 
 	return &api.Handler{
-		Bus:      bus,
-		Registry: registry,
-		Store:    cfg.Store,
-		Executor: executor,
+		Bus:             bus,
+		Registry:        reg,
+		Store:           cfg.Store,
+		Executor:        executor,
+		AdapterRegistry: cfg.AdapterRegistry,
 	}, nil
 }
 

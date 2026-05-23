@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"sync"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -29,12 +30,13 @@ type ProcessExecutor struct {
 	bus     *events.Bus
 	store   store.RunLifecycleStore
 	profile RunnerProfile
+	adapter adapters.AgentAdapter // nil = raw stdout capture
 
 	mu      sync.Mutex
 	running map[string]context.CancelFunc
 }
 
-func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig) (*ProcessExecutor, error) {
+func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter) (*ProcessExecutor, error) {
 	if bus == nil {
 		return nil, ErrProcessBusRequired
 	}
@@ -58,6 +60,7 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		bus:     bus,
 		store:   store,
 		profile: profile,
+		adapter: adapter,
 		running: make(map[string]context.CancelFunc),
 	}, nil
 }
@@ -155,9 +158,18 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go e.publishOutput(&wg, run, "stdout", stdout)
+	wg.Add(1)
 	go e.publishOutput(&wg, run, "stderr", stderr)
+
+	if e.adapter != nil {
+		// Structured parsing: adapter translates CLI protocol to typed events
+		wg.Add(1)
+		go e.publishStructuredOutput(&wg, run, stdout)
+	} else {
+		// Raw capture: stdout goes to run.output.batch events
+		wg.Add(1)
+		go e.publishOutput(&wg, run, "stdout", stdout)
+	}
 
 	waitErr := cmd.Wait()
 	wg.Wait()
@@ -245,4 +257,23 @@ func (e *ProcessExecutor) finish(runID string) {
 	e.mu.Lock()
 	delete(e.running, runID)
 	e.mu.Unlock()
+}
+
+// publishStructuredOutput uses the configured AgentAdapter to parse the CLI's
+// native protocol and emit typed events to the bus.
+func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.Run, stdout io.Reader) {
+	defer wg.Done()
+	emitter := &busEventEmitter{bus: e.bus}
+	if err := e.adapter.ParseStream(context.Background(), stdout, nil, emitter, run); err != nil {
+		// Structured parse errors are non-fatal; raw stderr is still captured
+	}
+}
+
+// busEventEmitter adapts events.Bus to the adapters.EventEmitter interface.
+type busEventEmitter struct {
+	bus *events.Bus
+}
+
+func (e *busEventEmitter) Emit(eventType string, scope map[string]any, payload any) {
+	e.bus.Publish(eventType, scope, payload)
 }
