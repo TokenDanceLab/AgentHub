@@ -9,7 +9,7 @@
 5. `api/openapi.yaml` — REST API 契约
 6. `api/events.md` — WebSocket 事件契约
 7. `api/conventions.md` — API 命名、分页、错误格式约定
-8. `C:\Users\Ding\.claude\plans\structured-imagining-pinwheel.md` — 完整架构方案
+8. `~/.claude/plans/structured-imagining-pinwheel.md` — 完整架构方案
 
 ## 仓库和分支
 
@@ -110,7 +110,7 @@ run.agent.result       — 执行结束（成功/失败、token 用量）
 
 3. **Adapter 集成测试** — 用真实 `claude -p "say hello"` 验证完整链路：
    ```powershell
-   .\agenthub-edge --agent-default claude-code --claude-code-path "C:\Users\Ding\.local\bin\claude.exe" --store-file .\test_store.json
+   .\agenthub-edge --agent-default claude-code --claude-code-path "~/.local/bin/claude.exe" --store-file .\test_store.json
    ```
    然后 `curl -X POST http://127.0.0.1:3210/v1/runs -H "Content-Type: application/json" -d '{"prompt":"say hello"}'`
 
@@ -195,7 +195,7 @@ go test ./... -count=1
 go run ./cmd/agenthub-edge --store-file .\test_store.json
 
 # 启动 (Claude Code 模式)
-go run ./cmd/agenthub-edge --agent-default claude-code --claude-code-path "C:\Users\Ding\.local\bin\claude.exe"
+go run ./cmd/agenthub-edge --agent-default claude-code --claude-code-path "~/.local/bin/claude.exe"
 
 # 验证
 git diff --check
@@ -206,9 +206,9 @@ python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml')
 
 | CLI | 路径 | 版本 |
 |-----|------|------|
-| claude | `C:\Users\Ding\.local\bin\claude.exe` | 2.1.143 |
-| codex | `C:\Users\Ding\AppData\Roaming\npm\codex.ps1` | 已安装 |
-| opencode | `C:\Users\Ding\AppData\Roaming\npm\opencode.ps1` | 1.15.3 |
+| claude | `~/.local/bin/claude.exe` | 2.1.143 |
+| codex | `~/AppData/Roaming/npm/codex.ps1` | 已安装 |
+| opencode | `~/AppData/Roaming/npm/opencode.ps1` | 1.15.3 |
 
 ## 隐私红线
 

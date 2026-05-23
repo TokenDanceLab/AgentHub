@@ -1,3 +1,5 @@
+// Legacy entry point. The canonical server is cmd/server-hub/main.go using internal/app/app.go (DI).
+// This file is retained for reference only.
 package api
 
 import (

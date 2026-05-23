@@ -1,3 +1,5 @@
+// Legacy entry point. The canonical server is cmd/server-hub/main.go using internal/app/app.go (DI).
+// This file is retained for reference only.
 // Hub Server — AgentHub 中心控制面和协作层
 //
 // 职责：账号/登录、群聊/Conversation、多端同步、Edge 注册/心跳、远程控制/中继
