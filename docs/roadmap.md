@@ -363,10 +363,10 @@ Hub 调度（远程）:
   - 工具调用循环检测：`useChatMessages.ts` 签名去重，3 次警告 5 次拦截
   - 文件读取去重缓存：`Map<path, {readCount, mtime}>` 缓存
 
-- [ ] **P0-3: 连接健壮性** `[3d]`
-  - WebSocket 心跳：10s ping/pong + 15s 超时检测（0.5d 快赢）
-  - 离线消息队列：新建 `offlineQueue.ts`，断线入队 localStorage，重连后按序发送
-  - 传输层抽象：新建 `transport.ts` Transport 接口，WebSocketTransport / MockTransport 实现
+- [x] **P0-3: 连接健壮性** `[3d]`
+  - ✅ WebSocket 心跳：10s ping/pong + 15s 超时检测（M5 `eventClient.ts`）
+  - ✅ 离线消息队列：`transport.ts` `WebSocketTransport` + localStorage 持久化
+  - ✅ 传输层抽象：`Transport` 接口 + `WebSocketTransport` 实现 + 指数退避重连
 
 - [x] **P0-4: 性能基础** `[2d]`
   - ✅ 虚拟滚动：`@tanstack/react-virtual`（M5 完成，`ChatView.tsx` + `useAutoScroll.ts`）
