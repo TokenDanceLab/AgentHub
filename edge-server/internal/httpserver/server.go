@@ -86,7 +86,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 				agentAdapter = a
 			}
 		}
-		processExecutor, err := lifecycle.NewProcessExecutor(bus, cfg.Store, cfg.ProcessExecutor, agentAdapter)
+		processExecutor, err := lifecycle.NewProcessExecutor(bus, cfg.Store, cfg.ProcessExecutor, agentAdapter, cfg.AdapterRegistry)
 		if err != nil {
 			return nil, err
 		}

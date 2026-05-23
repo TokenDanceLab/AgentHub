@@ -72,7 +72,7 @@ func WithFailedRun(runID string, err error) MockExecutorOption {
 	}
 }
 
-func (e *MockExecutor) Start(run store.Run) error {
+func (e *MockExecutor) Start(run store.Run, _ RunProcessContext) error {
 	current, ok := e.store.GetRun(run.ID)
 	if ok && current.Status != "queued" {
 		return ErrRunAlreadyStarted
@@ -97,7 +97,7 @@ func (e *MockExecutor) Cancel(runID string) CancelResult {
 		return CancelResult{Found: false, Status: "not_found"}
 	}
 	switch run.Status {
-	case "queued", "started":
+	case "queued", "started", "cancelling":
 	default:
 		return CancelResult{Run: run, Found: true, Status: run.Status}
 	}
@@ -133,7 +133,7 @@ func (e *MockExecutor) run(run store.Run, cancelCh <-chan struct{}) {
 		return
 	}
 
-	started, ok := e.store.SetRunStatus(run.ID, "started")
+	started, ok := e.store.SetRunStatusIf(run.ID, "started", "queued")
 	if !ok {
 		return
 	}

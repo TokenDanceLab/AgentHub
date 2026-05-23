@@ -14,18 +14,18 @@ import (
 )
 
 func TestProcessExecutorRequiresCommand(t *testing.T) {
-	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{}, nil)
+	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{}, nil, nil)
 	if !errors.Is(err, ErrProcessCommandRequired) {
 		t.Fatalf("NewProcessExecutor error = %v, want ErrProcessCommandRequired", err)
 	}
 }
 
 func TestProcessExecutorRequiresDependencies(t *testing.T) {
-	_, err := NewProcessExecutor(nil, store.New(), ProcessExecutorConfig{Command: os.Args[0]}, nil)
+	_, err := NewProcessExecutor(nil, store.New(), ProcessExecutorConfig{Command: os.Args[0]}, nil, nil)
 	if !errors.Is(err, ErrProcessBusRequired) {
 		t.Fatalf("NewProcessExecutor nil bus error = %v, want ErrProcessBusRequired", err)
 	}
-	_, err = NewProcessExecutor(events.NewBus(10), nil, ProcessExecutorConfig{Command: os.Args[0]}, nil)
+	_, err = NewProcessExecutor(events.NewBus(10), nil, ProcessExecutorConfig{Command: os.Args[0]}, nil, nil)
 	if !errors.Is(err, ErrProcessStoreRequired) {
 		t.Fatalf("NewProcessExecutor nil store error = %v, want ErrProcessStoreRequired", err)
 	}
@@ -60,7 +60,7 @@ func TestProcessExecutorRejectsInvalidWorkDir(t *testing.T) {
 			_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
 				Command: os.Args[0],
 				WorkDir: tt.workDir,
-			}, nil)
+			}, nil, nil)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("NewProcessExecutor error = %v, want containing %q", err, tt.want)
 			}
@@ -80,7 +80,7 @@ func TestProcessExecutorRejectsMissingRun(t *testing.T) {
 	_, ch, _ := bus.Subscribe(0)
 	executor := newTestProcessExecutor(t, bus, s, "success")
 
-	if err := executor.Start(run); !errors.Is(err, store.ErrNotFound) {
+	if err := executor.Start(run, RunProcessContext{}); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("Start missing run error = %v, want store.ErrNotFound", err)
 	}
 	select {
@@ -97,7 +97,7 @@ func TestProcessExecutorPublishesOutputAndFinished(t *testing.T) {
 	_, ch, _ := bus.Subscribe(0)
 	executor := newTestProcessExecutor(t, bus, s, "success")
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
@@ -162,12 +162,12 @@ func TestProcessExecutorRunsCommandWithInjectedContext(t *testing.T) {
 		Command: os.Args[0],
 		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "success"},
 		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
-	}, nil)
+	}, nil, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
@@ -241,12 +241,12 @@ func TestProcessExecutorRunsCommandInConfiguredWorkDir(t *testing.T) {
 		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "pwd"},
 		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
 		WorkDir: workDir,
-	}, nil)
+	}, nil, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
@@ -297,12 +297,12 @@ func TestProcessExecutorExpandsRunPlaceholdersInArgs(t *testing.T) {
 			"args",
 		},
 		Env: append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
-	}, nil)
+	}, nil, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
@@ -332,12 +332,12 @@ func TestProcessExecutorExpandsRunPlaceholdersInEnv(t *testing.T) {
 			"PROFILE_PROJECT={{run.projectId}}",
 			"PROFILE_THREAD={{run.threadId}}",
 		),
-	}, nil)
+	}, nil, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
@@ -368,12 +368,12 @@ func TestProcessExecutorExpandsRunPlaceholdersInExtraEnv(t *testing.T) {
 			"PROFILE_PROJECT={{run.projectId}}",
 			"PROFILE_THREAD={{run.threadId}}",
 		},
-	}, nil)
+	}, nil, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
@@ -397,7 +397,7 @@ func TestProcessExecutorExtraEnvDoesNotTemplateParentEnvironment(t *testing.T) {
 		Args:     []string{"-test.run=TestProcessExecutorHelper", "--", "env"},
 		Env:      nil,
 		ExtraEnv: []string{"PROFILE_RUN={{run.id}}"},
-	}, nil)
+	}, nil, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
@@ -415,12 +415,12 @@ func TestProcessExecutorNilEnvInheritsParentEnvironment(t *testing.T) {
 		Command: os.Args[0],
 		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "inherited-env"},
 		Env:     nil,
-	}, nil)
+	}, nil, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
@@ -434,7 +434,7 @@ func TestProcessExecutorRejectsUnknownPlaceholder(t *testing.T) {
 	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
 		Command: os.Args[0],
 		Args:    []string{"--bad={{run.workspaceId}}"},
-	}, nil)
+	}, nil, nil)
 	if err == nil || !strings.Contains(err.Error(), "unknown placeholder") {
 		t.Fatalf("NewProcessExecutor error = %v, want unknown placeholder", err)
 	}
@@ -457,7 +457,7 @@ func TestProcessExecutorRejectsInvalidEnvTemplate(t *testing.T) {
 			_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
 				Command: os.Args[0],
 				Env:     tt.env,
-			}, nil)
+			}, nil, nil)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("NewProcessExecutor error = %v, want containing %q", err, tt.want)
 			}
@@ -470,7 +470,7 @@ func TestProcessExecutorRedactsEnvTemplateValueInErrors(t *testing.T) {
 	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
 		Command: os.Args[0],
 		Env:     []string{"PROFILE_TOKEN=" + secretValue + "{{run.workspaceId}}"},
-	}, nil)
+	}, nil, nil)
 	if err == nil {
 		t.Fatal("NewProcessExecutor returned nil error for invalid env placeholder")
 	}
@@ -489,7 +489,7 @@ func TestProcessExecutorPublishesFailedForNonZeroExit(t *testing.T) {
 	_, ch, _ := bus.Subscribe(0)
 	executor := newTestProcessExecutor(t, bus, s, "fail")
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
@@ -523,12 +523,12 @@ func TestProcessExecutorPublishesFailedWhenCommandCannotStart(t *testing.T) {
 	s := store.New()
 	run := newExecutorTestRun(t, s)
 	_, ch, _ := bus.Subscribe(0)
-	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{Command: "agenthub-missing-command-for-test"}, nil)
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{Command: "agenthub-missing-command-for-test"}, nil, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
@@ -558,10 +558,10 @@ func TestProcessExecutorRejectsDuplicateStart(t *testing.T) {
 	run := newExecutorTestRun(t, s)
 	executor := newTestProcessExecutor(t, bus, s, "sleep")
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("first Start returned error: %v", err)
 	}
-	if err := executor.Start(run); !errors.Is(err, ErrRunAlreadyStarted) {
+	if err := executor.Start(run, RunProcessContext{}); !errors.Is(err, ErrRunAlreadyStarted) {
 		t.Fatalf("second Start error = %v, want ErrRunAlreadyStarted", err)
 	}
 	_ = executor.Cancel(run.ID)
@@ -574,7 +574,7 @@ func TestProcessExecutorCancelPublishesCancelledEvent(t *testing.T) {
 	_, ch, _ := bus.Subscribe(0)
 	executor := newTestProcessExecutor(t, bus, s, "sleep")
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
@@ -614,7 +614,7 @@ func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleS
 		Command: os.Args[0],
 		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", mode},
 		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
-	}, nil)
+	}, nil, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
