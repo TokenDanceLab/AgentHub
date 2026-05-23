@@ -1,8 +1,9 @@
 package adapters
 
 import (
+	"bufio"
 	"context"
-	"fmt"
+	"encoding/json"
 	"io"
 
 	"github.com/agenthub/edge-server/internal/store"
@@ -50,10 +51,28 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 		model = a.model
 	}
 
-	args := []string{"exec", prompt}
+	args := []string{"exec"}
 	if model != "" {
 		args = append(args, "-c", "model="+model)
 	}
+
+	// Reasoning effort
+	if ctx.ReasoningEffort != "" {
+		args = append(args, "-c", "model_reasoning_effort="+ctx.ReasoningEffort)
+	}
+
+	// Sandbox based on permission mode
+	if ctx.PermissionMode != "" {
+		sandbox := sandboxForPermissionMode(ctx.PermissionMode)
+		if sandbox != "" {
+			args = append(args, "--sandbox", sandbox)
+		}
+	}
+
+	// Structured JSON output
+	args = append(args, "--json")
+
+	args = append(args, prompt)
 
 	workDir := ctx.WorkDir
 	if workDir == "" {
@@ -69,35 +88,136 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 	return a.binaryPath, args, env, workDir
 }
 
+// sandboxForPermissionMode maps Claude Code permission modes to Codex sandbox levels.
+func sandboxForPermissionMode(mode string) string {
+	switch mode {
+	case "plan":
+		return "read-only"
+	case "default":
+		return "default"
+	case "acceptEdits", "dontAsk":
+		return "workspace-write"
+	case "bypassPermissions":
+		return "danger-full-access"
+	default:
+		return ""
+	}
+}
+
 func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
-	// Phase 1: codex exec writes plain text to stdout (not yet JSONL with --json flag).
-	// For now, capture as raw text blocks. Phase 2 will implement JSON-RPC parsing.
-	buf := make([]byte, 32*1024)
-	offset := 0
+	// Attempt JSONL parsing (exec --json output). Each line is a JSON object.
+	// Fall back to raw text capture if the first line is not valid JSON.
 	scope := map[string]any{
 		"projectId": run.ProjectID,
 		"threadId":  run.ThreadID,
 		"runId":     run.ID,
 	}
 
-	for {
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 256*1024), 10*1024*1024)
+
+	jsonlMode := false
+	offset := 0
+
+	for scanner.Scan() {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		n, err := stdout.Read(buf)
-		if n > 0 {
-			text := string(buf[:n])
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+
+		// Try JSONL parsing
+		if !jsonlMode {
+			var probe json.RawMessage
+			if json.Unmarshal(line, &probe) == nil {
+				jsonlMode = true
+			}
+		}
+
+		if jsonlMode {
+			var evt codexExecEvent
+			if err := json.Unmarshal(line, &evt); err != nil {
+				// If JSON parsing fails mid-stream, emit as raw text
+				emitter.Emit(BusEventTextDelta, scope, map[string]any{
+					"content": string(line),
+					"offset":  offset,
+				})
+				offset += len(line)
+				continue
+			}
+			a.dispatchCodexEvent(scope, emitter, &evt)
+		} else {
+			text := string(line)
 			emitter.Emit(BusEventTextDelta, scope, map[string]any{
 				"content": text,
 				"offset":  offset,
 			})
-			offset += n
+			offset += len(line)
 		}
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return fmt.Errorf("codex stdout: %w", err)
+	}
+	return scanner.Err()
+}
+
+// codexExecEvent represents a single JSONL line from codex exec --json output.
+type codexExecEvent struct {
+	Type    string          `json:"type"`
+	Content string          `json:"content,omitempty"`
+	Tool    *codexToolEvent `json:"tool,omitempty"`
+	Error   string          `json:"error,omitempty"`
+	Usage   *codexUsage     `json:"usage,omitempty"`
+}
+
+type codexToolEvent struct {
+	Name   string `json:"name"`
+	CallID string `json:"call_id,omitempty"`
+	Input  any    `json:"input,omitempty"`
+	Output string `json:"output,omitempty"`
+}
+
+type codexUsage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+}
+
+func (a *CodexAdapter) dispatchCodexEvent(scope map[string]any, emitter EventEmitter, evt *codexExecEvent) {
+	switch evt.Type {
+	case "text":
+		emitter.Emit(BusEventTextDelta, scope, map[string]any{
+			"content": evt.Content,
+		})
+	case "tool_use":
+		if evt.Tool != nil {
+			emitter.Emit(BusEventToolCall, scope, map[string]any{
+				"callId":   evt.Tool.CallID,
+				"toolName": evt.Tool.Name,
+				"input":    evt.Tool.Input,
+			})
 		}
+	case "tool_result":
+		if evt.Tool != nil {
+			emitter.Emit(BusEventToolResult, scope, map[string]any{
+				"callId":  evt.Tool.CallID,
+				"toolName": evt.Tool.Name,
+				"output":  evt.Tool.Output,
+			})
+		}
+	case "result":
+		result := map[string]any{
+			"success": evt.Error == "",
+		}
+		if evt.Error != "" {
+			result["error"] = evt.Error
+		}
+		if evt.Usage != nil {
+			result["usage"] = evt.Usage
+		}
+		emitter.Emit(BusEventResult, scope, result)
+	case "error":
+		emitter.Emit(BusEventResult, scope, map[string]any{
+			"success": false,
+			"error":   evt.Error,
+		})
 	}
 }

@@ -67,8 +67,32 @@ feat/frontend-webui        ← 归档（Trump 旧分支）
 |------|------|
 | 权限桥接 | ResolveOnce 竞速：CLI 触发→UI 响应 |
 | 工作区隔离 | git worktree per run (Emdash WorktreeHost 模式) |
+| Artifact 存储 | 抽象 `ArtifactStorageProvider` 接口，默认 Local 实现，预留 S3/R2/MinIO 等对象存储 backend |
 | 文档同步 | system-architecture.md / implementation-guide.md 更新 |
 | e2e 收口 | client-smoke.ps1 全链路 |
+
+## 远期：对象存储接入 (S3 / R2 / MinIO)
+
+> M4 只做接口抽象 + Local 实现。S3/R2 具体实现在 artifact 模块成型后接入。
+
+### 接入点
+
+1. **Artifact 内容存储**（优先）：`GET /v1/artifacts/{id}/content` → S3 presigned URL 302 重定向，API 契约已预留
+2. **Checkpoint 远程存储**（P2+）：`ContentAddressedStorage` 以 SHA-256 为 key 写入 bucket
+3. **Hub 缓存层**（P2+）：Hub Server 用 S3 做 artifact 中转缓存
+
+### 技术选型
+
+- Go SDK：`github.com/minio/minio-go/v7`（完整 S3 兼容，R2 只需改 endpoint）
+- Key 策略：content-addressable（SHA-256），幂等上传 + 自动去重
+- 本地优先：S3 不可用时自动降级到本地文件存储，保持 P0 离线可用
+- 凭证：环境变量注入（`R2_ACCESS_KEY` / `R2_SECRET_KEY`），不进仓库
+
+### 已有设计预留
+
+- `docs/archive/data-plane.md`：`ArtifactLocation` 已定义 `{ type: "object-storage"; url: string }`
+- `api/openapi.yaml`：`GET /v1/artifacts/{artifactId}/content` 已预留 302 presigned URL 响应
+- `docs/reference/03-build/backend/12-workspace-lifecycle.md`：`ContentAddressedStorage` 内容寻址设计可复用
 
 ## Desktop 测试
 
