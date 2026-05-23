@@ -86,6 +86,8 @@ docs/review/
 !.agents/skills/test-coverage/**
 !.agents/skills/pre-push/
 !.agents/skills/pre-push/**
+!.agents/skills/integration-test/
+!.agents/skills/integration-test/**
 .cursor/
 .continue/
 
