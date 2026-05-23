@@ -26,6 +26,22 @@ function getDisplayTitle(th: ThreadInfo, t: (k: string) => string): string {
   return t('thread.untitled');
 }
 
+/** Relative time display (e.g. "3m ago", "2h ago"). Uses i18n for locale. */
+function relativeTime(
+  dateStr: string,
+  t: (k: string, v?: Record<string, unknown>) => string,
+): string {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return t('time.justNow');
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return t('time.minutesAgo', { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t('time.hoursAgo', { count: hours });
+  const days = Math.floor(hours / 24);
+  if (days < 30) return t('time.daysAgo', { count: days });
+  return new Date(dateStr).toLocaleDateString();
+}
+
 export default memo(function ThreadPanel({ threads, online, selectedId, onSelect, onCreate }: Props) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -219,17 +235,21 @@ export default memo(function ThreadPanel({ threads, online, selectedId, onSelect
             }
 
             // ── normal row ────────────────────
+            const displayTitle = getDisplayTitle(th, t);
+            const hasUnread = ext.runCount != null && ext.runCount > 0 && th.threadId !== selectedId;
+
             return (
               <li key={th.threadId} className={styles.itemRow}>
                 <button
                   className={`${styles.item} ${th.threadId === selectedId ? styles.selected : ''}`}
                   onClick={() => onSelect(th)}
                 >
+                  {hasUnread && <span className={styles.unreadDot} />}
                   <MessageSquare size={14} />
                   <div className={styles.itemInfo}>
-                    <div className={styles.name}>{getDisplayTitle(th, t)}</div>
+                    <div className={styles.name} title={displayTitle}>{displayTitle}</div>
                     <div className={styles.meta}>
-                      {new Date(th.updatedAt).toLocaleDateString()}
+                      {relativeTime(th.updatedAt, t)}
                       {count && <span className={styles.count}>{` · ${count}`}</span>}
                     </div>
                   </div>
