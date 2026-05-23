@@ -86,7 +86,7 @@ feat/trump-webui          ← Web 前端（Trump）
 - [ ] Codex E2E：二进制可用但未实测（需额度）
 - [x] 环境隔离：envForRun 传递完整父进程环境给 Agent CLI（MEDIUM，已知风险）
 - [ ] Hub auth middleware：在 stub 转真实实现前必须接入
-- [ ] 权限门控升级：Desktop 主动批准/拒绝
+- [x] 权限门控升级：Desktop 主动批准/拒绝 + 60s 超时自动拒绝
 - [ ] Web 前端集成：feat/trump-webui → dev/delicious233 合并
 - [x] 响应式布局 + 移动端适配
 
