@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { Circle, Wifi, WifiOff, Sun, Moon } from 'lucide-react';
+import { Wifi, WifiOff, Sun, Moon } from 'lucide-react';
 import type { HealthResponse } from '@shared/types';
+import { StatusBadge } from '@shared/components';
+import type { StatusVariant } from '@shared/components';
 import { useTheme } from '@/contexts/ThemeContext';
 import styles from './StatusBar.module.css';
 
