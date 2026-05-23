@@ -280,12 +280,16 @@ func TestAPIRetry(t *testing.T) {
 
 func TestTaskLifecycle(t *testing.T) {
 	input := strings.Join([]string{
+		`{"type":"system","subtype":"task_dispatched","task_id":"task_1","tool_use_id":"toolu_p","description":"Dispatching code analysis","task_type":"local_agent","session_id":"ses_abc"}`,
 		`{"type":"system","subtype":"task_started","task_id":"task_1","tool_use_id":"toolu_p","description":"Analyzing code","task_type":"local_agent","session_id":"ses_abc"}`,
 		`{"type":"system","subtype":"task_progress","task_id":"task_1","description":"Reading files","last_tool_name":"Read","session_id":"ses_abc"}`,
 		`{"type":"system","subtype":"task_notification","task_id":"task_1","status":"completed","summary":"Found 3 issues","session_id":"ses_abc"}`,
 	}, "\n")
 	emitter := parseLines(t, input)
 
+	if len(emitter.eventsOfType(BusEventTaskDispatched)) != 1 {
+		t.Error("missing task_dispatched")
+	}
 	if len(emitter.eventsOfType(BusEventTaskStarted)) != 1 {
 		t.Error("missing task_started")
 	}
