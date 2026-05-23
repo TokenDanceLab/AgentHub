@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os/exec"
-	"strings"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -134,17 +132,4 @@ func (a *ClaudeCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, s
 		parser.WithControlHandler(NewEventEmittingPermissionHandler(emitter), stdin)
 	}
 	return parser.Parse(ctx, stdout)
-}
-
-// DetectClaudeVersion attempts to get the installed claude version.
-func DetectClaudeVersion(binaryPath string) string {
-	if binaryPath == "" {
-		binaryPath = "claude"
-	}
-	cmd := exec.Command(binaryPath, "--version")
-	out, err := cmd.Output()
-	if err != nil {
-		return "unknown"
-	}
-	return strings.TrimSpace(string(out))
 }
