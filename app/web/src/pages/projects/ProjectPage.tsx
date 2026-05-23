@@ -1,1048 +1,1793 @@
-const pageHtml = String.raw`<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AgentHub Project Workspace</title>
-    <style>
-      :root {
-        color-scheme: light;
-        --bg: #eef6ff;
-        --bg-2: #f8fbff;
-        --text: #172033;
-        --muted: #667085;
-        --line: rgba(255, 255, 255, 0.7);
-        --panel: rgba(255, 255, 255, 0.72);
-        --blue: #2563eb;
-        --cyan: #0891b2;
-        --purple: #7c3aed;
-        --green: #059669;
-        --amber: #d97706;
-        --red: #dc2626;
-        --shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        min-height: 100vh;
-        color: var(--text);
-        background:
-          radial-gradient(circle at 12% 18%, rgba(37, 99, 235, 0.18), transparent 30%),
-          radial-gradient(circle at 86% 4%, rgba(8, 145, 178, 0.15), transparent 28%),
-          linear-gradient(135deg, var(--bg) 0%, var(--bg-2) 100%);
-        font-family:
-          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        overflow: hidden;
-      }
-
-      button,
-      input {
-        font: inherit;
-      }
-
-      button {
-        border: 0;
-        cursor: pointer;
-      }
-
-      .workspace {
-        position: relative;
-        min-height: 100vh;
-        overflow: hidden;
-      }
-
-      #antigravity-canvas {
-        position: fixed;
-        inset: 0;
-        z-index: 0;
-        pointer-events: none;
-      }
-
-      .shell {
-        position: relative;
-        z-index: 1;
-        display: grid;
-        grid-template-columns: 260px minmax(0, 1fr);
-        min-height: 100vh;
-        padding: 18px;
-        gap: 18px;
-      }
-
-      .glass {
-        background: rgba(255, 255, 255, 0.72);
-        border: 1px solid rgba(255, 255, 255, 0.7);
-        border-radius: 12px;
-        box-shadow: var(--shadow);
-        backdrop-filter: blur(28px) saturate(160%);
-        -webkit-backdrop-filter: blur(28px) saturate(160%);
-      }
-
-      .sidebar {
-        display: flex;
-        flex-direction: column;
-        min-height: calc(100vh - 36px);
-        padding: 18px;
-      }
-
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding-bottom: 18px;
-        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-      }
-
-      .brand-mark {
-        display: grid;
-        width: 42px;
-        height: 42px;
-        place-items: center;
-        border-radius: 12px;
-        color: white;
-        font-weight: 800;
-        background: linear-gradient(135deg, var(--blue), var(--cyan));
-        box-shadow: 0 12px 28px rgba(37, 99, 235, 0.25);
-      }
-
-      .brand-title {
-        margin: 0;
-        font-size: 18px;
-        line-height: 1.2;
-      }
-
-      .brand-subtitle {
-        margin: 2px 0 0;
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .nav {
-        display: grid;
-        gap: 8px;
-        margin: 22px 0;
-      }
-
-      .nav-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 11px 12px;
-        color: #334155;
-        border-radius: 8px;
-        text-decoration: none;
-      }
-
-      .nav-item.active {
-        color: var(--blue);
-        background: rgba(37, 99, 235, 0.1);
-        box-shadow: inset 3px 0 0 var(--blue);
-      }
-
-      .nav-icon,
-      .button-icon,
-      .metric-icon {
-        display: inline-grid;
-        place-items: center;
-        width: 22px;
-        height: 22px;
-        flex: 0 0 auto;
-      }
-
-      .sidebar-note {
-        margin-top: auto;
-        padding: 14px;
-        background: rgba(37, 99, 235, 0.08);
-        border: 1px solid rgba(37, 99, 235, 0.12);
-        border-radius: 12px;
-      }
-
-      .sidebar-note strong {
-        display: block;
-        margin-bottom: 6px;
-        font-size: 13px;
-      }
-
-      .sidebar-note span {
-        color: var(--muted);
-        font-size: 12px;
-        line-height: 1.45;
-      }
-
-      .main {
-        min-width: 0;
-        max-height: calc(100vh - 36px);
-        overflow: auto;
-        padding-right: 2px;
-      }
-
-      .topbar {
-        position: sticky;
-        top: 0;
-        z-index: 4;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        padding: 14px 18px;
-        margin-bottom: 18px;
-      }
-
-      .search {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-width: min(420px, 100%);
-        padding: 10px 12px;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.58);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-      }
-
-      .search input {
-        width: 100%;
-        min-width: 0;
-        border: 0;
-        outline: 0;
-        color: var(--text);
-        background: transparent;
-      }
-
-      .top-actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .icon-button {
-        display: inline-grid;
-        width: 38px;
-        height: 38px;
-        place-items: center;
-        border-radius: 8px;
-        color: #334155;
-        background: rgba(255, 255, 255, 0.58);
-        border: 1px solid rgba(148, 163, 184, 0.22);
-      }
-
-      .avatar {
-        display: grid;
-        width: 38px;
-        height: 38px;
-        place-items: center;
-        border-radius: 50%;
-        color: white;
-        font-size: 13px;
-        font-weight: 800;
-        background: linear-gradient(135deg, var(--purple), var(--blue));
-      }
-
-      .content {
-        display: grid;
-        gap: 18px;
-      }
-
-      .hero {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 300px;
-        gap: 18px;
-        padding: 22px;
-      }
-
-      .eyebrow {
-        margin: 0 0 8px;
-        color: var(--cyan);
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      h1,
-      h2,
-      h3,
-      p {
-        margin-top: 0;
-      }
-
-      h1 {
-        max-width: 720px;
-        margin-bottom: 8px;
-        font-size: 34px;
-        line-height: 1.12;
-        letter-spacing: 0;
-      }
-
-      .hero-copy {
-        max-width: 700px;
-        margin-bottom: 18px;
-        color: var(--muted);
-        line-height: 1.55;
-      }
-
-      .button-row,
-      .tabs,
-      .card-header,
-      .project-row,
-      .status-row {
-        display: flex;
-        align-items: center;
-      }
-
-      .button-row {
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-
-      .primary-button,
-      .secondary-button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        min-height: 38px;
-        padding: 10px 14px;
-        border-radius: 8px;
-        font-weight: 700;
-      }
-
-      .primary-button {
-        color: white;
-        background: linear-gradient(135deg, var(--blue), var(--cyan));
-        box-shadow: 0 12px 28px rgba(37, 99, 235, 0.24);
-      }
-
-      .secondary-button {
-        color: #1f3a63;
-        background: rgba(255, 255, 255, 0.64);
-        border: 1px solid rgba(148, 163, 184, 0.25);
-      }
-
-      .hero-side {
-        display: grid;
-        gap: 12px;
-      }
-
-      .progress-card {
-        padding: 14px;
-        border-radius: 12px;
-        background: rgba(255, 255, 255, 0.52);
-        border: 1px solid rgba(255, 255, 255, 0.62);
-      }
-
-      .status-row {
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 8px;
-      }
-
-      .status-row strong {
-        font-size: 20px;
-      }
-
-      .meter {
-        height: 8px;
-        overflow: hidden;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.08);
-      }
-
-      .meter span {
-        display: block;
-        height: 100%;
-        border-radius: inherit;
-        background: linear-gradient(90deg, var(--blue), var(--cyan));
-      }
-
-      .metric-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 18px;
-      }
-
-      .metric {
-        display: grid;
-        grid-template-columns: 42px minmax(0, 1fr);
-        gap: 12px;
-        align-items: center;
-        padding: 16px;
-      }
-
-      .metric-icon {
-        width: 42px;
-        height: 42px;
-        border-radius: 12px;
-        color: var(--blue);
-        background: rgba(37, 99, 235, 0.1);
-      }
-
-      .metric strong {
-        display: block;
-        font-size: 22px;
-        line-height: 1.1;
-      }
-
-      .metric span {
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .layout-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.85fr);
-        gap: 18px;
-      }
-
-      .card {
-        padding: 18px;
-      }
-
-      .card-header {
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 14px;
-      }
-
-      .card-header h2,
-      .card-header h3 {
-        margin: 0;
-        font-size: 18px;
-      }
-
-      .tabs {
-        gap: 6px;
-        padding: 4px;
-        border-radius: 10px;
-        background: rgba(15, 23, 42, 0.06);
-      }
-
-      .tab {
-        padding: 8px 10px;
-        color: var(--muted);
-        border-radius: 8px;
-        background: transparent;
-        font-weight: 700;
-      }
-
-      .tab.active {
-        color: var(--blue);
-        background: rgba(255, 255, 255, 0.72);
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-      }
-
-      .project-list,
-      .task-list,
-      .file-list,
-      .run-list,
-      .milestone-list,
-      .risk-list {
-        display: grid;
-        gap: 10px;
-      }
-
-      .project-row,
-      .task-row,
-      .file-row,
-      .run-row,
-      .milestone-row,
-      .risk-row {
-        border-radius: 12px;
-        background: rgba(255, 255, 255, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.62);
-      }
-
-      .project-row {
-        justify-content: space-between;
-        gap: 14px;
-        padding: 14px;
-      }
-
-      .project-title {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        min-width: 0;
-      }
-
-      .project-badge {
-        display: grid;
-        width: 38px;
-        height: 38px;
-        place-items: center;
-        flex: 0 0 auto;
-        color: white;
-        border-radius: 12px;
-        background: linear-gradient(135deg, var(--blue), var(--purple));
-      }
-
-      .project-title strong,
-      .task-row strong,
-      .file-row strong,
-      .run-row strong {
-        display: block;
-        margin-bottom: 4px;
-      }
-
-      .project-title span,
-      .task-row span,
-      .file-row span,
-      .run-row span,
-      .milestone-row span,
-      .risk-row span {
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .pill {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 26px;
-        padding: 5px 9px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 800;
-      }
-
-      .pill.blue {
-        color: var(--blue);
-        background: rgba(37, 99, 235, 0.1);
-      }
-
-      .pill.cyan {
-        color: var(--cyan);
-        background: rgba(8, 145, 178, 0.1);
-      }
-
-      .pill.purple {
-        color: var(--purple);
-        background: rgba(124, 58, 237, 0.1);
-      }
-
-      .pill.green {
-        color: var(--green);
-        background: rgba(5, 150, 105, 0.1);
-      }
-
-      .pill.amber {
-        color: var(--amber);
-        background: rgba(217, 119, 6, 0.12);
-      }
-
-      .task-row,
-      .file-row,
-      .run-row {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
-        gap: 12px;
-        align-items: center;
-        padding: 12px;
-      }
-
-      .check,
-      .file-icon,
-      .run-icon {
-        display: grid;
-        width: 34px;
-        height: 34px;
-        place-items: center;
-        border-radius: 10px;
-        background: rgba(37, 99, 235, 0.1);
-        color: var(--blue);
-      }
-
-      .task-row.done .check {
-        color: var(--green);
-        background: rgba(5, 150, 105, 0.1);
-      }
-
-      .milestone-row {
-        display: grid;
-        grid-template-columns: 14px minmax(0, 1fr) auto;
-        gap: 12px;
-        align-items: start;
-        padding: 12px;
-      }
-
-      .dot {
-        width: 10px;
-        height: 10px;
-        margin-top: 5px;
-        border-radius: 50%;
-        background: var(--blue);
-        box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.1);
-      }
-
-      .dot.cyan {
-        background: var(--cyan);
-        box-shadow: 0 0 0 5px rgba(8, 145, 178, 0.1);
-      }
-
-      .dot.purple {
-        background: var(--purple);
-        box-shadow: 0 0 0 5px rgba(124, 58, 237, 0.1);
-      }
-
-      .side-stack {
-        display: grid;
-        gap: 18px;
-      }
-
-      .risk-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 12px;
-        padding: 12px;
-        border-color: rgba(217, 119, 6, 0.18);
-      }
-
-      .panel {
-        display: none;
-      }
-
-      .panel.active {
-        display: block;
-      }
-
-      .empty-state {
-        display: none;
-        margin-top: 12px;
-        padding: 12px;
-        color: var(--blue);
-        background: rgba(37, 99, 235, 0.08);
-        border: 1px solid rgba(37, 99, 235, 0.16);
-        border-radius: 12px;
-      }
-
-      .empty-state.visible {
-        display: block;
-      }
-
-      @media (max-width: 1040px) {
-        .shell {
-          grid-template-columns: 1fr;
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+type BoardView = 'overview' | 'tasks' | 'files';
+type TaskStatus = 'Done' | 'Active' | 'Next';
+type FileType = 'TSX' | 'DOC';
+type FileFilter = 'All' | FileType;
+type RunStatus = 'Pass' | 'Ready' | 'Deferred' | 'Local';
+type RunFilter = 'All' | RunStatus;
+type NoticeTone = 'success' | 'info' | 'warning';
+
+type Task = {
+  id: string;
+  title: string;
+  owner: string;
+  status: TaskStatus;
+  detail: string;
+};
+
+type FileItem = {
+  name: string;
+  type: FileType;
+  status: string;
+  detail: string;
+};
+
+type RunRecord = {
+  id: string;
+  status: RunStatus;
+  detail: string;
+  time: string;
+};
+
+type RiskItem = {
+  id: string;
+  title: string;
+  detail: string;
+  status: 'Open' | 'Reviewed' | 'Tracked';
+  reviewable: boolean;
+};
+
+type TaskForm = {
+  title: string;
+  owner: string;
+  detail: string;
+};
+
+type Notice = {
+  tone: NoticeTone;
+  message: string;
+};
+
+const viewLabels: Record<BoardView, string> = {
+  overview: 'Overview',
+  tasks: 'Tasks',
+  files: 'Files',
+};
+
+const emptyTaskForm: TaskForm = {
+  title: 'Review project page responsive states',
+  owner: 'Frontend page coordinator',
+  detail: 'Check tabs, risk toggle, sync feedback, and drawer spacing.',
+};
+
+const fileFilters: FileFilter[] = ['All', 'TSX', 'DOC'];
+const runFilters: RunFilter[] = ['All', 'Pass', 'Ready', 'Deferred', 'Local'];
+
+const projects = [
+  {
+    code: 'FP',
+    name: 'Frontend page preview',
+    detail: 'Route preview, page polish, and visual QA for the web workspace.',
+    status: 'In progress',
+  },
+  {
+    code: 'GW',
+    name: 'Group workspace shell',
+    detail: 'Shared message panels, member presence, and preview entry points.',
+    status: 'Review',
+  },
+  {
+    code: 'ED',
+    name: 'Edge dry-run console',
+    detail: 'Local runner states and command transcript framing without live API calls.',
+    status: 'Queued',
+  },
+];
+
+const initialTasks: Task[] = [
+  {
+    id: 'task-glass-tokens',
+    title: 'Align glass card tokens',
+    owner: 'Design systems',
+    status: 'Done',
+    detail: 'Blur, border, radius, and shadow match the project visual standard.',
+  },
+  {
+    id: 'task-project-copy',
+    title: 'Build project detail copy',
+    owner: 'Frontend pages',
+    status: 'Active',
+    detail: 'Overview, milestones, files, runs, and risk blocks are ready for review.',
+  },
+  {
+    id: 'task-react-copy',
+    title: 'Prepare React landing copy',
+    owner: 'Project worker',
+    status: 'Next',
+    detail: 'State changes are local only and ready for type checking.',
+  },
+];
+
+const initialFiles: FileItem[] = [
+  {
+    name: 'ProjectPage.tsx',
+    type: 'TSX',
+    status: 'Edited',
+    detail: 'Iframe shell preview with canvas particles and local UI interactions.',
+  },
+  {
+    name: 'ProjectPageInteractive.tsx',
+    type: 'TSX',
+    status: 'Edited',
+    detail: 'Stateful local interaction copy with tab, task, risk, sync, and filter logic.',
+  },
+  {
+    name: 'ProjectPageReact.tsx',
+    type: 'TSX',
+    status: 'New',
+    detail: 'React component copy for later route integration and state experiments.',
+  },
+  {
+    name: 'acceptance-notes.md',
+    type: 'DOC',
+    status: 'Draft',
+    detail: 'Suggested validation notes for frontend coordination.',
+  },
+];
+
+const initialRuns: RunRecord[] = [
+  {
+    id: 'visual-preview-042',
+    status: 'Pass',
+    detail: 'Static layout scan completed against the local preview surface.',
+    time: '09:42',
+  },
+  {
+    id: 'typecheck-next',
+    status: 'Ready',
+    detail: 'Recommended command: corepack.cmd pnpm typecheck.',
+    time: '10:10',
+  },
+  {
+    id: 'api-wire-later',
+    status: 'Deferred',
+    detail: 'No live API is connected in this page copy.',
+    time: 'Later',
+  },
+];
+
+const initialRisks: RiskItem[] = [
+  {
+    id: 'risk-no-api',
+    title: 'No live API yet',
+    detail: 'All data is static and safe for page coordination.',
+    status: 'Open',
+    reviewable: true,
+  },
+  {
+    id: 'risk-parallel-edits',
+    title: 'Parallel page edits',
+    detail: 'This worker only changes ProjectPageInteractive.tsx.',
+    status: 'Tracked',
+    reviewable: false,
+  },
+  {
+    id: 'risk-local-only',
+    title: 'Local-only state',
+    detail: 'New tasks, risk review, filters, and sync runs reset after refresh.',
+    status: 'Open',
+    reviewable: true,
+  },
+];
+
+const milestones = [
+  {
+    title: 'Preview shell locked',
+    detail: 'Route preview and project page layout are stable enough for review.',
+    status: 'Done',
+  },
+  {
+    title: 'Stateful React copy',
+    detail: 'Tabs, task panel, risk review, and sync feedback are visible.',
+    status: 'Active',
+  },
+  {
+    title: 'Real API pass',
+    detail: 'Deferred until contracts and backend mocks settle.',
+    status: 'Later',
+  },
+];
+
+const pageStyles = `
+  .projectReactRoot {
+    position: relative;
+    min-height: 100vh;
+    overflow: hidden;
+    color: #172033;
+    background:
+      radial-gradient(circle at 12% 18%, rgba(37, 99, 235, 0.18), transparent 30%),
+      radial-gradient(circle at 84% 8%, rgba(8, 145, 178, 0.14), transparent 28%),
+      linear-gradient(135deg, #eef6ff 0%, #f8fbff 100%);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  .projectReactRoot * {
+    box-sizing: border-box;
+  }
+
+  .projectParticles {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .projectReactShell {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 18px;
+    min-height: 100vh;
+    padding: 18px;
+  }
+
+  .projectGlass {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 12px;
+    box-shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
+
+  .projectSidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-height: calc(100vh - 36px);
+    padding: 18px;
+  }
+
+  .projectBrand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .projectBrandMark,
+  .projectIconTile,
+  .projectFileType {
+    display: grid;
+    place-items: center;
+    color: #ffffff;
+    font-weight: 800;
+    background: linear-gradient(135deg, #2563eb, #0891b2);
+  }
+
+  .projectBrandMark {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    box-shadow: 0 12px 28px rgba(37, 99, 235, 0.25);
+  }
+
+  .projectBrand h1 {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.2;
+    letter-spacing: 0;
+  }
+
+  .projectBrand p,
+  .projectMuted {
+    margin: 2px 0 0;
+    color: #667085;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .projectNav {
+    display: grid;
+    gap: 8px;
+  }
+
+  .projectNav button,
+  .projectTab,
+  .projectPrimaryButton,
+  .projectSecondaryButton,
+  .projectGhostButton,
+  .projectIconButton {
+    border: 0;
+    border-radius: 8px;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .projectNav button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px;
+    color: #334155;
+    text-align: left;
+    background: transparent;
+  }
+
+  .projectNav button.isActive {
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.1);
+    box-shadow: inset 3px 0 0 #2563eb;
+  }
+
+  .projectSidebarNote {
+    margin-top: auto;
+    padding: 14px;
+    border: 1px solid rgba(37, 99, 235, 0.12);
+    border-radius: 12px;
+    background: rgba(37, 99, 235, 0.08);
+  }
+
+  .projectSidebarNote strong {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+
+  .projectMain {
+    min-width: 0;
+    max-height: calc(100vh - 36px);
+    overflow: auto;
+    padding-right: 2px;
+  }
+
+  .projectTopbar,
+  .projectHero,
+  .projectMetricGrid,
+  .projectBoardGrid {
+    margin-bottom: 18px;
+  }
+
+  .projectTopbar {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 18px;
+  }
+
+  .projectSearch {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: min(430px, 100%);
+    padding: 10px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.58);
+  }
+
+  .projectSearch input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    color: #172033;
+    background: transparent;
+  }
+
+  .projectTopActions,
+  .projectButtonRow,
+  .projectCardHeader,
+  .projectStatusRow,
+  .projectRowTitle {
+    display: flex;
+    align-items: center;
+  }
+
+  .projectTopActions,
+  .projectButtonRow {
+    gap: 10px;
+  }
+
+  .projectIconButton {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    color: #334155;
+    background: rgba(255, 255, 255, 0.58);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+  }
+
+  .projectAvatar {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    color: #ffffff;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #7c3aed, #2563eb);
+  }
+
+  .projectHero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 18px;
+    padding: 22px;
+  }
+
+  .projectEyebrow {
+    margin: 0 0 8px;
+    color: #0891b2;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .projectHero h2 {
+    max-width: 720px;
+    margin: 0 0 8px;
+    font-size: 34px;
+    line-height: 1.12;
+    letter-spacing: 0;
+  }
+
+  .projectHero p {
+    max-width: 700px;
+    margin: 0 0 18px;
+    color: #667085;
+    line-height: 1.55;
+  }
+
+  .projectPrimaryButton,
+  .projectSecondaryButton,
+  .projectGhostButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 10px 14px;
+    font-weight: 700;
+  }
+
+  .projectPrimaryButton:disabled,
+  .projectSecondaryButton:disabled,
+  .projectGhostButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .projectPrimaryButton {
+    color: #ffffff;
+    background: linear-gradient(135deg, #2563eb, #0891b2);
+    box-shadow: 0 12px 28px rgba(37, 99, 235, 0.24);
+  }
+
+  .projectSecondaryButton,
+  .projectGhostButton {
+    color: #1f3a63;
+    background: rgba(255, 255, 255, 0.64);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+  }
+
+  .projectSyncMessage {
+    display: inline-flex;
+    align-items: center;
+    min-height: 38px;
+    padding: 9px 12px;
+    color: #2563eb;
+    border: 1px solid rgba(37, 99, 235, 0.16);
+    border-radius: 8px;
+    background: rgba(37, 99, 235, 0.08);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .projectSyncMessage.success {
+    color: #059669;
+    border-color: rgba(5, 150, 105, 0.18);
+    background: rgba(5, 150, 105, 0.1);
+  }
+
+  .projectSyncMessage.warning {
+    color: #d97706;
+    border-color: rgba(217, 119, 6, 0.2);
+    background: rgba(217, 119, 6, 0.12);
+  }
+
+  .projectHeroSide {
+    display: grid;
+    gap: 12px;
+  }
+
+  .projectProgressCard {
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.62);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.52);
+  }
+
+  .projectStatusRow {
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .projectStatusRow strong {
+    font-size: 20px;
+  }
+
+  .projectMeter {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.08);
+  }
+
+  .projectMeter span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #2563eb, #0891b2);
+  }
+
+  .projectMetricGrid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .projectMetric {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 16px;
+  }
+
+  .projectMetricIcon {
+    display: grid;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    color: #2563eb;
+    border-radius: 12px;
+    background: rgba(37, 99, 235, 0.1);
+    font-weight: 800;
+  }
+
+  .projectMetric strong {
+    display: block;
+    font-size: 22px;
+    line-height: 1.1;
+  }
+
+  .projectMetric span {
+    color: #667085;
+    font-size: 12px;
+  }
+
+  .projectBoardGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.85fr);
+    gap: 18px;
+  }
+
+  .projectPanel {
+    padding: 18px;
+  }
+
+  .projectCardHeader {
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .projectCardHeader h3 {
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .projectTabs {
+    display: flex;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.06);
+  }
+
+  .projectTab {
+    padding: 8px 10px;
+    color: #667085;
+    background: transparent;
+    font-weight: 700;
+  }
+
+  .projectTab.isActive {
+    color: #2563eb;
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  }
+
+  .projectFilterBar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .projectFilterGroup {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .projectFilterLabel {
+    color: #667085;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .projectMiniButton {
+    min-height: 30px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 8px;
+    padding: 6px 9px;
+    color: #334155;
+    background: rgba(255, 255, 255, 0.58);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .projectMiniButton.isActive {
+    color: #2563eb;
+    border-color: rgba(37, 99, 235, 0.2);
+    background: rgba(37, 99, 235, 0.1);
+  }
+
+  .projectMiniButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .projectList,
+  .projectStack {
+    display: grid;
+    gap: 10px;
+  }
+
+  .projectRow,
+  .projectTaskRow,
+  .projectFileRow,
+  .projectRunRow,
+  .projectMilestoneRow,
+  .projectRiskRow {
+    border: 1px solid rgba(255, 255, 255, 0.62);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  .projectRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .projectRowTitle {
+    min-width: 0;
+    gap: 12px;
+  }
+
+  .projectIconTile {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    border-radius: 12px;
+  }
+
+  .projectRowTitle strong,
+  .projectTaskRow strong,
+  .projectFileRow strong,
+  .projectRunRow strong,
+  .projectMilestoneRow strong,
+  .projectRiskRow strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .projectPill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .projectPill.blue {
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.1);
+  }
+
+  .projectPill.cyan {
+    color: #0891b2;
+    background: rgba(8, 145, 178, 0.1);
+  }
+
+  .projectPill.purple {
+    color: #7c3aed;
+    background: rgba(124, 58, 237, 0.1);
+  }
+
+  .projectPill.green {
+    color: #059669;
+    background: rgba(5, 150, 105, 0.1);
+  }
+
+  .projectPill.amber {
+    color: #d97706;
+    background: rgba(217, 119, 6, 0.12);
+  }
+
+  .projectTaskRow,
+  .projectFileRow,
+  .projectRunRow {
+    display: grid;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+  }
+
+  .projectTaskRow {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .projectFileRow,
+  .projectRunRow {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .projectCheck,
+  .projectRunIcon,
+  .projectFileType {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+
+  .projectCheck,
+  .projectRunIcon {
+    display: grid;
+    place-items: center;
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.1);
+    font-weight: 800;
+  }
+
+  .projectTaskRow.done .projectCheck {
+    color: #059669;
+    background: rgba(5, 150, 105, 0.1);
+  }
+
+  .projectInlineActions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .projectEmptyState {
+    display: grid;
+    gap: 8px;
+    place-items: center;
+    min-height: 150px;
+    padding: 24px;
+    color: #667085;
+    text-align: center;
+    border: 1px dashed rgba(148, 163, 184, 0.34);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.38);
+  }
+
+  .projectEmptyState strong {
+    color: #334155;
+  }
+
+  .projectMetaLine {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 4px;
+  }
+
+  .projectSideStack {
+    display: grid;
+    gap: 18px;
+  }
+
+  .projectMilestoneRow {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: start;
+    padding: 12px;
+  }
+
+  .projectDot {
+    width: 10px;
+    height: 10px;
+    margin-top: 5px;
+    border-radius: 50%;
+    background: #2563eb;
+    box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.1);
+  }
+
+  .projectDot.cyan {
+    background: #0891b2;
+    box-shadow: 0 0 0 5px rgba(8, 145, 178, 0.1);
+  }
+
+  .projectDot.purple {
+    background: #7c3aed;
+    box-shadow: 0 0 0 5px rgba(124, 58, 237, 0.1);
+  }
+
+  .projectRiskRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border-color: rgba(217, 119, 6, 0.18);
+  }
+
+  .projectDrawer {
+    position: fixed;
+    inset: 18px 18px 18px auto;
+    z-index: 10;
+    display: grid;
+    width: min(420px, calc(100vw - 36px));
+    align-content: start;
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .projectDrawer h3 {
+    margin: 0;
+    font-size: 20px;
+  }
+
+  .projectField {
+    display: grid;
+    gap: 7px;
+  }
+
+  .projectField label {
+    color: #334155;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .projectField input,
+  .projectField textarea {
+    width: 100%;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: #172033;
+    background: rgba(255, 255, 255, 0.62);
+    font: inherit;
+  }
+
+  .projectField textarea {
+    min-height: 92px;
+    resize: vertical;
+  }
+
+  @media (max-width: 1080px) {
+    .projectReactShell {
+      grid-template-columns: 1fr;
+    }
+
+    .projectSidebar {
+      min-height: auto;
+    }
+
+    .projectNav {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .projectHero,
+    .projectBoardGrid {
+      grid-template-columns: 1fr;
+    }
+
+    .projectMetricGrid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 720px) {
+    .projectReactRoot {
+      overflow: auto;
+    }
+
+    .projectReactShell {
+      padding: 12px;
+    }
+
+    .projectMain {
+      max-height: none;
+      overflow: visible;
+    }
+
+    .projectTopbar,
+    .projectRow,
+    .projectCardHeader,
+    .projectFilterBar {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .projectTaskRow,
+    .projectFileRow,
+    .projectRunRow,
+    .projectRiskRow {
+      grid-template-columns: 1fr;
+    }
+
+    .projectMetricGrid {
+      grid-template-columns: 1fr;
+    }
+  }
+`;
+
+function statusTone(status: string): 'blue' | 'cyan' | 'purple' | 'green' | 'amber' {
+  if (status === 'Done' || status === 'Pass' || status === 'Reviewed') {
+    return 'green';
+  }
+
+  if (status === 'Review' || status === 'Ready' || status === 'Local') {
+    return 'cyan';
+  }
+
+  if (status === 'Queued' || status === 'Later' || status === 'Deferred') {
+    return 'purple';
+  }
+
+  if (status === 'Next' || status === 'Open') {
+    return 'amber';
+  }
+
+  return 'blue';
+}
+
+function matchesQuery(fields: string[], query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  return fields.some((field) => field.toLowerCase().includes(normalizedQuery));
+}
+
+function nextTaskStatus(status: TaskStatus): TaskStatus {
+  if (status === 'Next') {
+    return 'Active';
+  }
+
+  if (status === 'Active') {
+    return 'Done';
+  }
+
+  return 'Active';
+}
+
+function taskActionLabel(status: TaskStatus) {
+  if (status === 'Next') {
+    return 'Start';
+  }
+
+  if (status === 'Active') {
+    return 'Mark done';
+  }
+
+  return 'Reopen';
+}
+
+function formatLocalTime(date = new Date()) {
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function ProjectParticles() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return undefined;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return undefined;
+    }
+
+    type Particle = {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      radius: number;
+      alpha: number;
+      hue: string;
+    };
+
+    const particles: Particle[] = [];
+    let frameId = 0;
+
+    const createParticle = (): Particle => ({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      vx: (Math.random() - 0.5) * 0.18,
+      vy: -0.16 - Math.random() * 0.22,
+      radius: 1.2 + Math.random() * 2.2,
+      alpha: 0.18 + Math.random() * 0.24,
+      hue: Math.random() > 0.45 ? '37, 99, 235' : '8, 145, 178',
+    });
+
+    const resetParticles = () => {
+      particles.length = 0;
+      for (let index = 0; index < 56; index += 1) {
+        particles.push(createParticle());
+      }
+    };
+
+    const resize = () => {
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(window.innerWidth * ratio);
+      canvas.height = Math.floor(window.innerHeight * ratio);
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      resetParticles();
+    };
+
+    const draw = () => {
+      context.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+      for (let index = 0; index < particles.length; index += 1) {
+        const particle = particles[index];
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+
+        if (particle.y < -16) {
+          particle.y = window.innerHeight + 16;
+          particle.x = Math.random() * window.innerWidth;
         }
 
-        .sidebar {
-          min-height: auto;
+        if (particle.x < -16) {
+          particle.x = window.innerWidth + 16;
         }
 
-        .nav {
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+        if (particle.x > window.innerWidth + 16) {
+          particle.x = -16;
         }
 
-        .hero,
-        .layout-grid {
-          grid-template-columns: 1fr;
-        }
+        context.beginPath();
+        context.fillStyle = `rgba(${particle.hue}, ${particle.alpha})`;
+        context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+        context.fill();
 
-        .metric-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+        for (let inner = index + 1; inner < particles.length; inner += 1) {
+          const other = particles[inner];
+          const distance = Math.hypot(particle.x - other.x, particle.y - other.y);
+          if (distance < 118) {
+            context.beginPath();
+            context.strokeStyle = `rgba(37, 99, 235, ${0.055 * (1 - distance / 118)})`;
+            context.lineWidth = 1;
+            context.moveTo(particle.x, particle.y);
+            context.lineTo(other.x, other.y);
+            context.stroke();
+          }
         }
       }
 
-      @media (max-width: 720px) {
-        body {
-          overflow: auto;
-        }
+      frameId = window.requestAnimationFrame(draw);
+    };
 
-        .shell {
-          padding: 12px;
-        }
+    resize();
+    draw();
+    window.addEventListener('resize', resize);
 
-        .main {
-          max-height: none;
-          overflow: visible;
-        }
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
 
-        .topbar,
-        .project-row,
-        .card-header {
-          align-items: stretch;
-          flex-direction: column;
-        }
+  return <canvas aria-hidden="true" className="projectParticles" ref={canvasRef} />;
+}
 
-        .search {
-          min-width: 0;
-        }
+export function ProjectPageInteractive() {
+  const [activeView, setActiveView] = useState<BoardView>('overview');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(false);
+  const [taskForm, setTaskForm] = useState<TaskForm>(emptyTaskForm);
+  const [projectTasks, setProjectTasks] = useState<Task[]>(initialTasks);
+  const [projectRuns, setProjectRuns] = useState<RunRecord[]>(initialRuns);
+  const [projectRisks, setProjectRisks] = useState<RiskItem[]>(initialRisks);
+  const [fileFilter, setFileFilter] = useState<FileFilter>('All');
+  const [runFilter, setRunFilter] = useState<RunFilter>('All');
+  const [lastSyncAt, setLastSyncAt] = useState('Not synced yet');
+  const [syncStatus, setSyncStatus] = useState('Idle');
+  const [notice, setNotice] = useState<Notice | null>(null);
 
-        .metric-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="workspace">
-      <canvas id="antigravity-canvas" aria-hidden="true"></canvas>
-      <div class="shell">
-        <aside class="sidebar glass" aria-label="Project navigation">
-          <div class="brand">
-            <div class="brand-mark">AH</div>
+  const canSaveTask = taskForm.title.trim().length > 0 && taskForm.owner.trim().length > 0;
+  const completedTaskCount = projectTasks.filter((task) => task.status === 'Done').length;
+  const activeTaskCount = projectTasks.filter((task) => task.status !== 'Done').length;
+  const deliveryProgress = Math.round((completedTaskCount / Math.max(projectTasks.length, 1)) * 100);
+  const reviewableRisks = projectRisks.filter((risk) => risk.reviewable);
+  const openRiskCount = projectRisks.filter((risk) => risk.status === 'Open').length;
+  const reviewedRiskCount = projectRisks.filter((risk) => risk.status === 'Reviewed').length;
+  const riskProgress = Math.round((reviewedRiskCount / Math.max(reviewableRisks.length, 1)) * 100);
+  const allReviewableRisksClosed = reviewableRisks.every((risk) => risk.status === 'Reviewed');
+
+  const filteredProjects = useMemo(
+    () => projects.filter((project) => matchesQuery([project.name, project.detail, project.status], searchTerm)),
+    [searchTerm],
+  );
+
+  const filteredTasks = useMemo(
+    () =>
+      projectTasks.filter((task) =>
+        matchesQuery([task.title, task.owner, task.detail, task.status], searchTerm),
+      ),
+    [projectTasks, searchTerm],
+  );
+
+  const filteredFiles = useMemo(
+    () =>
+      initialFiles.filter(
+        (file) =>
+          (fileFilter === 'All' || file.type === fileFilter) &&
+          matchesQuery([file.name, file.type, file.status, file.detail], searchTerm),
+      ),
+    [fileFilter, searchTerm],
+  );
+
+  const filteredRuns = useMemo(
+    () =>
+      projectRuns.filter(
+        (run) =>
+          (runFilter === 'All' || run.status === runFilter) &&
+          matchesQuery([run.id, run.status, run.detail, run.time], searchTerm),
+      ),
+    [projectRuns, runFilter, searchTerm],
+  );
+
+  const activityPrompt = useMemo(() => {
+    if (notice) {
+      return notice.message;
+    }
+
+    if (openRiskCount > 0) {
+      return `${openRiskCount} open risk${openRiskCount === 1 ? '' : 's'} still need review.`;
+    }
+
+    return `${activeTaskCount} active task${activeTaskCount === 1 ? '' : 's'} remain after local review.`;
+  }, [activeTaskCount, notice, openRiskCount]);
+
+  const boardTitle = useMemo(() => {
+    if (activeView === 'tasks') {
+      return `Task status (${filteredTasks.length})`;
+    }
+
+    if (activeView === 'files') {
+      return `Files and run records (${filteredFiles.length}/${filteredRuns.length})`;
+    }
+
+    return `Project overview (${filteredProjects.length})`;
+  }, [activeView, filteredFiles.length, filteredProjects.length, filteredRuns.length, filteredTasks.length]);
+
+  const openTaskPanel = () => {
+    setIsTaskPanelOpen(true);
+    setNotice(null);
+  };
+
+  const closeTaskPanel = () => {
+    setIsTaskPanelOpen(false);
+  };
+
+  const updateTaskForm = (field: keyof TaskForm, value: string) => {
+    setTaskForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const saveTask = () => {
+    if (!canSaveTask) {
+      setNotice({
+        tone: 'warning',
+        message: 'Add a task title and owner before saving.',
+      });
+      return;
+    }
+
+    const newTask: Task = {
+      id: `local-task-${Date.now().toString(36)}`,
+      title: taskForm.title.trim(),
+      owner: taskForm.owner.trim(),
+      status: 'Next',
+      detail: taskForm.detail.trim() || 'No additional note was added.',
+    };
+
+    setProjectTasks((current) => [...current, newTask]);
+    setTaskForm(emptyTaskForm);
+    setIsTaskPanelOpen(false);
+    setActiveView('tasks');
+    setNotice({
+      tone: 'success',
+      message: `Saved "${newTask.title}" as a local task.`,
+    });
+  };
+
+  const toggleTaskStatus = (taskId: string) => {
+    const currentTask = projectTasks.find((task) => task.id === taskId);
+
+    if (!currentTask) {
+      return;
+    }
+
+    const nextStatus = nextTaskStatus(currentTask.status);
+
+    setProjectTasks((current) =>
+      current.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              status: nextStatus,
+            }
+          : task,
+      ),
+    );
+
+    setNotice({
+      tone: nextStatus === 'Done' ? 'success' : 'info',
+      message: `"${currentTask.title}" moved to ${nextStatus}.`,
+    });
+  };
+
+  const toggleRisk = (riskId: string) => {
+    const currentRisk = projectRisks.find((risk) => risk.id === riskId);
+
+    if (!currentRisk || !currentRisk.reviewable) {
+      return;
+    }
+
+    const nextStatus = currentRisk.status === 'Reviewed' ? 'Open' : 'Reviewed';
+
+    setProjectRisks((current) =>
+      current.map((risk) =>
+        risk.id === riskId
+          ? {
+              ...risk,
+              status: nextStatus,
+            }
+          : risk,
+      ),
+    );
+
+    setNotice({
+      tone: nextStatus === 'Reviewed' ? 'success' : 'warning',
+      message:
+        nextStatus === 'Reviewed'
+          ? `"${currentRisk.title}" marked reviewed.`
+          : `"${currentRisk.title}" reopened for review.`,
+    });
+  };
+
+  const toggleAllReviewableRisks = () => {
+    const nextStatus = allReviewableRisksClosed ? 'Open' : 'Reviewed';
+
+    setProjectRisks((current) =>
+      current.map((risk) =>
+        risk.reviewable
+          ? {
+              ...risk,
+              status: nextStatus,
+            }
+          : risk,
+      ),
+    );
+
+    setNotice({
+      tone: nextStatus === 'Reviewed' ? 'success' : 'warning',
+      message:
+        nextStatus === 'Reviewed'
+          ? 'All reviewable risks are marked reviewed.'
+          : 'Reviewable risks were reopened.',
+    });
+  };
+
+  const simulateSync = () => {
+    const syncTime = formatLocalTime();
+    const syncRun: RunRecord = {
+      id: `local-sync-${String(projectRuns.length + 1).padStart(3, '0')}`,
+      status: 'Local',
+      detail: `Local sync captured ${activeTaskCount} active tasks and ${openRiskCount} open risks.`,
+      time: syncTime,
+    };
+
+    setLastSyncAt(syncTime);
+    setSyncStatus('Local sync complete');
+    setProjectRuns((current) => [syncRun, ...current]);
+    setRunFilter('All');
+    setNotice({
+      tone: 'info',
+      message: `Sync updated local run records at ${syncTime}.`,
+    });
+  };
+
+  return (
+    <div className="projectReactRoot">
+      <style>{pageStyles}</style>
+      <ProjectParticles />
+
+      <div className="projectReactShell">
+        <aside className="projectSidebar projectGlass" aria-label="Project navigation">
+          <div className="projectBrand">
+            <div className="projectBrandMark">AH</div>
             <div>
-              <h1 class="brand-title">AgentHub</h1>
-              <p class="brand-subtitle">Project workspace</p>
+              <h1>AgentHub</h1>
+              <p>Project workspace</p>
             </div>
           </div>
 
-          <nav class="nav">
-            <a class="nav-item active" href="#"><span class="nav-icon">▦</span>Overview</a>
-            <a class="nav-item" href="#"><span class="nav-icon">✓</span>Tasks</a>
-            <a class="nav-item" href="#"><span class="nav-icon">◇</span>Milestones</a>
-            <a class="nav-item" href="#"><span class="nav-icon">□</span>Files</a>
+          <nav className="projectNav">
+            {(['overview', 'tasks', 'files'] as BoardView[]).map((view) => (
+              <button
+                className={activeView === view ? 'isActive' : undefined}
+                key={view}
+                onClick={() => setActiveView(view)}
+                type="button"
+              >
+                <span>{view === 'overview' ? 'OV' : view === 'tasks' ? 'TK' : 'FL'}</span>
+                <span>{viewLabels[view]}</span>
+              </button>
+            ))}
+            <button onClick={openTaskPanel} type="button">
+              <span>NT</span>
+              <span>New task</span>
+            </button>
           </nav>
 
-          <div class="sidebar-note">
+          <div className="projectSidebarNote">
             <strong>Project signal</strong>
-            <span>Edge relay, preview review, and approval copy are staged for design validation only.</span>
+            <span>{activityPrompt}</span>
           </div>
         </aside>
 
-        <main class="main">
-          <header class="topbar glass">
-            <label class="search">
-              <span>⌕</span>
-              <input aria-label="Search projects" placeholder="Search projects, tasks, files..." />
+        <main className="projectMain">
+          <header className="projectTopbar projectGlass">
+            <label className="projectSearch">
+              <span>Search</span>
+              <input
+                aria-label="Search projects"
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Projects, tasks, files..."
+                value={searchTerm}
+              />
             </label>
-            <div class="top-actions">
-              <button class="icon-button" type="button" aria-label="Notifications">○</button>
-              <button class="icon-button" type="button" aria-label="Settings">⚙</button>
-              <div class="avatar" aria-label="Current user">PM</div>
+            <div className="projectTopActions">
+              <button
+                className="projectIconButton"
+                disabled={!searchTerm}
+                onClick={() => setSearchTerm('')}
+                type="button"
+                aria-label="Clear search"
+              >
+                C
+              </button>
+              <button className="projectIconButton" type="button" aria-label="Notifications">
+                N
+              </button>
+              <button className="projectIconButton" type="button" aria-label="Settings">
+                S
+              </button>
+              <div className="projectAvatar" aria-label="Current user">
+                PM
+              </div>
             </div>
           </header>
 
-          <div class="content">
-            <section class="hero glass">
+          <section className="projectHero projectGlass">
+            <div>
+              <p className="projectEyebrow">Project detail</p>
+              <h2>Workspace Preview Foundation</h2>
+              <p>
+                Coordinate frontend preview pages, milestones, task readiness, design files, and dry-run records before
+                real API integration.
+              </p>
+              <div className="projectButtonRow">
+                <button
+                  className="projectPrimaryButton"
+                  onClick={simulateSync}
+                  type="button"
+                >
+                  {syncStatus === 'Idle' ? 'Simulate sync' : 'Sync again'}
+                </button>
+                <button
+                  className="projectSecondaryButton"
+                  disabled={reviewableRisks.length === 0}
+                  onClick={toggleAllReviewableRisks}
+                  type="button"
+                >
+                  {allReviewableRisksClosed ? 'Reopen risks' : 'Mark risks reviewed'}
+                </button>
+                <button className="projectGhostButton" onClick={openTaskPanel} type="button">
+                  New task
+                </button>
+                {notice ? <span className={`projectSyncMessage ${notice.tone}`}>{notice.message}</span> : null}
+              </div>
+            </div>
+
+            <div className="projectHeroSide">
+              <div className="projectProgressCard">
+                <div className="projectStatusRow">
+                  <span>Delivery progress</span>
+                  <strong>{deliveryProgress}%</strong>
+                </div>
+                <div className="projectMeter" aria-label={`Delivery progress ${deliveryProgress} percent`}>
+                  <span style={{ width: `${deliveryProgress}%` }} />
+                </div>
+              </div>
+              <div className="projectProgressCard">
+                <div className="projectStatusRow">
+                  <span>Open risks</span>
+                  <strong>{openRiskCount}</strong>
+                </div>
+                <div className="projectMeter" aria-label="Risk review progress">
+                  <span
+                    style={{
+                      width: `${riskProgress}%`,
+                      background: 'linear-gradient(90deg, #7c3aed, #2563eb)',
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="projectProgressCard">
+                <div className="projectStatusRow">
+                  <span>Sync status</span>
+                  <strong>{syncStatus}</strong>
+                </div>
+                <p className="projectMuted">{lastSyncAt}</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="projectMetricGrid" aria-label="Project metrics">
+            <article className="projectMetric projectGlass">
+              <span className="projectMetricIcon">TK</span>
               <div>
-                <p class="eyebrow">Project detail</p>
-                <h1>Workspace Preview Foundation</h1>
-                <p class="hero-copy">
-                  Coordinate frontend preview pages, project milestones, task readiness, design files, and dry-run records before real API integration.
-                </p>
-                <div class="button-row">
-                  <button class="primary-button" id="sync-button" type="button">
-                    <span class="button-icon">↻</span>Simulate sync
-                  </button>
-                  <button class="secondary-button" id="risk-button" type="button">
-                    <span class="button-icon">!</span>Mark risk reviewed
-                  </button>
+                <strong>{activeTaskCount}</strong>
+                <span>Active tasks</span>
+              </div>
+            </article>
+            <article className="projectMetric projectGlass">
+              <span className="projectMetricIcon">M1</span>
+              <div>
+                <strong>{milestones.length}</strong>
+                <span>Milestones</span>
+              </div>
+            </article>
+            <article className="projectMetric projectGlass">
+              <span className="projectMetricIcon">FL</span>
+              <div>
+                <strong>{initialFiles.length}</strong>
+                <span>Shared files</span>
+              </div>
+            </article>
+            <article className="projectMetric projectGlass">
+              <span className="projectMetricIcon">RN</span>
+              <div>
+                <strong>{projectRuns.length}</strong>
+                <span>Dry runs</span>
+              </div>
+            </article>
+          </section>
+
+          <div className="projectBoardGrid">
+            <section className="projectPanel projectGlass">
+              <div className="projectCardHeader">
+                <h3>{boardTitle}</h3>
+                <div className="projectTabs" role="tablist" aria-label="Project board sections">
+                  {(['overview', 'tasks', 'files'] as BoardView[]).map((view) => (
+                    <button
+                      aria-selected={activeView === view}
+                      className={activeView === view ? 'projectTab isActive' : 'projectTab'}
+                      key={view}
+                      onClick={() => setActiveView(view)}
+                      role="tab"
+                      type="button"
+                    >
+                      {viewLabels[view]}
+                    </button>
+                  ))}
                 </div>
-                <div class="empty-state" id="sync-state">Sync queued locally. No remote API was called.</div>
               </div>
 
-              <div class="hero-side">
-                <div class="progress-card">
-                  <div class="status-row">
-                    <span>Delivery progress</span>
-                    <strong>68%</strong>
-                  </div>
-                  <div class="meter" aria-label="Delivery progress 68 percent"><span style="width: 68%"></span></div>
+              {activeView === 'overview' ? (
+                <div className="projectList">
+                  {filteredProjects.length > 0 ? (
+                    filteredProjects.map((project) => (
+                    <article className="projectRow" key={project.name}>
+                      <div className="projectRowTitle">
+                        <span className="projectIconTile">{project.code}</span>
+                        <div>
+                          <strong>{project.name}</strong>
+                          <p className="projectMuted">{project.detail}</p>
+                        </div>
+                      </div>
+                      <span className={`projectPill ${statusTone(project.status)}`}>{project.status}</span>
+                    </article>
+                    ))
+                  ) : (
+                    <div className="projectEmptyState">
+                      <strong>No projects match this search.</strong>
+                      <span>Clear the search box to restore the overview list.</span>
+                    </div>
+                  )}
                 </div>
-                <div class="progress-card">
-                  <div class="status-row">
-                    <span>Open risks</span>
-                    <strong id="risk-count">3</strong>
+              ) : null}
+
+              {activeView === 'tasks' ? (
+                <div className="projectList">
+                  <div className="projectFilterBar">
+                    <span className="projectMuted">
+                      {completedTaskCount} done / {projectTasks.length} total
+                    </span>
+                    <button className="projectSecondaryButton" onClick={openTaskPanel} type="button">
+                      New task
+                    </button>
                   </div>
-                  <div class="meter" aria-label="Risk review progress 42 percent"><span style="width: 42%; background: linear-gradient(90deg, var(--purple), var(--blue))"></span></div>
+                  {filteredTasks.length > 0 ? (
+                    filteredTasks.map((task) => (
+                    <article className={task.status === 'Done' ? 'projectTaskRow done' : 'projectTaskRow'} key={task.id}>
+                      <span className="projectCheck">{task.status === 'Done' ? 'OK' : 'IN'}</span>
+                      <div>
+                        <strong>{task.title}</strong>
+                        <p className="projectMuted">
+                          {task.owner}: {task.detail}
+                        </p>
+                      </div>
+                      <span className={`projectPill ${statusTone(task.status)}`}>{task.status}</span>
+                      <div className="projectInlineActions">
+                        <button className="projectMiniButton" onClick={() => toggleTaskStatus(task.id)} type="button">
+                          {taskActionLabel(task.status)}
+                        </button>
+                      </div>
+                    </article>
+                    ))
+                  ) : (
+                    <div className="projectEmptyState">
+                      <strong>No tasks are visible.</strong>
+                      <span>Clear search or add a local task to repopulate the board.</span>
+                    </div>
+                  )}
                 </div>
-              </div>
+              ) : null}
+
+              {activeView === 'files' ? (
+                <div className="projectStack">
+                  <div className="projectFilterBar">
+                    <div className="projectFilterGroup" aria-label="File type filters">
+                      <span className="projectFilterLabel">Files</span>
+                      {fileFilters.map((filter) => (
+                        <button
+                          className={fileFilter === filter ? 'projectMiniButton isActive' : 'projectMiniButton'}
+                          key={filter}
+                          onClick={() => setFileFilter(filter)}
+                          type="button"
+                        >
+                          {filter}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="projectFilterGroup" aria-label="Run status filters">
+                      <span className="projectFilterLabel">Runs</span>
+                      {runFilters.map((filter) => (
+                        <button
+                          className={runFilter === filter ? 'projectMiniButton isActive' : 'projectMiniButton'}
+                          key={filter}
+                          onClick={() => setRunFilter(filter)}
+                          type="button"
+                        >
+                          {filter}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="projectList">
+                    {filteredFiles.length > 0 ? (
+                      filteredFiles.map((file) => (
+                        <article className="projectFileRow" key={file.name}>
+                          <span className="projectFileType">{file.type}</span>
+                          <div>
+                            <strong>{file.name}</strong>
+                            <p className="projectMuted">{file.detail}</p>
+                          </div>
+                          <span className={`projectPill ${statusTone(file.status)}`}>{file.status}</span>
+                        </article>
+                      ))
+                    ) : (
+                      <div className="projectEmptyState">
+                        <strong>No files match this filter.</strong>
+                        <span>Use All or clear search to show project files.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="projectList" aria-label="Run records">
+                    {filteredRuns.length > 0 ? (
+                      filteredRuns.map((run) => (
+                        <article className="projectRunRow" key={run.id}>
+                          <span className="projectRunIcon">RN</span>
+                          <div>
+                            <strong>{run.id}</strong>
+                            <p className="projectMuted">{run.detail}</p>
+                            <div className="projectMetaLine">
+                              <span className="projectPill blue">{run.time}</span>
+                            </div>
+                          </div>
+                          <span className={`projectPill ${statusTone(run.status)}`}>{run.status}</span>
+                        </article>
+                      ))
+                    ) : (
+                      <div className="projectEmptyState">
+                        <strong>No run records match this filter.</strong>
+                        <span>Run a local sync or switch the run status filter.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </section>
 
-            <section class="metric-grid">
-              <article class="metric glass">
-                <span class="metric-icon">▣</span>
-                <div><strong>12</strong><span>Active tasks</span></div>
-              </article>
-              <article class="metric glass">
-                <span class="metric-icon">◌</span>
-                <div><strong>4</strong><span>Milestones</span></div>
-              </article>
-              <article class="metric glass">
-                <span class="metric-icon">□</span>
-                <div><strong>18</strong><span>Shared files</span></div>
-              </article>
-              <article class="metric glass">
-                <span class="metric-icon">▶</span>
-                <div><strong>7</strong><span>Dry runs</span></div>
-              </article>
-            </section>
-
-            <div class="layout-grid">
-              <section class="card glass">
-                <div class="card-header">
-                  <h2>Project board</h2>
-                  <div class="tabs" role="tablist" aria-label="Project board sections">
-                    <button class="tab active" data-panel="overview" type="button">Overview</button>
-                    <button class="tab" data-panel="tasks" type="button">Tasks</button>
-                    <button class="tab" data-panel="files" type="button">Files</button>
-                  </div>
+            <aside className="projectSideStack">
+              <section className="projectPanel projectGlass">
+                <div className="projectCardHeader">
+                  <h3>Milestones</h3>
+                  <span className="projectPill blue">M1</span>
                 </div>
-
-                <div class="panel active" id="overview">
-                  <div class="project-list">
-                    <div class="project-row">
-                      <div class="project-title">
-                        <span class="project-badge">FP</span>
-                        <div>
-                          <strong>Frontend page preview</strong>
-                          <span>Page coordination, visual QA, and route-level polish.</span>
-                        </div>
+                <div className="projectList">
+                  {milestones.map((milestone, index) => (
+                    <article className="projectMilestoneRow" key={milestone.title}>
+                      <span className={index === 1 ? 'projectDot cyan' : index === 2 ? 'projectDot purple' : 'projectDot'} />
+                      <div>
+                        <strong>{milestone.title}</strong>
+                        <p className="projectMuted">{milestone.detail}</p>
                       </div>
-                      <span class="pill blue">In progress</span>
-                    </div>
-                    <div class="project-row">
-                      <div class="project-title">
-                        <span class="project-badge" style="background: linear-gradient(135deg, var(--cyan), var(--blue))">IM</span>
-                        <div>
-                          <strong>Group workspace shell</strong>
-                          <span>Shared panels, message rhythm, and preview entry points.</span>
-                        </div>
-                      </div>
-                      <span class="pill cyan">Review</span>
-                    </div>
-                    <div class="project-row">
-                      <div class="project-title">
-                        <span class="project-badge" style="background: linear-gradient(135deg, var(--purple), var(--blue))">ED</span>
-                        <div>
-                          <strong>Edge dry-run console</strong>
-                          <span>Local-only runner states and command transcript framing.</span>
-                        </div>
-                      </div>
-                      <span class="pill purple">Queued</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="panel" id="tasks">
-                  <div class="task-list">
-                    <div class="task-row done">
-                      <span class="check">✓</span>
-                      <div><strong>Align glass card tokens</strong><span>Blur, border, radius, and shadow applied consistently.</span></div>
-                      <span class="pill green">Done</span>
-                    </div>
-                    <div class="task-row">
-                      <span class="check">•</span>
-                      <div><strong>Build project detail copy</strong><span>Overview, milestone, file, and run copy are present.</span></div>
-                      <span class="pill blue">Active</span>
-                    </div>
-                    <div class="task-row">
-                      <span class="check">•</span>
-                      <div><strong>Prepare React landing copy</strong><span>No API dependency; visible state transitions only.</span></div>
-                      <span class="pill amber">Next</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="panel" id="files">
-                  <div class="file-list">
-                    <div class="file-row">
-                      <span class="file-icon">TS</span>
-                      <div><strong>ProjectPage.tsx</strong><span>Iframe shell preview and antigravity background.</span></div>
-                      <span class="pill blue">Edited</span>
-                    </div>
-                    <div class="file-row">
-                      <span class="file-icon">RX</span>
-                      <div><strong>ProjectPageReact.tsx</strong><span>React landing copy for later integration.</span></div>
-                      <span class="pill purple">New</span>
-                    </div>
-                    <div class="file-row">
-                      <span class="file-icon">MD</span>
-                      <div><strong>acceptance-notes.md</strong><span>Suggested validation notes for the frontend track.</span></div>
-                      <span class="pill cyan">Draft</span>
-                    </div>
-                  </div>
+                      <span className={`projectPill ${statusTone(milestone.status)}`}>{milestone.status}</span>
+                    </article>
+                  ))}
                 </div>
               </section>
 
-              <div class="side-stack">
-                <section class="card glass">
-                  <div class="card-header">
-                    <h3>Milestones</h3>
-                    <span class="pill blue">M1</span>
-                  </div>
-                  <div class="milestone-list">
-                    <div class="milestone-row">
-                      <span class="dot"></span>
-                      <div><strong>Preview shell locked</strong><span>Route preview and project page layout stabilized.</span></div>
-                      <span class="pill green">Done</span>
-                    </div>
-                    <div class="milestone-row">
-                      <span class="dot cyan"></span>
-                      <div><strong>Stateful React copy</strong><span>Tab, panel, risk, and sync states are visible.</span></div>
-                      <span class="pill blue">Active</span>
-                    </div>
-                    <div class="milestone-row">
-                      <span class="dot purple"></span>
-                      <div><strong>Real API pass</strong><span>Deferred until contract and backend mocks settle.</span></div>
-                      <span class="pill purple">Later</span>
-                    </div>
-                  </div>
-                </section>
-
-                <section class="card glass">
-                  <div class="card-header">
-                    <h3>Run records</h3>
-                    <span class="pill cyan">Local</span>
-                  </div>
-                  <div class="run-list">
-                    <div class="run-row">
-                      <span class="run-icon">▶</span>
-                      <div><strong>visual-preview-042</strong><span>Layout scan completed in local preview mode.</span></div>
-                      <span class="pill green">Pass</span>
-                    </div>
-                    <div class="run-row">
-                      <span class="run-icon">↻</span>
-                      <div><strong>typecheck-next</strong><span>Recommended command: corepack.cmd pnpm typecheck.</span></div>
-                      <span class="pill amber">Ready</span>
-                    </div>
-                  </div>
-                </section>
-
-                <section class="card glass">
-                  <div class="card-header">
-                    <h3>Risks</h3>
-                    <span class="pill amber" id="risk-label">Needs review</span>
-                  </div>
-                  <div class="risk-list">
-                    <div class="risk-row">
-                      <div><strong>No live API yet</strong><span>All data is static and safe for design validation.</span></div>
-                      <span class="pill amber">Open</span>
-                    </div>
-                    <div class="risk-row">
-                      <div><strong>Parallel page edits</strong><span>Scope is limited to the project page directory.</span></div>
-                      <span class="pill blue">Tracked</span>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            </div>
+              <section className="projectPanel projectGlass">
+                <div className="projectCardHeader">
+                  <h3>Risks</h3>
+                  <span className={`projectPill ${openRiskCount === 0 ? 'green' : 'amber'}`}>
+                    {openRiskCount === 0 ? 'Reviewed' : 'Needs review'}
+                  </span>
+                </div>
+                <div className="projectList">
+                  {projectRisks.map((risk) => (
+                    <article className="projectRiskRow" key={risk.id}>
+                      <div>
+                        <strong>{risk.title}</strong>
+                        <p className="projectMuted">{risk.detail}</p>
+                      </div>
+                      <span className={`projectPill ${statusTone(risk.status)}`}>{risk.status}</span>
+                      <button
+                        className="projectMiniButton"
+                        disabled={!risk.reviewable}
+                        onClick={() => toggleRisk(risk.id)}
+                        type="button"
+                      >
+                        {risk.reviewable && risk.status === 'Reviewed' ? 'Reopen' : 'Review'}
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </aside>
           </div>
         </main>
       </div>
+
+      {isTaskPanelOpen ? (
+        <aside className="projectDrawer projectGlass" aria-label="New task panel">
+          <div className="projectCardHeader">
+            <h3>New task draft</h3>
+            <button className="projectIconButton" onClick={closeTaskPanel} type="button" aria-label="Close">
+              X
+            </button>
+          </div>
+          <p className="projectMuted">
+            This panel is local UI only. It demonstrates how the project page will expose task creation without connecting
+            a backend.
+          </p>
+          <div className="projectField">
+            <label htmlFor="task-title">Title</label>
+            <input
+              id="task-title"
+              onChange={(event) => updateTaskForm('title', event.target.value)}
+              value={taskForm.title}
+            />
+          </div>
+          <div className="projectField">
+            <label htmlFor="task-owner">Owner</label>
+            <input
+              id="task-owner"
+              onChange={(event) => updateTaskForm('owner', event.target.value)}
+              value={taskForm.owner}
+            />
+          </div>
+          <div className="projectField">
+            <label htmlFor="task-note">Note</label>
+            <textarea
+              id="task-note"
+              onChange={(event) => updateTaskForm('detail', event.target.value)}
+              value={taskForm.detail}
+            />
+          </div>
+          <div className="projectButtonRow">
+            <button className="projectPrimaryButton" disabled={!canSaveTask} onClick={saveTask} type="button">
+              Save draft locally
+            </button>
+            <button className="projectSecondaryButton" onClick={closeTaskPanel} type="button">
+              Close
+            </button>
+          </div>
+          {!canSaveTask ? <span className="projectSyncMessage warning">Title and owner are required.</span> : null}
+        </aside>
+      ) : null}
     </div>
-
-    <script>
-      const tabs = Array.from(document.querySelectorAll(".tab"));
-      const panels = Array.from(document.querySelectorAll(".panel"));
-      tabs.forEach((tab) => {
-        tab.addEventListener("click", () => {
-          const target = tab.getAttribute("data-panel");
-          tabs.forEach((item) => item.classList.toggle("active", item === tab));
-          panels.forEach((panel) => panel.classList.toggle("active", panel.id === target));
-        });
-      });
-
-      const syncButton = document.getElementById("sync-button");
-      const syncState = document.getElementById("sync-state");
-      syncButton.addEventListener("click", () => {
-        syncState.classList.add("visible");
-        syncButton.innerHTML = '<span class="button-icon">✓</span>Sync simulated';
-      });
-
-      const riskButton = document.getElementById("risk-button");
-      const riskCount = document.getElementById("risk-count");
-      const riskLabel = document.getElementById("risk-label");
-      riskButton.addEventListener("click", () => {
-        riskCount.textContent = "2";
-        riskLabel.textContent = "Reviewed";
-        riskLabel.className = "pill green";
-        riskButton.innerHTML = '<span class="button-icon">✓</span>Risk reviewed';
-      });
-
-      const canvas = document.getElementById("antigravity-canvas");
-      const ctx = canvas.getContext("2d");
-      const particles = [];
-      const particleCount = 56;
-
-      function resizeCanvas() {
-        const ratio = window.devicePixelRatio || 1;
-        canvas.width = Math.floor(window.innerWidth * ratio);
-        canvas.height = Math.floor(window.innerHeight * ratio);
-        canvas.style.width = window.innerWidth + "px";
-        canvas.style.height = window.innerHeight + "px";
-        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-      }
-
-      function createParticle() {
-        return {
-          x: Math.random() * window.innerWidth,
-          y: Math.random() * window.innerHeight,
-          vx: (Math.random() - 0.5) * 0.18,
-          vy: -0.16 - Math.random() * 0.22,
-          radius: 1.2 + Math.random() * 2.2,
-          alpha: 0.18 + Math.random() * 0.24,
-          hue: Math.random() > 0.45 ? "37, 99, 235" : "8, 145, 178",
-        };
-      }
-
-      function resetParticles() {
-        particles.length = 0;
-        for (let index = 0; index < particleCount; index += 1) {
-          particles.push(createParticle());
-        }
-      }
-
-      function draw() {
-        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-        for (let index = 0; index < particles.length; index += 1) {
-          const particle = particles[index];
-          particle.x += particle.vx;
-          particle.y += particle.vy;
-
-          if (particle.y < -16) {
-            particle.y = window.innerHeight + 16;
-            particle.x = Math.random() * window.innerWidth;
-          }
-
-          if (particle.x < -16) particle.x = window.innerWidth + 16;
-          if (particle.x > window.innerWidth + 16) particle.x = -16;
-
-          ctx.beginPath();
-          ctx.fillStyle = "rgba(" + particle.hue + ", " + particle.alpha + ")";
-          ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-          ctx.fill();
-
-          for (let inner = index + 1; inner < particles.length; inner += 1) {
-            const other = particles[inner];
-            const distance = Math.hypot(particle.x - other.x, particle.y - other.y);
-            if (distance < 118) {
-              ctx.beginPath();
-              ctx.strokeStyle = "rgba(37, 99, 235, " + (0.055 * (1 - distance / 118)) + ")";
-              ctx.lineWidth = 1;
-              ctx.moveTo(particle.x, particle.y);
-              ctx.lineTo(other.x, other.y);
-              ctx.stroke();
-            }
-          }
-        }
-
-        requestAnimationFrame(draw);
-      }
-
-      window.addEventListener("resize", () => {
-        resizeCanvas();
-        resetParticles();
-      });
-
-      resizeCanvas();
-      resetParticles();
-      draw();
-    </script>
-  </body>
-</html>`;
-
-export function ProjectPage() {
-  return (
-    <iframe
-      title="Project"
-      srcDoc={pageHtml}
-      sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-      style={{ width: "100%", height: "100vh", border: 0, display: "block" }}
-    />
   );
 }
 
-export default ProjectPage;
+export default ProjectPageInteractive;
