@@ -5,6 +5,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { ThreadInfo } from '@shared/types';
 import { useThreads, useRenameThread, useDeleteThread } from '@/api/threadQueries';
 import { useToast } from '@/contexts/ToastContext';
+// TODO: Migrate inline list to ConversationList from @shared/components
+// import { ConversationList } from '@shared/components';
 import styles from './ThreadPanel.module.css';
 
 /** ThreadInfo with optional count metadata the Edge may return. */
