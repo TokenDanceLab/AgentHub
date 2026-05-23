@@ -13,6 +13,9 @@ import (
 
 func opencodePath(t *testing.T) string {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	path := os.Getenv("OPENCODE_PATH")
 	if path == "" {
 		path = "opencode"
