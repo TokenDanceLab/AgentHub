@@ -17,6 +17,7 @@ import RunDetail from '@/components/RunDetail';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ResizeHandle from '@/components/ResizeHandle';
 import PromptInput from '@/components/PromptInput';
+import SearchDialog from '@/components/SearchDialog';
 import styles from '@/App.module.css';
 
 const MIN_SIDEBAR = 200;
@@ -207,6 +208,7 @@ export default function App() {
         onSend={handleSend}
         disabled={!online}
       />
+      <SearchDialog />
     </div>
   );
 }
