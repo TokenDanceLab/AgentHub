@@ -137,6 +137,8 @@ const milestones = [
 ];
 
 const pageStyles = `
+  @import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap");
+
   .projectReactRoot {
     position: relative;
     min-height: 100vh;
@@ -146,7 +148,7 @@ const pageStyles = `
       radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
       radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.14), transparent 30%),
       linear-gradient(135deg, #f7fbff, #edf6ff);
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 
   .projectReactRoot * {
