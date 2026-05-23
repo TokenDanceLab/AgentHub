@@ -13,16 +13,16 @@ import (
 )
 
 type mockMessageService struct {
-	sendMsgFn             func(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error)
-	getMsgsFn             func(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error)
-	getMsgsIncrFn         func(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error)
-	recallFn              func(ctx context.Context, msgID, userID string) error
-	pinFn                 func(ctx context.Context, userID, sessionID, msgID string) error
-	unpinFn               func(ctx context.Context, userID, sessionID, msgID string) error
-	listPinsFn            func(ctx context.Context, userID, sessionID string) ([]service.MessageResponse, error)
-	forwardFn             func(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
-	markReadFn            func(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
-	searchFn              func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
+	sendMsgFn     func(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error)
+	getMsgsFn     func(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]service.MessageResponse, error)
+	getMsgsIncrFn func(ctx context.Context, sessionID, userID string, afterSeq int64, limit int) ([]service.MessageResponse, error)
+	recallFn      func(ctx context.Context, msgID, userID string) error
+	pinFn         func(ctx context.Context, userID, sessionID, msgID string) error
+	unpinFn       func(ctx context.Context, userID, sessionID, msgID string) error
+	listPinsFn    func(ctx context.Context, userID, sessionID string) ([]service.MessageResponse, error)
+	forwardFn     func(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
+	markReadFn    func(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
+	searchFn      func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error)
 }
 
 func (m *mockMessageService) SendMessage(ctx context.Context, sessionID, senderUserID string, req service.SendMessageRequest) (*service.SendMessageResponse, error) {

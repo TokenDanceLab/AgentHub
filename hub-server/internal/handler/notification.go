@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 )
@@ -30,7 +31,7 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 
 	unreadOnly, _ := strconv.ParseBool(c.DefaultQuery("unread_only", "false"))
 
-	limit := 50
+	limit := config.DefaultPaginationLimit
 	if l := c.Query("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil {
 			limit = v

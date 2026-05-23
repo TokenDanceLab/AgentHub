@@ -148,7 +148,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.HTTPServer = &http.Server{
 		Addr:              fmt.Sprintf(":%d", a.Config.Server.Port),
 		Handler:           r,
-		ReadHeaderTimeout: 5 * time.Second,
+		ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       120 * time.Second,
@@ -225,7 +225,7 @@ func (a *App) setupWSManager() {
 	a.mgr.OnRouteDel = a.onRouteDel
 	a.mgr.ResolveMembers = func(sessionID string) []string {
 		ctx := context.Background()
-		ids, err := cache.GetOrLoad(a.CacheClient, ctx, "session:members:"+sessionID, 5*time.Minute, func(ctx context.Context) ([]string, error) {
+		ids, err := cache.GetOrLoad(a.CacheClient, ctx, "session:members:"+sessionID, config.SessionMemberCacheTTL, func(ctx context.Context) ([]string, error) {
 			members, err := repository.ListActiveMembers(a.DB, sessionID)
 			if err != nil {
 				return nil, err
@@ -436,7 +436,7 @@ func (a *App) startAdminServer() {
 	a.AdminServer = &http.Server{
 		Addr:              fmt.Sprintf("127.0.0.1:%d", adminPort),
 		Handler:           adminHandler,
-		ReadHeaderTimeout: 5 * time.Second,
+		ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       120 * time.Second,
