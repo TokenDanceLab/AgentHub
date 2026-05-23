@@ -1,4 +1,4 @@
-﻿package lifecycle
+package lifecycle
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -293,17 +294,24 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, strea
 }
 
 // envForRun builds the environment for a child process.
-// nil env inherits the full parent environment via os.Environ(); a non-nil
-// (possibly empty) env replaces it entirely. This distinction is intentional
-// and tested — do not change without updating TestProcessExecutorNilEnvInheritsParentEnvironment.
+// When profileEnv is nil the child receives a minimal sanitized environment
+// (only whitelisted parent vars + extraEnv + AGENTHUB_* runtime vars).
+// A non-nil profileEnv is used verbatim as the base (administrator-configured).
 func (e *ProcessExecutor) envForRun(run store.Run, profileEnv, extraEnv []string) []string {
-	env := profileEnv
-	if env == nil {
-		env = os.Environ()
+	var env []string
+	if profileEnv == nil {
+		env = SanitizedEnv(nil, extraEnv)
 	} else {
-		env = append([]string(nil), env...)
+		// Administrator explicitly configured the environment — respect it,
+		// but still warn about any sensitive-looking variables it includes.
+		for _, kv := range profileEnv {
+			key, _, _ := strings.Cut(kv, "=")
+			if IsSensitiveEnvKey(key) {
+				slog.Warn("sensitive env var present in explicitly configured agent environment", "key", key)
+			}
+		}
+		env = append(append([]string(nil), profileEnv...), extraEnv...)
 	}
-	env = append(env, extraEnv...)
 	return append(env,
 		"AGENTHUB_RUN_ID="+run.ID,
 		"AGENTHUB_PROJECT_ID="+run.ProjectID,
