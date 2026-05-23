@@ -1,5 +1,6 @@
 // Global search state — client-side index
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 
 export interface SearchResult {
   id: string;
@@ -21,7 +22,8 @@ interface SearchState {
   setSelectedIndex: (i: number) => void;
 }
 
-export const useSearchStore = create<SearchState>((set) => ({
+export const useSearchStore = create<SearchState>()(
+  subscribeWithSelector((set) => ({
   open: false,
   query: '',
   results: [],
@@ -31,4 +33,5 @@ export const useSearchStore = create<SearchState>((set) => ({
   setQuery: (q) => set({ query: q, selectedIndex: 0 }),
   setResults: (r) => set({ results: r }),
   setSelectedIndex: (i) => set({ selectedIndex: i }),
-}));
+  })),
+);

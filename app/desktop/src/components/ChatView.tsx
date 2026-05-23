@@ -5,6 +5,7 @@ import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './Cha
 import MarkdownRenderer from './MarkdownRenderer';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
+import { useToast } from '@/contexts/ToastContext';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -345,6 +346,7 @@ function extractMessageText(msg: ChatMessage): string {
 // ── ChatView ────────────────────────────────
 export default function ChatView({ messages, isStreaming, onRetry, onDelete }: Props) {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
@@ -361,11 +363,12 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
     try {
       await navigator.clipboard.writeText(text);
       setCopiedMessageId(msg.id);
+      showToast('success', t('toast.copied'));
       setTimeout(() => setCopiedMessageId(null), 1500);
     } catch {
-      // clipboard write failed — silently ignore
+      showToast('error', t('toast.error'));
     }
-  }, []);
+  }, [showToast, t]);
 
   const lastMsg = messages[messages.length - 1];
   const lastMsgHasText =
