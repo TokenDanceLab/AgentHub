@@ -14,6 +14,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -37,6 +38,7 @@ type ProcessExecutor struct {
 	profile    RunnerProfile
 	adapter    adapters.AgentAdapter // default adapter; may be nil (raw stdout capture)
 	adapterReg *adapters.Registry    // per-run adapter resolution; may be nil
+	metrics    *metrics.EdgeMetrics  // Prometheus instrumentation; may be nil
 
 	maxConcurrentRuns int // maximum concurrent runs; 0 means use default (5)
 
@@ -82,6 +84,12 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 // defaultRunTimeout is the hard deadline for any agent run. A hung subprocess
 // should not block the executor goroutine forever.
 const defaultRunTimeout = 30 * time.Minute
+
+// SetMetrics attaches Prometheus instrumentation to this executor.
+// It is safe to call with nil to disable metrics.
+func (e *ProcessExecutor) SetMetrics(m *metrics.EdgeMetrics) {
+	e.metrics = m
+}
 
 func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	current, ok := e.store.GetRun(run.ID)
@@ -164,6 +172,30 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 	}
 
+	// Resolve adapter label for Prometheus metrics
+	var adapterLabel string
+	if e.metrics != nil {
+		if adapter != nil {
+			adapterLabel = adapter.Metadata().ID
+		} else {
+			adapterLabel = "none"
+		}
+	}
+
+	var runStartTime time.Time
+	if e.metrics != nil {
+		defer func() {
+			if runStartTime.IsZero() {
+				return // run never started (early failure before cmd.Start)
+			}
+			r, ok := e.store.GetRun(run.ID)
+			if !ok {
+				return
+			}
+			e.metrics.RecordRunFinish(adapterLabel, r.Status, time.Since(runStartTime).Seconds())
+		}()
+	}
+
 	var cmdPath string
 	var args, env []string
 	var workDir string
@@ -242,6 +274,12 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		}
 		e.publishCancelled(run)
 		return
+	}
+
+	// Record metrics: run has started successfully
+	if e.metrics != nil {
+		e.metrics.RecordRunStart(adapterLabel)
+		runStartTime = time.Now()
 	}
 
 	started, ok := e.store.SetRunStatusIf(run.ID, "started", "queued")
