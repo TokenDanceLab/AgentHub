@@ -79,8 +79,8 @@ docs/review/
 !.codex/
 !.codex/skills/
 .codex/skills/*
-!.codex/skills/set-goal/
-!.codex/skills/set-goal/**
+!.codex/skills/dev-loop/
+!.codex/skills/dev-loop/**
 .cursor/
 .continue/
 
