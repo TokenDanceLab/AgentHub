@@ -60,20 +60,6 @@ func (s *lifecycleOnlyStore) SetRunStatusIf(id, status string, allowedCurrent ..
 	return s.SetRunStatus(id, status)
 }
 
-func newExecutorTestRun(t *testing.T, s store.Repository) store.Run {
-	t.Helper()
-	project, _ := s.CreateProject("proj_test", "Test Project")
-	thread, err := s.CreateThread("thread_test", project.ID, "Test Thread")
-	if err != nil {
-		t.Fatalf("CreateThread returned error: %v", err)
-	}
-	run, err := s.CreateRun("run_test", project.ID, thread.ID)
-	if err != nil {
-		t.Fatalf("CreateRun returned error: %v", err)
-	}
-	return run
-}
-
 func TestMockExecutorAcceptsRunLifecycleStore(t *testing.T) {
 	run := store.Run{
 		ID:        "run_test",
@@ -253,16 +239,5 @@ func TestMockExecutorCancelTerminalRunDoesNotRegressStatus(t *testing.T) {
 			case <-time.After(50 * time.Millisecond):
 			}
 		})
-	}
-}
-
-func nextEvent(t *testing.T, ch <-chan events.EventEnvelope) events.EventEnvelope {
-	t.Helper()
-	select {
-	case evt := <-ch:
-		return evt
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timed out waiting for event")
-		return events.EventEnvelope{}
 	}
 }
