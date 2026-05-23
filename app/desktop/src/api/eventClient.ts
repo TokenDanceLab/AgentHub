@@ -1,8 +1,13 @@
 // WebSocket event stream client.
 // Manages connection lifecycle, cursor-based replay, exponential backoff,
 // and application-level ping/pong heartbeat with latency tracking.
+//
+// Supports an optional Transport instance for connection management.
+// When no transport is provided, creates its own WebSocket internally
+// (backward compatible with existing callers).
 
 import { WS_URL } from '@/config';
+import type { Transport, TransportStatus } from './transport';
 import type { EventEnvelope } from '@shared/events';
 
 export type { EventEnvelope };
@@ -22,7 +27,14 @@ export interface StreamHandle {
   close(): void;
 }
 
-export function createEventStream(cursorOrUrl?: string, opts?: { baseUrl?: string }): StreamHandle {
+export interface EventStreamOptions {
+  baseUrl?: string;
+  /** Optional Transport instance. When provided, the stream uses it
+   *  for connection management instead of creating its own WebSocket. */
+  transport?: Transport;
+}
+
+export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOptions): StreamHandle {
   let baseUrl = WS_URL;
   let cursor: string | undefined;
 
@@ -35,21 +47,29 @@ export function createEventStream(cursorOrUrl?: string, opts?: { baseUrl?: strin
   if (opts?.baseUrl) {
     baseUrl = opts.baseUrl;
   }
+
+  const providedTransport = opts?.transport ?? null;
+
+  // Internal WebSocket (only used when no transport is provided)
   let ws: WebSocket | null = null;
-  const handlers: EventHandler[] = [];
-  const statusHandlers: StatusHandler[] = [];
   let reconnectDelay = 1000;
   const MAX_RECONNECT_DELAY = 30000;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const handlers: EventHandler[] = [];
+  const statusHandlers: StatusHandler[] = [];
   let closed = false;
   let lastCursor: string | undefined = cursor;
+
+  // Transport subscriptions (only used when transport is provided)
+  let unsubMessage: (() => void) | null = null;
+  let unsubStatus: (() => void) | null = null;
 
   // Heartbeat state
   let pingTimer: ReturnType<typeof setInterval> | null = null;
   let pongTimer: ReturnType<typeof setTimeout> | null = null;
   let latestLatencyMs: number | null = null;
   let pingSendTime = 0;
-  let lastMessageAt: number = Date.now();
 
   function notifyStatus(connected: boolean) {
     for (const h of statusHandlers) h(connected);
@@ -69,17 +89,80 @@ export function createEventStream(cursorOrUrl?: string, opts?: { baseUrl?: strin
   function startHeartbeat() {
     clearHeartbeat();
     pingTimer = setInterval(() => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      pingSendTime = Date.now();
-      ws.send(JSON.stringify({ type: 'ping', ts: Date.now() }));
+      if (providedTransport) {
+        if (providedTransport.getStatus() !== 'connected') return;
+        pingSendTime = Date.now();
+        providedTransport.send({ type: 'ping', ts: Date.now() });
+      } else {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        pingSendTime = Date.now();
+        ws.send(JSON.stringify({ type: 'ping', ts: Date.now() }));
+      }
       pongTimer = setTimeout(() => {
         console.warn('WebSocket pong timeout, closing connection');
-        if (ws) ws.close();
+        if (providedTransport) {
+          providedTransport.close();
+        } else if (ws) {
+          ws.close();
+        }
       }, PONG_TIMEOUT_MS);
     }, PING_INTERVAL_MS);
   }
 
-  function connect() {
+  function handleMessage(data: Record<string, unknown>) {
+    // Any message proves the connection is alive — clear pong timeout
+    if (pongTimer) {
+      clearTimeout(pongTimer);
+      pongTimer = null;
+    }
+
+    // Application-level pong response — compute round-trip latency
+    if (data.type === 'pong') {
+      if (pingSendTime > 0) {
+        latestLatencyMs = Math.round(Date.now() - pingSendTime);
+        pingSendTime = 0;
+      }
+      return;
+    }
+
+    const envelope = data as unknown as EventEnvelope;
+    lastCursor = String(envelope.seq);
+    for (const handler of handlers) handler(envelope);
+  }
+
+  // ── Transport mode ──────────────────────────────────
+
+  function connectViaTransport(): void {
+    if (closed) return;
+    const t = providedTransport!;
+
+    // Clean up previous subscriptions
+    if (unsubMessage) { unsubMessage(); unsubMessage = null; }
+    if (unsubStatus) { unsubStatus(); unsubStatus = null; }
+
+    unsubStatus = t.on('status', (status: TransportStatus) => {
+      const connected = status === 'connected';
+      if (connected) {
+        startHeartbeat();
+      } else {
+        clearHeartbeat();
+      }
+      notifyStatus(connected);
+    });
+
+    unsubMessage = t.on('message', (data: unknown) => {
+      if (typeof data === 'string') return; // raw string — ignore at event level
+      const record = data as Record<string, unknown>;
+      if (!record || typeof record !== 'object') return;
+      handleMessage(record);
+    });
+
+    t.connect();
+  }
+
+  // ── Direct WebSocket mode (no transport) ────────────
+
+  function connectDirect() {
     if (closed) return;
     const url = lastCursor ? `${baseUrl}?cursor=${encodeURIComponent(lastCursor)}` : baseUrl;
 
@@ -92,29 +175,9 @@ export function createEventStream(cursorOrUrl?: string, opts?: { baseUrl?: strin
     };
 
     ws.onmessage = (event) => {
-      lastMessageAt = Date.now();
-
-      // Any message proves the connection is alive — clear pong timeout
-      if (pongTimer) {
-        clearTimeout(pongTimer);
-        pongTimer = null;
-      }
-
       try {
         const data = JSON.parse(event.data as string);
-
-        // Application-level pong response — compute round-trip latency
-        if (data.type === 'pong') {
-          if (pingSendTime > 0) {
-            latestLatencyMs = Math.round(Date.now() - pingSendTime);
-            pingSendTime = 0;
-          }
-          return;
-        }
-
-        const envelope = data as EventEnvelope;
-        lastCursor = String(envelope.seq);
-        for (const handler of handlers) handler(envelope);
+        handleMessage(data);
       } catch (e) {
         console.error('Failed to parse event:', e);
       }
@@ -134,12 +197,20 @@ export function createEventStream(cursorOrUrl?: string, opts?: { baseUrl?: strin
   function scheduleReconnect() {
     if (closed) return;
     reconnectTimer = setTimeout(() => {
-      connect();
+      connectDirect();
       reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
     }, reconnectDelay);
   }
 
-  connect();
+  // ── Initiate connection ─────────────────────────────
+
+  if (providedTransport) {
+    connectViaTransport();
+  } else {
+    connectDirect();
+  }
+
+  // ── Return StreamHandle ─────────────────────────────
 
   return {
     subscribe(handler: EventHandler): () => void {
@@ -169,6 +240,11 @@ export function createEventStream(cursorOrUrl?: string, opts?: { baseUrl?: strin
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
       }
+      if (unsubMessage) { unsubMessage(); unsubMessage = null; }
+      if (unsubStatus) { unsubStatus(); unsubStatus = null; }
+      if (providedTransport) {
+        providedTransport.close();
+      }
       if (ws) {
         ws.close();
         ws = null;
@@ -178,7 +254,9 @@ export function createEventStream(cursorOrUrl?: string, opts?: { baseUrl?: strin
     },
 
     send(data: Record<string, unknown>): void {
-      if (ws && ws.readyState === WebSocket.OPEN) {
+      if (providedTransport) {
+        providedTransport.send(data);
+      } else if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(data));
       }
     },
