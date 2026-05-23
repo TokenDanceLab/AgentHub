@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { startRun, cancelRun, fetchAgents, fetchThreads, fetchHealth } from '@/api/edgeClient';
-import type { AgentInfo, StartRunRequest } from '@shared/types';
+import type { AgentInfo, ThreadInfo, StartRunRequest } from '@shared/types';
 import type { ChatMessage } from '@/components/ChatView.types';
 import { useUIStore } from '@/stores/uiStore';
 import { useConnectionStore } from '@/stores/connectionStore';
@@ -12,14 +12,16 @@ import { useRunStore } from '@/stores/runStore';
 import StatusBar from '@/components/StatusBar';
 import ThreadPanel from '@/components/ThreadPanel';
 import AgentList from '@/components/AgentList';
-import ChatView from '@/components/ChatView';
-import RunDetail from '@/components/RunDetail';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ResizeHandle from '@/components/ResizeHandle';
 import PromptInput from '@/components/PromptInput';
-import SearchDialog from '@/components/SearchDialog';
 import { SkeletonLine, SkeletonCircle } from '@/components/Skeleton';
 import styles from '@/App.module.css';
+
+// ── Lazy-loaded heavy components ──────────────
+const ChatView = lazy(() => import('@/components/ChatView'));
+const RunDetail = lazy(() => import('@/components/RunDetail'));
+const SearchDialog = lazy(() => import('@/components/SearchDialog'));
 
 const MIN_SIDEBAR = 200;
 const MAX_SIDEBAR = 420;
@@ -216,6 +218,18 @@ export default function App() {
     [rightPanelWidth, setRightPanelWidth],
   );
 
+  // Stable callbacks for memoized presentational components
+  const handleSelectAgent = useCallback((agent: AgentInfo) => {
+    setSelectedAgentId(agent.id);
+  }, []);
+
+  const handleSelectThread = useCallback(
+    (thread: ThreadInfo) => {
+      selectThread(thread.threadId);
+    },
+    [selectThread],
+  );
+
   const allMessages = [...userMessages, ...messages];
 
   return (
@@ -252,7 +266,7 @@ export default function App() {
             threads={threads}
             online={online}
             selectedId={selectedThreadId ?? undefined}
-            onSelect={(th) => selectThread(th.threadId)}
+            onSelect={handleSelectThread}
             onCreate={handleCreateThread}
           />
         </div>
@@ -283,7 +297,7 @@ export default function App() {
                 agents={agents}
                 online={online}
                 selectedId={selectedAgentId}
-                onSelect={(a) => setSelectedAgentId(a.id)}
+                onSelect={handleSelectAgent}
               />
             )}
           </div>
@@ -311,7 +325,28 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <ChatView messages={allMessages} isStreaming={isStreaming} />
+              <Suspense
+                fallback={
+                  <div className={styles.skeletonChat} aria-busy="true" aria-label="Loading chat">
+                    <div className={styles.skeletonChatBubble}>
+                      <SkeletonLine width="90%" height="14px" />
+                      <SkeletonLine width="75%" height="14px" />
+                      <SkeletonLine width="60%" height="14px" />
+                      <SkeletonLine width="45%" height="14px" />
+                    </div>
+                    <div className={styles.skeletonChatBubbleRight}>
+                      <SkeletonLine width="80%" height="14px" />
+                    </div>
+                    <div className={styles.skeletonChatBubble}>
+                      <SkeletonLine width="70%" height="14px" />
+                      <SkeletonLine width="55%" height="14px" />
+                      <SkeletonLine width="35%" height="14px" />
+                    </div>
+                  </div>
+                }
+              >
+                <ChatView messages={allMessages} isStreaming={isStreaming} />
+              </Suspense>
             )}
           </ErrorBoundary>
         </div>
@@ -320,21 +355,30 @@ export default function App() {
 
         <div style={{ width: rightPanelWidth, flexShrink: 0 }}>
           <ErrorBoundary>
-            <RunDetail
-              run={
-                currentRun
-                  ? {
-                      runId: currentRun.runId,
-                      projectId: '',
-                      threadId: selectedThread?.threadId ?? '',
-                      status: currentRun.status,
-                    }
-                  : null
+            <Suspense
+              fallback={
+                <div style={{ padding: '16px', color: 'var(--foreground)' }}>
+                  <SkeletonLine width="60%" height="1em" />
+                  <SkeletonLine width="40%" height="1em" />
+                </div>
               }
-              toolCalls={currentRun?.toolCalls ?? []}
-              changedFiles={currentRun?.changedFiles ?? []}
-              outputText={currentRun?.outputText ?? ''}
-            />
+            >
+              <RunDetail
+                run={
+                  currentRun
+                    ? {
+                        runId: currentRun.runId,
+                        projectId: '',
+                        threadId: selectedThread?.threadId ?? '',
+                        status: currentRun.status,
+                      }
+                    : null
+                }
+                toolCalls={currentRun?.toolCalls ?? []}
+                changedFiles={currentRun?.changedFiles ?? []}
+                outputText={currentRun?.outputText ?? ''}
+              />
+            </Suspense>
           </ErrorBoundary>
         </div>
       </div>
@@ -348,7 +392,9 @@ export default function App() {
         onCancel={handleCancel}
         disabled={!online}
       />
-      <SearchDialog />
+      <Suspense fallback={null}>
+        <SearchDialog />
+      </Suspense>
     </div>
   );
 }

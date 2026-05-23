@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Circle, Search } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import type { AgentInfo } from '@shared/types';
 import styles from './AgentList.module.css';
 
@@ -34,7 +34,7 @@ const capColorClass: Record<string, string> = {
   multiTurn: styles.tagMultiTurn,
 };
 
-export default function AgentList({ agents, online, selectedId, onSelect }: Props) {
+export default memo(function AgentList({ agents, online, selectedId, onSelect }: Props) {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -123,4 +123,4 @@ export default function AgentList({ agents, online, selectedId, onSelect }: Prop
       )}
     </nav>
   );
-}
+});

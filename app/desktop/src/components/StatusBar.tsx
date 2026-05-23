@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Circle, Wifi, WifiOff } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { Circle, Wifi, WifiOff, Sun, Moon } from 'lucide-react';
 import type { HealthResponse } from '@shared/types';
 import { fetchHealth } from '@/api/edgeClient';
 import { HEALTH_POLL_MS } from '@/config';
+import { useTheme } from '@/contexts/ThemeContext';
 import styles from './StatusBar.module.css';
 
 interface Props {
@@ -16,8 +17,9 @@ interface Props {
 const LATENCY_GREEN = 50; // ms
 const LATENCY_YELLOW = 200; // ms
 
-export default function StatusBar({ online, health, isConnected, error }: Props) {
+export default memo(function StatusBar({ online, health, isConnected, error }: Props) {
   const { t } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [errorCount, setErrorCount] = useState(0);
   const [isReconnecting, setIsReconnecting] = useState(false);
@@ -123,6 +125,15 @@ export default function StatusBar({ online, health, isConnected, error }: Props)
           {errorCount > 99 ? '99+' : errorCount}
         </span>
       )}
+      <button
+        className={styles.themeBtn}
+        onClick={toggleTheme}
+        aria-label={theme === 'dark' ? t('theme.light') : t('theme.dark')}
+        title={theme === 'dark' ? t('theme.light') : t('theme.dark')}
+        type="button"
+      >
+        {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+      </button>
     </div>
   );
-}
+});
