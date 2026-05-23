@@ -1,3 +1,5 @@
+> 📦 已归档
+
 # AgentHub 架构
 
 ## Hub-Edge-Runner 架构总览

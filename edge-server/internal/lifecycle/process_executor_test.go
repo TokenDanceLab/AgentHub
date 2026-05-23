@@ -403,9 +403,11 @@ func TestProcessExecutorExtraEnvDoesNotTemplateParentEnvironment(t *testing.T) {
 	}
 }
 
-func TestProcessExecutorNilEnvInheritsParentEnvironment(t *testing.T) {
-	t.Setenv("AGENTHUB_PROCESS_EXECUTOR_HELPER", "1")
-	t.Setenv("AGENTHUB_INHERITED_ENV_FOR_TEST", "expected")
+func TestProcessExecutorNilEnvSanitizesParentEnvironment(t *testing.T) {
+	// Set a non-whitelisted var in the parent — it must NOT leak to the child.
+	t.Setenv("RANDOM_TEST_SECRET_TOKEN", "must-not-leak")
+	// PATH is whitelisted — it SHOULD be visible to the child.
+	parentPath := os.Getenv("PATH")
 
 	bus := events.NewBus(100)
 	s := store.New()
@@ -413,8 +415,12 @@ func TestProcessExecutorNilEnvInheritsParentEnvironment(t *testing.T) {
 	_, ch, _ := bus.Subscribe(0)
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
 		Command: os.Args[0],
-		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "inherited-env"},
+		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "sanitized-env"},
 		Env:     nil,
+		ExtraEnv: []string{
+			"AGENTHUB_PROCESS_EXECUTOR_HELPER=1",
+			"AGENTHUB_PARENT_PATH=" + parentPath,
+		},
 	}, nil, nil)
 	if err != nil {
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
@@ -425,8 +431,13 @@ func TestProcessExecutorNilEnvInheritsParentEnvironment(t *testing.T) {
 	}
 
 	stdoutText := collectStdoutUntilFinished(t, ch)
-	if !strings.Contains(stdoutText, "inherited=expected") {
-		t.Fatalf("stdout text = %q, want inherited env value", stdoutText)
+	// The random secret must NOT appear in the child environment.
+	if strings.Contains(stdoutText, "randomSecret=must-not-leak") {
+		t.Fatalf("stdout text = %q, must NOT contain leaked env value", stdoutText)
+	}
+	// PATH must be present in the child.
+	if !strings.Contains(stdoutText, "sanitizedPath=") {
+		t.Fatalf("stdout text = %q, want PATH to be inherited (whitelisted)", stdoutText)
 	}
 }
 
@@ -653,6 +664,17 @@ func TestProcessExecutorHelper(t *testing.T) {
 		fmt.Fprintf(os.Stdout, "profileThread=%s\n", os.Getenv("PROFILE_THREAD"))
 	case "inherited-env":
 		fmt.Fprintf(os.Stdout, "inherited=%s\n", os.Getenv("AGENTHUB_INHERITED_ENV_FOR_TEST"))
+	case "sanitized-env":
+		path := os.Getenv("PATH")
+		if path == "" {
+			fmt.Fprint(os.Stderr, "PATH not inherited (whitelisted var missing)\n")
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stdout, "sanitizedPath=%s\n", path)
+		randomSecret := os.Getenv("RANDOM_TEST_SECRET_TOKEN")
+		if randomSecret != "" {
+			fmt.Fprintf(os.Stdout, "randomSecret=%s\n", randomSecret)
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "unknown helper mode %q\n", mode)
 		os.Exit(2)
