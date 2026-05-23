@@ -87,7 +87,7 @@ func TestMockExecutorAcceptsRunLifecycleStore(t *testing.T) {
 	_, ch, _ := bus.Subscribe(0)
 	executor := NewMockExecutor(bus, lifecycleStore, WithStepDelay(0), WithOutputBatches(nil))
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 	for _, wantType := range []string{"run.started", "run.finished"} {
@@ -116,7 +116,7 @@ func TestMockExecutorPublishesLifecycleEvents(t *testing.T) {
 		WithOutputBatches([]OutputBatch{{Stream: "stdout", Offset: 0, Text: "hello\n"}}),
 	)
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
@@ -146,7 +146,7 @@ func TestMockExecutorPublishesFailedEvent(t *testing.T) {
 	_, ch, _ := bus.Subscribe(0)
 	executor := NewMockExecutor(bus, s, WithStepDelay(0), WithFailedRun(run.ID, nil))
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
@@ -172,10 +172,10 @@ func TestMockExecutorRejectsDuplicateStart(t *testing.T) {
 	run := newExecutorTestRun(t, s)
 	executor := NewMockExecutor(bus, s, WithStepDelay(50*time.Millisecond))
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("first Start returned error: %v", err)
 	}
-	if err := executor.Start(run); !errors.Is(err, ErrRunAlreadyStarted) {
+	if err := executor.Start(run, RunProcessContext{}); !errors.Is(err, ErrRunAlreadyStarted) {
 		t.Fatalf("second Start error = %v, want ErrRunAlreadyStarted", err)
 	}
 }
@@ -187,7 +187,7 @@ func TestMockExecutorCancelPublishesCancelledEvent(t *testing.T) {
 	_, ch, _ := bus.Subscribe(0)
 	executor := NewMockExecutor(bus, s, WithStepDelay(50*time.Millisecond))
 
-	if err := executor.Start(run); err != nil {
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 

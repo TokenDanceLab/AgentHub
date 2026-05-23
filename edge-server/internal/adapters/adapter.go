@@ -7,8 +7,12 @@ import (
 	"context"
 	"io"
 
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
+
+// RunProcessContext is an alias for the shared runnerctx.RunProcessContext.
+type RunProcessContext = runnerctx.RunProcessContext
 
 // AgentAdapter is the unified interface for all Agent CLI backends.
 // Each implementation speaks a CLI's native protocol directly.
@@ -24,8 +28,6 @@ type AgentAdapter interface {
 	Capabilities() AgentCapabilities
 
 	// BuildCommand builds the exec.Cmd arguments for a given run.
-	// Placeholders in args and env are expanded by the caller (ProcessExecutor)
-	// using the existing CommandTemplate system before the process starts.
 	BuildCommand(ctx RunProcessContext) (cmdPath string, args []string, env []string, workDir string)
 
 	// ParseStream reads from the CLI's stdout and emits structured events.
@@ -39,15 +41,6 @@ type EventEmitter interface {
 	Emit(eventType string, scope map[string]any, payload any)
 }
 
-// RunProcessContext provides the context needed to build a command and parse its output.
-type RunProcessContext struct {
-	Run     store.Run
-	Prompt  string // User's message content (for {{run.prompt}})
-	AgentID string // Which agent configuration to use (for {{agent.id}})
-	Model   string // Optional model override (for {{agent.model}})
-	WorkDir string // Working directory (for {{run.workdir}})
-}
-
 // AdapterMetadata holds static adapter identification.
 type AdapterMetadata struct {
 	ID          string // "claude-code", "codex", "opencode", "orchestrator"
@@ -58,40 +51,52 @@ type AdapterMetadata struct {
 
 // AgentCapabilities describes what an agent adapter can do.
 type AgentCapabilities struct {
-	Streaming       bool // Real-time event streaming
-	ToolCalls       bool // Supports tool use/calls
-	FileChanges     bool // Produces file diffs/changes
-	PermissionHooks bool // Supports permission request interception
-	ThinkingVisible bool // Can expose reasoning/thinking content
-	MultiTurn       bool // Supports multi-turn conversations
-	MCPIntegration  bool // Supports MCP tool registration
-	SubAgentSpawn   bool // Can spawn sub-agents (orchestrator)
+	Streaming       bool
+	ToolCalls       bool
+	FileChanges     bool
+	PermissionHooks bool
+	ThinkingVisible bool
+	MultiTurn       bool
+	MCPIntegration  bool
+	SubAgentSpawn   bool
 }
 
 // --- Unified event types emitted by all adapters ---
 
-// AgentEventType enumerates structured event types parsed from agent streams.
 type AgentEventType string
 
 const (
-	EventTextDelta   AgentEventType = "agent.text.delta"    // Streaming text delta
-	EventTextBlock   AgentEventType = "agent.text.block"    // Complete text block
-	EventThinking    AgentEventType = "agent.thinking"      // Reasoning content
-	EventToolCall    AgentEventType = "agent.tool.call"     // Tool execution requested
-	EventToolResult  AgentEventType = "agent.tool.result"   // Tool execution completed
-	EventFileChange  AgentEventType = "agent.file.change"   // File created/modified/deleted
-	EventSessionInit AgentEventType = "agent.session.init"  // Session initialized
-	EventResult      AgentEventType = "agent.result"        // Turn completed/failed
+	EventTextDelta   AgentEventType = "agent.text.delta"
+	EventTextBlock   AgentEventType = "agent.text.block"
+	EventThinking    AgentEventType = "agent.thinking"
+	EventToolCall    AgentEventType = "agent.tool.call"
+	EventToolResult  AgentEventType = "agent.tool.result"
+	EventFileChange  AgentEventType = "agent.file.change"
+	EventSessionInit AgentEventType = "agent.session.init"
+	EventResult      AgentEventType = "agent.result"
 )
 
 // Bus event type strings (prefixed with "run.").
 const (
-	BusEventTextDelta   = "run.agent.text_delta"
-	BusEventTextBlock   = "run.agent.text_block"
-	BusEventThinking    = "run.agent.thinking"
-	BusEventToolCall    = "run.agent.tool_call"
-	BusEventToolResult  = "run.agent.tool_result"
-	BusEventFileChange  = "run.agent.file_change"
-	BusEventSessionInit = "run.agent.session_init"
-	BusEventResult      = "run.agent.result"
+	BusEventTextDelta           = "run.agent.text_delta"
+	BusEventTextBlock           = "run.agent.text_block"
+	BusEventThinking            = "run.agent.thinking"
+	BusEventToolCall            = "run.agent.tool_call"
+	BusEventToolResult          = "run.agent.tool_result"
+	BusEventFileChange          = "run.agent.file_change"
+	BusEventSessionInit         = "run.agent.session_init"
+	BusEventResult              = "run.agent.result"
+	BusEventCompactBoundary     = "run.agent.compact_boundary"
+	BusEventStatusChange        = "run.agent.status_change"
+	BusEventAPIRetry            = "run.agent.api_retry"
+	BusEventTaskStarted         = "run.agent.task_started"
+	BusEventTaskProgress        = "run.agent.task_progress"
+	BusEventTaskNotification    = "run.agent.task_notification"
+	BusEventSessionStateChanged = "run.agent.session_state_changed"
+	BusEventHookStarted         = "run.agent.hook_started"
+	BusEventHookProgress        = "run.agent.hook_progress"
+	BusEventHookResponse        = "run.agent.hook_response"
+	BusEventToolUseSummary      = "run.agent.tool_use_summary"
+	BusEventAuthStatus          = "run.agent.auth_status"
+	BusEventRateLimit           = "run.agent.rate_limit"
 )

@@ -40,7 +40,7 @@ type fakeRunExecutor struct {
 	err     error
 }
 
-func (f *fakeRunExecutor) Start(run store.Run) error {
+func (f *fakeRunExecutor) Start(run store.Run, _ lifecycle.RunProcessContext) error {
 	f.started = append(f.started, run)
 	return f.err
 }
@@ -347,8 +347,8 @@ func TestPostRunsReturnsErrorWhenExecutorStartFails(t *testing.T) {
 	if !ok {
 		t.Fatalf("error body = %#v, want error object", body)
 	}
-	if errObj["code"] != "EXECUTOR_START_FAILED" {
-		t.Fatalf("error code = %#v, want EXECUTOR_START_FAILED", errObj["code"])
+	if errObj["code"] != "executor_start_failed" {
+		t.Fatalf("error code = %#v, want executor_start_failed", errObj["code"])
 	}
 }
 
@@ -834,8 +834,8 @@ func TestGetHealthWrongMethod(t *testing.T) {
 	var body map[string]any
 	json.NewDecoder(rec.Body).Decode(&body)
 	errObj := body["error"].(map[string]any)
-	if errObj["code"] != "METHOD_NOT_ALLOWED" {
-		t.Errorf("expected METHOD_NOT_ALLOWED, got %v", errObj["code"])
+	if errObj["code"] != "method_not_allowed" {
+		t.Errorf("expected method_not_allowed, got %v", errObj["code"])
 	}
 }
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/agenthub/edge-server/internal/store"
+	"github.com/agenthub/edge-server/internal/runnerctx"
 )
 
 type RunnerProfile struct {
@@ -19,13 +19,8 @@ type CommandTemplate struct {
 	Env  []string
 }
 
-type RunProcessContext struct {
-	Run     store.Run
-	Prompt  string // User message content ({{run.prompt}})
-	AgentID string // Agent adapter ID ({{agent.id}})
-	Model   string // Model override ({{agent.model}})
-	WorkDir string // Working directory ({{run.workdir}})
-}
+// RunProcessContext is an alias for the shared runnerctx.RunProcessContext.
+type RunProcessContext = runnerctx.RunProcessContext
 
 func NewGenericRunnerProfile(command string, args, env, extraEnv []string, workDir string) (RunnerProfile, error) {
 	command = strings.TrimSpace(command)

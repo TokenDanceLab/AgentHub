@@ -1,17 +1,19 @@
 package adapters
 
 import (
+	"bufio"
 	"context"
-	"fmt"
+	"encoding/json"
 	"io"
+	"log/slog"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
 
 // OpenCodeAdapter integrates the opencode CLI.
 //
-// Phase 1: opencode run "prompt" -- batch mode, plain text output.
-// Phase 2: opencode serve --port N -- HTTP REST + SSE streaming.
+// Phase 1: opencode run "prompt" — batch mode, plain text output.
+// Phase 2: opencode run "prompt" --format json — structured JSON events.
 type OpenCodeAdapter struct {
 	binaryPath string
 }
@@ -31,10 +33,11 @@ func (a *OpenCodeAdapter) Metadata() AdapterMetadata {
 
 func (a *OpenCodeAdapter) Capabilities() AgentCapabilities {
 	return AgentCapabilities{
-		Streaming:  false, // Phase 1: batch only; P1: SSE via serve
-		ToolCalls:  true,
-		FileChanges: true,
-		MultiTurn:  true,
+		Streaming:       true, // Phase 2: JSON event streaming
+		ToolCalls:       true,
+		FileChanges:     true,
+		ThinkingVisible: true,
+		MultiTurn:       true,
 	}
 }
 
@@ -44,12 +47,22 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		prompt = "Continue."
 	}
 
-	args := []string{"run", prompt}
+	args := []string{"run", "--format", "json"}
 
 	model := ctx.Model
 	if model != "" {
 		args = append(args, "-m", model)
 	}
+	if ctx.SessionID != "" {
+		args = append(args, "--session", ctx.SessionID)
+	} else if ctx.ContinueLast {
+		args = append(args, "--continue")
+	}
+	if ctx.ForkSession {
+		args = append(args, "--fork")
+	}
+
+	args = append(args, prompt)
 
 	workDir := ctx.WorkDir
 	if workDir == "" {
@@ -66,34 +79,97 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 }
 
 func (a *OpenCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
-	// Phase 1: opencode run writes plain text to stdout.
-	// Phase 2 will implement SSE parsing from serve mode.
-	buf := make([]byte, 32*1024)
-	offset := 0
 	scope := map[string]any{
 		"projectId": run.ProjectID,
 		"threadId":  run.ThreadID,
 		"runId":     run.ID,
 	}
 
-	for {
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 256*1024), 10*1024*1024)
+
+	for scanner.Scan() {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		n, err := stdout.Read(buf)
-		if n > 0 {
-			text := string(buf[:n])
-			emitter.Emit(BusEventTextDelta, scope, map[string]any{
-				"content": text,
-				"offset":  offset,
-			})
-			offset += n
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
 		}
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return fmt.Errorf("opencode stdout: %w", err)
+		var evt opencodeEvent
+		if err := json.Unmarshal(line, &evt); err != nil {
+			slog.Debug("opencode: skipping unparseable line", "err", err)
+			continue
 		}
+		a.dispatch(scope, emitter, &evt)
 	}
+	return scanner.Err()
+}
+
+func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
+	switch evt.Type {
+	case "step_start":
+		emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
+			"state": "busy",
+		})
+	case "text":
+		if evt.Part != nil {
+			emitter.Emit(BusEventTextDelta, scope, map[string]any{
+				"content": evt.Part.Text,
+			})
+		}
+	case "tool_use":
+		if evt.Part != nil {
+			emitter.Emit(BusEventToolCall, scope, map[string]any{
+				"callId":   evt.Part.CallID,
+				"toolName": evt.Part.ToolName,
+				"input":    evt.Part.Input,
+				"status":   evt.Part.State,
+			})
+		}
+	case "reasoning":
+		if evt.Part != nil {
+			emitter.Emit(BusEventThinking, scope, map[string]any{
+				"content": evt.Part.Text,
+			})
+		}
+	case "step_finish":
+		if evt.Part != nil {
+			emitter.Emit(BusEventResult, scope, map[string]any{
+				"success": evt.Part.Reason == "stop",
+				"reason":  evt.Part.Reason,
+				"usage":   evt.Part.Usage,
+			})
+		}
+		emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
+			"state": "idle",
+		})
+	case "error":
+		emitter.Emit(BusEventResult, scope, map[string]any{
+			"success": false,
+			"error":   evt.ErrorMessage,
+		})
+	default:
+		slog.Debug("opencode: unhandled event type", "type", evt.Type)
+	}
+}
+
+// --- OpenCode JSON event schemas ---
+
+type opencodeEvent struct {
+	Type         string          `json:"type"`
+	Timestamp    int64           `json:"timestamp,omitempty"`
+	SessionID    string          `json:"sessionID,omitempty"`
+	Part         *opencodePart   `json:"part,omitempty"`
+	ErrorMessage string          `json:"error,omitempty"`
+}
+
+type opencodePart struct {
+	Text     string `json:"text,omitempty"`
+	CallID   string `json:"callId,omitempty"`
+	ToolName string `json:"toolName,omitempty"`
+	Input    any    `json:"input,omitempty"`
+	State    string `json:"state,omitempty"`
+	Reason   string `json:"reason,omitempty"`
+	Usage    any    `json:"usage,omitempty"`
 }
