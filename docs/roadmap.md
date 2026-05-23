@@ -368,16 +368,16 @@ Hub 调度（远程）:
   - 离线消息队列：新建 `offlineQueue.ts`，断线入队 localStorage，重连后按序发送
   - 传输层抽象：新建 `transport.ts` Transport 接口，WebSocketTransport / MockTransport 实现
 
-- [ ] **P0-4: 性能基础** `[2d]`
-  - 虚拟滚动：`@tanstack/react-virtual`，>200 条消息时启用
-  - App.tsx 视图注册表拆分：新建 `viewRegistry.ts`，从 500+ 行拆分
+- [x] **P0-4: 性能基础** `[2d]`
+  - ✅ 虚拟滚动：`@tanstack/react-virtual`（M5 完成，`ChatView.tsx` + `useAutoScroll.ts`）
+  - [ ] App.tsx 视图注册表拆分：新建 `viewRegistry.ts`，从 500+ 行拆分
 
 ##### Quick Wins（<1 天 / 项）
 
-- [ ] QW-1: 非受控输入迁移（参见 P0-2）
-- [ ] QW-2: 草稿持久化（参见 P0-2）
-- [ ] QW-3: WebSocket 心跳（参见 P0-3）
-- [ ] QW-4: Zustand selector 粒度优化（参见 P0-1）
+- [x] QW-1: 非受控输入迁移（✅ M5 `useRef` 完成）
+- [x] QW-2: 草稿持久化（✅ M5 `useInputDraft.ts` 完成）
+- [x] QW-3: WebSocket 心跳（✅ M5 `eventClient.ts` 完成）
+- [x] QW-4: Zustand selector 粒度优化（✅ M5 `useShallow` 完成）
 - [ ] QW-5: Toast 反馈（新建 `Toast.tsx` 组件）
 
 ---
