@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,6 +32,13 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	flag.Parse()
+	// -short skips integration tests that need PostgreSQL/Redis.
+	// CI and local dev use -short for fast feedback without external services.
+	if testing.Short() {
+		os.Exit(0)
+	}
+
 	gin.SetMode(gin.TestMode)
 	metrics.Register()
 
