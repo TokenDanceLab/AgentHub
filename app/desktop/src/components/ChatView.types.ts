@@ -8,6 +8,7 @@ export interface ChatMessage {
   role: MessageRole;
   timestamp: string;
   blocks: MessageBlock[];
+  parentId?: string;
 }
 
 // ── Message Block types ───────────────────────
