@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -45,6 +46,11 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 }
 
 func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("ws writeLoop panic recovered", "conn_id", conn.ID, "panic", r)
+		}
+	}()
 	ctx := context.Background()
 	for data := range conn.Send {
 		err := conn.W.Write(ctx, websocket.MessageText, data)
@@ -149,5 +155,7 @@ func (h *WebSocketHandler) sendFrame(conn *ws.Conn, frame ws.Frame) {
 	select {
 	case conn.Send <- data:
 	default:
+		metrics.WSDroppedFrames.Inc()
+		slog.Warn("ws frame dropped: send buffer full", "conn_id", conn.ID, "user_id", conn.UserID)
 	}
 }
