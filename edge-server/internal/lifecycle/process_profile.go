@@ -75,8 +75,8 @@ func (t CommandTemplate) Expand(ctx RunProcessContext) ([]string, []string, erro
 		args = append(args, expanded)
 	}
 
-	var env []string
-	if t.Env != nil {
+	var env []string //nolint:prealloc // nil preserves parent env inheritance; prealloc only when t.Env populated
+	if len(t.Env) > 0 {
 		env = make([]string, 0, len(t.Env))
 	}
 	for _, entry := range t.Env {

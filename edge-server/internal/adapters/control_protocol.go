@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"sync"
 )
 
 // ControlHandler receives control messages from the CLI's stdout and can respond on stdin.
@@ -19,7 +18,7 @@ type ControlHandler interface {
 
 // ControlMessage represents a control_request or control_response on stdout.
 type ControlMessage struct {
-	Type      string          `json:"type"`                // "control_request", "control_response", "control_cancel_request"
+	Type      string          `json:"type"` // "control_request", "control_response", "control_cancel_request"
 	RequestID string          `json:"request_id,omitempty"`
 	Request   json.RawMessage `json:"request,omitempty"`
 	Response  json.RawMessage `json:"response,omitempty"`
@@ -27,24 +26,24 @@ type ControlMessage struct {
 
 // ControlRequestInner is the inner request payload.
 type ControlRequestInner struct {
-	Subtype          string           `json:"subtype"`
-	ToolName         string           `json:"tool_name,omitempty"`
-	Input            any              `json:"input,omitempty"`
-	ToolUseID        string           `json:"tool_use_id,omitempty"`
-	PermissionSuggestions []any       `json:"permission_suggestions,omitempty"`
-	AgentID          string           `json:"agent_id,omitempty"`
-	Description      string           `json:"description,omitempty"`
-	TaskID           string           `json:"task_id,omitempty"`
-	Mode             string           `json:"mode,omitempty"`
-	Model            string           `json:"model,omitempty"`
-	MaxThinkingTokens *int            `json:"max_thinking_tokens,omitempty"`
+	Subtype               string `json:"subtype"`
+	ToolName              string `json:"tool_name,omitempty"`
+	Input                 any    `json:"input,omitempty"`
+	ToolUseID             string `json:"tool_use_id,omitempty"`
+	PermissionSuggestions []any  `json:"permission_suggestions,omitempty"`
+	AgentID               string `json:"agent_id,omitempty"`
+	Description           string `json:"description,omitempty"`
+	TaskID                string `json:"task_id,omitempty"`
+	Mode                  string `json:"mode,omitempty"`
+	Model                 string `json:"model,omitempty"`
+	MaxThinkingTokens     *int   `json:"max_thinking_tokens,omitempty"`
 }
 
 // ControlResponseInner is the response to a control_request.
 type ControlResponseInner struct {
 	Subtype            string `json:"subtype"`
 	RequestID          string `json:"request_id,omitempty"`
-	Behavior           string `json:"behavior,omitempty"`           // "allow", "deny"
+	Behavior           string `json:"behavior,omitempty"` // "allow", "deny"
 	UpdatedInput       any    `json:"updatedInput,omitempty"`
 	Message            string `json:"message,omitempty"`
 	Interrupt          bool   `json:"interrupt,omitempty"`
@@ -70,8 +69,10 @@ type PermissionDecision struct {
 
 // DefaultPermissionHandler auto-approves all tool use (bypassPermissions equivalent).
 // Replace with a proper approval engine for production use.
+// For production, use EventEmittingPermissionHandler which emits events to the bus
+// and allows Desktop to make the decision.
 type DefaultPermissionHandler struct {
-	mu sync.Mutex
+	emitter EventEmitter // nil = silent auto-approve; non-nil = emit permission events
 }
 
 func (h *DefaultPermissionHandler) HandleControlRequest(ctx context.Context, stdin io.Writer, msg ControlMessage) error {
@@ -93,6 +94,16 @@ func (h *DefaultPermissionHandler) HandleControlRequest(ctx context.Context, std
 }
 
 func (h *DefaultPermissionHandler) handleCanUseTool(stdin io.Writer, requestID string, inner *ControlRequestInner) error {
+	// Emit permission_requested so Desktop can display approval UI
+	if h.emitter != nil {
+		h.emitter.Emit("run.agent.permission_requested", nil, map[string]any{
+			"requestId": requestID,
+			"toolName":  inner.ToolName,
+			"toolUseId": inner.ToolUseID,
+			"input":     inner.Input,
+		})
+	}
+
 	resp := ControlMessage{
 		Type:      "control_response",
 		RequestID: requestID,
@@ -117,8 +128,26 @@ func (h *DefaultPermissionHandler) handleCanUseTool(stdin io.Writer, requestID s
 	if _, err := stdin.Write(data); err != nil {
 		return fmt.Errorf("write control_response: %w", err)
 	}
+
+	// Emit permission_decided after auto-approval
+	if h.emitter != nil {
+		h.emitter.Emit("run.agent.permission_decided", nil, map[string]any{
+			"requestId": requestID,
+			"toolName":  inner.ToolName,
+			"toolUseId": inner.ToolUseID,
+			"decision":  "allow",
+		})
+	}
+
 	slog.Debug("control: auto-allowed tool", "tool", inner.ToolName, "toolUseId", inner.ToolUseID)
 	return nil
+}
+
+// NewEventEmittingPermissionHandler creates a handler that emits permission events
+// to the EventEmitter while still auto-approving all tools.
+// This allows Desktop to observe permission activity without blocking execution.
+func NewEventEmittingPermissionHandler(emitter EventEmitter) *DefaultPermissionHandler {
+	return &DefaultPermissionHandler{emitter: emitter}
 }
 
 // WriteInterrupt sends an interrupt control_request to the CLI via stdin.
