@@ -4,7 +4,23 @@
 
 ## 当前总目标
 
-推进 M2 Edge 本地数据层，让前端、后端、客户端三条线能围绕稳定的 Project / Thread / Run / Item / Event 模型并行开发。当前客户端 PR #30 已提供内存态最小实现，`feat/client-thread-messages-delicious233` 已补 message/item 写入链路，`feat/client-run-lifecycle-delicious233` 已抽出 Runner lifecycle 边界，`feat/client-store-boundary-delicious233` 已抽象 Edge store 接口边界，`feat/client-store-persistence-delicious233` 已提供轻量 JSON 文件持久化实现，`feat/client-edge-store-file-flag-delicious233` 已接入 Edge 启动参数 `--store-file`，`feat/client-runner-process-adapter-delicious233` 已补本地进程 executor 边界，`feat/client-runner-workdir-delicious233` 已补本地进程工作目录边界，`feat/client-runner-adapter-profile-delicious233` 已补 generic adapter profile / 命令模板最小层，`feat/client-runner-profile-preset-delicious233` 已补 `agenthub-runner-mock` preset 入口，`feat/client-runner-context-delicious233` 已让仓库自带 Runner mock 读取 Edge 注入的 Run 上下文，`feat/client-runner-edge-smoke-delicious233` 已补 Edge ProcessExecutor 启动仓库 Runner mock CLI 的集成测试，`feat/client-httpserver-runner-wiring-delicious233` 已补 Edge HTTP server 将 ProcessExecutor 装配进 Handler 的测试，`feat/client-smoke-runner-context-delicious233` 已补本地 smoke 对 Edge -> Runner mock 上下文输出的验证，下一步重点是真实 Runner adapter。
+Desktop M3 收口——已完成 M2 设计系统+状态管理+渐进展开，M3.1 消息树+DiffViewer。Edge AgentAdapter 已具备完整 NDJSON 协议。Web 前端 5 页面预览壳已上线。
+
+## 当前活跃分支
+
+```
+dev/delicious233          ← 主 dev（Delicious233）: Desktop M3 + Edge + 共享
+dev/trump                 ← Trump dev: Web 前端 + 同步 Desktop
+
+feat/desktop-sidecar      ← Desktop 工作区 → dev/delicious233
+feat/edge-adapters        ← Edge 工作区 → 已合入 dev/delicious233
+feat/trump-webui          ← Web 工作区 → dev/trump
+
+feat/frontend-page-preview ← 归档（Trump 旧 HTML mockup）
+feat/frontend-webui        ← 归档（Trump 旧分支）
+```
+
+合并方向：`feat/* → dev/delicious233 → dev/trump → (review) → dev/delicious233 → master`
 
 ## 路线图分层
 
@@ -16,48 +32,48 @@
 
 ## 基本原则
 
-- Go 优先：Hub Server、Edge Server、Runner 使用 Go。
+- Go 优先：Hub Server、Edge Server 使用 Go。
 - 协议简单：REST JSON API + WebSocket typed events 是当前主线。
-- 中文优先：README、AGENTS、issue、PR 和项目文档中文为主；代码标识保持英文。
-- 隐私安全：本机状态、密钥、真实服务器信息和个人路径不进仓库。
-- 渐进式加载：先读 `AGENTS.md` 和任务相关主文档，不全文扫描调研资料。
+- UI 使用 React + TypeScript。Desktop 使用 Tauri v2。Web 使用 Vite。
+- 设计系统：OKLCH 色彩空间、shadcn 语义 token、3 字号 + 2 字重 + 零阴影。
+- 状态管理：Zustand 工厂模式（客户端状态）、WebSocket 事件只做增量。
+- Runner 策略：AgentHub 不实现自己的 Agent 架构——Claude Code/Codex/OpenCode 作为 Runner。
+- AgentHub 负责：进程管理、工作区隔离、CLI 输出解析、Diff 查看、审批桥接、IM 聊天。
 
-## 里程碑
+## M2 完成项（Desktop 基础架构）
 
-- [x] M1 客户端本地链路：Desktop Shell + Local Edge + Mock Runner + smoke test。
-- [ ] M2 Edge 本地数据层：Project / Thread / Run / Item / EventStore。最小内存实现已在 PR #30，message/item 写入链路、Runner lifecycle 边界、store 接口边界、轻量 JSON 文件持久化实现和 `--store-file` 启动参数已补齐，SQLite 仍是后续可选评估项。
-- [ ] M3 真实 Runner：CLI Agent 进程、取消、日志、错误映射。本地进程 executor、本地进程工作目录边界、generic adapter profile / 命令模板最小层和仓库自带 mock Runner preset 已补齐，但还不是 Claude Code / Codex / OpenCode 的完整 adapter。
-- [ ] M4 Workspace 能力：worktree、diff、preview、artifact、approval。
-- [ ] M5 Hub 协作链路：Edge-Hub sync、远程查看、远程审批。
+| 模块 | 内容 | 状态 |
+|------|------|------|
+| OKLCH tokens.css | hex→OKLCH, 3字号+2字重+零阴影, dark/light 双主题 | ✅ |
+| CSS Module 迁移 | 9 文件旧 token→新 OKLCH, srgb→oklch | ✅ |
+| Zustand stores | uiStore, connectionStore, threadStore, runStore | ✅ |
+| App.tsx 重构 | useState→Zustand selectors | ✅ |
+| 渐进展开 L0-L2 | 条件渲染替代 details/summary, ThinkingBlock+ToolUseBlock | ✅ |
+| DiffCard 内联 | 文件头+统计+hunk预览, agenthub:open-diff 事件 | ✅ |
 
-## 当前活跃方向
+## M3 进行中（消息树 + 事件持久化）
 
-- 前端：从 Mock 数据过渡到真实 REST / WebSocket client，承接 UI 同学设计。
-- 后端：实现 Hub Server、Edge-Hub 通信、账号/群聊/同步/中继能力。
-- 客户端：PR #30 推进 Edge 本地数据层，`feat/client-thread-messages-delicious233` 补齐 message/item 写入链路，`feat/client-run-lifecycle-delicious233` 和 `feat/client-store-boundary-delicious233` 分别补齐 lifecycle/store 可替换边界，`feat/client-store-persistence-delicious233` 增加轻量 JSON 文件持久化 store，`feat/client-edge-store-file-flag-delicious233` 将文件 store 接入 Edge 启动入口，`feat/client-runner-process-adapter-delicious233` 增加可测试的本地进程 executor，`feat/client-runner-workdir-delicious233` 增加本地进程工作目录配置，`feat/client-runner-adapter-profile-delicious233` 增加可测试的 generic adapter profile / 命令模板最小层，`feat/client-runner-profile-preset-delicious233` 增加可测试的 `agenthub-runner-mock` preset 入口，`feat/client-runner-context-delicious233` 让 mock Runner stdout 稳定带上 Run / Project / Thread 上下文，`feat/client-runner-edge-smoke-delicious233` 验证 Edge ProcessExecutor 能启动仓库 Runner mock CLI 并聚合真实上下文输出，`feat/client-httpserver-runner-wiring-delicious233` 验证 HTTP server 配置能把 ProcessExecutor 装配进 Handler，`feat/client-smoke-runner-context-delicious233` 让本地 smoke 默认自启动 Edge 时接入 Runner mock binary 并验证上下文输出，后续继续做真实 Runner adapter。
+| 模块 | 内容 | 状态 |
+|------|------|------|
+| message-tree | buildTree O(n), flattenActivePath, DIRECT_PATH/INCLUDE_BRANCHES fork | ✅ |
+| SiblingSwitch | 分支导航 ← 2/5 → | ✅ |
+| DiffViewer | unified diff, 折叠文件头, hunk 渲染 | ✅ |
+| EventStore JSONL | 追加写入 + 2MB 快照 + zstd 压缩 | ⏳ |
+| Context Builder | 6 步管线 + reserveRatio=0.05 | ⏳ |
 
-## 验收门槛
+## M4 计划
 
-- [ ] 当前分支路线图已更新。
-- [ ] 相关方向路线图已更新。
-- [ ] 测试或确定性检查已运行。
-- [ ] API 或事件变化已同步 `api/`。
-- [ ] `git status --short --branch` 已检查。
+| 模块 | 内容 |
+|------|------|
+| 权限桥接 | ResolveOnce 竞速：CLI 触发→UI 响应 |
+| 工作区隔离 | git worktree per run (Emdash WorktreeHost 模式) |
+| 文档同步 | system-architecture.md / implementation-guide.md 更新 |
+| e2e 收口 | client-smoke.ps1 全链路 |
 
-## 待办池
+## Desktop 测试
 
-- [x] 抽象 Edge store 可替换接口边界。
-- [x] 增加 Edge store 轻量 JSON 文件持久化实现；SQLite 依赖获取问题保留为后续可选评估。
-- [x] 为 Edge 启动入口接入可选 `--store-file <path>`，未传时继续使用内存 store。
-- [x] 在客户端 M2 基础上补 `POST /v1/threads/{threadId}/messages` 到 Item / event 的写入链路。
-- [x] 增加 Edge 本地进程 executor 边界，支持 stdout/stderr、成功、失败和取消事件映射。
-- [x] 为 Edge 本地进程 executor 增加工作目录配置边界；这只是本地进程 workdir 能力，不是完整真实 Runner adapter。
-- [x] 为 Edge 本地进程 executor 增加 generic adapter profile / 命令模板最小层，支持从 Run 上下文展开 args/env。
-- [x] 为 Edge 启动入口增加 `--runner-profile agenthub-runner-mock` preset，默认使用仓库自带 Runner mock CLI。
-- [x] 让仓库自带 `agenthub-runner --mock` 读取 Edge 注入的 Run / Project / Thread 环境变量，并在 stdout 输出稳定上下文行。
-- [x] 增加 Edge ProcessExecutor 到仓库 Runner mock CLI 的集成测试，覆盖 `run.started`、stdout `run.output.batch`、上下文输出和 `run.finished`。
-- [x] 增加 Edge HTTP server 到 ProcessExecutor 的装配测试，覆盖默认 mock 延迟装配和配置进程 executor 后的 `POST /v1/runs` 启动链路。
-- [x] 补强 `scripts/client-smoke.ps1`，默认自启动 Edge 时接入 Runner mock binary，并通过 WebSocket 验证当前 run 的 stdout 上下文。
-- [ ] 将 Runner 真正接入 Edge Run lifecycle，替换 handler 内置 mock flow。
-- [ ] M2 完成后归档或更新 `docs/client-roadmap.md`，避免路线图重复。
-- [ ] 为 Runner 真实 CLI adapter 规划最小测试夹具。
+当前 123/123 单测通过 (Vitest)。覆盖：
+- API client / errors / hooks / eventClient（原有 30）
+- ChatView / AgentList / PromptInput / ThreadPanel / RunDetail（新增 81）
+- useChatMessages（新增 25，含 tool_use 层级嵌套）
+- message-tree（新增 12，buildTree/flattenActivePath/fork/cycle detection）
