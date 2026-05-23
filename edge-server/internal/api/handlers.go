@@ -369,7 +369,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			IncludePartial:    req.IncludePartial,
 		}
 		if err := h.Executor.Start(run, runCtx); err != nil {
-			writeJSON(w, http.StatusInternalServerError, errorResponse("executor_start_failed", "failed to start run executor"))
+			writeJSON(w, http.StatusInternalServerError, errorResponse("executor_start_failed", fmt.Sprintf("failed to start run executor: %v", err)))
 			return
 		}
 	}
