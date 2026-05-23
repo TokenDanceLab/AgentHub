@@ -137,7 +137,6 @@ func (a *App) Run(ctx context.Context) error {
 	// Background goroutines
 	a.startTaskScheduler(a.coreCtx)
 	a.startWebSocketCleanup(a.coreCtx)
-	a.startNotificationCleanup(a.coreCtx)
 
 	// Admin server (pprof + metrics)
 	a.startAdminServer()
@@ -411,12 +410,6 @@ func (a *App) startTaskScheduler(ctx context.Context) {
 // startWebSocketCleanup starts heartbeat-based stale connection cleanup.
 func (a *App) startWebSocketCleanup(ctx context.Context) {
 	a.mgr.StartHeartbeat()
-}
-
-// startNotificationCleanup is reserved for periodic notification cleanup (e.g., purging old notifications).
-// Currently no cleanup logic exists; this is a placeholder for future implementation.
-func (a *App) startNotificationCleanup(ctx context.Context) {
-	// TODO: Periodically purge expired/old notifications when policy is defined.
 }
 
 // startAdminServer starts the admin HTTP server with pprof and /metrics endpoints.
