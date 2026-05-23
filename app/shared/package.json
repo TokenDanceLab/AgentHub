@@ -10,6 +10,8 @@
     "./types": "./src/types.ts",
     "./events": "./src/events.ts",
     "./errors": "./src/errors.ts",
-    "./tree": "./src/tree.ts"
+    "./apiClient": "./src/apiClient.ts",
+    "./eventClient": "./src/eventClient.ts",
+    "./mock": "./src/mock.ts"
   }
 }

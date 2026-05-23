@@ -82,18 +82,8 @@ docs/review/
 .agents/skills/*
 !.agents/skills/dev-loop/
 !.agents/skills/dev-loop/**
-!.agents/skills/test-coverage/
-!.agents/skills/test-coverage/**
-!.agents/skills/pre-push/
-!.agents/skills/pre-push/**
-!.agents/skills/integration-test/
-!.agents/skills/integration-test/**
 .cursor/
 .continue/
-
-# Agent inbox — reports dropped by other agents, local only
-docs/inbox/*
-!docs/inbox/README.md
 
 # Cloned reference repos (at repo root only)
 /reference/*
