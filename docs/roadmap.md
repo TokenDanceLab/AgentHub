@@ -54,7 +54,7 @@ feat/trump-webui          ← Web 前端（Trump）
 ### P1 级（成熟聊天产品标配）
 - [x] ThreadPanel: 重命名/删除 + 消息/运行计数（sonnet agent 实现: inline edit + confirm delete + PATCH/DELETE API）
 - [x] DiffViewer: 单块 Accept/Reject 交互（haiku agent 实现: Check/X toggle + 透明度/删除线反馈）
-- [ ] ChatView: 消息操作（复制/重试/删除）→ haiku agent 进行中
+- [x] ChatView: 消息操作（复制/重试/删除）→ haiku agent 实现
 - [ ] AgentList: 搜索过滤 + 描述面板 + 标签 → haiku agent 进行中
 
 ### P2 级（打磨）
