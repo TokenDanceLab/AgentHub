@@ -29,7 +29,9 @@ func NewBus() *Bus {
 	pool, err := ants.NewPool(1024,
 		ants.WithNonblocking(false),
 		ants.WithPanicHandler(func(p interface{}) {
-			metrics.EventBusPanics.Inc()
+			if metrics.EventBusPanics != nil {
+				metrics.EventBusPanics.Inc()
+			}
 			slog.Error("eventbus panic recovered", "error", p, "stack", string(debug.Stack()))
 		}),
 	)
@@ -61,7 +63,9 @@ func (b *Bus) Publish(ctx context.Context, event Event) {
 		err := b.pool.Submit(func() {
 			defer func() {
 				if r := recover(); r != nil {
-					metrics.EventBusPanics.Inc()
+					if metrics.EventBusPanics != nil {
+						metrics.EventBusPanics.Inc()
+					}
 					slog.Error("eventbus panic recovered", "error", r, "stack", string(debug.Stack()))
 				}
 				b.pending.Add(-1)
