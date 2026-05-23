@@ -5,6 +5,33 @@
   flex-shrink: 0;
 }
 
+.configRow {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md) 0;
+}
+
+.select {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  outline: none;
+}
+
+.select:focus {
+  border-color: var(--primary);
+}
+
+.select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .bar {
   display: flex;
   align-items: center;
