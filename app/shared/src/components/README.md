@@ -1,30 +1,62 @@
-# 共享 UI 组件规范
+# Shared UI Components
 
-## 文件结构
+## File Structure
+
 ```
 components/
   ComponentName/
-    ComponentName.tsx       — React 组件（named export only）
-    ComponentName.module.css — CSS Module
-    ComponentName.test.tsx   — 单元测试（可选）
-    index.ts                 — re-export
+    ComponentName.tsx          — React component (named export only)
+    ComponentName.module.css   — CSS Module
+    ComponentName.test.tsx     — unit tests (optional)
+    index.ts                   — barrel re-export
 ```
 
-## 命名规则
-- 目录/文件：PascalCase（`BrandingSection/`、`AgentCard.tsx`）
-- Props 接口：`{ComponentName}Props`
-- CSS class：`camelCase`（`brandingTitle`、`agentCard`）
-- 只使用 named export，禁止 default export
+## Naming Conventions
 
-## CSS 规则
-- 所有颜色使用 OKLCH CSS 变量（`var(--brand)` 等），禁止硬编码色值
-- 字体使用 `var(--font-sans)` 或 `var(--font-mono)`
-- 圆角使用 `var(--radius-*)` token
-- 禁止 `!important`
-- 禁止使用 `position: absolute` 除非有对应的 `position: relative` 父容器
-- 动画超过 200ms 需包裹在 `@media (prefers-reduced-motion: no-preference)` 中
+- **Directory / file**: PascalCase (`BrandingSection/`, `BrandingSection.tsx`)
+- **Props interface**: `ComponentNameProps` — always exported alongside the component
+- **CSS Module import**: `import styles from './ComponentName.module.css'`
+- **No default exports** — use named exports only
 
-## Props 规则
-- 必须接受 `className?: string` 用于外部样式覆盖
-- 复杂组件使用 `children` 而非硬编码内容
-- 不使用 `any` 类型
+```tsx
+// ComponentName/ComponentName.tsx
+import styles from './ComponentName.module.css';
+
+export interface ComponentNameProps {
+  title: string;
+  className?: string;
+  children?: React.ReactNode;
+}
+
+export function ComponentName({ title, className, children }: ComponentNameProps) {
+  return (
+    <div className={`${styles.root} ${className ?? ''}`}>
+      <h2>{title}</h2>
+      {children}
+    </div>
+  );
+}
+```
+
+## Barrel Export
+
+```ts
+// ComponentName/index.ts
+export { ComponentName } from './ComponentName';
+export type { ComponentNameProps } from './ComponentName';
+```
+
+## CSS Rules
+
+- Use OKLCH CSS variables for colors (`var(--brand)` etc.), never hardcode hex/rgb values
+- Use font tokens: `var(--font-sans)`, `var(--font-mono)`
+- Use radius tokens: `var(--radius-*)`
+- No `!important`
+- No `position: absolute` without a corresponding `position: relative` parent
+- Animations over 200ms must be wrapped in `@media (prefers-reduced-motion: no-preference)`
+
+## Props Rules
+
+- Every component must accept `className?: string` for external style overrides
+- Favor `children` over hardcoded content in complex components
+- Never use `any` — prefer `unknown` if the type is truly unconstrained
