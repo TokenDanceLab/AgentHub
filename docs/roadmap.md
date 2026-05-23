@@ -97,7 +97,7 @@ feat/contributor-b-webui          ← Web 前端（contributor-b）
 | Claude Code | ✅ 5/5 pass | ✅ 24 fixtures | 20+ types | 全链路验证通过 |
 | OpenCode | ✅ 5/5 pass | ✅ 12 tests | 16 types | 全链路验证通过 — newapi/deepseek-v4-pro |
 | Codex | ✅ 3/3 pass | ✅ fixture tests | 9 item types | 全链路验证通过 — gpt-5.5 |
-| Hub Server | ✅ 骨架可运行 | — | 18 routes | 待后端开发 |
+| Hub Server | ✅ 全功能三层架构 | ✅ auth/builder 单元 | 40+ REST + WS | contributor-a 合入 — Gin/GORM/Redis/PG + 15 migration |
 
 ## 验收
 
