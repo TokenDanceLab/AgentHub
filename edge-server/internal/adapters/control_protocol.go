@@ -70,8 +70,11 @@ type PermissionDecision struct {
 
 // DefaultPermissionHandler auto-approves all tool use (bypassPermissions equivalent).
 // Replace with a proper approval engine for production use.
+// For production, use EventEmittingPermissionHandler which emits events to the bus
+// and allows Desktop to make the decision.
 type DefaultPermissionHandler struct {
 	mu sync.Mutex
+	emitter EventEmitter // nil = silent auto-approve; non-nil = emit permission events
 }
 
 func (h *DefaultPermissionHandler) HandleControlRequest(ctx context.Context, stdin io.Writer, msg ControlMessage) error {
@@ -93,6 +96,16 @@ func (h *DefaultPermissionHandler) HandleControlRequest(ctx context.Context, std
 }
 
 func (h *DefaultPermissionHandler) handleCanUseTool(stdin io.Writer, requestID string, inner *ControlRequestInner) error {
+	// Emit permission_requested so Desktop can display approval UI
+	if h.emitter != nil {
+		h.emitter.Emit("run.agent.permission_requested", nil, map[string]any{
+			"requestId": requestID,
+			"toolName":  inner.ToolName,
+			"toolUseId": inner.ToolUseID,
+			"input":     inner.Input,
+		})
+	}
+
 	resp := ControlMessage{
 		Type:      "control_response",
 		RequestID: requestID,
@@ -117,8 +130,26 @@ func (h *DefaultPermissionHandler) handleCanUseTool(stdin io.Writer, requestID s
 	if _, err := stdin.Write(data); err != nil {
 		return fmt.Errorf("write control_response: %w", err)
 	}
+
+	// Emit permission_decided after auto-approval
+	if h.emitter != nil {
+		h.emitter.Emit("run.agent.permission_decided", nil, map[string]any{
+			"requestId": requestID,
+			"toolName":  inner.ToolName,
+			"toolUseId": inner.ToolUseID,
+			"decision":  "allow",
+		})
+	}
+
 	slog.Debug("control: auto-allowed tool", "tool", inner.ToolName, "toolUseId", inner.ToolUseID)
 	return nil
+}
+
+// NewEventEmittingPermissionHandler creates a handler that emits permission events
+// to the EventEmitter while still auto-approving all tools.
+// This allows Desktop to observe permission activity without blocking execution.
+func NewEventEmittingPermissionHandler(emitter EventEmitter) *DefaultPermissionHandler {
+	return &DefaultPermissionHandler{emitter: emitter}
 }
 
 // WriteInterrupt sends an interrupt control_request to the CLI via stdin.
