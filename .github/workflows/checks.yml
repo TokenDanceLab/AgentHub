@@ -51,6 +51,26 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Commit message check (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          TYPES="init|feat|fix|docs|refactor|chore|test|perf|ci|revert"
+          PATTERN="^($TYPES)(\([a-z0-9._-]+\))?: .+"
+          FAILED=0
+          for commit in $(git log --format="%H %s" "origin/${{ github.base_ref }}..HEAD" 2>/dev/null || echo ""); do
+            sha=$(echo "$commit" | cut -d' ' -f1)
+            msg=$(echo "$commit" | cut -d' ' -f2-)
+            if ! echo "$msg" | grep -qE "$PATTERN"; then
+              echo "::warning ::${sha:0:7} 不符合规范: $msg"
+              FAILED=1
+            fi
+          done
+          if [ $FAILED -eq 1 ]; then
+            echo "::error::提交信息需符合 Conventional Commits: type(scope): 中文摘要"
+            exit 1
+          fi
+          echo "✓ 所有提交信息格式正确"
+
   # ── Go: Hub Server ──────────────────────────
   go-hub:
     runs-on: ubuntu-latest
