@@ -202,6 +202,8 @@ func TestFormatAgentList(t *testing.T) {
 		{"empty slice", []string{}, "none"},
 		{"single", []string{"agent-a"}, "agent-a"},
 		{"multiple", []string{"agent-a", "agent-b", "agent-c"}, "agent-a, agent-b, agent-c"},
+		{"with backtick", []string{"`evil`"}, "\\`evil\\`"},
+		{"with dollar brace", []string{"${foo}"}, "\\${foo}"},
 	}
 
 	for _, tt := range tests {
@@ -211,6 +213,37 @@ func TestFormatAgentList(t *testing.T) {
 				t.Fatalf("formatAgentList(%v) = %q, want %q", tt.agents, got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestEscapePromptLiteral(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"plain text", "plain text"},
+		{"`code`", "\\`code\\`"},
+		{"${VAR}", "\\${VAR}"},
+		{"`code` and ${VAR}", "\\`code\\` and \\${VAR}"},
+		{"already\\`escaped", "already\\\\`escaped"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := escapePromptLiteral(tt.input)
+			if got != tt.expected {
+				t.Fatalf("escapePromptLiteral(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestOrchestratorAdapterEscapesSystemPrompt(t *testing.T) {
+	a := NewOrchestratorAdapter("claude", "sonnet", "Use `code` blocks for ${VAR}", nil)
+	// The constructor should escape backticks and ${} in the system prompt.
+	if a.systemPrompt != "Use \\`code\\` blocks for \\${VAR}" {
+		t.Fatalf("systemPrompt = %q, want escaped version", a.systemPrompt)
 	}
 }
 
