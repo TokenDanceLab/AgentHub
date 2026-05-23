@@ -4,7 +4,7 @@
   height: 100vh;
   min-width: 960px;
   overflow: hidden;
-  background: #f7f8fb;
+  background: #eef1f5;
   color: #172033;
   font-family:
     Inter,
@@ -16,10 +16,10 @@
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 24px;
-  height: 56px;
-  padding: 0 20px;
-  border-bottom: 1px solid #d8deea;
+  gap: 18px;
+  height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid #d8dee8;
   background: #ffffff;
   flex-shrink: 0;
 }
@@ -28,7 +28,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 220px;
+  min-width: 250px;
   font-size: 14px;
   font-weight: 700;
 }
@@ -40,7 +40,7 @@
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: #005faa;
+  background: #1f6feb;
   color: #ffffff;
   font-size: 12px;
   letter-spacing: 0;
@@ -56,28 +56,40 @@
 
 .tab,
 .activeTab {
-  height: 32px;
-  padding: 0 12px;
+  height: 30px;
+  padding: 0 10px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: #48556a;
+  color: #65758b;
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 700;
   white-space: nowrap;
 }
 
+.tab[data-priority="secondary"] {
+  opacity: 0.72;
+}
+
 .tab:hover {
-  background: #eef3fa;
+  background: #f4f6f9;
   color: #172033;
+  opacity: 1;
 }
 
 .activeTab {
-  border-color: #b8c8dc;
-  background: #e8f1fb;
-  color: #004f90;
+  border-color: #b9cdf6;
+  background: #f3f7ff;
+  color: #1f6feb;
   font-weight: 700;
+}
+
+.activeTab[data-priority="primary"] {
+  border-color: #1f6feb;
+  background: #1f6feb;
+  color: #ffffff;
 }
 
 .preview {
