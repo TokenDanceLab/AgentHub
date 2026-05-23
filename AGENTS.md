@@ -281,7 +281,16 @@ feat/*                    ← 功能分支。开 PR 到 dev 时触发 CI。
 - 删除已合并的 `feat/*` 分支和对应的 worktree。
 - worktree 放在 `.worktrees/`，已在 `.gitignore`，严禁提交。
 
-### 提交规范
+### 提交纪律
+
+- **小步提交**：每个逻辑改动完成后立即 commit，不要攒到一天结束。
+- **commit 即 push**：`git commit` 后直接 `git push`，让 CI 尽快运行。
+- **每日收尾**：结束工作前 `git status --short` 确认无遗留改动，已全部 commit + push。
+- **不跨夜留改动**：未完成的功能用 feature flag 或 WIP commit，不留 uncommitted 改动过夜。
+- **PR 优先**：跨分支协作尽早开 PR（哪怕未完成），让其他人看到进度和方向。
+- **hook 必须启用**：clone 后运行 `scripts/setup.ps1`（Windows）或 `scripts/setup.sh`（Unix），确保 `core.hooksPath` 指向 `scripts/git-hooks`。CI 也会拦截不规范提交。
+
+### 提交格式
 
 ```
 type(scope): 中文摘要
