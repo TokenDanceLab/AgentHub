@@ -348,14 +348,13 @@ Hub 调度（远程）:
 
 > 参考：`docs/roadmaps/client.md` Phase 0（完整 12 项任务）
 
-- [ ] **P0-1: 状态架构重构** `[5d]`
-  - 引入 TanStack Query：新建 `app/desktop/src/api/queryClient.ts`, `threadQueries.ts`, `runQueries.ts`
-  - 改造 `useChatMessages.ts`：事件 → `queryClient.invalidateQueries`
-  - 改造 `runStore.ts`：删除服务端数据，仅保留 `isStreaming` 等客户端标志
-  - RunState 正式状态机：`NO_TASK → RUNNING ↔ STREAMING → WAITING_FOR_INPUT / IDLE / COMPLETED / FAILED / CANCELLED`
-  - Zustand selector 粒度优化：所有 store 使用 `subscribeWithSelector`
+- [x] **P0-1: 状态架构重构** `[5d]`
+  - ✅ 引入 TanStack Query：`queryClient.ts`, `threadQueries.ts`, `runQueries.ts`（M5）
+  - ✅ 改造 `useChatMessages.ts`：事件 → `queryClient.invalidateQueries`
+  - ✅ 改造 `runStore.ts`：删除服务端数据，仅保留 `isStreaming` 等客户端标志
+  - ✅ RunState 正式状态机：`IDLE → RUNNING ↔ STREAMING → WAITING_FOR_INPUT / COMPLETED / FAILED / CANCELLED`（M5，`runStateMachine.ts`）
+  - ✅ Zustand selector 粒度优化：所有 store 使用 `subscribeWithSelector`
   - 参考：Multica TanStack Query+Zustand 分离模式，Roo-Code AgentLoopState
-  - 实施详情：`docs/design/client-p0-architecture.md#p0-1`
 
 - [x] **P0-2: 输入体验修复** `[4d]`
   - ✅ 非受控输入迁移：`PromptInput.tsx` `useState` → `useRef + DOM`
