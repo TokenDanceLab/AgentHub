@@ -425,10 +425,8 @@ Hub 调度（远程）:
   - 方案：Hub Server 接入 `swaggo/swag`，从代码注解生成 `hub-server/api/swagger.yaml`
   - 验收：`http://localhost:8080/swagger/index.html` 可交互浏览
 
-- [ ] **架构决策记录 (ADR)** `[1d]`
-  - 新建：`docs/adr/` 目录，至少 5 篇关键决策记录
-  - 内容：Hub-Edge 双层 vs 单体、WebSocket vs SSE、NDJSON vs protobuf、Zustand vs Redux、Worktree 隔离方案
-  - 验收：每篇 ADR 含背景、决策、后果、备选方案
+- [x] **架构决策记录 (ADR)** `[1d]` ✅ M5
+  - `docs/adr/` — 5 篇：Hub-Edge双层/WS+NDJSON/Zustand+TanStack/Go进程编排/Worktree隔离
 
 - [ ] **文档与代码一致性修复** `[1d]`
   - Hub Server 准确性矩阵（`docs/review/hub-server-audit.md` 第 10 节）31 项对比中 15 项不一致
