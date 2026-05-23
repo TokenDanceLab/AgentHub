@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Copy, RefreshCw, Trash2 } from 'lucide-react';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
+import { useStreamingText } from '@/hooks/useStreamingText';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -53,6 +54,12 @@ function ThinkingBlock({ content }: { content: string }) {
       {expanded && <div className={styles.thinkingContent}>{content}</div>}
     </div>
   );
+}
+
+// ── StreamingTextBlock ───────────────────────
+function StreamingTextBlock({ content, isStreaming }: { content: string; isStreaming: boolean }) {
+  const displayed = useStreamingText(content, isStreaming);
+  return <MarkdownRenderer content={displayed} />;
 }
 
 // ── ToolUseBlock ────────────────────────────
@@ -308,6 +315,8 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
     }
   }, []);
 
+  const lastMsg = messages[messages.length - 1];
+
   return (
     <div className={styles.root}>
       <div ref={scrollRef} className={styles.stream} role="log" aria-live="polite">
@@ -349,9 +358,12 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
               {copiedMessageId === msg.id && (
                 <span className={styles.copyToast}>Copied!</span>
               )}
-              {msg.blocks.map((block, i) => (
-                <BlockRenderer key={i} block={block} t={t} />
-              ))}
+              {msg.blocks.map((block, i) => {
+                if (block.kind === 'text' && isStreaming && msg.id === lastMsg?.id) {
+                  return <StreamingTextBlock key={i} content={block.content} isStreaming={true} />;
+                }
+                return <BlockRenderer key={i} block={block} t={t} />;
+              })}
             </div>
           ))
         )}
