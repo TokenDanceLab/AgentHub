@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { mockProjects, mockRuns, mockWorkspaceFiles, mockRunners } from '@shared/index';
 
 type BoardView = 'overview' | 'tasks' | 'files';
 type TaskStatus = 'Done' | 'Active' | 'Next';
@@ -64,98 +65,34 @@ const emptyTaskForm: TaskForm = {
 const fileFilters: FileFilter[] = ['All', 'TSX', 'DOC'];
 const runFilters: RunFilter[] = ['All', 'Pass', 'Ready', 'Deferred', 'Local'];
 
-const projects = [
-  {
-    code: 'FP',
-    name: 'Frontend page preview',
-    detail: 'Route preview, page polish, and visual QA for the web workspace.',
-    status: 'In progress',
-  },
-  {
-    code: 'GW',
-    name: 'Group workspace shell',
-    detail: 'Shared message panels, member presence, and preview entry points.',
-    status: 'Review',
-  },
-  {
-    code: 'ED',
-    name: 'Edge dry-run console',
-    detail: 'Local runner states and command transcript framing without live API calls.',
-    status: 'Queued',
-  },
-];
+const projects = mockProjects.map((p) => ({
+  code: p.id.split('_').pop()?.toUpperCase().slice(0, 2) ?? p.id.slice(0, 2).toUpperCase(),
+  name: p.name,
+  detail: p.description ?? '',
+  status: 'In progress' as const,
+}));
 
-const initialTasks: Task[] = [
-  {
-    id: 'task-glass-tokens',
-    title: 'Align glass card tokens',
-    owner: 'Design systems',
-    status: 'Done',
-    detail: 'Blur, border, radius, and shadow match the project visual standard.',
-  },
-  {
-    id: 'task-project-copy',
-    title: 'Build project detail copy',
-    owner: 'Frontend pages',
-    status: 'Active',
-    detail: 'Overview, milestones, files, runs, and risk blocks are ready for review.',
-  },
-  {
-    id: 'task-react-copy',
-    title: 'Prepare React landing copy',
-    owner: 'Project worker',
-    status: 'Next',
-    detail: 'State changes are local only and ready for type checking.',
-  },
-];
+const initialTasks: Task[] = mockRuns.map((run, i) => ({
+  id: `task-${run.runId}`,
+  title: `Run ${run.runId.split('_').pop()} on ${run.threadId}`,
+  owner: mockRunners[i % mockRunners.length]?.name ?? 'Agent',
+  status: (run.status === 'finished' ? 'Done' : run.status === 'running' ? 'Active' : 'Next') as TaskStatus,
+  detail: `Status: ${run.status}. Project: ${run.projectId}, Thread: ${run.threadId}`,
+}));
 
-const initialFiles: FileItem[] = [
-  {
-    name: 'ProjectPage.tsx',
-    type: 'TSX',
-    status: 'Edited',
-    detail: 'Iframe shell preview with canvas particles and local UI interactions.',
-  },
-  {
-    name: 'ProjectPageInteractive.tsx',
-    type: 'TSX',
-    status: 'Edited',
-    detail: 'Stateful local interaction copy with tab, task, risk, sync, and filter logic.',
-  },
-  {
-    name: 'ProjectPageReact.tsx',
-    type: 'TSX',
-    status: 'New',
-    detail: 'React component copy for later route integration and state experiments.',
-  },
-  {
-    name: 'acceptance-notes.md',
-    type: 'DOC',
-    status: 'Draft',
-    detail: 'Suggested validation notes for frontend coordination.',
-  },
-];
+const initialFiles: FileItem[] = mockWorkspaceFiles.map((f) => ({
+  name: f.path.split('/').pop() ?? f.path,
+  type: (f.path.endsWith('.tsx') || f.path.endsWith('.ts') ? 'TSX' : 'DOC') as FileType,
+  status: 'Edited',
+  detail: `${f.path} — ${(f.sizeBytes / 1024).toFixed(1)} KB, modified ${f.modifiedAt.slice(0, 10)}`,
+}));
 
-const initialRuns: RunRecord[] = [
-  {
-    id: 'visual-preview-042',
-    status: 'Pass',
-    detail: 'Static layout scan completed against the local preview surface.',
-    time: '09:42',
-  },
-  {
-    id: 'typecheck-next',
-    status: 'Ready',
-    detail: 'Recommended command: corepack.cmd pnpm typecheck.',
-    time: '10:10',
-  },
-  {
-    id: 'api-wire-later',
-    status: 'Deferred',
-    detail: 'No live API is connected in this page copy.',
-    time: 'Later',
-  },
-];
+const initialRuns: RunRecord[] = mockRuns.map((run) => ({
+  id: run.runId,
+  status: (run.status === 'finished' ? 'Pass' : run.status === 'running' ? 'Ready' : run.status === 'queued' ? 'Deferred' : 'Local') as RunStatus,
+  detail: `Run on thread ${run.threadId}, project ${run.projectId}. Status: ${run.status}.`,
+  time: run.createdAt.slice(11, 16),
+}));
 
 const initialRisks: RiskItem[] = [
   {
@@ -206,9 +143,9 @@ const pageStyles = `
     overflow: hidden;
     color: #172033;
     background:
-      radial-gradient(circle at 12% 18%, rgba(37, 99, 235, 0.18), transparent 30%),
-      radial-gradient(circle at 84% 8%, rgba(8, 145, 178, 0.14), transparent 28%),
-      linear-gradient(135deg, #eef6ff 0%, #f8fbff 100%);
+      radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
+      radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.14), transparent 30%),
+      linear-gradient(135deg, #f7fbff, #edf6ff);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 
@@ -253,8 +190,8 @@ const pageStyles = `
   .projectBrand {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding-bottom: 18px;
+    gap: 10px;
+    padding-bottom: 14px;
     border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   }
 
@@ -264,30 +201,42 @@ const pageStyles = `
     display: grid;
     place-items: center;
     color: #ffffff;
-    font-weight: 800;
-    background: linear-gradient(135deg, #2563eb, #0891b2);
+    font-weight: 900;
+    background: linear-gradient(135deg, #1769e8, #08a7cf);
   }
 
   .projectBrandMark {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    box-shadow: 0 12px 28px rgba(37, 99, 235, 0.25);
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    border-radius: 10px;
+    box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
   }
 
-  .projectBrand h1 {
+  .projectTitle h2 {
     margin: 0;
-    font-size: 18px;
-    line-height: 1.2;
-    letter-spacing: 0;
+    font-size: 15px;
+    line-height: 1.25;
+    color: #172033;
   }
 
-  .projectBrand p,
-  .projectMuted {
-    margin: 2px 0 0;
+  .projectTitle p {
+    margin: 0;
     color: #667085;
-    font-size: 12px;
-    line-height: 1.45;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    line-height: normal;
+  }
+
+  .projectMuted {
+    margin: 4px 0 0;
+    color: #667085;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    line-height: 1.2;
   }
 
   .projectNav {
@@ -1051,26 +1000,26 @@ function ProjectParticles() {
       vy: number;
       radius: number;
       alpha: number;
-      hue: string;
+      hue: number;
     };
 
     const particles: Particle[] = [];
     let frameId = 0;
 
-    const createParticle = (): Particle => ({
+    const createParticle = (index: number): Particle => ({
       x: Math.random() * window.innerWidth,
       y: Math.random() * window.innerHeight,
-      vx: (Math.random() - 0.5) * 0.18,
-      vy: -0.16 - Math.random() * 0.22,
-      radius: 1.2 + Math.random() * 2.2,
-      alpha: 0.18 + Math.random() * 0.24,
-      hue: Math.random() > 0.45 ? '37, 99, 235' : '8, 145, 178',
+      vx: -0.18 + Math.random() * 0.36,
+      vy: -0.18 - Math.random() * 0.48,
+      radius: 1.6 + Math.random() * 2.6,
+      alpha: 0.18 + Math.random() * 0.2,
+      hue: index % 3 === 0 ? 196 : 210,
     });
 
     const resetParticles = () => {
       particles.length = 0;
       for (let index = 0; index < 56; index += 1) {
-        particles.push(createParticle());
+        particles.push(createParticle(index));
       }
     };
 
@@ -1106,16 +1055,16 @@ function ProjectParticles() {
         }
 
         context.beginPath();
-        context.fillStyle = `rgba(${particle.hue}, ${particle.alpha})`;
+        context.fillStyle = `hsla(${particle.hue}, 84%, 48%, ${particle.alpha})`;
         context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
         context.fill();
 
         for (let inner = index + 1; inner < particles.length; inner += 1) {
           const other = particles[inner];
           const distance = Math.hypot(particle.x - other.x, particle.y - other.y);
-          if (distance < 118) {
+          if (distance < 126) {
             context.beginPath();
-            context.strokeStyle = `rgba(37, 99, 235, ${0.055 * (1 - distance / 118)})`;
+            context.strokeStyle = `rgba(23, 105, 232, ${(1 - distance / 126) * 0.07})`;
             context.lineWidth = 1;
             context.moveTo(particle.x, particle.y);
             context.lineTo(other.x, other.y);
@@ -1369,9 +1318,9 @@ export function ProjectPageInteractive() {
       <div className="projectReactShell">
         <aside className="projectSidebar projectGlass" aria-label="Project navigation">
           <div className="projectBrand">
-            <div className="projectBrandMark">AH</div>
-            <div>
-              <h1>AgentHub</h1>
+            <span className="projectBrandMark">AH</span>
+            <div className="projectTitle">
+              <h2>AGENTHUB</h2>
               <p>Project workspace</p>
             </div>
           </div>
