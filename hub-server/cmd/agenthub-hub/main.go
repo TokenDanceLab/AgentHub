@@ -1,5 +1,6 @@
-// Legacy entry point. The canonical server is cmd/server-hub/main.go using internal/app/app.go (DI).
-// This file is retained for reference only.
+// DEPRECATED: This binary is no longer maintained.
+// Use cmd/server-hub/main.go with internal/app/app.go (DI architecture) instead.
+// This file will be removed in Q3 2026.
 // Hub Server — AgentHub 中心控制面和协作层
 //
 // 职责：账号/登录、群聊/Conversation、多端同步、Edge 注册/心跳、远程控制/中继
@@ -30,6 +31,7 @@ func main() {
 		Level: slog.LevelInfo,
 	})))
 
+	slog.Warn("DEPRECATED: cmd/agenthub-hub is a legacy entry point. Use cmd/server-hub/main.go instead.")
 	slog.Info("hub server starting", "addr", *addr)
 
 	if err := httpserver.Run(httpserver.Config{

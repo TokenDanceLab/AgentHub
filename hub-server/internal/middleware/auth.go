@@ -3,10 +3,10 @@ package middleware
 import (
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/gin-gonic/gin"
 )
 
 func AuthMiddleware(secret string) gin.HandlerFunc {

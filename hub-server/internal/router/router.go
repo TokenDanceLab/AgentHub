@@ -100,7 +100,6 @@ func SetupRoutes(r *gin.Engine, jwtSecret string, cacheClient *cache.Client, aut
 			attachments.GET("/:id", attachmentHandler.Download)
 		}
 
-
 		notifications := client.Group("/notifications")
 		notifications.Use(middleware.AuthMiddleware(jwtSecret))
 		{

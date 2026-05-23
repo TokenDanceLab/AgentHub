@@ -41,10 +41,10 @@ func (s *AuthService) Register(ctx context.Context, username, password, nickname
 	if len(username) < 4 || len(username) > 32 {
 		return nil, errcode.UserInvalidParam
 	}
-	if len(password) < 8 || len(password) > 64 {
+	if len(password) < config.MinPasswordLength || len(password) > config.MaxPasswordLength {
 		return nil, errcode.UserInvalidParam
 	}
-	if len(nickname) < 1 || len(nickname) > 64 {
+	if len(nickname) < 1 || len(nickname) > config.MaxPasswordLength {
 		return nil, errcode.UserInvalidParam
 	}
 
@@ -176,7 +176,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID, nickname, avata
 }
 
 func (s *AuthService) ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error {
-	if len(newPassword) < 8 || len(newPassword) > 64 {
+	if len(newPassword) < config.MinPasswordLength || len(newPassword) > config.MaxPasswordLength {
 		return errcode.UserInvalidParam
 	}
 
