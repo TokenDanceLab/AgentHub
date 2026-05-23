@@ -28,8 +28,8 @@ feat/trump-webui          ← Web 前端（Trump）
 - [x] 权限通知 Desktop（permission_requested/decided）
 - [x] 集成 smoke test 17/17 通过
 - [x] OpenCode 集成测试
-- [ ] CI `-short` 标记：集成测试在 CI 正确跳过
-- [ ] 打通 Edge → Desktop WebSocket 事件投递验证
+- [x] CI `-short` 标记：集成测试在 CI 正确跳过
+- [x] 打通 Edge → Desktop WebSocket 事件投递验证
 
 ### Desktop（Leader + Agent）
 - [x] 共享类型修复（4 阻塞不匹配）
@@ -40,9 +40,9 @@ feat/trump-webui          ← Web 前端（Trump）
 - [x] RunDetail Output/ToolCalls/FileChanges 标签页
 - [x] RunDetail text_delta 累积到 outputText
 - [x] 12/12 测试文件全部通过 (123 tests)
-- [ ] PromptInput 模型选择器（model + reasoningEffort）
-- [ ] POST /v1/runs 请求中带 model/reasoningEffort
-- [ ] 消费 run.agent.task_* → 子代理事件
+- [x] PromptInput 模型选择器（model + reasoningEffort）
+- [x] POST /v1/runs 请求中带 model/reasoningEffort
+- [x] 消费 run.agent.task_* → 子代理事件
 
 ### Docs
 - [x] archive/ 清理 7 份过时文档
