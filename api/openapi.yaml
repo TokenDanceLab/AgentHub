@@ -61,16 +61,32 @@ paths:
         - $ref: "#/components/parameters/PageCursor"
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Project list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectListResponse"
     post:
       tags: [IMProject]
       operationId: createProject
       summary: Create or register a project.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
       responses:
         "201":
-          $ref: "#/components/responses/Created"
+          description: Project created or existing project returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/Error"
 
   /v1/projects/{projectId}:
     get:
@@ -83,7 +99,11 @@ paths:
         - $ref: "#/components/parameters/ProjectId"
       responses:
         "200":
-          $ref: "#/components/responses/Ok"
+          description: Project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
         "404":
           $ref: "#/components/responses/Error"
     patch:
@@ -96,7 +116,13 @@ paths:
         - $ref: "#/components/parameters/ProjectId"
       responses:
         "200":
-          $ref: "#/components/responses/Ok"
+          description: Item.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+        "404":
+          $ref: "#/components/responses/Error"
     delete:
       tags: [IMProject]
       operationId: deleteProject
@@ -241,16 +267,34 @@ paths:
         - $ref: "#/components/parameters/PageCursor"
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Thread list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThreadListResponse"
     post:
       tags: [IMProject]
       operationId: createThread
       summary: Create thread.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateThreadRequest"
       responses:
         "201":
-          $ref: "#/components/responses/Created"
+          description: Thread created or existing thread returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Thread"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
 
   /v1/threads/{threadId}:
     get:
@@ -263,7 +307,13 @@ paths:
         - $ref: "#/components/parameters/ThreadId"
       responses:
         "200":
-          $ref: "#/components/responses/Ok"
+          description: Thread.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Thread"
+        "404":
+          $ref: "#/components/responses/Error"
     patch:
       tags: [IMProject]
       operationId: updateThread
@@ -315,7 +365,13 @@ paths:
         - $ref: "#/components/parameters/PageCursor"
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Thread item list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemListResponse"
+        "404":
+          $ref: "#/components/responses/Error"
 
   /v1/threads/{threadId}/messages:
     post:
@@ -355,7 +411,13 @@ paths:
         - $ref: "#/components/parameters/ItemId"
       responses:
         "200":
-          $ref: "#/components/responses/Ok"
+          description: Item.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+        "404":
+          $ref: "#/components/responses/Error"
 
   /v1/runners:
     get:
@@ -1265,6 +1327,36 @@ components:
           type: string
         hasMore:
           type: boolean
+    ProjectListResponse:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    ThreadListResponse:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Thread"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    ItemListResponse:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        page:
+          $ref: "#/components/schemas/PageInfo"
     ErrorResponse:
       type: object
       required: [error]
@@ -1291,6 +1383,70 @@ components:
         threadId:
           type: string
           description: Thread to bind the run to. Defaults to the local thread in P0 compatibility mode.
+    Project:
+      type: object
+      required: [projectId, name, status, createdAt, updatedAt]
+      properties:
+        projectId:
+          type: string
+          description: Project identifier. Generated with the `proj_` prefix when omitted on create.
+        name:
+          type: string
+          description: Project display name. Defaults to `Local Project` when empty.
+        status:
+          type: string
+          enum: [active]
+          description: Current project status.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateProjectRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+          description: Optional caller-provided project ID. The Edge server generates one when omitted.
+        name:
+          type: string
+          description: Optional project display name.
+    Thread:
+      type: object
+      required: [threadId, projectId, title, status, createdAt, updatedAt]
+      properties:
+        threadId:
+          type: string
+          description: Thread identifier. Generated with the `thread_` prefix when omitted on create.
+        projectId:
+          type: string
+          description: Project that owns the thread.
+        title:
+          type: string
+          description: Thread title. Defaults to `New Thread` when empty.
+        status:
+          type: string
+          enum: [active]
+          description: Current thread status.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateThreadRequest:
+      type: object
+      properties:
+        threadId:
+          type: string
+          description: Optional caller-provided thread ID. The Edge server generates one when omitted.
+        projectId:
+          type: string
+          description: Project to create the thread under. Defaults to `proj_local` when omitted.
+        title:
+          type: string
+          description: Optional thread title.
     CreateThreadMessageRequest:
       type: object
       required: [content]
@@ -1302,7 +1458,7 @@ components:
         role:
           type: string
           default: user
-          description: Message role. Defaults to user when omitted.
+          description: Message role. Defaults to user when omitted. The current Edge server persists custom role strings; P0 clients should prefer user or assistant.
     Item:
       type: object
       required: [itemId, projectId, threadId, type, status, createdAt, updatedAt]
@@ -1317,10 +1473,15 @@ components:
           type: string
         type:
           type: string
+          enum: [event, run, user_message]
+          description: Item kind currently produced by the Edge server.
         role:
           type: string
+          description: Message role for message items.
         status:
           type: string
+          enum: [created, queued, started, finished, failed, cancelled]
+          description: Item lifecycle status.
         content:
           type: string
         createdAt:
