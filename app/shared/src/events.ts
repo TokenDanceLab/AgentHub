@@ -171,6 +171,29 @@ export interface ErrorEvent extends EventEnvelope {
   };
 }
 
+export interface AgentPermissionRequestedEvent extends EventEnvelope {
+  type: 'run.agent.permission_requested';
+  payload: {
+    runId: string;
+    requestId: string;
+    toolName: string;
+    toolInput: Record<string, unknown>;
+    sessionId?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface AgentPermissionDecidedEvent extends EventEnvelope {
+  type: 'run.agent.permission_decided';
+  payload: {
+    runId: string;
+    requestId: string;
+    decision: 'allow' | 'deny';
+    reason?: string;
+    [key: string]: unknown;
+  };
+}
+
 // ── Union ─────────────────────────────────────
 
 export type AnyEvent =
@@ -186,5 +209,7 @@ export type AnyEvent =
   | AgentFileChangeEvent
   | AgentSessionInitEvent
   | AgentResultEvent
+  | AgentPermissionRequestedEvent
+  | AgentPermissionDecidedEvent
   | ErrorEvent
   | EventEnvelope;
