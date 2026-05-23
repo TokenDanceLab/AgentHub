@@ -34,6 +34,86 @@
   animation: messageIn 0.3s ease-out;
 }
 
+/* ── Responsive: Mobile (< 768px) ──────── */
+
+@media (max-width: 767px) {
+  .stream {
+    padding: var(--space-sm) var(--space-xs);
+    gap: var(--space-xs);
+  }
+
+  .message {
+    max-width: 95%;
+    padding: var(--space-sm);
+    font-size: var(--font-size-xs);
+    border-radius: 6px;
+  }
+
+  .codeBlock {
+    font-size: 10px;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .toolUseContainer {
+    max-width: 100%;
+  }
+
+  .toolUseHeader {
+    font-size: 10px;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+
+  .toolParamSummary {
+    display: none; /* hide param summary on mobile to save space */
+  }
+
+  .diffCard {
+    max-width: 100%;
+  }
+
+  .diffInline {
+    font-size: 10px;
+    max-height: 180px;
+  }
+
+  .diffCardHeader {
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 10px;
+  }
+
+  /* ── Action buttons always visible on mobile ──── */
+  .actionBar {
+    opacity: 1;
+    position: static;
+    display: flex;
+    gap: 4px;
+    margin-bottom: var(--space-xs);
+  }
+
+  .actionBtn {
+    width: var(--touch-target-min, 44px);
+    height: var(--touch-target-min, 44px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  .copyToast {
+    top: auto;
+    bottom: -22px;
+  }
+}
+
+/* ── Responsive: Tablet (768px - 1023px) ─ */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .message {
+    max-width: 90%;
+  }
+}
+
 @keyframes messageIn {
   from {
     opacity: 0;
@@ -582,5 +662,62 @@
   100% {
     opacity: 0;
     transform: translateY(-4px);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Mobile (< 768px)
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .stream {
+    padding: var(--space-sm);
+    gap: var(--space-xs);
+  }
+
+  .message {
+    max-width: 95%;
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .actionBar {
+    opacity: 1; /* always visible on touch */
+  }
+
+  .actionBtn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .toolUseHeader {
+    padding: 8px 10px;
+    min-height: 44px;
+  }
+
+  .toolUseContainer {
+    margin: 2px 0;
+  }
+
+  .diffInline {
+    font-size: 10px;
+    max-height: 180px;
+  }
+
+  .codeBlock {
+    font-size: 11px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Tablet (768px - 1023px)
+   ═══════════════════════════════════════════════════════ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .message {
+    max-width: 90%;
+  }
+
+  .stream {
+    padding: var(--space-md);
   }
 }

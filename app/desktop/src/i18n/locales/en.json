@@ -51,5 +51,12 @@
   "banner.dismiss": "Dismiss",
   "status.reconnecting": "Reconnecting...",
   "theme.light": "Switch to light theme",
-  "theme.dark": "Switch to dark theme"
+  "theme.dark": "Switch to dark theme",
+  "nav.openSidebar": "Open sidebar",
+  "nav.closeSidebar": "Close sidebar",
+  "run.open": "Open run detail",
+  "run.close": "Close run detail",
+  "chat.viewFullDiff": "View full diff",
+  "prompt.model": "Model",
+  "prompt.reasoning": "Reasoning effort"
 }
