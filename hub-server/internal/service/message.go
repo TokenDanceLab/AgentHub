@@ -2,19 +2,20 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"log/slog"
 	"strings"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/pkg/uuidv7"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
 const maxPinsPerSession = 50
@@ -93,7 +94,11 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 
 	content := req.Content
 	if req.ContentType == "text" {
-		content = `{"text":"` + strings.ReplaceAll(req.Content, `"`, `\"`) + `"}`
+		contentBytes, err := json.Marshal(map[string]string{"text": req.Content})
+		if err != nil {
+			return nil, errcode.ErrInternal
+		}
+		content = string(contentBytes)
 	}
 
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, senderUserID)
