@@ -88,6 +88,10 @@ docs/review/
 !.agents/skills/pre-push/**
 !.agents/skills/integration-test/
 !.agents/skills/integration-test/**
+!.agents/skills/adapter-dev/
+!.agents/skills/adapter-dev/**
+!.agents/skills/env-sandbox/
+!.agents/skills/env-sandbox/**
 .cursor/
 .continue/
 
