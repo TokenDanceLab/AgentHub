@@ -17,6 +17,9 @@ import '@testing-library/jest-dom/vitest';
 import PromptInput from '@/components/PromptInput';
 import type { AgentInfo } from '@shared/types';
 
+// jsdom does not implement scrollIntoView
+Element.prototype.scrollIntoView = vi.fn();
+
 function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
   return {
     id: 'agent-1',
@@ -140,7 +143,7 @@ describe('PromptInput', () => {
     expect(input.value).toBe('');
   });
 
-  it('opens agent selector when @Agent button is clicked', () => {
+  it('opens mention popover when @ is typed in textarea', () => {
     const agents = [makeAgent({ id: 'a1', name: 'Alpha' })];
     render(
       <PromptInput
@@ -151,18 +154,23 @@ describe('PromptInput', () => {
       />,
     );
 
-    // Agent selector should not be visible initially
+    // No popover initially
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
 
-    // Click the @Agent button
-    const agentBtn = screen.getByText('@Agent');
-    fireEvent.click(agentBtn);
+    // Type @Alpha in the textarea — must focus first (useMention reads document.activeElement)
+    const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLTextAreaElement;
+    input.focus();
+    input.value = ' @Alpha';
+    input.selectionStart = 7;
+    input.selectionEnd = 7;
+    fireEvent.input(input);
 
-    // Now the selector should appear
-    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    // Popover should appear with agent suggestion
+    const listbox = screen.getByRole('listbox', { name: 'Agent suggestions' });
+    expect(within(listbox).getByText('Alpha')).toBeInTheDocument();
   });
 
-  it('closes agent selector when @Agent button is clicked again', () => {
+  it('closes mention popover on Escape key', () => {
     const agents = [makeAgent({ id: 'a1', name: 'Alpha' })];
     render(
       <PromptInput
@@ -173,33 +181,30 @@ describe('PromptInput', () => {
       />,
     );
 
-    const agentBtn = screen.getByText('@Agent');
-    // Open
-    fireEvent.click(agentBtn);
-    expect(screen.getByRole('listbox')).toBeInTheDocument();
-    // Close
-    fireEvent.click(agentBtn);
+    const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLTextAreaElement;
+    input.focus();
+    input.value = ' @Alpha';
+    input.selectionStart = 7;
+    input.selectionEnd = 7;
+    fireEvent.input(input);
+    expect(screen.getByRole('listbox', { name: 'Agent suggestions' })).toBeInTheDocument();
+
+    // Press Escape
+    fireEvent.keyDown(input, { key: 'Escape' });
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
-  it('highlights selected agent in selector', () => {
+  it('shows selected agent badge when agent is selected', () => {
     const agents = [makeAgent({ id: 'a1', name: 'Alpha' }), makeAgent({ id: 'a2', name: 'Beta' })];
     render(
       <PromptInput agents={agents} selectedAgentId="a2" onSelectAgent={vi.fn()} onSend={vi.fn()} />,
     );
 
-    // Open the selector
-    const agentBtn = screen.getByText('@Beta');
-    fireEvent.click(agentBtn);
-
-    // Check that Beta is highlighted
-    const options = screen.getAllByRole('option');
-    const betaOption = options.find((opt) => opt.textContent?.includes('Beta'));
-    expect(betaOption?.className).toContain('optionSelected');
-    expect(betaOption).toHaveAttribute('aria-selected', 'true');
+    // Badge shows selected agent
+    expect(screen.getByText('@Beta')).toBeInTheDocument();
   });
 
-  it('calls onSelectAgent when an agent is selected from the dropdown', () => {
+  it('calls onSelectAgent when agent is clicked from mention popover', () => {
     const onSelectAgent = vi.fn();
     const agents = [makeAgent({ id: 'a1', name: 'Alpha' }), makeAgent({ id: 'a2', name: 'Beta' })];
     render(
@@ -211,15 +216,103 @@ describe('PromptInput', () => {
       />,
     );
 
-    // Open selector
-    const agentBtn = screen.getByText('@Agent');
-    fireEvent.click(agentBtn);
+    const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLTextAreaElement;
+    input.focus();
+    input.value = ' @Alpha';
+    input.selectionStart = 7;
+    input.selectionEnd = 7;
+    fireEvent.input(input);
 
-    // Click on Alpha inside the agent listbox (not the model select)
-    const listbox = screen.getByRole('listbox');
+    // Click Alpha in the popover
+    const listbox = screen.getByRole('listbox', { name: 'Agent suggestions' });
     fireEvent.click(within(listbox).getByText('Alpha'));
 
     expect(onSelectAgent).toHaveBeenCalledWith('a1');
+  });
+
+  it('calls onSelectAgent when Enter is pressed on highlighted mention', () => {
+    const onSelectAgent = vi.fn();
+    const agents = [makeAgent({ id: 'a1', name: 'Alpha' })];
+    render(
+      <PromptInput
+        agents={agents}
+        selectedAgentId={undefined}
+        onSelectAgent={onSelectAgent}
+        onSend={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLTextAreaElement;
+    input.focus();
+    input.value = ' @Alpha';
+    input.selectionStart = 7;
+    input.selectionEnd = 7;
+    fireEvent.input(input);
+
+    // Press Enter to select highlighted agent
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSelectAgent).toHaveBeenCalledWith('a1');
+  });
+
+  it('navigates mention popover with ArrowDown and ArrowUp', () => {
+    const agents = [
+      makeAgent({ id: 'a1', name: 'Alpha' }),
+      makeAgent({ id: 'a2', name: 'Beta' }),
+      makeAgent({ id: 'a3', name: 'Gamma' }),
+    ];
+    render(
+      <PromptInput
+        agents={agents}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLTextAreaElement;
+    // @ matches all three agents
+    input.focus();
+    input.value = ' @';
+    input.selectionStart = 2;
+    input.selectionEnd = 2;
+    fireEvent.input(input);
+
+    const options = screen.getAllByRole('option');
+    // First item should be active by default (index 0)
+    expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    expect(options[1]).toHaveAttribute('aria-selected', 'false');
+
+    // ArrowDown moves to second item
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(options[0]).toHaveAttribute('aria-selected', 'false');
+    expect(options[1]).toHaveAttribute('aria-selected', 'true');
+
+    // ArrowUp moves back to first
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    expect(options[1]).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('hides mention popover when query matches no agents', () => {
+    const agents = [makeAgent({ id: 'a1', name: 'Alpha' })];
+    render(
+      <PromptInput
+        agents={agents}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLTextAreaElement;
+    input.focus();
+    // @Z matches nothing
+    input.value = ' @Z';
+    input.selectionStart = 3;
+    input.selectionEnd = 3;
+    fireEvent.input(input);
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
   it('sends with agentId when an agent is selected', () => {
