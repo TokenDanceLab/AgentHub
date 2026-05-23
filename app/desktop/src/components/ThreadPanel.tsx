@@ -45,13 +45,14 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
   const { t } = useTranslation();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
-  const [query, setQuery] = useState('');
 
-  // ── TanStack Query hooks ──────────────────────
+  // TanStack Query — server state
   const { data } = useThreads();
   const threads = data?.items ?? [];
   const renameMutation = useRenameThread();
   const deleteMutation = useDeleteThread();
+
+  const [query, setQuery] = useState('');
 
   // Inline rename state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -139,6 +140,7 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
   // ── create handler ─────────────────────────
 
   const handleCreate = () => {
+    // Invalidate queries so Edge-synced threads refresh
     queryClient.invalidateQueries({ queryKey: ['threads'] });
   };
 

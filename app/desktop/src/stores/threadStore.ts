@@ -1,5 +1,4 @@
-// Thread store — only UI state (selected thread).
-// Thread list CRUD is now managed by TanStack Query (see @/api/threadQueries).
+// Thread UI store — selection state only. Server state is managed by TanStack Query.
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 
