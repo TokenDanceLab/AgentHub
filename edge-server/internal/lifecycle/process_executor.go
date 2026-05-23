@@ -358,7 +358,7 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	defer wg.Done()
 	emitter := &busEventEmitter{bus: e.bus}
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
-		slog.Warn("structured output parse error", "runId", run.ID, "err", err)
+		slog.Error("structured output parse error", "runId", run.ID, "err", err)
 	}
 }
 

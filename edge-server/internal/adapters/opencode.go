@@ -82,6 +82,11 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		args = append(args, "--fork")
 	}
 
+	// Permission mode: bypassPermissions maps to --dangerously-skip-permissions
+	if ctx.PermissionMode == "bypassPermissions" {
+		args = append(args, "--dangerously-skip-permissions")
+	}
+
 	args = append(args, prompt)
 
 	workDir := ctx.WorkDir
@@ -261,7 +266,6 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 
 type opencodeEvent struct {
 	Type            string        `json:"type"`
-	Timestamp       int64         `json:"timestamp,omitempty"`
 	SessionID       string        `json:"sessionID,omitempty"`
 	Part            *opencodePart `json:"part,omitempty"`
 	ErrorMessage    string        `json:"error,omitempty"`

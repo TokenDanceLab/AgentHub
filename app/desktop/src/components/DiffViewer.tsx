@@ -1,7 +1,6 @@
-// Unified diff viewer — collapsible file headers + hunk rendering
-// 参考: CCViewer DiffViewer.tsx (530 lines)
+// GitHub-style diff viewer with file tree, collapsible hunks, and line numbers
 import { useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, X, ChevronRight, FileCode } from 'lucide-react';
 import type { FileDiff, DiffHunk } from './ChatView.types';
 import styles from './DiffViewer.module.css';
 
@@ -12,34 +11,113 @@ interface Props {
 }
 
 export default function DiffViewer({ files, onAcceptFile, onRejectFile }: Props) {
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(() => new Set(files.map((f) => f.filePath)));
+  const [activeFile, setActiveFile] = useState<string | null>(files[0]?.filePath ?? null);
+
   if (files.length === 0) {
     return <div className={styles.empty}>No changes to display</div>;
   }
 
+  const toggleFile = (path: string) => {
+    setExpandedFiles((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  };
+
+  const expandAll = () => setExpandedFiles(new Set(files.map((f) => f.filePath)));
+  const collapseAll = () => setExpandedFiles(new Set());
+
+  const totalAdditions = files.reduce((s, f) => s + f.additions, 0);
+  const totalDeletions = files.reduce((s, f) => s + f.deletions, 0);
+
   return (
     <div className={styles.root}>
-      {files.map((file) => (
-        <FileDiffSection
-          key={file.filePath}
-          file={file}
-          onAcceptFile={onAcceptFile}
-          onRejectFile={onRejectFile}
-        />
-      ))}
+      <div className={styles.fileTree}>
+        <div className={styles.fileTreeHeader}>
+          <span className={styles.fileTreeTitle}>
+            {files.length} changed file{files.length !== 1 ? 's' : ''}
+          </span>
+          <span className={styles.fileTreeStats}>
+            <span className={styles.addedCount}>+{totalAdditions}</span>
+            <span className={styles.deletedCount}>-{totalDeletions}</span>
+          </span>
+          <div className={styles.fileTreeActions}>
+            <button className={styles.miniBtn} onClick={expandAll} title="Expand all">
+              <ChevronRight size={14} style={{ transform: 'rotate(90deg)' }} />
+            </button>
+            <button className={styles.miniBtn} onClick={collapseAll} title="Collapse all">
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+        <div className={styles.fileTreeList}>
+          {files.map((file) => (
+            <button
+              key={file.filePath}
+              className={`${styles.fileTreeItem} ${activeFile === file.filePath ? styles.fileTreeItemActive : ''}`}
+              onClick={() => {
+                setActiveFile(file.filePath);
+                setExpandedFiles((prev) => {
+                  const next = new Set(prev);
+                  next.add(file.filePath);
+                  return next;
+                });
+              }}
+            >
+              <FileCode size={14} className={styles.fileTreeIcon} />
+              <span className={styles.fileTreePath}>{file.filePath}</span>
+              <span className={statusBadgeClass(file.status)}>{statusLabel(file.status)}</span>
+              <span className={styles.addedCount}>+{file.additions}</span>
+              <span className={styles.deletedCount}>-{file.deletions}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className={styles.diffPanel}>
+        {files.map((file) => (
+          <FileDiffSection
+            key={file.filePath}
+            file={file}
+            expanded={expandedFiles.has(file.filePath)}
+            onToggle={() => toggleFile(file.filePath)}
+            onAcceptFile={onAcceptFile}
+            onRejectFile={onRejectFile}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
+function statusLabel(status: string): string {
+  if (status === 'added') return 'A';
+  if (status === 'deleted') return 'D';
+  return 'M';
+}
+
+function statusBadgeClass(status: string): string {
+  if (status === 'added') return `${styles.statusBadge} ${styles.statusAdded}`;
+  if (status === 'deleted') return `${styles.statusBadge} ${styles.statusDeleted}`;
+  return `${styles.statusBadge} ${styles.statusModified}`;
+}
+
 function FileDiffSection({
   file,
+  expanded,
+  onToggle,
   onAcceptFile,
   onRejectFile,
 }: {
   file: FileDiff;
+  expanded: boolean;
+  onToggle: () => void;
   onAcceptFile?: (path: string) => void;
   onRejectFile?: (path: string) => void;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [rejected, setRejected] = useState(false);
 
@@ -65,7 +143,7 @@ function FileDiffSection({
     onRejectFile?.(file.filePath);
   };
 
-  const sectionClasses = [
+  const sectionClass = [
     styles.fileSection,
     accepted && styles.fileAccepted,
     rejected && styles.fileRejected,
@@ -73,23 +151,20 @@ function FileDiffSection({
     .filter(Boolean)
     .join(' ');
 
-  const chevronClass = styles.chevron + (collapsed ? '' : ' ' + styles.chevronDown);
-
   return (
-    <div className={sectionClasses}>
+    <div className={sectionClass}>
       <div className={styles.fileHeader}>
-        <button
-          className={styles.fileHeaderBtn}
-          onClick={() => setCollapsed((v) => !v)}
-          aria-expanded={!collapsed}
-        >
-          <span className={statusClass(file.status)}>
-            {file.status === 'added' ? 'A' : file.status === 'deleted' ? 'D' : 'M'}
-          </span>
+        <button className={styles.fileHeaderBtn} onClick={onToggle} aria-expanded={expanded}>
+          <ChevronRight
+            size={14}
+            className={`${styles.chevron} ${expanded ? styles.chevronDown : ''}`}
+          />
+          <span className={statusBadgeClass(file.status)}>{statusLabel(file.status)}</span>
           <code className={styles.filePath}>{file.filePath}</code>
-          <span className={styles.addedCount}>+{file.additions}</span>
-          <span className={styles.deletedCount}>-{file.deletions}</span>
-          <span className={chevronClass}>▸</span>
+          <span className={styles.fileChangeStats}>
+            <span className={styles.addedCount}>+{file.additions}</span>
+            <span className={styles.deletedCount}>-{file.deletions}</span>
+          </span>
         </button>
 
         <button
@@ -110,7 +185,7 @@ function FileDiffSection({
         </button>
       </div>
 
-      {!collapsed && (
+      {expanded && (
         <div className={styles.fileBody}>
           {file.hunks.map((hunk, i) => (
             <HunkRenderer key={i} hunk={hunk} />
@@ -122,39 +197,44 @@ function FileDiffSection({
 }
 
 function HunkRenderer({ hunk }: { hunk: DiffHunk }) {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <div className={styles.hunk}>
-      <div className={styles.hunkHeader}>{hunk.header}</div>
-      {hunk.lines.map((line, j) => (
-        <div
-          key={j}
-          className={
-            line.type === 'added'
-              ? styles.lineAdded
-              : line.type === 'deleted'
-                ? styles.lineDeleted
-                : styles.lineContext
-          }
-        >
-          <span className={styles.lineNum}>{line.oldLineNumber ?? ''}</span>
-          <span className={styles.lineNum}>{line.newLineNumber ?? ''}</span>
-          <span className={styles.lineContent}>
-            {line.type === 'added' ? '+' : line.type === 'deleted' ? '-' : ' '}
-            {line.content}
-          </span>
+      <button className={styles.hunkHeader} onClick={() => setCollapsed((v) => !v)}>
+        <ChevronRight
+          size={12}
+          className={`${styles.hunkChevron} ${collapsed ? '' : styles.hunkChevronDown}`}
+        />
+        <code className={styles.hunkHeaderText}>{hunk.header}</code>
+      </button>
+      {!collapsed && (
+        <div className={styles.hunkBody}>
+          {hunk.lines.map((line, j) => (
+            <div
+              key={j}
+              className={
+                line.type === 'added'
+                  ? styles.lineAdded
+                  : line.type === 'deleted'
+                    ? styles.lineDeleted
+                    : styles.lineContext
+              }
+            >
+              <span className={styles.lineNumOld}>
+                {line.oldLineNumber != null ? line.oldLineNumber : ''}
+              </span>
+              <span className={styles.lineNumNew}>
+                {line.newLineNumber != null ? line.newLineNumber : ''}
+              </span>
+              <span className={styles.lineSign}>
+                {line.type === 'added' ? '+' : line.type === 'deleted' ? '-' : ''}
+              </span>
+              <span className={styles.lineContent}>{line.content}</span>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
-}
-
-function statusClass(status: string): string {
-  switch (status) {
-    case 'added':
-      return styles.statusAdded;
-    case 'deleted':
-      return styles.statusDeleted;
-    default:
-      return styles.statusModified;
-  }
 }

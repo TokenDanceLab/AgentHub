@@ -575,23 +575,37 @@
   animation: toastFade 1.5s ease-out forwards;
 }
 
-@keyframes toastFade {
-  0% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  15% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  70% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
+/* ── Scroll-to-bottom indicator ──────────── */
+
+.scrollToBottomBtn {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+  animation: toastFade 0.3s ease-out;
+  transition: background var(--duration-fast), transform var(--duration-fast);
+}
+
+.scrollToBottomBtn:hover {
+  background: color-mix(in oklch, var(--primary) 10%, var(--card));
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.scrollToBottomBtn:active {
+  transform: translateX(-50%) scale(0.97);
 }
 
 /* ═══════════════════════════════════════════════════════

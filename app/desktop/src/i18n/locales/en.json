@@ -57,6 +57,8 @@
   "run.open": "Open run detail",
   "run.close": "Close run detail",
   "chat.viewFullDiff": "View full diff",
+  "chat.scrollToBottom": "Scroll to bottom",
+  "chat.newMessages": "New messages",
   "prompt.model": "Model",
   "prompt.reasoning": "Reasoning effort",
   "perm.title": "Permission Gate",
