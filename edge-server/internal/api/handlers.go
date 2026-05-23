@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -521,7 +522,8 @@ func decodeOptionalJSON(r *http.Request, dst any) error {
 		return nil
 	}
 	// Limit request body to 1MB to prevent memory exhaustion.
-	r.Body = http.MaxBytesReader(nil, r.Body, 1<<20)
+	// Use io.LimitReader instead of http.MaxBytesReader to avoid needing a ResponseWriter.
+	r.Body = io.NopCloser(io.LimitReader(r.Body, 1<<20))
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(dst); err != nil {
 		return err
