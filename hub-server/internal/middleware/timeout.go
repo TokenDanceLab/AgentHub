@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/agenthub/hub-server/internal/handler"
-	"github.com/agenthub/hub-server/internal/errcode"
 )
 
 // Timeout returns a middleware that sets a request deadline.
@@ -29,8 +27,7 @@ func Timeout(d time.Duration) gin.HandlerFunc {
 		case <-done:
 		case <-ctx.Done():
 			if ctx.Err() == context.DeadlineExceeded {
-				c.Abort()
-				handler.Fail(c, errcode.New("REQUEST_TIMEOUT", "request timed out", http.StatusGatewayTimeout))
+				c.AbortWithStatusJSON(http.StatusGatewayTimeout, gin.H{"error": "request_timeout", "message": "request timed out"})
 			}
 		}
 	}
