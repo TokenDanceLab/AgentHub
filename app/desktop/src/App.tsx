@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Menu, X, PanelRightClose, PanelRightOpen, Bot } from 'lucide-react';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
-import { startRun, cancelRun, fetchAgents, fetchHealth, decidePermission as decidePermissionRest } from '@/api/edgeClient';
+import { useEdgeStatus } from '@/hooks/useEdgeStatus';
+import { startRun, cancelRun, fetchAgents, decidePermission as decidePermissionRest } from '@/api/edgeClient';
 import { useThreads } from '@/api/threadQueries';
 import type { AgentInfo, ThreadInfo, StartRunRequest } from '@shared/types';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -13,42 +14,47 @@ import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
 import { useRunStore } from '@/stores/runStore';
 import { useShallow } from 'zustand/shallow';
-import StatusBar from '@/components/StatusBar';
-import ThreadPanel from '@/components/ThreadPanel';
-import AgentList from '@/components/AgentList';
-import ErrorBoundary from '@/components/ErrorBoundary';
-import ResizeHandle from '@/components/ResizeHandle';
-import PromptInput from '@/components/PromptInput';
-import PermissionDialog from '@/components/PermissionDialog';
-import WelcomeScreen from '@/components/WelcomeScreen';
-import ShortcutHelp from '@/components/ShortcutHelp';
 import { SkeletonLine, SkeletonCircle } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
+import { Slot } from '@/views/viewRegistry';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import ResizeHandle from '@/components/ResizeHandle';
 import styles from '@/App.module.css';
-
-// ── Lazy-loaded heavy components ──────────────
-const ChatView = lazy(() => import('@/components/ChatView'));
-const RunDetail = lazy(() => import('@/components/RunDetail'));
-const SearchDialog = lazy(() => import('@/components/SearchDialog'));
 
 const MIN_SIDEBAR = 200;
 const MAX_SIDEBAR = 420;
 const MIN_RIGHT = 240;
 const MAX_RIGHT = 600;
 
+/** Shared skeleton shown while AgentList data is loading. */
+function AgentListSkeleton() {
+  return (
+    <div className={styles.skeletonAgentList} aria-busy="true" aria-label="Loading agents">
+      {Array.from({ length: 5 }, (_, i) => (
+        <div key={i} className={styles.skeletonAgentItem}>
+          <SkeletonCircle width={8} height={8} />
+          <div className={styles.skeletonAgentInfo}>
+            <SkeletonLine width={`${55 + (i % 3) * 10}%`} height="14px" />
+            <SkeletonLine width={`${35 + (i % 4) * 8}%`} height="10px" />
+            <div className={styles.skeletonAgentTags}>
+              <SkeletonLine width="42px" height="14px" />
+              <SkeletonLine width="50px" height="14px" />
+              <SkeletonLine width="36px" height="14px" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
   const { online, health } = useHealth();
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online);
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-
   const isTablet = useIsTablet();
-
-  // ── Edge disconnected banner state ──
-  const [bannerDismissed, setBannerDismissed] = useState(false);
-  const [lastEdgeError, setLastEdgeError] = useState<string | null>(null);
-  const [retrying, setRetrying] = useState(false);
-  const wasOnlineRef = useRef(false);
+  const edgeStatus = useEdgeStatus(online);
   const addToast = useToastStore((s) => s.addToast);
 
   // TanStack Query — replaces setInterval polling for threads
@@ -116,7 +122,6 @@ export default function App() {
   // Escape key closes mobile overlays / modals; ? opens keyboard shortcut help
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't capture shortcuts when user is typing in an input/textarea
       const tag = (e.target as HTMLElement)?.tagName;
       const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
 
@@ -142,47 +147,6 @@ export default function App() {
   useEffect(() => {
     setConnected(isConnected);
   }, [isConnected, setConnected]);
-
-  // Banner lifecycle: show when offline after being online; auto-dismiss on reconnect
-  useEffect(() => {
-    if (online) {
-      setBannerDismissed(false);
-      setLastEdgeError(null);
-    } else if (wasOnlineRef.current) {
-      // Transition: online → offline — surface the error
-      if (!lastEdgeError) {
-        setLastEdgeError(t('banner.disconnected'));
-      }
-    }
-    wasOnlineRef.current = online;
-    // Only react to online transitions; lastEdgeError is read inside via closure
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online]);
-
-  // Toast on Edge connect/disconnect transitions
-  const prevOnlineRef = useRef(false);
-  useEffect(() => {
-    if (online && !prevOnlineRef.current) {
-      addToast({ type: 'success', message: t('toast.connected') });
-    } else if (!online && prevOnlineRef.current) {
-      addToast({ type: 'warning', message: t('toast.disconnected') });
-    }
-    prevOnlineRef.current = online;
-  }, [online, addToast, t]);
-
-  const handleRetryEdge = useCallback(async () => {
-    setRetrying(true);
-    try {
-      await fetchHealth();
-      // Success — useHealth will pick it up on its own poll, but give it a moment
-    } catch (e) {
-      setLastEdgeError(
-        e instanceof Error ? e.message : t('banner.disconnected'),
-      );
-    } finally {
-      setRetrying(false);
-    }
-  }, [t]);
 
   // Sync chat messages → run store (Kanna dual-Map pattern)
   useEffect(() => {
@@ -294,7 +258,6 @@ export default function App() {
     [rightPanelWidth, setRightPanelWidth],
   );
 
-  // Stable callbacks for memoized presentational components
   const handleSelectAgent = useCallback((agent: AgentInfo) => {
     setSelectedAgentId(agent.id);
     setTabletAgentOpen(false);
@@ -308,7 +271,6 @@ export default function App() {
     [selectThread],
   );
 
-  // ── Permission gate ──
   const handleDecidePermission = useCallback(
     (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
       // 1. Update local state and send via WebSocket
@@ -335,31 +297,11 @@ export default function App() {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
   }, []);
 
-  // ── Welcome screen callbacks ──
-  const handleWelcomeCreateThread = useCallback(() => {
-    // Focus the prompt input so the user can start typing
-    const textarea = document.querySelector<HTMLTextAreaElement>(
-      'textarea[placeholder*="Type a message"]',
-    );
-    if (textarea) {
-      textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setTimeout(() => textarea.focus(), 150);
-    }
-  }, []);
-
-  const handleWelcomeSendMessage = useCallback(
-    (message: string) => {
-      handleSend(message);
-    },
-    [handleSend],
-  );
-
   // Scroll to a message when SearchDialog selects one
   useEffect(() => {
     if (!scrollToMessageId) return;
     const idx = allMessages.findIndex((m) => m.id === scrollToMessageId);
     if (idx < 0) return;
-    // ChatView renders messages inside [role="log"] in array order
     const log = chatContainerRef.current?.querySelector('[role="log"]');
     if (log && log.children[idx]) {
       (log.children[idx] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -370,25 +312,32 @@ export default function App() {
 
   return (
     <div className={styles.root}>
-      <StatusBar online={online} health={health} isConnected={isConnected} error={lastEdgeError} wsLatency={wsLatency} />
+      <Slot
+        name="status-bar"
+        online={online}
+        health={health}
+        isConnected={isConnected}
+        error={edgeStatus.lastError}
+        wsLatency={wsLatency}
+      />
 
-      {!online && !bannerDismissed && (
+      {edgeStatus.showBanner && (
         <div className={styles.banner} role="alert">
           <span className={styles.bannerIcon} aria-hidden="true">&#9888;</span>
           <span className={styles.bannerMsg}>
-            {lastEdgeError ?? t('banner.disconnected')}
+            {edgeStatus.lastError ?? t('banner.disconnected')}
           </span>
           <span className={styles.bannerActions}>
             <button
               className={styles.bannerBtn}
-              onClick={handleRetryEdge}
-              disabled={retrying}
+              onClick={edgeStatus.retry}
+              disabled={edgeStatus.retrying}
             >
-              {retrying ? '...' : t('banner.retry')}
+              {edgeStatus.retrying ? '...' : t('banner.retry')}
             </button>
             <button
               className={styles.bannerBtn}
-              onClick={() => setBannerDismissed(true)}
+              onClick={edgeStatus.dismissBanner}
             >
               {t('banner.dismiss')}
             </button>
@@ -465,7 +414,8 @@ export default function App() {
           className={`${styles.sidebarWrapper} ${mobileSidebarOpen ? styles.sidebarOpen : ''}`}
           style={isMobile ? undefined : { width: sidebarWidth, flexShrink: 0 }}
         >
-          <ThreadPanel
+          <Slot
+            name="thread-panel"
             online={online}
             selectedId={selectedThreadId ?? undefined}
             onSelect={handleSelectThread}
@@ -477,24 +427,10 @@ export default function App() {
           className={`${styles.agentOverlayWrapper} ${tabletAgentOpen ? styles.agentOverlayOpen : ''}`}
         >
           {agents.length === 0 && online ? (
-            <div className={styles.skeletonAgentList} aria-busy="true" aria-label="Loading agents">
-              {Array.from({ length: 5 }, (_, i) => (
-                <div key={i} className={styles.skeletonAgentItem}>
-                  <SkeletonCircle width={8} height={8} />
-                  <div className={styles.skeletonAgentInfo}>
-                    <SkeletonLine width={`${55 + (i % 3) * 10}%`} height="14px" />
-                    <SkeletonLine width={`${35 + (i % 4) * 8}%`} height="10px" />
-                    <div className={styles.skeletonAgentTags}>
-                      <SkeletonLine width="42px" height="14px" />
-                      <SkeletonLine width="50px" height="14px" />
-                      <SkeletonLine width="36px" height="14px" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <AgentListSkeleton />
           ) : (
-            <AgentList
+            <Slot
+              name="agent-list"
               agents={agents}
               online={online}
               selectedId={selectedAgentId}
@@ -509,24 +445,10 @@ export default function App() {
           {!isMobile && !isTablet && (
             <div className={styles.centerSidebar}>
               {agents.length === 0 && online ? (
-                <div className={styles.skeletonAgentList} aria-busy="true" aria-label="Loading agents">
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <div key={i} className={styles.skeletonAgentItem}>
-                      <SkeletonCircle width={8} height={8} />
-                      <div className={styles.skeletonAgentInfo}>
-                        <SkeletonLine width={`${55 + (i % 3) * 10}%`} height="14px" />
-                        <SkeletonLine width={`${35 + (i % 4) * 8}%`} height="10px" />
-                        <div className={styles.skeletonAgentTags}>
-                          <SkeletonLine width="42px" height="14px" />
-                          <SkeletonLine width="50px" height="14px" />
-                          <SkeletonLine width="36px" height="14px" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <AgentListSkeleton />
               ) : (
-                <AgentList
+                <Slot
+                  name="agent-list"
                   agents={agents}
                   online={online}
                   selectedId={selectedAgentId}
@@ -537,61 +459,17 @@ export default function App() {
           )}
 
           <div ref={chatContainerRef} className={styles.chatWrapper}>
-            {allMessages.length === 0 && threads.length === 0 && isConnected ? (
-              <WelcomeScreen
-                online={isConnected}
-                onCreateThread={handleWelcomeCreateThread}
-                onSendMessage={handleWelcomeSendMessage}
-              />
-            ) : (
-          <ErrorBoundary>
-            {messages.length === 0 && isStreaming ? (
-              <div className={styles.skeletonChat} aria-busy="true" aria-label="Generating response">
-                <div className={styles.skeletonChatBubble}>
-                  <SkeletonLine width="90%" height="14px" />
-                  <SkeletonLine width="75%" height="14px" />
-                  <SkeletonLine width="60%" height="14px" />
-                  <SkeletonLine width="45%" height="14px" />
-                </div>
-                <div className={styles.skeletonChatBubbleRight}>
-                  <SkeletonLine width="80%" height="14px" />
-                </div>
-                <div className={styles.skeletonChatBubble}>
-                  <SkeletonLine width="70%" height="14px" />
-                  <SkeletonLine width="55%" height="14px" />
-                  <SkeletonLine width="35%" height="14px" />
-                </div>
-                <div className={styles.skeletonChatBubble}>
-                  <SkeletonLine width="85%" height="14px" />
-                  <SkeletonLine width="65%" height="14px" />
-                </div>
-              </div>
-            ) : (
-              <Suspense
-                fallback={
-                  <div className={styles.skeletonChat} aria-busy="true" aria-label="Loading chat">
-                    <div className={styles.skeletonChatBubble}>
-                      <SkeletonLine width="90%" height="14px" />
-                      <SkeletonLine width="75%" height="14px" />
-                      <SkeletonLine width="60%" height="14px" />
-                      <SkeletonLine width="45%" height="14px" />
-                    </div>
-                    <div className={styles.skeletonChatBubbleRight}>
-                      <SkeletonLine width="80%" height="14px" />
-                    </div>
-                    <div className={styles.skeletonChatBubble}>
-                      <SkeletonLine width="70%" height="14px" />
-                      <SkeletonLine width="55%" height="14px" />
-                      <SkeletonLine width="35%" height="14px" />
-                    </div>
-                  </div>
-                }
-              >
-                <ChatView messages={allMessages} isStreaming={isStreaming} onRetry={handleRetry} onDelete={handleDelete} />
-              </Suspense>
-            )}
-          </ErrorBoundary>
-            )}
+            <Slot
+              name="main-view"
+              messages={messages}
+              allMessages={allMessages}
+              threadsCount={threads.length}
+              isStreaming={isStreaming}
+              isConnected={isConnected}
+              onRetry={handleRetry}
+              onDelete={handleDelete}
+              onSendMessage={handleSend}
+            />
           </div>
         </div>
 
@@ -610,7 +488,8 @@ export default function App() {
                 </div>
               }
             >
-              <RunDetail
+              <Slot
+                name="run-detail"
                 run={
                   currentRun
                     ? {
@@ -631,7 +510,8 @@ export default function App() {
         </div>
       </div>
 
-      <PromptInput
+      <Slot
+        name="prompt-input"
         agents={agents}
         selectedAgentId={selectedAgentId}
         onSelectAgent={setSelectedAgentId}
@@ -642,10 +522,10 @@ export default function App() {
         threadId={selectedThreadId ?? undefined}
       />
       <Suspense fallback={null}>
-        <SearchDialog messages={allMessages} onSelect={handleSearchSelect} />
+        <Slot name="search-dialog" messages={allMessages} onSelect={handleSearchSelect} />
       </Suspense>
-      <PermissionDialog requests={permissionRequests} onDecide={handleDecidePermission} />
-      <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
+      <Slot name="permission-dialog" requests={permissionRequests} onDecide={handleDecidePermission} />
+      <Slot name="shortcut-help" open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
     </div>
   );
 }
