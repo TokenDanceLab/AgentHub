@@ -77,6 +77,18 @@ export default function App() {
     }
   }, [isMobile]);
 
+  // Escape key closes mobile overlays (keyboard accessibility)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMobileSidebarOpen(false);
+        setMobileRunDetailOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Sync health hook → connection store
   useEffect(() => {
     setOnline(online, health);
