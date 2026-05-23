@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, MessageSquare, Pencil, Trash2, Check, X } from 'lucide-react';
 import type { ThreadInfo } from '@shared/types';
@@ -26,7 +26,7 @@ function getDisplayTitle(th: ThreadInfo, t: (k: string) => string): string {
   return t('thread.untitled');
 }
 
-export default function ThreadPanel({ threads, online, selectedId, onSelect, onCreate }: Props) {
+export default memo(function ThreadPanel({ threads, online, selectedId, onSelect, onCreate }: Props) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
 
@@ -261,4 +261,4 @@ export default function ThreadPanel({ threads, online, selectedId, onSelect, onC
       )}
     </nav>
   );
-}
+});

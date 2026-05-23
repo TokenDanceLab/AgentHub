@@ -85,6 +85,10 @@ docs/review/
 .cursor/
 .continue/
 
+# Agent inbox — reports dropped by other agents, local only
+docs/inbox/*
+!docs/inbox/README.md
+
 # Cloned reference repos (at repo root only)
 /reference/*
 !/reference/INDEX.md
