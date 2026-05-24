@@ -12,13 +12,12 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
-
-const maxPinsPerSession = 50
 
 // messageCache is the subset of *cache.Client methods used by MessageService.
 type messageCache interface {
@@ -311,7 +310,7 @@ func (s *MessageService) RecallMessage(ctx context.Context, msgID, userID string
 		return errcode.SessionNotMember
 	}
 
-	if !isOwner && time.Since(msg.CreatedAt) > 5*time.Minute {
+	if !isOwner && time.Since(msg.CreatedAt) > config.MessageRecallWindow {
 		return errcode.MsgRecallTimeout
 	}
 
@@ -337,7 +336,7 @@ func (s *MessageService) PinMessage(ctx context.Context, userID, sessionID, msgI
 	if err != nil {
 		return err
 	}
-	if count >= maxPinsPerSession {
+	if count >= config.MaxPinsPerSession {
 		return errcode.MsgPinLimitExceeded
 	}
 
@@ -434,9 +433,8 @@ func (s *MessageService) ForwardMessage(ctx context.Context, userID, msgID strin
 		return errcode.SessionNotMember
 	}
 
-	// Concurrent forwarding with concurrency limit 8
 	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(8)
+	g.SetLimit(config.ForwardMessageConcurrency)
 
 	for _, sessionID := range targetSessionIDs {
 		sid := sessionID

@@ -147,6 +147,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			triggered_by_user_id TEXT NOT NULL,
 			trigger_message_id TEXT NOT NULL,
 			status TEXT NOT NULL,
+			edge_run_id TEXT DEFAULT '',
 			error_message TEXT DEFAULT '',
 			created_at DATETIME,
 			dispatched_at DATETIME,
@@ -978,6 +979,14 @@ func TestPendingTaskRepo_CRUD(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, model.TaskStatusDispatched, fetched.Status)
 	assert.NotNil(t, fetched.DispatchedAt)
+
+	// Update status to running and persist the Edge run mapping.
+	err = UpdatePendingTaskStatusWithEdgeRunID(db, task.ID, model.TaskStatusRunning, "", "run-edge-1")
+	require.NoError(t, err)
+	fetched, err = GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusRunning, fetched.Status)
+	assert.Equal(t, "run-edge-1", fetched.EdgeRunID)
 
 	// Update status to done
 	err = UpdatePendingTaskStatus(db, task.ID, model.TaskStatusDone, "")
