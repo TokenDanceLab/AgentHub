@@ -70,29 +70,29 @@
   color: #94A3B8; font-size: 11px; user-select: none;
 }
 
-/* ── Send button (circle) ─────────────────── */
+/* ── Send button ──────────────────────────── */
 .sendBtn, .stopBtn {
   width: 30px; height: 30px; border-radius: 50%;
   border: none; display: flex; align-items: center; justify-content: center;
   cursor: pointer; flex-shrink: 0;
-  transition: background 0.2s, transform 0.1s;
+  transition: all 0.2s ease, transform 0.1s;
 }
 .sendBtn {
-  background: #E4E4E7; color: #FFFFFF;
+  background: transparent; color: #94A3B8;
 }
 .sendBtnActive {
   background: #111827; color: #FFFFFF;
 }
 .sendBtnActive:hover { background: #1F2937; }
 .sendBtn:active { transform: scale(0.94); }
-.sendBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+.sendBtn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .stopBtn { background: #DC2626; color: #fff; }
 .stopBtn:hover { background: #B91C1C; }
 .stopBtn:active { transform: scale(0.94); }
 .stopBtn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-[data-theme='dark'] .sendBtn { background: #3F3F46; }
+[data-theme='dark'] .sendBtn { color: #6B7280; }
 [data-theme='dark'] .sendBtnActive { background: #FAFAFA; color: #18181B; }
 [data-theme='dark'] .sendBtnActive:hover { background: #E4E4E7; }
 

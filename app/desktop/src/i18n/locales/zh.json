@@ -179,6 +179,7 @@
   "thread.save": "保存",
   "thread.search": "搜索会话...",
   "thread.title": "会话",
+  "thread.emptyHint": "暂无最近会话，选择上方智能体开始聊天",
   "thread.untitled": "未命名会话",
 
   "time.daysAgo": "{{count}}天前",
