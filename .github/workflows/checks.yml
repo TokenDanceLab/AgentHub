@@ -166,6 +166,33 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+  # ── Cross-Platform Build ─────────────────────
+  cross-build:
+    name: Cross-platform build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Build edge-server
+        run: cd edge-server && go build ./...
+
+      - name: Build hub-server
+        run: cd hub-server && go build ./...
+
+      - name: Test edge-server
+        run: cd edge-server && go test ./... -short -count=1
+
+      - name: Test hub-server
+        run: cd hub-server && go test ./... -short -count=1
+
   # ── Docker: Hub Server ───────────────────────
   docker:
     name: Docker build (Hub Server)
