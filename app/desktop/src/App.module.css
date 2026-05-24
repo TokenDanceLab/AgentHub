@@ -375,3 +375,42 @@
     font-size: var(--font-size-xs);
   }
 }
+
+/* Mode switching bar (Agent / IM tabs) */
+.modeBar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+
+.modeTab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.modeTab:hover {
+  color: var(--foreground);
+}
+
+.modeTabActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.modeTabActive:hover {
+  color: var(--accent);
+}
