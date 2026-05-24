@@ -166,6 +166,22 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+  # ── Docker: Hub Server ───────────────────────
+  docker:
+    name: Docker build (Hub Server)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t agenthub-hub-server -f deployments/Dockerfile .
+
+      - name: Verify image
+        run: docker images agenthub-hub-server
+
   # ── Frontend: Desktop ────────────────────────
   frontend-desktop:
     runs-on: ubuntu-latest
