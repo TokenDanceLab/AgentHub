@@ -18,6 +18,7 @@
   "agent.capability.thinking": "Thinking",
   "agent.capability.multiTurn": "Multi-Turn",
   "thread.title": "Threads",
+  "thread.emptyHint": "No recent threads. Select an agent above to start chatting.",
   "thread.empty": "No threads yet",
   "thread.emptyTitle": "Create your first thread",
   "thread.emptyDescription": "Threads help you organize and track multiple agent conversations",
