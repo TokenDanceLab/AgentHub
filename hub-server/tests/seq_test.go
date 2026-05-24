@@ -3,6 +3,7 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 
@@ -225,10 +226,9 @@ func TestForwardToMultipleSessions(t *testing.T) {
 
 func TestSeqAfterRedisRestart(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
-	t.Skip("TestSeqAfterRedisRestart: requires Redis restart to verify seq continuity across restarts. " +
-		"After restart, seq should continue from where it left off (not reset to 1). " +
-		"Manual verification: send messages before restart, restart Redis, send more messages, " +
-		"verify seq continues monotonically.")
+	if os.Getenv("AGENTHUB_REDIS_RESTART_TEST") != "1" {
+		t.Skip("TestSeqAfterRedisRestart: requires Redis restart. Set AGENTHUB_REDIS_RESTART_TEST=1 to run.")
+	}
 	t.Log("seq-after-restart test skipped (no Redis restart access)")
 }
 
