@@ -14,10 +14,9 @@
     "isolatedModules": true,
     "noEmit": true,
     "lib": ["ES2021", "DOM", "DOM.Iterable"],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@shared/*": ["../shared/src/*"]
+      "@/*": ["./src/*"],
+      "@shared/*": ["./../shared/src/*"]
     }
   },
   "include": ["src"]
