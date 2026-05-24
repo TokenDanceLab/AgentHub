@@ -11,29 +11,6 @@ interface Props {
   onSelect?: (agent: AgentInfo) => void;
 }
 
-interface CapItem {
-  label: string;
-  key: string;
-}
-
-function capabilityItems(caps: AgentInfo['capabilities'], t: (key: string) => string): CapItem[] {
-  const items: CapItem[] = [];
-  if (caps.streaming) items.push({ label: t('agent.capability.streaming'), key: 'streaming' });
-  if (caps.toolCalls) items.push({ label: t('agent.capability.toolCalls'), key: 'toolCalls' });
-  if (caps.fileChanges) items.push({ label: t('agent.capability.fileChanges'), key: 'fileChanges' });
-  if (caps.thinkingVisible) items.push({ label: t('agent.capability.thinking'), key: 'thinkingVisible' });
-  if (caps.multiTurn) items.push({ label: t('agent.capability.multiTurn'), key: 'multiTurn' });
-  return items;
-}
-
-const capColorClass: Record<string, string> = {
-  streaming: styles.tagStreaming,
-  toolCalls: styles.tagToolCalls,
-  fileChanges: styles.tagFileChanges,
-  thinkingVisible: styles.tagThinking,
-  multiTurn: styles.tagMultiTurn,
-};
-
 export default memo(function AgentList({ agents, online, selectedId, onSelect }: Props) {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
@@ -105,16 +82,6 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
                   {a.description && (
                     <div className={styles.description}>{a.description}</div>
                   )}
-                  <div className={styles.tags}>
-                    {capabilityItems(a.capabilities, t).map((item) => (
-                      <span
-                        key={item.key}
-                        className={`${styles.tag} ${capColorClass[item.key] ?? ''}`}
-                      >
-                        {item.label}
-                      </span>
-                    ))}
-                  </div>
                 </div>
               </button>
             </li>

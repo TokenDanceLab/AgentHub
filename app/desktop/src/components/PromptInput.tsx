@@ -5,6 +5,7 @@ import type { AgentInfo } from '@shared/types';
 import { useInputDraft } from '@/hooks/useInputDraft';
 import { useMention } from '@/hooks/useMention';
 import MentionPopover from '@/components/MentionPopover';
+import ModelDropdown from '@/components/ModelDropdown';
 import styles from './PromptInput.module.css';
 
 const COMMON_MODELS = [
@@ -160,36 +161,26 @@ export default function PromptInput({
 
       <div className={styles.inputCard}>
         <div className={styles.configRow}>
-        <select
-          className={styles.select}
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          disabled={disabled}
-          aria-label={t('prompt.model')}
-        >
-          <option value="">{t('prompt.model')}</option>
-          {models.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
+          <ModelDropdown
+            options={[
+              ...models.map((m) => ({ value: m, label: m, group: 'Base Models' })),
+            ]}
+            value={model}
+            onChange={setModel}
+            placeholder={t('prompt.model')}
+            disabled={disabled}
+            ariaLabel={t('prompt.model')}
+          />
 
-        <select
-          className={styles.select}
-          value={reasoningEffort}
-          onChange={(e) => setReasoningEffort(e.target.value as ReasoningEffort | '')}
-          disabled={disabled}
-          aria-label={t('prompt.reasoning')}
-        >
-          <option value="">{t('prompt.reasoning')}</option>
-          {REASONING_EFFORTS.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </div>
+          <ModelDropdown
+            options={REASONING_EFFORTS.map((r) => ({ value: r, label: r, group: 'Reasoning' }))}
+            value={reasoningEffort}
+            onChange={(v) => setReasoningEffort(v as ReasoningEffort | '')}
+            placeholder={t('prompt.reasoning')}
+            disabled={disabled}
+            ariaLabel={t('prompt.reasoning')}
+          />
+        </div>
 
       <div className={styles.bar}>
         {selectedAgent && (
