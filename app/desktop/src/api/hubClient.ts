@@ -506,8 +506,11 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     // ── Edge callbacks (desktop → hub task lifecycle) ──
 
-    ackTask: (taskId: string) =>
-      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/ack`, { method: 'POST' }),
+    ackTask: (taskId: string, runId?: string) =>
+      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/ack`, {
+        method: 'POST',
+        ...(runId ? { body: JSON.stringify({ run_id: runId }) } : {}),
+      }),
 
     streamTask: (taskId: string, content: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
