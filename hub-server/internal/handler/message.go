@@ -1,25 +1,11 @@
 package handler
 
 import (
-<<<<<<< HEAD
-=======
 	"context"
->>>>>>> origin/master
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 
-<<<<<<< HEAD
-	"github.com/agenthub/server-hub/internal/errcode"
-	"github.com/agenthub/server-hub/internal/service"
-)
-
-type MessageHandler struct {
-	service *service.MessageService
-}
-
-func NewMessageHandler(s *service.MessageService) *MessageHandler {
-=======
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/service"
@@ -44,7 +30,6 @@ type MessageHandler struct {
 }
 
 func NewMessageHandler(s MessageService) *MessageHandler {
->>>>>>> origin/master
 	return &MessageHandler{service: s}
 }
 
@@ -87,11 +72,7 @@ func (h *MessageHandler) GetMessages(c *gin.Context) {
 		beforeSeq = parsed
 	}
 
-<<<<<<< HEAD
-	limit := 50
-=======
 	limit := config.DefaultPaginationLimit
->>>>>>> origin/master
 	if limitStr != "" {
 		parsed, err := strconv.Atoi(limitStr)
 		if err != nil {
@@ -130,11 +111,7 @@ func (h *MessageHandler) GetIncrementalMessages(c *gin.Context) {
 		afterSeq = parsed
 	}
 
-<<<<<<< HEAD
-	limit := 50
-=======
 	limit := config.DefaultPaginationLimit
->>>>>>> origin/master
 	if limitStr != "" {
 		parsed, err := strconv.Atoi(limitStr)
 		if err != nil {

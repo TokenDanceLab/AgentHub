@@ -32,6 +32,10 @@ Hub Server 通过 `AGENTHUB_` 前缀的环境变量覆盖配置文件中的值�
 | `AGENTHUB_JWT_SECRET` | JWT 签名密钥（**必填，最少 16 字符**） | — |
 | `AGENTHUB_JWT_ACCESS_TTL` | Access Token 有效期 | `15m` |
 | `AGENTHUB_JWT_REFRESH_TTL` | Refresh Token 有效期 | `720h` |
+| `AGENTHUB_TOKENDANCE_ID_ISSUER_URL` | TokenDance ID issuer，用于 RS256 bearer-token 兼容路径 | `https://id.example.invalid` |
+| `AGENTHUB_TOKENDANCE_ID_JWKS_URI` | TokenDance ID JWKS；为空时由 issuer 拼出 `/oidc/jwks` | `https://id.example.invalid/oidc/jwks` |
+| `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | 预留给未来 Hub OIDC browser flow | — |
+| `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | 预留给未来 confidential-client flow；只从 secret store 注入 | — |
 | `AGENTHUB_UPLOAD_DIR` | 上传文件存储目录 | `./uploads` |
 | `AGENTHUB_UPLOAD_MAX_SIZE` | 上传文件最大字节数 | `10485760` |
 | `AGENTHUB_PPROF_USER` | 管理端点 HTTP Basic 用户名 | **必填** |
@@ -39,70 +43,19 @@ Hub Server 通过 `AGENTHUB_` 前缀的环境变量覆盖配置文件中的值�
 
 `AGENTHUB_JWT_SECRET` 必须通过环境变量设置；配置文件中的硬编码默认值会被拒绝。参见 `.env.example`。
 
+TokenDance ID 相关变量只启用 Hub Server 对 TokenDance ID RS256 bearer token 的兼容校验路径。当前 Hub Server 还没有最终定稿的 TokenDance ID 浏览器登录 callback，也不会为 TokenDance ID bearer token 自动创建 Hub refresh session；完整边界见 `../README.md` 的 TokenDance ID 兼容鉴权章节。
+
 ## 快速启动（Docker Compose）
 
-项目暂无内置 `docker-compose.yml`，以下为参考示例：
-
-```yaml
-# docker-compose.yml
-version: "3.8"
-services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: agenthub
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: agenthub
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agenthub"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    command: redis-server --save 60 1 --loglevel warning
-    volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  hub-server:
-    build:
-      context: .
-      dockerfile: deployments/Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      AGENTHUB_DB_HOST: postgres
-      AGENTHUB_DB_PASSWORD: ${DB_PASSWORD}
-      AGENTHUB_REDIS_HOST: redis
-      AGENTHUB_JWT_SECRET: ${AGENTHUB_JWT_SECRET}
-      AGENTHUB_PPROF_USER: admin
-      AGENTHUB_PPROF_PASS: ${AGENTHUB_PPROF_PASS}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-volumes:
-  pgdata:
-  redisdata:
-```
+开发环境 compose 位于仓库根目录 `docker-compose.yml`，会启动 PostgreSQL 16、Redis 7 和 Hub Server。
 
 ```powershell
-# 启动
-$env:DB_PASSWORD = "your-db-password"
-$env:AGENTHUB_JWT_SECRET = "your-32-char-secret-key-here!!"
-$env:AGENTHUB_PPROF_PASS = "your-admin-password"
+# 在 AgentHub 仓库根目录
+copy .env.example .env
 docker compose up -d
 ```
+
+生产部署参考 `deployments/docker-compose.prod.yml`，镜像构建入口为 `deployments/Dockerfile`。
 
 ## 生产部署
 
@@ -232,8 +185,8 @@ systemctl stop hub-server
 # 2. 恢复
 pg_restore -h <host> -U agenthub -d agenthub --clean --if-exists hub-server-20260524.dump
 
-# 3. 重新跑迁移（确保一致）
-cd hub-server && go run ./cmd/server-hub migrate up
+# 3. 重新启动服务，启动过程会自动执行缺失迁移
+cd hub-server && go run ./cmd/server-hub
 
 # 4. 启动服务
 systemctl start hub-server
@@ -259,7 +212,10 @@ docker exec <redis-container> redis-cli BGSAVE
   "checks": {
     "database": "ok",
     "redis": "ok",
-    "migrations": 16
+    "migrations": {
+      "version": 17,
+      "dirty": false
+    }
   }
 }
 ```
@@ -312,10 +268,4 @@ readinessProbe:
 
 ## 迁移管理
 
-```powershell
-# 应用所有待执行迁移（服务启动时自动执行）
-go run ./cmd/server-hub migrate up
-
-# 回滚最后一次迁移
-go run ./cmd/server-hub migrate down
-```
+Hub Server 启动时自动执行 `migrations/` 下的待执行迁移。当前 `cmd/server-hub` 没有单独的 `migrate up/down` 子命令；需要回滚时使用数据库备份恢复或手动执行对应 down SQL，并在恢复后重启服务确认 `/health` 中的迁移状态。

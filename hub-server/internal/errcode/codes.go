@@ -17,16 +17,10 @@ func New(code, message string, httpStatus int) *Error {
 }
 
 var (
-<<<<<<< HEAD
-	OK          = &Error{Code: "OK", Message: "", HTTPStatus: http.StatusOK}
-	ErrInternal = &Error{Code: "INTERNAL_ERROR", Message: "internal server error", HTTPStatus: http.StatusInternalServerError}
-	ErrBadRequest = &Error{Code: "BAD_REQUEST", Message: "invalid request", HTTPStatus: http.StatusBadRequest}
-=======
 	OK            = &Error{Code: "OK", Message: "", HTTPStatus: http.StatusOK}
 	ErrInternal   = &Error{Code: "INTERNAL_ERROR", Message: "internal server error", HTTPStatus: http.StatusInternalServerError}
 	ErrBadRequest = &Error{Code: "BAD_REQUEST", Message: "invalid request", HTTPStatus: http.StatusBadRequest}
 	ErrTimeout    = &Error{Code: "REQUEST_TIMEOUT", Message: "request timed out", HTTPStatus: http.StatusGatewayTimeout}
->>>>>>> origin/master
 
 	AuthInvalidToken       = &Error{Code: "AUTH_INVALID_TOKEN", Message: "token is invalid or expired", HTTPStatus: http.StatusUnauthorized}
 	AuthInvalidCredentials = &Error{Code: "AUTH_INVALID_CREDENTIALS", Message: "invalid username or password", HTTPStatus: http.StatusUnauthorized}
@@ -61,13 +55,8 @@ var (
 	FriendBlocked         = &Error{Code: "FRIEND_BLOCKED", Message: "blocked by user", HTTPStatus: http.StatusForbidden}
 	FriendRequestNotFound = &Error{Code: "FRIEND_REQUEST_NOT_FOUND", Message: "friend request not found", HTTPStatus: http.StatusNotFound}
 
-<<<<<<< HEAD
-	AttachNotFound    = &Error{Code: "ATTACH_NOT_FOUND", Message: "attachment not found", HTTPStatus: http.StatusNotFound}
-	AttachTooLarge    = &Error{Code: "ATTACH_TOO_LARGE", Message: "file exceeds maximum size", HTTPStatus: http.StatusRequestEntityTooLarge}
-=======
 	AttachNotFound     = &Error{Code: "ATTACH_NOT_FOUND", Message: "attachment not found", HTTPStatus: http.StatusNotFound}
 	AttachTooLarge     = &Error{Code: "ATTACH_TOO_LARGE", Message: "file exceeds maximum size", HTTPStatus: http.StatusRequestEntityTooLarge}
->>>>>>> origin/master
 	AttachHashMismatch = &Error{Code: "ATTACH_HASH_MISMATCH", Message: "file hash does not match", HTTPStatus: http.StatusBadRequest}
 
 	NotifNotFound = &Error{Code: "NOTIF_NOT_FOUND", Message: "notification not found", HTTPStatus: http.StatusNotFound}

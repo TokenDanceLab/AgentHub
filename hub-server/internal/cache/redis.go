@@ -6,21 +6,11 @@ import (
 	"log/slog"
 	"time"
 
-<<<<<<< HEAD
-	"github.com/agenthub/server-hub/internal/config"
-	"github.com/redis/go-redis/v9"
-)
-
-var RDB *redis.Client
-
-func InitRedis(cfg *config.RedisConfig) error {
-=======
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/redis/go-redis/v9"
 )
 
 func InitRedis(cfg *config.RedisConfig) (*redis.Client, error) {
->>>>>>> origin/master
 	poolSize := cfg.PoolSize
 	if poolSize == 0 {
 		poolSize = 100
@@ -48,18 +38,9 @@ func InitRedis(cfg *config.RedisConfig) (*redis.Client, error) {
 	defer cancel()
 
 	if err := rdb.Ping(ctx).Err(); err != nil {
-<<<<<<< HEAD
-		return fmt.Errorf("failed to ping redis: %w", err)
-	}
-
-	RDB = rdb
-	slog.Info("redis connected", "addr", cfg.Addr())
-	return nil
-=======
 		return nil, fmt.Errorf("failed to ping redis: %w", err)
 	}
 
 	slog.Info("redis connected", "addr", cfg.Addr())
 	return rdb, nil
->>>>>>> origin/master
 }

@@ -20,10 +20,24 @@ import { useHubStore } from '@/stores/hubStore';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
-import { MessageSquare, Bot, Sun, Moon, Wifi, WifiOff, Circle, LogIn, Settings } from 'lucide-react';
+import SettingsPage from '@/components/SettingsPage';
+import { MessageSquare, Bot, Sun, Moon, Wifi, WifiOff, Circle, LogIn, Settings, Search, Copy, Maximize2, Minimize2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '@/App.module.css';
+
+interface OptimisticRun {
+  runId: string;
+  status: string;
+  outputText: string;
+  toolCalls: [];
+  changedFiles: [];
+}
+
+function isRunActiveStatus(status: string | undefined): boolean {
+  if (!status) return false;
+  return ['queued', 'running', 'streaming', 'waiting_for_input', 'RUNNING', 'STREAMING', 'WAITING_FOR_INPUT'].includes(status);
+}
 
 export default function App() {
   const { online, health } = useHealth();
@@ -54,6 +68,9 @@ export default function App() {
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
   const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
 
   // Mobile/tablet overlays
   const [navPanelOpen, setNavPanelOpen] = useState(false);
@@ -90,8 +107,15 @@ export default function App() {
   const selectedThread = threads.find((th) => th.threadId === selectedThreadId);
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const allMessages = [...userMessages, ...messages];
+  const displayedRun = currentRun ?? optimisticRun;
+  const runIsActive = isRunActiveStatus(displayedRun?.status);
+
+  useEffect(() => {
+    if (currentRun) setOptimisticRun(null);
+  }, [currentRun]);
 
   const handleSend = useCallback(async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string }) => {
+    const tempRunId = `starting-${Date.now()}`;
     try {
       const req: StartRunRequest = { prompt };
       if (agentId) req.agentId = agentId;
@@ -99,15 +123,22 @@ export default function App() {
       if (opts?.reasoningEffort) req.reasoningEffort = opts.reasoningEffort;
       if (selectedThread) req.threadId = selectedThread.threadId;
       setUserMessages((prev) => [...prev, { id: `user-${Date.now()}`, role: 'user', timestamp: new Date().toISOString(), blocks: [{ kind: 'text', content: prompt }] }]);
-      await startRun(req);
-    } catch (e) { console.error('Failed to start run:', e); }
-  }, [selectedThread]);
+      setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
+      const started = await startRun(req);
+      setOptimisticRun({ ...started, outputText: '', toolCalls: [], changedFiles: [] });
+    } catch (e) {
+      setOptimisticRun(null);
+      addToast({ type: 'error', message: t('error.startRunFailed') });
+      console.error('Failed to start run:', e);
+    }
+  }, [addToast, selectedThread, t]);
 
   const handleCancel = useCallback(async () => {
-    if (currentRun?.runId) {
-      try { await cancelRun(currentRun.runId); } catch {}
+    const runId = currentRun?.runId ?? (optimisticRun?.runId.startsWith('starting-') ? undefined : optimisticRun?.runId);
+    if (runId) {
+      try { await cancelRun(runId); } catch {}
     }
-  }, [currentRun?.runId]);
+  }, [currentRun?.runId, optimisticRun?.runId]);
 
   const handleSelectThread = useCallback((id: string) => { selectThread(id); setUserMessages([]); }, [selectThread]);
   const handleSelectAgent = useCallback((id: string) => setSelectedAgentId(id), []);
@@ -130,6 +161,21 @@ export default function App() {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
   }, []);
 
+  const handleShareWorkspace = useCallback(async () => {
+    const title = selectedThread?.title ?? selectedAgent?.name ?? 'AgentHub';
+    const summary = [
+      `AgentHub: ${title}`,
+      selectedThread ? `Thread: ${selectedThread.threadId}` : null,
+      selectedAgent ? `Agent: ${selectedAgent.name}` : null,
+    ].filter(Boolean).join('\n');
+    try {
+      await navigator.clipboard.writeText(summary);
+      addToast({ type: 'success', message: t('toast.copied') });
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addToast, selectedAgent, selectedThread, t]);
+
   // Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -140,13 +186,6 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // ── Drag handler for frameless window (Tauri v2 programmatic API)
-  const handleDragStart = useCallback(async (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('button, input, select, a')) return;
-    try { await getCurrentWindow().startDragging(); } catch {}
   }, []);
 
   // ── Double-click top bar → toggle maximize/restore
@@ -165,7 +204,7 @@ export default function App() {
     <ErrorBoundary>
     <div className={styles.root}>
       {/* Top status bar — drag region + window controls */}
-      <div className={styles.topBar} onMouseDown={handleDragStart} onDoubleClick={handleTopBarDoubleClick}>
+      <div className={styles.topBar} data-tauri-drag-region onDoubleClick={handleTopBarDoubleClick}>
         <div className={styles.topBarLeft}>
           <span className={styles.statusBadge}>
             <span className={`${styles.statusBadgeDot} ${online ? styles.statusBadgeDotOnline : styles.statusBadgeDotOffline}`} />
@@ -176,10 +215,6 @@ export default function App() {
           {edgeStatus.lastError && <span className={styles.topBarDim} title={edgeStatus.lastError} style={{ marginLeft: 4 }}>⚠</span>}
         </div>
         <div className={styles.topBarRight}>
-          <button className={styles.topBarBtn} onClick={toggleTheme} title={theme === 'dark' ? t('theme.light') : t('theme.dark')}>
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
-
           {/* Window controls — no drag region so clicks register */}
           <div className={styles.winControls}>
             <button className={styles.winBtn} onClick={() => getCurrentWindow().minimize()} title="最小化">
@@ -209,6 +244,14 @@ export default function App() {
         </div>
       )}
 
+      {settingsOpen ? (
+        <SettingsPage
+          onBack={() => setSettingsOpen(false)}
+          onOpenAuth={() => useHubStore.getState().setShowAuthModal(true)}
+        />
+      ) : (
+      <>
+
       {/* Mobile toolbar */}
       {isMobile && (
         <div style={{ display: 'flex', padding: '4px 8px', gap: 8, background: 'var(--card)', borderBottom: '1px solid var(--border)' }}>
@@ -228,58 +271,75 @@ export default function App() {
       )}
 
       <div className={styles.body}>
-        {/* Left icon nav (desktop/tablet) */}
-        {!isMobile && (
-          <div className={styles.nav}>
-            <button className={`${styles.navBtn} ${viewMode === 'agent' ? styles.navBtnActive : ''}`} onClick={() => setViewMode('agent')} title={t('nav.agent')}>
-              <Bot size={18} />
-            </button>
-            <button className={`${styles.navBtn} ${viewMode === 'im' ? styles.navBtnActive : ''}`} onClick={() => setViewMode('im')} title={t('nav.messages')}>
-              <MessageSquare size={18} />
-            </button>
-            <div className={styles.navSpacer} />
-            {/* Settings + Hub at bottom */}
-            <button className={styles.navBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} title={t('nav.settings')}>
-              <Settings size={18} />
-            </button>
-            <button
-              className={styles.navBtn}
-              onClick={() => useHubStore.getState().setShowAuthModal(true)}
-              title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
-            >
-              {hubAuthenticated ? (
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Circle size={10} fill="var(--color-success)" color="var(--color-success)" />
-                </span>
-              ) : (
-                <LogIn size={18} />
-              )}
+        {/* Single sidebar — agents + threads grouped */}
+        {!isMobile && !workspaceExpanded && (
+          <div className={styles.sidebar}>
+            {/* Global search */}
+            <div className={styles.sidebarSearch}>
+              <Search size={14} color="#B0B0B5" />
+              <input type="text" placeholder={t('im.contact.search')} />
+            </div>
+
+            {/* Agents section */}
+            <div className={styles.sidebarSection}>
+              <div className={styles.sidebarSectionLabel}>{t('agent.title')}</div>
+              <div className={styles.sidebarScroll}>
+                <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
+              </div>
+            </div>
+
+            {/* Threads section */}
+            <div className={styles.sidebarSection}>
+              <div className={styles.sidebarSectionLabel}>{t('thread.title')}</div>
+              <div className={styles.sidebarScroll}>
+                <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
+                {threads.length === 0 && (
+                  <div className={styles.sidebarEmpty}>{t('thread.emptyHint')}</div>
+                )}
+              </div>
+            </div>
+
+            {/* Sidebar footer */}
+            <div className={styles.sidebarFooter}>
+              <button className={styles.navIconBtn} onClick={() => setSettingsOpen(true)} title={t('nav.settings')} aria-label={t('nav.settings')}>
+                <Settings size={16} />
               </button>
-          </div>
-        )}
-
-        {/* Desktop Thread panel */}
-        {!isMobile && !isTablet && (
-          <div className={styles.sidebarPanel}>
-            <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
-          </div>
-        )}
-
-        {/* Agent list panel (desktop only) */}
-        {!isMobile && !isTablet && (
-          <div className={styles.sidebarPanel}>
-            <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
+              <button className={styles.navIconBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
+                {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={16} />}
+              </button>
+              <button className={styles.navIconBtn} onClick={toggleTheme} title={theme === 'dark' ? t('theme.light') : t('theme.dark')}>
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+            </div>
           </div>
         )}
 
         {/* Main zone */}
-        <div className={styles.main}>
+        <div className={`${styles.main} ${workspaceExpanded ? styles.mainExpanded : ''}`}>
           <div className={styles.workspace}>
             {/* Workspace header */}
             <div className={styles.workspaceHeader}>
               <div className={`${styles.workspaceHeaderDot} ${online ? styles.workspaceHeaderDotOnline : styles.workspaceHeaderDotOffline}`} />
               <h2>{selectedAgent ? selectedAgent.name : 'AgentHub'}</h2>
               {selectedThread && <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted-foreground)' }}>{selectedThread.title}</span>}
+              <div className={styles.workspaceHeaderActions}>
+                <button
+                  className={styles.workspaceHeaderBtn}
+                  onClick={handleShareWorkspace}
+                  title={t('workspace.share')}
+                  aria-label={t('workspace.share')}
+                >
+                  <Copy size={15} />
+                </button>
+                <button
+                  className={styles.workspaceHeaderBtn}
+                  onClick={() => setWorkspaceExpanded((v) => !v)}
+                  title={workspaceExpanded ? t('workspace.collapse') : t('workspace.expand')}
+                  aria-label={workspaceExpanded ? t('workspace.collapse') : t('workspace.expand')}
+                >
+                  {workspaceExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                </button>
+              </div>
             </div>
 
             {/* Chat area */}
@@ -287,22 +347,22 @@ export default function App() {
               {viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
               ) : (
-                <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={currentRun != null} isConnected={isConnected} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
+                <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={runIsActive} isConnected={isConnected} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
               )}
             </div>
 
             {/* Input area */}
             {viewMode === 'agent' && (
               <div className={styles.inputArea}>
-                <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} onSend={handleSend} isStreaming={currentRun != null} onCancel={handleCancel} disabled={!online} threadId={selectedThreadId ?? undefined} />
+                <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} onSend={handleSend} isStreaming={runIsActive} onCancel={handleCancel} disabled={!online} threadId={selectedThreadId ?? undefined} />
               </div>
             )}
           </div>
         </div>
 
-        {/* Right panel (desktop/tablet) */}
-        {!isMobile && (
-          <div className={styles.rightPanel}>
+        {/* Right panel — hidden until there is active work */}
+        {!isMobile && !workspaceExpanded && (
+          <div className={`${styles.rightPanel} ${displayedRun ? '' : styles.rightPanelHidden}`}>
             <div className={styles.rightPanelHeader}>
               <div className={styles.rightPanelSegmented}>
                 <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`}>{t('run.output')}</button>
@@ -312,13 +372,23 @@ export default function App() {
             <div className={styles.rightPanelBody}>
               <ErrorBoundary>
                 <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted-foreground)' }}><SkeletonLine width="60%" height="1em" /><SkeletonLine width="40%" height="1em" /></div>}>
-                  <Slot name="run-detail" run={currentRun ? { runId: currentRun.runId, projectId: '', threadId: selectedThread?.threadId ?? '', status: currentRun.status } : null} outputText={currentRun?.outputText} toolCalls={currentRun?.toolCalls ?? []} changedFiles={currentRun?.changedFiles ?? []} />
+                  <Slot
+                    name="run-detail"
+                    run={displayedRun ? { runId: displayedRun.runId, projectId: '', threadId: selectedThread?.threadId ?? '', status: displayedRun.status } : null}
+                    outputText={displayedRun?.outputText ?? ''}
+                    toolCalls={displayedRun?.toolCalls ?? []}
+                    changedFiles={displayedRun?.changedFiles ?? []}
+                    onCancel={handleCancel}
+                    chatMessages={allMessages}
+                  />
                 </Suspense>
               </ErrorBoundary>
             </div>
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Modals */}
       <Suspense fallback={null}>

@@ -1,6 +1,6 @@
 // Hub WebSocket client for AgentHub Desktop.
 // Manages auth-frame handshake, typed event routing, and reconnection
-// via the Transport abstraction (Phase 1).
+// via the Transport abstraction.
 //
 // Protocol (matching hub-server/internal/handler/ws.go + ws/frame.go):
 //   1. WebSocket connects to ws://host/client/ws
@@ -8,6 +8,11 @@
 //   3. Server responds: {"type":"auth.ok","payload":null}
 //      or:  {"type":"auth.fail","payload":{"reason":"..."}}
 //   4. After auth, bidirectional events flow with {type, payload} framing.
+//
+// Reconnection: The underlying Transport handles exponential-backoff
+// reconnection (max 10 retries). On every reconnect, the auth handshake
+// is re-executed automatically. Typed event subscriptions survive
+// across reconnects.
 
 import { HUB_WS_URL } from '@/config';
 import { WebSocketTransport, type Transport, type TransportStatus } from './transport';
@@ -48,13 +53,19 @@ export interface HubWSHandle {
   reconnect: () => void;
   /** Current transport status. */
   getStatus: () => TransportStatus;
+  /** Whether the connection is currently authenticated. */
+  isAuthenticated: () => boolean;
 }
 
 // ── Implementation ───────────────────────────────
 
 export function createHubWS(opts: HubWSOptions): HubWSHandle {
   const transport: Transport =
-    opts.transport ?? new WebSocketTransport({ url: opts.url ?? HUB_WS_URL, maxRetries: 3 });
+    opts.transport ??
+    new WebSocketTransport({
+      url: opts.url ?? HUB_WS_URL,
+      maxRetries: 10,
+    });
 
   const typedHandlers = new Map<string, Set<(payload: unknown) => void>>();
   const anyHandlers = new Set<(type: string, payload: unknown) => void>();
@@ -190,6 +201,10 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
 
     getStatus(): TransportStatus {
       return transport.getStatus();
+    },
+
+    isAuthenticated(): boolean {
+      return authenticated;
     },
   };
 }

@@ -3,17 +3,11 @@ package service
 import (
 	"context"
 	"log/slog"
-<<<<<<< HEAD
-	"sync"
-	"sync/atomic"
-
-=======
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
 
 	"github.com/agenthub/hub-server/internal/metrics"
->>>>>>> origin/master
 	"github.com/panjf2000/ants/v2"
 )
 
@@ -31,13 +25,6 @@ type Bus struct {
 	pool     *ants.Pool
 }
 
-<<<<<<< HEAD
-func NewBus() *Bus {
-	pool, err := ants.NewPool(1024,
-		ants.WithNonblocking(false),
-		ants.WithPanicHandler(func(p interface{}) {
-			slog.Error("eventbus panic", "panic", p)
-=======
 const defaultPoolSize = 1024
 
 func NewBus() *Bus {
@@ -48,7 +35,6 @@ func NewBus() *Bus {
 				metrics.EventBusPanics.Inc()
 			}
 			slog.Error("eventbus panic recovered", "error", p, "stack", string(debug.Stack()))
->>>>>>> origin/master
 		}),
 	)
 	if err != nil {
@@ -57,13 +43,8 @@ func NewBus() *Bus {
 	return &Bus{handlers: make(map[string][]EventHandler), pool: pool}
 }
 
-<<<<<<< HEAD
-func (b *Bus) Pending() int64  { return b.pending.Load() }
-func (b *Bus) Running() int    { return b.pool.Running() }
-=======
 func (b *Bus) Pending() int64 { return b.pending.Load() }
 func (b *Bus) Running() int   { return b.pool.Running() }
->>>>>>> origin/master
 
 func (b *Bus) Subscribe(eventType string, handler EventHandler) {
 	b.mu.Lock()
@@ -83,16 +64,12 @@ func (b *Bus) Publish(ctx context.Context, event Event) {
 		b.pending.Add(1)
 		err := b.pool.Submit(func() {
 			defer func() {
-<<<<<<< HEAD
-				recover()
-=======
 				if r := recover(); r != nil {
 					if metrics.EventBusPanics != nil {
 						metrics.EventBusPanics.Inc()
 					}
 					slog.Error("eventbus panic recovered", "error", r, "stack", string(debug.Stack()))
 				}
->>>>>>> origin/master
 				b.pending.Add(-1)
 			}()
 			h(ctx, event)

@@ -9,11 +9,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-<<<<<<< HEAD
-	"github.com/agenthub/server-hub/internal/config"
-=======
 	"github.com/agenthub/hub-server/internal/config"
->>>>>>> origin/master
 )
 
 func RunMigrations(cfg *config.DBConfig) error {
@@ -24,8 +20,6 @@ func RunMigrationsFrom(cfg *config.DBConfig, sourceURL string) error {
 	return runMigrations(cfg, sourceURL)
 }
 
-<<<<<<< HEAD
-=======
 // VerifyMigrations checks whether all database migrations are applied without
 // running any new ones. Returns the current migration version or an error if
 // there are pending migrations.
@@ -47,7 +41,6 @@ func VerifyMigrations(cfg *config.DBConfig) (version uint, dirty bool, err error
 	return v, d, err
 }
 
->>>>>>> origin/master
 func runMigrations(cfg *config.DBConfig, sourceURL string) error {
 	password := url.QueryEscape(cfg.Password)
 	pgURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",

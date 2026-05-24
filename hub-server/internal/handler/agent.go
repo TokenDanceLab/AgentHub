@@ -1,19 +1,6 @@
 package handler
 
 import (
-<<<<<<< HEAD
-	"github.com/gin-gonic/gin"
-
-	"github.com/agenthub/server-hub/internal/errcode"
-	"github.com/agenthub/server-hub/internal/service"
-)
-
-type AgentHandler struct {
-	service *service.AgentService
-}
-
-func NewAgentHandler(s *service.AgentService) *AgentHandler {
-=======
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -38,7 +25,6 @@ type AgentHandler struct {
 }
 
 func NewAgentHandler(s AgentService) *AgentHandler {
->>>>>>> origin/master
 	return &AgentHandler{service: s}
 }
 
