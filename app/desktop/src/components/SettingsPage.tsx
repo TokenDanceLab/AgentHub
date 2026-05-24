@@ -224,7 +224,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [detailLevel, setDetailLevel] = useStoredValueState<SelectValue>('detailLevel', 'detailed');
   const [approvalMode, setApprovalMode] = useStoredValueState<SelectValue>('approvalMode', 'ask');
   const agents = agentData?.items ?? [];
-  const availableAgents = agents.filter((agent) => agent.status === 'available').length;
+  const availableRuntimes = agents.filter((agent) => agent.status === 'available').length;
   const runnerHealth = health?.checks?.runners;
   const runnerItems = runnerHealth?.items ?? [];
   const availableRunners = runnerHealth?.available ?? runnerItems.filter((item) => item.status === 'online').length;
@@ -508,8 +508,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Bot size={18} />}
                   label={t('settings.profileAvailable')}
-                  value={`${availableAgents}/${agents.length}`}
-                  detail={edgeOnline ? t('settings.profileAvailableDesc') : t('settings.edgeOffline')}
+                  value={`${availableRuntimes}/${agents.length}`}
+                  detail={edgeOnline ? t('settings.runtimeInventoryDesc') : t('settings.edgeOffline')}
                 />
                 <SummaryCard
                   icon={<Cpu size={18} />}
@@ -518,12 +518,46 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   detail={t('settings.profileRuntimeCoverageDesc')}
                 />
               </div>
-              <div className={styles.profileGrid}>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.runtimeInventory')}</strong>
+                  <span>{t('settings.runtimeInventoryDesc')}</span>
+                </div>
                 {agents.length > 0 ? (
-                  agents.map((agent) => <AgentProfileCard key={agent.id} agent={agent} />)
+                  <div className={styles.profileGrid}>
+                    {agents.map((agent) => <RuntimeInventoryCard key={agent.id} agent={agent} />)}
+                  </div>
                 ) : (
-                  <EmptyBlock title={t('settings.noAgentProfiles')} description={t('settings.noAgentProfilesDesc')} />
+                  <EmptyBlock title={t('settings.noRuntimes')} description={t('settings.noRuntimesDesc')} />
                 )}
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.profileComposition')}</strong>
+                  <span>{t('settings.profileCompositionDesc')}</span>
+                </div>
+                <div className={styles.capabilityGrid}>
+                  <CapabilityCard
+                    title={t('settings.profileRuntime')}
+                    description={t('settings.profileRuntimeDesc')}
+                    status={agents.length > 0 ? t('settings.statusReady') : t('settings.notConfigured')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.profileModel')}
+                    description={t('settings.profileModelDesc')}
+                    status={t('settings.statusInProgress')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.profileConfig')}
+                    description={t('settings.profileConfigDesc')}
+                    status={t('settings.statusInProgress')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.executionTargets')}
+                    description={t('settings.profileExecutionTargetDesc')}
+                    status={edgeOnline ? t('settings.statusReady') : t('settings.notConfigured')}
+                  />
+                </div>
               </div>
               <SettingRow title={t('settings.profileConfigSource')} description={t('settings.profileConfigSourceDesc')} value="AGENTS.md / memory / skills" />
               <SettingRow title={t('settings.profilePublish')} description={t('settings.profilePublishDesc')} value={t('settings.statusPlanned')} />
@@ -693,7 +727,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Bot size={18} />}
                   label={t('settings.schedulerProfiles')}
-                  value={`${availableAgents}/${agents.length}`}
+                  value={`${availableRuntimes}/${agents.length}`}
                   detail={edgeOnline ? t('settings.schedulerProfilesDesc') : t('settings.edgeOffline')}
                 />
                 <SummaryCard
@@ -1416,7 +1450,7 @@ function SummaryCard({ icon, label, value, detail }: { icon: ReactNode; label: s
   );
 }
 
-function AgentProfileCard({ agent }: { agent: AgentInfo }) {
+function RuntimeInventoryCard({ agent }: { agent: AgentInfo }) {
   const { t } = useTranslation();
   return (
     <div className={styles.profileCard}>
@@ -1426,16 +1460,17 @@ function AgentProfileCard({ agent }: { agent: AgentInfo }) {
         </div>
         <div>
           <strong>{agent.name}</strong>
-          <span>{agent.description || t('settings.profileDefaultDesc')}</span>
+          <span>{agent.description || t('settings.runtimeDefaultDesc')}</span>
         </div>
         <em className={`${styles.profileStatus} ${styles[`profileStatus_${agent.status}`]}`}>
           {t(`agent.status.${agent.status}`)}
         </em>
       </div>
       <div className={styles.profileMeta}>
-        <span>{t('settings.profileRuntime')}: {agent.id}</span>
-        <span>{t('settings.profileModel')}: {t('settings.routingAuto')}</span>
-        <span>{t('settings.profileConfig')}: {t('settings.statusInProgress')}</span>
+        <span>{t('settings.runtimeAdapter')}: {agent.id}</span>
+        <span>{t('settings.profileRuntime')}: {t('settings.statusReady')}</span>
+        <span>{t('settings.profileModel')}: {t('settings.statusPlanned')}</span>
+        <span>{t('settings.profileConfig')}: {t('settings.statusPlanned')}</span>
       </div>
     </div>
   );
