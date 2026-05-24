@@ -145,6 +145,17 @@ export type {
   WorkbenchSnapshot,
   WorkbenchState,
 } from './workbenchState';
+export {
+  getWorkbenchCatalogState,
+  getWorkbenchDataMode,
+  workbenchDataModeLabels,
+  workbenchDataModeTones,
+} from './workbenchDataMode';
+export type {
+  WorkbenchCatalogState,
+  WorkbenchCatalogTone,
+  WorkbenchDataMode,
+} from './workbenchDataMode';
 
 export {
   mockProject,
