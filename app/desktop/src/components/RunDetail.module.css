@@ -26,6 +26,10 @@
 .tabContent {
   flex: 1;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
   animation: tabFadeIn 0.2s ease-out;
 }
 
@@ -56,7 +60,7 @@
 
 /* ── Output ────────────────────────────────── */
 .output {
-  margin-top: 6px;
+  margin: 0;
   padding: 8px;
   background: rgba(0,0,0,0.02);
   border-radius: 8px;
@@ -71,11 +75,97 @@
 
 [data-theme='light'] .output { background: #F1F3F5; }
 
+.emptyStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.emptyCard,
+.cardSection {
+  border: 1px solid rgba(0,0,0,0.04);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.35);
+}
+
+[data-theme='dark'] .emptyCard,
+[data-theme='dark'] .cardSection {
+  background: rgba(255,255,255,0.035);
+  border-color: rgba(255,255,255,0.06);
+}
+
+.emptyCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 14px;
+  color: #8E8E93;
+  font-size: 12px;
+}
+
+.cardSection {
+  overflow: hidden;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .cardHeader {
+  border-bottom-color: rgba(255,255,255,0.06);
+}
+
+.cardCount {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.04);
+  color: #8E8E93;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .cardCount {
+  background: rgba(255,255,255,0.07);
+}
+
 .list {
-  margin-top: 6px;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: 4px 10px 8px;
+}
+
+.sourceList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+}
+
+.sourceItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.025);
+}
+
+[data-theme='dark'] .sourceItem {
+  background: rgba(255,255,255,0.04);
 }
 
 .item {
@@ -136,6 +226,18 @@
 .filePath {
   font-family: var(--font-mono);
   font-size: 11px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action {
+  color: #8E8E93;
+  font-size: 10px;
+  text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 .cancelButton {

@@ -1,57 +1,160 @@
-/* AgentList — inline items within sidebar (no outer panel) */
+/* AgentList — compact Edge-backed agent manager inside the app sidebar. */
 
-/* ── Hidden: App sidebar provides search + title ─ */
-.title, .searchWrapper, .searchIcon, .searchInput { display: none; }
+.sidebar {
+  min-width: 0;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 4px 8px;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.countPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.045);
+  color: #8E8E93;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+[data-theme='dark'] .countPill {
+  background: rgba(255,255,255,0.065);
+}
+
+.searchWrapper,
+.searchIcon,
+.searchInput {
+  display: none;
+}
 
 /* ── List ──────────────────────────────────── */
 .list {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 /* ── Item ──────────────────────────────────── */
 .item {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 9px;
   width: 100%;
-  padding: 7px 12px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
+  min-height: 64px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.18);
   color: var(--foreground);
   cursor: pointer;
   font-family: var(--font-sans);
   font-size: 13px;
   text-align: left;
-  transition: background 0.12s ease;
+  transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
 }
 
-.item:hover { background: rgba(0,0,0,0.04); }
+.item:hover {
+  background: rgba(0,0,0,0.035);
+}
+
+.item:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
 
 .selected {
-  background: rgba(99,102,241,0.08);
+  border-color: rgba(99,102,241,0.22);
+  background: rgba(99,102,241,0.1);
   color: var(--primary);
 }
 
-.statusDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+[data-theme='dark'] .item {
+  background: rgba(255,255,255,0.025);
+}
+
+[data-theme='dark'] .item:hover {
+  background: rgba(255,255,255,0.055);
+}
+
+[data-theme='dark'] .selected {
+  border-color: rgba(129,140,248,0.26);
+  background: rgba(129,140,248,0.12);
+}
+
+.avatar {
+  position: relative;
+  display: grid;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
+  place-items: center;
+  border-radius: 9px;
+  background: rgba(0,0,0,0.045);
+  color: var(--foreground);
+}
+
+[data-theme='dark'] .avatar {
+  background: rgba(255,255,255,0.07);
+}
+
+.statusDot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--sidebar-bg);
+  border-radius: 50%;
+  background: var(--color-danger);
+}
+
+.status_available {
+  background: var(--color-success);
+}
+
+.status_configuring {
+  background: #F59E0B;
+}
+
+.status_unavailable {
+  background: var(--color-danger);
 }
 
 /* ── Info ──────────────────────────────────── */
 .info {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 4px;
   min-width: 0;
+  flex: 1;
+}
+
+.nameLine {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
 }
 
 .name {
-  font-weight: 500;
+  min-width: 0;
+  flex: 1;
+  font-weight: 650;
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
@@ -60,18 +163,72 @@
 
 .description {
   font-size: 11px;
-  color: #B0B0B5;
+  color: #9CA3AF;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.3;
 }
 
+.statusText {
+  flex-shrink: 0;
+  color: #9CA3AF;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.statusText_available {
+  color: var(--color-success);
+}
+
+.statusText_configuring {
+  color: #F59E0B;
+}
+
+.statusText_unavailable {
+  color: var(--color-danger);
+}
+
+.metaLine {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.version,
+.capability {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.04);
+  color: #8E8E93;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+}
+
+[data-theme='dark'] .version,
+[data-theme='dark'] .capability {
+  background: rgba(255,255,255,0.065);
+}
+
+.version {
+  color: var(--foreground);
+}
+
 /* ── Empty ─────────────────────────────────── */
 .empty {
-  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
   color: #B0B0B5;
   font-size: 11px;
+  line-height: 1.4;
 }
 
 /* ── Highlight ─────────────────────────────── */
