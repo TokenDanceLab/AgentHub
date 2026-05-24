@@ -483,12 +483,14 @@ Hub 调度（远程）:
 - [x] 启动时注册设备 `POST /edge/devices/register`
 - [x] 验证：22 integration tests + 440 全部通过
 
-##### 阶段 4: Desktop IM UI `[5d]`
+##### 阶段 4: Desktop IM UI `[5d]` 🔄 M5（核心组件完成）
 
-- [ ] 新建会话列表侧边栏（来源：`docs/reference/cross-comparison/02-im-ux.md` 2.2 节）
-- [ ] 新建 IM 消息视图（聊天气泡 + Agent/User 区分 + Authority 色带）
-- [ ] 新建会话消息输入（文本/代码/附件上传）
-- [ ] 新增加联系人管理（搜索/添加好友/屏蔽）
+- [x] 新建会话消息视图（`IMMessageView` — 聊天气泡 + Agent/User 区分 + Authority 色带）
+- [x] 新建会话消息输入（`IMMessageInput` — 自动变高 + Enter/Shift+Enter）
+- [x] 新增加联系人管理（`IMContactList` — 搜索/在线状态/未读计数）
+- [x] 验证：25 tests + 491 全部通过
+- [ ] 新建会话列表侧边栏（全文搜索、分组、拖拽排序）
+- [ ] 附件上传/预览
 - [ ] 新增通知浮层（好友请求/Agent 完成/@提及）
 - [ ] 新增在线状态指示器（从 device 事件获取）
 - [ ] 增量消息同步（REST `/sync` + WS `message.new`）
