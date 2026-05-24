@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import SettingsPage from '@/components/SettingsPage';
 import type { AgentInfo, RunInfo } from '@shared/types';
 import type { AgentTask } from '@/stores/taskBridgeStore';
 
-const { mockAgents, mockRuns, mockTasks } = vi.hoisted(() => ({
+const { mockAgents, mockCancelRun, mockRefetchRuns, mockRuns, mockTasks } = vi.hoisted(() => ({
   mockAgents: [] as AgentInfo[],
+  mockCancelRun: vi.fn(),
+  mockRefetchRuns: vi.fn(),
   mockRuns: [] as RunInfo[],
   mockTasks: [] as AgentTask[],
 }));
@@ -55,7 +57,14 @@ vi.mock('@/api/runQueries', () => ({
   useRuns: () => ({
     data: { items: mockRuns, page: { hasMore: false } },
     isError: false,
+    isFetching: false,
     isLoading: false,
+    refetch: mockRefetchRuns,
+  }),
+  useCancelRun: () => ({
+    isPending: false,
+    mutateAsync: mockCancelRun,
+    variables: undefined,
   }),
 }));
 
@@ -87,6 +96,8 @@ describe('SettingsPage tasks', () => {
     mockAgents.splice(0, mockAgents.length);
     mockRuns.splice(0, mockRuns.length);
     mockTasks.splice(0, mockTasks.length);
+    mockCancelRun.mockReset();
+    mockRefetchRuns.mockReset();
     localStorage.clear();
     sessionStorage.clear();
   });
@@ -118,6 +129,25 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('proj_local / thread_local')).toBeInTheDocument();
     expect(screen.getByText('Dispatch from TokenDance Hub')).toBeInTheDocument();
     expect(screen.getByText('agent-codex')).toBeInTheDocument();
+  });
+
+  it('refreshes and cancels active local runs from the task panel', () => {
+    mockRuns.splice(0, mockRuns.length, {
+      runId: 'run_active_cancel_me',
+      projectId: 'proj_local',
+      threadId: 'thread_local',
+      status: 'running',
+      createdAt: '2026-05-25T01:00:00Z',
+      startedAt: '2026-05-25T01:01:00Z',
+    });
+
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="tasks" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'settings.taskRefreshRuns' }));
+    expect(mockRefetchRuns).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'settings.taskCancelRun' }));
+    expect(mockCancelRun).toHaveBeenCalledWith('run_active_cancel_me');
   });
 
   it('renders scheduler readiness from runs, profiles, targets, and policy inputs', () => {
