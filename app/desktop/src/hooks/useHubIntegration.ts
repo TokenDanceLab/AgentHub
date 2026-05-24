@@ -255,7 +255,7 @@ export function useHubIntegration(
         store.getState().updateTask(taskId, { runId, status: 'running' });
 
         // Acknowledge task to Hub
-        hubClient.ackTask(taskId).catch(() => {});
+        hubClient.ackTask(taskId, runId).catch(() => {});
 
         // Notify consumer
         const updatedTask = store.getState().tasks.find((t) => t.taskId === taskId);

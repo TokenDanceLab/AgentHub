@@ -6,6 +6,7 @@ import {
   Bot,
   Check,
   ChevronRight,
+  ClipboardList,
   Code2,
   Computer,
   Eye,
@@ -18,9 +19,11 @@ import {
   LockKeyhole,
   LogIn,
   LogOut,
+  MessageSquareText,
   Monitor,
   Palette,
   Plug,
+  Route,
   ShieldCheck,
   SlidersHorizontal,
   TerminalSquare,
@@ -31,12 +34,16 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useHubStore } from '@/stores/hubStore';
 import styles from './SettingsPage.module.css';
 
-type SectionId =
+export type SectionId =
   | 'general'
   | 'appearance'
   | 'configuration'
   | 'personalization'
+  | 'permissions'
+  | 'tasks'
   | 'onlineIm'
+  | 'groupChat'
+  | 'agentScheduling'
   | 'agentMarket'
   | 'keyboard'
   | 'mcp'
@@ -62,6 +69,7 @@ type SelectValue = 'balanced' | 'detailed' | 'manual' | 'auto' | 'ask' | 'never'
 interface Props {
   onBack: () => void;
   onOpenAuth: () => void;
+  initialSection?: SectionId;
 }
 
 interface NavItem {
@@ -107,18 +115,21 @@ function writeStoredValue(key: string, value: string | boolean) {
   }
 }
 
-export default function SettingsPage({ onBack, onOpenAuth }: Props) {
+export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'general' }: Props) {
   const { t } = useTranslation();
   const { themeMode, setThemeMode } = useTheme();
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const username = useHubStore((s) => s.username);
   const clearHubAuth = useHubStore((s) => s.clear);
-  const [active, setActive] = useState<SectionId>('general');
+  const [active, setActive] = useState<SectionId>(initialSection);
   const [compactMode, setCompactMode] = useStoredBooleanState('compactMode', false);
   const [autoReview, setAutoReview] = useStoredBooleanState('autoReview', true);
   const [fullAccess, setFullAccess] = useStoredBooleanState('fullAccess', false);
   const [enableMcp, setEnableMcp] = useStoredBooleanState('enableMcp', true);
   const [skillSync, setSkillSync] = useStoredBooleanState('skillSync', true);
+  const [taskSync, setTaskSync] = useStoredBooleanState('taskSync', true);
+  const [groupChatEnabled, setGroupChatEnabled] = useStoredBooleanState('groupChat', true);
+  const [agentSchedulingEnabled, setAgentSchedulingEnabled] = useStoredBooleanState('agentScheduling', true);
   const [enableHooks, setEnableHooks] = useStoredBooleanState('enableHooks', false);
   const [modelMappingEnabled, setModelMappingEnabled] = useStoredBooleanState('modelMapping', true);
   const [ccSwitchBridge, setCcSwitchBridge] = useStoredBooleanState('ccSwitchBridge', false);
@@ -138,7 +149,11 @@ export default function SettingsPage({ onBack, onOpenAuth }: Props) {
       { id: 'appearance', label: t('settings.appearance'), icon: <Palette size={17} />, group: 'workspace' },
       { id: 'configuration', label: t('settings.configuration'), icon: <Wrench size={17} />, group: 'workspace' },
       { id: 'personalization', label: t('settings.personalization'), icon: <UserCircle size={17} />, group: 'workspace' },
+      { id: 'permissions', label: t('settings.permissions'), icon: <ShieldCheck size={17} />, group: 'workspace' },
+      { id: 'tasks', label: t('settings.tasks'), icon: <ClipboardList size={17} />, group: 'workspace' },
       { id: 'onlineIm', label: t('settings.onlineIm'), icon: <Globe2 size={17} />, group: 'workspace' },
+      { id: 'groupChat', label: t('settings.groupChat'), icon: <MessageSquareText size={17} />, group: 'workspace' },
+      { id: 'agentScheduling', label: t('settings.agentScheduling'), icon: <Route size={17} />, group: 'workspace' },
       { id: 'agentMarket', label: t('settings.agentMarket'), icon: <Bot size={17} />, group: 'workspace' },
       { id: 'keyboard', label: t('settings.keyboard'), icon: <Keyboard size={17} />, group: 'workspace' },
       { id: 'mcp', label: t('settings.mcp'), icon: <Plug size={17} />, group: 'automation' },
@@ -350,6 +365,35 @@ export default function SettingsPage({ onBack, onOpenAuth }: Props) {
             </Panel>
           )}
 
+          {active === 'permissions' && (
+            <Panel title={t('settings.permissions')} description={t('settings.permissionsDesc')}>
+              <SettingRow
+                title={t('settings.autoReview')}
+                description={t('settings.autoReviewDesc')}
+                control={<Switch checked={autoReview} onChange={setBooleanSetting('autoReview', setAutoReview)} />}
+              />
+              <SettingRow
+                title={t('settings.fullAccess')}
+                description={t('settings.fullAccessDesc')}
+                control={<Switch checked={fullAccess} onChange={setBooleanSetting('fullAccess', setFullAccess)} />}
+              />
+              <SettingRow title={t('settings.permissionLedger')} description={t('settings.permissionLedgerDesc')} value={t('settings.statusPlanned')} />
+            </Panel>
+          )}
+
+          {active === 'tasks' && (
+            <Panel title={t('settings.tasks')} description={t('settings.tasksDesc')}>
+              <SettingRow
+                title={t('settings.taskSync')}
+                description={t('settings.taskSyncDesc')}
+                control={<Switch checked={taskSync} onChange={setBooleanSetting('taskSync', setTaskSync)} />}
+              />
+              <SettingRow title={t('settings.taskInbox')} description={t('settings.taskInboxDesc')} value={t('settings.statusReady')} />
+              <SettingRow title={t('settings.taskRunBinding')} description={t('settings.taskRunBindingDesc')} value={t('settings.statusInProgress')} />
+              <SettingRow title={t('settings.taskApprovalQueue')} description={t('settings.taskApprovalQueueDesc')} value={t('settings.statusPlanned')} />
+            </Panel>
+          )}
+
           {active === 'onlineIm' && (
             <Panel title={t('settings.onlineIm')} description={t('settings.onlineImDesc')}>
               <div className={styles.capabilityGrid}>
@@ -369,6 +413,32 @@ export default function SettingsPage({ onBack, onOpenAuth }: Props) {
                   status={t('settings.statusPlanned')}
                 />
               </div>
+            </Panel>
+          )}
+
+          {active === 'groupChat' && (
+            <Panel title={t('settings.groupChat')} description={t('settings.groupChatDesc')}>
+              <SettingRow
+                title={t('settings.enableGroupChat')}
+                description={t('settings.enableGroupChatDesc')}
+                control={<Switch checked={groupChatEnabled} onChange={setBooleanSetting('groupChat', setGroupChatEnabled)} />}
+              />
+              <SettingRow title={t('settings.groupChatAgents')} description={t('settings.groupChatAgentsDesc')} value={t('settings.statusReady')} />
+              <SettingRow title={t('settings.groupChatRooms')} description={t('settings.groupChatRoomsDesc')} value={t('settings.statusPlanned')} />
+              <SettingRow title={t('settings.groupChatModeration')} description={t('settings.groupChatModerationDesc')} value={t('settings.statusPlanned')} />
+            </Panel>
+          )}
+
+          {active === 'agentScheduling' && (
+            <Panel title={t('settings.agentScheduling')} description={t('settings.agentSchedulingDesc')}>
+              <SettingRow
+                title={t('settings.enableAgentScheduling')}
+                description={t('settings.enableAgentSchedulingDesc')}
+                control={<Switch checked={agentSchedulingEnabled} onChange={setBooleanSetting('agentScheduling', setAgentSchedulingEnabled)} />}
+              />
+              <SettingRow title={t('settings.schedulerQueue')} description={t('settings.schedulerQueueDesc')} value={t('settings.statusInProgress')} />
+              <SettingRow title={t('settings.schedulerPolicy')} description={t('settings.schedulerPolicyDesc')} value={t('settings.statusPlanned')} />
+              <SettingRow title={t('settings.schedulerRemote')} description={t('settings.schedulerRemoteDesc')} value={t('settings.statusPlanned')} />
             </Panel>
           )}
 

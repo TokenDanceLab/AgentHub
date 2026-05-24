@@ -231,7 +231,7 @@ describe('useHubIntegration', () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, dp);
     });
 
-    expect(hubClient.ackTask).toHaveBeenCalledWith('task-1');
+    expect(hubClient.ackTask).toHaveBeenCalledWith('task-1', 'run-1');
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:3210/v1/runs',
       expect.objectContaining({
@@ -463,8 +463,8 @@ describe('useHubIntegration', () => {
     expect(result.current.getRunByTaskId('task-B')).toBe('run-B');
     expect(result.current.getTaskByRunId('run-A')?.taskId).toBe('task-A');
     expect(result.current.getTaskByRunId('run-B')?.taskId).toBe('task-B');
-    expect(hubClient.ackTask).toHaveBeenCalledWith('task-A');
-    expect(hubClient.ackTask).toHaveBeenCalledWith('task-B');
+    expect(hubClient.ackTask).toHaveBeenCalledWith('task-A', 'run-A');
+    expect(hubClient.ackTask).toHaveBeenCalledWith('task-B', 'run-B');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Loader2, AlertCircle, KeyRound } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,11 +49,11 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
   const [serverError, setServerError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
-  // Once the auth state updates with a user, notify parent
-  if (user) {
-    onSuccess(user);
-    return null;
-  }
+  useEffect(() => {
+    if (user) onSuccess(user);
+  }, [onSuccess, user]);
+
+  if (user) return null;
 
   const clearFieldError = useCallback((field: keyof FieldErrors) => {
     setFieldErrors((prev) => {
