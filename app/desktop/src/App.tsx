@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, Suspense, type CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
@@ -12,6 +12,7 @@ import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
+import { useUIStore } from '@/stores/uiStore';
 import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
@@ -79,6 +80,10 @@ function getActiveRunConflictId(error: unknown): string | undefined {
   return typeof runId === 'string' && runId.length > 0 ? runId : undefined;
 }
 
+function isEditableShortcutTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable]'));
+}
+
 export default function App() {
   const { online, health } = useHealth();
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online);
@@ -108,10 +113,27 @@ export default function App() {
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
-  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
-  const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState(396);
-  const [rightPanelWidth, setRightPanelWidth] = useState(360);
+  const {
+    leftSidebarCollapsed,
+    rightPanelOpen,
+    leftSidebarWidth,
+    rightPanelWidth,
+    setLeftSidebarCollapsed,
+    setRightPanelOpen,
+    setLeftSidebarWidth,
+    setRightPanelWidth,
+  } = useUIStore(
+    useShallow((s) => ({
+      leftSidebarCollapsed: s.leftSidebarCollapsed,
+      rightPanelOpen: s.rightPanelOpen,
+      leftSidebarWidth: s.sidebarWidth,
+      rightPanelWidth: s.rightPanelWidth,
+      setLeftSidebarCollapsed: s.setLeftSidebarCollapsed,
+      setRightPanelOpen: s.setRightPanelOpen,
+      setLeftSidebarWidth: s.setSidebarWidth,
+      setRightPanelWidth: s.setRightPanelWidth,
+    })),
+  );
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
 
@@ -149,10 +171,44 @@ export default function App() {
 
   const selectedThread = threads.find((th) => th.threadId === selectedThreadId);
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
-  const allMessages = [...userMessages, ...messages];
   const displayedRun = currentRun ?? optimisticRun;
   const runIsActive = isRunActiveStatus(displayedRun?.status);
   const composerLocked = runStartPending || runIsActive;
+  const allMessages = useMemo(() => {
+    const merged = [...userMessages, ...messages];
+    if (!displayedRun) return merged;
+
+    const hasVisibleAgentFeedback = messages.some(
+      (msg) => msg.role === 'agent' && msg.blocks.some((block) => block.kind !== 'session_init'),
+    );
+    if (hasVisibleAgentFeedback) return merged;
+
+    const statusKey = `run.status.${displayedRun.status}`;
+    const statusLabel = t(statusKey, { defaultValue: displayedRun.status });
+    const output = displayedRun.outputText.trim();
+    const content = output.length > 0
+      ? output
+      : runIsActive
+        ? t('chat.runStatus.running', {
+            status: statusLabel,
+            agent: selectedAgent?.name ?? t('chat.runStatus.agentFallback'),
+          })
+        : t('chat.runStatus.completed', {
+            status: statusLabel,
+            agent: selectedAgent?.name ?? t('chat.runStatus.agentFallback'),
+          });
+
+    return [
+      ...merged,
+      {
+        id: `run-status-${displayedRun.runId}-${displayedRun.status}`,
+        role: 'agent' as const,
+        timestamp: new Date().toISOString(),
+        agentName: selectedAgent?.name,
+        blocks: [{ kind: 'text' as const, content }],
+      },
+    ];
+  }, [displayedRun, messages, runIsActive, selectedAgent?.name, t, userMessages]);
   const shellStyle = {
     '--left-sidebar-width': `${leftSidebarWidth}px`,
     '--right-panel-width': `${rightPanelWidth}px`,
@@ -169,7 +225,17 @@ export default function App() {
       return false;
     }
     const tempRunId = `starting-${Date.now()}`;
+    const tempUserMessageId = `user-${tempRunId}`;
     setRunStartPending(true);
+    setUserMessages((prev) => [
+      ...prev,
+      {
+        id: tempUserMessageId,
+        role: 'user',
+        timestamp: new Date().toISOString(),
+        blocks: [{ kind: 'text', content: prompt }],
+      },
+    ]);
     try {
       const req: StartRunRequest = { prompt };
       if (agentId) req.agentId = agentId;
@@ -179,10 +245,10 @@ export default function App() {
       setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
       setRightPanelOpen(true);
       const started = await startRun(req);
-      setUserMessages((prev) => [...prev, { id: `user-${Date.now()}`, role: 'user', timestamp: new Date().toISOString(), blocks: [{ kind: 'text', content: prompt }] }]);
       setOptimisticRun({ ...started, outputText: '', toolCalls: [], changedFiles: [] });
       return true;
     } catch (e) {
+      setUserMessages((prev) => prev.filter((msg) => msg.id !== tempUserMessageId));
       const activeRunId = getActiveRunConflictId(e);
       if (activeRunId) {
         setOptimisticRun({ runId: activeRunId, status: 'running', outputText: '', toolCalls: [], changedFiles: [] });
@@ -238,6 +304,32 @@ export default function App() {
     window.addEventListener('pointerup', handleUp, { once: true });
   }, [leftSidebarWidth, rightPanelWidth]);
 
+  const handleResizeKeyDown = useCallback((side: 'left' | 'right') => (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? 40 : 16;
+    let nextWidth: number | null = null;
+
+    if (side === 'left') {
+      if (event.key === 'ArrowLeft') nextWidth = leftSidebarWidth - step;
+      if (event.key === 'ArrowRight') nextWidth = leftSidebarWidth + step;
+      if (event.key === 'Home') nextWidth = LEFT_SIDEBAR_MIN;
+      if (event.key === 'End') nextWidth = LEFT_SIDEBAR_MAX;
+      if (nextWidth != null) {
+        event.preventDefault();
+        setLeftSidebarWidth(clamp(nextWidth, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX));
+      }
+      return;
+    }
+
+    if (event.key === 'ArrowLeft') nextWidth = rightPanelWidth + step;
+    if (event.key === 'ArrowRight') nextWidth = rightPanelWidth - step;
+    if (event.key === 'Home') nextWidth = RIGHT_PANEL_MIN;
+    if (event.key === 'End') nextWidth = RIGHT_PANEL_MAX;
+    if (nextWidth != null) {
+      event.preventDefault();
+      setRightPanelWidth(clamp(nextWidth, RIGHT_PANEL_MIN, RIGHT_PANEL_MAX));
+    }
+  }, [leftSidebarWidth, rightPanelWidth, setLeftSidebarWidth, setRightPanelWidth]);
+
   const handleDecidePermission = useCallback((requestId: string, decision: 'allow' | 'deny', reason?: string) => {
     decidePermission(requestId, decision, reason);
     if (currentRun?.runId) {
@@ -271,17 +363,41 @@ export default function App() {
     }
   }, [addToast, selectedAgent, selectedThread, t]);
 
-  // Escape key
+  // Global shell shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setNavPanelOpen(false); }
-      if (e.key === '?' && !(e.target as HTMLElement)?.closest('input,textarea,[contenteditable]') && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault(); setShortcutHelpOpen((v) => !v);
+      if (e.key === 'Escape') {
+        setNavPanelOpen(false);
+      }
+      if (isEditableShortcutTarget(e.target)) return;
+
+      const shellModifier = e.ctrlKey || e.metaKey;
+      if (shortcutHelpOpen && !(e.key === '?' && !shellModifier)) return;
+      if (e.key === '?' && !shellModifier) {
+        e.preventDefault();
+        setShortcutHelpOpen((v) => !v);
+      }
+      if (shellModifier && e.key.toLowerCase() === 'b' && !workspaceExpanded && !isMobile) {
+        e.preventDefault();
+        setLeftSidebarCollapsed(!leftSidebarCollapsed);
+      }
+      if (shellModifier && e.key.toLowerCase() === 'j' && displayedRun && !workspaceExpanded && !isMobile) {
+        e.preventDefault();
+        setRightPanelOpen(!rightPanelOpen);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [
+    displayedRun,
+    isMobile,
+    leftSidebarCollapsed,
+    rightPanelOpen,
+    setLeftSidebarCollapsed,
+    setRightPanelOpen,
+    shortcutHelpOpen,
+    workspaceExpanded,
+  ]);
 
   // ── Double-click top bar → toggle maximize/restore
   const handleTopBarDoubleClick = useCallback(async (e: React.MouseEvent) => {
@@ -312,16 +428,16 @@ export default function App() {
         <div className={styles.topBarRight}>
           {/* Window controls — no drag region so clicks register */}
           <div className={styles.winControls}>
-            <button className={styles.winBtn} onClick={() => getCurrentWindow().minimize()} title="最小化">
+            <button className={styles.winBtn} onClick={() => getCurrentWindow().minimize()} title="最小化" aria-label="最小化">
               <Minus size={13} />
             </button>
             <button className={styles.winBtn} onClick={async () => {
               const w = getCurrentWindow();
               (await w.isMaximized()) ? w.unmaximize() : w.maximize();
-            }} title="最大化">
+            }} title="最大化" aria-label="最大化">
               <Square size={11} />
             </button>
-            <button className={`${styles.winBtn} ${styles.winBtnClose}`} onClick={() => getCurrentWindow().close()} title="关闭">
+            <button className={`${styles.winBtn} ${styles.winBtnClose}`} onClick={() => getCurrentWindow().close()} title="关闭" aria-label="关闭">
               <X size={14} />
             </button>
           </div>
@@ -351,7 +467,7 @@ export default function App() {
       {/* Mobile toolbar */}
       {isMobile && (
         <div className={styles.mobileToolbar}>
-          <button className={styles.mobileToolbarBtn} onClick={() => setNavPanelOpen(true)} aria-label={t('nav.openMenu')}>
+          <button className={styles.mobileToolbarBtn} onClick={() => setNavPanelOpen(true)} aria-label={t('nav.openMenu')} aria-expanded={navPanelOpen}>
             <Menu size={17} />
           </button>
           <span className={styles.mobileToolbarTitle}>{selectedAgent?.name ?? 'AgentHub'}</span>
@@ -361,7 +477,7 @@ export default function App() {
           <button className={styles.mobileToolbarBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} aria-label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
             {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={17} />}
           </button>
-          <button className={styles.mobileToolbarBtn} onClick={toggleTheme} aria-label={theme === 'dark' ? t('theme.light') : t('theme.dark')}>
+          <button className={styles.mobileToolbarBtn} onClick={toggleTheme} aria-label={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-pressed={theme === 'dark'}>
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
         </div>
@@ -394,16 +510,28 @@ export default function App() {
         {/* Single sidebar — agents + threads grouped */}
         {!isMobile && !workspaceExpanded && leftSidebarCollapsed && (
           <div className={styles.leftRail}>
-            <button className={styles.railBtn} onClick={() => setLeftSidebarCollapsed(false)} title={t('nav.expandSidebar')} aria-label={t('nav.expandSidebar')}>
+            <button
+              className={styles.railBtn}
+              onClick={() => setLeftSidebarCollapsed(false)}
+              title={t('nav.expandSidebar')}
+              aria-label={t('nav.expandSidebar')}
+              aria-expanded="false"
+            >
               <PanelLeftOpen size={17} />
             </button>
             <button className={styles.railBtn} onClick={() => openSettings('general')} title={t('nav.settings')} aria-label={t('nav.settings')}>
               <Settings size={17} />
             </button>
-            <button className={styles.railBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
+            <button
+              className={styles.railBtn}
+              onClick={() => useHubStore.getState().setShowAuthModal(true)}
+              title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
+              aria-label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
+              aria-pressed={hubAuthenticated}
+            >
               {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={17} />}
             </button>
-            <button className={styles.railBtn} onClick={toggleTheme} title={theme === 'dark' ? t('theme.light') : t('theme.dark')}>
+            <button className={styles.railBtn} onClick={toggleTheme} title={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-label={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-pressed={theme === 'dark'}>
               {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
             </button>
           </div>
@@ -439,16 +567,28 @@ export default function App() {
 
             {/* Sidebar footer */}
             <div className={styles.sidebarFooter}>
-              <button className={styles.navIconBtn} onClick={() => setLeftSidebarCollapsed(true)} title={t('nav.collapseSidebar')} aria-label={t('nav.collapseSidebar')}>
+              <button
+                className={styles.navIconBtn}
+                onClick={() => setLeftSidebarCollapsed(true)}
+                title={t('nav.collapseSidebar')}
+                aria-label={t('nav.collapseSidebar')}
+                aria-expanded="true"
+              >
                 <PanelLeftClose size={16} />
               </button>
               <button className={styles.navIconBtn} onClick={() => openSettings('general')} title={t('nav.settings')} aria-label={t('nav.settings')}>
                 <Settings size={16} />
               </button>
-              <button className={styles.navIconBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
+              <button
+                className={styles.navIconBtn}
+                onClick={() => useHubStore.getState().setShowAuthModal(true)}
+                title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
+                aria-label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
+                aria-pressed={hubAuthenticated}
+              >
                 {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={16} />}
               </button>
-              <button className={styles.navIconBtn} onClick={toggleTheme} title={theme === 'dark' ? t('theme.light') : t('theme.dark')}>
+              <button className={styles.navIconBtn} onClick={toggleTheme} title={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-label={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-pressed={theme === 'dark'}>
                 {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
               </button>
             </div>
@@ -458,7 +598,12 @@ export default function App() {
             role="separator"
             aria-orientation="vertical"
             aria-label={t('layout.resizeLeft')}
+            aria-valuemin={LEFT_SIDEBAR_MIN}
+            aria-valuemax={LEFT_SIDEBAR_MAX}
+            aria-valuenow={leftSidebarWidth}
+            tabIndex={0}
             onPointerDown={handleStartResize('left')}
+            onKeyDown={handleResizeKeyDown('left')}
           />
           </>
         )}
@@ -485,6 +630,7 @@ export default function App() {
                   onClick={() => setViewMode((mode) => (mode === 'agent' ? 'im' : 'agent'))}
                   title={viewMode === 'agent' ? t('im.groupChat') : t('nav.agent')}
                   aria-label={viewMode === 'agent' ? t('im.groupChat') : t('nav.agent')}
+                  aria-pressed={viewMode === 'im'}
                 >
                   <MessageSquareText size={15} />
                 </button>
@@ -510,6 +656,7 @@ export default function App() {
                     onClick={() => setRightPanelOpen(true)}
                     title={t('run.open')}
                     aria-label={t('run.open')}
+                    aria-expanded="false"
                   >
                     <PanelRightOpen size={15} />
                   </button>
@@ -519,6 +666,7 @@ export default function App() {
                   onClick={() => setWorkspaceExpanded((v) => !v)}
                   title={workspaceExpanded ? t('workspace.collapse') : t('workspace.expand')}
                   aria-label={workspaceExpanded ? t('workspace.collapse') : t('workspace.expand')}
+                  aria-pressed={workspaceExpanded}
                 >
                   {workspaceExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
                 </button>
@@ -550,15 +698,26 @@ export default function App() {
             role="separator"
             aria-orientation="vertical"
             aria-label={t('layout.resizeRight')}
+            aria-valuemin={RIGHT_PANEL_MIN}
+            aria-valuemax={RIGHT_PANEL_MAX}
+            aria-valuenow={rightPanelWidth}
+            tabIndex={0}
             onPointerDown={handleStartResize('right')}
+            onKeyDown={handleResizeKeyDown('right')}
           />
           <div className={styles.rightPanel}>
             <div className={styles.rightPanelHeader}>
               <div className={styles.rightPanelSegmented}>
-                <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`}>{t('run.output')}</button>
-                <button className={styles.rightPanelTab}>{t('run.files')}</button>
+                <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`} type="button" role="tab" aria-selected="true">{t('run.output')}</button>
+                <button className={styles.rightPanelTab} type="button" role="tab" aria-selected="false">{t('run.files')}</button>
               </div>
-              <button className={styles.rightPanelCollapseBtn} onClick={() => setRightPanelOpen(false)} title={t('run.close')} aria-label={t('run.close')}>
+              <button
+                className={styles.rightPanelCollapseBtn}
+                onClick={() => setRightPanelOpen(false)}
+                title={t('run.close')}
+                aria-label={t('run.close')}
+                aria-expanded="true"
+              >
                 <PanelRightClose size={15} />
               </button>
             </div>
@@ -579,6 +738,37 @@ export default function App() {
             </div>
           </div>
           </>
+        )}
+
+        {!isMobile && !workspaceExpanded && displayedRun && !rightPanelOpen && (
+          <div className={styles.rightRail} aria-label={t('run.collapsedRail')}>
+            <button
+              className={styles.railBtn}
+              onClick={() => setRightPanelOpen(true)}
+              title={t('run.open')}
+              aria-label={t('run.open')}
+              aria-expanded="false"
+            >
+              <PanelRightOpen size={17} />
+            </button>
+            <span className={`${styles.railStatusDot} ${runIsActive ? styles.railStatusDotActive : ''}`} />
+            <button
+              className={styles.railBtn}
+              onClick={() => openSettings('tasks')}
+              title={t('settings.tasks')}
+              aria-label={t('settings.tasks')}
+            >
+              <ClipboardList size={17} />
+            </button>
+            <button
+              className={styles.railBtn}
+              onClick={() => openSettings('agentScheduling')}
+              title={t('settings.agentScheduling')}
+              aria-label={t('settings.agentScheduling')}
+            >
+              <Route size={17} />
+            </button>
+          </div>
         )}
       </div>
       </>
