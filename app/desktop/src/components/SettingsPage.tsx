@@ -24,6 +24,7 @@ import {
   Monitor,
   Palette,
   Plug,
+  RefreshCw,
   Route,
   Server,
   ShieldCheck,
@@ -31,12 +32,13 @@ import {
   TerminalSquare,
   UserCircle,
   Wrench,
+  XCircle,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHubStore } from '@/stores/hubStore';
 import { APP_VERSION, HUB_URL } from '@/config';
 import { useAgentList } from '@/api/agentQueries';
-import { useRuns } from '@/api/runQueries';
+import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
@@ -212,7 +214,14 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const hubAuth = useAuth();
   const { online: edgeOnline, health } = useHealth();
   const { data: agentData } = useAgentList(edgeOnline);
-  const { data: runData, isError: runsError, isLoading: runsLoading } = useRuns();
+  const {
+    data: runData,
+    isError: runsError,
+    isFetching: runsFetching,
+    isLoading: runsLoading,
+    refetch: refetchRuns,
+  } = useRuns();
+  const cancelRunMutation = useCancelRun();
   const bridgedTasks = useTaskBridgeStore((s) => s.tasks);
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const username = useHubStore((s) => s.username);
@@ -283,6 +292,12 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     Boolean(readBrowserStorage('session', TD_CODE_VERIFIER_KEY)) && Boolean(readBrowserStorage('session', TD_STATE_KEY));
   const handleSignOut = () => {
     void hubAuth.logout();
+  };
+  const handleRefreshRuns = () => {
+    void refetchRuns();
+  };
+  const handleCancelRun = (runId: string) => {
+    void cancelRunMutation.mutateAsync(runId);
   };
   const schedulerPolicyReadyCount = [
     modelMappingEnabled,
@@ -678,13 +693,36 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow title={t('settings.taskRunBinding')} description={t('settings.taskRunBindingDesc')} value={t('settings.statusInProgress')} />
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.taskRecentRuns')}</strong>
-                  <span>{t('settings.taskRecentRunsDesc')}</span>
+                  <div className={styles.taskSectionTitleRow}>
+                    <div>
+                      <strong>{t('settings.taskRecentRuns')}</strong>
+                      <span>{runsFetching ? t('settings.taskRefreshingRuns') : t('settings.taskRecentRunsDesc')}</span>
+                    </div>
+                    <div className={styles.taskSectionActions}>
+                      <span className={`${styles.statusPill} ${runsError ? '' : styles.statusPillOn}`}>
+                        {runsError ? t('settings.edgeOffline') : t('settings.taskRunLive')}
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.secondaryBtn}
+                        onClick={handleRefreshRuns}
+                        disabled={runsFetching}
+                      >
+                        <RefreshCw size={15} />
+                        {runsFetching ? t('settings.taskRefreshingRuns') : t('settings.taskRefreshRuns')}
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 {recentRuns.length > 0 ? (
                   <div className={styles.taskList}>
                     {recentRuns.map((run) => (
-                      <TaskRunRow key={run.runId} run={run} />
+                      <TaskRunRow
+                        key={run.runId}
+                        run={run}
+                        onCancel={isActiveRun(run) ? handleCancelRun : undefined}
+                        cancelling={cancelRunMutation.isPending && cancelRunMutation.variables === run.runId}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -1441,7 +1479,15 @@ function Panel({ title, description, children }: { title: string; description?: 
   );
 }
 
-function TaskRunRow({ run }: { run: RunInfo }) {
+function TaskRunRow({
+  run,
+  onCancel,
+  cancelling = false,
+}: {
+  run: RunInfo;
+  onCancel?: (runId: string) => void;
+  cancelling?: boolean;
+}) {
   const { t } = useTranslation();
   const timestamp = run.finishedAt ?? run.startedAt ?? run.createdAt;
   return (
@@ -1459,6 +1505,19 @@ function TaskRunRow({ run }: { run: RunInfo }) {
       <span className={`${styles.statusPill} ${isActiveRun(run) ? styles.statusPillOn : ''}`}>
         {t(`run.status.${run.status}`, { defaultValue: run.status })}
       </span>
+      {onCancel ? (
+        <button
+          type="button"
+          className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
+          onClick={() => onCancel(run.runId)}
+          disabled={cancelling}
+          aria-label={t('settings.taskCancelRun')}
+          title={t('settings.taskCancelRun')}
+        >
+          <XCircle size={15} />
+          {cancelling ? t('settings.taskCancellingRun') : t('settings.taskCancelRun')}
+        </button>
+      ) : null}
     </div>
   );
 }
