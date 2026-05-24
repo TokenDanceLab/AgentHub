@@ -43,9 +43,10 @@
 }
 
 [data-theme='dark'] .sidebar {
-  background: rgba(28,28,30,0.72);
-  backdrop-filter: blur(20px);
-  border-color: rgba(255,255,255,0.05);
+  background: rgba(35,35,45,0.55);
+  backdrop-filter: blur(40px) saturate(1.2);
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+  border-color: rgba(255,255,255,0.06);
 }
 
 /* ── Sidebar sections ──────────────────────── */
@@ -103,6 +104,7 @@
 
 [data-theme='dark'] .sidebarSearch {
   background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.05);
 }
 
 .sidebarSearch input {
@@ -133,7 +135,7 @@
 }
 
 [data-theme='dark'] .sidebarFooter {
-  border-top-color: rgba(255,255,255,0.05);
+  border-top-color: rgba(255,255,255,0.06);
 }
 
 .navIconBtn {
@@ -224,6 +226,22 @@
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(0,0,0,0.04);
+  transition: opacity 0.25s ease, width 0.25s ease, margin 0.25s ease;
+}
+
+.rightPanelHidden {
+  opacity: 0;
+  width: 0;
+  margin: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+[data-theme='dark'] .rightPanel {
+  background: rgba(35,35,45,0.55);
+  backdrop-filter: blur(40px) saturate(1.2);
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+  border-color: rgba(255,255,255,0.06);
 }
 
 .rightPanelHeader {
@@ -277,7 +295,7 @@
 }
 
 [data-theme='dark'] .rightPanelTabActive {
-  background: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.1);
   color: #FFFFFF;
   box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }

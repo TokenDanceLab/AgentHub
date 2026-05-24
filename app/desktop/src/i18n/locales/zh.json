@@ -51,8 +51,11 @@
 
   "chat.empty": "选择一个会话并发送消息开始",
   "chat.emptyAction": "尝试示例",
-  "chat.emptyDescription": "发送消息开始与 AI 编程代理协作",
-  "chat.emptyTitle": "开始对话",
+  "chat.emptyDescription": "选择上方智能体并输入消息，开始与 AI 编程代理协作",
+  "chat.emptyTitle": "我们该在 AgentHub 中做什么？",
+  "chat.suggestion.newTask": "新建任务",
+  "chat.suggestion.explainCode": "解释代码",
+  "chat.suggestion.fixBugs": "修复 Bug",
   "chat.fileChange": "已修改: {{path}}",
   "chat.newMessages": "新消息",
   "chat.result.failed": "失败: {{error}}",
