@@ -114,6 +114,8 @@ api/
 
 当前集成分支为 `dev/delicious233`。只有互不相干的大任务，才从 `master` 新切短分支。
 
+> **注意**：早期 M1-M4 阶段表中曾出现独立的 `runner/` 目录。当前 Runner 功能已合并到 `edge-server/internal/lifecycle/` 和 `edge-server/internal/adapters/` 中，不再作为独立目录存在。
+
 ## 5. Go 服务边界
 
 ### Edge Server
