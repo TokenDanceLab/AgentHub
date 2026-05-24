@@ -1,18 +1,16 @@
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
-import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 import { useEdgeStatus } from '@/hooks/useEdgeStatus';
 import { useAgentList } from '@/api/agentQueries';
 import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
 import { useThreads } from '@/api/threadQueries';
-import type { AgentInfo, ThreadInfo, StartRunRequest } from '@shared/types';
+import type { StartRunRequest } from '@shared/types';
 import type { ChatMessage } from '@/components/ChatView.types';
-import { useUIStore } from '@/stores/uiStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
-import { useRunStore } from '@/stores/runStore';
 import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
@@ -20,8 +18,32 @@ import { useHubStore } from '@/stores/hubStore';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
-import SettingsPage from '@/components/SettingsPage';
-import { MessageSquare, Bot, Sun, Moon, Wifi, WifiOff, Circle, LogIn, Settings, Search, Copy, Maximize2, Minimize2 } from 'lucide-react';
+import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
+import {
+  AlertTriangle,
+  ClipboardList,
+  Circle,
+  Copy,
+  MessageSquareText,
+  LogIn,
+  Maximize2,
+  Menu,
+  Minimize2,
+  Minus,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Route,
+  Search,
+  Settings,
+  Square,
+  Sun,
+  Wifi,
+  WifiOff,
+  X,
+} from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '@/App.module.css';
@@ -34,6 +56,15 @@ interface OptimisticRun {
   changedFiles: [];
 }
 
+const LEFT_SIDEBAR_MIN = 248;
+const LEFT_SIDEBAR_MAX = 520;
+const RIGHT_PANEL_MIN = 272;
+const RIGHT_PANEL_MAX = 560;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 function isRunActiveStatus(status: string | undefined): boolean {
   if (!status) return false;
   return ['queued', 'running', 'streaming', 'waiting_for_input', 'RUNNING', 'STREAMING', 'WAITING_FOR_INPUT'].includes(status);
@@ -44,7 +75,6 @@ export default function App() {
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online);
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-  const isTablet = useIsTablet();
   const edgeStatus = useEdgeStatus(online);
   const addToast = useToastStore((s) => s.addToast);
   const { theme, toggleTheme } = useTheme();
@@ -60,8 +90,6 @@ export default function App() {
   const { selectedThreadId, selectThread } = useThreadStore(
     useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectThread: s.selectThread })),
   );
-  const isStreaming = useRunStore((s) => s.isStreaming);
-
   const { data: agentData } = useAgentList(online);
   const agents = agentData?.items ?? [];
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>();
@@ -70,6 +98,11 @@ export default function App() {
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(396);
+  const [rightPanelWidth, setRightPanelWidth] = useState(360);
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
 
   // Mobile/tablet overlays
@@ -109,6 +142,10 @@ export default function App() {
   const allMessages = [...userMessages, ...messages];
   const displayedRun = currentRun ?? optimisticRun;
   const runIsActive = isRunActiveStatus(displayedRun?.status);
+  const shellStyle = {
+    '--left-sidebar-width': `${leftSidebarWidth}px`,
+    '--right-panel-width': `${rightPanelWidth}px`,
+  } as CSSProperties;
 
   useEffect(() => {
     if (currentRun) setOptimisticRun(null);
@@ -124,6 +161,7 @@ export default function App() {
       if (selectedThread) req.threadId = selectedThread.threadId;
       setUserMessages((prev) => [...prev, { id: `user-${Date.now()}`, role: 'user', timestamp: new Date().toISOString(), blocks: [{ kind: 'text', content: prompt }] }]);
       setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
+      setRightPanelOpen(true);
       const started = await startRun(req);
       setOptimisticRun({ ...started, outputText: '', toolCalls: [], changedFiles: [] });
     } catch (e) {
@@ -142,6 +180,35 @@ export default function App() {
 
   const handleSelectThread = useCallback((id: string) => { selectThread(id); setUserMessages([]); }, [selectThread]);
   const handleSelectAgent = useCallback((id: string) => setSelectedAgentId(id), []);
+  const openSettings = useCallback((section: SettingsSectionId = 'general') => {
+    setSettingsInitialSection(section);
+    setSettingsOpen(true);
+  }, []);
+
+  const handleStartResize = useCallback((side: 'left' | 'right') => (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const initialLeft = leftSidebarWidth;
+    const initialRight = rightPanelWidth;
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      if (side === 'left') {
+        setLeftSidebarWidth(clamp(initialLeft + moveEvent.clientX - startX, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX));
+      } else {
+        setRightPanelWidth(clamp(initialRight + startX - moveEvent.clientX, RIGHT_PANEL_MIN, RIGHT_PANEL_MAX));
+      }
+    };
+
+    const handleUp = () => {
+      document.body.classList.remove(styles.resizing);
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+
+    document.body.classList.add(styles.resizing);
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp, { once: true });
+  }, [leftSidebarWidth, rightPanelWidth]);
 
   const handleDecidePermission = useCallback((requestId: string, decision: 'allow' | 'deny', reason?: string) => {
     decidePermission(requestId, decision, reason);
@@ -212,22 +279,22 @@ export default function App() {
           </span>
           {wsLatency != null && <span className={styles.topBarDim} style={{ marginLeft: 6 }}>{wsLatency}ms</span>}
           {isConnected ? <Wifi size={12} className={styles.topBarDim} /> : <WifiOff size={12} className={styles.topBarDim} />}
-          {edgeStatus.lastError && <span className={styles.topBarDim} title={edgeStatus.lastError} style={{ marginLeft: 4 }}>⚠</span>}
+          {edgeStatus.lastError && <AlertTriangle size={13} className={styles.topBarDim} style={{ marginLeft: 4 }} aria-label={edgeStatus.lastError} />}
         </div>
         <div className={styles.topBarRight}>
           {/* Window controls — no drag region so clicks register */}
           <div className={styles.winControls}>
             <button className={styles.winBtn} onClick={() => getCurrentWindow().minimize()} title="最小化">
-              <svg width="10" height="1" viewBox="0 0 10 1" fill="none"><path d="M0 0.5H10" stroke="currentColor"/></svg>
+              <Minus size={13} />
             </button>
             <button className={styles.winBtn} onClick={async () => {
               const w = getCurrentWindow();
               (await w.isMaximized()) ? w.unmaximize() : w.maximize();
             }} title="最大化">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor"/></svg>
+              <Square size={11} />
             </button>
             <button className={`${styles.winBtn} ${styles.winBtnClose}`} onClick={() => getCurrentWindow().close()} title="关闭">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1L9 9M9 1L1 9" stroke="currentColor" strokeWidth="1.2"/></svg>
+              <X size={14} />
             </button>
           </div>
         </div>
@@ -235,7 +302,7 @@ export default function App() {
 
       {edgeStatus.showBanner && (
         <div className={styles.banner} role="alert">
-          <span className={styles.bannerIcon}>&#9888;</span>
+          <AlertTriangle size={15} className={styles.bannerIcon} aria-hidden="true" />
           <span className={styles.bannerMsg}>{edgeStatus.lastError ?? t('banner.disconnected')}</span>
           <span className={styles.bannerActions}>
             <button className={styles.bannerBtn} onClick={edgeStatus.retry} disabled={edgeStatus.retrying}>{edgeStatus.retrying ? '...' : t('banner.retry')}</button>
@@ -246,6 +313,7 @@ export default function App() {
 
       {settingsOpen ? (
         <SettingsPage
+          initialSection={settingsInitialSection}
           onBack={() => setSettingsOpen(false)}
           onOpenAuth={() => useHubStore.getState().setShowAuthModal(true)}
         />
@@ -254,9 +322,20 @@ export default function App() {
 
       {/* Mobile toolbar */}
       {isMobile && (
-        <div style={{ display: 'flex', padding: '4px 8px', gap: 8, background: 'var(--card)', borderBottom: '1px solid var(--border)' }}>
-          <button onClick={() => setNavPanelOpen(true)} style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--background)', color: 'var(--foreground)', cursor: 'pointer', fontSize: 12 }}>☰ Menu</button>
-          <span style={{ flex: 1, fontSize: 12, color: 'var(--muted-foreground)', alignSelf: 'center' }}>{selectedAgent?.name ?? 'AgentHub'}</span>
+        <div className={styles.mobileToolbar}>
+          <button className={styles.mobileToolbarBtn} onClick={() => setNavPanelOpen(true)} aria-label={t('nav.openMenu')}>
+            <Menu size={17} />
+          </button>
+          <span className={styles.mobileToolbarTitle}>{selectedAgent?.name ?? 'AgentHub'}</span>
+          <button className={styles.mobileToolbarBtn} onClick={() => openSettings('general')} aria-label={t('nav.settings')}>
+            <Settings size={17} />
+          </button>
+          <button className={styles.mobileToolbarBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} aria-label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
+            {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={17} />}
+          </button>
+          <button className={styles.mobileToolbarBtn} onClick={toggleTheme} aria-label={theme === 'dark' ? t('theme.light') : t('theme.dark')}>
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
         </div>
       )}
 
@@ -265,14 +344,45 @@ export default function App() {
         <>
           <div className={`${styles.overlay} ${navPanelOpen ? styles.overlayActive : ''}`} onClick={() => setNavPanelOpen(false)} />
           <div className={`${styles.overlayPanel} ${styles.overlayPanelLeft} ${navPanelOpen ? styles.overlayPanelLeftActive : ''}`}>
-            <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
+            <div className={styles.mobileNavPanel}>
+              <div className={styles.sidebarSection}>
+                <div className={styles.sidebarSectionLabel}>{t('agent.title')}</div>
+                <div className={styles.sidebarScroll}>
+                  <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
+                </div>
+              </div>
+              <div className={styles.sidebarSection}>
+                <div className={styles.sidebarSectionLabel}>{t('thread.title')}</div>
+                <div className={styles.sidebarScroll}>
+                  <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
+                </div>
+              </div>
+            </div>
           </div>
         </>
       )}
 
-      <div className={styles.body}>
+      <div className={styles.body} style={shellStyle}>
         {/* Single sidebar — agents + threads grouped */}
-        {!isMobile && !workspaceExpanded && (
+        {!isMobile && !workspaceExpanded && leftSidebarCollapsed && (
+          <div className={styles.leftRail}>
+            <button className={styles.railBtn} onClick={() => setLeftSidebarCollapsed(false)} title={t('nav.expandSidebar')} aria-label={t('nav.expandSidebar')}>
+              <PanelLeftOpen size={17} />
+            </button>
+            <button className={styles.railBtn} onClick={() => openSettings('general')} title={t('nav.settings')} aria-label={t('nav.settings')}>
+              <Settings size={17} />
+            </button>
+            <button className={styles.railBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
+              {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={17} />}
+            </button>
+            <button className={styles.railBtn} onClick={toggleTheme} title={theme === 'dark' ? t('theme.light') : t('theme.dark')}>
+              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+          </div>
+        )}
+
+        {!isMobile && !workspaceExpanded && !leftSidebarCollapsed && (
+          <>
           <div className={styles.sidebar}>
             {/* Global search */}
             <div className={styles.sidebarSearch}>
@@ -301,7 +411,10 @@ export default function App() {
 
             {/* Sidebar footer */}
             <div className={styles.sidebarFooter}>
-              <button className={styles.navIconBtn} onClick={() => setSettingsOpen(true)} title={t('nav.settings')} aria-label={t('nav.settings')}>
+              <button className={styles.navIconBtn} onClick={() => setLeftSidebarCollapsed(true)} title={t('nav.collapseSidebar')} aria-label={t('nav.collapseSidebar')}>
+                <PanelLeftClose size={16} />
+              </button>
+              <button className={styles.navIconBtn} onClick={() => openSettings('general')} title={t('nav.settings')} aria-label={t('nav.settings')}>
                 <Settings size={16} />
               </button>
               <button className={styles.navIconBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
@@ -312,6 +425,14 @@ export default function App() {
               </button>
             </div>
           </div>
+          <div
+            className={styles.resizeHandle}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t('layout.resizeLeft')}
+            onPointerDown={handleStartResize('left')}
+          />
+          </>
         )}
 
         {/* Main zone */}
@@ -331,6 +452,40 @@ export default function App() {
                 >
                   <Copy size={15} />
                 </button>
+                <button
+                  className={styles.workspaceHeaderBtn}
+                  onClick={() => setViewMode((mode) => (mode === 'agent' ? 'im' : 'agent'))}
+                  title={viewMode === 'agent' ? t('im.groupChat') : t('nav.agent')}
+                  aria-label={viewMode === 'agent' ? t('im.groupChat') : t('nav.agent')}
+                >
+                  <MessageSquareText size={15} />
+                </button>
+                <button
+                  className={styles.workspaceHeaderBtn}
+                  onClick={() => openSettings('tasks')}
+                  title={t('settings.tasks')}
+                  aria-label={t('settings.tasks')}
+                >
+                  <ClipboardList size={15} />
+                </button>
+                <button
+                  className={styles.workspaceHeaderBtn}
+                  onClick={() => openSettings('agentScheduling')}
+                  title={t('settings.agentScheduling')}
+                  aria-label={t('settings.agentScheduling')}
+                >
+                  <Route size={15} />
+                </button>
+                {displayedRun && !rightPanelOpen && (
+                  <button
+                    className={styles.workspaceHeaderBtn}
+                    onClick={() => setRightPanelOpen(true)}
+                    title={t('run.open')}
+                    aria-label={t('run.open')}
+                  >
+                    <PanelRightOpen size={15} />
+                  </button>
+                )}
                 <button
                   className={styles.workspaceHeaderBtn}
                   onClick={() => setWorkspaceExpanded((v) => !v)}
@@ -360,14 +515,24 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right panel — hidden until there is active work */}
-        {!isMobile && !workspaceExpanded && (
-          <div className={`${styles.rightPanel} ${displayedRun ? '' : styles.rightPanelHidden}`}>
+        {!isMobile && !workspaceExpanded && displayedRun && rightPanelOpen && (
+          <>
+          <div
+            className={styles.resizeHandle}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t('layout.resizeRight')}
+            onPointerDown={handleStartResize('right')}
+          />
+          <div className={styles.rightPanel}>
             <div className={styles.rightPanelHeader}>
               <div className={styles.rightPanelSegmented}>
                 <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`}>{t('run.output')}</button>
                 <button className={styles.rightPanelTab}>{t('run.files')}</button>
               </div>
+              <button className={styles.rightPanelCollapseBtn} onClick={() => setRightPanelOpen(false)} title={t('run.close')} aria-label={t('run.close')}>
+                <PanelRightClose size={15} />
+              </button>
             </div>
             <div className={styles.rightPanelBody}>
               <ErrorBoundary>
@@ -385,6 +550,7 @@ export default function App() {
               </ErrorBoundary>
             </div>
           </div>
+          </>
         )}
       </div>
       </>

@@ -46,6 +46,11 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+const (
+	defaultRunCleanupTerminalTTL              = 24 * time.Hour
+	defaultRunCleanupMaxTerminalRunsPerThread = 50
+)
+
 // ---------------------------------------------------------------------------
 // Response helpers
 // ---------------------------------------------------------------------------
@@ -456,6 +461,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 
 	repository := ensureStore(h)
 	h.runCreateMu.Lock()
+	cleanupRuns(repository)
 	thread, ok := repository.GetThread(req.ThreadID)
 	if !ok || thread.ProjectID != req.ProjectID {
 		h.runCreateMu.Unlock()
@@ -741,6 +747,17 @@ func isActiveRunStatus(status string) bool {
 	default:
 		return false
 	}
+}
+
+func cleanupRuns(repository store.Repository) store.RunCleanupResult {
+	cleaner, ok := repository.(store.RunCleaner)
+	if !ok {
+		return store.RunCleanupResult{}
+	}
+	return cleaner.CleanupRuns(store.RunCleanupOptions{
+		TerminalTTL:              defaultRunCleanupTerminalTTL,
+		MaxTerminalRunsPerThread: defaultRunCleanupMaxTerminalRunsPerThread,
+	})
 }
 
 // ---------------------------------------------------------------------------

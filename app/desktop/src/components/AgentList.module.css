@@ -197,9 +197,10 @@
 }
 
 .version,
-.capability {
+.runtimeMeta {
   display: inline-flex;
   align-items: center;
+  gap: 3px;
   max-width: 100%;
   height: 19px;
   padding: 0 6px;
@@ -212,7 +213,7 @@
 }
 
 [data-theme='dark'] .version,
-[data-theme='dark'] .capability {
+[data-theme='dark'] .runtimeMeta {
   background: rgba(255,255,255,0.065);
 }
 
