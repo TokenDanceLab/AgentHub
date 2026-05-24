@@ -7,6 +7,19 @@ info:
     message deltas, approvals and artifact notifications are delivered through
     WebSocket typed events documented in api/events.md.
 
+    ## Implementation Status (2026-05-24)
+
+    **Edge Server**: Core endpoints (health/runs/threads/projects/agents/events/permissions)
+    are fully implemented. P0 endpoints for approvals, artifacts, previews, workspaces,
+    and runner management are declared but not yet implemented — see phase tags.
+
+    **Hub Server**: All documented `/client/auth`, `/client/contacts`, `/client/sessions`,
+    `/client/messages`, `/edge/*`, `/web/*` endpoints are implemented. Additional routes
+    exist in code but are not yet documented here (~36 routes for session members,
+    message pins, attachments, notifications, custom agents, contacts search/block).
+    The legacy `/v1/auth`, `/v1/users`, `/v1/contacts` paths are planned for future
+    migration and not currently implemented.
+
     ## Status tags
     - `x-agenthub-status: implemented` — 已实现，可直接调用
     - `x-agenthub-status: planned` — 远期规划，尚未实现

@@ -172,7 +172,7 @@ Hub 调度（远程）:
   - 修复：`json.Marshal` 错误不再 `_` 丢弃，返回 error
   - 验收：所有 Write* 函数输出合法 JSON，错误路径有覆盖
 
-- [ ] **S5: 修复 OrchestratorAdapter NeedsStdin 返回 false** `[0.5d]`
+- [x] **S5: 修复 OrchestratorAdapter NeedsStdin 返回 false** `[0.5d]`
   - 文件：`edge-server/internal/adapters/orchestrator.go:67-68`
   - 方案：改为 `return true`，或确保内层 adapter 永久 bypassPermissions
   - 风险：orchestrator 内部 Claude Code 无法通过 stdin 处理权限请求
@@ -189,20 +189,20 @@ Hub 调度（远程）:
   - 方案：为每个 CLI flag 添加环境变量 fallback
   - 验收：`AGENTHUB_ADDR=:4321 go run ./cmd/agenthub-edge/` 使用环境变量值
 
-- [ ] **S6: 抽取共享测试 helper** `[0.5d]`
+- [x] **S6: 抽取共享测试 helper** `[0.5d]`
   - 文件：新增 `edge-server/internal/lifecycle/testutil_test.go`
   - 方案：将 `nextEvent` 等 helper 从 `mock_executor_test.go` 移至专用文件
   - 验收：`go test ./internal/lifecycle/` 不变
 
 ##### P2 -- 改善
 
-- [ ] **S8: busEventEmitter 移入 adapters 包** `[1d]`
+- [x] **S8: busEventEmitter 移入 adapters 包** `[1d]`
   - 文件：`edge-server/internal/lifecycle/process_executor.go:414-449` → `internal/adapters/event_emitter.go`
 - [ ] **S9: Orchestrator prompt 模板转义** `[0.5d]`
   - 文件：`edge-server/internal/adapters/orchestrator.go:72-95`
 - [ ] **S11: CreateProject 返回区分已存在/新建** `[0.5d]`
   - 文件：`edge-server/internal/store/store.go`
-- [ ] **S12: 清理空目录 `internal/edgeserver/`** `[0.5d]`
+- [x] **S12: 清理空目录 `internal/edgeserver/`** `[0.5d]`
 - [ ] **常量提取**：`maxConcurrentRuns: 5`, `channel buffer: 256`, `read buffer: 32*1024` 等魔数 → named constants `[0.5d]`
 
 ---
@@ -219,40 +219,40 @@ Hub 调度（远程）:
   - 修复：`hub-server/internal/config/config.go` -- Load 阶段校验
   - 验收：未设置环境变量时启动 panic
 
-- [ ] **P0-2: Admin pprof 绑定 localhost + 认证** `[0.5d]`
+- [x] **P0-2: Admin pprof 绑定 localhost + 认证** `[0.5d]`
   - 文件：`hub-server/cmd/server-hub/main.go:294-300`
   - 方案：绑定 `127.0.0.1:6060`（非 `0.0.0.0`），添加 basic auth 中间件
   - 验收：外部 IP 无法访问 `/debug/pprof/`
 
-- [ ] **P0-3: EventBus panic 记录日志** `[0.5d]`
+- [x] **P0-3: EventBus panic 记录日志** `[0.5d]`
   - 文件：`hub-server/internal/service/eventbus.go:58-64`
   - 方案：`recover()` 处添加 `slog.Error("eventbus panic", "stack", debug.Stack())`，增加 Prometheus counter
   - 验收：模拟 panic handler，确认日志输出完整 stack trace
 
-- [ ] **修复 go.mod 版本号** `[0.5d]`
+- [x] **修复 go.mod 版本号** `[0.5d]`
   - 文件：`hub-server/go.mod:3` -- `go 1.25.6` → `go 1.24.0`
   - 文件：`hub-server/deployments/Dockerfile` -- 同步 Go 版本
   - 验收：`go build ./...` 和 `go test ./...` 正常执行
 
 ##### P1 -- 高优先级架构修复
 
-- [ ] **P1-1: 创建 DeviceService 消除 handler 直连 DB** `[1d]`
+- [x] **P1-1: 创建 DeviceService 消除 handler 直连 DB** `[1d]`
   - 文件：`hub-server/internal/handler/device.go:15-17`
   - 新增：`hub-server/internal/service/device.go` -- `DeviceService` struct + methods
   - 验收：`DeviceHandler` 只依赖 `*service.DeviceService`
 
-- [ ] **P1-2: 消除 config.Cfg 全局单例** `[2d]`
+- [x] **P1-2: 消除 config.Cfg 全局单例** `[2d]`
   - 文件：`hub-server/internal/config/config.go:63`
   - 影响面：`middleware/auth.go:31`, `service/auth.go:87-88`, `service/attachment.go:65`, `router/router.go:31`
   - 方案：所有受影响模块通过构造函数接受 `*config.Config`
   - 验收：不再有任何文件直接引用 `config.Cfg`
 
-- [ ] **P1-3: 消除 repository.DB 全局单例** `[1d]`
+- [x] **P1-3: 消除 repository.DB 全局单例** `[1d]`
   - 文件：`hub-server/internal/repository/db.go:14`
   - 方案：所有 service/handler 通过构造函数接受 `*gorm.DB`
   - 验收：移除 `var DB *gorm.DB`，所有引用替换为参数传递
 
-- [ ] **P1-4: 实现速率限制中间件** `[1d]`
+- [x] **P1-4: 实现速率限制中间件** `[1d]`
   - 新增：`hub-server/internal/middleware/rate_limit.go`
   - 方案：基于 Redis 的 per-IP token bucket，登录 5 req/min，注册 3 req/min
   - 验收：`curl` 连续请求被 429 拒绝
@@ -262,7 +262,7 @@ Hub 调度（远程）:
   - 方案：`strings.ReplaceAll` → `json.Marshal(map[string]string{"text": req.Content})`
   - 验收：包含特殊字符（换行、反斜杠、引号）的消息正确存储
 
-- [ ] **P1-6: 请求超时中间件** `[0.5d]`
+- [x] **P1-6: 请求超时中间件** `[0.5d]`
   - 新增：`hub-server/internal/middleware/timeout.go`
   - 方案：Gin middleware 包装 `context.WithTimeout(15s)`，上传端点 30s
   - 验收：模拟慢查询 20s 后返回 504
@@ -318,12 +318,12 @@ Hub 调度（远程）:
 
 ##### 测试基础设施（Phase 1-2，来自 testing audit）
 
-- [ ] **jwtutil 单元测试（0% → 100%）** `[1.5d]` `[P0]`
+- [x] **jwtutil 单元测试（0% → 100%）** `[1.5d]` `[P0]`
   - 新增：`hub-server/internal/jwtutil/jwt_test.go`
   - 覆盖：`GenerateAccessToken`, `ParseToken`, `GenerateRefreshToken`, `HashRefreshToken`
   - 验收：`go test -cover ./internal/jwtutil/` >= 90%
 
-- [ ] **cache 单元测试（0% → 80%）** `[1d]` `[P0]`
+- [x] **cache 单元测试（0% → 80%）** `[1d]` `[P0]`
   - 新增：`hub-server/internal/cache/data_test.go`
   - 覆盖：`GetOrLoad` cache hit/miss, singleflight 去重, `Invalidate`, `AllocateSeq`
   - 验收：mock Redis 测试所有缓存路径
