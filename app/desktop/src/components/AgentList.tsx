@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Search } from 'lucide-react';
+import { Search, Settings2, Sparkles } from 'lucide-react';
 import { useState, useMemo, memo, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
@@ -11,6 +11,15 @@ function agentIcon(name: string): ReactNode {
   if (n.includes('codex')) return <Codex size={20} />;
   if (n.includes('opencode')) return <OpenCode size={20} />;
   return null;
+}
+
+type CapabilityKey = keyof AgentInfo['capabilities'];
+
+const CAPABILITY_KEYS: CapabilityKey[] = ['streaming', 'toolCalls', 'fileChanges', 'thinkingVisible', 'multiTurn'];
+
+function capabilityLabelKey(key: CapabilityKey) {
+  if (key === 'thinkingVisible') return 'agent.capability.thinking';
+  return `agent.capability.${key}`;
 }
 
 interface Props {
@@ -30,7 +39,7 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
     return agents.filter((a) => a.name.toLowerCase().includes(q));
   }, [agents, searchQuery]);
 
-  function highlightMatch(text: string): React.ReactNode {
+  function highlightMatch(text: string): ReactNode {
     if (!searchQuery.trim()) return text;
     const q = searchQuery.trim();
     const idx = text.toLowerCase().indexOf(q.toLowerCase());
@@ -46,10 +55,14 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
 
   const isEmpty = agents.length === 0;
   const isSearchEmpty = !isEmpty && filteredAgents.length === 0;
+  const availableCount = agents.filter((a) => a.status === 'available').length;
 
   return (
     <nav className={styles.sidebar} aria-label={t('agent.title')}>
-      <div className={styles.title}>{t('agent.title')}</div>
+      <div className={styles.title}>
+        <span>{t('agent.title')}</span>
+        <span className={styles.countPill}>{online ? `${availableCount}/${agents.length}` : t('agent.offline')}</span>
+      </div>
 
       <div className={styles.searchWrapper}>
         <Search size={14} className={styles.searchIcon} />
@@ -65,7 +78,8 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
 
       {isEmpty ? (
         <div className={styles.empty}>
-          {online ? t('agent.emptyOnline') : t('agent.emptyOffline')}
+          <Sparkles size={16} />
+          <span>{online ? t('agent.emptyOnline') : t('agent.emptyOffline')}</span>
         </div>
       ) : isSearchEmpty ? (
         <div className={styles.empty}>{t('agent.noMatch')}</div>
@@ -77,21 +91,30 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
                 className={`${styles.item} ${a.id === selectedId ? styles.selected : ''}`}
                 onClick={() => onSelect?.(a)}
                 aria-pressed={a.id === selectedId}
+                disabled={a.status !== 'available'}
               >
-                {agentIcon(a.name) || (
-                  <span
-                    className={styles.statusDot}
-                    style={{
-                      backgroundColor:
-                        a.status === 'available' ? 'var(--color-success)' : 'var(--color-danger)',
-                    }}
-                  />
-                )}
+                <span className={styles.avatar}>
+                  {agentIcon(a.name) || <Settings2 size={17} />}
+                  <span className={`${styles.statusDot} ${styles[`status_${a.status}`]}`} />
+                </span>
                 <div className={styles.info}>
-                  <div className={styles.name}>{highlightMatch(a.name)}</div>
+                  <div className={styles.nameLine}>
+                    <span className={styles.name}>{highlightMatch(a.name)}</span>
+                    <span className={`${styles.statusText} ${styles[`statusText_${a.status}`]}`}>
+                      {t(`agent.status.${a.status}`)}
+                    </span>
+                  </div>
                   {a.description && (
                     <div className={styles.description}>{a.description}</div>
                   )}
+                  <div className={styles.metaLine}>
+                    {a.version && <span className={styles.version}>{a.version}</span>}
+                    {CAPABILITY_KEYS.filter((key) => a.capabilities[key]).slice(0, 3).map((key) => (
+                      <span key={key} className={styles.capability}>
+                        {t(capabilityLabelKey(key))}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </button>
             </li>
