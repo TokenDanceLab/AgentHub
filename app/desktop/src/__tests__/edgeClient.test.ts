@@ -1,9 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchHealth, fetchRunners, startRun, cancelRun } from '../api/edgeClient';
 
 describe('edgeClient', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
   });
 
   describe('fetchHealth', () => {
@@ -58,6 +63,57 @@ describe('edgeClient', () => {
       const result = await startRun();
       expect(result.runId).toMatch(/^run_/);
       expect(result.status).toBe('queued');
+    });
+
+    it('sends Edge auth token when one is stored locally', async () => {
+      localStorage.setItem('agenthub:edge_auth_token', 'local-edge-token');
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ runId: 'run_abc123', status: 'queued' }),
+      } as Response);
+
+      await startRun();
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/runs$/),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer local-edge-token',
+          }),
+        }),
+      );
+    });
+
+    it('preserves model routing metadata in the request body', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ runId: 'run_abc123', status: 'queued' }),
+      } as Response);
+
+      await startRun({
+        prompt: 'route this',
+        model: 'claude-opus-4-7',
+        provider: 'anthropic',
+        modelAlias: 'opus',
+        modelMappingEnabled: true,
+        providerFallbackEnabled: true,
+        reasoningEffort: 'max',
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/runs$/),
+        expect.objectContaining({
+          body: JSON.stringify({
+            prompt: 'route this',
+            model: 'claude-opus-4-7',
+            provider: 'anthropic',
+            modelAlias: 'opus',
+            modelMappingEnabled: true,
+            providerFallbackEnabled: true,
+            reasoningEffort: 'max',
+          }),
+        }),
+      );
     });
   });
 
