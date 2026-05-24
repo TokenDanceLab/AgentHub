@@ -25,7 +25,8 @@
 Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 
 1. 先读本文件。
-2. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
+2. 读 `docs/handoff/STATE.md` — 当前项目状态、阻塞、部署信息（新 Agent 接手必读）。
+3. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
 3. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
 4. 只读相关主文档章节：产品不清读 `docs/product-requirements.md`；边界不清读 `docs/system-architecture.md`；实现顺序不清读 `docs/implementation-guide.md`。
 5. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
