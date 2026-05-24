@@ -23,6 +23,14 @@ const MaxIncrementalMessageLimit = 500
 // admin server to limit how long the server will spend reading request headers.
 const DefaultReadHeaderTimeout = 5 * time.Second
 
+// DefaultServerWriteTimeout is the WriteTimeout applied to both the main and
+// admin HTTP servers.
+const DefaultServerWriteTimeout = 60 * time.Second
+
+// DefaultShutdownTimeout is the context deadline used during graceful shutdown
+// of the HTTP server.
+const DefaultShutdownTimeout = 5 * time.Second
+
 // ── Cache TTLs ────────────────────────────────────────────────────────────────
 
 // SessionMemberCacheTTL is the TTL for the cached session member list used when
