@@ -26,22 +26,22 @@ describe('WelcomeScreen', () => {
       />,
     );
 
-    // Brand
-    expect(screen.getByText('AgentHub')).toBeInTheDocument();
-    expect(screen.getByText('welcome.subtitle')).toBeInTheDocument();
-    // Description
-    expect(screen.getByText('welcome.description')).toBeInTheDocument();
-    // Create Thread button
-    expect(screen.getByText('welcome.createThread')).toBeInTheDocument();
-    // Suggestions label
+    expect(screen.getByText('welcome.eyebrow')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'welcome.headline' })).toBeInTheDocument();
+    expect(screen.getByText('welcome.runtime')).toBeInTheDocument();
+    expect(screen.getByText('welcome.profile')).toBeInTheDocument();
+    expect(screen.getByText('welcome.target')).toBeInTheDocument();
+    expect(screen.getByText('welcome.commandPlaceholder')).toBeInTheDocument();
+    expect(screen.getByText('welcome.localEdge')).toBeInTheDocument();
+    expect(screen.getByText('welcome.approval')).toBeInTheDocument();
+    expect(screen.getByText('welcome.tokendance')).toBeInTheDocument();
     expect(screen.getByText('welcome.suggestionsLabel')).toBeInTheDocument();
-    // Suggestion chips
     expect(screen.getByText('welcome.suggestion1')).toBeInTheDocument();
     expect(screen.getByText('welcome.suggestion2')).toBeInTheDocument();
     expect(screen.getByText('welcome.suggestion3')).toBeInTheDocument();
   });
 
-  it('calls onCreateThread when Create Thread button is clicked', () => {
+  it('calls onCreateThread when the command launcher is clicked', () => {
     const onCreateThread = vi.fn();
     render(
       <WelcomeScreen
@@ -51,7 +51,7 @@ describe('WelcomeScreen', () => {
       />,
     );
 
-    fireEvent.click(screen.getByText('welcome.createThread'));
+    fireEvent.click(screen.getByText('welcome.commandPlaceholder'));
     expect(onCreateThread).toHaveBeenCalledTimes(1);
   });
 
