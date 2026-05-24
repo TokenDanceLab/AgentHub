@@ -219,7 +219,7 @@ PR 说明按影响选择填写：
 | 方向 | 已有测试 |
 |---|---|
 | Edge | Go `testing`，覆盖 API handler、event bus、file store、adapter 解析（NDJSON/JSONL/JSON）、控制协议、process executor、mock executor、runner registry、security origin |
-| Desktop | Vitest + React Testing Library，191 个测试，覆盖 17 个组件、API client、错误处理、hooks、event client |
+| Desktop | Vitest + React Testing Library，551/560 通过 (38 test files)，覆盖 17 个组件、API client、错误处理、hooks、event client |
 | Desktop e2e | Playwright，覆盖在线/离线状态、RunnerList、EventLog、Agent 端到端执行 |
 | 全链路 | `scripts/client-smoke.ps1`，覆盖 Edge/Desktop build 和核心接口 |
 | Adapter 集成 | Go `testing`，覆盖 Claude Code、OpenCode、Codex 三种 adapter 端到端执行、工具调用、取消、stdin 控制、命令行参数 |
