@@ -36,6 +36,7 @@ Thumbs.db
 .env.local
 .env.*
 !.env.example
+!.env.production.example
 .envrc
 *.pem
 *.key
@@ -65,6 +66,7 @@ yarn-error.log*
 *.bak
 *.backup
 *.sql.gz
+backups/
 
 # Local machine and agent state
 .worktrees/
