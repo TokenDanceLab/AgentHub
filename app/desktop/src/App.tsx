@@ -13,6 +13,7 @@ import type { ChatMessage } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
 import { useUIStore } from '@/stores/uiStore';
+import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
@@ -237,10 +238,11 @@ export default function App() {
       },
     ]);
     try {
-      const req: StartRunRequest = { prompt };
+      const req: StartRunRequest = {
+        prompt,
+        ...useModelSettingsStore.getState().resolveRunRequestOptions(opts),
+      };
       if (agentId) req.agentId = agentId;
-      if (opts?.model) req.model = opts.model;
-      if (opts?.reasoningEffort) req.reasoningEffort = opts.reasoningEffort;
       if (selectedThread) req.threadId = selectedThread.threadId;
       setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
       setRightPanelOpen(true);
