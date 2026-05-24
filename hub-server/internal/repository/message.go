@@ -104,7 +104,7 @@ func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]
 	if to != "" {
 		query = query.Where("created_at <= ?", to)
 	}
-	err := query.Order("seq_id DESC").Limit(100).Find(&msgs).Error
+	err := query.Order("seq_id DESC").Limit(config.MaxMessagePageLimit).Find(&msgs).Error
 	return msgs, err
 }
 
@@ -117,7 +117,7 @@ func SearchAllMessages(db *gorm.DB, userID, q string) ([]model.Message, error) {
 			AND m.recalled = false
 			AND m.content->>'text' ILIKE ?
 		ORDER BY m.created_at DESC
-		LIMIT 100
-	`, "user", userID, "%"+q+"%").Scan(&msgs).Error
+		LIMIT ?
+	`, "user", userID, "%"+q+"%", config.MaxMessagePageLimit).Scan(&msgs).Error
 	return msgs, err
 }

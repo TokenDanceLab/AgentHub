@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 )
 
@@ -16,6 +17,10 @@ func init() {
 }
 
 func testSecret() string { return "test-secret-for-middleware-tests" }
+
+func testConfig() *config.Config {
+	return &config.Config{JWT: config.JWTConfig{Secret: testSecret()}}
+}
 
 func makeToken(userID, deviceType, deviceID string) string {
 	token, err := jwtutil.GenerateAccessToken(userID, deviceType, deviceID, testSecret(), time.Hour)
@@ -47,7 +52,7 @@ func ginRequest(method, path, authHeader string) (*gin.Context, *httptest.Respon
 
 func TestAuthMiddlewareNoHeader(t *testing.T) {
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "")
-	AuthMiddleware(testSecret())(c)
+	AuthMiddleware(testConfig())(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected request to be aborted")
@@ -59,7 +64,7 @@ func TestAuthMiddlewareNoHeader(t *testing.T) {
 
 func TestAuthMiddlewareNoBearerPrefix(t *testing.T) {
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Token some-token")
-	AuthMiddleware(testSecret())(c)
+	AuthMiddleware(testConfig())(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected request to be aborted")
@@ -71,7 +76,7 @@ func TestAuthMiddlewareNoBearerPrefix(t *testing.T) {
 
 func TestAuthMiddlewareInvalidToken(t *testing.T) {
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer not.a.valid.token")
-	AuthMiddleware(testSecret())(c)
+	AuthMiddleware(testConfig())(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected request to be aborted")
@@ -84,7 +89,7 @@ func TestAuthMiddlewareInvalidToken(t *testing.T) {
 func TestAuthMiddlewareExpiredToken(t *testing.T) {
 	token := makeExpiredToken("user-1", "desktop", "dev-1")
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
-	AuthMiddleware(testSecret())(c)
+	AuthMiddleware(testConfig())(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected request to be aborted for expired token")
@@ -97,7 +102,7 @@ func TestAuthMiddlewareExpiredToken(t *testing.T) {
 func TestAuthMiddlewareWrongSecret(t *testing.T) {
 	token, _ := jwtutil.GenerateAccessToken("user-1", "desktop", "dev-1", "wrong-secret", time.Hour)
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
-	AuthMiddleware(testSecret())(c)
+	AuthMiddleware(testConfig())(c)
 
 	if !c.IsAborted() {
 		t.Fatal("expected request to be aborted for wrong secret")
@@ -113,7 +118,7 @@ func TestAuthMiddlewareValidToken(t *testing.T) {
 	next := func(c *gin.Context) { called = true }
 
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
-	handler := AuthMiddleware(testSecret())
+	handler := AuthMiddleware(testConfig())
 	handler(c)
 	if !c.IsAborted() {
 		next(c)
@@ -134,7 +139,7 @@ func TestAuthMiddlewareSetsContextValues(t *testing.T) {
 	token := makeToken("user-99", "mobile", "dev-mobile-1")
 
 	c, _ := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
-	AuthMiddleware(testSecret())(c)
+	AuthMiddleware(testConfig())(c)
 
 	if c.IsAborted() {
 		t.Fatal("expected request not to be aborted")

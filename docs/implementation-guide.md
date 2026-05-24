@@ -2,7 +2,7 @@
 
 ## 1. 当前实现状态
 
-当前阶段是 **P0-P3 全部完成，M3b 6/6 完成，M4 8/8 完成**。全部 3 个 Agent（Claude Code、OpenCode、Codex）端到端测试通过。
+当前阶段是 **P0-P3 全部完成，M3b 6/6 完成，M4 8/8 完成，M5 工程基础收敛完成，M6 生产部署完成，M7 Desktop P0 打磨完成**。全部 3 个 Agent（Claude Code、OpenCode、Codex）端到端测试通过。
 
 ### M3a 已完成：真实 Agent CLI 集成
 
@@ -103,13 +103,18 @@ api/
 
 | 阶段 | 目标 | 写入范围 | API 影响 | 验收 |
 |---|---|---|---|---|
-| M1 | 基础骨架和 mock 链路（已完成） | `app/desktop/`、`app/shared/`、`edge-server/`、`runner/`、`scripts/client-smoke.ps1` | 保持 `/v1/health`、`/v1/runners`、`/v1/runs`、`/v1/events` 稳定 | Go tests、Vitest、Playwright、client smoke |
+| M1 | 基础骨架和 mock 链路（已完成） | `app/desktop/`、`app/shared/`、`edge-server/`、`scripts/client-smoke.ps1` | 保持 `/v1/health`、`/v1/runners`、`/v1/runs`、`/v1/events` 稳定 | Go tests、Vitest、Playwright、client smoke |
 | M2 | Edge 本地权威数据层（已完成） | `edge-server/`、`api/`、`app/desktop/src-tauri/` | 补 Project/Thread/Run/Item snapshot schema | Edge 重启后 Project/Thread/Run/Item/EventStore 可恢复 |
 | M3a | 真实 AgentAdapter 集成（已完成） | `edge-server/internal/adapters/`、`edge-server/internal/runnerctx/` | 补 run start/cancel/error schema 和 event | Claude Code / Codex / OpenCode 三种 adapter 可启动、解析、stdin 取消，32+14 测试通过 |
-| M3b | 多 Agent 协调、Orchestrator、Clone/Init/Worktree（已完成，6/6） | `edge-server/`、`runner/`、`api/` | 补 orchestrator dispatch schema | Orchestrator 可拆解任务、分派 sub-agent |
-| M4 | Hub Server + Workspace + Diff + Apply/Discard + Preview + 响应式布局 + 环境隔离 + E2E + 权限门控 + Hub auth（已完成，8/8） | `edge-server/`、`runner/`、`hub-server/`、`app/desktop/`、`api/` | 补 artifact、diff、preview、approval schema | 用户能审查并应用或丢弃变更，三大 Agent 各 5/5 E2E 通过 |
+| M3b | 多 Agent 协调、Orchestrator、Clone/Init/Worktree（已完成，6/6） | `edge-server/`、`api/` | 补 orchestrator dispatch schema | Orchestrator 可拆解任务、分派 sub-agent |
+| M4 | Hub Server + Workspace + Diff + Apply/Discard + Preview + 响应式布局 + 环境隔离 + E2E + 权限门控 + Hub auth（已完成，8/8） | `edge-server/`、`hub-server/`、`app/desktop/`、`api/` | 补 artifact、diff、preview、approval schema | 用户能审查并应用或丢弃变更，三大 Agent 各 5/5 E2E 通过 |
+| M5 | 工程基础收敛（已完成） | `edge-server/`、`hub-server/`、`app/`、`api/` | 收敛 API，统一错误处理，清理遗留代码 | 全量测试通过，CI 流水线稳定 |
+| M6 | 生产部署（已完成） | `edge-server/`、`hub-server/` | 生产配置、监控、日志、部署脚本 | 生产环境稳定运行 |
+| M7 | Desktop P0 打磨（已完成） | `app/desktop/` | UI/UX 打磨、性能优化、边界情况 | Desktop 体验达到 P0 交付标准 |
 
 当前集成分支为 `dev/delicious233`。只有互不相干的大任务，才从 `master` 新切短分支。
+
+> **注意**：早期 M1-M4 阶段表中曾出现独立的 `runner/` 目录。当前 Runner 功能已合并到 `edge-server/internal/lifecycle/` 和 `edge-server/internal/adapters/` 中，不再作为独立目录存在。
 
 ## 5. Go 服务边界
 
@@ -214,7 +219,7 @@ PR 说明按影响选择填写：
 | 方向 | 已有测试 |
 |---|---|
 | Edge | Go `testing`，覆盖 API handler、event bus、file store、adapter 解析（NDJSON/JSONL/JSON）、控制协议、process executor、mock executor、runner registry、security origin |
-| Desktop | Vitest + React Testing Library，191 个测试，覆盖 17 个组件、API client、错误处理、hooks、event client |
+| Desktop | Vitest + React Testing Library，551/560 通过 (38 test files)，覆盖 17 个组件、API client、错误处理、hooks、event client |
 | Desktop e2e | Playwright，覆盖在线/离线状态、RunnerList、EventLog、Agent 端到端执行 |
 | 全链路 | `scripts/client-smoke.ps1`，覆盖 Edge/Desktop build 和核心接口 |
 | Adapter 集成 | Go `testing`，覆盖 Claude Code、OpenCode、Codex 三种 adapter 端到端执行、工具调用、取消、stdin 控制、命令行参数 |

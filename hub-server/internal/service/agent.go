@@ -280,12 +280,17 @@ func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) er
 		return errcode.AgentTaskTimeout
 	}
 
+	ai, err := repository.GetAgentInstanceByID(s.db, task.AgentInstanceID)
+	if err != nil {
+		return err
+	}
+
 	_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusCancelled, "")
 
 	s.bus.Publish(ctx, Event{Type: "agent.cancel", Payload: map[string]string{
 		"task_id":           taskID,
 		"agent_instance_id": task.AgentInstanceID,
-		"session_id":        task.AgentInstanceID, // will be resolved from agent instance
+		"session_id":        ai.SessionID,
 		"triggered_by":      task.TriggeredByUserID,
 	}})
 

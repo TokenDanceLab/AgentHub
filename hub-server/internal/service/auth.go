@@ -14,6 +14,7 @@ import (
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
 // authCache is the subset of *cache.Client methods used by AuthService.
@@ -85,8 +86,9 @@ func (s *AuthService) Login(ctx context.Context, username, password, deviceType,
 		return nil, errcode.AuthInvalidCredentials
 	}
 
+	devUUID := uuidv7.Must()
 	if err := repository.UpsertDevice(s.db, &model.Device{
-		ID: deviceID, UserID: user.ID, DeviceType: deviceType, Capabilities: "[]",
+		ID: uuidv7.Must(), UserID: user.ID, DeviceType: deviceType, Capabilities: "[]",
 	}); err != nil {
 		return nil, err
 	}
@@ -104,7 +106,7 @@ func (s *AuthService) Login(ctx context.Context, username, password, deviceType,
 
 	tokenHash := jwtutil.HashRefreshToken(rawRefresh)
 	rt := &model.RefreshToken{
-		UserID: user.ID, DeviceType: deviceType, DeviceID: deviceID,
+		UserID: user.ID, DeviceType: deviceType, DeviceID: devUUID,
 		TokenHash: tokenHash,
 		ExpiresAt: time.Now().Add(s.jwtCfg.RefreshTTL),
 	}
