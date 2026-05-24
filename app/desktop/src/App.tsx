@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Menu, X, PanelRightClose, PanelRightOpen, Bot, MessageSquare } from 'lucide-react';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { useEdgeStatus } from '@/hooks/useEdgeStatus';
-import { startRun, cancelRun, fetchAgents, decidePermission as decidePermissionRest } from '@/api/edgeClient';
+import { useAgents } from '@/hooks/useAgents';
+import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
 import { useThreads } from '@/api/threadQueries';
 import type { AgentInfo, ThreadInfo, StartRunRequest } from '@shared/types';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -20,6 +20,11 @@ import { useHubStore } from '@/stores/hubStore';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ResizeHandle from '@/components/ResizeHandle';
+import ModeBar from '@/components/ModeBar';
+import MobileToolbar from '@/components/MobileToolbar';
+import OverlayBackdrop from '@/components/OverlayBackdrop';
+import AppSidebar from '@/components/AppSidebar';
+import RightPanel from '@/components/RightPanel';
 import styles from '@/App.module.css';
 
 const MIN_SIDEBAR = 200;
@@ -100,7 +105,7 @@ export default function App() {
   );
 
   // Local state (lightweight, not worth a store yet)
-  const [agents, setAgents] = useState<AgentInfo[]>([]);
+  const agents = useAgents(online);
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>();
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -162,29 +167,6 @@ export default function App() {
       runStoreClear();
     }
   }, [currentRun, runStoreSetCurrentRun, runStoreSetStreaming, runStoreClear]);
-
-  // Poll agents
-  useEffect(() => {
-    if (!online) {
-      setAgents([]);
-      return;
-    }
-    let active = true;
-    const poll = async () => {
-      try {
-        const res = await fetchAgents();
-        if (active) setAgents(res.items);
-      } catch {
-        /* Edge may not have /v1/agents yet */
-      }
-    };
-    poll();
-    const id = setInterval(poll, 10000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, [online]);
 
   // Toast when a new thread appears (detected via TanStack Query data changes)
   const prevThreadIdsRef = useRef<Set<string>>(new Set());
@@ -315,6 +297,23 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToMessageId]);
 
+  // ── Derived toggle handlers for MobileToolbar ──
+  const handleToggleSidebar = useCallback(() => {
+    setMobileSidebarOpen((v) => !v);
+    setMobileRunDetailOpen(false);
+  }, []);
+
+  const handleToggleAgent = useCallback(() => {
+    setTabletAgentOpen((v) => !v);
+    setMobileRunDetailOpen(false);
+  }, []);
+
+  const handleToggleRunDetail = useCallback(() => {
+    setMobileRunDetailOpen((v) => !v);
+    setMobileSidebarOpen(false);
+    setTabletAgentOpen(false);
+  }, []);
+
   return (
     <ErrorBoundary>
     <div className={styles.root}>
@@ -354,72 +353,39 @@ export default function App() {
 
       {/* Mobile/Tablet header bar with toggles */}
       {(isMobile || isTablet) && (
-        <div className={styles.mobileToolbar}>
-          {isMobile && (
-            <button
-              className={styles.mobileToggle}
-              onClick={() => { setMobileSidebarOpen((v) => !v); setMobileRunDetailOpen(false); }}
-              aria-label={mobileSidebarOpen ? t('nav.closeSidebar') : t('nav.openSidebar')}
-              aria-expanded={mobileSidebarOpen}
-            >
-              {mobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-          )}
-          {isTablet && (
-            <button
-              className={styles.mobileToggle}
-              onClick={() => { setTabletAgentOpen((v) => !v); setMobileRunDetailOpen(false); }}
-              aria-label={tabletAgentOpen ? t('agent.close') : t('agent.open')}
-              aria-expanded={tabletAgentOpen}
-            >
-              {tabletAgentOpen ? <X size={20} /> : <Bot size={20} />}
-            </button>
-          )}
-          <span className={styles.mobileTitle}>
-            {selectedThread?.title ?? 'AgentHub'}
-          </span>
-          <button
-            className={styles.mobileToggle}
-            onClick={() => { setMobileRunDetailOpen((v) => !v); setMobileSidebarOpen(false); setTabletAgentOpen(false); }}
-            aria-label={mobileRunDetailOpen ? t('run.close') : t('run.open')}
-            aria-expanded={mobileRunDetailOpen}
-          >
-            {mobileRunDetailOpen ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}
-          </button>
-        </div>
+        <MobileToolbar
+          title={selectedThread?.title ?? 'AgentHub'}
+          isMobile={isMobile}
+          isTablet={isTablet}
+          mobileSidebarOpen={mobileSidebarOpen}
+          mobileRunDetailOpen={mobileRunDetailOpen}
+          tabletAgentOpen={tabletAgentOpen}
+          onToggleSidebar={handleToggleSidebar}
+          onToggleAgent={handleToggleAgent}
+          onToggleRunDetail={handleToggleRunDetail}
+        />
       )}
 
       <div className={styles.body}>
         {/* Sidebar overlay backdrop */}
         {mobileSidebarOpen && (
-          <div
-            className={styles.overlay}
-            onClick={() => setMobileSidebarOpen(false)}
-            aria-hidden="true"
-          />
+          <OverlayBackdrop onClick={() => setMobileSidebarOpen(false)} />
         )}
 
         {/* Right panel overlay backdrop */}
         {mobileRunDetailOpen && (
-          <div
-            className={styles.overlay}
-            onClick={() => setMobileRunDetailOpen(false)}
-            aria-hidden="true"
-          />
+          <OverlayBackdrop onClick={() => setMobileRunDetailOpen(false)} />
         )}
 
         {/* Agent panel overlay backdrop (tablet) */}
         {tabletAgentOpen && (
-          <div
-            className={styles.overlay}
-            onClick={() => setTabletAgentOpen(false)}
-            aria-hidden="true"
-          />
+          <OverlayBackdrop onClick={() => setTabletAgentOpen(false)} />
         )}
 
-        <div
-          className={`${styles.sidebarWrapper} ${mobileSidebarOpen ? styles.sidebarOpen : ''}`}
-          style={isMobile ? undefined : { width: sidebarWidth, flexShrink: 0 }}
+        <AppSidebar
+          width={sidebarWidth}
+          isMobile={isMobile}
+          isOpen={mobileSidebarOpen}
         >
           <Slot
             name="thread-panel"
@@ -427,7 +393,7 @@ export default function App() {
             selectedId={selectedThreadId ?? undefined}
             onSelect={handleSelectThread}
           />
-        </div>
+        </AppSidebar>
 
         {/* Agent panel overlay (tablet) — slides in from left */}
         <div
@@ -467,24 +433,7 @@ export default function App() {
 
           {/* Mode switch tabs — only shown when Hub authenticated */}
           {hubAuthenticated && (
-          <div className={styles.modeBar}>
-            <button
-              className={`${styles.modeTab} ${viewMode === 'agent' ? styles.modeTabActive : ''}`}
-              onClick={() => setViewMode('agent')}
-              aria-pressed={viewMode === 'agent'}
-            >
-              <Bot size={14} />
-              <span>{t('nav.agent')}</span>
-            </button>
-            <button
-              className={`${styles.modeTab} ${viewMode === 'im' ? styles.modeTabActive : ''}`}
-              onClick={() => setViewMode('im')}
-              aria-pressed={viewMode === 'im'}
-            >
-              <MessageSquare size={14} />
-              <span>{t('nav.messages')}</span>
-            </button>
-          </div>
+            <ModeBar viewMode={viewMode} onChange={setViewMode} />
           )}
 
           <div ref={chatContainerRef} className={styles.chatWrapper}>
@@ -516,9 +465,10 @@ export default function App() {
 
         {!isMobile && <ResizeHandle direction="horizontal" onResize={handleRightResize} />}
 
-        <div
-          className={`${styles.rightPanelWrapper} ${mobileRunDetailOpen ? styles.rightPanelOpen : ''}`}
-          style={isMobile ? undefined : { width: rightPanelWidth, flexShrink: 0 }}
+        <RightPanel
+          width={rightPanelWidth}
+          isMobile={isMobile}
+          isOpen={mobileRunDetailOpen}
         >
           <ErrorBoundary>
             <Suspense
@@ -548,7 +498,7 @@ export default function App() {
               />
             </Suspense>
           </ErrorBoundary>
-        </div>
+        </RightPanel>
       </div>
 
       {viewMode === 'agent' && (
