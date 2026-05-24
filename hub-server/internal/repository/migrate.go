@@ -20,6 +20,27 @@ func RunMigrationsFrom(cfg *config.DBConfig, sourceURL string) error {
 	return runMigrations(cfg, sourceURL)
 }
 
+// VerifyMigrations checks whether all database migrations are applied without
+// running any new ones. Returns the current migration version or an error if
+// there are pending migrations.
+func VerifyMigrations(cfg *config.DBConfig) (version uint, dirty bool, err error) {
+	password := url.QueryEscape(cfg.Password)
+	pgURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		cfg.User, password, cfg.Host, cfg.Port, cfg.Name)
+
+	m, err := migrate.New("file://migrations", pgURL)
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to create migrate instance: %w", err)
+	}
+	defer m.Close()
+
+	v, d, err := m.Version()
+	if err == migrate.ErrNilVersion {
+		return 0, false, fmt.Errorf("no migrations applied; run migrations first")
+	}
+	return v, d, err
+}
+
 func runMigrations(cfg *config.DBConfig, sourceURL string) error {
 	password := url.QueryEscape(cfg.Password)
 	pgURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
