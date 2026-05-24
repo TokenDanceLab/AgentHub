@@ -71,6 +71,7 @@
   background: var(--surface-base);
   border-right: 1px solid var(--border);
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* ── Main zone (center, scrollable) ───────── */
@@ -170,8 +171,18 @@
   display: flex;
   background: var(--background);
   border-radius: 8px;
-  padding: 2px;
+  padding: 3px;
   width: 100%;
+}
+
+/* ── Light mode: explicit light segmented control ─ */
+[data-theme='light'] .rightPanelSegmented {
+  background: #F1F3F5;
+}
+
+[data-theme='light'] .rightPanelTabActive {
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .rightPanelTab {
@@ -301,13 +312,14 @@
 
 .winControls {
   display: flex;
-  align-items: center;
-  margin-left: 6px;
+  align-items: stretch;
+  height: 32px;
+  margin-left: 12px;
 }
 
 .winBtn {
-  width: 36px;
-  height: 28px;
+  width: 46px;
+  height: 100%;
   border: none;
   background: transparent;
   color: var(--muted-foreground);
@@ -319,7 +331,7 @@
 }
 
 .winBtn:hover {
-  background: var(--hover-overlay);
+  background: color-mix(in oklch, var(--muted-foreground) 12%, transparent);
   color: var(--foreground);
 }
 
