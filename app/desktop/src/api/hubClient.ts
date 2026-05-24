@@ -292,6 +292,29 @@ export function createHubClient(opts: HubClientOptions = {}) {
     cancelAgentTask: (taskId: string) =>
       request<void>(`/web/agent-tasks/${taskId}/cancel`, { method: 'POST' }),
 
+    // ── Edge callbacks (desktop → hub) ────────────
+
+    ackTask: (taskId: string) =>
+      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/ack`, { method: 'POST' }),
+
+    streamTask: (taskId: string, content: string) =>
+      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      }),
+
+    doneTask: (taskId: string, finalContent?: string) =>
+      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/done`, {
+        method: 'POST',
+        body: JSON.stringify({ final_content: finalContent ?? '' }),
+      }),
+
+    failTask: (taskId: string, error: string) =>
+      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/fail`, {
+        method: 'POST',
+        body: JSON.stringify({ error }),
+      }),
+
     // ── Custom agents ─────────────────────────────
 
     listCustomAgents: () => request<Record<string, unknown>[]>('/web/custom-agents'),
