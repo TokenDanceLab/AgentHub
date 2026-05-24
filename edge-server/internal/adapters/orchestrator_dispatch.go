@@ -12,22 +12,25 @@ import (
 // events. When a dispatch is detected, it calls the SubAgentSpawner to create
 // a new run for the sub-agent.
 //
-// This implements the AgentTree pattern: orchestrator → sub-agent spawn → result.
+// This implements the AgentTree pattern: orchestrator -> sub-agent spawn -> result.
 type DispatchAwareParser struct {
-	inner   *NDJSONStreamParser
-	spawner SubAgentSpawner
-	run     store.Run
-	depth   int // current delegation depth
+	inner    *NDJSONStreamParser
+	spawner  SubAgentSpawner
+	run      store.Run
+	depth    int    // current delegation depth
+	threadID string // inherited from parent run
+	model    string // model override from parent context
 }
 
 // NewDispatchAwareParser creates a parser that intercepts sub-agent dispatch
 // events and spawns new runs via the provided spawner.
 func NewDispatchAwareParser(inner *NDJSONStreamParser, spawner SubAgentSpawner, run store.Run, depth int) *DispatchAwareParser {
 	return &DispatchAwareParser{
-		inner:   inner,
-		spawner: spawner,
-		run:     run,
-		depth:   depth,
+		inner:    inner,
+		spawner:  spawner,
+		run:      run,
+		depth:    depth,
+		threadID: run.ThreadID,
 	}
 }
 
@@ -39,10 +42,12 @@ func (p *DispatchAwareParser) Parse(ctx context.Context, r io.Reader) error {
 	// The inner parser already emits task_dispatched events. We wrap its
 	// emitter to detect these events and trigger sub-agent spawn.
 	wrapped := &dispatchEmitter{
-		inner:   p.inner.emitter,
-		spawner: p.spawner,
-		run:     p.run,
-		depth:   p.depth,
+		inner:    p.inner.emitter,
+		spawner:  p.spawner,
+		run:      p.run,
+		depth:    p.depth,
+		threadID: p.threadID,
+		model:    p.model,
 	}
 	p.inner.emitter = wrapped
 	return p.inner.Parse(ctx, r)
@@ -50,22 +55,37 @@ func (p *DispatchAwareParser) Parse(ctx context.Context, r io.Reader) error {
 
 // dispatchEmitter wraps an EventEmitter to intercept task_dispatched.
 type dispatchEmitter struct {
-	inner   EventEmitter
-	spawner SubAgentSpawner
-	run     store.Run
-	depth   int
+	inner    EventEmitter
+	spawner  SubAgentSpawner
+	run      store.Run
+	depth    int
+	threadID string // inherited from parent run
+	model    string // model override from parent context
 }
 
 func (d *dispatchEmitter) Emit(eventType string, scope map[string]any, payload any) {
 	// Intercept task_dispatched to spawn a sub-agent run
 	if eventType == BusEventTaskDispatched && d.spawner != nil {
 		if taskID, ok := extractDispatchTask(payload); ok {
+			// Resolve ThreadID: prefer payload override, then emitter field.
+			threadID := extractString(payload, "threadId")
+			if threadID == "" {
+				threadID = d.threadID
+			}
+			// Resolve Model: prefer payload override, then emitter field.
+			model := extractString(payload, "model")
+			if model == "" {
+				model = d.model
+			}
+
 			task := SubAgentTask{
 				TaskID:      taskID,
 				Description: extractString(payload, "description"),
 				Prompt:      extractString(payload, "description"), // task description IS the prompt
 				Depth:       d.depth + 1,
 				ParentRunID: d.run.ID,
+				ThreadID:    threadID,
+				Model:       model,
 			}
 			// Try to resolve agent from description
 			if agentID := extractString(payload, "taskType"); agentID != "" {

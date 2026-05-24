@@ -71,3 +71,29 @@ func (b *ContextBudget) Remaining() int64 {
 func (b *ContextBudget) Track(tokens int) {
 	b.UsedTokens.Add(int64(tokens))
 }
+
+// AllocateChild creates a child budget with a fraction of the parent's remaining
+// tokens. ratio should be between 0 and 1 (e.g., 0.4 = 40%). The child's MaxTokens
+// is set to the allocated amount, and the parent's used tokens are NOT incremented
+// (the child tracks its own usage independently).
+// Returns nil if the parent budget is nil.
+func (b *ContextBudget) AllocateChild(ratio float64) *ContextBudget {
+	if b == nil {
+		return nil
+	}
+	if ratio <= 0 {
+		ratio = 0.4
+	}
+	if ratio > 1 {
+		ratio = 1
+	}
+	remaining := b.Remaining()
+	childMax := int(float64(remaining) * ratio)
+	if childMax <= 0 {
+		childMax = 10_000 // minimum budget
+	}
+	return &ContextBudget{
+		MaxTokens:      int64(childMax),
+		ReservedTokens: int64(float64(b.ReservedTokens) * ratio),
+	}
+}
