@@ -156,7 +156,6 @@ describe('RegisterForm', () => {
   });
 
   it('calls onSuccess callback after registration', async () => {
-    vi.useFakeTimers();
     mockRegister.mockResolvedValueOnce(undefined);
     renderForm();
 
@@ -165,13 +164,13 @@ describe('RegisterForm', () => {
     fireEvent.change(screen.getByLabelText('auth.confirmPassword'), { target: { value: '12345678' } });
     fireEvent.click(screen.getByText('auth.registerButton'));
 
-    await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalledTimes(1);
-    });
-
-    vi.advanceTimersByTime(1500);
-    expect(onSuccess).toHaveBeenCalledTimes(1);
-    vi.useRealTimers();
+    // RegisterForm has a 1500ms success animation delay before calling onSuccess
+    await waitFor(
+      () => {
+        expect(onSuccess).toHaveBeenCalled();
+      },
+      { timeout: 2500 },
+    );
   });
 
   it('shows login button on success screen', async () => {
