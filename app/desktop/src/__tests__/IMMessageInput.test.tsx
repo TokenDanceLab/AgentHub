@@ -1,156 +1,99 @@
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, vars?: Record<string, unknown>) => {
-      if (!vars) return key;
-      const varStr = Object.entries(vars)
-        .map(([k, v]) => `${k}=${v}`)
-        .join(', ');
-      return `${key}(${varStr})`;
-    },
-    i18n: { language: 'en' },
-  }),
-}));
-
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import IMMessageInput from '@/components/IMMessageInput';
-
-// jsdom does not implement scrollIntoView
-Element.prototype.scrollIntoView = vi.fn();
+import { IMMessageInput } from '@/components/IM';
 
 describe('IMMessageInput', () => {
-  it('renders input field with placeholder', () => {
+  it('renders textarea and send button', () => {
     render(<IMMessageInput onSend={vi.fn()} />);
-
-    const input = screen.getByPlaceholderText('im.input.placeholder');
-    expect(input).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Type a message...')).toBeInTheDocument();
+    expect(screen.getByLabelText('Send message')).toBeInTheDocument();
   });
 
-  it('uses custom placeholder when provided', () => {
-    render(<IMMessageInput onSend={vi.fn()} placeholder="Type here..." />);
-
-    const input = screen.getByPlaceholderText('Type here...');
-    expect(input).toBeInTheDocument();
-  });
-
-  it('calls onSend when send button is clicked with non-empty input', () => {
+  it('calls onSend with trimmed content when send button clicked', () => {
     const onSend = vi.fn();
     render(<IMMessageInput onSend={onSend} />);
-
-    const input = screen.getByPlaceholderText('im.input.placeholder');
-    fireEvent.change(input, { target: { value: 'Hello world' } });
-
-    const sendBtn = screen.getByRole('button', { name: 'im.input.send' });
-    fireEvent.click(sendBtn);
-
-    expect(onSend).toHaveBeenCalledTimes(1);
-    expect(onSend).toHaveBeenCalledWith('Hello world');
+    const textarea = screen.getByPlaceholderText('Type a message...');
+    fireEvent.change(textarea, { target: { value: 'Hello!' } });
+    fireEvent.click(screen.getByLabelText('Send message'));
+    expect(onSend).toHaveBeenCalledWith('Hello!');
   });
 
   it('calls onSend on Enter key', () => {
     const onSend = vi.fn();
     render(<IMMessageInput onSend={onSend} />);
-
-    const input = screen.getByPlaceholderText('im.input.placeholder');
-    fireEvent.change(input, { target: { value: 'Test message' } });
-    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
-
-    expect(onSend).toHaveBeenCalledTimes(1);
-    expect(onSend).toHaveBeenCalledWith('Test message');
+    const textarea = screen.getByPlaceholderText('Type a message...');
+    fireEvent.change(textarea, { target: { value: 'Test' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+    expect(onSend).toHaveBeenCalledWith('Test');
   });
 
-  it('does NOT call onSend on Enter with empty input', () => {
+  it('does not send on Shift+Enter', () => {
     const onSend = vi.fn();
     render(<IMMessageInput onSend={onSend} />);
-
-    const input = screen.getByPlaceholderText('im.input.placeholder');
-    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
-
+    const textarea = screen.getByPlaceholderText('Type a message...');
+    fireEvent.change(textarea, { target: { value: 'Test' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true });
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it('does NOT call onSend on Enter with whitespace-only input', () => {
+  it('does not send empty message', () => {
     const onSend = vi.fn();
     render(<IMMessageInput onSend={onSend} />);
-
-    const input = screen.getByPlaceholderText('im.input.placeholder');
-    fireEvent.change(input, { target: { value: '   ' } });
-    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
-
+    fireEvent.click(screen.getByLabelText('Send message'));
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it('Shift+Enter inserts newline without sending', () => {
+  it('does not send whitespace-only message', () => {
     const onSend = vi.fn();
     render(<IMMessageInput onSend={onSend} />);
-
-    const input = screen.getByPlaceholderText('im.input.placeholder') as HTMLTextAreaElement;
-    fireEvent.change(input, { target: { value: 'Line 1' } });
-    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
-
-    // onSend should NOT be called (Shift+Enter is for newline)
+    const textarea = screen.getByPlaceholderText('Type a message...');
+    fireEvent.change(textarea, { target: { value: '   ' } });
+    fireEvent.click(screen.getByLabelText('Send message'));
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it('disables input and send button when disabled prop is true', () => {
-    render(<IMMessageInput onSend={vi.fn()} disabled={true} />);
-
-    const input = screen.getByPlaceholderText('im.input.placeholder');
-    expect(input).toBeDisabled();
-
-    const sendBtn = screen.getByRole('button', { name: 'im.input.send' });
-    expect(sendBtn).toBeDisabled();
+  it('clears input after send', () => {
+    const onSend = vi.fn();
+    render(<IMMessageInput onSend={onSend} />);
+    const textarea = screen.getByPlaceholderText('Type a message...') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'Sent' } });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    expect(textarea.value).toBe('');
   });
 
-  it('disables send button when input is empty', () => {
+  it('disables send button when disabled prop is true', () => {
+    render(<IMMessageInput onSend={vi.fn()} disabled />);
+    expect(screen.getByLabelText('Send message')).toBeDisabled();
+  });
+
+  it('shows character count', () => {
     render(<IMMessageInput onSend={vi.fn()} />);
-
-    const sendBtn = screen.getByRole('button', { name: 'im.input.send' });
-    expect(sendBtn).toBeDisabled();
+    const textarea = screen.getByPlaceholderText('Type a message...');
+    fireEvent.change(textarea, { target: { value: 'Hello' } });
+    expect(screen.getByText('5/2000')).toBeInTheDocument();
   });
 
-  it('enables send button when input has content', () => {
-    render(<IMMessageInput onSend={vi.fn()} />);
-
-    const input = screen.getByPlaceholderText('im.input.placeholder');
-    fireEvent.change(input, { target: { value: 'Hi' } });
-
-    const sendBtn = screen.getByRole('button', { name: 'im.input.send' });
-    expect(sendBtn).not.toBeDisabled();
+  it('uses custom placeholder', () => {
+    render(<IMMessageInput onSend={vi.fn()} placeholder="Say something..." />);
+    expect(screen.getByPlaceholderText('Say something...')).toBeInTheDocument();
   });
 
-  it('clears input after sending', () => {
+  it('does not send when disabled and Enter is pressed', () => {
     const onSend = vi.fn();
-    render(<IMMessageInput onSend={onSend} />);
-
-    const input = screen.getByPlaceholderText('im.input.placeholder') as HTMLTextAreaElement;
-    fireEvent.change(input, { target: { value: 'Clear me' } });
-    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
-
-    expect(onSend).toHaveBeenCalled();
-    expect(input.value).toBe('');
-  });
-
-  it('does NOT call onSend when disabled and Enter is pressed', () => {
-    const onSend = vi.fn();
-    render(<IMMessageInput onSend={onSend} disabled={true} />);
-
-    const input = screen.getByPlaceholderText('im.input.placeholder');
-    fireEvent.change(input, { target: { value: 'Should not send' } });
-    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
-
+    render(<IMMessageInput onSend={onSend} disabled />);
+    const textarea = screen.getByPlaceholderText('Type a message...');
+    fireEvent.change(textarea, { target: { value: 'Should not send' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it('trims whitespace from message before sending', () => {
+  it('trims whitespace before sending', () => {
     const onSend = vi.fn();
     render(<IMMessageInput onSend={onSend} />);
-
-    const input = screen.getByPlaceholderText('im.input.placeholder');
-    fireEvent.change(input, { target: { value: '  Hello  ' } });
-    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
-
+    const textarea = screen.getByPlaceholderText('Type a message...');
+    fireEvent.change(textarea, { target: { value: '  Hello  ' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
     expect(onSend).toHaveBeenCalledWith('Hello');
   });
 });
