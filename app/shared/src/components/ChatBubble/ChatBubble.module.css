@@ -1,0 +1,90 @@
+.row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  max-width: 78%;
+}
+
+/* ── Sender side: agent (left) or user (right) ───────────── */
+.agent {
+  /* default: left-aligned */
+}
+
+.user {
+  align-self: flex-end;
+  grid-template-columns: minmax(0, 1fr) 36px;
+}
+
+.user .avatar {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.user .stack {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+/* ── Avatar ──────────────────────────────────────────────── */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--brand), var(--info));
+  color: oklch(1 0 0);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  box-shadow: 0 10px 22px oklch(0.55 0.16 255 / 0.24);
+}
+
+.user .avatar {
+  background: linear-gradient(135deg, var(--primary), oklch(0.5 0.18 285));
+  box-shadow: 0 10px 22px oklch(0.5 0.18 285 / 0.24);
+}
+
+/* ── Meta ────────────────────────────────────────────────── */
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0 0 6px;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+.user .meta {
+  justify-content: flex-end;
+}
+
+.meta strong {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── Time ────────────────────────────────────────────────── */
+.time {
+  white-space: nowrap;
+}
+
+/* ── Bubble ──────────────────────────────────────────────── */
+.bubble {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-md) 14px;
+  background: var(--card);
+  box-shadow: 0 10px 26px oklch(0.14 0.005 260 / 0.09);
+  color: var(--foreground);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.user .bubble {
+  border-color: oklch(0.55 0.16 255 / 0.36);
+  background: var(--brand);
+  color: var(--primary-foreground);
+}

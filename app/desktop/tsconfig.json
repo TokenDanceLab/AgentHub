@@ -5,6 +5,8 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -16,7 +18,8 @@
     "paths": {
       "@/*": ["src/*"],
       "@shared/*": ["../shared/src/*"]
-    }
+    },
+    "types": ["vitest/globals"]
   },
   "include": ["src"]
 }
