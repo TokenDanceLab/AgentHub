@@ -20,7 +20,7 @@ import { useHubStore } from '@/stores/hubStore';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
-import { MessageSquare, Bot, Sun, Moon, Wifi, WifiOff, Circle, LogIn, Settings } from 'lucide-react';
+import { MessageSquare, Bot, Sun, Moon, Wifi, WifiOff, Circle, LogIn, Settings, Search } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '@/App.module.css';
@@ -228,47 +228,43 @@ export default function App() {
       )}
 
       <div className={styles.body}>
-        {/* Left icon nav (desktop/tablet) */}
+        {/* Single sidebar — agents + threads grouped */}
         {!isMobile && (
-          <div className={styles.nav}>
-            <button className={`${styles.navBtn} ${viewMode === 'agent' ? styles.navBtnActive : ''}`} onClick={() => setViewMode('agent')} title={t('nav.agent')}>
-              <Bot size={18} />
-            </button>
-            <button className={`${styles.navBtn} ${viewMode === 'im' ? styles.navBtnActive : ''}`} onClick={() => setViewMode('im')} title={t('nav.messages')}>
-              <MessageSquare size={18} />
-            </button>
-            <div className={styles.navSpacer} />
-            {/* Settings + Hub at bottom */}
-            <button className={styles.navBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} title={t('nav.settings')}>
-              <Settings size={18} />
-            </button>
-            <button
-              className={styles.navBtn}
-              onClick={() => useHubStore.getState().setShowAuthModal(true)}
-              title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
-            >
-              {hubAuthenticated ? (
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Circle size={10} fill="var(--color-success)" color="var(--color-success)" />
-                </span>
-              ) : (
-                <LogIn size={18} />
-              )}
+          <div className={styles.sidebar}>
+            {/* Global search */}
+            <div className={styles.sidebarSearch}>
+              <Search size={14} color="#B0B0B5" />
+              <input type="text" placeholder={t('im.contact.search')} />
+            </div>
+
+            {/* Agents section */}
+            <div className={styles.sidebarSection}>
+              <div className={styles.sidebarSectionLabel}>{t('agent.title')}</div>
+              <div className={styles.sidebarScroll}>
+                <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
+              </div>
+            </div>
+
+            {/* Threads section */}
+            <div className={styles.sidebarSection}>
+              <div className={styles.sidebarSectionLabel}>{t('thread.title')}</div>
+              <div className={styles.sidebarScroll}>
+                <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
+              </div>
+            </div>
+
+            {/* Sidebar footer */}
+            <div className={styles.sidebarFooter}>
+              <button className={styles.navIconBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} title={t('nav.settings')}>
+                <Settings size={16} />
               </button>
-          </div>
-        )}
-
-        {/* Desktop Thread panel */}
-        {!isMobile && !isTablet && (
-          <div className={styles.sidebarPanel}>
-            <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
-          </div>
-        )}
-
-        {/* Agent list panel (desktop only) */}
-        {!isMobile && !isTablet && (
-          <div className={styles.sidebarPanel}>
-            <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
+              <button className={styles.navIconBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
+                {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={16} />}
+              </button>
+              <button className={styles.navIconBtn} onClick={toggleTheme} title={theme === 'dark' ? t('theme.light') : t('theme.dark')}>
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+            </div>
           </div>
         )}
 
