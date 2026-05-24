@@ -328,11 +328,11 @@ Hub 调度（远程）:
   - 覆盖：`GetOrLoad` cache hit/miss, singleflight 去重, `Invalidate`, `AllocateSeq`
   - 验收：mock Redis 测试所有缓存路径
 
-- [ ] **middleware 单元测试（0% → 80%）** `[1d]` `[P1]`
+- [x] **middleware 单元测试（0% → 80%）** `[1d]` `[P1]`
   - 新增：`hub-server/internal/middleware/` 各 middle 的 `*_test.go`
   - 覆盖：auth skip path, device type gating, access log fields
 
-- [ ] **service 层单元测试（0% → 60%）** `[3d]` `[P1]`
+- [x] **service 层单元测试（0% → 60%）** `[3d]` `[P1]`
   - 新增：`hub-server/internal/service/auth_test.go`, `session_test.go`, `message_test.go`, `eventbus_test.go`
   - 方案：`go-sqlmock` mock DB 层，table-driven tests
   - 验收：核心服务逻辑（注册/登录/创建会话/发送消息/召回）有独立单元测试
