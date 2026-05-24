@@ -80,6 +80,10 @@ function getActiveRunConflictId(error: unknown): string | undefined {
   return typeof runId === 'string' && runId.length > 0 ? runId : undefined;
 }
 
+function isEditableShortcutTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable]'));
+}
+
 export default function App() {
   const { online, health } = useHealth();
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online);
@@ -289,17 +293,41 @@ export default function App() {
     }
   }, [addToast, selectedAgent, selectedThread, t]);
 
-  // Escape key
+  // Global shell shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setNavPanelOpen(false); }
-      if (e.key === '?' && !(e.target as HTMLElement)?.closest('input,textarea,[contenteditable]') && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault(); setShortcutHelpOpen((v) => !v);
+      if (e.key === 'Escape') {
+        setNavPanelOpen(false);
+      }
+      if (isEditableShortcutTarget(e.target)) return;
+
+      const shellModifier = e.ctrlKey || e.metaKey;
+      if (shortcutHelpOpen && !(e.key === '?' && !shellModifier)) return;
+      if (e.key === '?' && !shellModifier) {
+        e.preventDefault();
+        setShortcutHelpOpen((v) => !v);
+      }
+      if (shellModifier && e.key.toLowerCase() === 'b' && !workspaceExpanded && !isMobile) {
+        e.preventDefault();
+        setLeftSidebarCollapsed(!leftSidebarCollapsed);
+      }
+      if (shellModifier && e.key.toLowerCase() === 'j' && displayedRun && !workspaceExpanded && !isMobile) {
+        e.preventDefault();
+        setRightPanelOpen(!rightPanelOpen);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [
+    displayedRun,
+    isMobile,
+    leftSidebarCollapsed,
+    rightPanelOpen,
+    setLeftSidebarCollapsed,
+    setRightPanelOpen,
+    shortcutHelpOpen,
+    workspaceExpanded,
+  ]);
 
   // ── Double-click top bar → toggle maximize/restore
   const handleTopBarDoubleClick = useCallback(async (e: React.MouseEvent) => {

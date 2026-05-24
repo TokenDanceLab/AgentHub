@@ -21,14 +21,17 @@ Write scope:
 - The collapsed right rail exposes icon-only controls for reopening run detail, opening Tasks, and opening Agent Scheduling.
 - Added a live status dot on the collapsed right rail so active runs remain visible without occupying the full right panel.
 - Added i18n for the collapsed run detail rail aria label.
+- Added shell keyboard shortcuts: `Cmd/Ctrl+B` toggles the left sidebar and `Cmd/Ctrl+J` toggles the run detail panel.
+- Updated the shortcut help dialog and Settings keyboard page so the navigation shortcuts are discoverable.
 
 ## Verification
 
 - `cd app/desktop && corepack.cmd pnpm vitest run src\__tests__\uiStore.test.ts src\__tests__\SettingsPage.test.tsx`
+- `cd app/desktop && corepack.cmd pnpm vitest run src\__tests__\ShortcutHelp.test.tsx src\__tests__\SettingsPage.test.tsx src\__tests__\uiStore.test.ts`
 - `cd app/desktop && corepack.cmd pnpm typecheck`
 - Playwright visual checks at `1440x900`, `1280x720`, and `390x844`: no console errors or warnings, no raw i18n keys, and no horizontal overflow.
 
 ## Follow-up
 
 - Fold the status into `docs/roadmap.md` batch B once the current parallel docs edits settle.
-- Next layout step: add keyboard shortcuts for left sidebar collapse and right run panel reopen, then validate focus order.
+- Next layout step: validate focus order for the rail controls and add tooltips if shared UI tooltip primitives are promoted.

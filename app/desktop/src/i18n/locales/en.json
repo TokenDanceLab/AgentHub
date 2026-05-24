@@ -568,6 +568,8 @@
   "shortcut.newline": "Add newline",
   "shortcut.close": "Close / Dismiss",
   "shortcut.help": "Show shortcuts",
+  "shortcut.toggleSidebar": "Toggle left sidebar",
+  "shortcut.toggleRunPanel": "Toggle run detail panel",
   "time.justNow": "just now",
   "time.minutesAgo": "{{count}}m ago",
   "time.hoursAgo": "{{count}}h ago",

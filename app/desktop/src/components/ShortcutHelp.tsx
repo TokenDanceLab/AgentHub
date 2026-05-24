@@ -9,6 +9,8 @@ interface Shortcut {
 
 const SHORTCUTS: Shortcut[] = [
   { keys: ['Ctrl', 'K'], description: 'shortcut.search' },
+  { keys: ['⌘/Ctrl', 'B'], description: 'shortcut.toggleSidebar' },
+  { keys: ['⌘/Ctrl', 'J'], description: 'shortcut.toggleRunPanel' },
   { keys: ['Enter'], description: 'shortcut.send' },
   { keys: ['Shift', 'Enter'], description: 'shortcut.newline' },
   { keys: ['Escape'], description: 'shortcut.close' },
