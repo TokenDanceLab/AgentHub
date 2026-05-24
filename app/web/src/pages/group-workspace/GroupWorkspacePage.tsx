@@ -1155,8 +1155,8 @@ export function GroupWorkspacePageInteractive() {
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
   const [noteDraft, setNoteDraft] = useState("");
   const [confirmation, setConfirmation] = useState<Confirmation>({
-    detail: "Local controls are wired for review, sync, assignment, member presence, and notes.",
-    title: "Interactive workspace ready",
+    detail: "Local controls are wired for review, dry-run sync, assignment, member presence, and notes.",
+    title: "Local workspace ready",
     tone: "info",
   });
 
@@ -1270,12 +1270,12 @@ export function GroupWorkspacePageInteractive() {
     }));
     pushActivity({
       title: "Xavier approved parser v2",
-      detail: "Sync controls are unlocked and the review task is marked complete.",
+      detail: "Local dry-run sync controls are unlocked and the review task is marked complete.",
       accent: "blue",
     });
     showConfirmation({
       title: "Approval saved",
-      detail: "Parser v2 is approved. The snapshot sync button is now enabled.",
+      detail: "Parser v2 is approved. The local dry-run snapshot button is now enabled.",
       tone: "success",
     });
   };
@@ -1289,12 +1289,12 @@ export function GroupWorkspacePageInteractive() {
     }));
     pushActivity({
       title: "Xavier requested parser edits",
-      detail: "Sync was locked again until the requested changes are resolved.",
+      detail: "Local dry-run sync was locked again until the requested changes are resolved.",
       accent: "purple",
     });
     showConfirmation({
       title: "Changes requested",
-      detail: "Approval state changed and sync is locked while the review is open.",
+      detail: "Approval state changed and local dry-run sync is locked while the review is open.",
       tone: "warning",
     });
   };
@@ -1317,8 +1317,8 @@ export function GroupWorkspacePageInteractive() {
   const syncSnapshot = () => {
     if (!approved) {
       showConfirmation({
-        title: "Sync is locked",
-        detail: "Approve parser v2 before syncing the shared snapshot.",
+        title: "Local sync is locked",
+        detail: "Approve parser v2 before running the local dry-run snapshot.",
         tone: "warning",
       });
       return;
@@ -1335,12 +1335,12 @@ export function GroupWorkspacePageInteractive() {
     }));
     pushActivity({
       title: "Dry-run snapshot synced",
-      detail: `Workspace files updated and sync receipt generated at ${syncedAt}.`,
+      detail: `Local workspace files updated and dry-run receipt generated at ${syncedAt}.`,
       accent: "cyan",
     });
     showConfirmation({
-      title: "Snapshot synced",
-      detail: `Files, progress, and last sync time now reflect revision ${nextRevision}.`,
+      title: "Dry-run snapshot synced",
+      detail: `Local files, progress, and last dry-run time now reflect revision ${nextRevision}.`,
       tone: "success",
     });
   };
@@ -1488,7 +1488,7 @@ export function GroupWorkspacePageInteractive() {
                 <AccentIcon accent="blue" label="S" />
                 <div className="gwr-truncate">
                   <strong>Legacy Migration</strong>
-                  <p className="gwr-tiny gwr-truncate">Cross-system sync</p>
+                  <p className="gwr-tiny gwr-truncate">Local dry-run sync</p>
                 </div>
               </div>
               <div className="gwr-nav">
@@ -1558,7 +1558,7 @@ export function GroupWorkspacePageInteractive() {
                 {catalogLabel}
               </span>
             </div>
-            <p className="gwr-small">{catalogDetail} Last sync: {syncState.lastSyncedAt}.</p>
+            <p className="gwr-small">{catalogDetail} Last local sync: {syncState.lastSyncedAt}.</p>
           </section>
         </aside>
 
@@ -1568,7 +1568,7 @@ export function GroupWorkspacePageInteractive() {
               <p className="gwr-eyebrow">Legacy Migration Room</p>
               <h1>Shared operations cockpit</h1>
               <p className="gwr-small">
-                Members, tasks, files, approvals, and sync status stay visible in one working surface.
+                Members, tasks, files, approvals, and local dry-run status stay visible in one working surface.
               </p>
             </div>
             <div className="gwr-actions">
@@ -1600,7 +1600,7 @@ export function GroupWorkspacePageInteractive() {
             </div>
             <div className="gwr-stat gwr-glass">
               <strong>{syncState.progress}%</strong>
-              <p className="gwr-small">Sync readiness</p>
+              <p className="gwr-small">Dry-run readiness</p>
             </div>
           </section>
 
@@ -1678,7 +1678,7 @@ export function GroupWorkspacePageInteractive() {
                 </div>
                 <span className={`gwr-pill ${syncState.complete ? "green" : "cyan"}`}>
                   <span className="gwr-dot" />
-                  {syncState.complete ? "Synced" : catalogLabel}
+                  {syncState.complete ? "Local synced" : catalogLabel}
                 </span>
               </div>
 
@@ -1761,10 +1761,10 @@ export function GroupWorkspacePageInteractive() {
               </div>
               <p className="gwr-small">
                 {approved
-                  ? "Parser diff is approved. Sync controls are now visible and enabled."
+                  ? "Parser diff is approved. Local dry-run controls are now visible and enabled."
                   : needsEdits
                     ? "A requested-edit state is visible on the review card and board."
-                    : "Parser diff is staged, security checks passed, and sync remains locked until approval."}
+                    : "Parser diff is staged, security checks passed, and local dry-run sync remains locked until approval."}
               </p>
               <div className="gwr-actions">
                 <button className="gwr-button warning" type="button" onClick={requestEdits}>
@@ -1780,15 +1780,15 @@ export function GroupWorkspacePageInteractive() {
           <section className="gwr-section">
             <div className="gwr-section-head">
               <div className="gwr-title">
-                <p className="gwr-eyebrow">Sync Status</p>
-                <h2>Shared snapshot</h2>
+                <p className="gwr-eyebrow">Local Sync Status</p>
+                <h2>Dry-run snapshot</h2>
               </div>
               <span className={`gwr-pill ${syncState.complete ? "green" : "cyan"}`}>{syncState.progress}%</span>
             </div>
             <div className="gwr-sync">
               <div className="gwr-row">
                 <span className="gwr-small">Dry-run readiness</span>
-                <strong>{syncState.complete ? "Complete" : approved ? "Unlocked" : "Locked"}</strong>
+                <strong>{syncState.complete ? "Local synced" : approved ? "Unlocked" : "Locked"}</strong>
               </div>
               <div className="gwr-progress" aria-label="Dry-run readiness">
                 <span style={{ width: `${syncState.progress}%` }} />
@@ -1799,7 +1799,7 @@ export function GroupWorkspacePageInteractive() {
                 disabled={approvalLocked}
                 onClick={syncSnapshot}
               >
-                {syncState.complete ? "Sync again" : approved ? "Sync snapshot" : "Approve to sync"}
+                {syncState.complete ? "Run local sync again" : approved ? "Run local sync" : "Approve to run"}
               </button>
               <div className="gwr-checks">
                 <div className="gwr-check">
@@ -1819,7 +1819,7 @@ export function GroupWorkspacePageInteractive() {
                 <div className="gwr-check">
                   <span className="gwr-dot" />
                   <div>
-                    <strong>Last sync</strong>
+                    <strong>Last local sync</strong>
                     <p className="gwr-tiny">{syncState.lastSyncedAt}.</p>
                   </div>
                 </div>
