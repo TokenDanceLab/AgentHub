@@ -11,6 +11,7 @@ import (
 )
 
 func SetupRoutes(r *gin.Engine, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler) {
+	r.Use(middleware.RequestID())
 	r.Use(middleware.AccessLog())
 	r.Use(middleware.PrometheusMiddleware())
 	r.Use(middleware.Timeout(15 * time.Second))

@@ -89,6 +89,18 @@ func (a *App) Run(ctx context.Context) error {
 		slog.Warn("JWT secret is insecure: using default or too short, set AGENTHUB_JWT_SECRET environment variable")
 	}
 
+	// Startup health verification: ping DB and Redis to confirm connectivity
+	// before registering routes or starting background goroutines.
+	if sqlDB, err := a.DB.DB(); err == nil {
+		if err := sqlDB.Ping(); err != nil {
+			return fmt.Errorf("database ping failed: %w", err)
+		}
+	}
+	if err := a.CacheClient.GetRDB().Ping(ctx).Err(); err != nil {
+		return fmt.Errorf("redis ping failed: %w", err)
+	}
+	slog.Info("health check passed", "database", "ok", "redis", "ok")
+
 	if a.Config.Server.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
 	} else {
@@ -177,33 +189,54 @@ func (a *App) Run(ctx context.Context) error {
 	return a.Shutdown(ctxShutdown)
 }
 
-// Shutdown gracefully stops all servers and background goroutines.
+// Shutdown gracefully stops all servers and background goroutines with
+// the following order: HTTP → Admin → WS → EventBus → cancel background → DB → Redis.
 func (a *App) Shutdown(ctx context.Context) error {
-	ctxShutdown, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	// Cancel background goroutines
-	if a.coreCancel != nil {
-		a.coreCancel()
-	}
-
-	// Close event bus
-	if a.bus != nil {
-		a.bus.Close()
-	}
-
+	// 1. Stop accepting new HTTP requests.
 	if a.HTTPServer != nil {
-		if err := a.HTTPServer.Shutdown(ctxShutdown); err != nil {
-			slog.Error("server shutdown failed", "error", err)
+		if err := a.HTTPServer.Shutdown(ctx); err != nil {
+			slog.Error("http server shutdown failed", "error", err)
 		}
 	}
+	// 2. Stop admin server (pprof/metrics).
 	if a.AdminServer != nil {
-		if err := a.AdminServer.Shutdown(ctxShutdown); err != nil {
+		if err := a.AdminServer.Shutdown(ctx); err != nil {
 			slog.Error("admin server shutdown failed", "error", err)
 		}
 	}
 
-	slog.Info("servers exited")
+	// 3. Close all WebSocket connections.
+	if a.mgr != nil {
+		a.mgr.Shutdown()
+	}
+
+	// 4. Close event bus (stop publishing events).
+	if a.bus != nil {
+		a.bus.Close()
+	}
+
+	// 5. Cancel background goroutines (scheduler, heartbeat, metrics collector).
+	if a.coreCancel != nil {
+		a.coreCancel()
+	}
+
+	// 6. Close database connection pool.
+	if a.DB != nil {
+		if sqlDB, err := a.DB.DB(); err == nil {
+			if closeErr := sqlDB.Close(); closeErr != nil {
+				slog.Error("db close failed", "error", closeErr)
+			}
+		}
+	}
+
+	// 7. Close Redis connection pool.
+	if a.CacheClient != nil {
+		if err := a.CacheClient.Close(); err != nil {
+			slog.Error("redis close failed", "error", err)
+		}
+	}
+
+	slog.Info("shutdown complete")
 	return nil
 }
 
