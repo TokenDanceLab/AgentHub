@@ -49,7 +49,8 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selected = options.find((o) => o.value === value);
-  const displayLabel = selected ? cleanModelName(selected.label) : (placeholder || 'Select...');
+  const showPlaceholder = !selected && variant !== 'text';
+  const displayLabel = selected ? cleanModelName(selected.label) : (showPlaceholder ? (placeholder || 'Select...') : '');
 
   const grouped: Record<string, Option[]> = useMemo(() => {
     const g: Record<string, Option[]> = {};
@@ -171,7 +172,7 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
         onClick={() => open ? setOpen(false) : openDropdown()}
         disabled={disabled} aria-label={ariaLabel} aria-expanded={open}>
         <span className={styles.triggerLabel}>{displayLabel}</span>
-        <ChevronDown size={12} className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} />
+        {variant !== 'text' && <ChevronDown size={12} className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} />}
       </button>
       {dropdown}
     </div>
