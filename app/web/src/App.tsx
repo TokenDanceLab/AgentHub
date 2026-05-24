@@ -5,18 +5,18 @@ import styles from '@/App.module.css';
 
 function LoadingFallback() {
   return (
-    <div className={styles.root}>
-      <main className={styles.preview}>
-        <p>Loading...</p>
-      </main>
-    </div>
+    <main className={styles.preview}>
+      <p>Loading...</p>
+    </main>
   );
 }
 
 export default function App() {
   return (
-    <Suspense fallback={<LoadingFallback />}>
-      <RouterProvider router={router} />
-    </Suspense>
+    <div className={styles.root}>
+      <Suspense fallback={<LoadingFallback />}>
+        <RouterProvider router={router} />
+      </Suspense>
+    </div>
   );
 }
