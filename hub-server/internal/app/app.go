@@ -39,8 +39,12 @@ type App struct {
 	AdminServer *http.Server
 
 	// Internal runtime state
-	mgr *ws.Manager
-	bus *service.Bus
+	mgr       *ws.Manager
+	bus       *service.Bus
+	startTime time.Time
+
+	// Version is the build version, settable via -ldflags. Defaults to "dev".
+	Version string
 
 	// Service layer
 	AuthService         *service.AuthService
@@ -63,6 +67,7 @@ type App struct {
 	CustomAgentHandler  *handler.CustomAgentHandler
 	AttachmentHandler   *handler.AttachmentHandler
 	NotificationHandler *handler.NotificationHandler
+	HealthHandler       *handler.HealthHandler
 
 	// Goroutine lifecycle
 	coreCtx    context.Context
@@ -84,10 +89,7 @@ func New(cfg *config.Config, db *gorm.DB, cacheClient *cache.Client) *App {
 
 // Run starts the Hub Server and blocks until a shutdown signal is received.
 func (a *App) Run(ctx context.Context) error {
-	// JWT security warning
-	if a.Config.JWT.Secret == "" || a.Config.JWT.Secret == "dev-secret-change-in-production" || len(a.Config.JWT.Secret) < 16 {
-		slog.Warn("JWT secret is insecure: using default or too short, set AGENTHUB_JWT_SECRET environment variable")
-	}
+	a.startTime = time.Now()
 
 	// Startup health verification: ping DB and Redis to confirm connectivity
 	// before registering routes or starting background goroutines.
@@ -139,6 +141,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.CustomAgentHandler = handler.NewCustomAgentHandler(a.AgentService)
 	a.AttachmentHandler = handler.NewAttachmentHandler(a.AttachmentService)
 	a.NotificationHandler = handler.NewNotificationHandler(a.NotificationService)
+	a.HealthHandler = handler.NewHealthHandler(a.DB, a.CacheClient, &a.Config.DB, a.startTime, a.Version)
 
 	// Router
 	r := a.setupRouter()
@@ -249,6 +252,7 @@ func (a *App) setupRouter() *gin.Engine {
 		a.ContactHandler, a.SessionHandler, a.MessageHandler,
 		a.AgentHandler, a.CustomAgentHandler,
 		a.AttachmentHandler, a.NotificationHandler,
+		a.HealthHandler,
 	)
 	return r
 }
@@ -464,10 +468,11 @@ func (a *App) startAdminServer() {
 	adminMux.Handle("/metrics", promhttp.Handler())
 	pprofUser := os.Getenv("AGENTHUB_PPROF_USER")
 	pprofPass := os.Getenv("AGENTHUB_PPROF_PASS")
-	adminHandler := http.Handler(adminMux)
-	if pprofUser != "" && pprofPass != "" {
-		adminHandler = pprofBasicAuth(adminMux, pprofUser, pprofPass)
+	if pprofUser == "" || pprofPass == "" {
+		slog.Error("admin server not started: AGENTHUB_PPROF_USER and AGENTHUB_PPROF_PASS must both be set")
+		return
 	}
+	adminHandler := pprofBasicAuth(adminMux, pprofUser, pprofPass)
 	a.AdminServer = &http.Server{
 		Addr:              fmt.Sprintf("127.0.0.1:%d", adminPort),
 		Handler:           adminHandler,
