@@ -184,7 +184,7 @@ func TestSendMessage_Success(t *testing.T) {
 	mock.ExpectExec(sqlmInsertMsg).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(sqlmUpdateSession).
-		WithArgs("sess-1").
+		WithArgs(sqlmock.AnyArg(), "sess-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -222,7 +222,7 @@ func TestSendMessage_SuccessNonText(t *testing.T) {
 	mock.ExpectExec(sqlmInsertMsg).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(sqlmUpdateSession).
-		WithArgs("sess-1").
+		WithArgs(sqlmock.AnyArg(), "sess-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 

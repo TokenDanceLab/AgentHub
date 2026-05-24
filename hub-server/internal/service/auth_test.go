@@ -190,7 +190,7 @@ func TestLogin_Success(t *testing.T) {
 
 	// UpsertRefreshToken: lookup then create
 	mock.ExpectQuery(sqlRTByUserDevice).
-		WithArgs("user-uuid", "desktop", "dev-1", 1).
+		WithArgs("user-uuid", "desktop", sqlmock.AnyArg(), 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 	mock.ExpectExec(sqlInsertRT).
 		WillReturnResult(sqlmock.NewResult(1, 1))

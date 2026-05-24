@@ -15,6 +15,7 @@
 | Tier 0 | Multica | `reference/multica/` | 产品形态、前端观感、运行生命周期、包边界 |
 | Tier 0 | OpenAI Codex | `reference/codex/` | 本地 agent loop、app-server、worktree、审批、diff |
 | Tier 0 | Claude Code source | `reference/claude-code-source/` | Claude Code 行为、权限、hook、工具调用 |
+| Tier 1 | AionUi | `reference/aionui/` | Cowork 平台、ACP 协议、多 Agent Team、Cron、扩展系统 |
 | Tier 1 | CloudCLI / claudecodeui | `reference/claudecodeui/` | Claude Code Web UI、移动端适配、Git Explorer |
 | Tier 1 | OpenCode | `reference/opencode/` | 多 provider、插件、hook、TUI/SDK 分层 |
 | Tier 1 | OpenHands | `reference/OpenHands/` | sandbox、workspace、agent protocol、GUI/CLI/SDK |
@@ -24,6 +25,7 @@
 
 | 仓库 | 路径 | 用途 |
 |---|---|---|
+| aionui | `reference/aionui/` | Cowork 平台、Team Mode、ACP 协议、Cron、Extension |
 | aider | `reference/aider/` | 代码修改、patch、命令行 agent 参考 |
 | ChatDev | `reference/ChatDev/` | 多角色协作和 workflow 参考 |
 | claude-code-source | `reference/claude-code-source/` | Claude Code 行为和权限参考 |

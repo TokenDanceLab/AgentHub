@@ -110,6 +110,29 @@
   font-style: italic;
 }
 
+/* ── Hub button ── */
+
+.hubBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+
+.hubBtn:hover {
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
 /* ── Theme toggle button ── */
 
 .themeBtn {
@@ -124,6 +147,7 @@
   color: var(--muted-foreground);
   cursor: pointer;
   flex-shrink: 0;
+  margin-left: 4px; /* Add 4px margin to separate from hub button */
   transition: color var(--duration-fast) var(--ease-out);
 }
 

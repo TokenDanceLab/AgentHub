@@ -13,8 +13,8 @@ Desktop (React 19 + Tauri) → Edge Server → AgentAdapter → Claude Code / Co
 核心原则：
 
 - Desktop 是一个 Edge Node，不只是客户端。
-- 所有能运行 Runner 的机器都视为 Edge Node。
-- Runner 只负责执行，不负责 IM。
+- 所有能运行 Edge Server 和 Agent CLI adapter 的机器都视为 Edge Node。
+- 执行生命周期由 Edge Server 负责，`lifecycle` 管进程，`adapters` 管 CLI 协议。
 - Hub 负责账号、IM、多端同步、中继和权限。
 - UI 只负责交互，不直接控制 Agent CLI。
 
@@ -73,7 +73,8 @@ adapter 包包含 32 个单元测试（覆盖 24 种 NDJSON 消息类型解析�
 Desktop App
   ├─ Desktop UI
   ├─ Local Edge Server
-  ├─ Local Runner
+  │   ├─ lifecycle executor
+  │   └─ AgentAdapter registry
   └─ Agent CLI
        ├─ Claude Code
        ├─ Codex
@@ -82,11 +83,11 @@ Desktop App
 
 当前架构边界：
 
-- Hub Server 已完整实现（三层架构，15 migrations，Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。
+- Hub Server 已完整实现（三层架构，17 migrations，Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。
 - Web/Mobile 可通过 Hub 远程查看和审批。
 - Desktop UI 默认只连接本机 Local Edge。
-- Edge 才能启动 Runner，UI 不直接启动 Agent CLI。
-- Runner 只在授权 workspace 或 worktree 内执行。
+- Edge 才能启动 Agent CLI 进程，UI 不直接启动 Agent CLI。
+- Agent CLI 只能在授权 workspace 或 worktree 内执行。
 
 ## 3. 组件职责
 
@@ -94,9 +95,10 @@ Desktop App
 |---|---|---|
 | Web / Desktop UI | `app/` | IM 工作台、Thread、Diff、Preview、Approval |
 | Hub Server | `hub-server/` | 中心 IM、账号、群聊、多端同步、Edge 中继 |
-| Edge Server | `edge-server/` | 本地项目、Thread、Context、Runner 管理、Artifact 索引 |
-| Runner | `runner/` | Agent CLI 进程、workspace、日志、Diff、Preview |
+| Edge Server | `edge-server/` | 本地项目、Thread、Context、执行生命周期、Agent CLI 适配、Artifact 索引 |
 | API Contract | `api/` | REST API 和 WebSocket event 契约 |
+
+> **注意**：早期曾存在独立的 `runner/` 组件。当前 Runner 进程生命周期管理已合并到 `edge-server/internal/lifecycle/`，Agent CLI 适配层位于 `edge-server/internal/adapters/`，不再作为独立组件。Runner 由 Edge Server 统一调度。
 
 ## 4. 通信方式
 
@@ -110,8 +112,8 @@ REST JSON API + WebSocket typed events
 |---|---|---|
 | UI -> Edge | REST JSON | 查询项目、创建 Thread、启动 Run、审批 |
 | Edge -> UI | WebSocket typed events | 消息增量、run output、artifact、preview、审批请求 |
-| Edge -> Runner | 本地 REST / event stream | 启动执行、取消执行、读取产物 |
-| Runner -> Edge | typed events | 日志、状态、Diff、Artifact、Preview |
+| Edge lifecycle -> AgentAdapter | Go interface + process context | 启动执行、取消执行、读取产物、解析 CLI 输出 |
+| AgentAdapter -> Edge | typed events | 日志、状态、Diff、Artifact、Preview |
 | Edge -> Hub | REST sync + reverse WebSocket | 同步、注册、中继、远程控制 |
 | Web/Mobile -> Hub | REST JSON + WebSocket | 云端会话、远程查看、远程审批 |
 
@@ -120,8 +122,8 @@ Protobuf、Connect-RPC、JSON-RPC 不是当前主线；只作为未来可选或�
 安全边界：
 
 - WebSocket 只投递事件，不承载普通查询或命令。
-- UI 不能绕过 Edge 直接访问远程 Runner。
-- Runner 不默认读取用户全盘、本机密钥、浏览器数据或系统配置。
+- UI 不能绕过 Edge 直接访问 Agent CLI。
+- Agent CLI 进程不默认读取用户全盘、本机密钥、浏览器数据或系统配置。
 - 日志和事件不应包含 token、cookie、私钥、真实服务器隐私。
 
 ## 5. 三条数据线
@@ -154,7 +156,7 @@ Edge EventStore -> Hub Sync -> Web/Mobile
 Edge EventStore -> Hub Sync -> other devices
 ```
 
-本地 EventStore 语义已完整实现。Hub Server 也已完整实现（三层架构，15 migrations，Gin + GORM + Redis + PostgreSQL），提供账号、IM、多端同步和中继能力。
+本地 EventStore 语义已完整实现。Hub Server 也已完整实现（三层架构，17 migrations，Gin + GORM + Redis + PostgreSQL），提供账号、IM、多端同步和中继能力。
 
 ## 6. EventStore 和恢复语义
 
@@ -239,10 +241,10 @@ REST snapshot 至少应能按 Project、Thread、Run、Item、Artifact 重建 UI
 | M3a | 真实 AgentAdapter 集成：ClaudeCode / Codex / OpenCode CLI | ✅ |
 | M3b | 多 Agent 协调、Orchestrator、sub-agent spawn | ✅ |
 | M4 | Hub Server、响应式布局、环境隔离、E2E、权限门控、Hub auth | ✅ |
-| P0 | Desktop UI -> Local Edge -> Local Runner -> Agent CLI (完整闭环) | ✅ |
+| P0 | Desktop UI -> Local Edge -> AgentAdapter -> Agent CLI (完整闭环) | ✅ |
 | P1 | Local Edge + 多 Agent Thread | 已完成 |
-| P2 | Edge <-> Hub 同步，Web/Mobile 查看和审批 | 已完成 |
-| P3 | Hub Relay -> Desktop/Cloud Edge -> Runner | 已完成 |
+| P2 | Edge <-> Hub 同步，Web/Mobile 查看和审批 | 规划中（Q3） |
+| P3 | Hub Relay -> Desktop/Cloud Edge -> AgentAdapter | 规划中（Q3） |
 | P4 | 完整团队 IM 和云端协作 | 规划中 |
 
 ## 10. 文档分层

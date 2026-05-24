@@ -1,5 +1,6 @@
 // Builds ChatMessage objects from WebSocket agent events.
 // P0-1: Uses RunState enum for typed status values.
+// P0-1: Run lifecycle events invalidate TanStack Query caches; streaming state stays local.
 // Status transitions are validated in runStore; invalid jumps are logged here as warnings.
 
 import { useReducer, useEffect, useRef, useCallback } from 'react';
@@ -9,8 +10,10 @@ import type { EventEnvelope } from '@shared/events';
 import type { ChatMessage, MessageBlock, ToolResultBlock } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useToastStore } from '@/stores/toastStore';
+import { useRunStore } from '@/stores/runStore';
 import { RunState } from '@/utils/runStateMachine';
 import { cancelRun } from '@/api/edgeClient';
+import { queryClient } from '@/api/queryClient';
 
 const MAX_MESSAGES = 500;
 const MAX_OUTPUT_TEXT = 20000;
@@ -154,16 +157,7 @@ function processEvent(state: State, event: EventEnvelope): State {
 
   switch (event.type) {
     case 'run.queued': {
-      const rid = event.payload.runId as string;
-      messages = [
-        ...messages,
-        {
-          id: `run-${rid}`,
-          role: 'system',
-          timestamp: ts,
-          blocks: [{ kind: 'text', content: 'Run queued...' } as MessageBlock],
-        },
-      ];
+      // Silently track – rendering handled by streaming indicator
       break;
     }
 
@@ -177,17 +171,9 @@ function processEvent(state: State, event: EventEnvelope): State {
         changedFiles: [],
         tasks: [],
       };
-      messages = [
-        ...messages,
-        {
-          id: `run-${rid}`,
-          role: 'system',
-          timestamp: ts,
-          blocks: [],
-        },
-      ];
       isStreaming = true;
       agentName = '';
+      useRunStore.getState().setRun(rid);
       break;
     }
 
@@ -451,6 +437,8 @@ function processEvent(state: State, event: EventEnvelope): State {
         }
         currentRun = { ...currentRun, status: RunState.COMPLETED };
       }
+      useRunStore.getState().setRunState(RunState.COMPLETED);
+      queryClient.invalidateQueries({ queryKey: ['runs'] });
       break;
     }
 
@@ -465,6 +453,8 @@ function processEvent(state: State, event: EventEnvelope): State {
         }
         currentRun = { ...currentRun, status: RunState.FAILED };
       }
+      useRunStore.getState().setRunState(RunState.FAILED);
+      queryClient.invalidateQueries({ queryKey: ['runs'] });
       break;
     }
 
@@ -483,6 +473,8 @@ function processEvent(state: State, event: EventEnvelope): State {
         }
         currentRun = { ...currentRun, status: RunState.CANCELLED };
       }
+      useRunStore.getState().setRunState(RunState.CANCELLED);
+      queryClient.invalidateQueries({ queryKey: ['runs'] });
       break;
     }
 

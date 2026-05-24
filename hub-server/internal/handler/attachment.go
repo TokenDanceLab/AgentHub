@@ -44,6 +44,10 @@ func (h *AttachmentHandler) Probe(c *gin.Context) {
 
 	a, err := h.service.ProbeAttachment(c.Request.Context(), req.Hash)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}

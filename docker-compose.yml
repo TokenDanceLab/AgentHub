@@ -1,0 +1,132 @@
+# ──────────────────────────────────────────────
+# AgentHub Hub Server — Docker Compose 开发环境
+# ──────────────────────────────────────────────
+# 启动完整 Hub 技术栈：PostgreSQL 16 + Redis 7 + Hub Server。
+#
+# 快速开始：
+#   cp .env.example .env              # 首次：复制环境变量（已提供默认值）
+#   ./scripts/dev-up.sh               # 一键启动全部服务
+#   ./scripts/dev-down.sh             # 停止并清理
+#
+# 仅启动基础设施（自己用 go run 启动 Hub Server）：
+#   docker compose up -d postgres redis
+#   cd hub-server && go run ./cmd/server-hub
+#
+# 服务端口：
+#   Hub Server API:  http://localhost:8080
+#   Hub Admin/metrics: http://localhost:6060
+#   PostgreSQL:       localhost:5432
+#   Redis:            localhost:6379
+# ──────────────────────────────────────────────
+
+services:
+  # ── PostgreSQL 16 ──────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: agenthub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${AGENTHUB_DB_NAME:-agenthub}
+      POSTGRES_USER: ${AGENTHUB_DB_USER:-agenthub}
+      POSTGRES_PASSWORD: ${AGENTHUB_DB_PASSWORD:-dev_password}
+    ports:
+      - "${AGENTHUB_DB_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AGENTHUB_DB_USER:-agenthub} -d ${AGENTHUB_DB_NAME:-agenthub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - agenthub-net
+
+  # ── Redis 7 ────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: agenthub-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+    ports:
+      - "${AGENTHUB_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - agenthub-net
+
+  # ── Hub Server ─────────────────────────────
+  hub-server:
+    build:
+      context: ./hub-server
+      dockerfile: ./deployments/Dockerfile
+    container_name: agenthub-hub
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # 数据库
+      AGENTHUB_DB_HOST: postgres
+      AGENTHUB_DB_PORT: "5432"
+      AGENTHUB_DB_USER: ${AGENTHUB_DB_USER:-agenthub}
+      AGENTHUB_DB_PASSWORD: ${AGENTHUB_DB_PASSWORD:-dev_password}
+      AGENTHUB_DB_NAME: ${AGENTHUB_DB_NAME:-agenthub}
+      # Redis
+      AGENTHUB_REDIS_HOST: redis
+      AGENTHUB_REDIS_PORT: "6379"
+      AGENTHUB_REDIS_PASSWORD: ""
+      AGENTHUB_REDIS_DB: "0"
+      AGENTHUB_REDIS_POOL_SIZE: "100"
+      AGENTHUB_REDIS_MIN_IDLE_CONNS: "10"
+      # JWT
+      AGENTHUB_JWT_SECRET: ${AGENTHUB_JWT_SECRET:-dev-secret-change-in-production-min-length-32}
+      AGENTHUB_JWT_ACCESS_TTL: ${AGENTHUB_JWT_ACCESS_TTL:-15m}
+      AGENTHUB_JWT_REFRESH_TTL: ${AGENTHUB_JWT_REFRESH_TTL:-720h}
+      # 服务
+      AGENTHUB_SERVER_PORT: ${AGENTHUB_SERVER_PORT:-8080}
+      AGENTHUB_SERVER_LOG_LEVEL: ${AGENTHUB_SERVER_LOG_LEVEL:-info}
+      AGENTHUB_SERVER_ADMIN_PORT: ${AGENTHUB_SERVER_ADMIN_PORT:-6060}
+      AGENTHUB_UPLOAD_DIR: ${AGENTHUB_UPLOAD_DIR:-./uploads}
+      AGENTHUB_UPLOAD_MAX_SIZE: ${AGENTHUB_UPLOAD_MAX_SIZE:-10485760}
+    ports:
+      - "${AGENTHUB_SERVER_PORT:-8080}:8080"
+      - "${AGENTHUB_SERVER_ADMIN_PORT:-6060}:6060"
+    volumes:
+      - uploads_data:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - agenthub-net
+
+volumes:
+  pg_data:
+    name: agenthub_pg_data
+  redis_data:
+    name: agenthub_redis_data
+  uploads_data:
+    name: agenthub_uploads
+
+networks:
+  agenthub-net:
+    name: agenthub-net
+    driver: bridge

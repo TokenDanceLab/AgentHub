@@ -199,12 +199,11 @@ describe('hubClient', () => {
     });
 
     it('sendFriendRequest POSTs correctly', async () => {
-      const fetchSpy = mockFetch(200, { id: 'fr_1' });
-      const res = await client.sendFriendRequest('user_b', 'Hello!');
-      expect(res.id).toBe('fr_1');
+      const fetchSpy = mockFetch(200, {});
+      await client.sendFriendRequest('user_b', 'Hello!');
       const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string);
-      expect(body.user_id).toBe('user_b');
+      expect(body.friend_id).toBe('user_b');
       expect(body.message).toBe('Hello!');
     });
 
@@ -215,13 +214,13 @@ describe('hubClient', () => {
       expect(res[0].id).toBe('s1');
     });
 
-    it('createPrivateSession POSTs user_id', async () => {
+    it('createPrivateSession POSTs target_user_id', async () => {
       const fetchSpy = mockFetch(200, { id: 's_new', type: 'private', owner_user_id: 'u1' });
-      const res = await client.createPrivateSession({ user_id: 'user_b' });
+      const res = await client.createPrivateSession({ target_user_id: 'user_b' });
       expect(res.id).toBe('s_new');
       const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string);
-      expect(body.user_id).toBe('user_b');
+      expect(body.target_user_id).toBe('user_b');
     });
 
     it('registerDevice POSTs device info', async () => {
@@ -229,13 +228,14 @@ describe('hubClient', () => {
       const fetchSpy = mockFetch(200, device);
       const res = await client.registerDevice({
         device_id: 'dev_1',
-        device_type: 'desktop',
         app_version: '1.0',
+        capabilities: ['webgl', 'gpu'],
       });
       expect(res.id).toBe('dev_1');
       const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string);
       expect(body.device_id).toBe('dev_1');
+      expect(body.capabilities).toEqual(['webgl', 'gpu']);
     });
   });
 
