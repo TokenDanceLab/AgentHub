@@ -1,6 +1,6 @@
 .PHONY: build test test-all test-cover lint dev run migrate-up migrate-down clean help
 
-APP_NAME := agenthub-hub
+APP_NAME := server-hub
 CMD_DIR  := ./cmd/server-hub
 
 ## build: compile the hub server binary
@@ -25,21 +25,13 @@ test-cover:
 lint:
 	golangci-lint run ./...
 
-## dev: start the server for local development
+## dev: start the server for local development (auto-runs pending migrations)
 dev:
 	go run $(CMD_DIR)
 
-## run: build and run the server binary
+## run: build and run the server binary (auto-runs pending migrations)
 run: build
 	./$(APP_NAME)
-
-## migrate-up: apply all pending database migrations
-migrate-up:
-	go run $(CMD_DIR) migrate up
-
-## migrate-down: roll back the last migration
-migrate-down:
-	go run $(CMD_DIR) migrate down
 
 ## clean: remove build artifacts
 clean:
