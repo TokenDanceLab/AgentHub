@@ -13,7 +13,7 @@
 进入 Web 前端目录：
 
 ```powershell
-cd E:\AgentHub\app\web
+cd D:\Code\TokenDance\AgentHub\app\web
 ```
 
 首次启动或依赖变更后安装依赖：
@@ -71,7 +71,7 @@ corepack.cmd pnpm build
 仓库提交前建议在根目录检查空白字符问题：
 
 ```powershell
-cd E:\AgentHub
+cd D:\Code\TokenDance\AgentHub
 git diff --check
 ```
 

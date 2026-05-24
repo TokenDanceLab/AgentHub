@@ -1,20 +1,13 @@
 package model
 
 import (
-<<<<<<< HEAD
-=======
 	"encoding/json"
 	"fmt"
->>>>>>> origin/master
 	"time"
 
 	"gorm.io/gorm"
 
-<<<<<<< HEAD
-	"github.com/agenthub/server-hub/pkg/uuidv7"
-=======
 	"github.com/agenthub/hub-server/pkg/uuidv7"
->>>>>>> origin/master
 )
 
 type CustomAgent struct {
@@ -38,8 +31,6 @@ func (c *CustomAgent) BeforeCreate(tx *gorm.DB) error {
 		return err
 	}
 	c.ID = id
-<<<<<<< HEAD
-=======
 	return c.validateJSONB()
 }
 
@@ -53,17 +44,30 @@ func (c *CustomAgent) Validate() error {
 
 func (c *CustomAgent) validateJSONB() error {
 	for _, field := range []struct {
-		name  string
-		value string
+		name      string
+		value     string
+		wantArray bool
 	}{
-		{"capability_tags", c.CapabilityTags},
-		{"tool_whitelist", c.ToolWhitelist},
-		{"model_params", c.ModelParams},
+		{"capability_tags", c.CapabilityTags, true},
+		{"tool_whitelist", c.ToolWhitelist, true},
+		{"model_params", c.ModelParams, false},
 	} {
-		if field.value != "" && !json.Valid([]byte(field.value)) {
-			return fmt.Errorf("invalid JSON in %s: %w", field.name, json.Unmarshal([]byte(field.value), new(interface{})))
+		if field.value == "" {
+			continue
+		}
+		var decoded any
+		if err := json.Unmarshal([]byte(field.value), &decoded); err != nil {
+			return fmt.Errorf("invalid JSON in %s: %w", field.name, err)
+		}
+		if field.wantArray {
+			if _, ok := decoded.([]any); !ok {
+				return fmt.Errorf("%s must be a JSON array", field.name)
+			}
+			continue
+		}
+		if _, ok := decoded.(map[string]any); !ok {
+			return fmt.Errorf("%s must be a JSON object", field.name)
 		}
 	}
->>>>>>> origin/master
 	return nil
 }

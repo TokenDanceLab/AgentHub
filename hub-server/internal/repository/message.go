@@ -5,12 +5,8 @@ import (
 
 	"gorm.io/gorm"
 
-<<<<<<< HEAD
-	"github.com/agenthub/server-hub/internal/model"
-=======
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
->>>>>>> origin/master
 )
 
 func InsertMessage(db *gorm.DB, msg *model.Message) error {
@@ -24,13 +20,8 @@ func GetMessageByID(db *gorm.DB, id string) (*model.Message, error) {
 }
 
 func GetMessagesBySession(db *gorm.DB, sessionID string, beforeSeq int64, limit int) ([]model.Message, error) {
-<<<<<<< HEAD
-	if limit <= 0 || limit > 100 {
-		limit = 50
-=======
 	if limit <= 0 || limit > config.MaxMessagePageLimit {
 		limit = config.DefaultPaginationLimit
->>>>>>> origin/master
 	}
 	var msgs []model.Message
 	query := db.Where("session_id = ?", sessionID)
@@ -42,13 +33,8 @@ func GetMessagesBySession(db *gorm.DB, sessionID string, beforeSeq int64, limit 
 }
 
 func GetMessagesIncrement(db *gorm.DB, sessionID string, afterSeq int64, limit int) ([]model.Message, error) {
-<<<<<<< HEAD
-	if limit <= 0 || limit > 500 {
-		limit = 500
-=======
 	if limit <= 0 || limit > config.MaxIncrementalMessageLimit {
 		limit = config.MaxIncrementalMessageLimit
->>>>>>> origin/master
 	}
 	var msgs []model.Message
 	err := db.Where("session_id = ? AND seq_id > ?", sessionID, afterSeq).
@@ -118,11 +104,7 @@ func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]
 	if to != "" {
 		query = query.Where("created_at <= ?", to)
 	}
-<<<<<<< HEAD
-	err := query.Order("seq_id DESC").Limit(100).Find(&msgs).Error
-=======
 	err := query.Order("seq_id DESC").Limit(config.MaxMessagePageLimit).Find(&msgs).Error
->>>>>>> origin/master
 	return msgs, err
 }
 
@@ -135,12 +117,7 @@ func SearchAllMessages(db *gorm.DB, userID, q string) ([]model.Message, error) {
 			AND m.recalled = false
 			AND m.content->>'text' ILIKE ?
 		ORDER BY m.created_at DESC
-<<<<<<< HEAD
-		LIMIT 100
-	`, "user", userID, "%"+q+"%").Scan(&msgs).Error
-=======
 		LIMIT ?
 	`, "user", userID, "%"+q+"%", config.MaxMessagePageLimit).Scan(&msgs).Error
->>>>>>> origin/master
 	return msgs, err
 }

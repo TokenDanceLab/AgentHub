@@ -1,13 +1,9 @@
 package config
 
 import (
-<<<<<<< HEAD
-	"fmt"
-=======
 	"errors"
 	"fmt"
 	"os"
->>>>>>> origin/master
 	"strings"
 	"time"
 
@@ -15,25 +11,26 @@ import (
 )
 
 type Config struct {
-	Server ServerConfig `mapstructure:"server"`
-	DB     DBConfig     `mapstructure:"db"`
-	Redis  RedisConfig  `mapstructure:"redis"`
-	JWT    JWTConfig    `mapstructure:"jwt"`
-	Upload UploadConfig `mapstructure:"upload"`
+	Server      ServerConfig      `mapstructure:"server"`
+	DB          DBConfig          `mapstructure:"db"`
+	Redis       RedisConfig       `mapstructure:"redis"`
+	JWT         JWTConfig         `mapstructure:"jwt"`
+	Upload      UploadConfig      `mapstructure:"upload"`
+	TokenDanceID TokenDanceIDConfig `mapstructure:"tokendance_id"`
+}
+
+type TokenDanceIDConfig struct {
+	IssuerURL    string `mapstructure:"issuer_url"`
+	JWKSURI      string `mapstructure:"jwks_uri"`
+	ClientID     string `mapstructure:"client_id"`
+	ClientSecret string `mapstructure:"client_secret"`
 }
 
 type ServerConfig struct {
-<<<<<<< HEAD
-	Port     int    `mapstructure:"port"`
-	LogLevel string `mapstructure:"log_level"`
-	LogFile  string `mapstructure:"log_file"`
-	AdminPort int   `mapstructure:"admin_port"`
-=======
 	Port      int    `mapstructure:"port"`
 	LogLevel  string `mapstructure:"log_level"`
 	LogFile   string `mapstructure:"log_file"`
 	AdminPort int    `mapstructure:"admin_port"`
->>>>>>> origin/master
 }
 
 type DBConfig struct {
@@ -50,21 +47,12 @@ func (d DBConfig) DSN() string {
 }
 
 type RedisConfig struct {
-<<<<<<< HEAD
-	Host        string `mapstructure:"host"`
-	Port        int    `mapstructure:"port"`
-	Password    string `mapstructure:"password"`
-	DB          int    `mapstructure:"db"`
-	PoolSize    int    `mapstructure:"pool_size"`
-	MinIdleConns int   `mapstructure:"min_idle_conns"`
-=======
 	Host         string `mapstructure:"host"`
 	Port         int    `mapstructure:"port"`
 	Password     string `mapstructure:"password"`
 	DB           int    `mapstructure:"db"`
 	PoolSize     int    `mapstructure:"pool_size"`
 	MinIdleConns int    `mapstructure:"min_idle_conns"`
->>>>>>> origin/master
 }
 
 func (r RedisConfig) Addr() string {
@@ -82,11 +70,6 @@ type UploadConfig struct {
 	MaxSize int64  `mapstructure:"max_size"`
 }
 
-<<<<<<< HEAD
-var Cfg *Config
-
-=======
->>>>>>> origin/master
 func Load(configPath string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigFile(configPath)
@@ -103,11 +86,6 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-<<<<<<< HEAD
-	Cfg = &cfg
-	return &cfg, nil
-}
-=======
 	// Explicitly override JWT secret with env var (belt-and-suspenders on top of viper AutomaticEnv).
 	if envSecret := os.Getenv("AGENTHUB_JWT_SECRET"); envSecret != "" {
 		cfg.JWT.Secret = envSecret
@@ -154,6 +132,17 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("JWT secret too short: minimum 16 characters required (got %d)", len(c.JWT.Secret))
 	}
 
+	// TokenDance ID: validate URLs if configured.
+	if c.TokenDanceID.IssuerURL != "" {
+		if c.TokenDanceID.JWKSURI == "" {
+			c.TokenDanceID.JWKSURI = c.TokenDanceID.IssuerURL + "/oidc/jwks"
+		}
+	} else {
+		// Default to production TokenDance ID
+		c.TokenDanceID.IssuerURL = "https://id.vectorcontrol.tech"
+		c.TokenDanceID.JWKSURI = "https://id.vectorcontrol.tech/oidc/jwks"
+	}
+
 	// Upload: if a directory is configured, it must exist.
 	if c.Upload.Dir != "" {
 		if _, err := os.Stat(c.Upload.Dir); os.IsNotExist(err) {
@@ -163,4 +152,3 @@ func (c *Config) Validate() error {
 
 	return nil
 }
->>>>>>> origin/master

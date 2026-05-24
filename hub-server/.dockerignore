@@ -1,15 +1,7 @@
 .git/
-<<<<<<< HEAD
-docs/
-uploads/
-*.md
-.env
-.env.*
-=======
 .worktrees/
 tests/
 *.test
 coverage.out
 .env
 *.log
->>>>>>> origin/master

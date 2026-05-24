@@ -84,9 +84,10 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	reg := runners.NewRegistry()
 
 	// Prometheus metrics wired to bus depth
-	edgeMetrics := metrics.New(func() float64 {
-		return float64(bus.HistoryLen())
-	})
+	edgeMetrics := metrics.NewWithBusStats(
+		func() float64 { return float64(bus.HistoryLen()) },
+		func() float64 { return float64(bus.DroppedCount()) },
+	)
 
 	var executor lifecycle.RunExecutor
 	hasAdapter := cfg.AdapterRegistry != nil && cfg.AgentDefault != ""

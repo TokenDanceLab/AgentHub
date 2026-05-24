@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-24 20:45 UTC+8 | 分支：dev/delicious233 | 提交：e03c407
+最后更新：2026-05-25 01:36 UTC+8 | 分支：dev/delicious233 | 提交：cd26e2c
 
 ## 快速上手
 
@@ -41,7 +41,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 | 层 | 技术栈 | 测试 | 关键特性 |
 |---|------|:--:|------|
 | **Desktop** | React 19, TypeScript, Zustand, TanStack Query, OKLCH tokens, CSS Modules | 551/560 | viewRegistry, @shared/ui, Storybook, RunState 状态机, IM UI, AuthPage, 虚拟滚动 |
-| **Edge** | Go, gorilla/websocket, NDJSON | 13/13 包 | 3 Adapter (Claude/Codex/OpenCode), Prometheus, Orchestrator, E2E 19/19 API |
+| **Edge** | Go, gorilla/websocket, NDJSON | 13/13 包 | 3 Adapter (Claude/Codex/OpenCode), Prometheus, event bus dropped counter, Orchestrator, E2E 19/19 API |
 | **Hub** | Go, Gin, GORM, Redis, PostgreSQL | 13/13 包 | DI 架构, CORS→BodyLimit→RateLimit 链, 17 migrations, 公开 API |
 
 ## 生产部署
@@ -74,7 +74,29 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - ✅ 无边框 Tauri 窗口 + One Dark Pro 暗色主题
 - ✅ i18n 跟随系统语言（navigator.language）
 
+### 本轮进展（2026-05-25）
+- Desktop：设置页已按 Codex App 截图方向重构为全屏设置工作台，包含常规、外观、配置、个性化、快捷键、MCP、钩子、连接、Git、环境、工作树、浏览器、电脑操控、账号、归档对话等分类；截图验证见 `screenshots/settings-page-refined.png`、`screenshots/settings-mcp-refined.png`、`screenshots/settings-account-refined-clean.png`。
+- Desktop：Agent 管理左栏升级为真实 Edge-backed 状态面板，展示 `/v1/agents` 返回的可用状态、能力 chips 和在线数量；修复 Edge capabilities PascalCase（`Streaming`/`ToolCalls` 等）与前端 camelCase 契约不一致导致能力不显示的问题，在 `app/desktop/src/api/edgeClient.ts` 边界统一规范化。
+- Desktop：真实接口验证 `Invoke-RestMethod http://127.0.0.1:3210/v1/agents` 返回 Claude Code / Codex / OpenCode 三个可用 Agent；Playwright 截图 `screenshots/agent-manager-capabilities.png` 验证能力 chips 可见、无裸 i18n key、无 console error。
+- Desktop：验证已通过 `python -m json.tool app/desktop/src/i18n/locales/{zh,en}.json`、`pnpm vitest run src/__tests__/RunDetail.test.tsx`；`pnpm exec tsc --noEmit` 仍受既有 `app/shared/src/ui` React 类型依赖问题阻塞，但定向搜索未发现 `AgentList` / `SettingsPage` / `edgeClient` 新错误。
+- Hub：`CancelTask` 已通过 `AgentInstance` 解析真实 `SessionID` 后发布 `agent.cancel`，避免把 `AgentInstanceID` 误作为 `session_id`；回归测试 `TestCancelTaskPublishesResolvedSessionID` 已覆盖。
+- Hub：auth middleware 测试已适配 `AuthMiddleware(*config.Config)` 签名，当前 HEAD `cd26e2c` 已包含该修复。
+- Hub：Agent 任务回调链新增服务层回归测试，覆盖 `HandleTaskStream` 生成 `client_msg_id`、走 Redis seq、发布 `message.new`，以及 `HandleTaskDone` 在 Redis 失败时走 DB fallback、写最终消息并发布 `agent.done`。
+- Hub：WebSocket 慢客户端背压路径新增 `TestManagerPushToConnCountsDroppedFrames`，验证 send buffer 满时 `ws_dropped_frames_total` 递增；`writeLoop` 退出路径统一 defer close，覆盖正常结束、写失败和 panic recovery。
+- Hub：`UpsertDevice` 已按 `(user_id, device_type)` 冲突键处理桌面重复注册，`TestDeviceRepo_Upsert` 已验证同用户同设备类型、不同 device id 的更新路径。
+- Hub：联系人列表和收到的好友请求已补批量查询回归测试，覆盖多条记录只走一次 `WHERE id IN` 用户查询；好友请求 sender 缺失时记录 debug 并跳过坏数据，不阻断其他请求。
+- Hub：`CustomAgent` 的 jsonb 字段从“只校验 JSON 语法”收紧为结构校验：`capability_tags`/`tool_whitelist` 必须是 JSON array，`model_params` 必须是 JSON object；handler 创建/更新前预检，model hook 保存前兜底。
+- Edge：event bus 慢订阅者丢弃 fanout 时累计 `DroppedCount()`，Prometheus 新增 `edge_event_bus_dropped_total`，`httpserver` 已接入真实 bus 统计。
+- Edge：修复 lifecycle 测试 helper 固定 `run_test` 导致的 Windows 临时输出日志抢锁，改为 per-test 唯一 run/project/thread ID。
+- Edge：`CreateProject` 已通过 `ErrProjectExists` 区分新建/已存在；API 新建返回 201 并发布 `project.created`，重复创建返回 200、保留原项目名称且不重复发布 created 事件。
+- Edge：`POST /v1/runs` 已实现每 thread 一个公开 active run，命中 `queued`/`started`/`cancelling` 时返回 409 `active_run_exists` 和现有 `runId`；Store 继续允许同 thread 多 run，保留 orchestrator sub-agent 内部创建能力；executor 启动失败会把 queued run 标记为 `failed`，避免重试被永久 409 卡住。
+- Edge：`/v1/health` 的 runner 检查已暴露 `total`、`available`、`unavailable`、`statuses`、`items`，无 registry、无 runner 或全离线时整体降级为 `degraded`，方便客户端和运维区分“没有 runner”和“runner 离线”。
+- 验证：`hub-server && go test ./internal/model ./internal/handler -run "TestCustomAgent" -count=1 -v`、`hub-server && go test ./internal/service -run "TestListContacts_BatchesFriendUserLookup|TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender" -count=1 -v`、`edge-server && go test ./internal/store -run TestStoreCreateProjectDistinguishesExistingProject -count=1 -v`、`edge-server && go test ./internal/api -run TestMuxPostProjectsExistingProjectReturnsOKWithoutCreatedEvent -count=1 -v`、`edge-server && go test ./internal/api ./internal/store ./internal/lifecycle -count=1 -v`、`edge-server && go test ./internal/api -run "TestGetHealth|TestPostRuns" -count=1 -v` 均通过。
+- 全量短测：`hub-server && go test ./... -short -count=1`、`edge-server && go test ./... -short -count=1` 均通过；`git diff --check` 针对本轮 server/doc 文件通过。
+- 工作区：Hub Agent 回调测试、Hub WS 背压测试、Hub writeLoop close、Hub contact/custom agent 校验、Edge dropped counter、Edge lifecycle 测试隔离、Edge project duplicate 测试、Edge run 并发 API 约束、Edge health runner 状态与 `docs/roadmap.md`/本状态页为当前未提交推进；其他 Desktop/README/API/截图改动已存在，本轮未处理。
+
 ### 本轮提交（2026-05-24）
+- `cd26e2c` — Claude Session 2026-05-25 交接报告 + ui-screenshot skill；包含 Hub CancelTask/session_id 修复与 auth middleware 测试适配
 - `e03c407` — merge master 冲突解决
 - `adc829d` — CI/配置修复（go.mod、Dockerfile、CI workflow、docker-compose）
 - `d299f1c` — 清理死代码 useAgents.ts

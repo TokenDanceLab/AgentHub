@@ -1,11 +1,7 @@
 server:
   port: 8080
   log_level: info
-<<<<<<< HEAD
-  log_file: "/var/log/hub-server/server.log"
-=======
   log_file: ""
->>>>>>> origin/master
   admin_port: 6060
 db:
   host: postgres
@@ -21,10 +17,7 @@ redis:
   pool_size: 100
   min_idle_conns: 10
 jwt:
-<<<<<<< HEAD
-=======
   # AGENTHUB_JWT_SECRET env var takes precedence over this value.
->>>>>>> origin/master
   secret: dev-secret-change-in-production
   access_ttl: 15m
   refresh_ttl: 720h

@@ -4,31 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-<<<<<<< HEAD
-=======
 	"log/slog"
->>>>>>> origin/master
 	"time"
 
 	"gorm.io/gorm"
 
-<<<<<<< HEAD
-	"github.com/agenthub/server-hub/internal/cache"
-	"github.com/agenthub/server-hub/internal/errcode"
-	"github.com/agenthub/server-hub/internal/model"
-	"github.com/agenthub/server-hub/internal/repository"
-	"github.com/agenthub/server-hub/internal/ws"
-)
-
-type AgentService struct {
-	db  *gorm.DB
-	bus *Bus
-	mgr *ws.Manager
-}
-
-func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager) *AgentService {
-	return &AgentService{db: db, bus: bus, mgr: mgr}
-=======
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -54,7 +34,6 @@ type AgentService struct {
 
 func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client) *AgentService {
 	return &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: cacheClient}
->>>>>>> origin/master
 }
 
 // CustomAgent CRUD
@@ -106,12 +85,6 @@ func (s *AgentService) UpdateCustomAgent(ctx context.Context, ownerID string, ca
 		return errcode.AgentNotFound
 	}
 	ca.OwnerUserID = ownerID
-<<<<<<< HEAD
-if ca.CapabilityTags == "" {
-		ca.CapabilityTags = existing.CapabilityTags }
-	if ca.ToolWhitelist == "" { ca.ToolWhitelist = existing.ToolWhitelist }
-	if ca.ModelParams == "" { ca.ModelParams = existing.ModelParams }
-=======
 	if ca.CapabilityTags == "" {
 		ca.CapabilityTags = existing.CapabilityTags
 	}
@@ -121,7 +94,6 @@ if ca.CapabilityTags == "" {
 	if ca.ModelParams == "" {
 		ca.ModelParams = existing.ModelParams
 	}
->>>>>>> origin/master
 	ca.CreatedAt = existing.CreatedAt
 	return repository.UpdateCustomAgent(s.db, ca)
 }
@@ -241,11 +213,7 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 		TriggeredByUserID: userID,
 		TriggerMessageID:  triggerMessageID,
 		Status:            model.TaskStatusQueued,
-<<<<<<< HEAD
-		ExpireAt:          time.Now().Add(24 * time.Hour),
-=======
 		ExpireAt:          time.Now().Add(config.PendingTaskTTL),
->>>>>>> origin/master
 	}
 	if err := repository.CreatePendingTask(s.db, task); err != nil {
 		return nil, err
@@ -280,11 +248,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	payload, _ := json.Marshal(dp)
 
 	// try to push to inviter's edge (desktop) via WebSocket
-<<<<<<< HEAD
-	connID, err := cache.GetRoute(ctx, ai.InviterUserID, "desktop")
-=======
 	connID, err := s.cacheClient.GetRoute(ctx, ai.InviterUserID, "desktop")
->>>>>>> origin/master
 	if err == nil && connID != "" {
 		frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
 		s.mgr.PushToConn(connID, frame)
@@ -293,11 +257,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	}
 
 	// offline: push to Redis pending queue
-<<<<<<< HEAD
-	_ = cache.PushPendingTask(ctx, ai.InviterUserID, string(payload))
-=======
 	_ = s.cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload))
->>>>>>> origin/master
 }
 
 // CancelTask cancels a pending task by its ID.
@@ -320,27 +280,23 @@ func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) er
 		return errcode.AgentTaskTimeout
 	}
 
+	ai, err := repository.GetAgentInstanceByID(s.db, task.AgentInstanceID)
+	if err != nil {
+		return err
+	}
+
 	_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusCancelled, "")
 
 	s.bus.Publish(ctx, Event{Type: "agent.cancel", Payload: map[string]string{
-<<<<<<< HEAD
-		"task_id":            taskID,
-		"agent_instance_id":  task.AgentInstanceID,
-		"session_id":         task.AgentInstanceID, // will be resolved from agent instance
-		"triggered_by":       task.TriggeredByUserID,
-=======
 		"task_id":           taskID,
 		"agent_instance_id": task.AgentInstanceID,
-		"session_id":        task.AgentInstanceID, // will be resolved from agent instance
+		"session_id":        ai.SessionID,
 		"triggered_by":      task.TriggeredByUserID,
->>>>>>> origin/master
 	}})
 
 	return nil
 }
 
-<<<<<<< HEAD
-=======
 // allocateSeq returns the next message sequence number for a session.
 // It tries Redis INCR first and falls back to the DB row-level lock.
 func (s *AgentService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
@@ -358,7 +314,6 @@ func (s *AgentService) allocateSeq(ctx context.Context, sessionID string) (int64
 	return fallbackSeq, err
 }
 
->>>>>>> origin/master
 // HandleTaskAck marks a task as running.
 func (s *AgentService) HandleTaskAck(ctx context.Context, taskID string) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
@@ -396,10 +351,7 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, taskID, payload str
 		SessionID:   "", // will be set from agent instance
 		SenderType:  model.SenderTypeAgent,
 		SenderID:    task.AgentInstanceID,
-<<<<<<< HEAD
-=======
 		ClientMsgID: uuidv7.Must(),
->>>>>>> origin/master
 		ContentType: model.ContentTypeText,
 		Content:     payload,
 	}
@@ -410,14 +362,6 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, taskID, payload str
 	}
 	msg.SessionID = ai.SessionID
 
-<<<<<<< HEAD
-	err = s.db.Transaction(func(tx *gorm.DB) error {
-		seq, err := repository.AllocateSeqID(tx, ai.SessionID)
-		if err != nil {
-			return err
-		}
-		msg.SeqID = seq
-=======
 	seq, err := s.allocateSeq(ctx, ai.SessionID)
 	if err != nil {
 		return err
@@ -425,7 +369,6 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, taskID, payload str
 	msg.SeqID = seq
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {
->>>>>>> origin/master
 		return repository.InsertMessage(tx, msg)
 	})
 	if err != nil {
@@ -462,17 +405,6 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, taskID, finalContent 
 			SessionID:   ai.SessionID,
 			SenderType:  model.SenderTypeAgent,
 			SenderID:    task.AgentInstanceID,
-<<<<<<< HEAD
-			ContentType: model.ContentTypeText,
-			Content:     finalContent,
-		}
-		err = s.db.Transaction(func(tx *gorm.DB) error {
-			seq, err := repository.AllocateSeqID(tx, ai.SessionID)
-			if err != nil {
-				return err
-			}
-			msg.SeqID = seq
-=======
 			ClientMsgID: uuidv7.Must(),
 			ContentType: model.ContentTypeText,
 			Content:     finalContent,
@@ -484,7 +416,6 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, taskID, finalContent 
 		msg.SeqID = seq
 
 		err = s.db.Transaction(func(tx *gorm.DB) error {
->>>>>>> origin/master
 			return repository.InsertMessage(tx, msg)
 		})
 		if err != nil {
