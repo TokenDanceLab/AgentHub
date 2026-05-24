@@ -446,3 +446,43 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		slog.Error("structured output parse error", "runId", run.ID, "err", err)
 	}
 }
+
+// SpawnSubAgent implements adapters.SubAgentSpawner for the ProcessExecutor.
+// It creates a new run for a sub-agent dispatched by the orchestrator, queues it,
+// and starts execution using the resolved agent adapter.
+//
+// Reference: docs/reference/cross-comparison/03-orchestration.md Layer 3 (Supervisor routing).
+func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAgentTask) (agentInstanceID string, runID string, err error) {
+	runID = "run_" + task.TaskID
+	agentInstanceID = "agent_" + task.TaskID
+
+	// Create the run in the store
+	run, err := e.store.(store.Writer).CreateRun(runID, parentRun.ProjectID, parentRun.ThreadID)
+	if err != nil {
+		slog.Error("failed to create sub-agent run", "taskId", task.TaskID, "err", err)
+		return "", "", err
+	}
+
+	// Emit run.queued
+	scope := map[string]any{
+		"projectId": run.ProjectID,
+		"threadId":  run.ThreadID,
+		"runId":     run.ID,
+	}
+	e.bus.Publish("run.queued", scope, run)
+
+	// Build run context with the task prompt and target agent
+	runCtx := RunProcessContext{
+		Run:     run,
+		Prompt:  task.Prompt,
+		AgentID: task.AgentID,
+	}
+
+	// Start the run
+	if err := e.Start(run, runCtx); err != nil {
+		slog.Error("failed to start sub-agent run", "runId", runID, "err", err)
+		return "", "", err
+	}
+
+	return agentInstanceID, runID, nil
+}
