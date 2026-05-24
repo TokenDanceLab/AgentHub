@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"gorm.io/gorm"
+	"time"`n`n`t"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/model"
 )
@@ -70,7 +70,7 @@ func UpdateSessionNextSeq(db *gorm.DB, sessionID string, nextSeq int64) error {
 
 func TouchSessionLastMessage(db *gorm.DB, sessionID string) error {
 	return db.Model(&model.Session{}).Where("id = ?", sessionID).
-		Update("last_message_at", gorm.Expr("NOW()")).Error
+		Update("last_message_at", time.Now()).Error
 }
 
 func SearchSessions(db *gorm.DB, userID, q string) ([]SessionWithMeta, error) {
