@@ -71,6 +71,20 @@
   color: var(--foreground);
 }
 
+.mobileToolbarBtn:focus-visible,
+.railBtn:focus-visible,
+.rightPanelCollapseBtn:focus-visible,
+.navIconBtn:focus-visible,
+.workspaceHeaderBtn:focus-visible,
+.topBarBtn:focus-visible,
+.winBtn:focus-visible,
+.rightPanelTab:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  background: rgba(99,102,241,0.1);
+  color: var(--foreground);
+}
+
 [data-theme='dark'] .mobileToolbarBtn:hover,
 [data-theme='dark'] .railBtn:hover,
 [data-theme='dark'] .rightPanelCollapseBtn:hover {
@@ -137,6 +151,15 @@
   background: rgba(99,102,241,0.36);
 }
 
+.resizeHandle:focus-visible {
+  outline: none;
+}
+
+.resizeHandle:focus-visible::before {
+  background: rgba(99,102,241,0.68);
+  box-shadow: 0 0 0 4px rgba(99,102,241,0.12);
+}
+
 .resizing,
 .resizing * {
   cursor: col-resize !important;
@@ -161,6 +184,21 @@
 
 .rightRail {
   justify-content: flex-start;
+}
+
+.railStatusDot {
+  width: 7px;
+  height: 7px;
+  margin: 2px 0 4px;
+  border-radius: 999px;
+  background: var(--muted-foreground);
+  opacity: 0.55;
+}
+
+.railStatusDotActive {
+  background: var(--color-success);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--color-success) 18%, transparent);
+  opacity: 1;
 }
 
 [data-theme='dark'] .leftRail,
