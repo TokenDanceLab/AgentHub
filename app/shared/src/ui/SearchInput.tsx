@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes } from 'react';
+import React, { type InputHTMLAttributes } from 'react';
 import { Icon } from './Icon';
 import styles from './SearchInput.module.css';
 

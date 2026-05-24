@@ -11,7 +11,14 @@
     "./events": "./src/events.ts",
     "./errors": "./src/errors.ts",
     "./tree": "./src/tree.ts",
-    "./diff": "./src/diff.ts"
+    "./diff": "./src/diff.ts",
+    "./ui": "./src/ui/index.ts",
+    "./ui/*": "./src/ui/*.tsx",
+    "./ui/*.css": "./src/ui/*.module.css"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "dependencies": {
     "diff": "^8.0.2",
