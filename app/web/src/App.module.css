@@ -1,0 +1,91 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-width: 960px;
+  overflow: hidden;
+  background: #f7f8fb;
+  color: #172033;
+  font-family:
+    Inter,
+    "Segoe UI",
+    Arial,
+    sans-serif;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 56px;
+  padding: 0 20px;
+  border-bottom: 1px solid #d8deea;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 220px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.brandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #005faa;
+  color: #ffffff;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  overflow-x: auto;
+}
+
+.tab,
+.activeTab {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #48556a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background: #eef3fa;
+  color: #172033;
+}
+
+.activeTab {
+  border-color: #b8c8dc;
+  background: #e8f1fb;
+  color: #004f90;
+  font-weight: 700;
+}
+
+.preview {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.preview iframe {
+  height: 100% !important;
+}

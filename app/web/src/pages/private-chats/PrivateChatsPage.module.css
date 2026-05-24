@@ -1,0 +1,746 @@
+/* ═══════════════════════════════════════════════════════════════
+   PrivateChatsPage — CSS Module
+   3-column: sidebar (280px) | chat (1fr) | detail (300px)
+   Tokens only: no hardcoded hex/px font-sizes/weights.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Page ──────────────────────────────────────────────── */
+.page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 14% 8%, oklch(0.55 0.16 255 / 0.12), transparent 34%),
+    radial-gradient(circle at 82% 16%, oklch(0.60 0.12 230 / 0.10), transparent 32%),
+    linear-gradient(135deg, var(--background), var(--secondary), var(--accent));
+  color: var(--foreground);
+}
+
+/* ── Shell (3-col grid) ───────────────────────────────── */
+.shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(480px, 1fr) var(--detail-width);
+  gap: var(--space-lg);
+  min-height: 100vh;
+  padding: 18px;
+}
+
+/* ── Glass Panel ──────────────────────────────────────── */
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: oklch(1 0 0 / 0.72);
+  border: 1px solid oklch(1 0 0 / 0.70);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 18px 48px oklch(0.14 0.005 260 / 0.14);
+  backdrop-filter: blur(28px) saturate(160%);
+}
+
+/* ── Header ────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: 64px;
+  padding: 14px var(--space-lg);
+  border-bottom: 1px solid oklch(0.55 0.012 260 / 0.22);
+  flex-shrink: 0;
+}
+
+.headerBetween {
+  justify-content: space-between;
+}
+
+.headerStart {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+/* ── Title ─────────────────────────────────────────────── */
+.eyebrow {
+  margin: 0 0 2px;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.title h2 {
+  margin: 0;
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-tight);
+}
+
+.title p {
+  margin: 2px 0 0;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+/* ── Icon Button ───────────────────────────────────────── */
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid oklch(0.55 0.012 260 / 0.22);
+  border-radius: var(--radius-lg);
+  background: oklch(1 0 0 / 0.62);
+  color: var(--foreground);
+  box-shadow: 0 8px 20px oklch(0.14 0.005 260 / 0.08);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.iconBtn:hover {
+  background: var(--accent);
+}
+
+.iconBtn:active,
+.iconBtnActive {
+  border-color: oklch(0.55 0.16 255 / 0.30);
+  background: oklch(0.55 0.16 255 / 0.10);
+  color: var(--brand);
+}
+
+.iconBtn:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.iconBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ── Actions Row ───────────────────────────────────────── */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* ── Search ────────────────────────────────────────────── */
+.searchWrap {
+  position: relative;
+  padding: var(--space-md) 14px var(--space-sm);
+}
+
+.searchIcon {
+  position: absolute;
+  top: 19px;
+  left: 24px;
+  width: 16px;
+  height: 16px;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  outline: 0;
+  padding: 0 var(--space-md) 0 32px;
+  background: oklch(1 0 0 / 0.68);
+  color: var(--foreground);
+  font-size: var(--font-size-sm);
+}
+
+.searchInput::placeholder {
+  color: var(--muted-foreground);
+}
+
+/* ── Section Title ─────────────────────────────────────── */
+.sectionTitle {
+  padding: 10px var(--space-lg) var(--space-sm);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.filterNote {
+  padding: 0 var(--space-lg) var(--space-sm);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+/* ── Conversation List ─────────────────────────────────── */
+.chatList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 10px var(--space-lg);
+}
+
+/* ── Chat Card ─────────────────────────────────────────── */
+.chatCard {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 64px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xl);
+  padding: 10px;
+  background: oklch(1 0 0 / 0.45);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+  transition: border-color var(--duration-fast), background var(--duration-fast);
+}
+
+.chatCard:hover {
+  background: oklch(1 0 0 / 0.62);
+}
+
+.chatCardActive {
+  border-color: oklch(0.55 0.16 255 / 0.28);
+  background: linear-gradient(135deg, oklch(0.55 0.16 255 / 0.12), oklch(0.60 0.12 230 / 0.08));
+}
+
+.chatCardBody {
+  min-width: 0;
+}
+
+.chatCardBody h3 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
+}
+
+.chatCardBody p {
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chatCardMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* ── Time ──────────────────────────────────────────────── */
+.time {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+/* ── Unread Badge ──────────────────────────────────────── */
+.unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--brand);
+  color: var(--primary-foreground);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── Avatar ────────────────────────────────────────────── */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 10px;
+  background: var(--brand);
+  color: var(--primary-foreground);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  box-shadow: 0 10px 22px oklch(0.55 0.16 255 / 0.24);
+}
+
+.avatarSm {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+}
+
+.avatarCyan {
+  background: var(--info);
+  box-shadow: 0 10px 22px oklch(0.60 0.12 230 / 0.24);
+}
+
+.avatarPurple {
+  background: var(--primary);
+  box-shadow: 0 10px 22px oklch(0.21 0.006 286 / 0.24);
+}
+
+/* ── Status Dot ────────────────────────────────────────── */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: var(--radius-full);
+  background: oklch(0.58 0.18 150 / 0.12);
+  color: var(--success);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* ── Messages Area ─────────────────────────────────────── */
+.messages {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px;
+}
+
+/* ── Message Row ───────────────────────────────────────── */
+.messageRow {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  max-width: 78%;
+}
+
+.messageRowMine {
+  align-self: flex-end;
+  grid-template-columns: minmax(0, 1fr) 36px;
+}
+
+.messageRowMine .avatarCell {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.messageRowMine .messageStack {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+/* ── Message Meta ──────────────────────────────────────── */
+.messageMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0 0 6px;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+.messageRowMine .messageMeta {
+  justify-content: flex-end;
+}
+
+.messageMeta strong {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── Key Button ────────────────────────────────────────── */
+.keyBtn {
+  border: 0;
+  border-radius: 7px;
+  padding: 3px 7px;
+  background: oklch(0.21 0.006 286 / 0.10);
+  color: var(--primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.keyBtnActive {
+  background: oklch(0.21 0.006 286 / 0.18);
+  color: var(--primary);
+}
+
+/* ── Message Bubble ────────────────────────────────────── */
+.bubble {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-md) 14px;
+  background: var(--card);
+  box-shadow: 0 10px 26px oklch(0.14 0.005 260 / 0.09);
+  color: var(--foreground);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.bubbleMine {
+  border-color: oklch(0.55 0.16 255 / 0.36);
+  background: var(--brand);
+  color: var(--primary-foreground);
+}
+
+.bubbleDraft {
+  border-style: dashed;
+}
+
+/* ── Quote Block ───────────────────────────────────────── */
+.quote {
+  margin-bottom: 10px;
+  border-left: 3px solid var(--info);
+  padding: var(--space-sm) 10px;
+  border-radius: var(--radius-lg);
+  background: oklch(0.60 0.12 230 / 0.08);
+  color: var(--foreground);
+  font-size: var(--font-size-xs);
+}
+
+.quote strong {
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── Code Block ────────────────────────────────────────── */
+.codeBlock {
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid oklch(0.14 0.005 260 / 0.12);
+  border-radius: 10px;
+  background: oklch(0.14 0.005 260);
+  color: oklch(0.80 0.04 260);
+}
+
+.codeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 0 10px;
+  border-bottom: 1px solid oklch(1 0 0 / 0.08);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+
+.codeBody {
+  margin: 0;
+  overflow-x: auto;
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  line-height: 1.55;
+}
+
+.codeLine {
+  display: block;
+  white-space: pre;
+}
+
+/* ── Attachments ───────────────────────────────────────── */
+.attachmentList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: 10px;
+}
+
+.attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 6px 10px;
+  background: var(--card);
+  color: var(--foreground);
+  font-size: var(--font-size-xs);
+}
+
+button.attachment {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.attachmentActive {
+  border-color: oklch(0.55 0.16 255 / 0.34);
+  background: oklch(0.55 0.16 255 / 0.10);
+  color: var(--brand);
+  font-weight: var(--font-weight-medium);
+}
+
+.attachment svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ── Composer ──────────────────────────────────────────── */
+.composerWrap {
+  flex: 0 0 auto;
+  padding: 0 18px 18px;
+}
+
+.attachmentTray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: 10px;
+  padding: 10px;
+}
+
+.selectedAttachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: 10px;
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  min-height: 88px;
+  padding: var(--space-md);
+}
+
+.composerTools,
+.composerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.composerTextarea {
+  min-height: 58px;
+  max-height: 130px;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: 0;
+  padding: var(--space-md) 14px;
+  background: var(--card);
+  color: var(--foreground);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  font-family: inherit;
+}
+
+.composerTextarea::placeholder {
+  color: var(--muted-foreground);
+}
+
+/* ── Send Button ───────────────────────────────────────── */
+.sendBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid oklch(0.55 0.16 255 / 0.34);
+  border-radius: var(--radius-lg);
+  background: var(--brand);
+  color: var(--primary-foreground);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  box-shadow: 0 8px 20px oklch(0.14 0.005 260 / 0.08);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sendBtn:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.sendBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ── Notice Bar ────────────────────────────────────────── */
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: var(--card);
+  color: var(--foreground);
+  font-size: var(--font-size-xs);
+}
+
+.noticeSuccess {
+  border-color: oklch(0.58 0.18 150 / 0.24);
+  background: oklch(0.58 0.18 150 / 0.08);
+  color: var(--success);
+}
+
+.noticeActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* ── Chip ──────────────────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: var(--font-size-xs);
+  box-shadow: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+/* ── Detail / Context Panel ────────────────────────────── */
+.contextBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.miniCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-md);
+  background: var(--card);
+}
+
+.miniCard h3 {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+.miniCard p,
+.miniCard li {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+}
+
+.miniCard p {
+  margin: 0;
+}
+
+.miniCard ul {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ── Progress Bar ──────────────────────────────────────── */
+.progress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: oklch(0.55 0.16 255 / 0.10);
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand), var(--info), var(--primary));
+}
+
+/* ── Empty State ───────────────────────────────────────── */
+.empty {
+  align-self: center;
+  border-radius: var(--radius-xl);
+  padding: 14px var(--space-lg);
+  background: oklch(1 0 0 / 0.55);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width: 1120px) {
+  .shell {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+
+  .contextPanel {
+    display: none;
+  }
+
+  .messageRow {
+    max-width: 88%;
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    overflow: auto;
+  }
+
+  .shell {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    padding: var(--space-md);
+  }
+
+  .sidebar {
+    max-height: 260px;
+  }
+
+  .chatPanel {
+    min-height: 680px;
+  }
+
+  .composer {
+    grid-template-columns: 1fr;
+  }
+}
