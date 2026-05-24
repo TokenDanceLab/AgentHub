@@ -19,7 +19,9 @@
   top: 0;
   left: 0;
   width: 100%;
-  padding-bottom: var(--space-xl);
+  padding-bottom: var(--space-md);
+  display: flex;
+  flex-direction: column;
 }
 
 .empty {
@@ -35,12 +37,12 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
-  max-width: 85%;
-  padding: var(--space-sm) var(--space-md);
-  border-radius: 8px;
+  gap: var(--space-xs);
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 18px;
   font-size: var(--font-size-sm);
-  line-height: 1.5;
+  line-height: 1.55;
   overflow: visible;
   animation: messageIn 0.2s ease-out;
 }
@@ -72,15 +74,18 @@
 
 .userMsg {
   align-self: flex-end;
-  background: color-mix(in oklch, var(--primary) 20%, transparent);
-  border: 1px solid color-mix(in oklch, var(--primary) 30%, transparent);
+  background: #111827;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 18px 18px 4px 18px;
 }
 
 .agentMsg {
   align-self: flex-start;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 2px solid var(--primary);
+  background: #F3F4F6;
+  color: var(--foreground);
+  border: none;
+  border-radius: 18px 18px 18px 4px;
 }
 
 .systemMsg {
@@ -93,12 +98,12 @@
   padding: var(--space-xs) 0;
 }
 
-/* ── Hover overlay ─────────────────────────── */
-.message::after {
+/* ── Hover overlay (agent only) ───────────── */
+.agentMsg::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--hover-overlay);
+  background: rgba(0,0,0,0.03);
   border-radius: inherit;
   opacity: 0;
   transition: opacity var(--duration-fast);
@@ -106,7 +111,7 @@
   z-index: 0;
 }
 
-.message:hover::after {
+.agentMsg:hover::after {
   opacity: 1;
 }
 
@@ -626,10 +631,16 @@
   100% { background-position: 200% 0; }
 }
 
-/* ── Message hover enhancement ───────────── */
-
-.agentMsg:hover {
-  background: var(--surface-raised-hover);
+/* ── User msg timestamp / actionBar tint ───── */
+.userMsg .timestamp {
+  color: rgba(255,255,255,0.45);
+}
+.userMsg .actionBtn {
+  color: rgba(255,255,255,0.5);
+}
+.userMsg .actionBtn:hover {
+  background: rgba(255,255,255,0.12);
+  color: #FFFFFF;
 }
 
 .copyToast {
@@ -743,7 +754,7 @@
    ═══════════════════════════════════════════════════════ */
 @media (min-width: 768px) and (max-width: 1023px) {
   .message {
-    max-width: 90%;
+    max-width: 85%;
   }
 
   .stream {
