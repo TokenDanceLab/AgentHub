@@ -137,10 +137,14 @@ export function createHubAuth(client?: HubClient): HubAuth {
 
   const listeners = new Set<(s: HubAuthState) => void>();
 
-  let snapshot: HubAuthState = { ...state };
+  function createSnapshot(): HubAuthState {
+    return Object.freeze({ ...state }) as HubAuthState;
+  }
+
+  let snapshot: HubAuthState = createSnapshot();
 
   function notify() {
-    snapshot = { ...state };
+    snapshot = createSnapshot();
     listeners.forEach((fn) => fn(snapshot));
   }
 
@@ -168,7 +172,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
   }
 
   return {
-    getState: () => ({ ...snapshot }),
+    getState: () => snapshot,
 
     subscribe(fn: (s: HubAuthState) => void) {
       listeners.add(fn);
