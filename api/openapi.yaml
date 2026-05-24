@@ -6,11 +6,17 @@ info:
     AgentHub REST JSON API for commands and queries. Realtime state, logs,
     message deltas, approvals and artifact notifications are delivered through
     WebSocket typed events documented in api/events.md.
+
+    ## Status tags
+    - `x-agenthub-status: implemented` — 已实现，可直接调用
+    - `x-agenthub-status: planned` — 远期规划，尚未实现
 servers:
   - url: http://127.0.0.1:3210
     description: Local Edge Server
-  - url: https://hub.example.com
-    description: Hub Server placeholder
+  - url: http://localhost:8080
+    description: Local Hub Server
+  - url: http://api.hub.vectorcontrol.tech
+    description: Production Hub Server (hk2)
 tags:
   - name: Foundation
     description: Health, capability and event stream handshake.
@@ -768,6 +774,293 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/List"
+
+  # ── Missing from original spec ──────────────────────────────
+
+  /v1/metrics:
+    get:
+      tags: [Foundation]
+      operationId: getMetrics
+      summary: Prometheus metrics.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      responses:
+        "200":
+          description: Prometheus text format.
+
+  /v1/agent-instances:
+    get:
+      tags: [ExecutionRunner]
+      operationId: listAgentInstances
+      summary: List orchestrator sub-agent instances.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - name: runId
+          in: query
+          schema: { type: string }
+        - name: parentId
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [ExecutionRunner]
+      operationId: createAgentInstance
+      summary: Register a sub-agent instance.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /v1/permissions/decide:
+    post:
+      tags: [ExecutionRunner]
+      operationId: decidePermission
+      summary: Approve or deny a pending permission request.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, decision]
+              properties:
+                requestId: { type: string }
+                decision: { type: string, enum: [allow, deny] }
+                reason: { type: string }
+      responses:
+        "200":
+          description: Decision recorded.
+
+  # ═══════════════════════════════════════════════════════════
+  # Hub Server Routes (prefix: /client, /edge, /web, /api/public)
+  # ═══════════════════════════════════════════════════════════
+
+  /health:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubHealth
+      summary: Hub health check (DB + Redis + migrations).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/public/stats:
+    get:
+      tags: [HubSyncRelay]
+      operationId: publicStats
+      summary: Public statistics for official website.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      responses:
+        "200":
+          description: Public stats.
+
+  /client/auth/register:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRegister
+      summary: Register a new user account.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, minLength: 3 }
+                password: { type: string, minLength: 8 }
+                nickname: { type: string }
+                device_type: { type: string, enum: [desktop, web] }
+                device_id: { type: string }
+      responses:
+        "201":
+          description: Account created.
+
+  /client/auth/login:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubLogin
+      summary: Login — returns JWT access + refresh tokens.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+                device_type: { type: string }
+                device_id: { type: string }
+      responses:
+        "200":
+          description: JWT tokens.
+
+  /client/auth/me:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubMe
+      summary: Get current user profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: User profile.
+
+  /client/contacts:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubContacts
+      summary: List contacts.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/sessions:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubSessions
+      summary: List user sessions (private + group).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/sessions/private:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreatePrivate
+      summary: Create a private (1-on-1) chat session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201":
+          description: Session created.
+
+  /client/sessions/group:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateGroup
+      summary: Create a group chat session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201":
+          description: Group created.
+
+  /client/sessions/{id}/messages:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetMessages
+      summary: Get paginated messages for a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubSendMessage
+      summary: Send a message to a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "201":
+          description: Message sent.
+
+  /client/ws:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubWebSocket
+      summary: Hub WebSocket — real-time IM + agent dispatch.
+      description: First frame must be auth handshake. See api/events.md for Hub event types.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      responses:
+        "101":
+          description: Switching Protocols.
+
+  /web/agent-tasks:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubTriggerTask
+      summary: Trigger an agent task from web client.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "202":
+          description: Task dispatched.
+
+  /edge/agent-tasks/{id}/stream:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubTaskStream
+      summary: Edge reports agent output stream chunk to Hub.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Chunk recorded.
+
+  /edge/agent-tasks/{id}/done:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubTaskDone
+      summary: Edge reports agent task completed.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Task marked done.
+
+  # ── Legacy / Planned (not yet implemented) ──────────────────
 
   /v1/auth/login:
     post:
