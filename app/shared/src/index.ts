@@ -1,116 +1,59 @@
 export type {
   HealthResponse,
-  Project,
-  ProjectMemory,
-  Conversation,
-  Thread,
-  ThreadItem,
-  ThreadItemKind,
-  Message,
   Runner,
-  Run,
-  RunStatus,
-  StartRunRequest,
-  RunLogs,
-  RunDiff,
-  DiffFile,
-  Approval,
-  Artifact,
-  Preview,
-  Workspace,
-  WorkspaceFile,
   PageInfo,
   ListResponse,
+  RunInfo,
 } from './types';
 
 export type {
   EventEnvelope,
-  EventScope,
-  AnyEvent,
-  ProjectCreatedEvent,
-  ProjectUpdatedEvent,
-  ThreadCreatedEvent,
-  ThreadUpdatedEvent,
-  MessageCreatedEvent,
-  MessageDeltaEvent,
-  ItemCreatedEvent,
-  ItemUpdatedEvent,
-  RunnerOnlineEvent,
-  RunnerOfflineEvent,
-  RunQueuedEvent,
-  RunStartedEvent,
-  RunStatusChangedEvent,
+  RunnerEvent,
+  RunLifecycleEvent,
   RunOutputEvent,
   RunOutputBatchEvent,
-  RunFinishedEvent,
-  RunFailedEvent,
-  ApprovalRequestedEvent,
-  ApprovalDecidedEvent,
-  ArtifactCreatedEvent,
-  PreviewReadyEvent,
   ErrorEvent,
+  AnyEvent,
 } from './events';
 
 export { parseError, isErrorResponse, AppError } from './errors';
 
-export {
-  setBaseUrl,
-  getBaseUrl,
-  getHealth,
-  listProjects,
-  getProject,
-  createProject,
-  getProjectMemory,
-  listThreads,
-  getThread,
-  createThread,
-  updateThread,
-  archiveThread,
-  listThreadItems,
-  createThreadMessage,
-  listRunners,
-  getRunner,
-  pingRunner,
-  listRuns,
-  getRun,
-  startRun,
-  cancelRun,
-  listRunItems,
-  getRunLogs,
-  getRunDiff,
-  listApprovals,
-  getApproval,
-  decideApproval,
-  listArtifacts,
-  getArtifact,
-  getArtifactContent,
-  applyArtifact,
-  discardArtifact,
-  listPreviews,
-  getPreview,
-  createPreview,
-  getWorkspace,
-  listWorkspaceFiles,
-  readWorkspaceFile,
-} from './apiClient';
+export { buildTree, flattenTree } from './tree';
+export type { TreeNode } from './tree';
 
-export { EventClient } from './eventClient';
-export type { EventListener, EventClientOptions } from './eventClient';
+export { normalizeDiffs, parseUnifiedDiff } from './diff';
+export type { DiffFile, DiffHunk, DiffLine } from './diff';
+
+// New diff engine (ported from OpenCode session-diff.ts)
+export {
+  normalize,
+  text as diffText,
+  parseUnifiedPatch,
+  separateBeforeAfter,
+  fileMetadata,
+  enrichViewDiff,
+} from './diff/engine';
+export type {
+  ViewDiff,
+  FileDiffMetadata,
+  SnapshotFileDiff,
+  VcsFileDiff,
+  LegacyDiff,
+  ReviewDiff,
+} from './diff/engine';
 
 export {
-  mockProject,
-  mockProjects,
-  mockThreads,
-  mockMessages,
-  mockThreadItems,
-  mockRunners,
-  mockRuns,
-  mockApprovals,
-  mockArtifacts,
-  mockPreviews,
-  mockWorkspaces,
-  mockWorkspaceFiles,
-  MockEventStream,
-  playRunLifecycle,
-  playMessageStream,
-} from './mock';
+  estimateTokens,
+  breakdownContext,
+  toSegments,
+  formatTokens,
+  formatCost,
+} from './context/breakdown';
+export type {
+  ContextBreakdown,
+  BreakdownSegment,
+  SessionMetrics,
+} from './context/breakdown';
+
+export { HUB_EVENTS } from './hubEvents';
+export type { HubEventType } from './hubEvents';

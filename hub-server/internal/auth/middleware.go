@@ -32,8 +32,8 @@ func UserFromContext(ctx context.Context) (*User, bool) {
 // Middleware provides HTTP authentication via JWT Bearer tokens.
 type Middleware struct {
 	jwtSecret    []byte
-	skipPaths    map[string]bool   // exact path matches
-	skipPrefixes []string          // prefix matches (paths ending with /*)
+	skipPaths    map[string]bool // exact path matches
+	skipPrefixes []string        // prefix matches (paths ending with /*)
 }
 
 // NewMiddleware creates an auth middleware. jwtSecret is required and is used

@@ -9,8 +9,8 @@ import (
 
 func UpsertDevice(db *gorm.DB, device *model.Device) error {
 	return db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"app_version", "capabilities", "last_active_at", "device_type"}),
+		Columns:   []clause.Column{{Name: "user_id"}, {Name: "device_type"}},
+		DoUpdates: clause.AssignmentColumns([]string{"app_version", "capabilities", "last_active_at"}),
 	}).Create(device).Error
 }
 
