@@ -34,9 +34,11 @@ import {
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHubStore } from '@/stores/hubStore';
+import { APP_VERSION, HUB_URL } from '@/config';
 import { useAgentList } from '@/api/agentQueries';
 import { useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
+import { useAuth } from '@/hooks/useAuth';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
 import styles from './SettingsPage.module.css';
@@ -103,6 +105,9 @@ interface ProjectSkill {
 }
 
 const STORAGE_PREFIX = 'agenthub-settings.';
+const DEVICE_ID_KEY = 'agenthub_device_id';
+const TD_CODE_VERIFIER_KEY = 'td_code_verifier';
+const TD_STATE_KEY = 'td_state';
 
 const PROJECT_SKILLS: ProjectSkill[] = [
   {
@@ -192,16 +197,25 @@ function writeStoredValue(key: string, value: string | boolean) {
   }
 }
 
+function readBrowserStorage(storage: 'local' | 'session', key: string) {
+  try {
+    const target = storage === 'local' ? localStorage : sessionStorage;
+    return target.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'general' }: Props) {
   const { t } = useTranslation();
   const { themeMode, setThemeMode } = useTheme();
+  const hubAuth = useAuth();
   const { online: edgeOnline, health } = useHealth();
   const { data: agentData } = useAgentList(edgeOnline);
   const { data: runData, isError: runsError, isLoading: runsLoading } = useRuns();
   const bridgedTasks = useTaskBridgeStore((s) => s.tasks);
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const username = useHubStore((s) => s.username);
-  const clearHubAuth = useHubStore((s) => s.clear);
   const [active, setActive] = useState<SectionId>(initialSection);
   const [compactMode, setCompactMode] = useStoredBooleanState('compactMode', false);
   const [autoReview, setAutoReview] = useStoredBooleanState('autoReview', true);
@@ -255,6 +269,21 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const mcpCapableAgents = agents.filter((agent) => agent.capabilities.mcpIntegration).length;
   const mcpPermissionHookAgents = agents.filter((agent) => agent.capabilities.permissionHooks).length;
   const mcpSubAgentAgents = agents.filter((agent) => agent.capabilities.subAgentSpawn).length;
+  const hubSessionActive = hubAuthenticated || hubAuth.isAuthenticated;
+  const accountName = hubAuth.user?.username ?? username ?? t('settings.signedIn');
+  const tokenSource = hubAuth.tokenSource;
+  const tokenSourceLabel =
+    tokenSource === 'tokendance'
+      ? 'TokenDance ID'
+      : tokenSource === 'hub'
+        ? t('settings.hubLocalLogin')
+        : t('settings.notConfigured');
+  const deviceId = readBrowserStorage('local', DEVICE_ID_KEY);
+  const pkceStateReady =
+    Boolean(readBrowserStorage('session', TD_CODE_VERIFIER_KEY)) && Boolean(readBrowserStorage('session', TD_STATE_KEY));
+  const handleSignOut = () => {
+    void hubAuth.logout();
+  };
   const schedulerPolicyReadyCount = [
     modelMappingEnabled,
     ccSwitchBridge,
@@ -343,10 +372,10 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
         <div className={styles.sidebarAccount}>
           <button className={styles.sidebarAccountBtn} onClick={() => setActive('account')}>
             <UserCircle size={18} />
-            <span>{hubAuthenticated ? username ?? t('settings.signedIn') : t('settings.notSignedIn')}</span>
+            <span>{hubSessionActive ? accountName : t('settings.notSignedIn')}</span>
           </button>
-          {hubAuthenticated ? (
-            <button className={styles.sidebarActionBtn} onClick={clearHubAuth}>
+          {hubSessionActive ? (
+            <button className={styles.sidebarActionBtn} onClick={handleSignOut}>
               <LogOut size={17} />
               <span>{t('settings.signOut')}</span>
             </button>
@@ -1242,11 +1271,11 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <div className={styles.accountCard}>
                 <UserCircle size={34} />
                 <div className={styles.accountInfo}>
-                  <strong>{hubAuthenticated ? username ?? t('settings.signedIn') : t('settings.notSignedIn')}</strong>
-                  <span>{hubAuthenticated ? t('settings.accountConnected') : t('settings.accountDisconnected')}</span>
+                  <strong>{hubSessionActive ? accountName : t('settings.notSignedIn')}</strong>
+                  <span>{hubSessionActive ? t('settings.accountConnected') : t('settings.accountDisconnected')}</span>
                 </div>
-                {hubAuthenticated ? (
-                  <button className={styles.secondaryBtn} onClick={clearHubAuth}>
+                {hubSessionActive ? (
+                  <button className={styles.secondaryBtn} onClick={handleSignOut}>
                     <LogOut size={16} />
                     {t('settings.signOut')}
                   </button>
@@ -1257,9 +1286,63 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   </button>
                 )}
               </div>
-              <SettingRow title="TokenDance ID" description={t('settings.tokenDanceIdDesc')} value={t('settings.statusInProgress')} />
-              <SettingRow title={t('settings.authPolicy')} description={t('settings.authPolicyDesc')} value={t('settings.statusPlanned')} />
-              <SettingRow title={t('settings.syncScope')} description={t('settings.syncScopeDesc')} value="Hub" />
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<LockKeyhole size={18} />}
+                  label={t('settings.hubSession')}
+                  value={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')}
+                  detail={hubSessionActive ? t('settings.hubSessionDesc') : t('settings.hubSessionSignedOutDesc')}
+                />
+                <SummaryCard
+                  icon={<Globe2 size={18} />}
+                  label="TokenDance ID"
+                  value={tokenSource === 'tokendance' ? t('settings.enabled') : t('settings.statusInProgress')}
+                  detail={tokenSource === 'tokendance' ? t('settings.tokenDanceSessionDesc') : t('settings.tokenDanceOidcPendingDesc')}
+                />
+                <SummaryCard
+                  icon={<Monitor size={18} />}
+                  label={t('settings.desktopDevice')}
+                  value={deviceId ? shortId(deviceId) : t('settings.notConfigured')}
+                  detail={deviceId ? t('settings.desktopDeviceDesc') : t('settings.desktopDeviceMissingDesc')}
+                />
+                <SummaryCard
+                  icon={<Route size={18} />}
+                  label={t('settings.syncScope')}
+                  value={hubSessionActive ? 'Hub' : t('settings.notConfigured')}
+                  detail={t('settings.syncScopeDesc')}
+                />
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.identityBoundary')}</strong>
+                  <span>{t('settings.identityBoundaryDesc')}</span>
+                </div>
+                <div className={styles.capabilityGrid}>
+                  <CapabilityCard
+                    title={t('settings.hubSession')}
+                    description={t('settings.hubSessionCapabilityDesc')}
+                    status={hubSessionActive ? t('settings.statusReady') : t('settings.notConfigured')}
+                  />
+                  <CapabilityCard
+                    title="TokenDance ID OIDC"
+                    description={t('settings.tokenDanceOidcDesc')}
+                    status={pkceStateReady ? t('settings.statusInProgress') : t('settings.statusPlanned')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.authTokenSource')}
+                    description={t('settings.authTokenSourceDesc')}
+                    status={tokenSourceLabel}
+                  />
+                  <CapabilityCard
+                    title={t('settings.deviceProof')}
+                    description={t('settings.deviceProofDesc')}
+                    status={deviceId ? t('settings.statusInProgress') : t('settings.notConfigured')}
+                  />
+                </div>
+              </div>
+              <SettingRow title={t('settings.hubEndpoint')} description={HUB_URL} value={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')} />
+              <SettingRow title={t('settings.appVersion')} description={APP_VERSION} value={t('settings.statusReady')} />
+              <Callout title={t('settings.accountGuard')} body={t('settings.accountGuardDesc')} />
             </Panel>
           )}
 
