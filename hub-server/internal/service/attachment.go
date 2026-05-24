@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -58,7 +59,25 @@ func (s *AttachmentService) GetAttachmentByID(ctx context.Context, id string) (*
 	return a, nil
 }
 
+func IsValidAttachmentHash(hash string) bool {
+	if len(hash) != 64 {
+		return false
+	}
+	if strings.ToLower(hash) != hash {
+		return false
+	}
+	for _, r := range hash {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 func PathFromHash(hash string) string {
+	if !IsValidAttachmentHash(hash) {
+		return ""
+	}
 	return fmt.Sprintf("uploads/%s/%s/%s", hash[:2], hash[2:4], hash)
 }
 

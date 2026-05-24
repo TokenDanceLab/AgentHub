@@ -1,8 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-25（Desktop Settings 架构批次 + Runtime/Profile/Configuration/Execution Target 概念重构）
-
-> **合并方向**：`feat/* → dev/delicious233 → master`
+最后更新：2026-05-25（Desktop run 启动反馈 + Web 生态控制台补强 + 文档架构 sweep）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -89,7 +87,8 @@
 │  │        ▼         │   EventEnvelope           │   Edge Server    │    │
 │  │   @shared/       │ ◄───────────────────────► │  (net/http,3210) │    │
 │  │   events.ts      │                          │                  │    │
-│  └──────────────────┘                          │  Runner Registry │    │
+│  └──────────────────┘                          │ Runtime Registry │    │
+│                                                │ / Target Health  │    │
 │                                                │  Agent Adapters  │    │
 │  ┌──────────────────┐                          │  Process Executor│    │
 │  │   CLI Tools      │   local exec             │  EventBus (seq)  │    │
@@ -548,16 +547,17 @@ Hub 调度（远程）:
 
 ##### 批次 A：概念模型收敛 `[2d]`
 
-- [ ] 将 Desktop / Edge / Hub 统一抽象为四个一等概念：
+- [x] 将 Desktop / Edge / Hub 统一抽象为四个一等概念：
   - `Runtime`：可执行代理运行时，如 Claude Code、Codex、OpenCode、本地/远程 Runtime。
   - `Profile`：用户可选的运行画像，包含模型、权限、工具、环境和默认 Execution Target。
   - `Configuration`：可保存、可审计、可同步的设置集合，覆盖模型映射、MCP、Skill、cc-switch、账号鉴权、安全策略。
   - `Execution Target`：一次 run 的实际目标，包含本地 Edge、远程设备、Hub 调度、特定 workspace/thread。
-- [ ] 前端依赖：SettingsPage 信息架构、i18n 文案、运行入口、Agent 管理面板统一改用上述术语，不再混用 "Agent/Model/Connection" 指代不同层级。
-- [ ] Edge 依赖：`/v1/agents`、`/v1/health`、`POST /v1/runs` 能提供 Runtime capability、availability、accepted/error 语义；PascalCase/camelCase 在 API 边界规范化。
+- [x] 前端依赖：SettingsPage 信息架构、i18n 文案、运行入口、Agent 管理面板统一改用上述术语，不再混用 "Agent/Model/Connection" 指代不同层级。
+- [x] Edge 依赖：`/v1/agents`、`/v1/health`、`POST /v1/runs` 能提供 Runtime capability、availability、accepted/error 语义；PascalCase/camelCase 在 API 边界规范化。
 - [ ] Hub 依赖：后续需要为 Profile/Configuration 提供账号级持久化和多端同步；TokenDance ID 只做身份，产品配置归 Hub/AgentHub。
 - [ ] 生态依赖：cc-switch、模型 provider、Skill/MCP discovery 先作为外部配置源接入，避免把密钥或私有路径写入仓库文档。
 - [ ] 验收：Settings 与 Agent Manager 截图中四个术语含义清晰；类型/normalizer 测试覆盖 Edge capability 映射；真实 `POST /v1/runs` 使用稳定输入返回 202 后 UI 进入乐观运行态。
+- [x] 2026-05-25 前端落地：Settings 新增 `Agent Profiles` 与 `Execution Targets` 一级页面，消费 `useHealth()` / `useAgentList()`；`HealthResponse` 与 Zod schema 保留 `/v1/health.checks.runners` 扩展字段，Playwright 覆盖桌面和 375px 移动端无 raw i18n key、无 console error、无横向溢出。
 
 ##### 批次 B：Codex App 布局融合与侧栏回收 `[2d]`
 
@@ -573,6 +573,8 @@ Hub 调度（远程）:
 
 | 能力页 | 前端职责 | Hub 依赖 | Edge 依赖 | 生态集成 | 验收 |
 |---|---|---|---|---|---|
+| Agent Profile | Runtime + Model + Configuration 管理入口、可用 Profile 摘要 | 后续 Profile 持久化/同步 | `/v1/agents`、runner health | TokenDance ID profile sync / Agent Market | 2026-05-25 已接 Settings 预览与 Edge 真实状态，待接 Hub 存储 |
+| Execution Target | Local Edge / Hub Relay / SSH/Tailscale / Cloud Edge 目标入口 | dispatch/permission/session | `/v1/health.checks.runners` | SSH/Tailscale/Hub Relay | 2026-05-25 已接 Settings 预览与移动端验证，待接远程目标注册 |
 | 在线 IM | 会话、联系人、在线状态、通知入口 | session/message/device/WS sync | Desktop 桥接 Hub dispatch | 无 | 登录后能看到会话与在线状态，断线重连不丢未读 |
 | Agent 市场 | 搜索、安装入口、详情页、能力标签 | CustomAgent/模板/评分/使用统计 | 安装后 Runtime 可执行性检查 | 模板包/Skill 包源 | 搜索安装后出现在 Agent Manager |
 | Skill 管理 | 已安装/可安装/启用状态 | 可选同步用户配置 | 本地 skill discovery 与启停 | 本地 skill registry | 无效 skill 有明确错误，启用状态可恢复 |
@@ -590,11 +592,34 @@ Hub 调度（远程）:
 - [x] Settings / TokenDance ID 登录入口 / Agent Manager 已完成 Playwright 截图验证，当前无裸 i18n key 和 console error。
 - [x] 真实 Edge `/v1/agents` 已验证返回 Claude Code / Codex / OpenCode 三个可用 Runtime；能力 chips 已在前端显示。
 - [x] 使用稳定输入抓包验证 `POST /v1/runs` 返回 202，说明 Edge 接受 run 并进入异步执行链路。
-- [ ] 客户端继续完善 run start 乐观反馈：提交后立即显示 queued/started 状态、禁用重复提交、遇到 409 `active_run_exists` 时链接到现有 run。
-- [ ] 前端依赖：runStore/TanStack Query 状态更新、Toast、输入框 pending 状态。
-- [ ] Edge 依赖：202 accepted、409 active_run_exists、health degraded、runner availability 字段稳定。
-- [ ] Hub 依赖：Hub dispatch 桥接到 Edge run 时保留 taskId/runId 映射。
-- [ ] 验收：真实 Edge 运行时 `POST /v1/runs` 202、重复提交 409、runner 离线时 Settings 显示 degraded；Playwright 截图覆盖成功、重复、离线三态。
+- [x] Hub dispatch bridge 已持久化 `taskId` -> Edge `runId` 映射：`pending_agent_tasks.edge_run_id` + `/edge/agent-tasks/{id}/ack` 接收 `run_id`，Desktop ack 时回传 Edge run id。
+- [x] 真实 Codex-profile Edge WebSocket smoke 已通过：临时 Edge `--runner-profile codex` 产生 `run.agent.text_block: OK`、`run.agent.result`、`run.finished`，证明 Agent CLI -> Edge adapter -> event bus -> WS 链路可用。
+- [x] Edge runner 状态已对齐真实 executor：runtime adapter executor 下 `/v1/runners` 和 `/v1/health.checks.runners` 显示 `Codex Runner (local)`，不再误报默认 Mock Runner。
+- [x] Edge permission decision spoofing 已做 server 侧缓解：`/v1/permissions/decide` 必须匹配 pending `runId/requestId`，未知、错 run、重复 decision 均拒绝；adapter 权限事件补齐 run/project/thread scope，OpenAPI 已把 `runId` 标为必填。
+- [x] Desktop Settings `Agent Profiles` / `Execution Targets` 已完成 Playwright 桌面和 375px 移动端验证，截图见 `app/desktop/screenshots/settings-agent-profiles.png`、`settings-execution-targets.png`、`settings-execution-targets-mobile.png`。
+- [x] 2026-05-25 客户端 run start 反馈已落地：提交后显示 queued 乐观运行、启动中禁用输入与重复提交、409 `active_run_exists` 会打开现有 run、显示 toast，并保留未接受的草稿。
+- [x] 前端依赖：`AppError` 保留 HTTP status 和顶层 `runId` 到 details；`PromptInput` 支持 async send result；`ToastContainer` 已挂回 App shell。
+- [ ] 后续补强：把 runStore/TanStack Query 中 active run 订阅和历史 run 列表刷新接到同一条状态链，避免只靠 optimistic run。
+- [x] Edge 依赖：202 accepted、409 active_run_exists、health degraded、runner availability 字段稳定。
+- [x] Hub 依赖：Hub dispatch 桥接到 Edge run 时保留 taskId/runId 映射。
+- [x] 验收：`pnpm vitest run src/__tests__/errors.test.ts src/__tests__/PromptInput.test.tsx src/__tests__/Toast.test.tsx` 通过 42/42；Playwright 模拟 Edge 409 覆盖草稿保留、toast 可见、无横向溢出，截图见 `app/desktop/screenshots/run-start-active-conflict.png`。
+- [ ] live Edge 注意：当前 127.0.0.1:3210 用真实 runtime 连续双 POST 未稳定复现 409，观测到两个 202；server fake executor 单测覆盖 409，后续需确认 live Edge 是否为旧进程或真实 runtime 完成太快。
+
+##### Web UI 移植工作树状态 `[并行]`
+
+- [x] `feat/webui-desktop-port` / `.worktrees/webui-desktop-port` 已建立 TokenDance 生态 Web Console，`/` 指向生态控制台，旧工作台保留在 `/workbench-preview`。
+- [x] 2026-05-25 审查修复：移动端 `.workspace` 固定行/裁切、外层 `App.module.css min-width: 960px` 横向溢出、Toggle 缺少 `role="switch"` / `aria-checked` / accessible name / 44px 触控高度。
+- [x] 验证：`corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build` 通过；Playwright 375px 复测 `docScrollWidth=375`、switch `52x44`、无 console error。
+- [x] 2026-05-25 Web worker 补强：`app/web/README.md` 已说明 `/` 生态控制台、`/workbench-preview` 旧工作台、TokenDance 生态边界和验证命令；生态控制台新增身份边界、协作同步、Agent runtime、运维护栏等入口，并补响应式 lane 布局与测试。
+- [x] Web worker 验证：`corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx` 通过 4/4，`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web` 通过。
+- [ ] 合并前待办：验证 clean install 下 React alias/workaround 是否仍必要；确认 `/` 入口替换是否作为正式 Web 产品方向；worktree 当前仍落后 `origin/dev/delicious233` 5 个提交，不能直接合并。
+
+##### 文档架构 sweep `[并行]`
+
+- [x] 2026-05-25 gpt-5.5 xhigh 文档 worker 已写入 `docs/inbox/doc-architecture-sweep-2026-05-25.md`。
+- [x] 结论：主文档已基本对齐 Runtime/Profile/Configuration/Execution Target、TokenDance ID、IM、多端、远控、Skill/MCP、cc-switch、安全审计等边界。
+- [ ] 文档待办：补 `/v1/runners`、`runner.*` 作为历史兼容命名的说明；归档或改写 `docs/client-roadmap.md`、`docs/client-handoff.md`、`docs/design/integration.md` 等仍含旧独立 `runner/` 语义的文档。
+- [ ] API 待办：决定 `/v1/runners`、`runner_offline`、`runner.online/offline` 是否长期保留为 deprecated compatibility，新增 schema 优先 Runtime/Profile/Execution Target 命名。
 
 ---
 

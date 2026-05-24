@@ -104,6 +104,55 @@ func TestBusEventEmitter_NilScope(t *testing.T) {
 	}
 }
 
+func TestScopedEventEmitterAppliesDefaultScope(t *testing.T) {
+	inner := &recordingEmitter{}
+	scope := map[string]any{
+		"projectId": "proj_1",
+		"threadId":  "thread_1",
+		"runId":     "run_1",
+	}
+	emitter := NewScopedEventEmitter(inner, scope)
+
+	emitter.Emit(BusEventPermissionRequested, nil, map[string]any{
+		"requestId": "req_1",
+		"toolName":  "Bash",
+	})
+
+	events := inner.eventsByType(BusEventPermissionRequested)
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1", len(events))
+	}
+	if events[0].scope["runId"] != "run_1" || events[0].scope["projectId"] != "proj_1" || events[0].scope["threadId"] != "thread_1" {
+		t.Fatalf("scope = %#v, want default run scope", events[0].scope)
+	}
+	payload := events[0].payload.(map[string]any)
+	if payload["runId"] != "run_1" || payload["projectId"] != "proj_1" || payload["threadId"] != "thread_1" {
+		t.Fatalf("payload = %#v, want default scope fields", payload)
+	}
+}
+
+func TestScopedEventEmitterPreservesExplicitScopeAndPayload(t *testing.T) {
+	inner := &recordingEmitter{}
+	emitter := NewScopedEventEmitter(inner, map[string]any{"runId": "run_default"})
+
+	emitter.Emit(BusEventPermissionRequested, map[string]any{"runId": "run_explicit"}, map[string]any{
+		"runId":     "run_payload",
+		"requestId": "req_1",
+	})
+
+	events := inner.eventsByType(BusEventPermissionRequested)
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1", len(events))
+	}
+	if events[0].scope["runId"] != "run_explicit" {
+		t.Fatalf("scope = %#v, want explicit scope", events[0].scope)
+	}
+	payload := events[0].payload.(map[string]any)
+	if payload["runId"] != "run_payload" {
+		t.Fatalf("payload = %#v, want explicit payload preserved", payload)
+	}
+}
+
 // --- BudgetAwareEmitter tests ---
 
 // recordingEmitter is a mock EventEmitter that records all emitted events.
