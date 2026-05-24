@@ -4,6 +4,7 @@
 import type { UserProfile } from './hubClient';
 import { createHubClient } from './hubClient';
 import type { HubClient } from './hubClient';
+import { useHubStore } from '@/stores/hubStore';
 
 const TOKEN_KEY = 'agenthub_hub_token';
 const REFRESH_KEY = 'agenthub_hub_refresh';
@@ -77,6 +78,8 @@ export function createHubAuth(client?: HubClient): HubAuth {
       authClient = createHubClient({ getToken });
       state.user = await authClient.me();
       state.isAuthenticated = true;
+      // Sync to Zustand store for StatusBar indicator
+      useHubStore.getState().setAuthenticated(true, state.user?.id, state.user?.username);
       notify();
     },
 
@@ -92,6 +95,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(REFRESH_KEY);
       }
+      useHubStore.getState().clear();
       notify();
     },
 
@@ -101,6 +105,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       try {
         state.user = await authClient.me();
         state.isAuthenticated = true;
+        useHubStore.getState().setAuthenticated(true, state.user?.id, state.user?.username);
         notify();
         return true;
       } catch {
@@ -116,6 +121,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
             authClient = createHubClient({ getToken });
             state.user = await authClient.me();
             state.isAuthenticated = true;
+            useHubStore.getState().setAuthenticated(true, state.user?.id, state.user?.username);
             notify();
             return true;
           } catch {
@@ -130,6 +136,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(REFRESH_KEY);
         }
+        useHubStore.getState().clear();
         notify();
         return false;
       }
