@@ -72,11 +72,9 @@ export class EventClient {
     this.ws.onmessage = (msg: MessageEvent<string>) => {
       try {
         const raw = JSON.parse(msg.data) as EventEnvelope;
-        if (raw.seq && raw.seq > this.lastSeq) {
+        if (typeof raw.seq === 'number' && raw.seq > this.lastSeq) {
           this.lastSeq = raw.seq;
-        }
-        if (raw.id) {
-          this.cursor = raw.id;
+          this.cursor = String(raw.seq);
         }
         const event = raw as AnyEvent;
         this.dispatch(event);
