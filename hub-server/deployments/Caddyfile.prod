@@ -1,0 +1,72 @@
+# ──────────────────────────────────────────────
+# AgentHub Hub Server — Caddy 生产配置
+# 域名: api.hub.vectorcontrol.tech
+# 上游: 127.0.0.1:8080
+# ──────────────────────────────────────────────
+
+api.hub.vectorcontrol.tech {
+    # ── 反向代理 ──
+    reverse_proxy 127.0.0.1:8080 {
+        # 透传客户端真实 IP
+        header_up X-Real-IP {http.request.remote.host}
+        header_up X-Forwarded-For {http.request.remote.host}
+        header_up X-Forwarded-Proto {http.request.scheme}
+    }
+
+    # ── WebSocket 支持（IM 实时通信）──
+    # Caddy v2 默认透明代理 WebSocket，此处显式声明以禁用缓冲
+    @ws {
+        header Connection *Upgrade*
+        header Upgrade    websocket
+    }
+    reverse_proxy @ws 127.0.0.1:8080 {
+        flush_interval -1
+        header_up X-Real-IP {http.request.remote.host}
+        header_up X-Forwarded-For {http.request.remote.host}
+        header_up X-Forwarded-Proto {http.request.scheme}
+    }
+
+    # ── 静态压缩 ──
+    encode gzip zstd
+
+    # ── 安全响应头 ──
+    header {
+        # 防点击劫持
+        X-Frame-Options "DENY"
+        # 防 MIME 嗅探
+        X-Content-Type-Options "nosniff"
+        # 限制 Referrer 传递
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # 隐藏服务器标识
+        -Server
+        # HSTS（强制 HTTPS，1 年有效期）
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        # 限制浏览器特性权限
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+
+    # ── 速率限制（每 IP 每分钟 200 请求）──
+    rate_limit {
+        zone dynamic {
+            key    {http.request.remote.host}
+            events 200
+            window 1m
+        }
+    }
+
+    # ── 请求体大小限制（与 Hub Server 10MB 一致）──
+    request_body {
+        max_size 10MB
+    }
+
+    # ── 结构化日志（JSON 格式，便于日志采集与检索）──
+    log {
+        output file /var/log/caddy/agenthub-api.log {
+            roll_size  10MB
+            roll_keep  5
+            roll_keep_for 30d
+        }
+        format json
+        level INFO
+    }
+}

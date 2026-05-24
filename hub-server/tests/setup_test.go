@@ -3,12 +3,17 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+<<<<<<< HEAD
+=======
+	"flag"
+>>>>>>> origin/master
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+<<<<<<< HEAD
 
 	"github.com/gin-gonic/gin"
 
@@ -21,6 +26,22 @@ import (
 	"github.com/agenthub/server-hub/internal/router"
 	"github.com/agenthub/server-hub/internal/service"
 	"github.com/agenthub/server-hub/internal/ws"
+=======
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+
+	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/handler"
+	"github.com/agenthub/hub-server/internal/log"
+	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/router"
+	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/ws"
+>>>>>>> origin/master
 )
 
 var (
@@ -28,9 +49,21 @@ var (
 	client *http.Client
 	mgr    *ws.Manager
 	bus    *service.Bus
+<<<<<<< HEAD
 )
 
 func TestMain(m *testing.M) {
+=======
+	db     *gorm.DB // hold reference for cleanDB
+)
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	if testing.Short() {
+		os.Exit(0)
+	}
+
+>>>>>>> origin/master
 	gin.SetMode(gin.TestMode)
 	metrics.Register()
 
@@ -40,6 +73,7 @@ func TestMain(m *testing.M) {
 	}
 	log.Init(&cfg.Server)
 
+<<<<<<< HEAD
 	if err := repository.InitDB(&cfg.DB); err != nil {
 		panic(fmt.Sprintf("failed to init db: %v", err))
 	}
@@ -49,12 +83,28 @@ func TestMain(m *testing.M) {
 	if err := cache.InitRedis(&cfg.Redis); err != nil {
 		panic(fmt.Sprintf("failed to init redis: %v", err))
 	}
+=======
+	database, err := repository.InitDB(&cfg.DB)
+	if err != nil {
+		panic(fmt.Sprintf("failed to init db: %v", err))
+	}
+	db = database
+	if err := repository.RunMigrationsFrom(&cfg.DB, "file://../migrations"); err != nil {
+		panic(fmt.Sprintf("failed to run migrations: %v", err))
+	}
+	rdb, err := cache.InitRedis(&cfg.Redis)
+	if err != nil {
+		panic(fmt.Sprintf("failed to init redis: %v", err))
+	}
+	cacheClient := cache.NewClient(rdb)
+>>>>>>> origin/master
 
 	mgr = ws.NewManager()
 	mgr.StartHeartbeat()
 
 	bus = service.NewBus()
 	wsHandler := handler.NewWebSocketHandler(mgr, cfg.JWT.Secret)
+<<<<<<< HEAD
 	authService := service.NewAuthService(repository.DB)
 	authHandler := handler.NewAuthHandler(authService)
 	deviceHandler := handler.NewDeviceHandler(repository.DB)
@@ -75,15 +125,45 @@ func TestMain(m *testing.M) {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	router.SetupRoutes(r, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler)
+=======
+	authService := service.NewAuthService(db, cfg.JWT, cacheClient)
+	authHandler := handler.NewAuthHandler(authService)
+	deviceService := service.NewDeviceService(db)
+	deviceHandler := handler.NewDeviceHandler(deviceService)
+	contactService := service.NewContactService(db, bus, cacheClient)
+	contactHandler := handler.NewContactHandler(contactService)
+	sessionService := service.NewSessionService(db, cacheClient)
+	sessionHandler := handler.NewSessionHandler(sessionService)
+	messageService := service.NewMessageService(db, bus, cacheClient)
+	messageHandler := handler.NewMessageHandler(messageService)
+	agentService := service.NewAgentService(db, bus, mgr, cacheClient)
+	agentHandler := handler.NewAgentHandler(agentService)
+	customAgentHandler := handler.NewCustomAgentHandler(agentService)
+	attachmentService := service.NewAttachmentService(db, cfg.Upload)
+	attachmentHandler := handler.NewAttachmentHandler(attachmentService)
+	notificationService := service.NewNotificationService(db, mgr)
+	notificationHandler := handler.NewNotificationHandler(notificationService)
+	healthHandler := handler.NewHealthHandler(db, cacheClient, &cfg.DB, time.Now(), "test")
+	publicHandler := handler.NewPublicHandler(db, time.Now())
+
+	r := gin.New()
+	r.Use(gin.Recovery())
+	router.SetupRoutes(r, cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler, healthHandler, publicHandler)
+>>>>>>> origin/master
 
 	ts = httptest.NewServer(r)
 	client = ts.Client()
 
+<<<<<<< HEAD
 	cleanDB()
+=======
+	cleanDBTables(db)
+>>>>>>> origin/master
 
 	os.Exit(m.Run())
 }
 
+<<<<<<< HEAD
 func cleanDB() {
 	db := repository.DB
 	db.Exec("DELETE FROM message_pins")
@@ -101,6 +181,31 @@ func cleanDB() {
 	db.Exec("DELETE FROM refresh_tokens")
 	db.Exec("DELETE FROM devices")
 	db.Exec("DELETE FROM users")
+=======
+// CleanDB truncates all tables between tests for isolation.
+// Tables are deleted in FK-safe order (children before parents).
+func CleanDB(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	cleanDBTables(db)
+}
+
+func cleanDBTables(database *gorm.DB) {
+	database.Exec("DELETE FROM message_pins")
+	database.Exec("DELETE FROM message_reads")
+	database.Exec("DELETE FROM pending_agent_tasks")
+	database.Exec("DELETE FROM agent_instances")
+	database.Exec("DELETE FROM messages")
+	database.Exec("DELETE FROM session_members")
+	database.Exec("DELETE FROM sessions")
+	database.Exec("DELETE FROM notifications")
+	database.Exec("DELETE FROM friendships")
+	database.Exec("DELETE FROM attachments")
+	database.Exec("DELETE FROM custom_agents")
+	database.Exec("DELETE FROM workspaces")
+	database.Exec("DELETE FROM refresh_tokens")
+	database.Exec("DELETE FROM devices")
+	database.Exec("DELETE FROM users")
+>>>>>>> origin/master
 }
 
 func post(path string, body interface{}) *http.Response {

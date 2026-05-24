@@ -1,10 +1,15 @@
 package handler
 
 import (
+<<<<<<< HEAD
+=======
+	"context"
+>>>>>>> origin/master
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 
+<<<<<<< HEAD
 	"github.com/agenthub/server-hub/internal/errcode"
 	"github.com/agenthub/server-hub/internal/service"
 )
@@ -14,6 +19,25 @@ type NotificationHandler struct {
 }
 
 func NewNotificationHandler(s *service.NotificationService) *NotificationHandler {
+=======
+	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/model"
+)
+
+// NotificationService is the subset of *service.NotificationService used by NotificationHandler.
+type NotificationService interface {
+	ListNotifications(ctx context.Context, userID string, unreadOnly bool, limit, offset int) ([]model.Notification, error)
+	MarkRead(ctx context.Context, userID, notifID string) error
+	MarkAllRead(ctx context.Context, userID string) error
+}
+
+type NotificationHandler struct {
+	service NotificationService
+}
+
+func NewNotificationHandler(s NotificationService) *NotificationHandler {
+>>>>>>> origin/master
 	return &NotificationHandler{service: s}
 }
 
@@ -22,7 +46,11 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 
 	unreadOnly, _ := strconv.ParseBool(c.DefaultQuery("unread_only", "false"))
 
+<<<<<<< HEAD
 	limit := 50
+=======
+	limit := config.DefaultPaginationLimit
+>>>>>>> origin/master
 	if l := c.Query("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil {
 			limit = v
