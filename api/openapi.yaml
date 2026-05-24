@@ -841,14 +841,19 @@ paths:
           application/json:
             schema:
               type: object
-              required: [requestId, decision]
+              required: [runId, requestId, decision]
               properties:
+                runId: { type: string }
                 requestId: { type: string }
                 decision: { type: string, enum: [allow, deny] }
                 reason: { type: string }
       responses:
         "200":
           description: Decision recorded.
+        "400":
+          description: Invalid decision payload.
+        "404":
+          description: Pending permission request not found.
 
   # ═══════════════════════════════════════════════════════════
   # Hub Server Routes (prefix: /client, /edge, /web, /api/public)
