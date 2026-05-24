@@ -209,6 +209,7 @@ export default function PromptInput({
             placeholder={t('prompt.reasoning')}
             disabled={disabled}
             ariaLabel={t('prompt.reasoning')}
+            alignRight
           />
         </div>
 
