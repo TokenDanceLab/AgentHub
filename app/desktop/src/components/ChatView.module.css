@@ -19,7 +19,7 @@
   top: 0;
   left: 0;
   width: 100%;
-  padding-bottom: var(--space-md);
+  padding-bottom: var(--space-xs);
   display: flex;
   flex-direction: column;
 }
@@ -39,8 +39,8 @@
   flex-direction: column;
   gap: var(--space-xs);
   max-width: 80%;
-  padding: 10px 14px;
-  border-radius: 18px;
+  padding: 8px 12px;
+  border-radius: 12px;
   font-size: var(--font-size-sm);
   line-height: 1.55;
   overflow: visible;
@@ -74,18 +74,18 @@
 
 .userMsg {
   align-self: flex-end;
-  background: #111827;
-  color: #FFFFFF;
+  background: #F3F4F6;
+  color: var(--foreground);
   border: none;
-  border-radius: 18px 18px 4px 18px;
+  border-radius: 12px 12px 4px 12px;
 }
 
 .agentMsg {
   align-self: flex-start;
-  background: #F3F4F6;
+  background: #FFFFFF;
   color: var(--foreground);
-  border: none;
-  border-radius: 18px 18px 18px 4px;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 12px 12px 12px 4px;
 }
 
 .systemMsg {
@@ -631,16 +631,10 @@
   100% { background-position: 200% 0; }
 }
 
-/* ── User msg timestamp / actionBar tint ───── */
-.userMsg .timestamp {
-  color: rgba(255,255,255,0.45);
-}
-.userMsg .actionBtn {
-  color: rgba(255,255,255,0.5);
-}
+/* ── User msg actionBar hover tint ─────────── */
 .userMsg .actionBtn:hover {
-  background: rgba(255,255,255,0.12);
-  color: #FFFFFF;
+  background: rgba(0,0,0,0.06);
+  color: var(--foreground);
 }
 
 .copyToast {
