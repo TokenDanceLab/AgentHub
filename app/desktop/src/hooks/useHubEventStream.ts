@@ -27,6 +27,8 @@ export interface HubEventStreamState {
 }
 
 export interface HubEventStreamHandle extends HubEventStreamState {
+  /** The underlying Hub WS handle (for useIMChat, etc.). */
+  hubWS: HubWSHandle | null;
   /** Send a typing indicator for a session. */
   sendTyping: (sessionId: string) => void;
   /** Subscribe to raw Hub frames (after auth). Returns unsubscribe fn. */
@@ -130,6 +132,7 @@ export function useHubEventStream(
   }, []);
 
   return {
+    hubWS: handleRef.current,
     status,
     lastFrame,
     lastMessage,
