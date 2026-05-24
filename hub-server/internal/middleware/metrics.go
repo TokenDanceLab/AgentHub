@@ -4,8 +4,13 @@ import (
 	"strconv"
 	"time"
 
+<<<<<<< HEAD
 	"github.com/gin-gonic/gin"
 	"github.com/agenthub/server-hub/internal/metrics"
+=======
+	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/gin-gonic/gin"
+>>>>>>> origin/master
 )
 
 func PrometheusMiddleware() gin.HandlerFunc {

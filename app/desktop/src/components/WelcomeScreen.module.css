@@ -1,0 +1,143 @@
+.container {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  min-height: 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 480px;
+  gap: var(--space-xl);
+}
+
+/* ── Brand ─────────────────────────────────── */
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.appName {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--foreground);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+  line-height: var(--line-height-relaxed);
+}
+
+/* ── Description ───────────────────────────── */
+
+.description {
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+  line-height: var(--line-height-relaxed);
+  max-width: 360px;
+}
+
+/* ── Create Thread button ──────────────────── */
+
+.createButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm) var(--space-xl);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  min-height: var(--touch-target-min);
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.createButton:hover {
+  opacity: 0.9;
+}
+
+.createButton:active {
+  opacity: 0.8;
+}
+
+/* ── Suggestions ───────────────────────────── */
+
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.suggestionsLabel {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+}
+
+.chip:hover {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+
+/* ── Mobile ────────────────────────────────── */
+
+@media (max-width: 767px) {
+  .container {
+    padding: var(--space-lg);
+  }
+
+  .content {
+    gap: var(--space-lg);
+    max-width: 100%;
+  }
+
+  .chips {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .chip {
+    justify-content: center;
+  }
+}

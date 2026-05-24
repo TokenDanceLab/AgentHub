@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
+<<<<<<< HEAD
 	"github.com/agenthub/server-hub/internal/config"
 	"github.com/agenthub/server-hub/internal/errcode"
 	"github.com/agenthub/server-hub/internal/model"
@@ -19,6 +20,21 @@ type AttachmentService struct {
 
 func NewAttachmentService(db *gorm.DB) *AttachmentService {
 	return &AttachmentService{db: db}
+=======
+	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/repository"
+)
+
+type AttachmentService struct {
+	db        *gorm.DB
+	uploadCfg config.UploadConfig
+}
+
+func NewAttachmentService(db *gorm.DB, uploadCfg config.UploadConfig) *AttachmentService {
+	return &AttachmentService{db: db, uploadCfg: uploadCfg}
+>>>>>>> origin/master
 }
 
 func (s *AttachmentService) ProbeAttachment(ctx context.Context, hash string) (*model.Attachment, error) {
@@ -61,6 +77,11 @@ func PathFromHash(hash string) string {
 	return fmt.Sprintf("uploads/%s/%s/%s", hash[:2], hash[2:4], hash)
 }
 
+<<<<<<< HEAD
 func GetMaxUploadSize() int64 {
 	return config.Cfg.Upload.MaxSize
+=======
+func (s *AttachmentService) MaxUploadSize() int64 {
+	return s.uploadCfg.MaxSize
+>>>>>>> origin/master
 }

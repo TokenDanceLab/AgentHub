@@ -1,0 +1,681 @@
+/* ═══════════════════════════════════════════════════════════
+   WorkbenchPage — dashboard with sidebar, conversation area,
+   agent cards, metrics, activity feed, and inspector panel.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Root ────────────────────────────────────────────────── */
+.pageRoot {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  color: #142033;
+  font-family: "Hanken Grotesk", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
+    radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.14), transparent 30%),
+    linear-gradient(135deg, #f7fbff, #edf6ff);
+}
+
+/* ── Conversation Panel ───────────────────────────────────── */
+.conversation {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 18px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Task Header ──────────────────────────────────────────── */
+.taskHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.taskTitle {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.14;
+  letter-spacing: 0;
+}
+
+.taskCopy {
+  max-width: 680px;
+  margin: 8px 0 0;
+  color: #61708c;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.taskBody {
+  flex: 1;
+}
+
+/* ── Metrics ──────────────────────────────────────────────── */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric {
+  padding: 12px;
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.46);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+}
+
+.metricValue {
+  display: block;
+  color: #102449;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.metricLabel {
+  display: block;
+  margin-top: 3px;
+  color: #61708c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ── Agent Cards ──────────────────────────────────────────── */
+.agentList {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agentCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.agentCardPaused {
+  opacity: 0.78;
+}
+
+.agentTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agentName {
+  margin-top: 4px;
+  font-weight: 800;
+}
+
+.agentRole {
+  color: #61708c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.agentRoute {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: #425574;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.agentActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* ── Activity Feed ────────────────────────────────────────── */
+.feed {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0 2px 0 0;
+  list-style: none;
+  min-height: 0;
+  overflow: auto;
+}
+
+.message {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.messageIcon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: var(--radius-xl);
+  color: #1967ff;
+  background: rgba(25, 103, 255, 0.09);
+}
+
+.messageTitle {
+  font-weight: 800;
+}
+
+.messageDetail {
+  color: #61708c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* ── Composer ─────────────────────────────────────────────── */
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+}
+
+.composerInput {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  border: 0;
+  outline: 0;
+  color: #142033;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.composerInput::placeholder {
+  color: #61708c;
+}
+
+/* ── Empty State ──────────────────────────────────────────── */
+.emptyState {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  color: #61708c;
+}
+
+.emptyTitle {
+  font-weight: 800;
+  color: #142033;
+}
+
+/* ── Confirmation Bar ─────────────────────────────────────── */
+.confirmBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius-xl);
+  color: #143251;
+}
+
+.confirmInfo {
+  background: rgba(0, 173, 199, 0.12);
+  border: 1px solid rgba(0, 173, 199, 0.2);
+}
+
+.confirmSuccess {
+  background: rgba(18, 166, 122, 0.12);
+  border: 1px solid rgba(18, 166, 122, 0.22);
+}
+
+.confirmWarning {
+  background: rgba(255, 183, 77, 0.14);
+  border: 1px solid rgba(255, 183, 77, 0.28);
+}
+
+.confirmText {
+  display: grid;
+  gap: 3px;
+}
+
+.confirmStrong {
+  font-weight: 800;
+}
+
+.confirmDetail {
+  font-size: var(--font-size-xs);
+  color: #61708c;
+}
+
+/* ── Inspector ────────────────────────────────────────────── */
+.inspectorHead {
+  display: grid;
+  gap: 12px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid rgba(139, 156, 188, 0.24);
+}
+
+.panelHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panelTitle {
+  font-weight: 800;
+}
+
+.panelSubtitle {
+  color: #61708c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.tabBar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--radius-xl);
+  background: rgba(91, 111, 148, 0.1);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  color: #50617e;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: inherit;
+  background: transparent;
+  cursor: pointer;
+  text-transform: capitalize;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.tab:hover {
+  color: var(--foreground);
+}
+
+.tabActive {
+  color: #1967ff;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 8px 20px rgba(26, 40, 80, 0.08);
+}
+
+.panelBody {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+/* ── Preview Panel ────────────────────────────────────────── */
+.panelStack {
+  display: grid;
+  gap: 12px;
+}
+
+.previewCard {
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.previewToolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border-bottom: 1px solid rgba(139, 156, 188, 0.24);
+}
+
+.windowDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1967ff;
+  opacity: 0.55;
+}
+
+.windowDot:nth-child(2) {
+  background: #00adc7;
+}
+
+.windowDot:nth-child(3) {
+  background: #7a4dff;
+}
+
+.previewToolbarText {
+  color: #61708c;
+  font-size: 13px;
+}
+
+.previewStage {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.previewRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.previewRowTitle {
+  font-weight: 800;
+}
+
+.previewRowDesc {
+  color: #61708c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* ── Diff Panel ───────────────────────────────────────────── */
+.fileRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.fileRowTitle {
+  font-weight: 800;
+}
+
+.fileRowDesc {
+  color: #61708c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.codeDiff {
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(22, 33, 56, 0.9);
+  color: #e9f0ff;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.diffLine {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  padding: 0 12px;
+}
+
+.diffAdd {
+  background: rgba(0, 173, 199, 0.13);
+}
+
+.diffRemove {
+  background: rgba(122, 77, 255, 0.13);
+}
+
+.diffSign {
+  font-family: monospace;
+  font-weight: 800;
+}
+
+.diffText {
+  font-family: inherit;
+}
+
+/* ── Approval Panel ───────────────────────────────────────── */
+.statusStrip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.statusItem {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px;
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.44);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+}
+
+.statusLabel {
+  font-size: 13px;
+  color: #61708c;
+}
+
+.statusValue {
+  color: #102449;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.approvalRow {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.approvalRowTitle {
+  font-weight: 800;
+}
+
+.approvalRowDesc {
+  color: #61708c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.approvalActions {
+  display: grid;
+  gap: 8px;
+}
+
+/* ── Check Icon ───────────────────────────────────────────── */
+.checkPassed {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 8px;
+  color: #fff;
+  background: linear-gradient(135deg, #12a67a, #00adc7);
+}
+
+.checkPending {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 8px;
+  color: #61708c;
+  background: rgba(91, 111, 148, 0.12);
+  border: 1px solid rgba(91, 111, 148, 0.16);
+}
+
+/* ── Session List (sidebar bottom) ────────────────────────── */
+.sessionList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sessionItem {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.sessionTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sessionTitle {
+  font-weight: 800;
+}
+
+.sessionMeta {
+  color: #61708c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: #12a67a;
+  box-shadow: 0 0 0 5px rgba(18, 166, 122, 0.11);
+}
+
+/* ── Command Palette ──────────────────────────────────────── */
+.commandOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: start center;
+  padding-top: 92px;
+  background: rgba(24, 38, 64, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.commandPanel {
+  width: min(620px, calc(100vw - 32px));
+  padding: 14px;
+}
+
+.commandInput {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(255, 255, 255, 0.76);
+}
+
+.commandInputField {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #142033;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.commandActions {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.commandOption {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  color: #253552;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  transition: background 160ms ease;
+}
+
+.commandOption:hover {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.commandOption:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.commandCopy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.commandTitle {
+  font-weight: 800;
+}
+
+.commandDesc {
+  font-size: var(--font-size-xs);
+  color: #61708c;
+  line-height: 1.35;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 760px) {
+  .taskHead {
+    flex-wrap: wrap;
+  }
+
+  .metrics,
+  .agentList,
+  .statusStrip {
+    grid-template-columns: 1fr;
+  }
+
+  .confirmBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

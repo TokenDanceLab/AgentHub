@@ -5,7 +5,11 @@ import (
 
 	"gorm.io/gorm"
 
+<<<<<<< HEAD
 	"github.com/agenthub/server-hub/internal/model"
+=======
+	"github.com/agenthub/hub-server/internal/model"
+>>>>>>> origin/master
 )
 
 func CreateAgentInstance(db *gorm.DB, ai *model.AgentInstance) error {

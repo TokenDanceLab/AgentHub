@@ -3,11 +3,13 @@ package store
 import (
 	"errors"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
 
 var ErrNotFound = errors.New("not found")
+var ErrProjectExists = errors.New("project already exists")
 
 type Project struct {
 	ID        string `json:"projectId"`
@@ -49,6 +51,38 @@ type Item struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+type Reader interface {
+	GetProject(id string) (Project, bool)
+	ListProjects() []Project
+	GetThread(id string) (Thread, bool)
+	ListThreads(projectID string) []Thread
+	GetRun(id string) (Run, bool)
+	ListRuns(threadID string) []Run
+	GetItem(id string) (Item, bool)
+	ListThreadItems(threadID string) []Item
+}
+
+type Writer interface {
+	CreateProject(id, name string) (Project, error)
+	CreateThread(id, projectID, title string) (Thread, error)
+	CreateRun(id, projectID, threadID string) (Run, error)
+	SetRunStatus(id, status string) (Run, bool)
+	SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool)
+	CreateItem(item Item) (Item, error)
+	CreateThreadMessage(itemID, threadID, role, content string) (Item, error)
+}
+
+type Repository interface {
+	Reader
+	Writer
+}
+
+type RunLifecycleStore interface {
+	GetRun(id string) (Run, bool)
+	SetRunStatus(id, status string) (Run, bool)
+	SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool)
+}
+
 type Store struct {
 	mu sync.RWMutex
 
@@ -72,12 +106,74 @@ func New() *Store {
 	}
 }
 
-func (s *Store) CreateProject(id, name string) Project {
+func (s *Store) snapshot() fileSnapshot {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return fileSnapshot{
+		Projects:     copyMap(s.projects),
+		Threads:      copyMap(s.threads),
+		Runs:         copyMap(s.runs),
+		Items:        copyMap(s.items),
+		ProjectOrder: append([]string(nil), s.projectOrder...),
+		ThreadOrder:  append([]string(nil), s.threadOrder...),
+		RunOrder:     append([]string(nil), s.runOrder...),
+		ItemOrder:    append([]string(nil), s.itemOrder...),
+	}
+}
+
+func (s *Store) applySnapshot(snapshot fileSnapshot) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.projects = copyMap(snapshot.Projects)
+	s.threads = copyMap(snapshot.Threads)
+	s.runs = copyMap(snapshot.Runs)
+	s.items = copyMap(snapshot.Items)
+	s.projectOrder = normalizeOrder(snapshot.ProjectOrder, s.projects)
+	s.threadOrder = normalizeOrder(snapshot.ThreadOrder, s.threads)
+	s.runOrder = normalizeOrder(snapshot.RunOrder, s.runs)
+	s.itemOrder = normalizeOrder(snapshot.ItemOrder, s.items)
+}
+
+func copyMap[K comparable, V any](source map[K]V) map[K]V {
+	copied := make(map[K]V, len(source))
+	for key, value := range source {
+		copied[key] = value
+	}
+	return copied
+}
+
+func normalizeOrder[V any](order []string, items map[string]V) []string {
+	normalized := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, id := range order {
+		if _, ok := items[id]; !ok {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		normalized = append(normalized, id)
+		seen[id] = struct{}{}
+	}
+
+	missing := make([]string, 0, len(items)-len(seen))
+	for id := range items {
+		if _, ok := seen[id]; !ok {
+			missing = append(missing, id)
+		}
+	}
+	sort.Strings(missing)
+	return append(normalized, missing...)
+}
+
+func (s *Store) CreateProject(id, name string) (Project, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if existing, ok := s.projects[id]; ok {
-		return existing
+		return existing, ErrProjectExists
 	}
 	if name == "" {
 		name = "Local Project"
@@ -92,7 +188,7 @@ func (s *Store) CreateProject(id, name string) Project {
 	}
 	s.projects[id] = project
 	s.projectOrder = append(s.projectOrder, id)
-	return project
+	return project, nil
 }
 
 func (s *Store) GetProject(id string) (Project, bool) {
@@ -227,6 +323,35 @@ func (s *Store) SetRunStatus(id, status string) (Run, bool) {
 	return run, true
 }
 
+func (s *Store) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	run, ok := s.runs[id]
+	if !ok {
+		return Run{}, false
+	}
+	allowed := len(allowedCurrent) == 0
+	for _, current := range allowedCurrent {
+		if run.Status == current {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		return run, false
+	}
+	switch status {
+	case "started":
+		run.StartedAt = nowString()
+	case "finished", "failed", "cancelled":
+		run.FinishedAt = nowString()
+	}
+	run.Status = status
+	s.runs[id] = run
+	return run, true
+}
+
 func (s *Store) CreateItem(item Item) (Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -259,6 +384,28 @@ func (s *Store) CreateItem(item Item) (Item, error) {
 	s.items[item.ID] = item
 	s.itemOrder = append(s.itemOrder, item.ID)
 	return item, nil
+}
+
+func (s *Store) CreateThreadMessage(itemID, threadID, role, content string) (Item, error) {
+	s.mu.RLock()
+	thread, ok := s.threads[threadID]
+	s.mu.RUnlock()
+	if !ok {
+		return Item{}, ErrNotFound
+	}
+	role = strings.TrimSpace(role)
+	if role == "" {
+		role = "user"
+	}
+	return s.CreateItem(Item{
+		ID:        itemID,
+		ProjectID: thread.ProjectID,
+		ThreadID:  thread.ID,
+		Type:      "user_message",
+		Role:      role,
+		Status:    "created",
+		Content:   content,
+	})
 }
 
 func (s *Store) GetItem(id string) (Item, bool) {

@@ -36,6 +36,7 @@ Thumbs.db
 .env.local
 .env.*
 !.env.example
+!.env.production.example
 .envrc
 *.pem
 *.key
@@ -66,6 +67,12 @@ yarn-error.log*
 *.backup
 *.sql.gz
 
+# AgentHub deployment state (hk2 production)
+hub-server/deployments/.env.production
+hub-server/deployments/.env
+hub-server/deployments/backups/
+backups/
+
 # Local machine and agent state
 .worktrees/
 docs/review/
@@ -76,15 +83,39 @@ docs/review/
 .agenthub/secrets/
 .claude/
 .codex/*
-!.codex/
-!.codex/skills/
-.codex/skills/*
-!.codex/skills/set-goal/
-!.codex/skills/set-goal/**
+.agents/*
+!.agents/
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/dev-loop/
+!.agents/skills/dev-loop/**
+!.agents/skills/test-coverage/
+!.agents/skills/test-coverage/**
+!.agents/skills/pre-push/
+!.agents/skills/pre-push/**
+!.agents/skills/integration-test/
+!.agents/skills/integration-test/**
+!.agents/skills/adapter-dev/
+!.agents/skills/adapter-dev/**
+!.agents/skills/env-sandbox/
+!.agents/skills/env-sandbox/**
 .cursor/
 .continue/
+
+# Agent inbox — reports dropped by other agents, local only
+docs/inbox/*
+!docs/inbox/README.md
+
+# Local ops docs — deployment details, SSH, server addresses (not for repo)
+.ops/
+
+# Review reports — cross-review and audit outputs
+docs/review/*
+!docs/review/README.md
 
 # Cloned reference repos (at repo root only)
 /reference/*
 !/reference/INDEX.md
 /chat-verify/
+test_store.json
+app/desktop/stats.html

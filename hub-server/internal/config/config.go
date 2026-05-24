@@ -1,7 +1,13 @@
 package config
 
 import (
+<<<<<<< HEAD
 	"fmt"
+=======
+	"errors"
+	"fmt"
+	"os"
+>>>>>>> origin/master
 	"strings"
 	"time"
 
@@ -17,10 +23,17 @@ type Config struct {
 }
 
 type ServerConfig struct {
+<<<<<<< HEAD
 	Port     int    `mapstructure:"port"`
 	LogLevel string `mapstructure:"log_level"`
 	LogFile  string `mapstructure:"log_file"`
 	AdminPort int   `mapstructure:"admin_port"`
+=======
+	Port      int    `mapstructure:"port"`
+	LogLevel  string `mapstructure:"log_level"`
+	LogFile   string `mapstructure:"log_file"`
+	AdminPort int    `mapstructure:"admin_port"`
+>>>>>>> origin/master
 }
 
 type DBConfig struct {
@@ -37,12 +50,21 @@ func (d DBConfig) DSN() string {
 }
 
 type RedisConfig struct {
+<<<<<<< HEAD
 	Host        string `mapstructure:"host"`
 	Port        int    `mapstructure:"port"`
 	Password    string `mapstructure:"password"`
 	DB          int    `mapstructure:"db"`
 	PoolSize    int    `mapstructure:"pool_size"`
 	MinIdleConns int   `mapstructure:"min_idle_conns"`
+=======
+	Host         string `mapstructure:"host"`
+	Port         int    `mapstructure:"port"`
+	Password     string `mapstructure:"password"`
+	DB           int    `mapstructure:"db"`
+	PoolSize     int    `mapstructure:"pool_size"`
+	MinIdleConns int    `mapstructure:"min_idle_conns"`
+>>>>>>> origin/master
 }
 
 func (r RedisConfig) Addr() string {
@@ -60,8 +82,11 @@ type UploadConfig struct {
 	MaxSize int64  `mapstructure:"max_size"`
 }
 
+<<<<<<< HEAD
 var Cfg *Config
 
+=======
+>>>>>>> origin/master
 func Load(configPath string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigFile(configPath)
@@ -78,6 +103,64 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+<<<<<<< HEAD
 	Cfg = &cfg
 	return &cfg, nil
 }
+=======
+	// Explicitly override JWT secret with env var (belt-and-suspenders on top of viper AutomaticEnv).
+	if envSecret := os.Getenv("AGENTHUB_JWT_SECRET"); envSecret != "" {
+		cfg.JWT.Secret = envSecret
+	}
+
+	return &cfg, nil
+}
+
+// Validate checks that the loaded configuration is usable at startup.
+// It rejects insecure defaults, missing infrastructure addresses, and
+// missing directories that the server depends on.
+func (c *Config) Validate() error {
+	// DB: host and port must be plausible.
+	if c.DB.Host == "" {
+		return errors.New("db.host is required")
+	}
+	if c.DB.Port <= 0 || c.DB.Port > 65535 {
+		return fmt.Errorf("db.port is invalid: %d", c.DB.Port)
+	}
+	if c.DB.User == "" {
+		return errors.New("db.user is required")
+	}
+	if c.DB.Name == "" {
+		return errors.New("db.name is required")
+	}
+
+	// Redis: host and port must be plausible.
+	if c.Redis.Host == "" {
+		return errors.New("redis.host is required")
+	}
+	if c.Redis.Port <= 0 || c.Redis.Port > 65535 {
+		return fmt.Errorf("redis.port is invalid: %d", c.Redis.Port)
+	}
+
+	// JWT: reject hardcoded defaults.
+	if c.JWT.Secret == "" || c.JWT.Secret == "dev-secret-change-in-production" {
+		if os.Getenv("AGENTHUB_JWT_SECRET") == "" {
+			return errors.New("JWT secret must be set via AGENTHUB_JWT_SECRET environment variable; hardcoded defaults are rejected")
+		}
+	}
+
+	// JWT: enforce minimum length.
+	if len(c.JWT.Secret) < 16 {
+		return fmt.Errorf("JWT secret too short: minimum 16 characters required (got %d)", len(c.JWT.Secret))
+	}
+
+	// Upload: if a directory is configured, it must exist.
+	if c.Upload.Dir != "" {
+		if _, err := os.Stat(c.Upload.Dir); os.IsNotExist(err) {
+			return fmt.Errorf("upload directory does not exist: %s", c.Upload.Dir)
+		}
+	}
+
+	return nil
+}
+>>>>>>> origin/master
