@@ -24,6 +24,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Build
         run: go build ./...
@@ -38,15 +39,46 @@ jobs:
       - name: Test (unit only, skip integration)
         run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
 
-      - name: Coverage check
+      - name: Coverage check (overall >= 75%)
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          THRESHOLD=70
-          echo "Coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
+          THRESHOLD=75
+          echo "Overall coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
           if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
             echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
             exit 1
           fi
+
+      - name: Coverage per-package minimums
+        run: |
+          echo "=== Per-package coverage minimums ==="
+          check_pkg() {
+            local pattern="$1"
+            local min="$2"
+            local label="$3"
+            local cov
+            cov=$(go tool cover -func=coverage.out | grep "$pattern" | awk '{sum+=$NF; n++} END {if(n>0) printf "%.1f", sum/n; else print "0"}')
+            echo "  ${label}: ${cov}% (min: ${min}%)"
+            if (( $(echo "$cov < $min" | bc -l) )); then
+              echo "::error::${label} coverage ${cov}% below ${min}% minimum"
+              return 1
+            fi
+          }
+          FAILED=0
+          check_pkg "edge-server/internal/security/" 70 "security" || FAILED=1
+          check_pkg "edge-server/internal/lifecycle/" 60 "lifecycle" || FAILED=1
+          check_pkg "edge-server/internal/adapters/" 55 "adapters" || FAILED=1
+          exit $FAILED
+
+      - name: Race detection
+        run: go test ./... -count=1 -short -race
+
+      - name: Security scan (gosec)
+        run: go run github.com/securecodewarrior/gosec/v2/cmd/gosec@latest ./...
+        continue-on-error: true
+
+      - name: Vulnerability check (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
       - name: Vet
         run: go vet ./...
@@ -83,6 +115,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Build
         run: go build ./...
@@ -97,14 +130,37 @@ jobs:
       - name: Test (unit only, skip integration)
         run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
 
-      - name: Coverage check
+      - name: Coverage check (overall, soft)
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           THRESHOLD=40
-          echo "Coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
+          echo "Overall coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
           if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
-            echo "::warning::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
+            echo "::warning::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold (need more unit tests outside tests/)"
           fi
+
+      - name: Coverage per-package minimums
+        run: |
+          echo "=== Per-package coverage minimums ==="
+          FAILED=0
+          # auth is the only package with unit tests; must have high coverage
+          AUTH_COV=$(go tool cover -func=coverage.out | grep "hub-server/internal/auth/" | awk '{sum+=$NF; n++} END {if(n>0) printf "%.1f", sum/n; else print "0"}')
+          echo "  auth: ${AUTH_COV}% (min: 80%)"
+          if (( $(echo "$AUTH_COV < 80" | bc -l) )); then
+            echo "::error::auth package coverage ${AUTH_COV}% below 80% minimum"
+            FAILED=1
+          fi
+          exit $FAILED
+
+      - name: Race detection
+        run: go test ./... -count=1 -short -race
+
+      - name: Security scan (gosec)
+        run: go run github.com/securecodewarrior/gosec/v2/cmd/gosec@latest ./...
+        continue-on-error: true
+
+      - name: Vulnerability check (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
       - name: Vet
         run: go vet ./...

@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { Circle, Wifi, WifiOff, Sun, Moon } from 'lucide-react';
+import { Wifi, WifiOff, Sun, Moon } from 'lucide-react';
 import type { HealthResponse } from '@shared/types';
+import { StatusBadge } from '@shared/components';
 import { useTheme } from '@/contexts/ThemeContext';
 import styles from './StatusBar.module.css';
 
@@ -60,24 +61,17 @@ export default memo(function StatusBar({ online, health, isConnected, error, pro
 
   return (
     <div className={styles.bar} role="status" aria-atomic="true">
-      <Circle
-        size={8}
-        fill="currentColor"
-        className={isReconnecting ? styles.pulse : undefined}
-        style={{ color: online ? 'var(--color-success)' : 'var(--color-danger)' }}
-        aria-hidden="true"
-        data-testid={online ? 'status-dot-online' : 'status-dot-offline'}
+      <StatusBadge
+        status={online ? 'online' : isReconnecting ? 'running' : 'offline'}
       />
-      <span className={isReconnecting ? styles.reconnecting : undefined}>
-        {online
-          ? t('status.online', {
-              version: health?.version ?? 'v1',
-              edgeId: health?.edgeId ?? '?',
-            })
-          : isReconnecting
-            ? t('status.reconnecting')
-            : t('status.offline')}
-      </span>
+      {online && health && (
+        <span className={styles.edgeInfo}>
+          {health.version ?? 'v1'} / {health.edgeId ?? '?'}
+        </span>
+      )}
+      {isReconnecting && (
+        <span className={styles.reconnecting}>{t('status.reconnecting')}</span>
+      )}
       {latencyMs != null && (
         <span
           className={`${styles.latency} ${latencyClass}`}
