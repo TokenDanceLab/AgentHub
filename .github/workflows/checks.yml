@@ -182,6 +182,23 @@ jobs:
       - name: Verify image
         run: docker images agenthub-hub-server
 
+  # ── Benchmark Regression ─────────────────────
+  benchmark:
+    name: Benchmark regression check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Run benchmarks
+        run: |
+          cd edge-server && go test -bench=. -benchtime=1s ./internal/events/ ./internal/adapters/
+          cd ../hub-server && go test -bench=. -benchtime=1s ./internal/service/ ./internal/jwtutil/
+
   # ── Frontend: Desktop ────────────────────────
   frontend-desktop:
     runs-on: ubuntu-latest
