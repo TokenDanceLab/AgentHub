@@ -184,6 +184,8 @@
   "shortcut.search": "搜索消息",
   "shortcut.send": "发送消息",
   "shortcut.title": "键盘快捷键",
+  "shortcut.toggleRunPanel": "切换运行详情面板",
+  "shortcut.toggleSidebar": "切换左侧栏",
 
   "status.hubClickToLogin": "点击登录 Hub",
   "status.hubConnected": "Hub: 已连接",
