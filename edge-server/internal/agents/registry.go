@@ -189,6 +189,32 @@ func (r *Registry) SetRunID(id, runID string) bool {
 	return true
 }
 
+// FindByRunID returns the agent instance associated with the given run ID.
+// Returns nil if no agent has that run ID.
+func (r *Registry) FindByRunID(runID string) *AgentInstance {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, inst := range r.agents {
+		if inst.RunID == runID {
+			cloned := *inst
+			return &cloned
+		}
+	}
+	return nil
+}
+
+// SetLastSeenNow updates the LastSeen timestamp for the given agent instance.
+func (r *Registry) SetLastSeenNow(id string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	inst, ok := r.agents[id]
+	if !ok {
+		return false
+	}
+	inst.LastSeen = time.Now()
+	return true
+}
+
 // Count returns the total number of registered agents.
 func (r *Registry) Count() int {
 	r.mu.RLock()
@@ -260,4 +286,18 @@ func (r *Registry) MaxDepth() int {
 		}
 	}
 	return max
+}
+
+// GetByRunID returns the agent instance associated with the given run ID.
+// Returns nil if no agent matches.
+func (r *Registry) GetByRunID(runID string) *AgentInstance {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, inst := range r.agents {
+		if inst.RunID == runID {
+			cloned := *inst
+			return &cloned
+		}
+	}
+	return nil
 }
