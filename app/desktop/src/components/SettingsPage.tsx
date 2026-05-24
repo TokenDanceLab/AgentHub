@@ -170,6 +170,23 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const recentRuns = getRecentRuns(runs, 5);
   const activeHubTasks = bridgedTasks.filter(isActiveBridgeTask).length;
   const recentBridgeTasks = getRecentTasks(bridgedTasks, 5);
+  const schedulerActiveItems = activeRuns + activeHubTasks;
+  const schedulerTotalItems = runs.length + bridgedTasks.length;
+  const schedulerTargetReadyCount = [
+    edgeOnline,
+    hubAuthenticated,
+    remoteControlEnabled,
+    false,
+  ].filter(Boolean).length;
+  const schedulerLocalMetric = totalRunners > 0 ? runnerSummary : edgeOnline ? t('settings.edgeOnline') : t('settings.edgeOffline');
+  const marketPublishReady = agents.filter((agent) => agent.status === 'available').length;
+  const marketCapabilityCount = countAgentCapabilities(agents);
+  const schedulerPolicyReadyCount = [
+    modelMappingEnabled,
+    ccSwitchBridge,
+    autoReview,
+    remoteControlEnabled,
+  ].filter(Boolean).length;
 
   const navItems = useMemo<NavItem[]>(
     () => [
@@ -592,22 +609,198 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'agentScheduling' && (
             <Panel title={t('settings.agentScheduling')} description={t('settings.agentSchedulingDesc')}>
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<ClipboardList size={18} />}
+                  label={t('settings.schedulerQueueLive')}
+                  value={`${schedulerActiveItems}/${schedulerTotalItems}`}
+                  detail={runsLoading ? t('settings.loading') : t('settings.schedulerQueueLiveDesc')}
+                />
+                <SummaryCard
+                  icon={<Bot size={18} />}
+                  label={t('settings.schedulerProfiles')}
+                  value={`${availableAgents}/${agents.length}`}
+                  detail={edgeOnline ? t('settings.schedulerProfilesDesc') : t('settings.edgeOffline')}
+                />
+                <SummaryCard
+                  icon={<Server size={18} />}
+                  label={t('settings.schedulerTargets')}
+                  value={`${schedulerTargetReadyCount}/4`}
+                  detail={t('settings.schedulerTargetsDesc')}
+                />
+                <SummaryCard
+                  icon={<ShieldCheck size={18} />}
+                  label={t('settings.schedulerPolicyReady')}
+                  value={`${schedulerPolicyReadyCount}/4`}
+                  detail={t('settings.schedulerPolicyReadyDesc')}
+                />
+              </div>
               <SettingRow
                 title={t('settings.enableAgentScheduling')}
                 description={t('settings.enableAgentSchedulingDesc')}
                 control={<Switch checked={agentSchedulingEnabled} onChange={setBooleanSetting('agentScheduling', setAgentSchedulingEnabled)} />}
               />
-              <SettingRow title={t('settings.schedulerQueue')} description={t('settings.schedulerQueueDesc')} value={t('settings.statusInProgress')} />
-              <SettingRow title={t('settings.schedulerPolicy')} description={t('settings.schedulerPolicyDesc')} value={t('settings.statusPlanned')} />
-              <SettingRow title={t('settings.schedulerRemote')} description={t('settings.schedulerRemoteDesc')} value={t('settings.statusPlanned')} />
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.schedulerLiveQueue')}</strong>
+                  <span>{t('settings.schedulerLiveQueueDesc')}</span>
+                </div>
+                {recentRuns.length > 0 || recentBridgeTasks.length > 0 ? (
+                  <div className={styles.taskList}>
+                    {recentRuns.slice(0, 3).map((run) => (
+                      <TaskRunRow key={`scheduler-${run.runId}`} run={run} />
+                    ))}
+                    {recentBridgeTasks.slice(0, 3).map((task) => (
+                      <HubTaskRow key={`scheduler-${task.taskId}`} task={task} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.schedulerNoQueue')} description={t('settings.schedulerNoQueueDesc')} />
+                )}
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.schedulerTargets')}</strong>
+                  <span>{t('settings.schedulerTargetsDesc')}</span>
+                </div>
+                <div className={styles.targetGrid}>
+                  <ExecutionTargetCard
+                    icon={<Monitor size={18} />}
+                    title={t('settings.schedulerRouteLocal')}
+                    description={t('settings.schedulerRouteLocalDesc')}
+                    status={edgeOnline ? t('settings.enabled') : t('settings.offline')}
+                    metric={schedulerLocalMetric}
+                    connected={edgeOnline}
+                  />
+                  <ExecutionTargetCard
+                    icon={<Globe2 size={18} />}
+                    title={t('settings.schedulerRouteHub')}
+                    description={t('settings.schedulerRouteHubDesc')}
+                    status={hubAuthenticated ? t('settings.enabled') : t('settings.notConfigured')}
+                    metric={hubAuthenticated ? t('settings.targetHubSignedIn') : t('settings.targetHubSignInRequired')}
+                    connected={hubAuthenticated}
+                  />
+                  <ExecutionTargetCard
+                    icon={<Computer size={18} />}
+                    title={t('settings.schedulerRouteRemote')}
+                    description={t('settings.schedulerRouteRemoteDesc')}
+                    status={remoteControlEnabled ? t('settings.statusInProgress') : t('settings.statusPlanned')}
+                    metric="SSH / Tailscale"
+                    connected={remoteControlEnabled}
+                  />
+                  <ExecutionTargetCard
+                    icon={<Server size={18} />}
+                    title={t('settings.schedulerRouteCloud')}
+                    description={t('settings.schedulerRouteCloudDesc')}
+                    status={t('settings.statusPlanned')}
+                    metric="Cloud Edge"
+                  />
+                </div>
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.schedulerPolicy')}</strong>
+                  <span>{t('settings.schedulerPolicyDesc')}</span>
+                </div>
+                <div className={styles.capabilityGrid}>
+                  <CapabilityCard
+                    title={t('settings.schedulerPolicyModelMapping')}
+                    description={t('settings.schedulerPolicyModelMappingDesc')}
+                    status={modelMappingEnabled ? t('settings.enabled') : t('settings.notConfigured')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.schedulerPolicyCcSwitch')}
+                    description={t('settings.schedulerPolicyCcSwitchDesc')}
+                    status={ccSwitchBridge ? t('settings.enabled') : t('settings.statusPlanned')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.schedulerPolicyRemote')}
+                    description={t('settings.schedulerPolicyRemoteDesc')}
+                    status={remoteControlEnabled ? t('settings.enabled') : t('settings.statusPlanned')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.schedulerPolicyApproval')}
+                    description={t('settings.schedulerPolicyApprovalDesc')}
+                    status={autoReview ? t('settings.enabled') : t('settings.approvalMode.manual')}
+                  />
+                </div>
+              </div>
+              <Callout title={t('settings.schedulerGuard')} body={t('settings.schedulerGuardDesc')} />
             </Panel>
           )}
 
           {active === 'agentMarket' && (
             <Panel title={t('settings.agentMarket')} description={t('settings.agentMarketDesc')}>
-              <SettingRow title={t('settings.agentTemplates')} description={t('settings.agentTemplatesDesc')} value={t('settings.statusPlanned')} />
-              <SettingRow title={t('settings.agentCapabilityTags')} description={t('settings.agentCapabilityTagsDesc')} value={t('settings.statusReady')} />
-              <SettingRow title={t('settings.agentReviewFlow')} description={t('settings.agentReviewFlowDesc')} value={t('settings.statusPlanned')} />
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<Bot size={18} />}
+                  label={t('settings.marketLocalProfiles')}
+                  value={`${agents.length}`}
+                  detail={edgeOnline ? t('settings.marketLocalProfilesDesc') : t('settings.edgeOffline')}
+                />
+                <SummaryCard
+                  icon={<ShieldCheck size={18} />}
+                  label={t('settings.marketPublishReady')}
+                  value={`${marketPublishReady}/${agents.length}`}
+                  detail={t('settings.marketPublishReadyDesc')}
+                />
+                <SummaryCard
+                  icon={<Code2 size={18} />}
+                  label={t('settings.marketCapabilities')}
+                  value={`${marketCapabilityCount}`}
+                  detail={t('settings.marketCapabilitiesDesc')}
+                />
+                <SummaryCard
+                  icon={<Globe2 size={18} />}
+                  label={t('settings.marketHubSync')}
+                  value={hubAuthenticated ? t('settings.enabled') : t('settings.notConfigured')}
+                  detail={hubAuthenticated ? t('settings.marketHubSyncDesc') : t('settings.marketHubSyncSignedOut')}
+                />
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.marketInstalledProfiles')}</strong>
+                  <span>{t('settings.marketInstalledProfilesDesc')}</span>
+                </div>
+                {agents.length > 0 ? (
+                  <div className={styles.profileGrid}>
+                    {agents.map((agent) => (
+                      <AgentMarketCard key={`market-${agent.id}`} agent={agent} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.marketNoProfiles')} description={t('settings.marketNoProfilesDesc')} />
+                )}
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.marketReleaseReadiness')}</strong>
+                  <span>{t('settings.marketReleaseReadinessDesc')}</span>
+                </div>
+                <div className={styles.capabilityGrid}>
+                  <CapabilityCard
+                    title={t('settings.agentTemplates')}
+                    description={t('settings.agentTemplatesDesc')}
+                    status={agents.length > 0 ? t('settings.statusInProgress') : t('settings.statusPlanned')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.agentCapabilityTags')}
+                    description={t('settings.agentCapabilityTagsDesc')}
+                    status={marketCapabilityCount > 0 ? t('settings.statusReady') : t('settings.statusPlanned')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.agentReviewFlow')}
+                    description={t('settings.agentReviewFlowDesc')}
+                    status={autoReview ? t('settings.statusInProgress') : t('settings.statusPlanned')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.marketTokenDancePublish')}
+                    description={t('settings.marketTokenDancePublishDesc')}
+                    status={hubAuthenticated ? t('settings.statusInProgress') : t('settings.notConfigured')}
+                  />
+                </div>
+              </div>
+              <Callout title={t('settings.marketGuard')} body={t('settings.marketGuardDesc')} />
             </Panel>
           )}
 
@@ -880,6 +1073,16 @@ function getRecentTasks(tasks: AgentTask[], limit: number) {
   return [...tasks].sort((a, b) => timestampOf(b.createdAt) - timestampOf(a.createdAt)).slice(0, limit);
 }
 
+function countAgentCapabilities(agents: AgentInfo[]) {
+  const names = new Set<string>();
+  for (const agent of agents) {
+    for (const [name, enabled] of Object.entries(agent.capabilities)) {
+      if (enabled) names.add(name);
+    }
+  }
+  return names.size;
+}
+
 function timestampOf(value?: string) {
   if (!value) return 0;
   const parsed = Date.parse(value);
@@ -1027,6 +1230,42 @@ function AgentProfileCard({ agent }: { agent: AgentInfo }) {
         <span>{t('settings.profileRuntime')}: {agent.id}</span>
         <span>{t('settings.profileModel')}: {t('settings.routingAuto')}</span>
         <span>{t('settings.profileConfig')}: {t('settings.statusInProgress')}</span>
+      </div>
+    </div>
+  );
+}
+
+function AgentMarketCard({ agent }: { agent: AgentInfo }) {
+  const { t } = useTranslation();
+  const capabilityNames = Object.entries(agent.capabilities)
+    .filter(([, enabled]) => enabled)
+    .map(([name]) => t(`settings.capability.${name}`, { defaultValue: name }));
+
+  return (
+    <div className={styles.profileCard}>
+      <div className={styles.profileHeader}>
+        <div className={styles.profileIcon}>
+          <Bot size={17} />
+        </div>
+        <div>
+          <strong>{agent.name}</strong>
+          <span>{agent.description || t('settings.marketProfileDefaultDesc')}</span>
+        </div>
+        <em className={`${styles.profileStatus} ${styles[`profileStatus_${agent.status}`]}`}>
+          {t(`agent.status.${agent.status}`)}
+        </em>
+      </div>
+      <div className={styles.profileMeta}>
+        <span>{t('settings.profileRuntime')}: {agent.id}</span>
+        <span>{t('settings.marketInstallSource')}: Local Edge</span>
+        <span>{t('settings.marketPublishStatus')}: {agent.status === 'available' ? t('settings.statusInProgress') : t('settings.statusPlanned')}</span>
+      </div>
+      <div className={styles.profileMeta}>
+        {capabilityNames.length > 0 ? (
+          capabilityNames.map((name) => <span key={name}>{name}</span>)
+        ) : (
+          <span>{t('settings.marketNoCapabilityTags')}</span>
+        )}
       </div>
     </div>
   );
