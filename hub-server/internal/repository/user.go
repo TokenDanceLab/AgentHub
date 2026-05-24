@@ -34,3 +34,19 @@ func UpdateUser(db *gorm.DB, user *model.User) error {
 func UpdatePassword(db *gorm.DB, userID string, passwordHash string) error {
 	return db.Model(&model.User{}).Where("id = ?", userID).Update("password_hash", passwordHash).Error
 }
+
+// GetUsersByIDs returns a map of user ID → *User for the given IDs.
+func GetUsersByIDs(db *gorm.DB, ids []string) (map[string]*model.User, error) {
+	if len(ids) == 0 {
+		return map[string]*model.User{}, nil
+	}
+	var users []model.User
+	if err := db.Where("id IN ?", ids).Find(&users).Error; err != nil {
+		return nil, err
+	}
+	m := make(map[string]*model.User, len(users))
+	for i := range users {
+		m[users[i].ID] = &users[i]
+	}
+	return m, nil
+}

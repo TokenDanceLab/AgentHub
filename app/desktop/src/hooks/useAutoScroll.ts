@@ -1,6 +1,12 @@
 import { useState, useCallback, useEffect, useRef, type RefObject } from 'react';
 import type { ChatMessage } from '@/components/ChatView.types';
 
+interface UseAutoScrollOptions {
+  /** Custom scroll-to-bottom implementation (e.g. virtualizer.scrollToIndex).
+   *  When provided, flag-based auto-scroll detection is used instead of position-based. */
+  scrollToBottomFn?: (force?: boolean) => void;
+}
+
 /**
  * Port of OpenCode's createAutoScroll pattern.
  *
@@ -11,18 +17,25 @@ import type { ChatMessage } from '@/components/ChatView.types';
  * - When isStreaming starts → auto-scroll to bottom
  * - When new message arrives AND user is near bottom → scroll to bottom
  * - isNearBottom boolean for UI indicators
- * - Use requestAnimationFrame for smooth scrolling
+ *
+ * When scrollToBottomFn is provided (virtual scroll):
+ * - Uses flag-based detection: sets a flag before calling custom fn,
+ *   clears after 100ms timeout, skips scroll events while flag is set
+ * - Position-based markAutoScroll/isAutoScroll still used as fallback
  *
  * @param containerRef - Ref to the scrollable container element
  * @param deps.messages - Chat messages array (scroll on length change)
  * @param deps.isStreaming - Whether the agent is currently streaming
+ * @param options.scrollToBottomFn - Optional custom scroll function (e.g. virtualizer.scrollToIndex)
  * @returns scrollToBottom function and isNearBottom flag
  */
 export function useAutoScroll(
   containerRef: RefObject<HTMLDivElement | null>,
   deps: { messages: ChatMessage[]; isStreaming: boolean },
+  options?: UseAutoScrollOptions,
 ): { scrollToBottom: (force?: boolean) => void; isNearBottom: boolean } {
   const BOTTOM_THRESHOLD = 200;
+  const customFn = options?.scrollToBottomFn;
 
   const [isNearBottom, setIsNearBottom] = useState(true);
   const userScrolledRef = useRef(false);
@@ -31,6 +44,13 @@ export function useAutoScroll(
   const scrollRafRef = useRef<number | null>(null);
   const prevStreamingRef = useRef(deps.isStreaming);
   const prevMessageCountRef = useRef(deps.messages.length);
+  // Flag-based detection for custom scroll function
+  const flagRef = useRef(false);
+  const flagTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Stable ref for customFn to avoid dependency churn
+  const customFnRef = useRef(customFn);
+  customFnRef.current = customFn;
 
   // ── Helpers ───────────────────────────────────
 
@@ -78,12 +98,34 @@ export function useAutoScroll(
       if (!force && userScrolledRef.current) return;
 
       const dist = distanceFromBottom(el);
+      const fn = customFnRef.current;
+
+      // Already at bottom — mark and skip
       if (dist < 2) {
         markAutoScroll(el);
         return;
       }
 
-      // Use requestAnimationFrame for smooth scrolling after DOM paint
+      if (fn) {
+        // Flag-based detection: mark that we're auto-scrolling
+        flagRef.current = true;
+        if (flagTimerRef.current) clearTimeout(flagTimerRef.current);
+        flagTimerRef.current = setTimeout(() => {
+          flagRef.current = false;
+          flagTimerRef.current = undefined;
+        }, 1500);
+
+        // Use requestAnimationFrame for coordination with DOM paint
+        if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = requestAnimationFrame(() => {
+          scrollRafRef.current = null;
+          markAutoScroll(el);
+          fn(force);
+        });
+        return;
+      }
+
+      // Default: DOM scroll
       if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current);
       scrollRafRef.current = requestAnimationFrame(() => {
         scrollRafRef.current = null;
@@ -100,7 +142,12 @@ export function useAutoScroll(
     const el = containerRef.current;
     if (!el) return;
 
-    // Ignore scroll events triggered by our own scrollToBottom calls
+    // Flag-based: skip if we initiated this scroll via custom function
+    if (customFnRef.current && flagRef.current) {
+      return;
+    }
+
+    // Position-based: ignore scroll events triggered by our own scrollToBottom calls
     if (!userScrolledRef.current && isAutoScroll(el)) {
       return;
     }
@@ -170,6 +217,7 @@ export function useAutoScroll(
   useEffect(() => {
     return () => {
       if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
+      if (flagTimerRef.current) clearTimeout(flagTimerRef.current);
       if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current);
     };
   }, []);

@@ -32,8 +32,8 @@ func TestFileStoreRestoresProjectThreadRunItemAndOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewFile returned error: %v", err)
 	}
-	projectB := s.CreateProject("proj_b", "Project B")
-	projectA := s.CreateProject("proj_a", "Project A")
+	projectB, _ := s.CreateProject("proj_b", "Project B")
+	projectA, _ := s.CreateProject("proj_a", "Project A")
 	threadB, err := s.CreateThread("thread_b", projectB.ID, "Thread B")
 	if err != nil {
 		t.Fatalf("CreateThread thread_b returned error: %v", err)
@@ -225,7 +225,7 @@ func TestFileStoreDoesNotLeaveTempFilesAfterSave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewFile returned error: %v", err)
 	}
-	s.CreateProject("proj_test", "Test Project")
+	_, _ = s.CreateProject("proj_test", "Test Project")
 
 	matches, err := filepath.Glob(filepath.Join(dir, "store.json.tmp-*"))
 	if err != nil {
@@ -283,7 +283,7 @@ func TestFileStoreLastPersistErrorTracksSaveFailure(t *testing.T) {
 		t.Fatalf("Mkdir returned error: %v", err)
 	}
 
-	s.CreateProject("proj_test", "Test Project")
+	_, _ = s.CreateProject("proj_test", "Test Project")
 	if err := s.LastPersistError(); err == nil {
 		t.Fatal("LastPersistError returned nil after persist failure")
 	}

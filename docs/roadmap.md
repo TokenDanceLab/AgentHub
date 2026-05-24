@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-24
+最后更新：2026-05-24（M5 批次完成）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -30,24 +30,27 @@
 | **P3** | Bundle 分析 + React.lazy 拆分 + 权限事件管道 | 3/3 | 2026-05 |
 | **M3b** | AgentHook 接口 + 消息树 + 安全管道 + Task dispatched + Context Budget + 流式增量解析 | 6/6 | 2026-05 |
 | **M4** | Hub 骨架 + OpenCode E2E + Codex E2E + 环境隔离 + auth middleware + 权限门控升级 + 响应式布局 | 8/8 | 2026-05 |
+| **M5** | **工程基础收敛**：Edge race/metrics/tests/P2 + Hub 安全/DI全5阶段/测试12包/P2 + Desktop 虚拟滚动/高亮/空状态/@mention/tablet + CI增强 | 27/27 | 2026-05-24 |
 
-### 1.3 关键差距（来自审计报告）
+### 1.3 关键差距（来自审计报告 — M5 已全部修复）
+
+> 以下 P0-P2 项在 M5 批次（2026-05-24）中全部修复，保留作为记录。
 
 参考：`docs/review/edge-server-audit.md`、`docs/review/hub-server-audit.md`、`docs/review/hub-server-testing.md`、`docs/review/backend-engineering-standards.md`
 
-| 严重度 | 层面 | 核心问题 | 报告索引 |
-|:--:|------|------|:--:|
-| **P0** | Edge | ProcessExecutor race condition（并发 Cancel 找不到 cancel func） | edge S1 |
-| **P0** | Edge | 零可观测性（无 Prometheus、health check 浅） | edge S2 |
-| **P0** | Hub | JWT secret 硬编码在 config.yaml，pprof :6060 无认证 | hub P0-1, P0-2 |
-| **P0** | Hub | EventBus panic 静默丢弃（recover 无日志） | hub P0-3 |
-| **P0** | Hub | 零单元测试在 CI 中运行（`-short` 跳过全部） | testing report |
-| **P1** | Hub | 全局单例 `config.Cfg`/`repository.DB`/`cache.RDB` | hub P1-2, P1-3 |
-| **P1** | Hub | go.mod 声明 `go 1.25.6`（不存在版本） | standards 2.1 |
-| **P1** | Hub | DeviceHandler 绕过 service 层直接操作 DB | hub P1-1 |
-| **P1** | Edge | runnerctx 包覆盖率仅 17.3%，control_protocol 覆盖率 0% | edge S3, S4 |
-| **P1** | Desktop | 无 TanStack Query、无状态机、受控输入闪烁、无虚拟滚动 | client.md P0 |
-| **P2** | Hub | 两个 N+1 查询 + jsonb 无验证 + 无速率限制 | hub P2-1/2/3, P1-4 |
+| 严重度 | 层面 | 核心问题 | 报告索引 | 状态 |
+|:--:|------|------|:--:|:--:|
+| **P0** | Edge | ProcessExecutor race condition | edge S1 | ✅ M5 |
+| **P0** | Edge | 零可观测性（无 Prometheus、health check 浅） | edge S2 | ✅ M5 |
+| **P0** | Hub | JWT secret 硬编码，pprof :6060 无认证 | hub P0-1, P0-2 | ✅ M5 |
+| **P0** | Hub | EventBus panic 静默丢弃 | hub P0-3 | ✅ M5 |
+| **P0** | Hub | 零单元测试在 CI 中运行 | testing report | ✅ M5 |
+| **P1** | Hub | 全局单例 `config.Cfg`/`repository.DB`/`cache.RDB` | hub P1-2, P1-3 | ✅ M5 |
+| **P1** | Hub | go.mod 版本号错误 | standards 2.1 | ✅ M5 |
+| **P1** | Hub | DeviceHandler 绕过 service 层 | hub P1-1 | ✅ M5 |
+| **P1** | Edge | runnerctx 17.3%，control_protocol 0% | edge S3, S4 | ✅ M5 |
+| **P1** | Desktop | 无虚拟滚动 | client.md P0 | ✅ M5 |
+| **P2** | Hub | N+1 查询 + jsonb 无验证 + 无速率限制 | hub P2-1/2/3, P1-4 | ✅ M5 |
 
 ---
 
@@ -345,37 +348,36 @@ Hub 调度（远程）:
 
 > 参考：`docs/roadmaps/client.md` Phase 0（完整 12 项任务）
 
-- [ ] **P0-1: 状态架构重构** `[5d]`
-  - 引入 TanStack Query：新建 `app/desktop/src/api/queryClient.ts`, `threadQueries.ts`, `runQueries.ts`
-  - 改造 `useChatMessages.ts`：事件 → `queryClient.invalidateQueries`
-  - 改造 `runStore.ts`：删除服务端数据，仅保留 `isStreaming` 等客户端标志
-  - RunState 正式状态机：`NO_TASK → RUNNING ↔ STREAMING → WAITING_FOR_INPUT / IDLE / COMPLETED / FAILED / CANCELLED`
-  - Zustand selector 粒度优化：所有 store 使用 `subscribeWithSelector`
+- [x] **P0-1: 状态架构重构** `[5d]`
+  - ✅ 引入 TanStack Query：`queryClient.ts`, `threadQueries.ts`, `runQueries.ts`（M5）
+  - ✅ 改造 `useChatMessages.ts`：事件 → `queryClient.invalidateQueries`
+  - ✅ 改造 `runStore.ts`：删除服务端数据，仅保留 `isStreaming` 等客户端标志
+  - ✅ RunState 正式状态机：`IDLE → RUNNING ↔ STREAMING → WAITING_FOR_INPUT / COMPLETED / FAILED / CANCELLED`（M5，`runStateMachine.ts`）
+  - ✅ Zustand selector 粒度优化：所有 store 使用 `subscribeWithSelector`
   - 参考：Multica TanStack Query+Zustand 分离模式，Roo-Code AgentLoopState
-  - 实施详情：`docs/design/client-p0-architecture.md#p0-1`
 
-- [ ] **P0-2: 输入体验修复** `[4d]`
-  - 非受控输入迁移：`PromptInput.tsx` `useState` → `useRef + DOM`（0.5d 快赢）
-  - 草稿持久化：新建 `useInputDraft.ts`，localStorage 按 threadId 存储（0.5d 快赢）
-  - 工具调用循环检测：`useChatMessages.ts` 签名去重，3 次警告 5 次拦截
-  - 文件读取去重缓存：`Map<path, {readCount, mtime}>` 缓存
+- [x] **P0-2: 输入体验修复** `[4d]`
+  - ✅ 非受控输入迁移：`PromptInput.tsx` `useState` → `useRef + DOM`
+  - ✅ 草稿持久化：`useInputDraft.ts`，localStorage 按 threadId 存储
+  - ✅ 工具调用循环检测：`LoopDetector` 类，3 次警告 5 次自动取消
+  - ✅ 文件读取去重缓存：`FileReadCache` 类，path+mtime 键
 
-- [ ] **P0-3: 连接健壮性** `[3d]`
-  - WebSocket 心跳：10s ping/pong + 15s 超时检测（0.5d 快赢）
-  - 离线消息队列：新建 `offlineQueue.ts`，断线入队 localStorage，重连后按序发送
-  - 传输层抽象：新建 `transport.ts` Transport 接口，WebSocketTransport / MockTransport 实现
+- [x] **P0-3: 连接健壮性** `[3d]`
+  - ✅ WebSocket 心跳：10s ping/pong + 15s 超时检测（M5 `eventClient.ts`）
+  - ✅ 离线消息队列：`transport.ts` `WebSocketTransport` + localStorage 持久化
+  - ✅ 传输层抽象：`Transport` 接口 + `WebSocketTransport` 实现 + 指数退避重连
 
-- [ ] **P0-4: 性能基础** `[2d]`
-  - 虚拟滚动：`@tanstack/react-virtual`，>200 条消息时启用
-  - App.tsx 视图注册表拆分：新建 `viewRegistry.ts`，从 500+ 行拆分
+- [x] **P0-4: 性能基础** `[2d]`
+  - ✅ 虚拟滚动：`@tanstack/react-virtual`（M5 完成，`ChatView.tsx` + `useAutoScroll.ts`）
+  - ✅ App.tsx 视图注册表拆分（`viewRegistry.ts` + `Slot` 模式，651→531 行）
 
 ##### Quick Wins（<1 天 / 项）
 
-- [ ] QW-1: 非受控输入迁移（参见 P0-2）
-- [ ] QW-2: 草稿持久化（参见 P0-2）
-- [ ] QW-3: WebSocket 心跳（参见 P0-3）
-- [ ] QW-4: Zustand selector 粒度优化（参见 P0-1）
-- [ ] QW-5: Toast 反馈（新建 `Toast.tsx` 组件）
+- [x] QW-1: 非受控输入迁移（✅ M5 `useRef` 完成）
+- [x] QW-2: 草稿持久化（✅ M5 `useInputDraft.ts` 完成）
+- [x] QW-3: WebSocket 心跳（✅ M5 `eventClient.ts` 完成）
+- [x] QW-4: Zustand selector 粒度优化（✅ M5 `useShallow` 完成）
+- [x] QW-5: Toast 反馈（✅ M5 `Toast.tsx` + `toastStore.ts` Zustand 完成）
 
 ---
 
@@ -396,30 +398,21 @@ Hub 调度（远程）:
 
 ##### 待实施
 
-- [ ] **Hub 覆盖率阈值 40% → 60%（硬阻断）** `[0.5d]`
-  - 文件：`.github/workflows/checks.yml:133-141`
-  - 方案：`echo "::warning"` → `echo "::error"` + `exit 1`
+- [x] **Hub 覆盖率阈值 40% → 60%（硬阻断）** `[0.5d]` ✅ M5
+- [x] **Hub Server golangci-lint 项目级配置** `[1d]` ✅ M5
+- [x] **密钥检测（gitleaks）** `[0.5d]` ✅ M5
 
-- [ ] **Hub Server golangci-lint 项目级配置** `[1d]`
-  - 新增：`hub-server/.golangci.yml`
-  - 方案：以 `edge-server/.golangci.yml` 为基线，启用 `gosec`，添加 hub 特有排除项
-
-- [ ] **密钥检测（gitleaks）** `[0.5d]`
-  - 新增：`.github/workflows/checks.yml` 添加 gitleaks job
-  - 验收：误提交 `.env` / API key 时 CI 阻断
-
-- [ ] **Docker 镜像构建 + 推送** `[1d]`
-  - 新增：`.github/workflows/checks.yml` 添加 docker job
-  - 文件：`hub-server/deployments/Dockerfile`
-  - 方案：PR 时构建验证，push master 时推送到 ghcr.io
+- [x] **Docker 镜像构建 + 推送** `[1d]` ✅ M5
+  - `hub-server/deployments/Dockerfile`（Go 1.25、Alpine 3.21、HEALTHCHECK）
+  - `.github/workflows/checks.yml` docker job（PR 构建验证）
+  - `hub-server/.dockerignore`
 
 - [ ] **Benchmark 回归检测** `[1d]`
   - 新增：`edge-server/internal/events/bench_test.go`, `hub-server/internal/service/bench_test.go`
   - 方案：Bus.Publish、NDJSON 解析、JWT 验证、消息写入性能基准
   - CI：`go test -bench=. -benchtime=1s` 检测回归
 
-- [ ] **多平台构建验证（Windows + macOS）** `[1d]`
-  - 方案：添加 matrix build，验证跨平台编译
+- [x] **多平台构建验证（Windows + macOS + Linux）** `[1d]` ✅ M5
 
 ---
 
@@ -431,10 +424,8 @@ Hub 调度（远程）:
   - 方案：Hub Server 接入 `swaggo/swag`，从代码注解生成 `hub-server/api/swagger.yaml`
   - 验收：`http://localhost:8080/swagger/index.html` 可交互浏览
 
-- [ ] **架构决策记录 (ADR)** `[1d]`
-  - 新建：`docs/adr/` 目录，至少 5 篇关键决策记录
-  - 内容：Hub-Edge 双层 vs 单体、WebSocket vs SSE、NDJSON vs protobuf、Zustand vs Redux、Worktree 隔离方案
-  - 验收：每篇 ADR 含背景、决策、后果、备选方案
+- [x] **架构决策记录 (ADR)** `[1d]` ✅ M5
+  - `docs/adr/` — 5 篇：Hub-Edge双层/WS+NDJSON/Zustand+TanStack/Go进程编排/Worktree隔离
 
 - [ ] **文档与代码一致性修复** `[1d]`
   - Hub Server 准确性矩阵（`docs/review/hub-server-audit.md` 第 10 节）31 项对比中 15 项不一致
@@ -452,41 +443,53 @@ Hub 调度（远程）:
 
 ---
 
-#### 3.2.1 Hub-Edge-Desktop 集成（~19 天）
+#### 3.2.1 Q3 启动：Orchestrator Phase 1 ✅ `[2d]`
+
+- [x] Agent Registry（7 状态/树操作/并发安全）
+- [x] Agent Message Queue（6 消息类型/广播/父子通信）
+- [x] Sub-Agent Spawn（dispatchInterceptor + NDJSON 解析）
+- [x] REST: GET /v1/agent-instances
+- [x] 33 tests，12/12 包通过
+
+---
+
+#### 3.2.2 Hub-Edge-Desktop 集成（~19 天）
 
 > 参考：`docs/roadmaps/integration.md` 六阶段计划
 
-##### 阶段 1: Desktop Hub 认证 + REST 客户端 `[3d]`
+##### 阶段 1: Desktop Hub 认证 + REST 客户端 `[3d]` ✅ M5
 
-- [ ] 新建 `app/desktop/src/api/hubClient.ts` -- Hub REST 客户端
-- [ ] 新建 `app/desktop/src/api/hubAuth.ts` -- JWT 令牌管理（登录/刷新/存储/登出）
-- [ ] 修改 `app/desktop/src/config.ts` -- 添加 `HUB_URL`
-- [ ] StatusBar Hub 连接状态指示器
-- [ ] 验证：Desktop 可登录 Hub、查看用户信息、维持会话
+- [x] 新建 `app/desktop/src/api/hubClient.ts` -- Hub REST 客户端（auth/contacts/sessions/messages/edge）
+- [x] 新建 `app/desktop/src/api/hubAuth.ts` -- JWT 令牌管理（登录/刷新/存储/登出/自动登录）
+- [x] 修改 `app/desktop/src/config.ts` -- 添加 `HUB_URL`（默认 localhost:8080）
+- [x] StatusBar Hub 连接状态指示器
+- [x] 验证：28 hubClient tests + 399 全部通过
 
-##### 阶段 2: Hub WebSocket 客户端 `[2d]`
+##### 阶段 2: Hub WebSocket 客户端 `[2d]` ✅ M5
 
-- [ ] 新建 `app/desktop/src/api/hubWS.ts` -- 含 auth 帧协议的 Hub WS 客户端
-- [ ] 新建 `app/shared/src/hubEvents.ts` -- Hub WS 事件类型定义
-- [ ] 创建 `useHubEventStream` hook
-- [ ] 验证：Desktop 接收 `message.new`, `agent.dispatch`, `notification.new` 事件
+- [x] 新建 `app/desktop/src/api/hubWS.ts` -- 含 auth 帧协议的 Hub WS 客户端（Transport 注入）
+- [x] 新建 `app/shared/src/hubEvents.ts` -- 23 Hub WS 事件类型
+- [x] 创建 `useHubEventStream` hook — 分类事件状态管理
+- [x] 验证：20 hubWS tests + 419 全部通过
 
-##### 阶段 3: Agent 任务桥接 `[4d]`
+##### 阶段 3: Agent 任务桥接 `[4d]` ✅ M5
 
-- [ ] 新建 `app/desktop/src/hooks/useHubIntegration.ts` -- Hub-Edge 桥接核心
-- [ ] 监听 `agent.dispatch` → 解析 dispatchPayload → Edge `StartRunRequest`
-- [ ] Edge `run.agent.text_delta` → Hub `streamTask(taskId, content)`
-- [ ] Edge `run.agent.result` → Hub `doneTask()` 或 `failTask()`
-- [ ] 映射 `runId` ↔ `taskId` 双向追踪
-- [ ] 启动时注册设备 `POST /edge/devices/register`
-- [ ] 验证：Web 触发 Agent → Desktop 收到调度 → Edge 运行 → Web 聊天中看到 Agent 消息
+- [x] 新建 `app/desktop/src/hooks/useHubIntegration.ts` -- Hub-Edge 桥接核心（dispatch→run→stream→done/fail）
+- [x] 监听 `agent.dispatch` → 解析 dispatchPayload → Edge `StartRunRequest`
+- [x] Edge `run.agent.text_delta` → Hub `streamTask(taskId, content)`
+- [x] Edge `run.agent.result` → Hub `doneTask()` 或 `failTask()`
+- [x] 映射 `runId` ↔ `taskId` 双向追踪（taskBridgeStore）
+- [x] 启动时注册设备 `POST /edge/devices/register`
+- [x] 验证：22 integration tests + 440 全部通过
 
-##### 阶段 4: Desktop IM UI `[5d]`
+##### 阶段 4: Desktop IM UI `[5d]` 🔄 M5（核心组件完成）
 
-- [ ] 新建会话列表侧边栏（来源：`docs/reference/cross-comparison/02-im-ux.md` 2.2 节）
-- [ ] 新建 IM 消息视图（聊天气泡 + Agent/User 区分 + Authority 色带）
-- [ ] 新建会话消息输入（文本/代码/附件上传）
-- [ ] 新增加联系人管理（搜索/添加好友/屏蔽）
+- [x] 新建会话消息视图（`IMMessageView` — 聊天气泡 + Agent/User 区分 + Authority 色带）
+- [x] 新建会话消息输入（`IMMessageInput` — 自动变高 + Enter/Shift+Enter）
+- [x] 新增加联系人管理（`IMContactList` — 搜索/在线状态/未读计数）
+- [x] 验证：25 tests + 491 全部通过
+- [ ] 新建会话列表侧边栏（全文搜索、分组、拖拽排序）
+- [ ] 附件上传/预览
 - [ ] 新增通知浮层（好友请求/Agent 完成/@提及）
 - [ ] 新增在线状态指示器（从 device 事件获取）
 - [ ] 增量消息同步（REST `/sync` + WS `message.new`）

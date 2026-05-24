@@ -1,6 +1,8 @@
 package model
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -29,5 +31,29 @@ func (c *CustomAgent) BeforeCreate(tx *gorm.DB) error {
 		return err
 	}
 	c.ID = id
+	return c.validateJSONB()
+}
+
+func (c *CustomAgent) BeforeSave(tx *gorm.DB) error {
+	return c.validateJSONB()
+}
+
+func (c *CustomAgent) Validate() error {
+	return c.validateJSONB()
+}
+
+func (c *CustomAgent) validateJSONB() error {
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"capability_tags", c.CapabilityTags},
+		{"tool_whitelist", c.ToolWhitelist},
+		{"model_params", c.ModelParams},
+	} {
+		if field.value != "" && !json.Valid([]byte(field.value)) {
+			return fmt.Errorf("invalid JSON in %s: %w", field.name, json.Unmarshal([]byte(field.value), new(interface{})))
+		}
+	}
 	return nil
 }
