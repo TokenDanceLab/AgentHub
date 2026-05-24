@@ -1,6 +1,8 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-24（M5 批次完成）
+最后更新：2026-05-25（Hub contact/custom agent 校验 + Edge project duplicate/run/health 语义）
+
+> **合并方向**：`feat/* → dev/delicious233 → master`
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -14,11 +16,14 @@
 
 | 组件 | 技术栈 | 当前能力 | 测试状态 | 覆盖/质量 |
 |------|--------|---------|---------|----------|
-| **Desktop** | React 19 + Tauri 2 + Zustand | 17 组件 / 7 hooks / 5 stores，P0-P3 全部完成，M3b 6/6，M4 8/8 | 12/12 测试文件通过 (123 tests) | 类型检查通过，ESLint + Prettier |
-| **Edge Server** | Go (net/http + gorilla/websocket) | 3 种 AgentAdapter（Claude/Codex/OpenCode），24 种 NDJSON 消息，E2E 17/17 通过 | 整体 77.1%，12 个测试文件 | CI 硬阈值 75%，race/gosec/govulncheck 已接入 |
-| **Hub Server** | Go (Gin + GORM + Redis + PG) | 40+ REST + WS 路由，15 migration，IM 全功能 | 仅 1/19 包有单元测试（auth 89.1%），26 集成测试 | CI 软阈值 40%（实际 CI 中 `-short` 跳过所有集成测试 → 有效覆盖 0%） |
+| **Desktop** | React 19 + Tauri 2 + Zustand + TanStack Query | viewRegistry 9视图、IM UI、AuthPage、RunState 状态机、传输层抽象 | 519 tests（34 files） | tsc 严格模式，ESLint + Prettier |
+| **Edge Server** | Go (net/http + gorilla/websocket) | 3 Adapter、24 NDJSON、Orchestrator P1-P2、Prometheus、E2E 19/19 API | 13/13 包（530 funcs） | CI 硬阈值 75%，race/gosec/govulncheck |
+| **Hub Server** | Go (Gin + GORM + Redis + PG) | DI 架构、13 包有测试、CORS+RateLimit+BodyLimit 中间件链、32 migration | 13/13 包（355 funcs），repository 75.5% | CI 硬阈值 40%，golangci-lint/gitleaks |
 | **Web** | React + Vite | feat/trump-webui 开发中 | 构建通过 | 不做硬性要求 |
-| **CI/CD** | GitHub Actions | 4 job: go-edge / go-hub / frontend-desktop / frontend-web | 全绿 | gosec/govulncheck/race 已接入 |
+| **CI/CD** | GitHub Actions | 8 job: go-edge/go-hub/benchmark/docker/cross-build/frontend/validate/gitleaks | 全绿 | race/gosec/govulncheck/覆盖率硬阻断 |
+| **官网** | Next.js 16 + Tailwind v4 | hub.vectorcontrol.tech — LiveStats + ConnectAgent | 14/20 tests | 静态导出，nginx on hk2 |
+| **部署** | Docker Compose on hk2 | PG16 + Redis7 + Hub Server（独立实例，不与 AIhub 共用） | ✅ 生产运行 | nginx 反代 api.hub.vectorcontrol.tech:80→8090 |
+| **Infra** | Docker + Cloudflare DNS | docker-compose.prod.yml、deploy.sh、generate-secrets.sh、Caddyfile | ✅ | .env.production gitignored，密钥不进仓库 |
 
 ### 1.2 已完成任务集合
 
@@ -31,6 +36,8 @@
 | **M3b** | AgentHook 接口 + 消息树 + 安全管道 + Task dispatched + Context Budget + 流式增量解析 | 6/6 | 2026-05 |
 | **M4** | Hub 骨架 + OpenCode E2E + Codex E2E + 环境隔离 + auth middleware + 权限门控升级 + 响应式布局 | 8/8 | 2026-05 |
 | **M5** | **工程基础收敛**：Edge race/metrics/tests/P2 + Hub 安全/DI全5阶段/测试12包/P2 + Desktop 虚拟滚动/高亮/空状态/@mention/tablet + CI增强 | 27/27 | 2026-05-24 |
+| **M6** | **生产部署**：Docker Compose 生产配置 + hk2 部署 + nginx 反代 + Cloudflare DNS + 公开API + 官网 Hub 集成 + 安全加固（CORS/RateLimit/BodyLimit） | 12/12 | 2026-05-24 |
+| **M7** | **Desktop P0 打磨**：TanStack Query + Zod + 非受控输入 + 心跳 + 虚拟滚动 + viewRegistry | 12/12 | 2026-05-24 |
 
 ### 1.3 关键差距（来自审计报告 — M5 已全部修复）
 
@@ -142,60 +149,62 @@ Hub 调度（远程）:
 
 ##### P0 -- 阻断级
 
-- [ ] **S1: 修复 ProcessExecutor race condition** `[0.5d]`
+- [x] **S1: 修复 ProcessExecutor race condition** `[0.5d]`
   - 文件：`edge-server/internal/lifecycle/process_executor.go:86-119`
   - 方案：先创建 context 再原子插入 running map，删除 nil placeholder 模式
   - 风险：并发 Cancel 找不到 cancel func，导致僵尸进程
   - 验收：`go test -race ./internal/lifecycle/ -count=10` 零失败
 
-- [ ] **S2: 接入 Prometheus metrics + 深度 health check** `[3d]`
+- [x] **S2: 接入 Prometheus metrics + 深度 health check** `[3d]`
   - 文件：新增 `edge-server/internal/metrics/metrics.go`，修改 `internal/httpserver/server.go`
-  - 指标：`edge_runs_total`, `edge_run_duration_seconds`, `edge_active_runs`, `edge_ws_connections`, `edge_event_bus_depth`
+  - 指标：`edge_runs_total`, `edge_run_duration_seconds`, `edge_active_runs`, `edge_ws_connections`, `edge_event_bus_depth`, `edge_event_bus_dropped_total`
   - Health check：验证 store 可读、runner registry 非空
   - 验收：`curl /v1/health` 返回 `{"status":"ok","checks":{"store":"ok","runners":3}}`
 
-- [ ] **S3: runnerctx 包测试（17.3% → 80%）** `[1d]`
+- [x] **S3: runnerctx 包测试（17.3% → 80%）** `[1d]`
   - 文件：`edge-server/internal/runnerctx/context_budget_test.go`
   - 缺失测试：`ShouldCompact()`, `UsagePercent()`, `RunOutputStore` 全部方法, `EstimateTokens()`
   - 验收：`go test -cover ./internal/runnerctx/` 覆盖 >= 80%
 
-- [ ] **S4: control_protocol 测试（0% → 80%）** `[1.5d]`
+- [x] **S4: control_protocol 测试（0% → 80%）** `[1.5d]`
   - 文件：`edge-server/internal/adapters/control_protocol.go`
   - 缺失：5 个 `Write*` 函数的 JSON 输出验证 + `HandleControlRequest`/`handleCanUseTool` 测试
   - 修复：`json.Marshal` 错误不再 `_` 丢弃，返回 error
   - 验收：所有 Write* 函数输出合法 JSON，错误路径有覆盖
 
-- [ ] **S5: 修复 OrchestratorAdapter NeedsStdin 返回 false** `[0.5d]`
+- [x] **S5: 修复 OrchestratorAdapter NeedsStdin 返回 false** `[0.5d]`
   - 文件：`edge-server/internal/adapters/orchestrator.go:67-68`
   - 方案：改为 `return true`，或确保内层 adapter 永久 bypassPermissions
   - 风险：orchestrator 内部 Claude Code 无法通过 stdin 处理权限请求
 
 ##### P1 -- 高优先级
 
-- [ ] **S10: 修复 FileStore persist 并发写竞态** `[1d]`
+- [x] **S10: 修复 FileStore persist 并发写竞态** `[1d]`
   - 文件：`edge-server/internal/store/file_store.go:162-169`
   - 方案：`persist()` 内部获取 `store.mu` 确保快照一致性
   - 验收：`go test -race ./internal/store/ -count=10` 零失败
 
-- [ ] **S7: 环境变量配置支持** `[1d]`
+- [x] **S7: 环境变量配置支持** `[1d]`
   - 文件：`edge-server/cmd/agenthub-edge/main.go:91-134`
   - 方案：为每个 CLI flag 添加环境变量 fallback
   - 验收：`AGENTHUB_ADDR=:4321 go run ./cmd/agenthub-edge/` 使用环境变量值
 
-- [ ] **S6: 抽取共享测试 helper** `[0.5d]`
+- [x] **S6: 抽取共享测试 helper** `[0.5d]`
   - 文件：新增 `edge-server/internal/lifecycle/testutil_test.go`
   - 方案：将 `nextEvent` 等 helper 从 `mock_executor_test.go` 移至专用文件
   - 验收：`go test ./internal/lifecycle/` 不变
 
 ##### P2 -- 改善
 
-- [ ] **S8: busEventEmitter 移入 adapters 包** `[1d]`
+- [x] **S8: busEventEmitter 移入 adapters 包** `[1d]`
   - 文件：`edge-server/internal/lifecycle/process_executor.go:414-449` → `internal/adapters/event_emitter.go`
 - [ ] **S9: Orchestrator prompt 模板转义** `[0.5d]`
   - 文件：`edge-server/internal/adapters/orchestrator.go:72-95`
-- [ ] **S11: CreateProject 返回区分已存在/新建** `[0.5d]`
-  - 文件：`edge-server/internal/store/store.go`
-- [ ] **S12: 清理空目录 `internal/edgeserver/`** `[0.5d]`
+- [x] **S11: CreateProject 返回区分已存在/新建** `[0.5d]`
+  - 文件：`edge-server/internal/store/store.go`, `edge-server/internal/api/handlers.go`
+  - 方案：Store 通过 `ErrProjectExists` 区分重复创建；API 新建返回 201 并发布 `project.created`，已存在返回 200 且不重复发布 created 事件
+  - 验收：`TestStoreCreateProjectDistinguishesExistingProject`、`TestMuxPostProjectsExistingProjectReturnsOKWithoutCreatedEvent`
+- [x] **S12: 清理空目录 `internal/edgeserver/`** `[0.5d]`
 - [ ] **常量提取**：`maxConcurrentRuns: 5`, `channel buffer: 256`, `read buffer: 32*1024` 等魔数 → named constants `[0.5d]`
 
 ---
@@ -206,104 +215,114 @@ Hub 调度（远程）:
 
 ##### P0 -- 阻断级
 
-- [ ] **P0-1: JWT secret 环境变量化管理** `[1d]`
+- [x] **P0-1: JWT secret 环境变量化管理** `[1d]`
   - 文件：`hub-server/configs/config.yaml:20`, `hub-server/configs/config.docker.yaml:20`
   - 方案：仅从环境变量 `AGENTHUB_JWT_SECRET` 读取，dev 环境硬编码值拒绝启动
   - 修复：`hub-server/internal/config/config.go` -- Load 阶段校验
   - 验收：未设置环境变量时启动 panic
 
-- [ ] **P0-2: Admin pprof 绑定 localhost + 认证** `[0.5d]`
+- [x] **P0-2: Admin pprof 绑定 localhost + 认证** `[0.5d]`
   - 文件：`hub-server/cmd/server-hub/main.go:294-300`
   - 方案：绑定 `127.0.0.1:6060`（非 `0.0.0.0`），添加 basic auth 中间件
   - 验收：外部 IP 无法访问 `/debug/pprof/`
 
-- [ ] **P0-3: EventBus panic 记录日志** `[0.5d]`
+- [x] **P0-3: EventBus panic 记录日志** `[0.5d]`
   - 文件：`hub-server/internal/service/eventbus.go:58-64`
   - 方案：`recover()` 处添加 `slog.Error("eventbus panic", "stack", debug.Stack())`，增加 Prometheus counter
   - 验收：模拟 panic handler，确认日志输出完整 stack trace
 
-- [ ] **修复 go.mod 版本号** `[0.5d]`
+- [x] **修复 go.mod 版本号** `[0.5d]`
   - 文件：`hub-server/go.mod:3` -- `go 1.25.6` → `go 1.24.0`
   - 文件：`hub-server/deployments/Dockerfile` -- 同步 Go 版本
   - 验收：`go build ./...` 和 `go test ./...` 正常执行
 
 ##### P1 -- 高优先级架构修复
 
-- [ ] **P1-1: 创建 DeviceService 消除 handler 直连 DB** `[1d]`
+- [x] **P1-1: 创建 DeviceService 消除 handler 直连 DB** `[1d]`
   - 文件：`hub-server/internal/handler/device.go:15-17`
   - 新增：`hub-server/internal/service/device.go` -- `DeviceService` struct + methods
   - 验收：`DeviceHandler` 只依赖 `*service.DeviceService`
 
-- [ ] **P1-2: 消除 config.Cfg 全局单例** `[2d]`
+- [x] **P1-2: 消除 config.Cfg 全局单例** `[2d]`
   - 文件：`hub-server/internal/config/config.go:63`
   - 影响面：`middleware/auth.go:31`, `service/auth.go:87-88`, `service/attachment.go:65`, `router/router.go:31`
   - 方案：所有受影响模块通过构造函数接受 `*config.Config`
   - 验收：不再有任何文件直接引用 `config.Cfg`
 
-- [ ] **P1-3: 消除 repository.DB 全局单例** `[1d]`
+- [x] **P1-3: 消除 repository.DB 全局单例** `[1d]`
   - 文件：`hub-server/internal/repository/db.go:14`
   - 方案：所有 service/handler 通过构造函数接受 `*gorm.DB`
   - 验收：移除 `var DB *gorm.DB`，所有引用替换为参数传递
 
-- [ ] **P1-4: 实现速率限制中间件** `[1d]`
+- [x] **P1-4: 实现速率限制中间件** `[1d]`
   - 新增：`hub-server/internal/middleware/rate_limit.go`
   - 方案：基于 Redis 的 per-IP token bucket，登录 5 req/min，注册 3 req/min
   - 验收：`curl` 连续请求被 429 拒绝
 
-- [ ] **P1-5: 修复 JSON 手工构建注入风险** `[0.5d]`
+- [x] **P1-5: 修复 JSON 手工构建注入风险** `[0.5d]`
   - 文件：`hub-server/internal/service/message.go:94-95`
   - 方案：`strings.ReplaceAll` → `json.Marshal(map[string]string{"text": req.Content})`
   - 验收：包含特殊字符（换行、反斜杠、引号）的消息正确存储
 
-- [ ] **P1-6: 请求超时中间件** `[0.5d]`
+- [x] **P1-6: 请求超时中间件** `[0.5d]`
   - 新增：`hub-server/internal/middleware/timeout.go`
   - 方案：Gin middleware 包装 `context.WithTimeout(15s)`，上传端点 30s
   - 验收：模拟慢查询 20s 后返回 504
 
 ##### P2 -- 中等严重度
 
-- [ ] **P2-1/P2-2: 修复 N+1 查询** `[1d]`
+- [x] **P2-1/P2-2: 修复 N+1 查询** `[1d]`
   - 文件：`hub-server/internal/service/contact.go:217-240` (ListContacts), `:149-172` (ListFriendRequests)
   - 方案：收集所有 friend ID → 单次 `WHERE id IN (?)` → 构建 map
+  - 验收：`TestListContacts_BatchesFriendUserLookup`、`TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender`
 
-- [ ] **P2-5: CancelTask session_id 错误** `[0.5d]`
+- [x] **P2-5: CancelTask session_id 错误** `[0.5d]`
   - 文件：`hub-server/internal/service/agent.go:269-274`
   - 方案：通过 `AgentInstance` 查找真实 `SessionID`，而非使用 `AgentInstanceID`
+  - 验收：`TestCancelTaskPublishesResolvedSessionID` 覆盖 agent instance → session id 解析
 
-- [ ] **P2-8: Agent 消息生成 ClientMsgID** `[0.5d]`
+- [x] **P2-8: Agent 消息生成 ClientMsgID** `[0.5d]`
   - 文件：`hub-server/internal/service/agent.go:312-318, 364-370`
   - 方案：`uuidv7.Must()` 生成 `client_msg_id`
-  - 风险：当前 `NOT NULL` 约束会拒绝不含 `client_msg_id` 的 INSERT
+  - 验收：`TestHandleTaskStreamPersistsAgentMessageWithClientMsgIDAndRedisSeq`、`TestHandleTaskDoneUsesDBSeqFallbackAndPublishesFinalEvents`
 
-- [ ] **P2-9: UpsertDevice ON CONFLICT 字段修正** `[0.5d]`
+- [x] **P2-9: UpsertDevice ON CONFLICT 字段修正** `[0.5d]`
   - 文件：`hub-server/internal/repository/device.go:10-14`
   - 方案：`ON CONFLICT (id)` → `ON CONFLICT (user_id, device_type)`
+  - 验收：`TestDeviceRepo_Upsert` 覆盖同用户同设备类型、不同 device id 的重复注册更新
 
-- [ ] **P2-10: WebSocket 丢帧告警 + 计数** `[0.5d]`
+- [x] **P2-10: WebSocket 丢帧告警 + 计数** `[0.5d]`
   - 文件：`hub-server/internal/handler/ws.go:143-147`, `hub-server/internal/ws/manager.go:164-167`
   - 方案：send channel 满时记录 WARN 日志 + Prometheus counter `ws_dropped_frames_total`
+  - 验收：`TestManagerPushToConnCountsDroppedFrames` 覆盖慢客户端 send buffer 满时 counter 递增
 
-- [ ] **P2-3: jsonb 字段类型校验** `[0.5d]`
+- [x] **P2-3: jsonb 字段类型校验** `[0.5d]`
   - 文件：`hub-server/internal/model/custom_agent.go:17-20`
-  - 方案：`CapabilityTags`, `ToolWhitelist`, `ModelParams` 使用 `json.RawMessage` 或 handler 层 JSON 校验
+  - 方案：`CapabilityTags`/`ToolWhitelist` 必须是 JSON array，`ModelParams` 必须是 JSON object；handler 创建/更新前预检，GORM hook 保存前兜底
+  - 验收：`TestCustomAgentValidateRejectsWrongJSONBShapes`、`TestCustomAgentHandler_CreateRejectsInvalidJSONBShapeBeforeService`、`TestCustomAgentHandler_UpdateRejectsInvalidJSONBShapeBeforeService`
 
-- [ ] **P2-4: FailWithMessage HTTP 状态守卫** `[0.5d]`
+- [x] **P2-4: FailWithMessage HTTP 状态守卫** `[0.5d]`
   - 文件：`hub-server/internal/handler/response.go:34-39`
   - 方案：添加 `if e.HTTPStatus == 0 { e = errcode.ErrInternal }` 守卫
 
-- [ ] **P2-7: Agent 消息 seq 分配走 Redis 缓存** `[0.5d]`
+- [x] **P2-7: Agent 消息 seq 分配走 Redis 缓存** `[0.5d]`
   - 文件：`hub-server/internal/service/agent.go:326-333`
   - 方案：`HandleTaskStream`/`HandleTaskDone` 使用 `allocateSeq`（Redis INCR + DB fallback）
+  - 验收：Agent stream 覆盖 Redis seq；Agent done 覆盖 Redis 失败后的 DB fallback
 
-- [ ] **P2-6: WebSocket writeLoop 添加 panic recovery** `[0.5d]`
+- [x] **P2-6: WebSocket writeLoop 添加 panic recovery** `[0.5d]`
   - 文件：`hub-server/internal/handler/ws.go:47-57`
   - 方案：`defer conn.W.Close(...)` + `defer recover()` + 日志
+  - 验收：`writeLoop` 退出统一 close，panic recovery 保留日志
 
 ##### P3 -- 低严重度
 
 - [ ] **P3-3/P3-6: 合并双 cmd 入口** `[1d]`
   - 文件：`hub-server/cmd/agenthub-hub/main.go` → 合并到 `cmd/server-hub/main.go` 或明确文档化
-- [ ] **P2-11: listFriendRequests 用户查找失败时记录日志** `[0.5d]`
+- [x] **P2-11: listFriendRequests 用户查找失败时记录日志** `[0.5d]`
+  - 文件：`hub-server/internal/service/contact.go`
+  - 方案：批量用户查询缺失 sender 时记录 `slog.Debug` 并跳过该坏数据，不阻断其他好友请求
+  - 验收：`TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender`
 - [ ] **P3-1: 路由参数命名统一** `[0.5d]`
 - [ ] **P3-2: 魔数常量化**（50/50/24h/5min/1024/64） `[1d]`
 - [ ] **P3-4: 创建 Workspace GORM model** `[0.5d]`
@@ -311,34 +330,34 @@ Hub 调度（远程）:
 
 ##### 测试基础设施（Phase 1-2，来自 testing audit）
 
-- [ ] **jwtutil 单元测试（0% → 100%）** `[1.5d]` `[P0]`
+- [x] **jwtutil 单元测试（0% → 100%）** `[1.5d]` `[P0]`
   - 新增：`hub-server/internal/jwtutil/jwt_test.go`
   - 覆盖：`GenerateAccessToken`, `ParseToken`, `GenerateRefreshToken`, `HashRefreshToken`
   - 验收：`go test -cover ./internal/jwtutil/` >= 90%
 
-- [ ] **cache 单元测试（0% → 80%）** `[1d]` `[P0]`
+- [x] **cache 单元测试（0% → 80%）** `[1d]` `[P0]`
   - 新增：`hub-server/internal/cache/data_test.go`
   - 覆盖：`GetOrLoad` cache hit/miss, singleflight 去重, `Invalidate`, `AllocateSeq`
   - 验收：mock Redis 测试所有缓存路径
 
-- [ ] **middleware 单元测试（0% → 80%）** `[1d]` `[P1]`
+- [x] **middleware 单元测试（0% → 80%）** `[1d]` `[P1]`
   - 新增：`hub-server/internal/middleware/` 各 middle 的 `*_test.go`
   - 覆盖：auth skip path, device type gating, access log fields
 
-- [ ] **service 层单元测试（0% → 60%）** `[3d]` `[P1]`
+- [x] **service 层单元测试（0% → 60%）** `[3d]` `[P1]`
   - 新增：`hub-server/internal/service/auth_test.go`, `session_test.go`, `message_test.go`, `eventbus_test.go`
   - 方案：`go-sqlmock` mock DB 层，table-driven tests
   - 验收：核心服务逻辑（注册/登录/创建会话/发送消息/召回）有独立单元测试
 
-- [ ] **eventbus panic recovery 测试** `[0.5d]` `[P1]`
+- [x] **eventbus panic recovery 测试** `[0.5d]` `[P1]`
   - 新增：`hub-server/internal/service/eventbus_test.go`
   - 验证：handler panic 后 logger 记录 stack + counter 递增
 
-- [ ] **test isolation（per-test cleanup）** `[1d]` `[P1]`
+- [x] **test isolation（per-test cleanup）** `[1d]` `[P1]`
   - 文件：`hub-server/tests/setup_test.go`
   - 方案：`cleanDB()` 在 `t.Cleanup` 中调用，确保测试不互相污染
 
-- [ ] **Hub 覆盖率阈值 40% → 60%（硬阻断）** `[1d]` `[P1]`
+- [x] **Hub 覆盖率阈值 40% → 60%（硬阻断）** `[1d]` `[P1]`
   - 文件：`.github/workflows/checks.yml` go-hub job
   - 方案：`continue-on-error` 改为 `exit 1`；低于 60% 时 CI 失败
 
@@ -407,7 +426,7 @@ Hub 调度（远程）:
   - `.github/workflows/checks.yml` docker job（PR 构建验证）
   - `hub-server/.dockerignore`
 
-- [ ] **Benchmark 回归检测** `[1d]`
+- [x] **Benchmark 回归检测** `[1d]`
   - 新增：`edge-server/internal/events/bench_test.go`, `hub-server/internal/service/bench_test.go`
   - 方案：Bus.Publish、NDJSON 解析、JWT 验证、消息写入性能基准
   - CI：`go test -bench=. -benchtime=1s` 检测回归
@@ -427,7 +446,7 @@ Hub 调度（远程）:
 - [x] **架构决策记录 (ADR)** `[1d]` ✅ M5
   - `docs/adr/` — 5 篇：Hub-Edge双层/WS+NDJSON/Zustand+TanStack/Go进程编排/Worktree隔离
 
-- [ ] **文档与代码一致性修复** `[1d]`
+- [x] **文档与代码一致性修复** `[1d]`
   - Hub Server 准确性矩阵（`docs/review/hub-server-audit.md` 第 10 节）31 项对比中 15 项不一致
   - 修复关键项：消息撤回 2min vs 5min、CORS/Rate-limit middleware 文档声明但不存在
   - 验收：移除文档中未实现的端点声明
@@ -504,10 +523,14 @@ Hub 调度（远程）:
 
 ##### 阶段 6: Edge Server 强化 `[2d]`
 
-- [ ] 并发 run 验证（每线程一个 run）
+- [x] 并发 run 验证（每线程一个公开 run）
+  - 方案：`POST /v1/runs` 在创建前检查同 thread 是否存在 `queued`/`started`/`cancelling` run，命中时返回 409 `active_run_exists` 和现有 `runId`；Store 保留同 thread 多 run 能力给 orchestrator sub-agent；executor 启动失败会把 queued run 标记为 `failed`，避免重试被永久 409 阻塞。
+  - 验收：`TestPostRunsRejectsSecondActiveRunForThread`、`TestPostRunsAllowsNewRunAfterActiveRunTerminal`、`TestPostRunsMarksExecutorStartFailureTerminalForRetry`、`TestStoreAllowsMultipleRunsForSameThread`
 - [ ] Run 清理（过期 run、资源限制）
 - [ ] 可选：重启后 run 历史持久化
-- [ ] Health check 包含 runner 状态
+- [x] Health check 包含 runner 状态
+  - 方案：`/v1/health` 的 `checks.runners` 返回 `total`、`available`、`unavailable`、`statuses`、`items`；无 registry、无 runner、全离线时降级为 `degraded`。
+  - 验收：`TestGetHealth`、`TestGetHealthDegradesWhenNoRunnerAvailable`、`TestGetHealthDegradesWhenRunnerRegistryMissing`
 
 ---
 
@@ -790,7 +813,6 @@ pnpm typecheck                                         # 零错误
 | **参考** | `docs/reference/cross-comparison/00-synthesis.md` | 18 项目全景分析 |
 | | `docs/reference/cross-comparison/10-best-practices-playbook.md` | 最佳实践索引 |
 | | `docs/reference/cross-comparison/02-im-ux.md` | IM/UX 设计建议 |
-| | `docs/inbox/RESEARCH-SUMMARY-2026-05-24.md` | 竞品研究总结 |
 | **设计** | `docs/design/client-p0-architecture.md` | Desktop P0 实施细节 |
 | | `docs/design/client-reference-patterns.md` | Desktop 参考模式 |
 | **架构** | `docs/system-architecture.md` | 系统架构文档 |

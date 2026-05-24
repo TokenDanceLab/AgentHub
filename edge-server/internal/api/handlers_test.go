@@ -75,10 +75,103 @@ func TestGetHealth(t *testing.T) {
 	if body["edgeId"] != "local" {
 		t.Errorf("expected edgeId=local, got %v", body["edgeId"])
 	}
+	checks, ok := body["checks"].(map[string]any)
+	if !ok {
+		t.Fatalf("checks = %T, want object", body["checks"])
+	}
+	runnerCheck, ok := checks["runners"].(map[string]any)
+	if !ok {
+		t.Fatalf("runner check = %T, want object", checks["runners"])
+	}
+	if runnerCheck["status"] != "ok" {
+		t.Fatalf("runner check status = %v, want ok", runnerCheck["status"])
+	}
+	if runnerCheck["total"] != float64(1) || runnerCheck["available"] != float64(1) || runnerCheck["unavailable"] != float64(0) {
+		t.Fatalf("runner counts = %#v, want total=1 available=1 unavailable=0", runnerCheck)
+	}
+	statuses, ok := runnerCheck["statuses"].(map[string]any)
+	if !ok {
+		t.Fatalf("runner statuses = %T, want object", runnerCheck["statuses"])
+	}
+	if statuses["online"] != float64(1) {
+		t.Fatalf("online runner count = %#v, want 1", statuses["online"])
+	}
+	items, ok := runnerCheck["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("runner items = %#v, want one item", runnerCheck["items"])
+	}
 
 	contentType := rec.Header().Get("Content-Type")
 	if !strings.Contains(contentType, "application/json") {
 		t.Errorf("expected JSON content-type, got %q", contentType)
+	}
+}
+
+func TestGetHealthDegradesWhenNoRunnerAvailable(t *testing.T) {
+	h := newTestHandler()
+	h.Registry.Upsert(runners.RunnerInfo{
+		ID:           "runner_local_1",
+		Name:         "Mock Runner (local)",
+		Status:       "offline",
+		Capabilities: []string{"mock"},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+	rec := httptest.NewRecorder()
+
+	h.GetHealth(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if body["status"] != "degraded" {
+		t.Fatalf("overall status = %v, want degraded", body["status"])
+	}
+	checks := body["checks"].(map[string]any)
+	runnerCheck := checks["runners"].(map[string]any)
+	if runnerCheck["status"] != "degraded" {
+		t.Fatalf("runner check status = %v, want degraded", runnerCheck["status"])
+	}
+	if runnerCheck["detail"] != "no available runners" {
+		t.Fatalf("runner detail = %v, want no available runners", runnerCheck["detail"])
+	}
+	if runnerCheck["available"] != float64(0) || runnerCheck["unavailable"] != float64(1) {
+		t.Fatalf("runner counts = %#v, want available=0 unavailable=1", runnerCheck)
+	}
+	statuses := runnerCheck["statuses"].(map[string]any)
+	if statuses["offline"] != float64(1) {
+		t.Fatalf("offline runner count = %#v, want 1", statuses["offline"])
+	}
+}
+
+func TestGetHealthDegradesWhenRunnerRegistryMissing(t *testing.T) {
+	h := newTestHandler()
+	h.Registry = nil
+	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+	rec := httptest.NewRecorder()
+
+	h.GetHealth(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if body["status"] != "degraded" {
+		t.Fatalf("overall status = %v, want degraded", body["status"])
+	}
+	checks := body["checks"].(map[string]any)
+	runnerCheck := checks["runners"].(map[string]any)
+	if runnerCheck["detail"] != "no runner registry configured" {
+		t.Fatalf("runner detail = %v, want missing registry detail", runnerCheck["detail"])
+	}
+	if runnerCheck["total"] != float64(0) || runnerCheck["available"] != float64(0) {
+		t.Fatalf("runner counts = %#v, want zero counts", runnerCheck)
 	}
 }
 
@@ -363,6 +456,117 @@ func TestPostRunsRejectsUnknownThreadBinding(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", rec.Code)
+	}
+}
+
+func TestPostRunsRejectsSecondActiveRunForThread(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("first POST /v1/runs status = %d, want 202", rec.Code)
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts after first run = %d, want 1", len(executor.started))
+	}
+	firstRunID := executor.started[0].ID
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec = httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("second POST /v1/runs status = %d, want 409; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts after duplicate active run = %d, want still 1", len(executor.started))
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode duplicate active run body: %v", err)
+	}
+	errObj, ok := body["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("error body = %#v, want error object", body)
+	}
+	if errObj["code"] != "active_run_exists" {
+		t.Fatalf("error code = %#v, want active_run_exists", errObj["code"])
+	}
+	if body["runId"] != firstRunID {
+		t.Fatalf("duplicate response runId = %#v, want active run %q", body["runId"], firstRunID)
+	}
+	if runs := h.Store.ListRuns("thread_local"); len(runs) != 1 {
+		t.Fatalf("thread run count = %d, want 1", len(runs))
+	}
+}
+
+func TestPostRunsAllowsNewRunAfterActiveRunTerminal(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("first POST /v1/runs status = %d, want 202", rec.Code)
+	}
+	firstRunID := executor.started[0].ID
+	if _, ok := h.Store.SetRunStatus(firstRunID, "finished"); !ok {
+		t.Fatal("SetRunStatus returned ok=false")
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec = httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("second POST /v1/runs after terminal status = %d, want 202; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 2 {
+		t.Fatalf("executor starts = %d, want 2", len(executor.started))
+	}
+	if executor.started[1].ID == firstRunID {
+		t.Fatalf("second run reused first run ID %q", firstRunID)
+	}
+}
+
+func TestPostRunsMarksExecutorStartFailureTerminalForRetry(t *testing.T) {
+	h := newTestHandler()
+	failingExecutor := &fakeRunExecutor{err: errors.New("start failed")}
+	h.Executor = failingExecutor
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("first POST /v1/runs status = %d, want 500; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(failingExecutor.started) != 1 {
+		t.Fatalf("failed executor starts = %d, want 1", len(failingExecutor.started))
+	}
+	failedRunID := failingExecutor.started[0].ID
+	failedRun, ok := h.Store.GetRun(failedRunID)
+	if !ok {
+		t.Fatalf("failed run %q was not stored", failedRunID)
+	}
+	if failedRun.Status != "failed" {
+		t.Fatalf("failed run status = %q, want failed", failedRun.Status)
+	}
+
+	retryExecutor := &fakeRunExecutor{}
+	h.Executor = retryExecutor
+	req = httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec = httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("retry POST /v1/runs status = %d, want 202; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(retryExecutor.started) != 1 {
+		t.Fatalf("retry executor starts = %d, want 1", len(retryExecutor.started))
 	}
 }
 
@@ -993,6 +1197,48 @@ func TestMuxPostProjectsRoute(t *testing.T) {
 	}
 	if project["projectId"] != "proj_manual" {
 		t.Fatalf("projectId = %v, want proj_manual", project["projectId"])
+	}
+}
+
+func TestMuxPostProjectsExistingProjectReturnsOKWithoutCreatedEvent(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	_, ch, _ := h.Bus.Subscribe(0)
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects", strings.NewReader(`{"projectId":"proj_manual","name":"Manual Project"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("initial POST /v1/projects status = %d, want 201", rec.Code)
+	}
+	select {
+	case evt := <-ch:
+		if evt.Type != "project.created" {
+			t.Fatalf("initial event type = %q, want project.created", evt.Type)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timed out waiting for initial project.created event")
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/projects", strings.NewReader(`{"projectId":"proj_manual","name":"Renamed Project"}`))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("duplicate POST /v1/projects status = %d, want 200", rec.Code)
+	}
+
+	var project map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&project); err != nil {
+		t.Fatalf("failed to decode duplicate body: %v", err)
+	}
+	if project["name"] != "Manual Project" {
+		t.Fatalf("duplicate project name = %v, want original Manual Project", project["name"])
+	}
+	select {
+	case evt := <-ch:
+		t.Fatalf("unexpected event for duplicate project: %s", evt.Type)
+	case <-time.After(50 * time.Millisecond):
 	}
 }
 

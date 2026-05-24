@@ -2,9 +2,10 @@ package middleware
 
 import (
 	"context"
-	"net/http"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,7 +28,8 @@ func Timeout(d time.Duration) gin.HandlerFunc {
 		case <-done:
 		case <-ctx.Done():
 			if ctx.Err() == context.DeadlineExceeded {
-				c.AbortWithStatusJSON(http.StatusGatewayTimeout, gin.H{"error": "request_timeout", "message": "request timed out"})
+				handler.Fail(c, errcode.ErrTimeout)
+				c.Abort()
 			}
 		}
 	}

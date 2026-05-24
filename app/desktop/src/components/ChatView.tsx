@@ -9,6 +9,7 @@ import EmptyState from './EmptyState';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
+import { CollapsibleBlock, Pill, TextShimmer } from '@shared/ui';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -287,24 +288,44 @@ function BlockRenderer({
 
     case 'session_init':
       return (
-        <div className={styles.sessionInit}>
-          {t('chat.sessionInit', { model: block.model ?? 'unknown' })}
-          {block.permissionMode && <span className={styles.permBadge}>{block.permissionMode}</span>}
-        </div>
+        <CollapsibleBlock
+          label={t('chat.sessionInit', { model: block.model ?? 'unknown' })}
+          badge={block.permissionMode ?? undefined}
+          icon="smart_toy"
+          colorScheme="blue"
+          defaultExpanded={false}
+        >
+          {block.tools && block.tools.length > 0 && (
+            <div className={styles.sessionMeta}>
+              <span className={styles.sessionMetaLabel}>Tools:</span>
+              {block.tools.map((tool: string) => (
+                <Pill key={tool} variant="blue">{tool}</Pill>
+              ))}
+            </div>
+          )}
+        </CollapsibleBlock>
       );
 
     case 'result':
       return (
-        <div
-          className={`${styles.result} ${block.success ? styles.resultSuccess : styles.resultFailed}`}
-        >
-          {block.success
+        <CollapsibleBlock
+          label={block.success
             ? t('chat.result.success', {
                 input: String(block.tokenUsage?.input ?? '?'),
                 output: String(block.tokenUsage?.output ?? '?'),
               })
             : t('chat.result.failed', { error: block.error ?? 'unknown error' })}
-        </div>
+          icon={block.success ? 'check_circle' : 'error'}
+          colorScheme={block.success ? 'green' : 'red'}
+          defaultExpanded={false}
+        >
+          {block.tokenUsage && (
+            <div className={styles.tokenUsage}>
+              <span>↑ {block.tokenUsage.input.toLocaleString()} tokens in</span>
+              <span>↓ {block.tokenUsage.output.toLocaleString()} tokens out</span>
+            </div>
+          )}
+        </CollapsibleBlock>
       );
 
     default:
@@ -410,50 +431,52 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
             </div>
           )}
 
-          <span
-            className={styles.timestamp}
-            title={rt.exact}
-            aria-label={rt.exact}
-          >
-            {rt.relative}
-          </span>
-
-          <div className={styles.actionBar}>
-            <button
-              className={styles.actionBtn}
-              title="Copy"
-              onClick={() => handleCopy(msg)}
-            >
-              <Copy size={14} />
-            </button>
-            {onRetry && (
-              <button
-                className={styles.actionBtn}
-                title="Retry"
-                onClick={() => onRetry(msg.id)}
-              >
-                <RefreshCw size={14} />
-              </button>
-            )}
-            {onDelete && (
-              <button
-                className={styles.actionBtn}
-                title="Delete"
-                onClick={() => onDelete(msg.id)}
-              >
-                <Trash2 size={14} />
-              </button>
-            )}
-          </div>
-          {copiedMessageId === msg.id && (
-            <span className={styles.copyToast}>Copied!</span>
-          )}
           {msg.blocks.map((block, i) => {
             if (block.kind === 'text' && isStreaming && msg.id === lastMsg?.id) {
               return <StreamingTextBlock key={i} content={block.content} isStreaming={true} />;
             }
             return <BlockRenderer key={i} block={block} t={t} />;
           })}
+
+          <div className={styles.messageFooter}>
+            <span
+              className={styles.timestamp}
+              title={rt.exact}
+              aria-label={rt.exact}
+            >
+              {rt.relative}
+            </span>
+            <div className={styles.actionBar}>
+              <button
+                className={styles.actionBtn}
+                title="Copy"
+                onClick={() => handleCopy(msg)}
+              >
+                <Copy size={14} />
+              </button>
+              {onRetry && (
+                <button
+                  className={styles.actionBtn}
+                  title="Retry"
+                  onClick={() => onRetry(msg.id)}
+                >
+                  <RefreshCw size={14} />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  className={styles.actionBtn}
+                  title="Delete"
+                  onClick={() => onDelete(msg.id)}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+          {copiedMessageId === msg.id && (
+            <span className={styles.copyToast}>Copied!</span>
+          )}
         </div>
       );
     },
@@ -474,9 +497,13 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
       >
         {messages.length === 0 ? (
           <EmptyState
-            icon={<MessageSquare size={24} />}
             title={t('chat.emptyTitle')}
             description={t('chat.emptyDescription')}
+            suggestions={[
+              { label: t('chat.suggestion.newTask'), onClick: () => {} },
+              { label: t('chat.suggestion.explainCode'), onClick: () => {} },
+              { label: t('chat.suggestion.fixBugs'), onClick: () => {} },
+            ]}
           />
         ) : (
           <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative', flexShrink: 0 }}>
@@ -504,11 +531,7 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
           (lastMsgHasText ? (
             <div className={styles.streamProgress} />
           ) : (
-            <div className={styles.typingDots}>
-              <span />
-              <span />
-              <span />
-            </div>
+            <TextShimmer label={t('chat.thinking')} bars={3} />
           ))}
       </div>
 

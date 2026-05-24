@@ -1,6 +1,9 @@
 package lifecycle
 
 import (
+	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,16 +14,23 @@ import (
 // newExecutorTestRun creates a project, thread, and run in the given store.
 func newExecutorTestRun(t *testing.T, s store.Repository) store.Run {
 	t.Helper()
-	project, _ := s.CreateProject("proj_test", "Test Project")
-	thread, err := s.CreateThread("thread_test", project.ID, "Test Thread")
+	suffix := testID(t)
+	project, _ := s.CreateProject("proj_"+suffix, "Test Project")
+	thread, err := s.CreateThread("thread_"+suffix, project.ID, "Test Thread")
 	if err != nil {
 		t.Fatalf("CreateThread returned error: %v", err)
 	}
-	run, err := s.CreateRun("run_test", project.ID, thread.ID)
+	run, err := s.CreateRun("run_"+suffix, project.ID, thread.ID)
 	if err != nil {
 		t.Fatalf("CreateRun returned error: %v", err)
 	}
 	return run
+}
+
+func testID(t *testing.T) string {
+	t.Helper()
+	replacer := strings.NewReplacer("/", "_", "\\", "_", " ", "_")
+	return fmt.Sprintf("%s_%d_%d", replacer.Replace(t.Name()), os.Getpid(), time.Now().UnixNano())
 }
 
 // nextEvent reads the next event from a channel with a 500ms timeout.

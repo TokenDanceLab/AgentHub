@@ -110,8 +110,11 @@ jwt:
 	path := writeTempConfig(t, yaml)
 
 	// No env var set — JWT secret is empty.
-	_, err := Load(path)
-	if err == nil {
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected error for empty JWT secret, got nil")
 	}
 }
@@ -126,8 +129,11 @@ jwt:
 	path := writeTempConfig(t, yaml)
 
 	// Env var not set, config has the hardcoded default — must be rejected.
-	_, err := Load(path)
-	if err == nil {
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected error for hardcoded default JWT secret, got nil")
 	}
 }
@@ -142,8 +148,11 @@ jwt:
 
 	// Env var set but too short — must be rejected.
 	t.Setenv("AGENTHUB_JWT_SECRET", "short")
-	_, err := Load(path)
-	if err == nil {
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected error for JWT secret shorter than 16 chars, got nil")
 	}
 }
