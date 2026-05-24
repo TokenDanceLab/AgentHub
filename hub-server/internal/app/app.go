@@ -172,7 +172,9 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	slog.Info("shutting down servers...")
 
-	return a.Shutdown(context.Background())
+	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return a.Shutdown(ctxShutdown)
 }
 
 // Shutdown gracefully stops all servers and background goroutines.
@@ -224,7 +226,7 @@ func (a *App) setupWSManager() {
 	a.mgr.OnRouteSet = a.onRouteSet
 	a.mgr.OnRouteDel = a.onRouteDel
 	a.mgr.ResolveMembers = func(sessionID string) []string {
-		ctx := context.Background()
+		ctx := a.coreCtx
 		ids, err := cache.GetOrLoad(a.CacheClient, ctx, "session:members:"+sessionID, config.SessionMemberCacheTTL, func(ctx context.Context) ([]string, error) {
 			members, err := repository.ListActiveMembers(a.DB, sessionID)
 			if err != nil {
@@ -394,7 +396,7 @@ func (a *App) startTaskScheduler(ctx context.Context) {
 				if ai != nil {
 					sessionID = ai.SessionID
 				}
-				a.bus.Publish(context.Background(), service.Event{
+				a.bus.Publish(a.coreCtx, service.Event{
 					Type: "agent.timeout",
 					Payload: map[string]interface{}{
 						"task_id":           task.ID,
@@ -468,7 +470,7 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 
 // syncLegacySeqs copies existing session next_seq values from DB into Redis.
 func (a *App) syncLegacySeqs() {
-	ctx := context.Background()
+	ctx := a.coreCtx
 	var sessions []model.Session
 	if err := a.DB.Select("id, next_seq").Where("next_seq > 0").Find(&sessions).Error; err != nil {
 		slog.Warn("failed to query sessions for seq sync", "error", err)
@@ -488,7 +490,7 @@ func (a *App) syncLegacySeqs() {
 // ── WebSocket route callbacks ──────────────────────────────────────────────
 
 func (a *App) onRouteSet(userID, deviceType, connID, oldConnID string, wasOffline bool) {
-	ctx := context.Background()
+	ctx := a.coreCtx
 
 	if oldConnID != "" && oldConnID != connID {
 		a.CacheClient.MarkKicked(ctx, oldConnID)
@@ -525,7 +527,7 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 }
 
 func (a *App) onRouteDel(userID, deviceType, connID string) {
-	ctx := context.Background()
+	ctx := a.coreCtx
 
 	kicked, _ := a.CacheClient.IsKicked(ctx, connID)
 	if !kicked {
