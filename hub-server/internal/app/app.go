@@ -68,6 +68,7 @@ type App struct {
 	AttachmentHandler   *handler.AttachmentHandler
 	NotificationHandler *handler.NotificationHandler
 	HealthHandler       *handler.HealthHandler
+	PublicHandler       *handler.PublicHandler
 
 	// Goroutine lifecycle
 	coreCtx    context.Context
@@ -142,6 +143,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.AttachmentHandler = handler.NewAttachmentHandler(a.AttachmentService)
 	a.NotificationHandler = handler.NewNotificationHandler(a.NotificationService)
 	a.HealthHandler = handler.NewHealthHandler(a.DB, a.CacheClient, &a.Config.DB, a.startTime, a.Version)
+	a.PublicHandler = handler.NewPublicHandler(a.DB, a.startTime)
 
 	// Router
 	r := a.setupRouter()
@@ -252,7 +254,7 @@ func (a *App) setupRouter() *gin.Engine {
 		a.ContactHandler, a.SessionHandler, a.MessageHandler,
 		a.AgentHandler, a.CustomAgentHandler,
 		a.AttachmentHandler, a.NotificationHandler,
-		a.HealthHandler,
+		a.HealthHandler, a.PublicHandler,
 	)
 	return r
 }
