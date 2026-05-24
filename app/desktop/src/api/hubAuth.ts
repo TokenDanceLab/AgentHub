@@ -6,6 +6,7 @@
 import type { UserProfile } from './hubClient';
 import { createHubClient } from './hubClient';
 import type { HubClient } from './hubClient';
+import { getOrCreateDeviceId } from './deviceId';
 import { useHubStore } from '@/stores/hubStore';
 
 const TOKEN_KEY = 'agenthub_hub_token';
@@ -167,7 +168,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
   }
 
   return {
-    getState: () => snapshot,
+    getState: () => ({ ...snapshot }),
 
     subscribe(fn: (s: HubAuthState) => void) {
       listeners.add(fn);
@@ -198,12 +199,11 @@ export function createHubAuth(client?: HubClient): HubAuth {
 
     // ── Legacy Hub username/password login ──
     async login(username: string, password: string) {
-      const deviceId = `desktop_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const res = await hubClient.login({
         username,
         password,
         device_type: 'desktop',
-        device_id: deviceId,
+        device_id: getOrCreateDeviceId(),
       });
 
       await completeLogin(res.access_token, res.refresh_token, 'hub');

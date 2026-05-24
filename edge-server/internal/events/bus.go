@@ -1,6 +1,7 @@
 package events
 
 import (
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -29,6 +30,11 @@ type subscriber struct {
 	ch chan EventEnvelope
 }
 
+type observer struct {
+	id int64
+	fn func(EventEnvelope)
+}
+
 // Bus is an in-memory event bus with monotonic sequence numbers and
 // support for cursor-based replay.
 type Bus struct {
@@ -37,7 +43,9 @@ type Bus struct {
 	dropped    atomic.Int64
 	history    []EventEnvelope
 	subs       []subscriber
+	observers  []observer
 	nextSubID  int64
+	nextObsID  int64
 	maxHistory int
 }
 
@@ -78,6 +86,18 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 		b.history = b.history[len(b.history)-b.maxHistory:]
 	}
 
+	observers := append([]observer(nil), b.observers...)
+	for _, obs := range observers {
+		func(fn func(EventEnvelope)) {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					slog.Error("event bus observer panic", "panic", recovered)
+				}
+			}()
+			fn(evt)
+		}(obs.fn)
+	}
+
 	// Fan out to all subscribers (non-blocking).
 	for _, sub := range b.subs {
 		select {
@@ -89,6 +109,31 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 	}
 
 	return evt
+}
+
+// AddObserver registers a synchronous observer that receives every published
+// event after it is appended to history and before subscribers can receive it.
+// Observers must not call back into the same bus.
+func (b *Bus) AddObserver(fn func(EventEnvelope)) func() {
+	if fn == nil {
+		return func() {}
+	}
+	b.mu.Lock()
+	id := b.nextObsID
+	b.nextObsID++
+	b.observers = append(b.observers, observer{id: id, fn: fn})
+	b.mu.Unlock()
+
+	return func() {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		for i, obs := range b.observers {
+			if obs.id == id {
+				b.observers = append(b.observers[:i], b.observers[i+1:]...)
+				return
+			}
+		}
+	}
 }
 
 // Subscribe registers a new subscriber. If cursor is non-zero, all

@@ -11,14 +11,26 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('@/components/ModelDropdown', () => ({
+  default: ({ placeholder, disabled, ariaLabel }: { placeholder?: string; disabled?: boolean; ariaLabel?: string }) => (
+    <button type="button" disabled={disabled} aria-label={ariaLabel}>
+      {placeholder}
+    </button>
+  ),
+}));
+
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import PromptInput from '@/components/PromptInput';
 import type { AgentInfo } from '@shared/types';
 
 // jsdom does not implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();
+
+function typeInPrompt(input: HTMLElement, value: string) {
+  fireEvent.input(input, { target: { value } });
+}
 
 function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
   return {
@@ -46,7 +58,7 @@ describe('PromptInput', () => {
         onSend={vi.fn()}
       />,
     );
-    const input = screen.getByPlaceholderText('prompt.placeholder');
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
     expect(input).toBeInTheDocument();
   });
 
@@ -61,8 +73,8 @@ describe('PromptInput', () => {
       />,
     );
 
-    const input = screen.getByPlaceholderText('prompt.placeholder');
-    fireEvent.change(input, { target: { value: 'Hello world' } });
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Hello world');
 
     const sendBtn = screen.getByRole('button', { name: 'action.startRun' });
     fireEvent.click(sendBtn);
@@ -83,7 +95,7 @@ describe('PromptInput', () => {
     );
 
     const input = screen.getByPlaceholderText('prompt.placeholder');
-    fireEvent.change(input, { target: { value: 'Test message' } });
+    typeInPrompt(input, 'Test message');
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
 
     expect(onSend).toHaveBeenCalledTimes(1);
@@ -124,7 +136,7 @@ describe('PromptInput', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it('clears input after sending', () => {
+  it('clears input after sending', async () => {
     const onSend = vi.fn();
     render(
       <PromptInput
@@ -136,11 +148,45 @@ describe('PromptInput', () => {
     );
 
     const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'Clear me' } });
+    typeInPrompt(input, 'Clear me');
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
 
     expect(onSend).toHaveBeenCalled();
-    expect(input.value).toBe('');
+    await waitFor(() => expect(input.value).toBe(''));
+  });
+
+  it('keeps input when onSend rejects the send', async () => {
+    const onSend = vi.fn().mockResolvedValue(false);
+    render(
+      <PromptInput
+        agents={[]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={onSend}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLTextAreaElement;
+    typeInPrompt(input, 'Keep me');
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+    expect(input.value).toBe('Keep me');
+  });
+
+  it('disables composing controls while a run is starting', () => {
+    render(
+      <PromptInput
+        agents={[]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={vi.fn()}
+        isStarting
+      />,
+    );
+
+    expect(screen.getByPlaceholderText('prompt.placeholder')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'prompt.starting' })).toBeDisabled();
   });
 
   it('opens mention popover when @ is typed in textarea', () => {
@@ -322,8 +368,8 @@ describe('PromptInput', () => {
       <PromptInput agents={agents} selectedAgentId="a1" onSelectAgent={vi.fn()} onSend={onSend} />,
     );
 
-    const input = screen.getByPlaceholderText('prompt.placeholder');
-    fireEvent.change(input, { target: { value: 'Do something' } });
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Do something');
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
 
     expect(onSend).toHaveBeenCalledWith('Do something', 'a1', undefined);
@@ -353,8 +399,8 @@ describe('PromptInput', () => {
       />,
     );
 
-    const input = screen.getByPlaceholderText('prompt.placeholder');
-    fireEvent.change(input, { target: { value: 'Hi' } });
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Hi');
 
     const sendBtn = screen.getByRole('button', { name: 'action.startRun' });
     expect(sendBtn).not.toBeDisabled();

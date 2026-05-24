@@ -208,6 +208,15 @@
   gap: 12px;
 }
 
+.summaryGrid,
+.profileGrid,
+.targetGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
 .capabilityCard {
   display: flex;
   min-height: 116px;
@@ -248,6 +257,187 @@
   font-size: 11px;
   font-style: normal;
   font-weight: 750;
+}
+
+.summaryCard,
+.profileCard,
+.targetCard {
+  min-width: 0;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.36);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+[data-theme='dark'] .summaryCard,
+[data-theme='dark'] .profileCard,
+[data-theme='dark'] .targetCard {
+  border-color: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.summaryCard {
+  display: flex;
+  gap: 13px;
+  min-height: 104px;
+  padding: 15px;
+}
+
+.summaryIcon,
+.profileIcon,
+.targetIcon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 11px;
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+}
+
+.summaryCard div:last-child,
+.profileHeader div:nth-child(2) {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summaryCard span,
+.profileCard span,
+.targetCard span,
+.profileMeta span {
+  color: #8e8e93;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.summaryCard strong,
+.profileCard strong,
+.targetCard strong {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.summaryCard small {
+  color: #8e8e93;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.profileCard {
+  display: flex;
+  min-height: 132px;
+  flex-direction: column;
+  gap: 13px;
+  padding: 15px;
+}
+
+.profileHeader {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.profileStatus {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(142, 142, 147, 0.14);
+  color: #8e8e93;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.profileStatus_available {
+  background: rgba(34, 197, 94, 0.14);
+  color: #22c55e;
+}
+
+.profileStatus_configuring {
+  background: rgba(245, 158, 11, 0.14);
+  color: #f59e0b;
+}
+
+.profileMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.profileMeta span,
+.targetCard em {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(142, 142, 147, 0.12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.targetCard {
+  display: flex;
+  min-height: 156px;
+  flex-direction: column;
+  gap: 9px;
+  padding: 15px;
+}
+
+.targetTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.targetCard em {
+  margin-top: auto;
+  color: var(--foreground);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.runnerList {
+  margin-top: 12px;
+}
+
+.taskSection {
+  margin-top: 18px;
+}
+
+.taskSectionHeader {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.taskSectionHeader strong {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.taskSectionHeader span {
+  color: #8e8e93;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.taskList {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
 }
 
 .modeCard {
@@ -309,6 +499,8 @@
 
 .settingRow,
 .connectionRow,
+.runnerRow,
+.taskRow,
 .accountCard {
   display: flex;
   align-items: center;
@@ -321,6 +513,8 @@
 
 [data-theme='dark'] .settingRow,
 [data-theme='dark'] .connectionRow,
+[data-theme='dark'] .runnerRow,
+[data-theme='dark'] .taskRow,
 [data-theme='dark'] .accountCard {
   border-color: rgba(255, 255, 255, 0.07);
   background: rgba(255, 255, 255, 0.035);
@@ -328,27 +522,57 @@
 
 .settingRow:first-child,
 .connectionRow:first-child,
+.runnerRow:first-child,
+.taskRow:first-child,
 .accountCard:first-child {
   border-radius: 12px 12px 0 0;
 }
 
 .settingRow:last-child,
 .connectionRow:last-child,
+.runnerRow:last-child,
+.taskRow:last-child,
 .accountCard:last-child {
   border-radius: 0 0 12px 12px;
 }
 
 .settingRow:only-child,
 .connectionRow:only-child,
+.runnerRow:only-child,
+.taskRow:only-child,
 .accountCard:only-child {
   border-radius: 12px;
 }
 
 .settingRow + .settingRow,
 .connectionRow + .connectionRow,
+.runnerRow + .runnerRow,
+.taskRow + .taskRow,
 .accountCard + .settingRow,
 .settingRow + .accountCard {
   border-top: 0;
+}
+
+.taskMeta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.taskMeta span {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(142, 142, 147, 0.12);
+  color: #8e8e93;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settingCopy,
@@ -716,8 +940,20 @@
 
   .settingRow,
   .connectionRow,
+  .runnerRow,
+  .taskRow,
   .accountCard {
     align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .summaryGrid,
+  .profileGrid,
+  .targetGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .profileHeader {
     flex-wrap: wrap;
   }
 
