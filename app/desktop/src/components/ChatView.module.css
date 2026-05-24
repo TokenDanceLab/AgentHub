@@ -19,7 +19,7 @@
   top: 0;
   left: 0;
   width: 100%;
-  padding-bottom: var(--space-xs);
+  padding-bottom: var(--space-lg);
   display: flex;
   flex-direction: column;
 }
@@ -31,20 +31,53 @@
   font-size: var(--font-size-sm);
 }
 
-/* ── Message bubbles ─────────────────────── */
+/* ── Message blocks (bubble-free, spacing-driven) ── */
 
 .message {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: 4px;
   max-width: 80%;
-  padding: 8px 12px;
-  border-radius: 12px;
+  padding: 0;
+  border-radius: 0;
   font-size: var(--font-size-sm);
   line-height: 1.55;
   overflow: visible;
   animation: messageIn 0.2s ease-out;
+}
+
+.userMsg {
+  align-self: flex-end;
+  background: transparent;
+  color: var(--foreground);
+  border: none;
+}
+
+.userMsg .timestamp,
+.userMsg .actionBar {
+  display: none;
+}
+
+.agentMsg {
+  align-self: flex-start;
+  background: transparent;
+  color: var(--foreground);
+  border: none;
+}
+
+.agentMsg:hover {
+  background: rgba(0,0,0,0.015);
+}
+
+.systemMsg {
+  align-self: center;
+  background: transparent;
+  border: none;
+  opacity: 0.5;
+  font-size: var(--font-size-xs);
+  max-width: 100%;
+  padding: var(--space-xs) 0;
 }
 
 /* ── Responsive: Tablet (768px - 1023px) ─ */
@@ -72,50 +105,7 @@
   50% { opacity: 0.4; }
 }
 
-.userMsg {
-  align-self: flex-end;
-  background: #F3F4F6;
-  color: var(--foreground);
-  border: none;
-  border-radius: 12px 12px 4px 12px;
-}
-
-.agentMsg {
-  align-self: flex-start;
-  background: #FFFFFF;
-  color: var(--foreground);
-  border: 1px solid rgba(0,0,0,0.06);
-  border-radius: 12px 12px 12px 4px;
-}
-
-.systemMsg {
-  align-self: center;
-  background: transparent;
-  border: none;
-  opacity: 0.5;
-  font-size: var(--font-size-xs);
-  max-width: 100%;
-  padding: var(--space-xs) 0;
-}
-
-/* ── Hover overlay (agent only) ───────────── */
-.agentMsg::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.03);
-  border-radius: inherit;
-  opacity: 0;
-  transition: opacity var(--duration-fast);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.agentMsg:hover::after {
-  opacity: 1;
-}
-
-/* Ensure message content sits above the overlay */
+/* Ensure content sits above any overlay */
 .message > * {
   position: relative;
   z-index: 1;
@@ -126,7 +116,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  margin-bottom: var(--space-xs);
 }
 
 .avatarCircle {
@@ -151,93 +140,44 @@
 
 /* ── Timestamp ────────────────────────────── */
 .timestamp {
-  position: absolute;
-  bottom: var(--space-xs);
-  right: var(--space-sm);
-  font-size: var(--font-size-xs);
+  align-self: flex-end;
+  font-size: 10px;
   color: var(--text-weaker);
   opacity: 0;
   transition: opacity var(--duration-fast);
-  pointer-events: none;
-  z-index: 2;
+  order: 10;
 }
 
 .message:hover .timestamp {
   opacity: 1;
 }
 
-/* ── Text ────────────────────────────────── */
+/* ── Message action bar ──────────────────── */
 
-.text {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* ── Code ────────────────────────────────── */
-
-.codeBlock {
-  position: relative;
-  margin: var(--space-xs) 0;
-  padding: var(--space-sm);
-  background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: var(--font-size-xs);
-  font-family: var(--font-mono);
-  overflow-x: auto;
-}
-
-.codeLang {
-  position: absolute;
-  top: 2px;
-  right: 8px;
-  font-size: 10px;
-  opacity: 0.5;
-  text-transform: uppercase;
-}
-
-/* ── Highlighted Code Block ───────────────── */
-
-.codeBlockHighlighted {
-  margin: var(--space-xs) 0;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.codeBlockHeader {
+.actionBar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 8px;
-  background: color-mix(in oklch, var(--foreground) 8%, transparent);
-  border-bottom: 1px solid var(--border);
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+  order: 11;
 }
 
-.codeLangBadge {
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--muted-foreground);
-  text-transform: lowercase;
+.message:hover .actionBar {
+  opacity: 1;
 }
 
-.copyBtn {
+.actionBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
-  transition: all var(--duration-fast);
-}
-
-.copyBtn:hover {
-  background: color-mix(in oklch, var(--foreground) 12%, transparent);
-  color: var(--foreground);
+  transition: background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast);
 }
 
 /* ── Thinking ────────────────────────────── */
@@ -611,6 +551,80 @@
   color: var(--foreground);
 }
 
+/* ── Text ────────────────────────────────── */
+
+.text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Code ────────────────────────────────── */
+
+.codeBlock {
+  position: relative;
+  margin: var(--space-xs) 0;
+  padding: var(--space-sm);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  overflow-x: auto;
+}
+
+.codeLang {
+  position: absolute;
+  top: 2px;
+  right: 8px;
+  font-size: 10px;
+  opacity: 0.5;
+  text-transform: uppercase;
+}
+
+/* ── Highlighted Code Block ───────────────── */
+
+.codeBlockHighlighted {
+  margin: var(--space-xs) 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.codeBlockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.codeLangBadge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  text-transform: lowercase;
+}
+
+.copyBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+
+.copyBtn:hover {
+  background: color-mix(in oklch, var(--foreground) 12%, transparent);
+  color: var(--foreground);
+}
+
 /* ── Streaming progress bar ──────────────── */
 
 .streamProgress {
@@ -631,24 +645,22 @@
   100% { background-position: 200% 0; }
 }
 
-/* ── User msg actionBar hover tint ─────────── */
+/* ── User msg actionBar tint ──────────────── */
 .userMsg .actionBtn:hover {
   background: rgba(0,0,0,0.06);
   color: var(--foreground);
 }
 
 .copyToast {
-  position: absolute;
-  bottom: -22px;
-  right: 4px;
+  align-self: flex-end;
+  margin-top: 4px;
   padding: 2px 8px;
   border-radius: var(--radius-sm);
   background: var(--foreground);
   color: var(--background);
   font-size: 11px;
-  pointer-events: none;
-  z-index: 10;
   animation: toastFade 1.5s ease-out forwards;
+  order: 12;
 }
 
 /* ── Scroll-to-bottom indicator ──────────── */
@@ -695,11 +707,11 @@
 
   .message {
     max-width: 95%;
-    padding: var(--space-xs) var(--space-sm);
+    padding: 0;
   }
 
   .actionBar {
-    opacity: 1; /* always visible on touch */
+    opacity: 1;
   }
 
   .actionBtn {
