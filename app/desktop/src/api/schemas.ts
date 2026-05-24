@@ -8,6 +8,16 @@ export const HealthResponseSchema = z.object({
   status: z.string(),
   version: z.string(),
   edgeId: z.string(),
+  checks: z
+    .record(
+      z.string(),
+      z
+        .object({
+          status: z.string(),
+        })
+        .catchall(z.unknown()),
+    )
+    .optional(),
 });
 
 // ── Runner ──────────────────────────────────────
