@@ -126,26 +126,30 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
     <div ref={dropdownRef}
       className={`${styles.dropdown} ${pos.up ? styles.dropdownUp : ''}`}
       style={{ position: 'fixed', top: pos.up ? 'auto' : pos.top, bottom: pos.up ? `${window.innerHeight - pos.top}px` : 'auto', left: pos.left, minWidth: pos.width, zIndex: 9999 }}>
-      {Object.entries(grouped).map(([group, opts]) => (
+      {Object.entries(grouped).map(([group, opts], gi) => (
         <div key={group}>
+          {gi > 0 && <div className={styles.separator} />}
           {group !== 'default' && <div className={styles.groupLabel}>{group}</div>}
-          {opts.map((opt) => (
+          {opts.map((opt) => {
+            const compact = !opt.isAgent;
+            return (
             <button key={opt.value} type="button"
-              className={`${styles.item} ${opt.value === value ? styles.itemActive : ''}`}
+              className={`${styles.item} ${compact ? styles.itemCompact : ''} ${opt.value === value ? styles.itemActive : ''}`}
               onClick={() => handleSelect(opt.value)}>
               <span className={styles.itemIcon}>
-                {opt.isAgent ? <AgentDot name={opt.label} /> : <ModelIcon model={opt.value} size={18} />}
+                {opt.isAgent ? <AgentDot name={opt.label} /> : <ModelIcon model={opt.value} size={16} />}
               </span>
               <span className={styles.itemBody}>
                 <span className={styles.itemName}>{cleanModelName(opt.label)}</span>
-                {opt.desc && <span className={styles.itemDesc}>{opt.desc}</span>}
+                {opt.desc && !compact && <span className={styles.itemDesc}>{opt.desc}</span>}
               </span>
               <span className={styles.itemRight}>
                 {opt.meta && <span className={styles.itemMeta}>{opt.meta}</span>}
                 {opt.value === value && <Check size={14} className={styles.check} />}
               </span>
             </button>
-          ))}
+            );
+          })}
         </div>
       ))}
     </div>, document.body);
