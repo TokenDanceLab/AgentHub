@@ -8,8 +8,10 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -34,6 +36,8 @@ type Handler struct {
 	AgentRegistry   *agents.Registry   // runtime agent instance registry
 	MessageQueue    *agents.Queue      // inter-agent message queue
 	Metrics         *metrics.EdgeMetrics
+
+	runCreateMu sync.Mutex
 }
 
 var upgrader = websocket.Upgrader{
@@ -130,12 +134,7 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		checks["store"] = map[string]any{"status": "ok"}
 	}
 
-	// Verify runner registry
-	if len(h.Registry.List()) == 0 {
-		checks["runners"] = map[string]any{"status": "degraded", "detail": "no runners registered"}
-	} else {
-		checks["runners"] = map[string]any{"status": "ok"}
-	}
+	checks["runners"] = runnerHealthCheck(h.Registry)
 
 	// Verify adapter registry (optional)
 	if h.AdapterRegistry != nil {
@@ -178,6 +177,79 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetRunners(w http.ResponseWriter, r *http.Request) {
 	list := h.Registry.List()
 	writeJSON(w, http.StatusOK, listResponse(list))
+}
+
+func runnerHealthCheck(registry *runners.Registry) map[string]any {
+	check := map[string]any{
+		"status":      "degraded",
+		"total":       0,
+		"available":   0,
+		"unavailable": 0,
+		"statuses":    map[string]int{},
+		"items":       []map[string]any{},
+	}
+	if registry == nil {
+		check["detail"] = "no runner registry configured"
+		return check
+	}
+
+	list := registry.List()
+	sort.SliceStable(list, func(i, j int) bool {
+		return list[i].ID < list[j].ID
+	})
+
+	statuses := map[string]int{}
+	items := make([]map[string]any, 0, len(list))
+	available := 0
+	unavailable := 0
+	for _, runner := range list {
+		status := normalizeRunnerStatus(runner.Status)
+		statuses[status]++
+		if isAvailableRunnerStatus(status) {
+			available++
+		} else {
+			unavailable++
+		}
+		items = append(items, map[string]any{
+			"id":           runner.ID,
+			"name":         runner.Name,
+			"status":       status,
+			"capabilities": append([]string(nil), runner.Capabilities...),
+		})
+	}
+
+	check["total"] = len(list)
+	check["available"] = available
+	check["unavailable"] = unavailable
+	check["statuses"] = statuses
+	check["items"] = items
+	if len(list) == 0 {
+		check["detail"] = "no runners registered"
+		return check
+	}
+	if available == 0 {
+		check["detail"] = "no available runners"
+		return check
+	}
+	check["status"] = "ok"
+	return check
+}
+
+func normalizeRunnerStatus(status string) string {
+	status = strings.ToLower(strings.TrimSpace(status))
+	if status == "" {
+		return "unknown"
+	}
+	return status
+}
+
+func isAvailableRunnerStatus(status string) bool {
+	switch status {
+	case "available", "busy", "idle", "online", "ready", "running":
+		return true
+	default:
+		return false
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -382,8 +454,28 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		req.ThreadID = "thread_local"
 	}
 
+	repository := ensureStore(h)
+	h.runCreateMu.Lock()
+	thread, ok := repository.GetThread(req.ThreadID)
+	if !ok || thread.ProjectID != req.ProjectID {
+		h.runCreateMu.Unlock()
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project or thread not found"))
+		return
+	}
+	if _, ok := repository.GetProject(req.ProjectID); !ok {
+		h.runCreateMu.Unlock()
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project or thread not found"))
+		return
+	}
+	if active, ok := activeRunForThread(repository.ListRuns(req.ThreadID)); ok {
+		h.runCreateMu.Unlock()
+		writeJSON(w, http.StatusConflict, activeRunExistsResponse(active))
+		return
+	}
+
 	runID := genID("run_")
-	run, err := ensureStore(h).CreateRun(runID, req.ProjectID, req.ThreadID)
+	run, err := repository.CreateRun(runID, req.ProjectID, req.ThreadID)
+	h.runCreateMu.Unlock()
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project or thread not found"))
 		return
@@ -424,6 +516,13 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			IncludePartial:    req.IncludePartial,
 		}
 		if err := h.Executor.Start(run, runCtx); err != nil {
+			if failed, ok := repository.SetRunStatusIf(run.ID, "failed", "queued"); ok {
+				h.Bus.Publish("run.failed", scope, map[string]any{
+					"runId":  failed.ID,
+					"status": failed.Status,
+					"error":  err.Error(),
+				})
+			}
 			if errors.Is(err, lifecycle.ErrTooManyConcurrentRuns) {
 				writeJSON(w, http.StatusTooManyRequests, errorResponse("too_many_concurrent_runs", err.Error()))
 				return
@@ -615,6 +714,33 @@ func decodeOptionalJSON(r *http.Request, dst any) error {
 
 func runToResponse(run store.Run) map[string]any {
 	return lifecycle.RunResponse(run)
+}
+
+func activeRunExistsResponse(run store.Run) map[string]any {
+	body := errorResponse("active_run_exists", "thread already has an active run")
+	body["runId"] = run.ID
+	body["projectId"] = run.ProjectID
+	body["threadId"] = run.ThreadID
+	body["status"] = run.Status
+	return body
+}
+
+func activeRunForThread(runs []store.Run) (store.Run, bool) {
+	for _, run := range runs {
+		if isActiveRunStatus(run.Status) {
+			return run, true
+		}
+	}
+	return store.Run{}, false
+}
+
+func isActiveRunStatus(status string) bool {
+	switch status {
+	case "queued", "started", "cancelling":
+		return true
+	default:
+		return false
+	}
 }
 
 // ---------------------------------------------------------------------------
