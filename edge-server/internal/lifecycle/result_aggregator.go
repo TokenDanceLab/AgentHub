@@ -56,12 +56,16 @@ func (ra *ResultAggregator) Start() (stop func()) {
 
 func (ra *ResultAggregator) handleEvent(evt events.EventEnvelope) {
 	switch evt.Type {
-	case "run.finished", "run.failed", "run.cancelled":
-		ra.handleRunComplete(evt)
+	case "run.finished":
+		ra.handleRunComplete(evt, agents.StatusCompleted)
+	case "run.failed":
+		ra.handleRunComplete(evt, agents.StatusError)
+	case "run.cancelled":
+		ra.handleRunComplete(evt, agents.StatusDisconnected)
 	}
 }
 
-func (ra *ResultAggregator) handleRunComplete(evt events.EventEnvelope) {
+func (ra *ResultAggregator) handleRunComplete(evt events.EventEnvelope, status agents.Status) {
 	runID := extractRunID(evt)
 	if runID == "" {
 		return
@@ -80,6 +84,7 @@ func (ra *ResultAggregator) handleRunComplete(evt events.EventEnvelope) {
 	ra.completedRuns[runID] = true
 	ra.mu.Unlock()
 
+	ra.registry.SetStatus(inst.ID, status, "")
 	ra.checkAllChildrenComplete(inst.ParentID)
 }
 
