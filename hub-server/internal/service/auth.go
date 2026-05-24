@@ -86,6 +86,7 @@ func (s *AuthService) Login(ctx context.Context, username, password, deviceType,
 		return nil, errcode.AuthInvalidCredentials
 	}
 
+	devUUID := uuidv7.Must()
 	if err := repository.UpsertDevice(s.db, &model.Device{
 		ID: uuidv7.Must(), UserID: user.ID, DeviceType: deviceType, Capabilities: "[]",
 	}); err != nil {
@@ -105,7 +106,7 @@ func (s *AuthService) Login(ctx context.Context, username, password, deviceType,
 
 	tokenHash := jwtutil.HashRefreshToken(rawRefresh)
 	rt := &model.RefreshToken{
-		UserID: user.ID, DeviceType: deviceType, DeviceID: deviceID,
+		UserID: user.ID, DeviceType: deviceType, DeviceID: devUUID,
 		TokenHash: tokenHash,
 		ExpiresAt: time.Now().Add(s.jwtCfg.RefreshTTL),
 	}
