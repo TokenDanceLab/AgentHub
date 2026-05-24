@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-24 19:00 UTC+8 | 分支：dev/delicious233 | 提交：1f50b17
+最后更新：2026-05-24 22:00 UTC+8 | 分支：dev/delicious233 | 提交：4cd8551
 
 ## 快速上手
 
@@ -24,13 +24,11 @@ cd app/desktop && pnpm test   # 604 tests (共享 UI: 26/26 通过)
 ### 前端 TypeScript 检查
 ```bash
 cd app/desktop && pnpm typecheck    # 零错误
-cd app/web && pnpm typecheck        # 零错误
 ```
 
 ### Storybook
 ```bash
 cd app/desktop && pnpm storybook    # http://localhost:6006
-```
 
 ## 三层架构
 
@@ -75,12 +73,24 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - ✅ i18n 跟随系统语言（navigator.language）
 
 ### 2026-05-24 本轮修复
-- `hubAuth.ts`: `getState()` snapshot 稳定化，修复 React StrictMode 无限重渲染
+- `4cd8551` — **i18n 中文化收官**：zh.json 全部翻译补完、App.tsx 右侧面板标签 i18n、AgentList/RunDetail 硬编码替换、亮色分段控件样式、窗口按钮尺寸微调
+- `1f50b17` — `hubAuth.ts`: `getState()` snapshot 稳定化，修复 React StrictMode 无限重渲染
 - `main.tsx`: 移除 AuthPage 门控，App 直接渲染，Hub 登录改为弹窗
 - `hub-server`: Device/RefreshToken ID 改用服务端 UUIDv7（修复 PostgreSQL uuid 列拒绝客户端非 UUID 字符串）
 - `hub-server`: 新增 migration 0017 — devices 索引改为 UNIQUE（修复 ON CONFLICT）
 - `hub-server`: Docker config 日志改 stdout（之前写入不存在目录导致日志丢失）
 - hk2 Docker 磁盘清理（释放 12GB）
+
+### 2026-05-24 22:00 — 工作区清零，准备 Desktop P0
+- ✅ 误删 `app/shared/` 和 `app/web/` 已恢复（`git restore`）
+- ✅ 6 个 Desktop i18n/UI 修改已提交
+- ✅ 工作区干净，可开始新功能开发
+- 📋 **下一步：Desktop P0 打磨**（详见 `docs/roadmaps/client.md`）
+  - P0-1: 状态架构重构 — TanStack Query + RunState 状态机 (5d)
+  - P0-2: 输入体验修复 — 非受控输入 + 草稿持久化 + 循环检测 (4d)
+  - P0-3: 连接健壮性 — WebSocket 心跳 + 离线队列 + 传输层抽象 (3d)
+  - P0-4: 性能基础 — 虚拟滚动 + App.tsx 拆分 (2d)
+- 🔗 **Edge 审计修复可并行推进**（详见 `docs/roadmap.md#311`）
 
 ## 模型分配
 
