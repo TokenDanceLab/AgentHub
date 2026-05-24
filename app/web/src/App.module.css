@@ -13,6 +13,42 @@
     sans-serif;
 }
 
+/* ── Scrollbar ────────────────────────────── */
+/* Track hidden, thumb semi-transparent, smoothly opaque on drag */
+
+.root *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.root *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.root *::-webkit-scrollbar-thumb {
+  background: rgba(100, 120, 160, 0.32);
+  border-radius: 3px;
+  transition: background 0.3s ease;
+}
+
+.root *::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 120, 160, 0.55);
+}
+
+.root *::-webkit-scrollbar-thumb:active {
+  background: rgba(60, 80, 120, 0.8);
+}
+
+/* Firefox */
+.root * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 120, 160, 0.32) transparent;
+}
+
+.root *:hover {
+  scrollbar-color: rgba(100, 120, 160, 0.55) transparent;
+}
+
 .toolbar {
   display: flex;
   align-items: center;

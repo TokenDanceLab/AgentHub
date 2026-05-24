@@ -872,7 +872,7 @@ const styles = `
     --asr-glass: rgba(255, 255, 255, 0.72);
     --asr-glass-border: rgba(255, 255, 255, 0.7);
     --asr-shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
-    min-height: 100vh;
+    height: 100%;
     color: var(--asr-ink);
     background:
       radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
@@ -940,7 +940,7 @@ const styles = `
   .asr-page {
     position: relative;
     z-index: 1;
-    height: 100vh;
+    height: 100%;
     padding: 18px;
   }
 
@@ -948,7 +948,7 @@ const styles = `
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr) 316px;
     gap: 18px;
-    height: calc(100vh - 44px);
+    height: 100%;
     width: 100%;
   }
 
@@ -1374,14 +1374,14 @@ const styles = `
   .asr-agent-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(230px, 1fr));
-    gap: 14px;
+    grid-auto-rows: auto;
+    gap: 20px;
     overflow: auto;
-    padding: 2px 4px 6px 2px;
+    padding: 2px 4px 10px 2px;
   }
 
   .asr-agent-card {
     display: flex;
-    min-height: 238px;
     flex-direction: column;
     gap: 12px;
     padding: 15px;

@@ -124,7 +124,7 @@ const styles = `
   --gwr-glass-border: rgba(255,255,255,0.7);
   --gwr-shadow: 0 18px 48px rgba(26,40,80,0.14);
   position: relative;
-  min-height: 100vh;
+  height: 100%;
   padding: 18px;
   overflow: hidden;
   color: var(--gwr-ink);
@@ -154,7 +154,7 @@ const styles = `
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr) 340px;
   gap: 18px;
-  height: calc(100vh - 44px);
+  height: 100%;
   width: 100%;
 }
 
@@ -792,7 +792,7 @@ const styles = `
 
 @media (max-width: 820px) {
   .group-workspace-react {
-    min-height: 100vh;
+    height: auto;
     overflow: auto;
     padding: 14px;
   }

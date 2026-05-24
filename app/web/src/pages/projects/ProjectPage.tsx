@@ -141,7 +141,7 @@ const pageStyles = `
 
   .projectReactRoot {
     position: relative;
-    min-height: 100vh;
+    height: 100%;
     overflow: hidden;
     color: #172033;
     background:
@@ -168,7 +168,7 @@ const pageStyles = `
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr);
     gap: 18px;
-    min-height: 100vh;
+    height: 100%;
     padding: 18px;
   }
 
@@ -185,7 +185,7 @@ const pageStyles = `
     display: flex;
     flex-direction: column;
     gap: 18px;
-    min-height: calc(100vh - 36px);
+    height: 100%;
     padding: 18px;
   }
 
@@ -292,7 +292,7 @@ const pageStyles = `
 
   .projectMain {
     min-width: 0;
-    max-height: calc(100vh - 36px);
+    max-height: 100%;
     overflow: auto;
     padding-right: 2px;
   }

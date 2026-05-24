@@ -165,7 +165,7 @@ const pageStyles = `
 
   .pc-page {
     position: relative;
-    min-height: 100vh;
+    height: 100%;
     overflow: hidden;
     background:
       radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
@@ -203,7 +203,7 @@ const pageStyles = `
     display: grid;
     grid-template-columns: 280px minmax(480px, 1fr) 336px;
     gap: 18px;
-    min-height: 100vh;
+    height: 100%;
     padding: 18px;
   }
 
