@@ -1,0 +1,7 @@
+.git/
+.worktrees/
+tests/
+*.test
+coverage.out
+.env
+*.log

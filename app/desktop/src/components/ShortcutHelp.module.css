@@ -1,0 +1,109 @@
+/* ── Overlay backdrop ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: oklch(0 0 0 / 0.5);
+  animation: fade-in var(--duration-medium) var(--ease-out);
+}
+
+/* ── Dialog panel ── */
+.dialog {
+  width: 420px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  animation: fade-in var(--duration-medium) var(--ease-out);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg) var(--space-lg) var(--space-sm);
+}
+
+.title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--foreground);
+  margin: 0;
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.closeBtn:hover {
+  background: var(--hover-overlay);
+  color: var(--foreground);
+}
+
+/* ── Table ── */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  padding: 0 var(--space-lg) var(--space-lg);
+}
+
+.row {
+  border-bottom: 1px solid var(--border);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+/* ── Key cell ── */
+.keys {
+  padding: var(--space-md) var(--space-lg);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+  background: var(--surface-base);
+  line-height: 1.6;
+  vertical-align: middle;
+}
+
+.plus {
+  margin: 0 4px;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  vertical-align: middle;
+}
+
+/* ── Description cell ── */
+.desc {
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--font-size-sm);
+  color: var(--muted-foreground);
+}
