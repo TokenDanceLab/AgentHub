@@ -20,6 +20,7 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/log"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
@@ -112,6 +113,11 @@ func (a *App) Run(ctx context.Context) error {
 
 	log.Init(&a.Config.Server)
 	defer log.Sync()
+
+	// Initialize TokenDance ID JWKS URI for JWT validation.
+	if a.Config.TokenDanceID.JWKSURI != "" {
+		jwtutil.SetJWKSURI(a.Config.TokenDanceID.JWKSURI)
+	}
 
 	// Legacy: sync existing session seq numbers to Redis
 	go a.syncLegacySeqs()
@@ -249,7 +255,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 func (a *App) setupRouter() *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	router.SetupRoutes(r, a.Config.JWT.Secret, a.CacheClient,
+	router.SetupRoutes(r, a.Config, a.Config.JWT.Secret, a.CacheClient,
 		a.AuthHandler, a.WebSocketHandler, a.DeviceHandler,
 		a.ContactHandler, a.SessionHandler, a.MessageHandler,
 		a.AgentHandler, a.CustomAgentHandler,

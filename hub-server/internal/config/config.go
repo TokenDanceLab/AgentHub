@@ -11,11 +11,19 @@ import (
 )
 
 type Config struct {
-	Server ServerConfig `mapstructure:"server"`
-	DB     DBConfig     `mapstructure:"db"`
-	Redis  RedisConfig  `mapstructure:"redis"`
-	JWT    JWTConfig    `mapstructure:"jwt"`
-	Upload UploadConfig `mapstructure:"upload"`
+	Server      ServerConfig      `mapstructure:"server"`
+	DB          DBConfig          `mapstructure:"db"`
+	Redis       RedisConfig       `mapstructure:"redis"`
+	JWT         JWTConfig         `mapstructure:"jwt"`
+	Upload      UploadConfig      `mapstructure:"upload"`
+	TokenDanceID TokenDanceIDConfig `mapstructure:"tokendance_id"`
+}
+
+type TokenDanceIDConfig struct {
+	IssuerURL    string `mapstructure:"issuer_url"`
+	JWKSURI      string `mapstructure:"jwks_uri"`
+	ClientID     string `mapstructure:"client_id"`
+	ClientSecret string `mapstructure:"client_secret"`
 }
 
 type ServerConfig struct {
@@ -122,6 +130,17 @@ func (c *Config) Validate() error {
 	// JWT: enforce minimum length.
 	if len(c.JWT.Secret) < 16 {
 		return fmt.Errorf("JWT secret too short: minimum 16 characters required (got %d)", len(c.JWT.Secret))
+	}
+
+	// TokenDance ID: validate URLs if configured.
+	if c.TokenDanceID.IssuerURL != "" {
+		if c.TokenDanceID.JWKSURI == "" {
+			c.TokenDanceID.JWKSURI = c.TokenDanceID.IssuerURL + "/oidc/jwks"
+		}
+	} else {
+		// Default to production TokenDance ID
+		c.TokenDanceID.IssuerURL = "https://id.vectorcontrol.tech"
+		c.TokenDanceID.JWKSURI = "https://id.vectorcontrol.tech/oidc/jwks"
 	}
 
 	// Upload: if a directory is configured, it must exist.
