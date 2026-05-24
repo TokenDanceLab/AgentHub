@@ -1,4 +1,4 @@
-import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
+import React, { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
 import styles from './Card.module.css';
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
