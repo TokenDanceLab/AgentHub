@@ -85,7 +85,7 @@ Orchestrator: 完成。预览地址 http://localhost:5173
 | 层 | 技术 |
 |----|------|
 | 前端 | React 19 + TypeScript + Vite + CSS Modules + `@shared/ui` |
-| Hub Server | Go 1.25 + Gin + GORM + PostgreSQL + Redis |
+| Hub Server | Go 1.25 + Gin + GORM + PostgreSQL + Redis + Hub JWT / TokenDance ID bearer-token middleware |
 | Edge Server | Go 1.25 + `net/http` + WebSocket + AgentAdapter |
 | 桌面端 | Tauri 2 |
 | 移动端 | PWA |
@@ -216,6 +216,23 @@ Docker 配置不再放根级 `docker/`。如果某个模块需要容器化，就
 | [API 契约](api/) | REST API 和 WebSocket typed events 的契约入口 |
 | [调研索引](docs/reference/) | 69 份跨仓库深度分析和工程规格，Agent 友好的四层结构 |
 | [调研与历史归档](docs/archive/) | 旧版细分架构、协议、memory、workspace 等深度材料 |
+
+在 `D:\Code\TokenDance` workspace 内做跨系统治理时，先看根级 `../AGENTS.md` 和 `../docs/`。其中 `../docs/system-architecture.md`、`../docs/identity-auth.md`、`../docs/design-system.md` 定义 TokenDance 级别的架构、身份鉴权和设计系统边界；本仓库 `docs/` 只负责 AgentHub 实现细节。
+
+<br>
+
+## TokenDance ID 鉴权边界
+
+AgentHub Hub Server 当前有双 JWT 兼容路径，但完整 TokenDance ID 浏览器登录 callback 尚未最终定稿。跨系统身份规则见 [../docs/identity-auth.md](../docs/identity-auth.md)。
+
+| 项 | 当前实现 |
+|----|----------|
+| Callback | AgentHub Hub 的 TokenDance ID 浏览器登录 callback 未最终确定；AgentHub Home 的站点 callback 是 `https://hub.vectorcontrol.tech/api/auth/callback` |
+| Token exchange | Hub 本地登录/注册仍走 `/client/auth/*`；Hub middleware 可接受 TokenDance ID 签发的 RS256 bearer token |
+| Token storage | Hub 本地登录由客户端保存 Hub JWT；TokenDance ID bearer-token 路径不创建 Hub refresh session |
+| Refresh | Hub 本地 refresh token 已实现；TokenDance ID refresh flow 尚未作为 Hub 浏览器登录流接入 |
+| Logout | Hub 本地 logout 与 TokenDance ID `/logout` 分离 |
+| JWKS validation | `hub-server/internal/middleware/auth.go` 先尝试 TokenDance ID RS256/JWKS，再 fallback 到 Hub 本地 HS256；当前 TokenDance ID 路径还缺少显式 issuer/audience 校验，是 P0 hardening 项 |
 
 <br>
 
