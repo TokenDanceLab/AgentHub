@@ -43,6 +43,9 @@ function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
       fileChanges: false,
       thinkingVisible: false,
       multiTurn: false,
+      mcpIntegration: false,
+      permissionHooks: false,
+      subAgentSpawn: false,
     },
     ...overrides,
   };

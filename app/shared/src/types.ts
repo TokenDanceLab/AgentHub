@@ -71,6 +71,9 @@ export interface AgentCapabilities {
   fileChanges: boolean;
   thinkingVisible: boolean;
   multiTurn: boolean;
+  mcpIntegration: boolean;
+  permissionHooks: boolean;
+  subAgentSpawn: boolean;
 }
 
 export interface AgentInfo {
