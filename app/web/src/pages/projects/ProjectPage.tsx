@@ -162,6 +162,13 @@ const pageStyles = `
     pointer-events: none;
   }
 
+  [data-theme="dark"] .projectReactRoot {
+    background:
+      radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.1), transparent 28%),
+      radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.1), transparent 30%),
+      linear-gradient(135deg, var(--surface-alt), var(--bg));
+  }
+
   .projectReactShell {
     position: relative;
     z-index: 1;

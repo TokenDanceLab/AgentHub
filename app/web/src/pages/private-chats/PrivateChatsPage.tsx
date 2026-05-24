@@ -186,6 +186,13 @@ const pageStyles = `
     opacity: 0.72;
   }
 
+  [data-theme="dark"] .pc-page {
+    background:
+      radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.1), transparent 28%),
+      radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.1), transparent 30%),
+      linear-gradient(135deg, var(--bg), var(--surface-alt));
+  }
+
   .pc-symbol {
     display: inline-flex;
     align-items: center;
