@@ -316,6 +316,7 @@ export default function App() {
   }, [scrollToMessageId]);
 
   return (
+    <ErrorBoundary>
     <div className={styles.root}>
       <Slot
         name="status-bar"
@@ -569,5 +570,6 @@ export default function App() {
       <Slot name="permission-dialog" requests={permissionRequests} onDecide={handleDecidePermission} />
       <Slot name="shortcut-help" open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
     </div>
+    </ErrorBoundary>
   );
 }
