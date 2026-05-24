@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -680,4 +681,177 @@ func TestProcessExecutorHelper(t *testing.T) {
 		os.Exit(2)
 	}
 	os.Exit(0)
+}
+
+
+// ── Result aggregation tests ───────────────────────────────────────────────
+
+func TestSendSubAgentResult_Completed(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	_, _ = s.CreateProject("proj-agg", "agg-project")
+	_, _ = s.CreateThread("thread-agg", "proj-agg", "agg-thread")
+	_, _ = s.CreateRun("parent-run", "proj-agg", "thread-agg")
+	_, _ = s.CreateRun("child-run", "proj-agg", "thread-agg")
+
+	reg := agents.NewRegistry()
+	queue := agents.NewQueue()
+
+	_ = reg.Register(&agents.AgentInstance{
+		ID:        "parent-agent",
+		AdapterID: "orchestrator",
+		Status:    agents.StatusBusy,
+	})
+	_ = reg.Register(&agents.AgentInstance{
+		ID:       "child-agent",
+		AdapterID: "claude-code",
+		ParentID: "parent-agent",
+		Status:   agents.StatusBusy,
+	})
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: os.Args[0],
+		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "success"},
+		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor: %v", err)
+	}
+	executor.WithAgentRegistry(reg).WithMessageQueue(queue)
+
+	// Populate the runToAgent mapping (normally done by SpawnSubAgent).
+	executor.mu.Lock()
+	executor.runToAgent["child-run"] = "child-agent"
+	executor.mu.Unlock()
+
+	queue.EnsureAgent("parent-agent", 64)
+
+	executor.sendSubAgentResult("child-run", "finished", map[string]any{
+		"output": "sub-agent completed successfully",
+	})
+
+	select {
+	case msg := <-queue.Receive("parent-agent"):
+		if msg.Type != agents.MsgTypeResult {
+			t.Fatalf("message type = %q, want %q", msg.Type, agents.MsgTypeResult)
+		}
+		if msg.FromAgentID != "child-agent" {
+			t.Fatalf("FromAgentID = %q, want child-agent", msg.FromAgentID)
+		}
+		if msg.ToAgentID != "parent-agent" {
+			t.Fatalf("ToAgentID = %q, want parent-agent", msg.ToAgentID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for result message on parent queue")
+	}
+}
+
+func TestSendSubAgentResult_Error(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	_, _ = s.CreateProject("proj-err", "err-project")
+	_, _ = s.CreateThread("thread-err", "proj-err", "err-thread")
+	_, _ = s.CreateRun("parent-err", "proj-err", "thread-err")
+	_, _ = s.CreateRun("child-err", "proj-err", "thread-err")
+
+	reg := agents.NewRegistry()
+	queue := agents.NewQueue()
+
+	_ = reg.Register(&agents.AgentInstance{
+		ID:        "parent-agent-err",
+		AdapterID: "orchestrator",
+		Status:    agents.StatusBusy,
+	})
+	_ = reg.Register(&agents.AgentInstance{
+		ID:       "child-agent-err",
+		AdapterID: "claude-code",
+		ParentID: "parent-agent-err",
+		Status:   agents.StatusBusy,
+	})
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: os.Args[0],
+		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "success"},
+		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor: %v", err)
+	}
+	executor.WithAgentRegistry(reg).WithMessageQueue(queue)
+
+	executor.mu.Lock()
+	executor.runToAgent["child-err"] = "child-agent-err"
+	executor.mu.Unlock()
+
+	queue.EnsureAgent("parent-agent-err", 64)
+
+	executor.sendSubAgentResult("child-err", "failed", map[string]any{
+		"error": "something went wrong",
+	})
+
+	select {
+	case msg := <-queue.Receive("parent-agent-err"):
+		if msg.Type != agents.MsgTypeError {
+			t.Fatalf("message type = %q, want %q", msg.Type, agents.MsgTypeError)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for error message on parent queue")
+	}
+}
+
+func TestSendSubAgentResult_NoRegistryNoCrash(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	_, _ = s.CreateProject("proj-noreg", "no-reg-project")
+	_, _ = s.CreateThread("thread-noreg", "proj-noreg", "no-reg-thread")
+	_, _ = s.CreateRun("run-noreg", "proj-noreg", "thread-noreg")
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: os.Args[0],
+		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "success"},
+		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor: %v", err)
+	}
+
+	// Should not panic with nil registry and nil message queue.
+	executor.sendSubAgentResult("run-noreg", "finished", nil)
+}
+
+func TestSendSubAgentResult_NonSubAgentNoAction(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	_, _ = s.CreateProject("proj-nosub", "nosub-project")
+	_, _ = s.CreateThread("thread-nosub", "proj-nosub", "nosub-thread")
+	_, _ = s.CreateRun("run-nosub", "proj-nosub", "thread-nosub")
+
+	reg := agents.NewRegistry()
+	queue := agents.NewQueue()
+
+	// Register agent with no parent (top-level run, not a sub-agent).
+	_ = reg.Register(&agents.AgentInstance{
+		ID:        "top-level-agent",
+		AdapterID: "claude-code",
+		ParentID:  "",
+		Status:    agents.StatusBusy,
+	})
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: os.Args[0],
+		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "success"},
+		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor: %v", err)
+	}
+	executor.WithAgentRegistry(reg).WithMessageQueue(queue)
+
+	// Map run to the top-level agent (which has no parent).
+	executor.mu.Lock()
+	executor.runToAgent["run-nosub"] = "top-level-agent"
+	executor.mu.Unlock()
+
+	// Should not panic or send a message because parentID is empty.
+	executor.sendSubAgentResult("run-nosub", "finished", nil)
 }

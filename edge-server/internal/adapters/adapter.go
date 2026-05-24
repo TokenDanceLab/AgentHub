@@ -76,6 +76,12 @@ type SubAgentTask struct {
 	Prompt      string `json:"prompt"`    // task prompt for the sub-agent
 	Depth       int    `json:"depth"`     // delegation depth (root=0)
 	ParentRunID string `json:"parentRunId"`
+	ThreadID    string `json:"threadId,omitempty"` // inherited from parent run
+	Model       string `json:"model,omitempty"`    // model override propagated from parent context
+
+	// Budget carries the context budget from the parent orchestrator to the
+	// child sub-agent. When nil, the sub-agent runs without budget tracking.
+	Budget *runnerctx.ContextBudget `json:"-"`
 }
 
 // SubAgentSpawner is implemented by the lifecycle layer to create new runs for
