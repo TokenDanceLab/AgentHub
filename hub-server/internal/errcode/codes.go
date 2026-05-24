@@ -20,6 +20,7 @@ var (
 	OK            = &Error{Code: "OK", Message: "", HTTPStatus: http.StatusOK}
 	ErrInternal   = &Error{Code: "INTERNAL_ERROR", Message: "internal server error", HTTPStatus: http.StatusInternalServerError}
 	ErrBadRequest = &Error{Code: "BAD_REQUEST", Message: "invalid request", HTTPStatus: http.StatusBadRequest}
+	ErrTimeout    = &Error{Code: "REQUEST_TIMEOUT", Message: "request timed out", HTTPStatus: http.StatusGatewayTimeout}
 
 	AuthInvalidToken       = &Error{Code: "AUTH_INVALID_TOKEN", Message: "token is invalid or expired", HTTPStatus: http.StatusUnauthorized}
 	AuthInvalidCredentials = &Error{Code: "AUTH_INVALID_CREDENTIALS", Message: "invalid username or password", HTTPStatus: http.StatusUnauthorized}
