@@ -66,6 +66,11 @@ yarn-error.log*
 *.bak
 *.backup
 *.sql.gz
+
+# AgentHub deployment state (hk2 production)
+hub-server/deployments/.env.production
+hub-server/deployments/.env
+hub-server/deployments/backups/
 backups/
 
 # Local machine and agent state
