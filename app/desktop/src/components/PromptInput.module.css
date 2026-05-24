@@ -56,6 +56,11 @@
   flex-shrink: 0; font-variant-numeric: tabular-nums;
 }
 
+/* ── Right group (metaChain + sendBtn) ────── */
+.rightGroup {
+  display: flex; align-items: center; gap: 8px;
+}
+
 /* ── Metadata chain (model · reasoning) ──── */
 .metaChain {
   display: flex; align-items: center; gap: 4px;
