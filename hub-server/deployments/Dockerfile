@@ -11,6 +11,7 @@ RUN adduser -D -h /app agenthub
 WORKDIR /app
 COPY --from=builder /app/server-hub .
 COPY --from=builder /app/configs/config.docker.yaml ./configs/config.yaml
+COPY --from=builder /app/migrations ./migrations
 RUN chown -R agenthub:agenthub /app
 USER agenthub
 EXPOSE 8080
