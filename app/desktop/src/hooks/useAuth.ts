@@ -27,6 +27,10 @@ export function useAuth() {
     [],
   );
 
+  const loginWithTokenDance = useCallback(async () => {
+    await auth.loginWithTokenDance();
+  }, []);
+
   const logout = useCallback(async () => {
     await auth.logout();
   }, []);
@@ -35,8 +39,9 @@ export function useAuth() {
     return auth.tryAutoLogin();
   }, []);
 
-  return { ...state, login, logout, tryAutoLogin } as HubAuthState & {
+  return { ...state, login, loginWithTokenDance, logout, tryAutoLogin } as HubAuthState & {
     login: (username: string, password: string) => Promise<void>;
+    loginWithTokenDance: () => Promise<void>;
     logout: () => Promise<void>;
     tryAutoLogin: () => Promise<boolean>;
   };
