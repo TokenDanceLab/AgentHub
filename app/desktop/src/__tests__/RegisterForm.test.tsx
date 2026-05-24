@@ -156,6 +156,7 @@ describe('RegisterForm', () => {
   });
 
   it('calls onSuccess callback after registration', async () => {
+    vi.useFakeTimers();
     mockRegister.mockResolvedValueOnce(undefined);
     renderForm();
 
@@ -165,8 +166,12 @@ describe('RegisterForm', () => {
     fireEvent.click(screen.getByText('auth.registerButton'));
 
     await waitFor(() => {
-      expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(mockRegister).toHaveBeenCalledTimes(1);
     });
+
+    vi.advanceTimersByTime(1500);
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 
   it('shows login button on success screen', async () => {
@@ -276,10 +281,12 @@ describe('RegisterForm', () => {
   it('clears field error when user types', () => {
     renderForm();
     fireEvent.click(screen.getByText('auth.registerButton'));
-    expect(screen.getByText('auth.error.required')).toBeInTheDocument();
+    const initialErrors = screen.getAllByText('auth.error.required').length;
+    expect(initialErrors).toBeGreaterThanOrEqual(2);
 
     fireEvent.change(screen.getByLabelText('auth.username'), { target: { value: 'u' } });
-    expect(screen.queryByText('auth.error.required')).not.toBeInTheDocument();
+    // Only username error clears; password/confirm still show
+    expect(screen.getAllByText('auth.error.required').length).toBeLessThan(initialErrors);
   });
 
   it('clears server error when user types', async () => {
