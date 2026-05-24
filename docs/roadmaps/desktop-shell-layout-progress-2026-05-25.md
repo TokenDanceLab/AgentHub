@@ -38,6 +38,8 @@ Write scope:
 - Turned Settings > Model Mapping into editable alias routing for `opus`, `sonnet`, and `haiku`, including concrete model, provider, reasoning effort, and enable state.
 - Turned Settings > cc-switch into editable local provider health rows with model counts, health state, and operator notes.
 - Tightened Settings mobile navigation into horizontal glass chips so Android/Web-sized viewports keep the active settings content in the first screen.
+- Wired persisted model settings into Desktop run dispatch: `App.handleSend` now resolves default model/provider/reasoning settings and alias mappings before calling `/v1/runs`.
+- Extended the shared `StartRunRequest` client contract with optional `provider`, `modelAlias`, `modelMappingEnabled`, and `providerFallbackEnabled` routing metadata so Edge/Hub can consume the same TokenDance model-routing envelope later.
 
 ## Verification
 
@@ -53,10 +55,12 @@ Write scope:
 - `cd app/desktop && corepack.cmd pnpm vitest run src\__tests__\SettingsPage.test.tsx src\__tests__\uiStore.test.ts`
 - `cd app/desktop && corepack.cmd pnpm typecheck`
 - Playwright Settings model-config/model-mapping/cc-switch checks at `1440x960` and `390x844`: no console errors or warnings, no raw i18n keys, no horizontal overflow, controls editable, and screenshots refreshed under `app/desktop/screenshots/settings-*-local-*.png`.
+- `cd app/desktop && corepack.cmd pnpm vitest run src\__tests__\modelSettingsStore.test.ts src\__tests__\edgeClient.test.ts src\__tests__\SettingsPage.test.tsx src\__tests__\PromptInput.test.tsx`
+- Playwright request-body check: changed Settings > Models to `gpt-5.5` / `openai` / `max`, returned to chat, sent a prompt, intercepted the real `/v1/runs` POST body, and verified `model=gpt-5.5`, `provider=openai`, `reasoningEffort=max`, `modelMappingEnabled=true`, `providerFallbackEnabled=true`, with no console errors, raw i18n keys, or horizontal overflow. Screenshot: `app/desktop/screenshots/run-request-model-settings-body.png`.
 
 ## Follow-up
 
 - Fold the status into `docs/roadmap.md` batch B once the current parallel docs edits settle.
 - Next layout step: add shared tooltip primitives for shell icon buttons once the shared UI package is ready for cross-app adoption.
-- Inject persisted model defaults and alias resolution into the Edge `StartRunRequest` path after the current Edge/API edits settle.
+- Teach Edge/Hub to persist or act on the optional model-routing metadata once the current Edge/API edits settle; Desktop already sends it.
 - Sync the same model/cc-switch settings with Hub/TokenDance ID once the account/auth boundary is stable.
