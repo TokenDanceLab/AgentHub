@@ -458,13 +458,13 @@ Hub 调度（远程）:
 
 > 参考：`docs/roadmaps/integration.md` 六阶段计划
 
-##### 阶段 1: Desktop Hub 认证 + REST 客户端 `[3d]`
+##### 阶段 1: Desktop Hub 认证 + REST 客户端 `[3d]` ✅ M5
 
-- [ ] 新建 `app/desktop/src/api/hubClient.ts` -- Hub REST 客户端
-- [ ] 新建 `app/desktop/src/api/hubAuth.ts` -- JWT 令牌管理（登录/刷新/存储/登出）
-- [ ] 修改 `app/desktop/src/config.ts` -- 添加 `HUB_URL`
-- [ ] StatusBar Hub 连接状态指示器
-- [ ] 验证：Desktop 可登录 Hub、查看用户信息、维持会话
+- [x] 新建 `app/desktop/src/api/hubClient.ts` -- Hub REST 客户端（auth/contacts/sessions/messages/edge）
+- [x] 新建 `app/desktop/src/api/hubAuth.ts` -- JWT 令牌管理（登录/刷新/存储/登出/自动登录）
+- [x] 修改 `app/desktop/src/config.ts` -- 添加 `HUB_URL`（默认 localhost:8080）
+- [x] StatusBar Hub 连接状态指示器
+- [x] 验证：28 hubClient tests + 399 全部通过
 
 ##### 阶段 2: Hub WebSocket 客户端 `[2d]`
 
