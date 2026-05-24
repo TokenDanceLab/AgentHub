@@ -9,6 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 )
@@ -36,7 +37,7 @@ func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func
 		pipe.ZAdd(ctx, key, redis.Z{Score: float64(now), Member: member})
 
 		// Set key expiry (window + buffer).
-		pipe.Expire(ctx, key, window+10*time.Second)
+		pipe.Expire(ctx, key, window+config.RateLimitExpiryBuffer)
 
 		if _, err := pipe.Exec(ctx); err != nil {
 			handler.Fail(c, errcode.ErrInternal)
