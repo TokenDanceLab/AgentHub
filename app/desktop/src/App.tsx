@@ -8,6 +8,7 @@ import { useAgentList } from '@/api/agentQueries';
 import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
 import { useThreads } from '@/api/threadQueries';
 import type { StartRunRequest } from '@shared/types';
+import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
@@ -18,6 +19,7 @@ import { useHubStore } from '@/stores/hubStore';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
+import { ToastContainer } from '@/components/Toast';
 import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
 import {
   AlertTriangle,
@@ -70,6 +72,13 @@ function isRunActiveStatus(status: string | undefined): boolean {
   return ['queued', 'running', 'streaming', 'waiting_for_input', 'RUNNING', 'STREAMING', 'WAITING_FOR_INPUT'].includes(status);
 }
 
+function getActiveRunConflictId(error: unknown): string | undefined {
+  if (!(error instanceof AppError)) return undefined;
+  if (error.status !== 409 || error.code !== 'active_run_exists') return undefined;
+  const runId = error.details?.runId;
+  return typeof runId === 'string' && runId.length > 0 ? runId : undefined;
+}
+
 export default function App() {
   const { online, health } = useHealth();
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online);
@@ -104,6 +113,7 @@ export default function App() {
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(396);
   const [rightPanelWidth, setRightPanelWidth] = useState(360);
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
+  const [runStartPending, setRunStartPending] = useState(false);
 
   // Mobile/tablet overlays
   const [navPanelOpen, setNavPanelOpen] = useState(false);
@@ -142,6 +152,7 @@ export default function App() {
   const allMessages = [...userMessages, ...messages];
   const displayedRun = currentRun ?? optimisticRun;
   const runIsActive = isRunActiveStatus(displayedRun?.status);
+  const composerLocked = runStartPending || runIsActive;
   const shellStyle = {
     '--left-sidebar-width': `${leftSidebarWidth}px`,
     '--right-panel-width': `${rightPanelWidth}px`,
@@ -152,24 +163,41 @@ export default function App() {
   }, [currentRun]);
 
   const handleSend = useCallback(async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string }) => {
+    if (runStartPending || runIsActive) {
+      setRightPanelOpen(true);
+      addToast({ type: 'info', message: t('error.activeRunExists') });
+      return false;
+    }
     const tempRunId = `starting-${Date.now()}`;
+    setRunStartPending(true);
     try {
       const req: StartRunRequest = { prompt };
       if (agentId) req.agentId = agentId;
       if (opts?.model) req.model = opts.model;
       if (opts?.reasoningEffort) req.reasoningEffort = opts.reasoningEffort;
       if (selectedThread) req.threadId = selectedThread.threadId;
-      setUserMessages((prev) => [...prev, { id: `user-${Date.now()}`, role: 'user', timestamp: new Date().toISOString(), blocks: [{ kind: 'text', content: prompt }] }]);
       setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
       setRightPanelOpen(true);
       const started = await startRun(req);
+      setUserMessages((prev) => [...prev, { id: `user-${Date.now()}`, role: 'user', timestamp: new Date().toISOString(), blocks: [{ kind: 'text', content: prompt }] }]);
       setOptimisticRun({ ...started, outputText: '', toolCalls: [], changedFiles: [] });
+      return true;
     } catch (e) {
+      const activeRunId = getActiveRunConflictId(e);
+      if (activeRunId) {
+        setOptimisticRun({ runId: activeRunId, status: 'running', outputText: '', toolCalls: [], changedFiles: [] });
+        setRightPanelOpen(true);
+        addToast({ type: 'info', message: t('error.activeRunExists') });
+        return false;
+      }
       setOptimisticRun(null);
       addToast({ type: 'error', message: t('error.startRunFailed') });
       console.error('Failed to start run:', e);
+      return false;
+    } finally {
+      setRunStartPending(false);
     }
-  }, [addToast, selectedThread, t]);
+  }, [addToast, runIsActive, runStartPending, selectedThread, t]);
 
   const handleCancel = useCallback(async () => {
     const runId = currentRun?.runId ?? (optimisticRun?.runId.startsWith('starting-') ? undefined : optimisticRun?.runId);
@@ -502,14 +530,14 @@ export default function App() {
               {viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
               ) : (
-                <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={runIsActive} isConnected={isConnected} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
+                <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
               )}
             </div>
 
             {/* Input area */}
             {viewMode === 'agent' && (
               <div className={styles.inputArea}>
-                <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} onSend={handleSend} isStreaming={runIsActive} onCancel={handleCancel} disabled={!online} threadId={selectedThreadId ?? undefined} />
+                <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={selectedThreadId ?? undefined} />
               </div>
             )}
           </div>
@@ -573,6 +601,7 @@ export default function App() {
           </div>
         </div>
       )}
+      <ToastContainer />
     </div>
     </ErrorBoundary>
   );

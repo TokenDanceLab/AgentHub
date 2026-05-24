@@ -41,6 +41,10 @@ func (h *AttachmentHandler) Probe(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
+	if !service.IsValidAttachmentHash(req.Hash) {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
 
 	a, err := h.service.ProbeAttachment(c.Request.Context(), req.Hash)
 	if err != nil {
@@ -62,7 +66,7 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	hash := c.PostForm("hash")
-	if hash == "" {
+	if !service.IsValidAttachmentHash(hash) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
@@ -135,8 +139,16 @@ func (h *AttachmentHandler) Download(c *gin.Context) {
 		Fail(c, errcode.AttachNotFound)
 		return
 	}
+	if !service.IsValidAttachmentHash(a.Hash) {
+		Fail(c, errcode.AttachNotFound)
+		return
+	}
 
 	relPath := service.PathFromHash(a.Hash)
+	if relPath == "" {
+		Fail(c, errcode.AttachNotFound)
+		return
+	}
 	absPath := filepath.Join(".", relPath, a.Hash)
 	if _, err := os.Stat(absPath); os.IsNotExist(err) {
 		Fail(c, errcode.AttachNotFound)

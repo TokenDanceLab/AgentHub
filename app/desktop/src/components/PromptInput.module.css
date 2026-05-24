@@ -123,6 +123,14 @@
 .stopBtn:active { transform: scale(0.94); }
 .stopBtn:disabled { opacity: 0.3; cursor: not-allowed; }
 
+.spinner {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 [data-theme='dark'] .sendBtn { color: #6B7280; }
 [data-theme='dark'] .sendBtnActive { background: #FAFAFA; color: #18181B; }
 [data-theme='dark'] .sendBtnActive:hover { background: #E4E4E7; }

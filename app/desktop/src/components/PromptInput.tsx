@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Circle, Plus, Square, ArrowUp } from 'lucide-react';
+import { Circle, Plus, Square, ArrowUp, LoaderCircle } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
 import { useInputDraft } from '@/hooks/useInputDraft';
 import { useMention } from '@/hooks/useMention';
@@ -24,8 +24,9 @@ interface Props {
   agents: AgentInfo[];
   selectedAgentId?: string;
   onSelectAgent: (agentId: string) => void;
-  onSend: (prompt: string, agentId?: string, opts?: SendOptions) => void;
+  onSend: (prompt: string, agentId?: string, opts?: SendOptions) => boolean | void | Promise<boolean | void>;
   isStreaming?: boolean;
+  isStarting?: boolean;
   onCancel?: () => void;
   disabled?: boolean;
   threadId?: string;
@@ -50,7 +51,7 @@ function modelMeta(name: string): string {
 
 export default function PromptInput({
   agents, selectedAgentId, onSelectAgent, onSend,
-  isStreaming = false, onCancel, disabled, threadId,
+  isStreaming = false, isStarting = false, onCancel, disabled, threadId,
 }: Props) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -96,27 +97,28 @@ export default function PromptInput({
     return () => ta.removeEventListener('input', handleUpdate);
   }, [mentionHandleInput]);
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const ta = inputRef.current;
     if (!ta) return;
     const trimmed = ta.value.trim();
-    if (!trimmed) return;
+    if (!trimmed || disabled || isStreaming || isStarting) return;
     const opts: SendOptions = {};
     if (model) opts.model = model;
     if (reasoningEffort) opts.reasoningEffort = reasoningEffort;
-    onSend(trimmed, selectedAgentId, opts.model || opts.reasoningEffort ? opts : undefined);
+    const accepted = await onSend(trimmed, selectedAgentId, opts.model || opts.reasoningEffort ? opts : undefined);
+    if (accepted === false) return;
     ta.value = '';
     ta.style.height = 'auto';
     setPromptLength(0);
     closeMention();
     clearDraft();
-  }, [selectedAgentId, model, reasoningEffort, onSend, clearDraft, closeMention]);
+  }, [disabled, isStreaming, isStarting, selectedAgentId, model, reasoningEffort, onSend, clearDraft, closeMention]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (mentionHandleKeyDown(e)) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   }, [handleSend, mentionHandleKeyDown]);
 
@@ -150,7 +152,7 @@ export default function PromptInput({
           className={styles.textarea}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          disabled={disabled}
+          disabled={disabled || isStarting || isStreaming}
           rows={1}
         />
 
@@ -160,7 +162,7 @@ export default function PromptInput({
             <button
               type="button"
               className={styles.attachBtn}
-              disabled={disabled}
+              disabled={disabled || isStarting}
               title={t('prompt.attachCustom')}
               aria-label={t('prompt.attachCustom')}
             >
@@ -177,26 +179,30 @@ export default function PromptInput({
                   ...COMMON_MODELS.map((m) => ({ value: m, label: m, group: 'Base Models', desc: modelDesc(m), meta: modelMeta(m), isAgent: false })),
                 ]}
                 value={model} onChange={setModel}
-                placeholder={t('prompt.model')} disabled={disabled} ariaLabel={t('prompt.model')}
+                placeholder={t('prompt.model')} disabled={disabled || isStarting} ariaLabel={t('prompt.model')}
                 variant="text"
               />
               {model && reasoningEffort && <span className={styles.metaDot}>·</span>}
               <ModelDropdown
                 options={REASONING_EFFORTS.map((r) => ({ value: r, label: r, group: 'Reasoning' }))}
                 value={reasoningEffort} onChange={(v) => setReasoningEffort(v as ReasoningEffort | '')}
-              placeholder={t('prompt.reasoning')} disabled={disabled} ariaLabel={t('prompt.reasoning')} alignRight
+              placeholder={t('prompt.reasoning')} disabled={disabled || isStarting} ariaLabel={t('prompt.reasoning')} alignRight
               variant="text"
             />
           </div>
 
-          {isStreaming ? (
+          {isStarting ? (
+            <button className={styles.sendBtn} disabled aria-label={t('prompt.starting')}>
+              <LoaderCircle size={16} strokeWidth={2.2} className={styles.spinner} />
+            </button>
+          ) : isStreaming ? (
             <button className={styles.stopBtn} onClick={onCancel} disabled={disabled} aria-label={t('action.cancelRun')}>
               <Square size={14} fill="currentColor" />
             </button>
           ) : (
             <button
               className={`${styles.sendBtn} ${promptLength > 0 ? styles.sendBtnActive : ''}`}
-              onClick={handleSend} disabled={disabled || promptLength === 0}
+              onClick={() => void handleSend()} disabled={disabled || promptLength === 0}
               aria-label={t('action.startRun')}
             >
               <ArrowUp size={16} strokeWidth={2.5} />

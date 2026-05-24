@@ -69,6 +69,46 @@ func TestPublishNilScope(t *testing.T) {
 	}
 }
 
+func TestAddObserverReceivesPublishedEvents(t *testing.T) {
+	b := NewBus(100)
+	observed := make(chan EventEnvelope, 1)
+	cancel := b.AddObserver(func(evt EventEnvelope) {
+		observed <- evt
+	})
+	defer cancel()
+
+	b.Publish("test.observed", map[string]any{"runId": "run_1"}, "payload")
+
+	select {
+	case evt := <-observed:
+		if evt.Type != "test.observed" {
+			t.Fatalf("observer event type = %q, want test.observed", evt.Type)
+		}
+		if evt.Scope["runId"] != "run_1" {
+			t.Fatalf("observer scope = %#v, want run_1", evt.Scope)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for observer")
+	}
+}
+
+func TestAddObserverCancelStopsEvents(t *testing.T) {
+	b := NewBus(100)
+	observed := make(chan EventEnvelope, 1)
+	cancel := b.AddObserver(func(evt EventEnvelope) {
+		observed <- evt
+	})
+	cancel()
+
+	b.Publish("test.after_cancel", nil, nil)
+
+	select {
+	case evt := <-observed:
+		t.Fatalf("unexpected observer event after cancel: %s", evt.Type)
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
 func TestSubscribeReceivesEvents(t *testing.T) {
 	b := NewBus(100)
 	_, ch, _ := b.Subscribe(0)
