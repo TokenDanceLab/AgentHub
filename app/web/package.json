@@ -7,17 +7,25 @@
     "dev": "vite",
     "build": "tsgo && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsgo -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@typescript/native-preview": "beta",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.4.0",
-    "@typescript/native-preview": "beta",
-    "vite": "^6.3.0"
+    "jsdom": "^29.1.1",
+    "vite": "^6.3.0",
+    "vitest": "^4.1.7"
   }
 }
