@@ -1,0 +1,26 @@
+server:
+  port: 8080
+  log_level: info
+  log_file: ""
+  admin_port: 6060
+db:
+  host: postgres
+  port: 5432
+  user: agenthub
+  password: dev_password
+  name: agenthub
+redis:
+  host: redis
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 100
+  min_idle_conns: 10
+jwt:
+  # AGENTHUB_JWT_SECRET env var takes precedence over this value.
+  secret: dev-secret-change-in-production
+  access_ttl: 15m
+  refresh_ttl: 720h
+upload:
+  dir: ./uploads
+  max_size: 10485760

@@ -24,7 +24,9 @@ export function useRunners(online: boolean): Runner[] {
     mountedRef.current = true;
     if (!online) {
       setRunners([]);
-      return () => { mountedRef.current = false; };
+      return () => {
+        mountedRef.current = false;
+      };
     }
 
     load();

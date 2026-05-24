@@ -1,0 +1,20 @@
+hub.example.com {
+    reverse_proxy localhost:8080
+    encode gzip
+    header {
+        X-Frame-Options DENY
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin
+        -Server
+    }
+    request_body {
+        max_size 10MB
+    }
+    rate_limit {
+        zone dynamic {
+            key {remote_host}
+            events 100
+            window 1m
+        }
+    }
+}

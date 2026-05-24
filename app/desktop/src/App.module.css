@@ -1,8 +1,21 @@
+/* ═══════════════════════════════════════════════════════
+   AgentHub Desktop — Card-Based Layout
+   Dark mode is :root default. Light mode via [data-theme='light'].
+   Glass effects: light mode only (dark relies on solid layers).
+   ═══════════════════════════════════════════════════════ */
+
 .root {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
+  background: var(--background);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
 }
+
+/* ── Body: three-zone layout ───────────────── */
 
 .body {
   display: flex;
@@ -10,26 +23,550 @@
   overflow: hidden;
 }
 
-.toolbar {
+/* ── Left Icon Nav (56px) ─────────────────── */
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 56px;
+  flex-shrink: 0;
+  padding: var(--space-xs) 0;
+  background: var(--surface-base);
+  border-right: 1px solid var(--border);
+}
+
+.navBtn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.navBtn:hover {
+  background: var(--hover-overlay);
+  color: var(--foreground);
+}
+
+.navBtnActive {
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+
+.navSpacer { flex: 1; }
+
+/* ── Sidebar panels (Threads / Agents) ───── */
+
+.sidebarPanel {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--surface-base);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Main zone (center, scrollable) ───────── */
+
+.main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-md);
+}
+
+/* ── Workspace Card ───────────────────────── */
+
+.workspace {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+}
+
+.workspaceHeader {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-xs) var(--space-lg);
-  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-md) var(--space-md);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+  flex-shrink: 0;
+  min-height: 56px;
+}
+
+.workspaceHeader h2 {
+  flex: 1;
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspaceHeaderDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
-.btn {
-  padding: 4px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  font-family: var(--font-ui);
+.workspaceHeaderDotOnline { background: var(--color-success); }
+.workspaceHeaderDotOffline { background: var(--color-danger); }
+
+/* ── Chat area ────────────────────────────── */
+
+.chatArea {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
-.btn:hover {
-  background: var(--color-border);
+/* ── Input area ───────────────────────────── */
+
+.inputArea {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+}
+
+/* ── Right panel ──────────────────────────── */
+
+.rightPanel {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--surface-base);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.rightPanelHeader {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--surface-raised);
+}
+
+.rightPanelSegmented {
+  display: flex;
+  background: var(--background);
+  border-radius: 8px;
+  padding: 3px;
+  width: 100%;
+}
+
+/* ── Light mode: explicit light segmented control ─ */
+[data-theme='light'] .rightPanelSegmented {
+  background: #F1F3F5;
+}
+
+[data-theme='light'] .rightPanelTabActive {
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.rightPanelTab {
+  flex: 1;
+  padding: 5px 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+  text-align: center;
+}
+
+.rightPanelTab:hover { color: var(--foreground); }
+
+.rightPanelTabActive {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.rightPanelBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-sm);
+  font-size: var(--font-size-xs);
+}
+
+/* ── Top status bar ───────────────────────── */
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 4px var(--space-md);
+  background: var(--surface-base);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  height: 32px;
+}
+
+.topBarLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+.topBarRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.topBarDim { color: var(--muted-foreground); }
+
+.topBarBtn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 100ms, color 100ms;
+}
+
+.topBarBtn:hover {
+  background: var(--hover-overlay);
+  color: var(--foreground);
+}
+
+/* ── Hub Login button ────────────────────── */
+
+.hubBtn {
+  padding: 3px 14px;
+  border: none;
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--muted-foreground) 10%, transparent);
+  color: var(--foreground);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+}
+
+.hubBtn:hover {
+  background: color-mix(in oklch, var(--muted-foreground) 20%, transparent);
+}
+
+/* ── Status badge ─────────────────────────── */
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+  background: var(--background);
+  white-space: nowrap;
+}
+
+.statusBadgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.statusBadgeDotOnline { background: var(--color-success); }
+.statusBadgeDotOffline { background: var(--color-danger); }
+
+/* ── Window controls (min/max/close) ──────── */
+
+.winControls {
+  display: flex;
+  align-items: stretch;
+  height: 32px;
+  margin-left: 12px;
+}
+
+.winBtn {
+  width: 46px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 100ms, color 100ms;
+}
+
+.winBtn:hover {
+  background: color-mix(in oklch, var(--muted-foreground) 12%, transparent);
+  color: var(--foreground);
+}
+
+.winBtnClose:hover {
+  background: #e81123 !important;
+  color: #fff !important;
+}
+
+/* ── Banner ───────────────────────────────── */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 4px var(--space-md);
+  background: #422e00;
+  border-bottom: 1px solid #f59e0b;
+  color: #fbbf24;
+  font-size: var(--font-size-xs);
+  flex-shrink: 0;
+}
+
+.bannerIcon { font-size: 14px; line-height: 1; flex-shrink: 0; }
+
+.bannerMsg {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bannerActions { display: flex; gap: var(--space-xs); flex-shrink: 0; }
+
+.bannerBtn {
+  padding: 1px 8px;
+  border: 1px solid #d97706;
+  border-radius: 4px;
+  background: transparent;
+  color: #fbbf24;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.bannerBtn:hover:not(:disabled) { background: rgba(245, 158, 11, 0.2); }
+.bannerBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Skeleton ─────────────────────────────── */
+
+.skeletonChat {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+  gap: var(--space-lg);
+  flex: 1;
+  background: var(--background);
+}
+
+.skeletonChatBubble {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  max-width: 72%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  animation: skBreath 2s ease-in-out infinite;
+}
+
+.skeletonChatBubbleRight {
+  align-self: flex-end;
+  background: color-mix(in oklch, var(--primary) 18%, transparent);
+  border: 1px solid color-mix(in oklch, var(--primary) 25%, transparent);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 10px;
+  max-width: 72%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  animation: skBreath 2s ease-in-out infinite;
+}
+
+@keyframes skBreath {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* ── Modal overlay ────────────────────────── */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.authModal {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  max-width: 420px;
+  width: 90vw;
+  max-height: 90vh;
+  overflow: visible;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.2),
+    0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: modalIn 0.3s var(--ease-out);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Overlay panels (mobile/tablet) ───────── */
+
+.overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 50;
+}
+
+.overlayActive { display: block; }
+
+.overlayPanel {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 280px;
+  max-width: 85vw;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  z-index: 60;
+  overflow-y: auto;
+  padding: var(--space-md);
+  transition: transform 180ms ease;
+}
+
+.overlayPanelLeft {
+  left: 0;
+  transform: translateX(-100%);
+}
+
+.overlayPanelLeftActive {
+  transform: translateX(0);
+}
+
+/* ── Dark mode: ensure window controls are visible ─ */
+
+.winBtn {
+  color: var(--muted-foreground);
+}
+
+/* ── Light mode: workspace header MUST be white ─ */
+
+[data-theme='light'] .workspaceHeader {
+  background: #FAFBFC;
+  border-bottom: 1px solid #EAECEF;
+}
+
+/* ── Nav bottom button breathing room ───── */
+
+.navBtn:last-child {
+  margin-bottom: var(--space-md);
+}
+
+/* ── Light theme glass effects ────────────── */
+
+[data-theme='light'] .nav,
+[data-theme='light'] .topBar,
+[data-theme='light'] .sidebarPanel,
+[data-theme='light'] .rightPanel {
+  background: rgba(248, 249, 250, 0.55);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+}
+
+[data-theme='light'] .workspace {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.06),
+    0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme='light'] .authModal {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+[data-theme='light'] .banner {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+[data-theme='light'] .bannerBtn {
+  color: #92400e;
+  border-color: #d97706;
+}
+
+[data-theme='light'] .bannerBtn:hover:not(:disabled) { background: #fde68a; }
+
+/* ── Responsive ───────────────────────────── */
+
+@media (max-width: 767px) {
+  .nav { display: none; }
+  .rightPanel { display: none; }
+  .main { padding: var(--space-xs); }
+  .workspace { border-radius: 0; border: none; box-shadow: none; }
+  .banner { padding: var(--space-xs) var(--space-sm); }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .rightPanel { width: 260px; }
+  .main { padding: var(--space-sm); }
 }

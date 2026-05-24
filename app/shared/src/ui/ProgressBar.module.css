@@ -1,0 +1,26 @@
+.track {
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: oklch(0 0 0 / 0.1);
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand, oklch(0.55 0.16 255)), oklch(0.60 0.14 210));
+  transition: width var(--duration-slow, 0.5s) ease-out;
+}
+
+.paused .fill {
+  background: linear-gradient(90deg, var(--warning, oklch(0.70 0.18 85)), oklch(0.55 0.22 300));
+}
+
+.label {
+  display: block;
+  margin-top: var(--space-xs, 0.25rem);
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--muted-foreground);
+}

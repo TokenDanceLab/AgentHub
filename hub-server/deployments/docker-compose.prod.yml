@@ -1,0 +1,147 @@
+# ──────────────────────────────────────────────
+# AgentHub Hub Server — 生产部署配置 (hk2)
+# ──────────────────────────────────────────────
+# 与 AIhub 完全隔离：独立的 PostgreSQL + Redis 容器。
+# DB/Redis 端口不对外暴露，仅 Docker 内部网络访问。
+#
+# 部署步骤（在 hk2 上执行）：
+#   1. 拉取代码：git clone 或 scp 整个 hub-server/ 目录
+#   2. 配置环境变量（必须设置 AGENTHUB_JWT_SECRET）
+#   3. docker compose up -d
+#   4. 配置 Caddy/nginx 反代：api.hub.vectorcontrol.tech → localhost:8080
+# ──────────────────────────────────────────────
+
+services:
+  # ── PostgreSQL 16（独立实例，不与 AIhub 共用）──
+  postgres:
+    image: postgres:16-alpine
+    container_name: agenthub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${AGENTHUB_DB_NAME:-agenthub}
+      POSTGRES_USER: ${AGENTHUB_DB_USER:-agenthub}
+      POSTGRES_PASSWORD: ${AGENTHUB_DB_PASSWORD:?必须设置 AGENTHUB_DB_PASSWORD}
+    # 不暴露端口到宿主机 — 仅 Docker 网络内部访问
+    expose:
+      - "5432"
+    volumes:
+      - agenthub_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AGENTHUB_DB_USER:-agenthub} -d ${AGENTHUB_DB_NAME:-agenthub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - agenthub-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Redis 7（独立实例，不与 AIhub 共用）───────
+  redis:
+    image: redis:7-alpine
+    container_name: agenthub-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --requirepass ${AGENTHUB_REDIS_PASSWORD:?必须设置 AGENTHUB_REDIS_PASSWORD}
+    # 不暴露端口到宿主机 — 仅 Docker 网络内部访问
+    expose:
+      - "6379"
+    volumes:
+      - agenthub_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${AGENTHUB_REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - agenthub-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Hub Server ─────────────────────────────
+  hub-server:
+    build:
+      context: ..
+      dockerfile: ./deployments/Dockerfile
+    container_name: agenthub-hub
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # 数据库（连接 Docker 网络内的独立 PG）
+      AGENTHUB_DB_HOST: postgres
+      AGENTHUB_DB_PORT: "5432"
+      AGENTHUB_DB_USER: ${AGENTHUB_DB_USER:-agenthub}
+      AGENTHUB_DB_PASSWORD: ${AGENTHUB_DB_PASSWORD}
+      AGENTHUB_DB_NAME: ${AGENTHUB_DB_NAME:-agenthub}
+      # Redis（连接 Docker 网络内的独立 Redis）
+      AGENTHUB_REDIS_HOST: redis
+      AGENTHUB_REDIS_PORT: "6379"
+      AGENTHUB_REDIS_PASSWORD: ${AGENTHUB_REDIS_PASSWORD}
+      AGENTHUB_REDIS_DB: "0"
+      AGENTHUB_REDIS_POOL_SIZE: "100"
+      AGENTHUB_REDIS_MIN_IDLE_CONNS: "10"
+      # JWT（生产环境必须设置强密钥）
+      AGENTHUB_JWT_SECRET: ${AGENTHUB_JWT_SECRET:?必须设置 AGENTHUB_JWT_SECRET（至少32字符）}
+      AGENTHUB_JWT_ACCESS_TTL: ${AGENTHUB_JWT_ACCESS_TTL:-15m}
+      AGENTHUB_JWT_REFRESH_TTL: ${AGENTHUB_JWT_REFRESH_TTL:-720h}
+      # 服务
+      AGENTHUB_SERVER_PORT: "8080"
+      AGENTHUB_SERVER_LOG_LEVEL: ${AGENTHUB_SERVER_LOG_LEVEL:-info}
+      AGENTHUB_SERVER_ADMIN_PORT: "6060"
+      AGENTHUB_UPLOAD_DIR: ./uploads
+      AGENTHUB_UPLOAD_MAX_SIZE: "10485760"
+      # PPROF 管理认证（生产必须设置）
+      AGENTHUB_PPROF_USER: ${AGENTHUB_PPROF_USER:-admin}
+      AGENTHUB_PPROF_PASS: ${AGENTHUB_PPROF_PASS:?必须设置 AGENTHUB_PPROF_PASS}
+      # CORS（允许官网和本地开发）
+      AGENTHUB_CORS_ORIGINS: ${AGENTHUB_CORS_ORIGINS:-https://hub.vectorcontrol.tech}
+    ports:
+      - "127.0.0.1:8080:8080"   # 仅本地回环，由 Caddy/nginx 反代
+      - "127.0.0.1:6060:6060"   # pprof/metrics 仅本地访问
+    volumes:
+      - agenthub_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - agenthub-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  agenthub_pg_data:
+    name: agenthub_pg_data
+  agenthub_redis_data:
+    name: agenthub_redis_data
+  agenthub_uploads:
+    name: agenthub_uploads
+
+networks:
+  agenthub-net:
+    name: agenthub-net
+    driver: bridge
