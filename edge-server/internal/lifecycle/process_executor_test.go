@@ -123,8 +123,10 @@ func TestProcessExecutorPublishesOutputAndFinished(t *testing.T) {
 				if !ok || len(chunks) == 0 {
 					t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
 				}
-				text, _ := chunks[0]["text"].(string)
-				stdoutText += text
+				for _, chunk := range chunks {
+					text, _ := chunk["text"].(string)
+					stdoutText += text
+				}
 			}
 		case "run.finished":
 			if !seenOutput["stdout"] || !seenOutput["stderr"] {
