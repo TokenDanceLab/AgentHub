@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Circle, Square } from 'lucide-react';
+import { Send, Circle, Square, ArrowUp } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
 import { useInputDraft } from '@/hooks/useInputDraft';
 import { useMention } from '@/hooks/useMention';
@@ -9,10 +9,8 @@ import ModelDropdown from '@/components/ModelDropdown';
 import styles from './PromptInput.module.css';
 
 const COMMON_MODELS = [
-  'claude-opus-4-7',
-  'claude-opus-4-5',
-  'claude-sonnet-4-6',
-  'claude-haiku-4-5',
+  'claude-opus-4-7', 'claude-opus-4-5',
+  'claude-sonnet-4-6', 'claude-haiku-4-5',
 ];
 
 const REASONING_EFFORTS = ['low', 'medium', 'high', 'max'] as const;
@@ -20,10 +18,7 @@ type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 const MAX_CHARS = 4000;
 
-interface SendOptions {
-  model?: string;
-  reasoningEffort?: ReasoningEffort;
-}
+interface SendOptions { model?: string; reasoningEffort?: ReasoningEffort; }
 
 interface Props {
   agents: AgentInfo[];
@@ -37,13 +32,13 @@ interface Props {
 }
 
 function modelDesc(name: string): string {
-  const map: Record<string, string> = {
+  const m: Record<string, string> = {
     'claude-opus-4-7': 'Anthropic flagship — strongest reasoning & coding',
     'claude-opus-4-5': 'Previous-gen flagship, balanced performance',
     'claude-sonnet-4-6': 'Fast, cost-effective for daily tasks',
     'claude-haiku-4-5': 'Lightning-fast for simple tasks',
   };
-  return map[name] || '';
+  return m[name] || '';
 }
 
 function modelMeta(name: string): string {
@@ -53,67 +48,43 @@ function modelMeta(name: string): string {
   return '';
 }
 
-function extractModels(agents: AgentInfo[]): string[] {
-  const fromAgents = agents.map((a) => a.name).filter(Boolean);
-  return [...new Set([...fromAgents, ...COMMON_MODELS])];
-}
-
 export default function PromptInput({
-  agents,
-  selectedAgentId,
-  onSelectAgent,
-  onSend,
-  isStreaming = false,
-  onCancel,
-  disabled,
-  threadId,
+  agents, selectedAgentId, onSelectAgent, onSend,
+  isStreaming = false, onCancel, disabled, threadId,
 }: Props) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [promptLength, setPromptLength] = useState(0);
   const [model, setModel] = useState<string>('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
-  const [textareaFocused, setTextareaFocused] = useState(false);
 
   const {
-    isOpen: mentionOpen,
-    query: mentionQuery,
-    position: mentionPosition,
-    selectedIndex: mentionIndex,
-    filteredAgents: mentionFiltered,
-    handleInput: mentionHandleInput,
-    handleKeyDown: mentionHandleKeyDown,
-    selectAgent: mentionSelectAgent,
-    closeMention,
+    isOpen: mentionOpen, query: mentionQuery, position: mentionPosition,
+    selectedIndex: mentionIndex, filteredAgents: mentionFiltered,
+    handleInput: mentionHandleInput, handleKeyDown: mentionHandleKeyDown,
+    selectAgent: mentionSelectAgent, closeMention,
   } = useMention({ agents, onSelectAgent });
 
-  const { restore: restoreDraft, save: saveDraft, flush: flushDraft, clear: clearDraft } =
-    useInputDraft(threadId);
+  const { restore: restoreDraft, save: saveDraft, flush: flushDraft, clear: clearDraft } = useInputDraft(threadId);
 
-  // Restore draft on mount / threadId change
   useEffect(() => {
     const ta = inputRef.current;
     if (!ta) return;
     restoreDraft(ta);
     setPromptLength(ta.value.length);
-    return () => {
-      if (ta) flushDraft(ta.value, threadId);
-    };
-  }, [threadId]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { if (ta) flushDraft(ta.value, threadId); };
+  }, [threadId]);
 
-  // Flush draft on unmount
   useEffect(() => {
     return () => {
       const ta = inputRef.current;
       if (ta) flushDraft(ta.value);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Auto-resize textarea, track character count, detect @mention on input
   useEffect(() => {
     const ta = inputRef.current;
     if (!ta) return;
-
     const handleUpdate = () => {
       setPromptLength(ta.value.length);
       ta.style.height = 'auto';
@@ -121,13 +92,8 @@ export default function PromptInput({
       saveDraft(ta.value);
       mentionHandleInput();
     };
-
     ta.addEventListener('input', handleUpdate);
-    ta.addEventListener('change', handleUpdate);
-    return () => {
-      ta.removeEventListener('input', handleUpdate);
-      ta.removeEventListener('change', handleUpdate);
-    };
+    return () => ta.removeEventListener('input', handleUpdate);
   }, [mentionHandleInput]);
 
   const handleSend = useCallback(() => {
@@ -146,134 +112,82 @@ export default function PromptInput({
     clearDraft();
   }, [selectedAgentId, model, reasoningEffort, onSend, clearDraft, closeMention]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      // Delegate to mention handler first; if consumed, skip default Enter handling
-      if (mentionHandleKeyDown(e)) return;
-
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    },
-    [handleSend, mentionHandleKeyDown],
-  );
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (mentionHandleKeyDown(e)) return;
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  }, [handleSend, mentionHandleKeyDown]);
 
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
+  const placeholder = selectedAgent
+    ? `${t('prompt.placeholder')} @${selectedAgent.name}...`
+    : t('prompt.placeholder');
 
   return (
     <div className={styles.root}>
-      {/* @mention inline popover */}
       <MentionPopover
-        agents={mentionFiltered}
-        isOpen={mentionOpen}
-        query={mentionQuery}
-        position={mentionPosition}
-        selectedIndex={mentionIndex}
-        onSelect={mentionSelectAgent}
-        onClose={closeMention}
+        agents={mentionFiltered} isOpen={mentionOpen} query={mentionQuery}
+        position={mentionPosition} selectedIndex={mentionIndex}
+        onSelect={mentionSelectAgent} onClose={closeMention}
       />
 
-      <div className={styles.inputCard}>
-        <div className={styles.configRow}>
-          <ModelDropdown
-            options={[
-              ...agents.map((a) => ({
-                value: a.name,
-                label: a.name,
-                group: 'My Agents',
-                desc: a.description || '',
-                meta: a.status === 'available' ? 'Online' : 'Offline',
-                isAgent: true,
-              })),
-              ...COMMON_MODELS.map((m) => ({
-                value: m,
-                label: m,
-                group: 'Base Models',
-                desc: modelDesc(m),
-                meta: modelMeta(m),
-                isAgent: false,
-              })),
-            ]}
-            value={model}
-            onChange={setModel}
-            placeholder={t('prompt.model')}
-            disabled={disabled}
-            ariaLabel={t('prompt.model')}
-          />
-
-          <ModelDropdown
-            options={REASONING_EFFORTS.map((r) => ({ value: r, label: r, group: 'Reasoning' }))}
-            value={reasoningEffort}
-            onChange={(v) => setReasoningEffort(v as ReasoningEffort | '')}
-            placeholder={t('prompt.reasoning')}
-            disabled={disabled}
-            ariaLabel={t('prompt.reasoning')}
-            alignRight
-          />
-        </div>
-
-      <div className={styles.bar}>
+      <div className={styles.capsule}>
+        {/* selected agent badge */}
         {selectedAgent && (
-          <span className={styles.selectedAgentBadge}>
-            <Circle
-              size={8}
-              fill="currentColor"
-              style={{
-                color:
-                  selectedAgent.status === 'available'
-                    ? 'var(--color-success)'
-                    : 'var(--color-danger)',
-              }}
-            />
+          <span className={styles.agentBadge}>
+            <Circle size={7} fill="currentColor" style={{
+              color: selectedAgent.status === 'available' ? 'var(--color-success)' : 'var(--color-danger)',
+            }} />
             @{selectedAgent.name}
           </span>
         )}
 
-        <div className={styles.inputWrapper}>
-          <textarea
-            ref={inputRef}
-            className={styles.textarea}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setTextareaFocused(true)}
-            onBlur={() => setTextareaFocused(false)}
-            placeholder={t('prompt.placeholder')}
-            disabled={disabled}
-            rows={1}
-          />
-          <div className={styles.inputFooter}>
-            <span className={styles.enterHint}>
-              <kbd className={styles.shortcutKey}>{textareaFocused ? 'Shift+Enter' : 'Enter'}</kbd>
-            </span>
-            <div className={styles.buttonGroup}>
-              <span className={styles.charCount}>
-                {promptLength}/{MAX_CHARS}
-              </span>
-              {isStreaming ? (
-                <button
-                  className={styles.stopBtn}
-                  onClick={onCancel}
-                  disabled={disabled}
-                  aria-label={t('action.cancelRun')}
-                  title={t('action.cancelRun')}
-                >
-                  <Square size={16} fill="currentColor" />
-                </button>
-              ) : (
-                <button
-                  className={styles.sendBtn}
-                  onClick={handleSend}
-                  disabled={disabled || promptLength === 0}
-                  aria-label={t('action.startRun')}
-                  title={t('action.startRun')}
-                >
-                  <Send size={16} />
-                </button>
-              )}
-            </div>
+        {/* borderless textarea */}
+        <textarea
+          ref={inputRef}
+          className={styles.textarea}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          disabled={disabled}
+          rows={1}
+        />
+
+        {/* bottom action bar */}
+        <div className={styles.actions}>
+          <span className={styles.charCount}>{promptLength}/{MAX_CHARS}</span>
+
+          <div className={styles.selectors}>
+            <ModelDropdown
+              options={[
+                ...agents.map((a) => ({ value: a.name, label: a.name, group: 'My Agents', desc: a.description || '', meta: a.status === 'available' ? 'Online' : 'Offline', isAgent: true })),
+                ...COMMON_MODELS.map((m) => ({ value: m, label: m, group: 'Base Models', desc: modelDesc(m), meta: modelMeta(m), isAgent: false })),
+              ]}
+              value={model} onChange={setModel}
+              placeholder={t('prompt.model')} disabled={disabled} ariaLabel={t('prompt.model')}
+            />
+            <ModelDropdown
+              options={REASONING_EFFORTS.map((r) => ({ value: r, label: r, group: 'Reasoning' }))}
+              value={reasoningEffort} onChange={(v) => setReasoningEffort(v as ReasoningEffort | '')}
+              placeholder={t('prompt.reasoning')} disabled={disabled} ariaLabel={t('prompt.reasoning')} alignRight
+            />
           </div>
+
+          {isStreaming ? (
+            <button className={styles.stopBtn} onClick={onCancel} disabled={disabled} aria-label={t('action.cancelRun')}>
+              <Square size={14} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              className={`${styles.sendBtn} ${promptLength > 0 ? styles.sendBtnActive : ''}`}
+              onClick={handleSend} disabled={disabled || promptLength === 0}
+              aria-label={t('action.startRun')}
+            >
+              <ArrowUp size={16} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
-      </div>
       </div>
     </div>
   );
