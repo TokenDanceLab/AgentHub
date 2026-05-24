@@ -93,6 +93,15 @@
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
+  color: var(--foreground);
+}
+
+[data-theme='light'] .output {
+  background: #F1F3F5;
+}
+
+[data-theme='light'] .toolCallOutput {
+  background: #F1F3F5;
 }
 
 .list {
