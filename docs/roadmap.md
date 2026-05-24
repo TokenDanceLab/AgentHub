@@ -412,8 +412,7 @@ Hub 调度（远程）:
   - 方案：Bus.Publish、NDJSON 解析、JWT 验证、消息写入性能基准
   - CI：`go test -bench=. -benchtime=1s` 检测回归
 
-- [ ] **多平台构建验证（Windows + macOS）** `[1d]`
-  - 方案：添加 matrix build，验证跨平台编译
+- [x] **多平台构建验证（Windows + macOS + Linux）** `[1d]` ✅ M5
 
 ---
 
