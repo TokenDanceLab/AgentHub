@@ -466,12 +466,12 @@ Hub 调度（远程）:
 - [x] StatusBar Hub 连接状态指示器
 - [x] 验证：28 hubClient tests + 399 全部通过
 
-##### 阶段 2: Hub WebSocket 客户端 `[2d]`
+##### 阶段 2: Hub WebSocket 客户端 `[2d]` ✅ M5
 
-- [ ] 新建 `app/desktop/src/api/hubWS.ts` -- 含 auth 帧协议的 Hub WS 客户端
-- [ ] 新建 `app/shared/src/hubEvents.ts` -- Hub WS 事件类型定义
-- [ ] 创建 `useHubEventStream` hook
-- [ ] 验证：Desktop 接收 `message.new`, `agent.dispatch`, `notification.new` 事件
+- [x] 新建 `app/desktop/src/api/hubWS.ts` -- 含 auth 帧协议的 Hub WS 客户端（Transport 注入）
+- [x] 新建 `app/shared/src/hubEvents.ts` -- 23 Hub WS 事件类型
+- [x] 创建 `useHubEventStream` hook — 分类事件状态管理
+- [x] 验证：20 hubWS tests + 419 全部通过
 
 ##### 阶段 3: Agent 任务桥接 `[4d]`
 
