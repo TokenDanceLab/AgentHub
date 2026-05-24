@@ -78,6 +78,9 @@ function normalizeAgentCapabilities(raw: unknown): AgentInfo['capabilities'] {
     fileChanges: read('fileChanges', 'FileChanges'),
     thinkingVisible: read('thinkingVisible', 'ThinkingVisible'),
     multiTurn: read('multiTurn', 'MultiTurn'),
+    mcpIntegration: read('mcpIntegration', 'MCPIntegration'),
+    permissionHooks: read('permissionHooks', 'PermissionHooks'),
+    subAgentSpawn: read('subAgentSpawn', 'SubAgentSpawn'),
   };
 }
 
