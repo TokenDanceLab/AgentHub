@@ -83,7 +83,9 @@ export function useHubIntegration(
   // ── Initialise Edge event stream once ─────────────────
 
   useEffect(() => {
-    const stream = createEventStream();
+    // Build Edge WebSocket URL from the REST base URL
+    const edgeWsUrl = edgeBaseUrl.replace(/^http/, 'ws') + '/v1/events';
+    const stream = createEventStream(edgeWsUrl);
     streamRef.current = stream;
 
     // Global Edge event handler — filter by runId and route to Hub callbacks

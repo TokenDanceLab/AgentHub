@@ -33,7 +33,6 @@ export function useDeviceRegistration(
     hubClient
       .registerDevice({
         device_id: deviceId,
-        device_type: 'desktop',
         app_version: APP_VERSION,
       })
       .then(() => {
