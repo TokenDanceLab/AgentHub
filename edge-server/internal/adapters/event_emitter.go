@@ -24,6 +24,48 @@ func (e *BusEventEmitter) Emit(eventType string, scope map[string]any, payload a
 	e.bus.Publish(eventType, scope, payload)
 }
 
+// ScopedEventEmitter supplies a default scope when an adapter emits an event
+// without one, such as control-protocol permission events.
+type ScopedEventEmitter struct {
+	inner EventEmitter
+	scope map[string]any
+}
+
+// NewScopedEventEmitter wraps an EventEmitter with a default scope.
+func NewScopedEventEmitter(inner EventEmitter, scope map[string]any) *ScopedEventEmitter {
+	return &ScopedEventEmitter{inner: inner, scope: scope}
+}
+
+func (e *ScopedEventEmitter) Emit(eventType string, scope map[string]any, payload any) {
+	if scope == nil {
+		scope = e.scope
+		payload = payloadWithScopeDefaults(payload, scope)
+	}
+	e.inner.Emit(eventType, scope, payload)
+}
+
+func payloadWithScopeDefaults(payload any, scope map[string]any) any {
+	if len(scope) == 0 {
+		return payload
+	}
+	payloadMap, ok := payload.(map[string]any)
+	if !ok {
+		return payload
+	}
+	withDefaults := make(map[string]any, len(payloadMap)+len(scope))
+	for k, v := range payloadMap {
+		withDefaults[k] = v
+	}
+	for _, key := range []string{"projectId", "threadId", "runId"} {
+		if _, exists := withDefaults[key]; !exists {
+			if v, ok := scope[key]; ok {
+				withDefaults[key] = v
+			}
+		}
+	}
+	return withDefaults
+}
+
 // BudgetAwareEmitter wraps an EventEmitter to emit run.agent.context_warning
 // when the context budget first crosses the 85% auto-compaction threshold.
 // It suppresses duplicate warnings for the same run.
