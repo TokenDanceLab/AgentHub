@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { mockThreads, mockMessages, MockEventStream, playMessageStream } from '@shared/index';
 
 type Accent = 'blue' | 'cyan' | 'purple';
@@ -1222,6 +1222,15 @@ export function PrivateChatsPageInteractive() {
     showNotice('Local draft appended to this private thread', 'success');
   };
 
+  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    sendDraft();
+  };
+
   return (
     <div className="pc-page">
       <style>{pageStyles}</style>
@@ -1487,6 +1496,7 @@ export function PrivateChatsPageInteractive() {
               <textarea
                 aria-label={`Message ${activeConversation.name}`}
                 onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
                 placeholder="Write a private note, paste a code fragment, or attach handoff context..."
                 value={draft}
               />
