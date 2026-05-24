@@ -1,15 +1,15 @@
 import { useTranslation } from 'react-i18next';
-import { Search } from 'lucide-react';
+import { Search, Terminal } from 'lucide-react';
 import { useState, useMemo, memo, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
-import { Anthropic, OpenAI, Github } from '@lobehub/icons';
+import { Anthropic, OpenAI } from '@lobehub/icons';
 import styles from './AgentList.module.css';
 
 function agentIcon(name: string): ReactNode {
   const n = name.toLowerCase();
   if (n.includes('claude')) return <Anthropic size={18} />;
   if (n.includes('codex') || n.includes('openai')) return <OpenAI size={18} />;
-  if (n.includes('opencode')) return <Github size={18} />;
+  if (n.includes('opencode')) return <Terminal size={16} strokeWidth={1.8} />;
   return null;
 }
 
