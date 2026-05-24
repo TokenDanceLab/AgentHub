@@ -22,6 +22,17 @@ export interface WorkbenchCatalogState {
   hasLiveCatalog: boolean;
 }
 
+export interface WorkbenchSectionSource {
+  label: string;
+  tone: WorkbenchCatalogTone;
+}
+
+export interface WorkbenchSectionSourceInput {
+  mode: WorkbenchDataMode;
+  hasSectionSnapshot: boolean;
+  hasLocalDryRun?: boolean;
+}
+
 export const workbenchDataModeLabels: Record<WorkbenchDataMode, string> = {
   loading: 'Loading catalog',
   live: 'Live',
@@ -73,6 +84,20 @@ export function getWorkbenchCatalogState(
   };
 }
 
+export function getWorkbenchSectionSource({
+  mode,
+  hasSectionSnapshot,
+  hasLocalDryRun = false,
+}: WorkbenchSectionSourceInput): WorkbenchSectionSource {
+  const baseSource = getWorkbenchSnapshotSectionSource(mode, hasSectionSnapshot);
+
+  if (!hasLocalDryRun) {
+    return baseSource;
+  }
+
+  return { label: `Local dry-run / ${baseSource.label}`, tone: 'cyan' };
+}
+
 function hasWorkbenchSnapshotData(state: WorkbenchState): boolean {
   return (
     state.projects.length > 0 ||
@@ -83,6 +108,29 @@ function hasWorkbenchSnapshotData(state: WorkbenchState): boolean {
     state.approvals.length > 0 ||
     state.previews.length > 0
   );
+}
+
+function getWorkbenchSnapshotSectionSource(
+  mode: WorkbenchDataMode,
+  hasSectionSnapshot: boolean,
+): WorkbenchSectionSource {
+  if (hasSectionSnapshot) {
+    if (mode === 'offline-snapshot') {
+      return { label: 'Offline snapshot', tone: 'purple' };
+    }
+
+    return { label: 'Edge snapshot', tone: 'green' };
+  }
+
+  if (mode === 'loading') {
+    return { label: 'Loading snapshot', tone: 'cyan' };
+  }
+
+  if (mode === 'mock') {
+    return { label: 'Mock fallback', tone: 'amber' };
+  }
+
+  return { label: 'Snapshot unavailable', tone: 'neutral' };
 }
 
 function workbenchDataModeMessage(
