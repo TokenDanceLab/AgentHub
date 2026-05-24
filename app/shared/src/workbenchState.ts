@@ -87,20 +87,30 @@ export function workbenchReducer(
   action: WorkbenchAction,
 ): WorkbenchState {
   switch (action.type) {
-    case 'snapshot.loaded':
+    case 'snapshot.loaded': {
+      const snapshot = normalizeSnapshot(action.snapshot);
+      if (isEmptyWorkbenchData(state)) {
+        return {
+          ...state,
+          ...snapshot,
+          connection: { status: 'connected' },
+        };
+      }
+
       return {
         ...state,
-        projects: compact(list(action.snapshot?.projects)),
-        threads: compact(list(action.snapshot?.threads)),
-        runners: compact(list(action.snapshot?.runners)),
-        runs: compact(list(action.snapshot?.runs)),
-        threadItems: compact(list(action.snapshot?.threadItems)),
-        approvals: compact(list(action.snapshot?.approvals)),
-        artifacts: compact(list(action.snapshot?.artifacts)),
-        previews: compact(list(action.snapshot?.previews)),
-        runLogs: keyRunLogs(action.snapshot?.runLogs),
+        projects: mergeByKey(snapshot.projects, state.projects, (project) => project.id),
+        threads: mergeByKey(snapshot.threads, state.threads, (thread) => thread.id),
+        runners: mergeByKey(snapshot.runners, state.runners, (runner) => runner.id),
+        runs: mergeByKey(snapshot.runs, state.runs, (run) => run.runId),
+        threadItems: mergeByKey(snapshot.threadItems, state.threadItems, (item) => item.id),
+        approvals: mergeByKey(snapshot.approvals, state.approvals, (approval) => approval.id),
+        artifacts: mergeByKey(snapshot.artifacts, state.artifacts, (artifact) => artifact.id),
+        previews: mergeByKey(snapshot.previews, state.previews, (preview) => preview.id),
+        runLogs: { ...snapshot.runLogs, ...state.runLogs },
         connection: { status: 'connected' },
       };
+    }
     case 'threadItems.loaded':
       return {
         ...state,
@@ -411,6 +421,63 @@ function list<T>(value: ListResponse<T> | T[] | null | undefined): T[] {
 
 function compact<T>(items: T[]): T[] {
   return items.filter(Boolean);
+}
+
+function normalizeSnapshot(
+  snapshot: WorkbenchSnapshot | null | undefined,
+): Pick<
+  WorkbenchState,
+  | 'projects'
+  | 'threads'
+  | 'runners'
+  | 'runs'
+  | 'threadItems'
+  | 'approvals'
+  | 'artifacts'
+  | 'previews'
+  | 'runLogs'
+> {
+  return {
+    projects: compact(list(snapshot?.projects)),
+    threads: compact(list(snapshot?.threads)),
+    runners: compact(list(snapshot?.runners)),
+    runs: compact(list(snapshot?.runs)),
+    threadItems: compact(list(snapshot?.threadItems)),
+    approvals: compact(list(snapshot?.approvals)),
+    artifacts: compact(list(snapshot?.artifacts)),
+    previews: compact(list(snapshot?.previews)),
+    runLogs: keyRunLogs(snapshot?.runLogs),
+  };
+}
+
+function isEmptyWorkbenchData(state: WorkbenchState): boolean {
+  return (
+    state.lastSeq === 0 &&
+    state.projects.length === 0 &&
+    state.threads.length === 0 &&
+    state.runners.length === 0 &&
+    state.runs.length === 0 &&
+    state.threadItems.length === 0 &&
+    state.approvals.length === 0 &&
+    state.artifacts.length === 0 &&
+    state.previews.length === 0 &&
+    Object.keys(state.runLogs).length === 0
+  );
+}
+
+function mergeByKey<T>(
+  snapshotItems: T[],
+  currentItems: T[],
+  keyOf: (item: T) => string | undefined,
+): T[] {
+  const currentKeys = new Set(currentItems.map(keyOf).filter(Boolean));
+  return [
+    ...snapshotItems.filter((item) => {
+      const key = keyOf(item);
+      return key && !currentKeys.has(key);
+    }),
+    ...currentItems,
+  ];
 }
 
 function upsertBy<T extends { id?: string; runId?: string }>(

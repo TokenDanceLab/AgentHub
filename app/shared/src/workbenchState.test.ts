@@ -210,6 +210,113 @@ describe('workbenchReducer', () => {
     });
   });
 
+  it('keeps event state when a stale snapshot arrives after events', () => {
+    const eventState = reduceEvents([
+      event(1, 'message.created', {
+        messageId: 'message-1',
+        threadId: 'thread-1',
+        role: 'agent',
+        content: 'new event message',
+      }),
+      event(2, 'run.queued', {
+        runId: 'run-1',
+        projectId: 'proj-1',
+        threadId: 'thread-1',
+      }),
+      event(3, 'run.started', {
+        runId: 'run-1',
+        startedAt: '2026-05-24T10:01:00.000Z',
+      }),
+      event(4, 'run.output', {
+        runId: 'run-1',
+        stream: 'stdout',
+        text: 'new log',
+      }),
+      event(5, 'approval.requested', {
+        approvalId: 'approval-1',
+        runId: 'run-1',
+        threadId: 'thread-1',
+        kind: 'command',
+        summary: 'Allow command?',
+      }),
+      event(6, 'approval.decided', {
+        approvalId: 'approval-1',
+        runId: 'run-1',
+        decision: 'approved',
+      }),
+      event(7, 'run.finished', {
+        runId: 'run-1',
+        finishedAt: '2026-05-24T10:02:00.000Z',
+      }),
+    ]);
+
+    const staleRun: Run = {
+      runId: 'run-1',
+      projectId: 'proj-1',
+      threadId: 'thread-1',
+      status: 'queued',
+      createdAt: '2026-05-24T09:59:00.000Z',
+    };
+    const staleMessage: ThreadItem = {
+      id: 'message-1',
+      threadId: 'thread-1',
+      kind: 'message',
+      role: 'agent',
+      content: 'old snapshot message',
+      createdAt: '2026-05-24T09:59:00.000Z',
+    };
+    const staleApproval: Approval = {
+      id: 'approval-1',
+      runId: 'run-1',
+      threadId: 'thread-1',
+      kind: 'command',
+      summary: 'Allow command?',
+      status: 'pending',
+      createdAt: '2026-05-24T09:59:00.000Z',
+    };
+
+    const state = workbenchReducer(eventState, {
+      type: 'snapshot.loaded',
+      snapshot: {
+        projects: [{ id: 'proj-1', name: 'AgentHub', createdAt: sentAt }],
+        threads: [
+          {
+            id: 'thread-1',
+            projectId: 'proj-1',
+            title: 'Validation',
+            status: 'active',
+            createdAt: sentAt,
+          },
+        ],
+        runs: [staleRun],
+        threadItems: [staleMessage],
+        approvals: [staleApproval],
+        runLogs: [{ runId: 'run-1', stdout: 'old log', stderr: '' }],
+      },
+    });
+
+    expect(state.connection.status).toBe('connected');
+    expect(state.lastSeq).toBe(7);
+    expect(state.projects).toEqual([
+      { id: 'proj-1', name: 'AgentHub', createdAt: sentAt },
+    ]);
+    expect(state.threads).toHaveLength(1);
+    expect(state.runs).toHaveLength(1);
+    expect(state.runs[0]).toMatchObject({
+      runId: 'run-1',
+      status: 'finished',
+      finishedAt: '2026-05-24T10:02:00.000Z',
+    });
+    expect(state.threadItems).toHaveLength(1);
+    expect(state.threadItems[0]?.content).toBe('new event message');
+    expect(state.approvals).toHaveLength(1);
+    expect(state.approvals[0]).toMatchObject({
+      id: 'approval-1',
+      status: 'approved',
+    });
+    expect(state.runLogs['run-1']?.stdout).toBe('new log');
+  });
+
   it('ignores duplicate, old, and unknown events without corrupting state', () => {
     const queued = event(10, 'run.queued', {
       runId: 'run-1',
