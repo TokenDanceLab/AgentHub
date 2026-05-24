@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -95,7 +96,7 @@ func (s *SessionService) CreatePrivateSession(ctx context.Context, currentUserID
 }
 
 func (s *SessionService) CreateGroupSession(ctx context.Context, ownerUserID, name string, memberIDs []string) (*CreateSessionResponse, error) {
-	if len(name) == 0 || len(name) > 64 {
+	if len(name) == 0 || len(name) > config.MaxGroupNameLength {
 		return nil, errcode.ErrBadRequest
 	}
 	if len(memberIDs) == 0 {

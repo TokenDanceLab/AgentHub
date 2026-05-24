@@ -314,8 +314,9 @@ func (s *AgentService) allocateSeq(ctx context.Context, sessionID string) (int64
 	return fallbackSeq, err
 }
 
-// HandleTaskAck marks a task as running.
-func (s *AgentService) HandleTaskAck(ctx context.Context, taskID string) error {
+// HandleTaskAck marks a task as running and optionally records the Edge run id
+// that is executing it.
+func (s *AgentService) HandleTaskAck(ctx context.Context, taskID, edgeRunID string) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -323,10 +324,19 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, taskID string) error {
 		}
 		return err
 	}
+	if task.Status == model.TaskStatusRunning {
+		if edgeRunID != "" && task.EdgeRunID != "" && task.EdgeRunID != edgeRunID {
+			return errcode.ErrBadRequest
+		}
+		if edgeRunID != "" && task.EdgeRunID == "" {
+			return repository.UpdatePendingTaskStatusWithEdgeRunID(s.db, taskID, model.TaskStatusRunning, "", edgeRunID)
+		}
+		return nil
+	}
 	if task.Status != model.TaskStatusDispatched {
 		return errcode.ErrBadRequest
 	}
-	return repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusRunning, "")
+	return repository.UpdatePendingTaskStatusWithEdgeRunID(s.db, taskID, model.TaskStatusRunning, "", edgeRunID)
 }
 
 // HandleTaskStream inserts an agent message into the session (streaming chunk).

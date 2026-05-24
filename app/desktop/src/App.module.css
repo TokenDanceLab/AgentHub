@@ -20,8 +20,79 @@
   display: flex;
   flex: 1;
   min-height: 0;
-  gap: 10px;
+  gap: 0;
   padding: 8px 10px 10px;
+}
+
+.mobileToolbar {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(255,255,255,0.32);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  background: rgba(250,250,251,0.78);
+  backdrop-filter: blur(22px) saturate(1.15);
+  -webkit-backdrop-filter: blur(22px) saturate(1.15);
+  flex-shrink: 0;
+}
+
+[data-theme='dark'] .mobileToolbar {
+  background: rgba(28,28,36,0.72);
+  border-top-color: rgba(255,255,255,0.06);
+  border-bottom-color: rgba(255,255,255,0.06);
+}
+
+.mobileToolbarBtn,
+.railBtn,
+.rightPanelCollapseBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  color: #7A7A83;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.mobileToolbarBtn {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.mobileToolbarBtn:hover,
+.railBtn:hover,
+.rightPanelCollapseBtn:hover {
+  background: rgba(0,0,0,0.055);
+  color: var(--foreground);
+}
+
+[data-theme='dark'] .mobileToolbarBtn:hover,
+[data-theme='dark'] .railBtn:hover,
+[data-theme='dark'] .rightPanelCollapseBtn:hover {
+  background: rgba(255,255,255,0.07);
+}
+
+.mobileToolbarBtn:active,
+.railBtn:active,
+.rightPanelCollapseBtn:active {
+  transform: scale(0.95);
+}
+
+.mobileToolbarTitle {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ═══════════════════════════════════════════════
@@ -29,7 +100,7 @@
    ═══════════════════════════════════════════════ */
 
 .sidebar {
-  width: 248px;
+  width: var(--left-sidebar-width, 396px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -40,6 +111,71 @@
   overflow: hidden;
   border: 1px solid rgba(0,0,0,0.04);
   position: relative;
+}
+
+.resizeHandle {
+  position: relative;
+  width: 12px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resizeHandle::before {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 5px;
+  width: 2px;
+  border-radius: 999px;
+  background: transparent;
+  content: '';
+  transition: background 0.14s ease, opacity 0.14s ease;
+}
+
+.resizeHandle:hover::before {
+  background: rgba(99,102,241,0.36);
+}
+
+.resizing,
+.resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+.leftRail,
+.rightRail {
+  width: 48px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 5px;
+  border: 1px solid rgba(0,0,0,0.04);
+  border-radius: 14px;
+  background: rgba(246,246,247,0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.rightRail {
+  justify-content: flex-start;
+}
+
+[data-theme='dark'] .leftRail,
+[data-theme='dark'] .rightRail {
+  background: rgba(35,35,45,0.55);
+  backdrop-filter: blur(40px) saturate(1.2);
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+  border-color: rgba(255,255,255,0.06);
+}
+
+.railBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: transparent;
 }
 
 [data-theme='dark'] .sidebar {
@@ -165,6 +301,7 @@
   flex: 1;
   display: flex;
   min-width: 0;
+  transition: min-width 0.18s ease;
 }
 
 .mainExpanded {
@@ -256,7 +393,7 @@
    ═══════════════════════════════════════════════ */
 
 .rightPanel {
-  width: 272px;
+  width: var(--right-panel-width, 360px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -264,15 +401,6 @@
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(0,0,0,0.04);
-  transition: opacity 0.25s ease, width 0.25s ease, margin 0.25s ease;
-}
-
-.rightPanelHidden {
-  opacity: 0;
-  width: 0;
-  margin: 0;
-  pointer-events: none;
-  overflow: hidden;
 }
 
 [data-theme='dark'] .rightPanel {
@@ -283,6 +411,9 @@
 }
 
 .rightPanelHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px;
   flex-shrink: 0;
   border-bottom: 1px solid rgba(0,0,0,0.04);
@@ -293,9 +424,19 @@
 /* Segmented control — juice capsule style */
 .rightPanelSegmented {
   display: flex;
+  flex: 1;
+  min-width: 0;
   background: rgba(0,0,0,0.05);
   border-radius: 8px;
   padding: 2px;
+}
+
+.rightPanelCollapseBtn {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: transparent;
 }
 
 [data-theme='dark'] .rightPanelSegmented {
@@ -507,22 +648,54 @@
   width: 280px;
   transform: translateX(-100%);
   transition: transform 0.25s var(--ease-out);
+  background: rgba(250,250,251,0.92);
+  backdrop-filter: blur(24px) saturate(1.1);
+  -webkit-backdrop-filter: blur(24px) saturate(1.1);
+  border-right: 1px solid rgba(0,0,0,0.06);
+}
+
+[data-theme='dark'] .overlayPanelLeft {
+  background: rgba(28,28,36,0.92);
+  border-right-color: rgba(255,255,255,0.08);
 }
 .overlayPanelLeftActive { transform: translateX(0); }
+
+.mobileNavPanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: calc(34px + env(safe-area-inset-top, 0px)) 8px 12px;
+}
+
+.mobileNavPanel .sidebarSection {
+  min-height: 0;
+}
+
+.mobileNavPanel .sidebarSection:first-child {
+  flex: 0 0 auto;
+}
+
+.mobileNavPanel .sidebarSection:last-child {
+  flex: 1;
+  border-bottom: 0;
+}
 
 /* ═══════════════════════════════════════════════
    Responsive
    ═══════════════════════════════════════════════ */
 
 @media (max-width: 1023px) {
-  .sidebar { width: 210px; }
-  .rightPanel { width: 240px; }
+  .sidebar { width: min(var(--left-sidebar-width, 320px), 34vw); }
+  .rightPanel { width: min(var(--right-panel-width, 320px), 34vw); }
 }
 
 @media (max-width: 767px) {
   .body { flex-direction: column; padding: 0; gap: 0; }
   .sidebar { display: none; }
+  .leftRail, .rightRail, .resizeHandle { display: none; }
   .rightPanel { display: none; }
   .workspace { border-radius: 0; }
   .nav { display: flex; }
+  .mobileToolbar { display: flex; }
 }
