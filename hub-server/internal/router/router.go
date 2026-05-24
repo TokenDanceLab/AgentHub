@@ -28,8 +28,13 @@ func SetupRoutes(r *gin.Engine, jwtSecret string, cacheClient *cache.Client, aut
 		})
 	}
 
-	// Public API (unauthenticated, for the official website)
-	r.GET("/api/public/stats", publicHandler.Stats)
+	// Public API — no auth required (official website hub.vectorcontrol.tech)
+	if publicHandler != nil {
+		public := r.Group("/api/public")
+		{
+			public.GET("/stats", publicHandler.Stats)
+		}
+	}
 
 	client := r.Group("/client")
 	{
