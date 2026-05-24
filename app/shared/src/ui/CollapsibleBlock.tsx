@@ -1,4 +1,4 @@
-import { useState, useCallback, type ReactNode } from 'react';
+import React, { useState, useCallback, type ReactNode } from 'react';
 import { Icon } from './Icon';
 import styles from './CollapsibleBlock.module.css';
 
