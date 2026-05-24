@@ -434,6 +434,29 @@
   line-height: 1.4;
 }
 
+.taskSectionTitleRow {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.taskSectionTitleRow > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.taskSectionActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
 .taskList {
   display: flex;
   min-width: 0;
@@ -829,8 +852,20 @@
   color: var(--foreground);
 }
 
+.primaryBtn:disabled,
+.secondaryBtn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 [data-theme='dark'] .secondaryBtn {
   border-color: rgba(255, 255, 255, 0.09);
+}
+
+.taskRowAction {
+  height: 30px;
+  padding: 0 10px;
+  white-space: nowrap;
 }
 
 .callout {
@@ -954,6 +989,15 @@
   }
 
   .profileHeader {
+    flex-wrap: wrap;
+  }
+
+  .taskSectionTitleRow {
+    flex-direction: column;
+  }
+
+  .taskSectionActions {
+    width: 100%;
     flex-wrap: wrap;
   }
 
