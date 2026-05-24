@@ -11,7 +11,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', '../shared/src/**/*.test.ts'],
+    exclude: ['../shared/src/events.test.ts'],
     setupFiles: [],
   },
 });
