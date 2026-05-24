@@ -14,45 +14,16 @@ import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
 import { useRunStore } from '@/stores/runStore';
 import { useShallow } from 'zustand/shallow';
-import { SkeletonLine, SkeletonCircle } from '@/components/Skeleton';
+import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
 import { useHubStore } from '@/stores/hubStore';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import ResizeHandle from '@/components/ResizeHandle';
-import ModeBar from '@/components/ModeBar';
-import MobileToolbar from '@/components/MobileToolbar';
-import OverlayBackdrop from '@/components/OverlayBackdrop';
-import AppSidebar from '@/components/AppSidebar';
-import RightPanel from '@/components/RightPanel';
+import AuthPage from '@/components/AuthPage';
+import { MessageSquare, Bot, Sun, Moon, Wifi, WifiOff, Circle, LogIn } from 'lucide-react';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '@/App.module.css';
-
-const MIN_SIDEBAR = 200;
-const MAX_SIDEBAR = 420;
-const MIN_RIGHT = 240;
-const MAX_RIGHT = 600;
-
-/** Shared skeleton shown while AgentList data is loading. */
-function AgentListSkeleton() {
-  return (
-    <div className={styles.skeletonAgentList} aria-busy="true" aria-label="Loading agents">
-      {Array.from({ length: 5 }, (_, i) => (
-        <div key={i} className={styles.skeletonAgentItem}>
-          <SkeletonCircle width={8} height={8} />
-          <div className={styles.skeletonAgentInfo}>
-            <SkeletonLine width={`${55 + (i % 3) * 10}%`} height="14px" />
-            <SkeletonLine width={`${35 + (i % 4) * 8}%`} height="10px" />
-            <div className={styles.skeletonAgentTags}>
-              <SkeletonLine width="42px" height="14px" />
-              <SkeletonLine width="50px" height="14px" />
-              <SkeletonLine width="36px" height="14px" />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default function App() {
   const { online, health } = useHealth();
@@ -62,216 +33,104 @@ export default function App() {
   const isTablet = useIsTablet();
   const edgeStatus = useEdgeStatus(online);
   const addToast = useToastStore((s) => s.addToast);
+  const { theme, toggleTheme } = useTheme();
 
-  // TanStack Query — replaces setInterval polling for threads
   const { data: threadData } = useThreads();
   const threads = threadData?.items ?? [];
 
-  // Zustand stores — batched with useShallow to minimize re-renders
-  const { sidebarWidth, rightPanelWidth, setSidebarWidth, setRightPanelWidth } = useUIStore(
-    useShallow((s) => ({
-      sidebarWidth: s.sidebarWidth,
-      rightPanelWidth: s.rightPanelWidth,
-      setSidebarWidth: s.setSidebarWidth,
-      setRightPanelWidth: s.setRightPanelWidth,
-    })),
-  );
-  const { setOnline, setConnected, wsLatency } = useConnectionStore(
-    useShallow((s) => ({
-      setOnline: s.setOnline,
-      setConnected: s.setConnected,
-      wsLatency: s.wsLatency,
-    })),
-  );
   const hubAuthenticated = useHubStore((s) => s.authenticated);
+  const showAuthModal = useHubStore((s) => s.showAuthModal);
+  const { setOnline, setConnected, wsLatency } = useConnectionStore(
+    useShallow((s) => ({ setOnline: s.setOnline, setConnected: s.setConnected, wsLatency: s.wsLatency })),
+  );
   const { selectedThreadId, selectThread } = useThreadStore(
-    useShallow((s) => ({
-      selectedThreadId: s.selectedThreadId,
-      selectThread: s.selectThread,
-    })),
+    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectThread: s.selectThread })),
   );
-  const {
-    setCurrentRun: runStoreSetCurrentRun,
-    setIsStreaming: runStoreSetStreaming,
-    isStreaming,
-    clear: runStoreClear,
-  } = useRunStore(
-    useShallow((s) => ({
-      isStreaming: s.isStreaming,
-      setCurrentRun: s.setCurrentRun,
-      setIsStreaming: s.setIsStreaming,
-      clear: s.clear,
-    })),
-  );
+  const { setCurrentRun: runStoreSetCurrentRun, setIsStreaming: runStoreSetStreaming, clear: runStoreClear } =
+    useRunStore(useShallow((s) => ({ setCurrentRun: s.setCurrentRun, setIsStreaming: s.setIsStreaming, clear: s.clear })));
 
-  // Local state (lightweight, not worth a store yet)
   const agents = useAgents(online);
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>();
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [mobileRunDetailOpen, setMobileRunDetailOpen] = useState(false);
-  const [tabletAgentOpen, setTabletAgentOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
 
-  // IM integration — view mode switching between Agent chat and IM
-  const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
+  // Mobile/tablet overlays
+  const [navPanelOpen, setNavPanelOpen] = useState(false);
 
-  // Search → scroll state
-  const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-
-  // Close mobile/tablet panels on desktop resize
+  // Sync health → connection store
+  const prevOnlineRef = useRef<boolean | null>(null);
+  const healthRef = useRef(health);
+  healthRef.current = health;
   useEffect(() => {
-    if (!isMobile && !isTablet) {
-      setMobileSidebarOpen(false);
-      setMobileRunDetailOpen(false);
-      setTabletAgentOpen(false);
-    }
-  }, [isMobile, isTablet]);
+    if (prevOnlineRef.current === online) return;
+    prevOnlineRef.current = online;
+    setOnline(online, healthRef.current);
+  }, [online, setOnline]);
 
-  // Escape key closes mobile overlays / modals; ? opens keyboard shortcut help
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
-
-      if (e.key === 'Escape') {
-        setMobileSidebarOpen(false);
-        setMobileRunDetailOpen(false);
-        setTabletAgentOpen(false);
-      }
-      if (e.key === '?' && !isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        setShortcutHelpOpen((v) => !v);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Sync health hook → connection store
-  useEffect(() => {
-    setOnline(online, health);
-  }, [online, health, setOnline]);
-
+  // Sync isConnected → connection store
   useEffect(() => {
     setConnected(isConnected);
   }, [isConnected, setConnected]);
 
-  // Sync chat messages → run store (Kanna dual-Map pattern)
+  // Sync currentRun → run store
+  const prevRunIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (currentRun) {
-      runStoreSetCurrentRun(currentRun);
-      runStoreSetStreaming(true);
+      if (prevRunIdRef.current !== currentRun.runId) {
+        prevRunIdRef.current = currentRun.runId;
+        runStoreSetCurrentRun(currentRun);
+        runStoreSetStreaming(true);
+      }
     } else {
+      prevRunIdRef.current = null;
       runStoreClear();
     }
   }, [currentRun, runStoreSetCurrentRun, runStoreSetStreaming, runStoreClear]);
 
-  // Toast when a new thread appears (detected via TanStack Query data changes)
+  // Toast when new thread appears
   const prevThreadIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!online || threads.length === 0) {
-      prevThreadIdsRef.current = new Set();
-      return;
-    }
+    if (!online || threads.length === 0) { prevThreadIdsRef.current = new Set(); return; }
     const currentIds = new Set(threads.map((th) => th.threadId));
     const wasInitial = prevThreadIdsRef.current.size === 0;
     if (!wasInitial) {
       for (const th of threads) {
-        if (!prevThreadIdsRef.current.has(th.threadId)) {
-          addToast({ type: 'success', message: t('toast.threadCreated') });
-        }
+        if (!prevThreadIdsRef.current.has(th.threadId)) addToast({ type: 'success', message: t('toast.threadCreated') });
       }
     }
     prevThreadIdsRef.current = currentIds;
   }, [threads, online, addToast, t]);
 
   const selectedThread = threads.find((th) => th.threadId === selectedThreadId);
+  const selectedAgent = agents.find((a) => a.id === selectedAgentId);
+  const allMessages = [...userMessages, ...messages];
 
-  const handleSend = useCallback(
-    async (
-      prompt: string,
-      agentId?: string,
-      opts?: { model?: string; reasoningEffort?: string },
-    ) => {
-      try {
-        const req: StartRunRequest = { prompt };
-        if (agentId) req.agentId = agentId;
-        if (opts?.model) req.model = opts.model;
-        if (opts?.reasoningEffort) req.reasoningEffort = opts.reasoningEffort;
-        if (selectedThread) req.threadId = selectedThread.threadId;
-        setUserMessages((prev) => [
-          ...prev,
-          {
-            id: `user-${Date.now()}`,
-            role: 'user',
-            timestamp: new Date().toISOString(),
-            blocks: [{ kind: 'text', content: prompt }],
-          },
-        ]);
-        await startRun(req);
-      } catch (e) {
-        console.error('Failed to start run:', e);
-      }
-    },
-    [selectedThread],
-  );
+  const handleSend = useCallback(async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string }) => {
+    try {
+      const req: StartRunRequest = { prompt };
+      if (agentId) req.agentId = agentId;
+      if (opts?.model) req.model = opts.model;
+      if (opts?.reasoningEffort) req.reasoningEffort = opts.reasoningEffort;
+      if (selectedThread) req.threadId = selectedThread.threadId;
+      setUserMessages((prev) => [...prev, { id: `user-${Date.now()}`, role: 'user', timestamp: new Date().toISOString(), blocks: [{ kind: 'text', content: prompt }] }]);
+      await startRun(req);
+    } catch (e) { console.error('Failed to start run:', e); }
+  }, [selectedThread]);
 
   const handleCancel = useCallback(async () => {
-    const run = useRunStore.getState().currentRun;
-    if (run?.runId) {
-      try {
-        await cancelRun(run.runId);
-      } catch (e) {
-        console.error('Failed to cancel run:', e);
-      }
+    if (currentRun?.runId) {
+      try { await cancelRun(currentRun.runId); } catch {}
     }
-  }, []);
+  }, [currentRun?.runId]);
 
-  const handleSearchSelect = useCallback((messageId: string) => {
-    setScrollToMessageId(messageId);
-  }, []);
+  const handleSelectThread = useCallback((id: string) => { selectThread(id); setUserMessages([]); }, [selectThread]);
+  const handleSelectAgent = useCallback((id: string) => setSelectedAgentId(id), []);
 
-  const handleSidebarResize = useCallback(
-    (delta: number) =>
-      setSidebarWidth(Math.min(MAX_SIDEBAR, Math.max(MIN_SIDEBAR, sidebarWidth + delta))),
-    [sidebarWidth, setSidebarWidth],
-  );
-
-  const handleRightResize = useCallback(
-    (delta: number) =>
-      setRightPanelWidth(Math.min(MAX_RIGHT, Math.max(MIN_RIGHT, rightPanelWidth - delta))),
-    [rightPanelWidth, setRightPanelWidth],
-  );
-
-  const handleSelectAgent = useCallback((agent: AgentInfo) => {
-    setSelectedAgentId(agent.id);
-    setTabletAgentOpen(false);
-  }, []);
-
-  const handleSelectThread = useCallback(
-    (thread: ThreadInfo) => {
-      selectThread(thread.threadId);
-      setMobileSidebarOpen(false);
-    },
-    [selectThread],
-  );
-
-  const handleDecidePermission = useCallback(
-    (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
-      // 1. Update local state and send via WebSocket
-      decidePermission(requestId, decision, reason);
-      // 2. Also notify Edge via REST (fallback if WebSocket send is not processed)
-      const runId = currentRun?.runId ?? '';
-      decidePermissionRest({ requestId, decision, reason, runId }).catch((e: unknown) => {
-        console.error('Failed to send permission decision via REST:', e);
-      });
-    },
-    [decidePermission, currentRun?.runId],
-  );
-
-  const allMessages = [...userMessages, ...messages];
+  const handleDecidePermission = useCallback((requestId: string, decision: 'allow' | 'deny', reason?: string) => {
+    decidePermission(requestId, decision, reason);
+    decidePermissionRest(requestId, decision, reason).catch(() => {});
+  }, [decidePermission]);
 
   const handleRetry = useCallback((messageId: string) => {
     const msg = allMessages.find((m) => m.id === messageId);
@@ -284,241 +143,210 @@ export default function App() {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
   }, []);
 
-  // Scroll to a message when SearchDialog selects one
+  // Escape key
   useEffect(() => {
-    if (!scrollToMessageId) return;
-    const idx = allMessages.findIndex((m) => m.id === scrollToMessageId);
-    if (idx < 0) return;
-    const log = chatContainerRef.current?.querySelector('[role="log"]');
-    if (log && log.children[idx]) {
-      (log.children[idx] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-    setScrollToMessageId(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scrollToMessageId]);
-
-  // ── Derived toggle handlers for MobileToolbar ──
-  const handleToggleSidebar = useCallback(() => {
-    setMobileSidebarOpen((v) => !v);
-    setMobileRunDetailOpen(false);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setNavPanelOpen(false); }
+      if (e.key === '?' && !(e.target as HTMLElement)?.closest('input,textarea,[contenteditable]') && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault(); setShortcutHelpOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleToggleAgent = useCallback(() => {
-    setTabletAgentOpen((v) => !v);
-    setMobileRunDetailOpen(false);
+  // ── Drag handler for frameless window (Tauri v2 programmatic API)
+  const handleDragStart = useCallback(async (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, select, a')) return;
+    try { await getCurrentWindow().startDragging(); } catch {}
   }, []);
 
-  const handleToggleRunDetail = useCallback(() => {
-    setMobileRunDetailOpen((v) => !v);
-    setMobileSidebarOpen(false);
-    setTabletAgentOpen(false);
+  // ── Double-click top bar → toggle maximize/restore
+  const handleTopBarDoubleClick = useCallback(async (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, select, a')) return;
+    try {
+      const w = getCurrentWindow();
+      (await w.isMaximized()) ? w.unmaximize() : w.maximize();
+    } catch {}
   }, []);
+
+  // ── Render ─────────────────────────────────
 
   return (
     <ErrorBoundary>
     <div className={styles.root}>
-      <Slot
-        name="status-bar"
-        online={online}
-        health={health}
-        isConnected={isConnected}
-        error={edgeStatus.lastError}
-        wsLatency={wsLatency}
-        hubAuthenticated={hubAuthenticated}
-      />
+      {/* Top status bar — drag region + window controls */}
+      <div className={styles.topBar} onMouseDown={handleDragStart} onDoubleClick={handleTopBarDoubleClick}>
+        <div className={styles.topBarLeft}>
+          <span className={styles.statusBadge}>
+            <span className={`${styles.statusBadgeDot} ${online ? styles.statusBadgeDotOnline : styles.statusBadgeDotOffline}`} />
+            {online ? `Edge ${health?.version ?? 'v1'}` : t('status.offline')}
+          </span>
+          {wsLatency != null && <span className={styles.topBarDim} style={{ marginLeft: 6 }}>{wsLatency}ms</span>}
+          {isConnected ? <Wifi size={12} className={styles.topBarDim} /> : <WifiOff size={12} className={styles.topBarDim} />}
+          {edgeStatus.lastError && <span className={styles.topBarDim} title={edgeStatus.lastError} style={{ marginLeft: 4 }}>⚠</span>}
+        </div>
+        <div className={styles.topBarRight}>
+          <button className={styles.topBarBtn} onClick={toggleTheme} title={theme === 'dark' ? t('theme.light') : t('theme.dark')}>
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+
+          {/* Window controls — no drag region so clicks register */}
+          <div className={styles.winControls}>
+            <button className={styles.winBtn} onClick={() => getCurrentWindow().minimize()} title="最小化">
+              <svg width="10" height="1" viewBox="0 0 10 1" fill="none"><path d="M0 0.5H10" stroke="currentColor"/></svg>
+            </button>
+            <button className={styles.winBtn} onClick={async () => {
+              const w = getCurrentWindow();
+              (await w.isMaximized()) ? w.unmaximize() : w.maximize();
+            }} title="最大化">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor"/></svg>
+            </button>
+            <button className={`${styles.winBtn} ${styles.winBtnClose}`} onClick={() => getCurrentWindow().close()} title="关闭">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1L9 9M9 1L1 9" stroke="currentColor" strokeWidth="1.2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {edgeStatus.showBanner && (
         <div className={styles.banner} role="alert">
-          <span className={styles.bannerIcon} aria-hidden="true">&#9888;</span>
-          <span className={styles.bannerMsg}>
-            {edgeStatus.lastError ?? t('banner.disconnected')}
-          </span>
+          <span className={styles.bannerIcon}>&#9888;</span>
+          <span className={styles.bannerMsg}>{edgeStatus.lastError ?? t('banner.disconnected')}</span>
           <span className={styles.bannerActions}>
-            <button
-              className={styles.bannerBtn}
-              onClick={edgeStatus.retry}
-              disabled={edgeStatus.retrying}
-            >
-              {edgeStatus.retrying ? '...' : t('banner.retry')}
-            </button>
-            <button
-              className={styles.bannerBtn}
-              onClick={edgeStatus.dismissBanner}
-            >
-              {t('banner.dismiss')}
-            </button>
+            <button className={styles.bannerBtn} onClick={edgeStatus.retry} disabled={edgeStatus.retrying}>{edgeStatus.retrying ? '...' : t('banner.retry')}</button>
+            <button className={styles.bannerBtn} onClick={edgeStatus.dismissBanner}>{t('banner.dismiss')}</button>
           </span>
         </div>
       )}
 
-      {/* Mobile/Tablet header bar with toggles */}
-      {(isMobile || isTablet) && (
-        <MobileToolbar
-          title={selectedThread?.title ?? 'AgentHub'}
-          isMobile={isMobile}
-          isTablet={isTablet}
-          mobileSidebarOpen={mobileSidebarOpen}
-          mobileRunDetailOpen={mobileRunDetailOpen}
-          tabletAgentOpen={tabletAgentOpen}
-          onToggleSidebar={handleToggleSidebar}
-          onToggleAgent={handleToggleAgent}
-          onToggleRunDetail={handleToggleRunDetail}
-        />
+      {/* Mobile toolbar */}
+      {isMobile && (
+        <div style={{ display: 'flex', padding: '4px 8px', gap: 8, background: 'var(--card)', borderBottom: '1px solid var(--border)' }}>
+          <button onClick={() => setNavPanelOpen(true)} style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--background)', color: 'var(--foreground)', cursor: 'pointer', fontSize: 12 }}>☰ Menu</button>
+          <span style={{ flex: 1, fontSize: 12, color: 'var(--muted-foreground)', alignSelf: 'center' }}>{selectedAgent?.name ?? 'AgentHub'}</span>
+        </div>
+      )}
+
+      {/* Mobile nav overlay */}
+      {isMobile && (
+        <>
+          <div className={`${styles.overlay} ${navPanelOpen ? styles.overlayActive : ''}`} onClick={() => setNavPanelOpen(false)} />
+          <div className={`${styles.overlayPanel} ${styles.overlayPanelLeft} ${navPanelOpen ? styles.overlayPanelLeftActive : ''}`}>
+            <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
+          </div>
+        </>
       )}
 
       <div className={styles.body}>
-        {/* Sidebar overlay backdrop */}
-        {mobileSidebarOpen && (
-          <OverlayBackdrop onClick={() => setMobileSidebarOpen(false)} />
-        )}
-
-        {/* Right panel overlay backdrop */}
-        {mobileRunDetailOpen && (
-          <OverlayBackdrop onClick={() => setMobileRunDetailOpen(false)} />
-        )}
-
-        {/* Agent panel overlay backdrop (tablet) */}
-        {tabletAgentOpen && (
-          <OverlayBackdrop onClick={() => setTabletAgentOpen(false)} />
-        )}
-
-        <AppSidebar
-          width={sidebarWidth}
-          isMobile={isMobile}
-          isOpen={mobileSidebarOpen}
-        >
-          <Slot
-            name="thread-panel"
-            online={online}
-            selectedId={selectedThreadId ?? undefined}
-            onSelect={handleSelectThread}
-          />
-        </AppSidebar>
-
-        {/* Agent panel overlay (tablet) — slides in from left */}
-        <div
-          className={`${styles.agentOverlayWrapper} ${tabletAgentOpen ? styles.agentOverlayOpen : ''}`}
-        >
-          {agents.length === 0 && online ? (
-            <AgentListSkeleton />
-          ) : (
-            <Slot
-              name="agent-list"
-              agents={agents}
-              online={online}
-              selectedId={selectedAgentId}
-              onSelect={handleSelectAgent}
-            />
-          )}
-        </div>
-
-        {!isMobile && <ResizeHandle direction="horizontal" onResize={handleSidebarResize} />}
-
-        <div className={styles.center}>
-          {!isMobile && !isTablet && (
-            <div className={styles.centerSidebar}>
-              {agents.length === 0 && online ? (
-                <AgentListSkeleton />
+        {/* Left icon nav (desktop/tablet) */}
+        {!isMobile && (
+          <div className={styles.nav}>
+            <button className={`${styles.navBtn} ${viewMode === 'agent' ? styles.navBtnActive : ''}`} onClick={() => setViewMode('agent')} title={t('nav.agent')}>
+              <Bot size={18} />
+            </button>
+            <button className={`${styles.navBtn} ${viewMode === 'im' ? styles.navBtnActive : ''}`} onClick={() => setViewMode('im')} title={t('nav.messages')}>
+              <MessageSquare size={18} />
+            </button>
+            <div className={styles.navSpacer} />
+            {/* Hub login at bottom of nav */}
+            <button
+              className={styles.navBtn}
+              onClick={() => useHubStore.getState().setShowAuthModal(true)}
+              title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
+            >
+              {hubAuthenticated ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Circle size={10} fill="var(--color-success)" color="var(--color-success)" />
+                </span>
               ) : (
-                <Slot
-                  name="agent-list"
-                  agents={agents}
-                  online={online}
-                  selectedId={selectedAgentId}
-                  onSelect={handleSelectAgent}
-                />
+                <LogIn size={18} />
+              )}
+              </button>
+          </div>
+        )}
+
+        {/* Desktop Thread panel */}
+        {!isMobile && !isTablet && (
+          <div className={styles.sidebarPanel}>
+            <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
+          </div>
+        )}
+
+        {/* Agent list panel (desktop only) */}
+        {!isMobile && !isTablet && (
+          <div className={styles.sidebarPanel}>
+            <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
+          </div>
+        )}
+
+        {/* Main zone */}
+        <div className={styles.main}>
+          <div className={styles.workspace}>
+            {/* Workspace header */}
+            <div className={styles.workspaceHeader}>
+              <div className={`${styles.workspaceHeaderDot} ${online ? styles.workspaceHeaderDotOnline : styles.workspaceHeaderDotOffline}`} />
+              <h2>{selectedAgent ? selectedAgent.name : 'AgentHub'}</h2>
+              {selectedThread && <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted-foreground)' }}>{selectedThread.title}</span>}
+            </div>
+
+            {/* Chat area */}
+            <div className={styles.chatArea}>
+              {viewMode === 'im' ? (
+                <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
+              ) : (
+                <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={currentRun != null} isConnected={isConnected} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
               )}
             </div>
-          )}
 
-          {/* Mode switch tabs — only shown when Hub authenticated */}
-          {hubAuthenticated && (
-            <ModeBar viewMode={viewMode} onChange={setViewMode} />
-          )}
-
-          <div ref={chatContainerRef} className={styles.chatWrapper}>
-            {viewMode === 'im' ? (
-              <ErrorBoundary>
-                <Suspense fallback={
-                  <div className={styles.skeletonChat} aria-busy="true">
-                    <SkeletonLine width="60%" height="14px" />
-                  </div>
-                }>
-                  <Slot name="im-view" />
-                </Suspense>
-              </ErrorBoundary>
-            ) : (
-              <Slot
-                name="main-view"
-                messages={messages}
-                allMessages={allMessages}
-                threadsCount={threads.length}
-                isStreaming={isStreaming}
-                isConnected={isConnected}
-                onRetry={handleRetry}
-                onDelete={handleDelete}
-                onSendMessage={handleSend}
-              />
+            {/* Input area */}
+            {viewMode === 'agent' && (
+              <div className={styles.inputArea}>
+                <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} onSend={handleSend} isStreaming={currentRun != null} onCancel={handleCancel} disabled={!online} threadId={selectedThreadId ?? undefined} />
+              </div>
             )}
           </div>
         </div>
 
-        {!isMobile && <ResizeHandle direction="horizontal" onResize={handleRightResize} />}
-
-        <RightPanel
-          width={rightPanelWidth}
-          isMobile={isMobile}
-          isOpen={mobileRunDetailOpen}
-        >
-          <ErrorBoundary>
-            <Suspense
-              fallback={
-                <div style={{ padding: '16px', color: 'var(--foreground)' }}>
-                  <SkeletonLine width="60%" height="1em" />
-                  <SkeletonLine width="40%" height="1em" />
-                </div>
-              }
-            >
-              <Slot
-                name="run-detail"
-                run={
-                  currentRun
-                    ? {
-                        runId: currentRun.runId,
-                        projectId: '',
-                        threadId: selectedThread?.threadId ?? '',
-                        status: currentRun.status,
-                      }
-                    : null
-                }
-                toolCalls={currentRun?.toolCalls ?? []}
-                changedFiles={currentRun?.changedFiles ?? []}
-                outputText={currentRun?.outputText ?? ''}
-                chatMessages={allMessages}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        </RightPanel>
+        {/* Right panel (desktop/tablet) */}
+        {!isMobile && (
+          <div className={styles.rightPanel}>
+            <div className={styles.rightPanelHeader}>
+              <div className={styles.rightPanelSegmented}>
+                <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`}>Output</button>
+                <button className={styles.rightPanelTab} style={{ opacity: 0.4 }}>Files</button>
+              </div>
+            </div>
+            <div className={styles.rightPanelBody}>
+              <ErrorBoundary>
+                <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted-foreground)' }}><SkeletonLine width="60%" height="1em" /><SkeletonLine width="40%" height="1em" /></div>}>
+                  <Slot name="run-detail" run={currentRun ? { runId: currentRun.runId, projectId: '', threadId: selectedThread?.threadId ?? '', status: currentRun.status } : null} outputText={currentRun?.outputText} toolCalls={currentRun?.toolCalls ?? []} changedFiles={currentRun?.changedFiles ?? []} />
+                </Suspense>
+              </ErrorBoundary>
+            </div>
+          </div>
+        )}
       </div>
 
-      {viewMode === 'agent' && (
-      <Slot
-        name="prompt-input"
-        agents={agents}
-        selectedAgentId={selectedAgentId}
-        onSelectAgent={setSelectedAgentId}
-        onSend={handleSend}
-        isStreaming={isStreaming}
-        onCancel={handleCancel}
-        disabled={!online}
-        threadId={selectedThreadId ?? undefined}
-      />
-      )}
+      {/* Modals */}
       <Suspense fallback={null}>
-        <Slot name="search-dialog" messages={allMessages} onSelect={handleSearchSelect} />
+        <Slot name="search-dialog" messages={allMessages} onSelect={() => {}} />
       </Suspense>
       <Slot name="permission-dialog" requests={permissionRequests} onDecide={handleDecidePermission} />
       <Slot name="shortcut-help" open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
+
+      {showAuthModal && (
+        <div className={styles.modalOverlay} onClick={() => useHubStore.getState().setShowAuthModal(false)}>
+          <div className={styles.authModal} onClick={(e) => e.stopPropagation()}>
+            <AuthPage
+              onLoginSuccess={() => useHubStore.getState().setShowAuthModal(false)}
+              onClose={() => useHubStore.getState().setShowAuthModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
     </ErrorBoundary>
   );
