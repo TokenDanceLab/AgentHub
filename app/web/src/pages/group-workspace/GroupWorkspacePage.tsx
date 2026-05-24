@@ -303,7 +303,7 @@ const styles = `
   color: var(--white);
   border-radius: 10px;
   background: linear-gradient(135deg, var(--gwr-blue), var(--gwr-cyan));
-  box-shadow: var(--gwr-shadow);
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.35);
   font-size: 16px;
   font-weight: 900;
   line-height: 1;
@@ -830,8 +830,8 @@ const styles = `
   --gwr-ink: #e1e4e8;
   --gwr-muted: #8b949e;
   --gwr-line: rgba(48, 54, 61, 0.4);
-  --gwr-blue: #58a6ff;
-  --gwr-cyan: #39d2c0;
+  --gwr-blue: #1769e8;
+  --gwr-cyan: #08a7cf;
   --gwr-purple: #a78bfa;
   --gwr-teal: #4dd4c8;
   --gwr-green: #3fb950;
@@ -839,6 +839,10 @@ const styles = `
   --gwr-glass: rgba(22, 27, 34, 0.8);
   --gwr-glass-border: rgba(48, 54, 61, 0.6);
   --gwr-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(8,167,207,0.1), transparent 28%),
+    radial-gradient(circle at 82% 8%, rgba(116,87,232,0.1), transparent 30%),
+    linear-gradient(135deg, var(--gwr-bg-2), var(--gwr-bg));
 }
 `;
 

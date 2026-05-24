@@ -326,7 +326,7 @@ const pageHtml: string = `
     }
 
     .avatar.blue {
-      background: linear-gradient(135deg, #2857e8, #46b8ff);
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
     }
 
     .avatar::after {
