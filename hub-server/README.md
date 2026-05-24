@@ -175,12 +175,12 @@ Redis Hash: `device_route:{user_id}` → `{device_type: conn_id}`
 | `/web/*` | 认证 + device_type=web | Web 端 Agent 任务触发、自定义 Agent 管理 |
 | `/edge/*` | 认证 + device_type=desktop | Edge 桌面端设备注册、Agent 任务回调 |
 
-完整 API 文档见 [`docs/Server-Hub API接口文档.md`](docs/Server-Hub%20API接口文档.md)。
+完整 API 文档见 `api/openapi.yaml`。
 
 ## WebSocket
 
-连接: `ws://host:8080/client/ws`  
-首帧认证: `{"type":"auth","payload":{"access_token":"..."}}`  
+连接: `ws://host:8080/client/ws`
+首帧认证: `{"type":"auth","payload":{"access_token":"..."}}`
 心跳: 服务端 30s ping，2 次丢失 pong 断开
 
 ## 数据库表
