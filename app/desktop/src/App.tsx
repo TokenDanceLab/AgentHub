@@ -12,6 +12,7 @@ import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
+import { useUIStore } from '@/stores/uiStore';
 import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
@@ -108,10 +109,27 @@ export default function App() {
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
-  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
-  const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState(396);
-  const [rightPanelWidth, setRightPanelWidth] = useState(360);
+  const {
+    leftSidebarCollapsed,
+    rightPanelOpen,
+    leftSidebarWidth,
+    rightPanelWidth,
+    setLeftSidebarCollapsed,
+    setRightPanelOpen,
+    setLeftSidebarWidth,
+    setRightPanelWidth,
+  } = useUIStore(
+    useShallow((s) => ({
+      leftSidebarCollapsed: s.leftSidebarCollapsed,
+      rightPanelOpen: s.rightPanelOpen,
+      leftSidebarWidth: s.sidebarWidth,
+      rightPanelWidth: s.rightPanelWidth,
+      setLeftSidebarCollapsed: s.setLeftSidebarCollapsed,
+      setRightPanelOpen: s.setRightPanelOpen,
+      setLeftSidebarWidth: s.setSidebarWidth,
+      setRightPanelWidth: s.setRightPanelWidth,
+    })),
+  );
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
 
@@ -579,6 +597,36 @@ export default function App() {
             </div>
           </div>
           </>
+        )}
+
+        {!isMobile && !workspaceExpanded && displayedRun && !rightPanelOpen && (
+          <div className={styles.rightRail} aria-label={t('run.collapsedRail')}>
+            <button
+              className={styles.railBtn}
+              onClick={() => setRightPanelOpen(true)}
+              title={t('run.open')}
+              aria-label={t('run.open')}
+            >
+              <PanelRightOpen size={17} />
+            </button>
+            <span className={`${styles.railStatusDot} ${runIsActive ? styles.railStatusDotActive : ''}`} />
+            <button
+              className={styles.railBtn}
+              onClick={() => openSettings('tasks')}
+              title={t('settings.tasks')}
+              aria-label={t('settings.tasks')}
+            >
+              <ClipboardList size={17} />
+            </button>
+            <button
+              className={styles.railBtn}
+              onClick={() => openSettings('agentScheduling')}
+              title={t('settings.agentScheduling')}
+              aria-label={t('settings.agentScheduling')}
+            >
+              <Route size={17} />
+            </button>
+          </div>
         )}
       </div>
       </>
