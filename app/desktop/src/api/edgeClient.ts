@@ -1,5 +1,6 @@
 // Edge REST API client — typed wrappers around fetch.
 // Uses @agenthub/shared for all response types and error handling.
+// P0-1: Zod schema validation with safeParse on all responses.
 
 import { EDGE_URL } from '@/config';
 import type {
@@ -12,6 +13,15 @@ import type {
   StartRunRequest,
 } from '@shared/types';
 import { parseError } from '@shared/errors';
+import {
+  HealthResponseSchema,
+  RunnerSchema,
+  AgentInfoSchema,
+  RunInfoSchema,
+  ThreadInfoSchema,
+  safeParse,
+  listResponseSchema,
+} from './schemas';
 
 export type {
   HealthResponse,
@@ -28,26 +38,36 @@ const BASE = EDGE_URL.replace(/\/+$/, '');
 export async function fetchHealth(): Promise<HealthResponse> {
   const res = await fetch(`${BASE}/v1/health`);
   if (!res.ok) throw await parseError(res);
-  return res.json();
+  return safeParse(HealthResponseSchema, await res.json(), 'health');
 }
 
 export async function fetchRunners(): Promise<ListResponse<Runner>> {
   const res = await fetch(`${BASE}/v1/runners`);
   if (!res.ok) throw await parseError(res);
-  return res.json();
+  return safeParse(listResponseSchema(RunnerSchema), await res.json(), 'runners');
 }
 
 export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {
   const res = await fetch(`${BASE}/v1/agents`);
   if (!res.ok) throw await parseError(res);
-  return res.json();
+  return safeParse(listResponseSchema(AgentInfoSchema), await res.json(), 'agents');
 }
 
 export async function fetchThreads(projectId?: string): Promise<ListResponse<ThreadInfo>> {
   const params = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
   const res = await fetch(`${BASE}/v1/threads${params}`);
   if (!res.ok) throw await parseError(res);
-  return res.json();
+  return safeParse(listResponseSchema(ThreadInfoSchema), await res.json(), 'threads');
+}
+
+export async function fetchRuns(projectId?: string, threadId?: string): Promise<ListResponse<RunInfo>> {
+  const params = new URLSearchParams();
+  if (projectId) params.set('projectId', projectId);
+  if (threadId) params.set('threadId', threadId);
+  const qs = params.toString();
+  const res = await fetch(`${BASE}/v1/runs${qs ? `?${qs}` : ''}`);
+  if (!res.ok) throw await parseError(res);
+  return safeParse(listResponseSchema(RunInfoSchema), await res.json(), 'runs');
 }
 
 export async function startRun(req?: StartRunRequest): Promise<RunInfo> {
@@ -57,7 +77,7 @@ export async function startRun(req?: StartRunRequest): Promise<RunInfo> {
     body: req ? JSON.stringify(req) : undefined,
   });
   if (!res.ok) throw await parseError(res);
-  return res.json();
+  return safeParse(RunInfoSchema, await res.json(), 'startRun');
 }
 
 export async function cancelRun(runId: string): Promise<RunInfo> {
@@ -65,7 +85,7 @@ export async function cancelRun(runId: string): Promise<RunInfo> {
     method: 'POST',
   });
   if (!res.ok) throw await parseError(res);
-  return res.json();
+  return safeParse(RunInfoSchema, await res.json(), 'cancelRun');
 }
 
 export async function renameThread(threadId: string, title: string): Promise<ThreadInfo> {
@@ -75,7 +95,7 @@ export async function renameThread(threadId: string, title: string): Promise<Thr
     body: JSON.stringify({ title }),
   });
   if (!res.ok) throw await parseError(res);
-  return res.json();
+  return safeParse(ThreadInfoSchema, await res.json(), 'renameThread');
 }
 
 export async function deleteThread(threadId: string): Promise<void> {
