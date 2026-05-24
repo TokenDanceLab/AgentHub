@@ -56,9 +56,13 @@
   flex-shrink: 0; font-variant-numeric: tabular-nums;
 }
 
-/* ── Selectors (bottom-right group) ───────── */
-.selectors {
-  display: flex; align-items: center; gap: 6px;
+/* ── Metadata chain (model · reasoning) ──── */
+.metaChain {
+  display: flex; align-items: center; gap: 4px;
+}
+
+.metaDot {
+  color: #94A3B8; font-size: 11px; user-select: none;
 }
 
 /* ── Send button (circle) ─────────────────── */
