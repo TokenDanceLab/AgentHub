@@ -1,6 +1,7 @@
 package handler
 
 import (
+<<<<<<< HEAD
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/server-hub/internal/errcode"
@@ -12,6 +13,32 @@ type AgentHandler struct {
 }
 
 func NewAgentHandler(s *service.AgentService) *AgentHandler {
+=======
+	"context"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/model"
+)
+
+// AgentService is the subset of *service.AgentService used by AgentHandler.
+type AgentService interface {
+	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
+	TriggerAgentTask(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error)
+	CancelTask(ctx context.Context, userID, taskID string) error
+	HandleTaskAck(ctx context.Context, taskID string) error
+	HandleTaskStream(ctx context.Context, taskID, content string) error
+	HandleTaskDone(ctx context.Context, taskID, finalContent string) error
+	HandleTaskFail(ctx context.Context, taskID, errMsg string) error
+}
+
+type AgentHandler struct {
+	service AgentService
+}
+
+func NewAgentHandler(s AgentService) *AgentHandler {
+>>>>>>> origin/master
 	return &AgentHandler{service: s}
 }
 

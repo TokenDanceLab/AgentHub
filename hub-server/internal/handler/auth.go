@@ -1,6 +1,7 @@
 package handler
 
 import (
+<<<<<<< HEAD
 	"github.com/gin-gonic/gin"
 	"github.com/agenthub/server-hub/internal/errcode"
 	"github.com/agenthub/server-hub/internal/service"
@@ -11,6 +12,33 @@ type AuthHandler struct {
 }
 
 func NewAuthHandler(s *service.AuthService) *AuthHandler {
+=======
+	"context"
+	"log"
+
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service"
+	"github.com/gin-gonic/gin"
+)
+
+// AuthService is the subset of *service.AuthService used by AuthHandler.
+type AuthService interface {
+	Register(ctx context.Context, username, password, nickname string) (*model.User, error)
+	Login(ctx context.Context, username, password, deviceType, deviceID string) (*service.LoginResponse, error)
+	RefreshToken(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error)
+	Logout(ctx context.Context, userID, deviceID string) error
+	GetMe(ctx context.Context, userID string) (*model.User, error)
+	UpdateProfile(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error)
+	ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error
+}
+
+type AuthHandler struct {
+	service AuthService
+}
+
+func NewAuthHandler(s AuthService) *AuthHandler {
+>>>>>>> origin/master
 	return &AuthHandler{service: s}
 }
 
@@ -57,6 +85,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			Fail(c, e)
 			return
 		}
+<<<<<<< HEAD
+=======
+		c.Error(err)
+		log.Printf("[LOGIN ERROR] username=%s device_type=%s err=%v", req.Username, req.DeviceType, err)
+>>>>>>> origin/master
 		Fail(c, errcode.ErrInternal)
 		return
 	}

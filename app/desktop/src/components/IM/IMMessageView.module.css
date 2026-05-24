@@ -1,0 +1,198 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  background: var(--background);
+}
+
+.stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* ── Message bubble ──────────────────────── */
+
+.bubble {
+  display: flex;
+  flex-direction: column;
+  max-width: 80%;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 12px;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  word-break: break-word;
+  position: relative;
+  animation: bubbleIn 0.2s var(--ease-out);
+}
+
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* User message — right aligned */
+.userRow {
+  align-items: flex-end;
+}
+
+.userBubble {
+  background: var(--accent, #3b82f6);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+/* Agent message — left aligned */
+.agentRow {
+  align-items: flex-start;
+}
+
+.agentBubble {
+  background: var(--surface-raised, #1e293b);
+  color: var(--foreground);
+  border: 1px solid var(--border-color, #334155);
+  border-bottom-left-radius: 4px;
+}
+
+/* ── Authority color band ────────────────── */
+
+.authorityBand {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 3px 0 0 3px;
+}
+
+.authorityHub {
+  background: #3b82f6;   /* Blue */
+}
+
+.authorityEdge {
+  background: #22c55e;   /* Green */
+}
+
+.authorityHybrid {
+  background: #f97316;   /* Orange */
+}
+
+/* ── Sender header ───────────────────────── */
+
+.senderRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: 2px;
+}
+
+.avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.avatarAgent {
+  background: var(--accent, #3b82f6);
+  color: #fff;
+}
+
+.avatarUser {
+  background: var(--surface-overlay, #334155);
+  color: var(--foreground);
+}
+
+.senderName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+  opacity: 0.7;
+}
+
+.authorityBadge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.authorityBadgeHub {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.authorityBadgeEdge {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.authorityBadgeHybrid {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
+
+/* ── Timestamp ───────────────────────────── */
+
+.timestamp {
+  font-size: 10px;
+  color: var(--foreground);
+  opacity: 0.4;
+  margin-top: 4px;
+  align-self: flex-end;
+}
+
+/* ── Recalled message ────────────────────── */
+
+.recalled {
+  font-style: italic;
+  opacity: 0.5;
+}
+
+/* ── Markdown content ────────────────────── */
+
+.content {
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+.content p {
+  margin: 0;
+}
+
+.content p + p {
+  margin-top: var(--space-sm);
+}
+
+/* ── Empty state ─────────────────────────── */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: var(--space-sm);
+  color: var(--foreground);
+  opacity: 0.4;
+  font-size: var(--font-size-sm);
+}
+
+/* ── Responsive ──────────────────────────── */
+
+@media (max-width: 768px) {
+  .bubble {
+    max-width: 90%;
+  }
+}

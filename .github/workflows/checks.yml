@@ -2,10 +2,288 @@ name: checks
 
 on:
   pull_request:
+    branches: [master, dev/delicious233, dev/trump]
   push:
-    branches: [master]
+    branches: [master, dev/delicious233, dev/trump]
+
+env:
+  GO_VERSION: "1.25"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10"
 
 jobs:
+  # ── Go: Edge Server ──────────────────────────
+  go-edge:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: edge-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: edge-server/go.sum
+
+      - name: Build
+        run: go build ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: edge-server
+          version: v1.64
+          args: --timeout=5m
+
+      - name: Test (unit only, skip integration)
+        run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
+
+      - name: Coverage check (overall >= 70%)
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          THRESHOLD=70
+          echo "Overall coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
+            exit 1
+          fi
+
+      - name: Coverage per-package minimums
+        run: |
+          echo "=== Per-package coverage minimums ==="
+          check_pkg() {
+            local pattern="$1"
+            local min="$2"
+            local label="$3"
+            local cov
+            cov=$(go tool cover -func=coverage.out | grep "$pattern" | awk '{sum+=$NF; n++} END {if(n>0) printf "%.1f", sum/n; else print "0"}')
+            echo "  ${label}: ${cov}% (min: ${min}%)"
+            if (( $(echo "$cov < $min" | bc -l) )); then
+              echo "::error::${label} coverage ${cov}% below ${min}% minimum"
+              return 1
+            fi
+          }
+          FAILED=0
+          check_pkg "edge-server/internal/security/" 70 "security" || FAILED=1
+          check_pkg "edge-server/internal/lifecycle/" 60 "lifecycle" || FAILED=1
+          check_pkg "edge-server/internal/adapters/" 55 "adapters" || FAILED=1
+          exit $FAILED
+
+      - name: Race detection
+        run: go test ./... -count=1 -short -race
+
+      - name: Security scan (gosec)
+        run: go run github.com/securecodewarrior/gosec/v2/cmd/gosec@latest ./...
+        continue-on-error: true
+
+      - name: Vulnerability check (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Commit message check (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          TYPES="init|feat|fix|docs|refactor|chore|test|perf|ci|revert"
+          PATTERN="^($TYPES)(\([a-z0-9._-]+\))?: .+"
+          FAILED=0
+          for commit in $(git log --format="%H %s" "origin/${{ github.base_ref }}..HEAD" 2>/dev/null || echo ""); do
+            sha=$(echo "$commit" | cut -d' ' -f1)
+            msg=$(echo "$commit" | cut -d' ' -f2-)
+            if ! echo "$msg" | grep -qE "$PATTERN"; then
+              echo "::warning ::${sha:0:7} 不符合规范: $msg"
+              FAILED=1
+            fi
+          done
+          if [ $FAILED -eq 1 ]; then
+            echo "::error::提交信息需符合 Conventional Commits: type(scope): 中文摘要"
+            exit 1
+          fi
+          echo "✓ 所有提交信息格式正确"
+
+  # ── Go: Hub Server ──────────────────────────
+  go-hub:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: hub-server/go.sum
+
+      - name: Build
+        run: go build ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: hub-server
+          version: v1.64
+          args: --timeout=5m
+
+      - name: Test (unit only, skip integration)
+        run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
+
+      - name: Coverage check (overall >= 40%)
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          THRESHOLD=40
+          echo "Overall coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
+            exit 1
+          fi
+
+      - name: Race detection
+        run: go test ./... -count=1 -short -race
+
+      - name: Security scan (gosec)
+        run: go run github.com/securecodewarrior/gosec/v2/cmd/gosec@latest ./...
+        continue-on-error: true
+
+      - name: Vulnerability check (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+      - name: Vet
+        run: go vet ./...
+
+  # ── Cross-Platform Build ─────────────────────
+  cross-build:
+    name: Cross-platform build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            edge-server/go.sum
+            hub-server/go.sum
+
+      - name: Build edge-server
+        run: cd edge-server && go build ./...
+
+      - name: Build hub-server
+        run: cd hub-server && go build ./...
+
+      - name: Test edge-server
+        run: cd edge-server && go test ./... -short -count=1
+        continue-on-error: ${{ matrix.os == 'macos-latest' }}
+
+      - name: Test hub-server
+        run: cd hub-server && go test ./... -short -count=1
+        continue-on-error: ${{ matrix.os == 'macos-latest' }}
+
+  # ── Docker: Hub Server ───────────────────────
+  docker:
+    name: Docker build (Hub Server)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t agenthub-hub-server -f deployments/Dockerfile .
+
+      - name: Verify image
+        run: docker images agenthub-hub-server
+
+  # ── Benchmark Regression ─────────────────────
+  benchmark:
+    name: Benchmark regression check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            edge-server/go.sum
+            hub-server/go.sum
+
+      - name: Run benchmarks
+        run: |
+          cd edge-server && go test -bench=. -benchtime=1s ./internal/events/ ./internal/adapters/
+          cd ../hub-server && go test -bench=. -benchtime=1s ./internal/service/ ./internal/jwtutil/
+
+  # ── Frontend: Desktop ────────────────────────
+  frontend-desktop:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app/desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/desktop/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install shared deps
+        working-directory: app/shared
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint --max-warnings 10
+
+      - name: Test Desktop
+        run: pnpm test:run
+
+  # ── Frontend: Web ────────────────────────────
+  frontend-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/web/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Web
+        run: pnpm build
+
+  # ── Validation ───────────────────────────────
   validate:
     runs-on: ubuntu-latest
     steps:

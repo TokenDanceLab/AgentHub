@@ -11,9 +11,17 @@ var (
 	HTTPRequestsTotal *prometheus.CounterVec
 	HTTPDuration      *prometheus.HistogramVec
 	WSConnections     prometheus.Gauge
+<<<<<<< HEAD
 	DBPoolInUse       prometheus.Gauge
 	RedisPoolHits     prometheus.Gauge
 	EventBusQueueLen  prometheus.Gauge
+=======
+	WSDroppedFrames   prometheus.Counter
+	DBPoolInUse       prometheus.Gauge
+	RedisPoolHits     prometheus.Gauge
+	EventBusQueueLen  prometheus.Gauge
+	EventBusPanics    prometheus.Counter
+>>>>>>> origin/master
 
 	once sync.Once
 )
@@ -44,6 +52,16 @@ func Register() {
 			},
 		)
 
+<<<<<<< HEAD
+=======
+		WSDroppedFrames = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "ws_dropped_frames_total",
+				Help: "Total number of WebSocket frames dropped due to full send buffer.",
+			},
+		)
+
+>>>>>>> origin/master
 		DBPoolInUse = prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "db_pool_in_use",
@@ -65,12 +83,30 @@ func Register() {
 			},
 		)
 
+<<<<<<< HEAD
 		prometheus.MustRegister(HTTPRequestsTotal)
 		prometheus.MustRegister(HTTPDuration)
 		prometheus.MustRegister(WSConnections)
 		prometheus.MustRegister(DBPoolInUse)
 		prometheus.MustRegister(RedisPoolHits)
 		prometheus.MustRegister(EventBusQueueLen)
+=======
+		EventBusPanics = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "eventbus_panics_total",
+				Help: "Total number of panics recovered in the event bus.",
+			},
+		)
+
+		prometheus.MustRegister(HTTPRequestsTotal)
+		prometheus.MustRegister(HTTPDuration)
+		prometheus.MustRegister(WSConnections)
+		prometheus.MustRegister(WSDroppedFrames)
+		prometheus.MustRegister(DBPoolInUse)
+		prometheus.MustRegister(RedisPoolHits)
+		prometheus.MustRegister(EventBusQueueLen)
+		prometheus.MustRegister(EventBusPanics)
+>>>>>>> origin/master
 		// Built-in collectors may already be registered; ignore if so.
 		prometheus.Register(collectors.NewGoCollector())
 		prometheus.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))

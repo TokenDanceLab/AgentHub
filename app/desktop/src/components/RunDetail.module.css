@@ -1,0 +1,336 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  min-width: 240px;
+  max-width: 320px;
+  height: 100%;
+  background: var(--card);
+  overflow-y: auto;
+}
+
+.title {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--foreground);
+  opacity: 0.6;
+  border-bottom: 1px solid var(--border);
+}
+
+.empty {
+  padding: var(--space-md);
+  color: var(--foreground);
+  opacity: 0.4;
+  font-size: var(--font-size-sm);
+}
+
+.section {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border);
+}
+
+.tabContent {
+  flex: 1;
+  overflow-y: auto;
+  animation: tabFadeIn 0.2s ease-out;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.statusDone {
+  background: color-mix(in oklch, var(--success) 12%, transparent);
+  color: var(--success);
+}
+
+.statusFailed {
+  background: color-mix(in oklch, var(--destructive) 20%, transparent);
+  color: var(--destructive);
+}
+
+.statusRunning {
+  background: color-mix(in oklch, var(--primary) 20%, transparent);
+  color: var(--primary);
+}
+
+.statusPending {
+  background: var(--border);
+  color: var(--foreground);
+}
+
+.runId {
+  margin-left: var(--space-sm);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  opacity: 0.5;
+}
+
+.output {
+  margin-top: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--background);
+  border-radius: 4px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.list {
+  margin-top: var(--space-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+  font-size: var(--font-size-xs);
+}
+
+/* Tool call items with expandable output */
+.toolCallItem {
+  border-bottom: 1px solid var(--border);
+}
+
+.toolCallItem:last-child {
+  border-bottom: none;
+}
+
+.toolCallHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  text-align: left;
+}
+
+.toolCallHeader:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.toolCallOutput {
+  margin: 2px 0 6px;
+  padding: var(--space-xs);
+  background: var(--background);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  max-height: 160px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.chevron {
+  display: inline-block;
+  font-size: 10px;
+  transition: transform 0.15s ease;
+  opacity: 0.5;
+  margin-left: auto;
+}
+
+.chevronDown {
+  transform: rotate(90deg);
+}
+
+.success {
+  color: var(--success);
+}
+
+.pending {
+  color: var(--foreground);
+  opacity: 0.6;
+}
+
+.itemTs {
+  font-size: 10px;
+  opacity: 0.4;
+}
+
+.filePath {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.action {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--border);
+  text-transform: uppercase;
+}
+
+.cancelButton {
+  width: 100%;
+  padding: 6px 12px;
+  border: 1px solid var(--destructive);
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--destructive) 15%, transparent);
+  color: var(--destructive);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cancelButton:hover {
+  background: color-mix(in oklch, var(--destructive) 25%, transparent);
+}
+
+.usageRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.usageLabel {
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+  opacity: 0.6;
+}
+
+.usageValue {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+/* ── Responsive: Tablet (768px - 1023px) ─ */
+
+@media (max-width: 1023px) {
+  .panel {
+    min-width: 200px;
+    max-width: 260px;
+    font-size: var(--font-size-xs);
+  }
+}
+
+/* ── Responsive: Mobile (< 768px) ──────── */
+
+@media (max-width: 767px) {
+  .panel {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+    height: 100%;
+    border-left: none;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    overflow-y: auto;
+  }
+
+  .title {
+    padding: var(--space-sm);
+    font-size: var(--font-size-sm);
+    text-align: center;
+  }
+
+  .section {
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  /* ── Tabs: horizontal scroll ──────────── */
+  .tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+
+  .tab {
+    padding: var(--space-sm) var(--space-md);
+    min-height: var(--touch-target-min, 44px);
+    font-size: var(--font-size-sm);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .tabContent {
+    padding: 0 var(--space-sm);
+  }
+
+  /* ── Token usage: stacked vertically ──── */
+  .usageRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 2px 0;
+  }
+
+  .usageLabel {
+    font-size: var(--font-size-xs);
+  }
+
+  .usageValue {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+  }
+
+  /* ── Tool call items: larger touch targets ── */
+  .toolCallHeader {
+    padding: var(--space-sm) 0;
+    min-height: var(--touch-target-min, 44px);
+    font-size: var(--font-size-sm);
+  }
+
+  .toolCallOutput {
+    font-size: var(--font-size-xs);
+    max-height: 200px;
+  }
+
+  /* ── Items ────────────────────────────── */
+  .item {
+    padding: var(--space-xs) 0;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+
+  .filePath {
+    font-size: var(--font-size-xs);
+    word-break: break-all;
+  }
+
+  .cancelButton {
+    min-height: var(--touch-target-min, 44px);
+    font-size: var(--font-size-sm);
+  }
+
+  .output {
+    font-size: var(--font-size-xs);
+    max-height: 300px;
+  }
+}
