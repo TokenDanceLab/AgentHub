@@ -1,6 +1,7 @@
 .git/
-docs/
-uploads/
-*.md
+.worktrees/
+tests/
+*.test
+coverage.out
 .env
-.env.*
+*.log

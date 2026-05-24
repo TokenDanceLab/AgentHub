@@ -1,11 +1,14 @@
 import { useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Copy, RefreshCw, Trash2, ArrowDown } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { Copy, RefreshCw, Trash2, ArrowDown, MessageSquare } from 'lucide-react';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
-import { ChatBubble } from '@shared/components';
 import MarkdownRenderer from './MarkdownRenderer';
+import CodeBlock from './CodeBlock';
+import EmptyState from './EmptyState';
+import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
-import { useToast } from '@/contexts/ToastContext';
+import { useToastStore } from '@/stores/toastStore';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -105,6 +108,12 @@ function ThinkingBlock({ content }: { content: string }) {
       {expanded && <div className={styles.thinkingContent}>{content}</div>}
     </div>
   );
+}
+
+// ── StreamingTextBlock ───────────────────────
+function StreamingTextBlock({ content, isStreaming }: { content: string; isStreaming: boolean }) {
+  const displayed = useStreamingText(content, isStreaming);
+  return <MarkdownRenderer content={displayed} />;
 }
 
 // ── ToolUseBlock ────────────────────────────
@@ -265,12 +274,7 @@ function BlockRenderer({
       return <MarkdownRenderer content={block.content} />;
 
     case 'code':
-      return (
-        <pre className={styles.codeBlock}>
-          {block.language && <span className={styles.codeLang}>{block.language}</span>}
-          <code>{block.content}</code>
-        </pre>
-      );
+      return <CodeBlock content={block.content} language={block.language} />;
 
     case 'thinking':
       return <ThinkingBlock content={block.content} />;
@@ -340,16 +344,38 @@ function extractMessageText(msg: ChatMessage): string {
 // ── ChatView ────────────────────────────────
 export default function ChatView({ messages, isStreaming, onRetry, onDelete }: Props) {
   const { t } = useTranslation();
-  const { showToast } = useToast();
+  const addToast = useToastStore((s) => s.addToast);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
-  const { scrollToBottom, isNearBottom } = useAutoScroll(scrollRef, {
-    messages,
-    isStreaming: isStreaming ?? false,
+  // ── Virtualizer ──────────────────────────────
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 200,
+    overscan: 5,
+    getItemKey: (index: number) => messages[index].id,
   });
 
-  // Show scroll-to-bottom indicator when streaming and user has scrolled up
+  // Stable refs so the callback closure always sees latest values
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+
+  const { scrollToBottom, isNearBottom } = useAutoScroll(
+    scrollRef,
+    { messages, isStreaming: isStreaming ?? false },
+    {
+      scrollToBottomFn: () => {
+        const len = messagesRef.current.length;
+        if (len > 0) {
+          virtualizerRef.current.scrollToIndex(len - 1, { align: 'end' });
+        }
+      },
+    },
+  );
+
   const showScrollIndicator = isStreaming && !isNearBottom;
 
   const handleCopy = useCallback(async (msg: ChatMessage) => {
@@ -357,12 +383,12 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
     try {
       await navigator.clipboard.writeText(text);
       setCopiedMessageId(msg.id);
-      showToast('success', t('toast.copied'));
+      addToast({ type: 'success', message: t('toast.copied') });
       setTimeout(() => setCopiedMessageId(null), 1500);
     } catch {
-      showToast('error', t('toast.error'));
+      addToast({ type: 'error', message: t('toast.error') });
     }
-  }, [showToast, t]);
+  }, [addToast, t]);
 
   const lastMsg = messages[messages.length - 1];
   const lastMsgHasText =
@@ -371,18 +397,26 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
   const renderMessage = useCallback(
     (msg: ChatMessage) => {
       const rt = relativeTime(msg.timestamp);
-      const textContent = extractMessageText(msg);
-      const nonTextBlocks = msg.blocks.filter((b) => b.kind !== 'text');
-      const isAgent = msg.role === 'agent';
-
       return (
-        <div key={msg.id} className={styles.messageWrapper}>
-          <ChatBubble
-            sender={{ name: msg.role === 'user' ? 'You' : msg.agentName ?? (msg.role === 'system' ? 'System' : 'Agent') }}
-            content={textContent}
-            timestamp={rt.relative}
-            isAgent={isAgent}
-          />
+        <div
+          className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
+        >
+          {msg.role === 'agent' && msg.agentName && (
+            <div className={styles.agentAvatar}>
+              <div className={styles.avatarCircle}>
+                {msg.agentName.charAt(0).toUpperCase()}
+              </div>
+              <span className={styles.agentNameLabel}>{msg.agentName}</span>
+            </div>
+          )}
+
+          <span
+            className={styles.timestamp}
+            title={rt.exact}
+            aria-label={rt.exact}
+          >
+            {rt.relative}
+          </span>
 
           <div className={styles.actionBar}>
             <button
@@ -414,20 +448,21 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
           {copiedMessageId === msg.id && (
             <span className={styles.copyToast}>Copied!</span>
           )}
-
-          {/* Render non-text blocks (tool use, thinking, file changes, etc.) as detail */}
-          {nonTextBlocks.length > 0 && (
-            <div className={styles.blockDetails}>
-              {nonTextBlocks.map((block, i) => (
-                <BlockRenderer key={i} block={block} t={t} />
-              ))}
-            </div>
-          )}
+          {msg.blocks.map((block, i) => {
+            if (block.kind === 'text' && isStreaming && msg.id === lastMsg?.id) {
+              return <StreamingTextBlock key={i} content={block.content} isStreaming={true} />;
+            }
+            return <BlockRenderer key={i} block={block} t={t} />;
+          })}
         </div>
       );
     },
     [t, isStreaming, lastMsg?.id, copiedMessageId, handleCopy, onRetry, onDelete],
   );
+
+  const handleScrollToBottom = useCallback(() => {
+    scrollToBottom(true);
+  }, [scrollToBottom]);
 
   return (
     <div className={styles.root}>
@@ -438,8 +473,33 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
         aria-live="polite"
       >
         {messages.length === 0 ? (
-          <div className={styles.empty}>{t('chat.empty')}</div>
-        ) : messages.map(renderMessage)}
+          <EmptyState
+            icon={<MessageSquare size={24} />}
+            title={t('chat.emptyTitle')}
+            description={t('chat.emptyDescription')}
+          />
+        ) : (
+          <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative', flexShrink: 0 }}>
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const msg = messages[virtualRow.index];
+              const isLast = virtualRow.index === messages.length - 1;
+              return (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  className={styles.virtualItem}
+                  style={{
+                    transform: `translateY(${virtualRow.start}px)`,
+                    paddingBottom: isLast ? 0 : undefined,
+                  }}
+                >
+                  {renderMessage(msg)}
+                </div>
+              );
+            })}
+          </div>
+        )}
         {isStreaming &&
           (lastMsgHasText ? (
             <div className={styles.streamProgress} />
@@ -452,11 +512,10 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
           ))}
       </div>
 
-      {/* Scroll-to-bottom floating indicator */}
       {showScrollIndicator && (
         <button
           className={styles.scrollToBottomBtn}
-          onClick={() => scrollToBottom(true)}
+          onClick={handleScrollToBottom}
           title={t('chat.scrollToBottom')}
           aria-label={t('chat.scrollToBottom')}
         >

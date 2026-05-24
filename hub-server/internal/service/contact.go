@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"gorm.io/gorm"
 
@@ -12,13 +13,20 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-type ContactService struct {
-	db  *gorm.DB
-	bus *Bus
+// contactCache is the subset of *cache.Client methods used by ContactService.
+type contactCache interface {
+	Invalidate(ctx context.Context, keys ...string) error
+	IsOnline(ctx context.Context, userID string) (bool, error)
 }
 
-func NewContactService(db *gorm.DB, bus *Bus) *ContactService {
-	return &ContactService{db: db, bus: bus}
+type ContactService struct {
+	db          *gorm.DB
+	bus         *Bus
+	cacheClient contactCache
+}
+
+func NewContactService(db *gorm.DB, bus *Bus, cacheClient *cache.Client) *ContactService {
+	return &ContactService{db: db, bus: bus, cacheClient: cacheClient}
 }
 
 type SearchResult struct {
@@ -137,9 +145,9 @@ func (s *ContactService) SendFriendRequest(ctx context.Context, userID, friendID
 
 	if s.bus != nil {
 		s.bus.Publish(ctx, Event{Type: "friend.request", Payload: map[string]interface{}{
-			"sender_id":  userID,
+			"sender_id":   userID,
 			"receiver_id": friendID,
-			"message":    message,
+			"message":     message,
 		}})
 	}
 
@@ -152,10 +160,26 @@ func (s *ContactService) ListFriendRequests(ctx context.Context, userID string) 
 		return nil, err
 	}
 
+	if len(requests) == 0 {
+		return []RequestInfo{}, nil
+	}
+
+	// Collect sender IDs for batch query (P2-1: fix N+1)
+	senderIDs := make([]string, 0, len(requests))
+	for _, r := range requests {
+		senderIDs = append(senderIDs, r.UserID)
+	}
+
+	users, err := repository.GetUsersByIDs(s.db, senderIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	result := make([]RequestInfo, 0, len(requests))
 	for _, r := range requests {
-		sender, err := repository.GetUserByID(s.db, r.UserID)
-		if err != nil {
+		sender, ok := users[r.UserID]
+		if !ok {
+			slog.Debug("friend request sender not found in batch lookup", "sender_id", r.UserID, "request_id", r.ID)
 			continue
 		}
 		result = append(result, RequestInfo{
@@ -195,7 +219,7 @@ func (s *ContactService) AcceptFriendRequest(ctx context.Context, userID, reques
 		return err
 	}
 
-	cache.Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
+	s.cacheClient.Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
 	return nil
 }
 
@@ -210,7 +234,7 @@ func (s *ContactService) RejectFriendRequest(ctx context.Context, userID, reques
 	if err := s.db.Delete(r).Error; err != nil {
 		return err
 	}
-	cache.Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
+	s.cacheClient.Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
 	return nil
 }
 
@@ -220,13 +244,28 @@ func (s *ContactService) ListContacts(ctx context.Context, userID string) ([]Con
 		return nil, err
 	}
 
+	if len(friends) == 0 {
+		return []ContactInfo{}, nil
+	}
+
+	// Collect friend IDs for batch query (P2-2: fix N+1)
+	friendIDs := make([]string, 0, len(friends))
+	for _, f := range friends {
+		friendIDs = append(friendIDs, f.FriendID)
+	}
+
+	users, err := repository.GetUsersByIDs(s.db, friendIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	result := make([]ContactInfo, 0, len(friends))
 	for _, f := range friends {
-		friend, err := repository.GetUserByID(s.db, f.FriendID)
-		if err != nil {
+		friend, ok := users[f.FriendID]
+		if !ok {
 			continue
 		}
-		online, _ := cache.IsOnline(ctx, friend.ID)
+		online, _ := s.cacheClient.IsOnline(ctx, friend.ID)
 		result = append(result, ContactInfo{
 			UserID:    friend.ID,
 			Username:  friend.Username,
@@ -248,7 +287,7 @@ func (s *ContactService) RemoveContact(ctx context.Context, currentUserID, frien
 	if err := repository.DeleteFriendshipPair(s.db, currentUserID, friendUserID); err != nil {
 		return err
 	}
-	cache.Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+friendUserID)
+	s.cacheClient.Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+friendUserID)
 	return nil
 }
 
@@ -273,7 +312,7 @@ func (s *ContactService) BlockContact(ctx context.Context, currentUserID, target
 	}); err != nil {
 		return err
 	}
-	cache.Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
+	s.cacheClient.Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
 	return nil
 }
 
@@ -285,7 +324,7 @@ func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targ
 	if err := s.db.Delete(f).Error; err != nil {
 		return err
 	}
-	cache.Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
+	s.cacheClient.Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
 	return nil
 }
 

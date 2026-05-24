@@ -1,4 +1,6 @@
 // Builds ChatMessage objects from WebSocket agent events.
+// P0-1: Uses RunState enum for typed status values.
+// Status transitions are validated in runStore; invalid jumps are logged here as warnings.
 
 import { useReducer, useEffect, useRef, useCallback } from 'react';
 import { createEventStream } from '@/api/eventClient';
@@ -6,13 +8,30 @@ import type { StreamHandle } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
 import type { ChatMessage, MessageBlock, ToolResultBlock } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
+import { useToastStore } from '@/stores/toastStore';
+import { RunState } from '@/utils/runStateMachine';
+import { cancelRun } from '@/api/edgeClient';
 
 const MAX_MESSAGES = 500;
 const MAX_OUTPUT_TEXT = 20000;
 
-interface RunState {
+const LOOP_WARN_AT = 3;
+const LOOP_CANCEL_AT = 5;
+
+interface LoopEntry {
+  count: number;
+  warned: boolean;
+  cancelled: boolean;
+}
+
+function hashSignature(toolName: string, input: Record<string, unknown> | undefined): string {
+  const args = input ? JSON.stringify(input, Object.keys(input ?? {}).sort()) : '{}';
+  return `${toolName}:${args}`;
+}
+
+interface RunStateData {
   runId: string;
-  status: string;
+  status: RunState;
   outputText: string;
   toolCalls: Array<{
     callId: string;
@@ -39,7 +58,7 @@ interface State {
   messages: ChatMessage[];
   isConnected: boolean;
   isStreaming: boolean;
-  currentRun: RunState | null;
+  currentRun: RunStateData | null;
   permissionRequests: PermissionRequestItem[];
   agentName: string;
 }
@@ -152,7 +171,7 @@ function processEvent(state: State, event: EventEnvelope): State {
       const rid = event.payload.runId as string;
       currentRun = {
         runId: rid,
-        status: 'running',
+        status: RunState.RUNNING,
         outputText: '',
         toolCalls: [],
         changedFiles: [],
@@ -425,7 +444,12 @@ function processEvent(state: State, event: EventEnvelope): State {
       isStreaming = false;
       const rid = event.payload.runId as string;
       if (currentRun && currentRun.runId === rid) {
-        currentRun = { ...currentRun, status: 'finished' };
+        if (currentRun.status !== RunState.COMPLETED) {
+          console.warn(
+            `[useChatMessages] run.finished: unexpected status ${currentRun.status} → ${RunState.COMPLETED}`,
+          );
+        }
+        currentRun = { ...currentRun, status: RunState.COMPLETED };
       }
       break;
     }
@@ -434,7 +458,12 @@ function processEvent(state: State, event: EventEnvelope): State {
       isStreaming = false;
       const rid = event.payload.runId as string;
       if (currentRun && currentRun.runId === rid) {
-        currentRun = { ...currentRun, status: 'failed' };
+        if (currentRun.status !== RunState.RUNNING && currentRun.status !== RunState.STREAMING) {
+          console.warn(
+            `[useChatMessages] run.failed: unexpected status ${currentRun.status} → ${RunState.FAILED}`,
+          );
+        }
+        currentRun = { ...currentRun, status: RunState.FAILED };
       }
       break;
     }
@@ -443,7 +472,16 @@ function processEvent(state: State, event: EventEnvelope): State {
       isStreaming = false;
       const rid = event.payload.runId as string;
       if (currentRun && currentRun.runId === rid) {
-        currentRun = { ...currentRun, status: 'cancelled' };
+        if (
+          currentRun.status !== RunState.RUNNING &&
+          currentRun.status !== RunState.STREAMING &&
+          currentRun.status !== RunState.WAITING_FOR_INPUT
+        ) {
+          console.warn(
+            `[useChatMessages] run.cancelled: unexpected status ${currentRun.status} → ${RunState.CANCELLED}`,
+          );
+        }
+        currentRun = { ...currentRun, status: RunState.CANCELLED };
       }
       break;
     }
@@ -558,6 +596,10 @@ export function useChatMessages(online: boolean): ChatState {
     [],
   );
 
+  // Loop detector — persists across renders, resets per run
+  const loopDetectorRef = useRef(new Map<string, LoopEntry>());
+  const currentRunIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     mountedRef.current = true;
     if (!online) {
@@ -575,6 +617,47 @@ export function useChatMessages(online: boolean): ChatState {
 
     stream.subscribe((event: EventEnvelope) => {
       if (!mountedRef.current) return;
+
+      // ── Tool call loop detection ──
+      if (event.type === 'run.agent.tool_call') {
+        const toolName = event.payload.toolName as string;
+        const input = event.payload.input as Record<string, unknown> | undefined;
+        const runId = event.payload.runId as string;
+
+        if (runId && runId === currentRunIdRef.current) {
+          const sig = hashSignature(toolName, input);
+          const entry = loopDetectorRef.current.get(sig) || {
+            count: 0,
+            warned: false,
+            cancelled: false,
+          };
+          entry.count++;
+
+          if (entry.count >= LOOP_CANCEL_AT && !entry.cancelled) {
+            entry.cancelled = true;
+            cancelRun(runId).catch(() => {});
+            useToastStore.getState().addToast({
+              type: 'error',
+              message: `Loop detected: "${toolName}" called ${entry.count} times with same args. Run cancelled.`,
+            });
+          } else if (entry.count >= LOOP_WARN_AT && !entry.warned) {
+            entry.warned = true;
+            useToastStore.getState().addToast({
+              type: 'warning',
+              message: `Loop warning: "${toolName}" called ${entry.count} times with same args.`,
+            });
+          }
+
+          loopDetectorRef.current.set(sig, entry);
+        }
+      }
+
+      // Reset loop detector on new run
+      if (event.type === 'run.started') {
+        currentRunIdRef.current = event.payload.runId as string;
+        loopDetectorRef.current.clear();
+      }
+
       dispatch({ type: 'EVENT_RECEIVED', event });
     });
 

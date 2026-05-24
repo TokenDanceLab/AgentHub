@@ -1,16 +1,19 @@
 package router
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 
-	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/middleware"
 )
 
-func SetupRoutes(r *gin.Engine, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler) {
+func SetupRoutes(r *gin.Engine, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler) {
 	r.Use(middleware.AccessLog())
 	r.Use(middleware.PrometheusMiddleware())
+	r.Use(middleware.Timeout(15 * time.Second))
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -22,13 +25,13 @@ func SetupRoutes(r *gin.Engine, authHandler *handler.AuthHandler, wsHandler *han
 
 		auth := client.Group("/auth")
 		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
+			auth.POST("/register", middleware.RateLimit(cacheClient, 3, time.Minute, middleware.IPKey), authHandler.Register)
+			auth.POST("/login", middleware.RateLimit(cacheClient, 5, time.Minute, middleware.IPKey), authHandler.Login)
 			auth.POST("/refresh", authHandler.Refresh)
 		}
 
 		authProtected := client.Group("/auth")
-		authProtected.Use(middleware.AuthMiddleware(config.Cfg.JWT.Secret))
+		authProtected.Use(middleware.AuthMiddleware(jwtSecret))
 		{
 			authProtected.POST("/logout", authHandler.Logout)
 			authProtected.GET("/me", authHandler.Me)
@@ -37,7 +40,7 @@ func SetupRoutes(r *gin.Engine, authHandler *handler.AuthHandler, wsHandler *han
 		}
 
 		contacts := client.Group("/contacts")
-		contacts.Use(middleware.AuthMiddleware(config.Cfg.JWT.Secret))
+		contacts.Use(middleware.AuthMiddleware(jwtSecret))
 		{
 			contacts.GET("/search", contactHandler.SearchUser)
 			contacts.GET("/friend-requests", contactHandler.ListFriendRequests)
@@ -52,7 +55,7 @@ func SetupRoutes(r *gin.Engine, authHandler *handler.AuthHandler, wsHandler *han
 		}
 
 		sessions := client.Group("/sessions")
-		sessions.Use(middleware.AuthMiddleware(config.Cfg.JWT.Secret))
+		sessions.Use(middleware.AuthMiddleware(jwtSecret))
 		{
 			sessions.GET("", sessionHandler.List)
 			sessions.POST("/private", sessionHandler.CreatePrivate)
@@ -80,7 +83,7 @@ func SetupRoutes(r *gin.Engine, authHandler *handler.AuthHandler, wsHandler *han
 		}
 
 		messages := client.Group("/messages")
-		messages.Use(middleware.AuthMiddleware(config.Cfg.JWT.Secret))
+		messages.Use(middleware.AuthMiddleware(jwtSecret))
 		{
 			messages.POST("/:id/recall", messageHandler.RecallMessage)
 			messages.POST("/:id/pin", messageHandler.PinMessage)
@@ -90,15 +93,15 @@ func SetupRoutes(r *gin.Engine, authHandler *handler.AuthHandler, wsHandler *han
 		}
 
 		attachments := client.Group("/attachments")
-		attachments.Use(middleware.AuthMiddleware(config.Cfg.JWT.Secret))
+		attachments.Use(middleware.AuthMiddleware(jwtSecret))
 		{
 			attachments.POST("/probe", attachmentHandler.Probe)
-			attachments.POST("", attachmentHandler.Upload)
+			attachments.POST("", middleware.Timeout(30*time.Second), attachmentHandler.Upload)
 			attachments.GET("/:id", attachmentHandler.Download)
 		}
 
 		notifications := client.Group("/notifications")
-		notifications.Use(middleware.AuthMiddleware(config.Cfg.JWT.Secret))
+		notifications.Use(middleware.AuthMiddleware(jwtSecret))
 		{
 			notifications.GET("", notificationHandler.ListNotifications)
 			notifications.POST("/:id/read", notificationHandler.MarkRead)
@@ -107,7 +110,7 @@ func SetupRoutes(r *gin.Engine, authHandler *handler.AuthHandler, wsHandler *han
 	}
 
 	edge := r.Group("/edge")
-	edge.Use(middleware.AuthMiddleware(config.Cfg.JWT.Secret))
+	edge.Use(middleware.AuthMiddleware(jwtSecret))
 	edge.Use(middleware.DeviceTypeCheck("desktop"))
 	{
 		edge.POST("/devices/register", deviceHandler.Register)
@@ -118,7 +121,7 @@ func SetupRoutes(r *gin.Engine, authHandler *handler.AuthHandler, wsHandler *han
 	}
 
 	web := r.Group("/web")
-	web.Use(middleware.AuthMiddleware(config.Cfg.JWT.Secret))
+	web.Use(middleware.AuthMiddleware(jwtSecret))
 	web.Use(middleware.DeviceTypeCheck("web"))
 	{
 		web.POST("/agent-tasks", agentHandler.TriggerTask)
