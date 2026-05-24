@@ -46,6 +46,7 @@ function createMockHubWS(): HubWSHandle & { _handlers: HandlerEntry[] } {
     close: vi.fn(),
     reconnect: vi.fn(),
     getStatus: vi.fn(() => 'connected' as const),
+    isAuthenticated: vi.fn(() => true),
   };
 }
 

@@ -2,6 +2,13 @@
 
 AgentHub 使用 WebSocket typed events 推送实时状态。REST API 用于发起命令和查询，WebSocket 只负责事件投递。
 
+> **Implementation Status (2026-05-24)**: Edge Server events (run.*, runner.*) are
+> the primary event system and are fully documented below. Hub Server has its own
+> WebSocket event system at `/client/ws` using a different envelope format
+> (`ws.Frame` with flat `dot.notation` types: `message.new`, `agent.dispatch`,
+> `session.created`, `device.online`, etc.) — this Hub event system is not yet
+> documented in this file.
+
 ## 1. 连接
 
 ```text

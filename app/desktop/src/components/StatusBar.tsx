@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { Wifi, WifiOff, Sun, Moon } from 'lucide-react';
+import { Circle, Wifi, WifiOff, Sun, Moon, LogIn } from 'lucide-react';
 import type { HealthResponse } from '@shared/types';
-import { StatusBadge } from '@shared/components';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useHubStore } from '@/stores/hubStore';
 import styles from './StatusBar.module.css';
 
 interface Props {
@@ -63,17 +63,24 @@ export default memo(function StatusBar({ online, health, isConnected, error, pro
 
   return (
     <div className={styles.bar} role="status" aria-atomic="true">
-      <StatusBadge
-        status={online ? 'online' : isReconnecting ? 'running' : 'offline'}
+      <Circle
+        size={8}
+        fill="currentColor"
+        className={isReconnecting ? styles.pulse : undefined}
+        style={{ color: online ? 'var(--color-success)' : 'var(--color-danger)' }}
+        aria-hidden="true"
+        data-testid={online ? 'status-dot-online' : 'status-dot-offline'}
       />
-      {online && health && (
-        <span className={styles.edgeInfo}>
-          {health.version ?? 'v1'} / {health.edgeId ?? '?'}
-        </span>
-      )}
-      {isReconnecting && (
-        <span className={styles.reconnecting}>{t('status.reconnecting')}</span>
-      )}
+      <span className={isReconnecting ? styles.reconnecting : undefined}>
+        {online
+          ? t('status.online', {
+              version: health?.version ?? 'v1',
+              edgeId: health?.edgeId ?? '?',
+            })
+          : isReconnecting
+            ? t('status.reconnecting')
+            : t('status.offline')}
+      </span>
       {latencyMs != null && (
         <span
           className={`${styles.latency} ${latencyClass}`}
@@ -101,18 +108,28 @@ export default memo(function StatusBar({ online, health, isConnected, error, pro
       {hubAuthenticated != null && (
         <>
           <span className={styles.separator} aria-hidden="true" />
-          <Circle
-            size={6}
-            fill="currentColor"
-            style={{ color: hubAuthenticated ? 'var(--color-success)' : 'var(--muted-foreground)' }}
-            aria-hidden="true"
-          />
-          <span
-            className={styles.wsStatus}
-            aria-label={hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
+          <button
+            className={styles.hubBtn}
+            onClick={() => {
+              if (!hubAuthenticated) {
+                useHubStore.getState().setShowAuthModal(true);
+              }
+            }}
+            type="button"
+            title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
+            aria-label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
           >
-            {hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
-          </span>
+            <Circle
+              size={6}
+              fill="currentColor"
+              style={{ color: hubAuthenticated ? 'var(--color-success)' : 'var(--muted-foreground)' }}
+              aria-hidden="true"
+            />
+            <span className={styles.wsStatus}>
+              {hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
+            </span>
+            {!hubAuthenticated && <LogIn size={12} />}
+          </button>
         </>
       )}
       {errorCount > 0 && (
