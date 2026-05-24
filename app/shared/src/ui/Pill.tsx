@@ -1,3 +1,4 @@
+import React from 'react';
 import styles from './Pill.module.css';
 
 type PillVariant = 'default' | 'blue' | 'cyan' | 'purple' | 'green' | 'amber';
