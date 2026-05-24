@@ -1,6 +1,8 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-24（M5 批次完成 + 生产部署 hk2）
+最后更新：2026-05-24（Desktop P0 全部完成 + M5/M6 已部署）
+
+> **合并方向**：`feat/* → dev/delicious233 → master`
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -35,6 +37,7 @@
 | **M4** | Hub 骨架 + OpenCode E2E + Codex E2E + 环境隔离 + auth middleware + 权限门控升级 + 响应式布局 | 8/8 | 2026-05 |
 | **M5** | **工程基础收敛**：Edge race/metrics/tests/P2 + Hub 安全/DI全5阶段/测试12包/P2 + Desktop 虚拟滚动/高亮/空状态/@mention/tablet + CI增强 | 27/27 | 2026-05-24 |
 | **M6** | **生产部署**：Docker Compose 生产配置 + hk2 部署 + nginx 反代 + Cloudflare DNS + 公开API + 官网 Hub 集成 + 安全加固（CORS/RateLimit/BodyLimit） | 12/12 | 2026-05-24 |
+| **M7** | **Desktop P0 打磨**：TanStack Query + Zod + 非受控输入 + 心跳 + 虚拟滚动 + viewRegistry | 12/12 | 2026-05-24 |
 
 ### 1.3 关键差距（来自审计报告 — M5 已全部修复）
 
