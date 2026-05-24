@@ -1,8 +1,8 @@
 import { lazy, type ComponentType } from 'react';
-import { MessageSquare, Bot, PanelRight, Search, Keyboard, Shield } from 'lucide-react';
+import { MessageSquare, Bot, PanelRight, Search, Keyboard, Shield, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-/** Slots in the layout shell that views can occupy. */
+/** Slot in the layout shell that views can occupy. */
 export type ViewSlot = 'sidebar' | 'centerSidebar' | 'center' | 'rightPanel' | 'agentOverlay' | 'modal';
 
 /**
@@ -46,6 +46,7 @@ export interface ViewConfig {
 const ChatView = lazy(() => import('@/components/ChatView'));
 const RunDetail = lazy(() => import('@/components/RunDetail'));
 const SearchDialog = lazy(() => import('@/components/SearchDialog'));
+const IMView = lazy(() => import('@/views/IMView'));
 
 // Eager imports
 import StatusBar from '@/components/StatusBar';
@@ -141,6 +142,16 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
     label: 'view.search',
     lazy: true,
   },
+  'im-view': {
+    id: 'im-view',
+    component: IMView,
+    slot: 'center',
+    showOnMobile: true,
+    showOnTablet: true,
+    icon: Users,
+    label: 'view.messages',
+    lazy: true,
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -178,7 +189,7 @@ export const VIEW_LIST: ViewConfig[] = Object.values(VIEW_REGISTRY);
 
 // ── Main content view mode (used by MainView resolution) ──
 
-export type ViewMode = 'welcome' | 'loading' | 'chat';
+export type ViewMode = 'welcome' | 'loading' | 'chat' | 'im';
 
 export interface ViewDescriptor {
   mode: ViewMode;
@@ -189,4 +200,5 @@ export const VIEWS: Record<ViewMode, ViewDescriptor> = {
   welcome: { mode: 'welcome', label: 'Welcome' },
   loading: { mode: 'loading', label: 'Loading' },
   chat: { mode: 'chat', label: 'Chat' },
+  im: { mode: 'im', label: 'Messages' },
 };
