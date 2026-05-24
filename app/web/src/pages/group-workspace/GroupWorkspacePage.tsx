@@ -1,25 +1,17 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import {
-  listApprovals,
-  listArtifacts,
-  listPreviews,
-  listProjects,
-  listRunners,
-  listRuns,
-  listThreads,
   mockRunners,
   mockRuns,
   mockWorkspaceFiles,
   getWorkbenchCatalogState,
   getWorkbenchSectionSource,
-  workbenchReducer,
   MockEventStream,
   playRunLifecycle,
   type Run,
   type Runner,
   type WorkbenchSectionSource,
-  type WorkbenchState,
 } from '@shared/index';
+import { useWorkbenchProjection } from '../../hooks/useWorkbenchProjection';
 
 type TaskStatus = "backlog" | "active" | "review";
 type ApprovalState = "pending" | "approved" | "changes";
@@ -127,41 +119,6 @@ const presenceLabels: Record<MemberPresence, string> = {
   busy: "Busy",
   offline: "Offline",
 };
-
-const initialWorkbenchProjectionState: WorkbenchState = {
-  projects: [],
-  threads: [],
-  runners: [],
-  runs: [],
-  threadItems: [],
-  approvals: [],
-  artifacts: [],
-  previews: [],
-  runLogs: {},
-  connection: { status: 'idle' },
-  lastSeq: 0,
-};
-
-function formatError(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return String(error || 'Edge catalog unavailable');
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs = 2500): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error('Edge catalog did not respond.')), timeoutMs);
-    promise.then(
-      (value) => {
-        window.clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        window.clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
-}
 
 function memberFromRunner(runner: Runner, index: number): Member {
   return {
@@ -1121,61 +1078,6 @@ function MemberAvatar({ member }: { member: Member }) {
     .join(" ");
 
   return <span className={className}>{member.initials}</span>;
-}
-
-function useWorkbenchProjection() {
-  const [state, dispatch] = useReducer(
-    workbenchReducer,
-    initialWorkbenchProjectionState,
-    (initialState) => workbenchReducer(initialState, { type: 'connection.loading' }),
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadSnapshot() {
-      dispatch({ type: 'connection.loading' });
-      try {
-        const [projects, threads, runners, runs, approvals, artifacts, previews] =
-          await withTimeout(Promise.all([
-            listProjects({ pageSize: 50 }),
-            listThreads({ pageSize: 50 }),
-            listRunners(),
-            listRuns({ pageSize: 50 }),
-            listApprovals(),
-            listArtifacts(),
-            listPreviews(),
-          ]));
-
-        if (cancelled) return;
-
-        dispatch({
-          type: 'snapshot.loaded',
-          snapshot: {
-            projects,
-            threads,
-            runners,
-            runs,
-            approvals,
-            artifacts,
-            previews,
-          },
-        });
-      } catch (error) {
-        if (!cancelled) {
-          dispatch({ type: 'connection.error', error: formatError(error) });
-        }
-      }
-    }
-
-    loadSnapshot();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return state;
 }
 
 export function GroupWorkspacePageInteractive() {
