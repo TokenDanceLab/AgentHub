@@ -230,6 +230,18 @@ func (m *Manager) StartHeartbeat() {
 	}()
 }
 
+// Shutdown closes all WebSocket connections and clears the internal maps.
+// Call after the HTTP server has stopped accepting new connections.
+func (m *Manager) Shutdown() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, c := range m.conns {
+		c.Close()
+		delete(m.conns, id)
+	}
+	m.byUser = make(map[string]map[string]string)
+}
+
 func (m *Manager) pingAll() {
 	m.mu.RLock()
 	conns := make([]*Conn, 0, len(m.conns))
