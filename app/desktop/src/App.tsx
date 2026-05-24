@@ -4,7 +4,7 @@ import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { useEdgeStatus } from '@/hooks/useEdgeStatus';
-import { useAgents } from '@/hooks/useAgents';
+import { useAgentList } from '@/api/agentQueries';
 import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
 import { useThreads } from '@/api/threadQueries';
 import type { AgentInfo, ThreadInfo, StartRunRequest } from '@shared/types';
@@ -46,10 +46,10 @@ export default function App() {
   const { selectedThreadId, selectThread } = useThreadStore(
     useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectThread: s.selectThread })),
   );
-  const { setCurrentRun: runStoreSetCurrentRun, setIsStreaming: runStoreSetStreaming, clear: runStoreClear } =
-    useRunStore(useShallow((s) => ({ setCurrentRun: s.setCurrentRun, setIsStreaming: s.setIsStreaming, clear: s.clear })));
+  const isStreaming = useRunStore((s) => s.isStreaming);
 
-  const agents = useAgents(online);
+  const { data: agentData } = useAgentList(online);
+  const agents = agentData?.items ?? [];
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>();
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
   const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
@@ -72,21 +72,6 @@ export default function App() {
   useEffect(() => {
     setConnected(isConnected);
   }, [isConnected, setConnected]);
-
-  // Sync currentRun → run store
-  const prevRunIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (currentRun) {
-      if (prevRunIdRef.current !== currentRun.runId) {
-        prevRunIdRef.current = currentRun.runId;
-        runStoreSetCurrentRun(currentRun);
-        runStoreSetStreaming(true);
-      }
-    } else {
-      prevRunIdRef.current = null;
-      runStoreClear();
-    }
-  }, [currentRun, runStoreSetCurrentRun, runStoreSetStreaming, runStoreClear]);
 
   // Toast when new thread appears
   const prevThreadIdsRef = useRef<Set<string>>(new Set());
@@ -129,8 +114,10 @@ export default function App() {
 
   const handleDecidePermission = useCallback((requestId: string, decision: 'allow' | 'deny', reason?: string) => {
     decidePermission(requestId, decision, reason);
-    decidePermissionRest(requestId, decision, reason).catch(() => {});
-  }, [decidePermission]);
+    if (currentRun?.runId) {
+      decidePermissionRest({ runId: currentRun.runId, requestId, decision, reason }).catch(() => {});
+    }
+  }, [decidePermission, currentRun?.runId]);
 
   const handleRetry = useCallback((messageId: string) => {
     const msg = allMessages.find((m) => m.id === messageId);

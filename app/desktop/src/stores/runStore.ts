@@ -1,6 +1,7 @@
-// Run state store — active runs, tool calls, file changes, output.
-// 参考: Kanna AgentCoordinator dual-Map (activeTurns + drainingStreams)
-// P0-1: Uses formal RunStateMachine from @/utils/runStateMachine for validated transitions.
+// Run UI store — client-only state for the active run session.
+// P0-1: Server data (outputText, toolCalls, changedFiles) removed —
+// those belong in TanStack Query (run metadata) and useChatMessages reducer (streaming).
+// RunState and AgentLoopState are formal state machine types from @/utils/runStateMachine.
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { RunState, RunStateMachine } from '@/utils/runStateMachine';
@@ -8,118 +9,110 @@ import { RunState, RunStateMachine } from '@/utils/runStateMachine';
 export type { RunState } from '@/utils/runStateMachine';
 export { RunState as RunPhase } from '@/utils/runStateMachine';
 
-export interface RunStateData {
-  runId: string;
-  status: RunState;
-  outputText: string;
-  toolCalls: Array<{ callId: string; toolName: string; status: string; timestamp: string }>;
-  changedFiles: Array<{ path: string; action: string; timestamp: string }>;
+export type AgentLoopState =
+  | 'NO_TASK'
+  | 'RUNNING'
+  | 'STREAMING'
+  | 'WAITING_FOR_INPUT'
+  | 'IDLE'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'CANCELLED';
+
+function agentLoopFromRunState(rs: RunState): AgentLoopState {
+  switch (rs) {
+    case RunState.RUNNING: return 'RUNNING';
+    case RunState.STREAMING: return 'STREAMING';
+    case RunState.WAITING_FOR_INPUT: return 'WAITING_FOR_INPUT';
+    case RunState.COMPLETED: return 'COMPLETED';
+    case RunState.FAILED: return 'FAILED';
+    case RunState.CANCELLED: return 'CANCELLED';
+    default: return 'NO_TASK';
+  }
 }
 
-interface RunStore {
-  currentRun: RunStateData | null;
+interface RunUIStore {
   isStreaming: boolean;
-  setCurrentRun: (run: RunStateData | null) => void;
-  /** Backward-compat: map legacy string → RunState, validate transition, then set. */
-  updateRunStatus: (status: string) => void;
-  /** Validate and perform a typed RunState transition. Returns false if rejected. */
-  transitionStatus: (to: RunState) => boolean;
-  appendOutput: (text: string) => void;
-  addToolCall: (tc: RunStateData['toolCalls'][number]) => void;
-  updateToolCallStatus: (callId: string, status: string) => void;
-  addFileChange: (fc: RunStateData['changedFiles'][number]) => void;
-  setIsStreaming: (v: boolean) => void;
+  currentRunId: string | null;
+  runState: AgentLoopState;
+  loopCount: number;
+  errorCount: number;
+  abortController: AbortController | null;
+  fileReadCache: Map<string, { readCount: number; mtime: number }>;
+
+  setRunState: (state: RunState) => void;
+  setStreaming: (v: boolean) => void;
+  setRun: (runId: string) => void;
+  incrementLoopCount: () => void;
+  incrementErrorCount: () => void;
+  setAbortController: (ctrl: AbortController | null) => void;
+  checkFileReadCache: (path: string, mtime: number) => boolean;
   clear: () => void;
 }
 
 const sm = new RunStateMachine();
 
-export const useRunStore = create<RunStore>()(
-  subscribeWithSelector((set) => ({
-    currentRun: null,
+export const useRunStore = create<RunUIStore>()(
+  subscribeWithSelector((set, get) => ({
     isStreaming: false,
+    currentRunId: null,
+    runState: 'NO_TASK',
+    loopCount: 0,
+    errorCount: 0,
+    abortController: null,
+    fileReadCache: new Map(),
 
-    setCurrentRun: (run) => {
-      // Sync the singleton state machine with the incoming run's status.
-      if (run && run.status !== sm.getState()) {
-        if (!sm.transition(run.status)) {
-          // Force-reset and transition for initial load / external sync
-          sm.reset();
-          sm.transition(run.status);
-        }
-      } else if (!run) {
-        sm.reset();
-      }
-      set({ currentRun: run });
-    },
-
-    updateRunStatus: (raw) => {
-      const mapped = RunStateMachine.fromLegacyStatus(raw);
-      const ok = sm.transition(mapped);
+    setRunState: (rs) => {
+      const ok = sm.transition(rs);
       if (!ok) {
-        console.warn(
-          `[runStore] updateRunStatus rejected: current=${sm.getState()} incoming="${raw}" mapped=${mapped}`,
-        );
+        console.warn(`[runStore] Invalid transition: ${sm.getState()} → ${rs}`);
       }
-      set((s) =>
-        s.currentRun ? { currentRun: { ...s.currentRun, status: mapped } } : {},
-      );
+      set({ runState: agentLoopFromRunState(rs), isStreaming: !sm.isTerminal() && rs !== RunState.IDLE });
     },
 
-    transitionStatus: (to) => {
-      const ok = sm.transition(to);
-      if (ok) {
-        set((s) =>
-          s.currentRun ? { currentRun: { ...s.currentRun, status: to } } : {},
-        );
-      } else {
-        console.warn(
-          `[runStore] transitionStatus rejected: ${sm.getState()} → ${to}`,
-        );
-      }
-      return ok;
+    setStreaming: (isStreaming) => set({ isStreaming }),
+
+    setRun: (runId) => {
+      sm.reset();
+      sm.transition(RunState.RUNNING);
+      set({ currentRunId: runId, runState: 'RUNNING', isStreaming: true, loopCount: 0, errorCount: 0 });
     },
 
-    appendOutput: (text) =>
-      set((s) =>
-        s.currentRun
-          ? { currentRun: { ...s.currentRun, outputText: s.currentRun.outputText + text } }
-          : {},
-      ),
+    incrementLoopCount: () => set((s) => ({ loopCount: s.loopCount + 1 })),
+    incrementErrorCount: () => set((s) => ({ errorCount: s.errorCount + 1 })),
 
-    addToolCall: (tc) =>
-      set((s) =>
-        s.currentRun
-          ? { currentRun: { ...s.currentRun, toolCalls: [...s.currentRun.toolCalls, tc] } }
-          : {},
-      ),
+    setAbortController: (ctrl) => {
+      const prev = get().abortController;
+      if (prev) prev.abort();
+      set({ abortController: ctrl });
+    },
 
-    updateToolCallStatus: (callId, status) =>
-      set((s) =>
-        s.currentRun
-          ? {
-              currentRun: {
-                ...s.currentRun,
-                toolCalls: s.currentRun.toolCalls.map((t) =>
-                  t.callId === callId ? { ...t, status } : t,
-                ),
-              },
-            }
-          : {},
-      ),
-
-    addFileChange: (fc) =>
-      set((s) =>
-        s.currentRun
-          ? { currentRun: { ...s.currentRun, changedFiles: [...s.currentRun.changedFiles, fc] } }
-          : {},
-      ),
-
-    setIsStreaming: (v) => set({ isStreaming: v }),
+    checkFileReadCache: (path, mtime) => {
+      const cached = get().fileReadCache.get(path);
+      if (cached && cached.mtime === mtime) {
+        set((s) => {
+          const next = new Map(s.fileReadCache);
+          next.set(path, { readCount: cached.readCount + 1, mtime });
+          return { fileReadCache: next };
+        });
+        return true;
+      }
+      return false;
+    },
 
     clear: () => {
       sm.reset();
-      set({ currentRun: null, isStreaming: false });
+      const ctrl = get().abortController;
+      if (ctrl) ctrl.abort();
+      set({
+        isStreaming: false,
+        currentRunId: null,
+        runState: 'NO_TASK',
+        loopCount: 0,
+        errorCount: 0,
+        abortController: null,
+        fileReadCache: new Map(),
+      });
     },
   })),
 );
