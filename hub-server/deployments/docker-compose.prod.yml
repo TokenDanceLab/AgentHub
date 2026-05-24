@@ -78,7 +78,7 @@ services:
   # ── Hub Server ─────────────────────────────
   hub-server:
     build:
-      context: ./hub-server
+      context: ..
       dockerfile: ./deployments/Dockerfile
     container_name: agenthub-hub
     restart: unless-stopped
