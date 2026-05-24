@@ -2,9 +2,9 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  min-width: 960px;
+  min-width: 0;
   overflow: hidden;
-  background: #f7f8fb;
+  background: #eef1f5;
   color: #172033;
   font-family:
     Inter,
@@ -13,13 +13,49 @@
     sans-serif;
 }
 
+/* ── Scrollbar ────────────────────────────── */
+/* Track hidden, thumb semi-transparent, smoothly opaque on drag */
+
+.root *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.root *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.root *::-webkit-scrollbar-thumb {
+  background: rgba(100, 120, 160, 0.32);
+  border-radius: 3px;
+  transition: background 0.3s ease;
+}
+
+.root *::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 120, 160, 0.55);
+}
+
+.root *::-webkit-scrollbar-thumb:active {
+  background: rgba(60, 80, 120, 0.8);
+}
+
+/* Firefox */
+.root * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 120, 160, 0.32) transparent;
+}
+
+.root *:hover {
+  scrollbar-color: rgba(100, 120, 160, 0.55) transparent;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 24px;
-  height: 56px;
-  padding: 0 20px;
-  border-bottom: 1px solid #d8deea;
+  gap: 14px;
+  height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid #d8dee8;
   background: #ffffff;
   flex-shrink: 0;
 }
@@ -40,10 +76,12 @@
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: #005faa;
+  background: linear-gradient(135deg, #2563eb, #0891b2);
   color: #ffffff;
   font-size: 12px;
+  font-weight: 800;
   letter-spacing: 0;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
 }
 
 .tabs {
@@ -56,28 +94,41 @@
 
 .tab,
 .activeTab {
-  height: 32px;
-  padding: 0 12px;
+  height: 30px;
+  padding: 0 9px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: #48556a;
+  color: #65758b;
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
   white-space: nowrap;
 }
 
+.tab[data-priority="secondary"] {
+  opacity: 0.72;
+}
+
 .tab:hover {
-  background: #eef3fa;
+  background: #f4f6f9;
   color: #172033;
+  opacity: 1;
 }
 
 .activeTab {
-  border-color: #b8c8dc;
-  background: #e8f1fb;
-  color: #004f90;
+  border-color: #b9cdf6;
+  background: #f3f7ff;
+  color: #1f6feb;
   font-weight: 700;
+}
+
+.activeTab[data-priority="primary"] {
+  border-color: #1f6feb;
+  background: #1f6feb;
+  color: #ffffff;
 }
 
 .preview {
@@ -88,4 +139,31 @@
 
 .preview iframe {
   height: 100% !important;
+}
+
+@media (max-width: 820px) {
+  .toolbar {
+    gap: 10px;
+    height: 48px;
+    padding: 0 12px;
+  }
+
+  .brand {
+    min-width: auto;
+  }
+
+  .brand span:last-child {
+    display: none;
+  }
+
+  .tabs {
+    flex: 1 1 auto;
+  }
+
+  .tab,
+  .activeTab {
+    height: 28px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
 }
