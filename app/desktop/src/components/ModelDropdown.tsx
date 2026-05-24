@@ -22,6 +22,7 @@ interface Props {
   disabled?: boolean;
   ariaLabel?: string;
   alignRight?: boolean;
+  variant?: 'default' | 'text';
 }
 
 function cleanModelName(name: string): string {
@@ -41,7 +42,7 @@ function AgentDot({ name }: { name: string }) {
   return <ModelIcon model={name} size={18} />;
 }
 
-export default function ModelDropdown({ options, value, onChange, placeholder, disabled, ariaLabel, alignRight }: Props) {
+export default function ModelDropdown({ options, value, onChange, placeholder, disabled, ariaLabel, alignRight, variant = 'default' }: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0, up: false, rightEdge: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -165,7 +166,8 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
 
   return (
     <div className={styles.container}>
-      <button ref={triggerRef} type="button" className={styles.trigger}
+      <button ref={triggerRef} type="button"
+        className={`${styles.trigger} ${variant === 'text' ? styles.triggerText : ''}`}
         onClick={() => open ? setOpen(false) : openDropdown()}
         disabled={disabled} aria-label={ariaLabel} aria-expanded={open}>
         <span className={styles.triggerLabel}>{displayLabel}</span>
