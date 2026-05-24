@@ -11,8 +11,8 @@ func TestNewBusDefaults(t *testing.T) {
 	if b == nil {
 		t.Fatal("expected non-nil bus")
 	}
-	if b.maxHistory != 10000 {
-		t.Errorf("default maxHistory = %d, want 10000", b.maxHistory)
+	if b.maxHistory != defaultMaxHistory {
+		t.Errorf("default maxHistory = %d, want %d", b.maxHistory, defaultMaxHistory)
 	}
 }
 
@@ -206,12 +206,12 @@ func TestCursorReplayAfterTrimSkipsTrimmedGap(t *testing.T) {
 func TestSlowSubscriberDrop(t *testing.T) {
 	b := NewBus(100)
 	// Create a subscriber with a tiny buffer so it drops.
-	// Subscribe returns a 256-buffer channel, so we can't easily test drops
-	// without filling it. Just verify publish doesn't block.
+	// Subscribe returns a buffered channel, so fill it past capacity to
+	// verify publish doesn't block.
 	_, ch, _ := b.Subscribe(0)
 
-	// Fill the channel buffer (256) + some extra.
-	for i := 0; i < 300; i++ {
+	publishCount := subscriberChannelBufferSize + 44
+	for i := 0; i < publishCount; i++ {
 		b.Publish("test", nil, i)
 	}
 
@@ -226,12 +226,11 @@ drain:
 			break drain
 		}
 	}
-	// We should have received at most 256 events (buffer size), not all 300.
-	if count > 256 {
-		t.Errorf("received %d events on slow sub, want <= 256 due to drops", count)
+	if count > subscriberChannelBufferSize {
+		t.Errorf("received %d events on slow sub, want <= %d due to drops", count, subscriberChannelBufferSize)
 	}
-	if got := b.DroppedCount(); got != int64(300-count) {
-		t.Errorf("DroppedCount() = %d, want %d", got, 300-count)
+	if got := b.DroppedCount(); got != int64(publishCount-count) {
+		t.Errorf("DroppedCount() = %d, want %d", got, publishCount-count)
 	}
 }
 
