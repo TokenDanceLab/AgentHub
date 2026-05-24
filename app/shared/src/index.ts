@@ -131,7 +131,38 @@ export {
 } from './apiClient';
 
 export { EventClient } from './eventClient';
-export type { EventListener, EventClientOptions } from './eventClient';
+export type {
+  EventClientOptions,
+  EventConnectionListener,
+  EventConnectionStatus,
+  EventListener,
+} from './eventClient';
+
+export {
+  createWorkbenchState,
+  initialWorkbenchState,
+  workbenchReducer,
+} from './workbenchState';
+export type {
+  WorkbenchAction,
+  WorkbenchConnectionStatus,
+  WorkbenchSnapshot,
+  WorkbenchState,
+} from './workbenchState';
+export {
+  getWorkbenchCatalogState,
+  getWorkbenchDataMode,
+  getWorkbenchSectionSource,
+  workbenchDataModeLabels,
+  workbenchDataModeTones,
+} from './workbenchDataMode';
+export type {
+  WorkbenchCatalogState,
+  WorkbenchCatalogTone,
+  WorkbenchDataMode,
+  WorkbenchSectionSource,
+  WorkbenchSectionSourceInput,
+} from './workbenchDataMode';
 
 export {
   mockProject,

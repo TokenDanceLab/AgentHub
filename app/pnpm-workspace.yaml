@@ -2,3 +2,5 @@ packages:
   - "shared"
   - "desktop"
   - "web"
+onlyBuiltDependencies:
+  - esbuild

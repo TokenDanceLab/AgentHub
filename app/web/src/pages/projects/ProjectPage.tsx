@@ -1,5 +1,26 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { mockProjects, mockRuns, mockWorkspaceFiles, mockRunners } from '@shared/index';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import {
+  listApprovals,
+  listArtifacts,
+  listPreviews,
+  listProjects,
+  listRunners,
+  listRuns,
+  listThreads,
+  mockProjects,
+  mockRuns,
+  mockWorkspaceFiles,
+  mockRunners,
+  getWorkbenchCatalogState,
+  getWorkbenchSectionSource,
+  workbenchReducer,
+  type Artifact,
+  type Project,
+  type Run,
+  type Runner,
+  type WorkbenchSectionSource,
+  type WorkbenchState,
+} from '@shared/index';
 
 type BoardView = 'overview' | 'tasks' | 'files';
 type TaskStatus = 'Done' | 'Active' | 'Next';
@@ -84,7 +105,7 @@ const initialFiles: FileItem[] = mockWorkspaceFiles.map((f) => ({
   name: f.path.split('/').pop() ?? f.path,
   type: (f.path.endsWith('.tsx') || f.path.endsWith('.ts') ? 'TSX' : 'DOC') as FileType,
   status: 'Edited',
-  detail: `${f.path} — ${(f.sizeBytes / 1024).toFixed(1)} KB, modified ${f.modifiedAt.slice(0, 10)}`,
+  detail: `${f.path} - ${(f.sizeBytes / 1024).toFixed(1)} KB, modified ${f.modifiedAt.slice(0, 10)}`,
 }));
 
 const initialRuns: RunRecord[] = mockRuns.map((run) => ({
@@ -97,8 +118,8 @@ const initialRuns: RunRecord[] = mockRuns.map((run) => ({
 const initialRisks: RiskItem[] = [
   {
     id: 'risk-no-api',
-    title: 'No live API yet',
-    detail: 'All data is static and safe for page coordination.',
+    title: 'Edge snapshot fallback',
+    detail: 'Live Edge data is preferred; mock preview data is shown only when that section has no snapshot data.',
     status: 'Open',
     reviewable: true,
   },
@@ -111,8 +132,8 @@ const initialRisks: RiskItem[] = [
   },
   {
     id: 'risk-local-only',
-    title: 'Local-only state',
-    detail: 'New tasks, risk review, filters, and sync runs reset after refresh.',
+    title: 'Local overlay state',
+    detail: 'New tasks, risk review, filters, and simulated sync runs stay local and reset after refresh.',
     status: 'Open',
     reviewable: true,
   },
@@ -135,6 +156,83 @@ const milestones = [
     status: 'Later',
   },
 ];
+
+const initialWorkbenchProjectionState: WorkbenchState = {
+  projects: [],
+  threads: [],
+  runners: [],
+  runs: [],
+  threadItems: [],
+  approvals: [],
+  artifacts: [],
+  previews: [],
+  runLogs: {},
+  connection: { status: 'idle' },
+  lastSeq: 0,
+};
+
+function formatError(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return String(error || 'Edge catalog unavailable');
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 2500): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error('Edge catalog did not respond.')), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+function projectFromApi(project: Project) {
+  return {
+    code: project.id.split('_').pop()?.toUpperCase().slice(0, 2) ?? project.id.slice(0, 2).toUpperCase(),
+    name: project.name,
+    detail: project.description ?? `Created ${project.createdAt.slice(0, 10)}`,
+    status: 'In progress' as const,
+  };
+}
+
+function taskFromRun(run: Run, index: number, runners: Runner[]): Task {
+  return {
+    id: `task-${run.runId}`,
+    title: `Run ${run.runId.split('_').pop()} on ${run.threadId}`,
+    owner: runners[index % Math.max(runners.length, 1)]?.name ?? 'Agent',
+    status: run.status === 'finished' ? 'Done' : run.status === 'running' || run.status === 'starting' ? 'Active' : 'Next',
+    detail: `Status: ${run.status}. Project: ${run.projectId}, Thread: ${run.threadId}`,
+  };
+}
+
+function fileFromArtifact(artifact: Artifact): FileItem {
+  const name = artifact.path.split('/').pop() ?? artifact.path;
+  return {
+    name,
+    type: artifact.path.endsWith('.tsx') || artifact.path.endsWith('.ts') ? 'TSX' : 'DOC',
+    status: artifact.kind,
+    detail: `${artifact.path} - ${(artifact.sizeBytes / 1024).toFixed(1)} KB, created ${artifact.createdAt.slice(0, 10)}`,
+  };
+}
+
+function runRecordFromApi(run: Run): RunRecord {
+  return {
+    id: run.runId,
+    status: run.status === 'finished' ? 'Pass' : run.status === 'running' || run.status === 'starting' ? 'Ready' : run.status === 'queued' ? 'Deferred' : 'Local',
+    detail: `Run on thread ${run.threadId}, project ${run.projectId}. Status: ${run.status}.`,
+    time: run.createdAt.slice(11, 16),
+  };
+}
+
+function SourceLabel({ source }: { source: WorkbenchSectionSource }) {
+  return <span className={`projectSourceLabel ${source.tone}`}>{source.label}</span>;
+}
 
 const pageStyles = `
   @import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap");
@@ -555,6 +653,14 @@ const pageStyles = `
     margin-bottom: 14px;
   }
 
+  .projectHeaderActions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
   .projectCardHeader h3 {
     margin: 0;
     font-size: 18px;
@@ -720,6 +826,52 @@ const pageStyles = `
     color: var(--warning-dot);
     border-color: rgba(217, 119, 6, 0.2);
     background: rgba(217, 119, 6, 0.12);
+  }
+
+  .projectPill.neutral {
+    color: var(--text-muted);
+    border-color: rgba(148, 163, 184, 0.25);
+    background: rgba(148, 163, 184, 0.12);
+  }
+
+  .projectSourceLabel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 4px 8px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 999px;
+    color: var(--text-muted);
+    background: rgba(148, 163, 184, 0.1);
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .projectSourceLabel.green {
+    color: var(--success);
+    border-color: rgba(5, 150, 105, 0.18);
+    background: var(--success-bg);
+  }
+
+  .projectSourceLabel.purple {
+    color: var(--accent);
+    border-color: rgba(124, 58, 237, 0.18);
+    background: rgba(124, 58, 237, 0.1);
+  }
+
+  .projectSourceLabel.amber {
+    color: var(--warning-dot);
+    border-color: rgba(217, 119, 6, 0.2);
+    background: rgba(217, 119, 6, 0.12);
+  }
+
+  .projectSourceLabel.cyan {
+    color: var(--accent);
+    border-color: rgba(8, 145, 178, 0.18);
+    background: rgba(8, 145, 178, 0.1);
   }
 
   .projectTaskRow,
@@ -1062,6 +1214,7 @@ function ProjectParticles() {
         if (!particle) {
           continue;
         }
+
         particle.x += particle.vx;
         particle.y += particle.vy;
 
@@ -1088,6 +1241,7 @@ function ProjectParticles() {
           if (!other) {
             continue;
           }
+
           const distance = Math.hypot(particle.x - other.x, particle.y - other.y);
           if (distance < 126) {
             context.beginPath();
@@ -1116,19 +1270,124 @@ function ProjectParticles() {
   return <canvas aria-hidden="true" className="projectParticles" ref={canvasRef} />;
 }
 
+function useWorkbenchProjection() {
+  const [state, dispatch] = useReducer(
+    workbenchReducer,
+    initialWorkbenchProjectionState,
+    (initialState) => workbenchReducer(initialState, { type: 'connection.loading' }),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSnapshot() {
+      dispatch({ type: 'connection.loading' });
+      try {
+        const [projects, threads, runners, runs, approvals, artifacts, previews] =
+          await withTimeout(Promise.all([
+            listProjects({ pageSize: 50 }),
+            listThreads({ pageSize: 50 }),
+            listRunners(),
+            listRuns({ pageSize: 50 }),
+            listApprovals(),
+            listArtifacts(),
+            listPreviews(),
+          ]));
+
+        if (cancelled) return;
+
+        dispatch({
+          type: 'snapshot.loaded',
+          snapshot: {
+            projects,
+            threads,
+            runners,
+            runs,
+            approvals,
+            artifacts,
+            previews,
+          },
+        });
+      } catch (error) {
+        if (!cancelled) {
+          dispatch({ type: 'connection.error', error: formatError(error) });
+        }
+      }
+    }
+
+    loadSnapshot();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return state;
+}
+
 export function ProjectPageInteractive() {
+  const workbenchState = useWorkbenchProjection();
+  const {
+    hasLiveCatalog,
+    label: catalogLabel,
+    message: catalogDetail,
+    mode: catalogMode,
+    tone: catalogTone,
+  } = getWorkbenchCatalogState(workbenchState);
+  const projectSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.projects.length > 0,
+  });
+  const fileSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.artifacts.length > 0,
+  });
+  const projectedProjects = hasLiveCatalog && workbenchState.projects.length
+    ? workbenchState.projects.map(projectFromApi)
+    : projects;
+  const projectedTasks = hasLiveCatalog && workbenchState.runs.length
+    ? workbenchState.runs.map((run, index) => taskFromRun(run, index, workbenchState.runners))
+    : initialTasks;
+  const projectedFiles = hasLiveCatalog && workbenchState.artifacts.length
+    ? workbenchState.artifacts.map(fileFromArtifact)
+    : initialFiles;
+  const projectedRuns = hasLiveCatalog && workbenchState.runs.length
+    ? workbenchState.runs.map(runRecordFromApi)
+    : initialRuns;
   const [activeView, setActiveView] = useState<BoardView>('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(false);
   const [taskForm, setTaskForm] = useState<TaskForm>(emptyTaskForm);
-  const [projectTasks, setProjectTasks] = useState<Task[]>(initialTasks);
-  const [projectRuns, setProjectRuns] = useState<RunRecord[]>(initialRuns);
+  const [localTasks, setLocalTasks] = useState<Task[]>([]);
+  const [localRuns, setLocalRuns] = useState<RunRecord[]>([]);
   const [projectRisks, setProjectRisks] = useState<RiskItem[]>(initialRisks);
   const [fileFilter, setFileFilter] = useState<FileFilter>('All');
   const [runFilter, setRunFilter] = useState<RunFilter>('All');
   const [lastSyncAt, setLastSyncAt] = useState('Not synced yet');
   const [syncStatus, setSyncStatus] = useState('Idle');
   const [notice, setNotice] = useState<Notice | null>(null);
+  const taskOverrides = useMemo(
+    () => new Map(localTasks.filter((task) => !task.id.startsWith('local-task-')).map((task) => [task.id, task])),
+    [localTasks],
+  );
+  const projectTasks = useMemo(
+    () => [
+      ...localTasks.filter((task) => task.id.startsWith('local-task-')),
+      ...projectedTasks.map((task) => taskOverrides.get(task.id) ?? task),
+    ],
+    [localTasks, projectedTasks, taskOverrides],
+  );
+  const projectRuns = useMemo(() => [...localRuns, ...projectedRuns], [localRuns, projectedRuns]);
+  const taskSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.runs.length > 0,
+    hasLocalDryRun: localTasks.length > 0,
+  });
+  const runSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.runs.length > 0,
+    hasLocalDryRun: localRuns.length > 0,
+  });
 
   const canSaveTask = taskForm.title.trim().length > 0 && taskForm.owner.trim().length > 0;
   const completedTaskCount = projectTasks.filter((task) => task.status === 'Done').length;
@@ -1141,8 +1400,8 @@ export function ProjectPageInteractive() {
   const allReviewableRisksClosed = reviewableRisks.every((risk) => risk.status === 'Reviewed');
 
   const filteredProjects = useMemo(
-    () => projects.filter((project) => matchesQuery([project.name, project.detail, project.status], searchTerm)),
-    [searchTerm],
+    () => projectedProjects.filter((project) => matchesQuery([project.name, project.detail, project.status], searchTerm)),
+    [projectedProjects, searchTerm],
   );
 
   const filteredTasks = useMemo(
@@ -1155,12 +1414,12 @@ export function ProjectPageInteractive() {
 
   const filteredFiles = useMemo(
     () =>
-      initialFiles.filter(
+      projectedFiles.filter(
         (file) =>
           (fileFilter === 'All' || file.type === fileFilter) &&
           matchesQuery([file.name, file.type, file.status, file.detail], searchTerm),
       ),
-    [fileFilter, searchTerm],
+    [fileFilter, projectedFiles, searchTerm],
   );
 
   const filteredRuns = useMemo(
@@ -1230,7 +1489,7 @@ export function ProjectPageInteractive() {
       detail: taskForm.detail.trim() || 'No additional note was added.',
     };
 
-    setProjectTasks((current) => [...current, newTask]);
+    setLocalTasks((current) => [newTask, ...current]);
     setTaskForm(emptyTaskForm);
     setIsTaskPanelOpen(false);
     setActiveView('tasks');
@@ -1249,16 +1508,21 @@ export function ProjectPageInteractive() {
 
     const nextStatus = nextTaskStatus(currentTask.status);
 
-    setProjectTasks((current) =>
-      current.map((task) =>
+    setLocalTasks((current) => {
+      const hasLocalTask = current.some((task) => task.id === taskId);
+      if (!hasLocalTask) {
+        return [...current, { ...currentTask, status: nextStatus }];
+      }
+
+      return current.map((task) =>
         task.id === taskId
           ? {
               ...task,
               status: nextStatus,
             }
           : task,
-      ),
-    );
+      );
+    });
 
     setNotice({
       tone: nextStatus === 'Done' ? 'success' : 'info',
@@ -1329,7 +1593,7 @@ export function ProjectPageInteractive() {
 
     setLastSyncAt(syncTime);
     setSyncStatus('Local sync complete');
-    setProjectRuns((current) => [syncRun, ...current]);
+    setLocalRuns((current) => [syncRun, ...current]);
     setRunFilter('All');
     setNotice({
       tone: 'info',
@@ -1371,8 +1635,8 @@ export function ProjectPageInteractive() {
           </nav>
 
           <div className="projectSidebarNote">
-            <strong>Project signal</strong>
-            <span>{activityPrompt}</span>
+            <strong>{catalogLabel}</strong>
+            <span>{catalogDetail} {activityPrompt}</span>
           </div>
         </aside>
 
@@ -1414,8 +1678,8 @@ export function ProjectPageInteractive() {
               <p className="projectEyebrow">Project detail</p>
               <h2>Workspace Preview Foundation</h2>
               <p>
-                Coordinate frontend preview pages, milestones, task readiness, design files, and dry-run records before
-                real API integration.
+                Coordinate frontend preview pages, milestones, task readiness, design files, and dry-run records with
+                clear live, offline snapshot, and mock fallback status.
               </p>
               <div className="projectButtonRow">
                 <button
@@ -1466,10 +1730,10 @@ export function ProjectPageInteractive() {
               </div>
               <div className="projectProgressCard">
                 <div className="projectStatusRow">
-                  <span>Sync status</span>
-                  <strong>{syncStatus}</strong>
+                  <span>Catalog status</span>
+                  <strong>{catalogLabel}</strong>
                 </div>
-                <p className="projectMuted">{lastSyncAt}</p>
+                <p className="projectMuted">{syncStatus} - {lastSyncAt}</p>
               </div>
             </div>
           </section>
@@ -1492,12 +1756,12 @@ export function ProjectPageInteractive() {
             <article className="projectMetric projectGlass">
               <span className="projectMetricIcon">FL</span>
               <div>
-                <strong>{initialFiles.length}</strong>
+                <strong>{projectedFiles.length}</strong>
                 <span>Shared files</span>
               </div>
             </article>
             <article className="projectMetric projectGlass">
-              <span className="projectMetricIcon">RN</span>
+              <span className={`projectPill ${catalogTone}`}>{catalogLabel}</span>
               <div>
                 <strong>{projectRuns.length}</strong>
                 <span>Dry runs</span>
@@ -1509,19 +1773,22 @@ export function ProjectPageInteractive() {
             <section className="projectPanel projectGlass">
               <div className="projectCardHeader">
                 <h3>{boardTitle}</h3>
-                <div className="projectTabs" role="tablist" aria-label="Project board sections">
-                  {(['overview', 'tasks', 'files'] as BoardView[]).map((view) => (
-                    <button
-                      aria-selected={activeView === view}
-                      className={activeView === view ? 'projectTab isActive' : 'projectTab'}
-                      key={view}
-                      onClick={() => setActiveView(view)}
-                      role="tab"
-                      type="button"
-                    >
-                      {viewLabels[view]}
-                    </button>
-                  ))}
+                <div className="projectHeaderActions">
+                  <SourceLabel source={activeView === 'tasks' ? taskSource : activeView === 'files' ? fileSource : projectSource} />
+                  <div className="projectTabs" role="tablist" aria-label="Project board sections">
+                    {(['overview', 'tasks', 'files'] as BoardView[]).map((view) => (
+                      <button
+                        aria-selected={activeView === view}
+                        className={activeView === view ? 'projectTab isActive' : 'projectTab'}
+                        key={view}
+                        onClick={() => setActiveView(view)}
+                        role="tab"
+                        type="button"
+                      >
+                        {viewLabels[view]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -1555,6 +1822,7 @@ export function ProjectPageInteractive() {
                     <span className="projectMuted">
                       {completedTaskCount} done / {projectTasks.length} total
                     </span>
+                    <SourceLabel source={taskSource} />
                     <button className="projectSecondaryButton" onClick={openTaskPanel} type="button">
                       New task
                     </button>
@@ -1591,6 +1859,7 @@ export function ProjectPageInteractive() {
                   <div className="projectFilterBar">
                     <div className="projectFilterGroup" aria-label="File type filters">
                       <span className="projectFilterLabel">Files</span>
+                      <SourceLabel source={fileSource} />
                       {fileFilters.map((filter) => (
                         <button
                           className={fileFilter === filter ? 'projectMiniButton isActive' : 'projectMiniButton'}
@@ -1604,6 +1873,7 @@ export function ProjectPageInteractive() {
                     </div>
                     <div className="projectFilterGroup" aria-label="Run status filters">
                       <span className="projectFilterLabel">Runs</span>
+                      <SourceLabel source={runSource} />
                       {runFilters.map((filter) => (
                         <button
                           className={runFilter === filter ? 'projectMiniButton isActive' : 'projectMiniButton'}
