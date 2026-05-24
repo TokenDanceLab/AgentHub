@@ -63,7 +63,8 @@ describe('RegisterForm', () => {
     renderForm();
     fireEvent.click(screen.getByText('auth.registerButton'));
 
-    expect(screen.getByText('auth.error.required')).toBeInTheDocument();
+    const requiredErrors = screen.getAllByText('auth.error.required');
+    expect(requiredErrors.length).toBeGreaterThanOrEqual(2);
     expect(mockRegister).not.toHaveBeenCalled();
   });
 
