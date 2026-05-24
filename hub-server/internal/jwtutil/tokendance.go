@@ -131,8 +131,14 @@ func parseJWKKey(k *jwkKey) (*rsa.PublicKey, error) {
 
 // ParseTokenDanceJWT validates a TokenDance ID-issued RS256 JWT.
 // It fetches the JWKS from the configured endpoint, finds the matching key by kid,
-// and verifies the signature and standard claims (iss, exp).
-func ParseTokenDanceJWT(tokenString string) (*TokenDanceClaims, error) {
+// and verifies signature, issuer, audience, and standard time claims.
+func ParseTokenDanceJWT(tokenString, expectedIssuer, expectedAudience string) (*TokenDanceClaims, error) {
+	if expectedIssuer == "" {
+		return nil, fmt.Errorf("expected issuer is required")
+	}
+	if expectedAudience == "" {
+		return nil, fmt.Errorf("expected audience is required")
+	}
 	if err := defaultJWKSCache.fetchJWKS(); err != nil {
 		return nil, err
 	}
@@ -168,12 +174,19 @@ func ParseTokenDanceJWT(tokenString string) (*TokenDanceClaims, error) {
 
 	// Second pass: full verification with the correct key.
 	claims := &TokenDanceClaims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-		}
-		return pubKey, nil
-	})
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		claims,
+		func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			}
+			return pubKey, nil
+		},
+		jwt.WithIssuer(expectedIssuer),
+		jwt.WithAudience(expectedAudience),
+		jwt.WithLeeway(30*time.Second),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("token verification failed: %w", err)
 	}

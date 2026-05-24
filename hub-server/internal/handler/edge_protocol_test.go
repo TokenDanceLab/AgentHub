@@ -35,6 +35,7 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 	deviceRegistered := false
 	taskCreated := false
 	taskAcked := false
+	ackedRunID := ""
 	streamChunks := make([]string, 0)
 	taskDone := false
 
@@ -71,9 +72,10 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 		addAgentFn: func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
 			return nil
 		},
-		handleAckFn: func(ctx context.Context, taskID string) error {
+		handleAckFn: func(ctx context.Context, taskID, edgeRunID string) error {
 			mu.Lock()
 			taskAcked = true
+			ackedRunID = edgeRunID
 			mu.Unlock()
 			return nil
 		},
@@ -138,7 +140,9 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 	})
 
 	t.Run("Stage3_EdgeAck", func(t *testing.T) {
-		c, w := newGinCtx("POST", "/edge/agent-tasks/task-001/ack", nil)
+		c, w := newGinCtx("POST", "/edge/agent-tasks/task-001/ack", map[string]string{
+			"run_id": "run-edge-001",
+		})
 		// Edge routes have Gin params parsed via router; set Param manually
 		c.Params = []gin.Param{{Key: "id", Value: "task-001"}}
 		agentHandler.TaskAck(c)
@@ -148,6 +152,9 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 
 		if !taskAcked {
 			t.Fatal("task should have been acked")
+		}
+		if ackedRunID != "run-edge-001" {
+			t.Fatalf("ack edge run id = %q, want run-edge-001", ackedRunID)
 		}
 	})
 
@@ -280,7 +287,7 @@ func TestEdgeHubProtocol_TaskLifecycleStateMachine(t *testing.T) {
 				Status: model.TaskStatusDispatched,
 			}, nil
 		},
-		handleAckFn: func(ctx context.Context, taskID string) error {
+		handleAckFn: func(ctx context.Context, taskID, edgeRunID string) error {
 			recordState(model.TaskStatusRunning)
 			return nil
 		},
@@ -334,7 +341,7 @@ type mockAgentService struct {
 	triggerTaskFn  func(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error)
 	addAgentFn     func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
 	cancelTaskFn   func(ctx context.Context, userID, taskID string) error
-	handleAckFn    func(ctx context.Context, taskID string) error
+	handleAckFn    func(ctx context.Context, taskID, edgeRunID string) error
 	handleStreamFn func(ctx context.Context, taskID, content string) error
 	handleDoneFn   func(ctx context.Context, taskID, finalContent string) error
 	handleFailFn   func(ctx context.Context, taskID, errMsg string) error
@@ -358,9 +365,9 @@ func (m *mockAgentService) CancelTask(ctx context.Context, userID, taskID string
 	}
 	return nil
 }
-func (m *mockAgentService) HandleTaskAck(ctx context.Context, taskID string) error {
+func (m *mockAgentService) HandleTaskAck(ctx context.Context, taskID, edgeRunID string) error {
 	if m.handleAckFn != nil {
-		return m.handleAckFn(ctx, taskID)
+		return m.handleAckFn(ctx, taskID, edgeRunID)
 	}
 	return nil
 }

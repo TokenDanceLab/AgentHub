@@ -40,6 +40,27 @@ func (m *mockAgentCache) AllocateSeq(ctx context.Context, sessionID string) (int
 	return m.seq, m.err
 }
 
+func TestHandleTaskAckPersistsEdgeRunID(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	taskID := "task-ack-1"
+	edgeRunID := "run-edge-1"
+
+	mock.ExpectQuery(sqlmPendingTask).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "agent_instance_id", "triggered_by_user_id", "trigger_message_id", "status", "edge_run_id", "expire_at",
+		}).AddRow(taskID, "agent-1", "user-1", "msg-1", model.TaskStatusDispatched, "", time.Now().Add(time.Hour)))
+
+	mock.ExpectExec(sqlmUpdateTask).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	svc := &AgentService{db: db}
+	require.NoError(t, svc.HandleTaskAck(context.Background(), taskID, edgeRunID))
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestCancelTaskPublishesResolvedSessionID(t *testing.T) {
 	db, mock, sqlDB := newMockDB(t)
 	defer sqlDB.Close()
