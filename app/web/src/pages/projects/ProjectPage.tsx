@@ -1,5 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { mockProjects, mockRuns, mockWorkspaceFiles, mockRunners } from '@shared/index';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import {
+  listApprovals,
+  listArtifacts,
+  listPreviews,
+  listProjects,
+  listRunners,
+  listRuns,
+  listThreads,
+  mockProjects,
+  mockRuns,
+  mockWorkspaceFiles,
+  mockRunners,
+  workbenchReducer,
+  type Artifact,
+  type Project,
+  type Run,
+  type Runner,
+  type WorkbenchState,
+} from '@shared/index';
 
 type BoardView = 'overview' | 'tasks' | 'files';
 type TaskStatus = 'Done' | 'Active' | 'Next';
@@ -50,6 +68,8 @@ type Notice = {
   message: string;
 };
 
+type DataMode = 'loading' | 'live' | 'offline-snapshot' | 'mock' | 'unavailable';
+
 const viewLabels: Record<BoardView, string> = {
   overview: 'Overview',
   tasks: 'Tasks',
@@ -84,7 +104,7 @@ const initialFiles: FileItem[] = mockWorkspaceFiles.map((f) => ({
   name: f.path.split('/').pop() ?? f.path,
   type: (f.path.endsWith('.tsx') || f.path.endsWith('.ts') ? 'TSX' : 'DOC') as FileType,
   status: 'Edited',
-  detail: `${f.path} — ${(f.sizeBytes / 1024).toFixed(1)} KB, modified ${f.modifiedAt.slice(0, 10)}`,
+  detail: `${f.path} - ${(f.sizeBytes / 1024).toFixed(1)} KB, modified ${f.modifiedAt.slice(0, 10)}`,
 }));
 
 const initialRuns: RunRecord[] = mockRuns.map((run) => ({
@@ -97,8 +117,8 @@ const initialRuns: RunRecord[] = mockRuns.map((run) => ({
 const initialRisks: RiskItem[] = [
   {
     id: 'risk-no-api',
-    title: 'No live API yet',
-    detail: 'All data is static and safe for page coordination.',
+    title: 'Edge snapshot fallback',
+    detail: 'Live Edge data is preferred; mock preview data is shown only when no snapshot is available.',
     status: 'Open',
     reviewable: true,
   },
@@ -111,8 +131,8 @@ const initialRisks: RiskItem[] = [
   },
   {
     id: 'risk-local-only',
-    title: 'Local-only state',
-    detail: 'New tasks, risk review, filters, and sync runs reset after refresh.',
+    title: 'Local overlay state',
+    detail: 'New tasks, risk review, filters, and simulated sync runs stay local and reset after refresh.',
     status: 'Open',
     reviewable: true,
   },
@@ -135,6 +155,115 @@ const milestones = [
     status: 'Later',
   },
 ];
+
+const initialWorkbenchProjectionState: WorkbenchState = {
+  projects: [],
+  threads: [],
+  runners: [],
+  runs: [],
+  threadItems: [],
+  approvals: [],
+  artifacts: [],
+  previews: [],
+  runLogs: {},
+  connection: { status: 'idle' },
+  lastSeq: 0,
+};
+
+function formatError(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return String(error || 'Edge catalog unavailable');
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 2500): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error('Edge catalog did not respond.')), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+function dataModeFromState(state: WorkbenchState): DataMode {
+  const hasSnapshot =
+    state.projects.length > 0 ||
+    state.threads.length > 0 ||
+    state.runners.length > 0 ||
+    state.runs.length > 0 ||
+    state.artifacts.length > 0 ||
+    state.approvals.length > 0 ||
+    state.previews.length > 0;
+
+  if (state.connection.status === 'loading') return 'loading';
+  if (state.connection.status === 'connected' && hasSnapshot) return 'live';
+  if ((state.connection.status === 'disconnected' || state.connection.status === 'error') && hasSnapshot) {
+    return 'offline-snapshot';
+  }
+  if (state.connection.status === 'error' || state.connection.status === 'disconnected') return 'mock';
+  return 'unavailable';
+}
+
+function dataModeLabel(mode: DataMode) {
+  switch (mode) {
+    case 'loading':
+      return 'Loading catalog';
+    case 'live':
+      return 'Live';
+    case 'offline-snapshot':
+      return 'Offline snapshot';
+    case 'mock':
+      return 'Mock fallback';
+    case 'unavailable':
+      return 'Snapshot unavailable';
+    default:
+      return 'Snapshot unavailable';
+  }
+}
+
+function projectFromApi(project: Project) {
+  return {
+    code: project.id.split('_').pop()?.toUpperCase().slice(0, 2) ?? project.id.slice(0, 2).toUpperCase(),
+    name: project.name,
+    detail: project.description ?? `Created ${project.createdAt.slice(0, 10)}`,
+    status: 'In progress' as const,
+  };
+}
+
+function taskFromRun(run: Run, index: number, runners: Runner[]): Task {
+  return {
+    id: `task-${run.runId}`,
+    title: `Run ${run.runId.split('_').pop()} on ${run.threadId}`,
+    owner: runners[index % Math.max(runners.length, 1)]?.name ?? 'Agent',
+    status: run.status === 'finished' ? 'Done' : run.status === 'running' || run.status === 'starting' ? 'Active' : 'Next',
+    detail: `Status: ${run.status}. Project: ${run.projectId}, Thread: ${run.threadId}`,
+  };
+}
+
+function fileFromArtifact(artifact: Artifact): FileItem {
+  const name = artifact.path.split('/').pop() ?? artifact.path;
+  return {
+    name,
+    type: artifact.path.endsWith('.tsx') || artifact.path.endsWith('.ts') ? 'TSX' : 'DOC',
+    status: artifact.kind,
+    detail: `${artifact.path} - ${(artifact.sizeBytes / 1024).toFixed(1)} KB, created ${artifact.createdAt.slice(0, 10)}`,
+  };
+}
+
+function runRecordFromApi(run: Run): RunRecord {
+  return {
+    id: run.runId,
+    status: run.status === 'finished' ? 'Pass' : run.status === 'running' || run.status === 'starting' ? 'Ready' : run.status === 'queued' ? 'Deferred' : 'Local',
+    detail: `Run on thread ${run.threadId}, project ${run.projectId}. Status: ${run.status}.`,
+    time: run.createdAt.slice(11, 16),
+  };
+}
 
 const pageStyles = `
   @import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap");
@@ -722,6 +851,12 @@ const pageStyles = `
     background: rgba(217, 119, 6, 0.12);
   }
 
+  .projectPill.neutral {
+    color: var(--text-muted);
+    border-color: rgba(148, 163, 184, 0.25);
+    background: rgba(148, 163, 184, 0.12);
+  }
+
   .projectTaskRow,
   .projectFileRow,
   .projectRunRow {
@@ -1118,19 +1253,113 @@ function ProjectParticles() {
   return <canvas aria-hidden="true" className="projectParticles" ref={canvasRef} />;
 }
 
+function useWorkbenchProjection() {
+  const [state, dispatch] = useReducer(
+    workbenchReducer,
+    initialWorkbenchProjectionState,
+    (initialState) => workbenchReducer(initialState, { type: 'connection.loading' }),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSnapshot() {
+      dispatch({ type: 'connection.loading' });
+      try {
+        const [projects, threads, runners, runs, approvals, artifacts, previews] =
+          await withTimeout(Promise.all([
+            listProjects({ pageSize: 50 }),
+            listThreads({ pageSize: 50 }),
+            listRunners(),
+            listRuns({ pageSize: 50 }),
+            listApprovals(),
+            listArtifacts(),
+            listPreviews(),
+          ]));
+
+        if (cancelled) return;
+
+        dispatch({
+          type: 'snapshot.loaded',
+          snapshot: {
+            projects,
+            threads,
+            runners,
+            runs,
+            approvals,
+            artifacts,
+            previews,
+          },
+        });
+      } catch (error) {
+        if (!cancelled) {
+          dispatch({ type: 'connection.error', error: formatError(error) });
+        }
+      }
+    }
+
+    loadSnapshot();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return state;
+}
+
 export function ProjectPageInteractive() {
+  const workbenchState = useWorkbenchProjection();
+  const dataMode = dataModeFromState(workbenchState);
+  const hasLiveCatalog = dataMode === 'live' || dataMode === 'offline-snapshot';
+  const catalogLabel = dataModeLabel(dataMode);
+  const catalogTone = dataMode === 'live' ? 'green' : dataMode === 'loading' ? 'cyan' : dataMode === 'offline-snapshot' ? 'purple' : dataMode === 'mock' ? 'amber' : 'neutral';
+  const catalogDetail =
+    dataMode === 'live'
+      ? 'Project catalog is loaded from Edge.'
+      : dataMode === 'offline-snapshot'
+        ? 'Edge is offline; preserving the last reducer snapshot.'
+        : dataMode === 'mock'
+          ? `Edge catalog unavailable: ${workbenchState.connection.error ?? 'no snapshot loaded'}. Showing mock demo data.`
+          : dataMode === 'loading'
+            ? 'Loading Edge catalog snapshot...'
+            : 'No Edge snapshot is available yet.';
+  const projectedProjects = hasLiveCatalog && workbenchState.projects.length
+    ? workbenchState.projects.map(projectFromApi)
+    : projects;
+  const projectedTasks = hasLiveCatalog && workbenchState.runs.length
+    ? workbenchState.runs.map((run, index) => taskFromRun(run, index, workbenchState.runners))
+    : initialTasks;
+  const projectedFiles = hasLiveCatalog && workbenchState.artifacts.length
+    ? workbenchState.artifacts.map(fileFromArtifact)
+    : initialFiles;
+  const projectedRuns = hasLiveCatalog && workbenchState.runs.length
+    ? workbenchState.runs.map(runRecordFromApi)
+    : initialRuns;
   const [activeView, setActiveView] = useState<BoardView>('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(false);
   const [taskForm, setTaskForm] = useState<TaskForm>(emptyTaskForm);
-  const [projectTasks, setProjectTasks] = useState<Task[]>(initialTasks);
-  const [projectRuns, setProjectRuns] = useState<RunRecord[]>(initialRuns);
+  const [localTasks, setLocalTasks] = useState<Task[]>([]);
+  const [localRuns, setLocalRuns] = useState<RunRecord[]>([]);
   const [projectRisks, setProjectRisks] = useState<RiskItem[]>(initialRisks);
   const [fileFilter, setFileFilter] = useState<FileFilter>('All');
   const [runFilter, setRunFilter] = useState<RunFilter>('All');
   const [lastSyncAt, setLastSyncAt] = useState('Not synced yet');
   const [syncStatus, setSyncStatus] = useState('Idle');
   const [notice, setNotice] = useState<Notice | null>(null);
+  const taskOverrides = useMemo(
+    () => new Map(localTasks.filter((task) => !task.id.startsWith('local-task-')).map((task) => [task.id, task])),
+    [localTasks],
+  );
+  const projectTasks = useMemo(
+    () => [
+      ...localTasks.filter((task) => task.id.startsWith('local-task-')),
+      ...projectedTasks.map((task) => taskOverrides.get(task.id) ?? task),
+    ],
+    [localTasks, projectedTasks, taskOverrides],
+  );
+  const projectRuns = useMemo(() => [...localRuns, ...projectedRuns], [localRuns, projectedRuns]);
 
   const canSaveTask = taskForm.title.trim().length > 0 && taskForm.owner.trim().length > 0;
   const completedTaskCount = projectTasks.filter((task) => task.status === 'Done').length;
@@ -1143,8 +1372,8 @@ export function ProjectPageInteractive() {
   const allReviewableRisksClosed = reviewableRisks.every((risk) => risk.status === 'Reviewed');
 
   const filteredProjects = useMemo(
-    () => projects.filter((project) => matchesQuery([project.name, project.detail, project.status], searchTerm)),
-    [searchTerm],
+    () => projectedProjects.filter((project) => matchesQuery([project.name, project.detail, project.status], searchTerm)),
+    [projectedProjects, searchTerm],
   );
 
   const filteredTasks = useMemo(
@@ -1157,12 +1386,12 @@ export function ProjectPageInteractive() {
 
   const filteredFiles = useMemo(
     () =>
-      initialFiles.filter(
+      projectedFiles.filter(
         (file) =>
           (fileFilter === 'All' || file.type === fileFilter) &&
           matchesQuery([file.name, file.type, file.status, file.detail], searchTerm),
       ),
-    [fileFilter, searchTerm],
+    [fileFilter, projectedFiles, searchTerm],
   );
 
   const filteredRuns = useMemo(
@@ -1232,7 +1461,7 @@ export function ProjectPageInteractive() {
       detail: taskForm.detail.trim() || 'No additional note was added.',
     };
 
-    setProjectTasks((current) => [...current, newTask]);
+    setLocalTasks((current) => [newTask, ...current]);
     setTaskForm(emptyTaskForm);
     setIsTaskPanelOpen(false);
     setActiveView('tasks');
@@ -1251,16 +1480,21 @@ export function ProjectPageInteractive() {
 
     const nextStatus = nextTaskStatus(currentTask.status);
 
-    setProjectTasks((current) =>
-      current.map((task) =>
+    setLocalTasks((current) => {
+      const hasLocalTask = current.some((task) => task.id === taskId);
+      if (!hasLocalTask) {
+        return [...current, { ...currentTask, status: nextStatus }];
+      }
+
+      return current.map((task) =>
         task.id === taskId
           ? {
               ...task,
               status: nextStatus,
             }
           : task,
-      ),
-    );
+      );
+    });
 
     setNotice({
       tone: nextStatus === 'Done' ? 'success' : 'info',
@@ -1331,7 +1565,7 @@ export function ProjectPageInteractive() {
 
     setLastSyncAt(syncTime);
     setSyncStatus('Local sync complete');
-    setProjectRuns((current) => [syncRun, ...current]);
+    setLocalRuns((current) => [syncRun, ...current]);
     setRunFilter('All');
     setNotice({
       tone: 'info',
@@ -1373,8 +1607,8 @@ export function ProjectPageInteractive() {
           </nav>
 
           <div className="projectSidebarNote">
-            <strong>Project signal</strong>
-            <span>{activityPrompt}</span>
+            <strong>{catalogLabel}</strong>
+            <span>{catalogDetail} {activityPrompt}</span>
           </div>
         </aside>
 
@@ -1416,8 +1650,8 @@ export function ProjectPageInteractive() {
               <p className="projectEyebrow">Project detail</p>
               <h2>Workspace Preview Foundation</h2>
               <p>
-                Coordinate frontend preview pages, milestones, task readiness, design files, and dry-run records before
-                real API integration.
+                Coordinate frontend preview pages, milestones, task readiness, design files, and dry-run records with
+                clear live, offline snapshot, and mock fallback status.
               </p>
               <div className="projectButtonRow">
                 <button
@@ -1468,10 +1702,10 @@ export function ProjectPageInteractive() {
               </div>
               <div className="projectProgressCard">
                 <div className="projectStatusRow">
-                  <span>Sync status</span>
-                  <strong>{syncStatus}</strong>
+                  <span>Catalog status</span>
+                  <strong>{catalogLabel}</strong>
                 </div>
-                <p className="projectMuted">{lastSyncAt}</p>
+                <p className="projectMuted">{syncStatus} - {lastSyncAt}</p>
               </div>
             </div>
           </section>
@@ -1494,12 +1728,12 @@ export function ProjectPageInteractive() {
             <article className="projectMetric projectGlass">
               <span className="projectMetricIcon">FL</span>
               <div>
-                <strong>{initialFiles.length}</strong>
+                <strong>{projectedFiles.length}</strong>
                 <span>Shared files</span>
               </div>
             </article>
             <article className="projectMetric projectGlass">
-              <span className="projectMetricIcon">RN</span>
+              <span className={`projectPill ${catalogTone}`}>{catalogLabel}</span>
               <div>
                 <strong>{projectRuns.length}</strong>
                 <span>Dry runs</span>

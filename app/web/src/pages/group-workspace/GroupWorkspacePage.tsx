@@ -1,5 +1,22 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import { mockRunners, mockRuns, mockWorkspaceFiles, MockEventStream, playRunLifecycle } from '@shared/index';
+import { useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import {
+  listApprovals,
+  listArtifacts,
+  listPreviews,
+  listProjects,
+  listRunners,
+  listRuns,
+  listThreads,
+  mockRunners,
+  mockRuns,
+  mockWorkspaceFiles,
+  workbenchReducer,
+  MockEventStream,
+  playRunLifecycle,
+  type Run,
+  type Runner,
+  type WorkbenchState,
+} from '@shared/index';
 
 type TaskStatus = "backlog" | "active" | "review";
 type ApprovalState = "pending" | "approved" | "changes";
@@ -52,6 +69,8 @@ type Confirmation = {
   title: string;
   tone: ConfirmationTone;
 };
+
+type DataMode = "loading" | "live" | "offline-snapshot" | "mock" | "unavailable";
 
 const accentPalette = ["blue", "purple", "teal", "cyan"] as const;
 const fileAccentPalette = ["cyan", "purple", "teal", "blue"] as const;
@@ -107,6 +126,108 @@ const presenceLabels: Record<MemberPresence, string> = {
   busy: "Busy",
   offline: "Offline",
 };
+
+const initialWorkbenchProjectionState: WorkbenchState = {
+  projects: [],
+  threads: [],
+  runners: [],
+  runs: [],
+  threadItems: [],
+  approvals: [],
+  artifacts: [],
+  previews: [],
+  runLogs: {},
+  connection: { status: 'idle' },
+  lastSeq: 0,
+};
+
+function formatError(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return String(error || 'Edge catalog unavailable');
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 2500): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error('Edge catalog did not respond.')), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+function dataModeFromState(state: WorkbenchState): DataMode {
+  const hasSnapshot =
+    state.projects.length > 0 ||
+    state.threads.length > 0 ||
+    state.runners.length > 0 ||
+    state.runs.length > 0 ||
+    state.artifacts.length > 0 ||
+    state.approvals.length > 0 ||
+    state.previews.length > 0;
+
+  if (state.connection.status === 'loading') return 'loading';
+  if (state.connection.status === 'connected' && hasSnapshot) return 'live';
+  if ((state.connection.status === 'disconnected' || state.connection.status === 'error') && hasSnapshot) {
+    return 'offline-snapshot';
+  }
+  if (state.connection.status === 'error' || state.connection.status === 'disconnected') return 'mock';
+  return 'unavailable';
+}
+
+function dataModeLabel(mode: DataMode) {
+  switch (mode) {
+    case 'loading':
+      return 'Loading catalog';
+    case 'live':
+      return 'Live';
+    case 'offline-snapshot':
+      return 'Offline snapshot';
+    case 'mock':
+      return 'Mock fallback';
+    case 'unavailable':
+      return 'Snapshot unavailable';
+    default:
+      return 'Snapshot unavailable';
+  }
+}
+
+function memberFromRunner(runner: Runner, index: number): Member {
+  return {
+    initials: runner.name.split(' ').map((word) => word[0]).join('').toUpperCase().slice(0, 2) || 'AG',
+    name: runner.name,
+    role: runner.capabilities ?? 'Runner registered',
+    accent: accentPalette[index % accentPalette.length] ?? 'blue',
+    presence: runner.status === 'online' ? 'online' : 'offline',
+  };
+}
+
+function taskFromRun(run: Run, index: number, runners: Runner[]): WorkspaceTask {
+  return {
+    id: run.runId,
+    title: `Run ${run.runId.split('_').pop()} - ${run.status}`,
+    summary: `Thread: ${run.threadId}, Project: ${run.projectId}`,
+    owner: runners[index % Math.max(runners.length, 1)]?.name ?? 'Unassigned',
+    status: run.status === 'finished' ? 'review' : run.status === 'running' || run.status === 'starting' ? 'active' : 'backlog',
+    tag: run.status === 'running' || run.status === 'starting' ? 'Active' : run.status === 'finished' ? 'Done' : 'Queue',
+    progress: run.status === 'finished' ? 100 : run.status === 'running' || run.status === 'starting' ? 65 : 15,
+  };
+}
+
+function activityFromRun(run: Run, index: number, runners: Runner[]): ActivityItem {
+  return {
+    title: `${runners[index % Math.max(runners.length, 1)]?.name ?? 'Agent'} - run.${run.status}`,
+    detail: `Run on thread ${run.threadId}: ${run.status === 'finished' ? 'Completed successfully' : run.status === 'running' ? 'Executing...' : 'Waiting in queue'}`,
+    time: run.createdAt.slice(11, 16),
+    accent: activityAccentPalette[index % activityAccentPalette.length] ?? 'cyan',
+  };
+}
 
 const styles = `
   @import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap");
@@ -473,6 +594,18 @@ const styles = `
   border-color: rgba(31,155,100,0.25);
   background: rgba(31,155,100,0.15);
   color: var(--gwr-green);
+}
+
+.gwr-pill.amber {
+  border-color: rgba(217,122,23,0.3);
+  background: rgba(217,122,23,0.15);
+  color: var(--gwr-orange);
+}
+
+.gwr-pill.neutral {
+  border-color: rgba(102,112,133,0.25);
+  background: rgba(102,112,133,0.12);
+  color: var(--gwr-muted);
 }
 
 .gwr-dot {
@@ -981,8 +1114,78 @@ function MemberAvatar({ member }: { member: Member }) {
   return <span className={className}>{member.initials}</span>;
 }
 
+function useWorkbenchProjection() {
+  const [state, dispatch] = useReducer(
+    workbenchReducer,
+    initialWorkbenchProjectionState,
+    (initialState) => workbenchReducer(initialState, { type: 'connection.loading' }),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSnapshot() {
+      dispatch({ type: 'connection.loading' });
+      try {
+        const [projects, threads, runners, runs, approvals, artifacts, previews] =
+          await withTimeout(Promise.all([
+            listProjects({ pageSize: 50 }),
+            listThreads({ pageSize: 50 }),
+            listRunners(),
+            listRuns({ pageSize: 50 }),
+            listApprovals(),
+            listArtifacts(),
+            listPreviews(),
+          ]));
+
+        if (cancelled) return;
+
+        dispatch({
+          type: 'snapshot.loaded',
+          snapshot: {
+            projects,
+            threads,
+            runners,
+            runs,
+            approvals,
+            artifacts,
+            previews,
+          },
+        });
+      } catch (error) {
+        if (!cancelled) {
+          dispatch({ type: 'connection.error', error: formatError(error) });
+        }
+      }
+    }
+
+    loadSnapshot();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return state;
+}
+
 export function GroupWorkspacePageInteractive() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const workbenchState = useWorkbenchProjection();
+  const dataMode = dataModeFromState(workbenchState);
+  const hasLiveCatalog = dataMode === 'live' || dataMode === 'offline-snapshot';
+  const catalogLabel = dataModeLabel(dataMode);
+  const catalogTone = dataMode === 'live' ? 'green' : dataMode === 'loading' ? 'cyan' : dataMode === 'offline-snapshot' ? 'purple' : dataMode === 'mock' ? 'amber' : 'neutral';
+  const catalogDetail =
+    dataMode === 'live'
+      ? 'Catalog data is loaded from Edge.'
+      : dataMode === 'offline-snapshot'
+        ? 'Edge is offline; preserving the last loaded reducer snapshot.'
+        : dataMode === 'mock'
+          ? `Edge catalog unavailable: ${workbenchState.connection.error ?? 'no snapshot loaded'}. Showing mock demo data.`
+          : dataMode === 'loading'
+            ? 'Loading Edge catalog snapshot...'
+            : 'No Edge snapshot is available yet.';
   const [approval, setApproval] = useState<ApprovalState>("pending");
   const [taskOwner, setTaskOwner] = useState("Xavier");
   const [syncState, setSyncState] = useState<SyncState>({
@@ -1004,6 +1207,14 @@ export function GroupWorkspacePageInteractive() {
 
   useParticleCanvas(canvasRef);
 
+  useEffect(() => {
+    if (!hasLiveCatalog || workbenchState.runners.length === 0) {
+      return;
+    }
+
+    setWorkspaceMembers(workbenchState.runners.map(memberFromRunner));
+  }, [hasLiveCatalog, workbenchState.runners]);
+
   const nowLabel = () =>
     new Date().toLocaleTimeString([], {
       hour: "2-digit",
@@ -1018,7 +1229,7 @@ export function GroupWorkspacePageInteractive() {
     setActivityLog((current) => [{ ...activity, time: nowLabel() }, ...current].slice(0, 8));
   };
 
-  // Mock event stream — feeds simulated run lifecycle into activity log.
+  // Mock event stream feeds a simulated run lifecycle into the demo activity log.
   useEffect(() => {
     const stream = new MockEventStream();
     const unsub = stream.on((event) => {
@@ -1051,10 +1262,22 @@ export function GroupWorkspacePageInteractive() {
         },
       ]
     : [];
-  const workspaceFiles = [...files, ...syncedFiles];
+  const liveFiles: FileItem[] = workbenchState.artifacts.map((artifact, index) => ({
+    name: artifact.path,
+    detail: `${artifact.kind} artifact, ${(artifact.sizeBytes / 1024).toFixed(1)} KB, created ${artifact.createdAt.slice(0, 10)}`,
+    size: artifact.sizeBytes > 1024 * 1024 ? `${(artifact.sizeBytes / (1024 * 1024)).toFixed(1)} MB` : `${(artifact.sizeBytes / 1024).toFixed(1)} KB`,
+    accent: fileAccentPalette[index % fileAccentPalette.length] ?? 'cyan',
+  }));
+  const workspaceFiles = [...(hasLiveCatalog && liveFiles.length ? liveFiles : files), ...syncedFiles];
+  const displayedBaseTasks = hasLiveCatalog && workbenchState.runs.length
+    ? workbenchState.runs.map((run, index) => taskFromRun(run, index, workbenchState.runners))
+    : baseTasks;
+  const displayedActivities = hasLiveCatalog && workbenchState.runs.length
+    ? workbenchState.runs.map((run, index) => activityFromRun(run, index, workbenchState.runners))
+    : activityLog;
 
   const tasks = useMemo<WorkspaceTask[]>(() => {
-    return baseTasks.map((task) => {
+    return displayedBaseTasks.map((task) => {
       if (task.id === "approve") {
         return {
           ...task,
@@ -1079,7 +1302,7 @@ export function GroupWorkspacePageInteractive() {
 
       return task;
     });
-  }, [approval, syncState.complete, syncState.lastSyncedAt, syncState.progress, taskOwner]);
+  }, [approval, displayedBaseTasks, syncState.complete, syncState.lastSyncedAt, syncState.progress, taskOwner]);
 
   const laneTasks = (status: TaskStatus) => tasks.filter((task) => task.status === status);
 
@@ -1302,7 +1525,7 @@ export function GroupWorkspacePageInteractive() {
               <h2>Spaces</h2>
               <span className="gwr-pill cyan">
                 <span className="gwr-dot cyan" />
-                Live
+                {catalogLabel}
               </span>
             </div>
             <div className="gwr-stack">
@@ -1376,11 +1599,11 @@ export function GroupWorkspacePageInteractive() {
           <section className="gwr-sync">
             <div className="gwr-row">
               <span className="gwr-eyebrow">Workspace Health</span>
-              <span className={`gwr-pill ${syncState.complete ? "green" : "cyan"}`}>
-                {syncState.complete ? "Synced" : "Stable"}
+              <span className={`gwr-pill ${catalogTone}`}>
+                {catalogLabel}
               </span>
             </div>
-            <p className="gwr-small">Local UI state only. Last sync: {syncState.lastSyncedAt}.</p>
+            <p className="gwr-small">{catalogDetail} Last sync: {syncState.lastSyncedAt}.</p>
           </section>
         </aside>
 
@@ -1500,12 +1723,12 @@ export function GroupWorkspacePageInteractive() {
                 </div>
                 <span className={`gwr-pill ${syncState.complete ? "green" : "cyan"}`}>
                   <span className="gwr-dot" />
-                  {syncState.complete ? "Synced" : "Live"}
+                  {syncState.complete ? "Synced" : catalogLabel}
                 </span>
               </div>
 
               <div className="gwr-activity-list">
-                {activityLog.map((activity, index) => (
+                {displayedActivities.map((activity, index) => (
                   <div className="gwr-activity" key={`${activity.title}-${index}`}>
                     <AccentIcon accent={activity.accent} label={activity.accent.slice(0, 1).toUpperCase()} />
                     <div className="gwr-truncate">
