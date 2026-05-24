@@ -444,7 +444,17 @@ Hub 调度（远程）:
 
 ---
 
-#### 3.2.1 Hub-Edge-Desktop 集成（~19 天）
+#### 3.2.1 Q3 启动：Orchestrator Phase 1 ✅ `[2d]`
+
+- [x] Agent Registry（7 状态/树操作/并发安全）
+- [x] Agent Message Queue（6 消息类型/广播/父子通信）
+- [x] Sub-Agent Spawn（dispatchInterceptor + NDJSON 解析）
+- [x] REST: GET /v1/agent-instances
+- [x] 33 tests，12/12 包通过
+
+---
+
+#### 3.2.2 Hub-Edge-Desktop 集成（~19 天）
 
 > 参考：`docs/roadmaps/integration.md` 六阶段计划
 
