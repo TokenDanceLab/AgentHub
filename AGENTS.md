@@ -13,6 +13,7 @@
 - `README.md` 是对外展示页，给评审、同学和新读者快速了解项目，不放细碎开发约束。
 - `README_EN.md` 是英文补充入口，只保留对外介绍。
 - `AGENTS.md` 是给开发者和 Agent 的开发规范、开发风格和流程约束；每个 Agent 开始工作前必须读。
+- 在 `<WORKSPACE>` workspace 内做跨系统治理时，先读 `../AGENTS.md` 和 `../docs/`；AgentHub 仓内 docs 只负责本产品实现细节。
 
 人类同学先读：
 
@@ -29,9 +30,10 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 4. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
 5. 只读相关主文档章节：产品不清读 `docs/product-requirements.md`；边界不清读 `docs/system-architecture.md`；实现顺序不清读 `docs/implementation-guide.md`。
 6. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
-7. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
-8. 客户端 M1 任务读 `docs/client-roadmap.md`。
-9. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
+7. 改 TokenDance ID 登录、OIDC、跨产品鉴权或共享设计 token 时，同步读 `../docs/identity-auth.md` 或 `../docs/design-system.md`。
+8. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
+9. 客户端 M1 任务读 `docs/client-roadmap.md`。
+10. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
 
 `docs/archive/` 只在追溯旧方案时读。`reference/**` 是第三方源码镜像，默认不改、不翻译、不全文扫描。
 
@@ -51,6 +53,15 @@ AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个�
 - Edge Server 同时连接前端和 Hub，改动前先看 `docs/system-architecture.md`。
 - 跨两个方向的改动先在 PR 描述里写清楚影响面。
 - 开发者必须审查自己 Agent 生成的代码、文档和命令输出；不要把未看懂的 Agent 改动直接合入。
+
+### 统一 TokenDance ID 登录边界
+
+所有 AgentHub 登录工作先读 `../docs/unified-login.md` 和 `../docs/identity-auth.md`。
+
+- Hub Agent 负责 Hub Server 作为 TokenDance ID relying party 的后端流程：Hub-owned callback、code exchange、ID token 验证、`tokendance_sub` 到 Hub user 的映射、Hub 本地 access/refresh session 签发。
+- Client Agent 负责 Desktop/Web 登录入口、系统浏览器 PKCE/回调体验和 Hub session 存储；客户端不得直接集成 GitHub、Google、飞书，也不得把第三方 provider token 存进 AgentHub。
+- AgentHub Home 的 `https://hub.example.invalid/api/auth/callback` 是产品官网静态站 OIDC callback，不是 Hub API 登录 callback。
+- 现有 TokenDance ID bearer-token middleware 只是兼容路径；最终浏览器/桌面登录必须由 Hub Server 兑换 code 并签发 Hub 本地 session。
 
 任务分发：
 
@@ -92,7 +103,7 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 
 ## 3. 技术主线
 
-- Hub Server、Edge Server、Runner 使用 Go。
+- Hub Server 和 Edge Server 使用 Go。早期独立 `runner/` 目录已废弃；当前 Runner 能力在 `edge-server/internal/lifecycle/` 和 `edge-server/internal/adapters/` 内实现。
 - UI 使用 React + TypeScript，Desktop 使用 Tauri。
 - 主协议是 REST JSON API + WebSocket typed events。
 - REST endpoint 入口是 `api/openapi.yaml`。
@@ -266,7 +277,7 @@ go test ./...
 Go 服务测试要求：
 
 - 新增核心逻辑要有同包 `*_test.go`。
-- Hub/Edge/Runner 的接口边界优先写 handler 或 service 层测试。
+- Hub/Edge/AgentAdapter 的接口边界优先写 handler、service、lifecycle 或 adapter 层测试。
 - 涉及权限、路径、命令执行、同步序号的逻辑必须有失败用例。
 
 有前端代码后追加：
@@ -280,7 +291,7 @@ pnpm build
 
 - 前端状态转换和 API client 要有单元测试。
 - 关键 UI 流程后续用 Playwright 覆盖：新建 Thread、启动 Run、查看 Diff、Approval、Preview。
-- Desktop/Runner 改动至少提供本地 smoke test 步骤；无法自动化时写在 PR 验收里。
+- Desktop/Edge 执行链路改动至少提供本地 smoke test 步骤；无法自动化时写在 PR 验收里。
 
 ## 8. 质量治理
 
