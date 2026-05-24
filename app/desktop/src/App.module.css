@@ -33,11 +33,19 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: var(--sidebar-bg);
+  background: rgba(246,246,247,0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(0,0,0,0.04);
   position: relative;
+}
+
+[data-theme='dark'] .sidebar {
+  background: rgba(28,28,30,0.72);
+  backdrop-filter: blur(20px);
+  border-color: rgba(255,255,255,0.05);
 }
 
 /* ── Sidebar sections ──────────────────────── */
@@ -107,16 +115,18 @@
 /* ── Nav icons (bottom of sidebar) ─────────── */
 .sidebarFooter {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 0; left: 0; right: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
   border-top: 1px solid rgba(0,0,0,0.04);
-  background: var(--sidebar-bg);
+  background: transparent;
+}
+
+[data-theme='dark'] .sidebarFooter {
+  border-top-color: rgba(255,255,255,0.05);
 }
 
 .navIconBtn {
