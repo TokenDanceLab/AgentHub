@@ -37,6 +37,9 @@ export const AgentCapabilitiesSchema = z.object({
   fileChanges: z.boolean(),
   thinkingVisible: z.boolean(),
   multiTurn: z.boolean(),
+  mcpIntegration: z.boolean(),
+  permissionHooks: z.boolean(),
+  subAgentSpawn: z.boolean(),
 });
 
 export const AgentInfoSchema = z.object({
