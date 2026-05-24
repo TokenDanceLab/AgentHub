@@ -1,19 +1,22 @@
 /* ═══════════════════════════════════════════════════════
-   AuthPage — macOS-style modal with soft glass backdrop
+   AuthPage + LoginForm + RegisterForm
+   macOS-style modal — soft glass backdrop, unified inputs
    ═══════════════════════════════════════════════════════ */
 
+/* ── AuthPage shell ───────────────────────── */
 .page {
   display: flex;
   flex-direction: column;
   padding: 28px;
-  min-width: 340px;
-  max-width: 400px;
+  min-width: 360px;
+  max-width: 420px;
+  position: relative;
 }
 
 .closeBtn {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
   width: 28px;
   height: 28px;
   border: none;
@@ -24,23 +27,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s;
 }
-.closeBtn:hover { background: rgba(0,0,0,0.05); color: var(--foreground); }
+.closeBtn:hover { background: rgba(0,0,0,0.05); }
 
-/* ── Brand header ──────────────────────────── */
-.brand { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; }
-.brandIcon { width: 36px; height: 36px; border-radius: 10px; background: var(--primary); display: flex; align-items: center; justify-content: center; color: #fff; }
-.brand h2 { font-size: 18px; font-weight: 600; margin: 0; }
-.brand p { font-size: 12px; color: #8E8E93; margin: 2px 0 0; }
+/* ── Header ───────────────────────────────── */
+.header { text-align: center; margin-bottom: 20px; }
+.logo {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+.appName { font-size: 18px; font-weight: 600; margin: 0; }
+.tagline { font-size: 12px; color: #8E8E93; margin: 4px 0 0; }
 
-/* ── Segmented tab switch ──────────────────── */
-.tabSwitch {
+/* ── Segmented tab switch ─────────────────── */
+.tabs {
   display: flex;
   background: rgba(0,0,0,0.05);
   border-radius: 8px;
   padding: 2px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 .tab {
   flex: 1;
@@ -52,7 +66,7 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s;
 }
 .tabActive {
   background: #FFFFFF;
@@ -60,9 +74,18 @@
   box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 }
 
-/* ── Form ──────────────────────────────────── */
-.form { display: flex; flex-direction: column; gap: 12px; }
-.field { display: flex; flex-direction: column; gap: 4px; }
+/* ── Form body (shared by Login/Register) ─── */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
 .label {
   font-size: 12px;
@@ -70,6 +93,7 @@
   color: #8E8E93;
 }
 
+/* ── Input — unified borderless style ─────── */
 .input {
   padding: 10px 14px;
   border: none;
@@ -81,53 +105,153 @@
   outline: none;
   transition: background 0.2s, box-shadow 0.2s;
   -webkit-font-smoothing: antialiased;
+  width: 100%;
+  box-sizing: border-box;
 }
 .input::placeholder { color: #B0B0B5; }
 .input:focus {
   background: rgba(0,0,0,0.02);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.10);
 }
+.input:disabled { opacity: 0.5; }
+.inputError { box-shadow: 0 0 0 1px rgba(239,68,68,0.3); }
 
-.submitBtn {
-  margin-top: 4px;
-  padding: 10px 0;
+/* ── Password field wrapper ───────────────── */
+.passwordWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.passwordWrapper .input { flex: 1; padding-right: 40px; }
+.passwordToggle {
+  position: absolute;
+  right: 8px;
   border: none;
-  border-radius: 10px;
-  background: var(--primary);
-  color: #FFFFFF;
-  font-size: 14px;
-  font-weight: 600;
+  background: transparent;
+  color: #B0B0B5;
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  padding: 4px;
+  display: flex;
 }
-.submitBtn:hover { background: oklch(0.42 0.16 265); }
-.submitBtn:active { transform: scale(0.98); }
-.submitBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* ── Error ────────────────────────────────── */
 .error {
+  font-size: 11px;
+  color: #DC2626;
+}
+.errorBanner {
   padding: 8px 12px;
   border-radius: 8px;
   background: rgba(239,68,68,0.06);
   color: #DC2626;
   font-size: 12px;
+  display: flex;
+  align-items: center;
 }
 
-/* ── Hub URL + status ──────────────────────── */
-.hubUrlSection { margin-bottom: 12px; }
-.hubStatus { display: flex; align-items: center; gap: 5px; font-size: 11px; margin-top: 4px; color: #8E8E93; }
-
-/* ── Switch link ───────────────────────────── */
-.switchLink {
-  margin-top: 8px;
-  text-align: center;
-  font-size: 12px;
-  color: #8E8E93;
+/* ── Submit button ────────────────────────── */
+.submitButton {
+  margin-top: 4px;
+  padding: 10px 0;
+  border: none;
+  border-radius: 10px;
+  background: #111827;
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  width: 100%;
 }
-.switchLink button {
+.submitButton:hover { background: #1F2937; }
+.submitButton:active { transform: scale(0.98); }
+.submitButton:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  vertical-align: -3px;
+  margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Switch link ──────────────────────────── */
+.switch { text-align: center; }
+.switchButton {
   border: none;
   background: transparent;
   color: var(--primary);
-  cursor: pointer;
+  font-size: 12px;
   font-weight: 500;
-  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
 }
+.switchButton:hover { text-decoration: underline; }
+.switchButton:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Success box ──────────────────────────── */
+.successBox { text-align: center; padding: 20px 0; }
+.successIcon { color: var(--success); margin-bottom: 8px; }
+.successText { font-size: 13px; color: var(--foreground); }
+
+/* ── Advanced toggle ──────────────────────── */
+.advancedToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  color: #8E8E93;
+  font-size: 12px;
+  cursor: pointer;
+  width: 100%;
+  justify-content: center;
+  transition: color 0.15s;
+}
+.advancedToggle:hover { color: var(--foreground); }
+
+.advancedToggleIcon {
+  display: inline-flex;
+  transition: transform 0.2s;
+}
+.advancedToggleIconOpen { transform: rotate(180deg); }
+
+/* ── Advanced section ─────────────────────── */
+.advancedSection { margin-top: 8px; }
+.hubInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.04);
+  color: var(--foreground);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  outline: none;
+  box-sizing: border-box;
+}
+.hubInput:focus {
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.10);
+}
+.hubStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #8E8E93;
+}
+
+.hubStatusDot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.hubStatusDotConnected { background: var(--color-success); }
+.hubStatusDotDisconnected { background: var(--color-danger); }
+.hubStatusDotChecking { background: #F59E0B; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.hubStatusText { font-size: 11px; }
