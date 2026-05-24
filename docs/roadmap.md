@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-24（Desktop P0 全部完成 + M5/M6 已部署）
+最后更新：2026-05-24（Desktop P0 全部完成 + M5/M6/M7 已部署）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 
@@ -149,13 +149,13 @@ Hub 调度（远程）:
 
 ##### P0 -- 阻断级
 
-- [ ] **S1: 修复 ProcessExecutor race condition** `[0.5d]`
+- [x] **S1: 修复 ProcessExecutor race condition** `[0.5d]`
   - 文件：`edge-server/internal/lifecycle/process_executor.go:86-119`
   - 方案：先创建 context 再原子插入 running map，删除 nil placeholder 模式
   - 风险：并发 Cancel 找不到 cancel func，导致僵尸进程
   - 验收：`go test -race ./internal/lifecycle/ -count=10` 零失败
 
-- [ ] **S2: 接入 Prometheus metrics + 深度 health check** `[3d]`
+- [x] **S2: 接入 Prometheus metrics + 深度 health check** `[3d]`
   - 文件：新增 `edge-server/internal/metrics/metrics.go`，修改 `internal/httpserver/server.go`
   - 指标：`edge_runs_total`, `edge_run_duration_seconds`, `edge_active_runs`, `edge_ws_connections`, `edge_event_bus_depth`
   - Health check：验证 store 可读、runner registry 非空
