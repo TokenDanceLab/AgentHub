@@ -34,7 +34,7 @@ Hub Server 通过 `AGENTHUB_` 前缀的环境变量覆盖配置文件中的值�
 | `AGENTHUB_JWT_REFRESH_TTL` | Refresh Token 有效期 | `720h` |
 | `AGENTHUB_TOKENDANCE_ID_ISSUER_URL` | TokenDance ID issuer，用于 RS256 bearer-token 兼容路径 | `https://id.example.invalid` |
 | `AGENTHUB_TOKENDANCE_ID_JWKS_URI` | TokenDance ID JWKS；为空时由 issuer 拼出 `/oidc/jwks` | `https://id.example.invalid/oidc/jwks` |
-| `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | 预留给未来 Hub OIDC browser flow | — |
+| `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | Hub OIDC client id；启用 TokenDance bearer 兼容路径时必填，用于强制 `aud` 校验 | — |
 | `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | 预留给未来 confidential-client flow；只从 secret store 注入 | — |
 | `AGENTHUB_UPLOAD_DIR` | 上传文件存储目录 | `./uploads` |
 | `AGENTHUB_UPLOAD_MAX_SIZE` | 上传文件最大字节数 | `10485760` |
@@ -43,7 +43,7 @@ Hub Server 通过 `AGENTHUB_` 前缀的环境变量覆盖配置文件中的值�
 
 `AGENTHUB_JWT_SECRET` 必须通过环境变量设置；配置文件中的硬编码默认值会被拒绝。参见 `.env.example`。
 
-TokenDance ID 相关变量只启用 Hub Server 对 TokenDance ID RS256 bearer token 的兼容校验路径。当前 Hub Server 还没有最终定稿的 TokenDance ID 浏览器登录 callback，也不会为 TokenDance ID bearer token 自动创建 Hub refresh session；完整边界见 `../README.md` 的 TokenDance ID 兼容鉴权章节。
+TokenDance ID 相关变量只启用 Hub Server 对 TokenDance ID RS256 bearer token 的兼容校验路径。启用该路径时必须配置 issuer、JWKS 和 Hub client id；Hub 会校验 RS256 签名、`exp`、`iss` 和 `aud`。当前 Hub Server 还没有最终定稿的 TokenDance ID 浏览器登录 callback，也不会为 TokenDance ID bearer token 自动创建 Hub refresh session；完整边界见 `../README.md` 的 TokenDance ID 兼容鉴权章节。
 
 ## 快速启动（Docker Compose）
 

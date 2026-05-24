@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/panjf2000/ants/v2"
 )
@@ -25,10 +26,8 @@ type Bus struct {
 	pool     *ants.Pool
 }
 
-const defaultPoolSize = 1024
-
 func NewBus() *Bus {
-	pool, err := ants.NewPool(defaultPoolSize,
+	pool, err := ants.NewPool(config.EventBusPoolSize,
 		ants.WithNonblocking(false),
 		ants.WithPanicHandler(func(p interface{}) {
 			if metrics.EventBusPanics != nil {

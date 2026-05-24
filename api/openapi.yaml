@@ -1035,9 +1035,42 @@ paths:
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [trigger_message_id]
+              properties:
+                trigger_message_id:
+                  type: string
       responses:
-        "202":
+        "200":
           description: Task dispatched.
+
+  /edge/agent-tasks/{id}/ack:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubTaskAck
+      summary: Edge acknowledges an agent task and may attach the Edge run id.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HubTaskAckRequest"
+      responses:
+        "200":
+          description: Task marked running.
 
   /edge/agent-tasks/{id}/stream:
     post:
@@ -1072,6 +1105,33 @@ paths:
       responses:
         "200":
           description: Task marked done.
+
+  /edge/agent-tasks/{id}/fail:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubTaskFail
+      summary: Edge reports agent task failure.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [error]
+              properties:
+                error:
+                  type: string
+      responses:
+        "200":
+          description: Task marked failed.
 
   # ── Legacy / Planned (not yet implemented) ──────────────────
 
@@ -1607,6 +1667,15 @@ components:
             details:
               type: object
               additionalProperties: true
+    HubTaskAckRequest:
+      type: object
+      properties:
+        run_id:
+          type: string
+          description: Edge run id returned by POST /v1/runs.
+        edge_run_id:
+          type: string
+          description: Alias for run_id for explicit Hub persistence.
     StartRunRequest:
       type: object
       properties:
