@@ -37,6 +37,7 @@
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(0,0,0,0.04);
+  position: relative;
 }
 
 /* ── Sidebar sections ──────────────────────── */
@@ -44,13 +45,20 @@
   border-bottom: 1px solid rgba(0,0,0,0.04);
 }
 
-.sidebarSection:last-child {
-  border-bottom: none;
+.sidebarSection:last-of-type {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
+
+.sidebarSection:last-of-type .sidebarScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 50px; /* leave space for footer */
+}
+
+/* ... rest of sidebar sections ... */
 
 .sidebarSectionLabel {
   padding: 10px 16px 2px;
@@ -94,12 +102,17 @@
 
 /* ── Nav icons (bottom of sidebar) ─────────── */
 .sidebarFooter {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 6px 8px;
+  gap: 6px;
+  padding: 8px;
   border-top: 1px solid rgba(0,0,0,0.04);
+  background: var(--sidebar-bg);
 }
 
 .navIconBtn {
@@ -196,6 +209,8 @@
   padding: 6px;
   flex-shrink: 0;
   border-bottom: 1px solid rgba(0,0,0,0.04);
+  position: relative;
+  z-index: 2;
 }
 
 /* Segmented control — juice capsule style */
@@ -237,17 +252,20 @@
 }
 
 /* ═══════════════════════════════════════════════
-   Top status bar — compact, transparent
+   Top status bar — drag region + window controls
    ═══════════════════════════════════════════════ */
 
 .topBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 12px;
+  height: 34px;
+  padding: 0 12px;
   background: transparent;
   flex-shrink: 0;
   font-size: 11px;
+  user-select: none;
+  cursor: default;
 }
 
 .topBarLeft, .topBarRight {
