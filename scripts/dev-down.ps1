@@ -7,9 +7,8 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$HubDir = Join-Path $RepoRoot 'hub-server'
 
-Push-Location $HubDir
+Push-Location $RepoRoot
 try {
     Write-Host "=== Tearing down Hub Server dev environment ===" -ForegroundColor Magenta
     docker compose down
