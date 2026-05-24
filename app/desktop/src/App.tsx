@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Menu, X, PanelRightClose, PanelRightOpen, Bot } from 'lucide-react';
+import { Menu, X, PanelRightClose, PanelRightOpen, Bot, MessageSquare } from 'lucide-react';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
@@ -107,6 +107,9 @@ export default function App() {
   const [mobileRunDetailOpen, setMobileRunDetailOpen] = useState(false);
   const [tabletAgentOpen, setTabletAgentOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+
+  // IM integration — view mode switching between Agent chat and IM
+  const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
 
   // Search → scroll state
   const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
@@ -461,18 +464,52 @@ export default function App() {
             </div>
           )}
 
+          {/* Mode switch tabs — only shown when Hub authenticated */}
+          {hubAuthenticated && (
+          <div className={styles.modeBar}>
+            <button
+              className={`${styles.modeTab} ${viewMode === 'agent' ? styles.modeTabActive : ''}`}
+              onClick={() => setViewMode('agent')}
+              aria-pressed={viewMode === 'agent'}
+            >
+              <Bot size={14} />
+              <span>{t('nav.agent')}</span>
+            </button>
+            <button
+              className={`${styles.modeTab} ${viewMode === 'im' ? styles.modeTabActive : ''}`}
+              onClick={() => setViewMode('im')}
+              aria-pressed={viewMode === 'im'}
+            >
+              <MessageSquare size={14} />
+              <span>{t('nav.messages')}</span>
+            </button>
+          </div>
+          )}
+
           <div ref={chatContainerRef} className={styles.chatWrapper}>
-            <Slot
-              name="main-view"
-              messages={messages}
-              allMessages={allMessages}
-              threadsCount={threads.length}
-              isStreaming={isStreaming}
-              isConnected={isConnected}
-              onRetry={handleRetry}
-              onDelete={handleDelete}
-              onSendMessage={handleSend}
-            />
+            {viewMode === 'im' ? (
+              <ErrorBoundary>
+                <Suspense fallback={
+                  <div className={styles.skeletonChat} aria-busy="true">
+                    <SkeletonLine width="60%" height="14px" />
+                  </div>
+                }>
+                  <Slot name="im-view" />
+                </Suspense>
+              </ErrorBoundary>
+            ) : (
+              <Slot
+                name="main-view"
+                messages={messages}
+                allMessages={allMessages}
+                threadsCount={threads.length}
+                isStreaming={isStreaming}
+                isConnected={isConnected}
+                onRetry={handleRetry}
+                onDelete={handleDelete}
+                onSendMessage={handleSend}
+              />
+            )}
           </div>
         </div>
 
@@ -513,6 +550,7 @@ export default function App() {
         </div>
       </div>
 
+      {viewMode === 'agent' && (
       <Slot
         name="prompt-input"
         agents={agents}
@@ -524,6 +562,7 @@ export default function App() {
         disabled={!online}
         threadId={selectedThreadId ?? undefined}
       />
+      )}
       <Suspense fallback={null}>
         <Slot name="search-dialog" messages={allMessages} onSelect={handleSearchSelect} />
       </Suspense>
