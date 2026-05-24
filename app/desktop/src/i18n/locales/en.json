@@ -118,5 +118,21 @@
   "time.justNow": "just now",
   "time.minutesAgo": "{{count}}m ago",
   "time.hoursAgo": "{{count}}h ago",
-  "time.daysAgo": "{{count}}d ago"
+  "time.daysAgo": "{{count}}d ago",
+  "im.input.placeholder": "Type a message...",
+  "im.input.send": "Send message",
+  "im.input.enterHint": "Enter to send, Shift+Enter for newline",
+  "im.contact.search": "Search contacts and sessions...",
+  "im.contact.empty": "No conversations yet",
+  "im.contact.online": "Online",
+  "im.contact.offline": "Offline",
+  "im.contact.archived": "Archived",
+  "im.contact.unread": "{{count}} unread",
+  "im.message.empty": "No messages yet. Start a conversation!",
+  "im.message.loading": "Sending...",
+  "im.message.sendFailed": "Failed to send. Click to retry.",
+  "im.message.retry": "Retry",
+  "im.message.recall": "Recall",
+  "im.message.agentLabel": "AI",
+  "im.message.you": "You"
 }
