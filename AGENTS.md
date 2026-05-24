@@ -4,8 +4,7 @@
 
 1. 管理员的直接指令
 2. 本文件
-3. `.agenthub/` 本地项目记忆（如果存在）
-4. `docs/reference/` 调研文档
+3. `docs/reference/` 调研文档
 
 ## 1. 渐进式加载
 
@@ -27,18 +26,18 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 1. 先读本文件。
 2. 读 `docs/handoff/STATE.md` — 当前项目状态、阻塞、部署信息（新 Agent 接手必读）。
 3. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
-3. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
-4. 只读相关主文档章节：产品不清读 `docs/product-requirements.md`；边界不清读 `docs/system-architecture.md`；实现顺序不清读 `docs/implementation-guide.md`。
-5. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
-6. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
-7. 客户端 M1 任务读 `docs/client-roadmap.md`。
-8. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
+4. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
+5. 只读相关主文档章节：产品不清读 `docs/product-requirements.md`；边界不清读 `docs/system-architecture.md`；实现顺序不清读 `docs/implementation-guide.md`。
+6. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
+7. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
+8. 客户端 M1 任务读 `docs/client-roadmap.md`。
+9. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
 
 `docs/archive/` 只在追溯旧方案时读。`reference/**` 是第三方源码镜像，默认不改、不翻译、不全文扫描。
 
 ## 2. 三人分工
 
-AgentHub 的开发工作流是“三个开发者，每个开发者可以带一个或多个 Agent”。Agent 是协助者，不是仓库负责人。
+AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个或多个 Agent"。Agent 是协助者，不是仓库负责人。
 
 | 部分 | 负责范围 | 主要目录 |
 |---|---|---|
@@ -114,14 +113,14 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 
 **类型检查**：`pnpm typecheck` 在 desktop 和 web 各跑一次，零错误才能提交。
 
-详细架构见 `.agenthub/memory/project_agenthub_frontend_architecture.md`。
+前端架构详见 `docs/system-architecture.md` 前端章节。
 
 ## 4. Git 规则
 
 开始工作前先同步：
 
 ```powershell
-git switch master
+git checkout dev/maintainer
 git pull --ff-only
 ```
 
@@ -129,7 +128,7 @@ git pull --ff-only
 
 ```powershell
 git fetch origin
-git rebase origin/master
+git rebase origin/dev/maintainer
 ```
 
 Commit message 使用英文 type/scope + 中文摘要：
@@ -162,33 +161,41 @@ docs/short-topic
 fix/short-topic
 ```
 
-`codex/` 是 Codex App 自动工作分支前缀，可以用于临时 PR。手工创建分支优先用 `feat/`、`fix/`、`docs/`。`master` 是稳定分支。实现、协议和结构调整走 PR；小文档修正可以直接提交，但不确定就走 PR。PR 标题也用 `type(scope): 中文摘要`。
+`codex/` 是 Codex App 自动工作分支前缀，可以用于临时 PR。手工创建分支优先用 `feat/`、`fix/`、`docs/`。实现、协议和结构调整走 PR；小文档修正可以直接提交，但不确定就走 PR。PR 标题也用 `type(scope): 中文摘要`。
 
-### 当前活跃分支 (2026-05-23)
+### 分支治理
+
+当前分支状态和合并规则详见 `docs/branch-governance.md`。摘要：
 
 ```
-Remote:
-  origin/master                            ← 稳定
-  origin/dev/maintainer                  ← 主 dev: P0-P3 全部完成, M4 推进中
-  origin/dev/contributor-b                         ← contributor-b dev
-  origin/feat/contributor-b-webui                  ← Web 工作区
-  origin/feat/backend-foundation           ← 后台预留 (dormant)
-
-本地: dev/maintainer + 1 worktree (feat-contributor-b-webui)
+feat/* → dev/maintainer → master
 ```
 
-合并方向：`feat/* → dev/maintainer → master`
+| 分支 | 说明 | 状态 |
+|------|------|:--:|
+| **dev/maintainer** | 主开发分支，唯一事实源 | 活跃 |
+| master | PR-only 稳定快照，Q2 里程碑后同步 | 滞后（勿直接 clone 使用） |
+| dev/contributor-b | contributor-b 的 Web 前端（`feat/frontend-page-preview`），不合并 | 独立开发 |
+| dev/contributor-a | 已过期 | 待清理 |
 
-开发引擎：`.agents/skills/dev-loop/` — 模型分配(opus/sonnet/haiku) + 标准循环 + 交叉审查
+规则：
+- `master` 禁止直接 push，必须通过 PR。
+- `master` 目前滞后于 `dev/maintainer` 300+ commits，始终从 `dev/maintainer` 开始工作。
+- `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + `pnpm build`。
+- `feat/*` 合并前需要 rebase 到最新 `dev/maintainer`，解决冲突后再开 PR。
+- 删除已合并的 `feat/*` 分支和对应的 worktree。
+- `dev/contributor-b` 不合并到 `dev/maintainer`，最终由 contributor-b 自行决定是否 PR。
 
-当前 P0-P3 全部完成，M4 推进中。详细进度见 `docs/roadmap.md`。
+开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
+
+P0-P3、M3b、M4、M5、M6、M7 全部完成。详细进度见 `docs/roadmap.md`。
 
 进度同步：
 
 - 每个开发者至少在一天结束前 push 当前分支。
 - 完成一个可说明的小阶段就 push，不要把多天工作只留在本机。
 - 跨方向改动尽早开 draft PR 或普通 PR，让另外两条线知道接口变化。
-- PR 合并前先同步最新 `master`，解决冲突后再合。
+- PR 合并前先同步最新 `dev/maintainer`，解决冲突后再合。
 - 不在共享分支上 force-push；确实需要时先在群里说明。
 - Issue 只保留三部分主线任务：前端、后端、客户端。小任务写进对应 issue 或 PR，不额外开一堆 issue。
 - 本地提交 hook 放在 `scripts/git-hooks/`。首次克隆后运行 `.\scripts\setup.ps1` 启用。
@@ -198,7 +205,7 @@ Remote:
 
 - 项目级 worktree 固定放在 `.worktrees/`，已写入 `.gitignore`，不得提交。
 - 一个 worktree = 一个短分支 = 一个 PR。不要多个 Agent 共用同一 worktree。
-- 创建前同步 `master`：`git switch master && git pull --ff-only`。
+- 创建前同步 `dev/maintainer`：`git checkout dev/maintainer && git pull --ff-only`。
 - 创建示例：`git worktree add .worktrees/client-edge-foundation -b feat/client-edge-foundation`。
 - 每个 worktree 必须绑定任务卡和写入范围；范围变化先更新任务卡或 PR 说明。
 - DeepSeek、Codex、Claude 等可在 worktree 内调度 subagent，但 subagent 只能在当前 worktree 的指定路径内工作。
@@ -228,14 +235,15 @@ Remote:
 - 真实服务器 IP、内网地址、数据库连接串、生产账号、个人路径。
 - 生产数据库 dump、用户数据、聊天记录、日志中的敏感字段。
 - GitHub issue、PR、commit message 中也不要写上述内容。
-- 本机 Agent 记忆和运行状态，例如 `.agenthub/memory/`、`.claude/`、`.codex/`、`.agents/`；仓库级 `.agents/skills/dev-loop/` 是唯一例外。
+- 本机 Agent 记忆和运行状态，例如 `.claude/`、`.codex/`、`.agents/`（仓库级 `.agents/skills/dev-loop/` 是唯一例外）。
+- 服务器别名（host-redacted、host-redacted、host-redacted、host-redacted）不得出现在仓库文件中；生产配置限 `.env.production`（已 gitignored）。
 
 执行规则：
 
 - 需要示例配置时只提交 `.env.example`，值用占位符。
 - 日志和错误截图提交前先检查是否含 token、路径、账号、服务器信息。
 - Agent 运行命令前，先确认命令不会上传本地文件、打印密钥或访问生产数据。
-- 不要因为“本机能跑”就把私有配置写死进代码；需要配置项时写成环境变量或本地配置文件，并提供公开示例。
+- 不要因为"本机能跑"就把私有配置写死进代码；需要配置项时写成环境变量或本地配置文件，并提供公开示例。
 - 新增本地生成目录、缓存、数据库、日志、私钥或 Agent 状态目录时，先更新 `.gitignore`。
 - 如果误提交敏感信息，立即停止继续推送，通知维护者，旋转密钥，再清理历史。
 
@@ -280,8 +288,9 @@ pnpm build
 
 | 模块 | 最低覆盖率 | 当前 |
 |------|-----------|------|
-| edge-server | 70% | 72.0%（CI 强制阻断） |
-| app/desktop | 不做硬性要求 | 123 tests |
+| edge-server | 75% | CI 强制阻断 |
+| hub-server | 40% | CI 强制阻断 |
+| app/desktop | 不做硬性要求 | 551/560 tests |
 | app/web | 不做硬性要求 | build 通过即可 |
 
 - CI 使用 `go test -short` 跳过需要真实 CLI 的集成测试。
@@ -296,22 +305,6 @@ pnpm build
 | push 到 `dev/*` | 全量 |
 | PR 到 `master` / `dev/*` | 全量 |
 | push 到 `feat/*` | **不触发**（仅在开 PR 后触发） |
-
-### 分支治理
-
-```
-master                    ← 稳定发布。CI 必须全绿才能合入。
-dev/maintainer          ← 主开发。所有 feat/* 的合入目标。
-dev/contributor-b                 ← Web 前端合并中继。
-feat/*                    ← 功能分支。开 PR 到 dev 时触发 CI。
-```
-
-规则：
-- `master` 禁止直接 push，必须通过 PR。
-- `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + `pnpm build`。
-- `feat/*` 合并前需要 rebase 到最新 `dev`，解决冲突后再开 PR。
-- 删除已合并的 `feat/*` 分支和对应的 worktree。
-- worktree 放在 `.worktrees/`，已在 `.gitignore`，严禁提交。
 
 ### 提交纪律
 
