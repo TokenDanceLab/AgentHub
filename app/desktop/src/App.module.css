@@ -167,6 +167,10 @@
   min-width: 0;
 }
 
+.mainExpanded {
+  min-width: 0;
+}
+
 .workspace {
   flex: 1;
   display: flex;
@@ -191,6 +195,40 @@
 }
 
 .workspaceHeader h2 { font-size: 13px; font-weight: 500; margin: 0; }
+
+.workspaceHeaderActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.workspaceHeaderBtn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #8E8E93;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+
+.workspaceHeaderBtn:hover {
+  background: rgba(0,0,0,0.05);
+  color: var(--foreground);
+}
+
+.workspaceHeaderBtn:active {
+  transform: scale(0.94);
+}
+
+[data-theme='dark'] .workspaceHeaderBtn:hover {
+  background: rgba(255,255,255,0.06);
+}
 
 .workspaceHeaderDot {
   width: 7px;
