@@ -163,6 +163,21 @@
   justify-content: flex-start;
 }
 
+.railStatusDot {
+  width: 7px;
+  height: 7px;
+  margin: 2px 0 4px;
+  border-radius: 999px;
+  background: var(--muted-foreground);
+  opacity: 0.55;
+}
+
+.railStatusDotActive {
+  background: var(--color-success);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--color-success) 18%, transparent);
+  opacity: 1;
+}
+
 [data-theme='dark'] .leftRail,
 [data-theme='dark'] .rightRail {
   background: rgba(35,35,45,0.55);

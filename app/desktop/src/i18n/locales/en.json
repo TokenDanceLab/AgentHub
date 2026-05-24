@@ -525,6 +525,7 @@
   "nav.settings": "Settings",
   "run.open": "Open run detail",
   "run.close": "Close run detail",
+  "run.collapsedRail": "Collapsed run detail controls",
   "chat.viewFullDiff": "View full diff",
   "chat.scrollToBottom": "Scroll to bottom",
   "chat.newMessages": "New messages",
