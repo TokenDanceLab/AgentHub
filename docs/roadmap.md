@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-24（M5 批次完成）
+最后更新：2026-05-24（M5 批次完成 + 生产部署 hk2）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -14,11 +14,14 @@
 
 | 组件 | 技术栈 | 当前能力 | 测试状态 | 覆盖/质量 |
 |------|--------|---------|---------|----------|
-| **Desktop** | React 19 + Tauri 2 + Zustand | 17 组件 / 7 hooks / 5 stores，P0-P3 全部完成，M3b 6/6，M4 8/8 | 12/12 测试文件通过 (123 tests) | 类型检查通过，ESLint + Prettier |
-| **Edge Server** | Go (net/http + gorilla/websocket) | 3 种 AgentAdapter（Claude/Codex/OpenCode），24 种 NDJSON 消息，E2E 17/17 通过 | 整体 77.1%，12 个测试文件 | CI 硬阈值 75%，race/gosec/govulncheck 已接入 |
-| **Hub Server** | Go (Gin + GORM + Redis + PG) | 40+ REST + WS 路由，15 migration，IM 全功能 | 仅 1/19 包有单元测试（auth 89.1%），26 集成测试 | CI 软阈值 40%（实际 CI 中 `-short` 跳过所有集成测试 → 有效覆盖 0%） |
+| **Desktop** | React 19 + Tauri 2 + Zustand + TanStack Query | viewRegistry 9视图、IM UI、AuthPage、RunState 状态机、传输层抽象 | 519 tests（34 files） | tsc 严格模式，ESLint + Prettier |
+| **Edge Server** | Go (net/http + gorilla/websocket) | 3 Adapter、24 NDJSON、Orchestrator P1-P2、Prometheus、E2E 19/19 API | 13/13 包（530 funcs） | CI 硬阈值 75%，race/gosec/govulncheck |
+| **Hub Server** | Go (Gin + GORM + Redis + PG) | DI 架构、13 包有测试、CORS+RateLimit+BodyLimit 中间件链、32 migration | 13/13 包（355 funcs），repository 75.5% | CI 硬阈值 40%，golangci-lint/gitleaks |
 | **Web** | React + Vite | feat/trump-webui 开发中 | 构建通过 | 不做硬性要求 |
-| **CI/CD** | GitHub Actions | 4 job: go-edge / go-hub / frontend-desktop / frontend-web | 全绿 | gosec/govulncheck/race 已接入 |
+| **CI/CD** | GitHub Actions | 8 job: go-edge/go-hub/benchmark/docker/cross-build/frontend/validate/gitleaks | 全绿 | race/gosec/govulncheck/覆盖率硬阻断 |
+| **官网** | Next.js 16 + Tailwind v4 | hub.vectorcontrol.tech — LiveStats + ConnectAgent | 14/20 tests | 静态导出，nginx on hk2 |
+| **部署** | Docker Compose on hk2 | PG16 + Redis7 + Hub Server（独立实例，不与 AIhub 共用） | ✅ 生产运行 | nginx 反代 api.hub.vectorcontrol.tech:80→8090 |
+| **Infra** | Docker + Cloudflare DNS | docker-compose.prod.yml、deploy.sh、generate-secrets.sh、Caddyfile | ✅ | .env.production gitignored，密钥不进仓库 |
 
 ### 1.2 已完成任务集合
 
@@ -31,6 +34,7 @@
 | **M3b** | AgentHook 接口 + 消息树 + 安全管道 + Task dispatched + Context Budget + 流式增量解析 | 6/6 | 2026-05 |
 | **M4** | Hub 骨架 + OpenCode E2E + Codex E2E + 环境隔离 + auth middleware + 权限门控升级 + 响应式布局 | 8/8 | 2026-05 |
 | **M5** | **工程基础收敛**：Edge race/metrics/tests/P2 + Hub 安全/DI全5阶段/测试12包/P2 + Desktop 虚拟滚动/高亮/空状态/@mention/tablet + CI增强 | 27/27 | 2026-05-24 |
+| **M6** | **生产部署**：Docker Compose 生产配置 + hk2 部署 + nginx 反代 + Cloudflare DNS + 公开API + 官网 Hub 集成 + 安全加固（CORS/RateLimit/BodyLimit） | 12/12 | 2026-05-24 |
 
 ### 1.3 关键差距（来自审计报告 — M5 已全部修复）
 
