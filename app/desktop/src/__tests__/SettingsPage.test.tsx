@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import SettingsPage from '@/components/SettingsPage';
+import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import type { AgentInfo, RunInfo } from '@shared/types';
 import type { AgentTask } from '@/stores/taskBridgeStore';
 
@@ -100,6 +101,7 @@ describe('SettingsPage tasks', () => {
     mockRefetchRuns.mockReset();
     localStorage.clear();
     sessionStorage.clear();
+    useModelSettingsStore.getState().reset();
   });
 
   it('renders local runs and bridged Hub tasks', () => {
@@ -337,5 +339,51 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('settings.skillScriptAudit')).toBeInTheDocument();
     expect(screen.getByText('settings.skillReferences')).toBeInTheDocument();
     expect(screen.getByText('settings.skillGuard')).toBeInTheDocument();
+  });
+
+  it('persists model defaults from the model configuration panel', () => {
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="models" />);
+
+    fireEvent.change(screen.getByDisplayValue('Auto'), { target: { value: 'gpt-5.5' } });
+    fireEvent.change(screen.getByDisplayValue('TokenDance Relay'), { target: { value: 'openai' } });
+    fireEvent.change(screen.getByDisplayValue('High'), { target: { value: 'max' } });
+
+    expect(useModelSettingsStore.getState()).toMatchObject({
+      defaultModel: 'gpt-5.5',
+      defaultProvider: 'openai',
+      reasoningEffort: 'max',
+    });
+    expect(screen.getByText('settings.modelLocalGuard')).toBeInTheDocument();
+  });
+
+  it('edits model alias routing from the model mapping panel', () => {
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="modelMapping" />);
+
+    expect(screen.getByText('opus')).toBeInTheDocument();
+    fireEvent.change(screen.getAllByDisplayValue('claude-opus-4-7')[0], {
+      target: { value: 'gpt-5.5' },
+    });
+    fireEvent.click(screen.getAllByRole('switch')[1]);
+
+    const opus = useModelSettingsStore.getState().aliases.find((item) => item.alias === 'opus');
+    expect(opus).toMatchObject({ model: 'gpt-5.5', enabled: false });
+    expect(screen.getByText('settings.modelPolicy')).toBeInTheDocument();
+  });
+
+  it('edits cc-switch provider health and notes locally', () => {
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="ccSwitch" />);
+
+    fireEvent.click(screen.getAllByRole('switch')[0]);
+    fireEvent.change(screen.getAllByDisplayValue('Degraded')[0], {
+      target: { value: 'ready' },
+    });
+    fireEvent.change(screen.getByDisplayValue('Local provider bridge; health should be refreshed by cc-switch integration.'), {
+      target: { value: 'healthy after manual check' },
+    });
+
+    expect(useModelSettingsStore.getState().ccSwitchBridgeEnabled).toBe(true);
+    const localProvider = useModelSettingsStore.getState().ccSwitchProviders.find((item) => item.id === 'cc-switch-local');
+    expect(localProvider).toMatchObject({ health: 'ready', notes: 'healthy after manual check' });
+    expect(screen.getAllByText('settings.ccSwitchHealth').length).toBeGreaterThan(0);
   });
 });

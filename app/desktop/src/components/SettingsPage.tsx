@@ -42,6 +42,7 @@ import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
+import { useModelSettingsStore, type ProviderHealth, type ReasoningEffortPreference } from '@/stores/modelSettingsStore';
 import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
 import styles from './SettingsPage.module.css';
 
@@ -78,6 +79,7 @@ export type SectionId =
   | 'archived';
 
 type SelectValue = 'balanced' | 'detailed' | 'manual' | 'auto' | 'ask' | 'never';
+type SettingsSelectValue = SelectValue | ReasoningEffortPreference | ProviderHealth | string;
 
 interface Props {
   onBack: () => void;
@@ -110,6 +112,35 @@ const STORAGE_PREFIX = 'agenthub-settings.';
 const DEVICE_ID_KEY = 'agenthub_device_id';
 const TD_CODE_VERIFIER_KEY = 'td_code_verifier';
 const TD_STATE_KEY = 'td_state';
+
+const MODEL_OPTIONS = [
+  ['auto', 'Auto'],
+  ['claude-opus-4-7', 'claude-opus-4-7'],
+  ['claude-sonnet-4-6', 'claude-sonnet-4-6'],
+  ['claude-haiku-4-5', 'claude-haiku-4-5'],
+  ['gpt-5.5', 'gpt-5.5'],
+  ['glm-5.1', 'glm-5.1'],
+] as const;
+
+const PROVIDER_OPTIONS = [
+  ['tokendance-relay', 'TokenDance Relay'],
+  ['anthropic', 'Anthropic'],
+  ['openai', 'OpenAI'],
+  ['cc-switch-local', 'cc-switch local'],
+] as const;
+
+const REASONING_OPTIONS = [
+  ['low', 'Low'],
+  ['medium', 'Medium'],
+  ['high', 'High'],
+  ['max', 'Max'],
+] as const;
+
+const PROVIDER_HEALTH_OPTIONS = [
+  ['ready', 'Ready'],
+  ['degraded', 'Degraded'],
+  ['disabled', 'Disabled'],
+] as const;
 
 const PROJECT_SKILLS: ProjectSkill[] = [
   {
@@ -235,8 +266,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [groupChatEnabled, setGroupChatEnabled] = useStoredBooleanState('groupChat', true);
   const [agentSchedulingEnabled, setAgentSchedulingEnabled] = useStoredBooleanState('agentScheduling', true);
   const [enableHooks, setEnableHooks] = useStoredBooleanState('enableHooks', false);
-  const [modelMappingEnabled, setModelMappingEnabled] = useStoredBooleanState('modelMapping', true);
-  const [ccSwitchBridge, setCcSwitchBridge] = useStoredBooleanState('ccSwitchBridge', false);
   const [remoteControlEnabled, setRemoteControlEnabled] = useStoredBooleanState('remoteControl', false);
   const [autoDetectGit, setAutoDetectGit] = useStoredBooleanState('autoDetectGit', true);
   const [worktreeIsolation, setWorktreeIsolation] = useStoredBooleanState('worktreeIsolation', true);
@@ -246,6 +275,23 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [auditTrail, setAuditTrail] = useStoredBooleanState('auditTrail', true);
   const [detailLevel, setDetailLevel] = useStoredValueState<SelectValue>('detailLevel', 'detailed');
   const [approvalMode, setApprovalMode] = useStoredValueState<SelectValue>('approvalMode', 'ask');
+  const defaultModel = useModelSettingsStore((s) => s.defaultModel);
+  const defaultProvider = useModelSettingsStore((s) => s.defaultProvider);
+  const modelReasoningEffort = useModelSettingsStore((s) => s.reasoningEffort);
+  const providerFallbackEnabled = useModelSettingsStore((s) => s.providerFallbackEnabled);
+  const modelMappingEnabled = useModelSettingsStore((s) => s.modelMappingEnabled);
+  const modelAliases = useModelSettingsStore((s) => s.aliases);
+  const ccSwitchBridge = useModelSettingsStore((s) => s.ccSwitchBridgeEnabled);
+  const ccSwitchProviders = useModelSettingsStore((s) => s.ccSwitchProviders);
+  const setDefaultModel = useModelSettingsStore((s) => s.setDefaultModel);
+  const setDefaultProvider = useModelSettingsStore((s) => s.setDefaultProvider);
+  const setModelReasoningEffort = useModelSettingsStore((s) => s.setReasoningEffort);
+  const setProviderFallbackEnabled = useModelSettingsStore((s) => s.setProviderFallbackEnabled);
+  const setModelMappingEnabled = useModelSettingsStore((s) => s.setModelMappingEnabled);
+  const updateModelAlias = useModelSettingsStore((s) => s.updateAlias);
+  const toggleModelAlias = useModelSettingsStore((s) => s.toggleAlias);
+  const setCcSwitchBridge = useModelSettingsStore((s) => s.setCcSwitchBridgeEnabled);
+  const updateCcSwitchProvider = useModelSettingsStore((s) => s.updateProvider);
   const agents = agentData?.items ?? [];
   const availableRuntimes = agents.filter((agent) => agent.status === 'available').length;
   const runnerHealth = health?.checks?.runners;
@@ -454,7 +500,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     <SelectControl
                       value={detailLevel}
                       onChange={(value) => {
-                        setDetailLevel(value);
+                        setDetailLevel(value as SelectValue);
                         writeStoredValue('detailLevel', value);
                       }}
                       options={[
@@ -510,7 +556,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <SelectControl
                     value={approvalMode}
                     onChange={(value) => {
-                      setApprovalMode(value);
+                      setApprovalMode(value as SelectValue);
                       writeStoredValue('approvalMode', value);
                     }}
                     options={[
@@ -1168,9 +1214,45 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'models' && (
             <Panel title={t('settings.models')} description={t('settings.modelsDesc')}>
-              <SettingRow title={t('settings.modelDefault')} description={t('settings.modelDefaultDesc')} value="Auto" />
-              <SettingRow title={t('settings.modelReasoning')} description={t('settings.modelReasoningDesc')} value={t('settings.statusReady')} />
-              <SettingRow title={t('settings.modelProviderFallback')} description={t('settings.modelProviderFallbackDesc')} value={t('settings.statusPlanned')} />
+              <SettingRow
+                title={t('settings.modelDefault')}
+                description={t('settings.modelDefaultDesc')}
+                control={
+                  <SelectControl
+                    value={defaultModel}
+                    options={MODEL_OPTIONS.map(([value, label]) => [value, label])}
+                    onChange={setDefaultModel}
+                  />
+                }
+              />
+              <SettingRow
+                title={t('settings.modelDefaultProvider')}
+                description={t('settings.modelDefaultProviderDesc')}
+                control={
+                  <SelectControl
+                    value={defaultProvider}
+                    options={PROVIDER_OPTIONS.map(([value, label]) => [value, label])}
+                    onChange={setDefaultProvider}
+                  />
+                }
+              />
+              <SettingRow
+                title={t('settings.modelReasoning')}
+                description={t('settings.modelReasoningDesc')}
+                control={
+                  <SelectControl
+                    value={modelReasoningEffort}
+                    options={REASONING_OPTIONS.map(([value, label]) => [value, label])}
+                    onChange={(value) => setModelReasoningEffort(value as ReasoningEffortPreference)}
+                  />
+                }
+              />
+              <SettingRow
+                title={t('settings.modelProviderFallback')}
+                description={t('settings.modelProviderFallbackDesc')}
+                control={<Switch checked={providerFallbackEnabled} onChange={setProviderFallbackEnabled} />}
+              />
+              <Callout title={t('settings.modelLocalGuard')} body={t('settings.modelLocalGuardDesc')} />
             </Panel>
           )}
 
@@ -1179,10 +1261,31 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.enableModelMapping')}
                 description={t('settings.enableModelMappingDesc')}
-                control={<Switch checked={modelMappingEnabled} onChange={setBooleanSetting('modelMapping', setModelMappingEnabled)} />}
+                control={<Switch checked={modelMappingEnabled} onChange={setModelMappingEnabled} />}
               />
-              <SettingRow title={t('settings.modelAlias')} description={t('settings.modelAliasDesc')} value="sonnet / opus / haiku" />
-              <SettingRow title={t('settings.modelPolicy')} description={t('settings.modelPolicyDesc')} value={t('settings.statusPlanned')} />
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.modelAlias')}</strong>
+                  <span>{t('settings.modelAliasDesc')}</span>
+                </div>
+                <div className={styles.modelAliasList}>
+                  {modelAliases.map((item) => (
+                    <AliasMappingRow
+                      key={item.alias}
+                      alias={item.alias}
+                      model={item.model}
+                      provider={item.provider}
+                      reasoningEffort={item.reasoningEffort}
+                      enabled={item.enabled}
+                      onToggle={() => toggleModelAlias(item.alias)}
+                      onModelChange={(model) => updateModelAlias(item.alias, { model })}
+                      onProviderChange={(provider) => updateModelAlias(item.alias, { provider })}
+                      onReasoningChange={(reasoningEffort) => updateModelAlias(item.alias, { reasoningEffort })}
+                    />
+                  ))}
+                </div>
+              </div>
+              <Callout title={t('settings.modelPolicy')} body={t('settings.modelPolicyDesc')} />
             </Panel>
           )}
 
@@ -1191,10 +1294,29 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.ccSwitchBridge')}
                 description={t('settings.ccSwitchBridgeDesc')}
-                control={<Switch checked={ccSwitchBridge} onChange={setBooleanSetting('ccSwitchBridge', setCcSwitchBridge)} />}
+                control={<Switch checked={ccSwitchBridge} onChange={setCcSwitchBridge} />}
               />
-              <SettingRow title={t('settings.ccSwitchProviders')} description={t('settings.ccSwitchProvidersDesc')} value={t('settings.statusPlanned')} />
-              <SettingRow title={t('settings.ccSwitchHealth')} description={t('settings.ccSwitchHealthDesc')} value={t('settings.statusPlanned')} />
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.ccSwitchProviders')}</strong>
+                  <span>{t('settings.ccSwitchProvidersDesc')}</span>
+                </div>
+                <div className={styles.providerList}>
+                  {ccSwitchProviders.map((provider) => (
+                    <ProviderHealthRow
+                      key={provider.id}
+                      id={provider.id}
+                      name={provider.name}
+                      health={provider.health}
+                      modelCount={provider.modelCount}
+                      notes={provider.notes}
+                      onHealthChange={(health) => updateCcSwitchProvider(provider.id, { health })}
+                      onNotesChange={(notes) => updateCcSwitchProvider(provider.id, { notes })}
+                    />
+                  ))}
+                </div>
+              </div>
+              <Callout title={t('settings.ccSwitchHealth')} body={t('settings.ccSwitchHealthDesc')} />
             </Panel>
           )}
 
@@ -1594,6 +1716,124 @@ function SummaryCard({ icon, label, value, detail }: { icon: ReactNode; label: s
   );
 }
 
+function AliasMappingRow({
+  alias,
+  model,
+  provider,
+  reasoningEffort,
+  enabled,
+  onToggle,
+  onModelChange,
+  onProviderChange,
+  onReasoningChange,
+}: {
+  alias: string;
+  model: string;
+  provider: string;
+  reasoningEffort: ReasoningEffortPreference;
+  enabled: boolean;
+  onToggle: () => void;
+  onModelChange: (model: string) => void;
+  onProviderChange: (provider: string) => void;
+  onReasoningChange: (reasoningEffort: ReasoningEffortPreference) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.modelAliasRow}>
+      <div className={styles.modelAliasHead}>
+        <div>
+          <strong>{alias}</strong>
+          <span>{t('settings.modelAliasRoute', { model, provider })}</span>
+        </div>
+        <Switch checked={enabled} onChange={onToggle} />
+      </div>
+      <div className={styles.modelAliasControls}>
+        <label>
+          <span>{t('settings.modelAliasModel')}</span>
+          <SelectControl
+            value={model}
+            options={MODEL_OPTIONS.filter(([value]) => value !== 'auto').map(([value, label]) => [value, label])}
+            onChange={onModelChange}
+          />
+        </label>
+        <label>
+          <span>{t('settings.modelAliasProvider')}</span>
+          <SelectControl
+            value={provider}
+            options={PROVIDER_OPTIONS.map(([value, label]) => [value, label])}
+            onChange={onProviderChange}
+          />
+        </label>
+        <label>
+          <span>{t('settings.modelAliasReasoning')}</span>
+          <SelectControl
+            value={reasoningEffort}
+            options={REASONING_OPTIONS.map(([value, label]) => [value, label])}
+            onChange={(value) => onReasoningChange(value as ReasoningEffortPreference)}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function ProviderHealthRow({
+  id,
+  name,
+  health,
+  modelCount,
+  notes,
+  onHealthChange,
+  onNotesChange,
+}: {
+  id: string;
+  name: string;
+  health: ProviderHealth;
+  modelCount: number;
+  notes: string;
+  onHealthChange: (health: ProviderHealth) => void;
+  onNotesChange: (notes: string) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.providerRow}>
+      <div className={styles.providerMain}>
+        <div className={styles.connectionIcon}>
+          <Plug size={17} />
+        </div>
+        <div className={styles.settingCopy}>
+          <strong>{name}</strong>
+          <span>{id}</span>
+          <div className={styles.taskMeta}>
+            <span>{t('settings.ccSwitchModelCount', { count: modelCount })}</span>
+          </div>
+        </div>
+        <span className={`${styles.statusPill} ${health === 'ready' ? styles.statusPillOn : ''}`}>
+          {t(`settings.providerHealth.${health}`)}
+        </span>
+      </div>
+      <div className={styles.providerControls}>
+        <label>
+          <span>{t('settings.ccSwitchHealth')}</span>
+          <SelectControl
+            value={health}
+            options={PROVIDER_HEALTH_OPTIONS.map(([value, label]) => [value, label])}
+            onChange={(value) => onHealthChange(value as ProviderHealth)}
+          />
+        </label>
+        <label>
+          <span>{t('settings.ccSwitchNotes')}</span>
+          <textarea
+            className={styles.textInput}
+            value={notes}
+            onChange={(event) => onNotesChange(event.target.value)}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function RuntimeInventoryCard({ agent }: { agent: AgentInfo }) {
   const { t } = useTranslation();
   return (
@@ -1813,12 +2053,12 @@ function SelectControl({
   options,
   onChange,
 }: {
-  value: SelectValue;
-  options: Array<[SelectValue, string]>;
-  onChange: (value: SelectValue) => void;
+  value: SettingsSelectValue;
+  options: Array<[SettingsSelectValue, string]>;
+  onChange: (value: string) => void;
 }) {
   return (
-    <select className={styles.select} value={value} onChange={(event) => onChange(event.target.value as SelectValue)}>
+    <select className={styles.select} value={value} onChange={(event) => onChange(event.target.value)}>
       {options.map(([optionValue, label]) => (
         <option key={optionValue} value={optionValue}>
           {label}
