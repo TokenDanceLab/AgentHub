@@ -1080,7 +1080,7 @@ const styles = `
     line-height: 1;
     border-radius: 10px;
     background: linear-gradient(135deg, var(--asr-blue), var(--asr-cyan));
-    box-shadow: var(--asr-shadow);
+    box-shadow: 0 10px 22px rgba(37, 99, 235, 0.35);
   }
 
   .asr-truncate {
@@ -1557,13 +1557,17 @@ const styles = `
     --asr-ink: #e1e4e8;
     --asr-muted: #8b949e;
     --asr-line: rgba(48, 54, 61, 0.4);
-    --asr-blue: #58a6ff;
-    --asr-cyan: #39d2c0;
+    --asr-blue: #1769e8;
+    --asr-cyan: #08a7cf;
     --asr-purple: #a78bfa;
     --asr-green: #3fb950;
     --asr-glass: rgba(22, 27, 34, 0.8);
     --asr-glass-border: rgba(48, 54, 61, 0.6);
     --asr-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+    background:
+      radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.1), transparent 28%),
+      radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.1), transparent 30%),
+      linear-gradient(135deg, var(--asr-bg-soft), var(--asr-bg));
   }
 `;
 
