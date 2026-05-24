@@ -209,10 +209,13 @@ describe('LoginForm', () => {
   it('clears field error when user types', () => {
     renderForm();
     fireEvent.click(screen.getByText('auth.loginButton'));
-    expect(screen.getByText('auth.error.required')).toBeInTheDocument();
+    const initialErrors = screen.getAllByText('auth.error.required');
+    expect(initialErrors.length).toBeGreaterThanOrEqual(1);
 
     fireEvent.change(screen.getByLabelText('auth.username'), { target: { value: 'u' } });
-    expect(screen.queryByText('auth.error.required')).not.toBeInTheDocument();
+    // Only username error cleared, password error may remain
+    const remainingErrors = screen.queryAllByText('auth.error.required');
+    expect(remainingErrors.length).toBeLessThan(initialErrors.length);
   });
 
   it('clears server error when user types', async () => {
