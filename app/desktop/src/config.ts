@@ -4,6 +4,7 @@
 export const EDGE_URL = 'http://127.0.0.1:3210';
 export const WS_URL = 'ws://127.0.0.1:3210/v1/events';
 export const HUB_URL = import.meta.env.VITE_HUB_URL || 'http://localhost:8080';
+export const HUB_WS_URL = import.meta.env.VITE_HUB_WS_URL || 'ws://localhost:8080/client/ws';
 
 export const HEALTH_POLL_MS = 5000;
 export const RUNNERS_POLL_MS = 5000;

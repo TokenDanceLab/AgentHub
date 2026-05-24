@@ -16,6 +16,7 @@ import { useRunStore } from '@/stores/runStore';
 import { useShallow } from 'zustand/shallow';
 import { SkeletonLine, SkeletonCircle } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
+import { useHubStore } from '@/stores/hubStore';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ResizeHandle from '@/components/ResizeHandle';
@@ -77,6 +78,7 @@ export default function App() {
       wsLatency: s.wsLatency,
     })),
   );
+  const hubAuthenticated = useHubStore((s) => s.authenticated);
   const { selectedThreadId, selectThread } = useThreadStore(
     useShallow((s) => ({
       selectedThreadId: s.selectedThreadId,
@@ -319,6 +321,7 @@ export default function App() {
         isConnected={isConnected}
         error={edgeStatus.lastError}
         wsLatency={wsLatency}
+        hubAuthenticated={hubAuthenticated}
       />
 
       {edgeStatus.showBanner && (
