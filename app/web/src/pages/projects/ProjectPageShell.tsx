@@ -13,8 +13,8 @@ const pageHtml = String.raw`<!DOCTYPE html>
         --muted: #667085;
         --line: rgba(255, 255, 255, 0.7);
         --panel: rgba(255, 255, 255, 0.72);
-        --blue: #2563eb;
-        --cyan: #0891b2;
+        --blue: #1769e8;
+        --cyan: #08a7cf;
         --purple: #7c3aed;
         --green: #059669;
         --amber: #d97706;
