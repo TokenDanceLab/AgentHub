@@ -78,22 +78,58 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	// P0-1: Explicitly override JWT secret with env var (belt-and-suspenders on top of viper AutomaticEnv).
+	// Explicitly override JWT secret with env var (belt-and-suspenders on top of viper AutomaticEnv).
 	if envSecret := os.Getenv("AGENTHUB_JWT_SECRET"); envSecret != "" {
 		cfg.JWT.Secret = envSecret
 	}
 
-	// P0-1: Reject hardcoded default JWT secrets.
-	if cfg.JWT.Secret == "" || cfg.JWT.Secret == "dev-secret-change-in-production" {
+	return &cfg, nil
+}
+
+// Validate checks that the loaded configuration is usable at startup.
+// It rejects insecure defaults, missing infrastructure addresses, and
+// missing directories that the server depends on.
+func (c *Config) Validate() error {
+	// DB: host and port must be plausible.
+	if c.DB.Host == "" {
+		return errors.New("db.host is required")
+	}
+	if c.DB.Port <= 0 || c.DB.Port > 65535 {
+		return fmt.Errorf("db.port is invalid: %d", c.DB.Port)
+	}
+	if c.DB.User == "" {
+		return errors.New("db.user is required")
+	}
+	if c.DB.Name == "" {
+		return errors.New("db.name is required")
+	}
+
+	// Redis: host and port must be plausible.
+	if c.Redis.Host == "" {
+		return errors.New("redis.host is required")
+	}
+	if c.Redis.Port <= 0 || c.Redis.Port > 65535 {
+		return fmt.Errorf("redis.port is invalid: %d", c.Redis.Port)
+	}
+
+	// JWT: reject hardcoded defaults.
+	if c.JWT.Secret == "" || c.JWT.Secret == "dev-secret-change-in-production" {
 		if os.Getenv("AGENTHUB_JWT_SECRET") == "" {
-			return nil, errors.New("JWT secret must be set via AGENTHUB_JWT_SECRET environment variable; hardcoded defaults are rejected")
+			return errors.New("JWT secret must be set via AGENTHUB_JWT_SECRET environment variable; hardcoded defaults are rejected")
 		}
 	}
 
-	// Enforce minimum JWT secret length.
-	if len(cfg.JWT.Secret) < 16 {
-		return nil, fmt.Errorf("JWT secret too short: minimum 16 characters required (got %d)", len(cfg.JWT.Secret))
+	// JWT: enforce minimum length.
+	if len(c.JWT.Secret) < 16 {
+		return fmt.Errorf("JWT secret too short: minimum 16 characters required (got %d)", len(c.JWT.Secret))
 	}
 
-	return &cfg, nil
+	// Upload: if a directory is configured, it must exist.
+	if c.Upload.Dir != "" {
+		if _, err := os.Stat(c.Upload.Dir); os.IsNotExist(err) {
+			return fmt.Errorf("upload directory does not exist: %s", c.Upload.Dir)
+		}
+	}
+
+	return nil
 }
