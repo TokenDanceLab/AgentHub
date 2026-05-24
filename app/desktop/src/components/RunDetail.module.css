@@ -21,10 +21,11 @@
 }
 
 .empty {
-  padding: var(--space-md);
+  padding: var(--space-lg);
   color: var(--foreground);
-  opacity: 0.4;
-  font-size: var(--font-size-sm);
+  opacity: 0.35;
+  font-size: var(--font-size-xs);
+  text-align: center;
 }
 
 .section {
