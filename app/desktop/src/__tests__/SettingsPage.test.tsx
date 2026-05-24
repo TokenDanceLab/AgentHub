@@ -225,6 +225,14 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('settings.profileComposition')).toBeInTheDocument();
     expect(screen.getByText('Claude Code')).toBeInTheDocument();
     expect(screen.getByText('settings.runtimeAdapter: claude-code')).toBeInTheDocument();
+    expect(screen.getByText('settings.localProfileName')).toBeInTheDocument();
+    expect(screen.getByText('settings.profileRuntime: claude-code')).toBeInTheDocument();
+    expect(screen.getByText('settings.profileModel: claude-opus-4-7')).toBeInTheDocument();
+    expect(screen.getByText('settings.modelAliasProvider: anthropic')).toBeInTheDocument();
+    expect(screen.getByText('settings.modelAliasReasoning: max')).toBeInTheDocument();
+    expect(screen.getByText('settings.profileAlias: opus')).toBeInTheDocument();
+    expect(screen.getByText('settings.executionTargets: settings.targetLocalEdge')).toBeInTheDocument();
+    expect(screen.getByText('settings.profileConfigSource: AGENTS.md / memory / skills')).toBeInTheDocument();
     expect(screen.getByText('settings.profileRuntime')).toBeInTheDocument();
     expect(screen.getByText('settings.profileModel')).toBeInTheDocument();
     expect(screen.getByText('settings.profileConfig')).toBeInTheDocument();
