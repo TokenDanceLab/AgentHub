@@ -164,5 +164,14 @@
   "auth.hubUrl": "Hub 地址",
   "auth.hubConnected": "Hub 可访问",
   "auth.hubDisconnected": "Hub 不可访问",
-  "auth.hubChecking": "正在检查连接..."
+  "auth.hubChecking": "正在检查连接...",
+  "liveStats.title": "实时统计",
+  "liveStats.online": "在线",
+  "liveStats.memory": "内存",
+  "liveStats.uptime": "运行时间",
+  "connectAgent.title": "连接代理",
+  "connectAgent.url": "代理地址",
+  "connectAgent.connect": "连接",
+  "connectAgent.connected": "已连接",
+  "connectAgent.disconnected": "已断开"
 }

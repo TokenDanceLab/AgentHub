@@ -164,5 +164,17 @@
   "auth.hubUrl": "Hub URL",
   "auth.hubConnected": "Hub reachable",
   "auth.hubDisconnected": "Hub not reachable",
-  "auth.hubChecking": "Checking connection..."
+  "auth.hubChecking": "Checking connection...",
+  "liveStats.title": "Live Stats",
+  "liveStats.online": "Online",
+  "liveStats.memory": "Memory",
+  "liveStats.uptime": "Uptime",
+  "connectAgent.title": "Connect Agent",
+  "connectAgent.description": "Download the AgentHub desktop app or open the web client to get started",
+  "connectAgent.download": "Download App",
+  "connectAgent.webClient": "Open Web Client",
+  "connectAgent.url": "Agent URL",
+  "connectAgent.connect": "Connect",
+  "connectAgent.connected": "Connected",
+  "connectAgent.disconnected": "Disconnected"
 }
