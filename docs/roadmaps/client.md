@@ -1,6 +1,10 @@
 # AgentHub Desktop Client Roadmap
 
 > 范围：React 19 + Tauri 2 桌面应用 (`app/desktop`) | 最后更新：2026-05-24
+> 
+> **Phase 0 已全部完成 (M7)**：P0-1~P0-4 + QW-1~QW-5 全部落地。
+> 下文 `- [ ]` 为历史记录，实际代码已实现。Phase 1/2 为后续规划。
+>
 > 参考：21 个竞品/参考项目 | 实施详情见 `docs/design/client-p0-architecture.md` | 参考模式见 `docs/design/client-reference-patterns.md`
 
 ---

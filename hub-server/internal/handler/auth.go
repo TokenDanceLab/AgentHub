@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"log"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
@@ -71,6 +72,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			Fail(c, e)
 			return
 		}
+		c.Error(err)
+		log.Printf("[LOGIN ERROR] username=%s device_type=%s err=%v", req.Username, req.DeviceType, err)
 		Fail(c, errcode.ErrInternal)
 		return
 	}

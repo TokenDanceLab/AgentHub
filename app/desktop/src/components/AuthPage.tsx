@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Circle } from 'lucide-react';
+import { X, ChevronDown } from 'lucide-react';
 import type { UserProfile } from '@/api/hubClient';
 import { HUB_URL } from '@/config';
 import LoginForm from '@/components/LoginForm';
@@ -12,11 +12,13 @@ type HubStatus = 'connected' | 'disconnected' | 'checking';
 
 interface Props {
   onLoginSuccess: (user: UserProfile) => void;
+  onClose?: () => void;
 }
 
-export default function AuthPage({ onLoginSuccess }: Props) {
+export default function AuthPage({ onLoginSuccess, onClose }: Props) {
   const { t } = useTranslation();
   const [page, setPage] = useState<Page>('login');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [hubUrl, setHubUrl] = useState(() => {
     try {
       return typeof localStorage !== 'undefined'
@@ -80,48 +82,65 @@ export default function AuthPage({ onLoginSuccess }: Props) {
 
   return (
     <div className={styles.page}>
-      <div className={styles.card}>
-        <div className={styles.header}>
-          <div className={styles.logo} aria-hidden="true">
-            AH
-          </div>
-          <h1 className={styles.appName}>{t('auth.title')}</h1>
-          <p className={styles.tagline}>{t('auth.tagline')}</p>
+      {/* Close button */}
+      {onClose && (
+        <button className={styles.closeBtn} onClick={onClose} title="关闭">
+          <X size={16} />
+        </button>
+      )}
+
+      {/* Clean header — no dark background */}
+      <div className={styles.header}>
+        <div className={styles.logo} aria-hidden="true">
+          AH
         </div>
+        <h1 className={styles.appName}>登录 AgentHub</h1>
+        <p className={styles.tagline}>连接 Hub 服务器以同步智能体和会话</p>
+      </div>
 
-        <div className={styles.tabs}>
-          <button
-            className={`${styles.tab} ${page === 'login' ? styles.tabActive : ''}`}
-            onClick={() => setPage('login')}
-          >
-            {t('auth.login')}
-          </button>
-          <button
-            className={`${styles.tab} ${page === 'register' ? styles.tabActive : ''}`}
-            onClick={() => setPage('register')}
-          >
-            {t('auth.register')}
-          </button>
-        </div>
+      {/* Segmented tab switcher */}
+      <div className={styles.tabs}>
+        <button
+          className={`${styles.tab} ${page === 'login' ? styles.tabActive : ''}`}
+          onClick={() => setPage('login')}
+        >
+          {t('auth.login')}
+        </button>
+        <button
+          className={`${styles.tab} ${page === 'register' ? styles.tabActive : ''}`}
+          onClick={() => setPage('register')}
+        >
+          {t('auth.register')}
+        </button>
+      </div>
 
-        {page === 'login' ? (
-          <LoginForm
-            onSuccess={handleLoginSuccess}
-            onSwitchToRegister={() => setPage('register')}
-          />
-        ) : (
-          <RegisterForm
-            onSuccess={handleRegisterSuccess}
-            onSwitchToLogin={() => setPage('login')}
-          />
-        )}
+      {page === 'login' ? (
+        <LoginForm
+          onSuccess={handleLoginSuccess}
+          onSwitchToRegister={() => setPage('register')}
+        />
+      ) : (
+        <RegisterForm
+          onSuccess={handleRegisterSuccess}
+          onSwitchToLogin={() => setPage('login')}
+        />
+      )}
 
-        <div className={styles.hubSection}>
-          <label className={styles.hubLabel} htmlFor="hub-url">
-            {t('auth.hubUrl')}
-          </label>
+      {/* Collapsible advanced settings */}
+      <button
+        className={styles.advancedToggle}
+        onClick={() => setShowAdvanced((v) => !v)}
+        type="button"
+      >
+        <span className={`${styles.advancedToggleIcon} ${showAdvanced ? styles.advancedToggleIconOpen : ''}`}>
+          <ChevronDown size={14} />
+        </span>
+        高级设置
+      </button>
+
+      {showAdvanced && (
+        <div className={styles.advancedSection}>
           <input
-            id="hub-url"
             className={styles.hubInput}
             type="url"
             value={hubUrl}
@@ -139,7 +158,7 @@ export default function AuthPage({ onLoginSuccess }: Props) {
             </span>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

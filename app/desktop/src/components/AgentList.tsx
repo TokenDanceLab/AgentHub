@@ -1,47 +1,32 @@
 import { useTranslation } from 'react-i18next';
-import { Search } from 'lucide-react';
-import { useState, useMemo, memo } from 'react';
+import { Search, Settings2, Sparkles } from 'lucide-react';
+import { useState, useMemo, memo, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
-import { StatusBadge } from '@shared/components';
-import type { StatusVariant } from '@shared/components';
+import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
 import styles from './AgentList.module.css';
+
+function agentIcon(name: string): ReactNode {
+  const n = name.toLowerCase();
+  if (n.includes('claude')) return <ClaudeCode size={20} />;
+  if (n.includes('codex')) return <Codex size={20} />;
+  if (n.includes('opencode')) return <OpenCode size={20} />;
+  return null;
+}
+
+type CapabilityKey = keyof AgentInfo['capabilities'];
+
+const CAPABILITY_KEYS: CapabilityKey[] = ['streaming', 'toolCalls', 'fileChanges', 'thinkingVisible', 'multiTurn'];
+
+function capabilityLabelKey(key: CapabilityKey) {
+  if (key === 'thinkingVisible') return 'agent.capability.thinking';
+  return `agent.capability.${key}`;
+}
 
 interface Props {
   agents: AgentInfo[];
   online: boolean;
   selectedId?: string;
   onSelect?: (agent: AgentInfo) => void;
-}
-
-interface CapItem {
-  label: string;
-  key: string;
-}
-
-function capabilityItems(caps: AgentInfo['capabilities'], t: (key: string) => string): CapItem[] {
-  const items: CapItem[] = [];
-  if (caps.streaming) items.push({ label: t('agent.capability.streaming'), key: 'streaming' });
-  if (caps.toolCalls) items.push({ label: t('agent.capability.toolCalls'), key: 'toolCalls' });
-  if (caps.fileChanges) items.push({ label: t('agent.capability.fileChanges'), key: 'fileChanges' });
-  if (caps.thinkingVisible) items.push({ label: t('agent.capability.thinking'), key: 'thinkingVisible' });
-  if (caps.multiTurn) items.push({ label: t('agent.capability.multiTurn'), key: 'multiTurn' });
-  return items;
-}
-
-const capColorClass: Record<string, string> = {
-  streaming: styles.tagStreaming,
-  toolCalls: styles.tagToolCalls,
-  fileChanges: styles.tagFileChanges,
-  thinkingVisible: styles.tagThinking,
-  multiTurn: styles.tagMultiTurn,
-};
-
-function agentStatusVariant(status: string): StatusVariant {
-  switch (status) {
-    case 'available': return 'online';
-    case 'busy': return 'running';
-    default: return 'offline';
-  }
 }
 
 export default memo(function AgentList({ agents, online, selectedId, onSelect }: Props) {
@@ -54,7 +39,7 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
     return agents.filter((a) => a.name.toLowerCase().includes(q));
   }, [agents, searchQuery]);
 
-  function highlightMatch(text: string): React.ReactNode {
+  function highlightMatch(text: string): ReactNode {
     if (!searchQuery.trim()) return text;
     const q = searchQuery.trim();
     const idx = text.toLowerCase().indexOf(q.toLowerCase());
@@ -70,29 +55,34 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
 
   const isEmpty = agents.length === 0;
   const isSearchEmpty = !isEmpty && filteredAgents.length === 0;
+  const availableCount = agents.filter((a) => a.status === 'available').length;
 
   return (
     <nav className={styles.sidebar} aria-label={t('agent.title')}>
-      <div className={styles.title}>{t('agent.title')}</div>
+      <div className={styles.title}>
+        <span>{t('agent.title')}</span>
+        <span className={styles.countPill}>{online ? `${availableCount}/${agents.length}` : t('agent.offline')}</span>
+      </div>
 
       <div className={styles.searchWrapper}>
         <Search size={14} className={styles.searchIcon} />
         <input
           className={styles.searchInput}
           type="text"
-          placeholder="Search agents..."
+          placeholder={t('agent.search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          aria-label="Search agents"
+          aria-label={t('agent.search')}
         />
       </div>
 
       {isEmpty ? (
         <div className={styles.empty}>
-          {online ? t('agent.emptyOnline') : t('agent.emptyOffline')}
+          <Sparkles size={16} />
+          <span>{online ? t('agent.emptyOnline') : t('agent.emptyOffline')}</span>
         </div>
       ) : isSearchEmpty ? (
-        <div className={styles.empty}>No agents match your search</div>
+        <div className={styles.empty}>{t('agent.noMatch')}</div>
       ) : (
         <ul className={styles.list}>
           {filteredAgents.map((a) => (
@@ -101,20 +91,27 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
                 className={`${styles.item} ${a.id === selectedId ? styles.selected : ''}`}
                 onClick={() => onSelect?.(a)}
                 aria-pressed={a.id === selectedId}
+                disabled={a.status !== 'available'}
               >
-                <StatusBadge status={agentStatusVariant(a.status)} className={styles.statusDot} />
+                <span className={styles.avatar}>
+                  {agentIcon(a.name) || <Settings2 size={17} />}
+                  <span className={`${styles.statusDot} ${styles[`status_${a.status}`]}`} />
+                </span>
                 <div className={styles.info}>
-                  <div className={styles.name}>{highlightMatch(a.name)}</div>
+                  <div className={styles.nameLine}>
+                    <span className={styles.name}>{highlightMatch(a.name)}</span>
+                    <span className={`${styles.statusText} ${styles[`statusText_${a.status}`]}`}>
+                      {t(`agent.status.${a.status}`)}
+                    </span>
+                  </div>
                   {a.description && (
                     <div className={styles.description}>{a.description}</div>
                   )}
-                  <div className={styles.tags}>
-                    {capabilityItems(a.capabilities, t).map((item) => (
-                      <span
-                        key={item.key}
-                        className={`${styles.tag} ${capColorClass[item.key] ?? ''}`}
-                      >
-                        {item.label}
+                  <div className={styles.metaLine}>
+                    {a.version && <span className={styles.version}>{a.version}</span>}
+                    {CAPABILITY_KEYS.filter((key) => a.capabilities[key]).slice(0, 3).map((key) => (
+                      <span key={key} className={styles.capability}>
+                        {t(capabilityLabelKey(key))}
                       </span>
                     ))}
                   </div>

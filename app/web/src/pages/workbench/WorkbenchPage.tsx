@@ -147,6 +147,9 @@ function useParticleCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) {
 
         for (let nextIndex = index + 1; nextIndex < particles.length; nextIndex += 1) {
           const neighbor = particles[nextIndex];
+          if (!neighbor) {
+            continue;
+          }
           const dx = particle.x - neighbor.x;
           const dy = particle.y - neighbor.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
