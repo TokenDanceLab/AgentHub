@@ -67,6 +67,25 @@ type AgentCapabilities struct {
 	SubAgentSpawn   bool
 }
 
+// SubAgentTask describes a sub-agent task to be dispatched by the orchestrator.
+// Reference: docs/reference/cross-comparison/03-orchestration.md Layer 3 (Supervisor routing).
+type SubAgentTask struct {
+	TaskID      string `json:"taskId"`
+	Description string `json:"description"`
+	AgentID     string `json:"agentId"`   // target agent adapter ID
+	Prompt      string `json:"prompt"`    // task prompt for the sub-agent
+	Depth       int    `json:"depth"`     // delegation depth (root=0)
+	ParentRunID string `json:"parentRunId"`
+}
+
+// SubAgentSpawner is implemented by the lifecycle layer to create new runs for
+// sub-agents dispatched by the orchestrator. The orchestrator adapter calls this
+// when it detects a task_dispatched event in the NDJSON stream.
+// This enables the AgentTree pattern from Codex CLI.
+type SubAgentSpawner interface {
+	SpawnSubAgent(run store.Run, task SubAgentTask) (agentInstanceID string, runID string, err error)
+}
+
 // --- Unified event types emitted by all adapters ---
 
 // Bus event type strings (prefixed with "run.").
