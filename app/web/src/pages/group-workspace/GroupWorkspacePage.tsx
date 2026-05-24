@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { mockRunners, mockRuns, mockWorkspaceFiles, MockEventStream, playRunLifecycle } from '@shared/index';
 
 type TaskStatus = "backlog" | "active" | "review";
@@ -275,12 +275,12 @@ const styles = `
   align-items: center;
   gap: 10px;
   padding-bottom: 14px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid var(--gwr-line);
 }
 
 .gwr-brand .gwr-title h2 {
   margin: 0;
-  color: #172033;
+  color: var(--gwr-ink);
   font-size: 15px;
   line-height: 1.25;
 }
@@ -300,10 +300,10 @@ const styles = `
 .gwr-mark {
   width: 38px;
   height: 38px;
-  color: #fff;
+  color: var(--white);
   border-radius: 10px;
   background: linear-gradient(135deg, var(--gwr-blue), var(--gwr-cyan));
-  box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
+  box-shadow: var(--gwr-shadow);
   font-size: 16px;
   font-weight: 900;
   line-height: 1;
@@ -334,9 +334,9 @@ const styles = `
 .gwr-card,
 .gwr-sync,
 .gwr-approval {
-  border: 1px solid rgba(255,255,255,0.64);
+  border: 1px solid var(--gwr-glass-border);
   border-radius: 12px;
-  background: rgba(255,255,255,0.5);
+  background: var(--gwr-glass);
 }
 
 .gwr-nav,
@@ -351,8 +351,8 @@ const styles = `
 }
 
 .gwr-nav.is-active {
-  border-color: rgba(23,105,232,0.2);
-  background: rgba(23,105,232,0.1);
+  border-color: rgba(23,105,232,0.25);
+  background: rgba(23,105,232,0.12);
 }
 
 .gwr-icon {
@@ -360,35 +360,35 @@ const styles = `
   height: 32px;
   border-radius: 9px;
   color: var(--gwr-blue);
-  background: rgba(23,105,232,0.1);
+  background: rgba(23,105,232,0.12);
   font-size: 14px;
   font-weight: 900;
 }
 
 .gwr-accent-cyan {
-  color: #087f9e;
-  background: rgba(8,167,207,0.11);
+  color: var(--gwr-cyan);
+  background: rgba(8,167,207,0.15);
 }
 
 .gwr-accent-purple {
-  color: #6044d7;
-  background: rgba(116,87,232,0.11);
+  color: var(--gwr-purple);
+  background: rgba(116,87,232,0.15);
 }
 
 .gwr-accent-teal {
-  color: #15746f;
-  background: rgba(15,159,154,0.11);
+  color: var(--gwr-teal);
+  background: rgba(15,159,154,0.15);
 }
 
 .gwr-avatar {
   position: relative;
   width: 34px;
   height: 34px;
-  color: #fff;
-  border: 2px solid rgba(255,255,255,0.82);
+  color: var(--white);
+  border: 2px solid var(--gwr-glass-border);
   border-radius: 50%;
   background: linear-gradient(135deg, var(--gwr-blue), var(--gwr-cyan));
-  box-shadow: 0 8px 20px rgba(23,105,232,0.16);
+  box-shadow: var(--gwr-shadow);
   font-size: 12px;
   font-weight: 800;
 }
@@ -414,15 +414,15 @@ const styles = `
   height: 9px;
   border: 2px solid #fff;
   border-radius: 50%;
-  background: #25c06d;
+  background: var(--gwr-green);
 }
 
 .gwr-avatar.is-busy::after {
-  background: #d97817;
+  background: var(--gwr-orange);
 }
 
 .gwr-avatar.is-offline::after {
-  background: #95a2b8;
+  background: var(--gwr-muted);
 }
 
 .gwr-truncate {
@@ -443,10 +443,10 @@ const styles = `
   gap: 6px;
   min-height: 24px;
   padding: 4px 9px;
-  border: 1px solid rgba(23,105,232,0.13);
+  border: 1px solid rgba(23,105,232,0.2);
   border-radius: 999px;
-  background: rgba(23,105,232,0.08);
-  color: #1459c7;
+  background: rgba(23,105,232,0.1);
+  color: var(--gwr-blue);
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
@@ -454,21 +454,21 @@ const styles = `
 }
 
 .gwr-pill.cyan {
-  border-color: rgba(8,167,207,0.18);
-  background: rgba(8,167,207,0.1);
-  color: #087f9e;
+  border-color: rgba(8,167,207,0.25);
+  background: rgba(8,167,207,0.15);
+  color: var(--gwr-cyan);
 }
 
 .gwr-pill.purple {
-  border-color: rgba(116,87,232,0.18);
-  background: rgba(116,87,232,0.1);
-  color: #6044d7;
+  border-color: rgba(116,87,232,0.25);
+  background: rgba(116,87,232,0.15);
+  color: var(--gwr-purple);
 }
 
 .gwr-pill.green {
-  border-color: rgba(31,155,100,0.2);
-  background: rgba(31,155,100,0.11);
-  color: #15744b;
+  border-color: rgba(31,155,100,0.25);
+  background: rgba(31,155,100,0.15);
+  color: var(--gwr-green);
 }
 
 .gwr-dot {
@@ -477,17 +477,17 @@ const styles = `
   height: 8px;
   border-radius: 50%;
   background: var(--gwr-green);
-  box-shadow: 0 0 0 4px rgba(31,155,100,0.12);
+  box-shadow: 0 0 0 4px rgba(31,155,100,0.2);
 }
 
 .gwr-dot.cyan {
   background: var(--gwr-cyan);
-  box-shadow: 0 0 0 4px rgba(8,167,207,0.13);
+  box-shadow: 0 0 0 4px rgba(8,167,207,0.2);
 }
 
 .gwr-dot.purple {
   background: var(--gwr-purple);
-  box-shadow: 0 0 0 4px rgba(116,87,232,0.13);
+  box-shadow: 0 0 0 4px rgba(116,87,232,0.2);
 }
 
 .gwr-actions {
@@ -503,12 +503,12 @@ const styles = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(23,105,232,0.14);
+  border: 1px solid rgba(23,105,232,0.2);
   border-radius: 8px;
-  background: rgba(255,255,255,0.62);
+  background: rgba(255,255,255,0.08);
   color: var(--gwr-ink);
   font-weight: 800;
-  box-shadow: 0 8px 18px rgba(26,40,80,0.08);
+  box-shadow: none;
   cursor: pointer;
 }
 
@@ -528,15 +528,15 @@ const styles = `
 
 .gwr-button.primary {
   border-color: transparent;
-  color: #fff;
+  color: var(--white);
   background: linear-gradient(135deg, var(--gwr-blue), var(--gwr-cyan));
-  box-shadow: 0 10px 22px rgba(23,105,232,0.23);
+  box-shadow: var(--gwr-shadow);
 }
 
 .gwr-button.warning {
-  color: #9a510a;
-  border-color: rgba(217,122,23,0.2);
-  background: rgba(217,122,23,0.1);
+  color: var(--gwr-orange);
+  border-color: rgba(217,122,23,0.25);
+  background: rgba(217,122,23,0.15);
 }
 
 .gwr-button:disabled,
@@ -563,9 +563,9 @@ const styles = `
 .gwr-filter {
   min-height: 28px;
   padding: 6px 8px;
-  border: 1px solid rgba(23,105,232,0.12);
+  border: 1px solid rgba(23,105,232,0.2);
   border-radius: 8px;
-  background: rgba(255,255,255,0.5);
+  background: var(--gwr-glass);
   color: var(--gwr-muted);
   font-size: 11px;
   font-weight: 800;
@@ -574,9 +574,9 @@ const styles = `
 }
 
 .gwr-filter.is-active {
-  border-color: rgba(23,105,232,0.22);
-  background: rgba(23,105,232,0.1);
-  color: #1459c7;
+  border-color: rgba(23,105,232,0.3);
+  background: rgba(23,105,232,0.12);
+  color: var(--gwr-blue);
 }
 
 .gwr-search {
@@ -586,9 +586,9 @@ const styles = `
   width: min(320px, 100%);
   min-height: 38px;
   padding: 9px 11px;
-  border: 1px solid rgba(255,255,255,0.68);
+  border: 1px solid var(--gwr-glass-border);
   border-radius: 10px;
-  background: rgba(255,255,255,0.58);
+  background: rgba(255,255,255,0.08);
   color: var(--gwr-muted);
   font-size: 12px;
 }
@@ -618,18 +618,18 @@ const styles = `
   padding: 12px 14px;
   border: 1px solid rgba(23,105,232,0.16);
   border-radius: 12px;
-  background: rgba(255,255,255,0.64);
-  box-shadow: 0 12px 28px rgba(26,40,80,0.1);
+  background: rgba(255,255,255,0.08);
+  box-shadow: none;
 }
 
 .gwr-confirmation.success {
-  border-color: rgba(31,155,100,0.2);
-  background: rgba(31,155,100,0.1);
+  border-color: rgba(31,155,100,0.25);
+  background: rgba(31,155,100,0.15);
 }
 
 .gwr-confirmation.warning {
-  border-color: rgba(217,122,23,0.22);
-  background: rgba(217,122,23,0.1);
+  border-color: rgba(217,122,23,0.3);
+  background: rgba(217,122,23,0.15);
 }
 
 .gwr-content {
@@ -660,9 +660,9 @@ const styles = `
   gap: 10px;
   padding: 12px;
   overflow: auto;
-  border: 1px solid rgba(143,160,190,0.14);
+  border: 1px solid var(--gwr-line);
   border-radius: 12px;
-  background: rgba(255,255,255,0.4);
+  background: var(--gwr-glass);
 }
 
 .gwr-card {
@@ -670,8 +670,8 @@ const styles = `
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  background: rgba(255,255,255,0.68);
-  box-shadow: 0 10px 26px rgba(26,40,80,0.08);
+  background: rgba(255,255,255,0.08);
+  box-shadow: none;
 }
 
 .gwr-progress {
@@ -679,7 +679,7 @@ const styles = `
   height: 7px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(23,105,232,0.11);
+  background: rgba(23,105,232,0.12);
 }
 
 .gwr-progress span {
@@ -714,9 +714,9 @@ const styles = `
   gap: 10px;
   margin-top: auto;
   padding: 12px;
-  border: 1px solid rgba(255,255,255,0.64);
+  border: 1px solid var(--gwr-glass-border);
   border-radius: 12px;
-  background: rgba(255,255,255,0.5);
+  background: var(--gwr-glass);
 }
 
 .gwr-composer textarea {
@@ -724,19 +724,19 @@ const styles = `
   min-height: 54px;
   resize: none;
   padding: 10px;
-  border: 1px solid rgba(143,160,190,0.18);
+  border: 1px solid var(--gwr-line);
   border-radius: 10px;
   outline: 0;
-  background: rgba(255,255,255,0.48);
+  background: var(--gwr-glass);
   color: var(--gwr-ink);
   font: inherit;
 }
 
 .gwr-empty {
   padding: 12px;
-  border: 1px dashed rgba(143,160,190,0.32);
+  border: 1px dashed var(--gwr-line);
   border-radius: 10px;
-  background: rgba(255,255,255,0.34);
+  background: var(--gwr-glass);
   color: var(--gwr-muted);
   font-size: 12px;
   line-height: 1.4;
@@ -751,7 +751,7 @@ const styles = `
 }
 
 .gwr-approval {
-  border-color: rgba(23,105,232,0.16);
+  border-color: rgba(23,105,232,0.25);
   background: linear-gradient(135deg, rgba(23,105,232,0.1), rgba(8,167,207,0.08));
 }
 
@@ -822,6 +822,23 @@ const styles = `
   .gwr-right {
     display: flex;
   }
+}
+
+[data-theme="dark"] .group-workspace-react {
+  --gwr-bg: #0f1117;
+  --gwr-bg-2: #0d1117;
+  --gwr-ink: #e1e4e8;
+  --gwr-muted: #8b949e;
+  --gwr-line: rgba(48, 54, 61, 0.4);
+  --gwr-blue: #58a6ff;
+  --gwr-cyan: #39d2c0;
+  --gwr-purple: #a78bfa;
+  --gwr-teal: #4dd4c8;
+  --gwr-green: #3fb950;
+  --gwr-orange: #d2991d;
+  --gwr-glass: rgba(22, 27, 34, 0.8);
+  --gwr-glass-border: rgba(48, 54, 61, 0.6);
+  --gwr-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
 }
 `;
 
@@ -1209,6 +1226,15 @@ export function GroupWorkspacePageInteractive() {
     });
   };
 
+  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    sendNote();
+  };
+
   const fillComposer = (token: string, confirmationTitle: string) => {
     setNoteDraft((current) => `${current}${current ? " " : ""}${token}`);
     showConfirmation({
@@ -1518,6 +1544,7 @@ export function GroupWorkspacePageInteractive() {
                   placeholder="Send a coordination note to this workspace..."
                   value={noteDraft}
                   onChange={(event) => setNoteDraft(event.target.value)}
+                  onKeyDown={handleComposerKeyDown}
                 />
                 <div className="gwr-row">
                   <span className="gwr-tiny">{noteDraft.trim() ? `${noteDraft.trim().length} characters ready` : "Draft is empty."}</span>

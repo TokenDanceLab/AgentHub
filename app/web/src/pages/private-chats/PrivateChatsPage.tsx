@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { mockThreads, mockMessages, MockEventStream, playMessageStream } from '@shared/index';
 
 type Accent = 'blue' | 'cyan' | 'purple';
@@ -170,8 +170,8 @@ const pageStyles = `
     background:
       radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
       radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.14), transparent 30%),
-      linear-gradient(135deg, #f7fbff, #edf6ff);
-    color: #172033;
+      linear-gradient(135deg, var(--bg), var(--surface-alt));
+    color: var(--text);
     font-family: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 
@@ -208,10 +208,10 @@ const pageStyles = `
   }
 
   .pc-glass {
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: 12px;
-    box-shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
+    box-shadow: 0 18px 48px var(--glass-shadow);
     backdrop-filter: blur(28px) saturate(160%);
     -webkit-backdrop-filter: blur(28px) saturate(160%);
   }
@@ -233,7 +233,7 @@ const pageStyles = `
     gap: 12px;
     min-height: 68px;
     padding: 14px 16px;
-    border-bottom: 1px solid rgba(134, 157, 190, 0.24);
+    border-bottom: 1px solid var(--border);
   }
 
   .pc-brand {
@@ -241,7 +241,7 @@ const pageStyles = `
     align-items: center;
     gap: 10px;
     padding-bottom: 14px;
-    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .pc-brand-mark {
@@ -250,13 +250,13 @@ const pageStyles = `
     display: grid;
     place-items: center;
     flex: 0 0 auto;
-    color: #fff;
+    color: var(--white);
     font-size: 16px;
     font-weight: 900;
     line-height: 1;
     border-radius: 10px;
-    background: linear-gradient(135deg, #1769e8, #08a7cf);
-    box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
+    background: var(--accent-gradient);
+    box-shadow: 0 10px 22px var(--shadow);
   }
   .pc-chat-header,
   .pc-context-header {
@@ -266,21 +266,21 @@ const pageStyles = `
   .pc-title h1,
   .pc-title h2 {
     margin: 0;
-    color: #172033;
+    color: var(--text);
     font-size: 15px;
     line-height: 1.25;
   }
 
   .pc-brand h2 {
     margin: 0;
-    color: #172033;
+    color: var(--text);
     font-size: 15px;
     line-height: 1.25;
   }
 
   .pc-title .pc-brand-sub {
     margin: 4px 0 0;
-    color: #667085;
+    color: var(--text-muted);
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.09em;
@@ -290,7 +290,7 @@ const pageStyles = `
   .pc-section-title,
   .pc-meta {
     margin: 0 0 4px;
-    color: #667085;
+    color: var(--text-muted);
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.09em;
@@ -299,7 +299,7 @@ const pageStyles = `
 
   .pc-title .pc-brand-sub {
     margin: 4px 0 0;
-    color: #667085;
+    color: var(--text-muted);
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.09em;
@@ -313,11 +313,11 @@ const pageStyles = `
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(132, 155, 190, 0.24);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.62);
-    color: #172033;
-    box-shadow: 0 8px 20px rgba(31, 57, 102, 0.08);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: none;
     cursor: pointer;
   }
 
@@ -331,9 +331,9 @@ const pageStyles = `
 
   .pc-icon-button.is-active,
   .pc-tool-button.is-active {
-    border-color: rgba(37, 99, 235, 0.34);
-    background: rgba(37, 99, 235, 0.1);
-    color: #2563eb;
+    border-color: var(--accent-border);
+    background: var(--accent-light);
+    color: var(--accent);
   }
 
   .pc-icon-button:disabled,
@@ -354,24 +354,24 @@ const pageStyles = `
     position: absolute;
     top: 21px;
     left: 25px;
-    color: #7b8aa4;
+    color: var(--text-muted);
     font-size: 18px;
   }
 
   .pc-search input {
     width: 100%;
     height: 36px;
-    border: 1px solid rgba(132, 155, 190, 0.24);
+    border: 1px solid var(--border);
     border-radius: 8px;
     outline: 0;
     padding: 0 12px 0 34px;
-    background: rgba(255, 255, 255, 0.68);
-    color: #172033;
+    background: var(--surface);
+    color: var(--text);
   }
 
   .pc-filter-note {
     padding: 0 16px 8px;
-    color: #667085;
+    color: var(--text-muted);
     font-size: 11px;
   }
 
@@ -394,17 +394,17 @@ const pageStyles = `
     gap: 10px;
     align-items: center;
     min-height: 64px;
-    border: 1px solid rgba(255, 255, 255, 0.64);
+    border: 1px solid var(--glass-border);
     border-radius: 12px;
     padding: 10px;
-    background: rgba(255, 255, 255, 0.5);
+    background: var(--surface);
     color: inherit;
     cursor: pointer;
     text-align: left;
   }
 
   .pc-chat-card.is-active {
-    border-color: rgba(37, 99, 235, 0.28);
+    border-color: var(--accent-border);
     background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(8, 145, 178, 0.08));
   }
 
@@ -416,19 +416,19 @@ const pageStyles = `
     height: 36px;
     flex: 0 0 36px;
     border-radius: 10px;
-    background: linear-gradient(135deg, #2563eb, #0891b2);
-    color: #fff;
+    background: var(--brand-gradient);
+    color: var(--white);
     font-size: 12px;
     font-weight: 800;
-    box-shadow: 0 10px 22px rgba(37, 99, 235, 0.24);
+    box-shadow: 0 10px 22px var(--shadow);
   }
 
   .pc-avatar.cyan {
-    background: linear-gradient(135deg, #0891b2, #22c55e);
+    background: linear-gradient(135deg, var(--accent), var(--success-dot));
   }
 
   .pc-avatar.purple {
-    background: linear-gradient(135deg, #7c3aed, #0ea5e9);
+    background: var(--accent-gradient);
   }
 
   .pc-chat-card h3,
@@ -441,14 +441,14 @@ const pageStyles = `
   .pc-chat-card p {
     margin: 4px 0 0;
     overflow: hidden;
-    color: #667085;
+    color: var(--text-muted);
     font-size: 12px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .pc-time {
-    color: #7f8aa3;
+    color: var(--text-muted);
     font-size: 11px;
     white-space: nowrap;
   }
@@ -461,8 +461,8 @@ const pageStyles = `
     height: 20px;
     margin-top: 6px;
     border-radius: 999px;
-    background: #2563eb;
-    color: #fff;
+    background: var(--accent);
+    color: var(--white);
     font-size: 11px;
     font-weight: 800;
   }
@@ -481,8 +481,8 @@ const pageStyles = `
     height: 24px;
     padding: 0 9px;
     border-radius: 999px;
-    background: rgba(5, 150, 105, 0.1);
-    color: #059669;
+    background: var(--success-bg);
+    color: var(--success);
     font-size: 11px;
     font-weight: 800;
   }
@@ -529,7 +529,7 @@ const pageStyles = `
   .pc-message-row.is-mine .pc-avatar {
     grid-column: 2;
     grid-row: 1;
-    background: linear-gradient(135deg, #1d4ed8, #7c3aed);
+    background: var(--brand-gradient);
   }
 
   .pc-message-row.is-mine .pc-message-stack {
@@ -542,7 +542,7 @@ const pageStyles = `
     align-items: center;
     gap: 8px;
     margin: 0 0 6px;
-    color: #667085;
+    color: var(--text-muted);
     font-size: 11px;
   }
 
@@ -554,16 +554,16 @@ const pageStyles = `
     border: 0;
     border-radius: 7px;
     padding: 3px 7px;
-    background: rgba(124, 58, 237, 0.1);
-    color: #6d28d9;
+    background: var(--accent-lighter);
+    color: var(--accent);
     font-size: 11px;
     font-weight: 800;
     cursor: pointer;
   }
 
   .pc-key-button.is-active {
-    background: rgba(124, 58, 237, 0.18);
-    color: #4c1d95;
+    background: var(--accent-light);
+    color: var(--accent);
   }
 
   .pc-confirm-bar {
@@ -572,18 +572,18 @@ const pageStyles = `
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 10px;
-    border: 1px solid rgba(37, 99, 235, 0.22);
+    border: 1px solid var(--accent-border);
     border-radius: 10px;
     padding: 9px 10px;
-    background: rgba(255, 255, 255, 0.66);
-    color: #344055;
+    background: var(--surface);
+    color: var(--text-secondary);
     font-size: 12px;
   }
 
   .pc-confirm-bar.is-success {
-    border-color: rgba(5, 150, 105, 0.24);
-    background: rgba(5, 150, 105, 0.08);
-    color: #047857;
+    border-color: var(--success-border);
+    background: var(--success-bg);
+    color: var(--success);
   }
 
   .pc-confirm-actions {
@@ -593,20 +593,20 @@ const pageStyles = `
   }
 
   .pc-bubble {
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    border: 1px solid var(--glass-border);
     border-radius: 12px;
     padding: 12px 14px;
-    background: rgba(255, 255, 255, 0.74);
-    box-shadow: 0 10px 26px rgba(31, 57, 102, 0.09);
-    color: #22304a;
+    background: var(--surface);
+    box-shadow: none;
+    color: var(--text-secondary);
     font-size: 14px;
     line-height: 1.5;
   }
 
   .pc-message-row.is-mine .pc-bubble {
-    border-color: rgba(37, 99, 235, 0.36);
+    border-color: var(--accent-border);
     background: linear-gradient(135deg, rgba(37, 99, 235, 0.92), rgba(8, 145, 178, 0.9));
-    color: #fff;
+    color: var(--white);
   }
 
   .pc-bubble.is-draft {
@@ -615,20 +615,20 @@ const pageStyles = `
 
   .pc-quote {
     margin-bottom: 10px;
-    border-left: 3px solid #0891b2;
+    border-left: 3px solid var(--accent);
     padding: 8px 10px;
     border-radius: 8px;
-    background: rgba(8, 145, 178, 0.08);
-    color: #345064;
+    background: var(--accent-lighter);
+    color: var(--text-secondary);
   }
 
   .pc-code-card {
     margin-top: 10px;
     overflow: hidden;
-    border: 1px solid rgba(23, 32, 51, 0.1);
+    border: 1px solid var(--border);
     border-radius: 10px;
-    background: #111827;
-    color: #d7e5ff;
+    background: var(--code-bg);
+    color: var(--code-text);
   }
 
   .pc-code-card header {
@@ -637,8 +637,8 @@ const pageStyles = `
     justify-content: space-between;
     min-height: 34px;
     padding: 0 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    color: #9fb4d8;
+    border-bottom: 1px solid var(--border);
+    color: var(--code-text);
     font-family: "SFMono-Regular", Consolas, monospace;
     font-size: 12px;
   }
@@ -669,11 +669,11 @@ const pageStyles = `
     align-items: center;
     gap: 8px;
     min-height: 34px;
-    border: 1px solid rgba(132, 155, 190, 0.24);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 6px 10px;
-    background: rgba(255, 255, 255, 0.68);
-    color: #344055;
+    background: var(--surface);
+    color: var(--text-secondary);
     font: inherit;
     font-size: 12px;
   }
@@ -683,9 +683,9 @@ const pageStyles = `
   }
 
   .pc-attachment.is-active {
-    border-color: rgba(37, 99, 235, 0.34);
-    background: rgba(37, 99, 235, 0.1);
-    color: #1d4ed8;
+    border-color: var(--accent-border);
+    background: var(--accent-light);
+    color: var(--accent);
     font-weight: 800;
   }
 
@@ -722,12 +722,12 @@ const pageStyles = `
     min-height: 58px;
     max-height: 130px;
     resize: none;
-    border: 1px solid rgba(132, 155, 190, 0.2);
+    border: 1px solid var(--border);
     border-radius: 10px;
     outline: 0;
     padding: 12px 14px;
-    background: rgba(255, 255, 255, 0.64);
-    color: #172033;
+    background: var(--surface);
+    color: var(--text);
     line-height: 1.45;
   }
 
@@ -735,9 +735,9 @@ const pageStyles = `
     height: 36px;
     gap: 8px;
     padding: 0 14px;
-    border-color: rgba(37, 99, 235, 0.34);
-    background: linear-gradient(135deg, #2563eb, #0891b2);
-    color: #fff;
+    border-color: var(--accent-border);
+    background: var(--brand-gradient);
+    color: var(--white);
     font-weight: 800;
   }
 
@@ -752,10 +752,10 @@ const pageStyles = `
   }
 
   .pc-mini-card {
-    border: 1px solid rgba(255, 255, 255, 0.64);
+    border: 1px solid var(--glass-border);
     border-radius: 12px;
     padding: 12px;
-    background: rgba(255, 255, 255, 0.5);
+    background: var(--surface);
   }
 
   .pc-mini-card h3 {
@@ -765,7 +765,7 @@ const pageStyles = `
 
   .pc-mini-card p,
   .pc-mini-card li {
-    color: #667085;
+    color: var(--text-muted);
     font-size: 12px;
     line-height: 1.45;
   }
@@ -791,7 +791,7 @@ const pageStyles = `
   .pc-chip {
     min-height: 24px;
     padding: 4px 9px;
-    color: #40516f;
+    color: var(--text-muted);
     font-size: 11px;
     line-height: 1;
     box-shadow: none;
@@ -801,7 +801,7 @@ const pageStyles = `
     height: 8px;
     overflow: hidden;
     border-radius: 999px;
-    background: rgba(37, 99, 235, 0.1);
+    background: var(--accent-light);
   }
 
   .pc-progress span {
@@ -809,15 +809,15 @@ const pageStyles = `
     width: 68%;
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(90deg, #2563eb, #0891b2, #7c3aed);
+    background: linear-gradient(90deg, var(--accent), var(--accent), var(--accent));
   }
 
   .pc-empty {
     align-self: center;
     border-radius: 12px;
     padding: 14px 16px;
-    background: rgba(255, 255, 255, 0.55);
-    color: #667085;
+    background: var(--surface);
+    color: var(--text-muted);
     font-size: 13px;
   }
 
@@ -1222,6 +1222,15 @@ export function PrivateChatsPageInteractive() {
     showNotice('Local draft appended to this private thread', 'success');
   };
 
+  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    sendDraft();
+  };
+
   return (
     <div className="pc-page">
       <style>{pageStyles}</style>
@@ -1487,6 +1496,7 @@ export function PrivateChatsPageInteractive() {
               <textarea
                 aria-label={`Message ${activeConversation.name}`}
                 onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
                 placeholder="Write a private note, paste a code fragment, or attach handoff context..."
                 value={draft}
               />
