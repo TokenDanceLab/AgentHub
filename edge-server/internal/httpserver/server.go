@@ -121,6 +121,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		processExecutor.WithAgentRegistry(agentReg).WithMessageQueue(msgQueue).WithResultAggregator(resultAgg)
 		executor = processExecutor
 	}
+	configureLocalRunner(reg, cfg.ProcessExecutor, agentAdapterForRegistry(cfg.AdapterRegistry, cfg.AgentDefault), executor)
 
 	// Wire orchestrator adapter with runtime dependencies so it can spawn sub-agents.
 	wireOrchestrator(cfg.AdapterRegistry, executor, agentReg, msgQueue)
@@ -135,6 +136,70 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		MessageQueue:    msgQueue,
 		Metrics:         edgeMetrics,
 	}, nil
+}
+
+func agentAdapterForRegistry(adapterReg *adapters.Registry, agentDefault string) adapters.AgentAdapter {
+	if adapterReg == nil || agentDefault == "" {
+		return nil
+	}
+	agentAdapter, ok := adapterReg.Get(agentDefault)
+	if !ok {
+		return nil
+	}
+	return agentAdapter
+}
+
+func configureLocalRunner(reg *runners.Registry, execCfg lifecycle.ProcessExecutorConfig, agentAdapter adapters.AgentAdapter, executor lifecycle.RunExecutor) {
+	if reg == nil || executor == nil {
+		return
+	}
+	if agentAdapter != nil {
+		metadata := agentAdapter.Metadata()
+		reg.Upsert(runners.RunnerInfo{
+			ID:           "runner_local_1",
+			Name:         metadata.Name + " Runner (local)",
+			Status:       "online",
+			Capabilities: runnerCapabilitiesForAdapter(metadata.ID, agentAdapter.Capabilities()),
+		})
+		return
+	}
+	if execCfg.Command != "" {
+		reg.Upsert(runners.RunnerInfo{
+			ID:           "runner_local_1",
+			Name:         "Process Runner (local)",
+			Status:       "online",
+			Capabilities: []string{"process", "shell"},
+		})
+	}
+}
+
+func runnerCapabilitiesForAdapter(adapterID string, caps adapters.AgentCapabilities) []string {
+	capabilities := []string{adapterID}
+	if caps.Streaming {
+		capabilities = append(capabilities, "streaming")
+	}
+	if caps.ToolCalls {
+		capabilities = append(capabilities, "tool_calls")
+	}
+	if caps.FileChanges {
+		capabilities = append(capabilities, "file_changes")
+	}
+	if caps.PermissionHooks {
+		capabilities = append(capabilities, "permission_hooks")
+	}
+	if caps.ThinkingVisible {
+		capabilities = append(capabilities, "thinking_visible")
+	}
+	if caps.MultiTurn {
+		capabilities = append(capabilities, "multi_turn")
+	}
+	if caps.MCPIntegration {
+		capabilities = append(capabilities, "mcp_integration")
+	}
+	if caps.SubAgentSpawn {
+		capabilities = append(capabilities, "sub_agent_spawn")
+	}
+	return capabilities
 }
 
 // wireOrchestrator sets the SubAgentSpawner, AgentRegistry, and MessageQueue on
