@@ -11,6 +11,7 @@ import {
   mockRuns,
   mockWorkspaceFiles,
   mockRunners,
+  getWorkbenchCatalogState,
   workbenchReducer,
   type Artifact,
   type Project,
@@ -67,8 +68,6 @@ type Notice = {
   tone: NoticeTone;
   message: string;
 };
-
-type DataMode = 'loading' | 'live' | 'offline-snapshot' | 'mock' | 'unavailable';
 
 const viewLabels: Record<BoardView, string> = {
   overview: 'Overview',
@@ -189,42 +188,6 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs = 2500): Promise<T> {
       },
     );
   });
-}
-
-function dataModeFromState(state: WorkbenchState): DataMode {
-  const hasSnapshot =
-    state.projects.length > 0 ||
-    state.threads.length > 0 ||
-    state.runners.length > 0 ||
-    state.runs.length > 0 ||
-    state.artifacts.length > 0 ||
-    state.approvals.length > 0 ||
-    state.previews.length > 0;
-
-  if (state.connection.status === 'loading') return 'loading';
-  if (state.connection.status === 'connected' && hasSnapshot) return 'live';
-  if ((state.connection.status === 'disconnected' || state.connection.status === 'error') && hasSnapshot) {
-    return 'offline-snapshot';
-  }
-  if (state.connection.status === 'error' || state.connection.status === 'disconnected') return 'mock';
-  return 'unavailable';
-}
-
-function dataModeLabel(mode: DataMode) {
-  switch (mode) {
-    case 'loading':
-      return 'Loading catalog';
-    case 'live':
-      return 'Live';
-    case 'offline-snapshot':
-      return 'Offline snapshot';
-    case 'mock':
-      return 'Mock fallback';
-    case 'unavailable':
-      return 'Snapshot unavailable';
-    default:
-      return 'Snapshot unavailable';
-  }
 }
 
 function projectFromApi(project: Project) {
@@ -1310,20 +1273,12 @@ function useWorkbenchProjection() {
 
 export function ProjectPageInteractive() {
   const workbenchState = useWorkbenchProjection();
-  const dataMode = dataModeFromState(workbenchState);
-  const hasLiveCatalog = dataMode === 'live' || dataMode === 'offline-snapshot';
-  const catalogLabel = dataModeLabel(dataMode);
-  const catalogTone = dataMode === 'live' ? 'green' : dataMode === 'loading' ? 'cyan' : dataMode === 'offline-snapshot' ? 'purple' : dataMode === 'mock' ? 'amber' : 'neutral';
-  const catalogDetail =
-    dataMode === 'live'
-      ? 'Project catalog is loaded from Edge.'
-      : dataMode === 'offline-snapshot'
-        ? 'Edge is offline; preserving the last reducer snapshot.'
-        : dataMode === 'mock'
-          ? `Edge catalog unavailable: ${workbenchState.connection.error ?? 'no snapshot loaded'}. Showing mock demo data.`
-          : dataMode === 'loading'
-            ? 'Loading Edge catalog snapshot...'
-            : 'No Edge snapshot is available yet.';
+  const {
+    hasLiveCatalog,
+    label: catalogLabel,
+    message: catalogDetail,
+    tone: catalogTone,
+  } = getWorkbenchCatalogState(workbenchState);
   const projectedProjects = hasLiveCatalog && workbenchState.projects.length
     ? workbenchState.projects.map(projectFromApi)
     : projects;
