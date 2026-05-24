@@ -116,6 +116,9 @@ describe('SettingsPage tasks', () => {
         fileChanges: true,
         thinkingVisible: true,
         multiTurn: true,
+        mcpIntegration: false,
+        permissionHooks: false,
+        subAgentSpawn: false,
       },
     });
     mockRuns.splice(0, mockRuns.length, {
@@ -162,6 +165,9 @@ describe('SettingsPage tasks', () => {
         fileChanges: true,
         thinkingVisible: false,
         multiTurn: true,
+        mcpIntegration: false,
+        permissionHooks: false,
+        subAgentSpawn: false,
       },
     });
 
@@ -175,6 +181,55 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('toolCalls')).toBeInTheDocument();
     expect(screen.getByText('settings.marketTokenDancePublish')).toBeInTheDocument();
     expect(screen.getByText('settings.marketGuard')).toBeInTheDocument();
+  });
+
+  it('renders MCP runtime capability matrix from local profiles', () => {
+    mockAgents.splice(
+      0,
+      mockAgents.length,
+      {
+        id: 'claude-code',
+        name: 'Claude Code',
+        description: 'Claude Code runtime',
+        status: 'available',
+        capabilities: {
+          streaming: true,
+          toolCalls: true,
+          fileChanges: true,
+          thinkingVisible: false,
+          multiTurn: true,
+          mcpIntegration: true,
+          permissionHooks: true,
+          subAgentSpawn: false,
+        },
+      },
+      {
+        id: 'codex',
+        name: 'Codex',
+        description: 'Codex runtime',
+        status: 'available',
+        capabilities: {
+          streaming: true,
+          toolCalls: true,
+          fileChanges: true,
+          thinkingVisible: true,
+          multiTurn: true,
+          mcpIntegration: false,
+          permissionHooks: false,
+          subAgentSpawn: false,
+        },
+      },
+    );
+
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="mcp" />);
+
+    expect(screen.getByText('settings.mcpRuntimeSupport')).toBeInTheDocument();
+    expect(screen.getByText('settings.mcpRuntimeMatrix')).toBeInTheDocument();
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
+    expect(screen.getByText('Codex')).toBeInTheDocument();
+    expect(screen.getByText('settings.mcpTemplates')).toBeInTheDocument();
+    expect(screen.getByText('settings.mcpTokenDanceHub')).toBeInTheDocument();
+    expect(screen.getByText('settings.mcpGuard')).toBeInTheDocument();
   });
 
   it('renders project skill registry with script and review metadata', () => {
