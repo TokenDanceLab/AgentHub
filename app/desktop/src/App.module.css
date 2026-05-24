@@ -176,6 +176,19 @@
 }
 
 /* ── Light mode: explicit light segmented control ─ */
+[data-theme='light'] .rightPanel {
+  background: #F8F9FA;
+}
+
+[data-theme='light'] .rightPanelHeader {
+  background: #FFFFFF;
+}
+
+[data-theme='light'] .rightPanelBody {
+  background: #F8F9FA;
+  color: oklch(0.14 0.005 260);
+}
+
 [data-theme='light'] .rightPanelSegmented {
   background: #F1F3F5;
 }
@@ -183,6 +196,7 @@
 [data-theme='light'] .rightPanelTabActive {
   background: #FFFFFF;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  color: oklch(0.14 0.005 260);
 }
 
 .rightPanelTab {
