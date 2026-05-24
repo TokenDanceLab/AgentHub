@@ -473,15 +473,15 @@ Hub 调度（远程）:
 - [x] 创建 `useHubEventStream` hook — 分类事件状态管理
 - [x] 验证：20 hubWS tests + 419 全部通过
 
-##### 阶段 3: Agent 任务桥接 `[4d]`
+##### 阶段 3: Agent 任务桥接 `[4d]` ✅ M5
 
-- [ ] 新建 `app/desktop/src/hooks/useHubIntegration.ts` -- Hub-Edge 桥接核心
-- [ ] 监听 `agent.dispatch` → 解析 dispatchPayload → Edge `StartRunRequest`
-- [ ] Edge `run.agent.text_delta` → Hub `streamTask(taskId, content)`
-- [ ] Edge `run.agent.result` → Hub `doneTask()` 或 `failTask()`
-- [ ] 映射 `runId` ↔ `taskId` 双向追踪
-- [ ] 启动时注册设备 `POST /edge/devices/register`
-- [ ] 验证：Web 触发 Agent → Desktop 收到调度 → Edge 运行 → Web 聊天中看到 Agent 消息
+- [x] 新建 `app/desktop/src/hooks/useHubIntegration.ts` -- Hub-Edge 桥接核心（dispatch→run→stream→done/fail）
+- [x] 监听 `agent.dispatch` → 解析 dispatchPayload → Edge `StartRunRequest`
+- [x] Edge `run.agent.text_delta` → Hub `streamTask(taskId, content)`
+- [x] Edge `run.agent.result` → Hub `doneTask()` 或 `failTask()`
+- [x] 映射 `runId` ↔ `taskId` 双向追踪（taskBridgeStore）
+- [x] 启动时注册设备 `POST /edge/devices/register`
+- [x] 验证：22 integration tests + 440 全部通过
 
 ##### 阶段 4: Desktop IM UI `[5d]`
 
