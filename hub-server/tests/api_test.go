@@ -6,6 +6,10 @@ import (
 )
 
 func TestAuth(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	t.Run("Register", func(t *testing.T) {
 		w := post("/client/auth/register", map[string]string{
 			"username": "ta01", "password": "pass1234", "nickname": "A1",
@@ -63,6 +67,10 @@ func TestAuth(t *testing.T) {
 }
 
 func TestContacts(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	alice := register(t, "tc0a", "pass1234", "AliceC")
 	bob := register(t, "tc0b", "pass1234", "BobC")
 
@@ -100,6 +108,10 @@ func TestContacts(t *testing.T) {
 }
 
 func TestSessions(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	alice := register(t, "ts0a", "pass1234", "AliceS")
 	bob := register(t, "ts0b", "pass1234", "BobS")
 
@@ -141,6 +153,10 @@ func TestSessions(t *testing.T) {
 }
 
 func TestMessages(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	alice := register(t, "tm0a", "pass1234", "AliceM")
 	bob := register(t, "tm0b", "pass1234", "BobM")
 
@@ -190,6 +206,10 @@ func TestMessages(t *testing.T) {
 }
 
 func TestAttachmentsAndNotifications(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	u := register(t, "tan1", "pass1234", "AN")
 
 	t.Run("Probe", func(t *testing.T) {
@@ -206,6 +226,10 @@ func TestAttachmentsAndNotifications(t *testing.T) {
 }
 
 func TestCustomAgent(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	u := register(t, "tca01", "pass1234", "CA")
 
 	t.Run("CRUD", func(t *testing.T) {
@@ -220,6 +244,10 @@ func TestCustomAgent(t *testing.T) {
 }
 
 func TestEdgeDevice(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	register(t, "ted1", "pass1234", "Edge")
 
 	w := post("/client/auth/login", map[string]interface{}{"username": "ted1", "password": "pass1234", "device_type": "desktop", "device_id": "dddddddd-dddd-dddd-dddd-dddddddddd01"})

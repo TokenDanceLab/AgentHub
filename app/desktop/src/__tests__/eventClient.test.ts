@@ -45,12 +45,19 @@ describe('eventClient', () => {
 
     const ws = lastWs();
     ws.onopen?.();
-    ws.onmessage?.(new MessageEvent('msg', {
-      data: JSON.stringify({
-        version: 'v1', id: 'evt_1', seq: 1, type: 'run.started',
-        scope: {}, sentAt: new Date().toISOString(), payload: { runId: 'run_1' },
+    ws.onmessage?.(
+      new MessageEvent('msg', {
+        data: JSON.stringify({
+          version: 'v1',
+          id: 'evt_1',
+          seq: 1,
+          type: 'run.started',
+          scope: {},
+          sentAt: new Date().toISOString(),
+          payload: { runId: 'run_1' },
+        }),
       }),
-    }));
+    );
 
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(expect.objectContaining({ type: 'run.started' }));
@@ -91,12 +98,19 @@ describe('eventClient', () => {
     const unsub = stream.subscribe(handler);
     unsub();
 
-    lastWs().onmessage?.(new MessageEvent('msg', {
-      data: JSON.stringify({
-        version: 'v1', id: 'evt_2', seq: 2, type: 'run.finished',
-        scope: {}, sentAt: new Date().toISOString(), payload: {},
+    lastWs().onmessage?.(
+      new MessageEvent('msg', {
+        data: JSON.stringify({
+          version: 'v1',
+          id: 'evt_2',
+          seq: 2,
+          type: 'run.finished',
+          scope: {},
+          sentAt: new Date().toISOString(),
+          payload: {},
+        }),
       }),
-    }));
+    );
 
     expect(handler).not.toHaveBeenCalled();
     stream.close();

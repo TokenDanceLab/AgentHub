@@ -1,6 +1,7 @@
 package handler
 
 import (
+<<<<<<< HEAD
 	"encoding/json"
 	"time"
 
@@ -18,6 +19,25 @@ type DeviceHandler struct {
 
 func NewDeviceHandler(db *gorm.DB) *DeviceHandler {
 	return &DeviceHandler{db: db}
+=======
+	"github.com/gin-gonic/gin"
+
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/model"
+)
+
+// DeviceService is the subset of *service.DeviceService used by DeviceHandler.
+type DeviceService interface {
+	Register(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error)
+}
+
+type DeviceHandler struct {
+	deviceService DeviceService
+}
+
+func NewDeviceHandler(deviceService DeviceService) *DeviceHandler {
+	return &DeviceHandler{deviceService: deviceService}
+>>>>>>> origin/master
 }
 
 type registerDeviceReq struct {
@@ -36,6 +56,7 @@ func (h *DeviceHandler) Register(c *gin.Context) {
 	userID := c.GetString("user_id")
 	deviceType := c.GetString("device_type")
 
+<<<<<<< HEAD
 	capsBytes, _ := json.Marshal(req.Capabilities)
 
 	device := &model.Device{
@@ -48,6 +69,14 @@ func (h *DeviceHandler) Register(c *gin.Context) {
 	}
 
 	if err := repository.UpsertDevice(h.db, device); err != nil {
+=======
+	device, err := h.deviceService.Register(req.DeviceID, userID, deviceType, req.AppVersion, req.Capabilities)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+>>>>>>> origin/master
 		Fail(c, errcode.ErrInternal)
 		return
 	}

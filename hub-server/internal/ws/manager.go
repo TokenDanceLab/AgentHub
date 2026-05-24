@@ -7,10 +7,20 @@ import (
 	"sync/atomic"
 	"time"
 
+<<<<<<< HEAD
 	"github.com/coder/websocket"
 	"github.com/agenthub/server-hub/pkg/uuidv7"
 )
 
+=======
+	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/pkg/uuidv7"
+	"github.com/coder/websocket"
+)
+
+const sendBufSize = 256
+
+>>>>>>> origin/master
 type Conn struct {
 	ID         string
 	UserID     string
@@ -60,7 +70,11 @@ func (m *Manager) Count() int {
 func NewConn(ws *websocket.Conn) *Conn {
 	return &Conn{
 		W:    ws,
+<<<<<<< HEAD
 		Send: make(chan []byte, 64),
+=======
+		Send: make(chan []byte, sendBufSize),
+>>>>>>> origin/master
 	}
 }
 
@@ -164,6 +178,18 @@ func (m *Manager) PushToConn(connID string, frame Frame) {
 	select {
 	case c.Send <- data:
 	default:
+<<<<<<< HEAD
+=======
+		metrics.WSDroppedFrames.Inc()
+		sessionID := extractSessionID(frame.Payload)
+		slog.Warn("ws frame dropped: send buffer full",
+			"conn_id", connID,
+			"user_id", c.UserID,
+			"device_type", c.DeviceType,
+			"frame_type", frame.Type,
+			"session_id", sessionID,
+		)
+>>>>>>> origin/master
 	}
 }
 
@@ -218,6 +244,21 @@ func (m *Manager) StartHeartbeat() {
 	}()
 }
 
+<<<<<<< HEAD
+=======
+// Shutdown closes all WebSocket connections and clears the internal maps.
+// Call after the HTTP server has stopped accepting new connections.
+func (m *Manager) Shutdown() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, c := range m.conns {
+		c.Close()
+		delete(m.conns, id)
+	}
+	m.byUser = make(map[string]map[string]string)
+}
+
+>>>>>>> origin/master
 func (m *Manager) pingAll() {
 	m.mu.RLock()
 	conns := make([]*Conn, 0, len(m.conns))
@@ -243,3 +284,20 @@ func (m *Manager) pingAll() {
 		}
 	}
 }
+<<<<<<< HEAD
+=======
+
+func extractSessionID(payload any) string {
+	if m, ok := payload.(map[string]interface{}); ok {
+		if sid, ok := m["session_id"].(string); ok {
+			return sid
+		}
+	}
+	if m, ok := payload.(map[string]string); ok {
+		if sid, ok := m["session_id"]; ok {
+			return sid
+		}
+	}
+	return ""
+}
+>>>>>>> origin/master

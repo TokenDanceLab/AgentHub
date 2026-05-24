@@ -1,6 +1,10 @@
 package handler
 
 import (
+<<<<<<< HEAD
+=======
+	"context"
+>>>>>>> origin/master
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -9,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+<<<<<<< HEAD
 	"github.com/agenthub/server-hub/internal/errcode"
 	"github.com/agenthub/server-hub/internal/service"
 )
@@ -18,6 +23,26 @@ type AttachmentHandler struct {
 }
 
 func NewAttachmentHandler(s *service.AttachmentService) *AttachmentHandler {
+=======
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service"
+)
+
+// AttachmentService is the subset of *service.AttachmentService used by AttachmentHandler.
+type AttachmentService interface {
+	ProbeAttachment(ctx context.Context, hash string) (*model.Attachment, error)
+	SaveAttachment(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64) (*model.Attachment, error)
+	GetAttachmentByID(ctx context.Context, id string) (*model.Attachment, error)
+	MaxUploadSize() int64
+}
+
+type AttachmentHandler struct {
+	service AttachmentService
+}
+
+func NewAttachmentHandler(s AttachmentService) *AttachmentHandler {
+>>>>>>> origin/master
 	return &AttachmentHandler{service: s}
 }
 
@@ -34,12 +59,23 @@ func (h *AttachmentHandler) Probe(c *gin.Context) {
 
 	a, err := h.service.ProbeAttachment(c.Request.Context(), req.Hash)
 	if err != nil {
+<<<<<<< HEAD
+=======
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+>>>>>>> origin/master
 		Fail(c, errcode.ErrInternal)
 		return
 	}
 
 	OK(c, gin.H{
+<<<<<<< HEAD
 		"exists":      a != nil,
+=======
+		"exists":     a != nil,
+>>>>>>> origin/master
 		"attachment": a,
 	})
 }
@@ -62,7 +98,11 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 	}
 	defer file.Close()
 
+<<<<<<< HEAD
 	if header.Size > service.GetMaxUploadSize() {
+=======
+	if header.Size > h.service.MaxUploadSize() {
+>>>>>>> origin/master
 		Fail(c, errcode.AttachTooLarge)
 		return
 	}

@@ -1,0 +1,225 @@
+/* AgentSquarePage — Agent marketplace styles */
+.pageRoot { position: relative; min-height: 100vh; }
+
+/* Stats row */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.statCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.statIcon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(23, 105, 232, 0.1);
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.statIconCyan { color: #087f9e; background: rgba(8, 167, 207, 0.11); }
+.statIconPurple { color: #6044d7; background: rgba(116, 87, 232, 0.11); }
+.statIconGreen { color: #15744b; background: rgba(29, 155, 103, 0.11); }
+
+.statValue { display: block; font-size: 20px; font-weight: 700; line-height: 1; color: var(--foreground); }
+.statLabel { font-size: 12px; color: var(--muted-foreground); margin-top: 2px; }
+
+/* Market section */
+.market {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(28px);
+  overflow: hidden;
+}
+
+.marketHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.marketTitle { font-size: 16px; font-weight: 700; color: var(--foreground); }
+.marketSubtitle { font-size: 11px; color: var(--muted-foreground); font-weight: 800; text-transform: uppercase; letter-spacing: 0.09em; }
+
+.filterSummary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Agent grid */
+.agentGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(230px, 1fr));
+  gap: 14px;
+  overflow-y: auto;
+  flex: 1;
+  padding: 2px 4px 6px 2px;
+}
+
+/* Agent card */
+.agentCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.agentCard:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklch, var(--primary) 24%, transparent);
+  box-shadow: 0 22px 54px rgba(26, 40, 80, 0.16);
+}
+
+.agentCardInstalled { border-color: rgba(29, 155, 103, 0.28); }
+
+.cardHead { display: flex; align-items: flex-start; justify-content: space-between; }
+.cardTitle { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+.agentLogo {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; flex-shrink: 0;
+  color: var(--primary);
+  background: rgba(23, 105, 232, 0.1);
+}
+
+.logoBlue { color: var(--primary); background: rgba(23, 105, 232, 0.1); }
+.logoCyan { color: #087f9e; background: rgba(8, 167, 207, 0.11); }
+.logoPurple { color: #6044d7; background: rgba(116, 87, 232, 0.11); }
+.logoGreen { color: #15744b; background: rgba(29, 155, 103, 0.11); }
+
+.cardName {
+  font-size: 13px; font-weight: 700; color: var(--foreground);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.cardCategory { font-size: 11px; color: var(--muted-foreground); }
+
+.favBtn {
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(23, 105, 232, 0.14); border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62); color: var(--foreground);
+  cursor: pointer; flex-shrink: 0; padding: 0;
+}
+
+.favBtnActive {
+  color: #fff; border-color: transparent;
+  background: linear-gradient(135deg, var(--purple-token, #7457e8), var(--primary));
+}
+
+.cardCopy { font-size: 13px; line-height: 1.45; color: var(--muted-foreground); min-height: 58px; }
+
+.tagRow { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.tag {
+  font-size: 11px; font-weight: 800; padding: 5px 9px;
+  border: 1px solid rgba(23, 105, 232, 0.13); border-radius: 999px;
+  background: rgba(23, 105, 232, 0.08); color: #1459c7;
+  white-space: nowrap;
+}
+
+.tagCyan { border-color: rgba(8, 167, 207, 0.18); background: rgba(8, 167, 207, 0.1); color: #087f9e; }
+.tagPurple { border-color: rgba(116, 87, 232, 0.18); background: rgba(116, 87, 232, 0.1); color: #6044d7; }
+.tagGreen { border-color: rgba(29, 155, 103, 0.2); background: rgba(29, 155, 103, 0.11); color: #15744b; }
+
+.cardMeta { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted-foreground); }
+
+.cardActions { display: flex; justify-content: space-between; gap: 8px; margin-top: auto; }
+.cardActions > * { flex: 1; }
+
+/* Empty state */
+.emptyState {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  grid-column: 1 / -1; gap: 12px; padding: 28px;
+  border: 1px dashed rgba(23, 105, 232, 0.22); border-radius: 12px;
+  background: rgba(255, 255, 255, 0.42); text-align: center;
+}
+
+.emptyTitle { font-size: 15px; font-weight: 700; color: var(--foreground); }
+.emptyHint { font-size: 12px; color: var(--muted-foreground); }
+
+/* Drawer styles */
+.drawerHead { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.drawerTitle { font-size: 16px; font-weight: 700; color: var(--foreground); }
+.drawerSubtitle { font-size: 11px; color: var(--muted-foreground); font-weight: 800; text-transform: uppercase; letter-spacing: 0.09em; }
+
+.drawerSection { display: flex; flex-direction: column; gap: 10px; }
+.drawerSectionTitle { font-size: 13px; font-weight: 700; color: var(--foreground); }
+
+.drawerHero { display: flex; align-items: center; gap: 12px; }
+.drawerHeroLogo { width: 44px; height: 44px; }
+
+.drawerDesc { font-size: 12px; line-height: 1.45; color: var(--muted-foreground); }
+
+.drawerRow { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid rgba(255, 255, 255, 0.62); border-radius: 12px; background: rgba(255, 255, 255, 0.46); }
+.drawerRowIcon { width: 34px; height: 34px; }
+
+.drawerEmpty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex: 1; gap: 12px; text-align: center;
+  border: 1px dashed rgba(23, 105, 232, 0.22); border-radius: 12px;
+  background: rgba(255, 255, 255, 0.42); padding: 28px;
+}
+
+/* Confirmation bar */
+.confirmBar {
+  position: fixed; left: 50%; bottom: 22px; z-index: 10;
+  display: flex; align-items: center; gap: 12px;
+  width: min(560px, calc(100vw - 44px));
+  padding: 12px 14px; transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.7); border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
+  backdrop-filter: blur(28px);
+}
+
+.confirmText { flex: 1; min-width: 0; overflow: hidden; }
+.confirmTitle { font-size: 12px; font-weight: 700; display: block; }
+.confirmDetail { font-size: 11px; color: var(--muted-foreground); }
+
+/* Sort select */
+.sortSelect {
+  min-height: 38px; padding: 8px 34px 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.68); border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62); color: var(--foreground);
+  font-size: 12px; font-weight: 800; cursor: pointer; outline: none;
+}
+
+/* Responsive */
+@media (max-width: 1180px) {
+  .agentGrid { grid-template-columns: repeat(2, minmax(230px, 1fr)); }
+}
+@media (max-width: 820px) {
+  .stats, .agentGrid { grid-template-columns: 1fr; }
+}
