@@ -6,6 +6,7 @@ node_modules/
 dist/
 build/
 .next/
+.vite/
 coverage/
 playwright-report/
 test-results/
