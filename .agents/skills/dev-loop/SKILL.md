@@ -44,8 +44,9 @@ dev-loop 配合两个 CC 内置命令使用效果最好：
 ## 标准工作循环
 
 ### 1. 理解
-- 读 AGENTS.md / CLAUDE.md / README.md / ROADMAP.md / STATE.md
+- 读 `AGENTS.md` / `docs/handoff/STATE.md` / `docs/roadmap.md`
 - 理解现有架构、约定、当前进度
+- STATE.md 是跨 session 状态文件，每次接手先读
 
 ### 2. 规划
 - 长期任务：创建 ROADMAP.md 或在现有 ROADMAP 中登记任务
@@ -69,7 +70,7 @@ dev-loop 配合两个 CC 内置命令使用效果最好：
 
 ### 5. 同步
 - AGENTS.md / CLAUDE.md（规则变更）
-- STATE.md（事实变更）
+- `docs/handoff/STATE.md`（事实变更：进度/阻塞/部署状态）
 - ROADMAP.md（标记完成、记录阻塞、写下一步）
 - 运行 `neat-freak` 清理过时文档
 - 运行 `memory-management` 同步 memory（如有跨系统需求）
