@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -567,6 +568,55 @@ func TestPostRunsMarksExecutorStartFailureTerminalForRetry(t *testing.T) {
 	}
 	if len(retryExecutor.started) != 1 {
 		t.Fatalf("retry executor starts = %d, want 1", len(retryExecutor.started))
+	}
+}
+
+func TestPostRunsCleansTerminalRunsBeforeCreatingNewRun(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+
+	for i := 0; i < defaultRunCleanupMaxTerminalRunsPerThread+1; i++ {
+		runID := fmt.Sprintf("run_terminal_%02d", i)
+		itemID := fmt.Sprintf("item_terminal_%02d", i)
+		run, err := h.Store.CreateRun(runID, "proj_local", "thread_local")
+		if err != nil {
+			t.Fatalf("CreateRun(%q) returned error: %v", runID, err)
+		}
+		if _, ok := h.Store.SetRunStatus(run.ID, "finished"); !ok {
+			t.Fatalf("SetRunStatus(%q) returned ok=false", run.ID)
+		}
+		if _, err := h.Store.CreateItem(store.Item{
+			ID:        itemID,
+			ProjectID: run.ProjectID,
+			ThreadID:  run.ThreadID,
+			RunID:     run.ID,
+			Type:      "run",
+			Status:    "finished",
+		}); err != nil {
+			t.Fatalf("CreateItem(%q) returned error: %v", itemID, err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("POST /v1/runs status = %d, want 202; body=%s", rec.Code, rec.Body.String())
+	}
+	if _, ok := h.Store.GetRun("run_terminal_00"); ok {
+		t.Fatal("oldest terminal run was not cleaned before creating a new run")
+	}
+	if _, ok := h.Store.GetItem("item_terminal_00"); ok {
+		t.Fatal("item for oldest terminal run was not cleaned before creating a new run")
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+	if got := h.Store.ListRuns("thread_local"); len(got) != defaultRunCleanupMaxTerminalRunsPerThread+1 {
+		t.Fatalf("thread run count = %d, want retained terminal runs plus new active run", len(got))
 	}
 }
 
