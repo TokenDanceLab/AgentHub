@@ -152,6 +152,7 @@
   "prompt.starting": "正在启动运行",
 
   "run.close": "关闭运行详情",
+  "run.collapsedRail": "已收起的运行详情控制栏",
   "run.empty": "当前没有正在执行的任务",
   "run.fileChanges": "项目文件",
   "run.files": "文件",
