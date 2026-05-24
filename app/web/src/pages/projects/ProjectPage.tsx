@@ -12,11 +12,13 @@ import {
   mockWorkspaceFiles,
   mockRunners,
   getWorkbenchCatalogState,
+  getWorkbenchSectionSource,
   workbenchReducer,
   type Artifact,
   type Project,
   type Run,
   type Runner,
+  type WorkbenchSectionSource,
   type WorkbenchState,
 } from '@shared/index';
 
@@ -67,13 +69,6 @@ type TaskForm = {
 type Notice = {
   tone: NoticeTone;
   message: string;
-};
-
-type SourceTone = 'green' | 'purple' | 'amber' | 'cyan' | 'neutral';
-
-type SectionSource = {
-  label: string;
-  tone: SourceTone;
 };
 
 const viewLabels: Record<BoardView, string> = {
@@ -235,35 +230,7 @@ function runRecordFromApi(run: Run): RunRecord {
   };
 }
 
-function snapshotSectionSource(mode: ReturnType<typeof getWorkbenchCatalogState>['mode'], hasSnapshotData: boolean): SectionSource {
-  if (hasSnapshotData) {
-    if (mode === 'offline-snapshot') {
-      return { label: 'Offline snapshot', tone: 'purple' };
-    }
-
-    return { label: 'Edge snapshot', tone: 'green' };
-  }
-
-  if (mode === 'loading') {
-    return { label: 'Loading snapshot', tone: 'cyan' };
-  }
-
-  if (mode === 'mock') {
-    return { label: 'Mock fallback', tone: 'amber' };
-  }
-
-  return { label: 'Snapshot unavailable', tone: 'neutral' };
-}
-
-function mergedSectionSource(baseSource: SectionSource, hasLocalDryRun: boolean): SectionSource {
-  if (!hasLocalDryRun) {
-    return baseSource;
-  }
-
-  return { label: `Local dry-run / ${baseSource.label}`, tone: 'cyan' };
-}
-
-function SourceLabel({ source }: { source: SectionSource }) {
+function SourceLabel({ source }: { source: WorkbenchSectionSource }) {
   return <span className={`projectSourceLabel ${source.tone}`}>{source.label}</span>;
 }
 
@@ -1367,10 +1334,14 @@ export function ProjectPageInteractive() {
     mode: catalogMode,
     tone: catalogTone,
   } = getWorkbenchCatalogState(workbenchState);
-  const projectSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.projects.length > 0);
-  const taskSnapshotSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.runs.length > 0);
-  const fileSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.artifacts.length > 0);
-  const runSnapshotSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.runs.length > 0);
+  const projectSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.projects.length > 0,
+  });
+  const fileSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.artifacts.length > 0,
+  });
   const projectedProjects = hasLiveCatalog && workbenchState.projects.length
     ? workbenchState.projects.map(projectFromApi)
     : projects;
@@ -1407,8 +1378,16 @@ export function ProjectPageInteractive() {
     [localTasks, projectedTasks, taskOverrides],
   );
   const projectRuns = useMemo(() => [...localRuns, ...projectedRuns], [localRuns, projectedRuns]);
-  const taskSource = mergedSectionSource(taskSnapshotSource, localTasks.length > 0);
-  const runSource = mergedSectionSource(runSnapshotSource, localRuns.length > 0);
+  const taskSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.runs.length > 0,
+    hasLocalDryRun: localTasks.length > 0,
+  });
+  const runSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.runs.length > 0,
+    hasLocalDryRun: localRuns.length > 0,
+  });
 
   const canSaveTask = taskForm.title.trim().length > 0 && taskForm.owner.trim().length > 0;
   const completedTaskCount = projectTasks.filter((task) => task.status === 'Done').length;

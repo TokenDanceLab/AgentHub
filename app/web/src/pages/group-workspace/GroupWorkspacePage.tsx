@@ -11,11 +11,13 @@ import {
   mockRuns,
   mockWorkspaceFiles,
   getWorkbenchCatalogState,
+  getWorkbenchSectionSource,
   workbenchReducer,
   MockEventStream,
   playRunLifecycle,
   type Run,
   type Runner,
+  type WorkbenchSectionSource,
   type WorkbenchState,
 } from '@shared/index';
 
@@ -69,13 +71,6 @@ type Confirmation = {
   detail: string;
   title: string;
   tone: ConfirmationTone;
-};
-
-type SourceTone = "green" | "purple" | "amber" | "cyan" | "neutral";
-
-type SectionSource = {
-  label: string;
-  tone: SourceTone;
 };
 
 const accentPalette = ["blue", "purple", "teal", "cyan"] as const;
@@ -199,35 +194,7 @@ function activityFromRun(run: Run, index: number, runners: Runner[]): ActivityIt
   };
 }
 
-function snapshotSectionSource(mode: ReturnType<typeof getWorkbenchCatalogState>["mode"], hasSnapshotData: boolean): SectionSource {
-  if (hasSnapshotData) {
-    if (mode === "offline-snapshot") {
-      return { label: "Offline snapshot", tone: "purple" };
-    }
-
-    return { label: "Edge snapshot", tone: "green" };
-  }
-
-  if (mode === "loading") {
-    return { label: "Loading snapshot", tone: "cyan" };
-  }
-
-  if (mode === "mock") {
-    return { label: "Mock fallback", tone: "amber" };
-  }
-
-  return { label: "Snapshot unavailable", tone: "neutral" };
-}
-
-function mergedSectionSource(baseSource: SectionSource, hasLocalDryRun: boolean): SectionSource {
-  if (!hasLocalDryRun) {
-    return baseSource;
-  }
-
-  return { label: `Local dry-run / ${baseSource.label}`, tone: "cyan" };
-}
-
-function SourceLabel({ source }: { source: SectionSource }) {
+function SourceLabel({ source }: { source: WorkbenchSectionSource }) {
   return <span className={`gwr-source ${source.tone}`}>{source.label}</span>;
 }
 
@@ -1221,10 +1188,10 @@ export function GroupWorkspacePageInteractive() {
     mode: catalogMode,
     tone: catalogTone,
   } = getWorkbenchCatalogState(workbenchState);
-  const memberSnapshotSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.runners.length > 0);
-  const taskSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.runs.length > 0);
-  const baseFileSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.artifacts.length > 0);
-  const baseActivitySource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.runs.length > 0);
+  const taskSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.runs.length > 0,
+  });
   const [approval, setApproval] = useState<ApprovalState>("pending");
   const [taskOwner, setTaskOwner] = useState("Xavier");
   const [syncState, setSyncState] = useState<SyncState>({
@@ -1290,7 +1257,11 @@ export function GroupWorkspacePageInteractive() {
   const visibleMembers = workspaceMembers.filter((member) => memberFilter === "all" || member.presence === memberFilter);
   const onlineCount = workspaceMembers.filter((member) => member.presence === "online").length;
   const busyCount = workspaceMembers.filter((member) => member.presence === "busy").length;
-  const memberSource = mergedSectionSource(memberSnapshotSource, hasLocalMemberChanges);
+  const memberSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.runners.length > 0,
+    hasLocalDryRun: hasLocalMemberChanges,
+  });
   const approvalLabel = approved ? "Approved" : needsEdits ? "Changes requested" : "Awaiting approval";
   const approvalLocked = !approved;
   const syncedFiles: FileItem[] = syncState.revision
@@ -1310,17 +1281,22 @@ export function GroupWorkspacePageInteractive() {
     accent: fileAccentPalette[index % fileAccentPalette.length] ?? 'cyan',
   }));
   const workspaceFiles = [...(hasLiveCatalog && liveFiles.length ? liveFiles : files), ...syncedFiles];
-  const fileSource = mergedSectionSource(baseFileSource, syncedFiles.length > 0);
+  const fileSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.artifacts.length > 0,
+    hasLocalDryRun: syncedFiles.length > 0,
+  });
   const displayedBaseTasks = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map((run, index) => taskFromRun(run, index, workbenchState.runners))
     : baseTasks;
   const displayedActivities = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map((run, index) => activityFromRun(run, index, workbenchState.runners))
     : activityLog;
-  const activitySource = mergedSectionSource(
-    baseActivitySource,
-    !(hasLiveCatalog && workbenchState.runs.length) && activityLog.length > initialActivities.length,
-  );
+  const activitySource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.runs.length > 0,
+    hasLocalDryRun: !(hasLiveCatalog && workbenchState.runs.length) && activityLog.length > initialActivities.length,
+  });
 
   const tasks = useMemo<WorkspaceTask[]>(() => {
     return displayedBaseTasks.map((task) => {

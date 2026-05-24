@@ -148,6 +148,7 @@ export type {
 export {
   getWorkbenchCatalogState,
   getWorkbenchDataMode,
+  getWorkbenchSectionSource,
   workbenchDataModeLabels,
   workbenchDataModeTones,
 } from './workbenchDataMode';
@@ -155,6 +156,8 @@ export type {
   WorkbenchCatalogState,
   WorkbenchCatalogTone,
   WorkbenchDataMode,
+  WorkbenchSectionSource,
+  WorkbenchSectionSourceInput,
 } from './workbenchDataMode';
 
 export {
