@@ -239,6 +239,9 @@ export default function App() {
               <div className={styles.sidebarSectionLabel}>{t('thread.title')}</div>
               <div className={styles.sidebarScroll}>
                 <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
+                {threads.length === 0 && (
+                  <div className={styles.sidebarEmpty}>{t('thread.emptyHint')}</div>
+                )}
               </div>
             </div>
 

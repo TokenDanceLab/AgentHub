@@ -83,6 +83,13 @@
   padding: 4px 8px;
 }
 
+.sidebarEmpty {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #A1A1AA;
+  line-height: 1.4;
+}
+
 /* ── Global search ─────────────────────────── */
 .sidebarSearch {
   margin: 6px 8px;
@@ -181,7 +188,7 @@
   font-weight: 600;
 }
 
-.workspaceHeader h2 { font-size: inherit; font-weight: 600; margin: 0; }
+.workspaceHeader h2 { font-size: 13px; font-weight: 500; margin: 0; }
 
 .workspaceHeaderDot {
   width: 7px;
