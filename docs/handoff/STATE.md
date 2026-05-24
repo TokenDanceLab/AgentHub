@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-24 15:45 UTC+8 | 分支：dev/delicious233 | 提交：e38caa7
+最后更新：2026-05-24 19:00 UTC+8 | 分支：dev/delicious233 | 提交：1f50b17
 
 ## 快速上手
 
@@ -70,6 +70,17 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - ✅ Repository 测试 0%→75.5%
 - ✅ 生产部署 hk2（独立 PG/Redis，与 AIhub 隔离）
 - ✅ 官网 Hub API 集成
+- ✅ Desktop 卡片式 UI 重构（左导航 + 中间主卡片 + 右侧面板）
+- ✅ 无边框 Tauri 窗口 + One Dark Pro 暗色主题
+- ✅ i18n 跟随系统语言（navigator.language）
+
+### 2026-05-24 本轮修复
+- `hubAuth.ts`: `getState()` snapshot 稳定化，修复 React StrictMode 无限重渲染
+- `main.tsx`: 移除 AuthPage 门控，App 直接渲染，Hub 登录改为弹窗
+- `hub-server`: Device/RefreshToken ID 改用服务端 UUIDv7（修复 PostgreSQL uuid 列拒绝客户端非 UUID 字符串）
+- `hub-server`: 新增 migration 0017 — devices 索引改为 UNIQUE（修复 ON CONFLICT）
+- `hub-server`: Docker config 日志改 stdout（之前写入不存在目录导致日志丢失）
+- hk2 Docker 磁盘清理（释放 12GB）
 
 ## 模型分配
 
@@ -109,7 +120,31 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - 分发 subagent、交叉审查
 - 更新 roadmap 和文档
 
-## 当前阻塞
+## 当前阻塞 / 已知问题
 
-- 全项目 hooks 测试失败（311/604）：pnpm 跨包虚拟存储导致 React 实例不一致，影响所有 use*/Hook 测试。非 hooks 组件测试正常。长期方案：pnpm workspace 统一虚拟存储。
-- api.hub.vectorcontrol.tech 无 SSL（HTTP only），需要时加 Let's Encrypt
+- 全项目 hooks 测试失败（305/598）：pnpm 跨包虚拟存储导致 React 实例不一致。非 hooks 组件测试正常。
+- api.hub.vectorcontrol.tech 无 SSL（HTTP only）
+- hk2 登录已修复但需验证（migration 0017 + UUIDv7 修复后需重建容器，磁盘空间已清理）
+- hk2 磁盘 29GB 总量偏小，需定期清理 Docker 镜像（`docker image prune -af`）
+
+## 本地开发
+
+```powershell
+# Edge Server（必需，先启动）
+cd edge-server && go build -o agenthub-edge.exe ./cmd/agenthub-edge && .\agenthub-edge.exe --store-file test_store.json
+
+# Desktop（Tauri 原生窗口）
+cd app/desktop && pnpm tauri dev
+
+# Hub Server — 不需要本地跑！Desktop 直接连 hk2 生产 Hub
+# Hub URL: http://api.hub.vectorcontrol.tech
+# 如需本地跑 Hub，见 .ops/backend-audit.md
+```
+
+## 接手文档
+
+| 文档 | 位置 | 面向 |
+|---|---|---|
+| 前端接手指南 | `.ops/frontend-handoff.md` | 前端 agent |
+| 后端接口审计 | `.ops/backend-audit.md` | 后端 agent |
+| hk2 运维手册 | `.ops/hk2-deployment.md` | 运维 |
