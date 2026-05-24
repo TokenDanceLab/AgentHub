@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Code2,
   Computer,
+  Cpu,
   Eye,
   FolderGit2,
   GitBranch,
@@ -24,6 +25,7 @@ import {
   Palette,
   Plug,
   Route,
+  Server,
   ShieldCheck,
   SlidersHorizontal,
   TerminalSquare,
@@ -32,6 +34,11 @@ import {
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHubStore } from '@/stores/hubStore';
+import { useAgentList } from '@/api/agentQueries';
+import { useRuns } from '@/api/runQueries';
+import { useHealth } from '@/hooks/useHealth';
+import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
+import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
 import styles from './SettingsPage.module.css';
 
 export type SectionId =
@@ -40,6 +47,8 @@ export type SectionId =
   | 'configuration'
   | 'personalization'
   | 'permissions'
+  | 'agentProfiles'
+  | 'executionTargets'
   | 'tasks'
   | 'onlineIm'
   | 'groupChat'
@@ -118,6 +127,10 @@ function writeStoredValue(key: string, value: string | boolean) {
 export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'general' }: Props) {
   const { t } = useTranslation();
   const { themeMode, setThemeMode } = useTheme();
+  const { online: edgeOnline, health } = useHealth();
+  const { data: agentData } = useAgentList(edgeOnline);
+  const { data: runData, isError: runsError, isLoading: runsLoading } = useRuns();
+  const bridgedTasks = useTaskBridgeStore((s) => s.tasks);
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const username = useHubStore((s) => s.username);
   const clearHubAuth = useHubStore((s) => s.clear);
@@ -142,6 +155,21 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [auditTrail, setAuditTrail] = useStoredBooleanState('auditTrail', true);
   const [detailLevel, setDetailLevel] = useStoredValueState<SelectValue>('detailLevel', 'detailed');
   const [approvalMode, setApprovalMode] = useStoredValueState<SelectValue>('approvalMode', 'ask');
+  const agents = agentData?.items ?? [];
+  const availableAgents = agents.filter((agent) => agent.status === 'available').length;
+  const runnerHealth = health?.checks?.runners;
+  const runnerItems = runnerHealth?.items ?? [];
+  const availableRunners = runnerHealth?.available ?? runnerItems.filter((item) => item.status === 'online').length;
+  const totalRunners = runnerHealth?.total ?? runnerItems.length;
+  const runnerSummary = edgeOnline
+    ? t('settings.runnerSummary', { available: availableRunners, total: totalRunners })
+    : t('settings.edgeOffline');
+  const runs = runData?.items ?? [];
+  const activeRuns = runs.filter(isActiveRun).length;
+  const latestRun = getRecentRuns(runs, 1)[0];
+  const recentRuns = getRecentRuns(runs, 5);
+  const activeHubTasks = bridgedTasks.filter(isActiveBridgeTask).length;
+  const recentBridgeTasks = getRecentTasks(bridgedTasks, 5);
 
   const navItems = useMemo<NavItem[]>(
     () => [
@@ -150,6 +178,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
       { id: 'configuration', label: t('settings.configuration'), icon: <Wrench size={17} />, group: 'workspace' },
       { id: 'personalization', label: t('settings.personalization'), icon: <UserCircle size={17} />, group: 'workspace' },
       { id: 'permissions', label: t('settings.permissions'), icon: <ShieldCheck size={17} />, group: 'workspace' },
+      { id: 'agentProfiles', label: t('settings.agentProfiles'), icon: <Bot size={17} />, group: 'workspace' },
+      { id: 'executionTargets', label: t('settings.executionTargets'), icon: <Server size={17} />, group: 'workspace' },
       { id: 'tasks', label: t('settings.tasks'), icon: <ClipboardList size={17} />, group: 'workspace' },
       { id: 'onlineIm', label: t('settings.onlineIm'), icon: <Globe2 size={17} />, group: 'workspace' },
       { id: 'groupChat', label: t('settings.groupChat'), icon: <MessageSquareText size={17} />, group: 'workspace' },
@@ -381,16 +411,147 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             </Panel>
           )}
 
+          {active === 'agentProfiles' && (
+            <Panel title={t('settings.agentProfiles')} description={t('settings.agentProfilesDesc')}>
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<Bot size={18} />}
+                  label={t('settings.profileAvailable')}
+                  value={`${availableAgents}/${agents.length}`}
+                  detail={edgeOnline ? t('settings.profileAvailableDesc') : t('settings.edgeOffline')}
+                />
+                <SummaryCard
+                  icon={<Cpu size={18} />}
+                  label={t('settings.profileRuntimeCoverage')}
+                  value={runnerSummary}
+                  detail={t('settings.profileRuntimeCoverageDesc')}
+                />
+              </div>
+              <div className={styles.profileGrid}>
+                {agents.length > 0 ? (
+                  agents.map((agent) => <AgentProfileCard key={agent.id} agent={agent} />)
+                ) : (
+                  <EmptyBlock title={t('settings.noAgentProfiles')} description={t('settings.noAgentProfilesDesc')} />
+                )}
+              </div>
+              <SettingRow title={t('settings.profileConfigSource')} description={t('settings.profileConfigSourceDesc')} value="AGENTS.md / memory / skills" />
+              <SettingRow title={t('settings.profilePublish')} description={t('settings.profilePublishDesc')} value={t('settings.statusPlanned')} />
+            </Panel>
+          )}
+
+          {active === 'executionTargets' && (
+            <Panel title={t('settings.executionTargets')} description={t('settings.executionTargetsDesc')}>
+              <div className={styles.targetGrid}>
+                <ExecutionTargetCard
+                  icon={<Monitor size={18} />}
+                  title={t('settings.targetLocalEdge')}
+                  description={t('settings.targetLocalEdgeDesc')}
+                  status={edgeOnline ? health?.status ?? 'ok' : t('settings.offline')}
+                  metric={runnerSummary}
+                  connected={edgeOnline && availableRunners > 0}
+                />
+                <ExecutionTargetCard
+                  icon={<Globe2 size={18} />}
+                  title={t('settings.targetHubRelay')}
+                  description={t('settings.targetHubRelayDesc')}
+                  status={hubAuthenticated ? t('settings.enabled') : t('settings.notConfigured')}
+                  metric={hubAuthenticated ? t('settings.targetHubSignedIn') : t('settings.targetHubSignInRequired')}
+                  connected={hubAuthenticated}
+                />
+                <ExecutionTargetCard
+                  icon={<Server size={18} />}
+                  title={t('settings.targetSsh')}
+                  description={t('settings.targetSshDesc')}
+                  status={t('settings.statusPlanned')}
+                  metric="SSH / Tailscale"
+                />
+                <ExecutionTargetCard
+                  icon={<Computer size={18} />}
+                  title={t('settings.targetCloudEdge')}
+                  description={t('settings.targetCloudEdgeDesc')}
+                  status={t('settings.statusPlanned')}
+                  metric="Cloud Edge"
+                />
+              </div>
+              {runnerItems.length > 0 ? (
+                <div className={styles.runnerList}>
+                  {runnerItems.map((runner) => <RunnerRow key={runner.id} runner={runner} />)}
+                </div>
+              ) : (
+                <Callout title={t('settings.runnerInventory')} body={t('settings.runnerInventoryDesc')} />
+              )}
+            </Panel>
+          )}
+
           {active === 'tasks' && (
             <Panel title={t('settings.tasks')} description={t('settings.tasksDesc')}>
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<Route size={18} />}
+                  label={t('settings.taskLocalRuns')}
+                  value={`${activeRuns}/${runs.length}`}
+                  detail={runsLoading ? t('settings.loading') : t('settings.taskLocalRunsDesc')}
+                />
+                <SummaryCard
+                  icon={<ClipboardList size={18} />}
+                  label={t('settings.taskHubBridge')}
+                  value={`${activeHubTasks}/${bridgedTasks.length}`}
+                  detail={hubAuthenticated ? t('settings.taskHubBridgeDesc') : t('settings.taskHubBridgeSignedOut')}
+                />
+                <SummaryCard
+                  icon={<Monitor size={18} />}
+                  label={t('settings.taskLastRun')}
+                  value={latestRun ? t(`run.status.${latestRun.status}`, { defaultValue: latestRun.status }) : t('settings.noData')}
+                  detail={latestRun ? formatTimestamp(latestRun.finishedAt ?? latestRun.startedAt ?? latestRun.createdAt) : t('settings.taskLastRunDesc')}
+                />
+                <SummaryCard
+                  icon={<ShieldCheck size={18} />}
+                  label={t('settings.taskApprovalQueue')}
+                  value={t('settings.statusPlanned')}
+                  detail={t('settings.taskApprovalQueueDesc')}
+                />
+              </div>
               <SettingRow
                 title={t('settings.taskSync')}
                 description={t('settings.taskSyncDesc')}
                 control={<Switch checked={taskSync} onChange={setBooleanSetting('taskSync', setTaskSync)} />}
               />
-              <SettingRow title={t('settings.taskInbox')} description={t('settings.taskInboxDesc')} value={t('settings.statusReady')} />
+              <SettingRow
+                title={t('settings.taskInbox')}
+                description={t('settings.taskInboxDesc')}
+                value={runsError ? t('settings.edgeOffline') : t('settings.statusInProgress')}
+              />
               <SettingRow title={t('settings.taskRunBinding')} description={t('settings.taskRunBindingDesc')} value={t('settings.statusInProgress')} />
-              <SettingRow title={t('settings.taskApprovalQueue')} description={t('settings.taskApprovalQueueDesc')} value={t('settings.statusPlanned')} />
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.taskRecentRuns')}</strong>
+                  <span>{t('settings.taskRecentRunsDesc')}</span>
+                </div>
+                {recentRuns.length > 0 ? (
+                  <div className={styles.taskList}>
+                    {recentRuns.map((run) => (
+                      <TaskRunRow key={run.runId} run={run} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.taskNoRuns')} description={t('settings.taskNoRunsDesc')} />
+                )}
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.taskBridgeQueue')}</strong>
+                  <span>{t('settings.taskBridgeQueueDesc')}</span>
+                </div>
+                {recentBridgeTasks.length > 0 ? (
+                  <div className={styles.taskList}>
+                    {recentBridgeTasks.map((task) => (
+                      <HubTaskRow key={task.taskId} task={task} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.taskNoHubTasks')} description={t('settings.taskNoHubTasksDesc')} />
+                )}
+              </div>
             </Panel>
           )}
 
@@ -542,8 +703,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 description={hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
                 connected={hubAuthenticated}
               />
-              <ConnectionRow name="Edge" description={t('settings.edgeLocal')} connected />
-              <ConnectionRow name="WebSocket" description={t('status.wsConnected')} connected />
+              <ConnectionRow name="Edge" description={`${t('settings.edgeLocal')} · ${runnerSummary}`} connected={edgeOnline} />
+              <ConnectionRow name="WebSocket" description={t('status.wsConnected')} connected={edgeOnline} />
             </Panel>
           )}
 
@@ -701,6 +862,47 @@ function useStoredValueState<T extends string>(key: string, fallback: T) {
   return useState<T>(() => readStoredValue(key, fallback));
 }
 
+function isActiveRun(run: RunInfo) {
+  return ['queued', 'started', 'running', 'cancelling'].includes(run.status);
+}
+
+function isActiveBridgeTask(task: AgentTask) {
+  return task.status === 'queued' || task.status === 'running';
+}
+
+function getRecentRuns(runs: RunInfo[], limit: number) {
+  return [...runs]
+    .sort((a, b) => timestampOf(b.finishedAt ?? b.startedAt ?? b.createdAt) - timestampOf(a.finishedAt ?? a.startedAt ?? a.createdAt))
+    .slice(0, limit);
+}
+
+function getRecentTasks(tasks: AgentTask[], limit: number) {
+  return [...tasks].sort((a, b) => timestampOf(b.createdAt) - timestampOf(a.createdAt)).slice(0, limit);
+}
+
+function timestampOf(value?: string) {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function formatTimestamp(value?: string) {
+  if (!value) return '--';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function shortId(value?: string) {
+  if (!value) return '--';
+  return value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
+}
+
 function Panel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
     <section className={styles.panel}>
@@ -710,6 +912,50 @@ function Panel({ title, description, children }: { title: string; description?: 
       </div>
       <div className={styles.panelBody}>{children}</div>
     </section>
+  );
+}
+
+function TaskRunRow({ run }: { run: RunInfo }) {
+  const { t } = useTranslation();
+  const timestamp = run.finishedAt ?? run.startedAt ?? run.createdAt;
+  return (
+    <div className={styles.taskRow}>
+      <div className={styles.connectionIcon}>
+        <Route size={17} />
+      </div>
+      <div className={styles.settingCopy}>
+        <strong>{shortId(run.runId)}</strong>
+        <span>{run.projectId} / {run.threadId}</span>
+        <div className={styles.taskMeta}>
+          <span>{formatTimestamp(timestamp)}</span>
+        </div>
+      </div>
+      <span className={`${styles.statusPill} ${isActiveRun(run) ? styles.statusPillOn : ''}`}>
+        {t(`run.status.${run.status}`, { defaultValue: run.status })}
+      </span>
+    </div>
+  );
+}
+
+function HubTaskRow({ task }: { task: AgentTask }) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.taskRow}>
+      <div className={styles.connectionIcon}>
+        <ClipboardList size={17} />
+      </div>
+      <div className={styles.settingCopy}>
+        <strong>{shortId(task.taskId)}</strong>
+        <span>{task.prompt}</span>
+        <div className={styles.taskMeta}>
+          <span>{task.agentId}</span>
+          <span>{task.runId ? shortId(task.runId) : t('settings.taskUnbound')}</span>
+        </div>
+      </div>
+      <span className={`${styles.statusPill} ${isActiveBridgeTask(task) ? styles.statusPillOn : ''}`}>
+        {t(`settings.taskStatus.${task.status}`, { defaultValue: task.status })}
+      </span>
+    </div>
   );
 }
 
@@ -744,6 +990,89 @@ function CapabilityCard({ title, description, status }: { title: string; descrip
       <strong>{title}</strong>
       <span>{description}</span>
       <em>{status}</em>
+    </div>
+  );
+}
+
+function SummaryCard({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail: string }) {
+  return (
+    <div className={styles.summaryCard}>
+      <div className={styles.summaryIcon}>{icon}</div>
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        <small>{detail}</small>
+      </div>
+    </div>
+  );
+}
+
+function AgentProfileCard({ agent }: { agent: AgentInfo }) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.profileCard}>
+      <div className={styles.profileHeader}>
+        <div className={styles.profileIcon}>
+          <Bot size={17} />
+        </div>
+        <div>
+          <strong>{agent.name}</strong>
+          <span>{agent.description || t('settings.profileDefaultDesc')}</span>
+        </div>
+        <em className={`${styles.profileStatus} ${styles[`profileStatus_${agent.status}`]}`}>
+          {t(`agent.status.${agent.status}`)}
+        </em>
+      </div>
+      <div className={styles.profileMeta}>
+        <span>{t('settings.profileRuntime')}: {agent.id}</span>
+        <span>{t('settings.profileModel')}: {t('settings.routingAuto')}</span>
+        <span>{t('settings.profileConfig')}: {t('settings.statusInProgress')}</span>
+      </div>
+    </div>
+  );
+}
+
+function ExecutionTargetCard({
+  icon,
+  title,
+  description,
+  status,
+  metric,
+  connected = false,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  status: string;
+  metric: string;
+  connected?: boolean;
+}) {
+  return (
+    <div className={styles.targetCard}>
+      <div className={styles.targetTop}>
+        <div className={styles.targetIcon}>{icon}</div>
+        <span className={`${styles.statusPill} ${connected ? styles.statusPillOn : ''}`}>{status}</span>
+      </div>
+      <strong>{title}</strong>
+      <span>{description}</span>
+      <em>{metric}</em>
+    </div>
+  );
+}
+
+function RunnerRow({ runner }: { runner: RunnerHealthItem }) {
+  return (
+    <div className={styles.runnerRow}>
+      <div className={styles.connectionIcon}>
+        <Cpu size={17} />
+      </div>
+      <div className={styles.settingCopy}>
+        <strong>{runner.name}</strong>
+        <span>{runner.capabilities?.join(' / ') || runner.id}</span>
+      </div>
+      <span className={`${styles.statusPill} ${runner.status === 'online' ? styles.statusPillOn : ''}`}>
+        {runner.status}
+      </span>
     </div>
   );
 }
