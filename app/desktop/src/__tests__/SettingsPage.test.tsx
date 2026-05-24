@@ -176,4 +176,18 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('settings.marketTokenDancePublish')).toBeInTheDocument();
     expect(screen.getByText('settings.marketGuard')).toBeInTheDocument();
   });
+
+  it('renders project skill registry with script and review metadata', () => {
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="skills" />);
+
+    expect(screen.getByText('settings.skillProjectRegistry')).toBeInTheDocument();
+    expect(screen.getByText('settings.skillReviewReady')).toBeInTheDocument();
+    expect(screen.getByText('settings.skillInstalled')).toBeInTheDocument();
+    expect(screen.getByText('adapter-dev')).toBeInTheDocument();
+    expect(screen.getByText('dev-loop')).toBeInTheDocument();
+    expect(screen.getByText('ui-screenshot')).toBeInTheDocument();
+    expect(screen.getByText('settings.skillScriptAudit')).toBeInTheDocument();
+    expect(screen.getByText('settings.skillReferences')).toBeInTheDocument();
+    expect(screen.getByText('settings.skillGuard')).toBeInTheDocument();
+  });
 });
