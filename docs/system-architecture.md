@@ -95,8 +95,9 @@ Desktop App
 | Web / Desktop UI | `app/` | IM 工作台、Thread、Diff、Preview、Approval |
 | Hub Server | `hub-server/` | 中心 IM、账号、群聊、多端同步、Edge 中继 |
 | Edge Server | `edge-server/` | 本地项目、Thread、Context、Runner 管理、Artifact 索引 |
-| Runner | `runner/` | Agent CLI 进程、workspace、日志、Diff、Preview |
 | API Contract | `api/` | REST API 和 WebSocket event 契约 |
+
+> **注意**：早期曾存在独立的 `runner/` 组件。当前 Runner 进程生命周期管理已合并到 `edge-server/internal/lifecycle/`，Agent CLI 适配层位于 `edge-server/internal/adapters/`，不再作为独立组件。Runner 由 Edge Server 统一调度。
 
 ## 4. 通信方式
 
@@ -241,8 +242,8 @@ REST snapshot 至少应能按 Project、Thread、Run、Item、Artifact 重建 UI
 | M4 | Hub Server、响应式布局、环境隔离、E2E、权限门控、Hub auth | ✅ |
 | P0 | Desktop UI -> Local Edge -> Local Runner -> Agent CLI (完整闭环) | ✅ |
 | P1 | Local Edge + 多 Agent Thread | 已完成 |
-| P2 | Edge <-> Hub 同步，Web/Mobile 查看和审批 | 已完成 |
-| P3 | Hub Relay -> Desktop/Cloud Edge -> Runner | 已完成 |
+| P2 | Edge <-> Hub 同步，Web/Mobile 查看和审批 | 规划中（Q3） |
+| P3 | Hub Relay -> Desktop/Cloud Edge -> Runner | 规划中（Q3） |
 | P4 | 完整团队 IM 和云端协作 | 规划中 |
 
 ## 10. 文档分层
