@@ -22,6 +22,7 @@
     "storybook:build": "storybook build"
   },
   "dependencies": {
+    "@lobehub/icons": "^5.8.0",
     "@tanstack/react-query": "^5.100.14",
     "@tanstack/react-virtual": "^3.13.25",
     "@tauri-apps/api": "^2.5.0",

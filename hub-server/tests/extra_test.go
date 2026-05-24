@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/master
 package tests
 
 import (
@@ -13,10 +9,7 @@ import (
 )
 
 func TestPinAndForward(t *testing.T) {
-<<<<<<< HEAD
-=======
 	t.Cleanup(func() { CleanDB(t, db) })
->>>>>>> origin/master
 	alice := register(t, "tpin_a", "pass1234", "AliceP")
 	bob := register(t, "tpin_b", "pass1234", "BobP")
 
@@ -81,10 +74,7 @@ func TestPinAndForward(t *testing.T) {
 }
 
 func TestGroupManagement(t *testing.T) {
-<<<<<<< HEAD
-=======
 	t.Cleanup(func() { CleanDB(t, db) })
->>>>>>> origin/master
 	alice := register(t, "tgrp_a", "pass1234", "AliceG")
 	bob := register(t, "tgrp_b", "pass1234", "BobG")
 	charlie := register(t, "tgrp_c", "pass1234", "CharlieG")
@@ -127,10 +117,7 @@ func TestGroupManagement(t *testing.T) {
 }
 
 func TestBlockedMessage(t *testing.T) {
-<<<<<<< HEAD
-=======
 	t.Cleanup(func() { CleanDB(t, db) })
->>>>>>> origin/master
 	alice := register(t, "tblk_a", "pass1234", "AliceB")
 	bob := register(t, "tblk_b", "pass1234", "BobB")
 
@@ -159,10 +146,7 @@ func TestBlockedMessage(t *testing.T) {
 }
 
 func TestFileUpload(t *testing.T) {
-<<<<<<< HEAD
-=======
 	t.Cleanup(func() { CleanDB(t, db) })
->>>>>>> origin/master
 	u := register(t, "tfile1", "pass1234", "FileUser")
 
 	t.Run("UploadSmallFile", func(t *testing.T) {
@@ -205,10 +189,7 @@ func TestFileUpload(t *testing.T) {
 }
 
 func TestRemainingREST(t *testing.T) {
-<<<<<<< HEAD
-=======
 	t.Cleanup(func() { CleanDB(t, db) })
->>>>>>> origin/master
 	alice := register(t, "tresta", "pass1234", "AliceR")
 	bob := register(t, "trestb", "pass1234", "BobR")
 
@@ -289,10 +270,7 @@ func TestRemainingREST(t *testing.T) {
 }
 
 func TestWebSocketUpgrade(t *testing.T) {
-<<<<<<< HEAD
-=======
 	t.Cleanup(func() { CleanDB(t, db) })
->>>>>>> origin/master
 	t.Run("WSUpgrade", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", ts.URL+"/client/ws", nil)
 		req.Header.Set("Connection", "Upgrade")
@@ -313,10 +291,7 @@ func TestWebSocketUpgrade(t *testing.T) {
 }
 
 func TestAgentTaskCallbacks(t *testing.T) {
-<<<<<<< HEAD
-=======
 	t.Cleanup(func() { CleanDB(t, db) })
->>>>>>> origin/master
 	alice := register(t, "tagtcb1", "pass1234", "AgentT")
 	bob := register(t, "tagtcb2", "pass1234", "BobT")
 

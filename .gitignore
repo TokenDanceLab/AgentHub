@@ -99,6 +99,8 @@ docs/review/
 !.agents/skills/adapter-dev/**
 !.agents/skills/env-sandbox/
 !.agents/skills/env-sandbox/**
+!.agents/skills/ui-screenshot/
+!.agents/skills/ui-screenshot/**
 .cursor/
 .continue/
 
