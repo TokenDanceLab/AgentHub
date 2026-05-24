@@ -288,9 +288,9 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right panel (desktop/tablet) */}
+        {/* Right panel — hidden until there is active work */}
         {!isMobile && (
-          <div className={styles.rightPanel}>
+          <div className={`${styles.rightPanel} ${currentRun ? '' : styles.rightPanelHidden}`}>
             <div className={styles.rightPanelHeader}>
               <div className={styles.rightPanelSegmented}>
                 <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`}>{t('run.output')}</button>

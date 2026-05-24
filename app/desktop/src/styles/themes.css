@@ -5,72 +5,83 @@
    Dark: One Dark Pro inspired — blue-gray layered system
    ═════════════════════════════════════════════════════════════════════ */
 
-/* ── Dark Theme (default) : One Dark Pro ──────────────────────────────── */
+/* ── Dark Theme : macOS Liquid Glass ──────────────────────────────────── */
 :root {
-  --background: oklch(0.18 0.008 252);
-  --foreground: oklch(0.74 0.012 252);
-  --card: oklch(0.21 0.009 252);
-  --card-foreground: oklch(0.74 0.012 252);
-  --popover: oklch(0.22 0.010 252);
-  --popover-foreground: oklch(0.74 0.012 252);
-  --primary: oklch(0.62 0.19 265);
-  --primary-foreground: oklch(0.97 0.003 252);
-  --secondary: oklch(0.22 0.010 252);
-  --secondary-foreground: oklch(0.74 0.012 252);
-  --muted: oklch(0.22 0.010 252);
-  --muted-foreground: oklch(0.55 0.012 252);
-  --accent: oklch(0.62 0.19 265);
-  --accent-foreground: oklch(0.97 0.003 252);
-  --destructive: oklch(0.58 0.20 20);
-  --destructive-foreground: oklch(0.97 0.003 252);
-  --border: oklch(0.13 0.006 252);
-  --input: oklch(0.16 0.007 252);
-  --ring: oklch(0.62 0.19 265);
+  /* Base layer — deep charcoal, not pure black */
+  --app-bg: #141418;
+  --background: rgba(28, 28, 34, 0.55);
+  --foreground: #E8E8ED;
 
-  --success: oklch(0.78 0.11 145);
-  --success-foreground: oklch(0.15 0.008 252);
-  --warning: oklch(0.72 0.14 80);
-  --warning-foreground: oklch(0.15 0.008 252);
-  --info: oklch(0.68 0.14 240);
-  --info-foreground: oklch(0.15 0.008 252);
+  /* Cards — semi-transparent glass */
+  --card: rgba(45, 45, 55, 0.55);
+  --card-foreground: #E8E8ED;
+  --popover: rgba(50, 50, 60, 0.72);
+  --popover-foreground: #E8E8ED;
 
-  --color-success: oklch(0.78 0.11 145);
-  --color-danger: oklch(0.58 0.20 20);
-  --color-border: oklch(0.15 0.007 252);
+  /* Primary — slightly desaturated for dark mode */
+  --primary: #7C7CE0;
+  --primary-foreground: #FFFFFF;
+  --secondary: rgba(255, 255, 255, 0.06);
+  --secondary-foreground: #E8E8ED;
+  --muted: rgba(255, 255, 255, 0.04);
+  --muted-foreground: #8E8E93;
+  --accent: #7C7CE0;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
 
-  --brand: oklch(0.62 0.19 265);
-  --authority-hub: oklch(0.62 0.19 265);
-  --authority-edge: oklch(0.78 0.11 145);
-  --authority-hybrid: oklch(0.72 0.14 80);
+  /* Borders — faint white glow for glass edge */
+  --border: rgba(255, 255, 255, 0.06);
+  --input: rgba(255, 255, 255, 0.05);
+  --ring: rgba(124, 124, 224, 0.35);
 
-  --run-queued: oklch(0.33 0.006 252);
-  --run-starting: oklch(0.62 0.19 265);
-  --run-running: oklch(0.78 0.11 145);
-  --run-completed: oklch(0.78 0.11 145);
-  --run-failed: oklch(0.58 0.20 20);
-  --run-cancelled: oklch(0.30 0.006 252);
+  /* Status */
+  --success: #34D399;
+  --success-foreground: #0F172A;
+  --warning: #FBBF24;
+  --warning-foreground: #0F172A;
+  --info: #60A5FA;
+  --info-foreground: #0F172A;
 
-  --diff-added-bg: oklch(0.20 0.04 145);
-  --diff-added-border: oklch(0.78 0.11 145);
-  --diff-removed-bg: oklch(0.20 0.04 20);
-  --diff-removed-border: oklch(0.58 0.20 20);
+  --color-success: #34D399;
+  --color-danger: #EF4444;
+  --color-border: rgba(255, 255, 255, 0.06);
 
-  --scrollbar-thumb: oklch(0.28 0.010 252);
-  --scrollbar-thumb-hover: oklch(0.36 0.012 252);
+  --brand: #7C7CE0;
+  --authority-hub: #7C7CE0;
+  --authority-edge: #34D399;
+  --authority-hybrid: #FBBF24;
+
+  --run-queued: rgba(255, 255, 255, 0.08);
+  --run-starting: #7C7CE0;
+  --run-running: #34D399;
+  --run-completed: #34D399;
+  --run-failed: #EF4444;
+  --run-cancelled: rgba(255, 255, 255, 0.05);
+
+  --diff-added-bg: rgba(52, 211, 153, 0.08);
+  --diff-added-border: #34D399;
+  --diff-removed-bg: rgba(239, 68, 68, 0.08);
+  --diff-removed-border: #EF4444;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
   --scrollbar-track: transparent;
 
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.45);
 
-  /* macOS sidebar gray (dark mode equivalent) */
-  --sidebar-bg: oklch(0.16 0.007 252);
-  --app-bg: oklch(0.14 0.006 260);
+  /* Glass panels — layered depth */
+  --sidebar-bg: rgba(30, 30, 38, 0.72);
 
-  --surface-base: oklch(0.18 0.008 252);
-  --surface-raised: oklch(0.21 0.009 252);
-  --surface-raised-hover: oklch(0.24 0.012 252);
-  --surface-overlay: oklch(0.26 0.014 252);
-  --hover-overlay: oklch(1 0 0 / 0.06);
+  --surface-base: rgba(28, 28, 34, 0.4);
+  --surface-raised: rgba(45, 45, 55, 0.5);
+  --surface-raised-hover: rgba(55, 55, 65, 0.6);
+  --surface-overlay: rgba(60, 60, 70, 0.7);
+  --hover-overlay: rgba(255, 255, 255, 0.04);
+
+  --text-weaker: #8E8E93;
+  --text-weakest: #636366;
 }
 
 /* ── Light Theme — macOS matte gray ────────────────────────────────────── */
@@ -155,4 +166,16 @@
   background: rgba(246, 246, 247, 0.68);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
+
+[data-theme='dark'] .glass-panel {
+  background: rgba(45, 45, 55, 0.45);
+  backdrop-filter: blur(40px) saturate(1.2);
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+}
+
+[data-theme='dark'] .glass-sidebar {
+  background: rgba(35, 35, 45, 0.55);
+  backdrop-filter: blur(40px) saturate(1.2);
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
 }
