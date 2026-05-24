@@ -193,6 +193,7 @@ export default function PromptInput({
           )}
           </div>
         </div>
+      </div>
     </div>
   );
 }
