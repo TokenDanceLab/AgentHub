@@ -38,6 +38,10 @@ func (h *DeviceHandler) Register(c *gin.Context) {
 
 	device, err := h.deviceService.Register(req.DeviceID, userID, deviceType, req.AppVersion, req.Capabilities)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}
