@@ -13,12 +13,14 @@ interface Props {
   projectPath?: string;
   /** QW-3: WebSocket ping-pong round-trip latency in ms, polled from eventClient. */
   wsLatency?: number | null;
+  /** Whether authenticated against Hub server. */
+  hubAuthenticated?: boolean;
 }
 
 const LATENCY_GREEN = 50; // ms
 const LATENCY_YELLOW = 200; // ms
 
-export default memo(function StatusBar({ online, health, isConnected, error, projectPath, wsLatency }: Props) {
+export default memo(function StatusBar({ online, health, isConnected, error, projectPath, wsLatency, hubAuthenticated }: Props) {
   const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const [errorCount, setErrorCount] = useState(0);
@@ -102,6 +104,23 @@ export default memo(function StatusBar({ online, health, isConnected, error, pro
       >
         {isConnected ? t('status.wsConnected') : t('status.wsDisconnected')}
       </span>
+      {hubAuthenticated != null && (
+        <>
+          <span className={styles.separator} aria-hidden="true" />
+          <Circle
+            size={6}
+            fill="currentColor"
+            style={{ color: hubAuthenticated ? 'var(--color-success)' : 'var(--muted-foreground)' }}
+            aria-hidden="true"
+          />
+          <span
+            className={styles.wsStatus}
+            aria-label={hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
+          >
+            {hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
+          </span>
+        </>
+      )}
       {errorCount > 0 && (
         <span
           className={styles.errorBadge}

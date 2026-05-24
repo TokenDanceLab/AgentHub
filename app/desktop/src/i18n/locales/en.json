@@ -3,6 +3,8 @@
   "status.offline": "Local Edge: Offline",
   "status.wsConnected": "WS: Connected",
   "status.wsDisconnected": "WS: —",
+  "status.hubConnected": "Hub: Connected",
+  "status.hubDisconnected": "Hub: —",
   "agent.title": "Agents",
   "agent.open": "Open agent panel",
   "agent.close": "Close agent panel",
