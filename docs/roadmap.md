@@ -161,12 +161,12 @@ Hub 调度（远程）:
   - Health check：验证 store 可读、runner registry 非空
   - 验收：`curl /v1/health` 返回 `{"status":"ok","checks":{"store":"ok","runners":3}}`
 
-- [ ] **S3: runnerctx 包测试（17.3% → 80%）** `[1d]`
+- [x] **S3: runnerctx 包测试（17.3% → 80%）** `[1d]`
   - 文件：`edge-server/internal/runnerctx/context_budget_test.go`
   - 缺失测试：`ShouldCompact()`, `UsagePercent()`, `RunOutputStore` 全部方法, `EstimateTokens()`
   - 验收：`go test -cover ./internal/runnerctx/` 覆盖 >= 80%
 
-- [ ] **S4: control_protocol 测试（0% → 80%）** `[1.5d]`
+- [x] **S4: control_protocol 测试（0% → 80%）** `[1.5d]`
   - 文件：`edge-server/internal/adapters/control_protocol.go`
   - 缺失：5 个 `Write*` 函数的 JSON 输出验证 + `HandleControlRequest`/`handleCanUseTool` 测试
   - 修复：`json.Marshal` 错误不再 `_` 丢弃，返回 error
@@ -179,12 +179,12 @@ Hub 调度（远程）:
 
 ##### P1 -- 高优先级
 
-- [ ] **S10: 修复 FileStore persist 并发写竞态** `[1d]`
+- [x] **S10: 修复 FileStore persist 并发写竞态** `[1d]`
   - 文件：`edge-server/internal/store/file_store.go:162-169`
   - 方案：`persist()` 内部获取 `store.mu` 确保快照一致性
   - 验收：`go test -race ./internal/store/ -count=10` 零失败
 
-- [ ] **S7: 环境变量配置支持** `[1d]`
+- [x] **S7: 环境变量配置支持** `[1d]`
   - 文件：`edge-server/cmd/agenthub-edge/main.go:91-134`
   - 方案：为每个 CLI flag 添加环境变量 fallback
   - 验收：`AGENTHUB_ADDR=:4321 go run ./cmd/agenthub-edge/` 使用环境变量值
@@ -213,7 +213,7 @@ Hub 调度（远程）:
 
 ##### P0 -- 阻断级
 
-- [ ] **P0-1: JWT secret 环境变量化管理** `[1d]`
+- [x] **P0-1: JWT secret 环境变量化管理** `[1d]`
   - 文件：`hub-server/configs/config.yaml:20`, `hub-server/configs/config.docker.yaml:20`
   - 方案：仅从环境变量 `AGENTHUB_JWT_SECRET` 读取，dev 环境硬编码值拒绝启动
   - 修复：`hub-server/internal/config/config.go` -- Load 阶段校验
@@ -257,7 +257,7 @@ Hub 调度（远程）:
   - 方案：基于 Redis 的 per-IP token bucket，登录 5 req/min，注册 3 req/min
   - 验收：`curl` 连续请求被 429 拒绝
 
-- [ ] **P1-5: 修复 JSON 手工构建注入风险** `[0.5d]`
+- [x] **P1-5: 修复 JSON 手工构建注入风险** `[0.5d]`
   - 文件：`hub-server/internal/service/message.go:94-95`
   - 方案：`strings.ReplaceAll` → `json.Marshal(map[string]string{"text": req.Content})`
   - 验收：包含特殊字符（换行、反斜杠、引号）的消息正确存储
@@ -294,7 +294,7 @@ Hub 调度（远程）:
   - 文件：`hub-server/internal/model/custom_agent.go:17-20`
   - 方案：`CapabilityTags`, `ToolWhitelist`, `ModelParams` 使用 `json.RawMessage` 或 handler 层 JSON 校验
 
-- [ ] **P2-4: FailWithMessage HTTP 状态守卫** `[0.5d]`
+- [x] **P2-4: FailWithMessage HTTP 状态守卫** `[0.5d]`
   - 文件：`hub-server/internal/handler/response.go:34-39`
   - 方案：添加 `if e.HTTPStatus == 0 { e = errcode.ErrInternal }` 守卫
 
