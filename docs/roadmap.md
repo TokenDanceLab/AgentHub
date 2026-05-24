@@ -402,10 +402,10 @@ Hub 调度（远程）:
 - [x] **Hub Server golangci-lint 项目级配置** `[1d]` ✅ M5
 - [x] **密钥检测（gitleaks）** `[0.5d]` ✅ M5
 
-- [ ] **Docker 镜像构建 + 推送** `[1d]`
-  - 新增：`.github/workflows/checks.yml` 添加 docker job
-  - 文件：`hub-server/deployments/Dockerfile`
-  - 方案：PR 时构建验证，push master 时推送到 ghcr.io
+- [x] **Docker 镜像构建 + 推送** `[1d]` ✅ M5
+  - `hub-server/deployments/Dockerfile`（Go 1.25、Alpine 3.21、HEALTHCHECK）
+  - `.github/workflows/checks.yml` docker job（PR 构建验证）
+  - `hub-server/.dockerignore`
 
 - [ ] **Benchmark 回归检测** `[1d]`
   - 新增：`edge-server/internal/events/bench_test.go`, `hub-server/internal/service/bench_test.go`
