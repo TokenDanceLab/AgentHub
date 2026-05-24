@@ -985,7 +985,7 @@ export function PrivateChatsPageInteractive() {
 
   const hasComposerContent = draft.trim().length > 0 || selectedAttachments.length > 0;
 
-  // Mock message stream — simulates streaming agent responses.
+  // Mock message stream - simulates local preview responses.
   useEffect(() => {
     const stream = new MockEventStream();
     const activeConv = conversations.find((c) => c.id === activeChatId);
@@ -1252,7 +1252,7 @@ export function PrivateChatsPageInteractive() {
     setSelectedAttachmentIds([]);
     setAttachmentsOpen(false);
     setDraft('');
-    showNotice('Local draft appended to this private thread', 'success');
+    showNotice('Local draft appended to this preview thread', 'success');
   };
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1290,10 +1290,10 @@ export function PrivateChatsPageInteractive() {
             />
           </div>
 
-          <div className="pc-section-title">Pinned Threads</div>
+          <div className="pc-section-title">Mock Conversations</div>
           {normalizedSearch ? (
             <div className="pc-filter-note">
-              {filteredConversations.length} chats and {messages.length} messages match "{searchQuery.trim()}"
+              {filteredConversations.length} preview chats and {messages.length} local messages match "{searchQuery.trim()}"
             </div>
           ) : null}
           <div className="pc-chat-list">
@@ -1319,7 +1319,7 @@ export function PrivateChatsPageInteractive() {
                 </button>
               ))
             ) : (
-              <div className="pc-empty">No private chats match this search.</div>
+              <div className="pc-empty">No local preview chats match this search.</div>
             )}
           </div>
         </aside>
@@ -1330,9 +1330,9 @@ export function PrivateChatsPageInteractive() {
               <Avatar initials={activeConversation.initials} accent={activeConversation.accent} />
               <div className="pc-title">
                 <h2>{activeConversation.name}</h2>
-                <p>{activeConversation.role} - private thread</p>
+                <p>{activeConversation.role} - local preview thread</p>
               </div>
-              <span className="pc-status">Online</span>
+              <span className="pc-status">Local mock</span>
             </div>
 
             <div className="pc-actions">
@@ -1442,7 +1442,7 @@ export function PrivateChatsPageInteractive() {
                   ? 'No key messages match the current view.'
                   : normalizedSearch
                     ? 'No messages match this search in the selected conversation.'
-                    : 'This private thread is empty.'}
+                    : 'This local preview thread is empty.'}
               </div>
             )}
           </section>
@@ -1530,7 +1530,7 @@ export function PrivateChatsPageInteractive() {
                 aria-label={`Message ${activeConversation.name}`}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleComposerKeyDown}
-                placeholder="Write a private note, paste a code fragment, or attach handoff context..."
+                placeholder="Write a local preview note, paste a code fragment, or attach handoff context..."
                 value={draft}
               />
 
@@ -1545,7 +1545,7 @@ export function PrivateChatsPageInteractive() {
                 </button>
                 <button className="pc-send-button" disabled={!hasComposerContent} onClick={sendDraft} type="button">
                   <Icon name="send" />
-                  Send
+                  Append
                 </button>
               </div>
             </div>
@@ -1555,10 +1555,10 @@ export function PrivateChatsPageInteractive() {
         <aside className="pc-context-panel pc-panel pc-glass">
           <header className="pc-header pc-context-header">
             <div className="pc-title">
-              <div className="pc-eyebrow">Thread Context</div>
+              <div className="pc-eyebrow">Preview Context</div>
               <h2>{activeConversation.name}</h2>
               <p>
-                {activeConversation.allMessages.length} messages - {reviewProgress}% reviewed
+                {activeConversation.allMessages.length} local messages - {reviewProgress}% reviewed
               </p>
             </div>
             <button
@@ -1577,7 +1577,7 @@ export function PrivateChatsPageInteractive() {
               <div className="pc-progress"><span style={{ width: `${reviewProgress}%` }} /></div>
               <p style={{ marginTop: 10 }}>
                 {activeKeyCount} key messages, {activeConversation.currentUnread} unread, and{' '}
-                {localMessages[activeConversation.id]?.length ?? 0} local drafts in this thread.
+                {localMessages[activeConversation.id]?.length ?? 0} local drafts in this thread. Hub /client/ws and message/session REST are not connected yet.
               </p>
             </section>
 
