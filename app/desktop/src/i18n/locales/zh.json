@@ -118,5 +118,21 @@
   "time.justNow": "刚刚",
   "time.minutesAgo": "{{count}}分钟前",
   "time.hoursAgo": "{{count}}小时前",
-  "time.daysAgo": "{{count}}天前"
+  "time.daysAgo": "{{count}}天前",
+  "im.input.placeholder": "输入消息...",
+  "im.input.send": "发送消息",
+  "im.input.enterHint": "Enter 发送，Shift+Enter 换行",
+  "im.contact.search": "搜索联系人和会话...",
+  "im.contact.empty": "暂无会话",
+  "im.contact.online": "在线",
+  "im.contact.offline": "离线",
+  "im.contact.archived": "已归档",
+  "im.contact.unread": "{{count}} 条未读",
+  "im.message.empty": "暂无消息，开始对话吧！",
+  "im.message.loading": "发送中...",
+  "im.message.sendFailed": "发送失败，点击重试",
+  "im.message.retry": "重试",
+  "im.message.recall": "撤回",
+  "im.message.agentLabel": "AI",
+  "im.message.you": "你"
 }
