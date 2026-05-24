@@ -1,8 +1,17 @@
 import { useTranslation } from 'react-i18next';
-import { Circle, Search } from 'lucide-react';
-import { useState, useMemo, memo } from 'react';
+import { Search } from 'lucide-react';
+import { useState, useMemo, memo, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
+import { Anthropic, OpenAI, Github } from '@lobehub/icons';
 import styles from './AgentList.module.css';
+
+function agentIcon(name: string): ReactNode {
+  const n = name.toLowerCase();
+  if (n.includes('claude')) return <Anthropic size={18} />;
+  if (n.includes('codex') || n.includes('openai')) return <OpenAI size={18} />;
+  if (n.includes('opencode')) return <Github size={18} />;
+  return null;
+}
 
 interface Props {
   agents: AgentInfo[];
@@ -69,14 +78,15 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
                 onClick={() => onSelect?.(a)}
                 aria-pressed={a.id === selectedId}
               >
-                <Circle
-                  size={8}
-                  fill="currentColor"
-                  style={{
-                    color:
-                      a.status === 'available' ? 'var(--color-success)' : 'var(--color-danger)',
-                  }}
-                />
+                {agentIcon(a.name) || (
+                  <span
+                    className={styles.statusDot}
+                    style={{
+                      backgroundColor:
+                        a.status === 'available' ? 'var(--color-success)' : 'var(--color-danger)',
+                    }}
+                  />
+                )}
                 <div className={styles.info}>
                   <div className={styles.name}>{highlightMatch(a.name)}</div>
                   {a.description && (
