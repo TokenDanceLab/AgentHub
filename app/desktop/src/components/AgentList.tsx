@@ -1,15 +1,26 @@
 import { useTranslation } from 'react-i18next';
-import { Search } from 'lucide-react';
+import { Search, Terminal, Braces, Box } from 'lucide-react';
 import { useState, useMemo, memo, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
-import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
 import styles from './AgentList.module.css';
 
 function agentIcon(name: string): ReactNode {
   const n = name.toLowerCase();
-  if (n.includes('claude')) return <ClaudeCode size={20} />;
-  if (n.includes('codex')) return <Codex size={20} />;
-  if (n.includes('opencode')) return <OpenCode size={20} />;
+  if (n.includes('claude')) return (
+    <span className={styles.agentIcon} style={{ background: 'linear-gradient(135deg, #DBB4FF, #B088F0)' }}>
+      <Terminal size={12} strokeWidth={2.5} color="#fff" />
+    </span>
+  );
+  if (n.includes('codex')) return (
+    <span className={styles.agentIcon} style={{ background: 'linear-gradient(135deg, #5EEAD4, #14B8A6)' }}>
+      <Box size={12} strokeWidth={2.5} color="#fff" />
+    </span>
+  );
+  if (n.includes('opencode')) return (
+    <span className={styles.agentIcon} style={{ background: 'linear-gradient(135deg, #7DD3FC, #38BDF8)' }}>
+      <Braces size={12} strokeWidth={2.5} color="#fff" />
+    </span>
+  );
   return null;
 }
 
