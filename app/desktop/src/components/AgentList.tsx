@@ -70,10 +70,10 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
         <input
           className={styles.searchInput}
           type="text"
-          placeholder="Search agents..."
+          placeholder={t('agent.search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          aria-label="Search agents"
+          aria-label={t('agent.search')}
         />
       </div>
 
@@ -82,7 +82,7 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
           {online ? t('agent.emptyOnline') : t('agent.emptyOffline')}
         </div>
       ) : isSearchEmpty ? (
-        <div className={styles.empty}>No agents match your search</div>
+        <div className={styles.empty}>{t('agent.noMatch')}</div>
       ) : (
         <ul className={styles.list}>
           {filteredAgents.map((a) => (

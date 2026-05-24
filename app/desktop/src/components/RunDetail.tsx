@@ -130,7 +130,7 @@ export default function RunDetail({
     return (
       <div className={styles.panel}>
         <div className={styles.title}>{t('run.title')}</div>
-        <div className={styles.empty}>No active run</div>
+        <div className={styles.empty}>{t('run.empty')}</div>
       </div>
     );
   }
