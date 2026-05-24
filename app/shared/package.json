@@ -12,6 +12,7 @@
     "./errors": "./src/errors.ts",
     "./apiClient": "./src/apiClient.ts",
     "./eventClient": "./src/eventClient.ts",
+    "./workbenchState": "./src/workbenchState.ts",
     "./mock": "./src/mock.ts",
     "./components": "./src/components/index.ts",
     "./tree": "./src/tree.ts",
@@ -37,12 +38,12 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
     "jsdom": "^29.1.1",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "typescript": "^5.8.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "~5.8.0",
     "vitest": "^4.1.7"
   }
 }
