@@ -26,7 +26,7 @@ api/
 | 模块 | 负责内容 | 主要归属 |
 |---|---|---|
 | IM / Project | Project、Conversation、Thread、Message、Item、Memory | Edge / Hub |
-| Execution / Runner | Runner、AgentRun、Approval、Artifact、Preview、Workspace | Edge / Runner |
+| Execution / Runtime | AgentRun、Approval、Artifact、Preview、Workspace、AgentAdapter | Edge |
 | Hub / Sync / Relay | Auth、User、Contact、Group、Device、Edge、Sync、Relay、Cloud | Hub / Edge |
 
 ## 阶段标记
@@ -35,7 +35,7 @@ api/
 
 | 阶段 | 含义 |
 |---|---|
-| P0 | 本地 Desktop -> Edge -> Runner 必需 |
+| P0 | 本地 Desktop -> Edge -> AgentAdapter 必需 |
 | P1 | 多 Agent Thread 和本地协作增强 |
 | P2 | Edge-Hub 同步、Web/Mobile 远程查看和审批 |
 | P3 | Hub relay、Cloud Edge、远程执行 |

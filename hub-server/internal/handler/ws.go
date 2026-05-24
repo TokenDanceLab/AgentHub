@@ -8,14 +8,9 @@ import (
 	"github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 
-<<<<<<< HEAD
-	"github.com/agenthub/server-hub/internal/jwtutil"
-	"github.com/agenthub/server-hub/internal/ws"
-=======
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/ws"
->>>>>>> origin/master
 )
 
 type WebSocketHandler struct {
@@ -51,14 +46,12 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 }
 
 func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
-<<<<<<< HEAD
-=======
+	defer conn.W.Close(websocket.StatusNormalClosure, "")
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("ws writeLoop panic recovered", "conn_id", conn.ID, "panic", r)
 		}
 	}()
->>>>>>> origin/master
 	ctx := context.Background()
 	for data := range conn.Send {
 		err := conn.W.Write(ctx, websocket.MessageText, data)
@@ -67,7 +60,6 @@ func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
 			return
 		}
 	}
-	conn.W.Close(websocket.StatusNormalClosure, "")
 }
 
 func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
@@ -98,9 +90,6 @@ func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
 		return
 	}
 
-<<<<<<< HEAD
-	accessToken, _ := payload["access_token"].(string)
-=======
 	accessToken, ok := payload["access_token"].(string)
 	if !ok || accessToken == "" {
 		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthFail, map[string]string{"reason": "missing access_token"}))
@@ -108,7 +97,6 @@ func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
 		conn.Close()
 		return
 	}
->>>>>>> origin/master
 
 	claims, err := jwtutil.ParseToken(accessToken, h.jwtSecret)
 	if err != nil {
@@ -167,10 +155,7 @@ func (h *WebSocketHandler) sendFrame(conn *ws.Conn, frame ws.Frame) {
 	select {
 	case conn.Send <- data:
 	default:
-<<<<<<< HEAD
-=======
 		metrics.WSDroppedFrames.Inc()
 		slog.Warn("ws frame dropped: send buffer full", "conn_id", conn.ID, "user_id", conn.UserID)
->>>>>>> origin/master
 	}
 }

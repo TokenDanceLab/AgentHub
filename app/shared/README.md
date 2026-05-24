@@ -6,7 +6,7 @@
 
 | 模块 | 路径 | 说明 |
 |---|---|---|
-| `@shared/types` | `src/types.ts` | REST API 响应类型：HealthResponse, Runner, ListResponse, RunInfo |
+| `@shared/types` | `src/types.ts` | REST API 响应类型：HealthResponse, AgentInfo, ListResponse, RunInfo, ThreadInfo |
 | `@shared/events` | `src/events.ts` | WebSocket 事件类型与 discriminated union |
 | `@shared/errors` | `src/errors.ts` | `api/conventions.md` §5 错误格式解析（AppError, parseError） |
 
@@ -15,7 +15,7 @@
 Desktop 和 Web 通过 `@shared/*` 路径别名导入：
 
 ```typescript
-import type { HealthResponse, Runner } from '@shared/types';
+import type { AgentInfo, HealthResponse, RunInfo } from '@shared/types';
 import type { EventEnvelope } from '@shared/events';
 import { parseError } from '@shared/errors';
 ```

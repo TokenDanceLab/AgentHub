@@ -9,7 +9,7 @@
 [English](README_EN.md) &nbsp;·&nbsp; [产品需求](docs/product-requirements.md) &nbsp;·&nbsp; [系统架构](docs/system-architecture.md) &nbsp;·&nbsp; [API 契约](api/) &nbsp;·&nbsp; [官网](https://hub.vectorcontrol.tech)
 
 <img src="https://img.shields.io/badge/状态-P0--P3_完成+M4-blue?style=flat-square" alt="status">
-<img src="https://img.shields.io/badge/go-1.24+-00ADD8?style=flat-square&logo=go" alt="go">
+<img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go" alt="go">
 <img src="https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react" alt="react">
 <img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square" alt="license">
 
@@ -23,14 +23,14 @@ AgentHub 把 AI 编程 Agent 变成了 IM 联系人。你可以像在飞书群�
 
 **与现有工具的区别**：大多数 Claude Code GUI 是单人聊天壳。AgentHub 是多 Agent 协作平台——Orchestrator 规划、Claude Code 实现、Reviewer 审查，在同一个群聊中流转。
 
-当前已完成：Edge Server 三大 Agent CLI 适配（Claude Code 5/5 E2E 通过，OpenCode/Codex 协议完整），Desktop IM 聊天式交互（React 19 + Tauri，17 组件，191 测试），Hub Server 三层架构（Gin/GORM/Redis/PostgreSQL，15 迁移）。P0-P3 全部完成，M3b 6/6 完成（AgentHook、消息树、安全流水线、任务已调度、上下文预算、流式解析器），M4 8/8 完成（Hub Server、响应式布局、环境隔离、OpenCode E2E、权限门控、Hub 认证、Codex E2E、Web 前端）。详细进展见 [路线图](docs/roadmap.md)。
+当前已完成：Edge Server 三大 Agent CLI 适配（Claude Code、Codex、OpenCode），Desktop IM 聊天式交互（React 19 + Tauri + TanStack Query + Zustand），Hub Server 三层架构（Gin/GORM/Redis/PostgreSQL，17 组迁移），以及 Edge-Hub 生产部署链路。P0-P3、M3b、M4、M5-M7 已完成；当前状态以 [docs/handoff/STATE.md](docs/handoff/STATE.md) 和 [路线图](docs/roadmap.md) 为准。
 
 <br>
 
 ## 架构
 
 ```
-Desktop UI ─→ Edge Server ─→ Runner ─→ Claude Code / Codex / OpenCode
+Desktop UI ─→ Edge Server ─→ AgentAdapter ─→ Claude Code / Codex / OpenCode
                    ⇅
               Hub Server
 ```
@@ -38,13 +38,13 @@ Desktop UI ─→ Edge Server ─→ Runner ─→ Claude Code / Codex / OpenCod
 | 组件 | 目录 | 职责 |
 |------|------|------|
 | **Hub Server** | `hub-server/` | 中心 IM：用户、联系人、群聊、消息路由、多端同步、Edge 中继 |
-| **Edge Server** | `edge-server/` | 本地节点：项目、记忆、上下文、Runner 管理，P2+ 同步到 Hub |
-| **Runner** | `runner/` | 执行器：workspace、进程管理、Agent CLI 适配、Diff/预览/日志 |
+| **Edge Server** | `edge-server/` | 本地节点：项目、Thread、Run、EventStore、执行生命周期、Agent CLI 适配、P2+ 同步到 Hub |
+| **Execution Runtime** | `edge-server/internal/lifecycle/`、`edge-server/internal/adapters/` | 进程管理、取消、权限门控、Claude/Codex/OpenCode 协议解析、Orchestrator 子 Agent 调度 |
 | **Desktop App** | `app/desktop/` | Tauri 桌面端入口，负责本地工作台体验 |
 | **Web App** | `app/web/` | React IM 界面：侧边栏、消息树、Diff 卡片、预览面板 |
 | **Shared App** | `app/shared/` | 前端共用组件、状态、API client 和事件 client |
 
-> 任何能运行 Runner 的机器都是 **Edge Node**——你的笔记本、远程服务器、云端 VM。
+> 早期设计中曾有独立 `runner/` 目录；当前 Runner 能力已经合并进 Edge Server。任何能运行 Edge Server 和 Agent CLI adapter 的机器都是 **Edge Node**。
 
 <br>
 
@@ -84,14 +84,14 @@ Orchestrator: 完成。预览地址 http://localhost:5173
 
 | 层 | 技术 |
 |----|------|
-| 前端 | React 19 + TypeScript + Vite + shadcn/ui |
-| Hub / Edge / Runner | Go 1.24 |
+| 前端 | React 19 + TypeScript + Vite + CSS Modules + `@shared/ui` |
+| Hub Server | Go 1.25 + Gin + GORM + PostgreSQL + Redis + Hub JWT / TokenDance ID bearer-token middleware |
+| Edge Server | Go 1.25 + `net/http` + WebSocket + AgentAdapter |
 | 桌面端 | Tauri 2 |
 | 移动端 | PWA |
 | 实时通信 | WebSocket (coder/websocket) |
-| 数据库 | SQLite + FTS5 (modernc.org/sqlite) |
+| 数据库 | Hub: PostgreSQL + Redis；Edge: 本地 store / file store |
 | 协议 | REST JSON API + WebSocket typed events |
-| 编辑器 | Monaco Editor |
 
 <br>
 
@@ -163,10 +163,10 @@ pnpm tauri dev        # 启动 Tauri 开发窗口（需要 Rust 和 Tauri CLI）
 git diff --check
 
 cd edge-server
-go test ./...
+go test ./... -short -count=1
 
-cd ..\runner
-go test ./...
+cd ..\hub-server
+go test ./... -short -count=1
 
 cd ..\app\desktop
 pnpm test
@@ -177,7 +177,7 @@ cd ..\..
 .\scripts\client-smoke.ps1
 ```
 
-完整 P0 链路 `Desktop UI -> Local Edge -> Local Runner -> Agent CLI` 已全部跑通，三大 Agent（Claude Code、OpenCode、Codex）E2E 各 5/5 通过。
+完整 P0 链路 `Desktop UI -> Local Edge -> AgentAdapter -> Agent CLI` 已跑通，三大 Agent（Claude Code、OpenCode、Codex）通过统一 adapter 接口接入。
 
 <br>
 
@@ -185,18 +185,18 @@ cd ..\..
 
 ```
 AgentHub/
-├── docs/                   # 三份主文档 + archive/reference/research
+├── docs/                   # 主文档、handoff、roadmap、archive/reference
 │   ├── product-requirements.md
 │   ├── system-architecture.md
 │   ├── implementation-guide.md
+│   ├── handoff/STATE.md    # 当前状态 SSOT
 │   └── reference/          # 69 份调研和工程规格文档，包含 Multica Tier-0 参考
 ├── app/
 │   ├── desktop/            # Tauri 桌面端入口
 │   ├── web/                # Web UI
 │   └── shared/             # 前端共享组件、状态和 API client
 ├── hub-server/             # 中心 Hub：账号、IM、群聊、同步、中继
-├── edge-server/            # 本地 Edge：项目、上下文、Runner 管理
-├── runner/                 # 执行器：Agent CLI、workspace、diff、preview、logs
+├── edge-server/            # 本地 Edge：项目、上下文、run 生命周期、Agent CLI adapters
 ├── api/                    # REST API 和 WebSocket event 契约
 └── scripts/                # 本地 setup、git hooks、reference 同步脚本
 ```
@@ -210,12 +210,29 @@ Docker 配置不再放根级 `docker/`。如果某个模块需要容器化，就
 | 文档 | 描述 |
 |------|------|
 | [产品需求文档](docs/product-requirements.md) | 产品定位、用户、核心体验、阶段目标和比赛交付对应 |
-| [系统架构文档](docs/system-architecture.md) | Hub-Edge-Runner、组件职责、通信方式、权威模型 |
+| [系统架构文档](docs/system-architecture.md) | Desktop-Edge-Hub、执行生命周期、通信方式、权威模型 |
 | [功能实现文档](docs/implementation-guide.md) | 三人分工、M1-M4 阶段路线、API 更新规则和验收命令 |
 | [客户端路线图](docs/client-roadmap.md) | 客户端 M1-M4 阶段、当前分支、下一步任务 |
 | [API 契约](api/) | REST API 和 WebSocket typed events 的契约入口 |
 | [调研索引](docs/reference/) | 69 份跨仓库深度分析和工程规格，Agent 友好的四层结构 |
 | [调研与历史归档](docs/archive/) | 旧版细分架构、协议、memory、workspace 等深度材料 |
+
+在 `D:\Code\TokenDance` workspace 内做跨系统治理时，先看根级 `../AGENTS.md` 和 `../docs/`。其中 `../docs/system-architecture.md`、`../docs/identity-auth.md`、`../docs/design-system.md` 定义 TokenDance 级别的架构、身份鉴权和设计系统边界；本仓库 `docs/` 只负责 AgentHub 实现细节。
+
+<br>
+
+## TokenDance ID 鉴权边界
+
+AgentHub Hub Server 当前有双 JWT 兼容路径，但完整 TokenDance ID 浏览器登录 callback 尚未最终定稿。跨系统身份规则见 [../docs/identity-auth.md](../docs/identity-auth.md)。
+
+| 项 | 当前实现 |
+|----|----------|
+| Callback | AgentHub Hub 的 TokenDance ID 浏览器登录 callback 未最终确定；AgentHub Home 的站点 callback 是 `https://hub.vectorcontrol.tech/api/auth/callback` |
+| Token exchange | Hub 本地登录/注册仍走 `/client/auth/*`；Hub middleware 可接受 TokenDance ID 签发的 RS256 bearer token |
+| Token storage | Hub 本地登录由客户端保存 Hub JWT；TokenDance ID bearer-token 路径不创建 Hub refresh session |
+| Refresh | Hub 本地 refresh token 已实现；TokenDance ID refresh flow 尚未作为 Hub 浏览器登录流接入 |
+| Logout | Hub 本地 logout 与 TokenDance ID `/logout` 分离 |
+| JWKS validation | `hub-server/internal/middleware/auth.go` 先尝试 TokenDance ID RS256/JWKS，再 fallback 到 Hub 本地 HS256；当前 TokenDance ID 路径还缺少显式 issuer/audience 校验，是 P0 hardening 项 |
 
 <br>
 

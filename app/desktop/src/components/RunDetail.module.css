@@ -1,105 +1,171 @@
+/* RunDetail — inline content within App's right panel (no outer panel) */
+
+/* ── Panel ─────────────────────────────────── */
 .panel {
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--border);
-  min-width: 240px;
-  max-width: 320px;
   height: 100%;
-  background: var(--card);
-  overflow-y: auto;
 }
 
 .title {
-  padding: var(--space-sm) var(--space-md);
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--foreground);
-  opacity: 0.6;
-  border-bottom: 1px solid var(--border);
+  display: none; /* App rightPanelHeader handles section label */
 }
 
 .empty {
-  padding: var(--space-md);
-  color: var(--foreground);
-  opacity: 0.4;
-  font-size: var(--font-size-sm);
+  padding: var(--space-lg);
+  color: #B0B0B5;
+  font-size: 12px;
+  text-align: center;
 }
 
 .section {
-  padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
 }
 
 .tabContent {
   flex: 1;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
   animation: tabFadeIn 0.2s ease-out;
 }
 
 @keyframes tabFadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
+/* ── Status ────────────────────────────────── */
 .status {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 4px;
-  font-size: var(--font-size-xs);
+  border-radius: 5px;
+  font-size: 11px;
   font-weight: 600;
 }
-
-.statusDone {
-  background: color-mix(in oklch, var(--success) 12%, transparent);
-  color: var(--success);
-}
-
-.statusFailed {
-  background: color-mix(in oklch, var(--destructive) 20%, transparent);
-  color: var(--destructive);
-}
-
-.statusRunning {
-  background: color-mix(in oklch, var(--primary) 20%, transparent);
-  color: var(--primary);
-}
-
-.statusPending {
-  background: var(--border);
-  color: var(--foreground);
-}
+.statusDone    { background: rgba(16,185,129,0.08); color: #059669; }
+.statusFailed  { background: rgba(239,68,68,0.08); color: #DC2626; }
+.statusRunning { background: rgba(99,102,241,0.08); color: #4F46E5; }
+.statusPending { background: rgba(0,0,0,0.04); color: #8E8E93; }
 
 .runId {
-  margin-left: var(--space-sm);
-  font-size: var(--font-size-xs);
+  margin-left: 6px;
+  font-size: 11px;
   font-family: var(--font-mono);
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
+/* ── Output ────────────────────────────────── */
 .output {
-  margin-top: var(--space-xs);
-  padding: var(--space-xs);
-  background: var(--background);
-  border-radius: 4px;
-  font-size: var(--font-size-xs);
+  margin: 0;
+  padding: 8px;
+  background: rgba(0,0,0,0.02);
+  border-radius: 8px;
+  font-size: 11px;
   font-family: var(--font-mono);
-  max-height: 200px;
+  max-height: 180px;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
+  color: var(--foreground);
+}
+
+[data-theme='light'] .output { background: #F1F3F5; }
+
+.emptyStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.emptyCard,
+.cardSection {
+  border: 1px solid rgba(0,0,0,0.04);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.35);
+}
+
+[data-theme='dark'] .emptyCard,
+[data-theme='dark'] .cardSection {
+  background: rgba(255,255,255,0.035);
+  border-color: rgba(255,255,255,0.06);
+}
+
+.emptyCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 14px;
+  color: #8E8E93;
+  font-size: 12px;
+}
+
+.cardSection {
+  overflow: hidden;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .cardHeader {
+  border-bottom-color: rgba(255,255,255,0.06);
+}
+
+.cardCount {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.04);
+  color: #8E8E93;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .cardCount {
+  background: rgba(255,255,255,0.07);
 }
 
 .list {
-  margin-top: var(--space-xs);
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: 4px 10px 8px;
+}
+
+.sourceList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+}
+
+.sourceItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.025);
+}
+
+[data-theme='dark'] .sourceItem {
+  background: rgba(255,255,255,0.04);
 }
 
 .item {
@@ -107,230 +173,93 @@
   justify-content: space-between;
   align-items: center;
   padding: 2px 0;
-  font-size: var(--font-size-xs);
+  font-size: 11px;
 }
 
-/* Tool call items with expandable output */
-.toolCallItem {
-  border-bottom: 1px solid var(--border);
-}
-
-.toolCallItem:last-child {
-  border-bottom: none;
-}
+/* ── Tool call items ───────────────────────── */
+.toolCallItem { border-bottom: 1px solid rgba(0,0,0,0.04); }
+.toolCallItem:last-child { border-bottom: none; }
 
 .toolCallHeader {
   display: flex;
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 4px 0;
+  padding: 5px 0;
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: var(--font-size-xs);
+  font-size: 11px;
   text-align: left;
-}
-
-.toolCallHeader:disabled {
-  cursor: default;
-  opacity: 1;
+  font-family: var(--font-sans);
 }
 
 .toolCallOutput {
-  margin: 2px 0 6px;
-  padding: var(--space-xs);
-  background: var(--background);
-  border-radius: 4px;
+  margin: 2px 0 8px;
+  padding: 8px;
+  background: rgba(0,0,0,0.02);
+  border-radius: 6px;
   font-size: 11px;
   font-family: var(--font-mono);
-  max-height: 160px;
+  max-height: 140px;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
 }
 
+[data-theme='light'] .toolCallOutput { background: #F1F3F5; }
+
 .chevron {
   display: inline-block;
-  font-size: 10px;
+  font-size: 9px;
   transition: transform 0.15s ease;
-  opacity: 0.5;
+  opacity: 0.4;
   margin-left: auto;
 }
+.chevronDown { transform: rotate(90deg); }
 
-.chevronDown {
-  transform: rotate(90deg);
-}
+.success { color: var(--success); }
+.pending { color: var(--foreground); opacity: 0.5; }
 
-.success {
-  color: var(--success);
-}
-
-.pending {
-  color: var(--foreground);
-  opacity: 0.6;
-}
-
-.itemTs {
-  font-size: 10px;
-  opacity: 0.4;
-}
+.itemTs { font-size: 10px; opacity: 0.35; }
 
 .filePath {
   font-family: var(--font-mono);
   font-size: 11px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .action {
+  color: #8E8E93;
   font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: var(--border);
   text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 .cancelButton {
   width: 100%;
   padding: 6px 12px;
-  border: 1px solid var(--destructive);
-  border-radius: 6px;
-  background: color-mix(in oklch, var(--destructive) 15%, transparent);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 8px;
+  background: rgba(239,68,68,0.04);
   color: var(--destructive);
-  font-size: var(--font-size-xs);
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s;
 }
+.cancelButton:hover { background: rgba(239,68,68,0.08); }
 
-.cancelButton:hover {
-  background: color-mix(in oklch, var(--destructive) 25%, transparent);
-}
-
+/* ── Token usage ───────────────────────────── */
 .usageRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 2px 0;
 }
-
-.usageLabel {
-  font-size: var(--font-size-xs);
-  color: var(--foreground);
-  opacity: 0.6;
-}
-
-.usageValue {
-  font-size: var(--font-size-xs);
-  font-family: var(--font-mono);
-  font-weight: 500;
-}
-
-/* ── Responsive: Tablet (768px - 1023px) ─ */
-
-@media (max-width: 1023px) {
-  .panel {
-    min-width: 200px;
-    max-width: 260px;
-    font-size: var(--font-size-xs);
-  }
-}
-
-/* ── Responsive: Mobile (< 768px) ──────── */
-
-@media (max-width: 767px) {
-  .panel {
-    min-width: 0;
-    max-width: none;
-    width: 100%;
-    height: 100%;
-    border-left: none;
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    overflow-y: auto;
-  }
-
-  .title {
-    padding: var(--space-sm);
-    font-size: var(--font-size-sm);
-    text-align: center;
-  }
-
-  .section {
-    padding: var(--space-xs) var(--space-sm);
-  }
-
-  /* ── Tabs: horizontal scroll ──────────── */
-  .tabs {
-    overflow-x: auto;
-    overflow-y: hidden;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; /* Firefox */
-  }
-
-  .tabs::-webkit-scrollbar {
-    display: none; /* Chrome/Safari */
-  }
-
-  .tab {
-    padding: var(--space-sm) var(--space-md);
-    min-height: var(--touch-target-min, 44px);
-    font-size: var(--font-size-sm);
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
-
-  .tabContent {
-    padding: 0 var(--space-sm);
-  }
-
-  /* ── Token usage: stacked vertically ──── */
-  .usageRow {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    padding: 2px 0;
-  }
-
-  .usageLabel {
-    font-size: var(--font-size-xs);
-  }
-
-  .usageValue {
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-  }
-
-  /* ── Tool call items: larger touch targets ── */
-  .toolCallHeader {
-    padding: var(--space-sm) 0;
-    min-height: var(--touch-target-min, 44px);
-    font-size: var(--font-size-sm);
-  }
-
-  .toolCallOutput {
-    font-size: var(--font-size-xs);
-    max-height: 200px;
-  }
-
-  /* ── Items ────────────────────────────── */
-  .item {
-    padding: var(--space-xs) 0;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-  }
-
-  .filePath {
-    font-size: var(--font-size-xs);
-    word-break: break-all;
-  }
-
-  .cancelButton {
-    min-height: var(--touch-target-min, 44px);
-    font-size: var(--font-size-sm);
-  }
-
-  .output {
-    font-size: var(--font-size-xs);
-    max-height: 300px;
-  }
-}
+.usageLabel { font-size: 11px; color: #8E8E93; }
+.usageValue { font-size: 11px; font-family: var(--font-mono); }

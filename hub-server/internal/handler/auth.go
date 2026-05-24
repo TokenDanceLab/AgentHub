@@ -1,18 +1,6 @@
 package handler
 
 import (
-<<<<<<< HEAD
-	"github.com/gin-gonic/gin"
-	"github.com/agenthub/server-hub/internal/errcode"
-	"github.com/agenthub/server-hub/internal/service"
-)
-
-type AuthHandler struct {
-	service *service.AuthService
-}
-
-func NewAuthHandler(s *service.AuthService) *AuthHandler {
-=======
 	"context"
 	"log"
 
@@ -38,7 +26,6 @@ type AuthHandler struct {
 }
 
 func NewAuthHandler(s AuthService) *AuthHandler {
->>>>>>> origin/master
 	return &AuthHandler{service: s}
 }
 
@@ -85,11 +72,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			Fail(c, e)
 			return
 		}
-<<<<<<< HEAD
-=======
 		c.Error(err)
 		log.Printf("[LOGIN ERROR] username=%s device_type=%s err=%v", req.Username, req.DeviceType, err)
->>>>>>> origin/master
 		Fail(c, errcode.ErrInternal)
 		return
 	}
