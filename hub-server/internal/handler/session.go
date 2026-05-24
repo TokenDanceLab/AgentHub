@@ -1,19 +1,6 @@
 package handler
 
 import (
-<<<<<<< HEAD
-	"github.com/gin-gonic/gin"
-
-	"github.com/agenthub/server-hub/internal/errcode"
-	"github.com/agenthub/server-hub/internal/service"
-)
-
-type SessionHandler struct {
-	service *service.SessionService
-}
-
-func NewSessionHandler(s *service.SessionService) *SessionHandler {
-=======
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -43,7 +30,6 @@ type SessionHandler struct {
 }
 
 func NewSessionHandler(s SessionService) *SessionHandler {
->>>>>>> origin/master
 	return &SessionHandler{service: s}
 }
 

@@ -48,6 +48,29 @@ func TestStoreCreatesProjectThreadRunAndItem(t *testing.T) {
 	}
 }
 
+func TestStoreCreateProjectDistinguishesExistingProject(t *testing.T) {
+	s := New()
+
+	created, err := s.CreateProject("proj_test", "Original")
+	if err != nil {
+		t.Fatalf("CreateProject first call returned error: %v", err)
+	}
+
+	existing, err := s.CreateProject("proj_test", "Renamed")
+	if !errors.Is(err, ErrProjectExists) {
+		t.Fatalf("CreateProject duplicate error = %v, want ErrProjectExists", err)
+	}
+	if existing.ID != created.ID {
+		t.Fatalf("duplicate project ID = %q, want %q", existing.ID, created.ID)
+	}
+	if existing.Name != "Original" {
+		t.Fatalf("duplicate project name = %q, want Original", existing.Name)
+	}
+	if projects := s.ListProjects(); len(projects) != 1 {
+		t.Fatalf("ListProjects length = %d, want 1", len(projects))
+	}
+}
+
 func TestStoreCreatesThreadMessageItem(t *testing.T) {
 	s := New()
 	project, _ := s.CreateProject("proj_test", "Test Project")
@@ -94,6 +117,29 @@ func TestStoreRejectsRunForMissingThread(t *testing.T) {
 	_, err := s.CreateRun("run_test", "proj_test", "thread_missing")
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("CreateRun error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestStoreAllowsMultipleRunsForSameThread(t *testing.T) {
+	s := New()
+	_, _ = s.CreateProject("proj_test", "Test Project")
+	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread")
+
+	first, err := s.CreateRun("run_first", "proj_test", "thread_test")
+	if err != nil {
+		t.Fatalf("CreateRun first returned error: %v", err)
+	}
+	second, err := s.CreateRun("run_second", "proj_test", "thread_test")
+	if err != nil {
+		t.Fatalf("CreateRun second returned error: %v", err)
+	}
+
+	runs := s.ListRuns("thread_test")
+	if len(runs) != 2 {
+		t.Fatalf("ListRuns length = %d, want 2", len(runs))
+	}
+	if runs[0].ID != first.ID || runs[1].ID != second.ID {
+		t.Fatalf("ListRuns order = %#v, want first then second", runs)
 	}
 }
 

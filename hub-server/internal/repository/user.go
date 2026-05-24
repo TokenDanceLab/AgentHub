@@ -1,11 +1,7 @@
 package repository
 
 import (
-<<<<<<< HEAD
-	"github.com/agenthub/server-hub/internal/model"
-=======
 	"github.com/agenthub/hub-server/internal/model"
->>>>>>> origin/master
 	"gorm.io/gorm"
 )
 
@@ -38,8 +34,6 @@ func UpdateUser(db *gorm.DB, user *model.User) error {
 func UpdatePassword(db *gorm.DB, userID string, passwordHash string) error {
 	return db.Model(&model.User{}).Where("id = ?", userID).Update("password_hash", passwordHash).Error
 }
-<<<<<<< HEAD
-=======
 
 // GetUsersByIDs returns a map of user ID → *User for the given IDs.
 func GetUsersByIDs(db *gorm.DB, ids []string) (map[string]*model.User, error) {
@@ -56,4 +50,3 @@ func GetUsersByIDs(db *gorm.DB, ids []string) (map[string]*model.User, error) {
 	}
 	return m, nil
 }
->>>>>>> origin/master

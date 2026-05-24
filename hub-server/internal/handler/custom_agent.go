@@ -1,20 +1,6 @@
 package handler
 
 import (
-<<<<<<< HEAD
-	"github.com/gin-gonic/gin"
-
-	"github.com/agenthub/server-hub/internal/errcode"
-	"github.com/agenthub/server-hub/internal/model"
-	"github.com/agenthub/server-hub/internal/service"
-)
-
-type CustomAgentHandler struct {
-	service *service.AgentService
-}
-
-func NewCustomAgentHandler(s *service.AgentService) *CustomAgentHandler {
-=======
 	"context"
 
 	"github.com/gin-gonic/gin"
@@ -36,7 +22,6 @@ type CustomAgentHandler struct {
 }
 
 func NewCustomAgentHandler(s CustomAgentService) *CustomAgentHandler {
->>>>>>> origin/master
 	return &CustomAgentHandler{service: s}
 }
 
@@ -58,8 +43,6 @@ func (h *CustomAgentHandler) Create(c *gin.Context) {
 		return
 	}
 	userID := c.GetString("user_id")
-<<<<<<< HEAD
-=======
 	// Pre-validate jsonb fields before DB insert.
 	if err := (&model.CustomAgent{
 		CapabilityTags: req.CapabilityTags,
@@ -69,7 +52,6 @@ func (h *CustomAgentHandler) Create(c *gin.Context) {
 		FailWithMessage(c, errcode.ErrBadRequest, err.Error())
 		return
 	}
->>>>>>> origin/master
 	ca, err := h.service.CreateCustomAgent(c.Request.Context(), userID, req.Name, req.AvatarURL, req.AgentType, req.SystemPrompt, req.CapabilityTags, req.ToolWhitelist, req.ModelParams)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
@@ -122,14 +104,11 @@ func (h *CustomAgentHandler) Update(c *gin.Context) {
 		ToolWhitelist:  req.ToolWhitelist,
 		ModelParams:    req.ModelParams,
 	}
-<<<<<<< HEAD
-=======
 	// Pre-validate jsonb fields before DB update.
 	if err := ca.Validate(); err != nil {
 		FailWithMessage(c, errcode.ErrBadRequest, err.Error())
 		return
 	}
->>>>>>> origin/master
 	if err := h.service.UpdateCustomAgent(c.Request.Context(), userID, ca); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)

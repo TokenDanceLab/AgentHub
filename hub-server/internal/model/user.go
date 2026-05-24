@@ -5,11 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
-<<<<<<< HEAD
-	"github.com/agenthub/server-hub/pkg/uuidv7"
-=======
 	"github.com/agenthub/hub-server/pkg/uuidv7"
->>>>>>> origin/master
 )
 
 type User struct {
