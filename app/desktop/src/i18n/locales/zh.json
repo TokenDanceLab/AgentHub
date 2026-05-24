@@ -3,6 +3,8 @@
   "status.offline": "Local Edge: Offline",
   "status.wsConnected": "WS: Connected",
   "status.wsDisconnected": "WS: —",
+  "status.hubConnected": "Hub: 已连接",
+  "status.hubDisconnected": "Hub: —",
   "agent.title": "Agents",
   "agent.open": "打开代理面板",
   "agent.close": "关闭代理面板",
