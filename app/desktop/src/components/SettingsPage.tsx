@@ -347,6 +347,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     { keys: ['Enter'], action: t('shortcut.send') },
     { keys: ['Shift', 'Enter'], action: t('shortcut.newline') },
     { keys: ['Ctrl', 'K'], action: t('shortcut.search') },
+    { keys: ['⌘/Ctrl', 'B'], action: t('shortcut.toggleSidebar') },
+    { keys: ['⌘/Ctrl', 'J'], action: t('shortcut.toggleRunPanel') },
     { keys: ['Esc'], action: t('shortcut.close') },
     { keys: ['?'], action: t('shortcut.help') },
   ];
