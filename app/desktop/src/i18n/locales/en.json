@@ -75,6 +75,7 @@
   "nav.closeSidebar": "Close sidebar",
   "nav.agent": "Agent",
   "nav.messages": "Messages",
+  "nav.settings": "Settings",
   "run.open": "Open run detail",
   "run.close": "Close run detail",
   "chat.viewFullDiff": "View full diff",
