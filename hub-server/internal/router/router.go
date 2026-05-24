@@ -10,8 +10,9 @@ import (
 	"github.com/agenthub/hub-server/internal/middleware"
 )
 
-func SetupRoutes(r *gin.Engine, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler) {
+func SetupRoutes(r *gin.Engine, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler) {
 	r.Use(middleware.CORS())
+	r.Use(middleware.APIVersion())
 	r.Use(middleware.BodyLimit(10 << 20))
 	r.Use(middleware.GlobalRateLimit(cacheClient))
 	r.Use(middleware.RequestID())
@@ -26,6 +27,9 @@ func SetupRoutes(r *gin.Engine, jwtSecret string, cacheClient *cache.Client, aut
 			c.JSON(200, gin.H{"status": "ok"})
 		})
 	}
+
+	// Public API (unauthenticated, for the official website)
+	r.GET("/api/public/stats", publicHandler.Stats)
 
 	client := r.Group("/client")
 	{
