@@ -246,6 +246,10 @@ function ParticleCanvas() {
 
         for (let nextIndex = index + 1; nextIndex < particles.length; nextIndex += 1) {
           const nextParticle = particles[nextIndex];
+          if (!nextParticle) {
+            continue;
+          }
+
           const dx = particle.x - nextParticle.x;
           const dy = particle.y - nextParticle.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
@@ -277,7 +281,7 @@ function ParticleCanvas() {
 
 export function AgentSquarePageInteractive() {
   const [activeCategory, setActiveCategory] = useState<AgentCategory | 'All'>('All');
-  const [detailAgentId, setDetailAgentId] = useState<string | null>(agents[0].id);
+  const [detailAgentId, setDetailAgentId] = useState<string | null>(agents[0]?.id ?? null);
   const [isDetailOpen, setIsDetailOpen] = useState(true);
   const [favoriteIds, setFavoriteIds] = useState(initialFavoriteIds);
   const [installedIds, setInstalledIds] = useState(initialInstalledIds);
