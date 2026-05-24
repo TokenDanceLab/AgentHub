@@ -31,10 +31,10 @@ jobs:
         run: go build ./...
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
           working-directory: edge-server
-          version: v1.64
+          version: v2.12.2
           args: --timeout=5m
 
       - name: Test (unit only, skip integration)
@@ -123,10 +123,10 @@ jobs:
         run: go build ./...
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
           working-directory: hub-server
-          version: v1.64
+          version: v2.12.2
           args: --timeout=5m
 
       - name: Test (unit only, skip integration)
