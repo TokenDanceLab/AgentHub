@@ -153,6 +153,36 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('settings.schedulerGuard')).toBeInTheDocument();
   });
 
+  it('renders runtime inventory separately from profile composition', () => {
+    mockAgents.splice(0, mockAgents.length, {
+      id: 'claude-code',
+      name: 'Claude Code',
+      description: 'Claude Code runtime',
+      status: 'available',
+      capabilities: {
+        streaming: true,
+        toolCalls: true,
+        fileChanges: true,
+        thinkingVisible: true,
+        multiTurn: true,
+        mcpIntegration: true,
+        permissionHooks: true,
+        subAgentSpawn: false,
+      },
+    });
+
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="agentProfiles" />);
+
+    expect(screen.getByText('settings.runtimeInventory')).toBeInTheDocument();
+    expect(screen.getByText('settings.profileComposition')).toBeInTheDocument();
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
+    expect(screen.getByText('settings.runtimeAdapter: claude-code')).toBeInTheDocument();
+    expect(screen.getByText('settings.profileRuntime')).toBeInTheDocument();
+    expect(screen.getByText('settings.profileModel')).toBeInTheDocument();
+    expect(screen.getByText('settings.profileConfig')).toBeInTheDocument();
+    expect(screen.getAllByText('settings.executionTargets').length).toBeGreaterThan(0);
+  });
+
   it('renders agent market readiness from local profiles and capabilities', () => {
     mockAgents.splice(0, mockAgents.length, {
       id: 'codex',
