@@ -337,15 +337,15 @@ Hub 调度（远程）:
   - 方案：`go-sqlmock` mock DB 层，table-driven tests
   - 验收：核心服务逻辑（注册/登录/创建会话/发送消息/召回）有独立单元测试
 
-- [ ] **eventbus panic recovery 测试** `[0.5d]` `[P1]`
+- [x] **eventbus panic recovery 测试** `[0.5d]` `[P1]`
   - 新增：`hub-server/internal/service/eventbus_test.go`
   - 验证：handler panic 后 logger 记录 stack + counter 递增
 
-- [ ] **test isolation（per-test cleanup）** `[1d]` `[P1]`
+- [x] **test isolation（per-test cleanup）** `[1d]` `[P1]`
   - 文件：`hub-server/tests/setup_test.go`
   - 方案：`cleanDB()` 在 `t.Cleanup` 中调用，确保测试不互相污染
 
-- [ ] **Hub 覆盖率阈值 40% → 60%（硬阻断）** `[1d]` `[P1]`
+- [x] **Hub 覆盖率阈值 40% → 60%（硬阻断）** `[1d]` `[P1]`
   - 文件：`.github/workflows/checks.yml` go-hub job
   - 方案：`continue-on-error` 改为 `exit 1`；低于 60% 时 CI 失败
 
@@ -414,7 +414,7 @@ Hub 调度（远程）:
   - `.github/workflows/checks.yml` docker job（PR 构建验证）
   - `hub-server/.dockerignore`
 
-- [ ] **Benchmark 回归检测** `[1d]`
+- [x] **Benchmark 回归检测** `[1d]`
   - 新增：`edge-server/internal/events/bench_test.go`, `hub-server/internal/service/bench_test.go`
   - 方案：Bus.Publish、NDJSON 解析、JWT 验证、消息写入性能基准
   - CI：`go test -bench=. -benchtime=1s` 检测回归
@@ -434,7 +434,7 @@ Hub 调度（远程）:
 - [x] **架构决策记录 (ADR)** `[1d]` ✅ M5
   - `docs/adr/` — 5 篇：Hub-Edge双层/WS+NDJSON/Zustand+TanStack/Go进程编排/Worktree隔离
 
-- [ ] **文档与代码一致性修复** `[1d]`
+- [x] **文档与代码一致性修复** `[1d]`
   - Hub Server 准确性矩阵（`docs/review/hub-server-audit.md` 第 10 节）31 项对比中 15 项不一致
   - 修复关键项：消息撤回 2min vs 5min、CORS/Rate-limit middleware 文档声明但不存在
   - 验收：移除文档中未实现的端点声明
@@ -797,7 +797,6 @@ pnpm typecheck                                         # 零错误
 | **参考** | `docs/reference/cross-comparison/00-synthesis.md` | 18 项目全景分析 |
 | | `docs/reference/cross-comparison/10-best-practices-playbook.md` | 最佳实践索引 |
 | | `docs/reference/cross-comparison/02-im-ux.md` | IM/UX 设计建议 |
-| | `docs/inbox/RESEARCH-SUMMARY-2026-05-24.md` | 竞品研究总结 |
 | **设计** | `docs/design/client-p0-architecture.md` | Desktop P0 实施细节 |
 | | `docs/design/client-reference-patterns.md` | Desktop 参考模式 |
 | **架构** | `docs/system-architecture.md` | 系统架构文档 |
