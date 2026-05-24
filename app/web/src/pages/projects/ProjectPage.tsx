@@ -69,6 +69,13 @@ type Notice = {
   message: string;
 };
 
+type SourceTone = 'green' | 'purple' | 'amber' | 'cyan' | 'neutral';
+
+type SectionSource = {
+  label: string;
+  tone: SourceTone;
+};
+
 const viewLabels: Record<BoardView, string> = {
   overview: 'Overview',
   tasks: 'Tasks',
@@ -117,7 +124,7 @@ const initialRisks: RiskItem[] = [
   {
     id: 'risk-no-api',
     title: 'Edge snapshot fallback',
-    detail: 'Live Edge data is preferred; mock preview data is shown only when no snapshot is available.',
+    detail: 'Live Edge data is preferred; mock preview data is shown only when that section has no snapshot data.',
     status: 'Open',
     reviewable: true,
   },
@@ -226,6 +233,38 @@ function runRecordFromApi(run: Run): RunRecord {
     detail: `Run on thread ${run.threadId}, project ${run.projectId}. Status: ${run.status}.`,
     time: run.createdAt.slice(11, 16),
   };
+}
+
+function snapshotSectionSource(mode: ReturnType<typeof getWorkbenchCatalogState>['mode'], hasSnapshotData: boolean): SectionSource {
+  if (hasSnapshotData) {
+    if (mode === 'offline-snapshot') {
+      return { label: 'Offline snapshot', tone: 'purple' };
+    }
+
+    return { label: 'Edge snapshot', tone: 'green' };
+  }
+
+  if (mode === 'loading') {
+    return { label: 'Loading snapshot', tone: 'cyan' };
+  }
+
+  if (mode === 'mock') {
+    return { label: 'Mock fallback', tone: 'amber' };
+  }
+
+  return { label: 'Snapshot unavailable', tone: 'neutral' };
+}
+
+function mergedSectionSource(baseSource: SectionSource, hasLocalDryRun: boolean): SectionSource {
+  if (!hasLocalDryRun) {
+    return baseSource;
+  }
+
+  return { label: `Local dry-run / ${baseSource.label}`, tone: 'cyan' };
+}
+
+function SourceLabel({ source }: { source: SectionSource }) {
+  return <span className={`projectSourceLabel ${source.tone}`}>{source.label}</span>;
 }
 
 const pageStyles = `
@@ -647,6 +686,14 @@ const pageStyles = `
     margin-bottom: 14px;
   }
 
+  .projectHeaderActions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
   .projectCardHeader h3 {
     margin: 0;
     font-size: 18px;
@@ -818,6 +865,46 @@ const pageStyles = `
     color: var(--text-muted);
     border-color: rgba(148, 163, 184, 0.25);
     background: rgba(148, 163, 184, 0.12);
+  }
+
+  .projectSourceLabel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 4px 8px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 999px;
+    color: var(--text-muted);
+    background: rgba(148, 163, 184, 0.1);
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .projectSourceLabel.green {
+    color: var(--success);
+    border-color: rgba(5, 150, 105, 0.18);
+    background: var(--success-bg);
+  }
+
+  .projectSourceLabel.purple {
+    color: var(--accent);
+    border-color: rgba(124, 58, 237, 0.18);
+    background: rgba(124, 58, 237, 0.1);
+  }
+
+  .projectSourceLabel.amber {
+    color: var(--warning-dot);
+    border-color: rgba(217, 119, 6, 0.2);
+    background: rgba(217, 119, 6, 0.12);
+  }
+
+  .projectSourceLabel.cyan {
+    color: var(--accent);
+    border-color: rgba(8, 145, 178, 0.18);
+    background: rgba(8, 145, 178, 0.1);
   }
 
   .projectTaskRow,
@@ -1277,8 +1364,13 @@ export function ProjectPageInteractive() {
     hasLiveCatalog,
     label: catalogLabel,
     message: catalogDetail,
+    mode: catalogMode,
     tone: catalogTone,
   } = getWorkbenchCatalogState(workbenchState);
+  const projectSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.projects.length > 0);
+  const taskSnapshotSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.runs.length > 0);
+  const fileSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.artifacts.length > 0);
+  const runSnapshotSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.runs.length > 0);
   const projectedProjects = hasLiveCatalog && workbenchState.projects.length
     ? workbenchState.projects.map(projectFromApi)
     : projects;
@@ -1315,6 +1407,8 @@ export function ProjectPageInteractive() {
     [localTasks, projectedTasks, taskOverrides],
   );
   const projectRuns = useMemo(() => [...localRuns, ...projectedRuns], [localRuns, projectedRuns]);
+  const taskSource = mergedSectionSource(taskSnapshotSource, localTasks.length > 0);
+  const runSource = mergedSectionSource(runSnapshotSource, localRuns.length > 0);
 
   const canSaveTask = taskForm.title.trim().length > 0 && taskForm.owner.trim().length > 0;
   const completedTaskCount = projectTasks.filter((task) => task.status === 'Done').length;
@@ -1700,19 +1794,22 @@ export function ProjectPageInteractive() {
             <section className="projectPanel projectGlass">
               <div className="projectCardHeader">
                 <h3>{boardTitle}</h3>
-                <div className="projectTabs" role="tablist" aria-label="Project board sections">
-                  {(['overview', 'tasks', 'files'] as BoardView[]).map((view) => (
-                    <button
-                      aria-selected={activeView === view}
-                      className={activeView === view ? 'projectTab isActive' : 'projectTab'}
-                      key={view}
-                      onClick={() => setActiveView(view)}
-                      role="tab"
-                      type="button"
-                    >
-                      {viewLabels[view]}
-                    </button>
-                  ))}
+                <div className="projectHeaderActions">
+                  <SourceLabel source={activeView === 'tasks' ? taskSource : activeView === 'files' ? fileSource : projectSource} />
+                  <div className="projectTabs" role="tablist" aria-label="Project board sections">
+                    {(['overview', 'tasks', 'files'] as BoardView[]).map((view) => (
+                      <button
+                        aria-selected={activeView === view}
+                        className={activeView === view ? 'projectTab isActive' : 'projectTab'}
+                        key={view}
+                        onClick={() => setActiveView(view)}
+                        role="tab"
+                        type="button"
+                      >
+                        {viewLabels[view]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -1746,6 +1843,7 @@ export function ProjectPageInteractive() {
                     <span className="projectMuted">
                       {completedTaskCount} done / {projectTasks.length} total
                     </span>
+                    <SourceLabel source={taskSource} />
                     <button className="projectSecondaryButton" onClick={openTaskPanel} type="button">
                       New task
                     </button>
@@ -1782,6 +1880,7 @@ export function ProjectPageInteractive() {
                   <div className="projectFilterBar">
                     <div className="projectFilterGroup" aria-label="File type filters">
                       <span className="projectFilterLabel">Files</span>
+                      <SourceLabel source={fileSource} />
                       {fileFilters.map((filter) => (
                         <button
                           className={fileFilter === filter ? 'projectMiniButton isActive' : 'projectMiniButton'}
@@ -1795,6 +1894,7 @@ export function ProjectPageInteractive() {
                     </div>
                     <div className="projectFilterGroup" aria-label="Run status filters">
                       <span className="projectFilterLabel">Runs</span>
+                      <SourceLabel source={runSource} />
                       {runFilters.map((filter) => (
                         <button
                           className={runFilter === filter ? 'projectMiniButton isActive' : 'projectMiniButton'}
