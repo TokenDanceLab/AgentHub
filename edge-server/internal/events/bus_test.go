@@ -230,6 +230,9 @@ drain:
 	if count > 256 {
 		t.Errorf("received %d events on slow sub, want <= 256 due to drops", count)
 	}
+	if got := b.DroppedCount(); got != int64(300-count) {
+		t.Errorf("DroppedCount() = %d, want %d", got, 300-count)
+	}
 }
 
 func TestConcurrentPublishSubscribe(t *testing.T) {

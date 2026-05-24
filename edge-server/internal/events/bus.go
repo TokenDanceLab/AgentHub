@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	defaultMaxHistory             = 10000
+	defaultMaxHistory           = 10000
 	subscriberChannelBufferSize = 256
 )
 
@@ -34,6 +34,7 @@ type subscriber struct {
 type Bus struct {
 	mu         sync.Mutex
 	seq        int64
+	dropped    atomic.Int64
 	history    []EventEnvelope
 	subs       []subscriber
 	nextSubID  int64
@@ -83,6 +84,7 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 		case sub.ch <- evt:
 		default:
 			// Drop event for slow subscriber.
+			b.dropped.Add(1)
 		}
 	}
 
@@ -133,4 +135,10 @@ func (b *Bus) HistoryLen() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return len(b.history)
+}
+
+// DroppedCount returns the number of fanout deliveries dropped because a
+// subscriber channel was full.
+func (b *Bus) DroppedCount() int64 {
+	return b.dropped.Load()
 }
