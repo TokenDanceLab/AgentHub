@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-24（Desktop P0 全部完成 + M5/M6/M7 已部署）
+最后更新：2026-05-25（Hub contact/custom agent 校验 + Edge project duplicate/run/health 语义）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 
@@ -157,7 +157,7 @@ Hub 调度（远程）:
 
 - [x] **S2: 接入 Prometheus metrics + 深度 health check** `[3d]`
   - 文件：新增 `edge-server/internal/metrics/metrics.go`，修改 `internal/httpserver/server.go`
-  - 指标：`edge_runs_total`, `edge_run_duration_seconds`, `edge_active_runs`, `edge_ws_connections`, `edge_event_bus_depth`
+  - 指标：`edge_runs_total`, `edge_run_duration_seconds`, `edge_active_runs`, `edge_ws_connections`, `edge_event_bus_depth`, `edge_event_bus_dropped_total`
   - Health check：验证 store 可读、runner registry 非空
   - 验收：`curl /v1/health` 返回 `{"status":"ok","checks":{"store":"ok","runners":3}}`
 
@@ -200,8 +200,10 @@ Hub 调度（远程）:
   - 文件：`edge-server/internal/lifecycle/process_executor.go:414-449` → `internal/adapters/event_emitter.go`
 - [ ] **S9: Orchestrator prompt 模板转义** `[0.5d]`
   - 文件：`edge-server/internal/adapters/orchestrator.go:72-95`
-- [ ] **S11: CreateProject 返回区分已存在/新建** `[0.5d]`
-  - 文件：`edge-server/internal/store/store.go`
+- [x] **S11: CreateProject 返回区分已存在/新建** `[0.5d]`
+  - 文件：`edge-server/internal/store/store.go`, `edge-server/internal/api/handlers.go`
+  - 方案：Store 通过 `ErrProjectExists` 区分重复创建；API 新建返回 201 并发布 `project.created`，已存在返回 200 且不重复发布 created 事件
+  - 验收：`TestStoreCreateProjectDistinguishesExistingProject`、`TestMuxPostProjectsExistingProjectReturnsOKWithoutCreatedEvent`
 - [x] **S12: 清理空目录 `internal/edgeserver/`** `[0.5d]`
 - [ ] **常量提取**：`maxConcurrentRuns: 5`, `channel buffer: 256`, `read buffer: 32*1024` 等魔数 → named constants `[0.5d]`
 
@@ -269,48 +271,58 @@ Hub 调度（远程）:
 
 ##### P2 -- 中等严重度
 
-- [ ] **P2-1/P2-2: 修复 N+1 查询** `[1d]`
+- [x] **P2-1/P2-2: 修复 N+1 查询** `[1d]`
   - 文件：`hub-server/internal/service/contact.go:217-240` (ListContacts), `:149-172` (ListFriendRequests)
   - 方案：收集所有 friend ID → 单次 `WHERE id IN (?)` → 构建 map
+  - 验收：`TestListContacts_BatchesFriendUserLookup`、`TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender`
 
-- [ ] **P2-5: CancelTask session_id 错误** `[0.5d]`
+- [x] **P2-5: CancelTask session_id 错误** `[0.5d]`
   - 文件：`hub-server/internal/service/agent.go:269-274`
   - 方案：通过 `AgentInstance` 查找真实 `SessionID`，而非使用 `AgentInstanceID`
+  - 验收：`TestCancelTaskPublishesResolvedSessionID` 覆盖 agent instance → session id 解析
 
-- [ ] **P2-8: Agent 消息生成 ClientMsgID** `[0.5d]`
+- [x] **P2-8: Agent 消息生成 ClientMsgID** `[0.5d]`
   - 文件：`hub-server/internal/service/agent.go:312-318, 364-370`
   - 方案：`uuidv7.Must()` 生成 `client_msg_id`
-  - 风险：当前 `NOT NULL` 约束会拒绝不含 `client_msg_id` 的 INSERT
+  - 验收：`TestHandleTaskStreamPersistsAgentMessageWithClientMsgIDAndRedisSeq`、`TestHandleTaskDoneUsesDBSeqFallbackAndPublishesFinalEvents`
 
-- [ ] **P2-9: UpsertDevice ON CONFLICT 字段修正** `[0.5d]`
+- [x] **P2-9: UpsertDevice ON CONFLICT 字段修正** `[0.5d]`
   - 文件：`hub-server/internal/repository/device.go:10-14`
   - 方案：`ON CONFLICT (id)` → `ON CONFLICT (user_id, device_type)`
+  - 验收：`TestDeviceRepo_Upsert` 覆盖同用户同设备类型、不同 device id 的重复注册更新
 
-- [ ] **P2-10: WebSocket 丢帧告警 + 计数** `[0.5d]`
+- [x] **P2-10: WebSocket 丢帧告警 + 计数** `[0.5d]`
   - 文件：`hub-server/internal/handler/ws.go:143-147`, `hub-server/internal/ws/manager.go:164-167`
   - 方案：send channel 满时记录 WARN 日志 + Prometheus counter `ws_dropped_frames_total`
+  - 验收：`TestManagerPushToConnCountsDroppedFrames` 覆盖慢客户端 send buffer 满时 counter 递增
 
-- [ ] **P2-3: jsonb 字段类型校验** `[0.5d]`
+- [x] **P2-3: jsonb 字段类型校验** `[0.5d]`
   - 文件：`hub-server/internal/model/custom_agent.go:17-20`
-  - 方案：`CapabilityTags`, `ToolWhitelist`, `ModelParams` 使用 `json.RawMessage` 或 handler 层 JSON 校验
+  - 方案：`CapabilityTags`/`ToolWhitelist` 必须是 JSON array，`ModelParams` 必须是 JSON object；handler 创建/更新前预检，GORM hook 保存前兜底
+  - 验收：`TestCustomAgentValidateRejectsWrongJSONBShapes`、`TestCustomAgentHandler_CreateRejectsInvalidJSONBShapeBeforeService`、`TestCustomAgentHandler_UpdateRejectsInvalidJSONBShapeBeforeService`
 
 - [x] **P2-4: FailWithMessage HTTP 状态守卫** `[0.5d]`
   - 文件：`hub-server/internal/handler/response.go:34-39`
   - 方案：添加 `if e.HTTPStatus == 0 { e = errcode.ErrInternal }` 守卫
 
-- [ ] **P2-7: Agent 消息 seq 分配走 Redis 缓存** `[0.5d]`
+- [x] **P2-7: Agent 消息 seq 分配走 Redis 缓存** `[0.5d]`
   - 文件：`hub-server/internal/service/agent.go:326-333`
   - 方案：`HandleTaskStream`/`HandleTaskDone` 使用 `allocateSeq`（Redis INCR + DB fallback）
+  - 验收：Agent stream 覆盖 Redis seq；Agent done 覆盖 Redis 失败后的 DB fallback
 
-- [ ] **P2-6: WebSocket writeLoop 添加 panic recovery** `[0.5d]`
+- [x] **P2-6: WebSocket writeLoop 添加 panic recovery** `[0.5d]`
   - 文件：`hub-server/internal/handler/ws.go:47-57`
   - 方案：`defer conn.W.Close(...)` + `defer recover()` + 日志
+  - 验收：`writeLoop` 退出统一 close，panic recovery 保留日志
 
 ##### P3 -- 低严重度
 
 - [ ] **P3-3/P3-6: 合并双 cmd 入口** `[1d]`
   - 文件：`hub-server/cmd/agenthub-hub/main.go` → 合并到 `cmd/server-hub/main.go` 或明确文档化
-- [ ] **P2-11: listFriendRequests 用户查找失败时记录日志** `[0.5d]`
+- [x] **P2-11: listFriendRequests 用户查找失败时记录日志** `[0.5d]`
+  - 文件：`hub-server/internal/service/contact.go`
+  - 方案：批量用户查询缺失 sender 时记录 `slog.Debug` 并跳过该坏数据，不阻断其他好友请求
+  - 验收：`TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender`
 - [ ] **P3-1: 路由参数命名统一** `[0.5d]`
 - [ ] **P3-2: 魔数常量化**（50/50/24h/5min/1024/64） `[1d]`
 - [ ] **P3-4: 创建 Workspace GORM model** `[0.5d]`
@@ -511,10 +523,14 @@ Hub 调度（远程）:
 
 ##### 阶段 6: Edge Server 强化 `[2d]`
 
-- [ ] 并发 run 验证（每线程一个 run）
+- [x] 并发 run 验证（每线程一个公开 run）
+  - 方案：`POST /v1/runs` 在创建前检查同 thread 是否存在 `queued`/`started`/`cancelling` run，命中时返回 409 `active_run_exists` 和现有 `runId`；Store 保留同 thread 多 run 能力给 orchestrator sub-agent；executor 启动失败会把 queued run 标记为 `failed`，避免重试被永久 409 阻塞。
+  - 验收：`TestPostRunsRejectsSecondActiveRunForThread`、`TestPostRunsAllowsNewRunAfterActiveRunTerminal`、`TestPostRunsMarksExecutorStartFailureTerminalForRetry`、`TestStoreAllowsMultipleRunsForSameThread`
 - [ ] Run 清理（过期 run、资源限制）
 - [ ] 可选：重启后 run 历史持久化
-- [ ] Health check 包含 runner 状态
+- [x] Health check 包含 runner 状态
+  - 方案：`/v1/health` 的 `checks.runners` 返回 `total`、`available`、`unavailable`、`statuses`、`items`；无 registry、无 runner、全离线时降级为 `degraded`。
+  - 验收：`TestGetHealth`、`TestGetHealthDegradesWhenNoRunnerAvailable`、`TestGetHealthDegradesWhenRunnerRegistryMissing`
 
 ---
 
