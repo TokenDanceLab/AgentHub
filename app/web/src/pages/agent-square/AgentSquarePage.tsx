@@ -134,7 +134,7 @@ const agents: Agent[] = [
     icon: runner.status === 'online' ? 'memory' : 'cloud_off',
     tone: (runner.status === 'online' ? 'cyan' : 'purple') as Agent['tone'],
     summary: runner.capabilities ?? 'Local runner agent',
-    description: `Runner ${runner.name} — status: ${runner.status}. Capabilities: ${runner.capabilities ?? 'unknown'}.`,
+    description: `Runner ${runner.name} - status: ${runner.status}. Capabilities: ${runner.capabilities ?? 'unknown'}.`,
     tags: [runner.status, ...(runner.capabilities?.split(',') ?? [])],
     installs: runner.status === 'online' ? 5200 : 800,
     favoriteCount: runner.status === 'online' ? 340 : 45,
@@ -151,7 +151,7 @@ const initialInstalledIds = new Set<string>(['refactor', mockRunners[0]?.id, moc
 const workspaceLimit = 8;
 
 const sortLabels: Record<SortMode, string> = {
-  popular: 'Most installed',
+  popular: 'Most staged',
   rating: 'Highest rated',
   recent: 'Recently updated',
 };
@@ -495,8 +495,8 @@ export function AgentSquarePageInteractive() {
                     <span className="material-symbols-outlined">storefront</span>
                   </div>
                   <div className="asr-truncate">
-                    <strong className="asr-small">Marketplace</strong>
-                    <p className="asr-tiny asr-muted asr-truncate">Browse installable agents</p>
+                    <strong className="asr-small">Catalog preview</strong>
+                    <p className="asr-tiny asr-muted asr-truncate">Browse mock agents</p>
                   </div>
                 </button>
 
@@ -560,16 +560,16 @@ export function AgentSquarePageInteractive() {
               <div className="asr-progress">
                 <span style={{ width: `${Math.min((installedIds.size / workspaceLimit) * 100, 100)}%` }} />
               </div>
-              <p className="asr-small asr-muted">Added agents are staged for the current workspace.</p>
+              <p className="asr-small asr-muted">Added agents are staged locally; Hub sync is not connected.</p>
             </section>
           </aside>
 
           <main className="asr-main">
             <header className="asr-topbar asr-glass">
               <div>
-                <p className="asr-label asr-muted">Agent market</p>
+                <p className="asr-label asr-muted">Mock catalog</p>
                 <h1>Find the right specialist before a run starts</h1>
-                <p className="asr-small asr-muted">Search, compare, favorite, and stage agents for the workspace.</p>
+                <p className="asr-small asr-muted">Local catalog preview only. Hub /web/custom-agents is not connected yet.</p>
               </div>
 
               <div className="asr-toolbar">
@@ -605,7 +605,7 @@ export function AgentSquarePageInteractive() {
                 </div>
                 <div>
                   <strong>{agents.length}</strong>
-                  <span className="asr-small asr-muted">Curated agents</span>
+                  <span className="asr-small asr-muted">Mock catalog agents</span>
                 </div>
               </div>
               <div className="asr-metric-card asr-glass">
@@ -632,7 +632,7 @@ export function AgentSquarePageInteractive() {
                 </div>
                 <div>
                   <strong>98%</strong>
-                  <span className="asr-small asr-muted">Policy checks</span>
+                  <span className="asr-small asr-muted">Preview checks</span>
                 </div>
               </div>
             </section>
@@ -640,8 +640,8 @@ export function AgentSquarePageInteractive() {
             <section className="asr-market asr-glass">
               <div className="asr-market-head">
                 <div>
-                  <p className="asr-label asr-muted">Agent catalog</p>
-                  <h2>Installable specialists</h2>
+                  <p className="asr-label asr-muted">Local catalog</p>
+                  <h2>Staged specialists</h2>
                 </div>
                 <div className="asr-filter-summary">
                   <span className="asr-pill asr-pill-cyan">Showing {filteredAgents.length} agents</span>
@@ -694,7 +694,7 @@ export function AgentSquarePageInteractive() {
 
                       <div className="asr-mini-row">
                         <span className="asr-small asr-muted">{agent.rating.toFixed(1)} rating</span>
-                        <span className="asr-small asr-muted">{formatInstalls(getDisplayInstalls(agent.id))} installs</span>
+                        <span className="asr-small asr-muted">{formatInstalls(getDisplayInstalls(agent.id))} staged</span>
                       </div>
 
                       <div className="asr-mini-row">
@@ -770,7 +770,7 @@ export function AgentSquarePageInteractive() {
                     <strong className="asr-small">{detailAgent.rating.toFixed(1)} / 5</strong>
                   </div>
                   <div className="asr-mini-row">
-                    <span className="asr-small asr-muted">Installs</span>
+                    <span className="asr-small asr-muted">Staged count</span>
                     <strong className="asr-small">{formatInstalls(getDisplayInstalls(detailAgent.id))}</strong>
                   </div>
                   <div className="asr-mini-row">
@@ -822,7 +822,7 @@ export function AgentSquarePageInteractive() {
                       </div>
                       <div>
                         <strong className="asr-small">{installedIds.has(detailAgent.id) ? 'Ready in workspace' : 'Ready to add'}</strong>
-                        <p className="asr-tiny asr-muted">Install state changes the card action and summary count.</p>
+                        <p className="asr-tiny asr-muted">Local stage state changes the card action and summary count.</p>
                       </div>
                     </div>
                   </div>
@@ -834,7 +834,7 @@ export function AgentSquarePageInteractive() {
                   <span className="material-symbols-outlined">ads_click</span>
                 </div>
                 <h2>Select an agent</h2>
-                <p className="asr-small asr-muted">Open details from any visible card to compare output, rating, install count, and workspace state.</p>
+                <p className="asr-small asr-muted">Open details from any visible card to compare output, rating, staged count, and workspace state.</p>
               </div>
             )}
           </aside>
