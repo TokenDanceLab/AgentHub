@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsgo && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsgo -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -17,7 +17,7 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.4.0",
-    "typescript": "~5.8.0",
+    "@typescript/native-preview": "beta",
     "vite": "^6.3.0"
   }
 }
