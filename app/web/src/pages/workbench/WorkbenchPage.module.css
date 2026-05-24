@@ -12,8 +12,8 @@
   background:
     radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
     radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.14), transparent 30%),
-    linear-gradient(135deg, #f7fbff, #edf6ff);
-  color: #172033;
+    linear-gradient(135deg, var(--surface-alt), var(--bg));
+  color: var(--text);
   font-family:
     "Hanken Grotesk",
     Inter,
@@ -54,10 +54,10 @@
   min-width: 0;
   max-width: 100%;
   min-height: 0;
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
+  background: var(--glass-bg);
+  box-shadow: 0 18px 48px var(--glass-shadow);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
 }
@@ -78,7 +78,7 @@
   align-items: center;
   gap: 10px;
   padding-bottom: 14px;
-  border-bottom: 1px solid #e4e8f0;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .brandTitle {
@@ -98,14 +98,14 @@
 }
 
 .brandBlock h1 {
-  color: #172033;
+  color: var(--text);
   font-size: 15px;
   line-height: 1.25;
 }
 
 .brandBlock p {
   margin: 4px 0 0;
-  color: #667085;
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.09em;
@@ -130,7 +130,7 @@
   flex: 0 0 auto;
   border-radius: 10px;
   background: linear-gradient(135deg, #1769e8, #08a7cf);
-  color: #ffffff;
+  color: var(--white);
   font-family:
     "Hanken Grotesk",
     Inter,
@@ -144,7 +144,7 @@
   font-size: 16px;
   font-weight: 900;
   line-height: 1;
-  box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
+  box-shadow: 0 10px 22px var(--shadow);
 }
 
 .railSection {
@@ -172,7 +172,7 @@
 }
 
 .sectionHead {
-  color: #526176;
+  color: var(--neutral);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -185,10 +185,10 @@
 .fileRow {
   display: grid;
   min-width: 0;
-  border: 1px solid #e0e6ef;
+  border: 1px solid var(--border-light);
   border-radius: 10px;
-  background: #ffffff;
-  color: #172033;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .projectCard {
@@ -200,16 +200,16 @@
 
 .selectedCard,
 .activeThread {
-  border-color: #b9cdf6;
-  background: #f3f7ff;
+  border-color: var(--accent-border);
+  background: var(--accent-light);
 }
 
 .projectIcon {
   width: 38px;
   height: 38px;
   border-radius: 7px;
-  background: #e9f1ff;
-  color: #1f6feb;
+  background: var(--accent-lighter);
+  color: var(--accent);
   font-size: 12px;
   font-weight: 800;
 }
@@ -233,7 +233,7 @@
   display: block;
   overflow: hidden;
   margin-top: 3px;
-  color: #65758b;
+  color: var(--text-muted);
   font-size: 11px;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -285,27 +285,27 @@
 }
 
 .good {
-  color: #087443;
-  background: #eaf8f0;
-  border: 1px solid #bde5ca;
+  color: var(--success);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
 }
 
 .warn {
-  color: #975a16;
-  background: #fff5e8;
-  border: 1px solid #f3d2a5;
+  color: var(--warning);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
 }
 
 .bad {
-  color: #b42318;
-  background: #fff0ee;
-  border: 1px solid #f3beb7;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
 }
 
 .neutral {
-  color: #526176;
-  background: #f4f6f9;
-  border: 1px solid #dce3ed;
+  color: var(--neutral);
+  background: var(--neutral-bg);
+  border: 1px solid var(--neutral-border);
 }
 
 .dot {
@@ -315,21 +315,21 @@
 }
 
 .goodDot {
-  background: #16a05d;
+  background: var(--success-dot);
 }
 
 .warnDot {
-  background: #d97706;
+  background: var(--warning-dot);
 }
 
 .neutralDot {
-  background: #9aa6b6;
+  background: var(--neutral-dot);
 }
 
 .textButton {
   border: 0;
   background: transparent;
-  color: #1f6feb;
+  color: var(--accent);
   cursor: pointer;
   font-size: 11px;
   font-weight: 800;
@@ -349,12 +349,12 @@
   justify-content: space-between;
   gap: 14px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #e4e8f0;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .eyebrow {
   margin: 0 0 4px;
-  color: #65758b;
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -369,7 +369,7 @@
 
 .threadHeader p {
   margin-top: 4px;
-  color: #65758b;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -385,10 +385,10 @@
 
 .primaryButton {
   min-height: 34px;
-  border: 1px solid #1688dc;
+  border: 1px solid var(--accent);
   padding: 0 12px;
   background: linear-gradient(135deg, #1769e8, #08a7cf);
-  color: #ffffff;
+  color: var(--white);
 }
 
 .primaryButton:disabled {
@@ -398,18 +398,18 @@
 
 .secondaryButton {
   min-height: 34px;
-  border: 1px solid #cfd8e6;
+  border: 1px solid var(--border);
   padding: 0 12px;
-  background: #ffffff;
-  color: #26354a;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .iconButton {
   width: 34px;
   height: 34px;
-  border: 1px solid #cfd8e6;
-  background: #ffffff;
-  color: #1f6feb;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--accent);
 }
 
 .runSummary {
@@ -421,17 +421,17 @@
 .runSummary article,
 .workspaceSummary article {
   min-width: 0;
-  border: 1px solid #e0e6ef;
+  border: 1px solid var(--border-light);
   border-radius: 7px;
   padding: 9px 10px;
-  background: #f8fafc;
+  background: var(--surface-alt);
 }
 
 .runSummary strong,
 .workspaceSummary strong {
   display: block;
   overflow: hidden;
-  color: #172033;
+  color: var(--text);
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -441,7 +441,7 @@
 .workspaceSummary span {
   display: block;
   margin-top: 3px;
-  color: #65758b;
+  color: var(--text-muted);
   font-size: 11px;
 }
 
@@ -456,9 +456,9 @@
 .runTimeline {
   min-height: 0;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.68);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .messages {
@@ -468,15 +468,15 @@
 
 .cardTitle {
   min-height: 42px;
-  border-bottom: 1px solid #e4e8f0;
+  border-bottom: 1px solid var(--border-subtle);
   padding: 0 12px;
-  color: #172033;
+  color: var(--text);
   font-size: 13px;
   font-weight: 800;
 }
 
 .muted {
-  color: #65758b;
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 600;
 }
@@ -490,31 +490,31 @@
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
   gap: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.68);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 10px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .owner {
-  background: #f6f9ff;
+  background: var(--owner-bg);
 }
 
 .agent {
-  background: #f8fafc;
+  background: var(--agent-bg);
 }
 
 .system {
-  border-color: #f3d2a5;
-  background: #fffaf3;
+  border-color: var(--warning-border);
+  background: var(--system-bg);
 }
 
 .avatar {
   width: 34px;
   height: 34px;
   border-radius: 7px;
-  background: #e9f1ff;
-  color: #1f6feb;
+  background: var(--accent-lighter);
+  color: var(--accent);
   font-size: 11px;
   font-weight: 800;
 }
@@ -522,7 +522,7 @@
 .messageMeta {
   justify-content: flex-start;
   margin-bottom: 4px;
-  color: #65758b;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -530,7 +530,7 @@
 .approvalCard p,
 .previewCanvas p,
 .approvalPanel p {
-  color: #39475c;
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -549,22 +549,22 @@
 }
 
 .runTimeline li {
-  color: #65758b;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .runTimeline strong {
   display: block;
-  color: #172033;
+  color: var(--text);
   font-size: 12px;
 }
 
 .doneStep::marker {
-  color: #16a05d;
+  color: var(--success-dot);
 }
 
 .activeStep::marker {
-  color: #d97706;
+  color: var(--warning-dot);
 }
 
 .approvalCard {
@@ -572,10 +572,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  border: 1px solid #f3d2a5;
+  border: 1px solid var(--warning-border);
   border-radius: 12px;
   padding: 12px;
-  background: #fffaf3;
+  background: var(--system-bg);
 }
 
 .approvalCard h3 {
@@ -586,19 +586,20 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 8px;
-  border: 1px solid #d8dee8;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 8px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .composer input {
   min-width: 0;
-  border: 1px solid #d8dee8;
+  border: 1px solid var(--border);
   border-radius: 7px;
   outline: 0;
   padding: 0 12px;
-  color: #172033;
+  background: transparent;
+  color: var(--text);
 }
 
 .workspacePanel {
@@ -608,7 +609,7 @@
 .workspaceHeader {
   align-items: flex-start;
   padding-bottom: 12px;
-  border-bottom: 1px solid #e4e8f0;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .workspaceSummary {
@@ -618,17 +619,17 @@
 }
 
 .warnText {
-  color: #975a16 !important;
+  color: var(--warning) !important;
 }
 
 .workspaceTabs {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
-  border: 1px solid #d8dee8;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 4px;
-  background: #f4f6f9;
+  background: var(--neutral-bg);
 }
 
 .panelTab,
@@ -638,7 +639,7 @@
   padding: 0 8px;
   overflow: hidden;
   background: transparent;
-  color: #526176;
+  color: var(--neutral);
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
@@ -647,9 +648,9 @@
 }
 
 .activePanelTab {
-  background: #ffffff;
-  color: #1f6feb;
-  box-shadow: 0 1px 2px rgba(22, 32, 51, 0.08);
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .panelBody {
@@ -670,8 +671,8 @@
   width: 34px;
   height: 34px;
   border-radius: 7px;
-  background: #f0f5ff;
-  color: #1f6feb;
+  background: var(--accent-lighter);
+  color: var(--accent);
   font-size: 11px;
   font-weight: 800;
 }
@@ -680,8 +681,8 @@
 .logBlock {
   overflow: hidden;
   border-radius: 8px;
-  background: #111827;
-  color: #dbe7ff;
+  background: var(--code-bg);
+  color: var(--code-text);
   font-family: Consolas, "SFMono-Regular", monospace;
   font-size: 12px;
   line-height: 1.6;
@@ -696,11 +697,11 @@
 }
 
 .addLine {
-  background: rgba(22, 160, 93, 0.18);
+  background: var(--success-bg);
 }
 
 .removeLine {
-  background: rgba(180, 35, 24, 0.16);
+  background: var(--danger-bg);
 }
 
 .logBlock {
@@ -711,15 +712,15 @@
 
 .previewBox {
   overflow: hidden;
-  border: 1px solid #d8dee8;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .previewTopbar {
   justify-content: flex-start;
   min-height: 34px;
-  border-bottom: 1px solid #e4e8f0;
+  border-bottom: 1px solid var(--border-subtle);
   padding: 0 10px;
 }
 
@@ -727,12 +728,12 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: #c8d1df;
+  background: var(--preview-dot);
 }
 
 .previewTopbar strong {
   margin-left: 6px;
-  color: #65758b;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -743,9 +744,9 @@
   place-content: center;
   padding: 22px;
   background:
-    linear-gradient(90deg, rgba(216, 222, 232, 0.55) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(216, 222, 232, 0.55) 1px, transparent 1px),
-    #f8fafc;
+    linear-gradient(90deg, rgba(128, 128, 128, 0.2) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(128, 128, 128, 0.2) 1px, transparent 1px),
+    var(--surface-alt);
   background-size: 24px 24px;
   text-align: center;
 }
@@ -754,7 +755,7 @@
   display: grid;
   grid-template-columns: 10px minmax(0, 1fr);
   gap: 10px;
-  border: 1px solid #e0e6ef;
+  border: 1px solid var(--border-light);
   border-radius: 8px;
   padding: 10px;
 }
