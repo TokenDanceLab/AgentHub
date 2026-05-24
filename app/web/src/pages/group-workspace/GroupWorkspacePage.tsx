@@ -53,11 +53,15 @@ type Confirmation = {
   tone: ConfirmationTone;
 };
 
+const accentPalette = ["blue", "purple", "teal", "cyan"] as const;
+const fileAccentPalette = ["cyan", "purple", "teal", "blue"] as const;
+const activityAccentPalette = ["cyan", "purple", "teal"] as const;
+
 const members: Member[] = mockRunners.map((runner, i) => ({
   initials: runner.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2),
   name: runner.name,
   role: runner.capabilities ?? 'No capability info',
-  accent: (['blue', 'purple', 'teal', 'cyan'] as const)[i % 4],
+  accent: accentPalette[i % accentPalette.length] ?? "blue",
   presence: (runner.status === 'online' ? 'online' : 'offline') as MemberPresence,
 }));
 
@@ -75,14 +79,14 @@ const files: FileItem[] = mockWorkspaceFiles.map((f, i) => ({
   name: f.path,
   detail: `${(f.sizeBytes / 1024).toFixed(1)} KB, modified ${f.modifiedAt.slice(0, 10)}`,
   size: f.sizeBytes > 1024 * 1024 ? `${(f.sizeBytes / (1024 * 1024)).toFixed(1)} MB` : `${(f.sizeBytes / 1024).toFixed(1)} KB`,
-  accent: (['cyan', 'purple', 'teal', 'blue'] as const)[i % 4],
+  accent: fileAccentPalette[i % fileAccentPalette.length] ?? "cyan",
 }));
 
 const initialActivities: ActivityItem[] = mockRuns.map((run, i) => ({
   title: `${mockRunners[i % mockRunners.length]?.name ?? 'Agent'} — run.${run.status}`,
   detail: `Run on thread ${run.threadId}: ${run.status === 'finished' ? 'Completed successfully' : run.status === 'running' ? 'Executing...' : 'Waiting in queue'}`,
   time: run.createdAt.slice(11, 16),
-  accent: (['cyan', 'purple', 'teal'] as const)[i % 3],
+  accent: activityAccentPalette[i % activityAccentPalette.length] ?? "cyan",
 }));
 
 const laneLabels: Record<TaskStatus, string> = {
@@ -1023,7 +1027,7 @@ export function GroupWorkspacePageInteractive() {
         detail: typeof event.payload === 'object' && event.payload && 'text' in event.payload
           ? String((event.payload as Record<string, unknown>).text).trim().slice(0, 100) || '(output)'
           : JSON.stringify(event.payload).slice(0, 100),
-        accent: (['cyan', 'purple', 'teal', 'blue'] as const)[Math.floor(Math.random() * 4)],
+        accent: fileAccentPalette[Math.floor(Math.random() * fileAccentPalette.length)] ?? "cyan",
       });
     });
     playRunLifecycle(stream, { stepDelayMs: 1000 });

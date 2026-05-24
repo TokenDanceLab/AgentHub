@@ -72,9 +72,12 @@ type Notice = {
   tone: 'info' | 'success';
 };
 
+const accentOptions: Accent[] = ['blue', 'cyan', 'purple'];
+
 const conversations: Conversation[] = mockThreads.map((thread, ti) => {
   const threadMessages = mockMessages.filter((m) => m.threadId === thread.id);
-  const accentOptions: Accent[] = ['blue', 'cyan', 'purple'];
+  const accent = accentOptions[ti % accentOptions.length] ?? 'blue';
+
   return {
     id: thread.id,
     name: thread.title ?? `Thread ${thread.id}`,
@@ -83,7 +86,7 @@ const conversations: Conversation[] = mockThreads.map((thread, ti) => {
     time: '10:42',
     summary: thread.status === 'active' ? 'Active conversation' : 'Archived',
     unread: ti === 0 ? 2 : ti === 1 ? 0 : 1,
-    accent: accentOptions[ti % accentOptions.length],
+    accent,
     messages: threadMessages.map((msg) => ({
       id: msg.id,
       author: msg.role === 'user' ? 'You' : 'Agent',
@@ -91,7 +94,7 @@ const conversations: Conversation[] = mockThreads.map((thread, ti) => {
       time: '10:30',
       side: (msg.role === 'user' ? 'right' : 'left') as 'left' | 'right',
       body: msg.content,
-      ...(msg.role === 'agent' ? { accent: accentOptions[ti % accentOptions.length] } : {}),
+      ...(msg.role === 'agent' ? { accent } : {}),
     })),
   };
 });
@@ -106,6 +109,22 @@ const initialUnreadByChat = conversations.reduce<Record<string, number>>((unread
   unreadMap[conversation.id] = conversation.unread;
   return unreadMap;
 }, {});
+
+const emptyConversationSnapshot: ConversationSnapshot = {
+  id: 'empty',
+  name: 'No private chats',
+  initials: 'NA',
+  role: 'Local preview',
+  time: '--:--',
+  summary: 'No conversations are available.',
+  unread: 0,
+  accent: 'blue',
+  messages: [],
+  allMessages: [],
+  currentSummary: 'No conversations are available.',
+  currentTime: '--:--',
+  currentUnread: 0,
+};
 
 function formatClock(date = new Date()) {
   const hours = date.getHours().toString().padStart(2, '0');
@@ -881,7 +900,7 @@ function Icon({ name }: { name: string }) {
 
 export function PrivateChatsPageInteractive() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [activeChatId, setActiveChatId] = useState(conversations[0].id);
+  const [activeChatId, setActiveChatId] = useState(conversations[0]?.id ?? '');
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [keyOnly, setKeyOnly] = useState(false);
   const [keyedMessages, setKeyedMessages] = useState<string[]>(mockMessages.slice(0, 1).map((m) => m.id));
@@ -915,7 +934,10 @@ export function PrivateChatsPageInteractive() {
   );
 
   const activeConversation = useMemo(
-    () => conversationSnapshots.find((conversation) => conversation.id === activeChatId) ?? conversationSnapshots[0],
+    () =>
+      conversationSnapshots.find((conversation) => conversation.id === activeChatId) ??
+      conversationSnapshots[0] ??
+      emptyConversationSnapshot,
     [activeChatId, conversationSnapshots],
   );
 
@@ -1092,6 +1114,10 @@ export function PrivateChatsPageInteractive() {
 
         for (let nextIndex = index + 1; nextIndex < particles.length; nextIndex += 1) {
           const next = particles[nextIndex];
+          if (!next) {
+            continue;
+          }
+
           const dx = particle.x - next.x;
           const dy = particle.y - next.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
