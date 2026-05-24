@@ -42,7 +42,8 @@
 }
 
 .workbench button,
-.workbench input {
+.workbench input,
+.workbench textarea {
   font: inherit;
 }
 
@@ -613,14 +614,18 @@
   background: var(--surface);
 }
 
-.composer input {
+.composer textarea {
+  height: 34px;
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: 7px;
   outline: 0;
-  padding: 0 12px;
+  padding: 6px 12px;
+  resize: none;
   background: transparent;
   color: var(--text);
+  line-height: 1.35;
+  overflow-y: auto;
 }
 
 .workspacePanel {

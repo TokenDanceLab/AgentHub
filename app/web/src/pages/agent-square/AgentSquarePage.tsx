@@ -159,7 +159,7 @@ const sortLabels: Record<SortMode, string> = {
 const viewModeLabels: Record<ViewMode, string> = {
   all: 'All agents',
   favorites: 'Only favorites',
-  installed: 'Only added',
+  installed: 'Only locally staged',
 };
 
 function formatInstalls(installs: number): string {
@@ -431,7 +431,7 @@ export function AgentSquarePageInteractive() {
         actionAgentId: agentId,
         id: `installed-${agentId}-${Date.now()}`,
         message: 'This agent is already staged in the current workspace.',
-        title: `${agent.name} already added`,
+        title: `${agent.name} already locally staged`,
       });
       return;
     }
@@ -456,7 +456,7 @@ export function AgentSquarePageInteractive() {
       actionAgentId: agentId,
       id: `add-${agentId}-${Date.now()}`,
       message: `${installedIds.size + 1} of ${workspaceLimit} workspace slots are now staged.`,
-      title: `${agent.name} added to workspace`,
+      title: `${agent.name} locally staged`,
     });
   }
 
@@ -510,7 +510,7 @@ export function AgentSquarePageInteractive() {
                   </div>
                   <div className="asr-truncate">
                     <strong className="asr-small">Workspace</strong>
-                    <p className="asr-tiny asr-muted asr-truncate">{installedIds.size} agents added</p>
+                    <p className="asr-tiny asr-muted asr-truncate">{installedIds.size} locally staged</p>
                   </div>
                 </button>
 
@@ -560,7 +560,7 @@ export function AgentSquarePageInteractive() {
               <div className="asr-progress">
                 <span style={{ width: `${Math.min((installedIds.size / workspaceLimit) * 100, 100)}%` }} />
               </div>
-              <p className="asr-small asr-muted">Added agents are staged locally; Hub sync is not connected.</p>
+              <p className="asr-small asr-muted">Locally staged agents stay in this preview; Hub sync is not connected.</p>
             </section>
           </aside>
 
@@ -614,7 +614,7 @@ export function AgentSquarePageInteractive() {
                 </div>
                 <div>
                   <strong>{installedIds.size}</strong>
-                  <span className="asr-small asr-muted">Workspace ready</span>
+                  <span className="asr-small asr-muted">Local workspace ready</span>
                 </div>
               </div>
               <div className="asr-metric-card asr-glass">
@@ -700,7 +700,7 @@ export function AgentSquarePageInteractive() {
                       <div className="asr-mini-row">
                         <span className="asr-small asr-muted">{formatInstalls(getDisplayFavoriteCount(agent.id))} saves</span>
                         <span className={cx('asr-pill', isInstalled ? 'asr-pill-green' : 'asr-pill-cyan')}>
-                          {isInstalled ? 'Added' : 'Available'}
+                          {isInstalled ? 'Locally staged' : 'Available'}
                         </span>
                       </div>
 
@@ -712,7 +712,7 @@ export function AgentSquarePageInteractive() {
                           type="button"
                         >
                           <span className="material-symbols-outlined">{isInstalled ? 'check_circle' : 'add'}</span>
-                          {isInstalled ? 'Added' : 'Add'}
+                          {isInstalled ? 'Locally staged' : 'Stage locally'}
                         </button>
                         <button className="asr-button asr-ghost" onClick={() => openAgentDetails(agent.id)} type="button">
                           <span className="material-symbols-outlined">open_in_new</span>
@@ -803,7 +803,7 @@ export function AgentSquarePageInteractive() {
                   <div className="asr-section-head">
                     <h3>Workspace state</h3>
                     <span className={cx('asr-pill', installedIds.has(detailAgent.id) ? 'asr-pill-green' : 'asr-pill-cyan')}>
-                      {installedIds.has(detailAgent.id) ? 'Added' : 'Available'}
+                      {installedIds.has(detailAgent.id) ? 'Locally staged' : 'Available'}
                     </span>
                   </div>
                   <div className="asr-activity-list">
@@ -821,7 +821,7 @@ export function AgentSquarePageInteractive() {
                         <span className="material-symbols-outlined">download_done</span>
                       </div>
                       <div>
-                        <strong className="asr-small">{installedIds.has(detailAgent.id) ? 'Ready in workspace' : 'Ready to add'}</strong>
+                        <strong className="asr-small">{installedIds.has(detailAgent.id) ? 'Local workspace ready' : 'Ready to stage locally'}</strong>
                         <p className="asr-tiny asr-muted">Local stage state changes the card action and summary count.</p>
                       </div>
                     </div>
