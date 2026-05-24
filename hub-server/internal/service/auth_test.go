@@ -19,6 +19,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 )
 
 func newMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
@@ -190,7 +191,7 @@ func TestLogin_Success(t *testing.T) {
 
 	// UpsertRefreshToken: lookup then create
 	mock.ExpectQuery(sqlRTByUserDevice).
-		WithArgs("user-uuid", "desktop", sqlmock.AnyArg(), 1).
+		WithArgs("user-uuid", "desktop", "dev-1", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 	mock.ExpectExec(sqlInsertRT).
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -201,6 +202,12 @@ func TestLogin_Success(t *testing.T) {
 	assert.NotEmpty(t, resp.AccessToken)
 	assert.NotEmpty(t, resp.RefreshToken)
 	assert.Equal(t, int64(900), resp.ExpiresIn)
+
+	claims, err := jwtutil.ParseToken(resp.AccessToken, jwtCfg().Secret)
+	require.NoError(t, err)
+	assert.Equal(t, "user-uuid", claims.UserID)
+	assert.Equal(t, "desktop", claims.DeviceType)
+	assert.Equal(t, "dev-1", claims.DeviceID)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 

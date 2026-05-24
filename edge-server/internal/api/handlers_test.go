@@ -852,6 +852,163 @@ func TestPostCancelRunReturnsStoredStatusWhenExecutorCannotCancel(t *testing.T) 
 	}
 }
 
+func TestPostPermissionDecideRejectsInvalidDecision(t *testing.T) {
+	h := newTestHandler()
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_1","decision":"maybe"}`))
+	rec := httptest.NewRecorder()
+
+	h.PostPermissionDecide(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "bad_request")
+}
+
+func TestPostPermissionDecideRequiresRunAndRequest(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{"missing run", `{"requestId":"req_1","decision":"allow"}`},
+		{"missing request", `{"runId":"run_1","decision":"allow"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newTestHandler()
+			req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(tt.body))
+			rec := httptest.NewRecorder()
+
+			h.PostPermissionDecide(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
+			}
+			assertErrorCode(t, rec.Body.String(), "bad_request")
+		})
+	}
+}
+
+func TestPostPermissionDecideRejectsUnknownRequest(t *testing.T) {
+	h := newTestHandler()
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_missing","decision":"allow"}`))
+	rec := httptest.NewRecorder()
+
+	h.PostPermissionDecide(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404; body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
+}
+
+func TestPostPermissionDecideRejectsWrongRun(t *testing.T) {
+	h := newTestHandler()
+	h.ensurePermissionRegistry().Register(PendingPermission{
+		RunID:     "run_real",
+		RequestID: "req_1",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_spoof","requestId":"req_1","decision":"allow"}`))
+	rec := httptest.NewRecorder()
+
+	h.PostPermissionDecide(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404; body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
+	if _, ok := h.PermissionRegistry.Consume("run_real", "req_1"); !ok {
+		t.Fatal("wrong-run decision consumed the real pending request")
+	}
+}
+
+func TestPostPermissionDecideConsumesPendingRequestAndPublishesEvent(t *testing.T) {
+	h := newTestHandler()
+	h.ensurePermissionRegistry().Register(PendingPermission{
+		ProjectID: "proj_1",
+		ThreadID:  "thread_1",
+		RunID:     "run_1",
+		RequestID: "req_1",
+		ToolName:  "Bash",
+		ToolUseID: "tool_1",
+	})
+	_, ch, _ := h.Bus.Subscribe(0)
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_1","decision":"deny","reason":"not now"}`))
+	rec := httptest.NewRecorder()
+
+	h.PostPermissionDecide(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if body["status"] != "ok" {
+		t.Fatalf("body status = %#v, want ok", body["status"])
+	}
+	select {
+	case evt := <-ch:
+		if evt.Type != "run.agent.permission_decided" {
+			t.Fatalf("event type = %q, want permission_decided", evt.Type)
+		}
+		if evt.Scope["projectId"] != "proj_1" || evt.Scope["threadId"] != "thread_1" || evt.Scope["runId"] != "run_1" {
+			t.Fatalf("event scope = %#v, want project/thread/run", evt.Scope)
+		}
+		payload := evt.Payload.(map[string]any)
+		if payload["requestId"] != "req_1" || payload["decision"] != "deny" || payload["reason"] != "not now" {
+			t.Fatalf("event payload = %#v, want deny decision", payload)
+		}
+		if payload["toolName"] != "Bash" || payload["toolUseId"] != "tool_1" {
+			t.Fatalf("event payload missing tool metadata: %#v", payload)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timed out waiting for permission_decided event")
+	}
+	if _, ok := h.PermissionRegistry.Consume("run_1", "req_1"); ok {
+		t.Fatal("pending request remained after decision")
+	}
+}
+
+func TestPostPermissionDecideRejectsSecondDecision(t *testing.T) {
+	h := newTestHandler()
+	h.ensurePermissionRegistry().Register(PendingPermission{
+		RunID:     "run_1",
+		RequestID: "req_1",
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_1","decision":"allow"}`))
+	rec := httptest.NewRecorder()
+	h.PostPermissionDecide(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_1","decision":"deny"}`))
+	rec = httptest.NewRecorder()
+	h.PostPermissionDecide(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("second status = %d, want 404; body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
+}
+
+func TestMuxPermissionDecideWrongMethod(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/permissions/decide", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET /v1/permissions/decide status = %d, want 405", rec.Code)
+	}
+}
+
 func TestErrorResponseFormat(t *testing.T) {
 	errResp := errorResponse("TEST_ERROR", "something went wrong")
 	data, _ := json.Marshal(errResp)
@@ -1583,5 +1740,20 @@ func TestWriteJSONEncodingError(t *testing.T) {
 	// Should still have set the status even if encoding fails
 	if rec.Code != http.StatusOK {
 		t.Fatalf("writeJSON status = %d, want 200", rec.Code)
+	}
+}
+
+func assertErrorCode(t *testing.T, body string, want string) {
+	t.Helper()
+	var decoded map[string]any
+	if err := json.Unmarshal([]byte(body), &decoded); err != nil {
+		t.Fatalf("failed to decode error body %q: %v", body, err)
+	}
+	errObj, ok := decoded["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("error body = %#v, want error object", decoded)
+	}
+	if errObj["code"] != want {
+		t.Fatalf("error code = %#v, want %q", errObj["code"], want)
 	}
 }

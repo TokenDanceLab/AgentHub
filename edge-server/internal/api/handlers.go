@@ -37,7 +37,11 @@ type Handler struct {
 	MessageQueue    *agents.Queue      // inter-agent message queue
 	Metrics         *metrics.EdgeMetrics
 
-	runCreateMu sync.Mutex
+	PermissionRegistry *PermissionRegistry
+
+	runCreateMu              sync.Mutex
+	permissionRegistryMu     sync.Mutex
+	permissionObserverCancel func()
 }
 
 var upgrader = websocket.Upgrader{
@@ -99,6 +103,25 @@ func (h *Handler) ensureExecutor() {
 
 func acceptedResponse(data map[string]any) map[string]any {
 	return data
+}
+
+func ensureBus(h *Handler) *events.Bus {
+	if h.Bus == nil {
+		h.Bus = events.NewBus(10000)
+	}
+	return h.Bus
+}
+
+func (h *Handler) ensurePermissionRegistry() *PermissionRegistry {
+	h.permissionRegistryMu.Lock()
+	defer h.permissionRegistryMu.Unlock()
+	if h.PermissionRegistry == nil {
+		h.PermissionRegistry = NewPermissionRegistry(0)
+	}
+	if h.permissionObserverCancel == nil {
+		h.permissionObserverCancel = ensureBus(h).AddObserver(h.PermissionRegistry.ObserveEvent)
+	}
+	return h.PermissionRegistry
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -780,15 +803,40 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
 		return
 	}
+	req.RunID = strings.TrimSpace(req.RunID)
+	req.RequestID = strings.TrimSpace(req.RequestID)
+	req.Decision = strings.TrimSpace(req.Decision)
+	if req.RunID == "" {
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "runId is required"))
+		return
+	}
+	if req.RequestID == "" {
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "requestId is required"))
+		return
+	}
 	if req.Decision != "allow" && req.Decision != "deny" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "decision must be 'allow' or 'deny'"))
 		return
 	}
 
-	scope := map[string]any{"runId": req.RunID}
-	h.Bus.Publish("run.agent.permission_decided", scope, map[string]any{
+	permission, ok := h.ensurePermissionRegistry().Consume(req.RunID, req.RequestID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, errorResponse("permission_request_not_found", "permission request not found"))
+		return
+	}
+
+	scope := map[string]any{"runId": permission.RunID}
+	if permission.ProjectID != "" {
+		scope["projectId"] = permission.ProjectID
+	}
+	if permission.ThreadID != "" {
+		scope["threadId"] = permission.ThreadID
+	}
+	ensureBus(h).Publish(adapters.BusEventPermissionDecided, scope, map[string]any{
 		"runId":     req.RunID,
 		"requestId": req.RequestID,
+		"toolName":  permission.ToolName,
+		"toolUseId": permission.ToolUseID,
 		"decision":  req.Decision,
 		"reason":    req.Reason,
 	})
@@ -850,6 +898,7 @@ func (h *Handler) GetAgentInstance(w http.ResponseWriter, r *http.Request, insta
 // ---------------------------------------------------------------------------
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	ensureStore(h)
+	h.ensurePermissionRegistry()
 	mux.HandleFunc("/v1/health", h.GetHealth)
 	mux.HandleFunc("/v1/runners", h.GetRunners)
 	mux.HandleFunc("/v1/agents", h.GetAgents)
