@@ -71,6 +71,13 @@ type Confirmation = {
   tone: ConfirmationTone;
 };
 
+type SourceTone = "green" | "purple" | "amber" | "cyan" | "neutral";
+
+type SectionSource = {
+  label: string;
+  tone: SourceTone;
+};
+
 const accentPalette = ["blue", "purple", "teal", "cyan"] as const;
 const fileAccentPalette = ["cyan", "purple", "teal", "blue"] as const;
 const activityAccentPalette = ["cyan", "purple", "teal"] as const;
@@ -190,6 +197,38 @@ function activityFromRun(run: Run, index: number, runners: Runner[]): ActivityIt
     time: run.createdAt.slice(11, 16),
     accent: activityAccentPalette[index % activityAccentPalette.length] ?? 'cyan',
   };
+}
+
+function snapshotSectionSource(mode: ReturnType<typeof getWorkbenchCatalogState>["mode"], hasSnapshotData: boolean): SectionSource {
+  if (hasSnapshotData) {
+    if (mode === "offline-snapshot") {
+      return { label: "Offline snapshot", tone: "purple" };
+    }
+
+    return { label: "Edge snapshot", tone: "green" };
+  }
+
+  if (mode === "loading") {
+    return { label: "Loading snapshot", tone: "cyan" };
+  }
+
+  if (mode === "mock") {
+    return { label: "Mock fallback", tone: "amber" };
+  }
+
+  return { label: "Snapshot unavailable", tone: "neutral" };
+}
+
+function mergedSectionSource(baseSource: SectionSource, hasLocalDryRun: boolean): SectionSource {
+  if (!hasLocalDryRun) {
+    return baseSource;
+  }
+
+  return { label: `Local dry-run / ${baseSource.label}`, tone: "cyan" };
+}
+
+function SourceLabel({ source }: { source: SectionSource }) {
+  return <span className={`gwr-source ${source.tone}`}>{source.label}</span>;
 }
 
 const styles = `
@@ -569,6 +608,46 @@ const styles = `
   border-color: rgba(102,112,133,0.25);
   background: rgba(102,112,133,0.12);
   color: var(--gwr-muted);
+}
+
+.gwr-source {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 4px 8px;
+  border: 1px solid rgba(102,112,133,0.25);
+  border-radius: 999px;
+  background: rgba(102,112,133,0.12);
+  color: var(--gwr-muted);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.gwr-source.green {
+  border-color: rgba(31,155,100,0.25);
+  background: rgba(31,155,100,0.15);
+  color: var(--gwr-green);
+}
+
+.gwr-source.purple {
+  border-color: rgba(116,87,232,0.25);
+  background: rgba(116,87,232,0.15);
+  color: var(--gwr-purple);
+}
+
+.gwr-source.amber {
+  border-color: rgba(217,122,23,0.3);
+  background: rgba(217,122,23,0.15);
+  color: var(--gwr-orange);
+}
+
+.gwr-source.cyan {
+  border-color: rgba(8,167,207,0.25);
+  background: rgba(8,167,207,0.15);
+  color: var(--gwr-cyan);
 }
 
 .gwr-dot {
@@ -1139,8 +1218,13 @@ export function GroupWorkspacePageInteractive() {
     hasLiveCatalog,
     label: catalogLabel,
     message: catalogDetail,
+    mode: catalogMode,
     tone: catalogTone,
   } = getWorkbenchCatalogState(workbenchState);
+  const memberSnapshotSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.runners.length > 0);
+  const taskSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.runs.length > 0);
+  const baseFileSource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.artifacts.length > 0);
+  const baseActivitySource = snapshotSectionSource(catalogMode, hasLiveCatalog && workbenchState.runs.length > 0);
   const [approval, setApproval] = useState<ApprovalState>("pending");
   const [taskOwner, setTaskOwner] = useState("Xavier");
   const [syncState, setSyncState] = useState<SyncState>({
@@ -1152,6 +1236,7 @@ export function GroupWorkspacePageInteractive() {
   });
   const [activityLog, setActivityLog] = useState<ActivityItem[]>(initialActivities);
   const [workspaceMembers, setWorkspaceMembers] = useState<Member[]>(members);
+  const [hasLocalMemberChanges, setHasLocalMemberChanges] = useState(false);
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
   const [noteDraft, setNoteDraft] = useState("");
   const [confirmation, setConfirmation] = useState<Confirmation>({
@@ -1205,6 +1290,7 @@ export function GroupWorkspacePageInteractive() {
   const visibleMembers = workspaceMembers.filter((member) => memberFilter === "all" || member.presence === memberFilter);
   const onlineCount = workspaceMembers.filter((member) => member.presence === "online").length;
   const busyCount = workspaceMembers.filter((member) => member.presence === "busy").length;
+  const memberSource = mergedSectionSource(memberSnapshotSource, hasLocalMemberChanges);
   const approvalLabel = approved ? "Approved" : needsEdits ? "Changes requested" : "Awaiting approval";
   const approvalLocked = !approved;
   const syncedFiles: FileItem[] = syncState.revision
@@ -1224,12 +1310,17 @@ export function GroupWorkspacePageInteractive() {
     accent: fileAccentPalette[index % fileAccentPalette.length] ?? 'cyan',
   }));
   const workspaceFiles = [...(hasLiveCatalog && liveFiles.length ? liveFiles : files), ...syncedFiles];
+  const fileSource = mergedSectionSource(baseFileSource, syncedFiles.length > 0);
   const displayedBaseTasks = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map((run, index) => taskFromRun(run, index, workbenchState.runners))
     : baseTasks;
   const displayedActivities = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map((run, index) => activityFromRun(run, index, workbenchState.runners))
     : activityLog;
+  const activitySource = mergedSectionSource(
+    baseActivitySource,
+    !(hasLiveCatalog && workbenchState.runs.length) && activityLog.length > initialActivities.length,
+  );
 
   const tasks = useMemo<WorkspaceTask[]>(() => {
     return displayedBaseTasks.map((task) => {
@@ -1364,6 +1455,7 @@ export function GroupWorkspacePageInteractive() {
           : member,
       ),
     );
+    setHasLocalMemberChanges(true);
     pushActivity({
       title: `${selectedMember.name} is now ${presenceLabels[nextPresence].toLowerCase()}`,
       detail: "Member presence changed locally and the member filter counters updated.",
@@ -1511,9 +1603,12 @@ export function GroupWorkspacePageInteractive() {
           <section className="gwr-section">
             <div className="gwr-section-head">
               <h2>Members</h2>
-              <span className="gwr-tiny">
-                {onlineCount} online / {busyCount} busy
-              </span>
+              <div className="gwr-actions">
+                <SourceLabel source={memberSource} />
+                <span className="gwr-tiny">
+                  {onlineCount} online / {busyCount} busy
+                </span>
+              </div>
             </div>
             <div className="gwr-filters" role="group" aria-label="Filter members by status">
               {memberFilterOptions.map((option) => (
@@ -1632,7 +1727,7 @@ export function GroupWorkspacePageInteractive() {
                   <p className="gwr-eyebrow">Shared Task Board</p>
                   <h2>Current coordination plan</h2>
                 </div>
-                <span className="gwr-pill purple">Auto assigned</span>
+                <SourceLabel source={taskSource} />
               </div>
 
               <div className="gwr-board">
@@ -1676,10 +1771,7 @@ export function GroupWorkspacePageInteractive() {
                   <p className="gwr-eyebrow">Activity Flow</p>
                   <h2>Workspace pulse</h2>
                 </div>
-                <span className={`gwr-pill ${syncState.complete ? "green" : "cyan"}`}>
-                  <span className="gwr-dot" />
-                  {syncState.complete ? "Local synced" : catalogLabel}
-                </span>
+                <SourceLabel source={activitySource} />
               </div>
 
               <div className="gwr-activity-list">
@@ -1833,9 +1925,12 @@ export function GroupWorkspacePageInteractive() {
                 <p className="gwr-eyebrow">Shared Files</p>
                 <h2>Workspace documents</h2>
               </div>
-              <button className="gwr-icon-button" type="button" aria-label="Add file" onClick={createLocalFile}>
-                +
-              </button>
+              <div className="gwr-actions">
+                <SourceLabel source={fileSource} />
+                <button className="gwr-icon-button" type="button" aria-label="Add file" onClick={createLocalFile}>
+                  +
+                </button>
+              </div>
             </div>
             <div className="gwr-stack">
               {workspaceFiles.map((file) => (
