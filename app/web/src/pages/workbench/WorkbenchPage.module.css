@@ -481,6 +481,27 @@
   font-weight: 600;
 }
 
+.emptyNotice,
+.errorText,
+.errorBanner {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.errorText,
+.errorBanner {
+  color: var(--danger);
+}
+
+.errorBanner {
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--danger-bg);
+}
+
 .messageList {
   overflow: auto;
   padding: 10px;
@@ -689,7 +710,8 @@
 }
 
 .addLine,
-.removeLine {
+.removeLine,
+.neutralLine {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
   gap: 8px;
@@ -702,6 +724,10 @@
 
 .removeLine {
   background: var(--danger-bg);
+}
+
+.neutralLine {
+  background: transparent;
 }
 
 .logBlock {
@@ -749,6 +775,13 @@
     var(--surface-alt);
   background-size: 24px 24px;
   text-align: center;
+}
+
+.previewLink {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .approvalPanel article {

@@ -1059,6 +1059,10 @@ function ProjectParticles() {
 
       for (let index = 0; index < particles.length; index += 1) {
         const particle = particles[index];
+        if (!particle) {
+          continue;
+        }
+
         particle.x += particle.vx;
         particle.y += particle.vy;
 
@@ -1082,6 +1086,10 @@ function ProjectParticles() {
 
         for (let inner = index + 1; inner < particles.length; inner += 1) {
           const other = particles[inner];
+          if (!other) {
+            continue;
+          }
+
           const distance = Math.hypot(particle.x - other.x, particle.y - other.y);
           if (distance < 126) {
             context.beginPath();

@@ -13,8 +13,11 @@
     "typecheck": "tsgo -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "diff": "^8.0.2",
+    "i18next": "^25.7.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-i18next": "^16.5.0",
     "react-router-dom": "^7"
   },
   "devDependencies": {
