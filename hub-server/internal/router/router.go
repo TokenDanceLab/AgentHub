@@ -10,15 +10,22 @@ import (
 	"github.com/agenthub/hub-server/internal/middleware"
 )
 
-func SetupRoutes(r *gin.Engine, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler) {
+func SetupRoutes(r *gin.Engine, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler) {
+	r.Use(middleware.CORS())
+	r.Use(middleware.BodyLimit(10 << 20))
+	r.Use(middleware.GlobalRateLimit(cacheClient))
 	r.Use(middleware.RequestID())
 	r.Use(middleware.AccessLog())
 	r.Use(middleware.PrometheusMiddleware())
 	r.Use(middleware.Timeout(15 * time.Second))
 
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
+	if healthHandler != nil {
+		r.GET("/health", healthHandler.Check)
+	} else {
+		r.GET("/health", func(c *gin.Context) {
+			c.JSON(200, gin.H{"status": "ok"})
+		})
+	}
 
 	client := r.Group("/client")
 	{
