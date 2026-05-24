@@ -27,8 +27,8 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		tokenStr := strings.TrimPrefix(header, "Bearer ")
 
 		// Try TokenDance ID RS256 JWT first (if TokenDance ID is configured).
-		if cfg.TokenDanceID.IssuerURL != "" {
-			if claims, err := jwtutil.ParseTokenDanceJWT(tokenStr); err == nil {
+		if cfg.TokenDanceID.IssuerURL != "" && cfg.TokenDanceID.ClientID != "" {
+			if claims, err := jwtutil.ParseTokenDanceJWT(tokenStr, cfg.TokenDanceID.IssuerURL, cfg.TokenDanceID.ClientID); err == nil {
 				c.Set("user_id", claims.Subject)
 				c.Set("device_type", "desktop") // OIDC tokens don't carry device_type; default to desktop
 				c.Set("device_id", "")

@@ -172,10 +172,10 @@ func (a *App) Run(ctx context.Context) error {
 		Addr:              fmt.Sprintf(":%d", a.Config.Server.Port),
 		Handler:           r,
 		ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
-		ReadTimeout:       30 * time.Second,
+		ReadTimeout:       config.DefaultServerReadTimeout,
 		WriteTimeout:      config.DefaultServerWriteTimeout,
-		IdleTimeout:       120 * time.Second,
-		MaxHeaderBytes:    1 << 20,
+		IdleTimeout:       config.DefaultServerIdleTimeout,
+		MaxHeaderBytes:    config.DefaultMaxHeaderBytes,
 	}
 
 	go func() {
@@ -426,7 +426,7 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 // startTaskScheduler periodically scans for expired agent tasks and publishes timeout events.
 func (a *App) startTaskScheduler(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(1 * time.Minute)
+		ticker := time.NewTicker(config.PendingTaskScanInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			tasks, err := repository.ScanExpiredTasks(a.DB)
@@ -485,9 +485,9 @@ func (a *App) startAdminServer() {
 		Addr:              fmt.Sprintf("127.0.0.1:%d", adminPort),
 		Handler:           adminHandler,
 		ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
-		ReadTimeout:       30 * time.Second,
+		ReadTimeout:       config.DefaultServerReadTimeout,
 		WriteTimeout:      config.DefaultServerWriteTimeout,
-		IdleTimeout:       120 * time.Second,
+		IdleTimeout:       config.DefaultServerIdleTimeout,
 	}
 	go func() {
 		slog.Info("admin server starting", "port", adminPort)
@@ -500,7 +500,7 @@ func (a *App) startAdminServer() {
 // startMetricsCollector periodically reports DB pool, WS connections, Redis hits, and bus queue length.
 func (a *App) startMetricsCollector(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(15 * time.Second)
+		ticker := time.NewTicker(config.MetricsCollectionInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			if sqlDB, err := a.DB.DB(); err == nil {
