@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-24 15:40 UTC+8 | 分支：dev/delicious233 | 提交：fd5fde2
+最后更新：2026-05-24 15:45 UTC+8 | 分支：dev/delicious233 | 提交：e38caa7
 
 ## 快速上手
 
@@ -18,7 +18,18 @@ cd ../hub-server && go test ./... -short -count=1  # 13/13 包
 
 ### 运行前端测试
 ```bash
-cd app/desktop && pnpm test   # 519 tests
+cd app/desktop && pnpm test   # 604 tests (共享 UI: 26/26 通过)
+```
+
+### 前端 TypeScript 检查
+```bash
+cd app/desktop && pnpm typecheck    # 零错误
+cd app/web && pnpm typecheck        # 零错误
+```
+
+### Storybook
+```bash
+cd app/desktop && pnpm storybook    # http://localhost:6006
 ```
 
 ## 三层架构
@@ -30,7 +41,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 
 | 层 | 技术栈 | 测试 | 关键特性 |
 |---|------|:--:|------|
-| **Desktop** | React 19, TypeScript, Zustand, TanStack Query, TailwindCSS | 519 tests | viewRegistry, RunState 状态机, IM UI, AuthPage, 传输层抽象, 虚拟滚动, @mention |
+| **Desktop** | React 19, TypeScript, Zustand, TanStack Query, OKLCH tokens, CSS Modules | 604 tests (26 shared UI) | viewRegistry, @shared/ui 组件库, Storybook, RunState 状态机, IM UI, AuthPage, 虚拟滚动 |
 | **Edge** | Go, gorilla/websocket, NDJSON | 13/13 包 | 3 Adapter (Claude/Codex/OpenCode), Prometheus, Orchestrator P1-P2, E2E 19/19 API |
 | **Hub** | Go, Gin, GORM, Redis, PostgreSQL | 13/13 包 | DI 架构, CORS→BodyLimit→RateLimit 链, 32 migrations, 公开 API |
 
@@ -86,7 +97,10 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - 提交即推送
 
 ### 前端 subagent（sonnet/Kimi-K2.6）
-- 范围：`app/desktop/`，不碰 Go 代码
+- 范围：`app/desktop/` 或 `app/web/`，不碰 Go 代码
+- 共享 UI 组件放 `app/shared/src/ui/`（从 `@shared/ui` 导入）
+- 新组件必须：测试(`*.test.tsx`) + Storybook story(`*.stories.tsx`) + barrel export(`index.ts`)
+- 样式用 CSS Modules + OKLCH 变量（禁止硬编码颜色）
 - 验证：`pnpm tsc --noEmit && pnpm test`
 - 提交即推送
 
@@ -97,6 +111,5 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 
 ## 当前阻塞
 
-- Desktop 有无限重渲染循环 bug（前端 Agent 修复中）
+- 全项目 hooks 测试失败（311/604）：pnpm 跨包虚拟存储导致 React 实例不一致，影响所有 use*/Hook 测试。非 hooks 组件测试正常。长期方案：pnpm workspace 统一虚拟存储。
 - api.hub.vectorcontrol.tech 无 SSL（HTTP only），需要时加 Let's Encrypt
-- Docker Compose 环境变量加载方式不理想（:? 语法不兼容），后续考虑改用 env_file
