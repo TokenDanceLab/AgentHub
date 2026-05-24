@@ -4,9 +4,11 @@ import { parseError, isErrorResponse, AppError } from '@shared/errors';
 describe('errors', () => {
   describe('isErrorResponse', () => {
     it('returns true for valid error body', () => {
-      expect(isErrorResponse({
-        error: { code: 'not_found', message: 'Not found' },
-      })).toBe(true);
+      expect(
+        isErrorResponse({
+          error: { code: 'not_found', message: 'Not found' },
+        }),
+      ).toBe(true);
     });
 
     it('returns false for null', () => {
@@ -50,9 +52,10 @@ describe('errors', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
-        json: () => Promise.resolve({
-          error: { code: 'not_found', message: 'thread not found', traceId: 'trace_abc' },
-        }),
+        json: () =>
+          Promise.resolve({
+            error: { code: 'not_found', message: 'thread not found', traceId: 'trace_abc' },
+          }),
       } as Response;
 
       const err = await parseError(res);

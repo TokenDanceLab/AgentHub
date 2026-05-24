@@ -1,5 +1,8 @@
 # 后端路线图
 
+> **状态：已过时 (superseded)**。本文内容已合并到 `docs/roadmap.md`（全局路线图唯一事实源）。
+> 后端当前状态见 `docs/roadmap.md` §1.1-1.2 和 `docs/handoff/STATE.md`。
+
 最后更新：2026-05-23
 
 ## 负责范围
