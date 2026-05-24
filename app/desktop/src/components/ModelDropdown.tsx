@@ -1,6 +1,7 @@
 // Custom model/agent dropdown — replaces native <select> with styled popover.
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
+import { ModelIcon } from '@lobehub/icons';
 import styles from './ModelDropdown.module.css';
 
 interface Option {
@@ -90,7 +91,10 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
                   className={`${styles.item} ${opt.value === value ? styles.itemActive : ''}`}
                   onClick={() => handleSelect(opt.value)}
                 >
-                  <span>{cleanModelName(opt.label)}</span>
+                  <span className={styles.itemLabel}>
+                    <ModelIcon model={opt.value} size={16} />
+                    <span>{cleanModelName(opt.label)}</span>
+                  </span>
                   {opt.value === value && <Check size={14} className={styles.check} />}
                 </button>
               ))}

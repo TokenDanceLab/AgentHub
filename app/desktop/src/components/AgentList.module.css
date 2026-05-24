@@ -57,6 +57,13 @@
   transition: background-color 0.15s ease;
 }
 
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .item:hover {
   background: var(--border);
   transition: background var(--duration-fast) var(--ease-out);
