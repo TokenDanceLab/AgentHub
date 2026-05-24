@@ -13,8 +13,8 @@ const pageHtml = String.raw`<!doctype html>
         --muted: #667085;
         --line: rgba(134, 157, 190, 0.24);
         --glass: rgba(255, 255, 255, 0.72);
-        --blue: #2563eb;
-        --cyan: #0891b2;
+        --blue: #1769e8;
+        --cyan: #08a7cf;
         --purple: #7c3aed;
         --green: #059669;
         --shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
@@ -249,11 +249,11 @@ const pageHtml = String.raw`<!doctype html>
       }
 
       .avatar.purple {
-        background: linear-gradient(135deg, var(--purple), #0ea5e9);
+        background: linear-gradient(135deg, var(--purple), var(--blue));
       }
 
       .avatar.cyan {
-        background: linear-gradient(135deg, var(--cyan), #22c55e);
+        background: linear-gradient(135deg, var(--cyan), var(--green));
       }
 
       .chat-card h3,
