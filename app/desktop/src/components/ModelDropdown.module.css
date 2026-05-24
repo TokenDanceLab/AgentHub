@@ -110,24 +110,14 @@
 }
 .itemActive:hover { background: rgba(99,102,241,0.10); }
 
-/* ── Agent app icon ───────────────────────── */
-.agentIcon {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
+/* ── Icon (mono, via lobe-icons) ─────────── */
 .itemIcon {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
 }
 
 /* ── Body: name + description ─────────────── */

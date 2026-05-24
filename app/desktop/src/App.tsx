@@ -176,10 +176,6 @@ export default function App() {
           {edgeStatus.lastError && <span className={styles.topBarDim} title={edgeStatus.lastError} style={{ marginLeft: 4 }}>⚠</span>}
         </div>
         <div className={styles.topBarRight}>
-          <button className={styles.topBarBtn} onClick={toggleTheme} title={theme === 'dark' ? t('theme.light') : t('theme.dark')}>
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
-
           {/* Window controls — no drag region so clicks register */}
           <div className={styles.winControls}>
             <button className={styles.winBtn} onClick={() => getCurrentWindow().minimize()} title="最小化">
@@ -255,7 +251,7 @@ export default function App() {
 
             {/* Sidebar footer */}
             <div className={styles.sidebarFooter}>
-              <button className={styles.navIconBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} title={t('nav.settings')}>
+              <button className={styles.navIconBtn} title={t('nav.settings')}>
                 <Settings size={16} />
               </button>
               <button className={styles.navIconBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
