@@ -165,7 +165,7 @@ const pageStyles = `
 
   .pc-page {
     position: relative;
-    min-height: 100vh;
+    height: 100%;
     overflow: hidden;
     background:
       radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
@@ -203,7 +203,7 @@ const pageStyles = `
     display: grid;
     grid-template-columns: 280px minmax(480px, 1fr) 336px;
     gap: 18px;
-    min-height: 100vh;
+    height: 100%;
     padding: 18px;
   }
 
@@ -251,7 +251,9 @@ const pageStyles = `
     place-items: center;
     flex: 0 0 auto;
     color: #fff;
+    font-size: 16px;
     font-weight: 900;
+    line-height: 1;
     border-radius: 10px;
     background: linear-gradient(135deg, #1769e8, #08a7cf);
     box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
@@ -296,12 +298,12 @@ const pageStyles = `
   }
 
   .pc-title .pc-brand-sub {
-    margin: 0;
+    margin: 4px 0 0;
     color: #667085;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.09em;
-    line-height: normal;
+    line-height: 1.236;
   }
 
   .pc-icon-button,
@@ -392,10 +394,10 @@ const pageStyles = `
     gap: 10px;
     align-items: center;
     min-height: 64px;
-    border: 1px solid transparent;
+    border: 1px solid rgba(255, 255, 255, 0.64);
     border-radius: 12px;
     padding: 10px;
-    background: rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.5);
     color: inherit;
     cursor: pointer;
     text-align: left;
@@ -750,10 +752,10 @@ const pageStyles = `
   }
 
   .pc-mini-card {
-    border: 1px solid rgba(132, 155, 190, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.64);
     border-radius: 12px;
     padding: 12px;
-    background: rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.5);
   }
 
   .pc-mini-card h3 {
@@ -787,10 +789,11 @@ const pageStyles = `
   }
 
   .pc-chip {
-    min-height: 28px;
-    padding: 0 9px;
+    min-height: 24px;
+    padding: 4px 9px;
     color: #40516f;
-    font-size: 12px;
+    font-size: 11px;
+    line-height: 1;
     box-shadow: none;
   }
 
@@ -818,7 +821,7 @@ const pageStyles = `
     font-size: 13px;
   }
 
-  @media (max-width: 1120px) {
+  @media (max-width: 1180px) {
     .pc-shell {
       grid-template-columns: 260px minmax(0, 1fr);
     }
@@ -832,7 +835,7 @@ const pageStyles = `
     }
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 820px) {
     .pc-page {
       overflow: auto;
     }

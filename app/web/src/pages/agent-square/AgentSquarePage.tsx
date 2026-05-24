@@ -872,7 +872,7 @@ const styles = `
     --asr-glass: rgba(255, 255, 255, 0.72);
     --asr-glass-border: rgba(255, 255, 255, 0.7);
     --asr-shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
-    min-height: 100vh;
+    height: 100%;
     color: var(--asr-ink);
     background:
       radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
@@ -940,7 +940,7 @@ const styles = `
   .asr-page {
     position: relative;
     z-index: 1;
-    height: 100vh;
+    height: 100%;
     padding: 18px;
   }
 
@@ -948,7 +948,7 @@ const styles = `
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr) 316px;
     gap: 18px;
-    height: calc(100vh - 44px);
+    height: 100%;
     width: 100%;
   }
 
@@ -1007,7 +1007,7 @@ const styles = `
   }
 
   .asr-title .asr-brand-sub {
-    margin: 0;
+    margin: 4px 0 0;
     color: var(--asr-muted);
     font-size: 11px;
     font-weight: 800;
@@ -1072,7 +1072,9 @@ const styles = `
     place-items: center;
     flex: 0 0 auto;
     color: #fff;
+    font-size: 16px;
     font-weight: 900;
+    line-height: 1;
     border-radius: 10px;
     background: linear-gradient(135deg, var(--asr-blue), var(--asr-cyan));
     box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
@@ -1106,9 +1108,9 @@ const styles = `
     gap: 10px;
     min-width: 0;
     padding: 10px;
-    border: 1px solid transparent;
+    border: 1px solid rgba(255, 255, 255, 0.64);
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.46);
+    background: rgba(255, 255, 255, 0.5);
     color: var(--asr-ink);
   }
 
@@ -1167,15 +1169,17 @@ const styles = `
   .asr-tag {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     min-height: 24px;
-    padding: 5px 9px;
+    padding: 4px 9px;
     border: 1px solid rgba(23, 105, 232, 0.13);
     border-radius: 999px;
     background: rgba(23, 105, 232, 0.08);
     color: #1459c7;
     font-size: 11px;
     font-weight: 800;
+    line-height: 1;
     white-space: nowrap;
   }
 
@@ -1370,14 +1374,14 @@ const styles = `
   .asr-agent-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(230px, 1fr));
-    gap: 14px;
+    grid-auto-rows: auto;
+    gap: 20px;
     overflow: auto;
-    padding: 2px 4px 6px 2px;
+    padding: 2px 4px 10px 2px;
   }
 
   .asr-agent-card {
     display: flex;
-    min-height: 238px;
     flex-direction: column;
     gap: 12px;
     padding: 15px;
@@ -1471,7 +1475,7 @@ const styles = `
   .asr-tool-row,
   .asr-activity-row {
     align-items: flex-start;
-    background: rgba(255, 255, 255, 0.52);
+    background: rgba(255, 255, 255, 0.5);
   }
 
   .asr-confirm-bar {
