@@ -9,6 +9,26 @@
     ".": "./src/index.ts",
     "./types": "./src/types.ts",
     "./events": "./src/events.ts",
-    "./errors": "./src/errors.ts"
+    "./errors": "./src/errors.ts",
+    "./tree": "./src/tree.ts",
+    "./diff": "./src/diff.ts",
+    "./ui": "./src/ui/index.ts",
+    "./ui/*": "./src/ui/*.tsx",
+    "./ui/*.css": "./src/ui/*.module.css"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "dependencies": {
+    "diff": "^8.0.2",
+    "@pierre/diffs": "^1.1.0-beta.18"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.8.0"
   }
 }

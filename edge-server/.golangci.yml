@@ -1,0 +1,96 @@
+linters-settings:
+  cyclop:
+    max-complexity: 21
+  gocyclo:
+    min-complexity: 20
+  gocognit:
+    min-complexity: 30
+  goconst:
+    min-len: 4
+    min-occurrences: 5
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: increment-decrement
+      - name: var-naming
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+
+linters:
+  enable:
+    # Bugs
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - nilerr
+    - exhaustive
+    # Style
+    - gocritic
+    - gofmt
+    - misspell
+    - revive
+    - unconvert
+    - unparam
+    - whitespace
+    # Complexity
+    - cyclop
+    - gocyclo
+    - gocognit
+    - goconst
+    # Performance
+    - prealloc
+    - errname
+
+run:
+  timeout: 5m
+  tests: true
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - cyclop
+        - gocyclo
+        - gocognit
+        - goconst
+        - unparam
+        - errcheck
+        - exhaustive
+    # Switch-based event dispatchers are inherently high complexity
+    - path: internal/adapters/parser_ndjson\.go
+      linters: [cyclop, gocyclo, gocognit, goconst]
+    - path: internal/adapters/opencode\.go
+      linters: [cyclop, gocyclo, gocognit]
+    - path: internal/adapters/codex\.go
+      linters: [cyclop, gocyclo, gocognit, goconst]
+    - path: internal/lifecycle/process_executor\.go
+      linters: [cyclop, gocyclo, gocognit, goconst, errcheck]
+    - path: internal/api/handlers\.go
+      linters: [gocognit, goconst]
+    - path: internal/lifecycle/result_aggregator\.go
+      linters: [goconst]
+    - path: internal/lifecycle/mock_executor\.go
+      linters: [goconst, errcheck]
+    # context-as-argument: ctx last is a deliberate choice for publishStructuredOutput
+    - linters: [revive]
+      text: "context-as-argument"
+    - linters: [staticcheck]
+      text: "SA1019"
+  exclude-dirs:
+    - reference
+    - vendor
+    - node_modules
+  exclude-dirs-use-default: true
