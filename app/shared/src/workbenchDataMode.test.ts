@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getWorkbenchCatalogState,
   getWorkbenchDataMode,
+  getWorkbenchSectionSource,
   type WorkbenchDataMode,
 } from './workbenchDataMode';
 import type { WorkbenchState } from './workbenchState';
@@ -90,5 +91,40 @@ describe('workbenchDataMode', () => {
       tone: 'purple',
       hasLiveCatalog: true,
     });
+  });
+
+  it.each([
+    [
+      'loading section without snapshot data',
+      { mode: 'loading', hasSectionSnapshot: false },
+      { label: 'Loading snapshot', tone: 'cyan' },
+    ],
+    [
+      'unavailable section without snapshot data',
+      { mode: 'unavailable', hasSectionSnapshot: false },
+      { label: 'Snapshot unavailable', tone: 'neutral' },
+    ],
+    [
+      'mock section without snapshot data',
+      { mode: 'mock', hasSectionSnapshot: false },
+      { label: 'Mock fallback', tone: 'amber' },
+    ],
+    [
+      'offline section with snapshot data',
+      { mode: 'offline-snapshot', hasSectionSnapshot: true },
+      { label: 'Offline snapshot', tone: 'purple' },
+    ],
+    [
+      'available snapshot mode with section data',
+      { mode: 'live', hasSectionSnapshot: true },
+      { label: 'Edge snapshot', tone: 'green' },
+    ],
+    [
+      'local dry-run layered over the base section source',
+      { mode: 'mock', hasSectionSnapshot: false, hasLocalDryRun: true },
+      { label: 'Local dry-run / Mock fallback', tone: 'cyan' },
+    ],
+  ] as const)('%s', (_label, input, expected) => {
+    expect(getWorkbenchSectionSource(input)).toEqual(expected);
   });
 });
