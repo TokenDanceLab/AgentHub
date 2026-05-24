@@ -43,7 +43,7 @@ function AgentDot({ name }: { name: string }) {
 
 export default function ModelDropdown({ options, value, onChange, placeholder, disabled, ariaLabel, alignRight }: Props) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0, up: false });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -65,7 +65,17 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
       const w = Math.max(rect.width, 280);
-      setPos({ top: rect.bottom + 4, left: alignRight ? rect.right - w : rect.left, width: w });
+      const dropdownH = 320; // estimated max height
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      // Open upward if not enough space below
+      const openUp = spaceBelow < dropdownH && spaceAbove > spaceBelow;
+      setPos({
+        top: openUp ? rect.top - 4 : rect.bottom + 4,
+        left: alignRight ? rect.right - w : rect.left,
+        width: w,
+        up: openUp,
+      });
     }
     setOpen(true);
   }, [disabled, alignRight]);
@@ -95,7 +105,11 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
       if (triggerRef.current) {
         const rect = triggerRef.current.getBoundingClientRect();
         const w = Math.max(rect.width, 280);
-        setPos({ top: rect.bottom + 4, left: alignRight ? rect.right - w : rect.left, width: w });
+        const dropdownH = 320;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        const openUp = spaceBelow < dropdownH && spaceAbove > spaceBelow;
+        setPos({ top: openUp ? rect.top - 4 : rect.bottom + 4, left: alignRight ? rect.right - w : rect.left, width: w, up: openUp });
       }
     };
     window.addEventListener('scroll', handler, true);
@@ -109,8 +123,9 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
   }, [onChange]);
 
   const dropdown = open && createPortal(
-    <div ref={dropdownRef} className={styles.dropdown}
-      style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.width, zIndex: 9999 }}>
+    <div ref={dropdownRef}
+      className={`${styles.dropdown} ${pos.up ? styles.dropdownUp : ''}`}
+      style={{ position: 'fixed', top: pos.up ? 'auto' : pos.top, bottom: pos.up ? `${window.innerHeight - pos.top}px` : 'auto', left: pos.left, minWidth: pos.width, zIndex: 9999 }}>
       {Object.entries(grouped).map(([group, opts]) => (
         <div key={group}>
           {group !== 'default' && <div className={styles.groupLabel}>{group}</div>}
