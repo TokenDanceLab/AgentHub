@@ -86,6 +86,23 @@ func TestAuthMiddlewareInvalidToken(t *testing.T) {
 	}
 }
 
+func TestAuthMiddlewareRejectsTokenDanceTokenWithoutExpectedAudience(t *testing.T) {
+	token := "not-a-valid-local-token"
+	cfg := testConfig()
+	cfg.TokenDanceID.IssuerURL = "https://id.example"
+	cfg.TokenDanceID.ClientID = ""
+
+	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
+	AuthMiddleware(cfg)(c)
+
+	if !c.IsAborted() {
+		t.Fatal("expected request to be aborted when TokenDance client_id is missing")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+}
+
 func TestAuthMiddlewareExpiredToken(t *testing.T) {
 	token := makeExpiredToken("user-1", "desktop", "dev-1")
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)

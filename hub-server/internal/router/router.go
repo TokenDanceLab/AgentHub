@@ -1,8 +1,6 @@
 package router
 
 import (
-	"time"
-
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/cache"
@@ -14,12 +12,12 @@ import (
 func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler) {
 	r.Use(middleware.CORS())
 	r.Use(middleware.APIVersion())
-	r.Use(middleware.BodyLimit(10 << 20))
+	r.Use(middleware.BodyLimit(config.DefaultRequestBodyLimit))
 	r.Use(middleware.GlobalRateLimit(cacheClient))
 	r.Use(middleware.RequestID())
 	r.Use(middleware.AccessLog())
 	r.Use(middleware.PrometheusMiddleware())
-	r.Use(middleware.Timeout(15 * time.Second))
+	r.Use(middleware.Timeout(config.DefaultRequestTimeout))
 
 	if healthHandler != nil {
 		r.GET("/health", healthHandler.Check)
@@ -43,8 +41,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		auth := client.Group("/auth")
 		{
-			auth.POST("/register", middleware.RateLimit(cacheClient, 3, time.Minute, middleware.IPKey), authHandler.Register)
-			auth.POST("/login", middleware.RateLimit(cacheClient, 5, time.Minute, middleware.IPKey), authHandler.Login)
+			auth.POST("/register", middleware.RateLimit(cacheClient, config.AuthRegisterRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Register)
+			auth.POST("/login", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Login)
 			auth.POST("/refresh", authHandler.Refresh)
 		}
 
@@ -114,7 +112,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		attachments.Use(middleware.AuthMiddleware(cfg))
 		{
 			attachments.POST("/probe", attachmentHandler.Probe)
-			attachments.POST("", middleware.Timeout(30*time.Second), attachmentHandler.Upload)
+			attachments.POST("", middleware.Timeout(config.UploadRequestTimeout), attachmentHandler.Upload)
 			attachments.GET("/:id", attachmentHandler.Download)
 		}
 
