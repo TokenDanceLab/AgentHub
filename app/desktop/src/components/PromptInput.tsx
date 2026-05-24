@@ -158,20 +158,21 @@ export default function PromptInput({
         <div className={styles.actions}>
           <span className={styles.charCount}>{promptLength}/{MAX_CHARS}</span>
 
-          <div className={styles.metaChain}>
-            <ModelDropdown
-              options={[
-                ...agents.map((a) => ({ value: a.name, label: a.name, group: 'My Agents', desc: a.description || '', meta: a.status === 'available' ? 'Online' : 'Offline', isAgent: true })),
-                ...COMMON_MODELS.map((m) => ({ value: m, label: m, group: 'Base Models', desc: modelDesc(m), meta: modelMeta(m), isAgent: false })),
-              ]}
-              value={model} onChange={setModel}
-              placeholder={t('prompt.model')} disabled={disabled} ariaLabel={t('prompt.model')}
-              variant="text"
-            />
-            <span className={styles.metaDot}>·</span>
-            <ModelDropdown
-              options={REASONING_EFFORTS.map((r) => ({ value: r, label: r, group: 'Reasoning' }))}
-              value={reasoningEffort} onChange={(v) => setReasoningEffort(v as ReasoningEffort | '')}
+          <div className={styles.rightGroup}>
+            <div className={styles.metaChain}>
+              <ModelDropdown
+                options={[
+                  ...agents.map((a) => ({ value: a.name, label: a.name, group: 'My Agents', desc: a.description || '', meta: a.status === 'available' ? 'Online' : 'Offline', isAgent: true })),
+                  ...COMMON_MODELS.map((m) => ({ value: m, label: m, group: 'Base Models', desc: modelDesc(m), meta: modelMeta(m), isAgent: false })),
+                ]}
+                value={model} onChange={setModel}
+                placeholder={t('prompt.model')} disabled={disabled} ariaLabel={t('prompt.model')}
+                variant="text"
+              />
+              <span className={styles.metaDot}>·</span>
+              <ModelDropdown
+                options={REASONING_EFFORTS.map((r) => ({ value: r, label: r, group: 'Reasoning' }))}
+                value={reasoningEffort} onChange={(v) => setReasoningEffort(v as ReasoningEffort | '')}
               placeholder={t('prompt.reasoning')} disabled={disabled} ariaLabel={t('prompt.reasoning')} alignRight
               variant="text"
             />
@@ -190,8 +191,8 @@ export default function PromptInput({
               <ArrowUp size={16} strokeWidth={2.5} />
             </button>
           )}
+          </div>
         </div>
-      </div>
     </div>
   );
 }
