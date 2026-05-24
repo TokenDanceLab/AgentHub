@@ -42,17 +42,6 @@
   flex-shrink: 0;
 }
 
-/* ── Agent app icon (gradient square) ─────── */
-.agentIcon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
 /* ── Info ──────────────────────────────────── */
 .info {
   display: flex;

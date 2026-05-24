@@ -142,13 +142,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // ── Drag handler for frameless window (Tauri v2 programmatic API)
-  const handleDragStart = useCallback(async (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('button, input, select, a')) return;
-    try { await getCurrentWindow().startDragging(); } catch {}
-  }, []);
-
   // ── Double-click top bar → toggle maximize/restore
   const handleTopBarDoubleClick = useCallback(async (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -165,7 +158,7 @@ export default function App() {
     <ErrorBoundary>
     <div className={styles.root}>
       {/* Top status bar — drag region + window controls */}
-      <div className={styles.topBar} onMouseDown={handleDragStart} onDoubleClick={handleTopBarDoubleClick}>
+      <div className={styles.topBar} data-tauri-drag-region onDoubleClick={handleTopBarDoubleClick}>
         <div className={styles.topBarLeft}>
           <span className={styles.statusBadge}>
             <span className={`${styles.statusBadgeDot} ${online ? styles.statusBadgeDotOnline : styles.statusBadgeDotOffline}`} />
