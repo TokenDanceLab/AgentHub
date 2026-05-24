@@ -1,3 +1,8 @@
+vi.mock('lucide-react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('lucide-react')>();
+  return { ...actual };
+});
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, vars?: Record<string, unknown>) => {
@@ -11,9 +16,35 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('@/contexts/ToastContext', () => ({
-  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
-  useToast: () => ({ showToast: vi.fn() }),
+vi.mock('@/stores/toastStore', () => ({
+  useToastStore: (selector: (s: { toasts: unknown[]; addToast: ReturnType<typeof vi.fn>; removeToast: ReturnType<typeof vi.fn> }) => unknown) => {
+    const store = {
+      toasts: [],
+      addToast: vi.fn(),
+      removeToast: vi.fn(),
+    };
+    return selector(store);
+  },
+}));
+
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count }: { count: number }) => {
+    // No-op virtualizer: render all items at their natural positions
+    const items = Array.from({ length: count }, (_, i) => ({
+      key: `vitem-${i}`,
+      index: i,
+      start: 0,
+      size: 0,
+      end: 0,
+      measureElement: () => {},
+    }));
+    return {
+      getVirtualItems: () => items,
+      getTotalSize: () => 0,
+      measureElement: () => {},
+      scrollToIndex: () => {},
+    };
+  },
 }));
 
 import { describe, it, expect, vi } from 'vitest';
@@ -43,7 +74,7 @@ function makeAgentTextMessage(content: string, id = 'msg-agent-1'): ChatMessage 
 describe('ChatView', () => {
   it('renders empty state when messages array is empty', () => {
     render(<ChatView messages={[]} />);
-    expect(screen.getByText('chat.empty')).toBeInTheDocument();
+    expect(screen.getByText('chat.emptyTitle')).toBeInTheDocument();
   });
 
   it('renders user messages on the right side', () => {
@@ -78,9 +109,8 @@ describe('ChatView', () => {
     };
     render(<ChatView messages={[msg]} />);
     expect(screen.getByText('typescript')).toBeInTheDocument();
-    // The code content is rendered inside a <code> element
-    const codeEl = screen.getByText('console.log("hi")');
-    expect(codeEl.tagName).toBe('CODE');
+    // Code content is rendered inside the SyntaxHighlighter
+    expect(screen.getByText('console.log("hi")')).toBeInTheDocument();
   });
 
   it('renders thinking blocks collapsed by default', () => {

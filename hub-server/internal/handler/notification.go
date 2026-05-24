@@ -1,19 +1,28 @@
 package handler
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/model"
 )
 
-type NotificationHandler struct {
-	service *service.NotificationService
+// NotificationService is the subset of *service.NotificationService used by NotificationHandler.
+type NotificationService interface {
+	ListNotifications(ctx context.Context, userID string, unreadOnly bool, limit, offset int) ([]model.Notification, error)
+	MarkRead(ctx context.Context, userID, notifID string) error
+	MarkAllRead(ctx context.Context, userID string) error
 }
 
-func NewNotificationHandler(s *service.NotificationService) *NotificationHandler {
+type NotificationHandler struct {
+	service NotificationService
+}
+
+func NewNotificationHandler(s NotificationService) *NotificationHandler {
 	return &NotificationHandler{service: s}
 }
 
@@ -22,7 +31,7 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 
 	unreadOnly, _ := strconv.ParseBool(c.DefaultQuery("unread_only", "false"))
 
-	limit := 50
+	limit := config.DefaultPaginationLimit
 	if l := c.Query("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil {
 			limit = v

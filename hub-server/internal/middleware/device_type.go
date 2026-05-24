@@ -3,9 +3,9 @@ package middleware
 import (
 	"slices"
 
-	"github.com/gin-gonic/gin"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
+	"github.com/gin-gonic/gin"
 )
 
 func DeviceTypeCheck(allowedTypes ...string) gin.HandlerFunc {

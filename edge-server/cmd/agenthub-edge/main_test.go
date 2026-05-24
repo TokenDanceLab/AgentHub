@@ -232,7 +232,7 @@ func TestNewStoreFromConfigUsesFileStore(t *testing.T) {
 		t.Fatalf("repository type = %T, want *store.FileStore", repository)
 	}
 
-	fileStore.CreateProject("proj_test", "Test Project")
+	_, _ = fileStore.CreateProject("proj_test", "Test Project")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("store file was not written: %v", err)
 	}

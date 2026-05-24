@@ -10,6 +10,7 @@ import (
 // ============================================================
 
 func TestLeaveAndRejoinGroup(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a := register(t, "trlj_a", "pass1234", "LeaveJoinA")
 	b := register(t, "trlj_b", "pass1234", "LeaveJoinB")
 	c := register(t, "trlj_c", "pass1234", "LeaveJoinC")
@@ -47,6 +48,7 @@ func TestLeaveAndRejoinGroup(t *testing.T) {
 }
 
 func TestLeaveAsLastOwner(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a := register(t, "tllo_a", "pass1234", "LastOwnerA")
 	b := register(t, "tllo_b", "pass1234", "LastOwnerB")
 	c := register(t, "tllo_c", "pass1234", "LastOwnerC")
@@ -76,6 +78,7 @@ func TestLeaveAsLastOwner(t *testing.T) {
 }
 
 func TestDissolveByNonOwner(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a := register(t, "tdno_a", "pass1234", "DissolveNonA")
 	b := register(t, "tdno_b", "pass1234", "DissolveNonB")
 	c := register(t, "tdno_c", "pass1234", "DissolveNonC")
@@ -109,6 +112,7 @@ func TestDissolveByNonOwner(t *testing.T) {
 // ============================================================
 
 func TestCreatePrivateWithSelf(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a := register(t, "tcpws", "pass1234", "PrivateSelf")
 
 	// Try to create private session with self
@@ -119,6 +123,7 @@ func TestCreatePrivateWithSelf(t *testing.T) {
 }
 
 func TestCreateGroupWithoutFriends(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a := register(t, "tcgwf_a", "pass1234", "GroupNoFriendA")
 	b := register(t, "tcgwf_b", "pass1234", "GroupNoFriendB")
 	c := register(t, "tcgwf_c", "pass1234", "GroupNoFriendC")
@@ -140,6 +145,7 @@ func TestCreateGroupWithoutFriends(t *testing.T) {
 }
 
 func TestDuplicateFriendRequest(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a := register(t, "tdfr_a", "pass1234", "DupFRA")
 	b := register(t, "tdfr_b", "pass1234", "DupFRB")
 
@@ -156,6 +162,7 @@ func TestDuplicateFriendRequest(t *testing.T) {
 }
 
 func TestAcceptNonPendingRequest(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a := register(t, "tanpr_a", "pass1234", "AccNonPenA")
 	b := register(t, "tanpr_b", "pass1234", "AccNonPenB")
 
@@ -180,6 +187,7 @@ func TestAcceptNonPendingRequest(t *testing.T) {
 }
 
 func TestSelfBlock(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a := register(t, "tsblk", "pass1234", "SelfBlock")
 
 	// Try to block self
@@ -192,6 +200,7 @@ func TestSelfBlock(t *testing.T) {
 // ============================================================
 
 func TestInvalidContentType(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a := register(t, "tict_a", "pass1234", "InvContentA")
 	b := register(t, "tict_b", "pass1234", "InvContentB")
 
@@ -218,6 +227,7 @@ func TestInvalidContentType(t *testing.T) {
 }
 
 func TestGetMessagesWithoutMembership(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a := register(t, "tgmwm_a", "pass1234", "GetMsgNoMemA")
 	b := register(t, "tgmwm_b", "pass1234", "GetMsgNoMemB")
 	c := register(t, "tgmwm_c", "pass1234", "GetMsgNoMemC")
@@ -250,6 +260,7 @@ func TestGetMessagesWithoutMembership(t *testing.T) {
 // ============================================================
 
 func TestChangePasswordWithWrongOldPassword(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a := register(t, "tcpwp", "pass1234", "ChangePWWrongOld")
 
 	// Try to change password with wrong old_password
@@ -261,6 +272,7 @@ func TestChangePasswordWithWrongOldPassword(t *testing.T) {
 }
 
 func TestRegisterWithShortPassword(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	// Try to register with password length < 8
 	w := post("/client/auth/register", map[string]string{
 		"username": "trwsp01", "password": "short", "nickname": "ShortPW",
@@ -269,6 +281,7 @@ func TestRegisterWithShortPassword(t *testing.T) {
 }
 
 func TestLoginWithInvalidDeviceType(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	// Register a user
 	a := register(t, "tlidt", "pass1234", "LoginDevType")
 

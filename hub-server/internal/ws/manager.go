@@ -7,9 +7,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/coder/websocket"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
+	"github.com/coder/websocket"
 )
+
+const sendBufSize = 256
 
 type Conn struct {
 	ID         string
@@ -60,7 +63,7 @@ func (m *Manager) Count() int {
 func NewConn(ws *websocket.Conn) *Conn {
 	return &Conn{
 		W:    ws,
-		Send: make(chan []byte, 64),
+		Send: make(chan []byte, sendBufSize),
 	}
 }
 
@@ -164,6 +167,15 @@ func (m *Manager) PushToConn(connID string, frame Frame) {
 	select {
 	case c.Send <- data:
 	default:
+		metrics.WSDroppedFrames.Inc()
+		sessionID := extractSessionID(frame.Payload)
+		slog.Warn("ws frame dropped: send buffer full",
+			"conn_id", connID,
+			"user_id", c.UserID,
+			"device_type", c.DeviceType,
+			"frame_type", frame.Type,
+			"session_id", sessionID,
+		)
 	}
 }
 
@@ -242,4 +254,18 @@ func (m *Manager) pingAll() {
 			c.missedPong.Store(0)
 		}
 	}
+}
+
+func extractSessionID(payload any) string {
+	if m, ok := payload.(map[string]interface{}); ok {
+		if sid, ok := m["session_id"].(string); ok {
+			return sid
+		}
+	}
+	if m, ok := payload.(map[string]string); ok {
+		if sid, ok := m["session_id"]; ok {
+			return sid
+		}
+	}
+	return ""
 }

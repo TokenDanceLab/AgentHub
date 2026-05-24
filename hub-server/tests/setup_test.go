@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
@@ -29,12 +30,11 @@ var (
 	client *http.Client
 	mgr    *ws.Manager
 	bus    *service.Bus
+	db     *gorm.DB // hold reference for cleanDB
 )
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	// -short skips integration tests that need PostgreSQL/Redis.
-	// CI and local dev use -short for fast feedback without external services.
 	if testing.Short() {
 		os.Exit(0)
 	}
@@ -48,67 +48,78 @@ func TestMain(m *testing.M) {
 	}
 	log.Init(&cfg.Server)
 
-	if err := repository.InitDB(&cfg.DB); err != nil {
+	database, err := repository.InitDB(&cfg.DB)
+	if err != nil {
 		panic(fmt.Sprintf("failed to init db: %v", err))
 	}
+	db = database
 	if err := repository.RunMigrationsFrom(&cfg.DB, "file://../migrations"); err != nil {
 		panic(fmt.Sprintf("failed to run migrations: %v", err))
 	}
-	if err := cache.InitRedis(&cfg.Redis); err != nil {
+	rdb, err := cache.InitRedis(&cfg.Redis)
+	if err != nil {
 		panic(fmt.Sprintf("failed to init redis: %v", err))
 	}
+	cacheClient := cache.NewClient(rdb)
 
 	mgr = ws.NewManager()
 	mgr.StartHeartbeat()
 
 	bus = service.NewBus()
 	wsHandler := handler.NewWebSocketHandler(mgr, cfg.JWT.Secret)
-	authService := service.NewAuthService(repository.DB)
+	authService := service.NewAuthService(db, cfg.JWT, cacheClient)
 	authHandler := handler.NewAuthHandler(authService)
-	deviceHandler := handler.NewDeviceHandler(repository.DB)
-	contactService := service.NewContactService(repository.DB, bus)
+	deviceService := service.NewDeviceService(db)
+	deviceHandler := handler.NewDeviceHandler(deviceService)
+	contactService := service.NewContactService(db, bus, cacheClient)
 	contactHandler := handler.NewContactHandler(contactService)
-	sessionService := service.NewSessionService(repository.DB)
+	sessionService := service.NewSessionService(db, cacheClient)
 	sessionHandler := handler.NewSessionHandler(sessionService)
-	messageService := service.NewMessageService(repository.DB, bus)
+	messageService := service.NewMessageService(db, bus, cacheClient)
 	messageHandler := handler.NewMessageHandler(messageService)
-	agentService := service.NewAgentService(repository.DB, bus, mgr)
+	agentService := service.NewAgentService(db, bus, mgr, cacheClient)
 	agentHandler := handler.NewAgentHandler(agentService)
 	customAgentHandler := handler.NewCustomAgentHandler(agentService)
-	attachmentService := service.NewAttachmentService(repository.DB)
+	attachmentService := service.NewAttachmentService(db, cfg.Upload)
 	attachmentHandler := handler.NewAttachmentHandler(attachmentService)
-	notificationService := service.NewNotificationService(repository.DB, mgr)
+	notificationService := service.NewNotificationService(db, mgr)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
-	router.SetupRoutes(r, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler)
+	router.SetupRoutes(r, cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler)
 
 	ts = httptest.NewServer(r)
 	client = ts.Client()
 
-	cleanDB()
+	cleanDBTables(db)
 
 	os.Exit(m.Run())
 }
 
-func cleanDB() {
-	db := repository.DB
-	db.Exec("DELETE FROM message_pins")
-	db.Exec("DELETE FROM message_reads")
-	db.Exec("DELETE FROM pending_agent_tasks")
-	db.Exec("DELETE FROM agent_instances")
-	db.Exec("DELETE FROM messages")
-	db.Exec("DELETE FROM session_members")
-	db.Exec("DELETE FROM sessions")
-	db.Exec("DELETE FROM notifications")
-	db.Exec("DELETE FROM friendships")
-	db.Exec("DELETE FROM attachments")
-	db.Exec("DELETE FROM custom_agents")
-	db.Exec("DELETE FROM workspaces")
-	db.Exec("DELETE FROM refresh_tokens")
-	db.Exec("DELETE FROM devices")
-	db.Exec("DELETE FROM users")
+// CleanDB truncates all tables between tests for isolation.
+// Tables are deleted in FK-safe order (children before parents).
+func CleanDB(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	cleanDBTables(db)
+}
+
+func cleanDBTables(database *gorm.DB) {
+	database.Exec("DELETE FROM message_pins")
+	database.Exec("DELETE FROM message_reads")
+	database.Exec("DELETE FROM pending_agent_tasks")
+	database.Exec("DELETE FROM agent_instances")
+	database.Exec("DELETE FROM messages")
+	database.Exec("DELETE FROM session_members")
+	database.Exec("DELETE FROM sessions")
+	database.Exec("DELETE FROM notifications")
+	database.Exec("DELETE FROM friendships")
+	database.Exec("DELETE FROM attachments")
+	database.Exec("DELETE FROM custom_agents")
+	database.Exec("DELETE FROM workspaces")
+	database.Exec("DELETE FROM refresh_tokens")
+	database.Exec("DELETE FROM devices")
+	database.Exec("DELETE FROM users")
 }
 
 func post(path string, body interface{}) *http.Response {
