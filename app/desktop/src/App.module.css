@@ -71,6 +71,20 @@
   color: var(--foreground);
 }
 
+.mobileToolbarBtn:focus-visible,
+.railBtn:focus-visible,
+.rightPanelCollapseBtn:focus-visible,
+.navIconBtn:focus-visible,
+.workspaceHeaderBtn:focus-visible,
+.topBarBtn:focus-visible,
+.winBtn:focus-visible,
+.rightPanelTab:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  background: rgba(99,102,241,0.1);
+  color: var(--foreground);
+}
+
 [data-theme='dark'] .mobileToolbarBtn:hover,
 [data-theme='dark'] .railBtn:hover,
 [data-theme='dark'] .rightPanelCollapseBtn:hover {
@@ -135,6 +149,15 @@
 
 .resizeHandle:hover::before {
   background: rgba(99,102,241,0.36);
+}
+
+.resizeHandle:focus-visible {
+  outline: none;
+}
+
+.resizeHandle:focus-visible::before {
+  background: rgba(99,102,241,0.68);
+  box-shadow: 0 0 0 4px rgba(99,102,241,0.12);
 }
 
 .resizing,

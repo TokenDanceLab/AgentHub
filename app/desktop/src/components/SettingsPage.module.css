@@ -1,6 +1,16 @@
 .root {
+  --settings-glass-bg: rgba(255, 255, 255, 0.46);
+  --settings-glass-border: rgba(0, 0, 0, 0.075);
+  --settings-glass-hover: rgba(255, 255, 255, 0.62);
+  --settings-glass-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 14px 34px rgba(15, 23, 42, 0.045);
+  --settings-chip-bg: rgba(0, 0, 0, 0.055);
+  --settings-icon-bg: rgba(99, 102, 241, 0.13);
+  --settings-sidebar-bg: rgba(246, 246, 248, 0.72);
   display: grid;
   grid-template-columns: 292px minmax(0, 1fr);
+  height: 100%;
   min-height: 0;
   flex: 1;
   background:
@@ -9,19 +19,36 @@
   color: var(--foreground);
 }
 
+[data-theme='dark'] .root {
+  --settings-glass-bg: rgba(31, 31, 38, 0.46);
+  --settings-glass-border: rgba(255, 255, 255, 0.085);
+  --settings-glass-hover: rgba(45, 45, 54, 0.62);
+  --settings-glass-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 44px rgba(0, 0, 0, 0.16);
+  --settings-chip-bg: rgba(255, 255, 255, 0.075);
+  --settings-icon-bg: rgba(99, 102, 241, 0.16);
+  --settings-sidebar-bg: rgba(22, 22, 28, 0.72);
+  background:
+    radial-gradient(circle at 70% 0%, rgba(99, 102, 241, 0.11), transparent 32%),
+    radial-gradient(circle at 92% 72%, rgba(20, 184, 166, 0.045), transparent 28%),
+    var(--app-bg);
+}
+
 .sidebar {
   display: flex;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
   padding: 16px 10px;
   border-right: 1px solid rgba(0, 0, 0, 0.06);
-  background: rgba(246, 246, 247, 0.74);
-  backdrop-filter: blur(24px) saturate(1.18);
+  background: var(--settings-sidebar-bg);
+  backdrop-filter: blur(30px) saturate(1.16);
+  -webkit-backdrop-filter: blur(30px) saturate(1.16);
 }
 
 [data-theme='dark'] .sidebar {
   border-right-color: rgba(255, 255, 255, 0.06);
-  background: rgba(25, 25, 32, 0.76);
 }
 
 .backBtn,
@@ -65,9 +92,31 @@
 }
 
 .nav {
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding-right: 2px;
+  scrollbar-gutter: stable;
+}
+
+.nav::-webkit-scrollbar,
+.main::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.nav::-webkit-scrollbar-thumb,
+.main::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(142, 142, 147, 0.32);
+  background-clip: padding-box;
+}
+
+.nav::-webkit-scrollbar-track,
+.main::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .navGroup {
@@ -139,7 +188,9 @@
 
 .main {
   min-width: 0;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 70px 32px 90px;
 }
 
@@ -223,15 +274,16 @@
   flex-direction: column;
   gap: 8px;
   padding: 16px;
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.36);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+  backdrop-filter: blur(22px) saturate(1.18);
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
 }
 
 [data-theme='dark'] .capabilityCard {
-  border-color: rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.035);
+  color-scheme: dark;
 }
 
 .capabilityCard strong {
@@ -263,17 +315,18 @@
 .profileCard,
 .targetCard {
   min-width: 0;
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.36);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+  backdrop-filter: blur(22px) saturate(1.18);
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
 }
 
 [data-theme='dark'] .summaryCard,
 [data-theme='dark'] .profileCard,
 [data-theme='dark'] .targetCard {
-  border-color: rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.035);
+  color-scheme: dark;
 }
 
 .summaryCard {
@@ -291,8 +344,8 @@
   height: 36px;
   flex-shrink: 0;
   place-items: center;
-  border-radius: 11px;
-  background: rgba(99, 102, 241, 0.12);
+  border-radius: 10px;
+  background: var(--settings-icon-bg);
   color: #6366f1;
 }
 
@@ -378,7 +431,7 @@
   overflow: hidden;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(142, 142, 147, 0.12);
+  background: var(--settings-chip-bg);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -469,25 +522,27 @@
   gap: 13px;
   min-height: 80px;
   padding: 15px;
-  border: 1px solid rgba(0, 0, 0, 0.075);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.38);
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+  backdrop-filter: blur(22px) saturate(1.18);
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
   color: var(--foreground);
   text-align: left;
   cursor: pointer;
 }
 
 [data-theme='dark'] .modeCard {
-  border-color: rgba(255, 255, 255, 0.075);
-  background: rgba(255, 255, 255, 0.035);
+  color-scheme: dark;
 }
 
 .modeCard:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--settings-glass-hover);
 }
 
 [data-theme='dark'] .modeCard:hover {
-  background: rgba(255, 255, 255, 0.058);
+  background: var(--settings-glass-hover);
 }
 
 .modeCardActive,
@@ -530,8 +585,11 @@
   gap: 16px;
   min-height: 66px;
   padding: 14px 16px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  background: rgba(255, 255, 255, 0.36);
+  border: 1px solid var(--settings-glass-border);
+  background: var(--settings-glass-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
 }
 
 [data-theme='dark'] .settingRow,
@@ -539,8 +597,7 @@
 [data-theme='dark'] .runnerRow,
 [data-theme='dark'] .taskRow,
 [data-theme='dark'] .accountCard {
-  border-color: rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
 .settingRow:first-child,
@@ -724,14 +781,16 @@
 
 .shortcutTable {
   border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.36);
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
 }
 
 [data-theme='dark'] .shortcutTable {
-  border-color: rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.035);
+  border-color: var(--settings-glass-border);
 }
 
 .shortcutRow {
@@ -909,16 +968,18 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.32);
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
   color: #8e8e93;
   text-align: center;
 }
 
 [data-theme='dark'] .emptyBlock {
-  border-color: rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.035);
+  color-scheme: dark;
 }
 
 .emptyBlock strong {
@@ -948,8 +1009,11 @@
 
   .nav {
     display: flex;
+    flex: none;
     gap: 10px;
+    min-height: auto;
     overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .navGroup {
