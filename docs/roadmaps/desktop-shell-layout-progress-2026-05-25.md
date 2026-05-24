@@ -41,6 +41,7 @@ Write scope:
 - Wired persisted model settings into Desktop run dispatch: `App.handleSend` now resolves default model/provider/reasoning settings and alias mappings before calling `/v1/runs`.
 - Extended the shared `StartRunRequest` client contract with optional `provider`, `modelAlias`, `modelMappingEnabled`, and `providerFallbackEnabled` routing metadata so Edge/Hub can consume the same TokenDance model-routing envelope later.
 - Added a compact run-route preview inside the prompt composer so users can see the resolved Provider, model, reasoning effort, and alias before dispatch.
+- Turned Settings > Agent Profiles into a local Profile readiness view: Runtime inventory stays separate, and derived Profile cards now compose Runtime + model route + alias + configuration sources + Local Edge execution target.
 
 ## Verification
 
@@ -60,6 +61,11 @@ Write scope:
 - Playwright request-body check: changed Settings > Models to `gpt-5.5` / `openai` / `max`, returned to chat, sent a prompt, intercepted the real `/v1/runs` POST body, and verified `model=gpt-5.5`, `provider=openai`, `reasoningEffort=max`, `modelMappingEnabled=true`, `providerFallbackEnabled=true`, with no console errors, raw i18n keys, or horizontal overflow. Screenshot: `app/desktop/screenshots/run-request-model-settings-body.png`.
 - `cd app/desktop && corepack.cmd pnpm vitest run src\__tests__\PromptInput.test.tsx src\__tests__\modelSettingsStore.test.ts src\__tests__\edgeClient.test.ts`
 - Playwright composer route-preview check at `1440x960` and `390x844`: Settings changed to `gpt-5.5` / `openai` / `max`, composer preview displayed those resolved values, `/v1/runs` POST body matched them, and both viewports had no console errors, raw i18n keys, or horizontal overflow. Screenshots: `app/desktop/screenshots/prompt-route-preview-desktop.png`, `app/desktop/screenshots/prompt-route-preview-mobile.png`.
+- `cd app/desktop && python -m json.tool src\i18n\locales\en.json > $null`
+- `cd app/desktop && python -m json.tool src\i18n\locales\zh.json > $null`
+- `cd app/desktop && corepack.cmd pnpm vitest run src\__tests__\SettingsPage.test.tsx src\__tests__\modelSettingsStore.test.ts`
+- `cd app/desktop && corepack.cmd pnpm typecheck`
+- Playwright Settings Agent Profiles check at `1440x960` and `390x844`: real Local Edge data produced Claude Code / Codex / OpenCode local Profile cards, mapped to `opus` / `sonnet` / `haiku` model routes, with no console errors or warnings, no raw i18n keys, and no horizontal overflow. Screenshots: `app/desktop/screenshots/settings-agent-profiles-local-profiles.png`, `app/desktop/screenshots/settings-agent-profiles-local-profiles-mobile.png`.
 
 ## Follow-up
 
@@ -67,3 +73,4 @@ Write scope:
 - Next layout step: add shared tooltip primitives for shell icon buttons once the shared UI package is ready for cross-app adoption.
 - Teach Edge/Hub to persist or act on the optional model-routing metadata once the current Edge/API edits settle; Desktop already sends it.
 - Sync the same model/cc-switch settings with Hub/TokenDance ID once the account/auth boundary is stable.
+- Next Agent Profile step: replace the derived readiness cards with editable local Profile persistence once the Agent/Profile API boundary lands.

@@ -42,7 +42,12 @@ import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
-import { useModelSettingsStore, type ProviderHealth, type ReasoningEffortPreference } from '@/stores/modelSettingsStore';
+import {
+  useModelSettingsStore,
+  type ProviderHealth,
+  type ReasoningEffortPreference,
+  type ResolvedRunModelSettings,
+} from '@/stores/modelSettingsStore';
 import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
 import styles from './SettingsPage.module.css';
 
@@ -292,7 +297,25 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const toggleModelAlias = useModelSettingsStore((s) => s.toggleAlias);
   const setCcSwitchBridge = useModelSettingsStore((s) => s.setCcSwitchBridgeEnabled);
   const updateCcSwitchProvider = useModelSettingsStore((s) => s.updateProvider);
+  const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
   const agents = agentData?.items ?? [];
+  const localAgentProfiles = useMemo(
+    () => agents.map((agent) => ({
+      agent,
+      alias: preferredProfileAlias(agent),
+      route: resolveRunRequestOptions({ model: preferredProfileAlias(agent) }),
+    })),
+    [
+      agents,
+      defaultModel,
+      defaultProvider,
+      modelAliases,
+      modelMappingEnabled,
+      modelReasoningEffort,
+      providerFallbackEnabled,
+      resolveRunRequestOptions,
+    ],
+  );
   const availableRuntimes = agents.filter((agent) => agent.status === 'available').length;
   const runnerHealth = health?.checks?.runners;
   const runnerItems = runnerHealth?.items ?? [];
@@ -628,6 +651,21 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <strong>{t('settings.profileComposition')}</strong>
                   <span>{t('settings.profileCompositionDesc')}</span>
                 </div>
+                {localAgentProfiles.length > 0 ? (
+                  <div className={styles.profileGrid}>
+                    {localAgentProfiles.map((profile) => (
+                      <LocalAgentProfileCard
+                        key={`profile-${profile.agent.id}`}
+                        agent={profile.agent}
+                        alias={profile.alias}
+                        route={profile.route}
+                        edgeOnline={edgeOnline}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.noProfiles')} description={t('settings.noProfilesDesc')} />
+                )}
                 <div className={styles.capabilityGrid}>
                   <CapabilityCard
                     title={t('settings.profileRuntime')}
@@ -1568,6 +1606,14 @@ function countAgentCapabilities(agents: AgentInfo[]) {
   return names.size;
 }
 
+function preferredProfileAlias(agent: AgentInfo) {
+  const id = `${agent.id} ${agent.name}`.toLowerCase();
+  if (id.includes('claude')) return 'opus';
+  if (id.includes('codex')) return 'sonnet';
+  if (id.includes('opencode') || id.includes('open-code')) return 'haiku';
+  return undefined;
+}
+
 function timestampOf(value?: string) {
   if (!value) return 0;
   const parsed = Date.parse(value);
@@ -1855,6 +1901,46 @@ function RuntimeInventoryCard({ agent }: { agent: AgentInfo }) {
         <span>{t('settings.profileRuntime')}: {t('settings.statusReady')}</span>
         <span>{t('settings.profileModel')}: {t('settings.statusPlanned')}</span>
         <span>{t('settings.profileConfig')}: {t('settings.statusPlanned')}</span>
+      </div>
+    </div>
+  );
+}
+
+function LocalAgentProfileCard({
+  agent,
+  alias,
+  route,
+  edgeOnline,
+}: {
+  agent: AgentInfo;
+  alias?: string;
+  route: ResolvedRunModelSettings;
+  edgeOnline: boolean;
+}) {
+  const { t } = useTranslation();
+  const profileReady = edgeOnline && agent.status === 'available';
+  return (
+    <div className={styles.profileCard}>
+      <div className={styles.profileHeader}>
+        <div className={styles.profileIcon}>
+          <Bot size={17} />
+        </div>
+        <div>
+          <strong>{t('settings.localProfileName', { runtime: agent.name })}</strong>
+          <span>{t('settings.localProfileDesc')}</span>
+        </div>
+        <em className={`${styles.profileStatus} ${profileReady ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
+          {profileReady ? t('settings.enabled') : t('settings.notConfigured')}
+        </em>
+      </div>
+      <div className={styles.profileMeta}>
+        <span>{t('settings.profileRuntime')}: {agent.id}</span>
+        <span>{t('settings.profileModel')}: {route.model ?? t('prompt.routeAuto')}</span>
+        <span>{t('settings.modelAliasProvider')}: {route.provider ?? t('prompt.routeAuto')}</span>
+        <span>{t('settings.modelAliasReasoning')}: {route.reasoningEffort ?? t('prompt.routeAuto')}</span>
+        {alias ? <span>{t('settings.profileAlias')}: {alias}</span> : null}
+        <span>{t('settings.executionTargets')}: {t('settings.targetLocalEdge')}</span>
+        <span>{t('settings.profileConfigSource')}: AGENTS.md / memory / skills</span>
       </div>
     </div>
   );
