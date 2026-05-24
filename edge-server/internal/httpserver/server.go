@@ -90,6 +90,14 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 
 	var executor lifecycle.RunExecutor
 	hasAdapter := cfg.AdapterRegistry != nil && cfg.AgentDefault != ""
+
+	agentReg := agents.NewRegistry()
+	msgQueue := agents.NewQueue()
+
+	// Result aggregator collects sub-agent output and routes it back to the parent orchestrator.
+	resultAgg := lifecycle.NewResultAggregator(bus, agentReg)
+	_ = resultAgg.Start() // stop function; goroutine exits on process shutdown
+
 	if cfg.ProcessExecutor.Command != "" || hasAdapter {
 		execCfg := cfg.ProcessExecutor
 		if execCfg.Command == "" && hasAdapter {
@@ -109,11 +117,9 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 			return nil, err
 		}
 		processExecutor.SetMetrics(edgeMetrics)
+		processExecutor.WithAgentRegistry(agentReg).WithMessageQueue(msgQueue).WithResultAggregator(resultAgg)
 		executor = processExecutor
 	}
-
-	agentReg := agents.NewRegistry()
-	msgQueue := agents.NewQueue()
 
 	// Wire orchestrator adapter with runtime dependencies so it can spawn sub-agents.
 	wireOrchestrator(cfg.AdapterRegistry, executor, agentReg, msgQueue)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/agents"
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -26,6 +27,7 @@ type OrchestratorAdapter struct {
 	messageQueue  *agents.Queue
 	spawner       SubAgentSpawner
 	depth         int
+	parentModel   string // model propagated from parent build context to child sub-agents
 }
 
 // NewOrchestratorAdapter creates an orchestrator wrapping a Claude Code instance.
@@ -83,6 +85,9 @@ func (a *OrchestratorAdapter) Capabilities() AgentCapabilities {
 func (a *OrchestratorAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
 	cmdPath, args, env, workDir := a.inner.BuildCommand(ctx)
 
+	// Capture model from parent context for sub-agent propagation.
+	a.parentModel = ctx.Model
+
 	// Inject the orchestrator system prompt
 	if a.systemPrompt != "" {
 		args = append(args, "--system-prompt", a.systemPrompt)
@@ -95,6 +100,12 @@ func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 	// Wrap the emitter with dispatch interception if we have a registry or spawner.
 	effectiveEmitter := emitter
 	if a.agentRegistry != nil || a.spawner != nil {
+		// Ensure the parent (orchestrator) has a message queue so it can
+		// receive result messages from spawned sub-agents.
+		if a.messageQueue != nil {
+			a.messageQueue.EnsureAgent(run.ID, 64)
+		}
+
 		effectiveEmitter = &dispatchInterceptor{
 			inner:     emitter,
 			registry:  a.agentRegistry,
@@ -102,6 +113,12 @@ func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 			spawner:   a.spawner,
 			parentRun: run,
 			depth:     a.depth,
+			threadID:  run.ThreadID,
+			model:     a.parentModel,
+		}
+		// Propagate context budget from parent context to sub-agent spawns.
+		if budget, ok := ctx.Value(CtxBudgetKey).(*runnerctx.ContextBudget); ok {
+			effectiveEmitter.(*dispatchInterceptor).budget = budget
 		}
 	}
 
@@ -145,10 +162,12 @@ Rules:
 
 // dispatchEvent is the expected JSON shape for a sub-agent dispatch from the orchestrator output.
 type dispatchEvent struct {
-	Action string `json:"action"` // "dispatch"
-	Agent  string `json:"agent"`  // target agent name
-	Task   string `json:"task"`   // task description
-	Role   string `json:"role"`   // optional: "worker" or "specialist"
+	Action   string `json:"action"`             // "dispatch"
+	Agent    string `json:"agent"`              // target agent name
+	Task     string `json:"task"`               // task description
+	Role     string `json:"role"`               // optional: "worker" or "specialist"
+	ThreadID string `json:"threadId,omitempty"` // optional: override thread for sub-agent
+	Model    string `json:"model,omitempty"`    // optional: model override for sub-agent
 }
 
 // dispatchInterceptor wraps an EventEmitter to detect dispatch events in text output.
@@ -161,6 +180,9 @@ type dispatchInterceptor struct {
 	spawner   SubAgentSpawner
 	parentRun store.Run
 	depth     int
+	threadID  string                   // inherited from parent run
+	model     string                   // model override from parent context
+	budget    *runnerctx.ContextBudget // context budget propagated from parent
 }
 
 func (d *dispatchInterceptor) Emit(eventType string, scope map[string]any, payload any) {
@@ -239,6 +261,17 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 		}
 	}
 
+	// Resolve ThreadID: prefer event-level override, then interceptor default.
+	threadID := evt.ThreadID
+	if threadID == "" {
+		threadID = d.threadID
+	}
+	// Resolve Model: prefer event-level override, then interceptor default.
+	model := evt.Model
+	if model == "" {
+		model = d.model
+	}
+
 	// Spawn a sub-agent run if spawner is available
 	var runID string
 	if d.spawner != nil {
@@ -249,14 +282,27 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 			Prompt:      evt.Task,
 			Depth:       d.depth + 1,
 			ParentRunID: d.parentRun.ID,
+			ThreadID:    threadID,
+			Model:       model,
+			Budget:      d.budget,
 		}
-		var err error
-		_, runID, err = d.spawner.SpawnSubAgent(d.parentRun, task)
-		if err == nil && runID != "" && d.registry != nil {
-			d.registry.SetRunID(agentID, runID)
-			d.registry.SetStatus(agentID, agents.StatusBusy, "")
+			var err error
+			_, runID, err = d.spawner.SpawnSubAgent(d.parentRun, task)
+			if err != nil {
+				d.inner.Emit(BusEventTaskNotification, scope, map[string]any{
+					"action":  "dispatch_error",
+					"agent":   evt.Agent,
+					"task":    evt.Task,
+					"error":   err.Error(),
+					"agentId": agentID,
+				})
+				return
+			}
+			if runID != "" && d.registry != nil {
+				d.registry.SetRunID(agentID, runID)
+				d.registry.SetStatus(agentID, agents.StatusBusy, "")
+			}
 		}
-	}
 
 	// Send a task message via the queue
 	if d.queue != nil {
@@ -267,9 +313,11 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 			ToAgentID:   agentID,
 			Type:        agents.MsgTypeTask,
 			Payload: map[string]any{
-				"task":  evt.Task,
-				"agent": evt.Agent,
-				"role":  evt.Role,
+				"task":     evt.Task,
+				"agent":    evt.Agent,
+				"role":     evt.Role,
+				"threadId": threadID,
+				"model":    model,
 			},
 			Timestamp: now,
 		})
@@ -283,6 +331,8 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 		"role":     inst.Role,
 		"runId":    runID,
 		"parentId": d.parentRun.ID,
+		"threadId": threadID,
+		"model":    model,
 	})
 }
 
