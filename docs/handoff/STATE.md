@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-24 22:00 UTC+8 | 分支：dev/delicious233 | 提交：4cd8551
+最后更新：2026-05-24 20:30 UTC+8 | 分支：dev/delicious233 | 提交：5e04e76
 
 ## 快速上手
 
@@ -81,16 +81,22 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - `hub-server`: Docker config 日志改 stdout（之前写入不存在目录导致日志丢失）
 - hk2 Docker 磁盘清理（释放 12GB）
 
-### 2026-05-24 22:00 — 工作区清零，准备 Desktop P0
-- ✅ 误删 `app/shared/` 和 `app/web/` 已恢复（`git restore`）
-- ✅ 6 个 Desktop i18n/UI 修改已提交
-- ✅ 工作区干净，可开始新功能开发
-- 📋 **下一步：Desktop P0 打磨**（详见 `docs/roadmaps/client.md`）
-  - P0-1: 状态架构重构 — TanStack Query + RunState 状态机 (5d)
-  - P0-2: 输入体验修复 — 非受控输入 + 草稿持久化 + 循环检测 (4d)
-  - P0-3: 连接健壮性 — WebSocket 心跳 + 离线队列 + 传输层抽象 (3d)
-  - P0-4: 性能基础 — 虚拟滚动 + App.tsx 拆分 (2d)
-- 🔗 **Edge 审计修复可并行推进**（详见 `docs/roadmap.md#311`）
+### 2026-05-24 23:00 — Desktop P0 全部完成，准备进 master
+- `5e04e76` — **P0-1 状态架构重构**：TanStack Query 接管 threads/runs/agents、Zod schema 验证、runStore 纯客户端化、useChatMessages 事件 → invalidateQueries、App.tsx 删除同步桥接（-10行 useEffect）
+- `39af68f` — STATE.md 更新 + Desktop P0 规划
+- `4cd8551` — i18n 中文化收官
+
+### Desktop P0 验收清单
+- [x] P0-1: TanStack Query + Zod + RunState 状态机 + selector 优化
+- [x] P0-2: 非受控输入（useRef+DOM）+ 草稿持久化（useInputDraft）+ 循环检测（3次警告/5次取消）+ 文件去重缓存（FileReadCache）
+- [x] P0-3: WebSocket ping/pong 心跳（10s/5s超时）+ 离线队列（localStorage）+ Transport 抽象（WebSocketTransport/MockTransport）
+- [x] P0-4: @tanstack/react-virtual 虚拟滚动（>200条启用）+ App.tsx 568→343 行（viewRegistry 拆分）
+
+### 已知问题（预存，非阻塞）
+- 5 个 shared/ui 测试文件无法加载（pnpm 跨包虚拟存储 React 实例不一致）
+- AuthPage 4 个测试失败（AuthPage 重构后测试未更新）
+- hubClient getState snapshot 测试失败（hubAuth 需修复返回副本而非 live state）
+- `app/web` 和 `app/shared/src/ui` typecheck 报 React 类型找不到（跨包依赖问题）
 
 ## 模型分配
 
