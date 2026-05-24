@@ -1,9 +1,9 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, RefreshCw, Trash2, ArrowDown } from 'lucide-react';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
+import { ChatBubble } from '@shared/components';
 import MarkdownRenderer from './MarkdownRenderer';
-import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToast } from '@/contexts/ToastContext';
 import styles from './ChatView.module.css';
@@ -105,12 +105,6 @@ function ThinkingBlock({ content }: { content: string }) {
       {expanded && <div className={styles.thinkingContent}>{content}</div>}
     </div>
   );
-}
-
-// ── StreamingTextBlock ───────────────────────
-function StreamingTextBlock({ content, isStreaming }: { content: string; isStreaming: boolean }) {
-  const displayed = useStreamingText(content, isStreaming);
-  return <MarkdownRenderer content={displayed} />;
 }
 
 // ── ToolUseBlock ────────────────────────────
@@ -377,27 +371,18 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
   const renderMessage = useCallback(
     (msg: ChatMessage) => {
       const rt = relativeTime(msg.timestamp);
-      return (
-        <div
-          key={msg.id}
-          className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
-        >
-          {msg.role === 'agent' && msg.agentName && (
-            <div className={styles.agentAvatar}>
-              <div className={styles.avatarCircle}>
-                {msg.agentName.charAt(0).toUpperCase()}
-              </div>
-              <span className={styles.agentNameLabel}>{msg.agentName}</span>
-            </div>
-          )}
+      const textContent = extractMessageText(msg);
+      const nonTextBlocks = msg.blocks.filter((b) => b.kind !== 'text');
+      const isAgent = msg.role === 'agent';
 
-          <span
-            className={styles.timestamp}
-            title={rt.exact}
-            aria-label={rt.exact}
-          >
-            {rt.relative}
-          </span>
+      return (
+        <div key={msg.id} className={styles.messageWrapper}>
+          <ChatBubble
+            sender={{ name: msg.role === 'user' ? 'You' : msg.agentName ?? (msg.role === 'system' ? 'System' : 'Agent') }}
+            content={textContent}
+            timestamp={rt.relative}
+            isAgent={isAgent}
+          />
 
           <div className={styles.actionBar}>
             <button
@@ -429,12 +414,15 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
           {copiedMessageId === msg.id && (
             <span className={styles.copyToast}>Copied!</span>
           )}
-          {msg.blocks.map((block, i) => {
-            if (block.kind === 'text' && isStreaming && msg.id === lastMsg?.id) {
-              return <StreamingTextBlock key={i} content={block.content} isStreaming={true} />;
-            }
-            return <BlockRenderer key={i} block={block} t={t} />;
-          })}
+
+          {/* Render non-text blocks (tool use, thinking, file changes, etc.) as detail */}
+          {nonTextBlocks.length > 0 && (
+            <div className={styles.blockDetails}>
+              {nonTextBlocks.map((block, i) => (
+                <BlockRenderer key={i} block={block} t={t} />
+              ))}
+            </div>
+          )}
         </div>
       );
     },
