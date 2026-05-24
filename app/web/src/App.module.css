@@ -1,16 +1,17 @@
+:global(body) {
+  margin: 0;
+  overflow: hidden;
+}
+
 .root {
   display: flex;
   flex-direction: column;
   height: 100vh;
   min-width: 960px;
   overflow: hidden;
-  background: #f7f8fb;
-  color: #172033;
-  font-family:
-    Inter,
-    "Segoe UI",
-    Arial,
-    sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
 }
 
 .toolbar {
@@ -19,8 +20,8 @@
   gap: 24px;
   height: 56px;
   padding: 0 20px;
-  border-bottom: 1px solid #d8deea;
-  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
   flex-shrink: 0;
 }
 
@@ -40,7 +41,7 @@
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: #005faa;
+  background: var(--brand);
   color: #ffffff;
   font-size: 12px;
   letter-spacing: 0;
@@ -61,7 +62,7 @@
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: #48556a;
+  color: var(--muted-foreground);
   cursor: pointer;
   font: inherit;
   font-size: 13px;
@@ -69,14 +70,14 @@
 }
 
 .tab:hover {
-  background: #eef3fa;
-  color: #172033;
+  background: var(--secondary);
+  color: var(--foreground);
 }
 
 .activeTab {
-  border-color: #b8c8dc;
-  background: #e8f1fb;
-  color: #004f90;
+  border-color: var(--border);
+  background: var(--accent);
+  color: var(--primary);
   font-weight: 700;
 }
 
