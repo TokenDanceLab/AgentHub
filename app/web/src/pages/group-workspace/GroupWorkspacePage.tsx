@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { mockRunners, mockRuns, mockWorkspaceFiles, MockEventStream, playRunLifecycle } from '@shared/index';
 
 type TaskStatus = "backlog" | "active" | "review";
@@ -1226,6 +1226,15 @@ export function GroupWorkspacePageInteractive() {
     });
   };
 
+  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    sendNote();
+  };
+
   const fillComposer = (token: string, confirmationTitle: string) => {
     setNoteDraft((current) => `${current}${current ? " " : ""}${token}`);
     showConfirmation({
@@ -1535,6 +1544,7 @@ export function GroupWorkspacePageInteractive() {
                   placeholder="Send a coordination note to this workspace..."
                   value={noteDraft}
                   onChange={(event) => setNoteDraft(event.target.value)}
+                  onKeyDown={handleComposerKeyDown}
                 />
                 <div className="gwr-row">
                   <span className="gwr-tiny">{noteDraft.trim() ? `${noteDraft.trim().length} characters ready` : "Draft is empty."}</span>
