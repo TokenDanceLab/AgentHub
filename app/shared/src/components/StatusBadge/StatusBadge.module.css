@@ -1,0 +1,44 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  white-space: nowrap;
+}
+
+/* ── Status variants ─────────────────────────────────────────────────── */
+.online,
+.done {
+  color: var(--success);
+  background: color-mix(in oklch, var(--success) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--success) 20%, transparent);
+}
+
+.offline {
+  color: var(--muted-foreground);
+  background: var(--secondary);
+  border: 1px solid var(--border);
+}
+
+.running,
+.inProgress {
+  color: var(--info);
+  background: color-mix(in oklch, var(--info) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--info) 20%, transparent);
+}
+
+.error {
+  color: var(--destructive);
+  background: color-mix(in oklch, var(--destructive) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--destructive) 20%, transparent);
+}
+
+.pending,
+.review {
+  color: var(--warning);
+  background: color-mix(in oklch, var(--warning) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--warning) 20%, transparent);
+}
