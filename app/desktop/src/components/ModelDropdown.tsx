@@ -43,7 +43,7 @@ function AgentDot({ name }: { name: string }) {
 
 export default function ModelDropdown({ options, value, onChange, placeholder, disabled, ariaLabel, alignRight }: Props) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0, up: false });
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0, up: false, rightEdge: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -73,6 +73,7 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
       setPos({
         top: openUp ? rect.top - 4 : rect.bottom + 4,
         left: alignRight ? rect.right - w : rect.left,
+        rightEdge: rect.right,
         width: w,
         up: openUp,
       });
@@ -109,7 +110,7 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
         const spaceBelow = window.innerHeight - rect.bottom;
         const spaceAbove = rect.top;
         const openUp = spaceBelow < dropdownH && spaceAbove > spaceBelow;
-        setPos({ top: openUp ? rect.top - 4 : rect.bottom + 4, left: alignRight ? rect.right - w : rect.left, width: w, up: openUp });
+        setPos({ top: openUp ? rect.top - 4 : rect.bottom + 4, left: alignRight ? rect.right - w : rect.left, rightEdge: rect.right, width: w, up: openUp });
       }
     };
     window.addEventListener('scroll', handler, true);
@@ -125,7 +126,15 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
   const dropdown = open && createPortal(
     <div ref={dropdownRef}
       className={`${styles.dropdown} ${pos.up ? styles.dropdownUp : ''}`}
-      style={{ position: 'fixed', top: pos.up ? 'auto' : pos.top, bottom: pos.up ? `${window.innerHeight - pos.top}px` : 'auto', left: pos.left, minWidth: pos.width, zIndex: 9999 }}>
+      style={{
+        position: 'fixed', zIndex: 9999,
+        top: pos.up ? 'auto' : pos.top,
+        bottom: pos.up ? `${window.innerHeight - pos.top}px` : 'auto',
+        ...(alignRight
+          ? { right: `${window.innerWidth - pos.rightEdge}px`, left: 'auto' }
+          : { left: pos.left, right: 'auto' }),
+        minWidth: pos.width,
+      }}>
       {Object.entries(grouped).map(([group, opts], gi) => (
         <div key={group}>
           {gi > 0 && <div className={styles.separator} />}
