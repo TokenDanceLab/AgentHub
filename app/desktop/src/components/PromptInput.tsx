@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Circle, Plus, Square, ArrowUp, LoaderCircle } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
@@ -6,6 +6,8 @@ import { useInputDraft } from '@/hooks/useInputDraft';
 import { useMention } from '@/hooks/useMention';
 import MentionPopover from '@/components/MentionPopover';
 import ModelDropdown from '@/components/ModelDropdown';
+import { useModelSettingsStore } from '@/stores/modelSettingsStore';
+import { useShallow } from 'zustand/shallow';
 import styles from './PromptInput.module.css';
 
 const COMMON_MODELS = [
@@ -58,6 +60,34 @@ export default function PromptInput({
   const [promptLength, setPromptLength] = useState(0);
   const [model, setModel] = useState<string>('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
+  const modelSettings = useModelSettingsStore(
+    useShallow((s) => ({
+      defaultModel: s.defaultModel,
+      defaultProvider: s.defaultProvider,
+      defaultReasoningEffort: s.reasoningEffort,
+      providerFallbackEnabled: s.providerFallbackEnabled,
+      modelMappingEnabled: s.modelMappingEnabled,
+      aliases: s.aliases,
+      resolveRunRequestOptions: s.resolveRunRequestOptions,
+    })),
+  );
+  const resolvedRoute = useMemo(
+    () => modelSettings.resolveRunRequestOptions({
+      model: model || undefined,
+      reasoningEffort: reasoningEffort || undefined,
+    }),
+    [
+      model,
+      modelSettings.aliases,
+      modelSettings.defaultModel,
+      modelSettings.defaultProvider,
+      modelSettings.defaultReasoningEffort,
+      modelSettings.modelMappingEnabled,
+      modelSettings.providerFallbackEnabled,
+      modelSettings.resolveRunRequestOptions,
+      reasoningEffort,
+    ],
+  );
 
   const {
     isOpen: mentionOpen, query: mentionQuery, position: mentionPosition,
@@ -155,6 +185,27 @@ export default function PromptInput({
           disabled={disabled || isStarting || isStreaming}
           rows={1}
         />
+
+        <div className={styles.routePreview} aria-label={t('prompt.routePreview')}>
+          <span className={styles.routeChip}>
+            <span>{t('prompt.routeProvider')}</span>
+            <strong>{resolvedRoute.provider ?? t('prompt.routeAuto')}</strong>
+          </span>
+          <span className={styles.routeChip}>
+            <span>{t('prompt.routeModel')}</span>
+            <strong>{resolvedRoute.model ?? t('prompt.routeAuto')}</strong>
+          </span>
+          <span className={styles.routeChip}>
+            <span>{t('prompt.routeReasoning')}</span>
+            <strong>{resolvedRoute.reasoningEffort ?? t('prompt.routeAuto')}</strong>
+          </span>
+          {resolvedRoute.modelAlias && (
+            <span className={styles.routeChip}>
+              <span>{t('prompt.routeAlias')}</span>
+              <strong>{resolvedRoute.modelAlias}</strong>
+            </span>
+          )}
+        </div>
 
         {/* bottom action bar */}
         <div className={styles.actions}>

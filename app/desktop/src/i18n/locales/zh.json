@@ -152,6 +152,12 @@
   "prompt.model": "模型",
   "prompt.placeholder": "输入消息，@Agent 提及代理...",
   "prompt.reasoning": "推理强度",
+  "prompt.routeAlias": "别名",
+  "prompt.routeAuto": "自动",
+  "prompt.routeModel": "模型",
+  "prompt.routePreview": "运行路由预览",
+  "prompt.routeProvider": "Provider",
+  "prompt.routeReasoning": "推理",
   "prompt.starting": "正在启动运行",
 
   "run.close": "关闭运行详情",
