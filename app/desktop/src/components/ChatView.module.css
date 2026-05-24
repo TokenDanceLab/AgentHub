@@ -61,8 +61,7 @@
   color: #E8E8ED;
 }
 
-.userMsg .timestamp,
-.userMsg .actionBar {
+.userMsg .messageFooter {
   display: none;
 }
 
@@ -146,31 +145,35 @@
 }
 
 /* ── Timestamp ────────────────────────────── */
-.timestamp {
-  align-self: flex-end;
-  font-size: 10px;
-  color: var(--text-weaker);
-  opacity: 0;
-  transition: opacity var(--duration-fast);
+.messageFooter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  margin-top: 2px;
   order: 10;
 }
 
-.message:hover .timestamp {
-  opacity: 1;
+.agentMsg .messageFooter {
+  align-self: flex-start;
+}
+
+.systemMsg .messageFooter {
+  display: none;
+}
+
+.timestamp {
+  font-size: 10px;
+  color: var(--text-weaker);
+  line-height: 1;
 }
 
 /* ── Message action bar ──────────────────── */
 
 .actionBar {
   display: flex;
+  align-items: center;
   gap: 2px;
-  opacity: 0;
-  transition: opacity var(--duration-fast);
-  order: 11;
-}
-
-.message:hover .actionBar {
-  opacity: 1;
 }
 
 .actionBtn {
@@ -185,6 +188,15 @@
   color: var(--muted-foreground);
   cursor: pointer;
   transition: background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast);
+}
+
+.actionBtn:active {
+  transform: scale(0.96);
+}
+
+.actionBtn:hover {
+  background: var(--border);
+  color: var(--foreground);
 }
 
 /* ── Thinking ────────────────────────────── */
@@ -516,46 +528,6 @@
   50% {
     opacity: 0;
   }
-}
-
-/* ── Message action bar ──────────────────── */
-
-.actionBar {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  display: flex;
-  gap: 2px;
-  opacity: 0;
-  transition: opacity var(--duration-fast);
-  z-index: 1;
-}
-
-.message:hover .actionBar {
-  opacity: 1;
-}
-
-.actionBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted-foreground);
-  cursor: pointer;
-  transition: background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast);
-}
-
-.actionBtn:active {
-  transform: scale(0.96);
-}
-
-.actionBtn:hover {
-  background: var(--border);
-  color: var(--foreground);
 }
 
 /* ── Text ────────────────────────────────── */
