@@ -280,6 +280,22 @@ describe('hubAuth', () => {
       expect(localStorage.getItem('agenthub_hub_refresh')).toBe('jwt_refresh_456');
     });
 
+    it('uses the stable desktop device id for legacy login', async () => {
+      localStorage.setItem('agenthub_device_id', '00000000-0000-0000-0000-00000000a001');
+      const auth = newAuth();
+
+      mockFetchSequence([
+        { status: 200, data: mockAuthResponse },
+        { status: 200, data: mockUser },
+      ]);
+
+      await auth.login('alice', 'hunter2');
+
+      const [, init] = vi.mocked(globalThis.fetch).mock.calls[0] as [string, RequestInit];
+      const body = JSON.parse(init.body as string);
+      expect(body.device_id).toBe('00000000-0000-0000-0000-00000000a001');
+    });
+
     it('notifies subscribers on login', async () => {
       const auth = newAuth();
       const states: { isAuthenticated: boolean }[] = [];
