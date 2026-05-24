@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/metrics"
@@ -30,6 +31,8 @@ type Handler struct {
 	Store           store.Repository
 	Executor        lifecycle.RunExecutor
 	AdapterRegistry *adapters.Registry // nil if no agent adapters configured
+	AgentRegistry   *agents.Registry   // runtime agent instance registry
+	MessageQueue    *agents.Queue      // inter-agent message queue
 	Metrics         *metrics.EdgeMetrics
 }
 
@@ -651,7 +654,57 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 }
 
+// ---------------------------------------------------------------------------
+// GET /v1/agent-instances
+// ---------------------------------------------------------------------------
+
+// GetAgentInstances returns all registered agent instances from the runtime registry.
+func (h *Handler) GetAgentInstances(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
+		return
+	}
+	if h.AgentRegistry == nil {
+		writeJSON(w, http.StatusOK, listResponse([]any{}))
+		return
+	}
+	statusFilter := r.URL.Query().Get("status")
+	parentFilter := r.URL.Query().Get("parentId")
+
+	var instances []agents.AgentInstance
+	switch {
+	case statusFilter != "":
+		instances = h.AgentRegistry.ListByStatus(agents.Status(statusFilter))
+	case parentFilter != "":
+		instances = h.AgentRegistry.ListByParent(parentFilter)
+	default:
+		instances = h.AgentRegistry.List()
+	}
+
+	writeJSON(w, http.StatusOK, listResponse(instances))
+}
+
+// GetAgentInstance returns a single agent instance by ID.
+func (h *Handler) GetAgentInstance(w http.ResponseWriter, r *http.Request, instanceID string) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
+		return
+	}
+	if h.AgentRegistry == nil {
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "agent registry not configured"))
+		return
+	}
+	inst, ok := h.AgentRegistry.Get(instanceID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "agent instance not found"))
+		return
+	}
+	writeJSON(w, http.StatusOK, inst)
+}
+
+// ---------------------------------------------------------------------------
 // RegisterRoutes registers all routes on the given mux.
+// ---------------------------------------------------------------------------
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	ensureStore(h)
 	mux.HandleFunc("/v1/health", h.GetHealth)
@@ -737,6 +790,21 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("/v1/metrics", h.GetMetrics)
 	mux.HandleFunc("/v1/events", h.GetEvents)
+	mux.HandleFunc("/v1/agent-instances", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			h.GetAgentInstances(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
+	})
+	mux.HandleFunc("/v1/agent-instances/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			instanceID := strings.TrimPrefix(r.URL.Path, "/v1/agent-instances/")
+			h.GetAgentInstance(w, r, instanceID)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
+	})
 	mux.HandleFunc("/v1/permissions/decide", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.PostPermissionDecide(w, r)
