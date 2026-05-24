@@ -20,7 +20,7 @@ import { useHubStore } from '@/stores/hubStore';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
-import { MessageSquare, Bot, Sun, Moon, Wifi, WifiOff, Circle, LogIn } from 'lucide-react';
+import { MessageSquare, Bot, Sun, Moon, Wifi, WifiOff, Circle, LogIn, Settings } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '@/App.module.css';
@@ -251,7 +251,10 @@ export default function App() {
               <MessageSquare size={18} />
             </button>
             <div className={styles.navSpacer} />
-            {/* Hub login at bottom of nav */}
+            {/* Settings + Hub at bottom */}
+            <button className={styles.navBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} title={t('nav.settings')}>
+              <Settings size={18} />
+            </button>
             <button
               className={styles.navBtn}
               onClick={() => useHubStore.getState().setShowAuthModal(true)}
@@ -315,8 +318,8 @@ export default function App() {
           <div className={styles.rightPanel}>
             <div className={styles.rightPanelHeader}>
               <div className={styles.rightPanelSegmented}>
-                <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`}>Output</button>
-                <button className={styles.rightPanelTab} style={{ opacity: 0.4 }}>Files</button>
+                <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`}>{t('run.output')}</button>
+                <button className={styles.rightPanelTab}>{t('run.files')}</button>
               </div>
             </div>
             <div className={styles.rightPanelBody}>
