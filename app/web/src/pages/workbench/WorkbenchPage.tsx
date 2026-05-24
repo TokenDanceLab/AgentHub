@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type RefObject } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type RefObject,
+} from 'react';
 import {
   EventClient,
   createPreview,
@@ -448,6 +456,15 @@ export default function WorkbenchPage() {
     }
   };
 
+  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    queueDraft();
+  };
+
   const startActiveRun = async () => {
     if (!activeThread) return;
 
@@ -779,12 +796,14 @@ export default function WorkbenchPage() {
           <button className={styles.iconButton} type="button" aria-label="Attach context">
             +
           </button>
-          <input
+          <textarea
             aria-label="Message thread"
             disabled={!activeThread || isSending}
             placeholder="Message this Thread with @ClaudeCode / @Codex / @OpenCode..."
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleComposerKeyDown}
+            rows={1}
           />
           <button className={styles.primaryButton} disabled={!draft.trim() || isSending} type="submit">
             {isSending ? 'Sending' : 'Send'}
