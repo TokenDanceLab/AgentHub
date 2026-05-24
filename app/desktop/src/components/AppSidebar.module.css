@@ -1,0 +1,32 @@
+.sidebarWrapper {
+  display: flex;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--card);
+}
+
+@media (max-width: 1023px) {
+  .sidebarWrapper {
+    max-width: 220px !important;
+    padding-left: env(safe-area-inset-left, 0);
+  }
+}
+
+@media (max-width: 767px) {
+  .sidebarWrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: calc(var(--z-overlay) + 1);
+    transform: translateX(-100%);
+    transition: transform var(--duration-medium) var(--ease-out);
+    width: 280px !important;
+    max-width: 85vw !important;
+    border-right: 1px solid var(--border);
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+  }
+}
