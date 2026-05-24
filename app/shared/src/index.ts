@@ -54,3 +54,6 @@ export type {
   BreakdownSegment,
   SessionMetrics,
 } from './context/breakdown';
+
+export { HUB_EVENTS } from './hubEvents';
+export type { HubEventType } from './hubEvents';
