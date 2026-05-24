@@ -155,4 +155,4 @@ cd app/desktop && pnpm tauri dev
 |---|---|---|
 | 前端接手指南 | `.ops/frontend-handoff.md` | 前端 agent |
 | 后端接口审计 | `.ops/backend-audit.md` | 后端 agent |
-| 运维手册 | `.ops/hk2-deployment.md` | 运维 |
+| 运维手册 | `.ops/deployment.md` | 运维 |
