@@ -36,6 +36,23 @@ interface Props {
   threadId?: string;
 }
 
+function modelDesc(name: string): string {
+  const map: Record<string, string> = {
+    'claude-opus-4-7': 'Anthropic flagship — strongest reasoning & coding',
+    'claude-opus-4-5': 'Previous-gen flagship, balanced performance',
+    'claude-sonnet-4-6': 'Fast, cost-effective for daily tasks',
+    'claude-haiku-4-5': 'Lightning-fast for simple tasks',
+  };
+  return map[name] || '';
+}
+
+function modelMeta(name: string): string {
+  if (name.includes('opus')) return '200k ctx';
+  if (name.includes('sonnet')) return '200k ctx';
+  if (name.includes('haiku')) return '200k ctx';
+  return '';
+}
+
 function extractModels(agents: AgentInfo[]): string[] {
   const fromAgents = agents.map((a) => a.name).filter(Boolean);
   return [...new Set([...fromAgents, ...COMMON_MODELS])];
@@ -57,8 +74,6 @@ export default function PromptInput({
   const [model, setModel] = useState<string>('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
   const [textareaFocused, setTextareaFocused] = useState(false);
-
-  const models = useMemo(() => extractModels(agents), [agents]);
 
   const {
     isOpen: mentionOpen,
@@ -163,7 +178,22 @@ export default function PromptInput({
         <div className={styles.configRow}>
           <ModelDropdown
             options={[
-              ...models.map((m) => ({ value: m, label: m, group: 'Base Models' })),
+              ...agents.map((a) => ({
+                value: a.name,
+                label: a.name,
+                group: 'My Agents',
+                desc: a.description || '',
+                meta: a.status === 'available' ? 'Online' : 'Offline',
+                isAgent: true,
+              })),
+              ...COMMON_MODELS.map((m) => ({
+                value: m,
+                label: m,
+                group: 'Base Models',
+                desc: modelDesc(m),
+                meta: modelMeta(m),
+                isAgent: false,
+              })),
             ]}
             value={model}
             onChange={setModel}
