@@ -143,11 +143,11 @@ const pageStyles = `
     position: relative;
     height: 100%;
     overflow: hidden;
-    color: #172033;
+    color: var(--text);
     background:
       radial-gradient(circle at 18% 12%, rgba(8, 167, 207, 0.16), transparent 28%),
       radial-gradient(circle at 82% 8%, rgba(116, 87, 232, 0.14), transparent 30%),
-      linear-gradient(135deg, #f7fbff, #edf6ff);
+      linear-gradient(135deg, var(--surface-alt), var(--bg));
     font-family: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 
@@ -173,10 +173,10 @@ const pageStyles = `
   }
 
   .projectGlass {
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: 12px;
-    box-shadow: 0 18px 48px rgba(26, 40, 80, 0.14);
+    box-shadow: 0 18px 48px var(--glass-shadow);
     backdrop-filter: blur(28px) saturate(160%);
     -webkit-backdrop-filter: blur(28px) saturate(160%);
   }
@@ -194,7 +194,7 @@ const pageStyles = `
     align-items: center;
     gap: 10px;
     padding-bottom: 14px;
-    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .projectBrandMark,
@@ -202,9 +202,9 @@ const pageStyles = `
   .projectFileType {
     display: grid;
     place-items: center;
-    color: #ffffff;
+    color: var(--white);
     font-weight: 900;
-    background: linear-gradient(135deg, #1769e8, #08a7cf);
+    background: var(--accent-gradient);
   }
 
   .projectBrandMark {
@@ -214,19 +214,19 @@ const pageStyles = `
     border-radius: 10px;
     font-size: 16px;
     line-height: 1;
-    box-shadow: 0 10px 22px rgba(23, 105, 232, 0.24);
+    box-shadow: 0 10px 22px var(--shadow);
   }
 
   .projectTitle h2 {
     margin: 0;
     font-size: 15px;
     line-height: 1.25;
-    color: #172033;
+    color: var(--text);
   }
 
   .projectTitle p {
     margin: 4px 0 0;
-    color: #667085;
+    color: var(--text-muted);
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.09em;
@@ -235,7 +235,7 @@ const pageStyles = `
 
   .projectMuted {
     margin: 4px 0 0;
-    color: #667085;
+    color: var(--text-muted);
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.09em;
@@ -265,15 +265,15 @@ const pageStyles = `
     align-items: center;
     gap: 10px;
     padding: 11px 12px;
-    color: #334155;
+    color: var(--text-secondary);
     text-align: left;
     background: transparent;
   }
 
   .projectNav button.isActive {
-    color: #2563eb;
-    background: rgba(37, 99, 235, 0.1);
-    box-shadow: inset 3px 0 0 #2563eb;
+    color: var(--accent);
+    background: var(--accent-light);
+    box-shadow: inset 3px 0 0 var(--accent);
   }
 
   .projectSidebarNote {
@@ -281,7 +281,7 @@ const pageStyles = `
     padding: 14px;
     border: 1px solid rgba(37, 99, 235, 0.12);
     border-radius: 12px;
-    background: rgba(37, 99, 235, 0.08);
+    background: var(--accent-lighter);
   }
 
   .projectSidebarNote strong {
@@ -323,7 +323,7 @@ const pageStyles = `
     padding: 10px 12px;
     border: 1px solid rgba(148, 163, 184, 0.22);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.58);
+    background: var(--surface);
   }
 
   .projectSearch input {
@@ -331,7 +331,7 @@ const pageStyles = `
     min-width: 0;
     border: 0;
     outline: 0;
-    color: #172033;
+    color: var(--text);
     background: transparent;
   }
 
@@ -354,8 +354,8 @@ const pageStyles = `
     width: 38px;
     height: 38px;
     place-items: center;
-    color: #334155;
-    background: rgba(255, 255, 255, 0.58);
+    color: var(--text-secondary);
+    background: var(--surface);
     border: 1px solid rgba(148, 163, 184, 0.22);
   }
 
@@ -364,11 +364,11 @@ const pageStyles = `
     width: 38px;
     height: 38px;
     place-items: center;
-    color: #ffffff;
+    color: var(--white);
     border-radius: 50%;
     font-size: 13px;
     font-weight: 800;
-    background: linear-gradient(135deg, #7c3aed, #2563eb);
+    background: linear-gradient(135deg, var(--accent), var(--accent));
   }
 
   .projectHero {
@@ -380,7 +380,7 @@ const pageStyles = `
 
   .projectEyebrow {
     margin: 0 0 8px;
-    color: #0891b2;
+    color: var(--accent);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -398,7 +398,7 @@ const pageStyles = `
   .projectHero p {
     max-width: 700px;
     margin: 0 0 18px;
-    color: #667085;
+    color: var(--text-muted);
     line-height: 1.55;
   }
 
@@ -423,15 +423,15 @@ const pageStyles = `
   }
 
   .projectPrimaryButton {
-    color: #ffffff;
-    background: linear-gradient(135deg, #2563eb, #0891b2);
+    color: var(--white);
+    background: var(--brand-gradient);
     box-shadow: 0 12px 28px rgba(37, 99, 235, 0.24);
   }
 
   .projectSecondaryButton,
   .projectGhostButton {
-    color: #1f3a63;
-    background: rgba(255, 255, 255, 0.64);
+    color: var(--text);
+    background: var(--surface);
     border: 1px solid rgba(148, 163, 184, 0.25);
   }
 
@@ -440,22 +440,22 @@ const pageStyles = `
     align-items: center;
     min-height: 38px;
     padding: 9px 12px;
-    color: #2563eb;
+    color: var(--accent);
     border: 1px solid rgba(37, 99, 235, 0.16);
     border-radius: 8px;
-    background: rgba(37, 99, 235, 0.08);
+    background: var(--accent-lighter);
     font-size: 13px;
     font-weight: 700;
   }
 
   .projectSyncMessage.success {
-    color: #059669;
+    color: var(--success);
     border-color: rgba(5, 150, 105, 0.18);
-    background: rgba(5, 150, 105, 0.1);
+    background: var(--success-bg);
   }
 
   .projectSyncMessage.warning {
-    color: #d97706;
+    color: var(--warning-dot);
     border-color: rgba(217, 119, 6, 0.2);
     background: rgba(217, 119, 6, 0.12);
   }
@@ -467,9 +467,9 @@ const pageStyles = `
 
   .projectProgressCard {
     padding: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.64);
+    border: 1px solid var(--glass-border);
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.5);
+    background: var(--surface);
   }
 
   .projectStatusRow {
@@ -493,7 +493,7 @@ const pageStyles = `
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(90deg, #2563eb, #0891b2);
+    background: linear-gradient(90deg, var(--accent), var(--accent));
   }
 
   .projectMetricGrid {
@@ -515,9 +515,9 @@ const pageStyles = `
     width: 42px;
     height: 42px;
     place-items: center;
-    color: #2563eb;
+    color: var(--accent);
     border-radius: 12px;
-    background: rgba(37, 99, 235, 0.1);
+    background: var(--accent-light);
     font-weight: 800;
   }
 
@@ -528,7 +528,7 @@ const pageStyles = `
   }
 
   .projectMetric span {
-    color: #667085;
+    color: var(--text-muted);
     font-size: 12px;
   }
 
@@ -563,14 +563,14 @@ const pageStyles = `
 
   .projectTab {
     padding: 8px 10px;
-    color: #667085;
+    color: var(--text-muted);
     background: transparent;
     font-weight: 700;
   }
 
   .projectTab.isActive {
-    color: #2563eb;
-    background: rgba(255, 255, 255, 0.72);
+    color: var(--accent);
+    background: var(--glass-bg);
     box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
   }
 
@@ -591,7 +591,7 @@ const pageStyles = `
   }
 
   .projectFilterLabel {
-    color: #667085;
+    color: var(--text-muted);
     font-size: 12px;
     font-weight: 800;
     text-transform: uppercase;
@@ -603,8 +603,8 @@ const pageStyles = `
     border: 1px solid rgba(148, 163, 184, 0.25);
     border-radius: 8px;
     padding: 6px 9px;
-    color: #334155;
-    background: rgba(255, 255, 255, 0.5);
+    color: var(--text-secondary);
+    background: var(--surface);
     font: inherit;
     font-size: 11px;
     font-weight: 800;
@@ -613,9 +613,9 @@ const pageStyles = `
   }
 
   .projectMiniButton.isActive {
-    color: #2563eb;
+    color: var(--accent);
     border-color: rgba(37, 99, 235, 0.2);
-    background: rgba(37, 99, 235, 0.1);
+    background: var(--accent-light);
   }
 
   .projectMiniButton:disabled {
@@ -635,9 +635,9 @@ const pageStyles = `
   .projectRunRow,
   .projectMilestoneRow,
   .projectRiskRow {
-    border: 1px solid rgba(255, 255, 255, 0.64);
+    border: 1px solid var(--glass-border);
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.5);
+    background: var(--surface);
   }
 
   .projectRow {
@@ -686,31 +686,31 @@ const pageStyles = `
   }
 
   .projectPill.blue {
-    color: #2563eb;
+    color: var(--accent);
     border-color: rgba(37, 99, 235, 0.18);
-    background: rgba(37, 99, 235, 0.1);
+    background: var(--accent-light);
   }
 
   .projectPill.cyan {
-    color: #0891b2;
+    color: var(--accent);
     border-color: rgba(8, 145, 178, 0.18);
     background: rgba(8, 145, 178, 0.1);
   }
 
   .projectPill.purple {
-    color: #7c3aed;
+    color: var(--accent);
     border-color: rgba(124, 58, 237, 0.18);
     background: rgba(124, 58, 237, 0.1);
   }
 
   .projectPill.green {
-    color: #059669;
+    color: var(--success);
     border-color: rgba(5, 150, 105, 0.18);
-    background: rgba(5, 150, 105, 0.1);
+    background: var(--success-bg);
   }
 
   .projectPill.amber {
-    color: #d97706;
+    color: var(--warning-dot);
     border-color: rgba(217, 119, 6, 0.2);
     background: rgba(217, 119, 6, 0.12);
   }
@@ -746,14 +746,14 @@ const pageStyles = `
   .projectRunIcon {
     display: grid;
     place-items: center;
-    color: #2563eb;
-    background: rgba(37, 99, 235, 0.1);
+    color: var(--accent);
+    background: var(--accent-light);
     font-weight: 800;
   }
 
   .projectTaskRow.done .projectCheck {
-    color: #059669;
-    background: rgba(5, 150, 105, 0.1);
+    color: var(--success);
+    background: var(--success-bg);
   }
 
   .projectInlineActions {
@@ -769,7 +769,7 @@ const pageStyles = `
     place-items: center;
     min-height: 150px;
     padding: 24px;
-    color: #667085;
+    color: var(--text-muted);
     text-align: center;
     border: 1px dashed rgba(148, 163, 184, 0.34);
     border-radius: 12px;
@@ -777,7 +777,7 @@ const pageStyles = `
   }
 
   .projectEmptyState strong {
-    color: #334155;
+    color: var(--text-secondary);
   }
 
   .projectMetaLine {
@@ -806,17 +806,17 @@ const pageStyles = `
     height: 10px;
     margin-top: 5px;
     border-radius: 50%;
-    background: #2563eb;
+    background: var(--accent);
     box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.1);
   }
 
   .projectDot.cyan {
-    background: #0891b2;
+    background: var(--accent);
     box-shadow: 0 0 0 5px rgba(8, 145, 178, 0.1);
   }
 
   .projectDot.purple {
-    background: #7c3aed;
+    background: var(--accent);
     box-shadow: 0 0 0 5px rgba(124, 58, 237, 0.1);
   }
 
@@ -851,7 +851,7 @@ const pageStyles = `
   }
 
   .projectField label {
-    color: #334155;
+    color: var(--text-secondary);
     font-size: 12px;
     font-weight: 800;
     text-transform: uppercase;
@@ -864,8 +864,8 @@ const pageStyles = `
     border: 1px solid rgba(148, 163, 184, 0.28);
     border-radius: 8px;
     padding: 10px 12px;
-    color: #172033;
-    background: rgba(255, 255, 255, 0.62);
+    color: var(--text);
+    background: var(--surface);
     font: inherit;
   }
 
@@ -1446,7 +1446,7 @@ export function ProjectPageInteractive() {
                   <span
                     style={{
                       width: `${riskProgress}%`,
-                      background: 'linear-gradient(90deg, #7c3aed, #2563eb)',
+                      background: 'linear-gradient(90deg, var(--accent), var(--accent))',
                     }}
                   />
                 </div>
