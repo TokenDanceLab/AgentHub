@@ -1,6 +1,11 @@
 import type { EventEnvelope, AnyEvent } from './events';
 
 export type EventListener = (event: AnyEvent) => void;
+export type EventConnectionStatus = 'connected' | 'disconnected' | 'error';
+export type EventConnectionListener = (
+  status: EventConnectionStatus,
+  error?: string,
+) => void;
 
 export interface EventClientOptions {
   baseUrl?: string;
@@ -14,6 +19,7 @@ export interface EventClientOptions {
 export class EventClient {
   private ws: WebSocket | null = null;
   private listeners = new Set<EventListener>();
+  private connectionListeners = new Set<EventConnectionListener>();
   private typeListeners = new Map<string, Set<EventListener>>();
   private baseUrl: string;
   private cursor: string | undefined;
@@ -60,6 +66,7 @@ export class EventClient {
 
     this.ws.onopen = () => {
       this.currentDelayMs = this.reconnectDelayMs;
+      this.dispatchConnection('connected');
     };
 
     this.ws.onmessage = (msg: MessageEvent<string>) => {
@@ -81,11 +88,13 @@ export class EventClient {
     this.ws.onclose = () => {
       this.ws = null;
       if (!this.destroyed) {
+        this.dispatchConnection('disconnected', 'Edge event stream disconnected');
         this.scheduleReconnect();
       }
     };
 
     this.ws.onerror = () => {
+      this.dispatchConnection('error', 'Edge event stream error');
       this.ws?.close();
     };
   }
@@ -108,6 +117,11 @@ export class EventClient {
   on(listener: EventListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  onConnection(listener: EventConnectionListener): () => void {
+    this.connectionListeners.add(listener);
+    return () => this.connectionListeners.delete(listener);
   }
 
   onType(type: string, listener: EventListener): () => void {
@@ -136,6 +150,19 @@ export class EventClient {
         } catch {
           // ignore
         }
+      }
+    }
+  }
+
+  private dispatchConnection(
+    status: EventConnectionStatus,
+    error?: string,
+  ): void {
+    for (const fn of this.connectionListeners) {
+      try {
+        fn(status, error);
+      } catch {
+        // Don't let one listener break others.
       }
     }
   }
