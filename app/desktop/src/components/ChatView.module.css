@@ -290,39 +290,27 @@
   overflow-y: auto;
 }
 
-/* ── Session init ────────────────────────── */
+/* ── CollapsibleBlock inner content ───────── */
 
-.sessionInit {
+.sessionMeta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 6px;
+}
+
+.sessionMetaLabel {
   font-size: var(--font-size-xs);
-  opacity: 0.7;
+  color: var(--muted-foreground);
+  margin-right: 2px;
 }
 
-.permBadge {
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: var(--border);
-  font-size: 10px;
-}
-
-/* ── Result ──────────────────────────────── */
-
-.result {
+.tokenUsage {
+  display: flex;
+  gap: var(--space-lg);
   font-size: var(--font-size-xs);
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: 4px;
-}
-
-.resultSuccess {
-  background: color-mix(in oklch, var(--success) 15%, transparent);
-  color: var(--success);
-}
-
-.resultFailed {
-  background: color-mix(in oklch, var(--destructive) 15%, transparent);
-  color: var(--destructive);
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
 }
 
 /* ── Progressive Disclosure ───────────────── */
@@ -632,50 +620,6 @@
 
 .agentMsg:hover {
   background: var(--surface-raised-hover);
-}
-
-/* ── Typing indicator ────────────────────── */
-
-.typingDots {
-  align-self: flex-start;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: var(--space-sm) var(--space-md);
-}
-
-.typingDots span {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--primary);
-  animation: dotBounce 1.2s ease-in-out infinite both;
-}
-
-.typingDots span:nth-child(1) {
-  animation-delay: 0s;
-}
-
-.typingDots span:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.typingDots span:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-@keyframes dotBounce {
-  0%,
-  80%,
-  100% {
-    opacity: 0.25;
-    transform: scale(0.7);
-  }
-  40% {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 .copyToast {
