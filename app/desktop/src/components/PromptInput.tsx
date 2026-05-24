@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Circle, Square, ArrowUp } from 'lucide-react';
+import { Circle, Plus, Square, ArrowUp } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
 import { useInputDraft } from '@/hooks/useInputDraft';
 import { useMention } from '@/hooks/useMention';
@@ -156,7 +156,18 @@ export default function PromptInput({
 
         {/* bottom action bar */}
         <div className={styles.actions}>
-          <span className={styles.charCount}>{promptLength}/{MAX_CHARS}</span>
+          <div className={styles.leftGroup}>
+            <button
+              type="button"
+              className={styles.attachBtn}
+              disabled={disabled}
+              title={t('prompt.attachCustom')}
+              aria-label={t('prompt.attachCustom')}
+            >
+              <Plus size={16} strokeWidth={2.2} />
+            </button>
+            <span className={styles.charCount}>{promptLength}/{MAX_CHARS}</span>
+          </div>
 
           <div className={styles.rightGroup}>
             <div className={styles.metaChain}>
