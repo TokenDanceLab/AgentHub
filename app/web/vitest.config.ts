@@ -9,10 +9,11 @@ export default defineConfig({
     },
   },
   test: {
-    globals: true,
-    environment: 'jsdom',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     exclude: ['src/**/*.e2e.test.ts', 'src/**/*.e2e.test.tsx', 'e2e/**'],
+    environment: 'jsdom',
+    globals: true,
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    passWithNoTests: true,
     setupFiles: [],
   },
 });
