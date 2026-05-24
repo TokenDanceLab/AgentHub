@@ -107,6 +107,12 @@
   transition: background 0.1s ease;
 }
 
+.itemLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .item:hover {
   background: #F3F4F6;
 }
