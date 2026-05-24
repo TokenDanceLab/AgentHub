@@ -1,5 +1,25 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import { mockRunners, mockRuns, mockWorkspaceFiles, MockEventStream, playRunLifecycle } from '@shared/index';
+import { useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import {
+  listApprovals,
+  listArtifacts,
+  listPreviews,
+  listProjects,
+  listRunners,
+  listRuns,
+  listThreads,
+  mockRunners,
+  mockRuns,
+  mockWorkspaceFiles,
+  getWorkbenchCatalogState,
+  getWorkbenchSectionSource,
+  workbenchReducer,
+  MockEventStream,
+  playRunLifecycle,
+  type Run,
+  type Runner,
+  type WorkbenchSectionSource,
+  type WorkbenchState,
+} from '@shared/index';
 
 type TaskStatus = "backlog" | "active" | "review";
 type ApprovalState = "pending" | "approved" | "changes";
@@ -53,11 +73,15 @@ type Confirmation = {
   tone: ConfirmationTone;
 };
 
+const accentPalette = ["blue", "purple", "teal", "cyan"] as const;
+const fileAccentPalette = ["cyan", "purple", "teal", "blue"] as const;
+const activityAccentPalette = ["cyan", "purple", "teal"] as const;
+
 const members: Member[] = mockRunners.map((runner, i) => ({
   initials: runner.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2),
   name: runner.name,
   role: runner.capabilities ?? 'No capability info',
-  accent: (['blue', 'purple', 'teal', 'cyan'] as const)[i % 4] ?? 'blue',
+  accent: accentPalette[i % accentPalette.length] ?? "blue",
   presence: (runner.status === 'online' ? 'online' : 'offline') as MemberPresence,
 }));
 
@@ -75,14 +99,14 @@ const files: FileItem[] = mockWorkspaceFiles.map((f, i) => ({
   name: f.path,
   detail: `${(f.sizeBytes / 1024).toFixed(1)} KB, modified ${f.modifiedAt.slice(0, 10)}`,
   size: f.sizeBytes > 1024 * 1024 ? `${(f.sizeBytes / (1024 * 1024)).toFixed(1)} MB` : `${(f.sizeBytes / 1024).toFixed(1)} KB`,
-  accent: (['cyan', 'purple', 'teal', 'blue'] as const)[i % 4] ?? 'cyan',
+  accent: fileAccentPalette[i % fileAccentPalette.length] ?? "cyan",
 }));
 
 const initialActivities: ActivityItem[] = mockRuns.map((run, i) => ({
   title: `${mockRunners[i % mockRunners.length]?.name ?? 'Agent'} — run.${run.status}`,
   detail: `Run on thread ${run.threadId}: ${run.status === 'finished' ? 'Completed successfully' : run.status === 'running' ? 'Executing...' : 'Waiting in queue'}`,
   time: run.createdAt.slice(11, 16),
-  accent: (['cyan', 'purple', 'teal'] as const)[i % 3] ?? 'cyan',
+  accent: activityAccentPalette[i % activityAccentPalette.length] ?? "cyan",
 }));
 
 const laneLabels: Record<TaskStatus, string> = {
@@ -103,6 +127,76 @@ const presenceLabels: Record<MemberPresence, string> = {
   busy: "Busy",
   offline: "Offline",
 };
+
+const initialWorkbenchProjectionState: WorkbenchState = {
+  projects: [],
+  threads: [],
+  runners: [],
+  runs: [],
+  threadItems: [],
+  approvals: [],
+  artifacts: [],
+  previews: [],
+  runLogs: {},
+  connection: { status: 'idle' },
+  lastSeq: 0,
+};
+
+function formatError(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return String(error || 'Edge catalog unavailable');
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 2500): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error('Edge catalog did not respond.')), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+function memberFromRunner(runner: Runner, index: number): Member {
+  return {
+    initials: runner.name.split(' ').map((word) => word[0]).join('').toUpperCase().slice(0, 2) || 'AG',
+    name: runner.name,
+    role: runner.capabilities ?? 'Runner registered',
+    accent: accentPalette[index % accentPalette.length] ?? 'blue',
+    presence: runner.status === 'online' ? 'online' : 'offline',
+  };
+}
+
+function taskFromRun(run: Run, index: number, runners: Runner[]): WorkspaceTask {
+  return {
+    id: run.runId,
+    title: `Run ${run.runId.split('_').pop()} - ${run.status}`,
+    summary: `Thread: ${run.threadId}, Project: ${run.projectId}`,
+    owner: runners[index % Math.max(runners.length, 1)]?.name ?? 'Unassigned',
+    status: run.status === 'finished' ? 'review' : run.status === 'running' || run.status === 'starting' ? 'active' : 'backlog',
+    tag: run.status === 'running' || run.status === 'starting' ? 'Active' : run.status === 'finished' ? 'Done' : 'Queue',
+    progress: run.status === 'finished' ? 100 : run.status === 'running' || run.status === 'starting' ? 65 : 15,
+  };
+}
+
+function activityFromRun(run: Run, index: number, runners: Runner[]): ActivityItem {
+  return {
+    title: `${runners[index % Math.max(runners.length, 1)]?.name ?? 'Agent'} - run.${run.status}`,
+    detail: `Run on thread ${run.threadId}: ${run.status === 'finished' ? 'Completed successfully' : run.status === 'running' ? 'Executing...' : 'Waiting in queue'}`,
+    time: run.createdAt.slice(11, 16),
+    accent: activityAccentPalette[index % activityAccentPalette.length] ?? 'cyan',
+  };
+}
+
+function SourceLabel({ source }: { source: WorkbenchSectionSource }) {
+  return <span className={`gwr-source ${source.tone}`}>{source.label}</span>;
+}
 
 const styles = `
   @import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap");
@@ -469,6 +563,58 @@ const styles = `
   border-color: rgba(31,155,100,0.25);
   background: rgba(31,155,100,0.15);
   color: var(--gwr-green);
+}
+
+.gwr-pill.amber {
+  border-color: rgba(217,122,23,0.3);
+  background: rgba(217,122,23,0.15);
+  color: var(--gwr-orange);
+}
+
+.gwr-pill.neutral {
+  border-color: rgba(102,112,133,0.25);
+  background: rgba(102,112,133,0.12);
+  color: var(--gwr-muted);
+}
+
+.gwr-source {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 4px 8px;
+  border: 1px solid rgba(102,112,133,0.25);
+  border-radius: 999px;
+  background: rgba(102,112,133,0.12);
+  color: var(--gwr-muted);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.gwr-source.green {
+  border-color: rgba(31,155,100,0.25);
+  background: rgba(31,155,100,0.15);
+  color: var(--gwr-green);
+}
+
+.gwr-source.purple {
+  border-color: rgba(116,87,232,0.25);
+  background: rgba(116,87,232,0.15);
+  color: var(--gwr-purple);
+}
+
+.gwr-source.amber {
+  border-color: rgba(217,122,23,0.3);
+  background: rgba(217,122,23,0.15);
+  color: var(--gwr-orange);
+}
+
+.gwr-source.cyan {
+  border-color: rgba(8,167,207,0.25);
+  background: rgba(8,167,207,0.15);
+  color: var(--gwr-cyan);
 }
 
 .gwr-dot {
@@ -977,8 +1123,75 @@ function MemberAvatar({ member }: { member: Member }) {
   return <span className={className}>{member.initials}</span>;
 }
 
+function useWorkbenchProjection() {
+  const [state, dispatch] = useReducer(
+    workbenchReducer,
+    initialWorkbenchProjectionState,
+    (initialState) => workbenchReducer(initialState, { type: 'connection.loading' }),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSnapshot() {
+      dispatch({ type: 'connection.loading' });
+      try {
+        const [projects, threads, runners, runs, approvals, artifacts, previews] =
+          await withTimeout(Promise.all([
+            listProjects({ pageSize: 50 }),
+            listThreads({ pageSize: 50 }),
+            listRunners(),
+            listRuns({ pageSize: 50 }),
+            listApprovals(),
+            listArtifacts(),
+            listPreviews(),
+          ]));
+
+        if (cancelled) return;
+
+        dispatch({
+          type: 'snapshot.loaded',
+          snapshot: {
+            projects,
+            threads,
+            runners,
+            runs,
+            approvals,
+            artifacts,
+            previews,
+          },
+        });
+      } catch (error) {
+        if (!cancelled) {
+          dispatch({ type: 'connection.error', error: formatError(error) });
+        }
+      }
+    }
+
+    loadSnapshot();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return state;
+}
+
 export function GroupWorkspacePageInteractive() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const workbenchState = useWorkbenchProjection();
+  const {
+    hasLiveCatalog,
+    label: catalogLabel,
+    message: catalogDetail,
+    mode: catalogMode,
+    tone: catalogTone,
+  } = getWorkbenchCatalogState(workbenchState);
+  const taskSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.runs.length > 0,
+  });
   const [approval, setApproval] = useState<ApprovalState>("pending");
   const [taskOwner, setTaskOwner] = useState("Xavier");
   const [syncState, setSyncState] = useState<SyncState>({
@@ -990,15 +1203,24 @@ export function GroupWorkspacePageInteractive() {
   });
   const [activityLog, setActivityLog] = useState<ActivityItem[]>(initialActivities);
   const [workspaceMembers, setWorkspaceMembers] = useState<Member[]>(members);
+  const [hasLocalMemberChanges, setHasLocalMemberChanges] = useState(false);
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
   const [noteDraft, setNoteDraft] = useState("");
   const [confirmation, setConfirmation] = useState<Confirmation>({
-    detail: "Local controls are wired for review, sync, assignment, member presence, and notes.",
-    title: "Interactive workspace ready",
+    detail: "Local controls are wired for review, dry-run sync, assignment, member presence, and notes.",
+    title: "Local workspace ready",
     tone: "info",
   });
 
   useParticleCanvas(canvasRef);
+
+  useEffect(() => {
+    if (!hasLiveCatalog || workbenchState.runners.length === 0) {
+      return;
+    }
+
+    setWorkspaceMembers(workbenchState.runners.map(memberFromRunner));
+  }, [hasLiveCatalog, workbenchState.runners]);
 
   const nowLabel = () =>
     new Date().toLocaleTimeString([], {
@@ -1014,7 +1236,7 @@ export function GroupWorkspacePageInteractive() {
     setActivityLog((current) => [{ ...activity, time: nowLabel() }, ...current].slice(0, 8));
   };
 
-  // Mock event stream — feeds simulated run lifecycle into activity log.
+  // Mock event stream feeds a simulated run lifecycle into the demo activity log.
   useEffect(() => {
     const stream = new MockEventStream();
     const unsub = stream.on((event) => {
@@ -1023,7 +1245,7 @@ export function GroupWorkspacePageInteractive() {
         detail: typeof event.payload === 'object' && event.payload && 'text' in event.payload
           ? String((event.payload as Record<string, unknown>).text).trim().slice(0, 100) || '(output)'
           : JSON.stringify(event.payload).slice(0, 100),
-        accent: (['cyan', 'purple', 'teal', 'blue'] as const)[Math.floor(Math.random() * 4)] ?? 'cyan',
+        accent: fileAccentPalette[Math.floor(Math.random() * fileAccentPalette.length)] ?? "cyan",
       });
     });
     playRunLifecycle(stream, { stepDelayMs: 1000 });
@@ -1035,6 +1257,11 @@ export function GroupWorkspacePageInteractive() {
   const visibleMembers = workspaceMembers.filter((member) => memberFilter === "all" || member.presence === memberFilter);
   const onlineCount = workspaceMembers.filter((member) => member.presence === "online").length;
   const busyCount = workspaceMembers.filter((member) => member.presence === "busy").length;
+  const memberSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.runners.length > 0,
+    hasLocalDryRun: hasLocalMemberChanges,
+  });
   const approvalLabel = approved ? "Approved" : needsEdits ? "Changes requested" : "Awaiting approval";
   const approvalLocked = !approved;
   const syncedFiles: FileItem[] = syncState.revision
@@ -1047,10 +1274,32 @@ export function GroupWorkspacePageInteractive() {
         },
       ]
     : [];
-  const workspaceFiles = [...files, ...syncedFiles];
+  const liveFiles: FileItem[] = workbenchState.artifacts.map((artifact, index) => ({
+    name: artifact.path,
+    detail: `${artifact.kind} artifact, ${(artifact.sizeBytes / 1024).toFixed(1)} KB, created ${artifact.createdAt.slice(0, 10)}`,
+    size: artifact.sizeBytes > 1024 * 1024 ? `${(artifact.sizeBytes / (1024 * 1024)).toFixed(1)} MB` : `${(artifact.sizeBytes / 1024).toFixed(1)} KB`,
+    accent: fileAccentPalette[index % fileAccentPalette.length] ?? 'cyan',
+  }));
+  const workspaceFiles = [...(hasLiveCatalog && liveFiles.length ? liveFiles : files), ...syncedFiles];
+  const fileSource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.artifacts.length > 0,
+    hasLocalDryRun: syncedFiles.length > 0,
+  });
+  const displayedBaseTasks = hasLiveCatalog && workbenchState.runs.length
+    ? workbenchState.runs.map((run, index) => taskFromRun(run, index, workbenchState.runners))
+    : baseTasks;
+  const displayedActivities = hasLiveCatalog && workbenchState.runs.length
+    ? workbenchState.runs.map((run, index) => activityFromRun(run, index, workbenchState.runners))
+    : activityLog;
+  const activitySource = getWorkbenchSectionSource({
+    mode: catalogMode,
+    hasSectionSnapshot: hasLiveCatalog && workbenchState.runs.length > 0,
+    hasLocalDryRun: !(hasLiveCatalog && workbenchState.runs.length) && activityLog.length > initialActivities.length,
+  });
 
   const tasks = useMemo<WorkspaceTask[]>(() => {
-    return baseTasks.map((task) => {
+    return displayedBaseTasks.map((task) => {
       if (task.id === "approve") {
         return {
           ...task,
@@ -1075,7 +1324,7 @@ export function GroupWorkspacePageInteractive() {
 
       return task;
     });
-  }, [approval, syncState.complete, syncState.lastSyncedAt, syncState.progress, taskOwner]);
+  }, [approval, displayedBaseTasks, syncState.complete, syncState.lastSyncedAt, syncState.progress, taskOwner]);
 
   const laneTasks = (status: TaskStatus) => tasks.filter((task) => task.status === status);
 
@@ -1088,12 +1337,12 @@ export function GroupWorkspacePageInteractive() {
     }));
     pushActivity({
       title: "Xavier approved parser v2",
-      detail: "Sync controls are unlocked and the review task is marked complete.",
+      detail: "Local dry-run sync controls are unlocked and the review task is marked complete.",
       accent: "blue",
     });
     showConfirmation({
       title: "Approval saved",
-      detail: "Parser v2 is approved. The snapshot sync button is now enabled.",
+      detail: "Parser v2 is approved. The local dry-run snapshot button is now enabled.",
       tone: "success",
     });
   };
@@ -1107,12 +1356,12 @@ export function GroupWorkspacePageInteractive() {
     }));
     pushActivity({
       title: "Xavier requested parser edits",
-      detail: "Sync was locked again until the requested changes are resolved.",
+      detail: "Local dry-run sync was locked again until the requested changes are resolved.",
       accent: "purple",
     });
     showConfirmation({
       title: "Changes requested",
-      detail: "Approval state changed and sync is locked while the review is open.",
+      detail: "Approval state changed and local dry-run sync is locked while the review is open.",
       tone: "warning",
     });
   };
@@ -1135,8 +1384,8 @@ export function GroupWorkspacePageInteractive() {
   const syncSnapshot = () => {
     if (!approved) {
       showConfirmation({
-        title: "Sync is locked",
-        detail: "Approve parser v2 before syncing the shared snapshot.",
+        title: "Local sync is locked",
+        detail: "Approve parser v2 before running the local dry-run snapshot.",
         tone: "warning",
       });
       return;
@@ -1153,12 +1402,12 @@ export function GroupWorkspacePageInteractive() {
     }));
     pushActivity({
       title: "Dry-run snapshot synced",
-      detail: `Workspace files updated and sync receipt generated at ${syncedAt}.`,
+      detail: `Local workspace files updated and dry-run receipt generated at ${syncedAt}.`,
       accent: "cyan",
     });
     showConfirmation({
-      title: "Snapshot synced",
-      detail: `Files, progress, and last sync time now reflect revision ${nextRevision}.`,
+      title: "Dry-run snapshot synced",
+      detail: `Local files, progress, and last dry-run time now reflect revision ${nextRevision}.`,
       tone: "success",
     });
   };
@@ -1182,6 +1431,7 @@ export function GroupWorkspacePageInteractive() {
           : member,
       ),
     );
+    setHasLocalMemberChanges(true);
     pushActivity({
       title: `${selectedMember.name} is now ${presenceLabels[nextPresence].toLowerCase()}`,
       detail: "Member presence changed locally and the member filter counters updated.",
@@ -1298,7 +1548,7 @@ export function GroupWorkspacePageInteractive() {
               <h2>Spaces</h2>
               <span className="gwr-pill cyan">
                 <span className="gwr-dot cyan" />
-                Live
+                {catalogLabel}
               </span>
             </div>
             <div className="gwr-stack">
@@ -1306,7 +1556,7 @@ export function GroupWorkspacePageInteractive() {
                 <AccentIcon accent="blue" label="S" />
                 <div className="gwr-truncate">
                   <strong>Legacy Migration</strong>
-                  <p className="gwr-tiny gwr-truncate">Cross-system sync</p>
+                  <p className="gwr-tiny gwr-truncate">Local dry-run sync</p>
                 </div>
               </div>
               <div className="gwr-nav">
@@ -1329,9 +1579,12 @@ export function GroupWorkspacePageInteractive() {
           <section className="gwr-section">
             <div className="gwr-section-head">
               <h2>Members</h2>
-              <span className="gwr-tiny">
-                {onlineCount} online / {busyCount} busy
-              </span>
+              <div className="gwr-actions">
+                <SourceLabel source={memberSource} />
+                <span className="gwr-tiny">
+                  {onlineCount} online / {busyCount} busy
+                </span>
+              </div>
             </div>
             <div className="gwr-filters" role="group" aria-label="Filter members by status">
               {memberFilterOptions.map((option) => (
@@ -1372,11 +1625,11 @@ export function GroupWorkspacePageInteractive() {
           <section className="gwr-sync">
             <div className="gwr-row">
               <span className="gwr-eyebrow">Workspace Health</span>
-              <span className={`gwr-pill ${syncState.complete ? "green" : "cyan"}`}>
-                {syncState.complete ? "Synced" : "Stable"}
+              <span className={`gwr-pill ${catalogTone}`}>
+                {catalogLabel}
               </span>
             </div>
-            <p className="gwr-small">Local UI state only. Last sync: {syncState.lastSyncedAt}.</p>
+            <p className="gwr-small">{catalogDetail} Last local sync: {syncState.lastSyncedAt}.</p>
           </section>
         </aside>
 
@@ -1386,7 +1639,7 @@ export function GroupWorkspacePageInteractive() {
               <p className="gwr-eyebrow">Legacy Migration Room</p>
               <h1>Shared operations cockpit</h1>
               <p className="gwr-small">
-                Members, tasks, files, approvals, and sync status stay visible in one working surface.
+                Members, tasks, files, approvals, and local dry-run status stay visible in one working surface.
               </p>
             </div>
             <div className="gwr-actions">
@@ -1418,7 +1671,7 @@ export function GroupWorkspacePageInteractive() {
             </div>
             <div className="gwr-stat gwr-glass">
               <strong>{syncState.progress}%</strong>
-              <p className="gwr-small">Sync readiness</p>
+              <p className="gwr-small">Dry-run readiness</p>
             </div>
           </section>
 
@@ -1450,7 +1703,7 @@ export function GroupWorkspacePageInteractive() {
                   <p className="gwr-eyebrow">Shared Task Board</p>
                   <h2>Current coordination plan</h2>
                 </div>
-                <span className="gwr-pill purple">Auto assigned</span>
+                <SourceLabel source={taskSource} />
               </div>
 
               <div className="gwr-board">
@@ -1494,14 +1747,11 @@ export function GroupWorkspacePageInteractive() {
                   <p className="gwr-eyebrow">Activity Flow</p>
                   <h2>Workspace pulse</h2>
                 </div>
-                <span className={`gwr-pill ${syncState.complete ? "green" : "cyan"}`}>
-                  <span className="gwr-dot" />
-                  {syncState.complete ? "Synced" : "Live"}
-                </span>
+                <SourceLabel source={activitySource} />
               </div>
 
               <div className="gwr-activity-list">
-                {activityLog.map((activity, index) => (
+                {displayedActivities.map((activity, index) => (
                   <div className="gwr-activity" key={`${activity.title}-${index}`}>
                     <AccentIcon accent={activity.accent} label={activity.accent.slice(0, 1).toUpperCase()} />
                     <div className="gwr-truncate">
@@ -1579,10 +1829,10 @@ export function GroupWorkspacePageInteractive() {
               </div>
               <p className="gwr-small">
                 {approved
-                  ? "Parser diff is approved. Sync controls are now visible and enabled."
+                  ? "Parser diff is approved. Local dry-run controls are now visible and enabled."
                   : needsEdits
                     ? "A requested-edit state is visible on the review card and board."
-                    : "Parser diff is staged, security checks passed, and sync remains locked until approval."}
+                    : "Parser diff is staged, security checks passed, and local dry-run sync remains locked until approval."}
               </p>
               <div className="gwr-actions">
                 <button className="gwr-button warning" type="button" onClick={requestEdits}>
@@ -1598,15 +1848,15 @@ export function GroupWorkspacePageInteractive() {
           <section className="gwr-section">
             <div className="gwr-section-head">
               <div className="gwr-title">
-                <p className="gwr-eyebrow">Sync Status</p>
-                <h2>Shared snapshot</h2>
+                <p className="gwr-eyebrow">Local Sync Status</p>
+                <h2>Dry-run snapshot</h2>
               </div>
               <span className={`gwr-pill ${syncState.complete ? "green" : "cyan"}`}>{syncState.progress}%</span>
             </div>
             <div className="gwr-sync">
               <div className="gwr-row">
                 <span className="gwr-small">Dry-run readiness</span>
-                <strong>{syncState.complete ? "Complete" : approved ? "Unlocked" : "Locked"}</strong>
+                <strong>{syncState.complete ? "Local synced" : approved ? "Unlocked" : "Locked"}</strong>
               </div>
               <div className="gwr-progress" aria-label="Dry-run readiness">
                 <span style={{ width: `${syncState.progress}%` }} />
@@ -1617,7 +1867,7 @@ export function GroupWorkspacePageInteractive() {
                 disabled={approvalLocked}
                 onClick={syncSnapshot}
               >
-                {syncState.complete ? "Sync again" : approved ? "Sync snapshot" : "Approve to sync"}
+                {syncState.complete ? "Run local sync again" : approved ? "Run local sync" : "Approve to run"}
               </button>
               <div className="gwr-checks">
                 <div className="gwr-check">
@@ -1637,7 +1887,7 @@ export function GroupWorkspacePageInteractive() {
                 <div className="gwr-check">
                   <span className="gwr-dot" />
                   <div>
-                    <strong>Last sync</strong>
+                    <strong>Last local sync</strong>
                     <p className="gwr-tiny">{syncState.lastSyncedAt}.</p>
                   </div>
                 </div>
@@ -1651,9 +1901,12 @@ export function GroupWorkspacePageInteractive() {
                 <p className="gwr-eyebrow">Shared Files</p>
                 <h2>Workspace documents</h2>
               </div>
-              <button className="gwr-icon-button" type="button" aria-label="Add file" onClick={createLocalFile}>
-                +
-              </button>
+              <div className="gwr-actions">
+                <SourceLabel source={fileSource} />
+                <button className="gwr-icon-button" type="button" aria-label="Add file" onClick={createLocalFile}>
+                  +
+                </button>
+              </div>
             </div>
             <div className="gwr-stack">
               {workspaceFiles.map((file) => (

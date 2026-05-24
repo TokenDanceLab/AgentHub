@@ -23,11 +23,13 @@ export function ChatInput({
   className,
 }: ChatInputProps) {
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      if (value.trim().length > 0 && !disabled) {
-        onSend();
-      }
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    if (value.trim().length > 0 && !disabled) {
+      onSend();
     }
   };
 
