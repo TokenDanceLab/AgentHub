@@ -11,8 +11,6 @@
 #   4. 配置 Caddy/nginx 反代：api.hub.vectorcontrol.tech → localhost:8080
 # ──────────────────────────────────────────────
 
-version: "3.9"
-
 services:
   # ── PostgreSQL 16（独立实例，不与 AIhub 共用）──
   postgres:
@@ -115,7 +113,7 @@ services:
       AGENTHUB_PPROF_USER: ${AGENTHUB_PPROF_USER:-admin}
       AGENTHUB_PPROF_PASS: ${AGENTHUB_PPROF_PASS:?必须设置 AGENTHUB_PPROF_PASS}
       # CORS（允许官网和本地开发）
-      AGENTHUB_CORS_ORIGINS: ${AGENTHUB_CORS_ORIGINS:-https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173}
+      AGENTHUB_CORS_ORIGINS: ${AGENTHUB_CORS_ORIGINS:-https://hub.vectorcontrol.tech}
     ports:
       - "127.0.0.1:8080:8080"   # 仅本地回环，由 Caddy/nginx 反代
       - "127.0.0.1:6060:6060"   # pprof/metrics 仅本地访问

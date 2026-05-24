@@ -31,7 +31,7 @@ jobs:
         run: go build ./...
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v8
         with:
           working-directory: edge-server
           version: v1.64
@@ -250,11 +250,9 @@ jobs:
 
       - name: Lint
         run: pnpm lint --max-warnings 10
-        continue-on-error: true
 
       - name: Test Desktop
         run: pnpm test:run
-        continue-on-error: true
 
   # ── Frontend: Web ────────────────────────────
   frontend-web:
@@ -273,15 +271,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-          cache-dependency-path: app/desktop/pnpm-lock.yaml
+          cache-dependency-path: app/web/pnpm-lock.yaml
 
       - name: Install
         run: pnpm install --frozen-lockfile
-        continue-on-error: true
 
       - name: Build Web
         run: pnpm build
-        continue-on-error: true
 
   # ── Validation ───────────────────────────────
   validate:
