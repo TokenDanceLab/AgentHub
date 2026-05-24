@@ -82,6 +82,20 @@
 
   --text-weaker: #8E8E93;
   --text-weakest: #636366;
+
+  /* TokenDance cross-app aliases */
+  --td-canvas: var(--app-bg);
+  --td-surface: var(--surface-raised);
+  --td-tint: var(--secondary);
+  --td-ink: var(--foreground);
+  --td-ink-muted: var(--muted-foreground);
+  --td-line: var(--border);
+  --td-plum: var(--brand);
+  --td-moss: var(--success);
+  --td-danger: var(--destructive);
+  --td-focus: var(--ring);
+  --td-radius-control: var(--radius-md);
+  --td-radius-panel: var(--radius-xl);
 }
 
 /* ── Light Theme — macOS matte gray ────────────────────────────────────── */
@@ -153,6 +167,20 @@
 
   --text-weaker: #8E8E93;
   --text-weakest: #B0B0B5;
+
+  /* TokenDance cross-app aliases */
+  --td-canvas: var(--app-bg);
+  --td-surface: var(--surface-raised);
+  --td-tint: var(--secondary);
+  --td-ink: var(--foreground);
+  --td-ink-muted: var(--muted-foreground);
+  --td-line: var(--border);
+  --td-plum: var(--brand);
+  --td-moss: var(--success);
+  --td-danger: var(--destructive);
+  --td-focus: var(--ring);
+  --td-radius-control: var(--radius-md);
+  --td-radius-panel: var(--radius-xl);
 }
 
 /* ── Shared glass/backdrop utilities ──────────────────────────────────── */
