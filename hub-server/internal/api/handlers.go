@@ -55,11 +55,9 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func stub(w http.ResponseWriter, r *http.Request, endpoint string) {
-	writeJSON(w, http.StatusNotImplemented, map[string]any{
-		"error": map[string]any{
-			"code":    "not_implemented",
-			"message": endpoint + " — Hub Server stub (backend developer TODO)",
-		},
+	writeJSON(w, http.StatusGone, map[string]any{
+		"error":   "endpoint_deprecated",
+		"message": "This API has moved. Use the canonical Hub Server (cmd/server-hub/main.go) with DI architecture.",
 	})
 }
 
