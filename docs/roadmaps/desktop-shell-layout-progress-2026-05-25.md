@@ -40,6 +40,7 @@ Write scope:
 - Tightened Settings mobile navigation into horizontal glass chips so Android/Web-sized viewports keep the active settings content in the first screen.
 - Wired persisted model settings into Desktop run dispatch: `App.handleSend` now resolves default model/provider/reasoning settings and alias mappings before calling `/v1/runs`.
 - Extended the shared `StartRunRequest` client contract with optional `provider`, `modelAlias`, `modelMappingEnabled`, and `providerFallbackEnabled` routing metadata so Edge/Hub can consume the same TokenDance model-routing envelope later.
+- Added a compact run-route preview inside the prompt composer so users can see the resolved Provider, model, reasoning effort, and alias before dispatch.
 
 ## Verification
 
@@ -57,6 +58,8 @@ Write scope:
 - Playwright Settings model-config/model-mapping/cc-switch checks at `1440x960` and `390x844`: no console errors or warnings, no raw i18n keys, no horizontal overflow, controls editable, and screenshots refreshed under `app/desktop/screenshots/settings-*-local-*.png`.
 - `cd app/desktop && corepack.cmd pnpm vitest run src\__tests__\modelSettingsStore.test.ts src\__tests__\edgeClient.test.ts src\__tests__\SettingsPage.test.tsx src\__tests__\PromptInput.test.tsx`
 - Playwright request-body check: changed Settings > Models to `gpt-5.5` / `openai` / `max`, returned to chat, sent a prompt, intercepted the real `/v1/runs` POST body, and verified `model=gpt-5.5`, `provider=openai`, `reasoningEffort=max`, `modelMappingEnabled=true`, `providerFallbackEnabled=true`, with no console errors, raw i18n keys, or horizontal overflow. Screenshot: `app/desktop/screenshots/run-request-model-settings-body.png`.
+- `cd app/desktop && corepack.cmd pnpm vitest run src\__tests__\PromptInput.test.tsx src\__tests__\modelSettingsStore.test.ts src\__tests__\edgeClient.test.ts`
+- Playwright composer route-preview check at `1440x960` and `390x844`: Settings changed to `gpt-5.5` / `openai` / `max`, composer preview displayed those resolved values, `/v1/runs` POST body matched them, and both viewports had no console errors, raw i18n keys, or horizontal overflow. Screenshots: `app/desktop/screenshots/prompt-route-preview-desktop.png`, `app/desktop/screenshots/prompt-route-preview-mobile.png`.
 
 ## Follow-up
 
