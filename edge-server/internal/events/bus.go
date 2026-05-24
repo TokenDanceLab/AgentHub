@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+const (
+	defaultMaxHistory             = 10000
+	subscriberChannelBufferSize = 256
+)
+
 // EventEnvelope is the standard event wrapper for all WebSocket events.
 type EventEnvelope struct {
 	Version string         `json:"version"`
@@ -27,18 +32,18 @@ type subscriber struct {
 // Bus is an in-memory event bus with monotonic sequence numbers and
 // support for cursor-based replay.
 type Bus struct {
-	mu          sync.Mutex
-	seq         int64
-	history     []EventEnvelope
-	subs        []subscriber
-	nextSubID   int64
-	maxHistory  int
+	mu         sync.Mutex
+	seq        int64
+	history    []EventEnvelope
+	subs       []subscriber
+	nextSubID  int64
+	maxHistory int
 }
 
 // NewBus creates a new event bus with the given maximum history size.
 func NewBus(maxHistory int) *Bus {
 	if maxHistory <= 0 {
-		maxHistory = 10000
+		maxHistory = defaultMaxHistory
 	}
 	return &Bus{
 		history:    make([]EventEnvelope, 0, maxHistory),
@@ -93,7 +98,7 @@ func (b *Bus) Subscribe(cursor int64) (int64, <-chan EventEnvelope, []EventEnvel
 	id := b.nextSubID
 	b.nextSubID++
 
-	ch := make(chan EventEnvelope, 256)
+	ch := make(chan EventEnvelope, subscriberChannelBufferSize)
 	b.subs = append(b.subs, subscriber{id: id, ch: ch})
 
 	// Replay events after cursor.
@@ -120,4 +125,12 @@ func (b *Bus) Unsubscribe(subID int64) {
 			return
 		}
 	}
+}
+
+// HistoryLen returns the current number of events retained in the bus history.
+// Exposed for Prometheus metrics (edge_event_bus_depth gauge).
+func (b *Bus) HistoryLen() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.history)
 }

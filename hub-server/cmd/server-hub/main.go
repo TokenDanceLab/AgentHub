@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+<<<<<<< HEAD
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -30,6 +31,17 @@ import (
 var mgr *ws.Manager
 var bus *service.Bus
 
+=======
+	"log/slog"
+	"os"
+
+	"github.com/agenthub/hub-server/internal/app"
+	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/repository"
+)
+
+>>>>>>> origin/master
 func main() {
 	cfg, err := config.Load("configs/config.yaml")
 	if err != nil {
@@ -37,6 +49,7 @@ func main() {
 		os.Exit(1)
 	}
 
+<<<<<<< HEAD
 	if cfg.Server.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
 	} else {
@@ -47,6 +60,15 @@ func main() {
 	defer log.Sync()
 
 	if err := repository.InitDB(&cfg.DB); err != nil {
+=======
+	if err := cfg.Validate(); err != nil {
+		slog.Error("invalid configuration", "error", err)
+		os.Exit(1)
+	}
+
+	db, err := repository.InitDB(&cfg.DB)
+	if err != nil {
+>>>>>>> origin/master
 		slog.Error("failed to init database", "error", err)
 		os.Exit(1)
 	}
@@ -56,6 +78,7 @@ func main() {
 		os.Exit(1)
 	}
 
+<<<<<<< HEAD
 	if err := cache.InitRedis(&cfg.Redis); err != nil {
 		slog.Error("failed to init redis", "error", err)
 		os.Exit(1)
@@ -436,5 +459,18 @@ func broadcastOnlineStatus(ctx context.Context, userID string, online bool) {
 		if online, _ := cache.IsOnline(ctx, friendID); online {
 			mgr.PushToUser(friendID, frame)
 		}
+=======
+	rdb, err := cache.InitRedis(&cfg.Redis)
+	if err != nil {
+		slog.Error("failed to init redis", "error", err)
+		os.Exit(1)
+	}
+	cacheClient := cache.NewClient(rdb)
+
+	application := app.New(cfg, db, cacheClient)
+	if err := application.Run(context.Background()); err != nil {
+		slog.Error("application exited with error", "error", err)
+		os.Exit(1)
+>>>>>>> origin/master
 	}
 }

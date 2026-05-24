@@ -8,6 +8,10 @@ import (
 )
 
 func TestCacheWarmsOnRead(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	alice := register(t, "tcch_a01", "pass1234", "AliceCache")
 	bob := register(t, "tcch_b01", "pass1234", "BobCache")
 
@@ -37,6 +41,10 @@ func TestCacheWarmsOnRead(t *testing.T) {
 }
 
 func TestCacheInvalidateOnSessionChange(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	alice := register(t, "tcinv_a", "pass1234", "AliceInv")
 	bob := register(t, "tcinv_b", "pass1234", "BobInv")
 	charlie := register(t, "tcinv_c", "pass1234", "CharlieInv")
@@ -77,6 +85,10 @@ func TestCacheInvalidateOnSessionChange(t *testing.T) {
 }
 
 func TestProfileUpdateInvalidatesCache(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	u := register(t, "tprof_c1", "pass1234", "OriginalName")
 
 	// Update nickname
@@ -99,6 +111,10 @@ func TestProfileUpdateInvalidatesCache(t *testing.T) {
 }
 
 func TestBlockAddsToCorrectList(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	alice := register(t, "tblk2_a", "pass1234", "AliceBlk2")
 	bob := register(t, "tblk2_b", "pass1234", "BobBlk2")
 
@@ -125,6 +141,10 @@ func TestBlockAddsToCorrectList(t *testing.T) {
 }
 
 func TestRecallByOwnerNonSender(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	alice := register(t, "trecl_a", "pass1234", "AliceRecall")
 	bob := register(t, "trecl_b", "pass1234", "BobRecall")
 	charlie := register(t, "trecl_c", "pass1234", "CharlieRecall")
@@ -162,6 +182,10 @@ func TestRecallByOwnerNonSender(t *testing.T) {
 }
 
 func TestRecallTimeout(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	alice := register(t, "trect_a", "pass1234", "AliceRecallT")
 	bob := register(t, "trect_b", "pass1234", "BobRecallT")
 
@@ -193,6 +217,10 @@ func TestRecallTimeout(t *testing.T) {
 }
 
 func TestPinLimit(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	alice := register(t, "tpin2_a", "pass1234", "AlicePin2")
 	bob := register(t, "tpin2_b", "pass1234", "BobPin2")
 
@@ -245,6 +273,10 @@ func TestPinLimit(t *testing.T) {
 }
 
 func TestSearchSessions(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	alice := register(t, "tsrch_a", "pass1234", "AliceSearch")
 	bob := register(t, "tsrch_b", "pass1234", "BobSearch")
 
@@ -284,6 +316,10 @@ func TestSearchSessions(t *testing.T) {
 }
 
 func TestSearchNonExistentUser(t *testing.T) {
+<<<<<<< HEAD
+=======
+	t.Cleanup(func() { CleanDB(t, db) })
+>>>>>>> origin/master
 	alice := register(t, "tsrchu_a", "pass1234", "AliceSearchU")
 
 	// Search for a random UUID that doesn't exist

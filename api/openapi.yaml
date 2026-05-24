@@ -6,11 +6,30 @@ info:
     AgentHub REST JSON API for commands and queries. Realtime state, logs,
     message deltas, approvals and artifact notifications are delivered through
     WebSocket typed events documented in api/events.md.
+
+    ## Implementation Status (2026-05-24)
+
+    **Edge Server**: Core endpoints (health/runs/threads/projects/agents/events/permissions)
+    are fully implemented. P0 endpoints for approvals, artifacts, previews, workspaces,
+    and runner management are declared but not yet implemented — see phase tags.
+
+    **Hub Server**: All documented `/client/auth`, `/client/contacts`, `/client/sessions`,
+    `/client/messages`, `/edge/*`, `/web/*` endpoints are implemented. Additional routes
+    exist in code but are not yet documented here (~36 routes for session members,
+    message pins, attachments, notifications, custom agents, contacts search/block).
+    The legacy `/v1/auth`, `/v1/users`, `/v1/contacts` paths are planned for future
+    migration and not currently implemented.
+
+    ## Status tags
+    - `x-agenthub-status: implemented` — 已实现，可直接调用
+    - `x-agenthub-status: planned` — 远期规划，尚未实现
 servers:
   - url: http://127.0.0.1:3210
     description: Local Edge Server
-  - url: https://hub.example.com
-    description: Hub Server placeholder
+  - url: http://localhost:8080
+    description: Local Hub Server
+  - url: http://api.hub.vectorcontrol.tech
+    description: Production Hub Server (hk2)
 tags:
   - name: Foundation
     description: Health, capability and event stream handshake.
@@ -326,9 +345,23 @@ paths:
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ThreadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateThreadMessageRequest"
       responses:
         "201":
-          $ref: "#/components/responses/Created"
+          description: Message item created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
 
   /v1/items/{itemId}:
     get:
@@ -352,7 +385,26 @@ paths:
       x-agenthub-owner: Edge
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Runner list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListResponse"
+
+  /v1/agents:
+    get:
+      tags: [ExecutionRunner]
+      operationId: listAgents
+      summary: List available agent adapters.
+      x-agenthub-phase: P0
+      x-agenthub-owner: Edge
+      responses:
+        "200":
+          description: Agent adapter list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListResponse"
 
   /v1/runners/{runnerId}:
     get:
@@ -735,6 +787,293 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/List"
+
+  # ── Missing from original spec ──────────────────────────────
+
+  /v1/metrics:
+    get:
+      tags: [Foundation]
+      operationId: getMetrics
+      summary: Prometheus metrics.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      responses:
+        "200":
+          description: Prometheus text format.
+
+  /v1/agent-instances:
+    get:
+      tags: [ExecutionRunner]
+      operationId: listAgentInstances
+      summary: List orchestrator sub-agent instances.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - name: runId
+          in: query
+          schema: { type: string }
+        - name: parentId
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [ExecutionRunner]
+      operationId: createAgentInstance
+      summary: Register a sub-agent instance.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /v1/permissions/decide:
+    post:
+      tags: [ExecutionRunner]
+      operationId: decidePermission
+      summary: Approve or deny a pending permission request.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, decision]
+              properties:
+                requestId: { type: string }
+                decision: { type: string, enum: [allow, deny] }
+                reason: { type: string }
+      responses:
+        "200":
+          description: Decision recorded.
+
+  # ═══════════════════════════════════════════════════════════
+  # Hub Server Routes (prefix: /client, /edge, /web, /api/public)
+  # ═══════════════════════════════════════════════════════════
+
+  /health:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubHealth
+      summary: Hub health check (DB + Redis + migrations).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/public/stats:
+    get:
+      tags: [HubSyncRelay]
+      operationId: publicStats
+      summary: Public statistics for official website.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      responses:
+        "200":
+          description: Public stats.
+
+  /client/auth/register:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRegister
+      summary: Register a new user account.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, minLength: 3 }
+                password: { type: string, minLength: 8 }
+                nickname: { type: string }
+                device_type: { type: string, enum: [desktop, web] }
+                device_id: { type: string }
+      responses:
+        "201":
+          description: Account created.
+
+  /client/auth/login:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubLogin
+      summary: Login — returns JWT access + refresh tokens.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+                device_type: { type: string }
+                device_id: { type: string }
+      responses:
+        "200":
+          description: JWT tokens.
+
+  /client/auth/me:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubMe
+      summary: Get current user profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: User profile.
+
+  /client/contacts:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubContacts
+      summary: List contacts.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/sessions:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubSessions
+      summary: List user sessions (private + group).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/sessions/private:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreatePrivate
+      summary: Create a private (1-on-1) chat session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201":
+          description: Session created.
+
+  /client/sessions/group:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateGroup
+      summary: Create a group chat session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201":
+          description: Group created.
+
+  /client/sessions/{id}/messages:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetMessages
+      summary: Get paginated messages for a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubSendMessage
+      summary: Send a message to a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "201":
+          description: Message sent.
+
+  /client/ws:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubWebSocket
+      summary: Hub WebSocket — real-time IM + agent dispatch.
+      description: First frame must be auth handshake. See api/events.md for Hub event types.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      responses:
+        "101":
+          description: Switching Protocols.
+
+  /web/agent-tasks:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubTriggerTask
+      summary: Trigger an agent task from web client.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "202":
+          description: Task dispatched.
+
+  /edge/agent-tasks/{id}/stream:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubTaskStream
+      summary: Edge reports agent output stream chunk to Hub.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Chunk recorded.
+
+  /edge/agent-tasks/{id}/done:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubTaskDone
+      summary: Edge reports agent task completed.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Task marked done.
+
+  # ── Legacy / Planned (not yet implemented) ──────────────────
 
   /v1/auth/login:
     post:
@@ -1277,6 +1616,102 @@ components:
         threadId:
           type: string
           description: Thread to bind the run to. Defaults to the local thread in P0 compatibility mode.
+        prompt:
+          type: string
+          description: User message or task description passed to the agent.
+        agentId:
+          type: string
+          description: Agent adapter ID (claude-code, codex, opencode, orchestrator). Defaults to the server's --agent-default.
+        model:
+          type: string
+          description: Model override for this run (e.g. claude-sonnet-4-6).
+        sessionId:
+          type: string
+          description: Resume a specific session by ID (Claude Code --resume, OpenCode --session).
+        continue:
+          type: boolean
+          description: Continue the most recent session (Claude Code --continue, OpenCode --continue).
+        fork:
+          type: boolean
+          description: Fork session before continuing (Claude Code --fork-session, OpenCode --fork).
+        reasoningEffort:
+          type: string
+          description: >
+            Reasoning effort level. Claude Code values: low, medium, high, max.
+            Codex values: minimal, low, medium, high, xhigh.
+            OpenCode: passed as --variant for thinking control.
+        maxThinkingTokens:
+          type: integer
+          description: Maximum thinking token budget (Claude Code --max-thinking-tokens).
+        permissionMode:
+          type: string
+          description: >
+            Claude Code permission mode: default, acceptEdits, bypassPermissions, plan, dontAsk.
+            Also mapped to Codex --sandbox level.
+        includePartial:
+          type: boolean
+          description: Include partial stream_event messages for real-time deltas (Claude Code --include-partial-messages).
+    AgentInfo:
+      type: object
+      required: [id, name, status]
+      properties:
+        id:
+          type: string
+          description: Agent adapter ID.
+        name:
+          type: string
+          description: Display name.
+        description:
+          type: string
+          description: Human-readable description.
+        version:
+          type: string
+          description: CLI version if detected.
+        status:
+          type: string
+          description: '"available" if the agent CLI is configured and reachable.'
+        capabilities:
+          type: object
+          additionalProperties: true
+          description: Capability flags (streaming, toolCalls, fileChanges, etc.).
+    CreateThreadMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          description: Message body. Whitespace-only content is rejected by the Edge server.
+        role:
+          type: string
+          default: user
+          description: Message role. Defaults to user when omitted.
+    Item:
+      type: object
+      required: [itemId, projectId, threadId, type, status, createdAt, updatedAt]
+      properties:
+        itemId:
+          type: string
+        projectId:
+          type: string
+        threadId:
+          type: string
+        runId:
+          type: string
+        type:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     Run:
       type: object
       required: [runId, projectId, threadId, status, createdAt]

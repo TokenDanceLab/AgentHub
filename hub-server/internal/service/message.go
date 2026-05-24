@@ -2,12 +2,18 @@ package service
 
 import (
 	"context"
+<<<<<<< HEAD
 	"fmt"
 	"golang.org/x/sync/errgroup"
+=======
+	"encoding/json"
+	"fmt"
+>>>>>>> origin/master
 	"log/slog"
 	"strings"
 	"time"
 
+<<<<<<< HEAD
 	"gorm.io/gorm"
 
 	"github.com/agenthub/server-hub/internal/cache"
@@ -15,10 +21,21 @@ import (
 	"github.com/agenthub/server-hub/pkg/uuidv7"
 	"github.com/agenthub/server-hub/internal/model"
 	"github.com/agenthub/server-hub/internal/repository"
+=======
+	"golang.org/x/sync/errgroup"
+	"gorm.io/gorm"
+
+	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/pkg/uuidv7"
+>>>>>>> origin/master
 )
 
 const maxPinsPerSession = 50
 
+<<<<<<< HEAD
 type MessageService struct {
 	db  *gorm.DB
 	bus *Bus
@@ -30,6 +47,25 @@ func NewMessageService(db *gorm.DB, bus *Bus) *MessageService {
 
 func (s *MessageService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
 	seq, err := cache.AllocateSeq(ctx, sessionID)
+=======
+// messageCache is the subset of *cache.Client methods used by MessageService.
+type messageCache interface {
+	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
+}
+
+type MessageService struct {
+	db          *gorm.DB
+	bus         *Bus
+	cacheClient messageCache
+}
+
+func NewMessageService(db *gorm.DB, bus *Bus, cacheClient *cache.Client) *MessageService {
+	return &MessageService{db: db, bus: bus, cacheClient: cacheClient}
+}
+
+func (s *MessageService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	seq, err := s.cacheClient.AllocateSeq(ctx, sessionID)
+>>>>>>> origin/master
 	if err == nil {
 		return seq, nil
 	}
@@ -51,12 +87,21 @@ type SendMessageRequest struct {
 }
 
 type ReplyToInfo struct {
+<<<<<<< HEAD
 	ID           string `json:"id"`
 	SenderID     string `json:"sender_id"`
 	ContentType  string `json:"content_type"`
 	Content      string `json:"content"`
 	Recalled     bool   `json:"recalled"`
 	CreatedAt    string `json:"created_at"`
+=======
+	ID          string `json:"id"`
+	SenderID    string `json:"sender_id"`
+	ContentType string `json:"content_type"`
+	Content     string `json:"content"`
+	Recalled    bool   `json:"recalled"`
+	CreatedAt   string `json:"created_at"`
+>>>>>>> origin/master
 }
 
 type MessageResponse struct {
@@ -92,7 +137,15 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 
 	content := req.Content
 	if req.ContentType == "text" {
+<<<<<<< HEAD
 		content = `{"text":"` + strings.ReplaceAll(req.Content, `"`, `\"`) + `"}`
+=======
+		contentBytes, err := json.Marshal(map[string]string{"text": req.Content})
+		if err != nil {
+			return nil, errcode.ErrInternal
+		}
+		content = string(contentBytes)
+>>>>>>> origin/master
 	}
 
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, senderUserID)

@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
+<<<<<<< HEAD
 	"github.com/agenthub/server-hub/internal/cache"
 	"github.com/agenthub/server-hub/internal/config"
 	"github.com/agenthub/server-hub/internal/errcode"
@@ -22,6 +23,30 @@ type AuthService struct {
 
 func NewAuthService(db *gorm.DB) *AuthService {
 	return &AuthService{db: db}
+=======
+	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/pkg/uuidv7"
+)
+
+// authCache is the subset of *cache.Client methods used by AuthService.
+type authCache interface {
+	Invalidate(ctx context.Context, keys ...string) error
+}
+
+type AuthService struct {
+	db          *gorm.DB
+	jwtCfg      config.JWTConfig
+	cacheClient authCache
+}
+
+func NewAuthService(db *gorm.DB, jwtCfg config.JWTConfig, cacheClient *cache.Client) *AuthService {
+	return &AuthService{db: db, jwtCfg: jwtCfg, cacheClient: cacheClient}
+>>>>>>> origin/master
 }
 
 type LoginResponse struct {
@@ -34,10 +59,17 @@ func (s *AuthService) Register(ctx context.Context, username, password, nickname
 	if len(username) < 4 || len(username) > 32 {
 		return nil, errcode.UserInvalidParam
 	}
+<<<<<<< HEAD
 	if len(password) < 8 || len(password) > 64 {
 		return nil, errcode.UserInvalidParam
 	}
 	if len(nickname) < 1 || len(nickname) > 64 {
+=======
+	if len(password) < config.MinPasswordLength || len(password) > config.MaxPasswordLength {
+		return nil, errcode.UserInvalidParam
+	}
+	if len(nickname) < 1 || len(nickname) > config.MaxPasswordLength {
+>>>>>>> origin/master
 		return nil, errcode.UserInvalidParam
 	}
 
@@ -78,14 +110,24 @@ func (s *AuthService) Login(ctx context.Context, username, password, deviceType,
 		return nil, errcode.AuthInvalidCredentials
 	}
 
+<<<<<<< HEAD
 	if err := repository.UpsertDevice(s.db, &model.Device{
 		ID: deviceID, UserID: user.ID, DeviceType: deviceType, Capabilities: "[]",
+=======
+	devUUID := uuidv7.Must()
+	if err := repository.UpsertDevice(s.db, &model.Device{
+		ID: uuidv7.Must(), UserID: user.ID, DeviceType: deviceType, Capabilities: "[]",
+>>>>>>> origin/master
 	}); err != nil {
 		return nil, err
 	}
 
 	accessToken, err := jwtutil.GenerateAccessToken(user.ID, deviceType, deviceID,
+<<<<<<< HEAD
 		config.Cfg.JWT.Secret, config.Cfg.JWT.AccessTTL)
+=======
+		s.jwtCfg.Secret, s.jwtCfg.AccessTTL)
+>>>>>>> origin/master
 	if err != nil {
 		return nil, err
 	}
@@ -97,9 +139,15 @@ func (s *AuthService) Login(ctx context.Context, username, password, deviceType,
 
 	tokenHash := jwtutil.HashRefreshToken(rawRefresh)
 	rt := &model.RefreshToken{
+<<<<<<< HEAD
 		UserID: user.ID, DeviceType: deviceType, DeviceID: deviceID,
 		TokenHash: tokenHash,
 		ExpiresAt: time.Now().Add(config.Cfg.JWT.RefreshTTL),
+=======
+		UserID: user.ID, DeviceType: deviceType, DeviceID: devUUID,
+		TokenHash: tokenHash,
+		ExpiresAt: time.Now().Add(s.jwtCfg.RefreshTTL),
+>>>>>>> origin/master
 	}
 	if err := repository.UpsertRefreshToken(s.db, rt); err != nil {
 		return nil, err
@@ -108,7 +156,11 @@ func (s *AuthService) Login(ctx context.Context, username, password, deviceType,
 	return &LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: rawRefresh,
+<<<<<<< HEAD
 		ExpiresIn:    int64(config.Cfg.JWT.AccessTTL.Seconds()),
+=======
+		ExpiresIn:    int64(s.jwtCfg.AccessTTL.Seconds()),
+>>>>>>> origin/master
 	}, nil
 }
 
@@ -123,7 +175,11 @@ func (s *AuthService) RefreshToken(ctx context.Context, rawRefreshToken string) 
 	}
 
 	accessToken, err := jwtutil.GenerateAccessToken(rt.UserID, rt.DeviceType, rt.DeviceID,
+<<<<<<< HEAD
 		config.Cfg.JWT.Secret, config.Cfg.JWT.AccessTTL)
+=======
+		s.jwtCfg.Secret, s.jwtCfg.AccessTTL)
+>>>>>>> origin/master
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +187,11 @@ func (s *AuthService) RefreshToken(ctx context.Context, rawRefreshToken string) 
 	return &LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: rawRefreshToken,
+<<<<<<< HEAD
 		ExpiresIn:    int64(config.Cfg.JWT.AccessTTL.Seconds()),
+=======
+		ExpiresIn:    int64(s.jwtCfg.AccessTTL.Seconds()),
+>>>>>>> origin/master
 	}, nil
 }
 
@@ -164,12 +224,20 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID, nickname, avata
 	if err := repository.UpdateUser(s.db, user); err != nil {
 		return nil, err
 	}
+<<<<<<< HEAD
 	cache.Invalidate(ctx, "user:profile:"+userID)
+=======
+	s.cacheClient.Invalidate(ctx, "user:profile:"+userID)
+>>>>>>> origin/master
 	return user, nil
 }
 
 func (s *AuthService) ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error {
+<<<<<<< HEAD
 	if len(newPassword) < 8 || len(newPassword) > 64 {
+=======
+	if len(newPassword) < config.MinPasswordLength || len(newPassword) > config.MaxPasswordLength {
+>>>>>>> origin/master
 		return errcode.UserInvalidParam
 	}
 
@@ -191,6 +259,10 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID, oldPassword, n
 		return err
 	}
 
+<<<<<<< HEAD
 	cache.Invalidate(ctx, "user:profile:"+userID)
+=======
+	s.cacheClient.Invalidate(ctx, "user:profile:"+userID)
+>>>>>>> origin/master
 	return repository.RevokeAllUserTokens(s.db, userID)
 }

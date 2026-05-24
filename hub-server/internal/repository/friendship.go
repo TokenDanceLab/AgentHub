@@ -6,7 +6,11 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+<<<<<<< HEAD
 	"github.com/agenthub/server-hub/internal/model"
+=======
+	"github.com/agenthub/hub-server/internal/model"
+>>>>>>> origin/master
 )
 
 func CreateFriendship(db *gorm.DB, f *model.Friendship) error {

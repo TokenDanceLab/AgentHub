@@ -1,6 +1,7 @@
 package handler
 
 import (
+<<<<<<< HEAD
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/server-hub/internal/errcode"
@@ -12,6 +13,37 @@ type SessionHandler struct {
 }
 
 func NewSessionHandler(s *service.SessionService) *SessionHandler {
+=======
+	"context"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/service"
+)
+
+// SessionService is the subset of *service.SessionService used by SessionHandler.
+type SessionService interface {
+	CreatePrivateSession(ctx context.Context, currentUserID, targetUserID string) (*service.CreateSessionResponse, error)
+	CreateGroupSession(ctx context.Context, ownerUserID, name string, memberIDs []string) (*service.CreateSessionResponse, error)
+	ListSessions(ctx context.Context, userID string) ([]service.SessionListItem, error)
+	AddGroupMembers(ctx context.Context, currentUserID, sessionID string, memberIDs []string) error
+	RemoveGroupMember(ctx context.Context, currentUserID, sessionID, targetUserID string) error
+	LeaveGroup(ctx context.Context, currentUserID, sessionID string) error
+	TransferGroupOwnership(ctx context.Context, currentUserID, sessionID, newOwnerID string) error
+	DissolveGroup(ctx context.Context, currentUserID, sessionID string) error
+	UpdateGroupInfo(ctx context.Context, currentUserID, sessionID string, name, avatarURL, announcement *string) error
+	UpdateMemberSettings(ctx context.Context, currentUserID, sessionID string, pinned, archived, muted *bool) error
+	DeleteForMe(ctx context.Context, currentUserID, sessionID string) error
+	SearchSessions(ctx context.Context, userID, q string) ([]service.SessionListItem, error)
+}
+
+type SessionHandler struct {
+	service SessionService
+}
+
+func NewSessionHandler(s SessionService) *SessionHandler {
+>>>>>>> origin/master
 	return &SessionHandler{service: s}
 }
 

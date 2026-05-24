@@ -1,0 +1,752 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 200px;
+}
+
+.stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-md);
+  overflow-anchor: none;
+  background: transparent;
+}
+
+.virtualItem {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding-bottom: var(--space-xl);
+}
+
+.empty {
+  margin: auto;
+  color: var(--foreground);
+  opacity: 0.4;
+  font-size: var(--font-size-sm);
+}
+
+/* ── Message bubbles ─────────────────────── */
+
+.message {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-width: 85%;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 8px;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  overflow: visible;
+  animation: messageIn 0.2s ease-out;
+}
+
+/* ── Responsive: Tablet (768px - 1023px) ─ */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .message {
+    max-width: 90%;
+  }
+}
+
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Skeleton loading animation ───────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.userMsg {
+  align-self: flex-end;
+  background: color-mix(in oklch, var(--primary) 20%, transparent);
+  border: 1px solid color-mix(in oklch, var(--primary) 30%, transparent);
+}
+
+.agentMsg {
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--primary);
+}
+
+.systemMsg {
+  align-self: center;
+  background: transparent;
+  border: none;
+  opacity: 0.5;
+  font-size: var(--font-size-xs);
+  max-width: 100%;
+  padding: var(--space-xs) 0;
+}
+
+/* ── Hover overlay ─────────────────────────── */
+.message::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--hover-overlay);
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.message:hover::after {
+  opacity: 1;
+}
+
+/* Ensure message content sits above the overlay */
+.message > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Agent avatar + name ──────────────────── */
+.agentAvatar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+.avatarCircle {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  flex-shrink: 0;
+}
+
+.agentNameLabel {
+  font-size: var(--font-size-xs);
+  color: var(--text-weaker);
+  white-space: nowrap;
+}
+
+/* ── Timestamp ────────────────────────────── */
+.timestamp {
+  position: absolute;
+  bottom: var(--space-xs);
+  right: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-weaker);
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.message:hover .timestamp {
+  opacity: 1;
+}
+
+/* ── Text ────────────────────────────────── */
+
+.text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Code ────────────────────────────────── */
+
+.codeBlock {
+  position: relative;
+  margin: var(--space-xs) 0;
+  padding: var(--space-sm);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  overflow-x: auto;
+}
+
+.codeLang {
+  position: absolute;
+  top: 2px;
+  right: 8px;
+  font-size: 10px;
+  opacity: 0.5;
+  text-transform: uppercase;
+}
+
+/* ── Highlighted Code Block ───────────────── */
+
+.codeBlockHighlighted {
+  margin: var(--space-xs) 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.codeBlockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.codeLangBadge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  text-transform: lowercase;
+}
+
+.copyBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+
+.copyBtn:hover {
+  background: color-mix(in oklch, var(--foreground) 12%, transparent);
+  color: var(--foreground);
+}
+
+/* ── Thinking ────────────────────────────── */
+
+.thinking {
+  margin: var(--space-xs) 0;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+}
+
+/* ── Tool call ───────────────────────────── */
+
+.toolInput,
+.toolOutput {
+  margin-top: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--background);
+  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* ── File change ─────────────────────────── */
+
+.fileCard {
+  margin: var(--space-xs) 0;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 4px;
+  border-left: 3px solid var(--border);
+}
+
+.fileCard summary {
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  font-family: var(--font-mono);
+  user-select: none;
+}
+
+.added {
+  border-left-color: var(--success);
+}
+
+.removed {
+  border-left-color: var(--destructive);
+}
+
+.modified {
+  border-left-color: var(--primary);
+}
+
+.diff {
+  margin-top: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--background);
+  border-radius: 3px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+/* ── CollapsibleBlock inner content ───────── */
+
+.sessionMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.sessionMetaLabel {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  margin-right: 2px;
+}
+
+.tokenUsage {
+  display: flex;
+  gap: var(--space-lg);
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+}
+
+/* ── Progressive Disclosure ───────────────── */
+
+.chevron {
+  display: inline-block;
+  font-size: 10px;
+  transition: transform var(--duration-fast) var(--ease-out);
+  opacity: 0.5;
+}
+.chevronDown {
+  transform: rotate(90deg);
+}
+
+/* Thinking block */
+.thinkingToggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
+  transition: opacity var(--duration-fast);
+}
+.thinkingToggle:hover {
+  opacity: 1;
+}
+.thinkingLen {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.5;
+}
+.thinkingContent {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-xs);
+  opacity: 0.65;
+  white-space: pre-wrap;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+/* Tool use block (conditional rendering, no <details>) */
+.toolUseContainer {
+  margin: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.toolUseHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: color-mix(in oklch, var(--primary) 8%, transparent);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  transition: background var(--duration-fast);
+}
+.toolUseHeader:hover {
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+}
+.toolIcon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.toolName {
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+.toolParamSummary {
+  color: var(--foreground);
+  opacity: 0.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.toolStatus {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.toolStatusPending {
+  background: var(--border);
+  color: var(--muted-foreground);
+}
+
+.toolStatusRunning {
+  background: color-mix(in oklch, var(--warning) 20%, transparent);
+  color: var(--warning);
+  animation: statusPulse 1.5s ease-in-out infinite;
+}
+
+.toolStatusDone {
+  background: color-mix(in oklch, var(--success) 20%, transparent);
+  color: var(--success);
+}
+
+.toolStatusFailed {
+  background: color-mix(in oklch, var(--destructive) 20%, transparent);
+  color: var(--destructive);
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.toolUseBody {
+  padding: var(--space-xs) var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+.showParamsBtn {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  margin-bottom: var(--space-xs);
+}
+.showParamsBtn:hover {
+  color: var(--foreground);
+}
+
+.readResult {
+  padding: 4px 0;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+}
+.bashResult {
+  margin-top: var(--space-xs);
+}
+.toolStderr {
+  color: var(--destructive);
+}
+.exitCode {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: var(--border);
+}
+
+/* ── Diff Card inline ─────────────────────── */
+.diffCard {
+  margin: var(--space-xs) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.diffCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-xs);
+  position: sticky;
+  top: 0;
+}
+.diffAdded {
+  font-weight: var(--font-weight-medium);
+  color: var(--diff-added-border);
+}
+.diffDeleted {
+  font-weight: var(--font-weight-medium);
+  color: var(--diff-removed-border);
+}
+.viewFullDiff {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+}
+.viewFullDiff:hover {
+  text-decoration: underline;
+}
+
+.diffInline {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 250px;
+  overflow-y: auto;
+}
+.lineAdded {
+  background: var(--diff-added-bg);
+  border-left: 3px solid var(--diff-added-border);
+  padding-left: 4px;
+}
+.lineDeleted {
+  background: var(--diff-removed-bg);
+  border-left: 3px solid var(--diff-removed-border);
+  padding-left: 4px;
+}
+.lineContext {
+  padding-left: 7px;
+}
+.linePrefix {
+  display: inline-block;
+  width: 16px;
+  text-align: center;
+  opacity: 0.5;
+  user-select: none;
+}
+.diffTruncated {
+  padding: 2px 8px;
+  color: var(--muted-foreground);
+  font-style: italic;
+  font-size: 10px;
+}
+
+/* ── Streaming cursor ────────────────────── */
+
+.cursor {
+  align-self: flex-start;
+  width: 8px;
+  height: 16px;
+  background: var(--primary);
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ── Message action bar ──────────────────── */
+
+.actionBar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+  z-index: 1;
+}
+
+.message:hover .actionBar {
+  opacity: 1;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast);
+}
+
+.actionBtn:active {
+  transform: scale(0.96);
+}
+
+.actionBtn:hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+
+/* ── Streaming progress bar ──────────────── */
+
+.streamProgress {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--primary) 50%,
+    transparent 100%
+  );
+  animation: progressSweep 1.5s ease-in-out infinite;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+@keyframes progressSweep {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Message hover enhancement ───────────── */
+
+.agentMsg:hover {
+  background: var(--surface-raised-hover);
+}
+
+.copyToast {
+  position: absolute;
+  bottom: -22px;
+  right: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 11px;
+  pointer-events: none;
+  z-index: 10;
+  animation: toastFade 1.5s ease-out forwards;
+}
+
+/* ── Scroll-to-bottom indicator ──────────── */
+
+.scrollToBottomBtn {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+  animation: toastFade 0.3s ease-out;
+  transition: background var(--duration-fast), transform var(--duration-fast);
+}
+
+.scrollToBottomBtn:hover {
+  background: color-mix(in oklch, var(--primary) 10%, var(--card));
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.scrollToBottomBtn:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Mobile (< 768px)
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .stream {
+    padding: var(--space-sm);
+    gap: var(--space-xs);
+  }
+
+  .message {
+    max-width: 95%;
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .actionBar {
+    opacity: 1; /* always visible on touch */
+  }
+
+  .actionBtn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .toolUseHeader {
+    padding: 8px 10px;
+    min-height: 44px;
+  }
+
+  .toolUseContainer {
+    margin: 2px 0;
+  }
+
+  .diffInline {
+    font-size: 10px;
+    max-height: 180px;
+  }
+
+  .codeBlock {
+    font-size: 11px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .toolParamSummary {
+    display: none; /* hide param summary on mobile to save space */
+  }
+
+  .diffCard {
+    max-width: 100%;
+  }
+
+  .diffCardHeader {
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 10px;
+  }
+
+}
+
+/* ═══════════════════════════════════════════════════════
+   Tablet (768px - 1023px)
+   ═══════════════════════════════════════════════════════ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .message {
+    max-width: 90%;
+  }
+
+  .stream {
+    padding: var(--space-md);
+  }
+}
