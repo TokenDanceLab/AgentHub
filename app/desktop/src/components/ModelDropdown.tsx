@@ -1,7 +1,7 @@
-// Custom model/agent dropdown — Portal-rendered popover with glass blur.
+// Custom model/agent dropdown — Portal-rendered, high-density two-line items.
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check, Terminal, Braces, Box } from 'lucide-react';
 import { ModelIcon } from '@lobehub/icons';
 import styles from './ModelDropdown.module.css';
 
@@ -9,6 +9,9 @@ interface Option {
   value: string;
   label: string;
   group?: string;
+  desc?: string;       // second-line description
+  meta?: string;       // right-aligned metadata tag (e.g. "Context 200k")
+  isAgent?: boolean;   // true = agent-style icon, false = model mono icon
 }
 
 interface Props {
@@ -33,6 +36,26 @@ function cleanModelName(name: string): string {
   return map[name] || name;
 }
 
+function AgentDot({ name }: { name: string }) {
+  const n = name.toLowerCase();
+  if (n.includes('claude')) return (
+    <span className={styles.agentIcon} style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)' }}>
+      <Terminal size={12} strokeWidth={2} color="#fff" />
+    </span>
+  );
+  if (n.includes('codex')) return (
+    <span className={styles.agentIcon} style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+      <Box size={12} strokeWidth={2} color="#fff" />
+    </span>
+  );
+  if (n.includes('opencode')) return (
+    <span className={styles.agentIcon} style={{ background: 'linear-gradient(135deg, #0ea5e9, #0369a1)' }}>
+      <Braces size={12} strokeWidth={2} color="#fff" />
+    </span>
+  );
+  return <ModelIcon model={name} size={18} />;
+}
+
 export default function ModelDropdown({ options, value, onChange, placeholder, disabled, ariaLabel }: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
@@ -42,7 +65,6 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
   const selected = options.find((o) => o.value === value);
   const displayLabel = selected ? cleanModelName(selected.label) : (placeholder || 'Select...');
 
-  // Group options
   const grouped: Record<string, Option[]> = useMemo(() => {
     const g: Record<string, Option[]> = {};
     for (const opt of options) {
@@ -53,46 +75,40 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
     return g;
   }, [options]);
 
-  // Calculate position before opening
   const openDropdown = useCallback(() => {
     if (disabled) return;
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 200) });
+      setPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 280) });
     }
     setOpen(true);
   }, [disabled]);
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (triggerRef.current?.contains(target)) return; // trigger handles own toggle
-      if (dropdownRef.current?.contains(target)) return; // inside dropdown
+      const t = e.target as Node;
+      if (triggerRef.current?.contains(t)) return;
+      if (dropdownRef.current?.contains(t)) return;
       setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [open]);
 
-  // Reposition on scroll/resize
   useEffect(() => {
     if (!open) return;
     const handler = () => {
       if (triggerRef.current) {
         const rect = triggerRef.current.getBoundingClientRect();
-        setPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 200) });
+        setPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 280) });
       }
     };
     window.addEventListener('scroll', handler, true);
@@ -126,11 +142,23 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
               className={`${styles.item} ${opt.value === value ? styles.itemActive : ''}`}
               onClick={() => handleSelect(opt.value)}
             >
-              <span className={styles.itemLabel}>
-                <ModelIcon model={opt.value} size={16} />
-                <span>{cleanModelName(opt.label)}</span>
+              <span className={styles.itemIcon}>
+                {opt.isAgent ? (
+                  <AgentDot name={opt.label} />
+                ) : (
+                  <ModelIcon model={opt.value} size={18} />
+                )}
               </span>
-              {opt.value === value && <Check size={14} className={styles.check} />}
+              <span className={styles.itemBody}>
+                <span className={styles.itemName}>{cleanModelName(opt.label)}</span>
+                {opt.desc && (
+                  <span className={styles.itemDesc}>{opt.desc}</span>
+                )}
+              </span>
+              <span className={styles.itemRight}>
+                {opt.meta && <span className={styles.itemMeta}>{opt.meta}</span>}
+                {opt.value === value && <Check size={14} className={styles.check} />}
+              </span>
             </button>
           ))}
         </div>
