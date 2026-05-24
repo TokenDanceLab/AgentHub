@@ -245,6 +245,10 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Install shared deps
+        working-directory: app/shared
+        run: pnpm install --frozen-lockfile
+
       - name: Type check
         run: pnpm typecheck
 
