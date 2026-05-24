@@ -106,6 +106,9 @@ docs/review/
 docs/inbox/*
 !docs/inbox/README.md
 
+# Local ops docs — deployment details, SSH, server addresses (not for repo)
+.ops/
+
 # Review reports — cross-review and audit outputs
 docs/review/*
 !docs/review/README.md

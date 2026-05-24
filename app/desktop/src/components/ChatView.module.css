@@ -3,7 +3,7 @@
   flex-direction: column;
   flex: 1;
   min-width: 0;
-  background: var(--background);
+  min-height: 200px;
 }
 
 .stream {
@@ -11,6 +11,7 @@
   overflow-y: auto;
   padding: var(--space-md);
   overflow-anchor: none;
+  background: transparent;
 }
 
 .virtualItem {
@@ -41,6 +42,7 @@
   font-size: var(--font-size-sm);
   line-height: 1.5;
   overflow: visible;
+  animation: messageIn 0.2s ease-out;
 }
 
 /* ── Responsive: Tablet (768px - 1023px) ─ */
@@ -62,6 +64,12 @@
   }
 }
 
+/* ── Skeleton loading animation ───────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 .userMsg {
   align-self: flex-end;
   background: color-mix(in oklch, var(--primary) 20%, transparent);
@@ -70,8 +78,9 @@
 
 .agentMsg {
   align-self: flex-start;
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
+  border-left: 2px solid var(--primary);
 }
 
 .systemMsg {
@@ -81,6 +90,7 @@
   opacity: 0.5;
   font-size: var(--font-size-xs);
   max-width: 100%;
+  padding: var(--space-xs) 0;
 }
 
 /* ── Hover overlay ─────────────────────────── */

@@ -100,11 +100,12 @@
 
 .item:hover {
   background: var(--hover-overlay);
+  transition: background var(--duration-fast) var(--ease-out);
 }
 
 .selected {
   box-shadow: inset 3px 0 0 var(--primary);
-  background: var(--surface-raised);
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
 }
 
 .itemInfo {

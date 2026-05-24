@@ -32,33 +32,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-.tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-}
-
-.tab {
-  padding: 6px 12px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--muted-foreground);
-  font-size: var(--font-size-xs);
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    border-color 0.15s;
-}
-
-.tab:hover {
-  color: var(--foreground);
-}
-
-.tabActive {
-  color: var(--foreground);
-  border-bottom-color: var(--primary);
-}
-
 .tabContent {
   flex: 1;
   overflow-y: auto;
@@ -83,7 +56,7 @@
 }
 
 .statusDone {
-  background: color-mix(in oklch, var(--success) 20%, transparent);
+  background: color-mix(in oklch, var(--success) 12%, transparent);
   color: var(--success);
 }
 

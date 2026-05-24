@@ -36,8 +36,14 @@ export function createHubAuth(client?: HubClient): HubAuth {
 
   const listeners = new Set<(s: HubAuthState) => void>();
 
+  // Stable snapshot — only changes when notify() is called.
+  // useSyncExternalStore + StrictMode requires getState() to return
+  // the SAME reference between renders, otherwise React detects a
+  // mismatch and triggers infinite re-renders.
+  let snapshot: HubAuthState = { ...state };
+
   function notify() {
-    const snapshot: HubAuthState = { ...state };
+    snapshot = { ...state };
     listeners.forEach((fn) => fn(snapshot));
   }
 
@@ -49,7 +55,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
   let authClient = createHubClient({ getToken });
 
   return {
-    getState: () => ({ ...state }),
+    getState: () => snapshot,
 
     subscribe(fn: (s: HubAuthState) => void) {
       listeners.add(fn);

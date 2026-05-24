@@ -158,7 +158,8 @@ export default function PromptInput({
         onClose={closeMention}
       />
 
-      <div className={styles.configRow}>
+      <div className={styles.inputCard}>
+        <div className={styles.configRow}>
         <select
           className={styles.select}
           value={model}
@@ -222,33 +223,35 @@ export default function PromptInput({
             <span className={styles.enterHint}>
               <kbd className={styles.shortcutKey}>{textareaFocused ? 'Shift+Enter' : 'Enter'}</kbd>
             </span>
-            <span className={styles.charCount}>
-              {promptLength}/{MAX_CHARS}
-            </span>
+            <div className={styles.buttonGroup}>
+              <span className={styles.charCount}>
+                {promptLength}/{MAX_CHARS}
+              </span>
+              {isStreaming ? (
+                <button
+                  className={styles.stopBtn}
+                  onClick={onCancel}
+                  disabled={disabled}
+                  aria-label={t('action.cancelRun')}
+                  title={t('action.cancelRun')}
+                >
+                  <Square size={16} fill="currentColor" />
+                </button>
+              ) : (
+                <button
+                  className={styles.sendBtn}
+                  onClick={handleSend}
+                  disabled={disabled || promptLength === 0}
+                  aria-label={t('action.startRun')}
+                  title={t('action.startRun')}
+                >
+                  <Send size={16} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
-
-        {isStreaming ? (
-          <button
-            className={styles.stopBtn}
-            onClick={onCancel}
-            disabled={disabled}
-            aria-label={t('action.cancelRun')}
-            title={t('action.cancelRun')}
-          >
-            <Square size={16} fill="currentColor" />
-          </button>
-        ) : (
-          <button
-            className={styles.sendBtn}
-            onClick={handleSend}
-            disabled={disabled || promptLength === 0}
-            aria-label={t('action.startRun')}
-            title={t('action.startRun')}
-          >
-            <Send size={16} />
-          </button>
-        )}
+      </div>
       </div>
     </div>
   );
