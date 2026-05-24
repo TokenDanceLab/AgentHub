@@ -95,3 +95,15 @@
 :global([data-theme='dark']) .trigger { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.06); }
 :global([data-theme='dark']) .trigger:hover { background: rgba(255,255,255,0.06); }
 :global([data-theme='dark']) .separator { background: rgba(255,255,255,0.06); }
+
+/* ── Text-only variant ────────────────────── */
+.triggerText {
+  background: transparent !important; border: none !important;
+  padding: 0 !important; font-size: 11px; color: #64748B;
+  font-weight: 400; gap: 2px; min-width: 0;
+}
+.triggerText:hover { color: #1F2937; }
+.triggerText:focus-visible { box-shadow: none; outline: none; color: #4F46E5; }
+
+[data-theme='dark'] .triggerText { color: #94A3B8; }
+[data-theme='dark'] .triggerText:hover { color: #E5E7EB; }
