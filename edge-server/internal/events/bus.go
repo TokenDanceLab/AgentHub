@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+const (
+	defaultMaxHistory             = 10000
+	subscriberChannelBufferSize = 256
+)
+
 // EventEnvelope is the standard event wrapper for all WebSocket events.
 type EventEnvelope struct {
 	Version string         `json:"version"`
@@ -38,7 +43,7 @@ type Bus struct {
 // NewBus creates a new event bus with the given maximum history size.
 func NewBus(maxHistory int) *Bus {
 	if maxHistory <= 0 {
-		maxHistory = 10000
+		maxHistory = defaultMaxHistory
 	}
 	return &Bus{
 		history:    make([]EventEnvelope, 0, maxHistory),
@@ -93,7 +98,7 @@ func (b *Bus) Subscribe(cursor int64) (int64, <-chan EventEnvelope, []EventEnvel
 	id := b.nextSubID
 	b.nextSubID++
 
-	ch := make(chan EventEnvelope, 256)
+	ch := make(chan EventEnvelope, subscriberChannelBufferSize)
 	b.subs = append(b.subs, subscriber{id: id, ch: ch})
 
 	// Replay events after cursor.

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
@@ -89,6 +90,14 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 
 	var executor lifecycle.RunExecutor
 	hasAdapter := cfg.AdapterRegistry != nil && cfg.AgentDefault != ""
+
+	agentReg := agents.NewRegistry()
+	msgQueue := agents.NewQueue()
+
+	// Result aggregator collects sub-agent output and routes it back to the parent orchestrator.
+	resultAgg := lifecycle.NewResultAggregator(bus, agentReg)
+	_ = resultAgg.Start() // stop function; goroutine exits on process shutdown
+
 	if cfg.ProcessExecutor.Command != "" || hasAdapter {
 		execCfg := cfg.ProcessExecutor
 		if execCfg.Command == "" && hasAdapter {
@@ -108,8 +117,12 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 			return nil, err
 		}
 		processExecutor.SetMetrics(edgeMetrics)
+		processExecutor.WithAgentRegistry(agentReg).WithMessageQueue(msgQueue).WithResultAggregator(resultAgg)
 		executor = processExecutor
 	}
+
+	// Wire orchestrator adapter with runtime dependencies so it can spawn sub-agents.
+	wireOrchestrator(cfg.AdapterRegistry, executor, agentReg, msgQueue)
 
 	return &api.Handler{
 		Bus:             bus,
@@ -117,8 +130,32 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		Store:           cfg.Store,
 		Executor:        executor,
 		AdapterRegistry: cfg.AdapterRegistry,
+		AgentRegistry:   agentReg,
+		MessageQueue:    msgQueue,
 		Metrics:         edgeMetrics,
 	}, nil
+}
+
+// wireOrchestrator sets the SubAgentSpawner, AgentRegistry, and MessageQueue on
+// the orchestrator adapter so it can spawn sub-agent runs during ParseStream.
+func wireOrchestrator(adapterReg *adapters.Registry, executor lifecycle.RunExecutor, agentReg *agents.Registry, msgQueue *agents.Queue) {
+	if adapterReg == nil || executor == nil {
+		return
+	}
+	orch, ok := adapterReg.Get("orchestrator")
+	if !ok {
+		return
+	}
+	orchAdapter, ok := orch.(*adapters.OrchestratorAdapter)
+	if !ok {
+		return
+	}
+	// Wire runtime dependencies into the orchestrator adapter.
+	if spawner, ok := executor.(adapters.SubAgentSpawner); ok {
+		orchAdapter.WithSpawner(spawner)
+	}
+	orchAdapter.WithAgentRegistry(agentReg)
+	orchAdapter.WithMessageQueue(msgQueue)
 }
 
 func corsMiddleware(next http.Handler) http.Handler {

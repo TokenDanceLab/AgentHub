@@ -5,6 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
 )
 
@@ -19,8 +20,8 @@ func GetMessageByID(db *gorm.DB, id string) (*model.Message, error) {
 }
 
 func GetMessagesBySession(db *gorm.DB, sessionID string, beforeSeq int64, limit int) ([]model.Message, error) {
-	if limit <= 0 || limit > 100 {
-		limit = 50
+	if limit <= 0 || limit > config.MaxMessagePageLimit {
+		limit = config.DefaultPaginationLimit
 	}
 	var msgs []model.Message
 	query := db.Where("session_id = ?", sessionID)
@@ -32,8 +33,8 @@ func GetMessagesBySession(db *gorm.DB, sessionID string, beforeSeq int64, limit 
 }
 
 func GetMessagesIncrement(db *gorm.DB, sessionID string, afterSeq int64, limit int) ([]model.Message, error) {
-	if limit <= 0 || limit > 500 {
-		limit = 500
+	if limit <= 0 || limit > config.MaxIncrementalMessageLimit {
+		limit = config.MaxIncrementalMessageLimit
 	}
 	var msgs []model.Message
 	err := db.Where("session_id = ? AND seq_id > ?", sessionID, afterSeq).

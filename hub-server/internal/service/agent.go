@@ -4,25 +4,36 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/ws"
+	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
-type AgentService struct {
-	db  *gorm.DB
-	bus *Bus
-	mgr *ws.Manager
+// agentCache is the subset of *cache.Client methods used by AgentService.
+type agentCache interface {
+	GetRoute(ctx context.Context, userID, deviceType string) (string, error)
+	PushPendingTask(ctx context.Context, userID, taskJSON string) error
+	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
 }
 
-func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager) *AgentService {
-	return &AgentService{db: db, bus: bus, mgr: mgr}
+type AgentService struct {
+	db          *gorm.DB
+	bus         *Bus
+	mgr         *ws.Manager
+	cacheClient agentCache
+}
+
+func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client) *AgentService {
+	return &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: cacheClient}
 }
 
 // CustomAgent CRUD
@@ -74,10 +85,15 @@ func (s *AgentService) UpdateCustomAgent(ctx context.Context, ownerID string, ca
 		return errcode.AgentNotFound
 	}
 	ca.OwnerUserID = ownerID
-if ca.CapabilityTags == "" {
-		ca.CapabilityTags = existing.CapabilityTags }
-	if ca.ToolWhitelist == "" { ca.ToolWhitelist = existing.ToolWhitelist }
-	if ca.ModelParams == "" { ca.ModelParams = existing.ModelParams }
+	if ca.CapabilityTags == "" {
+		ca.CapabilityTags = existing.CapabilityTags
+	}
+	if ca.ToolWhitelist == "" {
+		ca.ToolWhitelist = existing.ToolWhitelist
+	}
+	if ca.ModelParams == "" {
+		ca.ModelParams = existing.ModelParams
+	}
 	ca.CreatedAt = existing.CreatedAt
 	return repository.UpdateCustomAgent(s.db, ca)
 }
@@ -197,7 +213,7 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 		TriggeredByUserID: userID,
 		TriggerMessageID:  triggerMessageID,
 		Status:            model.TaskStatusQueued,
-		ExpireAt:          time.Now().Add(24 * time.Hour),
+		ExpireAt:          time.Now().Add(config.PendingTaskTTL),
 	}
 	if err := repository.CreatePendingTask(s.db, task); err != nil {
 		return nil, err
@@ -232,7 +248,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	payload, _ := json.Marshal(dp)
 
 	// try to push to inviter's edge (desktop) via WebSocket
-	connID, err := cache.GetRoute(ctx, ai.InviterUserID, "desktop")
+	connID, err := s.cacheClient.GetRoute(ctx, ai.InviterUserID, "desktop")
 	if err == nil && connID != "" {
 		frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
 		s.mgr.PushToConn(connID, frame)
@@ -241,7 +257,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	}
 
 	// offline: push to Redis pending queue
-	_ = cache.PushPendingTask(ctx, ai.InviterUserID, string(payload))
+	_ = s.cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload))
 }
 
 // CancelTask cancels a pending task by its ID.
@@ -267,13 +283,30 @@ func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) er
 	_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusCancelled, "")
 
 	s.bus.Publish(ctx, Event{Type: "agent.cancel", Payload: map[string]string{
-		"task_id":            taskID,
-		"agent_instance_id":  task.AgentInstanceID,
-		"session_id":         task.AgentInstanceID, // will be resolved from agent instance
-		"triggered_by":       task.TriggeredByUserID,
+		"task_id":           taskID,
+		"agent_instance_id": task.AgentInstanceID,
+		"session_id":        task.AgentInstanceID, // will be resolved from agent instance
+		"triggered_by":      task.TriggeredByUserID,
 	}})
 
 	return nil
+}
+
+// allocateSeq returns the next message sequence number for a session.
+// It tries Redis INCR first and falls back to the DB row-level lock.
+func (s *AgentService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	seq, err := s.cacheClient.AllocateSeq(ctx, sessionID)
+	if err == nil {
+		return seq, nil
+	}
+	slog.Warn("redis seq allocation failed, falling back to DB", "session_id", sessionID, "error", err)
+	var fallbackSeq int64
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		var txErr error
+		fallbackSeq, txErr = repository.AllocateSeqID(tx, sessionID)
+		return txErr
+	})
+	return fallbackSeq, err
 }
 
 // HandleTaskAck marks a task as running.
@@ -313,6 +346,7 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, taskID, payload str
 		SessionID:   "", // will be set from agent instance
 		SenderType:  model.SenderTypeAgent,
 		SenderID:    task.AgentInstanceID,
+		ClientMsgID: uuidv7.Must(),
 		ContentType: model.ContentTypeText,
 		Content:     payload,
 	}
@@ -323,12 +357,13 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, taskID, payload str
 	}
 	msg.SessionID = ai.SessionID
 
+	seq, err := s.allocateSeq(ctx, ai.SessionID)
+	if err != nil {
+		return err
+	}
+	msg.SeqID = seq
+
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		seq, err := repository.AllocateSeqID(tx, ai.SessionID)
-		if err != nil {
-			return err
-		}
-		msg.SeqID = seq
 		return repository.InsertMessage(tx, msg)
 	})
 	if err != nil {
@@ -365,15 +400,17 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, taskID, finalContent 
 			SessionID:   ai.SessionID,
 			SenderType:  model.SenderTypeAgent,
 			SenderID:    task.AgentInstanceID,
+			ClientMsgID: uuidv7.Must(),
 			ContentType: model.ContentTypeText,
 			Content:     finalContent,
 		}
+		seq, err := s.allocateSeq(ctx, ai.SessionID)
+		if err != nil {
+			return err
+		}
+		msg.SeqID = seq
+
 		err = s.db.Transaction(func(tx *gorm.DB) error {
-			seq, err := repository.AllocateSeqID(tx, ai.SessionID)
-			if err != nil {
-				return err
-			}
-			msg.SeqID = seq
 			return repository.InsertMessage(tx, msg)
 		})
 		if err != nil {

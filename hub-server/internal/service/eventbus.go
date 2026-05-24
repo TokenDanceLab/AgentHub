@@ -25,8 +25,10 @@ type Bus struct {
 	pool     *ants.Pool
 }
 
+const defaultPoolSize = 1024
+
 func NewBus() *Bus {
-	pool, err := ants.NewPool(1024,
+	pool, err := ants.NewPool(defaultPoolSize,
 		ants.WithNonblocking(false),
 		ants.WithPanicHandler(func(p interface{}) {
 			if metrics.EventBusPanics != nil {
@@ -41,8 +43,8 @@ func NewBus() *Bus {
 	return &Bus{handlers: make(map[string][]EventHandler), pool: pool}
 }
 
-func (b *Bus) Pending() int64  { return b.pending.Load() }
-func (b *Bus) Running() int    { return b.pool.Running() }
+func (b *Bus) Pending() int64 { return b.pending.Load() }
+func (b *Bus) Running() int   { return b.pool.Running() }
 
 func (b *Bus) Subscribe(eventType string, handler EventHandler) {
 	b.mu.Lock()

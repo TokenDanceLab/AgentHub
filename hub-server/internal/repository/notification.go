@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
 )
@@ -10,8 +11,8 @@ func CreateNotification(db *gorm.DB, n *model.Notification) error {
 }
 
 func ListNotifications(db *gorm.DB, userID string, unreadOnly bool, limit, offset int) ([]model.Notification, error) {
-	if limit <= 0 || limit > 100 {
-		limit = 50
+	if limit <= 0 || limit > config.MaxMessagePageLimit {
+		limit = config.DefaultPaginationLimit
 	}
 	var notifs []model.Notification
 	query := db.Where("user_id = ?", userID)

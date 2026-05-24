@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runnerctx"
@@ -42,10 +43,16 @@ type ProcessExecutor struct {
 
 	maxConcurrentRuns int // maximum concurrent runs; 0 means use default (5)
 
+	// Orchestrator result aggregation
+	agentRegistry *agents.Registry  // agent instance registry for sub-agent tracking; may be nil
+	messageQueue  *agents.Queue     // inter-agent message queue for result delivery; may be nil
+	resultAgg     *ResultAggregator // tracks sub-agent completion and emits sub_agents_complete; may be nil
+
 	mu         sync.Mutex
 	running    map[string]context.CancelFunc
-	stdins     map[string]io.Writer                    // runID → stdin (for adapter-aware interrupt)
-	runOutputs map[string]*runnerctx.RunOutputStore    // runID → temp log for output persistence & replay
+	stdins     map[string]io.Writer                    // runID to stdin (for adapter-aware interrupt)
+	runOutputs map[string]*runnerctx.RunOutputStore    // runID to temp log for output persistence and replay
+	runToAgent map[string]string                       // runID to agentInstanceID for result aggregation
 }
 
 func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter, adapterReg *adapters.Registry) (*ProcessExecutor, error) {
@@ -74,10 +81,11 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		profile:           profile,
 		adapter:           adapter,
 		adapterReg:        adapterReg,
-		maxConcurrentRuns: 5,
+		maxConcurrentRuns: defaultMaxConcurrentRuns,
 		running:           make(map[string]context.CancelFunc),
 		stdins:            make(map[string]io.Writer),
 		runOutputs:        make(map[string]*runnerctx.RunOutputStore),
+		runToAgent:        make(map[string]string),
 	}, nil
 }
 
@@ -85,10 +93,37 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 // should not block the executor goroutine forever.
 const defaultRunTimeout = 30 * time.Minute
 
+const (
+	defaultMaxConcurrentRuns = 5
+	defaultReadBufferSize    = 32 * 1024
+)
+
 // SetMetrics attaches Prometheus instrumentation to this executor.
 // It is safe to call with nil to disable metrics.
 func (e *ProcessExecutor) SetMetrics(m *metrics.EdgeMetrics) {
 	e.metrics = m
+}
+
+// WithAgentRegistry attaches an agent instance registry for sub-agent tracking
+// and result aggregation. When set, the executor will send result messages via
+// the message queue when sub-agent runs complete.
+func (e *ProcessExecutor) WithAgentRegistry(r *agents.Registry) *ProcessExecutor {
+	e.agentRegistry = r
+	return e
+}
+
+// WithMessageQueue attaches an inter-agent message queue for delivering sub-agent
+// results back to parent orchestration runs.
+func (e *ProcessExecutor) WithMessageQueue(q *agents.Queue) *ProcessExecutor {
+	e.messageQueue = q
+	return e
+}
+
+// WithResultAggregator attaches a ResultAggregator for tracking sub-agent
+// completion and emitting sub_agents_complete events.
+func (e *ProcessExecutor) WithResultAggregator(ra *ResultAggregator) *ProcessExecutor {
+	e.resultAgg = ra
+	return e
 }
 
 func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
@@ -103,7 +138,7 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	e.mu.Lock()
 	max := e.maxConcurrentRuns
 	if max <= 0 {
-		max = 5
+		max = defaultMaxConcurrentRuns
 	}
 	if len(e.running) >= max {
 		e.mu.Unlock()
@@ -287,7 +322,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		e.bus.Publish("run.started", runScope(started), RunResponse(started))
 	}
 
-	// Create temp file for run output persistence & replay
+	// Create temp file for run output persistence and replay
 	outStore, err := runnerctx.NewRunOutputStore(run.ID)
 	if err != nil {
 		slog.Warn("process: failed to create run output store", "runId", run.ID, "err", err)
@@ -321,22 +356,25 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 	if ctx.Err() != nil || e.runStatus(run.ID) == "cancelling" {
 		e.publishCancelled(run)
+		e.sendSubAgentResult(run.ID, "cancelled", nil)
 		return
 	}
 	if waitErr != nil {
 		e.publishFailed(run, waitErr)
+		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": waitErr.Error()})
 		return
 	}
 	finished, ok := e.store.SetRunStatusIf(run.ID, "finished", "started")
 	if ok {
 		e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
+		e.sendSubAgentResult(run.ID, "finished", RunResponse(finished))
 	}
 }
 
 func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outStore *runnerctx.RunOutputStore, stream string, reader io.Reader) {
 	defer wg.Done()
 
-	buf := make([]byte, 32*1024)
+	buf := make([]byte, defaultReadBufferSize)
 	offset := 0
 	for {
 		n, err := reader.Read(buf)
@@ -367,7 +405,7 @@ func (e *ProcessExecutor) envForRun(run store.Run, profileEnv, extraEnv []string
 	if profileEnv == nil {
 		env = SanitizedEnv(nil, extraEnv)
 	} else {
-		// Administrator explicitly configured the environment — respect it,
+		// Administrator explicitly configured the environment, respect it,
 		// but still warn about any sensitive-looking variables it includes.
 		for _, kv := range profileEnv {
 			key, _, _ := strings.Cut(kv, "=")
@@ -416,6 +454,7 @@ func (e *ProcessExecutor) finish(runID string) {
 	e.mu.Lock()
 	delete(e.running, runID)
 	delete(e.stdins, runID)
+	delete(e.runToAgent, runID)
 	if s, ok := e.runOutputs[runID]; ok {
 		if err := s.Close(); err != nil {
 			slog.Warn("process: failed to close output store", "runId", runID, "err", err)
@@ -425,20 +464,61 @@ func (e *ProcessExecutor) finish(runID string) {
 	e.mu.Unlock()
 }
 
+// sendSubAgentResult delivers a result message from a completed sub-agent run
+// back to its parent agent via the message queue. This enables the orchestrator
+// to aggregate results from dispatched sub-agents.
+func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) {
+	if e.agentRegistry == nil || e.messageQueue == nil {
+		return
+	}
+
+	e.mu.Lock()
+	agentID, ok := e.runToAgent[runID]
+	e.mu.Unlock()
+	if !ok {
+		return
+	}
+
+	inst, found := e.agentRegistry.Get(agentID)
+	if !found || inst.ParentID == "" {
+		return
+	}
+
+	msgType := agents.MsgTypeResult
+	if status == "failed" || status == "cancelled" {
+		msgType = agents.MsgTypeError
+		e.agentRegistry.SetStatus(agentID, agents.StatusError, "")
+	} else if status == "finished" {
+		e.agentRegistry.SetStatus(agentID, agents.StatusCompleted, "")
+	}
+
+	e.messageQueue.EnsureAgent(inst.ParentID, 64)
+	e.messageQueue.Send(agents.Message{
+		ID:          "msg_" + runID,
+		FromAgentID: agentID,
+		ToAgentID:   inst.ParentID,
+		Type:        msgType,
+		Payload: map[string]any{
+			"runId":     runID,
+			"status":    status,
+			"agentId":   agentID,
+			"agentName": inst.Name,
+			"result":    payload,
+		},
+		Timestamp: time.Now().UTC(),
+	})
+}
+
 // publishStructuredOutput uses the configured AgentAdapter to parse the CLI's
 // native protocol and emit typed events to the bus.
 func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.Run, stdout io.Reader, stdin io.Writer, adapter adapters.AgentAdapter, ctx context.Context) {
 	defer wg.Done()
-	var emitter adapters.EventEmitter = &busEventEmitter{bus: e.bus}
+	var emitter adapters.EventEmitter = adapters.NewBusEventEmitter(e.bus)
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
 	if budget, ok := ctx.Value(adapters.CtxBudgetKey).(*runnerctx.ContextBudget); ok && budget != nil {
-		emitter = &budgetAwareEmitter{
-			inner:     emitter,
-			budget:    budget,
-			scope:     runScope(run),
-		}
+		emitter = adapters.NewBudgetAwareEmitter(emitter, budget, runScope(run))
 	}
 
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
@@ -446,40 +526,86 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	}
 }
 
-// busEventEmitter adapts events.Bus to the adapters.EventEmitter interface.
-type busEventEmitter struct {
-	bus *events.Bus
-}
+// SpawnSubAgent implements adapters.SubAgentSpawner for the ProcessExecutor.
+// It creates a new run for a sub-agent dispatched by the orchestrator, queues it,
+// and starts execution using the resolved agent adapter.
+//
+// Reference: docs/reference/cross-comparison/03-orchestration.md Layer 3 (Supervisor routing).
+func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAgentTask) (agentInstanceID string, runID string, err error) {
+	runID = "run_" + task.TaskID
+	agentInstanceID = "agent_" + task.TaskID
 
-func (e *busEventEmitter) Emit(eventType string, scope map[string]any, payload any) {
-	e.bus.Publish(eventType, scope, payload)
-}
-
-// budgetAwareEmitter wraps an EventEmitter to emit run.agent.context_warning
-// when the context budget first crosses the 85% auto-compaction threshold.
-// It suppresses duplicate warnings for the same run.
-type budgetAwareEmitter struct {
-	inner  adapters.EventEmitter
-	budget *runnerctx.ContextBudget
-	scope  map[string]any
-	mu     sync.Mutex
-	warned bool
-}
-
-func (e *budgetAwareEmitter) Emit(eventType string, scope map[string]any, payload any) {
-	e.inner.Emit(eventType, scope, payload)
-
-	if eventType == adapters.BusEventContextWarning {
-		return // Prevent recursive emission
+	// Resolve ThreadID: prefer the explicit override from task, fall back to parent
+	threadID := task.ThreadID
+	if threadID == "" {
+		threadID = parentRun.ThreadID
 	}
 
+	// Create the run in the store
+	run, err := e.store.(store.Writer).CreateRun(runID, parentRun.ProjectID, threadID)
+	if err != nil {
+		slog.Error("failed to create sub-agent run", "taskId", task.TaskID, "err", err)
+		return "", "", err
+	}
+
+	// Emit run.queued
+	scope := map[string]any{
+		"projectId": run.ProjectID,
+		"threadId":  run.ThreadID,
+		"runId":     run.ID,
+	}
+	e.bus.Publish("run.queued", scope, run)
+
+	// Build run context with the task prompt, target agent, and propagated
+	// context budget from the parent orchestrator.
+	runCtx := RunProcessContext{
+		Run:     run,
+		Prompt:  task.Prompt,
+		AgentID: task.AgentID,
+		Budget:  childBudget(task.Budget, task.Depth),
+		Model:   task.Model,
+	}
+
+	// Store the run-to-agent mapping so result aggregation can find the agent later.
 	e.mu.Lock()
-	if !e.warned && e.budget.ShouldCompact() {
-		e.warned = true
-		e.inner.Emit(adapters.BusEventContextWarning, e.scope, map[string]any{
-			"usagePercent": e.budget.UsagePercent(),
-			"threshold":    85.0,
-		})
-	}
+	e.runToAgent[runID] = agentInstanceID
 	e.mu.Unlock()
+
+	// Use parent thread if no explicit ThreadID in task
+	if task.ThreadID != "" {
+		runCtx.SessionID = task.ThreadID
+	}
+
+	// Start the run
+	if err := e.Start(run, runCtx); err != nil {
+		slog.Error("failed to start sub-agent run", "runId", runID, "err", err)
+		e.mu.Lock()
+		delete(e.runToAgent, runID)
+		e.mu.Unlock()
+		return "", "", err
+	}
+
+	return agentInstanceID, runID, nil
+}
+
+// childBudget creates a context budget for a sub-agent from the parent budget.
+// Deeper delegation levels get a smaller fraction of remaining tokens to prevent
+// budget exhaustion at the root.
+func childBudget(parent *runnerctx.ContextBudget, depth int) *runnerctx.ContextBudget {
+	if parent == nil {
+		return runnerctx.NewContextBudget(0)
+	}
+	remaining := parent.Remaining()
+	// Fraction reduces with depth: depth 1 gets 1/2, depth 2 gets 1/4, etc.
+	// Minimum 16K tokens to ensure useful work can be done.
+	fraction := int64(1 << depth) // 2, 4, 8, ...
+	alloc := remaining / fraction
+	const minTokens = 16_000
+	if alloc < minTokens {
+		alloc = minTokens
+	}
+	if alloc > remaining {
+		alloc = remaining
+	}
+	return runnerctx.NewContextBudget(int(alloc))
 }

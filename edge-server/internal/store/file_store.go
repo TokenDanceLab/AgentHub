@@ -61,10 +61,18 @@ func (f *FileStore) LastPersistError() error {
 	return f.lastErr
 }
 
-func (f *FileStore) CreateProject(id, name string) Project {
-	project := f.store.CreateProject(id, name)
-	_ = f.persist()
-	return project
+func (f *FileStore) CreateProject(id, name string) (Project, error) {
+	project, err := f.store.CreateProject(id, name)
+	if errors.Is(err, ErrProjectExists) {
+		return project, err
+	}
+	if err != nil {
+		return Project{}, err
+	}
+	if err := f.persist(); err != nil {
+		return project, err
+	}
+	return project, nil
 }
 
 func (f *FileStore) GetProject(id string) (Project, bool) {
