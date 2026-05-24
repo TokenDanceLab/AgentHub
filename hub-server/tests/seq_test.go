@@ -67,6 +67,7 @@ func fetchMessages(t *testing.T, token, sessionID string, limit int) []map[strin
 // =============================================================================
 
 func TestSeqContinuity(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a, b := friendPair(t, "tseq_a", "tseq_b")
 	sid := privateSession(t, a, b)
 
@@ -106,6 +107,7 @@ func TestSeqContinuity(t *testing.T) {
 // =============================================================================
 
 func TestConcurrentSendNoDuplicateSeq(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a, b := friendPair(t, "tconc_a", "tconc_b")
 	sid := privateSession(t, a, b)
 
@@ -177,6 +179,7 @@ func TestConcurrentSendNoDuplicateSeq(t *testing.T) {
 // =============================================================================
 
 func TestForwardToMultipleSessions(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a, b := friendPair(t, "tfwd_a", "tfwd_b")
 	sid := privateSession(t, a, b)
 
@@ -221,6 +224,7 @@ func TestForwardToMultipleSessions(t *testing.T) {
 // =============================================================================
 
 func TestSeqAfterRedisRestart(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	t.Skip("TestSeqAfterRedisRestart: requires Redis restart to verify seq continuity across restarts. " +
 		"After restart, seq should continue from where it left off (not reset to 1). " +
 		"Manual verification: send messages before restart, restart Redis, send more messages, " +
@@ -233,6 +237,7 @@ func TestSeqAfterRedisRestart(t *testing.T) {
 // =============================================================================
 
 func TestSendMessageRejectNonMember(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a, b := friendPair(t, "tnmem_a", "tnmem_b")
 	c := register(t, "tnmem_c", "pass1234", "Charlie_nmem")
 
@@ -250,6 +255,7 @@ func TestSendMessageRejectNonMember(t *testing.T) {
 // =============================================================================
 
 func TestSendMessageToDissolvedSession(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a, b := friendPair(t, "tdiss_a", "tdiss_b")
 
 	gr := parse(postAuth("/client/sessions/group", a.Token, map[string]interface{}{
@@ -274,6 +280,7 @@ func TestSendMessageToDissolvedSession(t *testing.T) {
 // =============================================================================
 
 func TestRecallNotOwnByNonSender(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
 	a, b := friendPair(t, "trec_a", "trec_b")
 	sid := privateSession(t, a, b)
 

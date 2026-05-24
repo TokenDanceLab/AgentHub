@@ -92,27 +92,34 @@ func TestMain(m *testing.M) {
 	ts = httptest.NewServer(r)
 	client = ts.Client()
 
-	cleanDB()
+	cleanDBTables(db)
 
 	os.Exit(m.Run())
 }
 
-func cleanDB() {
-	db.Exec("DELETE FROM message_pins")
-	db.Exec("DELETE FROM message_reads")
-	db.Exec("DELETE FROM pending_agent_tasks")
-	db.Exec("DELETE FROM agent_instances")
-	db.Exec("DELETE FROM messages")
-	db.Exec("DELETE FROM session_members")
-	db.Exec("DELETE FROM sessions")
-	db.Exec("DELETE FROM notifications")
-	db.Exec("DELETE FROM friendships")
-	db.Exec("DELETE FROM attachments")
-	db.Exec("DELETE FROM custom_agents")
-	db.Exec("DELETE FROM workspaces")
-	db.Exec("DELETE FROM refresh_tokens")
-	db.Exec("DELETE FROM devices")
-	db.Exec("DELETE FROM users")
+// CleanDB truncates all tables between tests for isolation.
+// Tables are deleted in FK-safe order (children before parents).
+func CleanDB(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	cleanDBTables(db)
+}
+
+func cleanDBTables(database *gorm.DB) {
+	database.Exec("DELETE FROM message_pins")
+	database.Exec("DELETE FROM message_reads")
+	database.Exec("DELETE FROM pending_agent_tasks")
+	database.Exec("DELETE FROM agent_instances")
+	database.Exec("DELETE FROM messages")
+	database.Exec("DELETE FROM session_members")
+	database.Exec("DELETE FROM sessions")
+	database.Exec("DELETE FROM notifications")
+	database.Exec("DELETE FROM friendships")
+	database.Exec("DELETE FROM attachments")
+	database.Exec("DELETE FROM custom_agents")
+	database.Exec("DELETE FROM workspaces")
+	database.Exec("DELETE FROM refresh_tokens")
+	database.Exec("DELETE FROM devices")
+	database.Exec("DELETE FROM users")
 }
 
 func post(path string, body interface{}) *http.Response {
