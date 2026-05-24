@@ -36,6 +36,20 @@
   /* AgentHub-specific */
   --brand:               oklch(0.55 0.16 255);
 
+  /* TokenDance cross-app aliases */
+  --td-canvas:           var(--background);
+  --td-surface:          var(--card);
+  --td-tint:             var(--secondary);
+  --td-ink:              var(--foreground);
+  --td-ink-muted:        var(--muted-foreground);
+  --td-line:             var(--border);
+  --td-plum:             var(--brand);
+  --td-moss:             var(--success);
+  --td-danger:           var(--destructive);
+  --td-focus:            var(--ring);
+  --td-radius-control:   var(--radius-md);
+  --td-radius-panel:     var(--radius-xl);
+
   /* Typography */
   --font-sans:  "Inter Variable", "Inter", system-ui, -apple-system,
                 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
