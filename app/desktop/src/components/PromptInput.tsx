@@ -169,7 +169,7 @@ export default function PromptInput({
                 placeholder={t('prompt.model')} disabled={disabled} ariaLabel={t('prompt.model')}
                 variant="text"
               />
-              <span className={styles.metaDot}>·</span>
+              {model && reasoningEffort && <span className={styles.metaDot}>·</span>}
               <ModelDropdown
                 options={REASONING_EFFORTS.map((r) => ({ value: r, label: r, group: 'Reasoning' }))}
                 value={reasoningEffort} onChange={(v) => setReasoningEffort(v as ReasoningEffort | '')}
