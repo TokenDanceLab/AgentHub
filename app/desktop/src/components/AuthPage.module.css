@@ -125,7 +125,7 @@
 .passwordWrapper .input { flex: 1; padding-right: 40px; }
 .passwordToggle {
   position: absolute;
-  right: 8px;
+  right: 10px;
   border: none;
   background: transparent;
   color: #B0B0B5;
