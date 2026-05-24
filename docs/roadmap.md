@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-25（Hub contact/custom agent 校验 + Edge project duplicate/run/health 语义）
+最后更新：2026-05-25（Desktop Settings 架构批次 + Runtime/Profile/Configuration/Execution Target 概念重构）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 
@@ -198,14 +198,18 @@ Hub 调度（远程）:
 
 - [x] **S8: busEventEmitter 移入 adapters 包** `[1d]`
   - 文件：`edge-server/internal/lifecycle/process_executor.go:414-449` → `internal/adapters/event_emitter.go`
-- [ ] **S9: Orchestrator prompt 模板转义** `[0.5d]`
+- [x] **S9: Orchestrator prompt 模板转义** `[0.5d]`
   - 文件：`edge-server/internal/adapters/orchestrator.go:72-95`
+  - 方案：`NewOrchestratorAdapter` 写入 system prompt 前统一调用 `escapePromptLiteral`，转义 backtick 与 `${}`；`formatAgentList` 也复用同一转义逻辑，避免可用 agent 名称进入 prompt 时被下游模板处理误判。
+  - 验收：`TestFormatAgentList`、`TestEscapePromptLiteral`、`TestOrchestratorAdapterEscapesSystemPrompt`
 - [x] **S11: CreateProject 返回区分已存在/新建** `[0.5d]`
   - 文件：`edge-server/internal/store/store.go`, `edge-server/internal/api/handlers.go`
   - 方案：Store 通过 `ErrProjectExists` 区分重复创建；API 新建返回 201 并发布 `project.created`，已存在返回 200 且不重复发布 created 事件
   - 验收：`TestStoreCreateProjectDistinguishesExistingProject`、`TestMuxPostProjectsExistingProjectReturnsOKWithoutCreatedEvent`
 - [x] **S12: 清理空目录 `internal/edgeserver/`** `[0.5d]`
-- [ ] **常量提取**：`maxConcurrentRuns: 5`, `channel buffer: 256`, `read buffer: 32*1024` 等魔数 → named constants `[0.5d]`
+- [x] **常量提取**：`maxConcurrentRuns: 5`, `channel buffer: 256`, `read buffer: 32*1024` 等魔数 → named constants `[0.5d]`
+  - 方案：`defaultMaxConcurrentRuns`、`defaultReadBufferSize`、`subscriberChannelBufferSize` 已在对应包内命名；Codex/OpenCode/Claude NDJSON scanner 的初始 buffer 与最大 token size 统一收敛到 `configureAdapterScanner`。
+  - 验收：`go test ./internal/adapters ./internal/events -count=1 -v`、`go test ./... -short -count=1`
 
 ---
 
@@ -324,7 +328,9 @@ Hub 调度（远程）:
   - 方案：批量用户查询缺失 sender 时记录 `slog.Debug` 并跳过该坏数据，不阻断其他好友请求
   - 验收：`TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender`
 - [ ] **P3-1: 路由参数命名统一** `[0.5d]`
-- [ ] **P3-2: 魔数常量化**（50/50/24h/5min/1024/64） `[1d]`
+- [x] **P3-2: 魔数常量化**（50/50/24h/5min/1024/64） `[1d]`
+  - 方案：Hub request/body/timeout/rate-limit/message recall/pin limit/WebSocket heartbeat/EventBus pool/metrics interval/group name length 等默认值统一收敛到 `internal/config/constants.go`，调用点改为命名常量；保留 WebSocket send buffer 现有运行值 256。
+  - 验收：`go test ./internal/config ./internal/router ./internal/middleware ./internal/service ./internal/ws -count=1`、`go test ./... -short -count=1`
 - [ ] **P3-4: 创建 Workspace GORM model** `[0.5d]`
 - [ ] **P3-5: gofmt 格式修复** `[0.5d]`
 
@@ -458,7 +464,7 @@ Hub 调度（远程）:
 
 ### 3.2 Q3 2026（功能完善 -- 产品可用）
 
-> **目标**：IM 功能完整、Agent 可观测性、多 Agent 协作、Desktop 竞争 UX
+> **目标**：IM 功能完整、Agent 可观测性、多 Agent 协作、Desktop 竞争 UX、Settings 能力工作台和 Runtime/Profile/Configuration/Execution Target 概念重构
 
 ---
 
@@ -526,7 +532,9 @@ Hub 调度（远程）:
 - [x] 并发 run 验证（每线程一个公开 run）
   - 方案：`POST /v1/runs` 在创建前检查同 thread 是否存在 `queued`/`started`/`cancelling` run，命中时返回 409 `active_run_exists` 和现有 `runId`；Store 保留同 thread 多 run 能力给 orchestrator sub-agent；executor 启动失败会把 queued run 标记为 `failed`，避免重试被永久 409 阻塞。
   - 验收：`TestPostRunsRejectsSecondActiveRunForThread`、`TestPostRunsAllowsNewRunAfterActiveRunTerminal`、`TestPostRunsMarksExecutorStartFailureTerminalForRetry`、`TestStoreAllowsMultipleRunsForSameThread`
-- [ ] Run 清理（过期 run、资源限制）
+- [x] Run 清理（过期 run、资源限制）
+  - 方案：Store 暴露 `RunCleaner`/`CleanupRuns`，只清理 `finished`/`failed`/`cancelled` terminal run；支持 `TerminalTTL` 与 `MaxTerminalRunsPerThread`，连带删除关联 run item，保留 `queued`/`started`/`cancelling` active run；FileStore 在清理后持久化快照；`POST /v1/runs` 在 active-run 检查前执行保守清理，默认 terminal TTL 24h、每线程最多保留 50 条 terminal run。
+  - 验收：`TestStoreCleanupRunsRemovesExpiredTerminalRunsAndItems`、`TestStoreCleanupRunsEnforcesMaxTerminalRunsPerThread`、`TestFileStoreCleanupRunsPersistsRemovedRunsAndItems`、`TestPostRunsCleansTerminalRunsBeforeCreatingNewRun`
 - [ ] 可选：重启后 run 历史持久化
 - [x] Health check 包含 runner 状态
   - 方案：`/v1/health` 的 `checks.runners` 返回 `total`、`available`、`unavailable`、`statuses`、`items`；无 registry、无 runner、全离线时降级为 `degraded`。
@@ -534,7 +542,63 @@ Hub 调度（远程）:
 
 ---
 
-#### 3.2.2 Desktop 竞争 UX（~15 天）
+#### 3.2.3 当前 Sprint：Desktop 架构 / Settings / 概念重构（~12 天）
+
+> 顺序：先完成文档与架构语义收敛，再继续客户端实现。当前 worker 只维护 `docs/roadmap.md` 与 `docs/handoff/STATE.md`；核心架构文档由主线程在客户端实现前同步。
+
+##### 批次 A：概念模型收敛 `[2d]`
+
+- [ ] 将 Desktop / Edge / Hub 统一抽象为四个一等概念：
+  - `Runtime`：可执行代理运行时，如 Claude Code、Codex、OpenCode、本地/远程 Runtime。
+  - `Profile`：用户可选的运行画像，包含模型、权限、工具、环境和默认 Execution Target。
+  - `Configuration`：可保存、可审计、可同步的设置集合，覆盖模型映射、MCP、Skill、cc-switch、账号鉴权、安全策略。
+  - `Execution Target`：一次 run 的实际目标，包含本地 Edge、远程设备、Hub 调度、特定 workspace/thread。
+- [ ] 前端依赖：SettingsPage 信息架构、i18n 文案、运行入口、Agent 管理面板统一改用上述术语，不再混用 "Agent/Model/Connection" 指代不同层级。
+- [ ] Edge 依赖：`/v1/agents`、`/v1/health`、`POST /v1/runs` 能提供 Runtime capability、availability、accepted/error 语义；PascalCase/camelCase 在 API 边界规范化。
+- [ ] Hub 依赖：后续需要为 Profile/Configuration 提供账号级持久化和多端同步；TokenDance ID 只做身份，产品配置归 Hub/AgentHub。
+- [ ] 生态依赖：cc-switch、模型 provider、Skill/MCP discovery 先作为外部配置源接入，避免把密钥或私有路径写入仓库文档。
+- [ ] 验收：Settings 与 Agent Manager 截图中四个术语含义清晰；类型/normalizer 测试覆盖 Edge capability 映射；真实 `POST /v1/runs` 使用稳定输入返回 202 后 UI 进入乐观运行态。
+
+##### 批次 B：Codex App 布局融合与侧栏回收 `[2d]`
+
+- [ ] 学习 Codex App 布局密度、工具栏层级和消息操作方式，但保留 AgentHub 的三层架构、IM-native 与 TokenDance ID 登录边界。
+- [ ] 左侧栏支持回收/展开：保留 workspace/thread/IM 入口，提供图标按钮、键盘快捷键和窄宽度自适应状态。
+- [ ] 右侧栏支持回收/展开：运行详情、Agent 管理、工具时间线、Diff/Preview 不应强占空白状态；无 run 时默认收起或显示轻量入口。
+- [ ] 所有小按钮统一使用现有 icon 库和共享 IconButton 模式；只在必要时保留文字按钮，hover/focus/disabled/loading 状态必须完整。
+- [ ] 前端依赖：App shell、shared UI、Tooltip、快捷键管理、可访问性焦点环。
+- [ ] Edge/Hub 依赖：无新协议；右侧栏内容仍消费现有 run/event/agent/device 数据。
+- [ ] 验收：Playwright 覆盖 1440x900、1280x720、移动窄宽三档；左右侧栏收起后文本不溢出、不遮挡输入框；按钮无裸文本占位和裸 SVG。
+
+##### 批次 C：Settings 能力工作台 `[5d]`
+
+| 能力页 | 前端职责 | Hub 依赖 | Edge 依赖 | 生态集成 | 验收 |
+|---|---|---|---|---|---|
+| 在线 IM | 会话、联系人、在线状态、通知入口 | session/message/device/WS sync | Desktop 桥接 Hub dispatch | 无 | 登录后能看到会话与在线状态，断线重连不丢未读 |
+| Agent 市场 | 搜索、安装入口、详情页、能力标签 | CustomAgent/模板/评分/使用统计 | 安装后 Runtime 可执行性检查 | 模板包/Skill 包源 | 搜索安装后出现在 Agent Manager |
+| Skill 管理 | 已安装/可安装/启用状态 | 可选同步用户配置 | 本地 skill discovery 与启停 | 本地 skill registry | 无效 skill 有明确错误，启用状态可恢复 |
+| MCP 管理 | server 列表、连接状态、日志入口 | 可选同步配置元数据 | 本地 MCP 健康检查 | MCP 配置源 | 连接失败显示可操作错误，不暴露密钥 |
+| 模型配置 | provider、默认模型、reasoning 档位 | Profile 持久化 | Runtime 启动参数映射 | provider/cc-switch | 修改后新 run 使用新默认值 |
+| 模型映射 | 别名、fallback、能力标签映射 | 用户级映射保存 | Edge run 前解析 | cc-switch/model registry | "sonnet/opus/haiku" 等别名可预览解析结果 |
+| cc-switch | provider 健康、切换、配额提示 | 可选账号级状态 | Runtime env 注入边界 | cc-switch CLI/DB | 切换只影响新 run，旧 run 不被打断 |
+| 多端 | 设备列表、当前设备、能力差异 | Device registry/WS presence | 设备 capability 上报 | 无 | 同账号多设备可区分在线/离线/能力 |
+| 远控 | 远程 Execution Target 选择、授权提示 | dispatch/permission/session | 远程 Edge 回调和状态 | 无 | 未授权不能远控，授权后能发起远程 run |
+| 账号鉴权 | TokenDance ID 登录入口、会话状态、登出 | OIDC code exchange、本地 session | 无直接依赖 | TokenDance ID | 桌面入口只指向 TokenDance ID，不直连第三方 OAuth |
+| 安全审计 | 权限、密钥、命令风险、配置导出检查 | 审计事件存储 | command/permission/security events | gitleaks/本地扫描器 | 导出/截图不含 token，危险配置有警示 |
+
+##### 批次 D：Run 启动反馈与真实 Edge 验证 `[3d]`
+
+- [x] Settings / TokenDance ID 登录入口 / Agent Manager 已完成 Playwright 截图验证，当前无裸 i18n key 和 console error。
+- [x] 真实 Edge `/v1/agents` 已验证返回 Claude Code / Codex / OpenCode 三个可用 Runtime；能力 chips 已在前端显示。
+- [x] 使用稳定输入抓包验证 `POST /v1/runs` 返回 202，说明 Edge 接受 run 并进入异步执行链路。
+- [ ] 客户端继续完善 run start 乐观反馈：提交后立即显示 queued/started 状态、禁用重复提交、遇到 409 `active_run_exists` 时链接到现有 run。
+- [ ] 前端依赖：runStore/TanStack Query 状态更新、Toast、输入框 pending 状态。
+- [ ] Edge 依赖：202 accepted、409 active_run_exists、health degraded、runner availability 字段稳定。
+- [ ] Hub 依赖：Hub dispatch 桥接到 Edge run 时保留 taskId/runId 映射。
+- [ ] 验收：真实 Edge 运行时 `POST /v1/runs` 202、重复提交 409、runner 离线时 Settings 显示 degraded；Playwright 截图覆盖成功、重复、离线三态。
+
+---
+
+#### 3.2.4 Desktop 竞争 UX（~15 天）
 
 > 参考：`docs/roadmaps/client.md` Phase 1（12 项任务）
 
@@ -567,7 +631,7 @@ Hub 调度（远程）:
 
 ---
 
-#### 3.2.3 多 Agent 协作基础设施（~12 天）
+#### 3.2.5 多 Agent 协作基础设施（~12 天）
 
 > 参考：`docs/reference/cross-comparison/00-synthesis.md` + `docs/reference/cross-comparison/10-best-practices-playbook.md`
 
