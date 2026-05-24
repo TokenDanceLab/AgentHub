@@ -72,8 +72,8 @@ func TestCreatePrivateSession_Existing(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
 			AddRow("target-1", "target", "hash", "Target"))
 
-	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members m1`).
-		WithArgs("user-1", "target-1").
+	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members sm1`).
+		WithArgs("user-1", "target-1", "private").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "type"}).
 			AddRow("sess-existing", "private"))
 
@@ -96,8 +96,8 @@ func TestCreatePrivateSession_Success(t *testing.T) {
 			AddRow("target-1", "target", "hash", "Target"))
 
 	// FindPrivateSessionBetween returns empty (no existing session)
-	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members m1`).
-		WithArgs("user-1", "target-1").
+	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members sm1`).
+		WithArgs("user-1", "target-1", "private").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
 	// Transaction: BEGIN
