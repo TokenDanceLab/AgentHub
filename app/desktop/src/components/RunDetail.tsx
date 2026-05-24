@@ -196,58 +196,29 @@ export default function RunDetail({
       <ContextUsage metrics={metrics} />
 
       {hasAnyContent && (
-        <>
-          <div className={styles.tabs}>
-            {outputText && (
-              <button
-                className={`${styles.tab} ${selectedTab === 'output' ? styles.tabActive : ''}`}
-                onClick={() => setSelectedTab('output')}
-              >
-                {t('run.output')}
-              </button>
-            )}
-            {toolCalls.length > 0 && (
-              <button
-                className={`${styles.tab} ${selectedTab === 'toolCalls' ? styles.tabActive : ''}`}
-                onClick={() => setSelectedTab('toolCalls')}
-              >
-                {t('run.toolCalls')} ({toolCalls.length})
-              </button>
-            )}
-            {changedFiles.length > 0 && (
-              <button
-                className={`${styles.tab} ${selectedTab === 'fileChanges' ? styles.tabActive : ''}`}
-                onClick={() => setSelectedTab('fileChanges')}
-              >
-                {t('run.fileChanges')} ({changedFiles.length})
-              </button>
-            )}
-          </div>
-
-          <div className={styles.tabContent}>
-            {activeTab === 'output' && <pre className={styles.output}>{outputText}</pre>}
-            {activeTab === 'toolCalls' && (
+        <div className={styles.tabContent}>
+          {activeTab === 'output' && <pre className={styles.output}>{outputText}</pre>}
+          {activeTab === 'toolCalls' && (
+            <div className={styles.list}>
+              {toolCalls.map((tc) => (
+                <ToolCallItem key={tc.callId} tc={tc} />
+              ))}
+            </div>
+          )}
+          {activeTab === 'fileChanges' &&
+            (diffs && diffs.length > 0 ? (
+              <DiffViewer files={diffs} />
+            ) : (
               <div className={styles.list}>
-                {toolCalls.map((tc) => (
-                  <ToolCallItem key={tc.callId} tc={tc} />
+                {changedFiles.map((f) => (
+                  <div key={f.path} className={styles.item}>
+                    <code className={styles.filePath}>{f.path}</code>
+                    <span className={styles.action}>{f.action}</span>
+                  </div>
                 ))}
               </div>
-            )}
-            {activeTab === 'fileChanges' &&
-              (diffs && diffs.length > 0 ? (
-                <DiffViewer files={diffs} />
-              ) : (
-                <div className={styles.list}>
-                  {changedFiles.map((f) => (
-                    <div key={f.path} className={styles.item}>
-                      <code className={styles.filePath}>{f.path}</code>
-                      <span className={styles.action}>{f.action}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-          </div>
-        </>
+            ))}
+        </div>
       )}
     </aside>
   );

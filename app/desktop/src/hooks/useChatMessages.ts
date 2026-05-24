@@ -154,16 +154,7 @@ function processEvent(state: State, event: EventEnvelope): State {
 
   switch (event.type) {
     case 'run.queued': {
-      const rid = event.payload.runId as string;
-      messages = [
-        ...messages,
-        {
-          id: `run-${rid}`,
-          role: 'system',
-          timestamp: ts,
-          blocks: [{ kind: 'text', content: 'Run queued...' } as MessageBlock],
-        },
-      ];
+      // Silently track – rendering handled by streaming indicator
       break;
     }
 
@@ -177,15 +168,6 @@ function processEvent(state: State, event: EventEnvelope): State {
         changedFiles: [],
         tasks: [],
       };
-      messages = [
-        ...messages,
-        {
-          id: `run-${rid}`,
-          role: 'system',
-          timestamp: ts,
-          blocks: [],
-        },
-      ];
       isStreaming = true;
       agentName = '';
       break;

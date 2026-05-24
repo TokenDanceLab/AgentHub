@@ -1,26 +1,52 @@
 .root {
   position: relative;
-  border-top: 1px solid var(--border);
-  background: var(--card);
   flex-shrink: 0;
+  padding: var(--space-sm) var(--space-md) var(--space-md);
 }
+
+/* ── Input card wrapper ─────────────────── */
+
+.inputCard {
+  border: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 1px 4px color-mix(in oklch, var(--foreground) 4%, transparent);
+  overflow: hidden;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.inputCard:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 12%, transparent);
+}
+
+/* ── Card header: model + reasoning selects ─ */
 
 .configRow {
   display: flex;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md) 0;
+  padding: var(--space-sm) var(--space-sm) 0;
 }
 
 .select {
   padding: 3px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--background);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--muted-foreground) 6%, transparent);
   color: var(--foreground);
   font-size: var(--font-size-xs);
   font-family: var(--font-sans);
   cursor: pointer;
   outline: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background var(--duration-fast), border-color var(--duration-fast);
+}
+
+.select:hover {
+  background: color-mix(in oklch, var(--muted-foreground) 12%, transparent);
 }
 
 .select:focus {
@@ -32,16 +58,18 @@
   cursor: not-allowed;
 }
 
+/* ── Textarea row ───────────────────────── */
+
 .bar {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-sm) var(--space-sm);
 }
 
 .textarea {
   flex: 1;
-  padding: 6px 10px;
+  padding: 10px 10px; /* Increase vertical padding for better vertical centering */
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--background);
@@ -51,14 +79,14 @@
   outline: none;
   resize: none;
   overflow-y: auto;
-  min-height: calc(1.5em + 14px);
-  max-height: calc(8 * 1.5em + 14px);
+  min-height: 60px; /* Ensure proper minimum height */
+  max-height: calc(8 * 1.5em + 20px);
   line-height: 1.5;
 }
 
 .textarea:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 30%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 12%, transparent);
 }
 
 .textarea:disabled {
@@ -73,13 +101,16 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  position: relative;
 }
 
 .inputFooter {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 2px 4px 0;
+  justify-content: space-between;
+  padding: 8px 4px 0;
+  margin-top: 4px;
+  position: relative;
 }
 
 .enterHint {
@@ -90,29 +121,19 @@
   gap: 3px;
 }
 
-.shortcutKey {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 16px;
-  padding: 0 4px;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  font-family: var(--font-mono, monospace);
-  font-size: 9px;
-  line-height: 1;
-  color: var(--text-weaker);
-  background: var(--background);
-}
-
 .charCount {
   font-size: var(--font-size-xs);
   color: var(--text-weaker);
   font-variant-numeric: tabular-nums;
 }
 
-.sendBtn {
+.buttonGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sendBtn, .stopBtn {
   width: 36px;
   height: 36px;
   padding: 0;
@@ -130,6 +151,11 @@
               box-shadow var(--duration-fast, 100ms) ease;
 }
 
+.stopBtn {
+  background: var(--color-danger, #dc2626);
+  color: #fff;
+}
+
 .sendBtn:hover {
   background: color-mix(in oklch, var(--primary) 85%, black);
 }
@@ -144,22 +170,6 @@
   background: var(--muted);
   color: var(--muted-foreground);
   transform: none;
-}
-
-.stopBtn {
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-full);
-  background: var(--color-danger, #dc2626);
-  color: #fff;
-  cursor: pointer;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background var(--duration-fast, 100ms) ease, transform var(--duration-fast, 100ms) ease;
 }
 
 .stopBtn:hover {
