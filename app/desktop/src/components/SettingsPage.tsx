@@ -252,6 +252,9 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const skillScriptCount = PROJECT_SKILLS.filter((skill) => skill.hasScripts).length;
   const skillReferenceCount = PROJECT_SKILLS.filter((skill) => skill.hasReferences).length;
   const skillReadyCount = PROJECT_SKILLS.filter((skill) => skill.status === 'ready').length;
+  const mcpCapableAgents = agents.filter((agent) => agent.capabilities.mcpIntegration).length;
+  const mcpPermissionHookAgents = agents.filter((agent) => agent.capabilities.permissionHooks).length;
+  const mcpSubAgentAgents = agents.filter((agent) => agent.capabilities.subAgentSpawn).length;
   const schedulerPolicyReadyCount = [
     modelMappingEnabled,
     ccSwitchBridge,
@@ -894,13 +897,81 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'mcp' && (
             <Panel title={t('settings.mcp')} description={t('settings.mcpDesc')}>
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<Plug size={18} />}
+                  label={t('settings.mcpRuntimeSupport')}
+                  value={`${mcpCapableAgents}/${agents.length}`}
+                  detail={edgeOnline ? t('settings.mcpRuntimeSupportDesc') : t('settings.edgeOffline')}
+                />
+                <SummaryCard
+                  icon={<ShieldCheck size={18} />}
+                  label={t('settings.mcpPermissionHooks')}
+                  value={`${mcpPermissionHookAgents}`}
+                  detail={t('settings.mcpPermissionHooksDesc')}
+                />
+                <SummaryCard
+                  icon={<Bot size={18} />}
+                  label={t('settings.mcpSubAgentSpawn')}
+                  value={`${mcpSubAgentAgents}`}
+                  detail={t('settings.mcpSubAgentSpawnDesc')}
+                />
+                <SummaryCard
+                  icon={<Globe2 size={18} />}
+                  label={t('settings.mcpHubSync')}
+                  value={hubAuthenticated && enableMcp ? t('settings.enabled') : t('settings.notConfigured')}
+                  detail={hubAuthenticated ? t('settings.mcpHubSyncDesc') : t('settings.mcpHubSyncSignedOut')}
+                />
+              </div>
               <SettingRow
                 title={t('settings.enableMcp')}
                 description={t('settings.enableMcpDesc')}
                 control={<Switch checked={enableMcp} onChange={setBooleanSetting('enableMcp', setEnableMcp)} />}
               />
-              <SettingRow title="Filesystem" description={t('settings.mcpFilesystem')} value={t('settings.enabled')} />
-              <SettingRow title="GitHub" description={t('settings.mcpGitHub')} value={t('settings.notConfigured')} />
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.mcpRuntimeMatrix')}</strong>
+                  <span>{t('settings.mcpRuntimeMatrixDesc')}</span>
+                </div>
+                {agents.length > 0 ? (
+                  <div className={styles.profileGrid}>
+                    {agents.map((agent) => (
+                      <McpRuntimeCard key={`mcp-${agent.id}`} agent={agent} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.mcpNoRuntimes')} description={t('settings.mcpNoRuntimesDesc')} />
+                )}
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.mcpTemplates')}</strong>
+                  <span>{t('settings.mcpTemplatesDesc')}</span>
+                </div>
+                <div className={styles.capabilityGrid}>
+                  <CapabilityCard
+                    title="Filesystem"
+                    description={t('settings.mcpFilesystem')}
+                    status={t('settings.mcpTemplate')}
+                  />
+                  <CapabilityCard
+                    title="GitHub"
+                    description={t('settings.mcpGitHub')}
+                    status={t('settings.notConfigured')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.mcpTokenDanceHub')}
+                    description={t('settings.mcpTokenDanceHubDesc')}
+                    status={hubAuthenticated ? t('settings.statusInProgress') : t('settings.notConfigured')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.mcpRemoteServer')}
+                    description={t('settings.mcpRemoteServerDesc')}
+                    status={t('settings.statusPlanned')}
+                  />
+                </div>
+              </div>
+              <Callout title={t('settings.mcpGuard')} body={t('settings.mcpGuardDesc')} />
             </Panel>
           )}
 
@@ -1426,6 +1497,33 @@ function ProjectSkillCard({ skill }: { skill: ProjectSkill }) {
         <span>{t('settings.skillLocalRegistry')}: .agents/skills/{skill.id}</span>
         <span>{t('settings.skillScripts')}: {skill.hasScripts ? t('settings.enabled') : t('settings.notConfigured')}</span>
         <span>{t('settings.skillReferences')}: {skill.hasReferences ? t('settings.enabled') : t('settings.notConfigured')}</span>
+      </div>
+    </div>
+  );
+}
+
+function McpRuntimeCard({ agent }: { agent: AgentInfo }) {
+  const { t } = useTranslation();
+  const { mcpIntegration, permissionHooks, subAgentSpawn } = agent.capabilities;
+  return (
+    <div className={styles.profileCard}>
+      <div className={styles.profileHeader}>
+        <div className={styles.profileIcon}>
+          <Plug size={17} />
+        </div>
+        <div>
+          <strong>{agent.name}</strong>
+          <span>{agent.description || t('settings.mcpRuntimeDefaultDesc')}</span>
+        </div>
+        <em className={`${styles.profileStatus} ${mcpIntegration ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
+          {mcpIntegration ? t('settings.statusReady') : t('settings.notConfigured')}
+        </em>
+      </div>
+      <div className={styles.profileMeta}>
+        <span>{t('settings.profileRuntime')}: {agent.id}</span>
+        <span>{t('settings.mcpIntegration')}: {mcpIntegration ? t('settings.enabled') : t('settings.notConfigured')}</span>
+        <span>{t('settings.mcpPermissionHooks')}: {permissionHooks ? t('settings.enabled') : t('settings.notConfigured')}</span>
+        <span>{t('settings.mcpSubAgentSpawn')}: {subAgentSpawn ? t('settings.enabled') : t('settings.notConfigured')}</span>
       </div>
     </div>
   );
