@@ -30,7 +30,7 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 4. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
 5. 只读相关主文档章节：产品不清读 `docs/product-requirements.md`；边界不清读 `docs/system-architecture.md`；实现顺序不清读 `docs/implementation-guide.md`。
 6. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
-7. 改 TokenDance ID 登录、OIDC、跨产品鉴权或共享设计 token 时，同步读 `../docs/identity-auth.md` 或 `../docs/design-system.md`。
+7. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、公开包装或共享设计 token 时，同步读 `../docs/identity-auth.md`、`../docs/unified-login.md`、`../docs/feishu-agenthub-integration.md`、`../docs/product-matrix.md`、`../docs/agent-seo-i18n-packaging.md` 或 `../docs/design-system.md` 中相关文档。
 8. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
 9. 客户端 M1 任务读 `docs/client-roadmap.md`。
 10. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
@@ -44,8 +44,8 @@ AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个�
 | 部分 | 负责范围 | 主要目录 |
 |---|---|---|
 | 前端 | Web 工作台、IM 交互、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` |
-| 后端 | Hub Server、Edge-Hub 通信、账号/群聊/同步/中继 | `hub-server/`、`edge-server/`、`api/` |
-| 客户端 | Desktop、Edge 本地调度、Agent CLI 进程、workspace | `app/desktop/`、`edge-server/` |
+| 后端 | Hub Server、TokenDance ID 接入、Edge-Hub 通信、账号/群聊/同步/中继、Profile/Skill/MCP/审计 | `hub-server/`、`edge-server/`、`api/` |
+| 客户端 | Desktop、Edge 本地调度、Agent Runtime 进程、workspace、执行目标体验 | `app/desktop/`、`edge-server/` |
 
 共享边界：
 
@@ -53,6 +53,19 @@ AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个�
 - Edge Server 同时连接前端和 Hub，改动前先看 `docs/system-architecture.md`。
 - 跨两个方向的改动先在 PR 描述里写清楚影响面。
 - 开发者必须审查自己 Agent 生成的代码、文档和命令输出；不要把未看懂的 Agent 改动直接合入。
+
+### AgentHub 产品术语边界
+
+实现、文档和 UI 文案必须区分以下概念：
+
+| 概念 | 含义 | 权威位置 |
+|---|---|---|
+| Agent Runtime | Codex、OpenCode、Claude Code 等 CLI/SDK 运行时适配器，回答“用什么运行”。Runtime 不是用户可管理的业务 Agent。 | Edge `internal/adapters/` |
+| Agent Profile | 用户可选择、可管理的 Agent 实体，回答“谁来做事”。 | Hub CustomAgent / Edge local profile |
+| Agent Configuration | Profile 的配置集合，包含 `AGENTS.md`、memory、上下文、聊天记录、工作目录、Skill、MCP、模型参数、审批策略。 | Edge Context Builder + Hub profile store |
+| Execution Target | 一次 Run 的实际执行位置，包含 Local Edge、Remote Edge over SSH/Tailscale、Cloud Edge、Hub Relay target。 | Edge registration + Hub routing |
+
+本地执行不依赖 Hub：Desktop 可以只连接 Local Edge 完成项目、Thread、Run 和 Runtime adapter 调度。Hub 进入链路的场景是账号、云端 IM、多端同步、远程查看/审批、设备路由、中继和审计。
 
 ### 统一 TokenDance ID 登录边界
 
@@ -62,6 +75,10 @@ AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个�
 - Client Agent 负责 Desktop/Web 登录入口、系统浏览器 PKCE/回调体验和 Hub session 存储；客户端不得直接集成 GitHub、Google、飞书，也不得把第三方 provider token 存进 AgentHub。
 - AgentHub Home 的 `https://hub.example.invalid/api/auth/callback` 是产品官网静态站 OIDC callback，不是 Hub API 登录 callback。
 - 现有 TokenDance ID bearer-token middleware 只是兼容路径；最终浏览器/桌面登录必须由 Hub Server 兑换 code 并签发 Hub 本地 session。
+
+### Feishu/Lark 应用边界
+
+AgentHub 飞书/Lark应用规划见 `../docs/feishu-agenthub-integration.md`。Feishu app 只做协作入口：机器人收发消息、事件订阅、卡片交互、工作台/H5 和任务通知。它不得成为 AgentHub 第二套登录系统；飞书 OAuth provider、飞书账号绑定、TokenDance ID 账号自动创建和 `oauth_bindings` 由 TokenDance ID 负责。Hub Server 接收 Feishu Integration Gateway 转发的业务事件后，仍按 TokenDance ID `sub` 和 AgentHub 权限执行。
 
 任务分发：
 
@@ -103,7 +120,7 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 
 ## 3. 技术主线
 
-- Hub Server 和 Edge Server 使用 Go。早期独立 `runner/` 目录已废弃；当前 Runner 能力在 `edge-server/internal/lifecycle/` 和 `edge-server/internal/adapters/` 内实现。
+- Hub Server 和 Edge Server 使用 Go。早期独立 `runner/` 目录已废弃；当前执行生命周期在 `edge-server/internal/lifecycle/`，Agent Runtime 协议适配在 `edge-server/internal/adapters/`。
 - UI 使用 React + TypeScript，Desktop 使用 Tauri。
 - 主协议是 REST JSON API + WebSocket typed events。
 - REST endpoint 入口是 `api/openapi.yaml`。
@@ -122,7 +139,7 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 
 **Lint**：各 app 独立 eslint 配置。`pnpm lint`。Web 之前没有 lint，已补充。
 
-**类型检查**：`pnpm typecheck` 在 desktop 和 web 各跑一次，零错误才能提交。
+**类型检查**：`pnpm typecheck` 在 desktop 和 web 各跑一次。当前 `app/shared/src/ui` 存在 React 类型解析 / pnpm 跨包虚拟存储的既有限制；提交说明必须区分既有 shared-ui 限制和本次新增错误。
 
 前端架构详见 `docs/system-architecture.md` 前端章节。
 
@@ -166,7 +183,7 @@ type(scope): 中文摘要
 ```text
 feat/frontend-shell
 feat/backend-health
-feat/client-runner-mock
+feat/client-edge-smoke
 codex/short-topic
 docs/short-topic
 fix/short-topic
@@ -268,22 +285,34 @@ python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml')
 git status --short --branch
 ```
 
+运行命令以真实入口为准：Edge 是 `edge-server/cmd/agenthub-edge`，Hub 是 `hub-server/cmd/server-hub`。`scripts/dev-start.ps1` / `scripts/dev-start.sh` 仍引用旧 Hub 命令，`scripts/client-smoke.ps1` 仍包含已删除 `runner/` 的历史检查；修复脚本前不要把这些脚本作为验收依据。
+
 有 Go 代码后追加：
 
 ```powershell
-go test ./...
+cd edge-server
+go test ./... -short -count=1
+
+cd ..\hub-server
+go test ./... -short -count=1
 ```
 
 Go 服务测试要求：
 
 - 新增核心逻辑要有同包 `*_test.go`。
-- Hub/Edge/AgentAdapter 的接口边界优先写 handler、service、lifecycle 或 adapter 层测试。
+- Hub/Edge/Agent Runtime adapter 的接口边界优先写 handler、service、lifecycle 或 adapter 层测试。
 - 涉及权限、路径、命令执行、同步序号的逻辑必须有失败用例。
 
 有前端代码后追加：
 
 ```powershell
+cd app/desktop
 pnpm test
+pnpm build
+pnpm typecheck
+
+cd ..\web
+pnpm typecheck
 pnpm build
 ```
 

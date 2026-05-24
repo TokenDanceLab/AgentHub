@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Search, Settings2, Sparkles } from 'lucide-react';
+import { MapPin, Search, Settings2, Sparkles } from 'lucide-react';
 import { useState, useMemo, memo, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
@@ -13,20 +13,11 @@ function agentIcon(name: string): ReactNode {
   return null;
 }
 
-type CapabilityKey = keyof AgentInfo['capabilities'];
-
-const CAPABILITY_KEYS: CapabilityKey[] = ['streaming', 'toolCalls', 'fileChanges', 'thinkingVisible', 'multiTurn'];
-
-function capabilityLabelKey(key: CapabilityKey) {
-  if (key === 'thinkingVisible') return 'agent.capability.thinking';
-  return `agent.capability.${key}`;
-}
-
 interface Props {
   agents: AgentInfo[];
   online: boolean;
   selectedId?: string;
-  onSelect?: (agent: AgentInfo) => void;
+  onSelect?: (agentId: string) => void;
 }
 
 export default memo(function AgentList({ agents, online, selectedId, onSelect }: Props) {
@@ -89,7 +80,7 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
             <li key={a.id}>
               <button
                 className={`${styles.item} ${a.id === selectedId ? styles.selected : ''}`}
-                onClick={() => onSelect?.(a)}
+                onClick={() => onSelect?.(a.id)}
                 aria-pressed={a.id === selectedId}
                 disabled={a.status !== 'available'}
               >
@@ -109,11 +100,11 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
                   )}
                   <div className={styles.metaLine}>
                     {a.version && <span className={styles.version}>{a.version}</span>}
-                    {CAPABILITY_KEYS.filter((key) => a.capabilities[key]).slice(0, 3).map((key) => (
-                      <span key={key} className={styles.capability}>
-                        {t(capabilityLabelKey(key))}
-                      </span>
-                    ))}
+                    <span className={styles.runtimeMeta}>
+                      <MapPin size={10} aria-hidden="true" />
+                      {t('agent.runtime.localEdge')}
+                    </span>
+                    <span className={styles.runtimeMeta}>{t('agent.runtime.cliAdapter')}</span>
                   </div>
                 </div>
               </button>
