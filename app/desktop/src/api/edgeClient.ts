@@ -50,7 +50,35 @@ export async function fetchRunners(): Promise<ListResponse<Runner>> {
 export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {
   const res = await fetch(`${BASE}/v1/agents`);
   if (!res.ok) throw await parseError(res);
-  return safeParse(listResponseSchema(AgentInfoSchema), await res.json(), 'agents');
+  const raw = await res.json();
+  const normalized = normalizeAgentList(raw);
+  return safeParse(listResponseSchema(AgentInfoSchema), normalized, 'agents');
+}
+
+function normalizeAgentList(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || !('items' in raw) || !Array.isArray((raw as { items?: unknown }).items)) {
+    return raw;
+  }
+
+  return {
+    ...(raw as Record<string, unknown>),
+    items: (raw as { items: Array<Record<string, unknown>> }).items.map((agent) => ({
+      ...agent,
+      capabilities: normalizeAgentCapabilities(agent.capabilities),
+    })),
+  };
+}
+
+function normalizeAgentCapabilities(raw: unknown): AgentInfo['capabilities'] {
+  const source = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const read = (camel: string, pascal: string) => Boolean(source[camel] ?? source[pascal]);
+  return {
+    streaming: read('streaming', 'Streaming'),
+    toolCalls: read('toolCalls', 'ToolCalls'),
+    fileChanges: read('fileChanges', 'FileChanges'),
+    thinkingVisible: read('thinkingVisible', 'ThinkingVisible'),
+    multiTurn: read('multiTurn', 'MultiTurn'),
+  };
 }
 
 export async function fetchThreads(projectId?: string): Promise<ListResponse<ThreadInfo>> {
