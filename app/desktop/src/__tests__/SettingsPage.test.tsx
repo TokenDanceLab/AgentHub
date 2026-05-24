@@ -68,11 +68,27 @@ vi.mock('@/stores/hubStore', () => ({
     selector({ authenticated: true, username: 'TokenDance User', clear: vi.fn() }),
 }));
 
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({
+    token: 'hub_access_token',
+    refreshToken: 'hub_refresh_token',
+    user: { id: 'user_1', username: 'TokenDance User' },
+    isAuthenticated: true,
+    tokenSource: 'hub',
+    login: vi.fn(),
+    loginWithTokenDance: vi.fn(),
+    logout: vi.fn(),
+    tryAutoLogin: vi.fn(),
+  }),
+}));
+
 describe('SettingsPage tasks', () => {
   beforeEach(() => {
     mockAgents.splice(0, mockAgents.length);
     mockRuns.splice(0, mockRuns.length);
     mockTasks.splice(0, mockTasks.length);
+    localStorage.clear();
+    sessionStorage.clear();
   });
 
   it('renders local runs and bridged Hub tasks', () => {
@@ -260,6 +276,23 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('settings.mcpTemplates')).toBeInTheDocument();
     expect(screen.getByText('settings.mcpTokenDanceHub')).toBeInTheDocument();
     expect(screen.getByText('settings.mcpGuard')).toBeInTheDocument();
+  });
+
+  it('renders account identity boundary from Hub session and local device state', () => {
+    localStorage.setItem('agenthub_device_id', '00000000-0000-0000-0000-00000000a001');
+    sessionStorage.setItem('td_code_verifier', 'verifier');
+    sessionStorage.setItem('td_state', 'state');
+
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="account" />);
+
+    expect(screen.getAllByText('TokenDance User').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('settings.hubSession').length).toBeGreaterThan(0);
+    expect(screen.getByText('settings.desktopDevice')).toBeInTheDocument();
+    expect(screen.getByText('00000000...a001')).toBeInTheDocument();
+    expect(screen.getByText('settings.identityBoundary')).toBeInTheDocument();
+    expect(screen.getByText('settings.authTokenSource')).toBeInTheDocument();
+    expect(screen.getByText('settings.deviceProof')).toBeInTheDocument();
+    expect(screen.getByText('settings.accountGuard')).toBeInTheDocument();
   });
 
   it('renders project skill registry with script and review metadata', () => {

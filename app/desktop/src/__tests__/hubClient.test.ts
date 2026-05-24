@@ -445,9 +445,13 @@ describe('hubAuth', () => {
     });
   });
 
-  describe('getState returns a snapshot', () => {
-    it('returns a copy, not the live state object', async () => {
+  describe('getState snapshot stability', () => {
+    it('returns a stable frozen snapshot until auth state changes', async () => {
       const auth = newAuth();
+
+      const initialSnapshot = auth.getState();
+      expect(auth.getState()).toBe(initialSnapshot);
+      expect(Object.isFrozen(initialSnapshot)).toBe(true);
 
       mockFetchSequence([
         { status: 200, data: mockAuthResponse },
@@ -456,9 +460,14 @@ describe('hubAuth', () => {
       await auth.login('alice', 'hunter2');
 
       const snapshot = auth.getState();
-      snapshot.isAuthenticated = false; // mutate copy
+      expect(snapshot).not.toBe(initialSnapshot);
+      expect(auth.getState()).toBe(snapshot);
+      expect(Object.isFrozen(snapshot)).toBe(true);
 
-      expect(auth.getState().isAuthenticated).toBe(true); // original unchanged
+      expect(() => {
+        snapshot.isAuthenticated = false;
+      }).toThrow(TypeError);
+      expect(auth.getState().isAuthenticated).toBe(true);
     });
   });
 
