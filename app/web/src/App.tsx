@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import AgentSquarePage from '@/pages/agent-square/AgentSquarePage';
-import GroupWorkspacePage from '@/pages/group-workspace/GroupWorkspacePage';
-import PrivateChatsPage from '@/pages/private-chats/PrivateChatsPage';
-import ProjectPage from '@/pages/projects/ProjectPage';
-import WorkbenchPage from '@/pages/workbench/WorkbenchPage';
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import { RouterProvider } from 'react-router-dom';
+import { router } from '@/router';
 import styles from '@/App.module.css';
 
 type Theme = 'light' | 'dark';
@@ -19,65 +16,88 @@ function readTheme(): Theme {
   return 'light';
 }
 
-type PreviewPage = {
-  id: string;
+type PreviewTab = {
   label: string;
+  path: string;
   priority: 'primary' | 'secondary';
-  component: () => React.ReactElement;
 };
 
-const previewPages: PreviewPage[] = [
+const previewTabs: PreviewTab[] = [
   {
-    id: 'workbench',
+    path: '/',
     label: 'Workbench',
     priority: 'primary',
-    component: WorkbenchPage,
   },
   {
-    id: 'agent-square',
+    path: '/agent-square',
     label: 'Agent Square',
     priority: 'secondary',
-    component: AgentSquarePage,
   },
   {
-    id: 'private-chats',
+    path: '/chats',
     label: 'Private Chats',
     priority: 'secondary',
-    component: PrivateChatsPage,
   },
   {
-    id: 'group-workspace',
+    path: '/group/workbench',
     label: 'Group Workspace',
     priority: 'secondary',
-    component: GroupWorkspacePage,
   },
   {
-    id: 'project',
+    path: '/project/agent-hub',
     label: 'Project Preview',
     priority: 'secondary',
-    component: ProjectPage,
   },
 ];
 
-export default function App() {
-  const [activePageId, setActivePageId] = useState(previewPages[0].id);
+function LoadingFallback() {
+  return (
+    <div
+      role="status"
+      style={{
+        color: 'var(--text-muted)',
+        display: 'grid',
+        fontSize: 13,
+        fontWeight: 700,
+        height: '100%',
+        minHeight: 180,
+        placeItems: 'center',
+      }}
+    >
+      Loading...
+    </div>
+  );
+}
 
+export default function App() {
   const [theme, setTheme] = useState<Theme>(readTheme);
+  const [pathname, setPathname] = useState(() => router.state.location.pathname);
 
   useEffect(() => {
     try { localStorage.setItem('agenthub-theme', theme); } catch { /* noop */ }
   }, [theme]);
 
+  useEffect(() => router.subscribe((state) => setPathname(state.location.pathname)), []);
+
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   }, []);
 
-  const activePage = useMemo(
-    () => previewPages.find((page) => page.id === activePageId) ?? previewPages[0],
-    [activePageId],
-  );
+  const isActiveTab = (path: string) => {
+    if (path === '/') {
+      return pathname === '/';
+    }
 
-  const ActivePage = activePage.component;
+    if (path === '/group/workbench') {
+      return pathname === path || pathname.startsWith('/group/');
+    }
+
+    if (path === '/project/agent-hub') {
+      return pathname === path || pathname.startsWith('/project/');
+    }
+
+    return pathname === path || pathname.startsWith(`${path}/`);
+  };
 
   return (
     <div className={styles.root} data-theme={theme}>
@@ -88,12 +108,12 @@ export default function App() {
         </div>
 
         <nav className={styles.tabs} aria-label="Preview pages">
-          {previewPages.map((page) => (
+          {previewTabs.map((page) => (
             <button
-              className={page.id === activePage.id ? styles.activeTab : styles.tab}
+              className={isActiveTab(page.path) ? styles.activeTab : styles.tab}
               data-priority={page.priority}
-              key={page.id}
-              onClick={() => setActivePageId(page.id)}
+              key={page.path}
+              onClick={() => void router.navigate(page.path)}
               type="button"
             >
               {page.label}
@@ -140,7 +160,9 @@ export default function App() {
       </header>
 
       <main className={styles.preview}>
-        <ActivePage />
+        <Suspense fallback={<LoadingFallback />}>
+          <RouterProvider router={router} />
+        </Suspense>
       </main>
     </div>
   );
