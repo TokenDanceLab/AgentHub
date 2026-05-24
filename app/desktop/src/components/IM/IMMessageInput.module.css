@@ -1,0 +1,115 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-color, #334155);
+  background: var(--surface, #0f172a);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.bar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-sm);
+}
+
+.inputWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 36px;
+  max-height: 120px;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 8px;
+  background: var(--surface-raised, #1e293b);
+  color: var(--foreground);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.textarea:focus {
+  border-color: var(--accent, #3b82f6);
+}
+
+.textarea::placeholder {
+  color: var(--foreground);
+  opacity: 0.3;
+}
+
+.textarea:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2px;
+  padding: 0 var(--space-xs);
+}
+
+.charCount {
+  font-size: 10px;
+  color: var(--foreground);
+  opacity: 0.4;
+}
+
+.charCountOver {
+  color: var(--color-danger, #ef4444);
+  opacity: 1;
+}
+
+.hint {
+  font-size: 10px;
+  color: var(--foreground);
+  opacity: 0.3;
+}
+
+.hint kbd {
+  font-family: inherit;
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--border-color, #334155);
+  background: var(--surface-raised, #1e293b);
+}
+
+.sendBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent, #3b82f6);
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.sendBtn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.sendBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .root {
+    padding: var(--space-sm);
+  }
+}

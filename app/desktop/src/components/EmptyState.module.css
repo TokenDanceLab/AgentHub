@@ -1,0 +1,89 @@
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-md);
+  margin: auto;
+  text-align: center;
+  max-width: 320px;
+  animation: fadeIn 0.4s var(--ease-out);
+  user-select: none;
+}
+
+.iconWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--foreground);
+}
+
+.description {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--foreground);
+  opacity: 0.5;
+  line-height: 1.5;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-xs);
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--foreground);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background var(--duration-fast), border-color var(--duration-fast), transform var(--duration-fast);
+}
+
+.action:hover {
+  background: color-mix(in oklch, var(--primary) 10%, var(--card));
+  border-color: color-mix(in oklch, var(--primary) 30%, var(--border));
+}
+
+.action:active {
+  transform: scale(0.97);
+}
+
+/* ── Mobile ─────────────────────────────────── */
+@media (max-width: 767px) {
+  .container {
+    padding: var(--space-lg) var(--space-sm);
+    max-width: 280px;
+  }
+
+  .action {
+    min-height: var(--touch-target-min, 44px);
+    padding: 8px 20px;
+    font-size: var(--font-size-base);
+  }
+}

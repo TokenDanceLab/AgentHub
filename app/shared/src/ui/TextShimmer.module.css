@@ -1,0 +1,40 @@
+.shimmer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.visible { opacity: 1; }
+
+.label {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--muted-foreground);
+  font-weight: var(--font-weight-medium, 500);
+}
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bar {
+  height: 12px;
+  border-radius: var(--radius-sm, 0.25rem);
+  background: linear-gradient(
+    90deg,
+    oklch(0 0 0 / 0.06) 0%,
+    oklch(0 0 0 / 0.12) 50%,
+    oklch(0 0 0 / 0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

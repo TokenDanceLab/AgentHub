@@ -1,47 +1,233 @@
+/* ═════════════════════════════════════════════════════════════════════
+   AgentHub Design Tokens — non-theme tokens only
+   Theme colors live in themes.css (toggled via data-theme)
+   规则: 7字号 + 3字重 + 零阴影 + 语义token + 无硬编码色值
+   ═════════════════════════════════════════════════════════════════════ */
+
+/* ── Base Tokens (theme-independent) ─────────────────────────────────── */
 :root {
-  /* ── Palette ─────────────────────────────── */
-  --color-bg:        #0f1117;
-  --color-surface:   #161b22;
-  --color-border:    #21262d;
-  --color-border-subtle: #1a1d24;
-  --color-text:      #e1e4e8;
-  --color-text-muted: #8b949e;
-  --color-text-dim:  #484f58;
-  --color-accent:    #79c0ff;
-  --color-success:   #3fb950;
-  --color-danger:    #f85149;
-  --color-danger-bg: #490202;
+  /* ── Scrollbar ────────────────────────────────────────────────────── */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 
-  /* ── Typography ──────────────────────────── */
-  --font-ui:    system-ui, -apple-system, sans-serif;
-  --font-mono:  'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
-  --font-size-xs:  11px;
-  --font-size-sm:  12px;
-  --font-size-md:  13px;
+  /* ── Typography ──────────────────────────────────────────────────── */
+  --font-sans:
+    'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  --font-mono:
+    'Geist Mono', 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', ui-monospace, monospace;
 
-  /* ── Spacing ─────────────────────────────── */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 24px;
+  /* 7 个字号 (从 3 级扩展到 7 级) */
+  --font-size-xs: 0.75rem; /* 12px — metadata, badge, timestamp */
+  --font-size-sm: 0.875rem; /* 14px — default body, menu, button, form */
+  --font-size-base: 1rem; /* 16px — page title, empty state, editor */
+  --font-size-2xs: 0.625rem; /* 10px — keybind badge, tiny labels */
+  --font-size-lg: 1.125rem; /* 18px — section title */
+  --font-size-xl: 1.25rem; /* 20px — page title */
+  --font-size-2xl: 1.5rem; /* 24px — empty state big title */
 
-  /* ── Layout ──────────────────────────────── */
-  --sidebar-width: 260px;
+  /* 3 个字重 (从 2 级扩展到 3 级) */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ── Text Colors (base — theme overrides in themes.css) ──────────── */
+  --text-weaker:  oklch(0.52 0.012 252);  /* #6A7380 — visible secondary */
+  --text-weakest: oklch(0.32 0.010 252);  /* faint separators */
+
+  /* ── Spacing (4px grid) ──────────────────────────────────────────── */
+  --space-0: 0;
+  --space-xs: 0.25rem; /* 4px */
+  --space-sm: 0.5rem; /* 8px */
+  --space-md: 0.75rem; /* 12px */
+  --space-lg: 1rem; /* 16px */
+  --space-xl: 1.5rem; /* 24px */
+  --space-2xl: 2rem; /* 32px */
+  --space-3xl: 3rem; /* 48px */
+
+  /* ── Border Radius ───────────────────────────────────────────────── */
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+
+  /* ── Shadows (仅用于极少场景——默认用border分隔) ───────────────────── */
+  --shadow-none: 0 0 0 0 transparent;
+
+  /* ── Z-Index ─────────────────────────────────────────────────────── */
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-modal: 40;
+  --z-toast: 50;
+  --z-tooltip: 60;
+
+  /* ── Focus Ring ──────────────────────────────────────────────────── */
+  --ring-width: 2px;
+  --ring-offset: 2px;
+
+  /* ── Animation ───────────────────────────────────────────────────── */
+  --duration-fast: 100ms;
+  --duration-normal: 150ms;
+  --duration-medium: 200ms;
+  --duration-slow: 300ms;
+  --duration-glacial: 500ms;
+
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+
+  /* ── Surface Layers (base — theme overrides in themes.css) ────────── */
+  --surface-base:         oklch(0.14 0.006 260);  /* bottom container */
+  --surface-raised:       oklch(0.17 0.007 260);  /* cards/panels */
+  --surface-raised-hover: oklch(0.20 0.007 260);  /* hover elevation */
+  --surface-overlay:      oklch(0.22 0.008 260);  /* dropdown/popover */
+  --hover-overlay: oklch(1 0 0 / 0.06);           /* all hover states */
+
+  /* ── Layout ──────────────────────────────────────────────────────── */
+  --sidebar-min: 200px;
+  --sidebar-max: 420px;
+  --sidebar-default: 280px;
+  --right-panel-min: 240px;
+  --right-panel-max: 600px;
   --statusbar-height: 36px;
+
+  /* ── Responsive Breakpoints (documentation — use in @media) ──────── */
+  /* --bp-tablet: 768px;   tablet / small desktop */
+  /* --bp-desktop: 1024px; full desktop layout */
+  /* Note: CSS custom properties cannot be used inside @media queries,
+     so these are documented here and mirrored in each component's CSS. */
+
+  /* ── Touch Targets (WCAG 2.5.5) ─────────────────────────────────── */
+  --touch-target-min: 44px;
 }
 
-*, *::before, *::after {
+/* ── Global Reset ──────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body, #root {
-  height: 100%;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-ui);
-  font-size: var(--font-size-md);
+html,
+body,
+#root {
+  min-height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* 中文与拉丁字符间距自动插入 (Chrome 119+) */
+  text-autospace: ideograph-alpha ideograph-numeric;
 }
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ── Global Transition Reset ────────────────────────────────────────── */
+* {
+  transition-property: color, background-color, border-color, opacity, box-shadow;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-out);
+}
+
+/* ── Focus Ring ────────────────────────────────────────────────────── */
+*:focus-visible {
+  outline: var(--ring-width) solid var(--ring);
+  outline-offset: var(--ring-offset);
+  border-radius: var(--radius-md);
+}
+
+/* ── Reduced Motion (WCAG 2.2 AA 2.3.1) ───────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* ── Selection ─────────────────────────────────────────────────────── */
+::selection {
+  background: oklch(0.7 0.15 260 / 0.3);
+  color: inherit;
+}
+
+/* ── Mobile Input (iOS 16px 防缩放) ───────────────────────────────── */
+@media (max-width: 767px), (pointer: coarse) {
+  input:not([type='button']):not([type='checkbox']):not([type='color']):not([type='file']):not(
+      [type='hidden']
+    ):not([type='image']):not([type='radio']):not([type='range']):not([type='reset']):not(
+      [type='submit']
+    ),
+  textarea,
+  select,
+  [contenteditable]:not([contenteditable='false']) {
+    font-size: 16px !important;
+  }
+}
+
+/* ── Keyframe Animations ───────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes progress-indeterminate {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+/* ── Animation Utility Classes ─────────────────────────────────────── */
+.animate-fade-in  { animation: fade-in var(--duration-medium) var(--ease-out); }
+.animate-slide-in { animation: slide-in-right var(--duration-medium) var(--ease-out); }
+.animate-progress { animation: progress-indeterminate 1.5s infinite; }

@@ -1,0 +1,93 @@
+.block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 0.5rem);
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm, 0.875rem);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.header:hover {
+  background: oklch(0 0 0 / 0.04);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.label {
+  font-weight: var(--font-weight-medium, 500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: var(--radius-full, 999px);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: oklch(0 0 0 / 0.08);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 8px;
+  opacity: 0.7;
+}
+
+.previewLine {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-xs, 0.75rem);
+  line-height: 1.5;
+  color: var(--muted-foreground);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.previewMore {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.content {
+  padding: 8px 12px 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Color schemes ─────────────── */
+
+.schemeDefault { border-left: 3px solid var(--border); }
+.schemeBlue    { border-left: 3px solid oklch(0.60 0.18 240); }
+.schemeGreen   { border-left: 3px solid var(--success, oklch(0.58 0.18 150)); }
+.schemeAmber   { border-left: 3px solid var(--warning, oklch(0.70 0.18 85)); }
+.schemePurple  { border-left: 3px solid oklch(0.55 0.22 300); }
+.schemeRed     { border-left: 3px solid var(--destructive, oklch(0.58 0.24 27)); }
+
+.expanded {
+  border-color: oklch(0 0 0 / 0.15);
+}

@@ -1,0 +1,88 @@
+.base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm, 0.5rem);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 0.375rem);
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-medium, 500);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  user-select: none;
+}
+
+.base:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Sizes ─────────────────────── */
+
+.sm { height: 32px; padding: 0 10px; font-size: var(--font-size-xs, 0.75rem); border-radius: var(--radius-sm, 0.25rem); }
+.md { height: 36px; padding: 0 14px; font-size: var(--font-size-sm, 0.875rem); }
+.lg { height: 44px; padding: 0 20px; font-size: var(--font-size-base, 1rem); border-radius: var(--radius-lg, 0.5rem); }
+
+/* ── Variants ──────────────────── */
+
+.primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.secondary {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border-color: var(--border);
+}
+.secondary:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--muted-foreground);
+}
+.ghost:hover:not(:disabled) {
+  background: var(--secondary);
+  color: var(--foreground);
+}
+
+.destructive {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+}
+.destructive:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.gradient {
+  color: #fff;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--brand, oklch(0.55 0.16 255)), oklch(0.60 0.14 210));
+  box-shadow: 0 10px 22px oklch(0.55 0.16 255 / 0.24);
+}
+.gradient:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px oklch(0.55 0.16 255 / 0.32);
+}
+
+/* ── Icon-only ─────────────────── */
+
+.icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border-color: var(--border);
+}
+.icon:hover:not(:disabled) {
+  background: var(--accent);
+}
