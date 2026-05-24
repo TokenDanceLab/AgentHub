@@ -19,10 +19,11 @@ vi.mock('@/components/ModelDropdown', () => ({
   ),
 }));
 
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import PromptInput from '@/components/PromptInput';
+import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import type { AgentInfo } from '@shared/types';
 
 // jsdom does not implement scrollIntoView
@@ -52,6 +53,11 @@ function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
 }
 
 describe('PromptInput', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useModelSettingsStore.getState().reset();
+  });
+
   it('renders input field with placeholder', () => {
     render(
       <PromptInput
@@ -407,5 +413,25 @@ describe('PromptInput', () => {
 
     const sendBtn = screen.getByRole('button', { name: 'action.startRun' });
     expect(sendBtn).not.toBeDisabled();
+  });
+
+  it('shows the resolved model route from persisted settings', () => {
+    useModelSettingsStore.getState().setDefaultModel('gpt-5.5');
+    useModelSettingsStore.getState().setDefaultProvider('openai');
+    useModelSettingsStore.getState().setReasoningEffort('max');
+
+    render(
+      <PromptInput
+        agents={[]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={vi.fn()}
+      />,
+    );
+
+    const route = screen.getByLabelText('prompt.routePreview');
+    expect(within(route).getByText('openai')).toBeInTheDocument();
+    expect(within(route).getByText('gpt-5.5')).toBeInTheDocument();
+    expect(within(route).getByText('max')).toBeInTheDocument();
   });
 });
