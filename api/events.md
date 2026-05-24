@@ -5,7 +5,7 @@ AgentHub 使用 WebSocket typed events 推送实时状态。REST API 用于发�
 ## 1. 连接
 
 ```text
-GET /v1/events?cursor=evt_cursor
+GET /v1/events?cursor=42
 ```
 
 用途：
@@ -55,9 +55,10 @@ P0 只需要 `UI -> Edge` 事件流。
 ## 3. 序号和重连
 
 - `seq` 在同一 event stream 内单调递增。
-- 客户端保存最后处理的 `id` 或 cursor。
-- 断线后用 `GET /v1/events?cursor=...` 恢复。
-- 服务端无法回放时，发送 `error` 事件并要求客户端重新拉取 REST snapshot。
+- `cursor` 是 Edge event stream 的数字 `seq`，不是事件 `id`。
+- 客户端保存最后处理的 `seq` 作为 cursor。
+- 断线后用 `GET /v1/events?cursor=...` 恢复，Edge replay `seq > cursor` 的事件。
+- 如果 Edge 无法 replay，客户端应重新拉取 REST snapshot。
 
 ## 4. 输出流
 
