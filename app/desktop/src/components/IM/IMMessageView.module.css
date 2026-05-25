@@ -162,6 +162,33 @@
   color: inherit;
 }
 
+.metaAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.metaAction:hover:not(:disabled) {
+  opacity: 1;
+}
+
+.metaAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.actionError {
+  color: var(--destructive);
+}
+
 /* ── Recalled message ────────────────────── */
 
 .recalled {
