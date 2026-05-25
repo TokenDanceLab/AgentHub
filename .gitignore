@@ -11,6 +11,14 @@ coverage/
 playwright-report/
 test-results/
 
+# Generated reports and local test artifacts
+app/desktop/stats.html
+**/coverage.out
+**/coverage.html
+edge-server/cov_full
+edge-server/$covPath
+hub-server/tests/uploads/
+
 # Go
 *.exe
 *.exe~
@@ -37,6 +45,7 @@ Thumbs.db
 .env.local
 .env.*
 !.env.example
+!.env.production.example
 .envrc
 *.pem
 *.key
@@ -66,6 +75,12 @@ yarn-error.log*
 *.bak
 *.backup
 *.sql.gz
+
+# AgentHub deployment state (hk2 production)
+hub-server/deployments/.env.production
+hub-server/deployments/.env
+hub-server/deployments/backups/
+backups/
 
 # Local machine and agent state
 .worktrees/

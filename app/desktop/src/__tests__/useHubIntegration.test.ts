@@ -231,7 +231,7 @@ describe('useHubIntegration', () => {
       fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, dp);
     });
 
-    expect(hubClient.ackTask).toHaveBeenCalledWith('task-1');
+    expect(hubClient.ackTask).toHaveBeenCalledWith('task-1', 'run-1');
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:3210/v1/runs',
       expect.objectContaining({
@@ -299,7 +299,7 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'Hello' }));
     });
 
-    expect(hubClient.streamTask).toHaveBeenCalledWith('task-1', 'Hello');
+    expect(hubClient.streamTask).toHaveBeenCalledWith('task-1', 'Hello', 'run-1');
   });
 
   it('calls doneTask on successful run.agent.result', async () => {
@@ -315,7 +315,7 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true, content: 'done' }));
     });
 
-    expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'done');
+    expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'done', 'run-1');
   });
 
   it('calls failTask on failed run.agent.result', async () => {
@@ -333,7 +333,7 @@ describe('useHubIntegration', () => {
       );
     });
 
-    expect(hubClient.failTask).toHaveBeenCalledWith('task-1', 'exec failed');
+    expect(hubClient.failTask).toHaveBeenCalledWith('task-1', 'exec failed', 'run-1');
   });
 
   it('calls failTask on run.failed event', async () => {
@@ -349,7 +349,7 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.failed', { runId: 'run-1', status: 'failed' }));
     });
 
-    expect(hubClient.failTask).toHaveBeenCalledWith('task-1', 'Run lifecycle failure');
+    expect(hubClient.failTask).toHaveBeenCalledWith('task-1', 'Run lifecycle failure', 'run-1');
   });
 
   it('ignores Edge events for unknown runIds', async () => {
@@ -463,8 +463,8 @@ describe('useHubIntegration', () => {
     expect(result.current.getRunByTaskId('task-B')).toBe('run-B');
     expect(result.current.getTaskByRunId('run-A')?.taskId).toBe('task-A');
     expect(result.current.getTaskByRunId('run-B')?.taskId).toBe('task-B');
-    expect(hubClient.ackTask).toHaveBeenCalledWith('task-A');
-    expect(hubClient.ackTask).toHaveBeenCalledWith('task-B');
+    expect(hubClient.ackTask).toHaveBeenCalledWith('task-A', 'run-A');
+    expect(hubClient.ackTask).toHaveBeenCalledWith('task-B', 'run-B');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -491,8 +491,8 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-A', success: true }));
     });
 
-    expect(hubClient.doneTask).toHaveBeenCalledWith('task-A', expect.any(String));
-    expect(hubClient.doneTask).not.toHaveBeenCalledWith('task-B', expect.any(String));
+    expect(hubClient.doneTask).toHaveBeenCalledWith('task-A', expect.any(String), 'run-A');
+    expect(hubClient.doneTask).not.toHaveBeenCalledWith('task-B', expect.any(String), expect.any(String));
   });
 
   // ── Edge events after completion ──────────────────────

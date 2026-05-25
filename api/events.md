@@ -2,6 +2,15 @@
 
 AgentHub 使用 WebSocket typed events 推送实时状态。REST API 用于发起命令和查询，WebSocket 只负责事件投递。
 
+> **Implementation Status (2026-05-24)**: Edge Server events (run.*, runner.*) are
+> the primary event system and are fully documented below. Hub Server has its own
+> WebSocket event system at `/client/ws` using a different envelope format
+> (`ws.Frame` with flat `dot.notation` types: `message.new`, `agent.dispatch`,
+> `session.created`, `device.online`, etc.) — this Hub event system is not yet
+> documented in this file. `/client/ws` is a Hub-local session channel: the
+> first `auth` frame carries a Hub-issued HS256 access token, not a raw
+> TokenDance ID bearer token.
+
 ## 1. 连接
 
 ```text
@@ -69,6 +78,10 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 - 每 50ms 或每 8KB 合并一次。
 - 使用 `run.output.batch` 承载批量 chunk。
 - 每个 chunk 带 `offset`，方便前端去重。
+- Edge raw stdout/stderr 当前由 `ProcessExecutor` 做 per-run 总字节预算；默认 4 MiB，超出后截断持久化输出和 `run.output.batch` 文本。
+- 截断批次会在兼容 payload 上附加 `truncated: true`、`maxBytes`、`bytesWritten` 和 `message`。客户端应保留已收到文本，并用这些字段提示输出被截断。
+- 结构化 `run.agent.*` adapter payload 另有单事件 JSON payload 预算；默认 1 MiB。超出后 Edge 会优先递归截断字符串字段，保留事件类型和 scope，并在 payload 上附加 `truncated: true`、`maxBytes`、`bytesBefore` 和 `message`。
+- 如果 payload 主要由非字符串大对象组成，Edge 可以降级为 metadata-only payload，并附加 `dropped: true`。客户端应把这类事件视为“该事件内容被截断/丢弃”，不要把它当作 run 失败。
 
 单条输出：
 
@@ -96,6 +109,42 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
       { "offset": 0, "text": "installing...\n" },
       { "offset": 14, "text": "building...\n" }
     ]
+  }
+}
+```
+
+截断批次：
+
+```json
+{
+  "type": "run.output.batch",
+  "payload": {
+    "runId": "run_1",
+    "stream": "stdout",
+    "chunks": [
+      { "offset": 4194288, "text": "final bytes" }
+    ],
+    "truncated": true,
+    "maxBytes": 4194304,
+    "bytesWritten": 4194304,
+    "message": "run output truncated after 4194304 bytes"
+  }
+}
+```
+
+结构化事件截断示例：
+
+```json
+{
+  "type": "run.agent.tool_result",
+  "payload": {
+    "callId": "toolu_1",
+    "toolName": "shell_command",
+    "output": "first retained bytes...",
+    "truncated": true,
+    "maxBytes": 1048576,
+    "bytesBefore": 2097152,
+    "message": "structured event payload truncated after 1048576 bytes"
   }
 }
 ```
