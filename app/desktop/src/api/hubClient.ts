@@ -512,22 +512,25 @@ export function createHubClient(opts: HubClientOptions = {}) {
         ...(runId ? { body: JSON.stringify({ run_id: runId }) } : {}),
       }),
 
-    streamTask: (taskId: string, content: string) =>
+    streamTask: (taskId: string, content: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
         method: 'POST',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, ...(runId ? { run_id: runId } : {}) }),
       }),
 
-    doneTask: (taskId: string, finalContent?: string) =>
+    doneTask: (taskId: string, finalContent?: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/done`, {
         method: 'POST',
-        body: JSON.stringify({ final_content: finalContent ?? '' }),
+        body: JSON.stringify({
+          final_content: finalContent ?? '',
+          ...(runId ? { run_id: runId } : {}),
+        }),
       }),
 
-    failTask: (taskId: string, error: string) =>
+    failTask: (taskId: string, error: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/fail`, {
         method: 'POST',
-        body: JSON.stringify({ error }),
+        body: JSON.stringify({ error, ...(runId ? { run_id: runId } : {}) }),
       }),
 
     // ── Agent tasks ───────────────────────────────

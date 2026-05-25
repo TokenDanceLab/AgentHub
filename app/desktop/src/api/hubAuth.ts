@@ -7,6 +7,11 @@ import type { UserProfile } from './hubClient';
 import { createHubClient } from './hubClient';
 import type { HubClient } from './hubClient';
 import { getOrCreateDeviceId } from './deviceId';
+import {
+  clearStoredHubRefreshToken,
+  loadStoredHubRefreshToken,
+  saveStoredHubRefreshToken,
+} from './hubTokenStorage';
 import { useHubStore } from '@/stores/hubStore';
 
 const TOKEN_KEY = 'agenthub_hub_token';
@@ -129,11 +134,14 @@ export function createHubAuth(client?: HubClient): HubAuth {
 
   const state: HubAuthState = {
     token: typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null,
-    refreshToken: typeof localStorage !== 'undefined' ? localStorage.getItem(REFRESH_KEY) : null,
+    refreshToken: null,
     user: null,
     isAuthenticated: false,
     tokenSource: (typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_SOURCE_KEY) : null) as HubAuthState['tokenSource'],
   };
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(REFRESH_KEY);
+  }
 
   const listeners = new Set<(s: HubAuthState) => void>();
 
@@ -155,12 +163,13 @@ export function createHubAuth(client?: HubClient): HubAuth {
   let authClient = createHubClient({ getToken });
 
   async function completeLogin(token: string, refreshToken: string | null, source: 'tokendance' | 'hub') {
+    await saveStoredHubRefreshToken(refreshToken);
     state.token = token;
     state.refreshToken = refreshToken;
     state.tokenSource = source;
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(TOKEN_KEY, token);
-      if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
+      localStorage.removeItem(REFRESH_KEY);
       localStorage.setItem(TOKEN_SOURCE_KEY, source);
     }
 
@@ -227,6 +236,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
         localStorage.removeItem(REFRESH_KEY);
         localStorage.removeItem(TOKEN_SOURCE_KEY);
       }
+      await clearStoredHubRefreshToken();
       sessionStorage.removeItem('td_code_verifier');
       sessionStorage.removeItem('td_state');
       useHubStore.getState().clear();
@@ -243,13 +253,17 @@ export function createHubAuth(client?: HubClient): HubAuth {
         notify();
         return true;
       } catch {
-        if (state.refreshToken) {
+        const refreshToken = state.refreshToken ?? (await loadStoredHubRefreshToken());
+        if (refreshToken) {
           try {
             const refreshClient = createHubClient();
-            const res = await refreshClient.refresh(state.refreshToken);
+            const res = await refreshClient.refresh(refreshToken);
             state.token = res.access_token;
+            state.refreshToken = res.refresh_token;
+            await saveStoredHubRefreshToken(res.refresh_token);
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem(TOKEN_KEY, res.access_token);
+              localStorage.removeItem(REFRESH_KEY);
             }
             authClient = createHubClient({ getToken });
             state.user = await authClient.me();
@@ -271,6 +285,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
           localStorage.removeItem(REFRESH_KEY);
           localStorage.removeItem(TOKEN_SOURCE_KEY);
         }
+        await clearStoredHubRefreshToken();
         useHubStore.getState().clear();
         notify();
         return false;
