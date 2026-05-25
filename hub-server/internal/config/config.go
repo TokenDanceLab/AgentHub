@@ -117,6 +117,31 @@ func Load(configPath string) (*Config, error) {
 		cfg.JWT.Secret = envSecret
 	}
 
+	// Explicit env var overrides for TokenDance ID.
+	// Viper AutomaticEnv handles nesting with underscores but these
+	// belt-and-suspenders overrides guarantee the env vars take precedence
+	// regardless of config file content.
+	if envIssuer := os.Getenv("AGENTHUB_TOKENDANCE_ISSUER_URL"); envIssuer != "" {
+		cfg.TokenDanceID.IssuerURL = envIssuer
+	}
+	if envJWKS := os.Getenv("AGENTHUB_TOKENDANCE_JWKS_URI"); envJWKS != "" {
+		cfg.TokenDanceID.JWKSURI = envJWKS
+	}
+	if envClientID := os.Getenv("AGENTHUB_TOKENDANCE_CLIENT_ID"); envClientID != "" {
+		cfg.TokenDanceID.ClientID = envClientID
+	}
+	if envClientSecret := os.Getenv("AGENTHUB_TOKENDANCE_CLIENT_SECRET"); envClientSecret != "" {
+		cfg.TokenDanceID.ClientSecret = envClientSecret
+	}
+	if envRedirectURI := os.Getenv("AGENTHUB_TOKENDANCE_REDIRECT_URI"); envRedirectURI != "" {
+		cfg.TokenDanceID.RedirectURI = envRedirectURI
+	}
+
+	// Auto-derive JWKS URI from issuer URL when not explicitly set.
+	if cfg.TokenDanceID.JWKSURI == "" && cfg.TokenDanceID.IssuerURL != "" {
+		cfg.TokenDanceID.JWKSURI = cfg.TokenDanceID.IssuerURL + "/.well-known/jwks.json"
+	}
+
 	return &cfg, nil
 }
 
