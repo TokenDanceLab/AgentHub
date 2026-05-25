@@ -354,7 +354,7 @@ REST snapshot 至少应能按 Project、Thread、Run、Item、Artifact 重建 UI
 | M4 | Hub Server、响应式布局、环境隔离、E2E、权限门控、Hub auth | ✅ |
 | P0 | Desktop UI -> Local Edge -> AgentAdapter -> Agent CLI (完整闭环) | ✅ |
 | P1 | Local Edge + 多 Agent Thread | 已完成 |
-| P2 | Edge <-> Hub 同步，TokenDance ID 登录，Web/Mobile 查看和审批 | 规划中（Q3） |
+| P2 | Edge <-> Hub 同步，TokenDance ID 登录，Web/Mobile 查看和审批 | 进行中：Hub OIDC code exchange 与 Hub-local session 已在 repo 落地；部署配置、Desktop/Web 回调 UX、logout/reconnect 和授权证据仍需闭环 |
 | P3 | Hub Relay -> Local/Remote/Cloud Edge -> AgentAdapter，远程控制和预览代理 | 规划中（Q3） |
 | P4 | 完整团队 IM、Agent 市场、Skill/MCP 管理、模型配置和安全审计 | 规划中 |
 
