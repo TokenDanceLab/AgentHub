@@ -81,6 +81,16 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 		args = append(args, "--ephemeral")
 	}
 
+	// Image input (--image / -i)
+	if image, ok := ctx.ConfigOverrides["image"]; ok && image != "" {
+		args = append(args, "--image", image)
+	}
+
+	// Add working directory for tool access (mirrors Claude Code --add-dir)
+	if ctx.WorkDir != "" {
+		args = append(args, "--add-dir", ctx.WorkDir)
+	}
+
 	// Structured JSON output
 	args = append(args, "--json")
 
@@ -327,6 +337,8 @@ func (a *CodexAdapter) dispatchItemUpdated(scope map[string]any, emitter EventEm
 		a.emitToolProgress(raw, scope, emitter)
 	case "mcp_tool_call":
 		a.emitToolProgress(raw, scope, emitter)
+	case "web_search":
+		a.emitToolProgress(raw, scope, emitter)
 	case "collab_tool_call":
 		a.emitTaskNotification(raw, scope, emitter)
 	case "todo_list":
@@ -540,6 +552,17 @@ func (a *CodexAdapter) emitToolProgress(raw json.RawMessage, scope map[string]an
 			slog.Debug("codex: emitToolProgress mcp_tool_call unmarshal failed", "err", err)
 		}
 		payload["toolName"] = "mcp__" + item.Server + "__" + item.Tool
+	case "web_search":
+		var item struct {
+			Query  string `json:"query"`
+			Action string `json:"action"`
+		}
+		if err := json.Unmarshal(raw, &item); err != nil {
+			slog.Debug("codex: emitToolProgress web_search unmarshal failed", "err", err)
+		}
+		payload["toolName"] = "web_search"
+		payload["kind"] = "web_search"
+		payload["input"] = map[string]any{"query": item.Query, "action": item.Action}
 	}
 	emitter.Emit(BusEventToolCall, scope, payload)
 }
