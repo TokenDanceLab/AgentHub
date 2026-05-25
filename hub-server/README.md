@@ -44,7 +44,7 @@ TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产�
 5. Hub Server 把 `tokendance_sub` 映射到 Hub user。
 6. Hub Server 签发 Hub 本地 access/refresh session，并绑定 device proof。
 
-现有 `hub-server/internal/middleware/auth.go` 可先尝试 TokenDance ID RS256/JWKS bearer token，再 fallback 到 Hub 本地 HS256 JWT。这只是兼容路径，不能替代 Hub session、refresh token、device proof 或 Edge 权限检查。
+现有 `hub-server/internal/middleware/auth.go` 可在普通 REST 鉴权中先尝试 TokenDance ID RS256/JWKS bearer token，再 fallback 到 Hub 本地 HS256 JWT。这只是兼容路径，不能替代 Hub session、refresh token、device proof 或 Edge 权限检查。`/client/ws` 是例外：WebSocket upgrade middleware 和首帧 `auth` 都只接受 Hub-issued HS256 access token，TokenDance bearer 不会成为 Hub WebSocket session。
 
 | 项 | 当前说明 |
 |---|---|
@@ -52,6 +52,7 @@ TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产�
 | Code exchange | 由 Hub Server 完成；产品客户端不得保存第三方 provider token |
 | Hub session | AgentHub API 的长期授权边界；浏览器/桌面最终消费 Hub access/refresh session |
 | Bearer middleware | 兼容已签发 TokenDance ID bearer token；需要配置 TokenDance issuer 和 AgentHub client id；不创建 Hub refresh session |
+| Hub WebSocket | `/client/ws` 只接受 Hub-issued HS256 access token，可通过 header/query upgrade middleware 或首帧 `auth` 使用；TokenDance bearer 会被拒绝 |
 | JWKS validation | 校验 RS256 签名、`kid`、`exp`、TokenDance issuer 和 AgentHub client audience |
 
 ## AgentHub 产品模型
@@ -150,6 +151,8 @@ handler 只做参数校验和响应；service 承担业务逻辑、事务和事�
 ```json
 {"type":"auth","payload":{"access_token":"..."}}
 ```
+
+`access_token` 必须是 Hub-issued HS256 access token。TokenDance ID RS256 bearer token 只证明身份，不会通过 `/client/ws` upgrade middleware 或首帧认证。
 
 ### 业务数据缓存
 
