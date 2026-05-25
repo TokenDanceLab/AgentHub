@@ -222,10 +222,10 @@ func TestHandleControlRequestInvalidJSON(t *testing.T) {
 
 func TestHandleCanUseToolSilentAutoApprove(t *testing.T) {
 	inner, _ := json.Marshal(ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "Bash",
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
 		ToolUseID: "tooluse-1",
-		Input:    map[string]any{"command": "ls"},
+		Input:     map[string]any{"command": "ls"},
 	})
 	msg := ControlMessage{
 		Type:      "control_request",
@@ -269,10 +269,10 @@ func TestHandleCanUseToolSilentAutoApprove(t *testing.T) {
 func TestHandleCanUseToolWithEmitter(t *testing.T) {
 	emitter := &mockEventEmitter{}
 	inner, _ := json.Marshal(ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "WebFetch",
+		Subtype:   "can_use_tool",
+		ToolName:  "WebFetch",
 		ToolUseID: "tooluse-2",
-		Input:    map[string]any{"url": "https://example.com"},
+		Input:     map[string]any{"url": "https://example.com"},
 	})
 	msg := ControlMessage{
 		Type:      "control_request",
@@ -420,10 +420,10 @@ func TestHandleCanUseToolVariousTools(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.toolName, func(t *testing.T) {
 			inner, _ := json.Marshal(ControlRequestInner{
-				Subtype:  "can_use_tool",
-				ToolName: tt.toolName,
+				Subtype:   "can_use_tool",
+				ToolName:  tt.toolName,
 				ToolUseID: "tu-" + tt.toolName,
-				Input:    tt.input,
+				Input:     tt.input,
 			})
 			msg := ControlMessage{
 				Type:      "control_request",
@@ -494,8 +494,8 @@ func TestWriteStopTaskWriteError(t *testing.T) {
 
 func TestHandleCanUseToolWriteError(t *testing.T) {
 	inner, _ := json.Marshal(ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "Bash",
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
 		ToolUseID: "tu-err",
 	})
 	msg := ControlMessage{
@@ -513,8 +513,8 @@ func TestHandleCanUseToolWriteError(t *testing.T) {
 func TestHandleCanUseToolEventsOrdered(t *testing.T) {
 	emitter := &mockEventEmitter{}
 	inner, _ := json.Marshal(ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "Bash",
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
 		ToolUseID: "tu-ordered",
 	})
 
@@ -542,8 +542,8 @@ func TestHandleCanUseToolEventsOrdered(t *testing.T) {
 // blocks until the PermissionDecider callback returns a decision.
 func TestPermissionDeciderCallback(t *testing.T) {
 	inner, _ := json.Marshal(ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "Bash",
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
 		ToolUseID: "tu-decide",
 	})
 
@@ -591,8 +591,8 @@ func TestPermissionDeciderCallback(t *testing.T) {
 // denial is propagated correctly in the control_response.
 func TestPermissionDeciderDeny(t *testing.T) {
 	inner, _ := json.Marshal(ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "Bash",
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
 		ToolUseID: "tu-deny",
 	})
 
@@ -628,8 +628,8 @@ func TestPermissionDeciderDeny(t *testing.T) {
 // correctly bridges permission requests over Go channels.
 func TestChannelPermissionDecider(t *testing.T) {
 	inner, _ := json.Marshal(ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "Read",
+		Subtype:   "can_use_tool",
+		ToolName:  "Read",
 		ToolUseID: "tu-channel",
 	})
 
@@ -644,7 +644,7 @@ func TestChannelPermissionDecider(t *testing.T) {
 		if req.ToolName != "Read" {
 			t.Errorf("ToolName = %q, want Read", req.ToolName)
 		}
-		decCh <- PermissionDecision{Behavior: "allow", DecisionClass: "user_approved"}
+		decCh <- PermissionDecision{RequestID: req.RequestID, Behavior: "allow", DecisionClass: "user_approved"}
 	}()
 
 	handler := NewBridgedPermissionHandler(nil, decider.Decide)
@@ -668,6 +668,28 @@ func TestChannelPermissionDecider(t *testing.T) {
 	}
 	if innerResp.DecisionClass != "user_approved" {
 		t.Fatalf("DecisionClass = %q, want user_approved", innerResp.DecisionClass)
+	}
+}
+
+func TestChannelPermissionDeciderSkipsMismatchedDecision(t *testing.T) {
+	reqCh := make(chan PermissionRequest, 1)
+	decCh := make(chan PermissionDecision, 2)
+	decider := NewChannelPermissionDecider(reqCh, decCh)
+
+	decCh <- PermissionDecision{RequestID: "other-request", Behavior: "deny"}
+	decCh <- PermissionDecision{RequestID: "req-match", Behavior: "allow", DecisionClass: "matched"}
+
+	decision := decider.Decide(context.Background(), PermissionRequest{RequestID: "req-match", ToolName: "Read"})
+	if decision.Behavior != "allow" {
+		t.Fatalf("Behavior = %q, want allow", decision.Behavior)
+	}
+	if decision.DecisionClass != "matched" {
+		t.Fatalf("DecisionClass = %q, want matched", decision.DecisionClass)
+	}
+
+	req := <-reqCh
+	if req.RequestID != "req-match" {
+		t.Fatalf("request RequestID = %q, want req-match", req.RequestID)
 	}
 }
 

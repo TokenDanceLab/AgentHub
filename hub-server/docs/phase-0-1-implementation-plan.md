@@ -12,7 +12,7 @@ Step 1: Phase 0 契约补全 (并行, ~30min × 2 agents)
   └── Agent-B: api/events.md 新增 Hub WS 事件章节
 
 Step 2: Phase 1 基础设施 (并行, ~20min × 3 agents)
-  ├── Agent-C: Migration 0019 + User model
+  ├── Agent-C: Migration 0022 + User model
   ├── Agent-D: Config 扩展
   └── Agent-E: (等待 Step 1 完成，验证契约)
 
@@ -68,8 +68,8 @@ Step 4: 全量验证 (串行)
 ### Agent-C 任务卡 — Migration + Model
 
 **Migration 文件**:
-- `hub-server/migrations/0019_token_dance_sub.up.sql`
-- `hub-server/migrations/0019_token_dance_sub.down.sql`
+- `hub-server/migrations/0022_token_dance_sub.up.sql`
+- `hub-server/migrations/0022_token_dance_sub.down.sql`
 
 ```sql
 -- up

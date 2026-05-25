@@ -310,22 +310,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 	if adapter != nil {
 		// Adapter mode: BuildCommand provides full command configuration
-		cmdPath, args, env, workDir = adapter.BuildCommand(adapters.RunProcessContext{
-			Run:               runCtx.Run,
-			Prompt:            runCtx.Prompt,
-			AgentID:           runCtx.AgentID,
-			Model:             runCtx.Model,
-			WorkDir:           runCtx.WorkDir,
-			SessionID:         runCtx.SessionID,
-			ContinueLast:      runCtx.ContinueLast,
-			ForkSession:       runCtx.ForkSession,
-			ReasoningEffort:   runCtx.ReasoningEffort,
-			MaxThinkingTokens: runCtx.MaxThinkingTokens,
-			PermissionMode:    runCtx.PermissionMode,
-			IncludePartial:    runCtx.IncludePartial,
-			AgentName:         runCtx.AgentName,
-			Budget:            runCtx.Budget,
-		})
+		cmdPath, args, env, workDir = adapter.BuildCommand(runCtx)
 	} else {
 		// Profile mode: use configured command template
 		var err error

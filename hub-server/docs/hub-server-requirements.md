@@ -17,7 +17,7 @@
 | Agent 任务调度 | 80% | dispatch→ack→stream→done/fail，taskId↔edgeRunId |
 | WebSocket | 85% | per-user 路由、心跳、丢帧告警、panic recovery |
 | 中间件链 | 90% | CORS/APIVersion/BodyLimit/RateLimit/RequestID/AccessLog/Timeout |
-| 数据库 | 90% | 18 migrations, GORM+PG, Upsert/jsonb校验/seq分配 |
+| 数据库 | 90% | 28 migrations, GORM+PG, Upsert/jsonb校验/seq分配 |
 | 缓存 | 85% | Redis singleflight/seq/路由/离线任务队列 |
 | EventBus | 85% | ants pool 1024/panic recovery/metrics |
 | 生产部署 | 80% | Docker Compose on hk2, nginx 反代 |
@@ -158,15 +158,15 @@ UserRepository 新增:
 
 #### 2.1.5 新增 Model/Migration
 
-**Migration 0019: `users` 表新增字段**
+**Migration 0022: `users` 表新增字段**
 
 ```sql
--- 0019_token_dance_sub.up.sql
+-- 0022_token_dance_sub.up.sql
 ALTER TABLE users ADD COLUMN tokendance_sub VARCHAR(255);
 CREATE UNIQUE INDEX idx_users_tokendance_sub ON users(tokendance_sub) WHERE tokendance_sub IS NOT NULL AND tokendance_sub != '';
 ALTER TABLE users ADD COLUMN tokendance_sub_linked_at TIMESTAMPTZ;
 
--- 0019_token_dance_sub.down.sql
+-- 0022_token_dance_sub.down.sql
 DROP INDEX IF EXISTS idx_users_tokendance_sub;
 ALTER TABLE users DROP COLUMN IF EXISTS tokendance_sub_linked_at;
 ALTER TABLE users DROP COLUMN IF EXISTS tokendance_sub;
@@ -386,7 +386,7 @@ Desktop Settings > Agent Profiles 页当前只读展示 Edge `/v1/agents` 返回
 
 #### 3.1.2 数据模型
 
-**新表 `agent_profiles` (Migration 0020)**
+**新表 `agent_profiles` (Migration 0023)**
 
 ```sql
 CREATE TABLE agent_profiles (
@@ -582,7 +582,7 @@ Settings > Execution Targets 页当前只读展示 Edge health 中的 runner 状
 
 #### 3.3.2 数据模型
 
-**新表 `execution_targets` (Migration 0021)**
+**新表 `execution_targets` (Migration 0024)**
 
 ```sql
 CREATE TABLE execution_targets (
@@ -646,7 +646,7 @@ Settings > Skills 页需要展示可用 Skill 列表、已安装状态、启用/
 
 #### 3.4.2 数据模型
 
-**新表 `skills` (Migration 0022)**
+**新表 `skills` (Migration 0025)**
 
 ```sql
 CREATE TABLE skills (
@@ -698,7 +698,7 @@ Settings > MCP 页需要展示 MCP server 列表、连接状态、工具白名�
 
 #### 3.5.2 数据模型
 
-**新表 `mcp_servers` (Migration 0023)**
+**新表 `mcp_servers` (Migration 0026)**
 
 ```sql
 CREATE TABLE mcp_servers (
@@ -834,7 +834,7 @@ Settings > cc-switch 页需要展示 cc-switch 的 provider 可用性、切换�
 
 Hub 不直接集成 cc-switch SDK——cc-switch 是外部配置源。Hub 提供 provider binding 的元数据存储和状态查询 API。
 
-**新表 `provider_bindings` (Migration 0024)**
+**新表 `provider_bindings` (Migration 0027)**
 
 ```sql
 CREATE TABLE provider_bindings (
@@ -877,7 +877,7 @@ Settings > Security Audit 页需要展示 Agent 操作审计线索。审计日�
 
 #### 4.4.2 数据模型
 
-**新表 `audit_events` (Migration 0025)**
+**新表 `audit_events` (Migration 0028)**
 
 ```sql
 CREATE TABLE audit_events (

@@ -181,6 +181,59 @@ func TestPushToConn_AfterUnregister(t *testing.T) {
 	}))
 }
 
+func TestManagerSetAuthDoesNotReplaceDifferentSameTypeDevice(t *testing.T) {
+	m := NewManager()
+	first := &Conn{ID: "conn-desktop-1", Send: make(chan []byte, 4)}
+	second := &Conn{ID: "conn-desktop-2", Send: make(chan []byte, 4)}
+	if err := m.Register(first); err != nil {
+		t.Fatalf("Register first: %v", err)
+	}
+	if err := m.Register(second); err != nil {
+		t.Fatalf("Register second: %v", err)
+	}
+
+	var oldConnIDs []string
+	m.OnRouteSet = func(userID, deviceType, deviceID, connID, oldConnID string, wasOffline bool) {
+		oldConnIDs = append(oldConnIDs, oldConnID)
+	}
+
+	m.SetAuth(first.ID, "user-1", "desktop", "device-a")
+	m.SetAuth(second.ID, "user-1", "desktop", "device-b")
+
+	if len(oldConnIDs) != 2 {
+		t.Fatalf("OnRouteSet called %d times, want 2", len(oldConnIDs))
+	}
+	if oldConnIDs[1] != "" {
+		t.Fatalf("second same-type device oldConnID = %q, want empty", oldConnIDs[1])
+	}
+}
+
+func TestManagerSetAuthReplacesSamePhysicalDevice(t *testing.T) {
+	m := NewManager()
+	first := &Conn{ID: "conn-old", Send: make(chan []byte, 4)}
+	second := &Conn{ID: "conn-new", Send: make(chan []byte, 4)}
+	if err := m.Register(first); err != nil {
+		t.Fatalf("Register first: %v", err)
+	}
+	if err := m.Register(second); err != nil {
+		t.Fatalf("Register second: %v", err)
+	}
+
+	var oldConnID string
+	m.OnRouteSet = func(userID, deviceType, deviceID, connID, old string, wasOffline bool) {
+		if connID == second.ID {
+			oldConnID = old
+		}
+	}
+
+	m.SetAuth(first.ID, "user-1", "desktop", "device-a")
+	m.SetAuth(second.ID, "user-1", "desktop", "device-a")
+
+	if oldConnID != first.ID {
+		t.Fatalf("same physical device oldConnID = %q, want %q", oldConnID, first.ID)
+	}
+}
+
 func TestPushToConn_ConcurrentShutdownRace(t *testing.T) {
 	// Stress-test the race between PushToConn and Shutdown.
 	m := NewManager()

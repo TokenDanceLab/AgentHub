@@ -269,11 +269,11 @@ docs(api): 补全 Hub Server 37 条路由 OpenAPI 声明与 WebSocket 事件契�
 
 ### 3.3 任务清单
 
-#### 任务 1.1：Migration 0019 — users 表新增 tokendance_sub
+#### 任务 1.1：Migration 0022 — users 表新增 tokendance_sub
 
 **新建文件**：
-- `migrations/0019_token_dance_sub.up.sql`
-- `migrations/0019_token_dance_sub.down.sql`
+- `migrations/0022_token_dance_sub.up.sql`
+- `migrations/0022_token_dance_sub.down.sql`
 
 ```sql
 -- up
@@ -488,11 +488,11 @@ feat(hub): 注册 OIDC handler 路由并完成 app 装配
 
 ### 4.2 任务清单
 
-#### 任务 2.1：Migration 0020 — agent_profiles 表
+#### 任务 2.1：Migration 0023 — agent_profiles 表
 
 **新建文件**：
-- `migrations/0020_agent_profiles.up.sql`
-- `migrations/0020_agent_profiles.down.sql`
+- `migrations/0023_agent_profiles.up.sql`
+- `migrations/0023_agent_profiles.down.sql`
 
 DDL 见需求文档 3.1.2。
 
@@ -671,7 +671,7 @@ go test ./... -short -count=1
 
 ### 5.2 任务清单
 
-#### 任务 3.1：Migration 0022 — skills 表 / 0023 — mcp_servers 表
+#### 任务 3.1：Migration 0025 — skills 表 / 0026 — mcp_servers 表
 
 DDL 见需求文档 3.4.2 和 3.5.2。
 
@@ -770,7 +770,7 @@ web.POST("/market/profiles/:id:rate", marketHandler.Rate)
 
 #### 任务 4.2：Provider Binding
 
-**Migration 0024** — `provider_bindings` 表
+**Migration 0027** — `provider_bindings` 表
 **新建文件**：`internal/model/provider_binding.go`、`internal/repository/provider_binding.go`、`internal/service/provider_binding.go`、`internal/handler/provider_binding.go`
 
 ```go
@@ -801,7 +801,7 @@ go test ./internal/model -run "TestProviderBinding" -count=1 -v
 
 ### 7.2 任务清单
 
-#### 任务 5.1：Migration 0021 — execution_targets 表
+#### 任务 5.1：Migration 0024 — execution_targets 表
 
 DDL 见需求文档 3.3.2。
 
@@ -840,7 +840,7 @@ go test ./internal/service -run "TestExecutionTarget" -count=1 -v
 
 ### 8.2 任务清单
 
-#### 任务 6.1：Migration 0025 — audit_events 表
+#### 任务 6.1：Migration 0028 — audit_events 表
 
 DDL 见需求文档 4.4.2。
 

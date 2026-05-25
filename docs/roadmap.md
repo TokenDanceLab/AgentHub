@@ -1,10 +1,12 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-25（M8 审计批次 — B1-B7 已完成，B10 本轮新增 19 fix）
+最后更新：2026-05-25（M8 审计批次 + integration sweep 事实对齐）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
 > 本文是 AgentHub 全部七层（Desktop / Edge / Hub / CI/CD / Testing / Documentation / Engineering Standards）的**唯一事实源**，取代各方向分散路线图。每项任务均引用审计报告具体发现，含文件路径、优先级和工期。
+
+> **Integration sweep 快照（2026-05-25）**：主开发基线是 `dev/delicious233 @ 45f9ba1`；当前集成分支是 `feat/team-integration-sweep`；主 worktree dirty 且仍有 UIUX、OIDC、Web 并行改动；当前 23 个 worktree，Web parity worktree `.claude/worktrees/feat+web-desktop-parity` / `worktree-feat+web-desktop-parity` 仍在工作。`feat/team-adapter-compat`、`feat/team-hub-reliability`、`feat/team-hub-authz`、`feat/team-johnny-merge` 已进入 integration 分支，并已追加 runtime context、WS route、permission decider 和文档修复；最终合入主线仍需 PR/merge 决策。
 
 ---
 
@@ -16,8 +18,8 @@
 |------|--------|---------|---------|----------|
 | **Desktop** | React 19 + Tauri 2 + Zustand + TanStack Query | viewRegistry 9视图、IM UI、AuthPage、RunState 状态机、传输层抽象 | 519 tests（34 files） | tsc 严格模式，ESLint + Prettier |
 | **Edge Server** | Go (net/http + gorilla/websocket) | 3 Adapter、24 NDJSON、Orchestrator P1-P2、Prometheus、E2E 19/19 API | 13/13 包（530 funcs） | CI 硬阈值 75%，race/gosec/govulncheck |
-| **Hub Server** | Go (Gin + GORM + Redis + PG) | DI 架构、13 包有测试、CORS+RateLimit+BodyLimit 中间件链、21 migrations | 13/13 包（355 funcs），repository 75.5% | CI 硬阈值 40%，golangci-lint/gitleaks |
-| **Web** | React + Vite | feat/trump-webui 已合入主线（2026-05-25 归档） | 构建通过 | 不做硬性要求 |
+| **Hub Server** | Go (Gin + GORM + Redis + PG) | DI 架构、13 包有测试、CORS+RateLimit+BodyLimit 中间件链、28 个 `.up.sql` migration 文件；integration 已重排后续平台 migrations 到 `0022`-`0028` | 13/13 包（历史记录，integration sweep 仍需重新跑全量） | CI 硬阈值 40%，golangci-lint/gitleaks |
+| **Web** | React + Vite | Web parity worktree 仍在工作，旧 webui-desktop-port 只作历史输入 | integration 中处理 | 不做硬性要求 |
 | **CI/CD** | GitHub Actions | 8 job: go-edge/go-hub/benchmark/docker/cross-build/frontend/validate/gitleaks | 全绿 | race/gosec/govulncheck/覆盖率硬阻断 |
 | **官网** | Next.js 16 + Tailwind v4 | hub.vectorcontrol.tech — LiveStats + ConnectAgent | 14/20 tests | 静态导出，nginx on hk2 |
 | **部署** | Docker Compose on hk2 | PG16 + Redis7 + Hub Server（独立实例，不与 AIhub 共用） | ✅ 生产运行 | nginx 反代 api.hub.vectorcontrol.tech:80→8090 |
@@ -563,17 +565,12 @@ Hub 调度（远程）:
 - [x] 验收：`pnpm vitest run src/__tests__/errors.test.ts src/__tests__/PromptInput.test.tsx src/__tests__/Toast.test.tsx` 通过 42/42；Playwright 模拟 Edge 409 覆盖草稿保留、toast 可见、无横向溢出，截图见 `app/desktop/screenshots/run-start-active-conflict.png`。
 - [x] Active-run 真实 HTTP smoke 已复现 409：临时 Edge `127.0.0.1:3227` 使用可控慢 `powershell Start-Sleep` runner，连续同 thread `POST /v1/runs` 返回 first `202`、second `409 active_run_exists`，且 409 body 带回首个 active `runId`；说明真实 server + `ProcessExecutor` 路径有效，先前 3210 双 202 更可能是旧进程或真实 runtime 过快完成。
 
-##### Web UI 移植工作树状态 `[并行]`
+##### Web UI 工作树状态 `[并行 / integration 中处理]`
 
-- [x] `feat/webui-desktop-port` / `.worktrees/webui-desktop-port` 曾建立 TokenDance 生态 Web Console，`/` 指向生态控制台，旧工作台保留在 `/workbench-preview`。
-- [x] 2026-05-25 审查修复：移动端 `.workspace` 固定行/裁切、外层 `App.module.css min-width: 960px` 横向溢出、Toggle 缺少 `role="switch"` / `aria-checked` / accessible name / 44px 触控高度。
-- [x] 验证：`corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build` 通过；Playwright 375px 复测 `docScrollWidth=375`、switch `52x44`、无 console error。
-- [x] 2026-05-25 Web worker 补强：`app/web/README.md` 已说明 `/` 生态控制台、`/workbench-preview` 旧工作台、TokenDance 生态边界和验证命令；生态控制台新增身份边界、协作同步、Agent runtime、运维护栏等入口，并补响应式 lane 布局与测试。
-- [x] Web worker 验证：`corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx` 通过 4/4，`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web` 通过。
-- [x] 2026-05-25 Web worker 二次补强：`EcosystemConsole` 新增 `Feature readiness` 面板，按 TokenDance ecosystem lane 派生 ready/review/planned 数量和平均进度；测试补到 5/5，`typecheck`、`build`、`git diff --check -- app/web` 通过。
-- [x] 2026-05-25 Web worker 三次补强：`EcosystemConsole` 新增移动端/平板 `Jump to surface` picker，可直达 TokenDance ID、Hub、cc-switch、Remote control、audit 等生态入口；窄屏顺序调整为 workspace 优先、detail 次之、长侧边导航最后；测试补到 6/6，`typecheck`、`build`、`git diff --check -- app/web` 通过。
-- [x] **2026-05-25：`feat/webui-desktop-port` 分支与 worktree 已删除。** 产出已合入 `dev/delicious233` 主线（`app/web/` 与验证修复），不再独立维护。
-- [x] 结论：`/` 生态控制台入口已作为正式 Web 产品方向合入主线，旧 worktree 遗留问题（React alias、提交落后）随分支删除一并关闭。
+- [ ] 当前 Web parity worktree 是 `.claude/worktrees/feat+web-desktop-parity` / `worktree-feat+web-desktop-parity`，仍在工作；状态只能写为进行中。
+- [ ] 旧 `feat/webui-desktop-port` / `.worktrees/webui-desktop-port` 只能作为历史输入，不能代表当前 Web 状态。
+- [ ] integration sweep 需要重新核对 Web 路由、TokenDance ID、设备/Hub 同步、在线 IM/群聊、任务列表、Agent 调度、市场、Skill/MCP、模型映射、cc-switch、远控与审计入口。
+- [ ] 完成前不复用旧 Web worker 的测试输出作为当前通过证明；Web 通过状态必须以本轮 fresh 验证命令、截图或 diff 证据为准。
 
 ##### 文档架构 sweep `[并行]`
 
@@ -746,7 +743,7 @@ pnpm typecheck                                         # 零错误
 |------|------|---------|-----------|
 | 客户端 (Desktop + Edge) | Delicious233 | `dev/delicious233` | Edge 审计修复 + Desktop Phase 0 + 集成阶段 1-6 |
 | 后端 (Hub Server) | Johnny | `dev/delicious233` | Hub 审计 P0-P1 修复 + 测试基础设施建设 |
-| Web 前端 | Trump | `feat/trump-webui`（已删除，2026-05-25 归档） | Web UI 功能完善 → 已合入 `dev/delicious233` |
+| Web 前端 | Trump / Web parity worker | `worktree-feat+web-desktop-parity` 仍在工作；`dev/trump` 独立 | Web UI/OIDC parity integration 中处理 |
 
 ---
 

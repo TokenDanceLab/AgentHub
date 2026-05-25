@@ -62,22 +62,22 @@ type App struct {
 	OIDCHandler *handler.OIDCHandler
 
 	// Handler layer
-	AuthHandler          *handler.AuthHandler
-	WebSocketHandler     *handler.WebSocketHandler
-	DeviceHandler        *handler.DeviceHandler
-	ContactHandler       *handler.ContactHandler
-	SessionHandler       *handler.SessionHandler
-	MessageHandler       *handler.MessageHandler
-	AgentHandler         *handler.AgentHandler
-	CustomAgentHandler   *handler.CustomAgentHandler
-	AttachmentHandler    *handler.AttachmentHandler
-	NotificationHandler  *handler.NotificationHandler
-	HealthHandler        *handler.HealthHandler
-	PublicHandler        *handler.PublicHandler
-	AgentProfileHandler  *handler.AgentProfileHandler
-	SkillHandler         *handler.SkillHandler
-	MCPServerHandler     *handler.MCPServerHandler
-	MarketHandler        *handler.MarketHandler
+	AuthHandler            *handler.AuthHandler
+	WebSocketHandler       *handler.WebSocketHandler
+	DeviceHandler          *handler.DeviceHandler
+	ContactHandler         *handler.ContactHandler
+	SessionHandler         *handler.SessionHandler
+	MessageHandler         *handler.MessageHandler
+	AgentHandler           *handler.AgentHandler
+	CustomAgentHandler     *handler.CustomAgentHandler
+	AttachmentHandler      *handler.AttachmentHandler
+	NotificationHandler    *handler.NotificationHandler
+	HealthHandler          *handler.HealthHandler
+	PublicHandler          *handler.PublicHandler
+	AgentProfileHandler    *handler.AgentProfileHandler
+	SkillHandler           *handler.SkillHandler
+	MCPServerHandler       *handler.MCPServerHandler
+	MarketHandler          *handler.MarketHandler
 	ProviderBindingHandler *handler.ProviderBindingHandler
 	ExecutionTargetHandler *handler.ExecutionTargetHandler
 	AuditHandler           *handler.AuditHandler
@@ -159,7 +159,7 @@ func (a *App) Run(ctx context.Context) error {
 		}
 	} else {
 		attachmentStorage = service.NewLocalStorage(a.Config.Upload.Dir)
-		}
+	}
 	a.AttachmentService = service.NewAttachmentService(a.DB, a.Config.Upload, attachmentStorage)
 	a.ContactService = service.NewContactService(a.DB, a.bus, a.CacheClient)
 	a.SessionService = service.NewSessionService(a.DB, a.CacheClient)
@@ -180,21 +180,21 @@ func (a *App) Run(ctx context.Context) error {
 	// Market handler (reuses AgentProfileService)
 	a.MarketHandler = handler.NewMarketHandler(agentProfileSvc)
 
-		// Provider Binding service
-		pbSvc := service.NewProviderBindingService(a.DB)
-		a.ProviderBindingHandler = handler.NewProviderBindingHandler(pbSvc)
+	// Provider Binding service
+	pbSvc := service.NewProviderBindingService(a.DB)
+	a.ProviderBindingHandler = handler.NewProviderBindingHandler(pbSvc)
 
-		// Execution Target service
-		targetSvc := service.NewExecutionTargetService(a.DB)
-		a.ExecutionTargetHandler = handler.NewExecutionTargetHandler(targetSvc)
+	// Execution Target service
+	targetSvc := service.NewExecutionTargetService(a.DB)
+	a.ExecutionTargetHandler = handler.NewExecutionTargetHandler(targetSvc)
 
-		// Audit service
-		auditSvc := service.NewAuditService(a.DB)
-		a.AuditHandler = handler.NewAuditHandler(auditSvc)
+	// Audit service
+	auditSvc := service.NewAuditService(a.DB)
+	a.AuditHandler = handler.NewAuditHandler(auditSvc)
 
-		// Relay service
-		a.RelayService = service.NewRelayService(a.CacheClient, a.mgr)
-		a.RelayHandler = handler.NewRelayHandler(a.RelayService)
+	// Relay service
+	a.RelayService = service.NewRelayService(a.CacheClient, a.mgr)
+	a.RelayHandler = handler.NewRelayHandler(a.RelayService)
 
 	// OIDC Service (optional — only when TokenDance ID client is configured)
 	if a.Config.TokenDanceID.ClientID != "" {
@@ -613,7 +613,7 @@ func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string,
 		a.mgr.PushToConn(oldConnID, ws.NewFrame(ws.TypeDeviceKicked, map[string]string{
 			"reason": "logged_in_elsewhere",
 		}))
-		if c := a.mgr.FindByUserDevice(userID, deviceType); c != nil && c.ID == oldConnID {
+		if c := a.mgr.FindByConnID(oldConnID); c != nil {
 			c.Close()
 		}
 	}

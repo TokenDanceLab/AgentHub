@@ -1,8 +1,10 @@
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,8 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -227,6 +231,95 @@ func TestProcessExecutorRunsCommandWithInjectedContext(t *testing.T) {
 			t.Fatalf("repository mock runner was cancelled: %#v", evt.Payload)
 		default:
 			t.Fatalf("unexpected event type %q", evt.Type)
+		}
+	}
+}
+
+func TestProcessExecutorPassesFullRunContextToAdapter(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+
+	seen := make(chan RunProcessContext, 1)
+	adapter := &capturingAdapter{seen: seen}
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: os.Args[0],
+		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+	}, adapter, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	budget := runnerctx.NewContextBudget(1234)
+	runCtx := RunProcessContext{
+		Run:                    run,
+		Prompt:                 "inspect context",
+		AgentID:                "codex",
+		Model:                  "gpt-5.4",
+		WorkDir:                t.TempDir(),
+		HubTaskID:              "task-123",
+		SessionID:              "session-123",
+		ContinueLast:           true,
+		ForkSession:            true,
+		ReasoningEffort:        "xhigh",
+		MaxThinkingTokens:      4096,
+		ThinkingMode:           "adaptive",
+		PermissionMode:         "bypassPermissions",
+		IncludePartial:         true,
+		FastMode:               true,
+		StructuredOutputSchema: `{"type":"object"}`,
+		SystemPrompt:           "system",
+		AppendSystemPrompt:     "append",
+		AgentDefinitions: map[string]runnerctx.AgentDefinition{
+			"reviewer": {Description: "review", Prompt: "review this", Tools: []string{"Read"}, Model: "gpt-5.4"},
+		},
+		MCPConfig:       `{"servers":{}}`,
+		AllowedTools:    []string{"Read", "Edit"},
+		MaxBudgetUSD:    1.25,
+		AgentName:       "build",
+		ConfigOverrides: map[string]string{"image": "screenshot.png", "files": "a.go,b.go", "command": "test"},
+		Ephemeral:       true,
+		Budget:          budget,
+	}
+
+	if err := executor.Start(run, runCtx); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	var got RunProcessContext
+	select {
+	case got = <-seen:
+	case <-time.After(5 * time.Second):
+		t.Fatal("adapter did not receive run context")
+	}
+
+	if got.ConfigOverrides["image"] != "screenshot.png" || got.ConfigOverrides["files"] != "a.go,b.go" || got.ConfigOverrides["command"] != "test" {
+		t.Fatalf("ConfigOverrides = %#v, want full map", got.ConfigOverrides)
+	}
+	if !got.Ephemeral || got.ThinkingMode != "adaptive" || got.StructuredOutputSchema == "" || got.MCPConfig == "" {
+		t.Fatalf("context missing runtime fields: %#v", got)
+	}
+	if got.AgentDefinitions["reviewer"].Prompt != "review this" {
+		t.Fatalf("AgentDefinitions = %#v, want reviewer definition", got.AgentDefinitions)
+	}
+	if got.Budget != budget {
+		t.Fatalf("Budget pointer was not propagated")
+	}
+	if len(got.AllowedTools) != 2 || got.MaxBudgetUSD != 1.25 || got.FastMode != true {
+		t.Fatalf("tool/budget/fast fields not propagated: %#v", got)
+	}
+
+	for {
+		evt := nextEventWithin(t, ch, 20*time.Second)
+		if evt.Scope["runId"] != run.ID {
+			continue
+		}
+		switch evt.Type {
+		case "run.finished":
+			return
+		case "run.failed":
+			t.Fatalf("run failed: %#v", evt.Payload)
 		}
 	}
 }
@@ -634,6 +727,39 @@ func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleS
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
 	return executor
+}
+
+type capturingAdapter struct {
+	seen chan RunProcessContext
+}
+
+func (a *capturingAdapter) Metadata() adapters.AdapterMetadata {
+	return adapters.AdapterMetadata{ID: "capture", Name: "Capture"}
+}
+
+func (a *capturingAdapter) Capabilities() adapters.AgentCapabilities {
+	return adapters.AgentCapabilities{}
+}
+
+func (a *capturingAdapter) BuildCommand(ctx adapters.RunProcessContext) (string, []string, []string, string) {
+	a.seen <- ctx
+	return os.Args[0],
+		[]string{processExecutorHelperRunFlag, "--", "success"},
+		append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+		""
+}
+
+func (a *capturingAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter adapters.EventEmitter, run store.Run) error {
+	_, err := io.Copy(io.Discard, stdout)
+	return err
+}
+
+func (a *capturingAdapter) NeedsStdin() bool {
+	return false
+}
+
+func (a *capturingAdapter) Available() bool {
+	return true
 }
 
 func TestProcessExecutorHelperRunsFromModeArgument(t *testing.T) {

@@ -120,9 +120,19 @@ func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) {
 	if m.byUser[userID] == nil {
 		m.byUser[userID] = make(map[string]string)
 	}
-	// Find existing connection of same device type (for oldConnID tracking)
+	// Only replace the same physical device. Same-type devices are allowed to
+	// coexist, so a second desktop must not kick the first desktop unless the
+	// device_id matches. Legacy clients without a device_id keep the old
+	// same-type replacement behavior.
 	for _, existingCID := range m.byUser[userID] {
-		if ec, ok := m.conns[existingCID]; ok && ec.DeviceType == deviceType {
+		if existingCID == connID {
+			continue
+		}
+		ec, ok := m.conns[existingCID]
+		if !ok || ec.DeviceType != deviceType {
+			continue
+		}
+		if deviceID == "" || ec.DeviceID == deviceID {
 			oldConnID = existingCID
 			break
 		}

@@ -63,6 +63,7 @@ type PermissionRequest struct {
 
 // PermissionDecision is the response to a permission request.
 type PermissionDecision struct {
+	RequestID     string // optional; when set, channel deciders match the original request
 	Behavior      string // "allow" or "deny"
 	UpdatedInput  any    // modified tool input (optional)
 	Message       string // explanation for deny
@@ -80,7 +81,7 @@ type PermissionDecider func(ctx context.Context, req PermissionRequest) Permissi
 // For production use, supply a PermissionDecider via NewBridgedPermissionHandler
 // to bridge to Desktop's approval UI.
 type DefaultPermissionHandler struct {
-	emitter EventEmitter    // nil = silent auto-approve; non-nil = emit permission events
+	emitter EventEmitter      // nil = silent auto-approve; non-nil = emit permission events
 	decider PermissionDecider // nil = auto-approve all; non-nil = block until decision
 }
 
@@ -232,7 +233,9 @@ type ChannelPermissionDecider struct {
 
 // Decide implements PermissionDecider by sending the request on the requests
 // channel and blocking until the matching decision arrives on the decisions
-// channel. The context is passed through for cancellation/timeout propagation.
+// channel. Empty decision RequestID values are accepted for legacy single-flight
+// callers; non-empty mismatched decisions are treated as stale and skipped. The
+// context is passed through for cancellation/timeout propagation.
 func (d *ChannelPermissionDecider) Decide(ctx context.Context, req PermissionRequest) PermissionDecision {
 	select {
 	case d.requests <- req:
@@ -240,11 +243,16 @@ func (d *ChannelPermissionDecider) Decide(ctx context.Context, req PermissionReq
 		return PermissionDecision{Behavior: "deny", Message: "context cancelled before request could be sent"}
 	}
 
-	select {
-	case decision := <-d.decisions:
-		return decision
-	case <-ctx.Done():
-		return PermissionDecision{Behavior: "deny", Message: "context cancelled while waiting for decision"}
+	for {
+		select {
+		case decision := <-d.decisions:
+			if decision.RequestID == "" || decision.RequestID == req.RequestID {
+				return decision
+			}
+			slog.Debug("control: skipped stale permission decision", "requestID", req.RequestID, "decisionRequestID", decision.RequestID)
+		case <-ctx.Done():
+			return PermissionDecision{Behavior: "deny", Message: "context cancelled while waiting for decision"}
+		}
 	}
 }
 

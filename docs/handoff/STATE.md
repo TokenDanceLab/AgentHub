@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-25 21:00 UTC+8 | 分支：dev/delicious233 | 提交：6fcf079
+最后更新：2026-05-25 integration sweep | 基线：dev/delicious233 @ 45f9ba1 | 当前集成分支：feat/team-integration-sweep
 
 ## 快速上手
 
@@ -9,6 +9,16 @@ git clone https://github.com/TokenDanceLab/AgentHub.git
 cd AgentHub
 git checkout dev/delicious233
 ```
+
+## 当前 integration 事实
+
+- 当前 integration worktree：`.worktrees/team-integration-sweep`；本轮已合入四个候选分支并追加 runtime/WS/docs 修复，具体 HEAD 以 `git log -1` 为准。
+- 主 worktree 为 `dev/delicious233 @ 45f9ba1`，且仍有 UIUX、OIDC、Web 相关 dirty 改动；不要把主 worktree 当作干净可合并基线。
+- 当前 `git worktree list` 为 23 条，包含新 integration worktree、多条 `team-*` 候选 worktree、detached verification worktree 和仍在工作的 Web parity worktree。
+- Web parity worktree：`.claude/worktrees/feat+web-desktop-parity` / `worktree-feat+web-desktop-parity`，仍在工作；状态只能写为进行中。
+- 候选分支统一标注为 `integration 中处理`，除非 integration sweep 已记录冲突处理、diff 和 fresh 验证。
+- Hub migrations 当前有 28 个 `.up.sql` 文件；integration 分支已将后续平台 migrations 重排到 `0022`-`0028`，但仍需 schema/migration smoke 后才能声明 migration chain clean。
+- 本轮 integration 验证已通过：`edge-server && go test ./... -short -count=1`、`hub-server && go test ./... -short -count=1`、OpenAPI YAML 解析、migration `.up.sql` 版本唯一性检查和 `git diff --check`。
 
 ### 运行后端测试
 ```bash
@@ -42,7 +52,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 |---|------|:--:|------|
 | **Desktop** | React 19, TypeScript, Zustand, TanStack Query, OKLCH tokens, CSS Modules | 551/560 | viewRegistry, @shared/ui, Storybook, RunState 状态机, IM UI, AuthPage, 虚拟滚动 |
 | **Edge** | Go, gorilla/websocket, NDJSON | 13/13 包 | 3 Adapter (Claude/Codex/OpenCode), Prometheus, event bus dropped counter, Orchestrator, E2E 19/19 API |
-| **Hub** | Go, Gin, GORM, Redis, PostgreSQL | 13/13 包 | DI 架构, CORS→BodyLimit→RateLimit 链, 21 migrations, 公开 API |
+| **Hub** | Go, Gin, GORM, Redis, PostgreSQL | 13/13 包 | DI 架构, CORS→BodyLimit→RateLimit 链, 28 个 `.up.sql` migration 文件；integration 已重排后续平台 migrations 到 `0022`-`0028` |
 
 ## 生产部署
 
@@ -92,10 +102,10 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - Desktop：移动端工具栏已补 Settings、Hub 登录、主题切换与菜单入口；375px Playwright 验证无横向溢出。
 - Desktop：`useChatMessages` reducer 内的 runStore/queryClient 副作用已移到事件处理路径，修复 React “setState while rendering” console error；合法 `RUNNING/STREAMING/WAITING_FOR_INPUT -> COMPLETED` 不再输出误报 warning。
 - Desktop：真实接口验证 `http://127.0.0.1:3210/v1/health` ok，`POST /v1/runs` 返回 202 accepted；右栏关闭/重开、Settings 任务/群聊/调度入口、i18n raw key、移动端布局均通过 Playwright 检查，截图见 `app/desktop/screenshots/shell-right-panel-real-run-closed.png`、`app/desktop/screenshots/settings-tasks-im-scheduling.png`。
-- Web：~~已派 gpt-5.5 xhigh worker `Hegel` 在独立 worktree `D:\Code\TokenDance\AgentHub\.worktrees\webui-desktop-port` / `feat/webui-desktop-port` 推进 Web UI 移植，硬约束 TokenDance ID、设备/Hub 同步、在线 IM/群聊、任务列表、Agent 调度、市场、Skill/MCP、模型映射、cc-switch、远控与审计入口。~~ (分支已于 2026-05-25 清理；Web UI 路线保留 `dev/trump` 分支)
-- Web：gpt-5.5 xhigh 只读审查 `Ampere` 已完成，审查修复（移动端溢出、Toggle 语义/触控）已合入主线。分支及 worktree 已于 2026-05-25 删除，无需合并。
+- Web：旧 `feat/webui-desktop-port` 记录只作为历史线索；当前 Web parity worktree 为 `.claude/worktrees/feat+web-desktop-parity` / `worktree-feat+web-desktop-parity`，仍在工作，不能写成清理态或跳过合并。
+- Web：`Ampere` 只读审查和旧 Web worker 输出可作为历史背景；integration sweep 不复用旧验证输出来声明当前 Web 通过，最终状态以本轮合并 diff 和 fresh 验证为准。
 - Desktop/shared：`app/shared/pnpm-lock.yaml` 已同步 `@types/react`、`@types/react-dom`、`typescript` 等已声明 dev dependency；此前 `pnpm exec tsc --noEmit` / Desktop build 受 shared React 类型 lockfile 过期阻塞的问题已解除，`app/desktop && pnpm build` 已通过。
-- Desktop：新增验证已通过 Settings `Agent Profiles` / `Execution Targets` Playwright 桌面和 375px 移动端检查：无 console error、无 raw i18n key、无横向溢出；截图见 `app/desktop/screenshots/settings-agent-profiles.png`、`app/desktop/screenshots/settings-execution-targets.png`、`app/desktop/screenshots/settings-execution-targets-mobile.png`。Web worktree 验证已通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`，移动端复测 `docScrollWidth=375`、switch `52x44`、无 console error，截图见 `.worktrees/webui-desktop-port/app/web/screenshots/ecosystem-console-mobile-fixed.png`。
+- Desktop：新增验证已通过 Settings `Agent Profiles` / `Execution Targets` Playwright 桌面和 375px 移动端检查：无 console error、无 raw i18n key、无横向溢出；截图见 `app/desktop/screenshots/settings-agent-profiles.png`、`app/desktop/screenshots/settings-execution-targets.png`、`app/desktop/screenshots/settings-execution-targets-mobile.png`。Web parity worktree 仍在工作，Web 当前通过状态需由 integration sweep 重新验证后再写入。
 - Desktop：run 启动反馈已继续推进。`AppError` 现在保留 HTTP status，并把 Edge 409 `active_run_exists` 顶层 `runId` 归入 `details.runId`；`PromptInput` 支持 async send result，只有 Edge 接受 run 后才清空草稿；启动中会禁用输入/重复提交；409 时打开现有 run、显示 toast，并保留未接受的草稿。
 - Desktop：Toast 容器已挂回 App shell。此前 toast store 会写入但页面不可见，导致 `active_run_exists`、复制、连接状态等通知无法显示；本轮已修复。
 - Desktop：新增验证已通过 `python -m json.tool src/i18n/locales/{en,zh}.json`、`pnpm vitest run src/__tests__/errors.test.ts src/__tests__/PromptInput.test.tsx src/__tests__/Toast.test.tsx`（42/42）；Playwright 模拟 Edge 409 覆盖草稿保留、toast 可见、无横向溢出，截图见 `app/desktop/screenshots/run-start-active-conflict.png`，当前页面截图见 `app/desktop/screenshots/run-start-feedback-desktop.png`。
@@ -110,9 +120,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - Desktop：Skill Management 验证已通过 `pnpm vitest run src/__tests__/SettingsPage.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/errors.test.ts src/__tests__/Toast.test.tsx`（46/46）、`python -m json.tool src/i18n/locales/{en,zh}.json`、`git diff --check -- app/desktop/src/...`；Playwright 桌面和 375px 移动端检查 `logs: []`、无 raw i18n key、无横向溢出，截图见 `app/desktop/screenshots/settings-skill-registry-real-data.png`、`app/desktop/screenshots/settings-skill-registry-real-data-mobile.png`。
 - Desktop/Edge 注意：当前 live Edge `http://127.0.0.1:3210` health 和 agents 在线，返回 Claude Code / Codex / OpenCode；此前真实连续双 POST 到 `thread_local` 观测到两个 202。2026-05-25 已用临时 Edge `127.0.0.1:3227` + 可控慢 `powershell Start-Sleep` runner 复现真实 HTTP 路径 first 202、second 409 `active_run_exists`，且 409 body 带回首个 active `runId`；先前 3210 现象更可能是旧进程或真实 runtime 过快完成。
 - Docs：gpt-5.5 xhigh 文档架构 worker 已完成文档架构审查（原写入 `docs/inbox/`，该目录已于目录重组中删除）。结论是主文档已基本对齐 Runtime/Profile/Configuration/Execution Target、TokenDance ID、IM、多端、远控、Skill/MCP、cc-switch、安全审计等边界；剩余风险集中在 `/v1/runners` / `runner.*` 的历史兼容命名，以及 `docs/archive/client-handoff.md`、`docs/roadmaps/integration.md` 等旧独立 `runner/` 文档需要归档或改写。
-- Web：~~gpt-5.5 xhigh Web worker 已在 `.worktrees/webui-desktop-port/app/web` 内补强生态控制台。~~ (worktree 已随分支清理；`app/web/README.md` 已说明 `/` 生态控制台、`/workbench-preview` 旧工作台、TokenDance 生态边界和验证命令；`EcosystemConsole` 新增身份边界、协作同步、Agent runtime、运维护栏等入口，并补响应式 lane 布局和测试。验证通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`（4/4）、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web`。)
-- Web：~~gpt-5.5 xhigh worker `McClintock` 已继续在 `.worktrees/webui-desktop-port/app/web` 内新增 `Feature readiness` 面板~~ (worktree 已随分支清理)。验证通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`（5/5）、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web`。
-- Web：~~gpt-5.5 xhigh worker `Herschel` 已继续在 `.worktrees/webui-desktop-port/app/web` 内新增移动端/平板 `Jump to surface` picker~~ (worktree 已随分支清理)。验证通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`（6/6）、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web`。
+- Web：当前 Web parity worktree 仍在工作，旧生态控制台、Feature readiness、Jump to surface 等记录只作为待核对的历史输入；integration sweep 完成前只能写为进行中。
 - Hub：`CancelTask` 已通过 `AgentInstance` 解析真实 `SessionID` 后发布 `agent.cancel`，避免把 `AgentInstanceID` 误作为 `session_id`；回归测试 `TestCancelTaskPublishesResolvedSessionID` 已覆盖。
 - Hub：auth middleware 测试已适配 `AuthMiddleware(*config.Config)` 签名，当前 HEAD `19fcaa1` 已包含该修复。
 - Hub：Agent 任务回调链新增服务层回归测试，覆盖 `HandleTaskStream` 生成 `client_msg_id`、走 Redis seq、发布 `message.new`，以及 `HandleTaskDone` 在 Redis 失败时走 DB fallback、写最终消息并发布 `agent.done`。
@@ -170,7 +178,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - Edge：下一步若继续权限链路，要做真正阻塞式审批和远程 Edge 决策认证；当前修复只关闭 REST 任意 requestId 伪造和重复消费。
 - Docs：处理文档架构审查（原 `docs/inbox/` 已随目录重组删除）的最小建议：先在 API/架构文档标注 Runner 兼容命名，再归档或改写旧 `docs/archive/client-handoff.md`、`docs/roadmaps/integration.md`。
 - Docs：Codex follow-up 已完成（原 `docs/inbox/` 已随目录重组删除），确认最小补丁应优先改 `docs/architecture/implementation-guide.md` 的旧 client 文档入口，并在 API docs 标注 `/v1/runners` / `runner.*` 是历史兼容命名。
-- Web：~~继续保持 `D:\Code\TokenDance\AgentHub\.worktrees\webui-desktop-port` 独立~~ worktree 及 `feat/webui-desktop-port` 分支已于 2026-05-25 删除，产出已合入 `dev/delicious233`。
+- Web：继续保持 `.claude/worktrees/feat+web-desktop-parity` / `worktree-feat+web-desktop-parity` 独立推进；当前仍在工作，integration sweep 完成前只能写为进行中。
 - 后端：保留当前 Hub/Edge 并行改动，不回退；Hub `device_id` UUID 边界、多设备登录 schema、Hub cache fallback、Hub public stats bucket、dev compose loopback、Edge REST timeout、Edge local auth、Edge active-run smoke 和当前 `client-smoke` 23/23 已收口，后续优先做部署态 Hub 登录/设备注册验证、runner degraded/offline 与 Hub task/IM/scheduling API 的客户端消费；若继续安全队列，下一批可处理 `AH-SR-016/017` 部署态 CORS/admin 暴露验证，或开始 Remote/Cloud Edge 的 Hub session/device proof 设计。
 
 ### 本轮提交（2026-05-24）
@@ -233,7 +241,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 ## 当前阻塞 / 已知问题
 
 - api.hub.vectorcontrol.tech 无 SSL（HTTP only）— （待排期）
-- 登录已修复但需验证（migration 0017 + UUIDv7 修复后需重建容器）— （低优先级）
+- Hub migration 链需要单独验证：integration 已将后续平台 migrations 重排到 `0022`-`0028`；完成 schema/migration smoke 前，不要声明 schema/migration 已清理干净。
 - 服务器磁盘 29GB 总量偏小，需定期清理 Docker 镜像 — （运维任务）
 
 ## 本地开发

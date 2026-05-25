@@ -2,6 +2,7 @@
 
 AgentHub 使用 WebSocket typed events 推送实时状态。REST API 用于发起命令和查询，WebSocket 只负责事件投递。
 
+> **Implementation Status (2026-05-24)**: Edge Server events (run.*, runner.*) are
 > the primary event system and are documented in sections 1-6 below. Hub Server
 > WebSocket events at `/client/ws` use a different envelope format
 > (`ws.Frame` with flat `dot.notation` types: `message.new`, `agent.dispatch`,
@@ -150,7 +151,7 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.thinking` | P0 | Agent 思考/推理内容（可折叠显示） |
 | `run.agent.tool_call` | P0 | Agent 请求工具调用 |
 | `run.agent.tool_result` | P0 | 工具调用执行结果 |
-| `run.agent.file_change` | P0 | 文件变更，payload: `{ path, kind: "created"\|"modified"\|"deleted", diff? }` |
+| `run.agent.file_change` | P0 | 文件变更。当前 adapter payload 是兼容 union：Claude/OpenCode 可发单文件 `{ path, kind, content?, diff? }`，Codex 可发批量 `{ files: [{ path, kind, diff? }], status?, itemId? }`；前端需同时支持，后续再收敛为统一 schema。 |
 | `run.agent.session_init` | P0 | Agent 会话初始化（模型、工具列表、权限模式） |
 | `run.agent.result` | P0 | Agent 执行结束（成功/失败、token 用量） |
 | `run.agent.compact_boundary` | P1 | 上下文压缩边界 |
