@@ -484,7 +484,8 @@
 
 .emptyNotice,
 .errorText,
-.errorBanner {
+.errorBanner,
+.stateBanner {
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
@@ -501,6 +502,14 @@
   border-radius: 8px;
   padding: 8px 10px;
   background: var(--danger-bg);
+}
+
+.stateBanner {
+  border: 1px solid var(--warning-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--warning-bg);
+  color: var(--warning);
 }
 
 .messageList {

@@ -128,5 +128,13 @@
     "openRisksRemaining": "{{count}} 项未解决风险仍需审查。",
     "activeTasksRemaining": "{{count}} 项进行中任务经本地审查后仍保留。",
     "localSyncDetail": "本地同步捕获了 {{tasks}} 项进行中任务和 {{risks}} 项未解决风险。"
+  },
+  "source": {
+    "edgeSnapshot": "Edge 快照",
+    "offlineSnapshot": "离线快照",
+    "loadingSnapshot": "正在加载快照",
+    "mockFallback": "演示 / mock fallback",
+    "snapshotUnavailable": "快照不可用",
+    "localDryRun": "本地 dry-run / {{source}}"
   }
 }
