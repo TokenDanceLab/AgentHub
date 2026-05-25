@@ -121,6 +121,14 @@ func (f *FileStore) ListRuns(threadID string) []Run {
 	return f.store.ListRuns(threadID)
 }
 
+func (f *FileStore) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
+	result := f.store.CleanupRuns(opts)
+	if result.RemovedRuns > 0 || result.RemovedItems > 0 {
+		_ = f.persist()
+	}
+	return result
+}
+
 func (f *FileStore) SetRunStatus(id, status string) (Run, bool) {
 	run, ok := f.store.SetRunStatus(id, status)
 	if ok {

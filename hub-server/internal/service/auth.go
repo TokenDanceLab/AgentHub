@@ -14,7 +14,6 @@ import (
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/pkg/uuidv7"
 )
 
 // authCache is the subset of *cache.Client methods used by AuthService.
@@ -29,7 +28,7 @@ type AuthService struct {
 }
 
 func NewAuthService(db *gorm.DB, jwtCfg config.JWTConfig, cacheClient *cache.Client) *AuthService {
-	return &AuthService{db: db, jwtCfg: jwtCfg, cacheClient: cacheClient}
+	return &AuthService{db: db, jwtCfg: jwtCfg, cacheClient: resolveAuthCache(cacheClient)}
 }
 
 type LoginResponse struct {
@@ -86,10 +85,12 @@ func (s *AuthService) Login(ctx context.Context, username, password, deviceType,
 		return nil, errcode.AuthInvalidCredentials
 	}
 
-	devUUID := uuidv7.Must()
 	if err := repository.UpsertDevice(s.db, &model.Device{
-		ID: uuidv7.Must(), UserID: user.ID, DeviceType: deviceType, Capabilities: "[]",
+		ID: deviceID, UserID: user.ID, DeviceType: deviceType, Capabilities: "[]",
 	}); err != nil {
+		if errors.Is(err, repository.ErrDeviceOwnershipMismatch) {
+			return nil, errcode.ErrBadRequest
+		}
 		return nil, err
 	}
 
@@ -106,7 +107,7 @@ func (s *AuthService) Login(ctx context.Context, username, password, deviceType,
 
 	tokenHash := jwtutil.HashRefreshToken(rawRefresh)
 	rt := &model.RefreshToken{
-		UserID: user.ID, DeviceType: deviceType, DeviceID: devUUID,
+		UserID: user.ID, DeviceType: deviceType, DeviceID: deviceID,
 		TokenHash: tokenHash,
 		ExpiresAt: time.Now().Add(s.jwtCfg.RefreshTTL),
 	}
@@ -173,7 +174,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID, nickname, avata
 	if err := repository.UpdateUser(s.db, user); err != nil {
 		return nil, err
 	}
-	s.cacheClient.Invalidate(ctx, "user:profile:"+userID)
+	resolveAuthCache(s.cacheClient).Invalidate(ctx, "user:profile:"+userID)
 	return user, nil
 }
 
@@ -200,6 +201,6 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID, oldPassword, n
 		return err
 	}
 
-	s.cacheClient.Invalidate(ctx, "user:profile:"+userID)
+	resolveAuthCache(s.cacheClient).Invalidate(ctx, "user:profile:"+userID)
 	return repository.RevokeAllUserTokens(s.db, userID)
 }

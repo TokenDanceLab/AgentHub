@@ -1,14 +1,18 @@
 package lifecycle
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/store"
@@ -147,6 +151,144 @@ func TestProcessExecutorPublishesOutputAndFinished(t *testing.T) {
 				t.Fatalf("stored run = %#v, want finished with timestamps", stored)
 			}
 			return
+		default:
+			t.Fatalf("unexpected event type %q", evt.Type)
+		}
+	}
+}
+
+func TestRunOutputLimiterCapsAndSignalsOnce(t *testing.T) {
+	limiter := newRunOutputLimiter(5)
+
+	allowed, truncatedNow, written, maxBytes := limiter.allow([]byte("abc"))
+	if string(allowed) != "abc" || truncatedNow || written != 3 || maxBytes != 5 {
+		t.Fatalf("first allow = %q, %v, %d, %d; want abc, false, 3, 5", string(allowed), truncatedNow, written, maxBytes)
+	}
+
+	allowed, truncatedNow, written, maxBytes = limiter.allow([]byte("def"))
+	if string(allowed) != "de" || !truncatedNow || written != 5 || maxBytes != 5 {
+		t.Fatalf("second allow = %q, %v, %d, %d; want de, true, 5, 5", string(allowed), truncatedNow, written, maxBytes)
+	}
+
+	allowed, truncatedNow, written, maxBytes = limiter.allow([]byte("ghi"))
+	if len(allowed) != 0 || truncatedNow || written != 5 || maxBytes != 5 {
+		t.Fatalf("third allow = %q, %v, %d, %d; want empty, false, 5, 5", string(allowed), truncatedNow, written, maxBytes)
+	}
+}
+
+func TestProcessExecutorTruncatesRawOutputAtRunBudget(t *testing.T) {
+	const maxOutputBytes int64 = 16
+
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+	executor := newTestProcessExecutor(t, bus, s, "large-output")
+	executor.maxRunOutputBytes = maxOutputBytes
+
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	var stdoutText string
+	var sawTruncation bool
+	for {
+		evt := nextEventWithin(t, ch, 20*time.Second)
+		switch evt.Type {
+		case "run.started":
+		case "run.output.batch":
+			payload, ok := evt.Payload.(map[string]any)
+			if !ok {
+				t.Fatalf("output payload = %T, want map", evt.Payload)
+			}
+			if payload["runId"] != run.ID {
+				t.Fatalf("output payload runId = %#v, want %q", payload["runId"], run.ID)
+			}
+			chunks, ok := payload["chunks"].([]map[string]any)
+			if !ok || len(chunks) == 0 {
+				t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
+			}
+			text, _ := chunks[0]["text"].(string)
+			stdoutText += text
+			if payload["truncated"] == true {
+				sawTruncation = true
+				if payload["maxBytes"] != maxOutputBytes || payload["bytesWritten"] != maxOutputBytes {
+					t.Fatalf("truncation payload = %#v, want maxBytes and bytesWritten %d", payload, maxOutputBytes)
+				}
+				if payload["message"] == "" {
+					t.Fatalf("truncation payload = %#v, want message", payload)
+				}
+			}
+		case "run.finished":
+			if got := int64(len(stdoutText)); got != maxOutputBytes {
+				t.Fatalf("emitted stdout bytes = %d, want %d; text=%q", got, maxOutputBytes, stdoutText)
+			}
+			if !sawTruncation {
+				t.Fatal("run finished without truncation metadata")
+			}
+			stored, ok := s.GetRun(run.ID)
+			if !ok {
+				t.Fatalf("run %q was not stored", run.ID)
+			}
+			if stored.Status != "finished" {
+				t.Fatalf("stored run status = %q, want finished", stored.Status)
+			}
+			return
+		case "run.failed":
+			t.Fatalf("run failed: %#v", evt.Payload)
+		default:
+			t.Fatalf("unexpected event type %q", evt.Type)
+		}
+	}
+}
+
+func TestProcessExecutorTruncatesStructuredAdapterPayload(t *testing.T) {
+	const maxPayloadBytes int64 = 512
+
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+	adapter := structuredPayloadTestAdapter{
+		payload: map[string]any{
+			"content": strings.Repeat("A", 2048),
+			"nested": map[string]any{
+				"output": strings.Repeat("B", 2048),
+			},
+		},
+	}
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{Command: os.Args[0]}, adapter, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+	executor.maxStructuredPayloadBytes = maxPayloadBytes
+
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	for {
+		evt := nextEventWithin(t, ch, 20*time.Second)
+		switch evt.Type {
+		case "run.started", "run.output.batch":
+		case adapters.BusEventTextBlock:
+			payload, ok := evt.Payload.(map[string]any)
+			if !ok {
+				t.Fatalf("structured payload = %T, want map", evt.Payload)
+			}
+			if payload["truncated"] != true {
+				t.Fatalf("structured payload = %#v, want truncated metadata", payload)
+			}
+			if payload["maxBytes"] != maxPayloadBytes || payload["bytesBefore"] == nil || payload["message"] == "" {
+				t.Fatalf("structured payload = %#v, want maxBytes, bytesBefore, and message", payload)
+			}
+			if size := mustJSONPayloadSize(t, payload); size > maxPayloadBytes {
+				t.Fatalf("structured payload JSON size = %d, want <= %d; payload=%#v", size, maxPayloadBytes, payload)
+			}
+		case "run.finished":
+			return
+		case "run.failed":
+			t.Fatalf("run failed: %#v", evt.Payload)
 		default:
 			t.Fatalf("unexpected event type %q", evt.Type)
 		}
@@ -619,6 +761,46 @@ func TestProcessExecutorCancelMissingRun(t *testing.T) {
 	}
 }
 
+type structuredPayloadTestAdapter struct {
+	payload map[string]any
+}
+
+func (a structuredPayloadTestAdapter) Metadata() adapters.AdapterMetadata {
+	return adapters.AdapterMetadata{ID: "structured-payload-test", Name: "Structured Payload Test"}
+}
+
+func (a structuredPayloadTestAdapter) Capabilities() adapters.AgentCapabilities {
+	return adapters.AgentCapabilities{Streaming: true}
+}
+
+func (a structuredPayloadTestAdapter) BuildCommand(ctx adapters.RunProcessContext) (string, []string, []string, string) {
+	return os.Args[0],
+		[]string{"-test.run=TestProcessExecutorHelper", "--", "success"},
+		append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+		"."
+}
+
+func (a structuredPayloadTestAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter adapters.EventEmitter, run store.Run) error {
+	emitter.Emit(adapters.BusEventTextBlock, map[string]any{
+		"projectId": run.ProjectID,
+		"threadId":  run.ThreadID,
+		"runId":     run.ID,
+	}, a.payload)
+	_, _ = io.Copy(io.Discard, stdout)
+	return ctx.Err()
+}
+
+func (a structuredPayloadTestAdapter) NeedsStdin() bool { return false }
+
+func mustJSONPayloadSize(t *testing.T, value any) int64 {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+	return int64(len(encoded))
+}
+
 func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleStore, mode string) *ProcessExecutor {
 	t.Helper()
 
@@ -650,6 +832,8 @@ func TestProcessExecutorHelper(t *testing.T) {
 		os.Exit(7)
 	case "sleep":
 		time.Sleep(5 * time.Second)
+	case "large-output":
+		fmt.Fprint(os.Stdout, strings.Repeat("A", 64))
 	case "pwd":
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -683,7 +867,6 @@ func TestProcessExecutorHelper(t *testing.T) {
 	os.Exit(0)
 }
 
-
 // ── Result aggregation tests ───────────────────────────────────────────────
 
 func TestSendSubAgentResult_Completed(t *testing.T) {
@@ -703,10 +886,10 @@ func TestSendSubAgentResult_Completed(t *testing.T) {
 		Status:    agents.StatusBusy,
 	})
 	_ = reg.Register(&agents.AgentInstance{
-		ID:       "child-agent",
+		ID:        "child-agent",
 		AdapterID: "claude-code",
-		ParentID: "parent-agent",
-		Status:   agents.StatusBusy,
+		ParentID:  "parent-agent",
+		Status:    agents.StatusBusy,
 	})
 
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
@@ -763,10 +946,10 @@ func TestSendSubAgentResult_Error(t *testing.T) {
 		Status:    agents.StatusBusy,
 	})
 	_ = reg.Register(&agents.AgentInstance{
-		ID:       "child-agent-err",
+		ID:        "child-agent-err",
 		AdapterID: "claude-code",
-		ParentID: "parent-agent-err",
-		Status:   agents.StatusBusy,
+		ParentID:  "parent-agent-err",
+		Status:    agents.StatusBusy,
 	})
 
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
