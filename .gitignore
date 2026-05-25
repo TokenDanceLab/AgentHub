@@ -6,18 +6,9 @@ node_modules/
 dist/
 build/
 .next/
-.vite/
 coverage/
 playwright-report/
 test-results/
-
-# Generated reports and local test artifacts
-app/desktop/stats.html
-**/coverage.out
-**/coverage.html
-edge-server/cov_full
-edge-server/$covPath
-hub-server/tests/uploads/
 
 # Go
 *.exe
@@ -98,8 +89,31 @@ docs/review/
 .agents/skills/*
 !.agents/skills/dev-loop/
 !.agents/skills/dev-loop/**
+!.agents/skills/test-coverage/
+!.agents/skills/test-coverage/**
+!.agents/skills/pre-push/
+!.agents/skills/pre-push/**
+!.agents/skills/integration-test/
+!.agents/skills/integration-test/**
+!.agents/skills/adapter-dev/
+!.agents/skills/adapter-dev/**
+!.agents/skills/env-sandbox/
+!.agents/skills/env-sandbox/**
+!.agents/skills/ui-screenshot/
+!.agents/skills/ui-screenshot/**
 .cursor/
 .continue/
+
+# Agent inbox — reports dropped by other agents, local only
+docs/inbox/*
+!docs/inbox/README.md
+
+# Local ops docs — deployment details, SSH, server addresses (not for repo)
+.ops/
+
+# Review reports — cross-review and audit outputs
+docs/review/*
+!docs/review/README.md
 
 # Cloned reference repos (at repo root only)
 /reference/*
