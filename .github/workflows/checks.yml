@@ -43,7 +43,7 @@ jobs:
       - name: Coverage check (overall >= 70%)
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          THRESHOLD=70
+          THRESHOLD=75
           echo "Overall coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
           if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
             echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
@@ -76,8 +76,6 @@ jobs:
 
       - name: Security scan (gosec)
         run: go run github.com/securecodewarrior/gosec/v2/cmd/gosec@latest ./...
-        continue-on-error: true
-
       - name: Vulnerability check (govulncheck)
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
@@ -147,7 +145,6 @@ jobs:
 
       - name: Security scan (gosec)
         run: go run github.com/securecodewarrior/gosec/v2/cmd/gosec@latest ./...
-        continue-on-error: true
 
       - name: Vulnerability check (govulncheck)
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

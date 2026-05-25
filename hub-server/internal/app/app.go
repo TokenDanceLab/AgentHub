@@ -152,14 +152,14 @@ func (a *App) Run(ctx context.Context) error {
 		s3Store, err := service.NewS3StorageFromConfig(ctx, a.Config.S3)
 		if err != nil {
 			slog.Error("failed to init S3 storage, falling back to local", "error", err)
-			attachmentStorage = service.NewLocalStorage()
+			attachmentStorage = service.NewLocalStorage(a.Config.Upload.Dir)
 		} else {
 			attachmentStorage = s3Store
 			slog.Info("S3 attachment storage configured", "bucket", a.Config.S3.Bucket, "endpoint", a.Config.S3.Endpoint)
 		}
 	} else {
-		attachmentStorage = service.NewLocalStorage()
-	}
+		attachmentStorage = service.NewLocalStorage(a.Config.Upload.Dir)
+		}
 	a.AttachmentService = service.NewAttachmentService(a.DB, a.Config.Upload, attachmentStorage)
 	a.ContactService = service.NewContactService(a.DB, a.bus, a.CacheClient)
 	a.SessionService = service.NewSessionService(a.DB, a.CacheClient)
