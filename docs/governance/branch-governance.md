@@ -20,17 +20,18 @@ feat/* -> dev/delicious233 -> master
 |------|------|:--:|
 | **dev/delicious233** | 主开发分支，当前已推送到 origin | 活跃 |
 | master | 稳定发布，PR only | 保留 |
-| feat/web-desktop-parity | 早期 Web parity 本地分支，唯一提交 `797983e`；merge-base `c789c9a`，相对当前 dev 为 `30/5` 分叉，merge-tree 已出现大量 `changed in both` 冲突 | 保留作 patch 参考，禁止直合 |
-| worktree-feat+web-desktop-parity | 早期 Web handoff 本地分支，跟踪 `origin/worktree-feat+web-desktop-parity`；merge-base `d952655`，相对当前 dev 为 `33/2` 分叉，merge-tree 已出现大量冲突 | 保留作 patch 参考，禁止直合 |
+| feat/web-desktop-parity | 早期 Web parity 本地分支，唯一提交 `797983e`；已导出 patch 后删除本地分支 | 已归档 |
+| worktree-feat+web-desktop-parity | 早期 Web handoff 本地分支；本地分支已删除，远端 `origin/worktree-feat+web-desktop-parity` 仅作公共备份 | 已归档 |
 
 当前登记 worktree 只有主工作树 `D:/Code/TokenDance/AgentHub`。旧残留目录 `.worktrees/codex-trump-fork` 已移动到 `.worktrees/.trash/codex-trump-fork-archived-20260526`，未直接删除。
 
-当前 stash：
+当前 stash 为空。旧 Web parity 相关 stash 已先导出 patch，再从本地 stash 删除：
 
-| Stash | 来源 | 处理建议 |
+| Patch | 来源 | 处理建议 |
 |---|---|---|
-| `stash@{0}` | `feat/web-desktop-parity` at `797983e`，涉及 Desktop shell 小范围文件和 `app/pnpm-lock.yaml` | 不自动 pop；旧 Web parity 决策后再审 |
-| `stash@{1}` | `dev/delicious233` at `d952655`，涉及 Desktop UI 视觉/布局文件 | 不自动 pop；需要 UI 回捞时单独 patch-review |
+| `.worktrees/.trash/feat-web-desktop-parity-archive-20260526/0001-feat-web-Desktop-API.patch` | `feat/web-desktop-parity` 唯一提交 `797983e` | 只作 patch-review 参考，禁止直合 |
+| `.worktrees/.trash/feat-web-desktop-parity-archive-20260526/stash0-feat-web-desktop-parity.patch` | 旧 `feat/web-desktop-parity` stash | 只作 patch-review 参考，禁止自动应用 |
+| `.worktrees/.trash/feat-web-desktop-parity-archive-20260526/stash1-dev-delicious233.patch` | 旧 `dev/delicious233` stash | 只作 UI 回捞参考，禁止自动应用 |
 
 ## 当前远端未合入
 
@@ -50,6 +51,7 @@ feat/* -> dev/delicious233 -> master
 | WebAgent | `feat/web-agent-closeout-20260526` 已 fast-forward 合入 `dev/delicious233`，本地/远端分支已删除 |
 | TokenDance ID / Web token 收口 | `feat/td-id-runtime-integration` 已 fast-forward 合入 `dev/delicious233` 并推送；临时 worktree、本地分支和远端分支均已删除 |
 | Agent Runtime 架构收口 | `0f1f9c1 docs(architecture): 固化 Agent Runtime 实体模型` 已推送到 `dev/delicious233`，明确 `AgentRuntime -> AgentProfile -> ExecutionTarget -> Thread -> Run -> RunEvent -> Approval/Artifact` 主线 |
+| Web parity 本地残留 | 本地 `feat/web-desktop-parity`、`worktree-feat+web-desktop-parity` 已删除；相关 commit/stash 已导出到 `.worktrees/.trash/feat-web-desktop-parity-archive-20260526/`；远端 `origin/worktree-feat+web-desktop-parity` 仅作公共备份，不作为合入来源 |
 | team authz/reliability/adapter | `feat/team-hub-authz`、`feat/team-hub-reliability`、`feat/team-adapter-compat` 已独立合入 `dev/delicious233`，远端分支已删除 |
 | integration sweep | PR #197 已关闭；`feat/team-integration-sweep` 本地 worktree、本地分支、远端分支已删除 |
 | OIDC handoff | 本地 worktree/分支已删除，远端保存分支保留 |
