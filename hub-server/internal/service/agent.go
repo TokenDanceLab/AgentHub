@@ -291,7 +291,13 @@ func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) er
 		return err
 	}
 
-	_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusCancelled, "")
+	rowsAffected, err := repository.UpdatePendingTaskStatusAtomic(s.db, taskID, task.Status, model.TaskStatusCancelled, "")
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return errcode.ErrBadRequest
+	}
 
 	s.bus.Publish(ctx, Event{Type: "agent.cancel", Payload: map[string]string{
 		"task_id":           taskID,
@@ -335,14 +341,21 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDevice
 	}
 	if task.Status == model.TaskStatusRunning {
 		if edgeRunID != "" && task.EdgeRunID == "" {
-			return repository.UpdatePendingTaskStatusWithEdgeRunID(s.db, taskID, model.TaskStatusRunning, "", edgeRunID)
+			return repository.UpdatePendingTaskEdgeRunID(s.db, taskID, edgeRunID)
 		}
 		return nil
 	}
 	if task.Status != model.TaskStatusDispatched {
 		return errcode.ErrBadRequest
 	}
-	return repository.UpdatePendingTaskStatusWithEdgeRunID(s.db, taskID, model.TaskStatusRunning, "", edgeRunID)
+	rowsAffected, err := repository.UpdatePendingTaskStatusAtomicWithEdgeRunID(s.db, taskID, model.TaskStatusDispatched, model.TaskStatusRunning, "", edgeRunID)
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return errcode.ErrBadRequest
+	}
+	return nil
 }
 
 // HandleTaskStream inserts an agent message into the session (streaming chunk).
@@ -440,7 +453,7 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDevic
 		s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
 	}
 
-	_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusDone, "")
+	_, _ = repository.UpdatePendingTaskStatusAtomic(s.db, taskID, task.Status, model.TaskStatusDone, "")
 
 	s.bus.Publish(ctx, Event{Type: "agent.done", Payload: map[string]interface{}{
 		"task_id":           taskID,
@@ -470,7 +483,7 @@ func (s *AgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeDevic
 		return err
 	}
 
-	_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusFailed, errMsg)
+	_, _ = repository.UpdatePendingTaskStatusAtomic(s.db, taskID, task.Status, model.TaskStatusFailed, errMsg)
 
 	s.bus.Publish(ctx, Event{Type: "agent.failed", Payload: map[string]interface{}{
 		"task_id":           taskID,
