@@ -35,6 +35,7 @@ import { createHubClient, type HubClient } from '@/api/hubClient';
 import type { HubWSHandle } from '@/api/hubWS';
 import { useHubEventStream } from '@/hooks/useHubEventStream';
 import { useHubIntegration } from '@/hooks/useHubIntegration';
+import { buildWorkspaceShareText } from '@/utils/workspaceShare';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
@@ -442,18 +443,40 @@ export default function App() {
 
   const handleShareWorkspace = useCallback(async () => {
     const title = selectedThread?.title ?? selectedAgent?.name ?? 'AgentHub';
-    const summary = [
-      `AgentHub: ${title}`,
-      selectedThread ? `Thread: ${selectedThread.threadId}` : null,
-      selectedAgent ? `Agent: ${selectedAgent.name}` : null,
-    ].filter(Boolean).join('\n');
+    const runStatus = displayedRun
+      ? t(`run.status.${displayedRun.status}`, { defaultValue: displayedRun.status })
+      : undefined;
+    const summary = buildWorkspaceShareText({
+      title,
+      thread: selectedThread ? { id: selectedThread.threadId, title: selectedThread.title } : undefined,
+      agent: selectedAgent ? { id: selectedAgent.id, name: selectedAgent.name } : undefined,
+      run: displayedRun && runStatus ? { id: displayedRun.runId, status: runStatus } : undefined,
+      messages: allMessages,
+      labels: {
+        thread: t('workspace.shareThread'),
+        agent: t('workspace.shareAgent'),
+        run: t('workspace.shareRun'),
+        status: t('workspace.shareStatus'),
+        messages: t('workspace.shareMessages'),
+        noMessages: t('workspace.shareNoMessages'),
+        user: t('workspace.shareUser'),
+        assistant: t('workspace.shareAssistant'),
+        system: t('workspace.shareSystem'),
+        tool: t('workspace.shareTool'),
+        file: t('workspace.shareFile'),
+        code: t('workspace.shareCode'),
+        fileCreated: t('workspace.shareFileCreated'),
+        fileModified: t('workspace.shareFileModified'),
+        fileDeleted: t('workspace.shareFileDeleted'),
+      },
+    });
     try {
       await navigator.clipboard.writeText(summary);
       addToast({ type: 'success', message: t('toast.copied') });
     } catch {
       addToast({ type: 'error', message: t('toast.error') });
     }
-  }, [addToast, selectedAgent, selectedThread, t]);
+  }, [addToast, allMessages, displayedRun, selectedAgent, selectedThread, t]);
 
   // Global shell shortcuts
   useEffect(() => {
