@@ -5,19 +5,27 @@
   "search": {
     "ariaLabel": "Search private chats",
     "placeholder": "Search people, handoffs, snippets...",
-    "filtering": "{{chatCount}} preview chats and {{messageCount}} local messages match \"{{query}}\"",
+    "filtering": "{{chatCount}} chats and {{messageCount}} messages match \"{{query}}\"",
     "clear": "Clear search"
   },
   "sidebar": {
-    "title": "Mock Conversations",
-    "empty": "No local preview chats match this search."
+    "title": "Private Chats",
+    "empty": "No Hub private chats are available."
   },
   "chat": {
     "localPreview": "local preview thread",
+    "readOnly": "Hub session detected; chat REST is read-only in this Web pass",
+    "loginRequired": "Hub session required",
     "messagesArea": "Message thread"
   },
   "status": {
-    "localMock": "Local mock"
+    "localMock": "Local mock",
+    "readOnly": "Read-only",
+    "locked": "Login required"
+  },
+  "locked": {
+    "title": "Hub session required",
+    "description": "Private Chats will not show mock conversations, play mock streams, or report a fake send success until Web has a Hub session and message contracts are wired."
   },
   "header": {
     "star": "Show key messages only",
@@ -41,12 +49,16 @@
   },
   "composer": {
     "placeholder": "Write a local preview note, paste a code fragment, or attach handoff context...",
+    "lockedPlaceholder": "Sign in to Hub before using Private Chats",
+    "readOnlyPlaceholder": "Private Chats are read-only until Hub message REST is connected",
     "attach": "Toggle attachment panel",
     "insertCode": "Insert code",
     "quote": "Quote selected message",
     "messageLabel": "Message {{name}}",
     "voice": "Voice note unavailable in local preview",
     "send": "Append",
+    "lockedSend": "Locked",
+    "readOnlySend": "Read-only",
     "attachmentPanel": "Attachment panel"
   },
   "context": {
@@ -54,7 +66,7 @@
     "review": "{{count}} local messages - {{progress}}% reviewed",
     "open": "Open context",
     "reviewTitle": "Review Progress",
-    "reviewDetail": "{{keyCount}} key messages, {{unread}} unread, and {{drafts}} local drafts in this thread. Hub /client/ws and message/session REST are not connected yet.",
+    "reviewDetail": "{{keyCount}} key messages, {{unread}} unread, and {{drafts}} unsent local drafts in this thread. Hub /client/ws and message/session REST are locked in Web until the session contract is integrated.",
     "attachments": "Attachments",
     "noAttachments": "No linked attachments for this conversation yet.",
     "codeSnippets": "Code Snippets",
@@ -78,6 +90,8 @@
     "emptyMessage": "Write a message or select an attachment before sending",
     "moreActions": "More actions are local-preview only",
     "contextDetails": "Context details stay in this local preview",
+    "loginRequired": "Sign in to Hub before using Private Chats.",
+    "readOnly": "Private Chats are read-only until Hub message REST is connected.",
     "dismiss": "Dismiss"
   }
 }
