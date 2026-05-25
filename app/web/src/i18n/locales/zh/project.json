@@ -36,6 +36,7 @@
     "activeTasks": "进行中任务",
     "demoActiveTasks": "演示进行中任务",
     "milestones": "里程碑",
+    "demoMilestones": "演示里程碑",
     "sharedFiles": "共享文件",
     "demoSharedFiles": "演示共享文件",
     "dryRuns": "试运行",
@@ -139,5 +140,8 @@
     "mockFallback": "演示 / mock fallback",
     "snapshotUnavailable": "快照不可用",
     "localDryRun": "本地 dry-run / {{source}}"
+  },
+  "demo": {
+    "cardDetail": "演示/mock fallback 数据：{{detail}}"
   }
 }

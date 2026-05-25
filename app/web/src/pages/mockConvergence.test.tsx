@@ -129,13 +129,14 @@ describe('Web mock convergence states', () => {
     expect(screen.queryByText('Active conversation')).not.toBeInTheDocument();
   });
 
-  it('labels Agent Square catalog/mock fallback and does not render raw i18n keys', () => {
+  it('labels Agent Square catalog fallback and does not render raw i18n keys', () => {
     const { container } = render(<AgentSquarePageInteractive />);
     const text = visibleText(container);
 
-    expect(screen.getAllByText('Catalog/mock fallback').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Catalog fallback').length).toBeGreaterThan(0);
     expect(text).not.toMatch(/\b(?:agentSquare|privateChats|groupWorkspace|project|workbench)\./);
     expect(text).not.toContain('source.catalogMock');
+    expect(text).not.toContain('Catalog/mock fallback');
     expect(text).not.toContain('brand.subtitle');
     expect(text).not.toContain('sidebar.catalog');
     expect(text).not.toContain('header.description');

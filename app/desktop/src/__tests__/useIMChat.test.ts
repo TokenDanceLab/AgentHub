@@ -87,6 +87,26 @@ function createMockHubClient(overrides: Partial<HubClient> = {}): HubClient {
         ],
       },
     ]),
+    listFriendRequests: vi.fn(async () => [
+      {
+        request_id: 'fr-1',
+        user_id: 'friend-2',
+        username: 'bob',
+        nickname: 'Bob',
+        message: 'hi',
+        created_at: '2026-05-25T00:00:00.000Z',
+      },
+    ]),
+    listNotifications: vi.fn(async () => [
+      {
+        id: 'notif-1',
+        user_id: 'user-1',
+        type: 'mention',
+        payload: JSON.stringify({ title: 'Mention' }),
+        read: false,
+        created_at: '2026-05-25T00:00:00.000Z',
+      },
+    ]),
     getMessages: vi.fn(async () => [
       {
         id: 'm1',
@@ -153,6 +173,10 @@ describe('useIMChat', () => {
     await waitFor(() => expect(result.current.contacts).toHaveLength(1));
     expect(hubClient.listContacts).toHaveBeenCalled();
     expect(hubClient.listSessions).toHaveBeenCalled();
+    expect(hubClient.listFriendRequests).toHaveBeenCalled();
+    expect(hubClient.listNotifications).toHaveBeenCalledWith({ limit: 20 });
+    expect(result.current.friendRequests).toHaveLength(1);
+    expect(result.current.notifications).toHaveLength(1);
     expect(result.current.contacts[0]).toMatchObject({
       id: 'sess-1',
       name: 'Alice',
@@ -329,6 +353,49 @@ describe('useIMChat', () => {
       readBy: 'friend-1',
       readAt: '2026-05-25T00:03:00.000Z',
     });
+    expect(result.current.contacts[0]).toMatchObject({
+      statusHint: 'im.session.readThrough',
+      statusHintParams: { seq: 2 },
+    });
+  });
+
+  it('shows recall and session lifecycle hints from Hub WS events', async () => {
+    const ws = createMockHubWS();
+    const hubClient = createMockHubClient();
+
+    const { result } = renderHook(() => useIMChat({ hubClient, hubWS: ws }));
+    await waitFor(() => expect(result.current.contacts).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.loadSessionMessages('sess-1');
+    });
+
+    act(() => {
+      fire(ws, HUB_EVENTS.MESSAGE_RECALL, {
+        session_id: 'sess-1',
+        message_id: 'm1',
+      });
+    });
+
+    expect(result.current.getSessionMessages('sess-1')[0]).toMatchObject({
+      recalled: true,
+      content: '[Message recalled]',
+    });
+    expect(result.current.contacts[0]).toMatchObject({
+      statusHint: 'im.session.messageRecalled',
+    });
+
+    act(() => {
+      fire(ws, HUB_EVENTS.SESSION_DISSOLVED, {
+        session_id: 'sess-1',
+      });
+    });
+
+    expect(result.current.contacts[0]).toMatchObject({
+      dissolved: true,
+      online: false,
+      statusHint: 'im.session.dissolved',
+    });
   });
 
   it('adds a session when Hub WS emits session.created', async () => {
@@ -352,6 +419,7 @@ describe('useIMChat', () => {
       id: 'sess-2',
       name: 'Build Room',
       type: 'group',
+      statusHint: 'im.session.updated',
     });
   });
 
@@ -456,6 +524,8 @@ describe('useIMChat', () => {
 
     await waitFor(() => expect(result.current.status).toBe('idle'));
     expect(hubClient.listSessions).not.toHaveBeenCalled();
+    expect(hubClient.listFriendRequests).not.toHaveBeenCalled();
+    expect(hubClient.listNotifications).not.toHaveBeenCalled();
     expect(result.current.contacts).toHaveLength(0);
   });
 });
