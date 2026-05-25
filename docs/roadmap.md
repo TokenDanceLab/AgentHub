@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-25（M8 审计批次规划 — 129 Issues 分 8 批）
+最后更新：2026-05-25（M8 审计批次 — B1-B7 已完成，B10 本轮新增 19 fix）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -804,18 +804,19 @@ pnpm typecheck                                         # 零错误
 
 ### 7.0 批次总览
 
-| 批次 | 模块 | Issue 数 | 工期 | 风险等级 |
+| 批次 | 模块 | Issue 数 | 工期 | 状态 |
 |------|------|:--:|------|:--:|
-| B1 | Auth / Token 安全 | 8 | 3d | 🔴 严重 |
-| B2 | 数据完整性 / 并发 | 5 | 2d | 🔴 严重 |
-| B3 | Edge 可靠性 / 错误处理 | 8 | 3d | 🟡 高 |
-| B4 | 输入校验 / 边界防御 | 10 | 3d | 🟡 高 |
-| B5 | Session / Group 生命周期 | 8 | 3d | 🟡 高 |
-| B6 | Desktop IM / Hub 对接 | 12 | 4d | 🟢 中 |
-| B7 | CI / 文档 / 清理 | 8 | 2d | 🟢 低 |
+| B1 | Auth / Token 安全 | 8 | 3d | ✅ 完成 (2026-05-25) |
+| B2 | 数据完整性 / 并发 | 5 | 2d | ✅ 完成 (2026-05-25) |
+| B3 | Edge 可靠性 / 错误处理 | 8 | 3d | ✅ 完成 (2026-05-25) |
+| B4 | 输入校验 / 边界防御 | 10 | 3d | ✅ 完成 (2026-05-25) |
+| B5 | Session / Group 生命周期 | 8 | 3d | ✅ 完成 (2026-05-25) |
+| B6 | Desktop IM / Hub 对接 | 12 | 4d | 🔶 部分完成（纯后端已修，客户端待推进） |
+| B7 | CI / 文档 / 清理 | 8 | 2d | 🔶 部分完成（4/8 待处理） |
 | B8 | Enhancement / 产品方向 | 6 | — | 规划中 |
+| **B10** | **后端服务强化（本轮新增）** | **19** | **—** | **✅ 完成 (2026-05-25)** |
 
-> 其余未列入批次的 Issue（约 64 个）为 no-label 杂项，在批次推进中按文件就近顺手修。
+> B1-B5 由 5 个 parallel team 在 2026-05-25 早前修复完成。B10 由 3 个 parallel team 在 2026-05-25 晚间修复完成。
 
 ---
 
@@ -991,7 +992,65 @@ pnpm typecheck                                         # 零错误
 
 ---
 
-### 7.10 修复策略
+### 7.10 B10: 后端服务强化（2026-05-25，19 fix，3 Team 并行）
+
+**Team 1 — Hub Core Service（5 commits）**: `feat/team-hub-core-service`
+
+| # | Issue | 修复 |
+|---|-------|------|
+| 154 | Update session last_message_at | `allocateSeq` 在 Redis seq 分配后 touch session |
+| 132 | Expire running agent tasks | `ScanExpiredTasks` 纳入 `running` 状态 |
+| 159 | Allow clearing contact remarks | 空字符串备注合法化 |
+| 120 | Contact remark update error | `UpdateRemark` 0 行影响 → 404 |
+| 157 | Honor message search filters | 支持 content_type + 时间范围过滤 |
+| 122 | Align private-session with friendship | `CreatePrivateSession` 前校验好友关系 |
+
+**Team 2 — Agent + Edge Callbacks（3 commits）**: `feat/team-agent-edge-callbacks`
+
+| # | Issue | 修复 |
+|---|-------|------|
+| 130 | Non-duplicating stream-to-message | `HandleTaskStream` 通过 `client_msg_id` 幂等去重 |
+| 109 | Task lifecycle enforcement | `done`/`fail` 只接受 `running`/`dispatched` 状态 |
+| 99 | Offline-replayed task dispatch | `HandleTaskAck` 接受 `queued` → `dispatched` 转换 |
+| 132 | Running task heartbeat | `BumpRunningTaskExpireAt` 每次 stream 刷新 TTL |
+| 154 | Session refresh on agent output | `TouchSessionLastMessage` on stream/done |
+| 137 | Offline queue failure surface | `PushPendingTask` 错误记录 Error 日志 |
+| 179 | NDJSON parse failure | `parseErr` 传播，run 标记 failed |
+| 177 | CLI availability detection | `exec.LookPath` 检测，unavailable 上报 |
+| 108 | Cancel response alignment | 缺失 run → 404，terminal run → 200 |
+
+**Team 3 — WS + Auth + Middleware（1 commit）**: `feat/team-ws-auth-middleware`
+
+| # | Issue | 修复 |
+|---|-------|------|
+| 178 | WS routes for multi-device | `byUser` 改用 `connID` 索引 |
+| 96 | Recall only to original session | 事件处理器仅推到 `msg.SessionID` |
+| 93 | Mark-read sequence validation | `lastReadSeq > member.LastReadSeq` 才推进 |
+| 88 | Typing sender membership | 广播前校验发送者是 session member |
+| 78 | Session cache after DeleteForMe | `DeleteForMe` 新增 member cache 失效 |
+| 82 | WS auth alignment | `ServeWS` 复用 Gin middleware 认证上下文 |
+
+**验证**：hub-server 13/13 全绿，edge-server 15/15 全绿，`go test -race` 通过。
+
+---
+### 7.11 剩余待处理
+
+**纯后端（5 个）**：
+
+| # | Issue | 优先级 |
+|---|-------|:--:|
+| 145 | Honor configured upload directory for attachment storage | P2 |
+| 142 | Document request bodies for Edge task stream/done callbacks | P2 |
+| 138 | Align register request/response between OpenAPI and Hub | P2 |
+| 173 | Normalize non-text message content before jsonb writes | P2 |
+| 105 | Align CI gates with documented security/coverage policy | P2 |
+
+**B7 剩余（4 个，客户端相关）**：#181, #180, #71, #114
+**B6 剩余（9 个，Desktop IM/Hub 对接）**：#123, #121, #119, #118, #125, #126, #102, #106, #150
+
+---
+
+### 7.12 修复策略
 
 1. **按批次顺序推进**：B1 → B2 → ... → B7，不跨批次跳跃
 2. **每批次一个 PR**：10 个左右 Issue → 一个 PR，方便 review

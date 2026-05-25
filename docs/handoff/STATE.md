@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-25 06:46 UTC+8 | 分支：dev/delicious233 | 提交：0986ff5
+最后更新：2026-05-25 21:00 UTC+8 | 分支：dev/delicious233 | 提交：6fcf079
 
 ## 快速上手
 
@@ -75,6 +75,14 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - ✅ i18n 跟随系统语言（navigator.language）
 
 ### 本轮进展（2026-05-25）
+
+**后端 B10 批次（2026-05-25 晚间，19 fix，3 Team 并行）**：
+- Hub Core Service（5 commits）：#154 session last_message_at + #132 过期扫描含 running + #159 备注可清空 + #120 UpdateRemark 404 + #157 消息搜索过滤 + #122 私聊好友校验
+- Agent + Edge Callbacks（3 commits）：#130 stream 去重 + #109 生命周期强制 + #99 离线 dispatched + #137 队列失败日志 + #179 NDJSON 失败终止 + #177 CLI LookPath + #108 cancel 响应对齐
+- WS + Auth + Middleware（1 commit）：#178 WS 多设备路由 + #96 撤回原 session + #93 已读序列前进 + #88 typing 成员校验 + #78 DeleteForMe 缓存 + #82 WS 认证对齐
+- 测试：hub-server 13/13 + edge-server 15/15 全绿，race detector 通过
+- 19 issue 已关闭；5 个纯后端 issue 待修（#145 #142 #138 #173 #105）
+
 - Desktop：项目文档后台 sweep 已完成，`docs/architecture/system-architecture.md` / `docs/architecture/product-requirements.md` / `docs/architecture/implementation-guide.md` / `docs/roadmap.md` / README 系列 / archive + ADR 索引已统一 Runtime/Profile/Configuration/Execution Target、TokenDance ID、Hub/Edge/Desktop/Web 边界。
 - Desktop：设置页按 Codex App 截图方向重构为全屏设置工作台，并新增任务列表、IM 群聊、Agent 调度、在线 IM、Agent 市场、Skill/MCP、模型配置、模型映射、cc-switch、多端、远控、账号鉴权和安全审计等一等入口；顶部快捷图标可直达任务列表和 Agent 调度分区。
 - Desktop：Settings 已新增 `Agent Profiles` 与 `Execution Targets` 两个一级页面，把用户概念明确拆成 Agent Profile（Runtime + Model + Configuration）和 Execution Target（Local Edge / Hub Relay / SSH/Tailscale / Cloud Edge）；页面直接消费 `useHealth()` 与 `useAgentList()`，`HealthResponse`/Zod schema 已保留 `/v1/health.checks.runners` 扩展字段，Connections 页同步显示 Edge runner summary。
