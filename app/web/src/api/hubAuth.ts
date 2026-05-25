@@ -304,7 +304,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       const res = await hubClient.login({
         username,
         password,
-        device_type: 'desktop',
+        device_type: 'web',
         device_id: getOrCreateDeviceId(),
       });
 
