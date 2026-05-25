@@ -102,7 +102,7 @@ func TestHandleTaskAck_DispatchedToRunningAtomic(t *testing.T) {
 	mock.ExpectQuery(sqlmTaskByID).
 		WithArgs(taskID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
-			AddRow(taskID, "agent-1", "user-1", model.TaskStatusDispatched, "", ""))
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusDispatched, "dev-1", ""))
 
 	mock.ExpectQuery(sqlmAgentByID).
 		WithArgs("agent-1", 1).
@@ -127,7 +127,7 @@ func TestHandleTaskAck_AlreadyRunningIdempotent(t *testing.T) {
 	mock.ExpectQuery(sqlmTaskByID).
 		WithArgs(taskID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
-			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "", "run-001"))
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", "run-001"))
 
 	// Already running with edgeRunID set → idempotent, no DB update needed.
 	mock.ExpectQuery(sqlmAgentByID).
@@ -150,7 +150,7 @@ func TestHandleTaskAck_EdgeRunIDBackfill(t *testing.T) {
 	mock.ExpectQuery(sqlmTaskByID).
 		WithArgs(taskID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
-			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "", ""))
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", ""))
 
 	mock.ExpectQuery(sqlmAgentByID).
 		WithArgs("agent-1", 1).
