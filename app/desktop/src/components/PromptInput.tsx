@@ -7,6 +7,7 @@ import { useMention } from '@/hooks/useMention';
 import MentionPopover from '@/components/MentionPopover';
 import ModelDropdown from '@/components/ModelDropdown';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
+import { preferredProfileAlias } from '@/utils/agentProfile';
 import { useShallow } from 'zustand/shallow';
 import styles from './PromptInput.module.css';
 
@@ -60,6 +61,9 @@ export default function PromptInput({
   const [promptLength, setPromptLength] = useState(0);
   const [model, setModel] = useState<string>('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
+  const selectedAgent = agents.find((a) => a.id === selectedAgentId);
+  const selectedAgentAlias = preferredProfileAlias(selectedAgent);
+  const routeModel = model || selectedAgentAlias || undefined;
   const modelSettings = useModelSettingsStore(
     useShallow((s) => ({
       defaultModel: s.defaultModel,
@@ -73,7 +77,7 @@ export default function PromptInput({
   );
   const resolvedRoute = useMemo(
     () => modelSettings.resolveRunRequestOptions({
-      model: model || undefined,
+      model: routeModel,
       reasoningEffort: reasoningEffort || undefined,
     }),
     [
@@ -86,6 +90,7 @@ export default function PromptInput({
       modelSettings.providerFallbackEnabled,
       modelSettings.resolveRunRequestOptions,
       reasoningEffort,
+      routeModel,
     ],
   );
 
@@ -133,7 +138,7 @@ export default function PromptInput({
     const trimmed = ta.value.trim();
     if (!trimmed || disabled || isStreaming || isStarting) return;
     const opts: SendOptions = {};
-    if (model) opts.model = model;
+    if (model || selectedAgentAlias) opts.model = model || selectedAgentAlias;
     if (reasoningEffort) opts.reasoningEffort = reasoningEffort;
     const accepted = await onSend(trimmed, selectedAgentId, opts.model || opts.reasoningEffort ? opts : undefined);
     if (accepted === false) return;
@@ -142,7 +147,7 @@ export default function PromptInput({
     setPromptLength(0);
     closeMention();
     clearDraft();
-  }, [disabled, isStreaming, isStarting, selectedAgentId, model, reasoningEffort, onSend, clearDraft, closeMention]);
+  }, [disabled, isStreaming, isStarting, selectedAgentId, model, selectedAgentAlias, reasoningEffort, onSend, clearDraft, closeMention]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (mentionHandleKeyDown(e)) return;
@@ -152,7 +157,6 @@ export default function PromptInput({
     }
   }, [handleSend, mentionHandleKeyDown]);
 
-  const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const placeholder = selectedAgent
     ? `${t('prompt.placeholder')} @${selectedAgent.name}...`
     : t('prompt.placeholder');
