@@ -221,9 +221,28 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 		return errcode.ErrBadRequest
 	}
 
-	_, err = s.requireMember(ctx, sessionID, currentUserID)
+	// #86: Only the group owner can add members, and members must be friends.
+	member, err := s.requireMember(ctx, sessionID, currentUserID)
 	if err != nil {
 		return err
+	}
+	if member.Role != model.MemberRoleOwner {
+		return errcode.GroupNotOwner
+	}
+
+	// Re-apply friend-boundary check: owner can only invite friends into the group.
+	friendIDs, err := repository.GetFriendIDs(s.db, currentUserID)
+	if err != nil {
+		return err
+	}
+	friendSet := make(map[string]bool)
+	for _, id := range friendIDs {
+		friendSet[id] = true
+	}
+	for _, mid := range memberIDs {
+		if !friendSet[mid] {
+			return errcode.ErrBadRequest
+		}
 	}
 
 	// Deduplicate member IDs to prevent duplicate key violations
