@@ -96,6 +96,7 @@ describe('AuthPage', () => {
 
   it('renders Hub URL input with default value', () => {
     renderAuthPage();
+    fireEvent.click(screen.getByText('高级设置'));
     const hubInput = screen.getByLabelText('auth.hubUrl');
     expect(hubInput).toBeInTheDocument();
     expect(hubInput).toHaveValue();
@@ -103,6 +104,7 @@ describe('AuthPage', () => {
 
   it('allows editing Hub URL', () => {
     renderAuthPage();
+    fireEvent.click(screen.getByText('高级设置'));
     const hubInput = screen.getByLabelText('auth.hubUrl') as HTMLInputElement;
     fireEvent.change(hubInput, { target: { value: 'http://hub.example.com:8080' } });
     expect(hubInput.value).toBe('http://hub.example.com:8080');
@@ -112,6 +114,7 @@ describe('AuthPage', () => {
 
   it('renders Hub connection status indicator', () => {
     renderAuthPage();
+    fireEvent.click(screen.getByText('高级设置'));
     expect(screen.getByText('auth.hubChecking')).toBeInTheDocument();
   });
 

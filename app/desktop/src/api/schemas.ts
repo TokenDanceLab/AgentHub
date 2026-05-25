@@ -8,6 +8,16 @@ export const HealthResponseSchema = z.object({
   status: z.string(),
   version: z.string(),
   edgeId: z.string(),
+  checks: z
+    .record(
+      z.string(),
+      z
+        .object({
+          status: z.string(),
+        })
+        .catchall(z.unknown()),
+    )
+    .optional(),
 });
 
 // ── Runner ──────────────────────────────────────
@@ -27,6 +37,9 @@ export const AgentCapabilitiesSchema = z.object({
   fileChanges: z.boolean(),
   thinkingVisible: z.boolean(),
   multiTurn: z.boolean(),
+  mcpIntegration: z.boolean(),
+  permissionHooks: z.boolean(),
+  subAgentSpawn: z.boolean(),
 });
 
 export const AgentInfoSchema = z.object({

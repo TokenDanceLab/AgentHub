@@ -1,7 +1,7 @@
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -13,40 +13,38 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-sm);
-  padding: var(--space-xl) var(--space-md);
-  margin: auto;
+  justify-content: flex-start;
+  padding: 120px var(--space-md) var(--space-xl);
+  margin: 0 auto;
   text-align: center;
-  max-width: 320px;
-  animation: fadeIn 0.4s var(--ease-out);
+  animation: fadeIn 0.5s var(--ease-out);
   user-select: none;
+  max-width: 560px;
 }
 
-.iconWrapper {
+.content {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: color-mix(in oklch, var(--primary) 12%, transparent);
-  color: var(--primary);
+  gap: var(--space-md);
 }
 
 .title {
   margin: 0;
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
+  font-size: 22px;
+  font-weight: 500;
   color: var(--foreground);
+  letter-spacing: -0.02em;
+  line-height: 1.3;
 }
 
 .description {
   margin: 0;
   font-size: var(--font-size-sm);
   color: var(--foreground);
-  opacity: 0.5;
+  opacity: 0.4;
   line-height: 1.5;
+  max-width: 420px;
 }
 
 .action {
@@ -74,16 +72,83 @@
   transform: scale(0.97);
 }
 
+/* ── Suggestion chips ─────────────────────── */
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: var(--space-sm);
+}
+
+.suggestionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.02);
+  color: var(--foreground);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.suggestionChip:hover {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(99,102,241,0.2);
+  transform: translateY(-1px);
+}
+
+.suggestionChip:active {
+  transform: scale(0.97);
+}
+
+.suggestionIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+}
+
+/* ── Dark mode ────────────────────────────── */
+
+[data-theme='dark'] .suggestionChip {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.06);
+}
+
+[data-theme='dark'] .suggestionChip:hover {
+  background: rgba(255,255,255,0.05);
+}
+
 /* ── Mobile ─────────────────────────────────── */
+
 @media (max-width: 767px) {
   .container {
-    padding: var(--space-lg) var(--space-sm);
-    max-width: 280px;
+    padding: 80px var(--space-sm) var(--space-lg);
+    max-width: 100%;
+  }
+
+  .title {
+    font-size: 20px;
   }
 
   .action {
     min-height: var(--touch-target-min, 44px);
     padding: 8px 20px;
     font-size: var(--font-size-base);
+  }
+
+  .suggestions {
+    gap: 6px;
+  }
+
+  .suggestionChip {
+    padding: 5px 10px;
+    font-size: 12px;
   }
 }

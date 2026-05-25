@@ -20,6 +20,7 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/log"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
@@ -113,6 +114,11 @@ func (a *App) Run(ctx context.Context) error {
 	log.Init(&a.Config.Server)
 	defer log.Sync()
 
+	// Initialize TokenDance ID JWKS URI for JWT validation.
+	if a.Config.TokenDanceID.JWKSURI != "" {
+		jwtutil.SetJWKSURI(a.Config.TokenDanceID.JWKSURI)
+	}
+
 	// Legacy: sync existing session seq numbers to Redis
 	go a.syncLegacySeqs()
 
@@ -166,10 +172,10 @@ func (a *App) Run(ctx context.Context) error {
 		Addr:              fmt.Sprintf(":%d", a.Config.Server.Port),
 		Handler:           r,
 		ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
-		ReadTimeout:       30 * time.Second,
+		ReadTimeout:       config.DefaultServerReadTimeout,
 		WriteTimeout:      config.DefaultServerWriteTimeout,
-		IdleTimeout:       120 * time.Second,
-		MaxHeaderBytes:    1 << 20,
+		IdleTimeout:       config.DefaultServerIdleTimeout,
+		MaxHeaderBytes:    config.DefaultMaxHeaderBytes,
 	}
 
 	go func() {
@@ -249,7 +255,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 func (a *App) setupRouter() *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	router.SetupRoutes(r, a.Config.JWT.Secret, a.CacheClient,
+	router.SetupRoutes(r, a.Config, a.Config.JWT.Secret, a.CacheClient,
 		a.AuthHandler, a.WebSocketHandler, a.DeviceHandler,
 		a.ContactHandler, a.SessionHandler, a.MessageHandler,
 		a.AgentHandler, a.CustomAgentHandler,
@@ -420,7 +426,7 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 // startTaskScheduler periodically scans for expired agent tasks and publishes timeout events.
 func (a *App) startTaskScheduler(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(1 * time.Minute)
+		ticker := time.NewTicker(config.PendingTaskScanInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			tasks, err := repository.ScanExpiredTasks(a.DB)
@@ -455,36 +461,24 @@ func (a *App) startWebSocketCleanup(ctx context.Context) {
 
 // startAdminServer starts the admin HTTP server with pprof and /metrics endpoints.
 func (a *App) startAdminServer() {
-	metrics.Register()
-
 	adminPort := a.Config.Server.AdminPort
-	if adminPort == 0 {
-		adminPort = 6060
-	}
-	adminMux := http.NewServeMux()
-	adminMux.HandleFunc("/debug/pprof/", pprof.Index)
-	adminMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	adminMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	adminMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	adminMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	adminMux.Handle("/metrics", promhttp.Handler())
 	pprofUser := os.Getenv("AGENTHUB_PPROF_USER")
 	pprofPass := os.Getenv("AGENTHUB_PPROF_PASS")
 	if pprofUser == "" || pprofPass == "" {
 		slog.Error("admin server not started: AGENTHUB_PPROF_USER and AGENTHUB_PPROF_PASS must both be set")
 		return
 	}
-	adminHandler := pprofBasicAuth(adminMux, pprofUser, pprofPass)
+	adminHandler := pprofBasicAuth(newAdminMux(), pprofUser, pprofPass)
 	a.AdminServer = &http.Server{
-		Addr:              fmt.Sprintf("127.0.0.1:%d", adminPort),
+		Addr:              adminListenAddr(adminPort),
 		Handler:           adminHandler,
 		ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
-		ReadTimeout:       30 * time.Second,
+		ReadTimeout:       config.DefaultServerReadTimeout,
 		WriteTimeout:      config.DefaultServerWriteTimeout,
-		IdleTimeout:       120 * time.Second,
+		IdleTimeout:       config.DefaultServerIdleTimeout,
 	}
 	go func() {
-		slog.Info("admin server starting", "port", adminPort)
+		slog.Info("admin server starting", "addr", a.AdminServer.Addr)
 		if err := a.AdminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("admin server failed", "error", err)
 		}
@@ -494,7 +488,7 @@ func (a *App) startAdminServer() {
 // startMetricsCollector periodically reports DB pool, WS connections, Redis hits, and bus queue length.
 func (a *App) startMetricsCollector(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(15 * time.Second)
+		ticker := time.NewTicker(config.MetricsCollectionInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			if sqlDB, err := a.DB.DB(); err == nil {
@@ -558,9 +552,20 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 	if err != nil || len(tasks) == 0 {
 		return
 	}
+	conn := a.mgr.FindByConnID(connID)
+	edgeDeviceID := ""
+	if conn != nil {
+		edgeDeviceID = conn.DeviceID
+	}
 	for _, taskJSON := range tasks {
 		var payload json.RawMessage
 		if json.Unmarshal([]byte(taskJSON), &payload) == nil {
+			var meta struct {
+				TaskID string `json:"task_id"`
+			}
+			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
+				_ = repository.UpdatePendingTaskDispatched(a.DB, meta.TaskID, edgeDeviceID)
+			}
 			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
 		}
 	}
@@ -601,6 +606,26 @@ func (a *App) broadcastOnlineStatus(ctx context.Context, userID string, online b
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+func newAdminMux() http.Handler {
+	metrics.Register()
+
+	adminMux := http.NewServeMux()
+	adminMux.HandleFunc("/debug/pprof/", pprof.Index)
+	adminMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	adminMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	adminMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	adminMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	adminMux.Handle("/metrics", promhttp.Handler())
+	return adminMux
+}
+
+func adminListenAddr(adminPort int) string {
+	if adminPort == 0 {
+		adminPort = 6060
+	}
+	return fmt.Sprintf("127.0.0.1:%d", adminPort)
+}
 
 func pprofBasicAuth(next http.Handler, user, pass string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

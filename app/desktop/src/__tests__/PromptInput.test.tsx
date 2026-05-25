@@ -11,14 +11,45 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+vi.mock('@/components/ModelDropdown', () => ({
+  default: ({
+    placeholder,
+    disabled,
+    ariaLabel,
+    onChange,
+  }: {
+    placeholder?: string;
+    disabled?: boolean;
+    ariaLabel?: string;
+    onChange?: (value: string) => void;
+  }) => (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-label={ariaLabel}
+      onClick={() => {
+        if (placeholder === 'prompt.model') onChange?.('claude-opus-4-7');
+        if (placeholder === 'prompt.reasoning') onChange?.('max');
+      }}
+    >
+      {placeholder}
+    </button>
+  ),
+}));
+
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import PromptInput from '@/components/PromptInput';
+import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import type { AgentInfo } from '@shared/types';
 
 // jsdom does not implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();
+
+function typeInPrompt(input: HTMLElement, value: string) {
+  fireEvent.input(input, { target: { value } });
+}
 
 function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
   return {
@@ -31,12 +62,20 @@ function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
       fileChanges: false,
       thinkingVisible: false,
       multiTurn: false,
+      mcpIntegration: false,
+      permissionHooks: false,
+      subAgentSpawn: false,
     },
     ...overrides,
   };
 }
 
 describe('PromptInput', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useModelSettingsStore.getState().reset();
+  });
+
   it('renders input field with placeholder', () => {
     render(
       <PromptInput
@@ -46,7 +85,7 @@ describe('PromptInput', () => {
         onSend={vi.fn()}
       />,
     );
-    const input = screen.getByPlaceholderText('prompt.placeholder');
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
     expect(input).toBeInTheDocument();
   });
 
@@ -61,8 +100,8 @@ describe('PromptInput', () => {
       />,
     );
 
-    const input = screen.getByPlaceholderText('prompt.placeholder');
-    fireEvent.change(input, { target: { value: 'Hello world' } });
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Hello world');
 
     const sendBtn = screen.getByRole('button', { name: 'action.startRun' });
     fireEvent.click(sendBtn);
@@ -83,7 +122,7 @@ describe('PromptInput', () => {
     );
 
     const input = screen.getByPlaceholderText('prompt.placeholder');
-    fireEvent.change(input, { target: { value: 'Test message' } });
+    typeInPrompt(input, 'Test message');
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
 
     expect(onSend).toHaveBeenCalledTimes(1);
@@ -124,7 +163,7 @@ describe('PromptInput', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it('clears input after sending', () => {
+  it('clears input after sending', async () => {
     const onSend = vi.fn();
     render(
       <PromptInput
@@ -136,11 +175,45 @@ describe('PromptInput', () => {
     );
 
     const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'Clear me' } });
+    typeInPrompt(input, 'Clear me');
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
 
     expect(onSend).toHaveBeenCalled();
-    expect(input.value).toBe('');
+    await waitFor(() => expect(input.value).toBe(''));
+  });
+
+  it('keeps input when onSend rejects the send', async () => {
+    const onSend = vi.fn().mockResolvedValue(false);
+    render(
+      <PromptInput
+        agents={[]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={onSend}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLTextAreaElement;
+    typeInPrompt(input, 'Keep me');
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
+
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+    expect(input.value).toBe('Keep me');
+  });
+
+  it('disables composing controls while a run is starting', () => {
+    render(
+      <PromptInput
+        agents={[]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={vi.fn()}
+        isStarting
+      />,
+    );
+
+    expect(screen.getByPlaceholderText('prompt.placeholder')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'prompt.starting' })).toBeDisabled();
   });
 
   it('opens mention popover when @ is typed in textarea', () => {
@@ -322,11 +395,53 @@ describe('PromptInput', () => {
       <PromptInput agents={agents} selectedAgentId="a1" onSelectAgent={vi.fn()} onSend={onSend} />,
     );
 
-    const input = screen.getByPlaceholderText('prompt.placeholder');
-    fireEvent.change(input, { target: { value: 'Do something' } });
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Do something');
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
 
     expect(onSend).toHaveBeenCalledWith('Do something', 'a1', undefined);
+  });
+
+  it('shows the selected Codex profile route when no model is manually selected', () => {
+    const agents = [makeAgent({ id: 'codex', name: 'Codex Runtime' })];
+    render(
+      <PromptInput agents={agents} selectedAgentId="codex" onSelectAgent={vi.fn()} onSend={vi.fn()} />,
+    );
+
+    const route = screen.getByLabelText('prompt.routePreview');
+    expect(within(route).getByText('anthropic')).toBeInTheDocument();
+    expect(within(route).getByText('claude-sonnet-4-6')).toBeInTheDocument();
+    expect(within(route).getByText('high')).toBeInTheDocument();
+    expect(within(route).getByText('sonnet')).toBeInTheDocument();
+  });
+
+  it('sends the selected Codex profile alias when no model is manually selected', () => {
+    const onSend = vi.fn();
+    const agents = [makeAgent({ id: 'codex', name: 'Codex Runtime' })];
+    render(
+      <PromptInput agents={agents} selectedAgentId="codex" onSelectAgent={vi.fn()} onSend={onSend} />,
+    );
+
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Route through Codex');
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
+
+    expect(onSend).toHaveBeenCalledWith('Route through Codex', 'codex', { model: 'sonnet' });
+  });
+
+  it('lets a manually selected model override the selected agent profile alias', () => {
+    const onSend = vi.fn();
+    const agents = [makeAgent({ id: 'codex', name: 'Codex Runtime' })];
+    render(
+      <PromptInput agents={agents} selectedAgentId="codex" onSelectAgent={vi.fn()} onSend={onSend} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.model' }));
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Use manual model');
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
+
+    expect(onSend).toHaveBeenCalledWith('Use manual model', 'codex', { model: 'claude-opus-4-7' });
   });
 
   it('disables send button when input is empty', () => {
@@ -353,10 +468,30 @@ describe('PromptInput', () => {
       />,
     );
 
-    const input = screen.getByPlaceholderText('prompt.placeholder');
-    fireEvent.change(input, { target: { value: 'Hi' } });
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Hi');
 
     const sendBtn = screen.getByRole('button', { name: 'action.startRun' });
     expect(sendBtn).not.toBeDisabled();
+  });
+
+  it('shows the resolved model route from persisted settings', () => {
+    useModelSettingsStore.getState().setDefaultModel('gpt-5.5');
+    useModelSettingsStore.getState().setDefaultProvider('openai');
+    useModelSettingsStore.getState().setReasoningEffort('max');
+
+    render(
+      <PromptInput
+        agents={[]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={vi.fn()}
+      />,
+    );
+
+    const route = screen.getByLabelText('prompt.routePreview');
+    expect(within(route).getByText('openai')).toBeInTheDocument();
+    expect(within(route).getByText('gpt-5.5')).toBeInTheDocument();
+    expect(within(route).getByText('max')).toBeInTheDocument();
   });
 });
