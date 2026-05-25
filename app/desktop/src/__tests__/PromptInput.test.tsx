@@ -37,6 +37,13 @@ vi.mock('@/components/ModelDropdown', () => ({
   ),
 }));
 
+vi.mock('@lobehub/icons', () => ({
+  Claude: ({ size = 18 }: { size?: number }) => <svg data-testid="claude-icon" width={size} height={size} />,
+  ClaudeCode: ({ size = 18 }: { size?: number }) => <svg data-testid="claude-code-icon" width={size} height={size} />,
+  Codex: ({ size = 18 }: { size?: number }) => <svg data-testid="codex-icon" width={size} height={size} />,
+  OpenCode: ({ size = 18 }: { size?: number }) => <svg data-testid="opencode-icon" width={size} height={size} />,
+}));
+
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -410,8 +417,9 @@ describe('PromptInput', () => {
 
     const route = screen.getByLabelText('prompt.routePreview');
     expect(within(route).getByText('anthropic')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'prompt.model' })).toHaveTextContent('claude-sonnet-4-6');
-    expect(screen.getByRole('button', { name: 'prompt.reasoning' })).toHaveTextContent('high');
+    const picker = screen.getByRole('button', { name: 'prompt.modelReasoning' });
+    expect(picker).toHaveTextContent('Claude 4.6 Sonnet');
+    expect(picker).toHaveTextContent('prompt.reasoning.high');
   });
 
   it('sends the selected Codex profile alias when no model is manually selected', () => {
@@ -435,7 +443,8 @@ describe('PromptInput', () => {
       <PromptInput agents={agents} selectedAgentId="codex" onSelectAgent={vi.fn()} onSend={onSend} />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'prompt.model' }));
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.modelReasoning' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Claude 4.7 Opusanthropic' }));
     const input = screen.getByPlaceholderText(/prompt\.placeholder/);
     typeInPrompt(input, 'Use manual model');
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
@@ -490,7 +499,8 @@ describe('PromptInput', () => {
 
     const route = screen.getByLabelText('prompt.routePreview');
     expect(within(route).getByText('openai')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'prompt.model' })).toHaveTextContent('gpt-5.5');
-    expect(screen.getByRole('button', { name: 'prompt.reasoning' })).toHaveTextContent('max');
+    const picker = screen.getByRole('button', { name: 'prompt.modelReasoning' });
+    expect(picker).toHaveTextContent('gpt-5.5');
+    expect(picker).toHaveTextContent('prompt.reasoning.max');
   });
 });
