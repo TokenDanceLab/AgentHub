@@ -11,7 +11,7 @@
 - `edge-server/internal/api/`
 - `edge-server/internal/lifecycle/`
 - `docs/roadmaps/client.md`
-- `docs/roadmaps/branches/feat-client-run-lifecycle-maintainer.md`
+- `docs/archive/branches/feat-client-run-lifecycle-maintainer.md`
 
 ## 已完成
 

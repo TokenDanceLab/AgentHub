@@ -11,7 +11,7 @@
 - `scripts/client-smoke.ps1`
 - `docs/roadmap.md`
 - `docs/roadmaps/client.md`
-- `docs/roadmaps/branches/feat-client-smoke-runner-context-maintainer.md`
+- `docs/archive/branches/feat-client-smoke-runner-context-maintainer.md`
 
 ## 已完成
 

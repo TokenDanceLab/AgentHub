@@ -11,7 +11,7 @@
 - `edge-server/internal/lifecycle/`
 - `docs/roadmap.md`
 - `docs/roadmaps/client.md`
-- `docs/roadmaps/branches/feat-client-runner-edge-smoke-maintainer.md`
+- `docs/archive/branches/feat-client-runner-edge-smoke-maintainer.md`
 
 ## 已完成
 

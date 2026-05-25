@@ -12,7 +12,7 @@
 - `edge-server/cmd/agenthub-edge/`
 - `docs/roadmap.md`
 - `docs/roadmaps/client.md`
-- `docs/roadmaps/branches/feat-client-runner-adapter-profile-maintainer.md`
+- `docs/archive/branches/feat-client-runner-adapter-profile-maintainer.md`
 
 ## 已完成
 

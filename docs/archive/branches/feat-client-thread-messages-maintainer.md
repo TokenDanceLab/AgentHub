@@ -15,7 +15,7 @@
 - `api/openapi.yaml`
 - `docs/roadmap.md`
 - `docs/roadmaps/client.md`
-- `docs/roadmaps/branches/feat-client-thread-messages-maintainer.md`
+- `docs/archive/branches/feat-client-thread-messages-maintainer.md`
 
 ## 已完成
 

@@ -11,7 +11,7 @@
 - `edge-server/internal/store/`
 - `docs/roadmap.md`
 - `docs/roadmaps/client.md`
-- `docs/roadmaps/branches/feat-client-store-persistence-maintainer.md`
+- `docs/archive/branches/feat-client-store-persistence-maintainer.md`
 
 ## 已完成
 
