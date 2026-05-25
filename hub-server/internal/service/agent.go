@@ -262,7 +262,9 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	if err == nil && connID != "" && s.mgr != nil {
 		conn := s.mgr.FindByConnID(connID)
 		if conn == nil {
-			_ = cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload))
+			if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
+				slog.Error("failed to push agent task to offline queue (conn nil)", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+			}
 			return
 		}
 		frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
@@ -272,7 +274,9 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	}
 
 	// offline: push to Redis pending queue
-	_ = cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload))
+	if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
+		slog.Error("failed to push agent task to offline queue", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+	}
 }
 
 // CancelTask cancels a pending task by its ID.
@@ -354,7 +358,8 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDevice
 		}
 		return nil
 	}
-	if task.Status != model.TaskStatusDispatched {
+	// #99: accept queued tasks for offline-replayed tasks, transitioning to dispatched
+	if task.Status != model.TaskStatusDispatched && task.Status != model.TaskStatusQueued {
 		return errcode.ErrBadRequest
 	}
 	rowsAffected, err := repository.UpdatePendingTaskStatusAtomicWithEdgeRunID(s.db, taskID, model.TaskStatusDispatched, model.TaskStatusRunning, "", edgeRunID)
@@ -368,7 +373,7 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDevice
 }
 
 // HandleTaskStream inserts an agent message into the session (streaming chunk).
-func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, payload string) error {
+func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, payload, clientMsgID string) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -385,10 +390,21 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 		return err
 	}
 
+	// #130: idempotent stream-to-message — skip if a message with this client_msg_id already exists
+	if clientMsgID != "" {
+		existing, _ := repository.GetMessageByClientMsgID(s.db, ai.SessionID, clientMsgID)
+		if existing != nil {
+			return nil // already persisted, idempotent
+		}
+	}
+
 	// ensure status is running
 	if task.Status != model.TaskStatusRunning {
 		_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusRunning, "")
 	}
+
+	// #132: bump expire_at to keep running task alive while activity continues
+	_ = repository.BumpRunningTaskExpireAt(s.db, taskID, config.RunningTaskHeartbeatTTL)
 
 	msg := &model.Message{
 		SessionID:   "", // will be set from agent instance
@@ -397,6 +413,10 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 		ClientMsgID: uuidv7.Must(),
 		ContentType: model.ContentTypeText,
 		Content:     payload,
+	}
+	// #130: use caller-provided client_msg_id when available for dedup
+	if clientMsgID != "" {
+		msg.ClientMsgID = clientMsgID
 	}
 	msg.SessionID = ai.SessionID
 
@@ -413,6 +433,9 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 		return err
 	}
 
+	// #154: update session last_message_at when agent stream creates a message
+	_ = repository.TouchSessionLastMessage(s.db, ai.SessionID)
+
 	s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
 
 	return nil
@@ -427,8 +450,8 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDevic
 		}
 		return err
 	}
-	if task.Status == model.TaskStatusDone || task.Status == model.TaskStatusFailed ||
-		task.Status == model.TaskStatusCancelled || task.Status == model.TaskStatusTimeout {
+	// #109: only accept done callbacks for running or dispatched tasks
+	if task.Status != model.TaskStatusRunning && task.Status != model.TaskStatusDispatched {
 		return errcode.ErrBadRequest
 	}
 
@@ -459,6 +482,8 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDevic
 		if err != nil {
 			return err
 		}
+		// #154: update session last_message_at when agent done creates a message
+		_ = repository.TouchSessionLastMessage(s.db, ai.SessionID)
 		s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
 	}
 
@@ -482,8 +507,8 @@ func (s *AgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeDevic
 		}
 		return err
 	}
-	if task.Status == model.TaskStatusDone || task.Status == model.TaskStatusFailed ||
-		task.Status == model.TaskStatusCancelled || task.Status == model.TaskStatusTimeout {
+	// #109: only accept fail callbacks for running or dispatched tasks
+	if task.Status != model.TaskStatusRunning && task.Status != model.TaskStatusDispatched {
 		return errcode.ErrBadRequest
 	}
 
