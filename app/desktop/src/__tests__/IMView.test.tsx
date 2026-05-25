@@ -6,6 +6,16 @@ import IMView from '@/views/IMView';
 // jsdom does not implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();
 
+const {
+  mockAddContact,
+  mockCreatePrivateSession,
+  mockCreateGroupSession,
+} = vi.hoisted(() => ({
+  mockAddContact: vi.fn(async () => ({ ok: true })),
+  mockCreatePrivateSession: vi.fn(async () => ({ ok: true })),
+  mockCreateGroupSession: vi.fn(async () => ({ ok: true })),
+}));
+
 // Mock useIMChat
 vi.mock('@/hooks/useIMChat', () => ({
   useIMChat: vi.fn(() => ({
@@ -14,10 +24,18 @@ vi.mock('@/hooks/useIMChat', () => ({
       { id: 'c1', name: 'Alice', type: 'user' as const, online: true },
       { id: 'c2', name: 'Bob', type: 'user' as const, online: false },
     ],
+    hubContacts: [
+      { user_id: 'user-b', username: 'alice', nickname: 'Alice', online: true, type: 'friend' },
+      { user_id: 'user-c', username: 'bob', nickname: 'Bob', online: false, type: 'friend' },
+    ],
     sendMessage: vi.fn(),
     getSessionMessages: vi.fn(() => []),
+    loadSessionMessages: vi.fn(),
     upsertContact: vi.fn(),
     removeContact: vi.fn(),
+    addContact: mockAddContact,
+    createPrivateSession: mockCreatePrivateSession,
+    createGroupSession: mockCreateGroupSession,
     searchContacts: vi.fn((q: string) =>
       q
         ? [{ id: 'c1', name: 'Alice', type: 'user' as const, online: true }]
@@ -79,8 +97,35 @@ describe('IMView', () => {
     expect(screen.getByPlaceholderText('Search contacts...')).toBeInTheDocument();
   });
 
-  it('renders add contact button', () => {
+  it('exposes Hub-backed compose actions instead of local-only fake contacts', () => {
     render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open Hub compose' }));
+
     expect(screen.getByRole('button', { name: 'Add contact' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create direct chat' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create group chat' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Hub user ID')).toBeInTheDocument();
+  });
+
+  it('creates private chat through useIMChat action', async () => {
+    render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open Hub compose' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create direct chat' }));
+    fireEvent.change(screen.getByLabelText('Hub user ID'), { target: { value: 'user-b' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(mockCreatePrivateSession).toHaveBeenCalledWith('user-b');
+  });
+
+  it('creates group chat through useIMChat action', async () => {
+    render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open Hub compose' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create group chat' }));
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Build Room' } });
+    fireEvent.click(screen.getByLabelText('Alice'));
+    fireEvent.click(screen.getByLabelText('Bob'));
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(mockCreateGroupSession).toHaveBeenCalledWith('Build Room', ['user-b', 'user-c']);
   });
 });
