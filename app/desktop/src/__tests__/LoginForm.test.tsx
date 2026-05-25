@@ -9,10 +9,12 @@ vi.mock('react-i18next', () => ({
 }));
 
 const mockLogin = vi.fn();
+const mockLoginWithTokenDance = vi.fn();
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     login: mockLogin,
+    loginWithTokenDance: mockLoginWithTokenDance,
     user: null,
     token: null,
     refreshToken: null,
@@ -41,11 +43,18 @@ describe('LoginForm', () => {
     );
   }
 
+  function openDeveloperLogin() {
+    fireEvent.click(screen.getByText('auth.devLogin'));
+  }
+
   // ── Render ────────────────────────────────────────
 
   it('renders all form fields', () => {
     renderForm();
 
+    expect(screen.getByText('auth.tokenDanceLogin')).toBeInTheDocument();
+    expect(screen.queryByLabelText('auth.username')).not.toBeInTheDocument();
+    openDeveloperLogin();
     expect(screen.getByLabelText('auth.username')).toBeInTheDocument();
     expect(screen.getByLabelText('auth.password')).toBeInTheDocument();
     expect(screen.getByText('auth.loginButton')).toBeInTheDocument();
@@ -54,15 +63,44 @@ describe('LoginForm', () => {
 
   it('renders placeholders', () => {
     renderForm();
+    openDeveloperLogin();
 
     expect(screen.getByPlaceholderText('auth.usernamePlaceholder')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('auth.passwordPlaceholder')).toBeInTheDocument();
+  });
+
+  it('shows a neutral pending notice when TokenDance desktop callback is not connected', async () => {
+    mockLoginWithTokenDance.mockRejectedValueOnce(
+      new Error('TokenDance ID desktop callback is not connected yet.'),
+    );
+    renderForm();
+
+    fireEvent.click(screen.getByText('auth.tokenDanceLogin'));
+
+    await waitFor(() => {
+      expect(screen.getByText('auth.tokenDanceCallbackPending')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  it('shows a pending notice after opening the TokenDance login shell', async () => {
+    mockLoginWithTokenDance.mockResolvedValueOnce(undefined);
+    renderForm();
+
+    fireEvent.click(screen.getByText('auth.tokenDanceLogin'));
+
+    await waitFor(() => {
+      expect(mockLoginWithTokenDance).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('auth.tokenDanceCallbackPending')).toBeInTheDocument();
+    });
   });
 
   // ── Validation ────────────────────────────────────
 
   it('shows required errors for empty fields on submit', () => {
     renderForm();
+    openDeveloperLogin();
     fireEvent.click(screen.getByText('auth.loginButton'));
 
     const requiredErrors = screen.getAllByText('auth.error.required');
@@ -72,6 +110,7 @@ describe('LoginForm', () => {
 
   it('shows username min length error', () => {
     renderForm();
+    openDeveloperLogin();
 
     fireEvent.change(screen.getByLabelText('auth.username'), { target: { value: 'ab' } });
     fireEvent.change(screen.getByLabelText('auth.password'), { target: { value: '12345678' } });
@@ -82,6 +121,7 @@ describe('LoginForm', () => {
 
   it('shows password min length error', () => {
     renderForm();
+    openDeveloperLogin();
 
     fireEvent.change(screen.getByLabelText('auth.username'), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText('auth.password'), { target: { value: '1234567' } });
@@ -95,6 +135,7 @@ describe('LoginForm', () => {
   it('calls login with trimmed credentials on valid submit', async () => {
     mockLogin.mockResolvedValueOnce(undefined);
     renderForm();
+    openDeveloperLogin();
 
     fireEvent.change(screen.getByLabelText('auth.username'), { target: { value: '  testuser  ' } });
     fireEvent.change(screen.getByLabelText('auth.password'), { target: { value: '12345678' } });
@@ -112,6 +153,7 @@ describe('LoginForm', () => {
     // that login was called with correct credentials.
     mockLogin.mockResolvedValueOnce(undefined);
     renderForm();
+    openDeveloperLogin();
 
     fireEvent.change(screen.getByLabelText('auth.username'), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText('auth.password'), { target: { value: '12345678' } });
@@ -129,6 +171,7 @@ describe('LoginForm', () => {
   it('displays invalid credentials error on 401', async () => {
     mockLogin.mockRejectedValueOnce(new Error('401 Unauthorized: invalid credentials'));
     renderForm();
+    openDeveloperLogin();
 
     fireEvent.change(screen.getByLabelText('auth.username'), { target: { value: 'baduser' } });
     fireEvent.change(screen.getByLabelText('auth.password'), { target: { value: 'wrongpass' } });
@@ -142,6 +185,7 @@ describe('LoginForm', () => {
   it('displays network error for fetch failure', async () => {
     mockLogin.mockRejectedValueOnce(new Error('fetch failed'));
     renderForm();
+    openDeveloperLogin();
 
     fireEvent.change(screen.getByLabelText('auth.username'), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText('auth.password'), { target: { value: '12345678' } });
@@ -156,6 +200,7 @@ describe('LoginForm', () => {
 
   it('calls onSwitchToRegister when link is clicked', () => {
     renderForm();
+    openDeveloperLogin();
     fireEvent.click(screen.getByText('auth.switchToRegister'));
     expect(onSwitchToRegister).toHaveBeenCalledTimes(1);
   });
@@ -164,6 +209,7 @@ describe('LoginForm', () => {
 
   it('toggles password visibility', () => {
     renderForm();
+    openDeveloperLogin();
 
     const passwordInput = screen.getByLabelText('auth.password');
     expect(passwordInput).toHaveAttribute('type', 'password');
@@ -180,6 +226,7 @@ describe('LoginForm', () => {
   it('disables inputs and shows spinner during submit', async () => {
     mockLogin.mockImplementationOnce(() => new Promise(() => {}));
     renderForm();
+    openDeveloperLogin();
 
     fireEvent.change(screen.getByLabelText('auth.username'), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText('auth.password'), { target: { value: '12345678' } });
@@ -193,6 +240,7 @@ describe('LoginForm', () => {
   it('disables submit button during submit', async () => {
     mockLogin.mockImplementationOnce(() => new Promise(() => {}));
     renderForm();
+    openDeveloperLogin();
 
     fireEvent.change(screen.getByLabelText('auth.username'), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText('auth.password'), { target: { value: '12345678' } });
@@ -208,6 +256,7 @@ describe('LoginForm', () => {
 
   it('clears field error when user types', () => {
     renderForm();
+    openDeveloperLogin();
     fireEvent.click(screen.getByText('auth.loginButton'));
     const initialErrors = screen.getAllByText('auth.error.required');
     expect(initialErrors.length).toBeGreaterThanOrEqual(1);
@@ -221,6 +270,7 @@ describe('LoginForm', () => {
   it('clears server error when user types', async () => {
     mockLogin.mockRejectedValueOnce(new Error('fetch failed'));
     renderForm();
+    openDeveloperLogin();
 
     fireEvent.change(screen.getByLabelText('auth.username'), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText('auth.password'), { target: { value: '12345678' } });
@@ -239,6 +289,7 @@ describe('LoginForm', () => {
   it('submits on Enter key', async () => {
     mockLogin.mockResolvedValueOnce(undefined);
     renderForm();
+    openDeveloperLogin();
 
     fireEvent.change(screen.getByLabelText('auth.username'), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText('auth.password'), { target: { value: '12345678' } });

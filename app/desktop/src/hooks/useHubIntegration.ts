@@ -18,6 +18,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import type { HubWSHandle } from '@/api/hubWS';
 import type { HubClient } from '@/api/hubClient';
 import { createEventStream, type StreamHandle } from '@/api/eventClient';
+import { edgeAuthHeaders } from '@/api/edgeAuth';
 import type { EventEnvelope } from '@shared/events';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import {
@@ -103,7 +104,7 @@ export function useHubIntegration(
         case 'run.agent.text_delta': {
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
-            hubClient.streamTask(taskId, content).catch(() => {});
+            hubClient.streamTask(taskId, content, runId).catch(() => {});
           }
           break;
         }
@@ -111,7 +112,7 @@ export function useHubIntegration(
         case 'run.agent.text_block': {
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
-            hubClient.streamTask(taskId, content).catch(() => {});
+            hubClient.streamTask(taskId, content, runId).catch(() => {});
           }
           break;
         }
@@ -119,7 +120,7 @@ export function useHubIntegration(
         case 'run.agent.thinking': {
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
-            hubClient.streamTask(taskId, content).catch(() => {});
+            hubClient.streamTask(taskId, content, runId).catch(() => {});
           }
           break;
         }
@@ -129,7 +130,7 @@ export function useHubIntegration(
         case 'run.agent.file_change':
           // Forward tool metadata for chat visibility
           hubClient
-            .streamTask(taskId, JSON.stringify(payload))
+            .streamTask(taskId, JSON.stringify(payload), runId)
             .catch(() => {});
           break;
 
@@ -140,7 +141,7 @@ export function useHubIntegration(
               typeof payload.content === 'string'
                 ? payload.content
                 : JSON.stringify(payload);
-            hubClient.doneTask(taskId, output).catch(() => {});
+            hubClient.doneTask(taskId, output, runId).catch(() => {});
             store.getState().updateTask(taskId, {
               status: 'done',
             });
@@ -149,7 +150,7 @@ export function useHubIntegration(
               typeof payload.error === 'string'
                 ? payload.error
                 : 'Agent reported failure';
-            hubClient.failTask(taskId, error).catch(() => {});
+            hubClient.failTask(taskId, error, runId).catch(() => {});
             store.getState().updateTask(taskId, {
               status: 'failed',
               error,
@@ -165,7 +166,7 @@ export function useHubIntegration(
             typeof payload.error === 'string'
               ? payload.error
               : 'Run lifecycle failure';
-          hubClient.failTask(taskId, error).catch(() => {});
+          hubClient.failTask(taskId, error, runId).catch(() => {});
           store.getState().updateTask(taskId, {
             status: 'failed',
             error,
@@ -175,7 +176,7 @@ export function useHubIntegration(
         }
 
         case 'run.cancelled': {
-          hubClient.failTask(taskId, 'Run cancelled').catch(() => {});
+          hubClient.failTask(taskId, 'Run cancelled', runId).catch(() => {});
           store.getState().updateTask(taskId, {
             status: 'failed',
             error: 'Run cancelled',
@@ -231,7 +232,7 @@ export function useHubIntegration(
       try {
         const runResp = await fetch(`${edgeBaseUrl}/v1/runs`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             threadId: threadId || 'hub-dispatch',
             prompt: prompt || undefined,
@@ -285,6 +286,7 @@ export function useHubIntegration(
       try {
         await fetch(`${edgeBaseUrl}/v1/runs/${encodeURIComponent(runId)}:cancel`, {
           method: 'POST',
+          headers: edgeAuthHeaders(),
         });
         store.getState().updateTask(taskId, {
           status: 'failed',

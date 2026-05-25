@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -27,11 +28,12 @@ import (
 )
 
 var (
-	ts     *httptest.Server
-	client *http.Client
-	mgr    *ws.Manager
-	bus    *service.Bus
-	db     *gorm.DB // hold reference for cleanDB
+	ts              *httptest.Server
+	client          *http.Client
+	mgr             *ws.Manager
+	bus             *service.Bus
+	db              *gorm.DB // hold reference for cleanDB
+	testCacheClient *cache.Client
 )
 
 func TestMain(m *testing.M) {
@@ -62,6 +64,7 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("failed to init redis: %v", err))
 	}
 	cacheClient := cache.NewClient(rdb)
+	testCacheClient = cacheClient
 
 	mgr = ws.NewManager()
 	mgr.StartHeartbeat()
@@ -96,6 +99,9 @@ func TestMain(m *testing.M) {
 	client = ts.Client()
 
 	cleanDBTables(db)
+	if err := clearRateLimitKeys(); err != nil {
+		panic(fmt.Sprintf("failed to clear test rate limits: %v", err))
+	}
 
 	os.Exit(m.Run())
 }
@@ -105,9 +111,13 @@ func TestMain(m *testing.M) {
 func CleanDB(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	cleanDBTables(db)
+	if err := clearRateLimitKeys(); err != nil {
+		t.Fatalf("clear test rate limits: %v", err)
+	}
 }
 
 func cleanDBTables(database *gorm.DB) {
+	database.Exec("DELETE FROM message_attachments")
 	database.Exec("DELETE FROM message_pins")
 	database.Exec("DELETE FROM message_reads")
 	database.Exec("DELETE FROM pending_agent_tasks")
@@ -123,6 +133,25 @@ func cleanDBTables(database *gorm.DB) {
 	database.Exec("DELETE FROM refresh_tokens")
 	database.Exec("DELETE FROM devices")
 	database.Exec("DELETE FROM users")
+}
+
+func clearRateLimitKeys() error {
+	if testCacheClient == nil {
+		return nil
+	}
+	ctx := context.Background()
+	var keys []string
+	for _, pattern := range []string{"rate_limit:*", "ratelimit:*"} {
+		matched, err := testCacheClient.GetRDB().Keys(ctx, pattern).Result()
+		if err != nil {
+			return err
+		}
+		keys = append(keys, matched...)
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	return testCacheClient.GetRDB().Del(ctx, keys...).Err()
 }
 
 func post(path string, body interface{}) *http.Response {
@@ -211,7 +240,7 @@ func loginAndGetUser(t *testing.T, username, password string) testUser {
 	t.Helper()
 	w := post("/client/auth/login", map[string]interface{}{
 		"username": username, "password": password,
-		"device_type": "web", "device_id": "dddddddd-dddd-dddd-dddd-dddddddddd01",
+		"device_type": "web", "device_id": testDeviceID(username, "web"),
 	})
 	r := parse(w)
 	if r.Code != "OK" {
@@ -226,6 +255,15 @@ func loginAndGetUser(t *testing.T, username, password string) testUser {
 	}
 	id := extract(r.Data, "id")
 	return testUser{Username: username, Password: password, Token: tok, ID: id}
+}
+
+func testDeviceID(username, deviceType string) string {
+	h := uint64(1469598103934665603)
+	for _, b := range []byte(username + ":" + deviceType) {
+		h ^= uint64(b)
+		h *= 1099511628211
+	}
+	return fmt.Sprintf("dddddddd-dddd-4ddd-8ddd-%012x", h&0xffffffffffff)
 }
 
 func mustOK(t *testing.T, r apiResp, msg string) {

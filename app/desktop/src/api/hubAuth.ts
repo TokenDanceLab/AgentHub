@@ -1,29 +1,29 @@
 // JWT token management for Hub Server authentication.
-// Supports two auth methods:
-// 1. TokenDance ID OIDC PKCE (primary) — opens browser, receives callback, gets RS256 JWT
-// 2. Hub username/password (legacy fallback) — calls /client/auth/login
+// Access tokens stay in memory; refresh tokens use the desktop keyring bridge.
 
 import type { UserProfile } from './hubClient';
 import { createHubClient } from './hubClient';
 import type { HubClient } from './hubClient';
-import { getOrCreateDeviceId } from './deviceId';
+import { open as openShellUrl } from '@tauri-apps/plugin-shell';
+import { TOKENDANCE_LOGIN_URL } from '@/config';
+import { clearStoredHubRefreshToken, loadStoredHubRefreshToken, saveStoredHubRefreshToken } from './hubTokenStorage';
 import { useHubStore } from '@/stores/hubStore';
 
 const TOKEN_KEY = 'agenthub_hub_token';
-const REFRESH_KEY = 'agenthub_hub_refresh';
-const TOKEN_SOURCE_KEY = 'agenthub_token_source'; // "tokendance" | "hub"
+const USER_KEY = 'agenthub_hub_user';
 
-// TokenDance ID endpoints — configurable for local dev.
-const TD_AUTHORIZE_URL = 'https://id.vectorcontrol.tech/oidc/authorize';
-const TD_TOKEN_URL = 'https://id.vectorcontrol.tech/oidc/token';
-const TD_CLIENT_ID = 'c_agenthub_desktop'; // Registered OAuth client at TokenDance ID
+export type AuthStatus = 'checking' | 'anonymous' | 'local' | 'authenticated' | 'tokenDancePending' | 'error';
+export type CloudLockedReason = 'not_signed_in' | 'hub_unreachable' | 'tokenDance_pending' | 'none';
+type TokenSource = 'hub' | 'tokendance' | null;
 
 export interface HubAuthState {
   token: string | null;
   refreshToken: string | null;
   user: UserProfile | null;
   isAuthenticated: boolean;
-  tokenSource: 'tokendance' | 'hub' | null;
+  authStatus: AuthStatus;
+  cloudLockedReason: CloudLockedReason;
+  tokenSource: TokenSource;
 }
 
 export interface HubAuth {
@@ -31,120 +31,60 @@ export interface HubAuth {
   subscribe: (fn: (state: HubAuthState) => void) => () => void;
   login: (username: string, password: string) => Promise<void>;
   loginWithTokenDance: () => Promise<void>;
+  continueLocalMode: () => void;
   logout: () => Promise<void>;
   tryAutoLogin: () => Promise<boolean>;
 }
 
-// ── PKCE helpers ──────────────────────────────────────
-
-function generateCodeVerifier(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return base64UrlEncode(bytes);
+function getStableDeviceId(): string {
+  if (typeof localStorage === 'undefined') return makeId('desktop');
+  const stored = localStorage.getItem('agenthub_device_id');
+  if (stored) return stored;
+  const next = makeId('desktop');
+  localStorage.setItem('agenthub_device_id', next);
+  return next;
 }
 
-function base64UrlEncode(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+function makeId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
   }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-async function computeCodeChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(verifier));
-  return base64UrlEncode(new Uint8Array(digest));
-}
-
-// ── Local callback server ─────────────────────────────
-
-interface CallbackResult {
-  code: string;
-  state: string;
-}
-
-function startCallbackServer(expectedState: string): Promise<CallbackResult> {
-  return new Promise((resolve, reject) => {
-    // Use a random port between 18000-18999
-    const port = 18000 + Math.floor(Math.random() * 1000);
-
-    // Tauri: use the shell plugin to open the browser, then listen on a local TCP-like server.
-    // For now, use a simple approach: open the URL and poll.
-    // In a real Tauri app, use tauri-plugin-shell to handle deep links.
-    const timeout = setTimeout(() => reject(new Error('Login timed out — no callback received within 5 minutes')), 5 * 60_000);
-
-    // Register a temporary route handler via the browser's fetch API or
-    // a minimal local server. Since we're in a Tauri context, we use
-    // a navigator-based approach: listen for the redirect.
-    //
-    // For production Tauri: use tauri://localhost or a custom URI scheme.
-    // For now, we accept the token manually or use the browser redirect approach.
-    //
-    // Simplified flow: open browser, user copies the code, we exchange it.
-    window.open(
-      `${TD_AUTHORIZE_URL}?response_type=code&client_id=${encodeURIComponent(TD_CLIENT_ID)}&redirect_uri=${encodeURIComponent(`http://localhost:${port}/callback`)}&code_challenge=${encodeURIComponent('PLACEHOLDER')}&code_challenge_method=S256&scope=openid+profile+email&state=${encodeURIComponent(expectedState)}`,
-      '_blank',
-    );
-
-    // Resolve immediately — the actual code exchange will be done
-    // by the caller when they receive the code via manual input.
-    // This is a temporary simplified flow until Tauri deep-link is wired.
-    reject(new Error('Manual token input required — OIDC browser flow not yet automated'));
-  });
-}
-
-// ── Token exchange ────────────────────────────────────
-
-async function exchangeCodeForToken(
-  code: string,
-  codeVerifier: string,
-): Promise<{ access_token: string; refresh_token: string; id_token?: string }> {
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: 'http://localhost:18080/callback',
-    code_verifier: codeVerifier,
-    client_id: TD_CLIENT_ID,
-  });
-
-  const res = await fetch(TD_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'token_exchange_failed' }));
-    throw new Error(`Token exchange failed: ${err.error || res.status}`);
+function persistUser(user: UserProfile | null) {
+  if (typeof localStorage === 'undefined') return;
+  if (!user) {
+    localStorage.removeItem(USER_KEY);
+    return;
   }
-
-  return res.json();
+  localStorage.setItem(USER_KEY, JSON.stringify({ userId: user.id, username: user.username }));
 }
 
-// ── Auth factory ──────────────────────────────────────
+function clearLegacyTokenStorage() {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem('agenthub_hub_refresh');
+}
 
 export function createHubAuth(client?: HubClient): HubAuth {
   const hubClient = client || createHubClient();
 
   const state: HubAuthState = {
-    token: typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null,
-    refreshToken: typeof localStorage !== 'undefined' ? localStorage.getItem(REFRESH_KEY) : null,
+    token: null,
+    refreshToken: null,
     user: null,
     isAuthenticated: false,
-    tokenSource: (typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_SOURCE_KEY) : null) as HubAuthState['tokenSource'],
+    authStatus: 'checking',
+    cloudLockedReason: 'not_signed_in',
+    tokenSource: null,
   };
 
   const listeners = new Set<(s: HubAuthState) => void>();
-
-  function createSnapshot(): HubAuthState {
-    return Object.freeze({ ...state }) as HubAuthState;
-  }
-
-  let snapshot: HubAuthState = createSnapshot();
+  let snapshot: HubAuthState = Object.freeze({ ...state });
 
   function notify() {
-    snapshot = createSnapshot();
+    snapshot = Object.freeze({ ...state });
     listeners.forEach((fn) => fn(snapshot));
   }
 
@@ -152,24 +92,8 @@ export function createHubAuth(client?: HubClient): HubAuth {
     return state.token;
   }
 
+  // Rebind client with current token getter
   let authClient = createHubClient({ getToken });
-
-  async function completeLogin(token: string, refreshToken: string | null, source: 'tokendance' | 'hub') {
-    state.token = token;
-    state.refreshToken = refreshToken;
-    state.tokenSource = source;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(TOKEN_KEY, token);
-      if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
-      localStorage.setItem(TOKEN_SOURCE_KEY, source);
-    }
-
-    authClient = createHubClient({ getToken });
-    state.user = await authClient.me();
-    state.isAuthenticated = true;
-    useHubStore.getState().setAuthenticated(true, state.user?.id, state.user?.username);
-    notify();
-  }
 
   return {
     getState: () => snapshot,
@@ -181,36 +105,73 @@ export function createHubAuth(client?: HubClient): HubAuth {
       };
     },
 
-    // ── TokenDance ID OIDC PKCE login ──
-    async loginWithTokenDance() {
-      const codeVerifier = generateCodeVerifier();
-      const codeChallenge = await computeCodeChallenge(codeVerifier);
-      const stateStr = base64UrlEncode(crypto.getRandomValues(new Uint8Array(16)));
-
-      // Store code_verifier for the callback
-      sessionStorage.setItem('td_code_verifier', codeVerifier);
-      sessionStorage.setItem('td_state', stateStr);
-
-      // Open browser for authorization
-      const authUrl = `${TD_AUTHORIZE_URL}?response_type=code&client_id=${encodeURIComponent(TD_CLIENT_ID)}&redirect_uri=${encodeURIComponent('http://localhost:18080/callback')}&code_challenge=${encodeURIComponent(codeChallenge)}&code_challenge_method=S256&scope=openid+profile+email&state=${encodeURIComponent(stateStr)}`;
-
-      window.open(authUrl, '_blank');
-
-      // Note: Automated callback capture requires a local HTTP server or Tauri deep-link.
-      // For now, the user will be prompted to paste the authorization code.
-      // The code is exchanged via exchangeCodeForToken() when available.
-    },
-
-    // ── Legacy Hub username/password login ──
     async login(username: string, password: string) {
+      clearLegacyTokenStorage();
+      state.authStatus = 'checking';
+      state.cloudLockedReason = 'not_signed_in';
+      notify();
+      const deviceId = getStableDeviceId();
       const res = await hubClient.login({
         username,
         password,
         device_type: 'desktop',
-        device_id: getOrCreateDeviceId(),
+        device_id: deviceId,
       });
 
-      await completeLogin(res.access_token, res.refresh_token, 'hub');
+      state.token = res.access_token;
+      state.refreshToken = res.refresh_token;
+      state.tokenSource = 'hub';
+      state.authStatus = 'authenticated';
+      state.cloudLockedReason = 'none';
+      await saveStoredHubRefreshToken(res.refresh_token);
+
+      // Rebind client so subsequent calls use the new token
+      authClient = createHubClient({ getToken });
+      try {
+        state.user = await authClient.me();
+        state.isAuthenticated = true;
+        persistUser(state.user);
+        // Sync to Zustand store for StatusBar indicator
+        useHubStore.getState().setAuthenticated(true, state.user?.id, state.user?.username);
+        notify();
+      } catch (err) {
+        state.token = null;
+        state.refreshToken = null;
+        state.user = null;
+        state.isAuthenticated = false;
+        state.authStatus = 'error';
+        state.cloudLockedReason = 'hub_unreachable';
+        state.tokenSource = null;
+        clearLegacyTokenStorage();
+        persistUser(null);
+        await clearStoredHubRefreshToken();
+        useHubStore.getState().clear();
+        notify();
+        throw err;
+      }
+    },
+
+    async loginWithTokenDance() {
+      state.authStatus = 'tokenDancePending';
+      state.cloudLockedReason = 'tokenDance_pending';
+      notify();
+      if (!TOKENDANCE_LOGIN_URL) {
+        throw new Error('TokenDance ID desktop callback is not connected yet.');
+      }
+      await openShellUrl(TOKENDANCE_LOGIN_URL);
+    },
+
+    continueLocalMode() {
+      state.token = null;
+      state.refreshToken = null;
+      state.user = null;
+      state.isAuthenticated = false;
+      state.authStatus = 'local';
+      state.cloudLockedReason = 'not_signed_in';
+      state.tokenSource = null;
+      clearLegacyTokenStorage();
+      useHubStore.getState().setLocalModeSelected(true);
+      notify();
     },
 
     async logout() {
@@ -221,56 +182,55 @@ export function createHubAuth(client?: HubClient): HubAuth {
       state.refreshToken = null;
       state.user = null;
       state.isAuthenticated = false;
+      state.authStatus = 'anonymous';
+      state.cloudLockedReason = 'not_signed_in';
       state.tokenSource = null;
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(REFRESH_KEY);
-        localStorage.removeItem(TOKEN_SOURCE_KEY);
-      }
-      sessionStorage.removeItem('td_code_verifier');
-      sessionStorage.removeItem('td_state');
+      clearLegacyTokenStorage();
+      persistUser(null);
+      await clearStoredHubRefreshToken();
       useHubStore.getState().clear();
       notify();
     },
 
     async tryAutoLogin() {
-      if (!state.token) return false;
-      authClient = createHubClient({ getToken });
+      clearLegacyTokenStorage();
+      state.authStatus = 'checking';
+      state.cloudLockedReason = 'not_signed_in';
+      notify();
+      state.refreshToken = await loadStoredHubRefreshToken();
+      if (!state.refreshToken) {
+        state.authStatus = 'anonymous';
+        state.cloudLockedReason = 'not_signed_in';
+        notify();
+        return false;
+      }
       try {
+        const refreshClient = createHubClient();
+        const res = await refreshClient.refresh(state.refreshToken);
+        state.token = res.access_token;
+        state.refreshToken = res.refresh_token;
+        state.tokenSource = 'hub';
+        state.authStatus = 'authenticated';
+        state.cloudLockedReason = 'none';
+        await saveStoredHubRefreshToken(res.refresh_token);
+        authClient = createHubClient({ getToken });
         state.user = await authClient.me();
         state.isAuthenticated = true;
+        persistUser(state.user);
         useHubStore.getState().setAuthenticated(true, state.user?.id, state.user?.username);
         notify();
         return true;
       } catch {
-        if (state.refreshToken) {
-          try {
-            const refreshClient = createHubClient();
-            const res = await refreshClient.refresh(state.refreshToken);
-            state.token = res.access_token;
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(TOKEN_KEY, res.access_token);
-            }
-            authClient = createHubClient({ getToken });
-            state.user = await authClient.me();
-            state.isAuthenticated = true;
-            useHubStore.getState().setAuthenticated(true, state.user?.id, state.user?.username);
-            notify();
-            return true;
-          } catch {
-            // refresh failed
-          }
-        }
         state.token = null;
         state.refreshToken = null;
         state.user = null;
         state.isAuthenticated = false;
+        state.authStatus = 'error';
+        state.cloudLockedReason = 'hub_unreachable';
         state.tokenSource = null;
-        if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem(TOKEN_KEY);
-          localStorage.removeItem(REFRESH_KEY);
-          localStorage.removeItem(TOKEN_SOURCE_KEY);
-        }
+        clearLegacyTokenStorage();
+        persistUser(null);
+        await clearStoredHubRefreshToken();
         useHubStore.getState().clear();
         notify();
         return false;

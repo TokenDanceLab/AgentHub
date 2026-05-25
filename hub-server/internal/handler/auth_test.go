@@ -15,6 +15,8 @@ import (
 	"github.com/agenthub/hub-server/internal/service"
 )
 
+const testDeviceID = "11111111-1111-4111-8111-111111111111"
+
 // mockAuthService implements handler.AuthService.
 type mockAuthService struct {
 	registerFn       func(ctx context.Context, username, password, nickname string) (*model.User, error)
@@ -153,7 +155,7 @@ func TestAuthHandler_Login_Success(t *testing.T) {
 		"username":    "testuser",
 		"password":    "password123",
 		"device_type": "web",
-		"device_id":   "dev1",
+		"device_id":   testDeviceID,
 	})
 	h.Login(c)
 
@@ -174,7 +176,7 @@ func TestAuthHandler_Login_InvalidCredentials(t *testing.T) {
 		"username":    "testuser",
 		"password":    "wrong",
 		"device_type": "web",
-		"device_id":   "dev1",
+		"device_id":   testDeviceID,
 	})
 	h.Login(c)
 
@@ -197,6 +199,39 @@ func TestAuthHandler_Login_BadRequest(t *testing.T) {
 
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestAuthHandler_Login_InvalidDeviceID(t *testing.T) {
+	called := false
+	svc := &mockAuthService{
+		loginFn: func(ctx context.Context, username, password, deviceType, deviceID string) (*service.LoginResponse, error) {
+			called = true
+			return nil, errcode.ErrInternal
+		},
+	}
+	h := handler.NewAuthHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/login", map[string]string{
+		"username":    "testuser",
+		"password":    "password123",
+		"device_type": "web",
+		"device_id":   "dev1",
+	})
+	h.Login(c)
+
+	if called {
+		t.Fatal("service should not be called for malformed device_id")
+	}
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+	resp := parseResponse[any](t, w)
+	if resp.Code != "BAD_REQUEST" {
+		t.Fatalf("expected BAD_REQUEST, got %s", resp.Code)
+	}
+	if resp.Message != "device_id must be a UUID" {
+		t.Fatalf("unexpected message %q", resp.Message)
 	}
 }
 

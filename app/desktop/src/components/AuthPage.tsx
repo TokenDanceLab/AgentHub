@@ -13,9 +13,11 @@ type HubStatus = 'connected' | 'disconnected' | 'checking';
 interface Props {
   onLoginSuccess: (user: UserProfile) => void;
   onClose?: () => void;
+  onContinueLocal?: () => void;
+  startup?: boolean;
 }
 
-export default function AuthPage({ onLoginSuccess, onClose }: Props) {
+export default function AuthPage({ onLoginSuccess, onClose, onContinueLocal, startup = false }: Props) {
   const { t } = useTranslation();
   const [page, setPage] = useState<Page>('login');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -83,8 +85,8 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
   return (
     <div className={styles.page}>
       {/* Close button */}
-      {onClose && (
-        <button className={styles.closeBtn} onClick={onClose} title="关闭">
+      {onClose && !startup && (
+        <button className={styles.closeBtn} onClick={onClose} title={t('auth.close')}>
           <X size={16} />
         </button>
       )}
@@ -94,24 +96,8 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
         <div className={styles.logo} aria-hidden="true">
           AH
         </div>
-        <h1 className={styles.appName}>登录 AgentHub</h1>
-        <p className={styles.tagline}>连接 Hub 服务器以同步智能体和会话</p>
-      </div>
-
-      {/* Segmented tab switcher */}
-      <div className={styles.tabs}>
-        <button
-          className={`${styles.tab} ${page === 'login' ? styles.tabActive : ''}`}
-          onClick={() => setPage('login')}
-        >
-          {t('auth.login')}
-        </button>
-        <button
-          className={`${styles.tab} ${page === 'register' ? styles.tabActive : ''}`}
-          onClick={() => setPage('register')}
-        >
-          {t('auth.register')}
-        </button>
+        <h1 className={styles.appName}>{t('auth.title')}</h1>
+        <p className={styles.tagline}>{startup ? t('auth.startupTagline') : t('auth.tagline')}</p>
       </div>
 
       {page === 'login' ? (
@@ -126,6 +112,22 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
         />
       )}
 
+      {startup && (
+        <div className={styles.localModePanel}>
+          <div>
+            <strong>{t('auth.localModeTitle')}</strong>
+            <p>{t('auth.localModeDesc')}</p>
+          </div>
+          <button
+            type="button"
+            className={styles.localModeButton}
+            onClick={onContinueLocal}
+          >
+            {t('auth.continueLocal')}
+          </button>
+        </div>
+      )}
+
       {/* Collapsible advanced settings */}
       <button
         className={styles.advancedToggle}
@@ -135,7 +137,7 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
         <span className={`${styles.advancedToggleIcon} ${showAdvanced ? styles.advancedToggleIconOpen : ''}`}>
           <ChevronDown size={14} />
         </span>
-        高级设置
+        {t('auth.advancedSettings')}
       </button>
 
       {showAdvanced && (
@@ -146,6 +148,7 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
             value={hubUrl}
             onChange={handleHubUrlChange}
             placeholder="http://localhost:8080"
+            aria-label={t('auth.hubUrl')}
           />
           <div className={styles.hubStatus}>
             <span className={hubDotClass} aria-hidden="true" />

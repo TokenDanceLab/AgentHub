@@ -41,7 +41,9 @@ type ProcessExecutor struct {
 	adapterReg *adapters.Registry    // per-run adapter resolution; may be nil
 	metrics    *metrics.EdgeMetrics  // Prometheus instrumentation; may be nil
 
-	maxConcurrentRuns int // maximum concurrent runs; 0 means use default (5)
+	maxConcurrentRuns         int // maximum concurrent runs; 0 means use default (5)
+	maxRunOutputBytes         int64
+	maxStructuredPayloadBytes int64
 
 	// Orchestrator result aggregation
 	agentRegistry *agents.Registry  // agent instance registry for sub-agent tracking; may be nil
@@ -76,16 +78,18 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		}
 	}
 	return &ProcessExecutor{
-		bus:               bus,
-		store:             store,
-		profile:           profile,
-		adapter:           adapter,
-		adapterReg:        adapterReg,
-		maxConcurrentRuns: defaultMaxConcurrentRuns,
-		running:           make(map[string]context.CancelFunc),
-		stdins:            make(map[string]io.Writer),
-		runOutputs:        make(map[string]*runnerctx.RunOutputStore),
-		runToAgent:        make(map[string]string),
+		bus:                       bus,
+		store:                     store,
+		profile:                   profile,
+		adapter:                   adapter,
+		adapterReg:                adapterReg,
+		maxConcurrentRuns:         defaultMaxConcurrentRuns,
+		maxRunOutputBytes:         defaultRunOutputMaxBytes,
+		maxStructuredPayloadBytes: adapters.DefaultStructuredPayloadMaxBytes,
+		running:                   make(map[string]context.CancelFunc),
+		stdins:                    make(map[string]io.Writer),
+		runOutputs:                make(map[string]*runnerctx.RunOutputStore),
+		runToAgent:                make(map[string]string),
 	}, nil
 }
 
@@ -96,7 +100,49 @@ const defaultRunTimeout = 30 * time.Minute
 const (
 	defaultMaxConcurrentRuns = 5
 	defaultReadBufferSize    = 32 * 1024
+	defaultRunOutputMaxBytes = 4 * 1024 * 1024
 )
+
+type runOutputLimiter struct {
+	mu        sync.Mutex
+	maxBytes  int64
+	written   int64
+	truncated bool
+}
+
+func newRunOutputLimiter(maxBytes int64) *runOutputLimiter {
+	if maxBytes <= 0 {
+		maxBytes = defaultRunOutputMaxBytes
+	}
+	return &runOutputLimiter{maxBytes: maxBytes}
+}
+
+func (l *runOutputLimiter) allow(data []byte) (allowed []byte, truncatedNow bool, written int64, maxBytes int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	maxBytes = l.maxBytes
+	remaining := maxBytes - l.written
+	if remaining <= 0 {
+		if !l.truncated {
+			l.truncated = true
+			return nil, true, l.written, maxBytes
+		}
+		return nil, false, l.written, maxBytes
+	}
+	if int64(len(data)) <= remaining {
+		l.written += int64(len(data))
+		return data, false, l.written, maxBytes
+	}
+
+	allowed = data[:int(remaining)]
+	l.written = maxBytes
+	if !l.truncated {
+		l.truncated = true
+		truncatedNow = true
+	}
+	return allowed, truncatedNow, l.written, maxBytes
+}
 
 // SetMetrics attaches Prometheus instrumentation to this executor.
 // It is safe to call with nil to disable metrics.
@@ -333,8 +379,9 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	}
 
 	var wg sync.WaitGroup
+	outputLimiter := newRunOutputLimiter(e.maxRunOutputBytes)
 	wg.Add(1)
-	go e.publishOutput(&wg, run, outStore, "stderr", stderr)
+	go e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", stderr)
 
 	// Inject context budget for token tracking in stream parsers.
 	parserCtx := ctx
@@ -348,7 +395,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	} else {
 		// Raw capture: stdout goes to run.output.batch events
 		wg.Add(1)
-		go e.publishOutput(&wg, run, outStore, "stdout", stdout)
+		go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", stdout)
 	}
 
 	waitErr := cmd.Wait()
@@ -371,7 +418,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	}
 }
 
-func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outStore *runnerctx.RunOutputStore, stream string, reader io.Reader) {
+func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outStore *runnerctx.RunOutputStore, limiter *runOutputLimiter, stream string, reader io.Reader) {
 	defer wg.Done()
 
 	buf := make([]byte, defaultReadBufferSize)
@@ -379,18 +426,31 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 	for {
 		n, err := reader.Read(buf)
 		if n > 0 {
-			text := string(buf[:n])
-			if outStore != nil {
-				outStore.Write(text)
+			allowed, truncatedNow, written, maxBytes := limiter.allow(buf[:n])
+			if len(allowed) > 0 || truncatedNow {
+				text := string(allowed)
+				if outStore != nil && len(allowed) > 0 {
+					if _, err := outStore.Write(text); err != nil {
+						slog.Warn("process: failed to write output store", "runId", run.ID, "err", err)
+					}
+				}
+				payload := map[string]any{
+					"runId":  run.ID,
+					"stream": stream,
+					"chunks": []map[string]any{
+						{"offset": offset, "text": text},
+					},
+				}
+				if truncatedNow {
+					payload["truncated"] = true
+					payload["maxBytes"] = maxBytes
+					payload["bytesWritten"] = written
+					payload["message"] = fmt.Sprintf("run output truncated after %d bytes", maxBytes)
+					slog.Warn("process: run output truncated", "runId", run.ID, "maxBytes", maxBytes)
+				}
+				e.bus.Publish("run.output.batch", runScope(run), payload)
+				offset += len(allowed)
 			}
-			e.bus.Publish("run.output.batch", runScope(run), map[string]any{
-				"runId":  run.ID,
-				"stream": stream,
-				"chunks": []map[string]any{
-					{"offset": offset, "text": text},
-				},
-			})
-			offset += n
 		}
 		if err != nil {
 			return
@@ -516,7 +576,10 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.Run, stdout io.Reader, stdin io.Writer, adapter adapters.AgentAdapter, ctx context.Context) {
 	defer wg.Done()
 	scope := runScope(run)
-	var emitter adapters.EventEmitter = adapters.NewScopedEventEmitter(adapters.NewBusEventEmitter(e.bus), scope)
+	var emitter adapters.EventEmitter = adapters.NewScopedEventEmitter(
+		adapters.NewPayloadLimitEmitter(adapters.NewBusEventEmitter(e.bus), e.maxStructuredPayloadBytes),
+		scope,
+	)
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).

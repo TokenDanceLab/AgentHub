@@ -45,6 +45,57 @@
 .textarea::placeholder { color: #9CA3AF; }
 .textarea:disabled { opacity: 0.4; }
 
+/* ── Resolved route preview ───────────────── */
+.routePreview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 2px 0 1px;
+  scrollbar-width: none;
+}
+
+.routePreview::-webkit-scrollbar {
+  display: none;
+}
+
+.routeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 180px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid rgba(0,0,0,0.055);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.48);
+  color: #8E8E93;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.52);
+}
+
+.routeChip span {
+  flex: 0 0 auto;
+}
+
+.routeChip strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-weight: 650;
+  text-overflow: ellipsis;
+}
+
+[data-theme='dark'] .routeChip {
+  border-color: rgba(255,255,255,0.065);
+  background: rgba(255,255,255,0.045);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.055);
+}
+
 /* ── Bottom action bar ────────────────────── */
 .actions {
   display: flex; align-items: center; justify-content: space-between;
@@ -150,6 +201,8 @@
   .root { padding: 8px 8px 12px; }
   .capsule { border-radius: 16px; padding: 10px 12px 8px; }
   .textarea { font-size: 16px; }
+  .routePreview { flex-wrap: wrap; overflow: visible; }
+  .routeChip { max-width: 100%; }
   .actions { align-items: flex-end; }
   .rightGroup { gap: 6px; }
   .metaChain { flex-wrap: wrap; justify-content: flex-end; }

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Loader2, AlertCircle, KeyRound } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, KeyRound, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserProfile } from '@/api/hubClient';
 import styles from './AuthPage.module.css';
@@ -46,6 +46,7 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
   const [loading, setLoading] = useState(false);
   const [identityLoading, setIdentityLoading] = useState(false);
   const [identityNotice, setIdentityNotice] = useState<string | null>(null);
+  const [devLoginOpen, setDevLoginOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
@@ -74,7 +75,11 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
       setIdentityNotice(t('auth.tokenDanceCallbackPending'));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
-      setServerError(message || t('auth.error.tokenDanceUnavailable'));
+      if (message.includes('TokenDance ID desktop callback')) {
+        setIdentityNotice(t('auth.tokenDanceCallbackPending'));
+      } else {
+        setServerError(message || t('auth.error.tokenDanceUnavailable'));
+      }
     } finally {
       setIdentityLoading(false);
     }
@@ -121,6 +126,44 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
         </div>
       )}
 
+      <button
+        type="button"
+        className={styles.identityButton}
+        onClick={handleTokenDanceLogin}
+        disabled={loading || identityLoading}
+      >
+        {identityLoading ? (
+          <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+        ) : (
+          <KeyRound size={16} aria-hidden="true" />
+        )}
+        <span>{t('auth.tokenDanceLogin')}</span>
+      </button>
+
+      <p className={styles.identityHint}>{t('auth.tokenDancePrimary')}</p>
+
+      {identityNotice && (
+        <div className={styles.identityNotice} role="status">
+          {identityNotice}
+        </div>
+      )}
+
+      <button
+        type="button"
+        className={styles.devLoginToggle}
+        onClick={() => setDevLoginOpen((open) => !open)}
+        aria-expanded={devLoginOpen}
+      >
+        <ChevronDown
+          size={14}
+          className={`${styles.advancedToggleIcon} ${devLoginOpen ? styles.advancedToggleIconOpen : ''}`}
+          aria-hidden="true"
+        />
+        <span>{t('auth.devLogin')}</span>
+      </button>
+
+      {devLoginOpen && (
+        <div className={styles.devLoginPanel}>
       <div className={styles.field}>
         <label className={styles.label} htmlFor="login-username">
           {t('auth.username')}
@@ -188,34 +231,6 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
       )}
       </button>
 
-      <div className={styles.identityDivider} aria-hidden="true">
-        <span />
-        <strong>{t('auth.or')}</strong>
-        <span />
-      </div>
-
-      <button
-        type="button"
-        className={styles.identityButton}
-        onClick={handleTokenDanceLogin}
-        disabled={loading || identityLoading}
-      >
-        {identityLoading ? (
-          <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
-        ) : (
-          <KeyRound size={16} aria-hidden="true" />
-        )}
-        <span>{t('auth.tokenDanceLogin')}</span>
-      </button>
-
-      <p className={styles.identityHint}>{t('auth.tokenDancePrimary')}</p>
-
-      {identityNotice && (
-        <div className={styles.identityNotice} role="status">
-          {identityNotice}
-        </div>
-      )}
-
       <div className={styles.switch}>
         <button
           type="button"
@@ -226,6 +241,8 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
           {t('auth.switchToRegister')}
         </button>
       </div>
+        </div>
+      )}
     </form>
   );
 }
