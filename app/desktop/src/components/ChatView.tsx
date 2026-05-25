@@ -368,6 +368,7 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
   const addToast = useToastStore((s) => s.addToast);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [suggestionFeedback, setSuggestionFeedback] = useState<string | null>(null);
 
   // ── Virtualizer ──────────────────────────────
   const virtualizer = useVirtualizer({
@@ -487,6 +488,23 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
     scrollToBottom(true);
   }, [scrollToBottom]);
 
+  const handleSuggestionClick = useCallback((prompt: string) => {
+    const input = document.querySelector<HTMLTextAreaElement>('textarea:not(:disabled)');
+    if (!input) {
+      const message = t('chat.suggestionUnavailable');
+      setSuggestionFeedback(message);
+      addToast({ type: 'warning', message });
+      return;
+    }
+
+    input.value = prompt;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+    input.setSelectionRange(prompt.length, prompt.length);
+    setSuggestionFeedback(t('chat.suggestionApplied'));
+    addToast({ type: 'info', message: t('chat.suggestionApplied') });
+  }, [addToast, t]);
+
   return (
     <div className={styles.root}>
       <div
@@ -500,9 +518,18 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
             title={t('chat.emptyTitle')}
             description={t('chat.emptyDescription')}
             suggestions={[
-              { label: t('chat.suggestion.newTask'), onClick: () => {} },
-              { label: t('chat.suggestion.explainCode'), onClick: () => {} },
-              { label: t('chat.suggestion.fixBugs'), onClick: () => {} },
+              {
+                label: t('chat.suggestion.newTask'),
+                onClick: () => handleSuggestionClick(t('chat.suggestionPrompt.newTask')),
+              },
+              {
+                label: t('chat.suggestion.explainCode'),
+                onClick: () => handleSuggestionClick(t('chat.suggestionPrompt.explainCode')),
+              },
+              {
+                label: t('chat.suggestion.fixBugs'),
+                onClick: () => handleSuggestionClick(t('chat.suggestionPrompt.fixBugs')),
+              },
             ]}
           />
         ) : (
@@ -533,6 +560,11 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
           ) : (
             <TextShimmer label={t('chat.thinking')} bars={3} />
           ))}
+        {messages.length === 0 && suggestionFeedback && (
+          <p className={styles.suggestionFeedback} role="status">
+            {suggestionFeedback}
+          </p>
+        )}
       </div>
 
       {showScrollIndicator && (

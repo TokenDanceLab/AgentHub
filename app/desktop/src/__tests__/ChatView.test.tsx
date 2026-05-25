@@ -48,7 +48,7 @@ vi.mock('@tanstack/react-virtual', () => ({
 }));
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import ChatView from '@/components/ChatView';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -75,6 +75,33 @@ describe('ChatView', () => {
   it('renders empty state when messages array is empty', () => {
     render(<ChatView messages={[]} />);
     expect(screen.getByText('chat.emptyTitle')).toBeInTheDocument();
+  });
+
+  it('fills the available prompt input when clicking an empty-state suggestion', () => {
+    render(
+      <>
+        <textarea aria-label="Prompt input" />
+        <ChatView messages={[]} />
+      </>,
+    );
+
+    const input = screen.getByLabelText('Prompt input');
+    const onInput = vi.fn();
+    input.addEventListener('input', onInput);
+
+    fireEvent.click(screen.getByText('chat.suggestion.explainCode'));
+
+    expect(input).toHaveValue('chat.suggestionPrompt.explainCode');
+    expect(onInput).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('status')).toHaveTextContent('chat.suggestionApplied');
+  });
+
+  it('shows visible feedback when a suggestion has no prompt input to fill', () => {
+    render(<ChatView messages={[]} />);
+
+    fireEvent.click(screen.getByText('chat.suggestion.fixBugs'));
+
+    expect(screen.getByRole('status')).toHaveTextContent('chat.suggestionUnavailable');
   });
 
   it('renders user messages on the right side', () => {

@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Bot,
   Check,
-  ChevronRight,
   ClipboardList,
   Code2,
   Computer,
@@ -285,20 +284,10 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const username = useHubStore((s) => s.username);
   const [active, setActive] = useState<SectionId>(initialSection);
   const [compactMode, setCompactMode] = useStoredBooleanState('compactMode', false);
-  const [autoReview, setAutoReview] = useStoredBooleanState('autoReview', true);
-  const [fullAccess, setFullAccess] = useStoredBooleanState('fullAccess', false);
-  const [enableMcp, setEnableMcp] = useStoredBooleanState('enableMcp', true);
-  const [, setSkillSync] = useStoredBooleanState('skillSync', true);
-  const [taskSync, setTaskSync] = useStoredBooleanState('taskSync', true);
-  const [groupChatEnabled, setGroupChatEnabled] = useStoredBooleanState('groupChat', true);
-  const [agentSchedulingEnabled, setAgentSchedulingEnabled] = useStoredBooleanState('agentScheduling', true);
-  const [enableHooks, setEnableHooks] = useStoredBooleanState('enableHooks', false);
-  const [, setRemoteControlEnabled] = useStoredBooleanState('remoteControl', false);
   const [autoDetectGit, setAutoDetectGit] = useStoredBooleanState('autoDetectGit', true);
   const [worktreeIsolation, setWorktreeIsolation] = useStoredBooleanState('worktreeIsolation', true);
   const [browserPreview, setBrowserPreview] = useStoredBooleanState('browserPreview', true);
   const [computerConfirm, setComputerConfirm] = useStoredBooleanState('computerConfirm', true);
-  const [, setPlatformSync] = useStoredBooleanState('platformSync', true);
   const [auditTrail, setAuditTrail] = useStoredBooleanState('auditTrail', true);
   const [detailLevel, setDetailLevel] = useStoredValueState<SelectValue>('detailLevel', 'detailed');
   const [approvalMode, setApprovalMode] = useStoredValueState<SelectValue>('approvalMode', 'ask');
@@ -308,7 +297,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const providerFallbackEnabled = useModelSettingsStore((s) => s.providerFallbackEnabled);
   const modelMappingEnabled = useModelSettingsStore((s) => s.modelMappingEnabled);
   const modelAliases = useModelSettingsStore((s) => s.aliases);
-  const ccSwitchBridge = useModelSettingsStore((s) => s.ccSwitchBridgeEnabled);
   const ccSwitchProviders = useModelSettingsStore((s) => s.ccSwitchProviders);
   const setDefaultModel = useModelSettingsStore((s) => s.setDefaultModel);
   const setDefaultProvider = useModelSettingsStore((s) => s.setDefaultProvider);
@@ -317,7 +305,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const setModelMappingEnabled = useModelSettingsStore((s) => s.setModelMappingEnabled);
   const updateModelAlias = useModelSettingsStore((s) => s.updateAlias);
   const toggleModelAlias = useModelSettingsStore((s) => s.toggleAlias);
-  const setCcSwitchBridge = useModelSettingsStore((s) => s.setCcSwitchBridgeEnabled);
   const updateCcSwitchProvider = useModelSettingsStore((s) => s.updateProvider);
   const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
   const hubSessionActive = hubAuthenticated || hubAuth.isAuthenticated;
@@ -451,9 +438,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   };
   const schedulerPolicyReadyCount = [
     modelMappingEnabled,
-    ccSwitchBridge,
-    autoReview,
-    remoteControlReady,
+    providerFallbackEnabled,
+    approvalMode !== 'manual',
   ].filter(Boolean).length;
 
   const navItems = useMemo<NavItem[]>(
@@ -677,7 +663,11 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           {active === 'personalization' && (
             <Panel title={t('settings.personalization')} description={t('settings.personalizationDesc')}>
               <SettingRow title={t('settings.displayName')} description={username ?? 'AgentHub User'} value="Local" />
-              <SettingRow title={t('settings.instructions')} description={t('settings.instructionsDesc')} action />
+              <SettingRow
+                title={t('settings.instructions')}
+                description={t('settings.instructionsUnavailableDesc')}
+                value={t('settings.status.interfaceGap')}
+              />
               <Callout title={t('settings.personalizationNote')} body={t('settings.personalizationNoteDesc')} />
             </Panel>
           )}
@@ -686,13 +676,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             <Panel title={t('settings.permissions')} description={t('settings.permissionsDesc')}>
               <SettingRow
                 title={t('settings.autoReview')}
-                description={t('settings.autoReviewDesc')}
-                control={<Switch checked={autoReview} onChange={setBooleanSetting('autoReview', setAutoReview)} />}
+                description={t('settings.autoReviewGapDesc')}
+                value={t('settings.status.interfaceGap')}
               />
               <SettingRow
                 title={t('settings.fullAccess')}
-                description={t('settings.fullAccessDesc')}
-                control={<Switch checked={fullAccess} onChange={setBooleanSetting('fullAccess', setFullAccess)} />}
+                description={t('settings.fullAccessGapDesc')}
+                value={t('settings.status.interfaceGap')}
               />
               <SettingRow title={t('settings.permissionLedger')} description={t('settings.permissionLedgerDesc')} value={t('settings.statusPlanned')} />
             </Panel>
@@ -857,14 +847,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               </div>
               <SettingRow
                 title={t('settings.taskSync')}
-                description={t('settings.taskSyncDesc')}
-                control={
-                  <Switch
-                    checked={hubSessionActive && taskSync}
-                    onChange={setBooleanSetting('taskSync', setTaskSync)}
-                    disabled={!hubSessionActive}
-                  />
-                }
+                description={t('settings.taskSyncBoundaryDesc')}
+                value={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
               />
               <SettingRow
                 title={t('settings.taskInbox')}
@@ -1107,14 +1091,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               </div>
               <SettingRow
                 title={t('settings.enableGroupChat')}
-                description={t('settings.enableGroupChatDesc')}
-                control={
-                  <Switch
-                    checked={hubSessionActive && groupChatEnabled}
-                    onChange={setBooleanSetting('groupChat', setGroupChatEnabled)}
-                    disabled={!hubSessionActive}
-                  />
-                }
+                description={t('settings.enableGroupChatBoundaryDesc')}
+                value={hubSessionActive ? t('settings.readOnly') : t('settings.status.loginLocked')}
               />
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
@@ -1169,8 +1147,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               </div>
               <SettingRow
                 title={t('settings.enableAgentScheduling')}
-                description={t('settings.enableAgentSchedulingDesc')}
-                control={<Switch checked={agentSchedulingEnabled} onChange={setBooleanSetting('agentScheduling', setAgentSchedulingEnabled)} />}
+                description={t('settings.enableAgentSchedulingBoundaryDesc')}
+                value={t('settings.readOnly')}
               />
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
@@ -1243,7 +1221,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.schedulerPolicyCcSwitch')}
                     description={t('settings.schedulerPolicyCcSwitchDesc')}
-                    status={ccSwitchBridge ? t('settings.enabled') : t('settings.statusPlanned')}
+                    status={t('settings.status.interfaceGap')}
                   />
                   <CapabilityCard
                     title={t('settings.schedulerPolicyRemote')}
@@ -1253,7 +1231,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.schedulerPolicyApproval')}
                     description={t('settings.schedulerPolicyApprovalDesc')}
-                    status={autoReview ? t('settings.enabled') : t('settings.approvalMode.manual')}
+                    status={approvalMode === 'manual' ? t('settings.approvalMode.manual') : t('settings.status.localSource')}
                   />
                 </div>
               </div>
@@ -1413,8 +1391,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               </div>
               <SettingRow
                 title={t('settings.enableMcp')}
-                description={t('settings.enableMcpDesc')}
-                control={<Switch checked={enableMcp && edgeOnline} onChange={setBooleanSetting('enableMcp', setEnableMcp)} disabled={!edgeOnline} />}
+                description={t('settings.enableMcpBoundaryDesc')}
+                value={edgeOnline ? t('settings.readOnly') : t('settings.edgeOffline')}
               />
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
@@ -1493,8 +1471,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               </div>
               <SettingRow
                 title={t('settings.skillSync')}
-                description={t('settings.skillSyncDesc')}
-                control={<Switch checked={false} onChange={setBooleanSetting('skillSync', setSkillSync)} disabled />}
+                description={t('settings.skillSyncBoundaryDesc')}
+                value={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
               />
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
@@ -1543,8 +1521,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             <Panel title={t('settings.hooks')} description={t('settings.hooksDesc')}>
               <SettingRow
                 title={t('settings.enableHooks')}
-                description={t('settings.enableHooksDesc')}
-                control={<Switch checked={enableHooks} onChange={setBooleanSetting('enableHooks', setEnableHooks)} />}
+                description={t('settings.enableHooksBoundaryDesc')}
+                value={t('settings.status.interfaceGap')}
               />
               <SettingRow title="pre-run" description={t('settings.hookPreRun')} value={t('settings.notConfigured')} />
               <SettingRow title="post-run" description={t('settings.hookPostRun')} value={t('settings.notConfigured')} />
@@ -1647,8 +1625,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               />
               <SettingRow
                 title={t('settings.ccSwitchBridge')}
-                description={t('settings.ccSwitchBridgeDesc')}
-                control={<Switch checked={ccSwitchBridge} onChange={setCcSwitchBridge} />}
+                description={t('settings.ccSwitchBridgeBoundaryDesc')}
+                value={t('settings.status.interfaceGap')}
               />
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
@@ -1704,8 +1682,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             <Panel title={t('settings.remoteControl')} description={t('settings.remoteControlDesc')}>
               <SettingRow
                 title={t('settings.remoteControlEnable')}
-                description={t('settings.remoteControlEnableDesc')}
-                control={<Switch checked={false} onChange={setBooleanSetting('remoteControl', setRemoteControlEnabled)} disabled />}
+                description={t('settings.remoteControlEnableBoundaryDesc')}
+                value={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
               />
               <SettingRow title={t('settings.remoteControlApproval')} description={t('settings.remoteControlApprovalDesc')} value={t('settings.approvalMode.ask')} />
               <SettingRow
@@ -1788,8 +1766,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             <Panel title={t('settings.platforms')} description={t('settings.platformsDesc')}>
               <SettingRow
                 title={t('settings.platformSync')}
-                description={t('settings.platformSyncDesc')}
-                control={<Switch checked={false} onChange={setBooleanSetting('platformSync', setPlatformSync)} disabled />}
+                description={t('settings.platformSyncBoundaryDesc')}
+                value={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
               />
               <SettingRow
                 title={t('settings.platformSyncSource')}
@@ -2514,13 +2492,11 @@ function SettingRow({
   description,
   value,
   control,
-  action,
 }: {
   title: string;
   description: string;
   value?: string;
   control?: ReactNode;
-  action?: boolean;
 }) {
   return (
     <div className={styles.settingRow}>
@@ -2529,7 +2505,6 @@ function SettingRow({
         <span>{description}</span>
       </div>
       {control ?? (value ? <span className={styles.settingValue}>{value}</span> : null)}
-      {action ? <ChevronRight size={17} className={styles.rowChevron} /> : null}
     </div>
   );
 }

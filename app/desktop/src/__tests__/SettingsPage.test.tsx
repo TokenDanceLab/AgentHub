@@ -678,10 +678,9 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('settings.modelPolicy')).toBeInTheDocument();
   });
 
-  it('edits cc-switch provider health and notes locally', () => {
+  it('keeps cc-switch bridge as an interface gap while provider notes remain locally editable', () => {
     renderSettings('ccSwitch');
 
-    fireEvent.click(screen.getAllByRole('switch')[0]);
     fireEvent.change(screen.getAllByDisplayValue('Degraded')[0], {
       target: { value: 'ready' },
     });
@@ -689,17 +688,19 @@ describe('SettingsPage tasks', () => {
       target: { value: 'healthy after manual check' },
     });
 
-    expect(useModelSettingsStore.getState().ccSwitchBridgeEnabled).toBe(true);
+    expect(useModelSettingsStore.getState().ccSwitchBridgeEnabled).toBe(false);
     const localProvider = useModelSettingsStore.getState().ccSwitchProviders.find((item) => item.id === 'cc-switch-local');
     expect(localProvider).toMatchObject({ health: 'ready', notes: 'healthy after manual check' });
     expect(screen.getByText('settings.ccSwitchSource')).toBeInTheDocument();
+    expect(screen.getByText('settings.ccSwitchBridgeBoundaryDesc')).toBeInTheDocument();
     expect(screen.getByText('settings.status.localSource')).toBeInTheDocument();
+    expect(screen.getByText('settings.status.interfaceGap')).toBeInTheDocument();
     expect(screen.getAllByText('settings.ccSwitchHealth').length).toBeGreaterThan(0);
   });
 
   it('labels remote control devices with explicit interface gap state', () => {
     renderSettings('remoteControl');
-    expect(screen.getByText('settings.status.interfaceGap')).toBeInTheDocument();
+    expect(screen.getAllByText('settings.status.interfaceGap').length).toBeGreaterThan(0);
   });
 
   it('labels platform sync with local-source and interface gap states', () => {

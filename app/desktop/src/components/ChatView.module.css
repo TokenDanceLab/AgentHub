@@ -619,6 +619,19 @@
   flex-shrink: 0;
 }
 
+.suggestionFeedback {
+  width: fit-content;
+  max-width: min(420px, calc(100% - var(--space-lg)));
+  margin: 0 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
 @keyframes progressSweep {
   0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
