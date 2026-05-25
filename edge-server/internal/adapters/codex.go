@@ -71,6 +71,16 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 		}
 	}
 
+	// Generic config overrides (-c key=value)
+	for key, value := range ctx.ConfigOverrides {
+		args = append(args, "-c", key+"="+value)
+	}
+
+	// Ephemeral mode: no session persistence
+	if ctx.Ephemeral {
+		args = append(args, "--ephemeral")
+	}
+
 	// Structured JSON output
 	args = append(args, "--json")
 
@@ -92,7 +102,7 @@ func sandboxForPermissionMode(mode string) string {
 	case "plan":
 		return "read-only"
 	case "default":
-		return "default"
+		return "" // Codex has no "default" sandbox — let Codex decide
 	case "acceptEdits", "dontAsk":
 		return "workspace-write"
 	case "bypassPermissions":
@@ -317,6 +327,8 @@ func (a *CodexAdapter) dispatchItemUpdated(scope map[string]any, emitter EventEm
 		a.emitToolProgress(raw, scope, emitter)
 	case "mcp_tool_call":
 		a.emitToolProgress(raw, scope, emitter)
+	case "collab_tool_call":
+		a.emitTaskNotification(raw, scope, emitter)
 	case "todo_list":
 		a.emitTodoList(raw, scope, emitter)
 	case "file_change":

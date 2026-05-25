@@ -4,13 +4,14 @@
   flex: 1;
   min-width: 0;
   min-height: 200px;
+  position: relative; /* anchor for scrollToBottomBtn absolute positioning */
 }
 
 .stream {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-md);
-  overflow-anchor: none;
+  overflow-anchor: auto; /* browser scroll anchoring as safety net */
   background: transparent;
 }
 
