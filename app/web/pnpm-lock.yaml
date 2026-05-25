@@ -12,8 +12,8 @@ importers:
         specifier: ^8.0.2
         version: 8.0.4
       i18next:
-        specifier: ^25.7.2
-        version: 25.10.10
+        specifier: ^26.2.0
+        version: 26.2.0
       react:
         specifier: ^19.1.0
         version: 19.2.6
@@ -21,8 +21,8 @@ importers:
         specifier: ^19.1.0
         version: 19.2.6(react@19.2.6)
       react-i18next:
-        specifier: ^16.5.0
-        version: 16.6.6(i18next@25.10.10)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        specifier: ^17.0.8
+        version: 17.0.8(i18next@26.2.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       react-router-dom:
         specifier: ^7
         version: 7.15.1(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -793,8 +793,8 @@ packages:
   html-parse-stringify@3.0.1:
     resolution: {integrity: sha512-KknJ50kTInJ7qIScF3jeaFRpMpE8/lfiTdzf/twXyPBLAGrLRTmkz3AdTnKeh40X8k9L2fdYwEp/42WGXIRGcg==}
 
-  i18next@25.10.10:
-    resolution: {integrity: sha512-cqUW2Z3EkRx7NqSyywjkgCLK7KLCL6IFVFcONG7nVYIJ3ekZ1/N5jUsihHV6Bq37NfhgtczxJcxduELtjTwkuQ==}
+  i18next@26.2.0:
+    resolution: {integrity: sha512-zwBHldHdTmwN7r6UNc7lC6GWNN+YYg3DrRSeHR5PRRBf5QnJZcYHrQc0uaU26qZeYxR7iFZD+Y315dPnKP47wA==}
     peerDependencies:
       typescript: ^5 || ^6
     peerDependenciesMeta:
@@ -896,10 +896,10 @@ packages:
     peerDependencies:
       react: ^19.2.6
 
-  react-i18next@16.6.6:
-    resolution: {integrity: sha512-ZgL2HUoW34UKUkOV7uSQFE1CDnRPD+tCR3ywSuWH7u2iapnz86U8Bi3Vrs620qNDzCf1F47NxglCEkchCTDOHw==}
+  react-i18next@17.0.8:
+    resolution: {integrity: sha512-0ooKbGLU8JXhe1zwpQUWIeXSgLPOfwJmgheWRIUpcoA0CpyabpGhayjdG+/eA5esC1AQ8h2jWpXjJfzQzeDOCw==}
     peerDependencies:
-      i18next: '>= 25.10.9'
+      i18next: '>= 26.2.0'
       react: '>= 16.8.0'
       react-dom: '*'
       react-native: '*'
@@ -1772,9 +1772,7 @@ snapshots:
     dependencies:
       void-elements: 3.1.0
 
-  i18next@25.10.10:
-    dependencies:
-      '@babel/runtime': 7.29.2
+  i18next@26.2.0: {}
 
   indent-string@4.0.0: {}
 
@@ -1865,11 +1863,11 @@ snapshots:
       react: 19.2.6
       scheduler: 0.27.0
 
-  react-i18next@16.6.6(i18next@25.10.10)(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  react-i18next@17.0.8(i18next@26.2.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
     dependencies:
       '@babel/runtime': 7.29.2
       html-parse-stringify: 3.0.1
-      i18next: 25.10.10
+      i18next: 26.2.0
       react: 19.2.6
       use-sync-external-store: 1.6.0(react@19.2.6)
     optionalDependencies:
