@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-25 integration sweep | 基线：dev/delicious233 @ 69085d5 | 当前集成分支：feat/team-integration-sweep
+最后更新：2026-05-26 integration sweep saved | 基线：dev/delicious233 @ 69085d5 | 当前集成分支：feat/team-integration-sweep
 
 ## 快速上手
 
@@ -13,7 +13,9 @@ git checkout dev/delicious233
 ## 当前 integration 事实
 
 - 当前 integration 分支：`feat/team-integration-sweep`；本轮已合入四个候选分支并追加 runtime/WS/docs 修复，具体 HEAD 以 `git log -1` 为准。当前验证 worktree 是 `.worktrees/team-integration-verify`。
+- 本代理进度已保存到 `docs/handoff/integration-sweep-2026-05-26.md`；远端 draft PR 为 https://github.com/TokenDanceLab/AgentHub/pull/197，migration smoke blocker 为 https://github.com/TokenDanceLab/AgentHub/issues/196。
 - 主 worktree 为 `dev/delicious233 @ 69085d5`，且仍有 UIUX、OIDC、Web 相关 dirty 改动；不要把主 worktree 当作干净可合并基线。
+- 不要强制整理或提交正在开发的主 worktree；各 owner 完成自己的任务卡后按逻辑切片提交。
 - 当前 worktree 数量以 `git worktree list` 实时输出为准；不要复用旧的 23 条记录。
 - Web parity 分支：`worktree-feat+web-desktop-parity`，仍需实时核验路径；状态只能写为进行中。
 - 候选分支统一标注为 `integration 中处理`，除非 integration sweep 已记录冲突处理、diff 和 fresh 验证。

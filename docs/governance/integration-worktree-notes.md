@@ -1,16 +1,18 @@
 # Integration Worktree Notes
 
-最后更新：2026-05-25
+最后更新：2026-05-26
 
 本文只记录 integration sweep 的仓库事实和合并约束，不记录私有绝对路径或生产秘密。
 
 ## 已核对事实
 
 - 当前 integration 分支：`feat/team-integration-sweep`；本轮已合入四个候选分支并追加 follow-up 修复，具体 HEAD 以 `git log -1` 为准。
+- 当前保存进度见 `docs/handoff/integration-sweep-2026-05-26.md`；远端 draft PR 为 https://github.com/TokenDanceLab/AgentHub/pull/197。
 - 主开发基线：`dev/delicious233`，主 worktree HEAD `69085d5`。
 - 主 worktree dirty，仍有 UIUX、OIDC、Web 相关并行改动；integration 文档不能把这些改动写成已合并或已验证。
 - 当前登记的 worktree 以 `git worktree list` 实时输出为准；本轮用于验证的是 `.worktrees/team-integration-verify`。
 - Web parity 分支 `worktree-feat+web-desktop-parity` 仍保留；具体 worktree 路径需实时核验，旧 `feat/webui-desktop-port` 不能代表当前 Web 状态。
+- 不强制整理或提交正在开发的 `dev/delicious233` 主工作树；integration branch 只保存本代理负责的合并、验证、issue/PR 记录。
 
 ## 候选分支状态用语
 
@@ -46,6 +48,12 @@
 - `python -c "import pathlib, yaml; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('openapi yaml ok')"`
 - migration `.up.sql` 版本前缀唯一性检查
 - `git diff --check`
+
+## PR / Issue 保存状态
+
+- Draft PR: https://github.com/TokenDanceLab/AgentHub/pull/197
+- Migration smoke blocker: https://github.com/TokenDanceLab/AgentHub/issues/196
+- CI triage 已记录在 PR 评论中；Web/UI conflict markers、Go lint toolchain、Linux-only store test failure 不从本 integration branch 静默代修。
 
 ## Migration 状态
 
