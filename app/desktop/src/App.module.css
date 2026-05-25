@@ -750,6 +750,10 @@
 
 .authModal {
   background: var(--card);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px -8px rgba(0,0,0,0.12);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .startupGate {
