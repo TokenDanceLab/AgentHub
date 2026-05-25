@@ -121,6 +121,24 @@ AgentHub 后续平台能力按下表放置，避免散落到前端本地状态�
 
 新增产品文案、schema、事件和 UI 应优先使用 `runtime`、`profile`、`configuration`、`execution_target` / `target` 命名。只有为了兼容既有 Desktop/Edge/API 调用时，才沿用 Runner 词汇，并在说明中标注兼容边界。
 
+### 2.7 推荐数据模型
+
+AgentHub 不应照搬 LangGraph/Dify 的 graph/workflow DSL，也不应把 Claude Code、Codex、OpenCode 当成业务 Agent 本体。当前产品核心是 IM-native collaboration + local/remote Runtime execution。后续 Hub、Edge、Desktop/Web 的表结构、API 和 UI 应向下面这组实体收敛：
+
+| 实体 | 核心字段 | 说明 |
+|---|---|---|
+| `AgentRuntime` | `id`, `kind`, `binary_path`, `version`, `capabilities`, `health` | 真实 CLI/SDK 运行时和 adapter 能力，例如 `codex`、`claude-code`、`opencode`。 |
+| `AgentProfile` | `id`, `owner_org_id`, `runtime_id`, `display_name`, `model_alias`, `config_version`, `visibility` | 用户在 IM/设置/市场里选择的 Agent。 |
+| `AgentConfiguration` | `instructions_sources`, `memory_sources`, `skills`, `mcp_servers`, `provider_binding_id`, `approval_policy`, `sandbox_policy`, `worktree_policy` | Profile 的可编辑规则集合，不存真实 provider key。 |
+| `ExecutionTarget` | `id`, `type`, `edge_id`, `device_id`, `workspace_allowlist`, `online`, `trust_level` | 运行位置和信任边界，覆盖 local、remote、cloud、relay。 |
+| `Thread` | `id`, `project_id`, `authority`, `title`, `last_run_id` | IM 会话和项目工作上下文的统一入口。 |
+| `Run` | `id`, `thread_id`, `profile_id`, `target_id`, `runtime_id`, `native_session_id`, `status`, `trace_id`, `budget`, `created_by` | 一次 Runtime 执行。 |
+| `RunEvent` | `seq`, `run_id`, `type`, `scope`, `payload`, `native_item_id`, `visibility`, `created_at` | append-only 事件源。Transcript、Tool timeline、Diff、Artifact、Usage 都从这里派生。 |
+| `Approval` | `run_id`, `event_id`, `action`, `resource`, `requested_by`, `decision`, `decided_by`, `expires_at` | 人类审批闭环，必须可审计、可过期、可拒绝重放。 |
+| `Artifact` / `ToolCall` / `FileChange` / `Usage` / `TraceSpan` / `AuditEvent` | derived indexes | 便于查询和渲染的索引层，不替代 `RunEvent` 事件源。 |
+
+这个模型吸收 LangGraph 的 durable thread/checkpoint、LangSmith 的 trace/run/tag、OpenHands 的 append-only event log、Dify 的 run history 思路，但不把 AgentHub 变成低代码 workflow builder。Graph、workflow、chatflow 只能作为未来上层编排能力，不能替代 `Profile -> Target -> Thread -> Run -> RunEvent -> Approval/Artifact` 主线。
+
 ## 3. 当前已完成拓扑
 
 P0-P3 已全部完成，M4 8/8 已交付。真实 Agent CLI 集成通过统一 AgentAdapter 接口对接三种 CLI：
@@ -140,6 +158,27 @@ Edge 通过 AgentAdapter 接口直接调用各 CLI 的原生协议：
 | ClaudeCodeAdapter | `claude -p --output-format stream-json --verbose` | NDJSON 逐行解析，24 种消息类型 |
 | CodexAdapter | `codex exec --json` | JSONL 逐行解析，6 种事件类型 |
 | OpenCodeAdapter | `opencode run --format json` | JSON 逐行解析，7 种事件类型 |
+
+### 3.1 Runtime 最小闭环
+
+真实 Runtime 接入必须从 CLI 输出和 Edge 事件开始，而不是从前端 mock 状态开始：
+
+```text
+UI
+  -> POST /v1/runs 或 Hub /web/agent-tasks
+  -> Edge 校验 project/thread/profile/target/workspace
+  -> Run(status=queued) + RunEvent(run.created)
+  -> ProcessExecutor -> AgentAdapter.BuildCommand()
+  -> Claude Code / Codex / OpenCode 原生结构化输出
+  -> AgentAdapter.ParseStream()
+  -> RunEvent(seq++) append-only
+  -> Edge WebSocket cursor replay
+  -> UI 渲染 Transcript / Tool timeline / Diff / Approval / Usage
+```
+
+Adapter 必须把原生事件归一到稳定事件族：`text_delta`、`thinking`、`tool_call`、`tool_result`、`file_change`、`permission_requested`、`result`、`usage`。前端只依赖 AgentHub 事件，不直接理解某个 CLI 的私有 JSON。
+
+审批闭环必须进入 `RunEvent` 和 `Approval`：UI 通过 run-scoped approval API 决策；Edge 验证 pending permission registry、runId、requestId 和 one-shot replay；需要 stdin 控制协议的 Runtime 由 adapter 写回对应控制消息。Hub 参与时，Hub 先做 TokenDance ID -> Hub user -> resource/action 授权，再把任务派到目标 Edge；Hub 同步、审计和中继，不直接启动本地 CLI 进程。
 
 ### 关键实现细节
 
