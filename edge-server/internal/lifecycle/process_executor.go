@@ -100,7 +100,7 @@ const defaultRunTimeout = 30 * time.Minute
 const (
 	defaultMaxConcurrentRuns = 5
 	defaultReadBufferSize    = 32 * 1024
-	defaultRunOutputMaxBytes = 4 * 1024 * 1024
+	defaultRunOutputMaxBytes = 1 * 1024 * 1024 // 1MB cap on run output before temp log write
 )
 
 type runOutputLimiter struct {
@@ -367,6 +367,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if ok {
 		e.bus.Publish("run.started", runScope(started), RunResponse(started))
 	}
+	e.checkPersistError(run.ID)
 
 	// Create temp file for run output persistence and replay
 	outStore, err := runnerctx.NewRunOutputStore(run.ID)
@@ -416,6 +417,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
 		e.sendSubAgentResult(run.ID, "finished", RunResponse(finished))
 	}
+	e.checkPersistError(run.ID)
 }
 
 func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outStore *runnerctx.RunOutputStore, limiter *runOutputLimiter, stream string, reader io.Reader) {
@@ -495,12 +497,33 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 			"error":  classified,
 		})
 	}
+	e.checkPersistError(run.ID)
 }
 
 func (e *ProcessExecutor) publishCancelled(run store.Run) {
 	cancelled, ok := e.store.SetRunStatusIf(run.ID, "cancelled", "queued", "started", "cancelling")
 	if ok {
 		e.bus.Publish("run.cancelled", runScope(cancelled), RunResponse(cancelled))
+	}
+	e.checkPersistError(run.ID)
+}
+
+// checkPersistError logs and emits a persistence_error event when the FileStore
+// has a pending persistence failure after a status transition.
+func (e *ProcessExecutor) checkPersistError(runID string) {
+	type persistChecker interface {
+		LastPersistError() error
+	}
+	pc, ok := e.store.(persistChecker)
+	if !ok {
+		return
+	}
+	if persistErr := pc.LastPersistError(); persistErr != nil {
+		slog.Error("file store persist failed during run status transition", "runId", runID, "err", persistErr)
+		e.bus.Publish("run.persistence_error", map[string]any{"runId": runID}, map[string]any{
+			"runId": runID,
+			"error": persistErr.Error(),
+		})
 	}
 }
 

@@ -502,11 +502,24 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// #175: Reject unknown agentId — do not fall back to default adapter.
+	if req.AgentID != "" && h.AdapterRegistry != nil {
+		if _, ok := h.AdapterRegistry.Get(req.AgentID); !ok {
+			h.runCreateMu.Unlock()
+			writeJSON(w, http.StatusBadRequest, errorResponse("invalid_agent_id", fmt.Sprintf("unknown agent adapter: %q", req.AgentID)))
+			return
+		}
+	}
+
 	runID := genID("run_")
 	run, err := repository.CreateRun(runID, req.ProjectID, req.ThreadID)
 	h.runCreateMu.Unlock()
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project or thread not found"))
+		if errors.Is(err, store.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project or thread not found"))
+		} else {
+			writeJSON(w, http.StatusInternalServerError, errorResponse("internal_error", fmt.Sprintf("failed to create run: %v", err)))
+		}
 		return
 	}
 	scope := map[string]any{
@@ -665,11 +678,13 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	heartbeat := time.NewTicker(30 * time.Second)
 	defer heartbeat.Stop()
 
-	// Read goroutine to detect close and handle pong.
-	// done signals the read loop to exit when write loop returns.
+	// Read goroutine to detect close and handle pong timeout.
+	// When the read deadline expires (no pong within 60s), the connection
+	// is closed to force the write loop to exit.
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
+		defer conn.Close()
 		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		conn.SetPongHandler(func(string) error {
 			_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
@@ -681,13 +696,12 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			default:
 			}
-			mt, msg, err := conn.ReadMessage()
+			_, _, err := conn.ReadMessage()
 			if err != nil {
 				break
 			}
 			// Inbound messages from the client are discarded by design
 			// (the server pushes events; the client only sends close/pong).
-			slog.Debug("websocket inbound message discarded", "messageType", mt, "size", len(msg))
 		}
 	}()
 
