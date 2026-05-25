@@ -122,6 +122,35 @@ function clearPendingOIDC(): void {
   sessionStorage.removeItem(OIDC_PENDING_KEY);
 }
 
+function readTokenSource(): HubAuthState['tokenSource'] {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(TOKEN_SOURCE_KEY);
+    }
+    return (typeof sessionStorage !== 'undefined'
+      ? sessionStorage.getItem(TOKEN_SOURCE_KEY)
+      : null) as HubAuthState['tokenSource'];
+  } catch {
+    return null;
+  }
+}
+
+function saveTokenSource(source: HubAuthState['tokenSource']): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(TOKEN_SOURCE_KEY);
+    }
+    if (typeof sessionStorage === 'undefined') return;
+    if (source) {
+      sessionStorage.setItem(TOKEN_SOURCE_KEY, source);
+    } else {
+      sessionStorage.removeItem(TOKEN_SOURCE_KEY);
+    }
+  } catch {
+    /* storage disabled */
+  }
+}
+
 function leaveCallbackRoute(): void {
   if (typeof window === 'undefined') return;
   window.history.replaceState({}, document.title, '/');
@@ -164,13 +193,13 @@ export function createHubAuth(client?: HubClient): HubAuth {
   const hubClient = client || createHubClient();
 
   const state: HubAuthState = {
-    // Access token loaded from secure store on tryAutoLogin.
-    // Legacy localStorage read is handled via loadStoredHubAccessToken fallback.
+    // Access token is loaded from tab-scoped sessionStorage on tryAutoLogin.
+    // Legacy localStorage token keys are cleared by the storage layer.
     token: null,
     refreshToken: null,
     user: null,
     isAuthenticated: false,
-    tokenSource: (typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_SOURCE_KEY) : null) as HubAuthState['tokenSource'],
+    tokenSource: readTokenSource(),
   };
 
   const listeners = new Set<(s: HubAuthState) => void>();
@@ -198,9 +227,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
     state.refreshToken = refreshToken;
     state.tokenSource = source;
     await saveStoredHubAccessToken(token);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(TOKEN_SOURCE_KEY, source);
-    }
+    saveTokenSource(source);
 
     authClient = createHubClient({ getToken });
     // If user profile is already available (from OIDC callback), use it directly
@@ -293,9 +320,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       state.user = null;
       state.isAuthenticated = false;
       state.tokenSource = null;
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(TOKEN_SOURCE_KEY);
-      }
+      saveTokenSource(null);
       await clearStoredHubAccessToken();
       await clearStoredHubRefreshToken();
       useHubStore.getState().clear();
@@ -345,15 +370,12 @@ export function createHubAuth(client?: HubClient): HubAuth {
         }
       }
 
-      // Load access token from secure store (Tauri) or localStorage fallback
+      // Load Web Hub access token from tab-scoped sessionStorage.
       if (!state.token) {
         const stored = await loadStoredHubAccessToken();
         if (stored) {
           state.token = stored;
-          // Load token source hint (non-sensitive, kept in localStorage for read on subsequent starts)
-          if (typeof localStorage !== 'undefined') {
-            state.tokenSource = localStorage.getItem(TOKEN_SOURCE_KEY) as HubAuthState['tokenSource'];
-          }
+          state.tokenSource = readTokenSource();
         }
       }
       if (!state.token) return false;
@@ -389,9 +411,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
         state.user = null;
         state.isAuthenticated = false;
         state.tokenSource = null;
-        if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem(TOKEN_SOURCE_KEY);
-        }
+        saveTokenSource(null);
         await clearStoredHubAccessToken();
         await clearStoredHubRefreshToken();
         useHubStore.getState().clear();
