@@ -115,6 +115,12 @@ services:
       AGENTHUB_PPROF_PASS: ${AGENTHUB_PPROF_PASS:?必须设置 AGENTHUB_PPROF_PASS}
       # CORS（生产只允许正式前端域名）
       AGENTHUB_CORS_ORIGINS: ${AGENTHUB_CORS_ORIGINS:-https://hub.vectorcontrol.tech}
+      # TokenDance ID OIDC（Hub-owned code exchange）
+      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: ${AGENTHUB_TOKENDANCE_ID_ISSUER_URL:-https://id.vectorcontrol.tech}
+      AGENTHUB_TOKENDANCE_ID_JWKS_URI: ${AGENTHUB_TOKENDANCE_ID_JWKS_URI:-}
+      AGENTHUB_TOKENDANCE_ID_CLIENT_ID: ${AGENTHUB_TOKENDANCE_ID_CLIENT_ID:-}
+      AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: ${AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET:-}
+      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub.vectorcontrol.tech/client/auth/oidc/callback}
     ports:
       - "127.0.0.1:8080:8080"   # 仅本地回环，由 Caddy/nginx 反代
       - "127.0.0.1:6060:6060"   # pprof/metrics 仅本地访问
