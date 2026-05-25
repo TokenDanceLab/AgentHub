@@ -46,6 +46,7 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 }
 
 func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
+	defer conn.W.Close(websocket.StatusNormalClosure, "")
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("ws writeLoop panic recovered", "conn_id", conn.ID, "panic", r)
@@ -59,7 +60,6 @@ func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
 			return
 		}
 	}
-	conn.W.Close(websocket.StatusNormalClosure, "")
 }
 
 func (h *WebSocketHandler) readLoop(conn *ws.Conn) {

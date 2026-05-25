@@ -188,6 +188,11 @@ func (c *Client) PoolStats() *redis.PoolStats {
 	return c.rdb.PoolStats()
 }
 
+// Close closes the underlying Redis connection pool.
+func (c *Client) Close() error {
+	return c.rdb.Close()
+}
+
 // ── Rate limiting ──────────────────────────────────────────────────────
 
 // CheckRateLimit implements a simple sliding-window counter.  It atomically
