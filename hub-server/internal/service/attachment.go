@@ -38,6 +38,16 @@ func (s *AttachmentService) ProbeAttachment(ctx context.Context, userID, hash st
 }
 
 func (s *AttachmentService) SaveAttachment(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64) (*model.Attachment, error) {
+	if !IsValidAttachmentHash(hash) {
+		return nil, errcode.ErrBadRequest
+	}
+
+	// Hash-based dedup: if the same uploader already uploaded this hash,
+	// return the existing attachment.
+	if existing, err := repository.GetAttachmentByUploaderAndHash(s.db, uploaderID, hash); err == nil && existing != nil {
+		return existing, nil
+	}
+
 	a := &model.Attachment{
 		Hash:           hash,
 		Size:           size,
@@ -99,5 +109,8 @@ func PathFromHash(hash string) string {
 }
 
 func (s *AttachmentService) MaxUploadSize() int64 {
+	if s.uploadCfg.MaxSize <= 0 {
+		return config.DefaultMaxUploadSize
+	}
 	return s.uploadCfg.MaxSize
 }
