@@ -175,3 +175,13 @@ func CancelTasksByAgentInstance(db *gorm.DB, agentInstanceID string) error {
 		Where("agent_instance_id = ? AND status IN ?", agentInstanceID, []string{model.TaskStatusQueued, model.TaskStatusDispatched, model.TaskStatusRunning}).
 		Updates(map[string]interface{}{"status": model.TaskStatusCancelled, "finished_at": &now}).Error
 }
+
+// BumpRunningTaskExpireAt extends the expire_at timestamp for a running task,
+// keeping it alive while activity (stream callbacks) continues.
+// #132: running tasks that stop receiving activity will be expired by the scheduler.
+func BumpRunningTaskExpireAt(db *gorm.DB, id string, ttl time.Duration) error {
+	newExpire := time.Now().Add(ttl)
+	return db.Model(&model.PendingAgentTask{}).
+		Where("id = ? AND status = ?", id, model.TaskStatusRunning).
+		Update("expire_at", newExpire).Error
+}
