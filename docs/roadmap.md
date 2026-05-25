@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-25（Desktop Tasks/Agent Scheduling 实数据面 + Edge raw output cap/REST timeout/local auth + Hub cache fallback/public stats buckets + dev compose loopback + client-smoke 23/23 + Web readiness/surface picker）
+最后更新：2026-05-25（M8 审计批次规划 — 129 Issues 分 8 批）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -921,6 +921,194 @@ pnpm typecheck                                         # 零错误
 | 中心化服务器权威（Multica 模式） | Hub-Edge 双层，Edge 本地自治 |
 | CRDT/OT 实时同步 | Agent 非字符级协同编辑 |
 | 固定 YAML 拓扑（ChatDev 模式） | 限制 Agent 动态调度 |
+
+---
+
+## 7. M8: Codex 系统性安全审计 — 修复批次（129 Issues）
+
+> Codex 在 2026-05-25 开发 session 中对 Hub/Edge/Desktop 全模块进行了系统性安全审计，
+> 共创建 129 个 Issue。按模块分组为 8 个批次，每批次 4-10 个 Issue，分批修复。
+
+### 7.0 批次总览
+
+| 批次 | 模块 | Issue 数 | 工期 | 风险等级 |
+|------|------|:--:|------|:--:|
+| B1 | Auth / Token 安全 | 8 | 3d | 🔴 严重 |
+| B2 | 数据完整性 / 并发 | 5 | 2d | 🔴 严重 |
+| B3 | Edge 可靠性 / 错误处理 | 8 | 3d | 🟡 高 |
+| B4 | 输入校验 / 边界防御 | 10 | 3d | 🟡 高 |
+| B5 | Session / Group 生命周期 | 8 | 3d | 🟡 高 |
+| B6 | Desktop IM / Hub 对接 | 12 | 4d | 🟢 中 |
+| B7 | CI / 文档 / 清理 | 8 | 2d | 🟢 低 |
+| B8 | Enhancement / 产品方向 | 6 | — | 规划中 |
+
+> 其余未列入批次的 Issue（约 64 个）为 no-label 杂项，在批次推进中按文件就近顺手修。
+
+---
+
+### 7.1 B1: Auth / Token 安全（🔴 严重，3d）
+
+**目标**：防止越权操作、token 泄漏、身份伪造。
+
+| # | Issue | 文件 | 方案 |
+|---|-------|------|------|
+| 158 | TokenDance bearer 不应修改 Hub 本地用户 | `hub-server/internal/middleware/auth.go` | TokenDance 用户映射只读，禁止写 local user 表 |
+| 65 | TokenDance bearer 不能当 Edge session | `edge-server/internal/httpserver/server.go` | 区分 `Authorization: Bearer td_xxx` vs `X-AgentHub-Edge-Token` |
+| 63 | 校验 TokenDance ID token 的 issuer/audience | `hub-server/internal/jwtutil/tokendance.go` | `ParseTokenDanceJWT` 增加 iss/aud 校验 |
+| 101 | 拒绝 dev compose 中的固定 JWT fallback | `hub-server/internal/config/config.go` | 生产环境 `AGENTHUB_JWT_SECRET` 为空时直接 fatal |
+| 66 | logout 必须吊销 refresh token | `hub-server/internal/service/auth.go:Logout` | 写入 Redis blacklist + DB revoke |
+| 134 | refresh 成功后轮换 refresh token | `hub-server/internal/service/auth.go:Refresh` | 旧 token 标记 revoked，发新 token |
+| 149 | logout 按 device_type 作用域化 | `hub-server/internal/handler/auth.go:Logout` | 接受 `?device_type=` 参数，不传则全清 |
+| 161 | login 时校验 device_type 白名单 | `hub-server/internal/service/auth.go:Login` | `device_type` 枚举：`desktop`/`web`/`cli` |
+
+**验收**：
+- `go test ./hub-server/internal/service/ -run "Auth" -count=1`
+- TokenDance 用户调用 Hub-local mutation API → 403
+- logout 后 refresh token 不可用
+
+---
+
+### 7.2 B2: 数据完整性 / 并发（🔴 严重，2d）
+
+**目标**：防止数据竞争、状态不一致、静默丢失。
+
+| # | Issue | 文件 | 方案 |
+|---|-------|------|------|
+| 189 | Agent task 状态转换原子化 | `hub-server/internal/service/agent.go` | `UPDATE ... WHERE status = $old` + 行锁 |
+| 187 | 状态更新失败 fail closed | `hub-server/internal/repository/agent.go` | `RowsAffected == 0` → return error |
+| 136 | 密码修改 + refresh 吊销原子化 | `hub-server/internal/service/auth.go:ChangePassword` | 同一事务内 `UPDATE password` + `DELETE refresh_tokens` |
+| 168 | session pin 上限原子检查 | `hub-server/internal/repository/message.go:Pin` | `SELECT COUNT FOR UPDATE` + insert |
+| 124 | 群组加人前检查重复 member_id | `hub-server/internal/service/session.go:AddMembers` | 去重 + UNIQUE 约束 |
+
+**验收**：
+- `go test -race ./hub-server/internal/service/ -count=5` 零 race
+- 并发 pin 超过上限 → 第二个请求返回 error
+
+---
+
+### 7.3 B3: Edge 可靠性 / 错误处理（🟡 高，3d）
+
+| # | Issue | 文件 | 方案 |
+|---|-------|------|------|
+| 191 | cursor 与 replay 实现对齐 | `edge-server/internal/events/bus.go` | `ReplayFrom(cursor)` 从精确 cursor 开始回放 |
+| 167 | Run 创建持久化失败不映射为 not_found | `edge-server/internal/api/handlers.go:PostRuns` | 区分 store 错误类型，返回 500 |
+| 165 | FileStore 持久化失败时 surface 到 Run 状态 | `edge-server/internal/store/file_store.go` | persist 失败时返回 error，Run 标记 failed |
+| 111 | Run 输出到上限前截断 | `edge-server/internal/lifecycle/process_executor.go` | `maxOutputBytes = 1MB`，超限截断 + 警告 |
+| 175 | 拒绝未知 agentId（不 fallback 默认 adapter） | `edge-server/internal/api/handlers.go:PostRuns` | 未知 agentId → 400 bad_request |
+| 103 | Edge WS heartbeat 对齐 Desktop ping/pong | `edge-server/internal/httpserver/server.go` | 30s ping interval |
+| 94 | REST write deadline 与长连接 WS 分离 | `edge-server/internal/httpserver/server.go` | REST 30s timeout，WS 不设 deadline |
+| 172 | Edge store 拒绝跨 project 的 thread ID 碰撞 | `edge-server/internal/store/store.go:CreateThread` | 检查 project_id 归属 |
+
+**验收**：
+- `go test ./edge-server/internal/api/ -run "Run" -count=1`
+- `go test -race ./edge-server/internal/store/ -count=3` 零 race
+- Edge WS `ping` 每 30s → Desktop 收到 `pong`
+
+---
+
+### 7.4 B4: 输入校验 / 边界防御（🟡 高，3d）
+
+| # | Issue | 文件 | 方案 |
+|---|-------|------|------|
+| 170 | Edge JSON body 严格解码 | `edge-server/internal/api/handlers.go` | `json.NewDecoder` + `DisallowUnknownFields` |
+| 169 | message forward 目标列表校验限界 | `hub-server/internal/service/message.go:Forward` | 限制 `targets` 长度 ≤ 50 |
+| 188 | 附件上传校验配置的 max size | `hub-server/internal/handler/attachment.go` | 读取 `cfg.MaxUploadBytes`，超限 413 |
+| 185 | CustomAgent model_params 规范化后再校验 | `hub-server/internal/model/custom_agent.go` | `BeforeSave` hook 规范化 JSON |
+| 140 | 校验 client_msg_id 格式 | `hub-server/internal/handler/message.go` | UUID/ULID 格式校验 |
+| 139 | profile nickname/avatar URL 校验 | `hub-server/internal/service/user.go:UpdateProfile` | nickname 1-50 chars，avatar URL 格式 |
+| 127 | shell 命令危险模式匹配前先标准化 | `edge-server/internal/security/origin.go` | 去掉多余空白、注释后再匹配 |
+| 143 | 附件重复上传不覆盖已有文件 | `hub-server/internal/service/attachment.go` | hash 去重，返回已有 attachment |
+| 70 | 附件 hash 校验后推导存储路径 | `hub-server/internal/service/attachment.go:Upload` | sha256 → `uploads/XX/YY/hash` |
+| 153 | reply_to_message_id 校验在同一 session 内 | `hub-server/internal/service/message.go:Send` | 查询 message → 比对 session_id |
+
+**验收**：
+- Edge POST `{"unknownField": 1}` → 400
+- 附件超过 max size → 413
+- nickname 为空 → 400 validation error
+
+---
+
+### 7.5 B5: Session / Group 生命周期（🟡 高，3d）
+
+| # | Issue | 文件 | 方案 |
+|---|-------|------|------|
+| 166 | 消息 API 对齐 dissolved session 生命周期 | `hub-server/internal/service/message.go` | dissolved session 内拒绝新消息 |
+| 163 | session membership guard 仓储错误 fail closed | `hub-server/internal/service/session.go` | repo 错误返回 500，不静默通过 |
+| 113 | group owner 离开保护应用到 delete-session | `hub-server/internal/handler/session.go:Delete` | owner 需先转让或解散 |
+| 116 | dissolved session 拒绝新 agent task | `hub-server/internal/service/agent.go:Dispatch` | 检查 session status |
+| 115 | 列表/搜索中标记 dissolved session | `hub-server/internal/repository/session.go` | `WHERE status != 'dissolved'` 默认过滤 |
+| 97 | owner 不能通过 member removal 移除自己 | `hub-server/internal/service/session.go:RemoveMembers` | 禁止移除 owner_id |
+| 112 | 群名/头像/公告修改需 owner 权限 | `hub-server/internal/handler/session.go:Update` | 检查 `requester_id == owner_id` |
+| 135 | 群成员被移除时清理 invited agents | `hub-server/internal/service/session.go:RemoveMembers` | 级联删除 pending agent invitations |
+
+**验收**：
+- dissolved session 内发消息 → 410 Gone
+- 非 owner 修改群名 → 403
+
+---
+
+### 7.6 B6: Desktop IM / Hub 对接（🟢 中，4d）
+
+| # | Issue | 文件 | 方案 |
+|---|-------|------|------|
+| 123 | Desktop IM 对话接入真实 Hub session | `app/desktop/src/api/hubClient.ts` | 对接 `POST /v1/sessions` |
+| 122 | private-session 创建对齐联系人好友边界 | `app/desktop/src/api/hubClient.ts` | 非好友不能创建 private session |
+| 121 | Desktop session model 对齐 session_id 响应 | `app/desktop/src/api/hubClient.ts` | 统一 `sessionId` 字段 |
+| 119 | Desktop IM send 对齐 Hub message 契约 | `app/desktop/src/api/hubClient.ts:sendMessage` | `POST /v1/sessions/:id/messages` |
+| 118 | Desktop 处理 session 生命周期 WS 事件 | `app/desktop/src/hooks/useChatMessages.ts` | 监听 `session.created/updated/dissolved` |
+| 117 | Hub 发布 session 生命周期 WS 事件 | `hub-server/internal/ws/manager.go` | 广播 session 变更 |
+| 125 | Desktop client 解包 Hub response envelope | `app/desktop/src/api/hubClient.ts` | 统一处理 `{data, error}` 包装 |
+| 155 | 同上 — Hub response envelope 解包 | 同上 | 同上 |
+| 126 | 分离 Desktop Hub client 方法与 web 路由 | `app/desktop/src/api/hubClient.ts` | `hubClient.desktop.*` vs `hubClient.web.*` |
+| 106 | Desktop thread rename/delete 实现或隐藏 | `app/desktop/src/components/ThreadPanel.tsx` | 对接 Hub API |
+| 150 | Desktop 权限门控不自动聚焦 Allow | `app/desktop/src/components/PermissionGate.tsx` | 去掉 `autoFocus` |
+| 102 | Desktop 权限批准阻塞原 tool request | `app/desktop/src/hooks/useChatMessages.ts` | `await decidePermission()` |
+
+**验收**：
+- Desktop 创建 session → Hub 持久化 → 刷新后可见
+- Desktop 发消息 → Hub 存储 → 其他端收到 WS 推送
+
+---
+
+### 7.7 B7: CI / 文档 / 清理（🟢 低，2d）
+
+| # | Issue | 文件 | 方案 |
+|---|-------|------|------|
+| 181 | Desktop CI test 脚本名修正 | `.github/workflows/checks.yml` | `test:desktop` → 正确脚本名 |
+| 180 | Web ESLint 接入 package scripts + CI | `app/web/package.json` | 添加 `lint` script |
+| 105 | CI gates 对齐安全/覆盖率策略 | `.github/workflows/checks.yml` | 硬阻断门槛确认 |
+| 71 | pnpm lockfile 漂移修复 | `app/web/pnpm-lock.yaml` | 重新 `pnpm install` |
+| 164 | 清理跟踪的 Go coverage profiles | `edge-server/cov_full`, `hub-server/tests/uploads/` | `.gitignore` + `git rm --cached` |
+| 74 | 同上 — 删除 tracked Edge coverage | `.gitignore` | 同上 |
+| 69 | 删除 tracked Desktop bundle analyzer 输出 | `.gitignore` | `app/desktop/stats.html` |
+| 114 | dev/smoke 脚本更新（runner 已移除） | `scripts/client-smoke.ps1` | 更新引用 |
+
+**验收**：
+- CI 全绿
+- `git status` 无 tracked build artifacts
+
+---
+
+### 7.8 B8: Enhancement / 产品方向（规划中，不定工期）
+
+| # | Issue | 说明 |
+|---|-------|------|
+| 182 | Edge 事件流作用域订阅 | Hub relay 扩展前的必要基础设施 |
+| 68 | Hub-Edge-Desktop 远程任务闭环优先 Q4 差异化 | 产品决策 |
+| 146 | IM-native agent 协作的竞品定位刷新 | 文档/策略 |
+| 16 | M1: 客户端 | Epic |
+| 15 | M1: 后端 | Epic |
+| 14 | M1: 前端 | Epic |
+
+---
+
+### 7.9 修复策略
+
+1. **按批次顺序推进**：B1 → B2 → ... → B7，不跨批次跳跃
+2. **每批次一个 PR**：10 个左右 Issue → 一个 PR，方便 review
+3. **先写测试，再修代码**：每个 Issue 补一个失败测试 → 修代码 → 测试变绿
+4. **CI 硬阻断**：`go test -race ./...` + `pnpm test` 必须全绿
+5. **每日收尾**：当天修完的批次当天 commit + push
 
 ---
 
