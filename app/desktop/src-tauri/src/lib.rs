@@ -2,6 +2,7 @@ mod commands;
 mod edge_health;
 mod edge_manager;
 mod notifications;
+mod oidc_server;
 mod secure_store;
 mod tray;
 
@@ -22,6 +23,8 @@ pub fn run() {
             commands::get_edge_status,
             commands::start_edge,
             commands::stop_edge,
+            oidc_server::start_oidc_callback_server,
+            oidc_server::stop_oidc_callback_server,
             secure_store::clear_hub_refresh_token,
             secure_store::read_hub_refresh_token,
             secure_store::store_hub_refresh_token,
