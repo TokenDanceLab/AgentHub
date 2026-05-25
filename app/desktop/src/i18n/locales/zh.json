@@ -2,7 +2,6 @@
   "action.cancelRun": "取消运行",
   "action.clearEvents": "清除事件",
   "action.startRun": "发送",
-
   "agent.capability.fileChanges": "文件修改",
   "agent.capability.multiTurn": "多轮对话",
   "agent.capability.streaming": "流式输出",
@@ -21,7 +20,6 @@
   "agent.status.unavailable": "不可用",
   "agent.status.configuring": "配置中",
   "agent.title": "Agent Runtime",
-
   "auth.confirmPassword": "确认密码",
   "auth.confirmPasswordPlaceholder": "请再次输入密码",
   "auth.error.invalidCredentials": "用户名或密码错误",
@@ -46,20 +44,24 @@
   "auth.registerButton": "创建账号",
   "auth.registerSuccess": "账号创建成功！请登录。",
   "auth.or": "或",
+  "auth.devLogin": "开发者登录",
   "auth.switchToLogin": "已有账号？去登录",
   "auth.switchToRegister": "还没有账号？去注册",
   "auth.tagline": "在本地运行 AI 编程代理",
+  "auth.startupTagline": "登录可启用 Hub 同步，也可以继续在本机本地工作。",
+  "auth.localModeTitle": "本地模式始终可用",
+  "auth.localModeDesc": "跳过登录后仍可离线使用 Local Edge、本地 Runtime、会话和 Run。",
+  "auth.continueLocal": "使用本地模式",
+  "auth.advancedSettings": "高级设置",
   "auth.title": "AgentHub",
-  "auth.tokenDanceCallbackPending": "已打开 TokenDance ID 授权页。当前版本已保存 PKCE 状态，回调捕获与令牌交换仍在接入中。",
+  "auth.tokenDanceCallbackPending": "TokenDance ID 桌面端回调尚未接通。",
   "auth.tokenDanceLogin": "使用 TokenDance ID 登录",
   "auth.tokenDancePrimary": "推荐使用 TokenDance ID，同步 Hub、设备、Agent 权限与未来跨端身份。",
   "auth.username": "用户名",
   "auth.usernamePlaceholder": "请输入用户名",
-
   "banner.dismiss": "关闭",
   "banner.disconnected": "边缘端连接已断开",
   "banner.retry": "重试",
-
   "chat.empty": "选择一个会话并发送消息开始",
   "chat.emptyAction": "尝试示例",
   "chat.emptyDescription": "选择上方智能体并输入消息，开始与 AI 编程代理协作",
@@ -79,7 +81,6 @@
   "chat.thinking": "思考中...",
   "chat.toolCall": "工具: {{name}}",
   "chat.viewFullDiff": "查看完整差异",
-
   "connectAgent.connect": "连接",
   "connectAgent.connected": "已连接",
   "connectAgent.description": "下载 AgentHub 桌面应用或打开网页客户端以开始使用",
@@ -88,15 +89,12 @@
   "connectAgent.title": "连接代理",
   "connectAgent.url": "代理地址",
   "connectAgent.webClient": "打开网页客户端",
-
   "error.streamError": "事件流错误: {{message}}",
   "error.activeRunExists": "当前会话已有运行中的 Agent 任务，已打开现有运行。",
   "error.startRunFailed": "启动 Agent 运行失败，请检查 Edge 连接和 Agent 认证状态。",
-
   "event.emptyOffline": "启动 Edge Server 以接收事件",
   "event.emptyOnline": "等待事件...",
   "event.title": "事件",
-
   "im.contact.archived": "已归档",
   "im.contact.empty": "暂无对话",
   "im.contact.offline": "离线",
@@ -114,15 +112,12 @@
   "im.message.retry": "重试",
   "im.message.sendFailed": "发送失败，点击重试",
   "im.message.you": "你",
-
   "liveStats.memory": "内存",
   "liveStats.online": "在线",
   "liveStats.title": "实时状态",
   "liveStats.uptime": "运行时间",
-
   "layout.resizeLeft": "拖动调整左侧栏宽度",
   "layout.resizeRight": "拖动调整右侧运行面板宽度",
-
   "nav.agent": "智能体",
   "nav.closeSidebar": "关闭侧边栏",
   "nav.collapseSidebar": "收起侧边栏",
@@ -131,7 +126,6 @@
   "nav.openMenu": "打开菜单",
   "nav.openSidebar": "打开侧边栏",
   "nav.settings": "设置",
-
   "perm.allow": "允许",
   "perm.allowed": "已允许",
   "perm.awaiting": "等待中",
@@ -146,7 +140,6 @@
   "perm.pending": "{{count}} 个工具等待审批",
   "perm.showInput": "显示输入",
   "perm.title": "权限门控",
-
   "prompt.agentSelector": "选择代理",
   "prompt.attachCustom": "添加自定义附件",
   "prompt.model": "模型",
@@ -159,7 +152,6 @@
   "prompt.routeProvider": "Provider",
   "prompt.routeReasoning": "推理",
   "prompt.starting": "正在启动运行",
-
   "run.close": "关闭运行详情",
   "run.collapsedRail": "已收起的运行详情控制栏",
   "run.empty": "当前没有正在执行的任务",
@@ -186,7 +178,6 @@
   "run.status.cancelled": "已取消",
   "run.title": "执行详情",
   "run.toolCalls": "工具调用",
-
   "shortcut.close": "关闭 / 取消",
   "shortcut.help": "显示快捷键",
   "shortcut.newline": "添加换行",
@@ -195,7 +186,6 @@
   "shortcut.title": "键盘快捷键",
   "shortcut.toggleRunPanel": "切换运行详情面板",
   "shortcut.toggleSidebar": "切换左侧栏",
-
   "status.hubClickToLogin": "点击登录 Hub",
   "status.hubConnected": "Hub: 已连接",
   "status.hubDisconnected": "Hub: —",
@@ -204,14 +194,11 @@
   "status.reconnecting": "重连中...",
   "status.wsConnected": "WS: 已连接",
   "status.wsDisconnected": "WS: —",
-
   "theme.dark": "切换到暗色主题",
   "theme.light": "切换到亮色主题",
-
   "workspace.share": "复制工作区上下文",
   "workspace.expand": "展开工作区",
   "workspace.collapse": "恢复工作区",
-
   "settings.title": "设置",
   "settings.back": "返回应用",
   "settings.general": "常规",
@@ -652,7 +639,6 @@
   "settings.archivedDesc": "查看和恢复已归档的项目对话。",
   "settings.noArchived": "暂无已归档对话",
   "settings.noArchivedDesc": "归档后的会话会显示在这里，方便恢复或彻底清理。",
-
   "thread.cancel": "取消",
   "thread.confirmDelete": "确认删除该会话？",
   "thread.create": "新建会话",
@@ -668,12 +654,10 @@
   "thread.title": "会话",
   "thread.emptyHint": "暂无最近会话，选择上方智能体开始聊天",
   "thread.untitled": "未命名会话",
-
   "time.daysAgo": "{{count}}天前",
   "time.hoursAgo": "{{count}}小时前",
   "time.justNow": "刚刚",
   "time.minutesAgo": "{{count}}分钟前",
-
   "toast.connected": "已连接到边缘端",
   "toast.copied": "已复制到剪贴板",
   "toast.deleteFailed": "删除会话失败",
@@ -683,7 +667,6 @@
   "toast.threadCreated": "会话已创建",
   "toast.threadDeleted": "会话已删除",
   "toast.threadRenamed": "会话已重命名",
-
   "welcome.approval": "按策略审批",
   "welcome.commandPlaceholder": "描述任务，AgentHub 会选择 Profile、模型和执行位置",
   "welcome.createThread": "创建会话",
@@ -720,5 +703,7 @@
   "welcome.suggestionsLabel": "试试示例：",
   "welcome.target": "执行目标",
   "welcome.tokendance": "TokenDance ID",
-  "welcome.title": "欢迎使用 AgentHub"
+  "welcome.title": "欢迎使用 AgentHub",
+  "auth.close": "关闭",
+  "status.localMode": "本地模式"
 }

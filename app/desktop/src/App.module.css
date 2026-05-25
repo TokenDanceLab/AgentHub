@@ -752,6 +752,15 @@
   background: var(--card);
 }
 
+.startupGate {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
 .sidebarBrand {
   padding: var(--space-lg) var(--space-lg) var(--space-md);
   flex-shrink: 0;

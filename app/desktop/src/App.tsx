@@ -30,6 +30,7 @@ import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
 import { useHubStore } from '@/stores/hubStore';
+import { useAuth } from '@/hooks/useAuth';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
@@ -116,6 +117,7 @@ function ShellIconButton({
   ...buttonProps
 }: ShellIconButtonProps) {
   const tooltipId = useId();
+
   return (
     <button
       {...buttonProps}
@@ -145,6 +147,8 @@ export default function App() {
 
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
+  const localModeSelected = useHubStore((s) => s.localModeSelected);
+  const hubAuth = useAuth();
   const { setOnline, setConnected, wsLatency } = useConnectionStore(
     useShallow((s) => ({ setOnline: s.setOnline, setConnected: s.setConnected, wsLatency: s.wsLatency })),
   );
@@ -183,9 +187,20 @@ export default function App() {
   );
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   // Mobile/tablet overlays
   const [navPanelOpen, setNavPanelOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    hubAuth.tryAutoLogin().finally(() => {
+      if (!cancelled) setAuthChecked(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hubAuth.tryAutoLogin]);
 
   // Sync health → connection store
   const prevOnlineRef = useRef<boolean | null>(null);
@@ -459,6 +474,15 @@ export default function App() {
 
   // ── Render ─────────────────────────────────
 
+  const inLocalMode = !hubAuthenticated && localModeSelected;
+  const hubActionLabel = hubAuthenticated
+    ? t('status.hubConnected')
+    : inLocalMode
+      ? t('status.localMode')
+      : t('status.hubClickToLogin');
+  const showStartupAuthChecking = !authChecked && !hubAuthenticated && !localModeSelected;
+  const showStartupAuthGate = authChecked && !hubAuthenticated && !localModeSelected;
+
   return (
     <ErrorBoundary>
     <div className={styles.root}>
@@ -472,6 +496,7 @@ export default function App() {
           {wsLatency != null && <span className={styles.topBarDim} style={{ marginLeft: 6 }}>{wsLatency}ms</span>}
           {isConnected ? <Wifi size={12} className={styles.topBarDim} /> : <WifiOff size={12} className={styles.topBarDim} />}
           {edgeStatus.lastError && <AlertTriangle size={13} className={styles.topBarDim} style={{ marginLeft: 4 }} aria-label={edgeStatus.lastError} />}
+          {inLocalMode && <span className={styles.topBarDim}>{t('status.localMode')}</span>}
         </div>
         <div className={styles.topBarRight}>
           {/* Window controls — no drag region so clicks register */}
@@ -503,7 +528,17 @@ export default function App() {
         </div>
       )}
 
-      {settingsOpen ? (
+      {showStartupAuthChecking ? (
+        <div className={styles.startupGate} aria-busy="true" />
+      ) : showStartupAuthGate ? (
+        <div className={styles.startupGate}>
+          <AuthPage
+            startup
+            onLoginSuccess={() => useHubStore.getState().setShowAuthModal(false)}
+            onContinueLocal={hubAuth.continueLocalMode}
+          />
+        </div>
+      ) : settingsOpen ? (
         <SettingsPage
           initialSection={settingsInitialSection}
           onBack={() => setSettingsOpen(false)}
@@ -522,7 +557,7 @@ export default function App() {
           <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => openSettings('general')} label={t('nav.settings')}>
             <Settings size={17} />
           </ShellIconButton>
-          <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
+          <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} label={hubActionLabel}>
             {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={17} />}
           </ShellIconButton>
           <ShellIconButton className={styles.mobileToolbarBtn} onClick={toggleTheme} label={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-pressed={theme === 'dark'}>
@@ -573,7 +608,7 @@ export default function App() {
             <ShellIconButton
               className={styles.railBtn}
               onClick={() => useHubStore.getState().setShowAuthModal(true)}
-              label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
+              label={hubActionLabel}
               tooltipSide="right"
               aria-pressed={hubAuthenticated}
             >
@@ -630,7 +665,7 @@ export default function App() {
               <ShellIconButton
                 className={styles.navIconBtn}
                 onClick={() => useHubStore.getState().setShowAuthModal(true)}
-                label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
+                label={hubActionLabel}
                 tooltipSide="top"
                 aria-pressed={hubAuthenticated}
               >
@@ -831,7 +866,13 @@ export default function App() {
 
       {showAuthModal && (
         <div className={styles.modalOverlay} onClick={() => useHubStore.getState().setShowAuthModal(false)}>
-          <div className={styles.authModal} onClick={(e) => e.stopPropagation()}>
+          <div
+            className={styles.authModal}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('auth.title')}
+            onClick={(e) => e.stopPropagation()}
+          >
             <AuthPage
               onLoginSuccess={() => useHubStore.getState().setShowAuthModal(false)}
               onClose={() => useHubStore.getState().setShowAuthModal(false)}
