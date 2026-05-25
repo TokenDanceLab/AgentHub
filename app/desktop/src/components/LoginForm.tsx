@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, KeyRound } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserProfile } from '@/api/hubClient';
 import styles from './AuthPage.module.css';
@@ -39,19 +39,21 @@ function validate(
 
 export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
   const { t } = useTranslation();
-  const { login, user } = useAuth();
+  const { login, loginWithTokenDance, user } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [identityLoading, setIdentityLoading] = useState(false);
+  const [identityNotice, setIdentityNotice] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
-  // Once the auth state updates with a user, notify parent
-  if (user) {
-    onSuccess(user);
-    return null;
-  }
+  useEffect(() => {
+    if (user) onSuccess(user);
+  }, [onSuccess, user]);
+
+  if (user) return null;
 
   const clearFieldError = useCallback((field: keyof FieldErrors) => {
     setFieldErrors((prev) => {
@@ -62,6 +64,21 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
     });
     setServerError(null);
   }, []);
+
+  const handleTokenDanceLogin = useCallback(async () => {
+    setServerError(null);
+    setIdentityNotice(null);
+    setIdentityLoading(true);
+    try {
+      await loginWithTokenDance();
+      setIdentityNotice(t('auth.tokenDanceCallbackPending'));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '';
+      setServerError(message || t('auth.error.tokenDanceUnavailable'));
+    } finally {
+      setIdentityLoading(false);
+    }
+  }, [loginWithTokenDance, t]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -166,10 +183,38 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
             <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
             {t('auth.loginButton')}
           </>
-        ) : (
-          t('auth.loginButton')
-        )}
+      ) : (
+        t('auth.loginButton')
+      )}
       </button>
+
+      <div className={styles.identityDivider} aria-hidden="true">
+        <span />
+        <strong>{t('auth.or')}</strong>
+        <span />
+      </div>
+
+      <button
+        type="button"
+        className={styles.identityButton}
+        onClick={handleTokenDanceLogin}
+        disabled={loading || identityLoading}
+      >
+        {identityLoading ? (
+          <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+        ) : (
+          <KeyRound size={16} aria-hidden="true" />
+        )}
+        <span>{t('auth.tokenDanceLogin')}</span>
+      </button>
+
+      <p className={styles.identityHint}>{t('auth.tokenDancePrimary')}</p>
+
+      {identityNotice && (
+        <div className={styles.identityNotice} role="status">
+          {identityNotice}
+        </div>
+      )}
 
       <div className={styles.switch}>
         <button

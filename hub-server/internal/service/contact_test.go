@@ -575,6 +575,32 @@ func TestListContacts_WithFriends(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestListContacts_BatchesFriendUserLookup(t *testing.T) {
+	db, mock, sqlDB := newMockDBContact(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(sqlcFriendshipsByUser).
+		WithArgs("user-1", model.StatusAccepted).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "remark"}).
+			AddRow("f-1", "user-1", "friend-a", model.StatusAccepted, "A").
+			AddRow("f-2", "user-1", "friend-b", model.StatusAccepted, "B").
+			AddRow("f-3", "user-1", "friend-c", model.StatusAccepted, "C"))
+
+	mock.ExpectQuery(sqlcUsersByIDs).
+		WithArgs("friend-a", "friend-b", "friend-c").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname", "avatar_url"}).
+			AddRow("friend-a", "friendA", "hash-a", "Friend A", "").
+			AddRow("friend-b", "friendB", "hash-b", "Friend B", "").
+			AddRow("friend-c", "friendC", "hash-c", "Friend C", ""))
+
+	svc := NewContactService(db, nil, testCacheClient(t))
+	contacts, err := svc.ListContacts(context.Background(), "user-1")
+	require.NoError(t, err)
+	assert.Len(t, contacts, 3)
+	assert.Equal(t, "friend-c", contacts[2].UserID)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ==================== UpdateRemark ====================
 
 func TestUpdateRemark(t *testing.T) {
@@ -631,5 +657,32 @@ func TestListFriendRequests_WithRequests(t *testing.T) {
 	assert.Equal(t, "sender-a", requests[0].UserID)
 	assert.Equal(t, "senderA", requests[0].Username)
 	assert.Equal(t, "Hi, let's connect!", requests[0].Message)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender(t *testing.T) {
+	db, mock, sqlDB := newMockDBContact(t)
+	defer sqlDB.Close()
+
+	now := time.Now()
+	mock.ExpectQuery(sqlcPendingReqs).
+		WithArgs("user-1", model.StatusPending).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "request_message", "created_at"}).
+			AddRow("req-1", "sender-a", "user-1", model.StatusPending, "first", now).
+			AddRow("req-2", "sender-b", "user-1", model.StatusPending, "second", now).
+			AddRow("req-3", "sender-missing", "user-1", model.StatusPending, "missing", now))
+
+	mock.ExpectQuery(sqlcUsersByIDs).
+		WithArgs("sender-a", "sender-b", "sender-missing").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname", "avatar_url"}).
+			AddRow("sender-a", "senderA", "hash-a", "Sender A", "").
+			AddRow("sender-b", "senderB", "hash-b", "Sender B", ""))
+
+	svc := NewContactService(db, nil, nil)
+	requests, err := svc.ListFriendRequests(context.Background(), "user-1")
+	require.NoError(t, err)
+	require.Len(t, requests, 2)
+	assert.Equal(t, "req-1", requests[0].RequestID)
+	assert.Equal(t, "req-2", requests[1].RequestID)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

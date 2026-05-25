@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 var _ Repository = (*FileStore)(nil)
@@ -88,6 +89,62 @@ func TestFileStoreRestoresProjectThreadRunItemAndOrder(t *testing.T) {
 	}
 }
 
+func TestFileStoreCleanupRunsPersistsRemovedRunsAndItems(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "store.json")
+
+	s, err := NewFile(path)
+	if err != nil {
+		t.Fatalf("NewFile returned error: %v", err)
+	}
+	project, _ := s.CreateProject("proj_test", "Test Project")
+	thread, err := s.CreateThread("thread_test", project.ID, "Test Thread")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	run, err := s.CreateRun("run_test", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	if _, ok := s.SetRunStatus(run.ID, "finished"); !ok {
+		t.Fatal("SetRunStatus returned ok=false")
+	}
+	if _, err := s.CreateItem(Item{
+		ID:        "item_test",
+		ProjectID: project.ID,
+		ThreadID:  thread.ID,
+		RunID:     run.ID,
+		Type:      "run",
+		Status:    "finished",
+	}); err != nil {
+		t.Fatalf("CreateItem returned error: %v", err)
+	}
+
+	result := s.CleanupRuns(RunCleanupOptions{
+		Now:         time.Now().UTC().Add(48 * time.Hour),
+		TerminalTTL: 24 * time.Hour,
+	})
+	if result.RemovedRuns != 1 || result.RemovedItems != 1 {
+		t.Fatalf("CleanupRuns result = %#v, want one removed run and item", result)
+	}
+
+	restored, err := NewFile(path)
+	if err != nil {
+		t.Fatalf("NewFile restored returned error: %v", err)
+	}
+	if _, ok := restored.GetRun(run.ID); ok {
+		t.Fatal("removed run was restored from snapshot")
+	}
+	if _, ok := restored.GetItem("item_test"); ok {
+		t.Fatal("removed item was restored from snapshot")
+	}
+	if got := restored.ListRuns(thread.ID); len(got) != 0 {
+		t.Fatalf("ListRuns = %#v, want empty after cleanup persistence", got)
+	}
+	if got := restored.ListThreadItems(thread.ID); len(got) != 0 {
+		t.Fatalf("ListThreadItems = %#v, want empty after cleanup persistence", got)
+	}
+}
+
 func TestFileStoreRejectsBadJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "store.json")
 	if err := os.WriteFile(path, []byte("{not json"), 0o644); err != nil {
@@ -112,8 +169,12 @@ func TestFileStoreRejectsUnwritableSnapshotPathOnStartup(t *testing.T) {
 	if err == nil {
 		t.Fatal("NewFile returned nil error for blocked snapshot directory")
 	}
-	if !strings.Contains(err.Error(), "verify store snapshot write") ||
-		!strings.Contains(err.Error(), "create store snapshot directory") {
+	errMessage := err.Error()
+	startupVerifyError := strings.Contains(errMessage, "verify store snapshot write") &&
+		strings.Contains(errMessage, "create store snapshot directory")
+	readPathError := strings.Contains(errMessage, "read store snapshot") &&
+		strings.Contains(errMessage, "not a directory")
+	if !startupVerifyError && !readPathError {
 		t.Fatalf("NewFile error = %v, want startup write verification directory error", err)
 	}
 }

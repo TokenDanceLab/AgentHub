@@ -6,6 +6,10 @@
 
 /* ── Base Tokens (theme-independent) ─────────────────────────────────── */
 :root {
+  /* ── Scrollbar ────────────────────────────────────────────────────── */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+
   /* ── Typography ──────────────────────────────────────────────────── */
   --font-sans:
     'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC',
@@ -32,8 +36,8 @@
   --line-height-relaxed: 1.75;
 
   /* ── Text Colors (base — theme overrides in themes.css) ──────────── */
-  --text-weaker:  oklch(0.42 0.008 260);  /* placeholder, disabled */
-  --text-weakest: oklch(0.30 0.006 260);  /* nearly-invisible separators */
+  --text-weaker:  oklch(0.52 0.012 252);  /* #6A7380 — visible secondary */
+  --text-weakest: oklch(0.32 0.010 252);  /* faint separators */
 
   /* ── Spacing (4px grid) ──────────────────────────────────────────── */
   --space-0: 0;

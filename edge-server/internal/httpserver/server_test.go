@@ -380,6 +380,61 @@ func TestNewHandlerFromConfigWithRegisteredAdapter(t *testing.T) {
 	}
 }
 
+func TestNewHandlerFromConfigRegistersRuntimeRunner(t *testing.T) {
+	reg := adapters.NewRegistry()
+	a := adapters.NewCodexAdapter("codex", "")
+	if err := reg.Register(a); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	handler, err := newHandlerFromConfig(Config{
+		AdapterRegistry: reg,
+		AgentDefault:    "codex",
+	})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	runner, ok := handler.Registry.Get("runner_local_1")
+	if !ok {
+		t.Fatal("runner_local_1 should exist")
+	}
+	if runner.Name != "Codex Runner (local)" {
+		t.Fatalf("runner name = %q, want Codex Runner (local)", runner.Name)
+	}
+	if hasString(runner.Capabilities, "mock") {
+		t.Fatalf("runner capabilities = %v, must not report mock for runtime adapter executor", runner.Capabilities)
+	}
+	for _, want := range []string{"codex", "tool_calls", "file_changes", "multi_turn"} {
+		if !hasString(runner.Capabilities, want) {
+			t.Fatalf("runner capabilities = %v, missing %q", runner.Capabilities, want)
+		}
+	}
+}
+
+func TestNewHandlerFromConfigRegistersProcessRunner(t *testing.T) {
+	handler, err := newHandlerFromConfig(Config{
+		ProcessExecutor: lifecycle.ProcessExecutorConfig{
+			Command: os.Args[0],
+			Args:    []string{"-test.run=TestProcessExecutorWiringHelper", "--"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	runner, ok := handler.Registry.Get("runner_local_1")
+	if !ok {
+		t.Fatal("runner_local_1 should exist")
+	}
+	if runner.Name != "Process Runner (local)" {
+		t.Fatalf("runner name = %q, want Process Runner (local)", runner.Name)
+	}
+	for _, want := range []string{"process", "shell"} {
+		if !hasString(runner.Capabilities, want) {
+			t.Fatalf("runner capabilities = %v, missing %q", runner.Capabilities, want)
+		}
+	}
+}
+
 func TestNewHandlerFromConfigAdapterNotFound(t *testing.T) {
 	reg := adapters.NewRegistry()
 	// Register something different from AgentDefault
@@ -501,4 +556,13 @@ func sendInterrupt() error {
 		return err
 	}
 	return p.Signal(os.Interrupt)
+}
+
+func hasString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

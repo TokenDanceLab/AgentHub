@@ -1,0 +1,1 @@
+0 3 * * * cd /opt/agenthub && ./scripts/backup-db.sh >> /var/log/agenthub-backup.log 2>&1

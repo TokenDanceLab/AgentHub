@@ -31,7 +31,7 @@ function makeRun(overrides: Partial<RunInfo> = {}): RunInfo {
 describe('RunDetail', () => {
   it('renders empty state when run is null', () => {
     render(<RunDetail run={null} toolCalls={[]} changedFiles={[]} outputText="" />);
-    expect(screen.getByText('No active run')).toBeInTheDocument();
+    expect(screen.getByText('run.empty')).toBeInTheDocument();
   });
 
   it('shows run status with color coding for running', () => {

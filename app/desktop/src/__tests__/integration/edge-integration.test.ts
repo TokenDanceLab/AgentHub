@@ -296,6 +296,9 @@ class MockEdgeServer {
           fileChanges: true,
           thinkingVisible: false,
           multiTurn: true,
+          mcpIntegration: true,
+          permissionHooks: true,
+          subAgentSpawn: false,
         },
       },
     ];
