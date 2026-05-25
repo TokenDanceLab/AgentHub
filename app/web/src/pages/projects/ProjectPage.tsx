@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   mockProjects,
   mockRuns,
@@ -61,12 +62,6 @@ type TaskForm = {
 type Notice = {
   tone: NoticeTone;
   message: string;
-};
-
-const viewLabels: Record<BoardView, string> = {
-  overview: 'Overview',
-  tasks: 'Tasks',
-  files: 'Files',
 };
 
 const emptyTaskForm: TaskForm = {
@@ -276,7 +271,7 @@ const pageStyles = `
     border-radius: 10px;
     font-size: 16px;
     line-height: 1;
-    box-shadow: 0 10px 22px var(--shadow);
+    box-shadow: 0 10px 22px var(--brand-glow);
   }
 
   .projectTitle h2 {
@@ -1090,18 +1085,6 @@ function nextTaskStatus(status: TaskStatus): TaskStatus {
   return 'Active';
 }
 
-function taskActionLabel(status: TaskStatus) {
-  if (status === 'Next') {
-    return 'Start';
-  }
-
-  if (status === 'Active') {
-    return 'Mark done';
-  }
-
-  return 'Reopen';
-}
-
 function formatLocalTime(date = new Date()) {
   return date.toLocaleTimeString([], {
     hour: '2-digit',
@@ -1228,6 +1211,7 @@ function ProjectParticles() {
 }
 
 export function ProjectPageInteractive() {
+  const { t } = useTranslation('project');
   const workbenchState = useWorkbenchProjection();
   const {
     hasLiveCatalog,
@@ -1256,6 +1240,37 @@ export function ProjectPageInteractive() {
   const projectedRuns = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map(runRecordFromApi)
     : initialRuns;
+
+  const viewLabels: Record<BoardView, string> = {
+    overview: t('sidebar.navOverview'),
+    tasks: t('sidebar.navTasks'),
+    files: t('sidebar.navFiles'),
+  };
+
+  const statusLabels: Record<string, string> = {
+    Done: t('status.done'),
+    Active: t('status.active'),
+    Next: t('status.next'),
+    'In progress': t('status.inProgress'),
+    Pass: t('status.pass'),
+    Ready: t('status.ready'),
+    Deferred: t('status.deferred'),
+    Local: t('status.local'),
+    Reviewed: t('status.reviewed'),
+    Open: t('status.open'),
+    Tracked: t('status.tracked'),
+    Edited: t('status.edited'),
+    Later: t('status.later'),
+  };
+
+  const statusLabel = (status: string) => statusLabels[status] || status;
+
+  const taskActionLabel = (status: TaskStatus) => {
+    if (status === 'Next') return t('actions.start');
+    if (status === 'Active') return t('actions.markDone');
+    return t('actions.reopen');
+  };
+
   const [activeView, setActiveView] = useState<BoardView>('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(false);
@@ -1340,23 +1355,23 @@ export function ProjectPageInteractive() {
     }
 
     if (openRiskCount > 0) {
-      return `${openRiskCount} open risk${openRiskCount === 1 ? '' : 's'} still need review.`;
+      return t('confirm.openRisksRemaining', { count: openRiskCount });
     }
 
-    return `${activeTaskCount} active task${activeTaskCount === 1 ? '' : 's'} remain after local review.`;
-  }, [activeTaskCount, notice, openRiskCount]);
+    return t('confirm.activeTasksRemaining', { count: activeTaskCount });
+  }, [activeTaskCount, notice, openRiskCount, t]);
 
   const boardTitle = useMemo(() => {
     if (activeView === 'tasks') {
-      return `Task status (${filteredTasks.length})`;
+      return t('board.tasksTitle', { count: filteredTasks.length });
     }
 
     if (activeView === 'files') {
-      return `Files and run records (${filteredFiles.length}/${filteredRuns.length})`;
+      return t('board.filesTitle', { files: filteredFiles.length, runs: filteredRuns.length });
     }
 
-    return `Project overview (${filteredProjects.length})`;
-  }, [activeView, filteredFiles.length, filteredProjects.length, filteredRuns.length, filteredTasks.length]);
+    return t('board.overviewTitle', { count: filteredProjects.length });
+  }, [activeView, filteredFiles.length, filteredProjects.length, filteredRuns.length, filteredTasks.length, t]);
 
   const openTaskPanel = () => {
     setIsTaskPanelOpen(true);
@@ -1378,7 +1393,7 @@ export function ProjectPageInteractive() {
     if (!canSaveTask) {
       setNotice({
         tone: 'warning',
-        message: 'Add a task title and owner before saving.',
+        message: t('confirm.saveValidation'),
       });
       return;
     }
@@ -1388,7 +1403,7 @@ export function ProjectPageInteractive() {
       title: taskForm.title.trim(),
       owner: taskForm.owner.trim(),
       status: 'Next',
-      detail: taskForm.detail.trim() || 'No additional note was added.',
+      detail: taskForm.detail.trim() || t('confirm.fallbackNote'),
     };
 
     setLocalTasks((current) => [newTask, ...current]);
@@ -1397,7 +1412,7 @@ export function ProjectPageInteractive() {
     setActiveView('tasks');
     setNotice({
       tone: 'success',
-      message: `Saved "${newTask.title}" as a local task.`,
+      message: t('confirm.taskSaved', { title: newTask.title }),
     });
   };
 
@@ -1428,7 +1443,7 @@ export function ProjectPageInteractive() {
 
     setNotice({
       tone: nextStatus === 'Done' ? 'success' : 'info',
-      message: `"${currentTask.title}" moved to ${nextStatus}.`,
+      message: t('confirm.taskMoved', { title: currentTask.title, status: statusLabel(nextStatus) }),
     });
   };
 
@@ -1456,8 +1471,8 @@ export function ProjectPageInteractive() {
       tone: nextStatus === 'Reviewed' ? 'success' : 'warning',
       message:
         nextStatus === 'Reviewed'
-          ? `"${currentRisk.title}" marked reviewed.`
-          : `"${currentRisk.title}" reopened for review.`,
+          ? t('confirm.riskReviewed', { title: currentRisk.title })
+          : t('confirm.riskReopened', { title: currentRisk.title }),
     });
   };
 
@@ -1479,8 +1494,8 @@ export function ProjectPageInteractive() {
       tone: nextStatus === 'Reviewed' ? 'success' : 'warning',
       message:
         nextStatus === 'Reviewed'
-          ? 'All reviewable risks are marked reviewed.'
-          : 'Reviewable risks were reopened.',
+          ? t('confirm.allRisksReviewed')
+          : t('confirm.allRisksReopened'),
     });
   };
 
@@ -1489,7 +1504,7 @@ export function ProjectPageInteractive() {
     const syncRun: RunRecord = {
       id: `local-sync-${String(projectRuns.length + 1).padStart(3, '0')}`,
       status: 'Local',
-      detail: `Local sync captured ${activeTaskCount} active tasks and ${openRiskCount} open risks.`,
+      detail: t('confirm.localSyncDetail', { tasks: activeTaskCount, risks: openRiskCount }),
       time: syncTime,
     };
 
@@ -1499,7 +1514,7 @@ export function ProjectPageInteractive() {
     setRunFilter('All');
     setNotice({
       tone: 'info',
-      message: `Sync updated local run records at ${syncTime}.`,
+      message: t('confirm.syncComplete', { time: syncTime }),
     });
   };
 
@@ -1509,12 +1524,12 @@ export function ProjectPageInteractive() {
       <ProjectParticles />
 
       <div className="projectReactShell">
-        <aside className="projectSidebar projectGlass" aria-label="Project navigation">
+        <aside className="projectSidebar projectGlass" aria-label={t('sidebar.navigationAria')}>
           <div className="projectBrand">
             <span className="projectBrandMark">AH</span>
             <div className="projectTitle">
-              <h2>AGENTHUB</h2>
-              <p>Project workspace</p>
+              <h2>{t('sidebar.brandName')}</h2>
+              <p>{t('sidebar.workspaceLabel')}</p>
             </div>
           </div>
 
@@ -1532,7 +1547,7 @@ export function ProjectPageInteractive() {
             ))}
             <button onClick={openTaskPanel} type="button">
               <span>NT</span>
-              <span>New task</span>
+              <span>{t('sidebar.navNewTask')}</span>
             </button>
           </nav>
 
@@ -1545,11 +1560,11 @@ export function ProjectPageInteractive() {
         <main className="projectMain">
           <header className="projectTopbar projectGlass">
             <label className="projectSearch">
-              <span>Search</span>
+              <span>{t('header.searchLabel')}</span>
               <input
-                aria-label="Search projects"
+                aria-label={t('header.searchAria')}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Projects, tasks, files..."
+                placeholder={t('header.searchPlaceholder')}
                 value={searchTerm}
               />
             </label>
@@ -1559,17 +1574,17 @@ export function ProjectPageInteractive() {
                 disabled={!searchTerm}
                 onClick={() => setSearchTerm('')}
                 type="button"
-                aria-label="Clear search"
+                aria-label={t('header.clearSearch')}
               >
                 C
               </button>
-              <button className="projectIconButton" type="button" aria-label="Notifications">
+              <button className="projectIconButton" type="button" aria-label={t('header.notifications')}>
                 N
               </button>
-              <button className="projectIconButton" type="button" aria-label="Settings">
+              <button className="projectIconButton" type="button" aria-label={t('header.settings')}>
                 S
               </button>
-              <div className="projectAvatar" aria-label="Current user">
+              <div className="projectAvatar" aria-label={t('header.currentUser')}>
                 PM
               </div>
             </div>
@@ -1577,19 +1592,16 @@ export function ProjectPageInteractive() {
 
           <section className="projectHero projectGlass">
             <div>
-              <p className="projectEyebrow">Project detail</p>
+              <p className="projectEyebrow">{t('hero.eyebrow')}</p>
               <h2>Workspace Preview Foundation</h2>
-              <p>
-                Coordinate frontend preview pages, milestones, task readiness, design files, and dry-run records with
-                clear live, offline snapshot, and mock fallback status.
-              </p>
+              <p>{t('hero.description')}</p>
               <div className="projectButtonRow">
                 <button
                   className="projectPrimaryButton"
                   onClick={simulateSync}
                   type="button"
                 >
-                  {syncStatus === 'Idle' ? 'Simulate sync' : 'Sync again'}
+                  {syncStatus === 'Idle' ? t('hero.simulateSync') : t('hero.syncAgain')}
                 </button>
                 <button
                   className="projectSecondaryButton"
@@ -1597,10 +1609,10 @@ export function ProjectPageInteractive() {
                   onClick={toggleAllReviewableRisks}
                   type="button"
                 >
-                  {allReviewableRisksClosed ? 'Reopen risks' : 'Mark risks reviewed'}
+                  {allReviewableRisksClosed ? t('hero.reopenRisks') : t('hero.markRisksReviewed')}
                 </button>
                 <button className="projectGhostButton" onClick={openTaskPanel} type="button">
-                  New task
+                  {t('hero.newTask')}
                 </button>
                 {notice ? <span className={`projectSyncMessage ${notice.tone}`}>{notice.message}</span> : null}
               </div>
@@ -1609,19 +1621,19 @@ export function ProjectPageInteractive() {
             <div className="projectHeroSide">
               <div className="projectProgressCard">
                 <div className="projectStatusRow">
-                  <span>Delivery progress</span>
+                  <span>{t('hero.deliveryProgress')}</span>
                   <strong>{deliveryProgress}%</strong>
                 </div>
-                <div className="projectMeter" aria-label={`Delivery progress ${deliveryProgress} percent`}>
+                <div className="projectMeter" aria-label={t('hero.deliveryProgressAria', { percent: deliveryProgress })}>
                   <span style={{ width: `${deliveryProgress}%` }} />
                 </div>
               </div>
               <div className="projectProgressCard">
                 <div className="projectStatusRow">
-                  <span>Open risks</span>
+                  <span>{t('hero.openRisks')}</span>
                   <strong>{openRiskCount}</strong>
                 </div>
-                <div className="projectMeter" aria-label="Risk review progress">
+                <div className="projectMeter" aria-label={t('hero.riskReviewAria')}>
                   <span
                     style={{
                       width: `${riskProgress}%`,
@@ -1632,41 +1644,41 @@ export function ProjectPageInteractive() {
               </div>
               <div className="projectProgressCard">
                 <div className="projectStatusRow">
-                  <span>Catalog status</span>
+                  <span>{t('hero.catalogStatus')}</span>
                   <strong>{catalogLabel}</strong>
                 </div>
-                <p className="projectMuted">{syncStatus} - {lastSyncAt}</p>
+                <p className="projectMuted">{syncStatus === 'Idle' ? t('status.idle') : syncStatus === 'Local sync complete' ? t('status.localSyncComplete') : syncStatus} - {lastSyncAt === 'Not synced yet' ? t('status.notSyncedYet') : lastSyncAt}</p>
               </div>
             </div>
           </section>
 
-          <section className="projectMetricGrid" aria-label="Project metrics">
+          <section className="projectMetricGrid" aria-label={t('metrics.aria')}>
             <article className="projectMetric projectGlass">
               <span className="projectMetricIcon">TK</span>
               <div>
                 <strong>{activeTaskCount}</strong>
-                <span>Active tasks</span>
+                <span>{t('metrics.activeTasks')}</span>
               </div>
             </article>
             <article className="projectMetric projectGlass">
               <span className="projectMetricIcon">M1</span>
               <div>
                 <strong>{milestones.length}</strong>
-                <span>Milestones</span>
+                <span>{t('metrics.milestones')}</span>
               </div>
             </article>
             <article className="projectMetric projectGlass">
               <span className="projectMetricIcon">FL</span>
               <div>
                 <strong>{projectedFiles.length}</strong>
-                <span>Shared files</span>
+                <span>{t('metrics.sharedFiles')}</span>
               </div>
             </article>
             <article className="projectMetric projectGlass">
               <span className={`projectPill ${catalogTone}`}>{catalogLabel}</span>
               <div>
                 <strong>{projectRuns.length}</strong>
-                <span>Dry runs</span>
+                <span>{t('metrics.dryRuns')}</span>
               </div>
             </article>
           </section>
@@ -1677,7 +1689,7 @@ export function ProjectPageInteractive() {
                 <h3>{boardTitle}</h3>
                 <div className="projectHeaderActions">
                   <SourceLabel source={activeView === 'tasks' ? taskSource : activeView === 'files' ? fileSource : projectSource} />
-                  <div className="projectTabs" role="tablist" aria-label="Project board sections">
+                  <div className="projectTabs" role="tablist" aria-label={t('board.tabsAria')}>
                     {(['overview', 'tasks', 'files'] as BoardView[]).map((view) => (
                       <button
                         aria-selected={activeView === view}
@@ -1706,13 +1718,13 @@ export function ProjectPageInteractive() {
                           <p className="projectMuted">{project.detail}</p>
                         </div>
                       </div>
-                      <span className={`projectPill ${statusTone(project.status)}`}>{project.status}</span>
+                      <span className={`projectPill ${statusTone(project.status)}`}>{statusLabel(project.status)}</span>
                     </article>
                     ))
                   ) : (
                     <div className="projectEmptyState">
-                      <strong>No projects match this search.</strong>
-                      <span>Clear the search box to restore the overview list.</span>
+                      <strong>{t('overview.emptyTitle')}</strong>
+                      <span>{t('overview.emptyHint')}</span>
                     </div>
                   )}
                 </div>
@@ -1722,11 +1734,11 @@ export function ProjectPageInteractive() {
                 <div className="projectList">
                   <div className="projectFilterBar">
                     <span className="projectMuted">
-                      {completedTaskCount} done / {projectTasks.length} total
+                      {t('board.doneTotal', { done: completedTaskCount, total: projectTasks.length })}
                     </span>
                     <SourceLabel source={taskSource} />
                     <button className="projectSecondaryButton" onClick={openTaskPanel} type="button">
-                      New task
+                      {t('tasks.newTask')}
                     </button>
                   </div>
                   {filteredTasks.length > 0 ? (
@@ -1739,7 +1751,7 @@ export function ProjectPageInteractive() {
                           {task.owner}: {task.detail}
                         </p>
                       </div>
-                      <span className={`projectPill ${statusTone(task.status)}`}>{task.status}</span>
+                      <span className={`projectPill ${statusTone(task.status)}`}>{statusLabel(task.status)}</span>
                       <div className="projectInlineActions">
                         <button className="projectMiniButton" onClick={() => toggleTaskStatus(task.id)} type="button">
                           {taskActionLabel(task.status)}
@@ -1749,8 +1761,8 @@ export function ProjectPageInteractive() {
                     ))
                   ) : (
                     <div className="projectEmptyState">
-                      <strong>No tasks are visible.</strong>
-                      <span>Clear search or add a local task to repopulate the board.</span>
+                      <strong>{t('tasks.emptyTitle')}</strong>
+                      <span>{t('tasks.emptyHint')}</span>
                     </div>
                   )}
                 </div>
@@ -1759,8 +1771,8 @@ export function ProjectPageInteractive() {
               {activeView === 'files' ? (
                 <div className="projectStack">
                   <div className="projectFilterBar">
-                    <div className="projectFilterGroup" aria-label="File type filters">
-                      <span className="projectFilterLabel">Files</span>
+                    <div className="projectFilterGroup" aria-label={t('files.filterAria')}>
+                      <span className="projectFilterLabel">{t('files.label')}</span>
                       <SourceLabel source={fileSource} />
                       {fileFilters.map((filter) => (
                         <button
@@ -1769,12 +1781,12 @@ export function ProjectPageInteractive() {
                           onClick={() => setFileFilter(filter)}
                           type="button"
                         >
-                          {filter}
+                          {filter === 'All' ? t('filter.all') : filter}
                         </button>
                       ))}
                     </div>
-                    <div className="projectFilterGroup" aria-label="Run status filters">
-                      <span className="projectFilterLabel">Runs</span>
+                    <div className="projectFilterGroup" aria-label={t('runs.filterAria')}>
+                      <span className="projectFilterLabel">{t('runs.label')}</span>
                       <SourceLabel source={runSource} />
                       {runFilters.map((filter) => (
                         <button
@@ -1783,7 +1795,7 @@ export function ProjectPageInteractive() {
                           onClick={() => setRunFilter(filter)}
                           type="button"
                         >
-                          {filter}
+                          {filter === 'All' ? t('filter.all') : statusLabel(filter)}
                         </button>
                       ))}
                     </div>
@@ -1798,18 +1810,18 @@ export function ProjectPageInteractive() {
                             <strong>{file.name}</strong>
                             <p className="projectMuted">{file.detail}</p>
                           </div>
-                          <span className={`projectPill ${statusTone(file.status)}`}>{file.status}</span>
+                          <span className={`projectPill ${statusTone(file.status)}`}>{statusLabel(file.status)}</span>
                         </article>
                       ))
                     ) : (
                       <div className="projectEmptyState">
-                        <strong>No files match this filter.</strong>
-                        <span>Use All or clear search to show project files.</span>
+                        <strong>{t('files.emptyTitle')}</strong>
+                        <span>{t('files.emptyHint')}</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="projectList" aria-label="Run records">
+                  <div className="projectList" aria-label={t('runs.recordsAria')}>
                     {filteredRuns.length > 0 ? (
                       filteredRuns.map((run) => (
                         <article className="projectRunRow" key={run.id}>
@@ -1821,13 +1833,13 @@ export function ProjectPageInteractive() {
                               <span className="projectPill blue">{run.time}</span>
                             </div>
                           </div>
-                          <span className={`projectPill ${statusTone(run.status)}`}>{run.status}</span>
+                          <span className={`projectPill ${statusTone(run.status)}`}>{statusLabel(run.status)}</span>
                         </article>
                       ))
                     ) : (
                       <div className="projectEmptyState">
-                        <strong>No run records match this filter.</strong>
-                        <span>Run a local sync or switch the run status filter.</span>
+                        <strong>{t('runs.emptyTitle')}</strong>
+                        <span>{t('runs.emptyHint')}</span>
                       </div>
                     )}
                   </div>
@@ -1838,7 +1850,7 @@ export function ProjectPageInteractive() {
             <aside className="projectSideStack">
               <section className="projectPanel projectGlass">
                 <div className="projectCardHeader">
-                  <h3>Milestones</h3>
+                  <h3>{t('milestones.title')}</h3>
                   <span className="projectPill blue">M1</span>
                 </div>
                 <div className="projectList">
@@ -1849,7 +1861,7 @@ export function ProjectPageInteractive() {
                         <strong>{milestone.title}</strong>
                         <p className="projectMuted">{milestone.detail}</p>
                       </div>
-                      <span className={`projectPill ${statusTone(milestone.status)}`}>{milestone.status}</span>
+                      <span className={`projectPill ${statusTone(milestone.status)}`}>{statusLabel(milestone.status)}</span>
                     </article>
                   ))}
                 </div>
@@ -1857,9 +1869,9 @@ export function ProjectPageInteractive() {
 
               <section className="projectPanel projectGlass">
                 <div className="projectCardHeader">
-                  <h3>Risks</h3>
+                  <h3>{t('risks.title')}</h3>
                   <span className={`projectPill ${openRiskCount === 0 ? 'green' : 'amber'}`}>
-                    {openRiskCount === 0 ? 'Reviewed' : 'Needs review'}
+                    {openRiskCount === 0 ? t('risks.reviewed') : t('risks.needsReview')}
                   </span>
                 </div>
                 <div className="projectList">
@@ -1869,14 +1881,14 @@ export function ProjectPageInteractive() {
                         <strong>{risk.title}</strong>
                         <p className="projectMuted">{risk.detail}</p>
                       </div>
-                      <span className={`projectPill ${statusTone(risk.status)}`}>{risk.status}</span>
+                      <span className={`projectPill ${statusTone(risk.status)}`}>{statusLabel(risk.status)}</span>
                       <button
                         className="projectMiniButton"
                         disabled={!risk.reviewable}
                         onClick={() => toggleRisk(risk.id)}
                         type="button"
                       >
-                        {risk.reviewable && risk.status === 'Reviewed' ? 'Reopen' : 'Review'}
+                        {risk.reviewable && risk.status === 'Reviewed' ? t('risks.reopen') : t('risks.review')}
                       </button>
                     </article>
                   ))}
@@ -1888,19 +1900,16 @@ export function ProjectPageInteractive() {
       </div>
 
       {isTaskPanelOpen ? (
-        <aside className="projectDrawer projectGlass" aria-label="New task panel">
+        <aside className="projectDrawer projectGlass" aria-label={t('taskForm.drawerAria')}>
           <div className="projectCardHeader">
-            <h3>New task draft</h3>
-            <button className="projectIconButton" onClick={closeTaskPanel} type="button" aria-label="Close">
+            <h3>{t('taskForm.title')}</h3>
+            <button className="projectIconButton" onClick={closeTaskPanel} type="button" aria-label={t('taskForm.closeAria')}>
               X
             </button>
           </div>
-          <p className="projectMuted">
-            This panel is local UI only. It demonstrates how the project page will expose task creation without connecting
-            a backend.
-          </p>
+          <p className="projectMuted">{t('taskForm.description')}</p>
           <div className="projectField">
-            <label htmlFor="task-title">Title</label>
+            <label htmlFor="task-title">{t('taskForm.fieldTitle')}</label>
             <input
               id="task-title"
               onChange={(event) => updateTaskForm('title', event.target.value)}
@@ -1908,7 +1917,7 @@ export function ProjectPageInteractive() {
             />
           </div>
           <div className="projectField">
-            <label htmlFor="task-owner">Owner</label>
+            <label htmlFor="task-owner">{t('taskForm.fieldOwner')}</label>
             <input
               id="task-owner"
               onChange={(event) => updateTaskForm('owner', event.target.value)}
@@ -1916,7 +1925,7 @@ export function ProjectPageInteractive() {
             />
           </div>
           <div className="projectField">
-            <label htmlFor="task-note">Note</label>
+            <label htmlFor="task-note">{t('taskForm.fieldNote')}</label>
             <textarea
               id="task-note"
               onChange={(event) => updateTaskForm('detail', event.target.value)}
@@ -1925,13 +1934,13 @@ export function ProjectPageInteractive() {
           </div>
           <div className="projectButtonRow">
             <button className="projectPrimaryButton" disabled={!canSaveTask} onClick={saveTask} type="button">
-              Save draft locally
+              {t('taskForm.saveLocal')}
             </button>
             <button className="projectSecondaryButton" onClick={closeTaskPanel} type="button">
-              Close
+              {t('taskForm.close')}
             </button>
           </div>
-          {!canSaveTask ? <span className="projectSyncMessage warning">Title and owner are required.</span> : null}
+          {!canSaveTask ? <span className="projectSyncMessage warning">{t('taskForm.validationRequired')}</span> : null}
         </aside>
       ) : null}
     </div>
