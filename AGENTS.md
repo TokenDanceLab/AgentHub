@@ -243,11 +243,16 @@ feat/* → dev/delicious233 → master
 |------|------|:--:|
 | **dev/delicious233** | 主开发分支，唯一事实源 | ✅ 活跃 |
 | master | PR-only 稳定快照，Q2 里程碑后同步 | 滞后（勿直接 clone 使用） |
-| **dev/trump** | Trump 的 Web 前端，不合并 | 独立开发 |
-| ~~dev/johnny~~ | 已过期 | ✅ 已清理 |
+| origin/dev/trump | Trump 独立分支，不作为可信进度来源 | 保留，不自动合并 |
+| origin/feat/team-johnny-merge | Johnny 聚合 merge，冲突大 | 单独审，不直合 |
+| feat/web-desktop-parity / origin/worktree-feat+web-desktop-parity | 早期 Web parity 残留，和当前 WebAgent 主线分叉 | 保留待人工决策 |
+| origin/chore/oidc-handoff-save-20260526 | OIDC handoff 保存点 | 远端保留，本地 worktree 已清理 |
+| ~~dev/johnny~~ | 已合入但远端受保护 | 本地已清理 |
 | ~~codex/johnny-fork~~ | Codex 实验分支 | ✅ 已清理 |
 | ~~codex/trump-ui-fork~~ | Codex UI fork | ✅ 已清理 |
 | ~~feat/agent-runtime-expansion~~ | Runtime 扩展 | ✅ 已清理 |
+| ~~feat/web-agent-closeout-20260526~~ | WebAgent 收尾 | ✅ 已合入并删除 |
+| ~~feat/team-hub-authz / team-hub-reliability / team-adapter-compat~~ | 授权、可靠性、adapter 修复 | ✅ 已合入并删除 |
 
 规则：
 - `master` 禁止直接 push，必须通过 PR。
@@ -255,7 +260,7 @@ feat/* → dev/delicious233 → master
 - `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + `pnpm build`。
 - `feat/*` 合并前需要 rebase 到最新 `dev/delicious233`，解决冲突后再开 PR。
 - 删除已合并的 `feat/*` 分支和对应的 worktree。
-- `dev/trump` 不合并到 `dev/delicious233`，最终由 Trump 自行决定是否 PR。
+- Trump、Johnny 聚合和旧 Web parity 残留分支不合并到 `dev/delicious233`，除非先单独审查并拆成可验证的小 patch。
 
 开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
 

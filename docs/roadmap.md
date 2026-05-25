@@ -17,7 +17,7 @@
 | **Desktop** | React 19 + Tauri 2 + Zustand + TanStack Query | viewRegistry 9视图、IM UI、AuthPage、RunState 状态机、传输层抽象 | 519 tests（34 files） | tsc 严格模式，ESLint + Prettier |
 | **Edge Server** | Go (net/http + gorilla/websocket) | 3 Adapter、24 NDJSON、Orchestrator P1-P2、Prometheus、E2E 19/19 API | 13/13 包（530 funcs） | CI 硬阈值 75%，race/gosec/govulncheck |
 | **Hub Server** | Go (Gin + GORM + Redis + PG) | DI 架构、13 包有测试、CORS+RateLimit+BodyLimit 中间件链、28 migrations | 13/13 包（355 funcs），repository 75.5% | CI 硬阈值 40%，golangci-lint/gitleaks |
-| **Web** | React + Vite | feat/trump-webui 已合入主线（2026-05-25 归档） | 构建通过 | 不做硬性要求 |
+| **Web** | React + Vite | WebAgent closeout 已合入 `dev/delicious233`；旧 Trump/Web parity 分支只作单独审查输入 | `pnpm typecheck` + `pnpm build` 通过 | 不做硬性要求 |
 | **CI/CD** | GitHub Actions | 8 job: go-edge/go-hub/benchmark/docker/cross-build/frontend/validate/gitleaks | 全绿 | race/gosec/govulncheck/覆盖率硬阻断 |
 | **官网** | Next.js 16 + Tailwind v4 | hub.vectorcontrol.tech — LiveStats + ConnectAgent | 14/20 tests | 静态导出，nginx on hk2 |
 | **部署** | Docker Compose on hk2 | PG16 + Redis7 + Hub Server（独立实例，不与 AIhub 共用） | ✅ 生产运行 | nginx 反代 api.hub.vectorcontrol.tech:80→8090 |
@@ -563,7 +563,7 @@ Hub 调度（远程）:
 - [x] 验收：`pnpm vitest run src/__tests__/errors.test.ts src/__tests__/PromptInput.test.tsx src/__tests__/Toast.test.tsx` 通过 42/42；Playwright 模拟 Edge 409 覆盖草稿保留、toast 可见、无横向溢出，截图见 `app/desktop/screenshots/run-start-active-conflict.png`。
 - [x] Active-run 真实 HTTP smoke 已复现 409：临时 Edge `127.0.0.1:3227` 使用可控慢 `powershell Start-Sleep` runner，连续同 thread `POST /v1/runs` 返回 first `202`、second `409 active_run_exists`，且 409 body 带回首个 active `runId`；说明真实 server + `ProcessExecutor` 路径有效，先前 3210 双 202 更可能是旧进程或真实 runtime 过快完成。
 
-##### Web UI 移植工作树状态 `[并行]`
+##### Web UI 移植状态 `[已合入 / 残留分支待决策]`
 
 - [x] `feat/webui-desktop-port` / `.worktrees/webui-desktop-port` 曾建立 TokenDance 生态 Web Console，`/` 指向生态控制台，旧工作台保留在 `/workbench-preview`。
 - [x] 2026-05-25 审查修复：移动端 `.workspace` 固定行/裁切、外层 `App.module.css min-width: 960px` 横向溢出、Toggle 缺少 `role="switch"` / `aria-checked` / accessible name / 44px 触控高度。
@@ -574,13 +574,14 @@ Hub 调度（远程）:
 - [x] 2026-05-25 Web worker 三次补强：`EcosystemConsole` 新增移动端/平板 `Jump to surface` picker，可直达 TokenDance ID、Hub、cc-switch、Remote control、audit 等生态入口；窄屏顺序调整为 workspace 优先、detail 次之、长侧边导航最后；测试补到 6/6，`typecheck`、`build`、`git diff --check -- app/web` 通过。
 - [x] 2026-05-25 Codex 接手推进：Web workspace 主聊天链路已切到 Hub-only。`useThreads()` 读取 Hub sessions，Hub 允许创建 owner-only group session 作为 Web workspace 会话；Web 新建 Threads、空态发送、选 Agent 都可按需创建该会话，随后发送 Hub message、按需调用 `/client/sessions/{id}/agents`，再通过 `/web/agent-tasks` 触发 Hub→Desktop/Edge dispatch；取消走 `/web/agent-tasks/{id}/cancel`。验证通过 `app/web && corepack pnpm typecheck`、`corepack pnpm build`、Hub handler/service 聚焦测试、目标文件 `git diff --check`、冲突标记和 Trump 分支残留扫描、Playwright 桌面/移动 smoke。
 - [x] 2026-05-25 Web TypeScript 收紧：`app/web/tsconfig.json` 已恢复 `strict: true`、`strictNullChecks: true`、`noUncheckedIndexedAccess: true` 与 `exactOptionalPropertyTypes: true`，清理 Web/shared optional DTO、Hub/IM adapter、permission、composer、Settings 与 private chat 形状；验证通过 `app/web && corepack pnpm exec tsc -p tsconfig.json --noEmit --strict true`、`corepack pnpm typecheck`、`corepack pnpm build`。
-- [x] 2026-05-25 Web 纯色 Codex App 质感补强：按 `codex-theme-v1` 的 `surface=#25252d`、`ink=#e3e4e6`、`accent=#5d68cc` 改为纯色深灰 surface，移除 `app/web/src` 内全部 `linear/radial/conic-gradient` 与 gradient mask；composer 复用 Desktop 单层 capsule 的 760px 栏宽、17px 输入字号、低边框/低阴影和 14px radius，移除 Web 额外 goal/card 堆叠，空态建议项改成低噪 inline chips；Playwright 桌面/移动 smoke 验证无 console error、无 raw i18n key、无横向溢出、运行时 0 个 gradient 节点且 `backdrop-filter` 生效，截图见 `app/web/screenshots/web-desktop-composer-reuse-desktop.png`、`web-desktop-composer-reuse-callback.png`、`web-desktop-composer-reuse-mobile.png`。
-- [x] **2026-05-25：`feat/webui-desktop-port` 分支与 worktree 已删除。** 产出已合入 `dev/delicious233` 主线（`app/web/` 与验证修复），不再独立维护。
-- [x] 结论：`/` 生态控制台入口已作为正式 Web 产品方向合入主线，旧 worktree 遗留问题（React alias、提交落后）随分支删除一并关闭。
+- [x] 2026-05-25 Web 纯色 Codex App 质感补强：按 `codex-theme-v1` 的 `surface=#25252d`、`ink=#e3e4e6`、`accent=#5d68cc` 改为纯色深灰 surface，移除 `app/web/src` 内全部 `linear/radial/conic-gradient` 与 gradient mask；composer 复用 Desktop 单层 capsule 的 760px 栏宽、17px 输入字号、低边框/低阴影和 14px radius，移除 Web 额外 goal/card 堆叠，空态建议项改成低噪 inline chips；Playwright 桌面/移动 smoke 验证无 console error、无 raw i18n key、无横向溢出、运行时 0 个 gradient 节点且 `backdrop-filter` 生效。截图证据保留为本地 ignored 产物，不进入 Git。
+- [x] **2026-05-26：`feat/web-agent-closeout-20260526` 已合入并删除本地/远端分支。** WebAgent 产出已成为 `dev/delicious233` 主线的一部分。
+- [x] **2026-05-26：PR #197 已关闭。** 其中安全可独立验证的 `team-hub-authz`、`team-hub-reliability`、`team-adapter-compat` 已直接合入主线；Johnny 聚合分支因 migrations/API/process-executor-test 冲突保留单独审。
+- [ ] 残留分支：`origin/dev/trump` 不作为可信进度来源；`feat/web-desktop-parity` / `origin/worktree-feat+web-desktop-parity` 与当前 WebAgent 主线大幅分叉，删除或 cherry-pick 前必须人工审 diff。
 
 ##### 文档架构 sweep `[并行]`
 
-- [x] 2026-05-25 gpt-5.5 xhigh 文档 worker 已完成文档架构审查（原写入 `docs/inbox/`，该目录已于 2026-05-25 目录重组中删除，结论已合并入本文档）。
+- [x] 2026-05-25 gpt-5.5 xhigh 文档 worker 已完成文档架构审查，结论已合并入本文档；`docs/inbox/` 仍保留为临时报告投递入口，处理后归档到 `docs/reference/` 或 `docs/archive/`。
 - [x] 2026-05-25 Codex follow-up 文档 worker 已完成，确认主文档已基本对齐，剩余风险集中在 Runner 兼容 API 命名和旧 client handoff 入口。
 - [x] 结论：主文档已基本对齐 Runtime/Profile/Configuration/Execution Target、TokenDance ID、IM、多端、远控、Skill/MCP、cc-switch、安全审计等边界。
 - [x] 旧 client smoke 文档入口已最小收口：`docs/operations/client-roadmap.md`、`docs/architecture/implementation-guide.md`、`edge-server/README.md` 已说明早期独立 `runner/` 目录废弃，`client-smoke.ps1` 使用 Edge 内置 mock executor 和 `-EdgeAddr`。
@@ -749,7 +750,7 @@ pnpm typecheck                                         # 零错误
 |------|------|---------|-----------|
 | 客户端 (Desktop + Edge) | Delicious233 | `dev/delicious233` | Edge 审计修复 + Desktop Phase 0 + 集成阶段 1-6 |
 | 后端 (Hub Server) | Johnny | `dev/delicious233` | Hub 审计 P0-P1 修复 + 测试基础设施建设 |
-| Web 前端 | Trump | `feat/trump-webui`（已删除，2026-05-25 归档） | Web UI 功能完善 → 已合入 `dev/delicious233` |
+| Web 前端 | WebAgent / Delicious233 | `dev/delicious233` | Web closeout 已合入；Trump/Web parity 残留分支单独审，不自动合 |
 
 ---
 
