@@ -195,6 +195,15 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 		return nil, errcode.MsgNotFound
 	}
 
+	// #116: reject new agent tasks for dissolved sessions
+	session, err := repository.GetSessionByID(s.db, msg.SessionID)
+	if err != nil {
+		return nil, errcode.SessionNotFound
+	}
+	if session.Dissolved {
+		return nil, errcode.SessionDissolved
+	}
+
 	// find agent instances in this session invited by this user
 	agents, err := repository.ListAgentInstancesByInviter(s.db, msg.SessionID, userID)
 	if err != nil || len(agents) == 0 {
