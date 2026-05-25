@@ -10,10 +10,22 @@ const {
   mockAddContact,
   mockCreatePrivateSession,
   mockCreateGroupSession,
+  mockAcceptFriendRequest,
+  mockRejectFriendRequest,
+  mockMarkNotificationRead,
+  mockReadAllNotifications,
+  mockMarkSessionRead,
+  mockRecallMessage,
 } = vi.hoisted(() => ({
   mockAddContact: vi.fn(async () => ({ ok: true })),
   mockCreatePrivateSession: vi.fn(async () => ({ ok: true })),
   mockCreateGroupSession: vi.fn(async () => ({ ok: true })),
+  mockAcceptFriendRequest: vi.fn(async () => ({ ok: true })),
+  mockRejectFriendRequest: vi.fn(async () => ({ ok: true })),
+  mockMarkNotificationRead: vi.fn(async () => ({ ok: true })),
+  mockReadAllNotifications: vi.fn(async () => ({ ok: true })),
+  mockMarkSessionRead: vi.fn(async () => ({ ok: true })),
+  mockRecallMessage: vi.fn(async () => ({ ok: true })),
 }));
 
 // Mock useIMChat
@@ -41,6 +53,13 @@ vi.mock('@/hooks/useIMChat', () => ({
         created_at: '2026-05-25T00:00:00Z',
       },
     ],
+    actionState: {},
+    actionCapabilities: {
+      friendRequests: true,
+      notifications: true,
+      sessionRead: true,
+      recallMessage: true,
+    },
     status: 'ready',
     error: null,
     sendMessage: vi.fn(),
@@ -51,6 +70,12 @@ vi.mock('@/hooks/useIMChat', () => ({
     addContact: mockAddContact,
     createPrivateSession: mockCreatePrivateSession,
     createGroupSession: mockCreateGroupSession,
+    acceptFriendRequest: mockAcceptFriendRequest,
+    rejectFriendRequest: mockRejectFriendRequest,
+    markNotificationRead: mockMarkNotificationRead,
+    readAllNotifications: mockReadAllNotifications,
+    markSessionRead: mockMarkSessionRead,
+    recallMessage: mockRecallMessage,
     searchContacts: vi.fn((q: string) =>
       q
         ? [{ id: 'c1', name: 'Alice', type: 'user' as const, online: true }]
@@ -91,12 +116,28 @@ describe('IMView', () => {
     expect(screen.getByText('Select a contact to start messaging')).toBeInTheDocument();
   });
 
-  it('shows read-only Hub request and notification summary', () => {
+  it('shows Hub request and notification action summary', () => {
     render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
     expect(screen.getByLabelText('Hub IM snapshot')).toBeInTheDocument();
     expect(screen.getByText('1 contact requests')).toBeInTheDocument();
-    expect(screen.getByText('1 notifications')).toBeInTheDocument();
-    expect(screen.getByText('Read-only summary')).toBeInTheDocument();
+    expect(screen.getByText('1 unread notifications')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Accept request' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reject request' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark notification read' })).toBeInTheDocument();
+  });
+
+  it('calls Hub request and notification actions', () => {
+    render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Accept request' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reject request' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark notification read' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Read all' }));
+
+    expect(mockAcceptFriendRequest).toHaveBeenCalledWith('fr-1');
+    expect(mockRejectFriendRequest).toHaveBeenCalledWith('fr-1');
+    expect(mockMarkNotificationRead).toHaveBeenCalledWith('notif-1');
+    expect(mockReadAllNotifications).toHaveBeenCalled();
   });
 
   it('shows empty message area when no contact selected', () => {
@@ -113,6 +154,7 @@ describe('IMView', () => {
     const input = screen.getByRole('textbox', { name: 'Message input' });
     expect(input).toBeInTheDocument();
     expect(input).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /Mark read/i })).toBeDisabled();
   });
 
   it('renders search contact input', () => {

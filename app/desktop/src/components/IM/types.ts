@@ -17,6 +17,7 @@ export interface IMMessage {
   read?: boolean;
   readBy?: string;
   readAt?: string;
+  actionError?: string;
 }
 
 export interface IMContact {
@@ -30,4 +31,5 @@ export interface IMContact {
   dissolved?: boolean;
   statusHint?: string;
   statusHintParams?: Record<string, string | number>;
+  unreadCount?: number;
 }
