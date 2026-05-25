@@ -177,19 +177,19 @@ func Load(configPath string) (*Config, error) {
 	// Viper AutomaticEnv handles nesting with underscores but these
 	// belt-and-suspenders overrides guarantee the env vars take precedence
 	// regardless of config file content.
-	if envIssuer := os.Getenv("AGENTHUB_TOKENDANCE_ISSUER_URL"); envIssuer != "" {
+	if envIssuer := firstEnv("AGENTHUB_TOKENDANCE_ID_ISSUER_URL", "AGENTHUB_TOKENDANCE_ISSUER_URL"); envIssuer != "" {
 		cfg.TokenDanceID.IssuerURL = envIssuer
 	}
-	if envJWKS := os.Getenv("AGENTHUB_TOKENDANCE_JWKS_URI"); envJWKS != "" {
+	if envJWKS := firstEnv("AGENTHUB_TOKENDANCE_ID_JWKS_URI", "AGENTHUB_TOKENDANCE_JWKS_URI"); envJWKS != "" {
 		cfg.TokenDanceID.JWKSURI = envJWKS
 	}
-	if envClientID := os.Getenv("AGENTHUB_TOKENDANCE_CLIENT_ID"); envClientID != "" {
+	if envClientID := firstEnv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "AGENTHUB_TOKENDANCE_CLIENT_ID"); envClientID != "" {
 		cfg.TokenDanceID.ClientID = envClientID
 	}
-	if envClientSecret := os.Getenv("AGENTHUB_TOKENDANCE_CLIENT_SECRET"); envClientSecret != "" {
+	if envClientSecret := firstEnv("AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "AGENTHUB_TOKENDANCE_CLIENT_SECRET"); envClientSecret != "" {
 		cfg.TokenDanceID.ClientSecret = envClientSecret
 	}
-	if envRedirectURI := os.Getenv("AGENTHUB_TOKENDANCE_REDIRECT_URI"); envRedirectURI != "" {
+	if envRedirectURI := firstEnv("AGENTHUB_TOKENDANCE_ID_REDIRECT_URI", "AGENTHUB_TOKENDANCE_REDIRECT_URI"); envRedirectURI != "" {
 		cfg.TokenDanceID.RedirectURI = envRedirectURI
 	}
 
@@ -199,6 +199,15 @@ func Load(configPath string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func firstEnv(names ...string) string {
+	for _, name := range names {
+		if value := os.Getenv(name); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // Validate checks that the loaded configuration is usable at startup.
