@@ -8,6 +8,36 @@ export interface HealthResponse {
   status: string;
   version: string;
   edgeId: string;
+  checks?: HealthChecks;
+}
+
+export interface HealthCheck {
+  status: string;
+  detail?: string;
+  [key: string]: unknown;
+}
+
+export interface RunnerHealthItem {
+  id: string;
+  name: string;
+  status: string;
+  capabilities?: string[];
+}
+
+export interface RunnerHealthCheck extends HealthCheck {
+  total?: number;
+  available?: number;
+  unavailable?: number;
+  statuses?: Record<string, number>;
+  items?: RunnerHealthItem[];
+}
+
+export interface HealthChecks {
+  store?: HealthCheck;
+  adapters?: HealthCheck;
+  executor?: HealthCheck;
+  runners?: RunnerHealthCheck;
+  [name: string]: HealthCheck | RunnerHealthCheck | undefined;
 }
 
 export interface PageInfo {
@@ -76,7 +106,7 @@ export interface Message {
 export interface Runner {
   id: string;
   name: string;
-  status: 'online' | 'offline' | 'draining';
+  status: string;
   capabilities?: string;
 }
 
@@ -102,6 +132,51 @@ export interface Run {
 export interface StartRunRequest {
   projectId?: string;
   threadId?: string;
+  prompt?: string;
+  agentId?: string;
+  model?: string;
+  reasoningEffort?: string;
+}
+
+// Compatibility aliases for Desktop code that still consumes the original
+// Edge REST shape while the domain model above is being consolidated.
+export interface AgentCapabilities {
+  streaming: boolean;
+  toolCalls: boolean;
+  fileChanges: boolean;
+  thinkingVisible: boolean;
+  multiTurn: boolean;
+  mcpIntegration: boolean;
+  permissionHooks: boolean;
+  subAgentSpawn: boolean;
+}
+
+export interface AgentInfo {
+  id: string;
+  name: string;
+  description?: string;
+  version?: string;
+  status: 'available' | 'unavailable' | 'configuring';
+  capabilities: AgentCapabilities;
+}
+
+export interface RunInfo {
+  runId: string;
+  projectId: string;
+  threadId: string;
+  status: string;
+  createdAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+export interface ThreadInfo {
+  threadId: string;
+  projectId: string;
+  title: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface RunLogs {
