@@ -1,0 +1,80 @@
+package repository
+
+import (
+	"time"
+
+	"github.com/agenthub/hub-server/internal/model"
+	"gorm.io/gorm"
+)
+
+const defaultTargetPageSize = 50
+
+func CreateExecutionTarget(db *gorm.DB, t *model.ExecutionTarget) error {
+	return db.Create(t).Error
+}
+
+func GetExecutionTargetByID(db *gorm.DB, id string) (*model.ExecutionTarget, error) {
+	var t model.ExecutionTarget
+	err := db.Where("id = ? AND deleted_at IS NULL", id).First(&t).Error
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+func UpdateExecutionTarget(db *gorm.DB, t *model.ExecutionTarget) error {
+	return db.Save(t).Error
+}
+
+func SoftDeleteExecutionTarget(db *gorm.DB, id, ownerID string) error {
+	return db.Model(&model.ExecutionTarget{}).
+		Where("id = ? AND owner_id = ? AND deleted_at IS NULL", id, ownerID).
+		Update("deleted_at", time.Now()).Error
+}
+
+func ListExecutionTargets(db *gorm.DB, ownerID, targetType, cursor string, pageSize int) ([]model.ExecutionTarget, bool, error) {
+	if pageSize <= 0 || pageSize > 200 {
+		pageSize = defaultTargetPageSize
+	}
+
+	qry := db.Where("owner_id = ? AND deleted_at IS NULL", ownerID)
+	if targetType != "" {
+		qry = qry.Where("target_type = ?", targetType)
+	}
+	if cursor != "" {
+		qry = qry.Where("id > ?", cursor)
+	}
+
+	var targets []model.ExecutionTarget
+	if err := qry.Order("id ASC").Limit(pageSize + 1).Find(&targets).Error; err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(targets) > pageSize
+	if hasMore {
+		targets = targets[:pageSize]
+	}
+	return targets, hasMore, nil
+}
+
+func FindTargetByOwnerAndName(db *gorm.DB, ownerID, name string) (*model.ExecutionTarget, error) {
+	var t model.ExecutionTarget
+	err := db.Where("owner_id = ? AND name = ? AND deleted_at IS NULL", ownerID, name).First(&t).Error
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+func UpdateTargetOnlineStatus(db *gorm.DB, id string, isOnline bool) error {
+	updates := map[string]interface{}{
+		"is_online":    isOnline,
+		"last_seen_at": time.Now(),
+	}
+	if !isOnline {
+		delete(updates, "last_seen_at")
+	}
+	return db.Model(&model.ExecutionTarget{}).
+		Where("id = ? AND deleted_at IS NULL", id).
+		Updates(updates).Error
+}
