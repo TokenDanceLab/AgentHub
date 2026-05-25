@@ -1,4 +1,5 @@
 import { type ReactNode, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   Archive,
@@ -37,6 +38,7 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHubStore } from '@/stores/hubStore';
 import { APP_VERSION, HUB_URL } from '@/config';
+import { createHubClient } from '@/api/hubClient';
 import { useAgentList } from '@/api/agentQueries';
 import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
@@ -112,6 +114,16 @@ interface ProjectSkill {
   status: 'ready' | 'review';
   hasScripts: boolean;
   hasReferences: boolean;
+}
+
+interface CustomAgentMarketItem {
+  id: string;
+  name: string;
+  agentType: string;
+  systemPrompt: string;
+  capabilities: string[];
+  source: string;
+  updatedAt?: string;
 }
 
 const STORAGE_PREFIX = 'agenthub-settings.';
@@ -267,17 +279,17 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [autoReview, setAutoReview] = useStoredBooleanState('autoReview', true);
   const [fullAccess, setFullAccess] = useStoredBooleanState('fullAccess', false);
   const [enableMcp, setEnableMcp] = useStoredBooleanState('enableMcp', true);
-  const [skillSync, setSkillSync] = useStoredBooleanState('skillSync', true);
+  const [, setSkillSync] = useStoredBooleanState('skillSync', true);
   const [taskSync, setTaskSync] = useStoredBooleanState('taskSync', true);
   const [groupChatEnabled, setGroupChatEnabled] = useStoredBooleanState('groupChat', true);
   const [agentSchedulingEnabled, setAgentSchedulingEnabled] = useStoredBooleanState('agentScheduling', true);
   const [enableHooks, setEnableHooks] = useStoredBooleanState('enableHooks', false);
-  const [remoteControlEnabled, setRemoteControlEnabled] = useStoredBooleanState('remoteControl', false);
+  const [, setRemoteControlEnabled] = useStoredBooleanState('remoteControl', false);
   const [autoDetectGit, setAutoDetectGit] = useStoredBooleanState('autoDetectGit', true);
   const [worktreeIsolation, setWorktreeIsolation] = useStoredBooleanState('worktreeIsolation', true);
   const [browserPreview, setBrowserPreview] = useStoredBooleanState('browserPreview', true);
   const [computerConfirm, setComputerConfirm] = useStoredBooleanState('computerConfirm', true);
-  const [platformSync, setPlatformSync] = useStoredBooleanState('platformSync', true);
+  const [, setPlatformSync] = useStoredBooleanState('platformSync', true);
   const [auditTrail, setAuditTrail] = useStoredBooleanState('auditTrail', true);
   const [detailLevel, setDetailLevel] = useStoredValueState<SelectValue>('detailLevel', 'detailed');
   const [approvalMode, setApprovalMode] = useStoredValueState<SelectValue>('approvalMode', 'ask');
@@ -299,6 +311,18 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const setCcSwitchBridge = useModelSettingsStore((s) => s.setCcSwitchBridgeEnabled);
   const updateCcSwitchProvider = useModelSettingsStore((s) => s.updateProvider);
   const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
+  const hubSessionActive = hubAuthenticated || hubAuth.isAuthenticated;
+  const settingsHubClient = useMemo(
+    () => createHubClient({ getToken: () => hubAuth.token ?? null }),
+    [hubAuth.token],
+  );
+  const shouldLoadAgentMarket = hubSessionActive && active === 'agentMarket';
+  const customAgentsQuery = useQuery({
+    queryKey: ['hub-settings', 'custom-agents', hubAuth.token],
+    queryFn: () => settingsHubClient.listCustomAgents(),
+    enabled: shouldLoadAgentMarket,
+    retry: false,
+  });
   const agents = agentData?.items ?? [];
   const localAgentProfiles = useMemo(
     () => agents.map((agent) => ({
@@ -331,16 +355,18 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const recentRuns = getRecentRuns(runs, 5);
   const activeHubTasks = bridgedTasks.filter(isActiveBridgeTask).length;
   const recentBridgeTasks = getRecentTasks(bridgedTasks, 5);
+  const remoteControlReady = false;
   const schedulerActiveItems = activeRuns + activeHubTasks;
   const schedulerTotalItems = runs.length + bridgedTasks.length;
   const schedulerTargetReadyCount = [
     edgeOnline,
-    hubAuthenticated,
-    remoteControlEnabled,
+    hubSessionActive,
+    remoteControlReady,
     false,
   ].filter(Boolean).length;
   const schedulerLocalMetric = totalRunners > 0 ? runnerSummary : edgeOnline ? t('settings.edgeOnline') : t('settings.edgeOffline');
-  const marketPublishReady = agents.filter((agent) => agent.status === 'available').length;
+  const customAgents = (customAgentsQuery.data ?? []).map(normalizeCustomAgent);
+  const marketPublishReady = customAgents.length;
   const marketCapabilityCount = countAgentCapabilities(agents);
   const skillScriptCount = PROJECT_SKILLS.filter((skill) => skill.hasScripts).length;
   const skillReferenceCount = PROJECT_SKILLS.filter((skill) => skill.hasReferences).length;
@@ -348,7 +374,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const mcpCapableAgents = agents.filter((agent) => agent.capabilities.mcpIntegration).length;
   const mcpPermissionHookAgents = agents.filter((agent) => agent.capabilities.permissionHooks).length;
   const mcpSubAgentAgents = agents.filter((agent) => agent.capabilities.subAgentSpawn).length;
-  const hubSessionActive = hubAuthenticated || hubAuth.isAuthenticated;
   const accountName = hubAuth.user?.username ?? username ?? t('settings.signedIn');
   const tokenSource = hubAuth.tokenSource;
   const tokenSourceLabel =
@@ -373,7 +398,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     modelMappingEnabled,
     ccSwitchBridge,
     autoReview,
-    remoteControlEnabled,
+    remoteControlReady,
   ].filter(Boolean).length;
 
   const navItems = useMemo<NavItem[]>(
@@ -710,9 +735,9 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   icon={<Globe2 size={18} />}
                   title={t('settings.targetHubRelay')}
                   description={t('settings.targetHubRelayDesc')}
-                  status={hubAuthenticated ? t('settings.enabled') : t('settings.notConfigured')}
-                  metric={hubAuthenticated ? t('settings.targetHubSignedIn') : t('settings.targetHubSignInRequired')}
-                  connected={hubAuthenticated}
+                  status={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')}
+                  metric={hubSessionActive ? t('settings.targetHubSignedIn') : t('settings.targetHubSignInRequired')}
+                  connected={hubSessionActive}
                 />
                 <ExecutionTargetCard
                   icon={<Server size={18} />}
@@ -752,7 +777,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   icon={<ClipboardList size={18} />}
                   label={t('settings.taskHubBridge')}
                   value={`${activeHubTasks}/${bridgedTasks.length}`}
-                  detail={hubAuthenticated ? t('settings.taskHubBridgeDesc') : t('settings.taskHubBridgeSignedOut')}
+                  detail={hubSessionActive ? t('settings.taskHubBridgeDesc') : t('settings.taskHubBridgeSignedOut')}
                 />
                 <SummaryCard
                   icon={<Monitor size={18} />}
@@ -770,7 +795,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.taskSync')}
                 description={t('settings.taskSyncDesc')}
-                control={<Switch checked={taskSync} onChange={setBooleanSetting('taskSync', setTaskSync)} />}
+                control={
+                  <Switch
+                    checked={hubSessionActive && taskSync}
+                    onChange={setBooleanSetting('taskSync', setTaskSync)}
+                    disabled={!hubSessionActive}
+                  />
+                }
               />
               <SettingRow
                 title={t('settings.taskInbox')}
@@ -840,17 +871,17 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <CapabilityCard
                   title={t('settings.onlineImSessions')}
                   description={t('settings.onlineImSessionsDesc')}
-                  status={t('settings.statusReady')}
+                  status={hubSessionActive ? t('settings.contractPending') : t('settings.signedOut')}
                 />
                 <CapabilityCard
                   title={t('settings.onlineImPresence')}
                   description={t('settings.onlineImPresenceDesc')}
-                  status={t('settings.statusPlanned')}
+                  status={t('settings.contractPending')}
                 />
                 <CapabilityCard
                   title={t('settings.onlineImNotifications')}
                   description={t('settings.onlineImNotificationsDesc')}
-                  status={t('settings.statusPlanned')}
+                  status={hubSessionActive ? t('settings.contractPending') : t('settings.signedOut')}
                 />
               </div>
             </Panel>
@@ -861,11 +892,25 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.enableGroupChat')}
                 description={t('settings.enableGroupChatDesc')}
-                control={<Switch checked={groupChatEnabled} onChange={setBooleanSetting('groupChat', setGroupChatEnabled)} />}
+                control={
+                  <Switch
+                    checked={hubSessionActive && groupChatEnabled}
+                    onChange={setBooleanSetting('groupChat', setGroupChatEnabled)}
+                    disabled
+                  />
+                }
               />
-              <SettingRow title={t('settings.groupChatAgents')} description={t('settings.groupChatAgentsDesc')} value={t('settings.statusReady')} />
-              <SettingRow title={t('settings.groupChatRooms')} description={t('settings.groupChatRoomsDesc')} value={t('settings.statusPlanned')} />
-              <SettingRow title={t('settings.groupChatModeration')} description={t('settings.groupChatModerationDesc')} value={t('settings.statusPlanned')} />
+              <SettingRow
+                title={t('settings.groupChatAgents')}
+                description={t('settings.groupChatAgentsDesc')}
+                value={hubSessionActive ? t('settings.contractPending') : t('settings.signedOut')}
+              />
+              <SettingRow
+                title={t('settings.groupChatRooms')}
+                description={t('settings.groupChatRoomsDesc')}
+                value={hubSessionActive ? t('settings.contractPending') : t('settings.signedOut')}
+              />
+              <SettingRow title={t('settings.groupChatModeration')} description={t('settings.groupChatModerationDesc')} value={t('settings.contractPending')} />
             </Panel>
           )}
 
@@ -938,17 +983,17 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     icon={<Globe2 size={18} />}
                     title={t('settings.schedulerRouteHub')}
                     description={t('settings.schedulerRouteHubDesc')}
-                    status={hubAuthenticated ? t('settings.enabled') : t('settings.notConfigured')}
-                    metric={hubAuthenticated ? t('settings.targetHubSignedIn') : t('settings.targetHubSignInRequired')}
-                    connected={hubAuthenticated}
+                    status={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')}
+                    metric={hubSessionActive ? t('settings.targetHubSignedIn') : t('settings.targetHubSignInRequired')}
+                    connected={hubSessionActive}
                   />
                   <ExecutionTargetCard
                     icon={<Computer size={18} />}
                     title={t('settings.schedulerRouteRemote')}
                     description={t('settings.schedulerRouteRemoteDesc')}
-                    status={remoteControlEnabled ? t('settings.statusInProgress') : t('settings.statusPlanned')}
+                    status={t('settings.interfaceGap')}
                     metric="SSH / Tailscale"
-                    connected={remoteControlEnabled}
+                    connected={remoteControlReady}
                   />
                   <ExecutionTargetCard
                     icon={<Server size={18} />}
@@ -978,7 +1023,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.schedulerPolicyRemote')}
                     description={t('settings.schedulerPolicyRemoteDesc')}
-                    status={remoteControlEnabled ? t('settings.enabled') : t('settings.statusPlanned')}
+                    status={t('settings.interfaceGap')}
                   />
                   <CapabilityCard
                     title={t('settings.schedulerPolicyApproval')}
@@ -993,6 +1038,16 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'agentMarket' && (
             <Panel title={t('settings.agentMarket')} description={t('settings.agentMarketDesc')}>
+              {!hubSessionActive ? (
+                <AuthGapBlock
+                  title={t('settings.hubSignInRequired')}
+                  description={t('settings.marketSignedOutDesc')}
+                  actionLabel={t('settings.signIn')}
+                  onAction={onOpenAuth}
+                />
+              ) : customAgentsQuery.isError ? (
+                <EmptyBlock title={t('settings.hubUnavailable')} description={t('settings.marketHubErrorDesc')} />
+              ) : null}
               <div className={styles.summaryGrid}>
                 <SummaryCard
                   icon={<Bot size={18} />}
@@ -1003,7 +1058,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<ShieldCheck size={18} />}
                   label={t('settings.marketPublishReady')}
-                  value={`${marketPublishReady}/${agents.length}`}
+                  value={customAgentsQuery.isLoading ? t('settings.loading') : `${marketPublishReady}`}
                   detail={t('settings.marketPublishReadyDesc')}
                 />
                 <SummaryCard
@@ -1015,23 +1070,43 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Globe2 size={18} />}
                   label={t('settings.marketHubSync')}
-                  value={hubAuthenticated ? t('settings.enabled') : t('settings.notConfigured')}
-                  detail={hubAuthenticated ? t('settings.marketHubSyncDesc') : t('settings.marketHubSyncSignedOut')}
+                  value={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')}
+                  detail={hubSessionActive ? t('settings.marketHubSyncDesc') : t('settings.marketHubSyncSignedOut')}
                 />
               </div>
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.marketInstalledProfiles')}</strong>
-                  <span>{t('settings.marketInstalledProfilesDesc')}</span>
+                  <div className={styles.taskSectionTitleRow}>
+                    <div>
+                      <strong>{t('settings.marketInstalledProfiles')}</strong>
+                      <span>{t('settings.marketInstalledProfilesDesc')}</span>
+                    </div>
+                    <div className={styles.taskSectionActions}>
+                      <button
+                        type="button"
+                        className={styles.secondaryBtn}
+                        onClick={() => void customAgentsQuery.refetch()}
+                        disabled={!hubSessionActive || customAgentsQuery.isFetching}
+                      >
+                        <RefreshCw size={15} />
+                        {customAgentsQuery.isFetching ? t('settings.marketRefreshing') : t('settings.marketRefresh')}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                {agents.length > 0 ? (
+                {customAgentsQuery.isLoading ? (
+                  <EmptyBlock title={t('settings.loading')} description={t('settings.marketLoadingDesc')} />
+                ) : customAgents.length > 0 ? (
                   <div className={styles.profileGrid}>
-                    {agents.map((agent) => (
+                    {customAgents.map((agent) => (
                       <AgentMarketCard key={`market-${agent.id}`} agent={agent} />
                     ))}
                   </div>
                 ) : (
-                  <EmptyBlock title={t('settings.marketNoProfiles')} description={t('settings.marketNoProfilesDesc')} />
+                  <EmptyBlock
+                    title={t('settings.marketNoProfiles')}
+                    description={hubSessionActive ? t('settings.marketNoProfilesDesc') : t('settings.marketSignedOutDesc')}
+                  />
                 )}
               </div>
               <div className={styles.taskSection}>
@@ -1043,7 +1118,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.agentTemplates')}
                     description={t('settings.agentTemplatesDesc')}
-                    status={agents.length > 0 ? t('settings.statusInProgress') : t('settings.statusPlanned')}
+                    status={customAgents.length > 0 ? t('settings.statusReady') : t('settings.notConfigured')}
                   />
                   <CapabilityCard
                     title={t('settings.agentCapabilityTags')}
@@ -1053,12 +1128,12 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.agentReviewFlow')}
                     description={t('settings.agentReviewFlowDesc')}
-                    status={autoReview ? t('settings.statusInProgress') : t('settings.statusPlanned')}
+                    status={t('settings.interfaceGap')}
                   />
                   <CapabilityCard
                     title={t('settings.marketTokenDancePublish')}
                     description={t('settings.marketTokenDancePublishDesc')}
-                    status={hubAuthenticated ? t('settings.statusInProgress') : t('settings.notConfigured')}
+                    status={hubSessionActive ? t('settings.interfaceGap') : t('settings.notConfigured')}
                   />
                 </div>
               </div>
@@ -1107,14 +1182,14 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Globe2 size={18} />}
                   label={t('settings.mcpHubSync')}
-                  value={hubAuthenticated && enableMcp ? t('settings.enabled') : t('settings.notConfigured')}
-                  detail={hubAuthenticated ? t('settings.mcpHubSyncDesc') : t('settings.mcpHubSyncSignedOut')}
+                  value={t('settings.contractPending')}
+                  detail={t('settings.mcpHubSyncNoInterface')}
                 />
               </div>
               <SettingRow
                 title={t('settings.enableMcp')}
                 description={t('settings.enableMcpDesc')}
-                control={<Switch checked={enableMcp} onChange={setBooleanSetting('enableMcp', setEnableMcp)} />}
+                control={<Switch checked={enableMcp && edgeOnline} onChange={setBooleanSetting('enableMcp', setEnableMcp)} disabled={!edgeOnline} />}
               />
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
@@ -1150,7 +1225,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.mcpTokenDanceHub')}
                     description={t('settings.mcpTokenDanceHubDesc')}
-                    status={hubAuthenticated ? t('settings.statusInProgress') : t('settings.notConfigured')}
+                    status={t('settings.contractPending')}
                   />
                   <CapabilityCard
                     title={t('settings.mcpRemoteServer')}
@@ -1187,14 +1262,14 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Globe2 size={18} />}
                   label={t('settings.skillHubSync')}
-                  value={hubAuthenticated && skillSync ? t('settings.enabled') : t('settings.notConfigured')}
-                  detail={hubAuthenticated ? t('settings.skillHubSyncDesc') : t('settings.skillHubSyncSignedOut')}
+                  value={t('settings.contractPending')}
+                  detail={t('settings.skillHubSyncNoInterface')}
                 />
               </div>
               <SettingRow
                 title={t('settings.skillSync')}
                 description={t('settings.skillSyncDesc')}
-                control={<Switch checked={skillSync} onChange={setBooleanSetting('skillSync', setSkillSync)} />}
+                control={<Switch checked={false} onChange={setBooleanSetting('skillSync', setSkillSync)} disabled />}
               />
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
@@ -1363,8 +1438,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             <Panel title={t('settings.connections')} description={t('settings.connectionsDesc')}>
               <ConnectionRow
                 name="Hub"
-                description={hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
-                connected={hubAuthenticated}
+                description={hubSessionActive ? t('status.hubConnected') : t('status.hubDisconnected')}
+                connected={hubSessionActive}
               />
               <ConnectionRow name="Edge" description={`${t('settings.edgeLocal')} · ${runnerSummary}`} connected={edgeOnline} />
               <ConnectionRow name="WebSocket" description={t('status.wsConnected')} connected={edgeOnline} />
@@ -1376,10 +1451,10 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.remoteControlEnable')}
                 description={t('settings.remoteControlEnableDesc')}
-                control={<Switch checked={remoteControlEnabled} onChange={setBooleanSetting('remoteControl', setRemoteControlEnabled)} />}
+                control={<Switch checked={false} onChange={setBooleanSetting('remoteControl', setRemoteControlEnabled)} disabled />}
               />
               <SettingRow title={t('settings.remoteControlApproval')} description={t('settings.remoteControlApprovalDesc')} value={t('settings.approvalMode.ask')} />
-              <SettingRow title={t('settings.remoteControlDevices')} description={t('settings.remoteControlDevicesDesc')} value={t('settings.statusPlanned')} />
+              <SettingRow title={t('settings.remoteControlDevices')} description={t('settings.remoteControlDevicesDesc')} value={t('settings.interfaceGap')} />
             </Panel>
           )}
 
@@ -1456,7 +1531,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.platformSync')}
                 description={t('settings.platformSyncDesc')}
-                control={<Switch checked={platformSync} onChange={setBooleanSetting('platformSync', setPlatformSync)} />}
+                control={<Switch checked={false} onChange={setBooleanSetting('platformSync', setPlatformSync)} disabled />}
               />
               <div className={styles.capabilityGrid}>
                 <CapabilityCard title="macOS" description={t('settings.platformMacosDesc')} status={t('settings.statusReady')} />
@@ -1509,7 +1584,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Route size={18} />}
                   label={t('settings.syncScope')}
-                  value={hubSessionActive ? 'Hub' : t('settings.notConfigured')}
+                  value={hubSessionActive ? t('settings.contractPending') : t('settings.signedOut')}
                   detail={t('settings.syncScopeDesc')}
                 />
               </div>
@@ -1537,7 +1612,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.deviceProof')}
                     description={t('settings.deviceProofDesc')}
-                    status={deviceId ? t('settings.statusInProgress') : t('settings.notConfigured')}
+                    status={deviceId ? t('settings.localOnly') : t('settings.signedOut')}
                   />
                 </div>
               </div>
@@ -1939,11 +2014,8 @@ function LocalAgentProfileCard({
   );
 }
 
-function AgentMarketCard({ agent }: { agent: AgentInfo }) {
+function AgentMarketCard({ agent }: { agent: CustomAgentMarketItem }) {
   const { t } = useTranslation();
-  const capabilityNames = Object.entries(agent.capabilities)
-    .filter(([, enabled]) => enabled)
-    .map(([name]) => t(`settings.capability.${name}`, { defaultValue: name }));
 
   return (
     <div className={styles.profileCard}>
@@ -1953,20 +2025,22 @@ function AgentMarketCard({ agent }: { agent: AgentInfo }) {
         </div>
         <div>
           <strong>{agent.name}</strong>
-          <span>{agent.description || t('settings.marketProfileDefaultDesc')}</span>
+          <span>{agent.systemPrompt || t('settings.marketProfileDefaultDesc')}</span>
         </div>
-        <em className={`${styles.profileStatus} ${styles[`profileStatus_${agent.status}`]}`}>
-          {t(`agent.status.${agent.status}`)}
+        <em className={`${styles.profileStatus} ${styles.profileStatus_available}`}>
+          {t('settings.statusReady')}
         </em>
       </div>
       <div className={styles.profileMeta}>
-        <span>{t('settings.profileRuntime')}: {agent.id}</span>
-        <span>{t('settings.marketInstallSource')}: Local Edge</span>
-        <span>{t('settings.marketPublishStatus')}: {agent.status === 'available' ? t('settings.statusInProgress') : t('settings.statusPlanned')}</span>
+        <span>{t('settings.marketCustomAgentId')}: {agent.id}</span>
+        <span>{t('settings.marketAgentType')}: {agent.agentType}</span>
+        <span>{t('settings.marketInstallSource')}: {agent.source}</span>
+        <span>{t('settings.marketPublishStatus')}: {t('settings.statusReady')}</span>
+        {agent.updatedAt ? <span>{t('settings.marketUpdatedAt')}: {formatTimestamp(agent.updatedAt)}</span> : null}
       </div>
       <div className={styles.profileMeta}>
-        {capabilityNames.length > 0 ? (
-          capabilityNames.map((name) => <span key={name}>{name}</span>)
+        {agent.capabilities.length > 0 ? (
+          agent.capabilities.map((name) => <span key={name}>{name}</span>)
         ) : (
           <span>{t('settings.marketNoCapabilityTags')}</span>
         )}
@@ -2114,17 +2188,84 @@ function ConnectionRow({ name, description, connected }: { name: string; descrip
   );
 }
 
-function Switch({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+function Switch({
+  checked,
+  onChange,
+  disabled = false,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+}) {
   return (
     <button
       className={`${styles.switch} ${checked ? styles.switchOn : ''}`}
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
     >
       <span />
     </button>
   );
+}
+
+function AuthGapBlock({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <div className={styles.authGapBlock}>
+      <div className={styles.settingCopy}>
+        <strong>{title}</strong>
+        <span>{description}</span>
+      </div>
+      <button type="button" className={styles.primaryBtn} onClick={onAction}>
+        <LogIn size={16} />
+        {actionLabel}
+      </button>
+    </div>
+  );
+}
+
+function normalizeCustomAgent(raw: Record<string, unknown>): CustomAgentMarketItem {
+  const id = readUnknownString(raw.id) ?? readUnknownString(raw.agent_id) ?? readUnknownString(raw.custom_agent_id) ?? 'custom-agent';
+  const capabilityTags = readUnknownArray(raw.capability_tags);
+  return {
+    id,
+    name: readUnknownString(raw.name) ?? id,
+    agentType: readUnknownString(raw.agent_type) ?? readUnknownString(raw.type) ?? 'custom',
+    systemPrompt: readUnknownString(raw.system_prompt) ?? readUnknownString(raw.description) ?? '',
+    capabilities: capabilityTags.length > 0 ? capabilityTags : readUnknownArray(raw.capabilities),
+    source: '/web/custom-agents',
+    updatedAt: readUnknownString(raw.updated_at) ?? readUnknownString(raw.created_at),
+  };
+}
+
+function readUnknownString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function readUnknownArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return readUnknownArray(parsed);
+    } catch {
+      return value ? [value] : [];
+    }
+  }
+  return [];
 }
 
 function SelectControl({
