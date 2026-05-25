@@ -981,6 +981,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubCreateGroup
       summary: Create a group chat session.
+      description: "`member_ids` may be an empty array when a browser workspace needs an owner-only group session that can invite an Agent before dispatch."
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -3038,6 +3039,10 @@ components:
           type: string
           format: uuid
           description: Stable Hub device UUID; must match the callback request.
+        redirect_uri:
+          type: string
+          format: uri
+          description: Optional browser redirect URI for this PKCE round trip. When omitted, Hub uses its configured TokenDance ID redirect URI.
     HubOIDCAuthorizeResponse:
       type: object
       required: [code, data]
@@ -3078,6 +3083,10 @@ components:
           type: string
           format: uuid
           description: Same stable Hub device UUID used in the authorize request.
+        redirect_uri:
+          type: string
+          format: uri
+          description: Same redirect URI used in the authorize request. Optional for legacy desktop clients that use the configured Hub redirect URI.
     HubOIDCCallbackResponse:
       type: object
       required: [code, data]
@@ -3195,6 +3204,9 @@ components:
           description: >
             Claude Code permission mode: default, acceptEdits, bypassPermissions, plan, dontAsk.
             Also mapped to Codex --sandbox level.
+        workDir:
+          type: string
+          description: Working directory override for this run. Defaults to the Edge process profile workdir.
         includePartial:
           type: boolean
           description: Include partial stream_event messages for real-time deltas (Claude Code --include-partial-messages).

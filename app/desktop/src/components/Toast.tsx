@@ -11,10 +11,10 @@ const TOAST_ICONS: Record<ToastType, typeof CheckCircle> = {
 };
 
 const variantClass: Record<ToastType, string> = {
-  success: styles.success,
-  error: styles.error,
-  warning: styles.warning,
-  info: styles.info,
+  success: styles.success ?? '',
+  error: styles.error ?? '',
+  warning: styles.warning ?? '',
+  info: styles.info ?? '',
 };
 
 function Toast({ toast }: { toast: ToastItem }) {

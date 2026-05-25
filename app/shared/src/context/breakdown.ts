@@ -27,14 +27,14 @@ export interface BreakdownSegment {
 }
 
 export interface SessionMetrics {
-  model?: string;
-  provider?: string;
+  model?: string | undefined;
+  provider?: string | undefined;
   /** Context window limit in tokens. Falls back to 200K if missing. */
-  contextLimit?: number;
+  contextLimit?: number | undefined;
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
-  totalCost?: number;
+  totalCost?: number | undefined;
   messages: Array<{ role: string; content: string }>;
 }
 

@@ -186,7 +186,7 @@ Desktop App
 
 当前架构边界：
 
-- Hub Server 已完整实现（三层架构，21 migrations，Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。
+- Hub Server 已完整实现（三层架构，28 migrations，Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。
 - Web/Mobile 可通过 Hub 远程查看和审批。
 - Desktop UI 默认只连接本机 Local Edge。
 - Edge 才能启动 Agent CLI 进程，UI 不直接启动 Agent CLI。
@@ -262,7 +262,7 @@ Edge EventStore -> Hub Sync -> Web/Mobile
 Edge EventStore -> Hub Sync -> other devices
 ```
 
-本地 EventStore 语义已完整实现。Hub Server 也已完整实现（三层架构，17 migrations，Gin + GORM + Redis + PostgreSQL），提供账号、IM、多端同步和中继能力。
+本地 EventStore 语义已完整实现。Hub Server 也已完整实现（三层架构，28 migrations，Gin + GORM + Redis + PostgreSQL），提供账号、IM、多端同步和中继能力。
 
 ## 7. EventStore 和恢复语义
 

@@ -167,6 +167,26 @@ func TestCreatePrivateSession_NilCacheDoesNotPanic(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestCreateGroupSession_AllowsOwnerOnlyWorkspace(t *testing.T) {
+	db, mock, sqlDB := newMockDBSession(t)
+	defer sqlDB.Close()
+
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "sessions"`)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "session_members"`)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	svc := NewSessionService(db, testSessionCache(t))
+	resp, err := svc.CreateGroupSession(context.Background(), "owner-1", "Workspace", []string{})
+	require.NoError(t, err)
+	assert.True(t, resp.Created)
+	assert.Equal(t, "group", resp.Type)
+	assert.NotEmpty(t, resp.SessionID)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ==================== getSession (tested via DeleteForMe) ====================
 
 func TestDeleteForMe_SessionNotFound(t *testing.T) {

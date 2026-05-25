@@ -108,26 +108,25 @@ func (s *SessionService) CreateGroupSession(ctx context.Context, ownerUserID, na
 	if len(name) == 0 || len(name) > config.MaxGroupNameLength {
 		return nil, errcode.ErrBadRequest
 	}
-	if len(memberIDs) == 0 {
-		return nil, errcode.ErrBadRequest
-	}
 
-	friendIDs, err := repository.GetFriendIDs(s.db, ownerUserID)
-	if err != nil {
-		return nil, err
-	}
-	friendSet := make(map[string]bool)
-	for _, id := range friendIDs {
-		friendSet[id] = true
-	}
-	for _, mid := range memberIDs {
-		if !friendSet[mid] {
-			return nil, errcode.ErrBadRequest
+	if len(memberIDs) > 0 {
+		friendIDs, err := repository.GetFriendIDs(s.db, ownerUserID)
+		if err != nil {
+			return nil, err
+		}
+		friendSet := make(map[string]bool)
+		for _, id := range friendIDs {
+			friendSet[id] = true
+		}
+		for _, mid := range memberIDs {
+			if !friendSet[mid] {
+				return nil, errcode.ErrBadRequest
+			}
 		}
 	}
 
 	session := &model.Session{Type: model.SessionTypeGroup, Name: name, OwnerUserID: &ownerUserID}
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := repository.CreateSession(tx, session); err != nil {
 			return err
 		}

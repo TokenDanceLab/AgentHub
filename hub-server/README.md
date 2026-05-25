@@ -108,7 +108,7 @@ hub-server/
 │   ├── config.yaml              # 本地开发配置
 │   └── config.docker.yaml       # Docker 环境配置
 ├── deployments/                 # Dockerfile、生产 compose、部署脚本
-├── migrations/                  # SQL 迁移 (25 组 up/down)
+├── migrations/                  # SQL 迁移 (28 组 up/down)
 ├── uploads/                     # 文件存储目录
 ├── tests/                       # 集成测试
 ├── internal/
@@ -197,7 +197,7 @@ Hub 只做路由、队列、权限和状态持久化；Agent Runtime 进程仍�
 
 ## 数据库表
 
-迁移文件位于 `migrations/`，当前有 25 组 up/down：
+迁移文件位于 `migrations/`，当前有 28 组 up/down：
 
 | 迁移 | 用途 |
 |---|---|
@@ -219,13 +219,13 @@ Hub 只做路由、队列、权限和状态持久化；Agent Runtime 进程仍�
 | 0016_workspace_refactor | 工作区模型调整 |
 | 0017_devices_unique | 设备唯一约束修正 |
 | 0018_pending_agent_task_edge_run_id | task↔run 映射持久化 |
-| 0019_token_dance_sub | TokenDance ID 用户映射 |
-| 0020_agent_profiles | Agent Profile 持久化 |
-| 0021_execution_targets | Execution Target 管理 |
-| 0022_skills | Skill 目录 |
-| 0023_mcp_servers | MCP Server 注册表 |
-| 0024_provider_bindings | Provider Binding |
-| 0025_audit_events | 安全审计事件 |
+| 0020_token_dance_sub | TokenDance ID 用户映射 |
+| 0022_agent_profiles | Agent Profile 持久化 |
+| 0023_execution_targets | Execution Target 管理 |
+| 0025_skills | Skill 目录 |
+| 0026_mcp_servers | MCP Server 注册表 |
+| 0027_provider_bindings | Provider Binding |
+| 0028_audit_events | 安全审计事件 |
 
 ## Phase 1-7 新增 API
 
