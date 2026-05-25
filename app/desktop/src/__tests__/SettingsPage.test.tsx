@@ -10,7 +10,6 @@ import type { AgentTask } from '@/stores/taskBridgeStore';
 
 const {
   mockAgents,
-  mockAgentTasks,
   mockCancelRun,
   mockCustomAgents,
   mockFriendRequests,
@@ -26,7 +25,6 @@ const {
   mockUseHealthState,
 } = vi.hoisted(() => ({
   mockAgents: [] as AgentInfo[],
-  mockAgentTasks: [] as Record<string, unknown>[],
   mockCancelRun: vi.fn(),
   mockCustomAgents: [] as Record<string, unknown>[],
   mockFriendRequests: [] as Record<string, unknown>[],
@@ -43,7 +41,6 @@ const {
     listFriendRequests: vi.fn(),
     listNotifications: vi.fn(),
     listCustomAgents: vi.fn(),
-    listAgentTasks: vi.fn(),
     registerDevice: vi.fn(),
   },
   mockHubStoreState: {
@@ -156,7 +153,6 @@ function renderSettings(initialSection: ComponentProps<typeof SettingsPage>['ini
 describe('SettingsPage tasks', () => {
   beforeEach(() => {
     mockAgents.splice(0, mockAgents.length);
-    mockAgentTasks.splice(0, mockAgentTasks.length);
     mockCustomAgents.splice(0, mockCustomAgents.length);
     mockFriendRequests.splice(0, mockFriendRequests.length);
     mockNotifications.splice(0, mockNotifications.length);
@@ -170,14 +166,12 @@ describe('SettingsPage tasks', () => {
     mockHubClient.listFriendRequests.mockReset();
     mockHubClient.listNotifications.mockReset();
     mockHubClient.listCustomAgents.mockReset();
-    mockHubClient.listAgentTasks.mockReset();
     mockHubClient.registerDevice.mockReset();
     mockHubClient.listContacts.mockImplementation(async () => mockContacts);
     mockHubClient.listSessions.mockImplementation(async () => mockSessions);
     mockHubClient.listFriendRequests.mockImplementation(async () => mockFriendRequests);
     mockHubClient.listNotifications.mockImplementation(async () => mockNotifications);
     mockHubClient.listCustomAgents.mockImplementation(async () => mockCustomAgents);
-    mockHubClient.listAgentTasks.mockImplementation(async () => mockAgentTasks);
     mockHubClient.registerDevice.mockImplementation(async () => ({ id: 'dev-1' }));
     mockHubStoreState.authenticated = true;
     mockHubStoreState.username = 'TokenDance User';
@@ -207,7 +201,7 @@ describe('SettingsPage tasks', () => {
     useModelSettingsStore.getState().reset();
   });
 
-  it('renders local runs, Hub task snapshot, and bridged Hub tasks', async () => {
+  it('renders local runs, Hub bridge history, and the Hub list REST interface gap', () => {
     mockRuns.splice(0, mockRuns.length, {
       runId: 'run_1234567890abcdef',
       projectId: 'proj_local',
@@ -226,16 +220,6 @@ describe('SettingsPage tasks', () => {
       dispatchPayload: {},
       createdAt: '2026-05-25T01:02:00Z',
     });
-    mockAgentTasks.splice(0, mockAgentTasks.length, {
-      task_id: 'task_hub_snapshot_1',
-      agent_id: 'agent-hub',
-      prompt: 'Snapshot from Hub listAgentTasks',
-      session_id: 'thread_hub',
-      edge_run_id: 'run_hub_snapshot_1',
-      status: 'running',
-      created_at: '2026-05-25T01:03:00Z',
-    });
-
     renderSettings('tasks');
 
     expect(screen.getByText('settings.taskLocalRuns')).toBeInTheDocument();
@@ -243,8 +227,8 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('proj_local / thread_local')).toBeInTheDocument();
     expect(screen.getByText('Dispatch from TokenDance Hub')).toBeInTheDocument();
     expect(screen.getByText('agent-codex')).toBeInTheDocument();
-    expect(await screen.findByText('Snapshot from Hub listAgentTasks')).toBeInTheDocument();
-    expect(mockHubClient.listAgentTasks).toHaveBeenCalled();
+    expect(screen.getAllByText('settings.interfaceGap').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('settings.taskHubSnapshotUnavailable').length).toBeGreaterThan(0);
   });
 
   it('refreshes and cancels active local runs from the task panel', () => {
@@ -340,13 +324,20 @@ describe('SettingsPage tasks', () => {
     });
     mockNotifications.splice(0, mockNotifications.length, {
       id: 'notif-1',
-      title: 'Mention',
+      user_id: 'user-1',
+      type: 'mention',
+      payload: JSON.stringify({ title: 'Mention', content: 'Check this thread' }),
+      read: false,
       created_at: '2026-05-25T01:06:00Z',
     });
 
     renderSettings('onlineIm');
 
     expect(await screen.findByText('Alice DM')).toBeInTheDocument();
+    expect(screen.getByText('Bob')).toBeInTheDocument();
+    expect(screen.getByText('Mention')).toBeInTheDocument();
+    expect(screen.getByText('Check this thread')).toBeInTheDocument();
+    expect(screen.getAllByText('settings.readOnly').length).toBeGreaterThan(0);
     expect(screen.getByText('settings.onlineImSnapshot')).toBeInTheDocument();
     expect(screen.queryByText('settings.contractPending')).not.toBeInTheDocument();
     expect(mockHubClient.listContacts).toHaveBeenCalled();
@@ -593,7 +584,7 @@ describe('SettingsPage tasks', () => {
     renderSettings('mcp');
 
     expect(screen.getByText('settings.mcpNoRuntimes')).toBeInTheDocument();
-    expect(screen.getAllByText('settings.contractPending').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('settings.interfaceGap').length).toBeGreaterThan(0);
     expect(screen.queryByText('settings.statusReady')).not.toBeInTheDocument();
   });
 

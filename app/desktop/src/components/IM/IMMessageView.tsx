@@ -1,4 +1,5 @@
 import { useRef, useEffect, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import type { IMMessage } from './types';
 import styles from './IMMessageView.module.css';
@@ -71,6 +72,11 @@ const IMMessageBubble = memo(function IMMessageBubble({
   message: IMMessage;
   isOwn: boolean;
 }) {
+  const { t } = useTranslation();
+  const label = (key: string, fallback: string, vars?: Record<string, unknown>) => {
+    const translated = t(key, vars);
+    return translated === key ? fallback : translated;
+  };
   const isRecalled = message.content === '[Message recalled]';
 
   return (
@@ -101,10 +107,22 @@ const IMMessageBubble = memo(function IMMessageBubble({
         <MarkdownRenderer content={message.content} />
       </div>
 
-      {/* Timestamp */}
-      <time className={styles.timestamp} dateTime={message.timestamp}>
-        {formatTime(message.timestamp)}
-      </time>
+      <div className={styles.messageMeta}>
+        <time className={styles.timestamp} dateTime={message.timestamp}>
+          {formatTime(message.timestamp)}
+        </time>
+        {message.recalled || isRecalled ? (
+          <span>{label('im.message.recalledStatus', 'Recalled on Hub')}</span>
+        ) : message.read ? (
+          <span>
+            {label('im.message.readStatus', `Read by ${message.readBy ?? 'Hub member'}`, {
+              reader: message.readBy ?? label('im.message.unknownReader', 'Hub member'),
+            })}
+          </span>
+        ) : isOwn ? (
+          <span>{label('im.message.sentStatus', 'Sent through Hub')}</span>
+        ) : null}
+      </div>
     </div>
   );
 });

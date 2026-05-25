@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageCircle } from 'lucide-react';
 import type { IMContact, IMMessage } from '@/components/IM/types';
 import IMContactList from '@/components/IM/IMContactList';
@@ -12,6 +13,14 @@ import type { ViewProps } from '@/config/viewRegistry';
 import styles from './IMView.module.css';
 
 export default function IMView(props: ViewProps) {
+  const { t } = useTranslation();
+  const label = useCallback(
+    (key: string, fallback: string, vars?: Record<string, unknown>) => {
+      const translated = t(key, vars);
+      return translated === key ? fallback : translated;
+    },
+    [t],
+  );
   const hubWS = (props.hubWS ?? null) as HubWSHandle | null;
   const hubClient = (props.hubClient ?? null) as HubClient | null;
   const {
@@ -19,6 +28,8 @@ export default function IMView(props: ViewProps) {
     loadSessionMessages,
     contacts,
     hubContacts,
+    friendRequests,
+    notifications,
     sendMessage,
     addContact,
     createPrivateSession,
@@ -61,7 +72,7 @@ export default function IMView(props: ViewProps) {
         <div className={styles.empty}>
           <MessageCircle size={48} className={styles.emptyIcon} aria-hidden="true" />
           <span className={styles.emptyTitle}>IM Chat</span>
-          <span>Connect to Hub to start chatting</span>
+          <span>{label('im.state.connectHub', 'Connect to Hub to start chatting')}</span>
         </div>
       </div>
     );
@@ -82,17 +93,22 @@ export default function IMView(props: ViewProps) {
       </div>
 
       <div className={styles.chatArea}>
+        <div className={styles.chatHeader} aria-label={label('im.snapshot.title', 'Hub IM snapshot')}>
+          <span className={styles.chatType}>{label('im.snapshot.contactRequests', `${friendRequests.length} contact requests`, { count: friendRequests.length })}</span>
+          <span className={styles.chatType}>{label('im.snapshot.notifications', `${notifications.length} notifications`, { count: notifications.length })}</span>
+          <span className={styles.chatType}>{label('im.snapshot.readOnly', 'Read-only summary')}</span>
+        </div>
         {status === 'loading' ? (
           <div className={styles.noSelection}>
-            <span>Loading Hub sessions...</span>
+            <span>{label('im.state.loadingSessions', 'Loading Hub sessions...')}</span>
           </div>
         ) : status === 'error' ? (
           <div className={styles.noSelection} role="alert">
-            <span>{error ?? 'Hub messages are unavailable.'}</span>
+            <span>{error ? label(error, 'Hub messages are unavailable.') : label('im.state.unavailable', 'Hub messages are unavailable.')}</span>
           </div>
         ) : contacts.length === 0 ? (
           <div className={styles.noSelection}>
-            <span>No Hub conversations yet</span>
+            <span>{label('im.state.noConversations', 'No Hub conversations yet')}</span>
           </div>
         ) : activeContact ? (
           <>
@@ -110,12 +126,13 @@ export default function IMView(props: ViewProps) {
               <IMMessageInput
                 onSend={handleSend}
                 disabled={!activeSessionId || activeContact.dissolved}
+                placeholder={activeContact.dissolved ? label('im.input.sessionDissolved', 'This Hub session is dissolved') : undefined}
               />
             </div>
           </>
         ) : (
           <div className={styles.noSelection}>
-            <span>Select a contact to start messaging</span>
+            <span>{label('im.state.selectContact', 'Select a contact to start messaging')}</span>
           </div>
         )}
       </div>
