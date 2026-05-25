@@ -1208,7 +1208,7 @@ func TestWebSocketOriginPolicy(t *testing.T) {
 		origin string
 		want   bool
 	}{
-		{"no origin", "", true},
+		{"no origin", "", false},
 		{"desktop dev", "http://localhost:5199", true},
 		{"tauri dev", "http://localhost:5173", true},
 		{"loopback", "http://127.0.0.1:5199", true},
