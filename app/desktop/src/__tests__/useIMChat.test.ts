@@ -303,6 +303,34 @@ describe('useIMChat', () => {
     expect(result.current.getSessionMessages('sess-1')).toHaveLength(1);
   });
 
+  it('marks messages read from Hub message.read receipts', async () => {
+    const ws = createMockHubWS();
+    const hubClient = createMockHubClient();
+
+    const { result } = renderHook(() => useIMChat({ hubClient, hubWS: ws }));
+    await waitFor(() => expect(result.current.contacts).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.sendMessage('sess-1', 'Needs receipt');
+    });
+
+    act(() => {
+      fire(ws, HUB_EVENTS.MESSAGE_READ, {
+        session_id: 'sess-1',
+        user_id: 'friend-1',
+        last_read_seq: 2,
+        read_at: '2026-05-25T00:03:00.000Z',
+      });
+    });
+
+    expect(result.current.getSessionMessages('sess-1')[0]).toMatchObject({
+      id: 'm-out',
+      read: true,
+      readBy: 'friend-1',
+      readAt: '2026-05-25T00:03:00.000Z',
+    });
+  });
+
   it('adds a session when Hub WS emits session.created', async () => {
     const ws = createMockHubWS();
     const hubClient = createMockHubClient({ listSessions: vi.fn(async () => []) });
@@ -344,7 +372,32 @@ describe('useIMChat', () => {
 
   it('creates private sessions through Hub without fake local contacts', async () => {
     const ws = createMockHubWS();
-    const hubClient = createMockHubClient();
+    const listSessions = vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          id: 'sess-1',
+          type: 'private',
+          owner_user_id: 'user-1',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'sess-private',
+          type: 'private',
+          owner_user_id: 'user-1',
+          members: [
+            {
+              id: 'member-2',
+              session_id: 'sess-private',
+              member_type: 'user',
+              member_id: 'friend-2',
+              role: 'member',
+            },
+          ],
+        },
+      ]);
+    const hubClient = createMockHubClient({ listSessions });
 
     const { result } = renderHook(() => useIMChat({ hubClient, hubWS: ws }));
     await waitFor(() => expect(result.current.contacts).toHaveLength(1));
@@ -354,12 +407,30 @@ describe('useIMChat', () => {
     });
 
     expect(hubClient.createPrivateSession).toHaveBeenCalledWith({ target_user_id: 'friend-2' });
+    expect(hubClient.listSessions).toHaveBeenCalledTimes(2);
     expect(result.current.contacts.some((contact) => contact.id === 'sess-private')).toBe(true);
   });
 
   it('creates group sessions through Hub with trimmed member IDs', async () => {
     const ws = createMockHubWS();
-    const hubClient = createMockHubClient();
+    const listSessions = vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          id: 'sess-1',
+          type: 'private',
+          owner_user_id: 'user-1',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'sess-group',
+          type: 'group',
+          name: 'Build Room',
+          owner_user_id: 'user-1',
+        },
+      ]);
+    const hubClient = createMockHubClient({ listSessions });
 
     const { result } = renderHook(() => useIMChat({ hubClient, hubWS: ws }));
     await waitFor(() => expect(result.current.contacts).toHaveLength(1));
@@ -372,6 +443,7 @@ describe('useIMChat', () => {
       name: 'Build Room',
       member_ids: ['friend-2', 'friend-3'],
     });
+    expect(hubClient.listSessions).toHaveBeenCalledTimes(2);
     expect(result.current.contacts.some((contact) => contact.id === 'sess-group')).toBe(true);
   });
 
