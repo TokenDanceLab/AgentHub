@@ -103,6 +103,7 @@ function isEditableShortcutTarget(target: EventTarget | null): boolean {
 }
 
 type TooltipSide = 'top' | 'right' | 'bottom' | 'left';
+type RightRunTab = 'output' | 'files';
 
 interface ShellIconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-label'> {
   label: string;
@@ -191,6 +192,7 @@ export default function App() {
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
+  const [rightRunTab, setRightRunTab] = useState<RightRunTab>('output');
   const {
     leftSidebarCollapsed,
     rightPanelOpen,
@@ -826,9 +828,29 @@ export default function App() {
           />
           <div className={styles.rightPanel}>
             <div className={styles.rightPanelHeader}>
-              <div className={styles.rightPanelSegmented}>
-                <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`} type="button" role="tab" aria-selected="true">{t('run.output')}</button>
-                <button className={styles.rightPanelTab} type="button" role="tab" aria-selected="false">{t('run.files')}</button>
+              <div className={styles.rightPanelSegmented} role="tablist" aria-label={t('run.title')}>
+                <button
+                  className={`${styles.rightPanelTab} ${rightRunTab === 'output' ? styles.rightPanelTabActive : ''}`}
+                  type="button"
+                  role="tab"
+                  id="right-run-tab-output"
+                  aria-selected={rightRunTab === 'output'}
+                  aria-controls="right-run-panel"
+                  onClick={() => setRightRunTab('output')}
+                >
+                  {t('run.output')}
+                </button>
+                <button
+                  className={`${styles.rightPanelTab} ${rightRunTab === 'files' ? styles.rightPanelTabActive : ''}`}
+                  type="button"
+                  role="tab"
+                  id="right-run-tab-files"
+                  aria-selected={rightRunTab === 'files'}
+                  aria-controls="right-run-panel"
+                  onClick={() => setRightRunTab('files')}
+                >
+                  {t('run.files')}
+                </button>
               </div>
               <ShellIconButton
                 className={styles.rightPanelCollapseBtn}
@@ -840,7 +862,12 @@ export default function App() {
                 <PanelRightClose size={15} />
               </ShellIconButton>
             </div>
-            <div className={styles.rightPanelBody}>
+            <div
+              className={styles.rightPanelBody}
+              id="right-run-panel"
+              role="tabpanel"
+              aria-labelledby={rightRunTab === 'output' ? 'right-run-tab-output' : 'right-run-tab-files'}
+            >
               <ErrorBoundary>
                 <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted-foreground)' }}><SkeletonLine width="60%" height="1em" /><SkeletonLine width="40%" height="1em" /></div>}>
                   <Slot
@@ -849,6 +876,7 @@ export default function App() {
                     outputText={displayedRun?.outputText ?? ''}
                     toolCalls={displayedRun?.toolCalls ?? []}
                     changedFiles={displayedRun?.changedFiles ?? []}
+                    activeTab={rightRunTab}
                     onCancel={handleCancel}
                     chatMessages={allMessages}
                   />

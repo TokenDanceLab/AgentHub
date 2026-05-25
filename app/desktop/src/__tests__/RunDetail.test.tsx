@@ -131,7 +131,15 @@ describe('RunDetail', () => {
       { path: '/src/test.ts', action: 'created', timestamp: '2025-01-01T00:00:00Z' },
       { path: '/src/config.ts', action: 'modified', timestamp: '2025-01-01T00:00:01Z' },
     ];
-    render(<RunDetail run={run} toolCalls={[]} changedFiles={changedFiles} outputText="" />);
+    render(
+      <RunDetail
+        run={run}
+        toolCalls={[]}
+        changedFiles={changedFiles}
+        outputText=""
+        activeTab="files"
+      />,
+    );
     expect(screen.getByText('/src/test.ts')).toBeInTheDocument();
     expect(screen.getByText('/src/config.ts')).toBeInTheDocument();
     expect(screen.getByText('created')).toBeInTheDocument();
@@ -140,8 +148,79 @@ describe('RunDetail', () => {
 
   it('does not show changed files section when list is empty', () => {
     const run = makeRun();
-    render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);
+    render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" activeTab="files" />);
     expect(screen.queryByText('run.fileChanges')).not.toBeInTheDocument();
+  });
+
+  it('shows output tab content without file changes', () => {
+    const run = makeRun({ status: RunState.COMPLETED });
+    render(
+      <RunDetail
+        run={run}
+        toolCalls={[
+          {
+            callId: 'call-1',
+            toolName: 'read_file',
+            status: 'completed',
+            timestamp: '2025-01-01T00:00:00Z',
+          },
+        ]}
+        changedFiles={[
+          { path: '/src/hidden.ts', action: 'modified', timestamp: '2025-01-01T00:00:01Z' },
+        ]}
+        outputText="stdout from run"
+        activeTab="output"
+      />,
+    );
+
+    expect(screen.getByText('stdout from run')).toBeInTheDocument();
+    expect(screen.getByText('read_file')).toBeInTheDocument();
+    expect(screen.queryByText('/src/hidden.ts')).not.toBeInTheDocument();
+    expect(screen.queryByText('run.fileChanges')).not.toBeInTheDocument();
+  });
+
+  it('shows files tab content without output or tool calls', () => {
+    const run = makeRun({ status: RunState.COMPLETED });
+    render(
+      <RunDetail
+        run={run}
+        toolCalls={[
+          {
+            callId: 'call-1',
+            toolName: 'write_file',
+            status: 'completed',
+            timestamp: '2025-01-01T00:00:00Z',
+          },
+        ]}
+        changedFiles={[
+          { path: '/src/visible.ts', action: 'modified', timestamp: '2025-01-01T00:00:01Z' },
+        ]}
+        outputText="stdout hidden on files tab"
+        activeTab="files"
+      />,
+    );
+
+    expect(screen.getByText('/src/visible.ts')).toBeInTheDocument();
+    expect(screen.queryByText('stdout hidden on files tab')).not.toBeInTheDocument();
+    expect(screen.queryByText('write_file')).not.toBeInTheDocument();
+    expect(screen.queryByText('run.output')).not.toBeInTheDocument();
+    expect(screen.queryByText('run.toolCalls')).not.toBeInTheDocument();
+  });
+
+  it('shows tab-specific empty states', () => {
+    const run = makeRun({ status: RunState.RUNNING });
+    const { rerender } = render(
+      <RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" activeTab="output" />,
+    );
+
+    expect(screen.getByText('run.emptyOutput')).toBeInTheDocument();
+    expect(screen.queryByText('run.emptySources')).not.toBeInTheDocument();
+
+    rerender(
+      <RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" activeTab="files" />,
+    );
+    expect(screen.getByText('run.emptySources')).toBeInTheDocument();
+    expect(screen.queryByText('run.emptyOutput')).not.toBeInTheDocument();
   });
 
   it('renders title', () => {

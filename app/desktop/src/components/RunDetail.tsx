@@ -24,10 +24,13 @@ interface Props {
   changedFiles: Array<{ path: string; action: string; timestamp: string }>;
   outputText: string;
   diffs?: FileDiff[];
+  activeTab?: RunPanelTab;
   onCancel?: () => void;
   /** Chat messages from the current session, used for context breakdown visualization. */
   chatMessages?: ChatMessage[];
 }
+
+export type RunPanelTab = 'output' | 'files';
 
 /** Build SessionMetrics from chat messages by extracting token data from result blocks. */
 function buildMetrics(chatMessages: ChatMessage[] | undefined): SessionMetrics | null {
@@ -105,6 +108,7 @@ export default function RunDetail({
   changedFiles,
   outputText,
   diffs,
+  activeTab = 'output',
   onCancel,
   chatMessages,
 }: Props) {
@@ -138,8 +142,14 @@ export default function RunDetail({
   const hasOutput = !!outputText;
   const hasToolCalls = toolCalls.length > 0;
   const hasFileChanges = changedFiles.length > 0;
+  const visibleDiffs = diffs ?? [];
+  const hasDiffs = visibleDiffs.length > 0;
+  const showOutputPanel = activeTab === 'output';
+  const showFilesPanel = activeTab === 'files';
 
-  const hasAnyContent = hasOutput || hasToolCalls || hasFileChanges;
+  const hasOutputContent = hasOutput || hasToolCalls;
+  const hasFilesContent = hasFileChanges || hasDiffs;
+  const hasSelectedContent = showOutputPanel ? hasOutputContent : hasFilesContent;
   const latestFiles = changedFiles.slice(-4).reverse();
   const latestTools = toolCalls.slice(-4).reverse();
 
@@ -169,22 +179,26 @@ export default function RunDetail({
 
       <ContextUsage metrics={metrics} />
 
-      {!hasAnyContent && (
+      {!hasSelectedContent && (
         <div className={styles.emptyStack}>
-          <div className={styles.emptyCard}>
-            <TerminalSquare size={16} />
-            <span>{t('run.emptyOutput')}</span>
-          </div>
-          <div className={styles.emptyCard}>
-            <FileText size={16} />
-            <span>{t('run.emptySources')}</span>
-          </div>
+          {showOutputPanel && (
+            <div className={styles.emptyCard}>
+              <TerminalSquare size={16} />
+              <span>{t('run.emptyOutput')}</span>
+            </div>
+          )}
+          {showFilesPanel && (
+            <div className={styles.emptyCard}>
+              <FileText size={16} />
+              <span>{t('run.emptySources')}</span>
+            </div>
+          )}
         </div>
       )}
 
-      {hasAnyContent && (
+      {hasSelectedContent && (
         <div className={styles.tabContent}>
-          {hasOutput && (
+          {showOutputPanel && hasOutput && (
             <section className={styles.cardSection}>
               <div className={styles.cardHeader}>
                 <TerminalSquare size={14} />
@@ -194,7 +208,7 @@ export default function RunDetail({
             </section>
           )}
 
-          {hasToolCalls && (
+          {showOutputPanel && hasToolCalls && (
             <section className={styles.cardSection}>
               <div className={styles.cardHeader}>
                 <Wrench size={14} />
@@ -209,7 +223,7 @@ export default function RunDetail({
             </section>
           )}
 
-          {hasFileChanges && (
+          {showFilesPanel && hasFileChanges && (
             <section className={styles.cardSection}>
               <div className={styles.cardHeader}>
                 <FileText size={14} />
@@ -227,14 +241,14 @@ export default function RunDetail({
             </section>
           )}
 
-          {diffs && diffs.length > 0 && (
+          {showFilesPanel && hasDiffs && (
             <section className={styles.cardSection}>
               <div className={styles.cardHeader}>
                 <FileText size={14} />
                 <span>{t('run.preview')}</span>
-                <span className={styles.cardCount}>{diffs.length}</span>
+                <span className={styles.cardCount}>{visibleDiffs.length}</span>
               </div>
-              <DiffViewer files={diffs} />
+              <DiffViewer files={visibleDiffs} />
             </section>
           )}
         </div>
