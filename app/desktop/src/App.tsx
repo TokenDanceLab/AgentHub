@@ -403,7 +403,7 @@ export default function App() {
     const msg = allMessages.find((m) => m.id === messageId);
     if (!msg) return;
     const prompt = msg.blocks.find((b) => b.kind === 'text')?.content;
-    if (prompt) handleSend(prompt, selectedAgentId);
+    if (prompt) handleSend(prompt, selectedAgentId ?? undefined);
   }, [allMessages, handleSend, selectedAgentId]);
 
   const handleDelete = useCallback((messageId: string) => {
@@ -747,7 +747,7 @@ export default function App() {
             {/* Input area */}
             {viewMode === 'agent' && (
               <div className={styles.inputArea}>
-                <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={selectedThreadId ?? undefined} />
+                <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId ?? undefined} onSelectAgent={handleSelectAgent} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={selectedThreadId ?? undefined} />
               </div>
             )}
           </div>
