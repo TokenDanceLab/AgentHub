@@ -16,7 +16,7 @@
 |------|--------|---------|---------|----------|
 | **Desktop** | React 19 + Tauri 2 + Zustand + TanStack Query | viewRegistry 9视图、IM UI、AuthPage、RunState 状态机、传输层抽象 | 519 tests（34 files） | tsc 严格模式，ESLint + Prettier |
 | **Edge Server** | Go (net/http + gorilla/websocket) | 3 Adapter、24 NDJSON、Orchestrator P1-P2、Prometheus、E2E 19/19 API | 13/13 包（530 funcs） | CI 硬阈值 75%，race/gosec/govulncheck |
-| **Hub Server** | Go (Gin + GORM + Redis + PG) | DI 架构、13 包有测试、CORS+RateLimit+BodyLimit 中间件链、21 migrations | 13/13 包（355 funcs），repository 75.5% | CI 硬阈值 40%，golangci-lint/gitleaks |
+| **Hub Server** | Go (Gin + GORM + Redis + PG) | DI 架构、13 包有测试、CORS+RateLimit+BodyLimit 中间件链、28 migrations | 13/13 包（355 funcs），repository 75.5% | CI 硬阈值 40%，golangci-lint/gitleaks |
 | **Web** | React + Vite | feat/trump-webui 已合入主线（2026-05-25 归档） | 构建通过 | 不做硬性要求 |
 | **CI/CD** | GitHub Actions | 8 job: go-edge/go-hub/benchmark/docker/cross-build/frontend/validate/gitleaks | 全绿 | race/gosec/govulncheck/覆盖率硬阻断 |
 | **官网** | Next.js 16 + Tailwind v4 | hub.vectorcontrol.tech — LiveStats + ConnectAgent | 14/20 tests | 静态导出，nginx on hk2 |
@@ -290,7 +290,7 @@ Hub 调度（远程）:
   - 验收：`TestHandleTaskStreamPersistsAgentMessageWithClientMsgIDAndRedisSeq`、`TestHandleTaskDoneUsesDBSeqFallbackAndPublishesFinalEvents`
 
 - [x] **P2-9: UpsertDevice ON CONFLICT 字段修正** `[0.5d]`
-  - 文件：`hub-server/internal/repository/device.go`, `hub-server/migrations/0020_devices_allow_multiple_same_type.up.sql`
+  - 文件：`hub-server/internal/repository/device.go`, `hub-server/migrations/0021_devices_allow_multiple_same_type.up.sql`
   - 方案：按 `device_id` 做 `ON CONFLICT (id)` 更新，`(user_id, device_type)` 降为非唯一索引；同用户同设备类型可拥有多个物理设备，跨用户或跨类型复用同一 `device_id` 拒绝为客户端错误
   - 验收：`TestDeviceRepo_Upsert` 覆盖同物理设备更新、同用户同类型新增第二设备、跨用户抢占同一 `device_id` 拒绝
 
@@ -503,7 +503,7 @@ Hub 调度（远程）:
 | Agent Profile | Runtime + Model + Configuration 管理入口、可用 Profile 摘要 | 后续 Profile 持久化/同步 | `/v1/agents`、runner health | TokenDance ID profile sync / Agent Market | 2026-05-25 已接 Settings 预览与 Edge 真实状态，待接 Hub 存储 |
 | Execution Target | Local Edge / Hub Relay / SSH/Tailscale / Cloud Edge 目标入口 | dispatch/permission/session | `/v1/health.checks.runners` | SSH/Tailscale/Hub Relay | 2026-05-25 已接 Settings 预览与移动端验证，待接远程目标注册 |
 | 任务列表 | 本地 Run 概览、最近 Run、Hub task bridge 队列、审批入口 | pending task / ack / sync | `/v1/runs`、`useTaskBridgeStore` | TokenDance ID task sync / Hub dispatch | 2026-05-25 已接 Settings Tasks 实数据面，桌面 + 375px Playwright 无横向溢出 |
-| 在线 IM | 会话、联系人、在线状态、通知入口 | session/message/device/WS sync | Desktop 桥接 Hub dispatch | 无 | 登录后能看到会话与在线状态，断线重连不丢未读 |
+| 在线 IM | 会话、联系人、在线状态、通知入口 | session/message/device/WS sync；Web workspace 已复用 Hub sessions/messages/task bridge | Desktop 桥接 Hub dispatch | 无 | 登录后能看到会话与在线状态，断线重连不丢未读 |
 | Agent 市场 | 搜索、安装入口、详情页、能力标签 | CustomAgent/模板/评分/使用统计 | 安装后 Runtime 可执行性检查 | 模板包/Skill 包源 | 搜索安装后出现在 Agent Manager |
 | Skill 管理 | 已安装/可安装/启用状态 | 可选同步用户配置 | 本地 skill discovery 与启停 | 本地 skill registry | 无效 skill 有明确错误，启用状态可恢复 |
 | MCP 管理 | server 列表、连接状态、日志入口 | 可选同步配置元数据 | 本地 MCP 健康检查 | MCP 配置源 | 连接失败显示可操作错误，不暴露密钥 |
@@ -512,7 +512,7 @@ Hub 调度（远程）:
 | cc-switch | provider 健康、切换、配额提示 | 可选账号级状态 | Runtime env 注入边界 | cc-switch CLI/DB | 切换只影响新 run，旧 run 不被打断 |
 | 多端 | 设备列表、当前设备、能力差异 | Device registry/WS presence | 设备 capability 上报 | 无 | 同账号多设备可区分在线/离线/能力 |
 | 远控 | 远程 Execution Target 选择、授权提示 | dispatch/permission/session | 远程 Edge 回调和状态 | 无 | 未授权不能远控，授权后能发起远程 run |
-| 账号鉴权 | TokenDance ID 登录入口、会话状态、登出 | Hub OIDC code exchange 已落地；待客户端保存 Hub session 与登出/刷新 UX | 无直接依赖 | TokenDance ID | 桌面入口只指向 TokenDance ID，不直连第三方 OAuth；REST/WS 使用 Hub-issued access token |
+| 账号鉴权 | TokenDance ID 登录入口、会话状态、登出 | Hub OIDC code exchange 已落地；Web 已接浏览器 PKCE redirect callback；Desktop callback 捕获与登出/刷新 UX 待补 | 无直接依赖 | TokenDance ID | 入口只指向 TokenDance ID，不直连第三方 OAuth；REST/WS 使用 Hub-issued access token |
 | 安全审计 | 权限、密钥、命令风险、配置导出检查 | 审计事件存储 | command/permission/security events | gitleaks/本地扫描器 | 导出/截图不含 token，危险配置有警示 |
 
 ##### 批次 D：Run 启动反馈与真实 Edge 验证 `[3d]`
@@ -572,6 +572,9 @@ Hub 调度（远程）:
 - [x] Web worker 验证：`corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx` 通过 4/4，`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web` 通过。
 - [x] 2026-05-25 Web worker 二次补强：`EcosystemConsole` 新增 `Feature readiness` 面板，按 TokenDance ecosystem lane 派生 ready/review/planned 数量和平均进度；测试补到 5/5，`typecheck`、`build`、`git diff --check -- app/web` 通过。
 - [x] 2026-05-25 Web worker 三次补强：`EcosystemConsole` 新增移动端/平板 `Jump to surface` picker，可直达 TokenDance ID、Hub、cc-switch、Remote control、audit 等生态入口；窄屏顺序调整为 workspace 优先、detail 次之、长侧边导航最后；测试补到 6/6，`typecheck`、`build`、`git diff --check -- app/web` 通过。
+- [x] 2026-05-25 Codex 接手推进：Web workspace 主聊天链路已切到 Hub-only。`useThreads()` 读取 Hub sessions，Hub 允许创建 owner-only group session 作为 Web workspace 会话；Web 新建 Threads、空态发送、选 Agent 都可按需创建该会话，随后发送 Hub message、按需调用 `/client/sessions/{id}/agents`，再通过 `/web/agent-tasks` 触发 Hub→Desktop/Edge dispatch；取消走 `/web/agent-tasks/{id}/cancel`。验证通过 `app/web && corepack pnpm typecheck`、`corepack pnpm build`、Hub handler/service 聚焦测试、目标文件 `git diff --check`、冲突标记和 Trump 分支残留扫描、Playwright 桌面/移动 smoke。
+- [x] 2026-05-25 Web TypeScript 收紧：`app/web/tsconfig.json` 已恢复 `strict: true`、`strictNullChecks: true`、`noUncheckedIndexedAccess: true` 与 `exactOptionalPropertyTypes: true`，清理 Web/shared optional DTO、Hub/IM adapter、permission、composer、Settings 与 private chat 形状；验证通过 `app/web && corepack pnpm exec tsc -p tsconfig.json --noEmit --strict true`、`corepack pnpm typecheck`、`corepack pnpm build`。
+- [x] 2026-05-25 Web 纯色 Codex App 质感补强：按 `codex-theme-v1` 的 `surface=#25252d`、`ink=#e3e4e6`、`accent=#5d68cc` 改为纯色深灰 surface，移除 `app/web/src` 内全部 `linear/radial/conic-gradient` 与 gradient mask；composer 复用 Desktop 单层 capsule 的 760px 栏宽、17px 输入字号、低边框/低阴影和 14px radius，移除 Web 额外 goal/card 堆叠，空态建议项改成低噪 inline chips；Playwright 桌面/移动 smoke 验证无 console error、无 raw i18n key、无横向溢出、运行时 0 个 gradient 节点且 `backdrop-filter` 生效，截图见 `app/web/screenshots/web-desktop-composer-reuse-desktop.png`、`web-desktop-composer-reuse-callback.png`、`web-desktop-composer-reuse-mobile.png`。
 - [x] **2026-05-25：`feat/webui-desktop-port` 分支与 worktree 已删除。** 产出已合入 `dev/delicious233` 主线（`app/web/` 与验证修复），不再独立维护。
 - [x] 结论：`/` 生态控制台入口已作为正式 Web 产品方向合入主线，旧 worktree 遗留问题（React alias、提交落后）随分支删除一并关闭。
 

@@ -58,8 +58,6 @@ export type { TreeNode } from './tree';
 export { normalizeDiffs, parseUnifiedDiff } from './diff';
 export type { DiffFile, DiffHunk, DiffLine } from './diff';
 
-<<<<<<< HEAD
-=======
 export {
   normalize,
   text as diffText,
@@ -71,7 +69,6 @@ export type {
   ReviewDiff,
 } from './diff';
 
->>>>>>> origin/dev/trump
 export {
   estimateTokens,
   breakdownContext,

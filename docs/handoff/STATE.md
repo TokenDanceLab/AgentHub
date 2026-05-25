@@ -42,7 +42,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 |---|------|:--:|------|
 | **Desktop** | React 19, TypeScript, Zustand, TanStack Query, OKLCH tokens, CSS Modules | 551/560 | viewRegistry, @shared/ui, Storybook, RunState 状态机, IM UI, AuthPage, 虚拟滚动 |
 | **Edge** | Go, gorilla/websocket, NDJSON | 13/13 包 | 3 Adapter (Claude/Codex/OpenCode), Prometheus, event bus dropped counter, Orchestrator, E2E 19/19 API |
-| **Hub** | Go, Gin, GORM, Redis, PostgreSQL | 13/13 包 | DI 架构, CORS→BodyLimit→RateLimit 链, 21 migrations, 公开 API |
+| **Hub** | Go, Gin, GORM, Redis, PostgreSQL | 13/13 包 | DI 架构, CORS→BodyLimit→RateLimit 链, 28 migrations, 公开 API |
 
 ## 生产部署
 
@@ -86,7 +86,10 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - Desktop：项目文档后台 sweep 已完成，`docs/architecture/system-architecture.md` / `docs/architecture/product-requirements.md` / `docs/architecture/implementation-guide.md` / `docs/roadmap.md` / README 系列 / archive + ADR 索引已统一 Runtime/Profile/Configuration/Execution Target、TokenDance ID、Hub/Edge/Desktop/Web 边界。
 - Desktop：设置页按 Codex App 截图方向重构为全屏设置工作台，并新增任务列表、IM 群聊、Agent 调度、在线 IM、Agent 市场、Skill/MCP、模型配置、模型映射、cc-switch、多端、远控、账号鉴权和安全审计等一等入口；顶部快捷图标可直达任务列表和 Agent 调度分区。
 - Desktop：Settings 已新增 `Agent Profiles` 与 `Execution Targets` 两个一级页面，把用户概念明确拆成 Agent Profile（Runtime + Model + Configuration）和 Execution Target（Local Edge / Hub Relay / SSH/Tailscale / Cloud Edge）；页面直接消费 `useHealth()` 与 `useAgentList()`，`HealthResponse`/Zod schema 已保留 `/v1/health.checks.runners` 扩展字段，Connections 页同步显示 Edge runner summary。
-- Desktop/Hub：TokenDance ID 登录入口已作为账号体系主入口进入登录页和 Settings/账号页；Hub Server 已实现 `POST /client/auth/oidc/authorize` + `/callback` 的 code exchange、ID token JWKS 校验、`tokendance_sub` 映射和 Hub access/refresh session 签发。Desktop/Web 仍需补完整浏览器 callback 捕获、Hub session 存储、logout/reconnect 与截图证据。
+- Desktop/Hub/Web：TokenDance ID 登录入口已作为账号体系主入口进入登录页和 Settings/账号页；Hub Server 已实现 `POST /client/auth/oidc/authorize` + `/callback` 的 code exchange、ID token JWKS 校验、`tokendance_sub` 映射和 Hub access/refresh session 签发。Web 已接入浏览器 PKCE redirect callback：授权时可传本轮 `redirect_uri`，Hub 将其绑定到 state 并用于 token exchange，Web 回跳 `/auth/tokendance/callback` 后用 sessionStorage 中的 verifier 换 Hub session。Desktop 仍需补完整 callback 捕获、logout/reconnect 与截图证据。
+- Web：主工作区发送链路已从 `edgeClient` stub 切到 Hub session/message/task。Threads 面板读取/创建 Hub sessions；Hub 允许创建 owner-only group session 作为 Web workspace 会话，Workspace 空态发送或选 Agent 时可按需创建该会话，再写入 Hub message、邀请 Agent、通过 `/web/agent-tasks` 触发 Hub→Desktop/Edge `agent.dispatch`；取消走 `/web/agent-tasks/{id}/cancel`。浏览器仍不持有 Relay key，也不直接调用 Edge。
+- Web：`app/web/tsconfig.json` 已恢复 `strict: true`、`strictNullChecks: true`、`noUncheckedIndexedAccess: true` 与 `exactOptionalPropertyTypes: true`；已清理 Web/shared optional DTO、Hub/IM adapter、permission、composer、Settings 与 private chat 的 exact optional 形状，当前 `corepack pnpm typecheck` 与 `corepack pnpm build` 通过。
+- Web：暗色 Web shell 已按 Codex App 纯色深灰目标收敛：遵循 `codex-theme-v1` 的 `surface=#25252d`、`ink=#e3e4e6`、`accent=#5d68cc`，移除 `app/web/src` 内全部 `linear/radial/conic-gradient` 与 gradient mask；composer 直接复用 Desktop 单层 capsule 的宽度、字号、边框、blur 和低阴影结构，移除 Web 额外 goal/card 堆叠，空态建议项改为低噪 inline chips。Playwright 桌面/移动 smoke 覆盖运行时 0 个 gradient 节点、无 raw i18n key、无横向溢出、无 console error，截图见 `app/web/screenshots/web-desktop-composer-reuse-desktop.png`、`app/web/screenshots/web-desktop-composer-reuse-callback.png`、`app/web/screenshots/web-desktop-composer-reuse-mobile.png`。
 - Desktop：左栏概念从“智能体/能力 chips”改为 `Agent Runtime`，不再把“流式输出/工具调用/文件修改”等基础能力当产品主概念；Runtime 卡片展示本地 Edge + CLI adapter 元信息，基础 capability 仅保留在协议/后端层。
 - Desktop：App shell 已支持左侧栏折叠、右侧运行详情彻底关闭、左右栏宽拖拽 resize。真实 run 验证中，右侧运行面板展开宽度 360px，关闭后完全不占空间，主工作区从 640px 扩展到 1012px；两条 resize separator 可见。
 - Desktop：移动端工具栏已补 Settings、Hub 登录、主题切换与菜单入口；375px Playwright 验证无横向溢出。
@@ -124,7 +127,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - Hub：Hub dispatch bridge 已持久化 `taskId` -> Edge `runId` / `edge_device_id` 映射；`pending_agent_tasks.edge_run_id` 与 `edge_device_id` 分别绑定 Edge run 和具体 Desktop device，`/edge/agent-tasks/{id}/ack|stream|done|fail` 支持 `run_id`/`edge_run_id`，Desktop `useHubIntegration` 在 ack、stream、done、fail 回调中持续回传 Edge run id。
 - Hub：`AH-SR-020` Edge callback device/run proof 已 repo 内缓解。在线 dispatch 和离线 pending replay 都会在推送到具体 Desktop WS conn 时记录 `edge_device_id`；route 存在但 manager/conn 不可用时回落 pending queue，不误标 dispatched；service、handler、真实 HTTP 集成和 Desktop Vitest 已覆盖错误 user/device/run id 拒绝与 run_id 转发。
 - Hub：`/client/auth/login` 和 `/edge/devices/register` 已在 handler 层校验 `device_id` 为 UUID，非法值返回 `BAD_REQUEST` 且不会进入 service/repository；`AH-SR-019` 已标记为 repo 内缓解并通过临时 Postgres/Redis 的真实登录/设备注册集成验证，剩余是部署与客户端覆盖验证。
-- Hub：多设备登录已对齐真实 Postgres schema。迁移 `0020_devices_allow_multiple_same_type` 将 `(user_id, device_type)` 唯一约束改为普通索引，`/client/auth/login` 支持同用户两个 desktop UUID 分别登录并刷新 token；另一个用户复用已归属 `device_id` 返回 `BAD_REQUEST`，不再冒泡为 `INTERNAL_ERROR`。
+- Hub：多设备登录已对齐真实 Postgres schema。迁移 `0021_devices_allow_multiple_same_type` 将 `(user_id, device_type)` 唯一约束改为普通索引，`/client/auth/login` 支持同用户两个 desktop UUID 分别登录并刷新 token；另一个用户复用已归属 `device_id` 返回 `BAD_REQUEST`，不再冒泡为 `INTERNAL_ERROR`。
 - Hub：`AH-SR-022` message pin 跨 session 泄露已 repo 内缓解。`PinMessage` 创建 pin 前要求目标 message 属于当前 session，`ListPinnedMessages` 只在当前 session 范围 hydration pinned message；service 单测和临时 Postgres/Redis 集成测试已覆盖跨 session pin 拒绝与历史坏 pin 行过滤，剩余是历史数据清理或 DB 复合约束设计。
 - Hub：`AH-SR-021` attachment 共享已 repo 内缓解。新增 `message_attachments` 引用表，file message 发送时抽取并校验 UUID attachment 引用，发送者必须是 uploader 或已有会话引用授权；下载允许 uploader 或引用所在 session 的 active user member，局外人保持 `ATTACH_NOT_FOUND`。真实 Postgres/Redis 集成已覆盖 Alice 上传并发送 file message 后 Bob 下载成功、局外人下载失败。
 - Hub：`AH-SR-010` Redis/cache nil 行为已 repo 内缓解。Auth/Contact/Session/Message/Agent 构造器和方法统一经 `resolve*Cache` 处理 nil 与 typed-nil cache；测试/离线路径使用 no-op/fallback cache 避免 panic，Message/Agent seq 仍走 DB fallback；生产 `App.Run` 仍保留 Redis ping fail-fast。
