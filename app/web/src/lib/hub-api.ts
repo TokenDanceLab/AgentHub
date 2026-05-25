@@ -21,7 +21,7 @@ export interface HubStatsResponse {
 }
 
 async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${HUB_URL}${path}`, { signal });
+  const res = await fetch(`${HUB_URL}${path}`, signal ? { signal } : undefined);
   if (!res.ok) {
     throw new Error(`Hub API ${path} returned ${res.status}`);
   }

@@ -1,0 +1,272 @@
+/* AgentList — compact Edge-backed agent manager inside the app sidebar. */
+
+.sidebar {
+  min-width: 0;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 4px 8px;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.countPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.045);
+  color: #8E8E93;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+[data-theme='dark'] .countPill {
+  background: rgba(255,255,255,0.065);
+}
+
+.searchWrapper,
+.searchIcon,
+.searchInput {
+  display: none;
+}
+
+/* ── List ──────────────────────────────────── */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Item ──────────────────────────────────── */
+.item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 54px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--agent-card-bg);
+  color: var(--foreground);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-align: left;
+  transition: background var(--duration-fast), border-color var(--duration-fast), opacity var(--duration-fast);
+}
+
+.item:hover {
+  background: var(--agent-card-hover);
+}
+
+.item:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.selected {
+  border-color: transparent;
+  background: var(--agent-card-active);
+  color: var(--foreground);
+  box-shadow:
+    inset 2px 0 0 color-mix(in oklch, var(--primary) 74%, var(--foreground)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.selected:hover {
+  background: var(--surface-raised-hover);
+}
+
+[data-theme='dark'] .item {
+  background: var(--agent-card-bg);
+}
+
+[data-theme='dark'] .item:hover {
+  background: var(--agent-card-hover);
+}
+
+[data-theme='dark'] .selected {
+  border-color: transparent;
+  background: var(--agent-card-active);
+  box-shadow:
+    inset 2px 0 0 color-mix(in oklch, var(--primary) 74%, var(--foreground)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+[data-theme='dark'] .selected:hover {
+  background: var(--surface-raised-hover);
+}
+
+.avatar {
+  position: relative;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 9px;
+  background: rgba(0,0,0,0.045);
+  color: var(--foreground);
+}
+
+[data-theme='dark'] .avatar {
+  background: rgba(255,255,255,0.07);
+}
+
+.statusDot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 6px;
+  height: 6px;
+  border: 1.5px solid var(--sidebar-bg);
+  border-radius: 50%;
+  background: var(--color-danger);
+}
+
+.status_available {
+  background: var(--agent-dot-online);
+  box-shadow: var(--agent-dot-online-glow);
+}
+
+.status_configuring {
+  background: #F59E0B;
+}
+
+.status_unavailable {
+  background: var(--color-danger);
+}
+
+/* ── Info ──────────────────────────────────── */
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+
+.nameLine {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.name {
+  min-width: 0;
+  flex: 1;
+  font-weight: 650;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusText {
+  display: none; /* use dot only — text is redundant noise */
+}
+
+.metaLine {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.version,
+.runtimeMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.04);
+  color: #8E8E93;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+}
+
+[data-theme='dark'] .version,
+[data-theme='dark'] .runtimeMeta {
+  background: rgba(255,255,255,0.065);
+}
+
+.version {
+  color: var(--foreground);
+}
+
+.otherToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 620;
+  text-align: left;
+}
+
+.otherToggle:hover {
+  background: var(--agent-card-hover);
+  color: var(--foreground);
+}
+
+.otherCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Empty ─────────────────────────────────── */
+.empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  color: #B0B0B5;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* ── Highlight ─────────────────────────────── */
+.highlight {
+  background: rgba(99,102,241,0.15);
+  color: var(--primary);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* ── Tags (unused, kept for reference) ─────── */
+.tags { display: none; }
+.tag, .tagStreaming, .tagToolCalls, .tagFileChanges, .tagThinking, .tagMultiTurn { display: none; }

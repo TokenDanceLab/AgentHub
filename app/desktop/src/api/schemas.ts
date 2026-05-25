@@ -25,7 +25,7 @@ export const HealthResponseSchema = z.object({
 export const RunnerSchema = z.object({
   id: z.string(),
   name: z.string(),
-  status: z.string(),
+  status: z.enum(['online', 'offline', 'draining']),
   capabilities: z.string().optional(),
 });
 

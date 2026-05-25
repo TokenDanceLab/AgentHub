@@ -17,7 +17,7 @@
 | Agent 任务调度 | 80% | dispatch→ack→stream→done/fail，taskId↔edgeRunId |
 | WebSocket | 85% | per-user 路由、心跳、丢帧告警、panic recovery |
 | 中间件链 | 90% | CORS/APIVersion/BodyLimit/RateLimit/RequestID/AccessLog/Timeout |
-| 数据库 | 90% | 18 migrations, GORM+PG, Upsert/jsonb校验/seq分配 |
+| 数据库 | 90% | 28 migrations, GORM+PG, Upsert/jsonb校验/seq分配 |
 | 缓存 | 85% | Redis singleflight/seq/路由/离线任务队列 |
 | EventBus | 85% | ants pool 1024/panic recovery/metrics |
 | 生产部署 | 80% | Docker Compose on hk2, nginx 反代 |
@@ -161,12 +161,12 @@ UserRepository 新增:
 **Migration 0019: `users` 表新增字段**
 
 ```sql
--- 0019_token_dance_sub.up.sql
+-- 0020_token_dance_sub.up.sql
 ALTER TABLE users ADD COLUMN tokendance_sub VARCHAR(255);
 CREATE UNIQUE INDEX idx_users_tokendance_sub ON users(tokendance_sub) WHERE tokendance_sub IS NOT NULL AND tokendance_sub != '';
 ALTER TABLE users ADD COLUMN tokendance_sub_linked_at TIMESTAMPTZ;
 
--- 0019_token_dance_sub.down.sql
+-- 0020_token_dance_sub.down.sql
 DROP INDEX IF EXISTS idx_users_tokendance_sub;
 ALTER TABLE users DROP COLUMN IF EXISTS tokendance_sub_linked_at;
 ALTER TABLE users DROP COLUMN IF EXISTS tokendance_sub;

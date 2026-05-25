@@ -1,0 +1,30 @@
+/* Skeleton loading placeholders. */
+
+@keyframes skeletonPulse {
+  0% {
+    opacity: 0.54;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.54;
+  }
+}
+
+.base {
+  background: var(--muted);
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+.line {
+  border-radius: var(--radius-sm);
+}
+
+.block {
+  border-radius: var(--radius-md);
+}
+
+.circle {
+  border-radius: 50%;
+}

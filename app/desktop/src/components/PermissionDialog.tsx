@@ -36,6 +36,7 @@ export default function PermissionDialog({ requests, onDecide }: Props) {
   const pendingCount = visible.filter((r) => !r.decision).length;
   const latestPending = visible.find((r) => !r.decision);
   const latestDecided = visible.filter((r) => r.decision).slice(-3);
+  const lastDecided = latestDecided[latestDecided.length - 1];
 
   // Auto-expand when a new pending request arrives
   useEffect(() => {
@@ -79,10 +80,10 @@ export default function PermissionDialog({ requests, onDecide }: Props) {
               ? t('perm.pending', { count: pendingCount })
               : t('perm.lastDecided')}
           </span>
-          {latestDecided.length > 0 && (
+          {lastDecided && (
             <span className={styles.barLast}>
-              {latestDecided[latestDecided.length - 1].toolName}:{' '}
-              {latestDecided[latestDecided.length - 1].decision === 'allow' ? 'ALLOW' : 'DENY'}
+              {lastDecided.toolName}:{' '}
+              {lastDecided.decision === 'allow' ? 'ALLOW' : 'DENY'}
             </span>
           )}
           <ChevronUp size={14} className={styles.barChevron} />

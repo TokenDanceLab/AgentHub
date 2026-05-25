@@ -1,0 +1,122 @@
+.root {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.contactPanel {
+  width: min(280px, 32vw);
+  flex-shrink: 0;
+  min-height: 0;
+  border-right: 1px solid oklch(0.88 0.006 250 / 0.58);
+  background: oklch(1 0 0 / 0.28);
+  overflow-y: auto;
+  backdrop-filter: blur(22px) saturate(1.22);
+  -webkit-backdrop-filter: blur(22px) saturate(1.22);
+}
+
+[data-theme='dark'] .contactPanel {
+  border-right-color: oklch(1 0 0 / 0.08);
+  background: oklch(0.18 0.006 250 / 0.32);
+}
+
+.chatArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chatHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid oklch(0.88 0.006 250 / 0.5);
+  background: oklch(1 0 0 / 0.34);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.6);
+  flex-shrink: 0;
+}
+
+[data-theme='dark'] .chatHeader {
+  border-bottom-color: oklch(1 0 0 / 0.08);
+  background: oklch(0.2 0.007 250 / 0.36);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.06);
+}
+
+.chatTitle {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--foreground);
+}
+
+.chatType {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+}
+
+.messageArea {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.inputArea {
+  flex-shrink: 0;
+  border-top: 1px solid oklch(0.88 0.006 250 / 0.5);
+  padding: 10px 16px;
+  background: oklch(1 0 0 / 0.24);
+}
+
+[data-theme='dark'] .inputArea {
+  border-top-color: oklch(1 0 0 / 0.08);
+  background: oklch(0.18 0.006 250 / 0.28);
+}
+
+.noSelection,
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+
+.empty {
+  padding: 32px 16px;
+}
+
+.emptyIcon {
+  color: var(--muted-foreground);
+  opacity: 0.4;
+  margin-bottom: 8px;
+}
+
+.emptyTitle {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--foreground);
+  opacity: 0.7;
+}
+
+@media (max-width: 760px) {
+  .root {
+    flex-direction: column;
+  }
+
+  .contactPanel {
+    width: 100%;
+    max-height: 230px;
+    border-right: 0;
+    border-bottom: 1px solid oklch(0.88 0.006 250 / 0.5);
+  }
+
+  [data-theme='dark'] .contactPanel {
+    border-bottom-color: oklch(1 0 0 / 0.08);
+  }
+}

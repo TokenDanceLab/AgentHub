@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import Markdown from 'react-markdown';
 import type { Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import tsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx';
@@ -94,7 +95,7 @@ interface MarkdownRendererProps {
 function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
     <div className={styles.root}>
-      <Markdown components={components}>{content}</Markdown>
+      <Markdown components={components} remarkPlugins={[remarkGfm]}>{content}</Markdown>
     </div>
   );
 }
