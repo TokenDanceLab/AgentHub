@@ -778,13 +778,18 @@ func TestPostRunsMethodNotAllowed(t *testing.T) {
 
 func TestPostCancelRun(t *testing.T) {
 	h := newTestHandler()
+	// Create project and thread first (required for CreateRun).
+	_, _ = h.Store.CreateProject("proj_local", "Local")
+	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Thread")
+	_, _ = h.Store.CreateRun("run_test123", "proj_local", "thread_local")
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_test123:cancel", nil)
 	rec := httptest.NewRecorder()
 
 	h.PostCancelRun(rec, req)
 
-	if rec.Code != http.StatusAccepted {
-		t.Fatalf("expected status 202, got %d", rec.Code)
+	// #108: existing run returns 200 via store fallback
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
 	var body map[string]any
@@ -794,6 +799,19 @@ func TestPostCancelRun(t *testing.T) {
 
 	if body["runId"] != "run_test123" {
 		t.Errorf("expected runId=run_test123, got %v", body["runId"])
+	}
+}
+
+func TestPostCancelRunMissingRunReturns404(t *testing.T) {
+	h := newTestHandler()
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_nonexistent:cancel", nil)
+	rec := httptest.NewRecorder()
+
+	h.PostCancelRun(rec, req)
+
+	// #108: missing run returns 404
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404 for missing run, got %d", rec.Code)
 	}
 }
 
@@ -840,8 +858,9 @@ func TestPostCancelRunReturnsStoredStatusWhenExecutorCannotCancel(t *testing.T) 
 	rec := httptest.NewRecorder()
 	h.PostCancelRun(rec, req)
 
-	if rec.Code != http.StatusAccepted {
-		t.Fatalf("expected status 202, got %d", rec.Code)
+	// #108: store fallback for terminal runs returns 200
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200 (terminal run fallback), got %d", rec.Code)
 	}
 	var body map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
@@ -1123,6 +1142,10 @@ func TestMuxGetRunsRoute(t *testing.T) {
 
 func TestMuxCancelRunRoute(t *testing.T) {
 	h := newTestHandler()
+	// Create project, thread, and run so the cancel route can find it.
+	_, _ = h.Store.CreateProject("proj_local", "Local")
+	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Thread")
+	_, _ = h.Store.CreateRun("run_abc", "proj_local", "thread_local")
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
@@ -1130,8 +1153,23 @@ func TestMuxCancelRunRoute(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestMuxCancelRunMissingRunRoute(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_missing:cancel", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	// #108: missing run returns 404
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
 	}
 }
 
