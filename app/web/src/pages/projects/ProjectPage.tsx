@@ -144,6 +144,34 @@ const milestones = [
   },
 ];
 
+function demoProjectCard(project: ReturnType<typeof projectFromApi>, label: (detail: string) => string) {
+  return {
+    ...project,
+    detail: label(project.detail),
+  };
+}
+
+function demoTaskCard(task: Task, label: (detail: string) => string) {
+  return {
+    ...task,
+    detail: label(task.detail),
+  };
+}
+
+function demoFileCard(file: FileItem, label: (detail: string) => string) {
+  return {
+    ...file,
+    detail: label(file.detail),
+  };
+}
+
+function demoRunCard(run: RunRecord, label: (detail: string) => string) {
+  return {
+    ...run,
+    detail: label(run.detail),
+  };
+}
+
 function projectFromApi(project: Project) {
   return {
     code: project.id.split('_').pop()?.toUpperCase().slice(0, 2) ?? project.id.slice(0, 2).toUpperCase(),
@@ -1250,25 +1278,42 @@ export function ProjectPageInteractive() {
     hasSectionSnapshot: hasLiveCatalog && workbenchState.artifacts.length > 0,
   });
   const shouldUseDemoFallback = catalogMode === 'mock';
+  const demoDetailLabel = (detail: string) => t('demo.cardDetail', { detail });
+  const demoProjects = useMemo(
+    () => projects.map((project) => demoProjectCard(project, demoDetailLabel)),
+    [t],
+  );
+  const demoTasks = useMemo(
+    () => initialTasks.map((task) => demoTaskCard(task, demoDetailLabel)),
+    [t],
+  );
+  const demoFiles = useMemo(
+    () => initialFiles.map((file) => demoFileCard(file, demoDetailLabel)),
+    [t],
+  );
+  const demoRuns = useMemo(
+    () => initialRuns.map((run) => demoRunCard(run, demoDetailLabel)),
+    [t],
+  );
   const projectedProjects = hasLiveCatalog && workbenchState.projects.length
     ? workbenchState.projects.map(projectFromApi)
     : shouldUseDemoFallback
-      ? projects
+      ? demoProjects
       : [];
   const projectedTasks = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map((run, index) => taskFromRun(run, index, workbenchState.runners))
     : shouldUseDemoFallback
-      ? initialTasks
+      ? demoTasks
       : [];
   const projectedFiles = hasLiveCatalog && workbenchState.artifacts.length
     ? workbenchState.artifacts.map(fileFromArtifact)
     : shouldUseDemoFallback
-      ? initialFiles
+      ? demoFiles
       : [];
   const projectedRuns = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map(runRecordFromApi)
     : shouldUseDemoFallback
-      ? initialRuns
+      ? demoRuns
       : [];
 
   const viewLabels: Record<BoardView, string> = {
@@ -1698,7 +1743,11 @@ export function ProjectPageInteractive() {
               <span className="projectMetricIcon">M1</span>
               <div>
                 <strong>{milestones.length}</strong>
-                <span>{t('metrics.milestones')}</span>
+                <span>
+                  {shouldUseDemoFallback
+                    ? t('metrics.demoMilestones')
+                    : t('metrics.milestones')}
+                </span>
               </div>
             </article>
             <article className="projectMetric projectGlass">

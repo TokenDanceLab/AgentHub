@@ -33,7 +33,7 @@
   "viewMode.favorites": "Only favorites",
   "viewMode.installed": "Only locally staged",
 
-  "stats.curated": "Catalog/mock agents",
+  "stats.curated": "Catalog fallback agents",
   "stats.hub": "Hub custom agents",
   "stats.ready": "Local workspace ready",
   "stats.favorites": "Favorites",
@@ -51,10 +51,10 @@
   "source.hub": "Hub /web/custom-agents",
   "source.hubDetail": "Loaded from the Hub custom-agent contract for the current Web session.",
   "source.loading": "Loading Hub catalog",
-  "source.catalogMock": "Catalog/mock fallback",
-  "source.catalogFallbackDetail": "Hub did not return custom agents, so this page is showing the labeled catalog/mock fallback.",
-  "source.loginRequiredDetail": "No Web Hub session is available. Showing the labeled catalog/mock fallback.",
-  "source.errorDetail": "Hub custom agents are unavailable: {{error}}. Showing the labeled catalog/mock fallback.",
+  "source.catalogMock": "Catalog fallback",
+  "source.catalogFallbackDetail": "Hub did not return custom agents, so this page is showing the labeled catalog fallback.",
+  "source.loginRequiredDetail": "No Web Hub session is available. Showing the labeled catalog fallback.",
+  "source.errorDetail": "Hub custom agents are unavailable: {{error}}. Showing the labeled catalog fallback.",
 
   "card.details": "Details",
   "card.add": "Stage locally",
