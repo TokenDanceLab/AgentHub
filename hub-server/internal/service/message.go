@@ -127,6 +127,12 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 		return nil, errcode.SessionDissolved
 	}
 
+	if req.ReplyToMsgID != nil && *req.ReplyToMsgID != "" {
+		if _, err := repository.GetMessageBySessionAndID(s.db, sessionID, *req.ReplyToMsgID); err != nil {
+			return nil, errcode.MsgNotFound
+		}
+	}
+
 	if session.Type == model.SessionTypePrivate {
 		other, err := repository.GetOtherMemberInPrivate(s.db, sessionID, senderUserID)
 		if err != nil {
@@ -532,6 +538,9 @@ func (s *MessageService) ListPinnedMessages(ctx context.Context, userID, session
 }
 
 func (s *MessageService) ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error {
+	if len(targetSessionIDs) > config.MaxForwardTargets {
+		return errcode.ErrBadRequest
+	}
 	// Source message access check
 	msg, err := repository.GetMessageByID(s.db, msgID)
 	if err != nil {

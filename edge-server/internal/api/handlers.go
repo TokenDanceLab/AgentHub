@@ -749,6 +749,7 @@ func decodeOptionalJSON(r *http.Request, dst any) error {
 	// Use io.LimitReader instead of http.MaxBytesReader to avoid needing a ResponseWriter.
 	r.Body = io.NopCloser(io.LimitReader(r.Body, 1<<20))
 	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(dst); err != nil {
 		return err
 	}
