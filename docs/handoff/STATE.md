@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-25 21:00 UTC+8 | 分支：dev/delicious233 | 提交：6fcf079
+最后更新：2026-05-26 UTC+8 | 分支：dev/delicious233
 
 ## 快速上手
 
@@ -18,12 +18,13 @@ cd ../hub-server && go test ./... -short -count=1  # 13/13 包
 
 ### 运行前端测试
 ```bash
-cd app/desktop && pnpm test   # 551/560 通过
+cd app/desktop && pnpm vitest run src/__tests__/AgentList.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/ThreadPanel.test.tsx src/__tests__/uiStore.test.ts  # 52/52 通过
+cd app/web && pnpm typecheck && pnpm build
 ```
 
 ### 前端 TypeScript 检查
 ```bash
-cd app/desktop && pnpm typecheck    # 桌面代码零错误；app/shared lockfile 已同步 React 类型依赖
+cd app/desktop && pnpm typecheck    # 当前仍有测试文件 strict index/optional 类型债，不能作为本轮通过证明
 ```
 
 ### Storybook
@@ -40,7 +41,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 
 | 层 | 技术栈 | 测试 | 关键特性 |
 |---|------|:--:|------|
-| **Desktop** | React 19, TypeScript, Zustand, TanStack Query, OKLCH tokens, CSS Modules | 551/560 | viewRegistry, @shared/ui, Storybook, RunState 状态机, IM UI, AuthPage, 虚拟滚动 |
+| **Desktop** | React 19, TypeScript, Zustand, TanStack Query, OKLCH tokens, CSS Modules | 聚焦单测 52/52；全量仍有既有测试债 | viewRegistry, @shared/ui, Storybook, RunState 状态机, IM UI, AuthPage, 虚拟滚动 |
 | **Edge** | Go, gorilla/websocket, NDJSON | 13/13 包 | 3 Adapter (Claude/Codex/OpenCode), Prometheus, event bus dropped counter, Orchestrator, E2E 19/19 API |
 | **Hub** | Go, Gin, GORM, Redis, PostgreSQL | 13/13 包 | DI 架构, CORS→BodyLimit→RateLimit 链, 28 migrations, 公开 API |
 
@@ -89,7 +90,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - Desktop/Hub/Web：TokenDance ID 登录入口已作为账号体系主入口进入登录页和 Settings/账号页；Hub Server 已实现 `POST /client/auth/oidc/authorize` + `/callback` 的 code exchange、ID token JWKS 校验、`tokendance_sub` 映射和 Hub access/refresh session 签发。Web 已接入浏览器 PKCE redirect callback：授权时可传本轮 `redirect_uri`，Hub 将其绑定到 state 并用于 token exchange，Web 回跳 `/auth/tokendance/callback` 后用 sessionStorage 中的 verifier 换 Hub session。Desktop 仍需补完整 callback 捕获、logout/reconnect 与截图证据。
 - Web：主工作区发送链路已从 `edgeClient` stub 切到 Hub session/message/task。Threads 面板读取/创建 Hub sessions；Hub 允许创建 owner-only group session 作为 Web workspace 会话，Workspace 空态发送或选 Agent 时可按需创建该会话，再写入 Hub message、邀请 Agent、通过 `/web/agent-tasks` 触发 Hub→Desktop/Edge `agent.dispatch`；取消走 `/web/agent-tasks/{id}/cancel`。浏览器仍不持有 Relay key，也不直接调用 Edge。
 - Web：`app/web/tsconfig.json` 已恢复 `strict: true`、`strictNullChecks: true`、`noUncheckedIndexedAccess: true` 与 `exactOptionalPropertyTypes: true`；已清理 Web/shared optional DTO、Hub/IM adapter、permission、composer、Settings 与 private chat 的 exact optional 形状，当前 `corepack pnpm typecheck` 与 `corepack pnpm build` 通过。
-- Web：暗色 Web shell 已按 Codex App 纯色深灰目标收敛：遵循 `codex-theme-v1` 的 `surface=#25252d`、`ink=#e3e4e6`、`accent=#5d68cc`，移除 `app/web/src` 内全部 `linear/radial/conic-gradient` 与 gradient mask；composer 直接复用 Desktop 单层 capsule 的宽度、字号、边框、blur 和低阴影结构，移除 Web 额外 goal/card 堆叠，空态建议项改为低噪 inline chips。Playwright 桌面/移动 smoke 覆盖运行时 0 个 gradient 节点、无 raw i18n key、无横向溢出、无 console error，截图见 `app/web/screenshots/web-desktop-composer-reuse-desktop.png`、`app/web/screenshots/web-desktop-composer-reuse-callback.png`、`app/web/screenshots/web-desktop-composer-reuse-mobile.png`。
+- Web：暗色 Web shell 已按 Codex App 纯色深灰目标收敛：遵循 `codex-theme-v1` 的 `surface=#25252d`、`ink=#e3e4e6`、`accent=#5d68cc`，移除 `app/web/src` 内全部 `linear/radial/conic-gradient` 与 gradient mask；composer 直接复用 Desktop 单层 capsule 的宽度、字号、边框、blur 和低阴影结构，移除 Web 额外 goal/card 堆叠，空态建议项改为低噪 inline chips。Playwright 桌面/移动 smoke 覆盖运行时 0 个 gradient 节点、无 raw i18n key、无横向溢出、无 console error；截图证据保留为本地 ignored 产物，不纳入 Git。
 - Desktop：左栏概念从“智能体/能力 chips”改为 `Agent Runtime`，不再把“流式输出/工具调用/文件修改”等基础能力当产品主概念；Runtime 卡片展示本地 Edge + CLI adapter 元信息，基础 capability 仅保留在协议/后端层。
 - Desktop：App shell 已支持左侧栏折叠、右侧运行详情彻底关闭、左右栏宽拖拽 resize。真实 run 验证中，右侧运行面板展开宽度 360px，关闭后完全不占空间，主工作区从 640px 扩展到 1012px；两条 resize separator 可见。
 - Desktop：移动端工具栏已补 Settings、Hub 登录、主题切换与菜单入口；375px Playwright 验证无横向溢出。
@@ -112,7 +113,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - Desktop：Settings `Skill Management` 已从单行路径接入项目级 Skill registry 概览。页面基于当前 `.agents/skills/*/SKILL.md` 快照展示 7 个仓库级 Skill、6/7 可审核状态、1 个含脚本 Skill、1 个 references Skill、Hub sync 边界和脚本审计入口。
 - Desktop：Skill Management 验证已通过 `pnpm vitest run src/__tests__/SettingsPage.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/errors.test.ts src/__tests__/Toast.test.tsx`（46/46）、`python -m json.tool src/i18n/locales/{en,zh}.json`、`git diff --check -- app/desktop/src/...`；Playwright 桌面和 375px 移动端检查 `logs: []`、无 raw i18n key、无横向溢出，截图见 `app/desktop/screenshots/settings-skill-registry-real-data.png`、`app/desktop/screenshots/settings-skill-registry-real-data-mobile.png`。
 - Desktop/Edge 注意：当前 live Edge `http://127.0.0.1:3210` health 和 agents 在线，返回 Claude Code / Codex / OpenCode；此前真实连续双 POST 到 `thread_local` 观测到两个 202。2026-05-25 已用临时 Edge `127.0.0.1:3227` + 可控慢 `powershell Start-Sleep` runner 复现真实 HTTP 路径 first 202、second 409 `active_run_exists`，且 409 body 带回首个 active `runId`；先前 3210 现象更可能是旧进程或真实 runtime 过快完成。
-- Docs：gpt-5.5 xhigh 文档架构 worker 已完成文档架构审查（原写入 `docs/inbox/`，该目录已于目录重组中删除）。结论是主文档已基本对齐 Runtime/Profile/Configuration/Execution Target、TokenDance ID、IM、多端、远控、Skill/MCP、cc-switch、安全审计等边界；剩余风险集中在 `/v1/runners` / `runner.*` 的历史兼容命名，以及 `docs/archive/client-handoff.md`、`docs/roadmaps/integration.md` 等旧独立 `runner/` 文档需要归档或改写。
+- Docs：gpt-5.5 xhigh 文档架构 worker 已完成文档架构审查，结论已汇总到 roadmap/STATE；`docs/inbox/` 仍保留为临时投递入口，已处理报告归档到 `docs/reference/` 或 `docs/archive/`。主文档已基本对齐 Runtime/Profile/Configuration/Execution Target、TokenDance ID、IM、多端、远控、Skill/MCP、cc-switch、安全审计等边界；剩余风险集中在 `/v1/runners` / `runner.*` 的历史兼容命名，以及 `docs/archive/client-handoff.md`、`docs/roadmaps/integration.md` 等旧独立 `runner/` 文档需要归档或改写。
 - Web：~~gpt-5.5 xhigh Web worker 已在 `.worktrees/webui-desktop-port/app/web` 内补强生态控制台。~~ (worktree 已随分支清理；`app/web/README.md` 已说明 `/` 生态控制台、`/workbench-preview` 旧工作台、TokenDance 生态边界和验证命令；`EcosystemConsole` 新增身份边界、协作同步、Agent runtime、运维护栏等入口，并补响应式 lane 布局和测试。验证通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`（4/4）、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web`。)
 - Web：~~gpt-5.5 xhigh worker `McClintock` 已继续在 `.worktrees/webui-desktop-port/app/web` 内新增 `Feature readiness` 面板~~ (worktree 已随分支清理)。验证通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`（5/5）、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web`。
 - Web：~~gpt-5.5 xhigh worker `Herschel` 已继续在 `.worktrees/webui-desktop-port/app/web` 内新增移动端/平板 `Jump to surface` picker~~ (worktree 已随分支清理)。验证通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`（6/6）、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web`。
@@ -171,8 +172,8 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - Edge：active-run 真实 HTTP smoke 已用可控慢 runner 收口；后续若 3210 真实 runtime 仍出现双 202，应重点确认当前进程版本和 runtime 是否在第二个 POST 前已完成。
 - Edge：raw output cap 和 structured adapter payload cap 已 repo 内缓解；后续用 live runtime 做截断 metadata smoke，确认真实 Codex/Claude/OpenCode adapter 事件在客户端可读。
 - Edge：下一步若继续权限链路，要做真正阻塞式审批和远程 Edge 决策认证；当前修复只关闭 REST 任意 requestId 伪造和重复消费。
-- Docs：处理文档架构审查（原 `docs/inbox/` 已随目录重组删除）的最小建议：先在 API/架构文档标注 Runner 兼容命名，再归档或改写旧 `docs/archive/client-handoff.md`、`docs/roadmaps/integration.md`。
-- Docs：Codex follow-up 已完成（原 `docs/inbox/` 已随目录重组删除），确认最小补丁应优先改 `docs/architecture/implementation-guide.md` 的旧 client 文档入口，并在 API docs 标注 `/v1/runners` / `runner.*` 是历史兼容命名。
+- Docs：处理文档架构审查的最小建议：先在 API/架构文档标注 Runner 兼容命名，再归档或改写旧 `docs/archive/client-handoff.md`、`docs/roadmaps/integration.md`。
+- Docs：Codex follow-up 已完成，确认最小补丁应优先改 `docs/architecture/implementation-guide.md` 的旧 client 文档入口，并在 API docs 标注 `/v1/runners` / `runner.*` 是历史兼容命名。
 - Web：~~继续保持 `D:\Code\TokenDance\AgentHub\.worktrees\webui-desktop-port` 独立~~ worktree 及 `feat/webui-desktop-port` 分支已于 2026-05-25 删除，产出已合入 `dev/delicious233`。
 - 后端：保留当前 Hub/Edge 并行改动，不回退；Hub `device_id` UUID 边界、多设备登录 schema、Hub cache fallback、Hub public stats bucket、dev compose loopback、Edge REST timeout、Edge local auth、Edge active-run smoke 和当前 `client-smoke` 23/23 已收口，后续优先做部署态 Hub 登录/设备注册验证、runner degraded/offline 与 Hub task/IM/scheduling API 的客户端消费；若继续安全队列，下一批可处理 `AH-SR-016/017` 部署态 CORS/admin 暴露验证，或开始 Remote/Cloud Edge 的 Hub session/device proof 设计。
 

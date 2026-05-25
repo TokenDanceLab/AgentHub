@@ -159,7 +159,7 @@ cd app/desktop
 pnpm test:e2e
 ```
 
-注意：`scripts/client-smoke.ps1` 仍包含已删除 `runner/` 目录的历史检查，修复前不要把它作为通过/失败依据。
+`scripts/client-smoke.ps1` 已对齐当前 Edge Runtime 架构，不再构建已删除的独立 `runner/` 目录；它使用 Edge 内置 `agenthub-runner-mock` 兼容 profile，并支持 `-EdgeAddr` 在隔离端口运行。
 
 ### 当前验证命令
 
