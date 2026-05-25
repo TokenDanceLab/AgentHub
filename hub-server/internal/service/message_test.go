@@ -515,9 +515,15 @@ func TestPinMessage_LimitExceeded(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content", "recalled", "created_at"}).
 			AddRow("msg-1", "sess-1", 1, "c1", "user", "user-2", "text", `{"text":"pinned"}`, false, time.Now()))
 
+	// PinMessageAtomic transaction (FOR UPDATE session + count + rollback on limit)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT id FROM sessions WHERE id =`).
+		WithArgs("sess-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("sess-1"))
 	mock.ExpectQuery(sqlmPin).
 		WithArgs("sess-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(50))
+	mock.ExpectRollback()
 
 	svc := &MessageService{db: db}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-1")
@@ -556,12 +562,17 @@ func TestPinMessage_DuplicatePin(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content", "recalled", "created_at"}).
 			AddRow("msg-1", "sess-1", 1, "c1", "user", "user-2", "text", `{"text":"pinned"}`, false, time.Now()))
 
+	// PinMessageAtomic transaction (FOR UPDATE session + count + insert dup -> rollback)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT id FROM sessions WHERE id =`).
+		WithArgs("sess-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("sess-1"))
 	mock.ExpectQuery(sqlmPin).
 		WithArgs("sess-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
-
 	mock.ExpectExec(sqlmInsertPin).
 		WillReturnError(errors.New("duplicate key value violates unique constraint"))
+	mock.ExpectRollback()
 
 	svc := &MessageService{db: db}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-1")
@@ -582,12 +593,17 @@ func TestPinMessage_Success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content", "recalled", "created_at"}).
 			AddRow("msg-1", "sess-1", 1, "c1", "user", "user-2", "text", `{"text":"pinned"}`, false, time.Now()))
 
+	// PinMessageAtomic transaction (FOR UPDATE session + count + insert + commit)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT id FROM sessions WHERE id =`).
+		WithArgs("sess-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("sess-1"))
 	mock.ExpectQuery(sqlmPin).
 		WithArgs("sess-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
-
 	mock.ExpectExec(sqlmInsertPin).
 		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
 
 	svc := &MessageService{db: db, bus: newTestBus(t)}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-1")

@@ -217,6 +217,17 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 		return err
 	}
 
+	// Deduplicate member IDs to prevent duplicate key violations
+	seen := make(map[string]bool, len(memberIDs))
+	unique := make([]string, 0, len(memberIDs))
+	for _, mid := range memberIDs {
+		if !seen[mid] {
+			seen[mid] = true
+			unique = append(unique, mid)
+		}
+	}
+	memberIDs = unique
+
 	for _, mid := range memberIDs {
 		active, _ := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, mid)
 		if active {
