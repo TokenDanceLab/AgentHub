@@ -32,6 +32,8 @@ Read these first when the work crosses identity, authorization, Feishu/Lark, Rel
 | TD-P0-I18N-01 | Desktop/Web public/user copy | UI dictionaries or user-visible strings | zh/en copy parity for login, errors, Feishu, Relay, Agent terms; focused tests or review notes for changed strings |
 | TD-P0-SEC-01 | Security/risk | `docs/governance/security-risk-register.md`, auth/session/Edge execution/integration code | Risk finding updated with severity/status/evidence; Critical/High fixed, verified, or explicitly accepted before release-ready claims |
 
+Current TD-P0-HUB-01 status: Hub Server has repo-level implementation and tests for TokenDance ID authorize/callback exchange, configured JWKS validation, `tokendance_sub` mapping, Hub-local access/refresh token issuance, and UUID device proof. Remaining evidence before product-level closure is Desktop/Web callback UX, Hub session storage/logout/reconnect behavior, deployment config proof, and screenshots.
+
 ## Local Dispatch Rules
 
 1. Every repo issue, roadmap row, or PR for the queue items above should reference the relevant `TD-P0-*` / `TD-P1-*` ID.

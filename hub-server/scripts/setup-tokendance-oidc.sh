@@ -8,7 +8,7 @@
 #   - jq is installed
 #   - curl is installed
 #
-# Output: Exports AGENTHUB_TOKENDANCE_* env vars to stdout
+# Output: Exports AGENTHUB_TOKENDANCE_ID_* env vars to stdout
 
 set -euo pipefail
 
@@ -78,9 +78,9 @@ fi
 echo ""
 echo "=== Add these to your hub-server/.env ==="
 echo ""
-echo "AGENTHUB_TOKENDANCE_ISSUER_URL=$TOKENDANCE_URL"
-echo "AGENTHUB_TOKENDANCE_CLIENT_ID=$CLIENT_ID"
-echo "AGENTHUB_TOKENDANCE_CLIENT_SECRET=$SECRET"
-echo "AGENTHUB_TOKENDANCE_REDIRECT_URI=http://127.0.0.1:PORT_IDX/callback"
+echo "AGENTHUB_TOKENDANCE_ID_ISSUER_URL=$TOKENDANCE_URL"
+echo "AGENTHUB_TOKENDANCE_ID_CLIENT_ID=$CLIENT_ID"
+echo "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=$SECRET"
+echo "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=http://127.0.0.1:PORT_IDX/callback"
 echo ""
 echo "Done. Keep the client_secret safe — it will never be shown again."

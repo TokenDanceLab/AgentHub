@@ -86,7 +86,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - Desktop：项目文档后台 sweep 已完成，`docs/architecture/system-architecture.md` / `docs/architecture/product-requirements.md` / `docs/architecture/implementation-guide.md` / `docs/roadmap.md` / README 系列 / archive + ADR 索引已统一 Runtime/Profile/Configuration/Execution Target、TokenDance ID、Hub/Edge/Desktop/Web 边界。
 - Desktop：设置页按 Codex App 截图方向重构为全屏设置工作台，并新增任务列表、IM 群聊、Agent 调度、在线 IM、Agent 市场、Skill/MCP、模型配置、模型映射、cc-switch、多端、远控、账号鉴权和安全审计等一等入口；顶部快捷图标可直达任务列表和 Agent 调度分区。
 - Desktop：Settings 已新增 `Agent Profiles` 与 `Execution Targets` 两个一级页面，把用户概念明确拆成 Agent Profile（Runtime + Model + Configuration）和 Execution Target（Local Edge / Hub Relay / SSH/Tailscale / Cloud Edge）；页面直接消费 `useHealth()` 与 `useAgentList()`，`HealthResponse`/Zod schema 已保留 `/v1/health.checks.runners` 扩展字段，Connections 页同步显示 Edge runner summary。
-- Desktop：TokenDance ID 登录入口已作为账号体系主入口进入登录页和 Settings/账号页；当前保留 PKCE 状态写入，OIDC callback 捕获与 Hub token exchange 仍属后续实现。
+- Desktop/Hub：TokenDance ID 登录入口已作为账号体系主入口进入登录页和 Settings/账号页；Hub Server 已实现 `POST /client/auth/oidc/authorize` + `/callback` 的 code exchange、ID token JWKS 校验、`tokendance_sub` 映射和 Hub access/refresh session 签发。Desktop/Web 仍需补完整浏览器 callback 捕获、Hub session 存储、logout/reconnect 与截图证据。
 - Desktop：左栏概念从“智能体/能力 chips”改为 `Agent Runtime`，不再把“流式输出/工具调用/文件修改”等基础能力当产品主概念；Runtime 卡片展示本地 Edge + CLI adapter 元信息，基础 capability 仅保留在协议/后端层。
 - Desktop：App shell 已支持左侧栏折叠、右侧运行详情彻底关闭、左右栏宽拖拽 resize。真实 run 验证中，右侧运行面板展开宽度 360px，关闭后完全不占空间，主工作区从 640px 扩展到 1012px；两条 resize separator 可见。
 - Desktop：移动端工具栏已补 Settings、Hub 登录、主题切换与菜单入口；375px Playwright 验证无横向溢出。
