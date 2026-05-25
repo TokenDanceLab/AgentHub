@@ -36,6 +36,7 @@
     "activeTasks": "Active tasks",
     "demoActiveTasks": "Demo active tasks",
     "milestones": "Milestones",
+    "demoMilestones": "Demo milestones",
     "sharedFiles": "Shared files",
     "demoSharedFiles": "Demo shared files",
     "dryRuns": "Dry runs",
@@ -125,6 +126,9 @@
     "mockFallback": "Demo / mock fallback",
     "snapshotUnavailable": "Snapshot unavailable",
     "localDryRun": "Local dry-run / {{source}}"
+  },
+  "demo": {
+    "cardDetail": "Demo/mock fallback data: {{detail}}"
   },
   "confirm": {
     "saveValidation": "Add a task title and owner before saving.",

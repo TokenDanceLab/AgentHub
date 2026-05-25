@@ -14,6 +14,9 @@ export interface IMMessage {
   timestamp: string;
   replyToId?: string;
   recalled?: boolean;
+  read?: boolean;
+  readBy?: string;
+  readAt?: string;
 }
 
 export interface IMContact {
@@ -25,4 +28,6 @@ export interface IMContact {
   avatar?: string;
   lastSeen?: string;
   dissolved?: boolean;
+  statusHint?: string;
+  statusHintParams?: Record<string, string | number>;
 }
