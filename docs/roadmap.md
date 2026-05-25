@@ -16,8 +16,8 @@
 |------|--------|---------|---------|----------|
 | **Desktop** | React 19 + Tauri 2 + Zustand + TanStack Query | viewRegistry 9视图、IM UI、AuthPage、RunState 状态机、传输层抽象 | 519 tests（34 files） | tsc 严格模式，ESLint + Prettier |
 | **Edge Server** | Go (net/http + gorilla/websocket) | 3 Adapter、24 NDJSON、Orchestrator P1-P2、Prometheus、E2E 19/19 API | 13/13 包（530 funcs） | CI 硬阈值 75%，race/gosec/govulncheck |
-| **Hub Server** | Go (Gin + GORM + Redis + PG) | DI 架构、13 包有测试、CORS+RateLimit+BodyLimit 中间件链、32 migration | 13/13 包（355 funcs），repository 75.5% | CI 硬阈值 40%，golangci-lint/gitleaks |
-| **Web** | React + Vite | feat/trump-webui 开发中 | 构建通过 | 不做硬性要求 |
+| **Hub Server** | Go (Gin + GORM + Redis + PG) | DI 架构、13 包有测试、CORS+RateLimit+BodyLimit 中间件链、21 migrations | 13/13 包（355 funcs），repository 75.5% | CI 硬阈值 40%，golangci-lint/gitleaks |
+| **Web** | React + Vite | feat/trump-webui 已合入主线（2026-05-25 归档） | 构建通过 | 不做硬性要求 |
 | **CI/CD** | GitHub Actions | 8 job: go-edge/go-hub/benchmark/docker/cross-build/frontend/validate/gitleaks | 全绿 | race/gosec/govulncheck/覆盖率硬阻断 |
 | **官网** | Next.js 16 + Tailwind v4 | hub.vectorcontrol.tech — LiveStats + ConnectAgent | 14/20 tests | 静态导出，nginx on hk2 |
 | **部署** | Docker Compose on hk2 | PG16 + Redis7 + Hub Server（独立实例，不与 AIhub 共用） | ✅ 生产运行 | nginx 反代 api.hub.vectorcontrol.tech:80→8090 |
@@ -318,20 +318,16 @@ Hub 调度（远程）:
   - 方案：`defer conn.W.Close(...)` + `defer recover()` + 日志
   - 验收：`writeLoop` 退出统一 close，panic recovery 保留日志
 
-##### P3 -- 低严重度
+##### P3 -- 低严重度（已推迟至后续批次）
 
-- [ ] **P3-3/P3-6: 合并双 cmd 入口** `[1d]`
-  - 文件：`hub-server/cmd/agenthub-hub/main.go` → 合并到 `cmd/server-hub/main.go` 或明确文档化
+- [ ] **P3-3/P3-6: 合并双 cmd 入口** `[1d]` — 推迟
 - [x] **P2-11: listFriendRequests 用户查找失败时记录日志** `[0.5d]`
-  - 文件：`hub-server/internal/service/contact.go`
-  - 方案：批量用户查询缺失 sender 时记录 `slog.Debug` 并跳过该坏数据，不阻断其他好友请求
-  - 验收：`TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender`
-- [ ] **P3-1: 路由参数命名统一** `[0.5d]`
+- [ ] **P3-1: 路由参数命名统一** `[0.5d]` — 推迟
 - [x] **P3-2: 魔数常量化**（50/50/24h/5min/1024/64） `[1d]`
-  - 方案：Hub request/body/timeout/rate-limit/message recall/pin limit/WebSocket heartbeat/EventBus pool/metrics interval/group name length 等默认值统一收敛到 `internal/config/constants.go`，调用点改为命名常量；保留 WebSocket send buffer 现有运行值 256。
-  - 验收：`go test ./internal/config ./internal/router ./internal/middleware ./internal/service ./internal/ws -count=1`、`go test ./... -short -count=1`
-- [ ] **P3-4: 创建 Workspace GORM model** `[0.5d]`
-- [ ] **P3-5: gofmt 格式修复** `[0.5d]`
+- [ ] **P3-4: 创建 Workspace GORM model** `[0.5d]` — 推迟
+- [ ] **P3-5: gofmt 格式修复** `[0.5d]` — 推迟
+
+> **说明**：P3 低优先级项（P3-1, P3-3, P3-4, P3-5, P3-6）已从 M5/M6/M7 批次推迟。M5/M6/M7 的 P0-P2 工程基础、生产部署、Desktop P0 打磨已全部完成，P3 清理项后续批次处理。
 
 ##### 测试基础设施（Phase 1-2，来自 testing audit）
 
@@ -368,40 +364,19 @@ Hub 调度（远程）:
 
 ---
 
-#### 3.1.3 Desktop 基础打磨（~14 天）
+#### 3.1.3 Desktop 基础打磨（~14 天）✅ M5/M7 全部完成
 
-> 参考：`docs/roadmaps/client.md` Phase 0（完整 12 项任务）
+> **详细实现描述见 `docs/roadmaps/client.md` Phase 0。** 以下仅保留摘要。
+> 实施详情：`docs/architecture/design/client-p0-architecture.md` | 参考模式：`docs/architecture/design/client-reference-patterns.md`
 
-- [x] **P0-1: 状态架构重构** `[5d]`
-  - ✅ 引入 TanStack Query：`queryClient.ts`, `threadQueries.ts`, `runQueries.ts`（M5）
-  - ✅ 改造 `useChatMessages.ts`：事件 → `queryClient.invalidateQueries`
-  - ✅ 改造 `runStore.ts`：删除服务端数据，仅保留 `isStreaming` 等客户端标志
-  - ✅ RunState 正式状态机：`IDLE → RUNNING ↔ STREAMING → WAITING_FOR_INPUT / COMPLETED / FAILED / CANCELLED`（M5，`runStateMachine.ts`）
-  - ✅ Zustand selector 粒度优化：所有 store 使用 `subscribeWithSelector`
-  - 参考：Multica TanStack Query+Zustand 分离模式，Roo-Code AgentLoopState
+- [x] **P0-1: 状态架构重构** `[5d]` — TanStack Query + RunState 状态机 + Zustand selector 粒度优化
+- [x] **P0-2: 输入体验修复** `[4d]` — 非受控输入 + 草稿持久化 + 循环检测 + 文件去重
+- [x] **P0-3: 连接健壮性** `[3d]` — WebSocket 心跳 + 离线队列 + Transport 抽象
+- [x] **P0-4: 性能基础** `[2d]` — 虚拟滚动 + viewRegistry 拆分
 
-- [x] **P0-2: 输入体验修复** `[4d]`
-  - ✅ 非受控输入迁移：`PromptInput.tsx` `useState` → `useRef + DOM`
-  - ✅ 草稿持久化：`useInputDraft.ts`，localStorage 按 threadId 存储
-  - ✅ 工具调用循环检测：`LoopDetector` 类，3 次警告 5 次自动取消
-  - ✅ 文件读取去重缓存：`FileReadCache` 类，path+mtime 键
+##### Quick Wins（<1 天 / 项）✅ M5 全部完成
 
-- [x] **P0-3: 连接健壮性** `[3d]`
-  - ✅ WebSocket 心跳：10s ping/pong + 15s 超时检测（M5 `eventClient.ts`）
-  - ✅ 离线消息队列：`transport.ts` `WebSocketTransport` + localStorage 持久化
-  - ✅ 传输层抽象：`Transport` 接口 + `WebSocketTransport` 实现 + 指数退避重连
-
-- [x] **P0-4: 性能基础** `[2d]`
-  - ✅ 虚拟滚动：`@tanstack/react-virtual`（M5 完成，`ChatView.tsx` + `useAutoScroll.ts`）
-  - ✅ App.tsx 视图注册表拆分（`viewRegistry.ts` + `Slot` 模式，651→531 行）
-
-##### Quick Wins（<1 天 / 项）
-
-- [x] QW-1: 非受控输入迁移（✅ M5 `useRef` 完成）
-- [x] QW-2: 草稿持久化（✅ M5 `useInputDraft.ts` 完成）
-- [x] QW-3: WebSocket 心跳（✅ M5 `eventClient.ts` 完成）
-- [x] QW-4: Zustand selector 粒度优化（✅ M5 `useShallow` 完成）
-- [x] QW-5: Toast 反馈（✅ M5 `Toast.tsx` + `toastStore.ts` Zustand 完成）
+- [x] QW-1~QW-5: 非受控输入、草稿持久化、心跳、selector 优化、Toast 反馈
 
 ---
 
@@ -449,15 +424,15 @@ Hub 调度（远程）:
   - 验收：`http://localhost:8080/swagger/index.html` 可交互浏览
 
 - [x] **架构决策记录 (ADR)** `[1d]` ✅ M5
-  - `docs/adr/` — 5 篇：Hub-Edge双层/WS+NDJSON/Zustand+TanStack/Go进程编排/Worktree隔离
+  - `docs/architecture/adr/` — 5 篇：Hub-Edge双层/WS+NDJSON/Zustand+TanStack/Go进程编排/Worktree隔离
 
 - [x] **文档与代码一致性修复** `[1d]`
   - Hub Server 准确性矩阵（`docs/review/hub-server-audit.md` 第 10 节）31 项对比中 15 项不一致
   - 修复关键项：消息撤回 2min vs 5min、CORS/Rate-limit middleware 文档声明但不存在
   - 验收：移除文档中未实现的端点声明
 
-- [ ] **Edge Server 本地文档路径修复** `[0.5d]`
-  - 文件：`edge-server/README.md:36-38` 引用的 `docs/` 路径指向 monorepo 根
+- [x] **Edge Server 本地文档路径修复** `[0.5d]`
+  - ✅ 已随 2026-05-25 目录重组落地（`docs/architecture/` 新路径）
 
 ---
 
@@ -477,67 +452,19 @@ Hub 调度（远程）:
 
 ---
 
-#### 3.2.2 Hub-Edge-Desktop 集成（~19 天）
+#### 3.2.2 Hub-Edge-Desktop 集成
 
-> 参考：`docs/roadmaps/integration.md` 六阶段计划
+> **详细实现描述见 `docs/roadmaps/integration.md`。** 以下仅保留阶段摘要。
+> 阶段 1-3 已于 M5 完成，阶段 4 核心组件完成，阶段 5-6 部分完成。
 
-##### 阶段 1: Desktop Hub 认证 + REST 客户端 `[3d]` ✅ M5
-
-- [x] 新建 `app/desktop/src/api/hubClient.ts` -- Hub REST 客户端（auth/contacts/sessions/messages/edge）
-- [x] 新建 `app/desktop/src/api/hubAuth.ts` -- JWT 令牌管理（登录/刷新/存储/登出/自动登录）
-- [x] 修改 `app/desktop/src/config.ts` -- 添加 `HUB_URL`（默认 localhost:8080）
-- [x] StatusBar Hub 连接状态指示器
-- [x] 验证：28 hubClient tests + 399 全部通过
-
-##### 阶段 2: Hub WebSocket 客户端 `[2d]` ✅ M5
-
-- [x] 新建 `app/desktop/src/api/hubWS.ts` -- 含 auth 帧协议的 Hub WS 客户端（Transport 注入）
-- [x] 新建 `app/shared/src/hubEvents.ts` -- 23 Hub WS 事件类型
-- [x] 创建 `useHubEventStream` hook — 分类事件状态管理
-- [x] 验证：20 hubWS tests + 419 全部通过
-
-##### 阶段 3: Agent 任务桥接 `[4d]` ✅ M5
-
-- [x] 新建 `app/desktop/src/hooks/useHubIntegration.ts` -- Hub-Edge 桥接核心（dispatch→run→stream→done/fail）
-- [x] 监听 `agent.dispatch` → 解析 dispatchPayload → Edge `StartRunRequest`
-- [x] Edge `run.agent.text_delta` → Hub `streamTask(taskId, content)`
-- [x] Edge `run.agent.result` → Hub `doneTask()` 或 `failTask()`
-- [x] 映射 `runId` ↔ `taskId` 双向追踪（taskBridgeStore）
-- [x] 启动时注册设备 `POST /edge/devices/register`
-- [x] 验证：22 integration tests + 440 全部通过
-
-##### 阶段 4: Desktop IM UI `[5d]` 🔄 M5（核心组件完成）
-
-- [x] 新建会话消息视图（`IMMessageView` — 聊天气泡 + Agent/User 区分 + Authority 色带）
-- [x] 新建会话消息输入（`IMMessageInput` — 自动变高 + Enter/Shift+Enter）
-- [x] 新增加联系人管理（`IMContactList` — 搜索/在线状态/未读计数）
-- [x] 验证：25 tests + 491 全部通过
-- [ ] 新建会话列表侧边栏（全文搜索、分组、拖拽排序）
-- [ ] 附件上传/预览
-- [ ] 新增通知浮层（好友请求/Agent 完成/@提及）
-- [ ] 新增在线状态指示器（从 device 事件获取）
-- [ ] 增量消息同步（REST `/sync` + WS `message.new`）
-
-##### 阶段 5: 设备与同步强化 `[3d]`
-
-- [ ] 消息同步对账（基于 seq，处理缺口）
-- [ ] 离线任务队列（Desktop 离线后重连拉取待处理）
-- [ ] 优雅断开/重连（清洗认证状态 + 重新握手）
-- [ ] 设备能力上报（支持哪些 Agent 类型）
-- [ ] 令牌刷新鲁棒性（WS 收到 401 时重新认证）
-
-##### 阶段 6: Edge Server 强化 `[2d]`
-
-- [x] 并发 run 验证（每线程一个公开 run）
-  - 方案：`POST /v1/runs` 在创建前检查同 thread 是否存在 `queued`/`started`/`cancelling` run，命中时返回 409 `active_run_exists` 和现有 `runId`；Store 保留同 thread 多 run 能力给 orchestrator sub-agent；executor 启动失败会把 queued run 标记为 `failed`，避免重试被永久 409 阻塞。
-  - 验收：`TestPostRunsRejectsSecondActiveRunForThread`、`TestPostRunsAllowsNewRunAfterActiveRunTerminal`、`TestPostRunsMarksExecutorStartFailureTerminalForRetry`、`TestStoreAllowsMultipleRunsForSameThread`
-- [x] Run 清理（过期 run、资源限制）
-  - 方案：Store 暴露 `RunCleaner`/`CleanupRuns`，只清理 `finished`/`failed`/`cancelled` terminal run；支持 `TerminalTTL` 与 `MaxTerminalRunsPerThread`，连带删除关联 run item，保留 `queued`/`started`/`cancelling` active run；FileStore 在清理后持久化快照；`POST /v1/runs` 在 active-run 检查前执行保守清理，默认 terminal TTL 24h、每线程最多保留 50 条 terminal run。
-  - 验收：`TestStoreCleanupRunsRemovesExpiredTerminalRunsAndItems`、`TestStoreCleanupRunsEnforcesMaxTerminalRunsPerThread`、`TestFileStoreCleanupRunsPersistsRemovedRunsAndItems`、`TestPostRunsCleansTerminalRunsBeforeCreatingNewRun`
-- [ ] 可选：重启后 run 历史持久化
-- [x] Health check 包含 runner 状态
-  - 方案：`/v1/health` 的 `checks.runners` 返回 `total`、`available`、`unavailable`、`statuses`、`items`；无 registry、无 runner、全离线时降级为 `degraded`。
-  - 验收：`TestGetHealth`、`TestGetHealthDegradesWhenNoRunnerAvailable`、`TestGetHealthDegradesWhenRunnerRegistryMissing`
+| 阶段 | 内容 | 工期 | 状态 |
+|------|------|:--:|:--:|
+| 阶段 1 | Desktop Hub 认证 + REST 客户端 | 3d | ✅ M5 |
+| 阶段 2 | Hub WebSocket 客户端 | 2d | ✅ M5 |
+| 阶段 3 | Agent 任务桥接（dispatch→run→stream→done/fail） | 4d | ✅ M5 |
+| 阶段 4 | Desktop IM UI（核心组件完成，侧边栏/附件/通知待补） | 5d | 🔄 |
+| 阶段 5 | 设备与同步强化（消息对账、离线队列、令牌刷新） | 3d | ⬜ |
+| 阶段 6 | Edge Server 强化（并发 run、清理、持久化） | 2d | 🔄 |
 
 ---
 
@@ -638,56 +565,35 @@ Hub 调度（远程）:
 
 ##### Web UI 移植工作树状态 `[并行]`
 
-- [x] `feat/webui-desktop-port` / `.worktrees/webui-desktop-port` 已建立 TokenDance 生态 Web Console，`/` 指向生态控制台，旧工作台保留在 `/workbench-preview`。
+- [x] `feat/webui-desktop-port` / `.worktrees/webui-desktop-port` 曾建立 TokenDance 生态 Web Console，`/` 指向生态控制台，旧工作台保留在 `/workbench-preview`。
 - [x] 2026-05-25 审查修复：移动端 `.workspace` 固定行/裁切、外层 `App.module.css min-width: 960px` 横向溢出、Toggle 缺少 `role="switch"` / `aria-checked` / accessible name / 44px 触控高度。
 - [x] 验证：`corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build` 通过；Playwright 375px 复测 `docScrollWidth=375`、switch `52x44`、无 console error。
 - [x] 2026-05-25 Web worker 补强：`app/web/README.md` 已说明 `/` 生态控制台、`/workbench-preview` 旧工作台、TokenDance 生态边界和验证命令；生态控制台新增身份边界、协作同步、Agent runtime、运维护栏等入口，并补响应式 lane 布局与测试。
 - [x] Web worker 验证：`corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx` 通过 4/4，`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web` 通过。
 - [x] 2026-05-25 Web worker 二次补强：`EcosystemConsole` 新增 `Feature readiness` 面板，按 TokenDance ecosystem lane 派生 ready/review/planned 数量和平均进度；测试补到 5/5，`typecheck`、`build`、`git diff --check -- app/web` 通过。
 - [x] 2026-05-25 Web worker 三次补强：`EcosystemConsole` 新增移动端/平板 `Jump to surface` picker，可直达 TokenDance ID、Hub、cc-switch、Remote control、audit 等生态入口；窄屏顺序调整为 workspace 优先、detail 次之、长侧边导航最后；测试补到 6/6，`typecheck`、`build`、`git diff --check -- app/web` 通过。
-- [ ] 合并前待办：验证 clean install 下 React alias/workaround 是否仍必要；确认 `/` 入口替换是否作为正式 Web 产品方向；worktree 当前仍落后 `origin/dev/delicious233` 9 个提交，不能直接合并。
+- [x] **2026-05-25：`feat/webui-desktop-port` 分支与 worktree 已删除。** 产出已合入 `dev/delicious233` 主线（`app/web/` 与验证修复），不再独立维护。
+- [x] 结论：`/` 生态控制台入口已作为正式 Web 产品方向合入主线，旧 worktree 遗留问题（React alias、提交落后）随分支删除一并关闭。
 
 ##### 文档架构 sweep `[并行]`
 
-- [x] 2026-05-25 gpt-5.5 xhigh 文档 worker 已写入 `docs/inbox/doc-architecture-sweep-2026-05-25.md`。
-- [x] 2026-05-25 Codex follow-up 文档 worker 已写入 `docs/inbox/doc-architecture-sweep-codex-followup-2026-05-25.md`，确认主文档已基本对齐，剩余风险集中在 Runner 兼容 API 命名和旧 client handoff 入口。
+- [x] 2026-05-25 gpt-5.5 xhigh 文档 worker 已完成文档架构审查（原写入 `docs/inbox/`，该目录已于 2026-05-25 目录重组中删除，结论已合并入本文档）。
+- [x] 2026-05-25 Codex follow-up 文档 worker 已完成，确认主文档已基本对齐，剩余风险集中在 Runner 兼容 API 命名和旧 client handoff 入口。
 - [x] 结论：主文档已基本对齐 Runtime/Profile/Configuration/Execution Target、TokenDance ID、IM、多端、远控、Skill/MCP、cc-switch、安全审计等边界。
 - [x] 旧 client smoke 文档入口已最小收口：`docs/operations/client-roadmap.md`、`docs/architecture/implementation-guide.md`、`edge-server/README.md` 已说明早期独立 `runner/` 目录废弃，`client-smoke.ps1` 使用 Edge 内置 mock executor 和 `-EdgeAddr`。
-- [ ] 文档待办：补 `/v1/runners`、`runner.*` 作为历史兼容命名的说明；归档或改写 `docs/client-handoff.md`、`docs/design/integration.md` 等仍含旧独立 `runner/` 语义的文档。
+- [ ] 文档待办：补 `/v1/runners`、`runner.*` 作为历史兼容命名的说明；归档或改写 `docs/archive/client-handoff.md`、`docs/roadmaps/integration.md` 等仍含旧独立 `runner/` 语义的文档。
 - [ ] API 待办：决定 `/v1/runners`、`runner_offline`、`runner.online/offline` 是否长期保留为 deprecated compatibility，新增 schema 优先 Runtime/Profile/Execution Target 命名。
 
 ---
 
 #### 3.2.4 Desktop 竞争 UX（~15 天）
 
-> 参考：`docs/roadmaps/client.md` Phase 1（12 项任务）
+> **详细实现描述见 `docs/roadmaps/client.md` Phase 1/Phase 2。** 以下仅保留摘要。
 
-##### P1-1: 多 Agent 聊天 `[5d]`
-
-- [ ] 消息树形数据模型（`buildTree/flattenTree` 函数，来源：LibreChat `buildTree()`）
-- [ ] 子 Agent 内联视图（`SubAgentCard.tsx`，处理 `child_spawn/child_result` 事件）
-- [ ] 消息 Fork 支持（从任意消息分叉新线程，4 种模式：DIRECT_PATH / INCLUDE_BRANCHES / TARGET_LEVEL / DEFAULT）
-- [ ] SiblingSwitch 分支导航（来源：LibreChat `SiblingSwitch.tsx`）
-
-##### P1-2: 富文本输入 `[4d]`
-
-- [ ] @提及 + 自动补全（`@agent` / `@file` / `@thread`，来源：Jean `ChatInput.tsx:316-475`）
-- [ ] 斜杠命令系统（`/model`, `/clear`, `/retry`, `/fork` 等）
-- [ ] 模型别名解析（"sonnet" → 完整 model ID）
-
-##### P1-3: Agent 可观测性 `[3d]`
-
-- [ ] Token 用量实时更新（流式过程中实时更新 ContextUsage 条）
-- [ ] 工具调用时间线面板（`ToolTimeline.tsx`）
-- [ ] Agent 任务列表（`TaskList.tsx`）
-- [ ] Agent Live Card（来源：Multica，显示 Agent 实时状态）
-
-##### P1-4: 线程管理升级 `[3d]`
-
-- [ ] 按项目+日期分组（Today / Yesterday / Older，来源：LibreChat `groupConversationsByDate()`）
-- [ ] 线程状态标记（运行中/错误/未读）
-- [ ] 线程归档
-- [ ] 快捷键面板（`ShortcutPanel.tsx`，来源：CloudCLI command palette）
+- **P1-1: 多 Agent 聊天** `[5d]` — 消息树形数据模型、子 Agent 内联视图、消息 Fork、SiblingSwitch 分支导航
+- **P1-2: 富文本输入** `[4d]` — @提及/自动补全、斜杠命令系统、模型别名解析
+- **P1-3: Agent 可观测性** `[3d]` — Token 用量实时更新、工具时间线面板、Agent 任务列表、Live Card
+- **P1-4: 线程管理升级** `[3d]` — 按项目+日期分组、状态标记、归档、快捷键面板
 
 ---
 
@@ -716,58 +622,25 @@ Hub 调度（远程）:
 ### 3.3 Q4 2026（差异化 -- 超越竞品）
 
 > **目标**：AgentHub 独有功能，构建竞争壁垒
-
----
+> **详细实现描述见 `docs/roadmaps/client.md` Phase 2。** 以下仅保留功能摘要。
 
 #### 3.3.1 差异化功能
 
-- [ ] **Authority 可视化** `[3d]`
-  - 来源：`docs/reference/cross-comparison/02-im-ux.md` 3.2 节
-  - 内容：每条消息色带标识来源（蓝=Hub / 绿=Edge / 橙=Hybrid）
-  - 消息树用连线颜色区分 hub-owned / edge-owned / hybrid 三种模式
-  - AgentHub 独有能力 -- 四个竞品均无
-
-- [ ] **多 Agent 产物对比** `[3d]`
-  - 同一 prompt 下不同 Agent 产出 side-by-side 展示
-  - 产物溯源链路：artifact → tool_use → message → session → Agent
-
-- [ ] **Agent 市场 / 发现** `[4d]`
-  - Agent 模板分享（CustomAgent 配置包）
-  - Agent 能力标签搜索（capability_tags 过滤）
-  - 使用次数 + 评分排序
-
-- [ ] **Plugin 系统（6 Slot）** `[5d]`
-  - 来源：CloudCLI Manifest+RPC + Claude Code Hook 模式
-  - Slot: `tab`, `sidebar`, `toolbar`, `overlay`, `artifact-renderer`, `command`
-  - 插件注册、发现、生命周期管理
-
-- [ ] **进阶 Diff / 代码审查** `[5d]`
-  - Side-by-side diff 视图
-  - 行级评论系统
-  - Diff 语法高亮（Shiki）
-  - 来源：Claude Code Viewer `DiffViewer.tsx` + `CommentButton/CommentForm`
-
-- [ ] **Agent 通信图可视化** `[3d]`
-  - D3/ReactFlow 绘制 Agent 间消息传递关系
-  - 来源：Codex AgentTree 可视化
-
-- [ ] **FTS5 全文搜索** `[3d]`
-  - 来源：Claude Code Viewer FTS5 trigram + BM25
-  - 跨 session/thread/message 搜索 + 页内高亮
-
-- [ ] **Checkpoint/Undo（Turn 边界）** `[4d]`
-  - 来源：OpCode content-addressable storage
-  - 内容：SHA-256 文件快照 + zstd 压缩 + Timeline 树结构
-  - 支持：restore / fork / diff between checkpoints
-
----
+- **Authority 可视化** `[3d]` — 每条消息色带（蓝=Hub/绿=Edge/橙=Hybrid），消息树连线区分来源
+- **多 Agent 产物对比** `[3d]` — 同 prompt 不同 Agent 产出 side-by-side，产物溯源链路
+- **Agent 市场/发现** `[4d]` — 模板分享、能力标签搜索、使用次数+评分排序
+- **Plugin 系统（6 Slot）** `[5d]` — tab/sidebar/toolbar/overlay/artifact-renderer/command
+- **进阶 Diff/代码审查** `[5d]` — Side-by-side diff、行级评论、Shiki 语法高亮
+- **Agent 通信图可视化** `[3d]` — D3/ReactFlow 绘制 Agent 间消息传递
+- **FTS5 全文搜索** `[3d]` — trigram + BM25，跨 session/thread/message 搜索
+- **Checkpoint/Undo** `[4d]` — SHA-256 快照 + zstd 压缩 + Timeline 树
 
 #### 3.3.2 性能与可靠性
 
-- [ ] **React.memo 全面审计 + 代码块懒加载** `[1d]`
-- [ ] **WCAG 2.1 AA a11y 审计** `[1d]`
-- [ ] **E2E 测试覆盖（Playwright + Tauri driver）** `[2d]`
-- [ ] **消息同步压力测试**（1000 消息 / 100 并发会话）`[1d]`
+- **React.memo 审计 + 代码块懒加载** `[1d]`
+- **WCAG 2.1 AA a11y 审计** `[1d]`
+- **E2E 测试覆盖（Playwright + Tauri driver）** `[2d]`
+- **消息同步压力测试** `[1d]`
 
 ---
 
@@ -873,7 +746,7 @@ pnpm typecheck                                         # 零错误
 |------|------|---------|-----------|
 | 客户端 (Desktop + Edge) | Delicious233 | `dev/delicious233` | Edge 审计修复 + Desktop Phase 0 + 集成阶段 1-6 |
 | 后端 (Hub Server) | Johnny | `dev/delicious233` | Hub 审计 P0-P1 修复 + 测试基础设施建设 |
-| Web 前端 | Trump | `feat/trump-webui` | Web UI 功能完善 → `dev/delicious233` 合并 |
+| Web 前端 | Trump | `feat/trump-webui`（已删除，2026-05-25 归档） | Web UI 功能完善 → 已合入 `dev/delicious233` |
 
 ---
 
@@ -1125,8 +998,8 @@ pnpm typecheck                                         # 零错误
 | **参考** | `docs/reference/cross-comparison/00-synthesis.md` | 18 项目全景分析 |
 | | `docs/reference/cross-comparison/10-best-practices-playbook.md` | 最佳实践索引 |
 | | `docs/reference/cross-comparison/02-im-ux.md` | IM/UX 设计建议 |
-| **设计** | `docs/design/client-p0-architecture.md` | Desktop P0 实施细节 |
-| | `docs/design/client-reference-patterns.md` | Desktop 参考模式 |
+| **设计** | `docs/architecture/design/client-p0-architecture.md` | Desktop P0 实施细节 |
+| | `docs/architecture/design/client-reference-patterns.md` | Desktop 参考模式 |
 | **架构** | `docs/architecture/system-architecture.md` | 系统架构文档 |
 | | `docs/architecture/product-requirements.md` | 产品需求文档 |
 | | `docs/architecture/implementation-guide.md` | 功能实现文档 |

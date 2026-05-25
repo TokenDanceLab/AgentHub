@@ -140,6 +140,6 @@ Invoke-RestMethod http://127.0.0.1:3210/v1/agents
 ## 依赖
 
 - `api/` 契约：REST endpoint、WebSocket event、错误格式。
-- `docs/system-architecture.md`：Desktop-Edge-Hub 架构、Agent 产品模型、执行生命周期和职责边界。
-- `docs/implementation-guide.md`：当前实现顺序、Adapter 细节和验收命令。
+- `docs/architecture/system-architecture.md`：Desktop-Edge-Hub 架构、Agent 产品模型、执行生命周期和职责边界。
+- `docs/architecture/implementation-guide.md`：当前实现顺序、Adapter 细节和验收命令。
 - Go package 按实际代码需要创建，不提前铺空目录。

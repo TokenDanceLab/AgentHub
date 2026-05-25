@@ -186,7 +186,7 @@ Desktop App
 
 当前架构边界：
 
-- Hub Server 已完整实现（三层架构，17 migrations，Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。
+- Hub Server 已完整实现（三层架构，21 migrations，Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。
 - Web/Mobile 可通过 Hub 远程查看和审批。
 - Desktop UI 默认只连接本机 Local Edge。
 - Edge 才能启动 Agent CLI 进程，UI 不直接启动 Agent CLI。
@@ -362,9 +362,9 @@ REST snapshot 至少应能按 Project、Thread、Run、Item、Artifact 重建 UI
 
 主文档只保留三份：
 
-- `docs/product-requirements.md`
-- `docs/system-architecture.md`
-- `docs/implementation-guide.md`
+- `docs/architecture/product-requirements.md`
+- `docs/architecture/system-architecture.md`
+- `docs/architecture/implementation-guide.md`
 
 深度材料保留在：
 
