@@ -254,7 +254,7 @@ PR 说明按影响选择填写：
 | Edge | Go `testing`，覆盖 API handler、event bus、file store、adapter 解析（NDJSON/JSONL/JSON）、控制协议、process executor、mock executor、runtime registry、security origin |
 | Desktop | Vitest + React Testing Library，551/560 通过 (38 test files)，覆盖 17 个组件、API client、错误处理、hooks、event client |
 | Desktop e2e | Playwright，覆盖在线/离线状态、Runtime/Agent 列表、EventLog、Agent 端到端执行 |
-| 全链路 | `scripts/client-smoke.ps1`，覆盖 Edge/Desktop build 和核心接口 |
+| 全链路 | `scripts/client-smoke.ps1`，覆盖 Edge build、`app/shared` 依赖、Desktop web build、核心 REST 接口和 WebSocket run 事件流 |
 | Adapter 集成 | Go `testing`，覆盖 Claude Code、OpenCode、Codex 三种 adapter 端到端执行、工具调用、取消、stdin 控制、命令行参数 |
 
 必须继续覆盖的高风险点：
@@ -273,6 +273,7 @@ PR 说明按影响选择填写：
 - issue、PR、日志、截图里也不能出现真实密钥或服务器隐私。
 - Agent 执行命令前要确认不会上传文件、打印密钥或访问生产数据。
 - Agent Runtime 默认只能在授权 workspace 或 worktree 内执行。
+- Local Edge 可通过 `--local-auth-token` / `AGENTHUB_EDGE_AUTH_TOKEN` 开启本地 token。开启后，除 `/v1/health` 和 CORS preflight 外的 Edge REST API 需要 `Authorization: Bearer <token>` 或 `X-AgentHub-Edge-Token`；浏览器 WebSocket 使用 `/v1/events?access_token=<token>`。默认空 token 只用于本地开发兼容，不代表 Remote/Cloud Edge 鉴权。
 - Remote/Cloud/Hub relay Target 必须经过 Hub session、device proof、Target 权限和审计。
 - Agent 市场、Skill/MCP、模型映射和 cc-switch provider binding 只能保存公开元数据或引用，不保存真实 provider key。
 
@@ -303,5 +304,6 @@ pnpm build
 pnpm test:e2e
 
 cd ..\..
-.\scripts\client-smoke.ps1
+.\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228
+.\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228 -EdgeAuthToken local-smoke-token
 ```
