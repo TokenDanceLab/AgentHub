@@ -21,6 +21,7 @@ func (s *stubAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin i
 	return nil
 }
 func (s *stubAdapter) NeedsStdin() bool { return false }
+func (s *stubAdapter) Available() bool   { return true }
 
 func TestRegistryRegisterAndGet(t *testing.T) {
 	r := NewRegistry()
