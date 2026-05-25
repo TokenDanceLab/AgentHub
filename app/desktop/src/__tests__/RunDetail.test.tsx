@@ -138,6 +138,58 @@ describe('RunDetail', () => {
     expect(screen.getByText('modified')).toBeInTheDocument();
   });
 
+  it('filters to output content when view is output', () => {
+    const run = makeRun({ status: RunState.COMPLETED });
+    const changedFiles = [
+      { path: '/src/output-hidden.ts', action: 'modified', timestamp: '2025-01-01T00:00:00Z' },
+    ];
+    render(
+      <RunDetail
+        run={run}
+        toolCalls={[]}
+        changedFiles={changedFiles}
+        outputText="Visible console output"
+        view="output"
+      />,
+    );
+    expect(screen.getByText('Visible console output')).toBeInTheDocument();
+    expect(screen.queryByText('/src/output-hidden.ts')).not.toBeInTheDocument();
+  });
+
+  it('filters to file content when view is files', () => {
+    const run = makeRun({ status: RunState.COMPLETED });
+    const changedFiles = [
+      { path: '/src/files-visible.ts', action: 'modified', timestamp: '2025-01-01T00:00:00Z' },
+    ];
+    render(
+      <RunDetail
+        run={run}
+        toolCalls={[]}
+        changedFiles={changedFiles}
+        outputText="Hidden console output"
+        view="files"
+      />,
+    );
+    expect(screen.getByText('/src/files-visible.ts')).toBeInTheDocument();
+    expect(screen.queryByText('Hidden console output')).not.toBeInTheDocument();
+  });
+
+  it('shows file empty state when files view has no file changes', () => {
+    const run = makeRun({ status: RunState.COMPLETED });
+    render(
+      <RunDetail
+        run={run}
+        toolCalls={[]}
+        changedFiles={[]}
+        outputText="Hidden console output"
+        view="files"
+      />,
+    );
+    expect(screen.getByText('run.emptySources')).toBeInTheDocument();
+    expect(screen.queryByText('run.emptyOutput')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hidden console output')).not.toBeInTheDocument();
+  });
+
   it('does not show changed files section when list is empty', () => {
     const run = makeRun();
     render(<RunDetail run={run} toolCalls={[]} changedFiles={[]} outputText="" />);

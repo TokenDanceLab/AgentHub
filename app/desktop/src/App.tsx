@@ -77,6 +77,8 @@ interface OptimisticRun {
   changedFiles: [];
 }
 
+type RightPanelTab = 'output' | 'files';
+
 const LEFT_SIDEBAR_MIN = 248;
 const LEFT_SIDEBAR_MAX = 520;
 const RIGHT_PANEL_MIN = 272;
@@ -191,6 +193,7 @@ export default function App() {
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('output');
   const {
     leftSidebarCollapsed,
     rightPanelOpen,
@@ -827,8 +830,24 @@ export default function App() {
           <div className={styles.rightPanel}>
             <div className={styles.rightPanelHeader}>
               <div className={styles.rightPanelSegmented}>
-                <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`} type="button" role="tab" aria-selected="true">{t('run.output')}</button>
-                <button className={styles.rightPanelTab} type="button" role="tab" aria-selected="false">{t('run.files')}</button>
+                <button
+                  className={`${styles.rightPanelTab} ${rightPanelTab === 'output' ? styles.rightPanelTabActive : ''}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={rightPanelTab === 'output'}
+                  onClick={() => setRightPanelTab('output')}
+                >
+                  {t('run.output')}
+                </button>
+                <button
+                  className={`${styles.rightPanelTab} ${rightPanelTab === 'files' ? styles.rightPanelTabActive : ''}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={rightPanelTab === 'files'}
+                  onClick={() => setRightPanelTab('files')}
+                >
+                  {t('run.files')}
+                </button>
               </div>
               <ShellIconButton
                 className={styles.rightPanelCollapseBtn}
@@ -847,6 +866,7 @@ export default function App() {
                     name="run-detail"
                     run={displayedRun ? { runId: displayedRun.runId, projectId: '', threadId: selectedThread?.threadId ?? '', status: displayedRun.status } : null}
                     outputText={displayedRun?.outputText ?? ''}
+                    view={rightPanelTab}
                     toolCalls={displayedRun?.toolCalls ?? []}
                     changedFiles={displayedRun?.changedFiles ?? []}
                     onCancel={handleCancel}

@@ -23,11 +23,14 @@ interface Props {
   toolCalls: ToolCallEntry[];
   changedFiles: Array<{ path: string; action: string; timestamp: string }>;
   outputText: string;
+  view?: RunDetailView;
   diffs?: FileDiff[];
   onCancel?: () => void;
   /** Chat messages from the current session, used for context breakdown visualization. */
   chatMessages?: ChatMessage[];
 }
+
+export type RunDetailView = 'all' | 'output' | 'files';
 
 /** Build SessionMetrics from chat messages by extracting token data from result blocks. */
 function buildMetrics(chatMessages: ChatMessage[] | undefined): SessionMetrics | null {
@@ -104,6 +107,7 @@ export default function RunDetail({
   toolCalls,
   changedFiles,
   outputText,
+  view = 'all',
   diffs,
   onCancel,
   chatMessages,
@@ -138,8 +142,13 @@ export default function RunDetail({
   const hasOutput = !!outputText;
   const hasToolCalls = toolCalls.length > 0;
   const hasFileChanges = changedFiles.length > 0;
+  const hasDiffs = !!diffs?.length;
+  const showOutputView = view === 'all' || view === 'output';
+  const showFilesView = view === 'all' || view === 'files';
 
-  const hasAnyContent = hasOutput || hasToolCalls || hasFileChanges;
+  const hasVisibleContent =
+    (showOutputView && (hasOutput || hasToolCalls)) ||
+    (showFilesView && (hasFileChanges || hasDiffs));
   const latestFiles = changedFiles.slice(-4).reverse();
   const latestTools = toolCalls.slice(-4).reverse();
 
@@ -169,22 +178,26 @@ export default function RunDetail({
 
       <ContextUsage metrics={metrics} />
 
-      {!hasAnyContent && (
+      {!hasVisibleContent && (
         <div className={styles.emptyStack}>
-          <div className={styles.emptyCard}>
-            <TerminalSquare size={16} />
-            <span>{t('run.emptyOutput')}</span>
-          </div>
-          <div className={styles.emptyCard}>
-            <FileText size={16} />
-            <span>{t('run.emptySources')}</span>
-          </div>
+          {showOutputView && (
+            <div className={styles.emptyCard}>
+              <TerminalSquare size={16} />
+              <span>{t('run.emptyOutput')}</span>
+            </div>
+          )}
+          {showFilesView && (
+            <div className={styles.emptyCard}>
+              <FileText size={16} />
+              <span>{t('run.emptySources')}</span>
+            </div>
+          )}
         </div>
       )}
 
-      {hasAnyContent && (
+      {hasVisibleContent && (
         <div className={styles.tabContent}>
-          {hasOutput && (
+          {showOutputView && hasOutput && (
             <section className={styles.cardSection}>
               <div className={styles.cardHeader}>
                 <TerminalSquare size={14} />
@@ -194,7 +207,7 @@ export default function RunDetail({
             </section>
           )}
 
-          {hasToolCalls && (
+          {showOutputView && hasToolCalls && (
             <section className={styles.cardSection}>
               <div className={styles.cardHeader}>
                 <Wrench size={14} />
@@ -209,7 +222,7 @@ export default function RunDetail({
             </section>
           )}
 
-          {hasFileChanges && (
+          {showFilesView && hasFileChanges && (
             <section className={styles.cardSection}>
               <div className={styles.cardHeader}>
                 <FileText size={14} />
@@ -227,7 +240,7 @@ export default function RunDetail({
             </section>
           )}
 
-          {diffs && diffs.length > 0 && (
+          {showFilesView && diffs && diffs.length > 0 && (
             <section className={styles.cardSection}>
               <div className={styles.cardHeader}>
                 <FileText size={14} />
