@@ -12,6 +12,16 @@ func (e *Error) Error() string {
 	return e.Code + ": " + e.Message
 }
 
+// WithMessage returns a copy of the Error with a custom message,
+// preserving the code and HTTP status.
+func (e *Error) WithMessage(msg string) *Error {
+	return &Error{
+		Code:       e.Code,
+		Message:    msg,
+		HTTPStatus: e.HTTPStatus,
+	}
+}
+
 func New(code, message string, httpStatus int) *Error {
 	return &Error{Code: code, Message: message, HTTPStatus: httpStatus}
 }
@@ -63,4 +73,10 @@ var (
 
 	WsAuthTimeout = &Error{Code: "WS_AUTH_TIMEOUT", Message: "ws authentication timeout", HTTPStatus: http.StatusUnauthorized}
 	WsAuthFailed  = &Error{Code: "WS_AUTH_FAILED", Message: "ws authentication failed", HTTPStatus: http.StatusUnauthorized}
+
+	// OIDC errors
+	OIDCInvalidState       = &Error{Code: "OIDC_INVALID_STATE", Message: "state is invalid or expired", HTTPStatus: http.StatusBadRequest}
+	OIDCCodeExchangeFailed = &Error{Code: "OIDC_CODE_EXCHANGE_FAILED", Message: "failed to exchange authorization code", HTTPStatus: http.StatusBadRequest}
+	OIDCIDTokenInvalid     = &Error{Code: "OIDC_ID_TOKEN_INVALID", Message: "id token validation failed", HTTPStatus: http.StatusBadRequest}
+	OIDCSubNotFound        = &Error{Code: "OIDC_SUB_NOT_FOUND", Message: "no sub claim in id token", HTTPStatus: http.StatusBadRequest}
 )
