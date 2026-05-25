@@ -515,7 +515,7 @@ func (s *AgentService) authorizeTaskEdgeCallback(task *model.PendingAgentTask, e
 	if ai.InviterUserID != edgeUserID {
 		return nil, errcode.AgentTaskNotFound
 	}
-	if task.EdgeDeviceID != "" && task.EdgeDeviceID != edgeDeviceID {
+	if task.EdgeDeviceID == "" || task.EdgeDeviceID != edgeDeviceID {
 		return nil, errcode.AgentTaskNotFound
 	}
 	if task.EdgeRunID != "" && task.EdgeRunID != edgeRunID {
