@@ -42,6 +42,14 @@ func (h *DeviceHandler) Register(c *gin.Context) {
 
 	userID := c.GetString("user_id")
 	deviceType := c.GetString("device_type")
+	jwtDeviceID := c.GetString("device_id")
+
+	// Cross-validate that the JWT's device_id matches the registration request.
+	// A JWT issued for device X must not be abused to register device Y.
+	if jwtDeviceID != "" && jwtDeviceID != req.DeviceID {
+		FailWithMessage(c, errcode.ErrBadRequest, "device_id does not match JWT claims")
+		return
+	}
 
 	device, err := h.deviceService.Register(req.DeviceID, userID, deviceType, req.AppVersion, req.Capabilities)
 	if err != nil {

@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -35,6 +36,17 @@ type TokenDanceIDConfig struct {
 	RedirectURI string `mapstructure:"redirect_uri"`
 }
 
+// LogValue implements slog.LogValuer to redact secrets when config is logged.
+func (t TokenDanceIDConfig) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("issuer_url", t.IssuerURL),
+		slog.String("jwks_uri", t.JWKSURI),
+		slog.String("client_id", t.ClientID),
+		slog.String("client_secret", "[REDACTED]"),
+		slog.String("redirect_uri", t.RedirectURI),
+	)
+}
+
 type ServerConfig struct {
 	Port      int    `mapstructure:"port"`
 	LogLevel  string `mapstructure:"log_level"`
@@ -55,6 +67,17 @@ func (d DBConfig) DSN() string {
 		d.Host, d.Port, d.User, d.Password, d.Name)
 }
 
+// LogValue implements slog.LogValuer to redact secrets when config is logged.
+func (d DBConfig) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("host", d.Host),
+		slog.Int("port", d.Port),
+		slog.String("user", d.User),
+		slog.String("password", "[REDACTED]"),
+		slog.String("name", d.Name),
+	)
+}
+
 type RedisConfig struct {
 	Host         string `mapstructure:"host"`
 	Port         int    `mapstructure:"port"`
@@ -68,10 +91,31 @@ func (r RedisConfig) Addr() string {
 	return fmt.Sprintf("%s:%d", r.Host, r.Port)
 }
 
+// LogValue implements slog.LogValuer to redact secrets when config is logged.
+func (r RedisConfig) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("host", r.Host),
+		slog.Int("port", r.Port),
+		slog.String("password", "[REDACTED]"),
+		slog.Int("db", r.DB),
+		slog.Int("pool_size", r.PoolSize),
+		slog.Int("min_idle_conns", r.MinIdleConns),
+	)
+}
+
 type JWTConfig struct {
 	Secret     string        `mapstructure:"secret"`
 	AccessTTL  time.Duration `mapstructure:"access_ttl"`
 	RefreshTTL time.Duration `mapstructure:"refresh_ttl"`
+}
+
+// LogValue implements slog.LogValuer to redact secrets when config is logged.
+func (j JWTConfig) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("secret", "[REDACTED]"),
+		slog.Duration("access_ttl", j.AccessTTL),
+		slog.Duration("refresh_ttl", j.RefreshTTL),
+	)
 }
 
 type UploadConfig struct {
@@ -94,6 +138,18 @@ type S3Config struct {
 // S3-backed attachment storage.
 func (s S3Config) IsConfigured() bool {
 	return s.Endpoint != "" && s.Bucket != ""
+}
+
+// LogValue implements slog.LogValuer to redact secrets when config is logged.
+func (s S3Config) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("endpoint", s.Endpoint),
+		slog.String("access_key", "[REDACTED]"),
+		slog.String("secret_key", "[REDACTED]"),
+		slog.String("bucket", s.Bucket),
+		slog.String("region", s.Region),
+		slog.Bool("use_ssl", s.UseSSL),
+	)
 }
 
 func Load(configPath string) (*Config, error) {
@@ -188,8 +244,11 @@ func (c *Config) Validate() error {
 		"aaaaaaaaaaaaaaaa",
 	}
 	if slices.Contains(knownHardcodedSecrets, c.JWT.Secret) {
-		if os.Getenv("AGENTHUB_JWT_SECRET") == "" {
-			return errors.New("JWT secret must be set via AGENTHUB_JWT_SECRET environment variable; hardcoded defaults are rejected")
+		// Also check the env-var value against the blocklist to prevent
+		// bypass by setting AGENTHUB_JWT_SECRET to the same weak value.
+		envSecret := os.Getenv("AGENTHUB_JWT_SECRET")
+		if envSecret == "" || slices.Contains(knownHardcodedSecrets, envSecret) {
+			return errors.New("JWT secret must be set via AGENTHUB_JWT_SECRET environment variable with a strong, non-default value; hardcoded defaults are rejected")
 		}
 	}
 
