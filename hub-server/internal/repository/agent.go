@@ -165,7 +165,7 @@ func UpdatePendingTaskEdgeRunID(db *gorm.DB, id, edgeRunID string) error {
 
 func ScanExpiredTasks(db *gorm.DB) ([]model.PendingAgentTask, error) {
 	var tasks []model.PendingAgentTask
-	err := db.Where("expire_at < NOW() AND status IN ?", []string{model.TaskStatusQueued, model.TaskStatusDispatched}).Find(&tasks).Error
+	err := db.Where("expire_at < ? AND status IN ?", time.Now(), []string{model.TaskStatusQueued, model.TaskStatusDispatched, model.TaskStatusRunning}).Find(&tasks).Error
 	return tasks, err
 }
 
