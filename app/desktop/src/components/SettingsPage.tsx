@@ -414,6 +414,29 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
       : tokenSource === 'hub'
         ? t('settings.hubLocalLogin')
         : t('settings.notConfigured');
+  const imSnapshotStatus = statusLabelFromQuery({
+    signedIn: hubSessionActive,
+    isLoading: hubIMSnapshotQuery.isLoading,
+    isFetching: hubIMSnapshotQuery.isFetching,
+    isError: hubIMSnapshotQuery.isError,
+    isSuccess: hubIMSnapshotQuery.isSuccess,
+    t,
+  });
+  const marketSnapshotStatus = statusLabelFromQuery({
+    signedIn: hubSessionActive,
+    isLoading: customAgentsQuery.isLoading,
+    isFetching: customAgentsQuery.isFetching,
+    isError: customAgentsQuery.isError,
+    isSuccess: customAgentsQuery.isSuccess,
+    t,
+  });
+  const desktopDeviceStatus = statusLabelFromDevice({
+    signedIn: hubSessionActive,
+    status: deviceRegistration.status,
+    registeredLabel: 'registered',
+    idleLabel: 'deviceStatus',
+    t,
+  });
   const deviceId = deviceRegistration.deviceId ?? readBrowserStorage('local', DEVICE_ID_KEY);
   const pkceStateReady =
     Boolean(readBrowserStorage('session', TD_CODE_VERIFIER_KEY)) && Boolean(readBrowserStorage('session', TD_STATE_KEY));
@@ -977,8 +1000,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     </div>
                     {hubSessionActive ? (
                       <div className={styles.taskSectionActions}>
-                        <span className={`${styles.statusPill} ${hubIMSnapshotQuery.isError ? '' : styles.statusPillOn}`}>
-                          {hubIMSnapshotQuery.isError ? t('settings.hubUnavailable') : t('settings.status.snapshot')}
+                        <span className={`${styles.statusPill} ${hubIMSnapshotQuery.isSuccess ? styles.statusPillOn : ''}`}>
+                          {imSnapshotStatus}
                         </span>
                         <button
                           type="button"
@@ -1027,12 +1050,18 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <CapabilityCard
                   title={t('settings.onlineImPresence')}
                   description={t('settings.onlineImPresenceDesc')}
-                  status={deviceRegistration.status === 'registered' ? t('settings.statusReady') : t(`settings.deviceStatus.${deviceRegistration.status}`)}
+                  status={
+                    deviceRegistration.status === 'error'
+                      ? t('settings.status.error')
+                      : hubSessionActive
+                        ? t('settings.status.interfaceGap')
+                        : t('settings.status.loginLocked')
+                  }
                 />
                 <CapabilityCard
                   title={t('settings.onlineImNotificationActions')}
                   description={t('settings.onlineImNotificationActionsDesc')}
-                  status={hubSessionActive && !hubIMSnapshotQuery.isError ? t('settings.enabled') : t('settings.signedOut')}
+                  status={imSnapshotStatus}
                 />
               </div>
             </Panel>
@@ -1105,7 +1134,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.groupChatModeration')}
                 description={t('settings.groupChatModerationDesc')}
-                value={hubSessionActive && !hubIMSnapshotQuery.isError ? t('settings.status.snapshot') : t('settings.status.loginLocked')}
+                value={imSnapshotStatus}
               />
             </Panel>
           )}
@@ -1266,7 +1295,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Globe2 size={18} />}
                   label={t('settings.marketHubSync')}
-                  value={hubSessionActive && !customAgentsQuery.isError ? t('settings.status.snapshot') : t('settings.status.loginLocked')}
+                  value={marketSnapshotStatus}
                   detail={hubSessionActive ? t('settings.marketHubSyncDesc') : t('settings.marketHubSyncSignedOut')}
                 />
               </div>
@@ -1426,7 +1455,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.mcpRemoteServer')}
                     description={t('settings.mcpRemoteServerDesc')}
-                    status={t('settings.statusPlanned')}
+                    status={t('settings.status.interfaceGap')}
                   />
                 </div>
               </div>
@@ -1812,7 +1841,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Monitor size={18} />}
                   label={t('settings.desktopDevice')}
-                  value={t(`settings.deviceStatus.${deviceRegistration.status}`)}
+                  value={desktopDeviceStatus}
                   detail={
                     deviceRegistration.status === 'error'
                       ? deviceRegistration.error ?? t('settings.desktopDeviceRegisterFailed')
@@ -2658,4 +2687,47 @@ function EmptyBlock({ title, description }: { title: string; description: string
       <span>{description}</span>
     </div>
   );
+}
+
+function statusLabelFromQuery({
+  signedIn,
+  isLoading,
+  isFetching,
+  isError,
+  isSuccess,
+  t,
+}: {
+  signedIn: boolean;
+  isLoading: boolean;
+  isFetching: boolean;
+  isError: boolean;
+  isSuccess: boolean;
+  t: (key: string) => string;
+}) {
+  if (!signedIn) return t('settings.status.loginLocked');
+  if (isError) return t('settings.status.error');
+  if (isLoading || isFetching || !isSuccess) return t('settings.loading');
+  return t('settings.status.snapshot');
+}
+
+function statusLabelFromDevice({
+  signedIn,
+  status,
+  registeredLabel = 'snapshot',
+  idleLabel = 'localSource',
+  t,
+}: {
+  signedIn: boolean;
+  status: 'idle' | 'registering' | 'registered' | 'error';
+  registeredLabel?: 'snapshot' | 'registered';
+  idleLabel?: 'localSource' | 'deviceStatus';
+  t: (key: string) => string;
+}) {
+  if (!signedIn) return t('settings.status.loginLocked');
+  if (status === 'error') return t('settings.status.error');
+  if (status === 'registered') {
+    return registeredLabel === 'registered' ? t('settings.deviceStatus.registered') : t('settings.status.snapshot');
+  }
+  if (status === 'registering') return t('settings.deviceStatus.registering');
+  return idleLabel === 'deviceStatus' ? t('settings.deviceStatus.idle') : t('settings.status.localSource');
 }
