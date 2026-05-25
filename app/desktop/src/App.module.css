@@ -97,6 +97,102 @@
   transform: scale(0.95);
 }
 
+.iconTooltipHost {
+  position: relative;
+  overflow: visible;
+}
+
+.iconTooltipGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconTooltip {
+  position: absolute;
+  z-index: 40;
+  max-width: 220px;
+  padding: 5px 8px;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.86);
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
+  box-shadow: 0 10px 28px rgba(15,23,42,0.12), 0 1px 0 rgba(255,255,255,0.7) inset;
+  color: var(--foreground);
+  font-size: 11px;
+  font-weight: 560;
+  line-height: 1.25;
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+  transform: translate3d(0, 2px, 0) scale(0.98);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  white-space: nowrap;
+}
+
+[data-theme='dark'] .iconTooltip {
+  border-color: rgba(255,255,255,0.08);
+  background: rgba(36,36,44,0.82);
+  box-shadow: 0 14px 32px rgba(0,0,0,0.34), 0 1px 0 rgba(255,255,255,0.06) inset;
+}
+
+.iconTooltipHost:hover .iconTooltip,
+.iconTooltipHost:focus-visible .iconTooltip {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.iconTooltipHost[data-tooltip-side='top'] .iconTooltip {
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translate3d(-50%, 2px, 0) scale(0.98);
+}
+
+.iconTooltipHost[data-tooltip-side='top']:hover .iconTooltip,
+.iconTooltipHost[data-tooltip-side='top']:focus-visible .iconTooltip {
+  transform: translate3d(-50%, 0, 0) scale(1);
+}
+
+.iconTooltipHost[data-tooltip-side='right'] .iconTooltip {
+  top: 50%;
+  left: calc(100% + 9px);
+  transform: translate3d(-2px, -50%, 0) scale(0.98);
+}
+
+.iconTooltipHost[data-tooltip-side='right']:hover .iconTooltip,
+.iconTooltipHost[data-tooltip-side='right']:focus-visible .iconTooltip {
+  transform: translate3d(0, -50%, 0) scale(1);
+}
+
+.iconTooltipHost[data-tooltip-side='bottom'] .iconTooltip {
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translate3d(-50%, -2px, 0) scale(0.98);
+}
+
+.iconTooltipHost[data-tooltip-side='bottom']:hover .iconTooltip,
+.iconTooltipHost[data-tooltip-side='bottom']:focus-visible .iconTooltip {
+  transform: translate3d(-50%, 0, 0) scale(1);
+}
+
+.iconTooltipHost[data-tooltip-side='left'] .iconTooltip {
+  top: 50%;
+  right: calc(100% + 9px);
+  transform: translate3d(2px, -50%, 0) scale(0.98);
+}
+
+.iconTooltipHost[data-tooltip-side='left']:hover .iconTooltip,
+.iconTooltipHost[data-tooltip-side='left']:focus-visible .iconTooltip {
+  transform: translate3d(0, -50%, 0) scale(1);
+}
+
+@media (hover: none), (max-width: 767px) {
+  .iconTooltip {
+    display: none;
+  }
+}
+
 .mobileToolbarTitle {
   min-width: 0;
   flex: 1;
