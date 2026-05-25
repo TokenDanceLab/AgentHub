@@ -5,11 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+<<<<<<< HEAD
     "build": "tsc && vite build",
+=======
+    "build": "tsgo && vite build",
+>>>>>>> origin/dev/trump
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+<<<<<<< HEAD
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -17,16 +22,30 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-i18next": "^17.0.8",
+=======
+    "typecheck": "tsgo -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+>>>>>>> origin/dev/trump
     "react-router-dom": "^7"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+<<<<<<< HEAD
+=======
+    "@typescript/native-preview": "beta",
+>>>>>>> origin/dev/trump
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.4.0",
     "jsdom": "^29.1.1",
+<<<<<<< HEAD
     "typescript": "~5.8.0",
+=======
+>>>>>>> origin/dev/trump
     "vite": "^6.3.0",
     "vitest": "^4.1.7"
   }

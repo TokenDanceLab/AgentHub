@@ -1,46 +1,156 @@
 // Discriminated event types per api/events.md.
 //
-// Every event has a base envelope, and the payload type is narrowed by `type`.
+// Every event wraps a base envelope. The payload type is narrowed by `type`.
+// Scope fields follow the event table: projectId, conversationId, threadId,
+// runId, edgeId appear as relevant for each event family.
 
 // ── Base envelope ─────────────────────────────
+
+export interface EventScope {
+  projectId?: string;
+  conversationId?: string;
+  threadId?: string;
+  runId?: string;
+  edgeId?: string;
+  [key: string]: unknown;
+}
 
 export interface EventEnvelope {
   version: string;
   id: string;
   seq: number;
   type: string;
-  scope: Record<string, unknown>;
+  scope: EventScope;
   traceId?: string;
   sentAt: string;
   payload: Record<string, unknown>;
 }
 
-// ── Runner events ─────────────────────────────
+// ── IM / Project events (P0) ──────────────────
 
-export interface RunnerEvent extends EventEnvelope {
-  type: 'runner.online' | 'runner.offline';
+export interface ProjectCreatedEvent extends EventEnvelope {
+  type: 'project.created';
+  payload: {
+    projectId: string;
+    name: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface ProjectUpdatedEvent extends EventEnvelope {
+  type: 'project.updated';
+  payload: {
+    projectId: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface ThreadCreatedEvent extends EventEnvelope {
+  type: 'thread.created';
+  payload: {
+    threadId: string;
+    projectId: string;
+    title?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface ThreadUpdatedEvent extends EventEnvelope {
+  type: 'thread.updated';
+  payload: {
+    threadId: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface MessageCreatedEvent extends EventEnvelope {
+  type: 'message.created';
+  payload: {
+    messageId: string;
+    threadId: string;
+    role: 'user' | 'agent';
+    content: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface MessageDeltaEvent extends EventEnvelope {
+  type: 'message.delta';
+  payload: {
+    messageId: string;
+    threadId: string;
+    delta: string;
+    offset: number;
+    [key: string]: unknown;
+  };
+}
+
+export interface ItemCreatedEvent extends EventEnvelope {
+  type: 'item.created';
+  payload: {
+    itemId: string;
+    threadId: string;
+    kind: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface ItemUpdatedEvent extends EventEnvelope {
+  type: 'item.updated';
+  payload: {
+    itemId: string;
+    threadId: string;
+    [key: string]: unknown;
+  };
+}
+
+// ── Execution / Runner events (P0) ─────────────
+
+export interface RunnerOnlineEvent extends EventEnvelope {
+  type: 'runner.online';
+  payload: {
+    runnerId: string;
+    name: string;
+    capabilities?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface RunnerOfflineEvent extends EventEnvelope {
+  type: 'runner.offline';
   payload: {
     runnerId: string;
     [key: string]: unknown;
   };
 }
 
-// ── Run lifecycle events ──────────────────────
-
-export interface RunLifecycleEvent extends EventEnvelope {
-  type: 'run.queued' | 'run.started' | 'run.finished' | 'run.failed' | 'run.cancelled';
+export interface RunQueuedEvent extends EventEnvelope {
+  type: 'run.queued';
   payload: {
     runId: string;
-    status: string;
-    error?: string;
-    createdAt?: string;
-    startedAt?: string;
-    finishedAt?: string;
+    projectId: string;
+    threadId: string;
     [key: string]: unknown;
   };
 }
 
-// ── Run output events ─────────────────────────
+export interface RunStartedEvent extends EventEnvelope {
+  type: 'run.started';
+  payload: {
+    runId: string;
+    startedAt: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface RunStatusChangedEvent extends EventEnvelope {
+  type: 'run.status.changed';
+  payload: {
+    runId: string;
+    status: string;
+    [key: string]: unknown;
+  };
+}
 
 export interface RunOutputEvent extends EventEnvelope {
   type: 'run.output';
@@ -63,112 +173,65 @@ export interface RunOutputBatchEvent extends EventEnvelope {
   };
 }
 
-// ── Agent events (run.agent.*) ────────────────
-
-export interface AgentTextDeltaEvent extends EventEnvelope {
-  type: 'run.agent.text_delta';
+export interface RunFinishedEvent extends EventEnvelope {
+  type: 'run.finished';
   payload: {
     runId: string;
-    content: string;
-    offset: number;
+    finishedAt: string;
     [key: string]: unknown;
   };
 }
 
-export interface AgentTextBlockEvent extends EventEnvelope {
-  type: 'run.agent.text_block';
+export interface RunFailedEvent extends EventEnvelope {
+  type: 'run.failed';
   payload: {
     runId: string;
-    content: string;
-    contentType?: 'markdown' | 'text' | 'code';
-    language?: string;
+    reason: string;
+    finishedAt: string;
     [key: string]: unknown;
   };
 }
 
-export interface AgentThinkingEvent extends EventEnvelope {
-  type: 'run.agent.thinking';
+export interface ApprovalRequestedEvent extends EventEnvelope {
+  type: 'approval.requested';
   payload: {
+    approvalId: string;
     runId: string;
-    content: string;
+    threadId: string;
+    kind: string;
+    summary: string;
     [key: string]: unknown;
   };
 }
 
-export interface AgentToolCallEvent extends EventEnvelope {
-  type: 'run.agent.tool_call';
+export interface ApprovalDecidedEvent extends EventEnvelope {
+  type: 'approval.decided';
   payload: {
+    approvalId: string;
     runId: string;
-    callId: string;
-    toolName: string;
-    input: Record<string, unknown>;
-    status: 'pending' | 'started' | 'in_progress' | 'running' | 'completed' | 'failed';
+    decision: 'approved' | 'rejected';
     [key: string]: unknown;
   };
 }
 
-export interface AgentToolResultEvent extends EventEnvelope {
-  type: 'run.agent.tool_result';
+export interface ArtifactCreatedEvent extends EventEnvelope {
+  type: 'artifact.created';
   payload: {
+    artifactId: string;
     runId: string;
-    callId: string;
-    toolName: string;
-    content: unknown;
+    threadId: string;
+    kind: string;
+    path: string;
     [key: string]: unknown;
   };
 }
 
-export interface AgentFileChangeEvent extends EventEnvelope {
-  type: 'run.agent.file_change';
+export interface PreviewReadyEvent extends EventEnvelope {
+  type: 'preview.ready';
   payload: {
+    previewId: string;
     runId: string;
-    callId: string;
-    toolName: string;
-    content: string;
-    isError: boolean;
-    [key: string]: unknown;
-  };
-}
-
-export interface AgentSessionInitEvent extends EventEnvelope {
-  type: 'run.agent.session_init';
-  payload: {
-    runId: string;
-    model?: string;
-    tools?: string[];
-    permissionMode?: string;
-    [key: string]: unknown;
-  };
-}
-
-export interface AgentResultEvent extends EventEnvelope {
-  type: 'run.agent.result';
-  payload: {
-    runId: string;
-    success: boolean;
-    error?: string;
-    usage?: {
-      inputTokens?: number;
-      outputTokens?: number;
-      input?: number;
-      output?: number;
-      total?: number;
-      [key: string]: unknown;
-    };
-    [key: string]: unknown;
-  };
-}
-
-// ── Error event ───────────────────────────────
-
-export interface AgentTaskDispatchedEvent extends EventEnvelope {
-  type: 'run.agent.task_dispatched';
-  payload: {
-    runId: string;
-    taskId: string;
-    toolUseId?: string;
-    description?: string;
-    taskType?: string;
+    url: string;
     [key: string]: unknown;
   };
 }
@@ -183,58 +246,33 @@ export interface ErrorEvent extends EventEnvelope {
   };
 }
 
-export interface AgentPermissionRequestedEvent extends EventEnvelope {
-  type: 'run.agent.permission_requested';
-  payload: {
-    runId: string;
-    requestId: string;
-    toolName: string;
-    toolInput: Record<string, unknown>;
-    sessionId?: string;
-    [key: string]: unknown;
-  };
-}
-
-export interface AgentPermissionDecidedEvent extends EventEnvelope {
-  type: 'run.agent.permission_decided';
-  payload: {
-    runId: string;
-    requestId: string;
-    decision: 'allow' | 'deny';
-    reason?: string;
-    [key: string]: unknown;
-  };
-}
-
-export interface AgentPermissionDecideEvent extends EventEnvelope {
-  type: 'run.agent.permission_decide';
-  payload: {
-    runId: string;
-    requestId: string;
-    decision: 'allow' | 'deny';
-    reason?: string;
-    [key: string]: unknown;
-  };
-}
-
 // ── Union ─────────────────────────────────────
 
 export type AnyEvent =
-  | RunnerEvent
-  | RunLifecycleEvent
+  // IM / Project
+  | ProjectCreatedEvent
+  | ProjectUpdatedEvent
+  | ThreadCreatedEvent
+  | ThreadUpdatedEvent
+  | MessageCreatedEvent
+  | MessageDeltaEvent
+  | ItemCreatedEvent
+  | ItemUpdatedEvent
+  // Execution / Runner
+  | RunnerOnlineEvent
+  | RunnerOfflineEvent
+  | RunQueuedEvent
+  | RunStartedEvent
+  | RunStatusChangedEvent
   | RunOutputEvent
   | RunOutputBatchEvent
-  | AgentTextDeltaEvent
-  | AgentTextBlockEvent
-  | AgentThinkingEvent
-  | AgentToolCallEvent
-  | AgentToolResultEvent
-  | AgentFileChangeEvent
-  | AgentSessionInitEvent
-  | AgentResultEvent
-  | AgentTaskDispatchedEvent
-  | AgentPermissionRequestedEvent
-  | AgentPermissionDecidedEvent
-  | AgentPermissionDecideEvent
+  | RunFinishedEvent
+  | RunFailedEvent
+  | ApprovalRequestedEvent
+  | ApprovalDecidedEvent
+  | ArtifactCreatedEvent
+  | PreviewReadyEvent
+  // Common
   | ErrorEvent
+  // Fallback
   | EventEnvelope;
