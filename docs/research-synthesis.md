@@ -97,11 +97,11 @@
 
 | 仓库 | 文件 | 行数 | 模式 | AgentHub 文件 |
 |------|------|------|------|-------------|
-| `opcode` | `process/registry.rs` | 537 | ProcessRegistry 多进程管理 | `src-tauri/src/process_registry.rs` |
+| `opcode` | `process/registry.rs` | 537 | ProcessRegistry 多进程管理 | `edge-server/internal/lifecycle/process_executor.go` |
 | `opcode` | `apiAdapter.ts` | 444 | Tauri invoke vs HTTP 回退 | `src/lib/apiAdapter.ts` |
-| `claude-code-webui` | `UnifiedMessageProcessor.ts` | 543 | 统一流式/批量消息处理 | `src/utils/messageProcessor.ts` |
+| `claude-code-webui` | `UnifiedMessageProcessor.ts` | 543 | 统一流式/批量消息处理 | 未独立创建（消息处理已由各 adapter 层覆盖） |
 | `kanna` | `event-store.ts` | 1282 | JSONL + 2MB 快照 | `edge-server/internal/events/bus.go` |
-| `kanna` | `agent.ts` | 1610 | AgentCoordinator dual-Map | `edge-server/internal/agent_coordinator.go` |
+| `kanna` | `agent.ts` | 1610 | AgentCoordinator dual-Map | `edge-server/internal/adapters/orchestrator.go` |
 | `LibreChat` | `messages.ts` | 51 | buildTree() O(n) | `src/lib/message-tree.ts` |
 | `LibreChat` | `SiblingSwitch.tsx` | 69 | 分支导航 | `src/components/SiblingSwitch.tsx` |
 | `multica` | `tab-store.ts` | 845 | Zustand 标签管理 | `src/stores/uiStore.ts` |

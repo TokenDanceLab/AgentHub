@@ -18,6 +18,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := cfg.Validate(); err != nil {
+		slog.Error("invalid configuration", "error", err)
+		os.Exit(1)
+	}
+
 	db, err := repository.InitDB(&cfg.DB)
 	if err != nil {
 		slog.Error("failed to init database", "error", err)

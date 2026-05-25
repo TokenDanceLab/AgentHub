@@ -297,3 +297,142 @@ func TestEstimateTokens(t *testing.T) {
 	}
 }
 
+// --- AllocateChild tests ---
+
+func TestAllocateChildNilParent(t *testing.T) {
+	var b *ContextBudget = nil
+	child := b.AllocateChild(0.5)
+	if child != nil {
+		t.Fatal("AllocateChild on nil parent should return nil")
+	}
+}
+
+func TestAllocateChildDefaultRatio(t *testing.T) {
+	parent := NewContextBudget(100_000)
+	// usable = 90000, 40% = 36000
+	child := parent.AllocateChild(0.4)
+	if child.MaxTokens != 36000 {
+		t.Fatalf("MaxTokens = %d, want 36000", child.MaxTokens)
+	}
+	// Reserved scaled proportionally: 10000 * 0.4 = 4000
+	if child.ReservedTokens != 4000 {
+		t.Fatalf("ReservedTokens = %d, want 4000", child.ReservedTokens)
+	}
+}
+
+func TestAllocateChildCustomRatio(t *testing.T) {
+	parent := NewContextBudget(100_000)
+	// usable = 90000, 60% = 54000
+	child := parent.AllocateChild(0.6)
+	if child.MaxTokens != 54000 {
+		t.Fatalf("MaxTokens = %d, want 54000", child.MaxTokens)
+	}
+	// Reserved: 10000 * 0.6 = 6000
+	if child.ReservedTokens != 6000 {
+		t.Fatalf("ReservedTokens = %d, want 6000", child.ReservedTokens)
+	}
+}
+
+func TestAllocateChildRatioClampedZero(t *testing.T) {
+	parent := NewContextBudget(100_000)
+	child := parent.AllocateChild(0) // should clamp to 0.4
+	if child.MaxTokens != 36000 {
+		t.Fatalf("MaxTokens = %d, want 36000 (clamped to 0.4)", child.MaxTokens)
+	}
+}
+
+func TestAllocateChildRatioClampedNegative(t *testing.T) {
+	parent := NewContextBudget(100_000)
+	child := parent.AllocateChild(-0.5) // should clamp to 0.4
+	if child.MaxTokens != 36000 {
+		t.Fatalf("MaxTokens = %d, want 36000 (clamped to 0.4)", child.MaxTokens)
+	}
+}
+
+func TestAllocateChildRatioClampedAboveOne(t *testing.T) {
+	parent := NewContextBudget(100_000)
+	child := parent.AllocateChild(1.5) // should clamp to 1.0
+	// usable = 90000, 100% = 90000
+	if child.MaxTokens != 90000 {
+		t.Fatalf("MaxTokens = %d, want 90000", child.MaxTokens)
+	}
+	if child.ReservedTokens != 10000 {
+		t.Fatalf("ReservedTokens = %d, want 10000", child.ReservedTokens)
+	}
+}
+
+func TestAllocateChildWithAlreadyUsedTokens(t *testing.T) {
+	parent := NewContextBudget(100_000)
+	parent.Track(45000) // used half of usable (90000)
+	// remaining = 45000, 40% = 18000
+	child := parent.AllocateChild(0.4)
+	if child.MaxTokens != 18000 {
+		t.Fatalf("MaxTokens = %d, want 18000", child.MaxTokens)
+	}
+	// Reserved: 10000 * 0.4 = 4000
+	if child.ReservedTokens != 4000 {
+		t.Fatalf("ReservedTokens = %d, want 4000", child.ReservedTokens)
+	}
+}
+
+func TestAllocateChildMinimumBudget(t *testing.T) {
+	// Almost exhausted parent - remaining < 0 after ratio
+	parent := NewContextBudget(100_000)
+	parent.Track(89500) // remaining = 500, 40% = 200
+	child := parent.AllocateChild(0.4)
+	// Still valid since 200 > 0
+	if child.MaxTokens != 200 {
+		t.Fatalf("MaxTokens = %d, want 200", child.MaxTokens)
+	}
+
+	// Fully exhausted parent with small budget
+	parent2 := NewContextBudget(100_000)
+	parent2.Track(90000) // remaining = 0
+	child2 := parent2.AllocateChild(0.4)
+	// remaining * ratio = 0, falls back to minimum 10000
+	if child2.MaxTokens != 10000 {
+		t.Fatalf("MaxTokens = %d, want 10000 (minimum)", child2.MaxTokens)
+	}
+}
+
+func TestAllocateChildIndependentTracking(t *testing.T) {
+	parent := NewContextBudget(100_000)
+	child := parent.AllocateChild(0.4) // child MaxTokens = 36000
+
+	// Track tokens in child
+	child.Track(10000)
+	if child.UsedTokens.Load() != 10000 {
+		t.Fatalf("child.UsedTokens = %d, want 10000", child.UsedTokens.Load())
+	}
+
+	// Parent's used tokens should be unchanged
+	if parent.UsedTokens.Load() != 0 {
+		t.Fatalf("parent.UsedTokens = %d, want 0 (independent)", parent.UsedTokens.Load())
+	}
+
+	// Child exhaustion should be independent
+	if child.IsExhausted() {
+		t.Fatal("child should not be exhausted yet")
+	}
+	child.Track(26000) // 36000 used = child.MaxTokens, usable = 36000-4000=32000
+	// usable for child = 36000 - 4000 = 32000, used = 36000 >= 32000
+	if !child.IsExhausted() {
+		t.Fatal("child should be exhausted")
+	}
+	// Parent should still not be exhausted
+	if parent.IsExhausted() {
+		t.Fatal("parent should not be exhausted")
+	}
+}
+
+func TestAllocateChildFullRatio(t *testing.T) {
+	parent := NewContextBudget(100_000)
+	child := parent.AllocateChild(1.0)
+	// usable = 100000 - 10000 = 90000
+	if child.MaxTokens != 90000 {
+		t.Fatalf("MaxTokens = %d, want 90000", child.MaxTokens)
+	}
+	if child.ReservedTokens != 10000 {
+		t.Fatalf("ReservedTokens = %d, want 10000", child.ReservedTokens)
+	}
+}

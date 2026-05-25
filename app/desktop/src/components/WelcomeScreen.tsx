@@ -1,5 +1,6 @@
 import { useEffect, useRef, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Bot, Braces, Cloud, Cpu, HardDrive, LockKeyhole, MessageSquareText, Route, Sparkles } from 'lucide-react';
 import styles from './WelcomeScreen.module.css';
 
 interface Props {
@@ -37,21 +38,42 @@ export default memo(function WelcomeScreen({ online: _online, onCreateThread, on
   return (
     <div ref={containerRef} className={styles.container} role="region" aria-label={t('welcome.title')}>
       <div className={styles.content}>
-        {/* ── Brand ── */}
-        <div className={styles.brand}>
-          <h1 className={styles.appName}>AgentHub</h1>
-          <p className={styles.subtitle}>{t('welcome.subtitle')}</p>
+        <div className={styles.header}>
+          <div className={styles.brandMark} aria-hidden="true">
+            <Sparkles size={18} />
+          </div>
+          <span>{t('welcome.eyebrow')}</span>
+          <h1>{t('welcome.headline')}</h1>
         </div>
 
-        {/* ── Description ── */}
-        <p className={styles.description}>{t('welcome.description')}</p>
+        <div className={styles.launcher}>
+          <div className={styles.modeRow} aria-label={t('welcome.launcherLabel')}>
+            <button type="button" className={styles.modePill}>
+              <Cpu size={15} />
+              <span>{t('welcome.runtime')}</span>
+            </button>
+            <button type="button" className={`${styles.modePill} ${styles.modePillActive}`}>
+              <Bot size={15} />
+              <span>{t('welcome.profile')}</span>
+            </button>
+            <button type="button" className={styles.modePill}>
+              <Route size={15} />
+              <span>{t('welcome.target')}</span>
+            </button>
+          </div>
 
-        {/* ── Create Thread ── */}
-        <button className={styles.createButton} onClick={onCreateThread} type="button">
-          {t('welcome.createThread')}
-        </button>
+          <button className={styles.commandBox} onClick={onCreateThread} type="button">
+            <MessageSquareText size={19} />
+            <span>{t('welcome.commandPlaceholder')}</span>
+          </button>
 
-        {/* ── Example Prompts ── */}
+          <div className={styles.controlRow}>
+            <span><HardDrive size={14} />{t('welcome.localEdge')}</span>
+            <span><LockKeyhole size={14} />{t('welcome.approval')}</span>
+            <span><Cloud size={14} />{t('welcome.tokendance')}</span>
+          </div>
+        </div>
+
         <div className={styles.suggestions}>
           <p className={styles.suggestionsLabel}>{t('welcome.suggestionsLabel')}</p>
           <div className={styles.chips}>
@@ -62,6 +84,7 @@ export default memo(function WelcomeScreen({ online: _online, onCreateThread, on
                 onClick={() => handleSuggestionClick(t(key))}
                 type="button"
               >
+                <Braces size={14} />
                 {t(key)}
               </button>
             ))}

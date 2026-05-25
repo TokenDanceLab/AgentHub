@@ -50,9 +50,9 @@ type ProcessExecutor struct {
 
 	mu         sync.Mutex
 	running    map[string]context.CancelFunc
-	stdins     map[string]io.Writer                    // runID to stdin (for adapter-aware interrupt)
-	runOutputs map[string]*runnerctx.RunOutputStore    // runID to temp log for output persistence and replay
-	runToAgent map[string]string                       // runID to agentInstanceID for result aggregation
+	stdins     map[string]io.Writer                 // runID to stdin (for adapter-aware interrupt)
+	runOutputs map[string]*runnerctx.RunOutputStore // runID to temp log for output persistence and replay
+	runToAgent map[string]string                    // runID to agentInstanceID for result aggregation
 }
 
 func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter, adapterReg *adapters.Registry) (*ProcessExecutor, error) {
@@ -380,7 +380,9 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 		n, err := reader.Read(buf)
 		if n > 0 {
 			text := string(buf[:n])
-			if outStore != nil { outStore.Write(text) }
+			if outStore != nil {
+				outStore.Write(text)
+			}
 			e.bus.Publish("run.output.batch", runScope(run), map[string]any{
 				"runId":  run.ID,
 				"stream": stream,
@@ -513,12 +515,13 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 // native protocol and emit typed events to the bus.
 func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.Run, stdout io.Reader, stdin io.Writer, adapter adapters.AgentAdapter, ctx context.Context) {
 	defer wg.Done()
-	var emitter adapters.EventEmitter = adapters.NewBusEventEmitter(e.bus)
+	scope := runScope(run)
+	var emitter adapters.EventEmitter = adapters.NewScopedEventEmitter(adapters.NewBusEventEmitter(e.bus), scope)
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
 	if budget, ok := ctx.Value(adapters.CtxBudgetKey).(*runnerctx.ContextBudget); ok && budget != nil {
-		emitter = adapters.NewBudgetAwareEmitter(emitter, budget, runScope(run))
+		emitter = adapters.NewBudgetAwareEmitter(emitter, budget, scope)
 	}
 
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {

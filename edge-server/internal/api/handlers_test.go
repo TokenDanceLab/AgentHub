@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -75,10 +76,103 @@ func TestGetHealth(t *testing.T) {
 	if body["edgeId"] != "local" {
 		t.Errorf("expected edgeId=local, got %v", body["edgeId"])
 	}
+	checks, ok := body["checks"].(map[string]any)
+	if !ok {
+		t.Fatalf("checks = %T, want object", body["checks"])
+	}
+	runnerCheck, ok := checks["runners"].(map[string]any)
+	if !ok {
+		t.Fatalf("runner check = %T, want object", checks["runners"])
+	}
+	if runnerCheck["status"] != "ok" {
+		t.Fatalf("runner check status = %v, want ok", runnerCheck["status"])
+	}
+	if runnerCheck["total"] != float64(1) || runnerCheck["available"] != float64(1) || runnerCheck["unavailable"] != float64(0) {
+		t.Fatalf("runner counts = %#v, want total=1 available=1 unavailable=0", runnerCheck)
+	}
+	statuses, ok := runnerCheck["statuses"].(map[string]any)
+	if !ok {
+		t.Fatalf("runner statuses = %T, want object", runnerCheck["statuses"])
+	}
+	if statuses["online"] != float64(1) {
+		t.Fatalf("online runner count = %#v, want 1", statuses["online"])
+	}
+	items, ok := runnerCheck["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("runner items = %#v, want one item", runnerCheck["items"])
+	}
 
 	contentType := rec.Header().Get("Content-Type")
 	if !strings.Contains(contentType, "application/json") {
 		t.Errorf("expected JSON content-type, got %q", contentType)
+	}
+}
+
+func TestGetHealthDegradesWhenNoRunnerAvailable(t *testing.T) {
+	h := newTestHandler()
+	h.Registry.Upsert(runners.RunnerInfo{
+		ID:           "runner_local_1",
+		Name:         "Mock Runner (local)",
+		Status:       "offline",
+		Capabilities: []string{"mock"},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+	rec := httptest.NewRecorder()
+
+	h.GetHealth(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if body["status"] != "degraded" {
+		t.Fatalf("overall status = %v, want degraded", body["status"])
+	}
+	checks := body["checks"].(map[string]any)
+	runnerCheck := checks["runners"].(map[string]any)
+	if runnerCheck["status"] != "degraded" {
+		t.Fatalf("runner check status = %v, want degraded", runnerCheck["status"])
+	}
+	if runnerCheck["detail"] != "no available runners" {
+		t.Fatalf("runner detail = %v, want no available runners", runnerCheck["detail"])
+	}
+	if runnerCheck["available"] != float64(0) || runnerCheck["unavailable"] != float64(1) {
+		t.Fatalf("runner counts = %#v, want available=0 unavailable=1", runnerCheck)
+	}
+	statuses := runnerCheck["statuses"].(map[string]any)
+	if statuses["offline"] != float64(1) {
+		t.Fatalf("offline runner count = %#v, want 1", statuses["offline"])
+	}
+}
+
+func TestGetHealthDegradesWhenRunnerRegistryMissing(t *testing.T) {
+	h := newTestHandler()
+	h.Registry = nil
+	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+	rec := httptest.NewRecorder()
+
+	h.GetHealth(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if body["status"] != "degraded" {
+		t.Fatalf("overall status = %v, want degraded", body["status"])
+	}
+	checks := body["checks"].(map[string]any)
+	runnerCheck := checks["runners"].(map[string]any)
+	if runnerCheck["detail"] != "no runner registry configured" {
+		t.Fatalf("runner detail = %v, want missing registry detail", runnerCheck["detail"])
+	}
+	if runnerCheck["total"] != float64(0) || runnerCheck["available"] != float64(0) {
+		t.Fatalf("runner counts = %#v, want zero counts", runnerCheck)
 	}
 }
 
@@ -366,6 +460,166 @@ func TestPostRunsRejectsUnknownThreadBinding(t *testing.T) {
 	}
 }
 
+func TestPostRunsRejectsSecondActiveRunForThread(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("first POST /v1/runs status = %d, want 202", rec.Code)
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts after first run = %d, want 1", len(executor.started))
+	}
+	firstRunID := executor.started[0].ID
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec = httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("second POST /v1/runs status = %d, want 409; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts after duplicate active run = %d, want still 1", len(executor.started))
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode duplicate active run body: %v", err)
+	}
+	errObj, ok := body["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("error body = %#v, want error object", body)
+	}
+	if errObj["code"] != "active_run_exists" {
+		t.Fatalf("error code = %#v, want active_run_exists", errObj["code"])
+	}
+	if body["runId"] != firstRunID {
+		t.Fatalf("duplicate response runId = %#v, want active run %q", body["runId"], firstRunID)
+	}
+	if runs := h.Store.ListRuns("thread_local"); len(runs) != 1 {
+		t.Fatalf("thread run count = %d, want 1", len(runs))
+	}
+}
+
+func TestPostRunsAllowsNewRunAfterActiveRunTerminal(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("first POST /v1/runs status = %d, want 202", rec.Code)
+	}
+	firstRunID := executor.started[0].ID
+	if _, ok := h.Store.SetRunStatus(firstRunID, "finished"); !ok {
+		t.Fatal("SetRunStatus returned ok=false")
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec = httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("second POST /v1/runs after terminal status = %d, want 202; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 2 {
+		t.Fatalf("executor starts = %d, want 2", len(executor.started))
+	}
+	if executor.started[1].ID == firstRunID {
+		t.Fatalf("second run reused first run ID %q", firstRunID)
+	}
+}
+
+func TestPostRunsMarksExecutorStartFailureTerminalForRetry(t *testing.T) {
+	h := newTestHandler()
+	failingExecutor := &fakeRunExecutor{err: errors.New("start failed")}
+	h.Executor = failingExecutor
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("first POST /v1/runs status = %d, want 500; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(failingExecutor.started) != 1 {
+		t.Fatalf("failed executor starts = %d, want 1", len(failingExecutor.started))
+	}
+	failedRunID := failingExecutor.started[0].ID
+	failedRun, ok := h.Store.GetRun(failedRunID)
+	if !ok {
+		t.Fatalf("failed run %q was not stored", failedRunID)
+	}
+	if failedRun.Status != "failed" {
+		t.Fatalf("failed run status = %q, want failed", failedRun.Status)
+	}
+
+	retryExecutor := &fakeRunExecutor{}
+	h.Executor = retryExecutor
+	req = httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec = httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("retry POST /v1/runs status = %d, want 202; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(retryExecutor.started) != 1 {
+		t.Fatalf("retry executor starts = %d, want 1", len(retryExecutor.started))
+	}
+}
+
+func TestPostRunsCleansTerminalRunsBeforeCreatingNewRun(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+
+	for i := 0; i < defaultRunCleanupMaxTerminalRunsPerThread+1; i++ {
+		runID := fmt.Sprintf("run_terminal_%02d", i)
+		itemID := fmt.Sprintf("item_terminal_%02d", i)
+		run, err := h.Store.CreateRun(runID, "proj_local", "thread_local")
+		if err != nil {
+			t.Fatalf("CreateRun(%q) returned error: %v", runID, err)
+		}
+		if _, ok := h.Store.SetRunStatus(run.ID, "finished"); !ok {
+			t.Fatalf("SetRunStatus(%q) returned ok=false", run.ID)
+		}
+		if _, err := h.Store.CreateItem(store.Item{
+			ID:        itemID,
+			ProjectID: run.ProjectID,
+			ThreadID:  run.ThreadID,
+			RunID:     run.ID,
+			Type:      "run",
+			Status:    "finished",
+		}); err != nil {
+			t.Fatalf("CreateItem(%q) returned error: %v", itemID, err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{"projectId":"proj_local","threadId":"thread_local"}`))
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("POST /v1/runs status = %d, want 202; body=%s", rec.Code, rec.Body.String())
+	}
+	if _, ok := h.Store.GetRun("run_terminal_00"); ok {
+		t.Fatal("oldest terminal run was not cleaned before creating a new run")
+	}
+	if _, ok := h.Store.GetItem("item_terminal_00"); ok {
+		t.Fatal("item for oldest terminal run was not cleaned before creating a new run")
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+	if got := h.Store.ListRuns("thread_local"); len(got) != defaultRunCleanupMaxTerminalRunsPerThread+1 {
+		t.Fatalf("thread run count = %d, want retained terminal runs plus new active run", len(got))
+	}
+}
+
 func TestGetRunAndThreadItemsAfterPostRun(t *testing.T) {
 	h := newTestHandler()
 	mux := http.NewServeMux()
@@ -595,6 +849,163 @@ func TestPostCancelRunReturnsStoredStatusWhenExecutorCannotCancel(t *testing.T) 
 	}
 	if body["status"] != run.Status {
 		t.Fatalf("status = %#v, want %q", body["status"], run.Status)
+	}
+}
+
+func TestPostPermissionDecideRejectsInvalidDecision(t *testing.T) {
+	h := newTestHandler()
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_1","decision":"maybe"}`))
+	rec := httptest.NewRecorder()
+
+	h.PostPermissionDecide(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "bad_request")
+}
+
+func TestPostPermissionDecideRequiresRunAndRequest(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{"missing run", `{"requestId":"req_1","decision":"allow"}`},
+		{"missing request", `{"runId":"run_1","decision":"allow"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newTestHandler()
+			req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(tt.body))
+			rec := httptest.NewRecorder()
+
+			h.PostPermissionDecide(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
+			}
+			assertErrorCode(t, rec.Body.String(), "bad_request")
+		})
+	}
+}
+
+func TestPostPermissionDecideRejectsUnknownRequest(t *testing.T) {
+	h := newTestHandler()
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_missing","decision":"allow"}`))
+	rec := httptest.NewRecorder()
+
+	h.PostPermissionDecide(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404; body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
+}
+
+func TestPostPermissionDecideRejectsWrongRun(t *testing.T) {
+	h := newTestHandler()
+	h.ensurePermissionRegistry().Register(PendingPermission{
+		RunID:     "run_real",
+		RequestID: "req_1",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_spoof","requestId":"req_1","decision":"allow"}`))
+	rec := httptest.NewRecorder()
+
+	h.PostPermissionDecide(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404; body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
+	if _, ok := h.PermissionRegistry.Consume("run_real", "req_1"); !ok {
+		t.Fatal("wrong-run decision consumed the real pending request")
+	}
+}
+
+func TestPostPermissionDecideConsumesPendingRequestAndPublishesEvent(t *testing.T) {
+	h := newTestHandler()
+	h.ensurePermissionRegistry().Register(PendingPermission{
+		ProjectID: "proj_1",
+		ThreadID:  "thread_1",
+		RunID:     "run_1",
+		RequestID: "req_1",
+		ToolName:  "Bash",
+		ToolUseID: "tool_1",
+	})
+	_, ch, _ := h.Bus.Subscribe(0)
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_1","decision":"deny","reason":"not now"}`))
+	rec := httptest.NewRecorder()
+
+	h.PostPermissionDecide(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	if body["status"] != "ok" {
+		t.Fatalf("body status = %#v, want ok", body["status"])
+	}
+	select {
+	case evt := <-ch:
+		if evt.Type != "run.agent.permission_decided" {
+			t.Fatalf("event type = %q, want permission_decided", evt.Type)
+		}
+		if evt.Scope["projectId"] != "proj_1" || evt.Scope["threadId"] != "thread_1" || evt.Scope["runId"] != "run_1" {
+			t.Fatalf("event scope = %#v, want project/thread/run", evt.Scope)
+		}
+		payload := evt.Payload.(map[string]any)
+		if payload["requestId"] != "req_1" || payload["decision"] != "deny" || payload["reason"] != "not now" {
+			t.Fatalf("event payload = %#v, want deny decision", payload)
+		}
+		if payload["toolName"] != "Bash" || payload["toolUseId"] != "tool_1" {
+			t.Fatalf("event payload missing tool metadata: %#v", payload)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timed out waiting for permission_decided event")
+	}
+	if _, ok := h.PermissionRegistry.Consume("run_1", "req_1"); ok {
+		t.Fatal("pending request remained after decision")
+	}
+}
+
+func TestPostPermissionDecideRejectsSecondDecision(t *testing.T) {
+	h := newTestHandler()
+	h.ensurePermissionRegistry().Register(PendingPermission{
+		RunID:     "run_1",
+		RequestID: "req_1",
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_1","decision":"allow"}`))
+	rec := httptest.NewRecorder()
+	h.PostPermissionDecide(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_1","decision":"deny"}`))
+	rec = httptest.NewRecorder()
+	h.PostPermissionDecide(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("second status = %d, want 404; body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
+}
+
+func TestMuxPermissionDecideWrongMethod(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/permissions/decide", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET /v1/permissions/decide status = %d, want 405", rec.Code)
 	}
 }
 
@@ -996,6 +1407,48 @@ func TestMuxPostProjectsRoute(t *testing.T) {
 	}
 }
 
+func TestMuxPostProjectsExistingProjectReturnsOKWithoutCreatedEvent(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	_, ch, _ := h.Bus.Subscribe(0)
+	req := httptest.NewRequest(http.MethodPost, "/v1/projects", strings.NewReader(`{"projectId":"proj_manual","name":"Manual Project"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("initial POST /v1/projects status = %d, want 201", rec.Code)
+	}
+	select {
+	case evt := <-ch:
+		if evt.Type != "project.created" {
+			t.Fatalf("initial event type = %q, want project.created", evt.Type)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timed out waiting for initial project.created event")
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/projects", strings.NewReader(`{"projectId":"proj_manual","name":"Renamed Project"}`))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("duplicate POST /v1/projects status = %d, want 200", rec.Code)
+	}
+
+	var project map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&project); err != nil {
+		t.Fatalf("failed to decode duplicate body: %v", err)
+	}
+	if project["name"] != "Manual Project" {
+		t.Fatalf("duplicate project name = %v, want original Manual Project", project["name"])
+	}
+	select {
+	case evt := <-ch:
+		t.Fatalf("unexpected event for duplicate project: %s", evt.Type)
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
 func TestMuxPostProjectsAutoID(t *testing.T) {
 	h := newTestHandler()
 	mux := http.NewServeMux()
@@ -1287,5 +1740,20 @@ func TestWriteJSONEncodingError(t *testing.T) {
 	// Should still have set the status even if encoding fails
 	if rec.Code != http.StatusOK {
 		t.Fatalf("writeJSON status = %d, want 200", rec.Code)
+	}
+}
+
+func assertErrorCode(t *testing.T, body string, want string) {
+	t.Helper()
+	var decoded map[string]any
+	if err := json.Unmarshal([]byte(body), &decoded); err != nil {
+		t.Fatalf("failed to decode error body %q: %v", body, err)
+	}
+	errObj, ok := decoded["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("error body = %#v, want error object", decoded)
+	}
+	if errObj["code"] != want {
+		t.Fatalf("error code = %#v, want %q", errObj["code"], want)
 	}
 }

@@ -20,12 +20,18 @@ type EdgeMetrics struct {
 	EdgeActiveRuns         prometheus.Gauge
 	EdgeWSConnections      prometheus.Gauge
 	EdgeEventBusDepth      prometheus.GaugeFunc
+	EdgeEventBusDropped    prometheus.CounterFunc
 }
 
 // New creates and auto-registers all Edge Prometheus metrics in an isolated
 // registry. busDepthFn is a callback that returns the current event bus
 // history depth; it may be nil, in which case edge_event_bus_depth is skipped.
 func New(busDepthFn func() float64) *EdgeMetrics {
+	return NewWithBusStats(busDepthFn, nil)
+}
+
+// NewWithBusStats creates metrics with optional event bus callbacks.
+func NewWithBusStats(busDepthFn func() float64, busDroppedFn func() float64) *EdgeMetrics {
 	reg := prometheus.NewRegistry()
 	factory := promauto.With(reg)
 
@@ -55,6 +61,13 @@ func New(busDepthFn func() float64) *EdgeMetrics {
 			Name: "edge_event_bus_depth",
 			Help: "Current number of events in the event bus history.",
 		}, busDepthFn)
+	}
+
+	if busDroppedFn != nil {
+		m.EdgeEventBusDropped = factory.NewCounterFunc(prometheus.CounterOpts{
+			Name: "edge_event_bus_dropped_total",
+			Help: "Total number of event bus fanout deliveries dropped because subscriber channels were full.",
+		}, busDroppedFn)
 	}
 
 	return m
