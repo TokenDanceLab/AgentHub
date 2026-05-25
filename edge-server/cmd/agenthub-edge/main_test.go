@@ -36,6 +36,9 @@ func TestBuildConfigDefaultsToMemoryStore(t *testing.T) {
 	if len(cfg.RunnerEnv) != 0 {
 		t.Fatalf("RunnerEnv = %#v, want empty", cfg.RunnerEnv)
 	}
+	if cfg.LocalAuthToken != "" {
+		t.Fatalf("LocalAuthToken = %q, want empty", cfg.LocalAuthToken)
+	}
 }
 
 func TestBuildConfigParsesStoreFile(t *testing.T) {
@@ -450,13 +453,38 @@ func TestBuildConfigAgentFlags(t *testing.T) {
 // --- Environment variable fallback tests ---
 
 func TestBuildConfigEnvVarAddr(t *testing.T) {
-	t.Setenv("AGENTHUB_ADDR", ":4321")
+	t.Setenv("AGENTHUB_ADDR", "127.0.0.1:4321")
 	cfg, err := buildConfig(nil)
 	if err != nil {
 		t.Fatalf("buildConfig returned error: %v", err)
 	}
-	if cfg.Addr != ":4321" {
-		t.Fatalf("Addr = %q, want :4321 from env", cfg.Addr)
+	if cfg.Addr != "127.0.0.1:4321" {
+		t.Fatalf("Addr = %q, want 127.0.0.1:4321 from env", cfg.Addr)
+	}
+}
+
+func TestBuildConfigRejectsNonLoopbackAddr(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		env  string
+	}{
+		{"flag wildcard", []string{"--addr", ":4321"}, ""},
+		{"env wildcard", nil, ":4321"},
+		{"ipv4 wildcard", []string{"--addr", "0.0.0.0:4321"}, ""},
+		{"ipv6 wildcard", []string{"--addr", "[::]:4321"}, ""},
+		{"lan ip", []string{"--addr", "192.168.1.10:4321"}, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != "" {
+				t.Setenv("AGENTHUB_ADDR", tt.env)
+			}
+			if _, err := buildConfig(tt.args); err == nil {
+				t.Fatalf("buildConfig(%v) returned nil error", tt.args)
+			}
+		})
 	}
 }
 
@@ -527,14 +555,35 @@ func TestBuildConfigEnvVarAgentFlags(t *testing.T) {
 	}
 }
 
-func TestBuildConfigFlagOverridesEnvVar(t *testing.T) {
-	t.Setenv("AGENTHUB_ADDR", ":9999")
-	cfg, err := buildConfig([]string{"--addr", ":4321"})
+func TestBuildConfigParsesLocalAuthTokenFromFlag(t *testing.T) {
+	cfg, err := buildConfig([]string{"--local-auth-token", " edge-secret "})
 	if err != nil {
 		t.Fatalf("buildConfig returned error: %v", err)
 	}
-	if cfg.Addr != ":4321" {
-		t.Fatalf("Addr = %q, want :4321 (flag should override env)", cfg.Addr)
+	if cfg.LocalAuthToken != "edge-secret" {
+		t.Fatalf("LocalAuthToken = %q, want trimmed token", cfg.LocalAuthToken)
+	}
+}
+
+func TestBuildConfigEnvVarLocalAuthToken(t *testing.T) {
+	t.Setenv("AGENTHUB_EDGE_AUTH_TOKEN", "env-edge-secret")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.LocalAuthToken != "env-edge-secret" {
+		t.Fatalf("LocalAuthToken = %q, want env token", cfg.LocalAuthToken)
+	}
+}
+
+func TestBuildConfigFlagOverridesEnvVar(t *testing.T) {
+	t.Setenv("AGENTHUB_ADDR", "127.0.0.1:9999")
+	cfg, err := buildConfig([]string{"--addr", "127.0.0.1:4321"})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.Addr != "127.0.0.1:4321" {
+		t.Fatalf("Addr = %q, want 127.0.0.1:4321 (flag should override env)", cfg.Addr)
 	}
 }
 
