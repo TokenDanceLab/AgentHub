@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/service"
 )
@@ -97,6 +98,22 @@ func TestSessionHandler_CreatePrivate_BadRequest(t *testing.T) {
 
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestSessionHandler_CreatePrivate_NotFriend(t *testing.T) {
+	svc := &mockSessionService{
+		createPrivateFn: func(ctx context.Context, currentUserID, targetUserID string) (*service.CreateSessionResponse, error) {
+			return nil, errcode.FriendNotFriend
+		},
+	}
+	h := handler.NewSessionHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/sessions/private", map[string]string{"target_user_id": "u2"}, "user_id", "u1")
+	h.CreatePrivate(c)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

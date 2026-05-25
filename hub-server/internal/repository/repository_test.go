@@ -753,6 +753,37 @@ func TestFriendshipRepo_StatusTransitions(t *testing.T) {
 	assert.Equal(t, "Bestie", fetched.Remark)
 }
 
+func TestFriendshipRepo_UpdateRemarkNoRows(t *testing.T) {
+	db := setupSQLite(t)
+
+	// No friendship rows exist, so UpdateFriendshipRemark should return ErrRecordNotFound.
+	err := UpdateFriendshipRemark(db, "user-x", "user-y", "remark")
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	// Create a friendship with pending status - remark should NOT be updatable
+	f := &model.Friendship{UserID: "user-x", FriendID: "user-y", Status: model.StatusPending}
+	require.NoError(t, CreateFriendship(db, f))
+
+	err = UpdateFriendshipRemark(db, "user-x", "user-y", "remark")
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound, "pending friendship should not allow remark update")
+
+	// Update to accepted - remark SHOULD be updatable
+	require.NoError(t, UpdateFriendshipByID(db, f.ID, model.StatusAccepted))
+	err = UpdateFriendshipRemark(db, "user-x", "user-y", "cleared")
+	require.NoError(t, err)
+
+	fetched, err := GetFriendshipByID(db, f.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "cleared", fetched.Remark)
+
+	// Clearing remark to empty string
+	err = UpdateFriendshipRemark(db, "user-x", "user-y", "")
+	require.NoError(t, err)
+	fetched, err = GetFriendshipByID(db, f.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "", fetched.Remark)
+}
+
 func TestFriendshipRepo_Lists(t *testing.T) {
 	db := setupSQLite(t)
 
@@ -1152,6 +1183,94 @@ func TestPendingTaskRepo_CancelTasksByAgent(t *testing.T) {
 	fetched, _ = GetPendingTaskByID(db, task3.ID)
 	require.NotNil(t, fetched)
 	assert.Equal(t, model.TaskStatusQueued, fetched.Status)
+}
+
+func TestPendingTaskRepo_ScanExpiredTasks(t *testing.T) {
+	db := setupSQLite(t)
+
+	// Create tasks with different statuses and expire times
+	// Expired queued
+	task1 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusQueued,
+		ExpireAt:          time.Now().Add(-time.Hour), // expired
+	}
+	// Expired dispatched
+	task2 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-2",
+		Status:            model.TaskStatusDispatched,
+		ExpireAt:          time.Now().Add(-time.Hour), // expired
+	}
+	// Expired running (#132: running tasks should also be scanned)
+	task3 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-3",
+		Status:            model.TaskStatusRunning,
+		ExpireAt:          time.Now().Add(-time.Hour), // expired
+	}
+	// Not expired yet
+	task4 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-4",
+		Status:            model.TaskStatusQueued,
+		ExpireAt:          time.Now().Add(time.Hour), // not expired
+	}
+	// Expired but already done (terminal states excluded)
+	task5 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-5",
+		Status:            model.TaskStatusDone,
+		ExpireAt:          time.Now().Add(-time.Hour), // expired but done
+	}
+	// Expired but already failed (terminal states excluded)
+	task6 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-6",
+		Status:            model.TaskStatusFailed,
+		ExpireAt:          time.Now().Add(-time.Hour), // expired but failed
+	}
+	// Expired but already cancelled (terminal states excluded)
+	task7 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-7",
+		Status:            model.TaskStatusCancelled,
+		ExpireAt:          time.Now().Add(-time.Hour), // expired but cancelled
+	}
+
+	require.NoError(t, CreatePendingTask(db, task1))
+	require.NoError(t, CreatePendingTask(db, task2))
+	require.NoError(t, CreatePendingTask(db, task3))
+	require.NoError(t, CreatePendingTask(db, task4))
+	require.NoError(t, CreatePendingTask(db, task5))
+	require.NoError(t, CreatePendingTask(db, task6))
+	require.NoError(t, CreatePendingTask(db, task7))
+
+	tasks, err := ScanExpiredTasks(db)
+	require.NoError(t, err)
+
+	// Should only return tasks 1, 2, 3 (expired and in non-terminal states)
+	assert.Len(t, tasks, 3)
+
+	taskIDs := make(map[string]bool)
+	for _, t := range tasks {
+		taskIDs[t.ID] = true
+	}
+	assert.True(t, taskIDs[task1.ID], "expired queued task should be returned")
+	assert.True(t, taskIDs[task2.ID], "expired dispatched task should be returned")
+	assert.True(t, taskIDs[task3.ID], "expired running task should be returned (#132)")
+	assert.False(t, taskIDs[task4.ID], "non-expired task should not be returned")
+	assert.False(t, taskIDs[task5.ID], "expired done task should not be returned")
+	assert.False(t, taskIDs[task6.ID], "expired failed task should not be returned")
+	assert.False(t, taskIDs[task7.ID], "expired cancelled task should not be returned")
 }
 
 // =============================================================================
