@@ -119,9 +119,11 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 // HandleCallback validates the OIDC callback, exchanges the authorization code,
 // validates the ID token, maps the TokenDance sub to a Hub user, and issues Hub tokens.
 func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerifier, deviceType, deviceID string) (*CallbackResult, error) {
-	// 1. Validate state from Redis
+	// 1. Atomically consume state from Redis (GetDel = GET + DEL in one command).
+	//    This prevents replay attacks that could exploit the race window between
+	//    separate Get/Delete operations.
 	stateKey := "oidc:state:" + state
-	entryJSON, err := s.cache.GetRDB().Get(ctx, stateKey).Result()
+	entryJSON, err := s.cache.GetRDB().GetDel(ctx, stateKey).Result()
 	if err != nil {
 		return nil, errcode.OIDCInvalidState
 	}
@@ -189,8 +191,7 @@ func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerif
 		return nil, fmt.Errorf("upsert refresh token: %w", err)
 	}
 
-	// 8. Delete state from Redis (one-shot consumption)
-	s.cache.GetRDB().Del(ctx, stateKey)
+	// 8. State was already consumed atomically via GetDel — no explicit Del needed.
 
 	return &CallbackResult{
 		AccessToken:  accessToken,
