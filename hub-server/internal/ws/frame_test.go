@@ -3,6 +3,10 @@ package ws
 import (
 	"encoding/json"
 	"testing"
+
+	dto "github.com/prometheus/client_model/go"
+
+	"github.com/agenthub/hub-server/internal/metrics"
 )
 
 func TestNewFrame(t *testing.T) {
@@ -134,4 +138,40 @@ func TestParseFrameNilData(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for nil data")
 	}
+}
+
+func TestManagerPushToConnCountsDroppedFrames(t *testing.T) {
+	metrics.Register()
+
+	m := NewManager()
+	conn := &Conn{
+		ID:         "conn-1",
+		UserID:     "user-1",
+		DeviceType: "desktop",
+		Send:       make(chan []byte, 1),
+	}
+	conn.Send <- []byte(`{"type":"already.full"}`)
+	m.conns[conn.ID] = conn
+
+	before := counterValue(t)
+	m.PushToConn(conn.ID, NewFrame(TypeMessageNew, map[string]any{
+		"session_id": "session-1",
+	}))
+	after := counterValue(t)
+
+	if after != before+1 {
+		t.Fatalf("WSDroppedFrames = %v, want %v", after, before+1)
+	}
+	if got := len(conn.Send); got != 1 {
+		t.Fatalf("send buffer length = %d, want 1", got)
+	}
+}
+
+func counterValue(t *testing.T) float64 {
+	t.Helper()
+	m := &dto.Metric{}
+	if err := metrics.WSDroppedFrames.Write(m); err != nil {
+		t.Fatalf("write WSDroppedFrames metric: %v", err)
+	}
+	return m.GetCounter().GetValue()
 }

@@ -8,8 +8,10 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -34,6 +36,12 @@ type Handler struct {
 	AgentRegistry   *agents.Registry   // runtime agent instance registry
 	MessageQueue    *agents.Queue      // inter-agent message queue
 	Metrics         *metrics.EdgeMetrics
+
+	PermissionRegistry *PermissionRegistry
+
+	runCreateMu              sync.Mutex
+	permissionRegistryMu     sync.Mutex
+	permissionObserverCancel func()
 }
 
 var upgrader = websocket.Upgrader{
@@ -41,6 +49,11 @@ var upgrader = websocket.Upgrader{
 		return security.IsTrustedLocalOrigin(r.Header.Get("Origin"))
 	},
 }
+
+const (
+	defaultRunCleanupTerminalTTL              = 24 * time.Hour
+	defaultRunCleanupMaxTerminalRunsPerThread = 50
+)
 
 // ---------------------------------------------------------------------------
 // Response helpers
@@ -92,6 +105,25 @@ func acceptedResponse(data map[string]any) map[string]any {
 	return data
 }
 
+func ensureBus(h *Handler) *events.Bus {
+	if h.Bus == nil {
+		h.Bus = events.NewBus(10000)
+	}
+	return h.Bus
+}
+
+func (h *Handler) ensurePermissionRegistry() *PermissionRegistry {
+	h.permissionRegistryMu.Lock()
+	defer h.permissionRegistryMu.Unlock()
+	if h.PermissionRegistry == nil {
+		h.PermissionRegistry = NewPermissionRegistry(0)
+	}
+	if h.permissionObserverCancel == nil {
+		h.permissionObserverCancel = ensureBus(h).AddObserver(h.PermissionRegistry.ObserveEvent)
+	}
+	return h.PermissionRegistry
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -130,12 +162,7 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		checks["store"] = map[string]any{"status": "ok"}
 	}
 
-	// Verify runner registry
-	if len(h.Registry.List()) == 0 {
-		checks["runners"] = map[string]any{"status": "degraded", "detail": "no runners registered"}
-	} else {
-		checks["runners"] = map[string]any{"status": "ok"}
-	}
+	checks["runners"] = runnerHealthCheck(h.Registry)
 
 	// Verify adapter registry (optional)
 	if h.AdapterRegistry != nil {
@@ -178,6 +205,79 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetRunners(w http.ResponseWriter, r *http.Request) {
 	list := h.Registry.List()
 	writeJSON(w, http.StatusOK, listResponse(list))
+}
+
+func runnerHealthCheck(registry *runners.Registry) map[string]any {
+	check := map[string]any{
+		"status":      "degraded",
+		"total":       0,
+		"available":   0,
+		"unavailable": 0,
+		"statuses":    map[string]int{},
+		"items":       []map[string]any{},
+	}
+	if registry == nil {
+		check["detail"] = "no runner registry configured"
+		return check
+	}
+
+	list := registry.List()
+	sort.SliceStable(list, func(i, j int) bool {
+		return list[i].ID < list[j].ID
+	})
+
+	statuses := map[string]int{}
+	items := make([]map[string]any, 0, len(list))
+	available := 0
+	unavailable := 0
+	for _, runner := range list {
+		status := normalizeRunnerStatus(runner.Status)
+		statuses[status]++
+		if isAvailableRunnerStatus(status) {
+			available++
+		} else {
+			unavailable++
+		}
+		items = append(items, map[string]any{
+			"id":           runner.ID,
+			"name":         runner.Name,
+			"status":       status,
+			"capabilities": append([]string(nil), runner.Capabilities...),
+		})
+	}
+
+	check["total"] = len(list)
+	check["available"] = available
+	check["unavailable"] = unavailable
+	check["statuses"] = statuses
+	check["items"] = items
+	if len(list) == 0 {
+		check["detail"] = "no runners registered"
+		return check
+	}
+	if available == 0 {
+		check["detail"] = "no available runners"
+		return check
+	}
+	check["status"] = "ok"
+	return check
+}
+
+func normalizeRunnerStatus(status string) string {
+	status = strings.ToLower(strings.TrimSpace(status))
+	if status == "" {
+		return "unknown"
+	}
+	return status
+}
+
+func isAvailableRunnerStatus(status string) bool {
+	switch status {
+	case "available", "busy", "idle", "online", "ready", "running":
+		return true
+	default:
+		return false
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -382,8 +482,29 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		req.ThreadID = "thread_local"
 	}
 
+	repository := ensureStore(h)
+	h.runCreateMu.Lock()
+	cleanupRuns(repository)
+	thread, ok := repository.GetThread(req.ThreadID)
+	if !ok || thread.ProjectID != req.ProjectID {
+		h.runCreateMu.Unlock()
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project or thread not found"))
+		return
+	}
+	if _, ok := repository.GetProject(req.ProjectID); !ok {
+		h.runCreateMu.Unlock()
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project or thread not found"))
+		return
+	}
+	if active, ok := activeRunForThread(repository.ListRuns(req.ThreadID)); ok {
+		h.runCreateMu.Unlock()
+		writeJSON(w, http.StatusConflict, activeRunExistsResponse(active))
+		return
+	}
+
 	runID := genID("run_")
-	run, err := ensureStore(h).CreateRun(runID, req.ProjectID, req.ThreadID)
+	run, err := repository.CreateRun(runID, req.ProjectID, req.ThreadID)
+	h.runCreateMu.Unlock()
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project or thread not found"))
 		return
@@ -424,6 +545,13 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			IncludePartial:    req.IncludePartial,
 		}
 		if err := h.Executor.Start(run, runCtx); err != nil {
+			if failed, ok := repository.SetRunStatusIf(run.ID, "failed", "queued"); ok {
+				h.Bus.Publish("run.failed", scope, map[string]any{
+					"runId":  failed.ID,
+					"status": failed.Status,
+					"error":  err.Error(),
+				})
+			}
 			if errors.Is(err, lifecycle.ErrTooManyConcurrentRuns) {
 				writeJSON(w, http.StatusTooManyRequests, errorResponse("too_many_concurrent_runs", err.Error()))
 				return
@@ -617,6 +745,44 @@ func runToResponse(run store.Run) map[string]any {
 	return lifecycle.RunResponse(run)
 }
 
+func activeRunExistsResponse(run store.Run) map[string]any {
+	body := errorResponse("active_run_exists", "thread already has an active run")
+	body["runId"] = run.ID
+	body["projectId"] = run.ProjectID
+	body["threadId"] = run.ThreadID
+	body["status"] = run.Status
+	return body
+}
+
+func activeRunForThread(runs []store.Run) (store.Run, bool) {
+	for _, run := range runs {
+		if isActiveRunStatus(run.Status) {
+			return run, true
+		}
+	}
+	return store.Run{}, false
+}
+
+func isActiveRunStatus(status string) bool {
+	switch status {
+	case "queued", "started", "cancelling":
+		return true
+	default:
+		return false
+	}
+}
+
+func cleanupRuns(repository store.Repository) store.RunCleanupResult {
+	cleaner, ok := repository.(store.RunCleaner)
+	if !ok {
+		return store.RunCleanupResult{}
+	}
+	return cleaner.CleanupRuns(store.RunCleanupOptions{
+		TerminalTTL:              defaultRunCleanupTerminalTTL,
+		MaxTerminalRunsPerThread: defaultRunCleanupMaxTerminalRunsPerThread,
+	})
+}
+
 // ---------------------------------------------------------------------------
 // POST /v1/permissions/decide  (Desktop permission gate)
 // ---------------------------------------------------------------------------
@@ -637,15 +803,40 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
 		return
 	}
+	req.RunID = strings.TrimSpace(req.RunID)
+	req.RequestID = strings.TrimSpace(req.RequestID)
+	req.Decision = strings.TrimSpace(req.Decision)
+	if req.RunID == "" {
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "runId is required"))
+		return
+	}
+	if req.RequestID == "" {
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "requestId is required"))
+		return
+	}
 	if req.Decision != "allow" && req.Decision != "deny" {
 		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "decision must be 'allow' or 'deny'"))
 		return
 	}
 
-	scope := map[string]any{"runId": req.RunID}
-	h.Bus.Publish("run.agent.permission_decided", scope, map[string]any{
+	permission, ok := h.ensurePermissionRegistry().Consume(req.RunID, req.RequestID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, errorResponse("permission_request_not_found", "permission request not found"))
+		return
+	}
+
+	scope := map[string]any{"runId": permission.RunID}
+	if permission.ProjectID != "" {
+		scope["projectId"] = permission.ProjectID
+	}
+	if permission.ThreadID != "" {
+		scope["threadId"] = permission.ThreadID
+	}
+	ensureBus(h).Publish(adapters.BusEventPermissionDecided, scope, map[string]any{
 		"runId":     req.RunID,
 		"requestId": req.RequestID,
+		"toolName":  permission.ToolName,
+		"toolUseId": permission.ToolUseID,
 		"decision":  req.Decision,
 		"reason":    req.Reason,
 	})
@@ -707,6 +898,7 @@ func (h *Handler) GetAgentInstance(w http.ResponseWriter, r *http.Request, insta
 // ---------------------------------------------------------------------------
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	ensureStore(h)
+	h.ensurePermissionRegistry()
 	mux.HandleFunc("/v1/health", h.GetHealth)
 	mux.HandleFunc("/v1/runners", h.GetRunners)
 	mux.HandleFunc("/v1/agents", h.GetAgents)

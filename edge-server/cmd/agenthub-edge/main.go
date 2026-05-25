@@ -10,17 +10,19 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/httpserver"
 	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
 type config struct {
-	Addr          string
-	StoreFile     string
-	RunnerProfile string
-	RunnerCommand string
-	RunnerArgs    repeatedString
-	RunnerEnv     repeatedString
-	RunnerWorkDir string
+	Addr           string
+	StoreFile      string
+	RunnerProfile  string
+	RunnerCommand  string
+	RunnerArgs     repeatedString
+	RunnerEnv      repeatedString
+	RunnerWorkDir  string
+	LocalAuthToken string
 
 	// Agent adapter configuration
 	AgentDefault   string // default agent adapter ID
@@ -72,6 +74,7 @@ func main() {
 		Store:           repository,
 		AdapterRegistry: adapterReg,
 		AgentDefault:    cfg.AgentDefault,
+		LocalAuthToken:  cfg.LocalAuthToken,
 	}
 	if cfg.RunnerCommand != "" {
 		serverConfig.ProcessExecutor = lifecycle.ProcessExecutorConfig{
@@ -105,6 +108,7 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.RunnerProfile, "runner-profile", getEnv("AGENTHUB_RUNNER_PROFILE", ""), "runner profile preset; supported: agenthub-runner-mock, claude-code, codex, opencode")
 	fs.StringVar(&cfg.RunnerCommand, "runner-command", getEnv("AGENTHUB_RUNNER_COMMAND", ""), "local process executable to run for each run; empty uses the built-in mock executor")
 	fs.StringVar(&cfg.RunnerWorkDir, "runner-workdir", getEnv("AGENTHUB_RUNNER_WORKDIR", ""), "working directory for --runner-command; empty inherits the edge process working directory")
+	fs.StringVar(&cfg.LocalAuthToken, "local-auth-token", getEnv("AGENTHUB_EDGE_AUTH_TOKEN", ""), "optional local bearer token required for Edge APIs other than /v1/health")
 	fs.Var(&cfg.RunnerArgs, "runner-arg", "argument passed to --runner-command; may be repeated")
 	fs.Var(&cfg.RunnerEnv, "runner-env", "environment variable passed to --runner-command as KEY=VALUE; may be repeated")
 
@@ -117,11 +121,16 @@ func buildConfig(args []string) (config, error) {
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
 	}
+	cfg.Addr = strings.TrimSpace(cfg.Addr)
+	if err := security.ValidateLocalListenAddr(cfg.Addr); err != nil {
+		return config{}, err
+	}
 	if err := applyRunnerProfile(&cfg); err != nil {
 		return config{}, err
 	}
 	cfg.RunnerCommand = strings.TrimSpace(cfg.RunnerCommand)
 	cfg.AgentDefault = strings.TrimSpace(cfg.AgentDefault)
+	cfg.LocalAuthToken = strings.TrimSpace(cfg.LocalAuthToken)
 	if cfg.RunnerCommand == "" && len(cfg.RunnerArgs) > 0 {
 		return config{}, fmt.Errorf("--runner-arg requires --runner-command")
 	}

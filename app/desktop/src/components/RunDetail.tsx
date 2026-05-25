@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FileText, TerminalSquare, Wrench } from 'lucide-react';
 import type { RunInfo } from '@shared/types';
 import type { FileDiff, ChatMessage } from './ChatView.types';
 import type { SessionMetrics } from '@shared/context/breakdown';
@@ -27,8 +28,6 @@ interface Props {
   /** Chat messages from the current session, used for context breakdown visualization. */
   chatMessages?: ChatMessage[];
 }
-
-type TabId = 'output' | 'toolCalls' | 'fileChanges';
 
 /** Build SessionMetrics from chat messages by extracting token data from result blocks. */
 function buildMetrics(chatMessages: ChatMessage[] | undefined): SessionMetrics | null {
@@ -113,24 +112,11 @@ export default function RunDetail({
 
   const metrics = useMemo(() => buildMetrics(chatMessages), [chatMessages]);
 
-  const defaultTab: TabId = outputText
-    ? 'output'
-    : toolCalls.length > 0
-      ? 'toolCalls'
-      : 'fileChanges';
-  const [selectedTab, setSelectedTab] = useState<TabId>(defaultTab);
-
-  useEffect(() => {
-    const handler = () => setSelectedTab('fileChanges');
-    window.addEventListener('agenthub:open-diff', handler);
-    return () => window.removeEventListener('agenthub:open-diff', handler);
-  }, []);
-
   if (!run) {
     return (
       <div className={styles.panel}>
         <div className={styles.title}>{t('run.title')}</div>
-        <div className={styles.empty}>No active run</div>
+        <div className={styles.empty}>{t('run.empty')}</div>
       </div>
     );
   }
@@ -153,21 +139,9 @@ export default function RunDetail({
   const hasToolCalls = toolCalls.length > 0;
   const hasFileChanges = changedFiles.length > 0;
 
-  // Resolve the effective tab to display (falls back if the selected tab has no data)
-  const activeTab: TabId =
-    selectedTab === 'output' && hasOutput
-      ? 'output'
-      : selectedTab === 'toolCalls' && hasToolCalls
-        ? 'toolCalls'
-        : selectedTab === 'fileChanges' && hasFileChanges
-          ? 'fileChanges'
-          : hasOutput
-            ? 'output'
-            : hasToolCalls
-              ? 'toolCalls'
-              : 'fileChanges';
-
   const hasAnyContent = hasOutput || hasToolCalls || hasFileChanges;
+  const latestFiles = changedFiles.slice(-4).reverse();
+  const latestTools = toolCalls.slice(-4).reverse();
 
   // Show cancel button while the run is active (not terminal, not IDLE)
   const isActive =
@@ -195,59 +169,75 @@ export default function RunDetail({
 
       <ContextUsage metrics={metrics} />
 
-      {hasAnyContent && (
-        <>
-          <div className={styles.tabs}>
-            {outputText && (
-              <button
-                className={`${styles.tab} ${selectedTab === 'output' ? styles.tabActive : ''}`}
-                onClick={() => setSelectedTab('output')}
-              >
-                {t('run.output')}
-              </button>
-            )}
-            {toolCalls.length > 0 && (
-              <button
-                className={`${styles.tab} ${selectedTab === 'toolCalls' ? styles.tabActive : ''}`}
-                onClick={() => setSelectedTab('toolCalls')}
-              >
-                {t('run.toolCalls')} ({toolCalls.length})
-              </button>
-            )}
-            {changedFiles.length > 0 && (
-              <button
-                className={`${styles.tab} ${selectedTab === 'fileChanges' ? styles.tabActive : ''}`}
-                onClick={() => setSelectedTab('fileChanges')}
-              >
-                {t('run.fileChanges')} ({changedFiles.length})
-              </button>
-            )}
+      {!hasAnyContent && (
+        <div className={styles.emptyStack}>
+          <div className={styles.emptyCard}>
+            <TerminalSquare size={16} />
+            <span>{t('run.emptyOutput')}</span>
           </div>
+          <div className={styles.emptyCard}>
+            <FileText size={16} />
+            <span>{t('run.emptySources')}</span>
+          </div>
+        </div>
+      )}
 
-          <div className={styles.tabContent}>
-            {activeTab === 'output' && <pre className={styles.output}>{outputText}</pre>}
-            {activeTab === 'toolCalls' && (
+      {hasAnyContent && (
+        <div className={styles.tabContent}>
+          {hasOutput && (
+            <section className={styles.cardSection}>
+              <div className={styles.cardHeader}>
+                <TerminalSquare size={14} />
+                <span>{t('run.output')}</span>
+              </div>
+              <pre className={styles.output}>{outputText}</pre>
+            </section>
+          )}
+
+          {hasToolCalls && (
+            <section className={styles.cardSection}>
+              <div className={styles.cardHeader}>
+                <Wrench size={14} />
+                <span>{t('run.toolCalls')}</span>
+                <span className={styles.cardCount}>{toolCalls.length}</span>
+              </div>
               <div className={styles.list}>
-                {toolCalls.map((tc) => (
+                {latestTools.map((tc) => (
                   <ToolCallItem key={tc.callId} tc={tc} />
                 ))}
               </div>
-            )}
-            {activeTab === 'fileChanges' &&
-              (diffs && diffs.length > 0 ? (
-                <DiffViewer files={diffs} />
-              ) : (
-                <div className={styles.list}>
-                  {changedFiles.map((f) => (
-                    <div key={f.path} className={styles.item}>
-                      <code className={styles.filePath}>{f.path}</code>
-                      <span className={styles.action}>{f.action}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-          </div>
-        </>
+            </section>
+          )}
+
+          {hasFileChanges && (
+            <section className={styles.cardSection}>
+              <div className={styles.cardHeader}>
+                <FileText size={14} />
+                <span>{t('run.fileChanges')}</span>
+                <span className={styles.cardCount}>{changedFiles.length}</span>
+              </div>
+              <div className={styles.sourceList}>
+                {latestFiles.map((f) => (
+                  <div key={`${f.path}-${f.timestamp}`} className={styles.sourceItem}>
+                    <code className={styles.filePath}>{f.path}</code>
+                    <span className={styles.action}>{f.action}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {diffs && diffs.length > 0 && (
+            <section className={styles.cardSection}>
+              <div className={styles.cardHeader}>
+                <FileText size={14} />
+                <span>{t('run.preview')}</span>
+                <span className={styles.cardCount}>{diffs.length}</span>
+              </div>
+              <DiffViewer files={diffs} />
+            </section>
+          )}
+        </div>
       )}
     </aside>
   );

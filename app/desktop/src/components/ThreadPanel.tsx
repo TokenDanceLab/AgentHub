@@ -183,7 +183,6 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
       {filtered.length === 0 ? (
         threads.length === 0 ? (
           <EmptyState
-            icon={<MessageSquare size={24} />}
             title={t('thread.emptyTitle')}
             description={t('thread.emptyDescription')}
             action={{ label: t('thread.emptyAction'), onClick: handleCreate }}

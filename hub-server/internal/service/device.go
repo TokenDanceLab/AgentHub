@@ -2,10 +2,12 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 )
@@ -37,6 +39,9 @@ func (s *DeviceService) Register(deviceID, userID, deviceType, appVersion string
 	}
 
 	if err := repository.UpsertDevice(s.db, device); err != nil {
+		if errors.Is(err, repository.ErrDeviceOwnershipMismatch) {
+			return nil, errcode.ErrBadRequest
+		}
 		return nil, err
 	}
 
