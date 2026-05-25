@@ -106,6 +106,63 @@ func UpdatePendingTaskStatusWithEdgeRunID(db *gorm.DB, id, status, errMsg, edgeR
 	return db.Model(&model.PendingAgentTask{}).Where("id = ?", id).Updates(updates).Error
 }
 
+// UpdatePendingTaskStatusAtomic updates a task's status only when the current
+// status matches oldStatus (atomic compare-and-swap). Returns the number of
+// rows affected (0 means a concurrent write won).
+func UpdatePendingTaskStatusAtomic(db *gorm.DB, id, oldStatus, newStatus, errMsg string) (int64, error) {
+	updates := map[string]interface{}{"status": newStatus}
+	if newStatus == model.TaskStatusDispatched {
+		now := time.Now()
+		updates["dispatched_at"] = &now
+	}
+	if newStatus == model.TaskStatusDone || newStatus == model.TaskStatusFailed ||
+		newStatus == model.TaskStatusCancelled || newStatus == model.TaskStatusTimeout {
+		now := time.Now()
+		updates["finished_at"] = &now
+	}
+	if errMsg != "" {
+		updates["error_message"] = errMsg
+	}
+	result := db.Model(&model.PendingAgentTask{}).
+		Where("id = ? AND status = ?", id, oldStatus).
+		Updates(updates)
+	return result.RowsAffected, result.Error
+}
+
+// UpdatePendingTaskStatusAtomicWithEdgeRunID is the atomic variant that also
+// sets edge_run_id.
+func UpdatePendingTaskStatusAtomicWithEdgeRunID(db *gorm.DB, id, oldStatus, newStatus, errMsg, edgeRunID string) (int64, error) {
+	updates := map[string]interface{}{"status": newStatus}
+	if newStatus == model.TaskStatusDispatched {
+		now := time.Now()
+		updates["dispatched_at"] = &now
+	}
+	if newStatus == model.TaskStatusDone || newStatus == model.TaskStatusFailed ||
+		newStatus == model.TaskStatusCancelled || newStatus == model.TaskStatusTimeout {
+		now := time.Now()
+		updates["finished_at"] = &now
+	}
+	if errMsg != "" {
+		updates["error_message"] = errMsg
+	}
+	if edgeRunID != "" {
+		updates["edge_run_id"] = edgeRunID
+	}
+	result := db.Model(&model.PendingAgentTask{}).
+		Where("id = ? AND status = ?", id, oldStatus).
+		Updates(updates)
+	return result.RowsAffected, result.Error
+}
+
+// UpdatePendingTaskEdgeRunID sets the edge_run_id on a task that has an empty
+// edge_run_id. Used when the task is already running and only the edge run id
+// needs backfilling (idempotent).
+func UpdatePendingTaskEdgeRunID(db *gorm.DB, id, edgeRunID string) error {
+	return db.Model(&model.PendingAgentTask{}).
+		Where("id = ? AND edge_run_id = ?", id, "").
+		Update("edge_run_id", edgeRunID).Error
+}
+
 func ScanExpiredTasks(db *gorm.DB) ([]model.PendingAgentTask, error) {
 	var tasks []model.PendingAgentTask
 	err := db.Where("expire_at < NOW() AND status IN ?", []string{model.TaskStatusQueued, model.TaskStatusDispatched}).Find(&tasks).Error
