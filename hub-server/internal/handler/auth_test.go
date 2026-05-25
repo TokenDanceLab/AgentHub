@@ -22,7 +22,7 @@ type mockAuthService struct {
 	registerFn       func(ctx context.Context, username, password, nickname string) (*model.User, error)
 	loginFn          func(ctx context.Context, username, password, deviceType, deviceID string) (*service.LoginResponse, error)
 	refreshTokenFn   func(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error)
-	logoutFn         func(ctx context.Context, userID, deviceID string) error
+	logoutFn         func(ctx context.Context, userID, deviceID, deviceType string) error
 	getMeFn          func(ctx context.Context, userID string) (*model.User, error)
 	updateProfileFn  func(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error)
 	changePasswordFn func(ctx context.Context, userID, oldPassword, newPassword string) error
@@ -37,8 +37,8 @@ func (m *mockAuthService) Login(ctx context.Context, username, password, deviceT
 func (m *mockAuthService) RefreshToken(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error) {
 	return m.refreshTokenFn(ctx, rawRefreshToken)
 }
-func (m *mockAuthService) Logout(ctx context.Context, userID, deviceID string) error {
-	return m.logoutFn(ctx, userID, deviceID)
+func (m *mockAuthService) Logout(ctx context.Context, userID, deviceID, deviceType string) error {
+	return m.logoutFn(ctx, userID, deviceID, deviceType)
 }
 func (m *mockAuthService) GetMe(ctx context.Context, userID string) (*model.User, error) {
 	return m.getMeFn(ctx, userID)
@@ -60,6 +60,29 @@ func newGinCtx(method, path string, body any, kv ...string) (*gin.Context, *http
 		reqBody, _ = json.Marshal(body)
 	}
 	c.Request = httptest.NewRequest(method, path, bytes.NewReader(reqBody))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	for i := 0; i+1 < len(kv); i += 2 {
+		c.Set(kv[i], kv[i+1])
+	}
+	return c, w
+}
+
+// newGinCtxWithQuery creates a test context with a query string.
+func newGinCtxWithQuery(method, path, query string, body any, kv ...string) (*gin.Context, *httptest.ResponseRecorder) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	var reqBody []byte
+	if body != nil {
+		reqBody, _ = json.Marshal(body)
+	}
+	fullPath := path
+	if query != "" {
+		fullPath = path + "?" + query
+	}
+	c.Request = httptest.NewRequest(method, fullPath, bytes.NewReader(reqBody))
 	c.Request.Header.Set("Content-Type", "application/json")
 
 	for i := 0; i+1 < len(kv); i += 2 {
@@ -235,12 +258,40 @@ func TestAuthHandler_Login_InvalidDeviceID(t *testing.T) {
 	}
 }
 
-// ── Refresh ─────────────────────────────────────────────────────────
+
+// #161: Handler passes device_type from request body to service.
+// Actual enum validation is done in the service layer.
+func TestAuthHandler_Login_InvalidDeviceType(t *testing.T) {
+	capturedDeviceType := ""
+	svc := &mockAuthService{
+		loginFn: func(ctx context.Context, username, password, deviceType, deviceID string) (*service.LoginResponse, error) {
+			capturedDeviceType = deviceType
+			return nil, errcode.ErrBadRequest
+		},
+	}
+	h := handler.NewAuthHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/login", map[string]string{
+		"username":    "testuser",
+		"password":    "password123",
+		"device_type": "invalid_type",
+		"device_id":   testDeviceID,
+	})
+	h.Login(c)
+
+	if capturedDeviceType != "invalid_type" {
+		t.Fatalf("expected device_type=invalid_type to be passed to service, got %q", capturedDeviceType)
+	}
+	// Service rejects invalid device_type with 400.
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for invalid device_type, got %d", w.Code)
+	}
+}// ── Refresh ─────────────────────────────────────────────────────────
 
 func TestAuthHandler_Refresh_Success(t *testing.T) {
 	svc := &mockAuthService{
 		refreshTokenFn: func(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error) {
-			return &service.LoginResponse{AccessToken: "new-access", RefreshToken: rawRefreshToken, ExpiresIn: 3600}, nil
+			return &service.LoginResponse{AccessToken: "new-access", RefreshToken: "new-refresh", ExpiresIn: 3600}, nil
 		},
 	}
 	h := handler.NewAuthHandler(svc)
@@ -290,8 +341,12 @@ func TestAuthHandler_Refresh_BadRequest(t *testing.T) {
 // ── Logout ──────────────────────────────────────────────────────────
 
 func TestAuthHandler_Logout_Success(t *testing.T) {
+	capturedDeviceType := ""
 	svc := &mockAuthService{
-		logoutFn: func(ctx context.Context, userID, deviceID string) error { return nil },
+		logoutFn: func(ctx context.Context, userID, deviceID, deviceType string) error {
+			capturedDeviceType = deviceType
+			return nil
+		},
 	}
 	h := handler.NewAuthHandler(svc)
 
@@ -301,11 +356,37 @@ func TestAuthHandler_Logout_Success(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
+	if capturedDeviceType != "" {
+		t.Fatalf("expected empty device_type from context (no query param), got %q", capturedDeviceType)
+	}
+}
+
+// #149: Logout with device_type query parameter.
+func TestAuthHandler_Logout_WithDeviceType(t *testing.T) {
+	capturedDeviceType := ""
+	svc := &mockAuthService{
+		logoutFn: func(ctx context.Context, userID, deviceID, deviceType string) error {
+			capturedDeviceType = deviceType
+			return nil
+		},
+	}
+	h := handler.NewAuthHandler(svc)
+
+	c, w := newGinCtxWithQuery("POST", "/client/auth/logout", "device_type=desktop", nil,
+		"user_id", "u1", "device_id", "d1")
+	h.Logout(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if capturedDeviceType != "desktop" {
+		t.Fatalf("expected device_type=desktop, got %q", capturedDeviceType)
+	}
 }
 
 func TestAuthHandler_Logout_Error(t *testing.T) {
 	svc := &mockAuthService{
-		logoutFn: func(ctx context.Context, userID, deviceID string) error {
+		logoutFn: func(ctx context.Context, userID, deviceID, deviceType string) error {
 			return context.DeadlineExceeded
 		},
 	}
