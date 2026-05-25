@@ -149,16 +149,30 @@ func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]
 	return msgs, err
 }
 
-func SearchAllMessages(db *gorm.DB, userID, q string) ([]model.Message, error) {
+func SearchAllMessages(db *gorm.DB, userID, q, contentType, from, to string) ([]model.Message, error) {
 	var msgs []model.Message
-	err := db.Raw(`
-		SELECT m.* FROM messages m
+	sql := `SELECT m.* FROM messages m
 		INNER JOIN session_members sm ON m.session_id = sm.session_id
 		WHERE sm.member_type = ? AND sm.member_id = ? AND sm.left_at IS NULL
 			AND m.recalled = false
-			AND m.content->>'text' ILIKE ?
-		ORDER BY m.created_at DESC
-		LIMIT ?
-	`, "user", userID, "%"+q+"%", config.MaxMessagePageLimit).Scan(&msgs).Error
+			AND m.content->>'text' ILIKE ?`
+	args := []interface{}{"user", userID, "%" + q + "%"}
+
+	if contentType != "" {
+		sql += " AND m.content_type = ?"
+		args = append(args, contentType)
+	}
+	if from != "" {
+		sql += " AND m.created_at >= ?"
+		args = append(args, from)
+	}
+	if to != "" {
+		sql += " AND m.created_at <= ?"
+		args = append(args, to)
+	}
+	sql += " ORDER BY m.created_at DESC LIMIT ?"
+	args = append(args, config.MaxMessagePageLimit)
+
+	err := db.Raw(sql, args...).Scan(&msgs).Error
 	return msgs, err
 }
