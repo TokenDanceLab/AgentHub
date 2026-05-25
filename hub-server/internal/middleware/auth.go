@@ -30,7 +30,7 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		if cfg.TokenDanceID.IssuerURL != "" && cfg.TokenDanceID.ClientID != "" {
 			if claims, err := jwtutil.ParseTokenDanceJWT(tokenStr, cfg.TokenDanceID.IssuerURL, cfg.TokenDanceID.ClientID); err == nil {
 				c.Set("user_id", claims.Subject)
-				c.Set("device_type", "desktop") // OIDC tokens don't carry device_type; default to desktop
+				c.Set("device_type", "tokendance_bearer")
 				c.Set("device_id", "")
 				c.Set("auth_source", "tokendance_id")
 				c.Next()

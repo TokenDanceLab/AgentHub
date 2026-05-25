@@ -1,6 +1,8 @@
 package adapters
 
 import (
+	"encoding/json"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -151,6 +153,95 @@ func TestScopedEventEmitterPreservesExplicitScopeAndPayload(t *testing.T) {
 	if payload["runId"] != "run_payload" {
 		t.Fatalf("payload = %#v, want explicit payload preserved", payload)
 	}
+}
+
+func TestPayloadLimitEmitterPassesSmallPayload(t *testing.T) {
+	inner := &recordingEmitter{}
+	emitter := NewPayloadLimitEmitter(inner, 512)
+
+	payload := map[string]any{
+		"content": "small",
+		"kind":    "text",
+	}
+	emitter.Emit(BusEventTextDelta, nil, payload)
+
+	events := inner.eventsByType(BusEventTextDelta)
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1", len(events))
+	}
+	got := events[0].payload.(map[string]any)
+	if got["content"] != "small" || got["truncated"] == true {
+		t.Fatalf("payload = %#v, want unmodified small payload", got)
+	}
+}
+
+func TestPayloadLimitEmitterTruncatesLargeStructuredPayload(t *testing.T) {
+	inner := &recordingEmitter{}
+	emitter := NewPayloadLimitEmitter(inner, 512)
+	originalContent := strings.Repeat("A", 1024)
+	payload := map[string]any{
+		"content": originalContent,
+		"nested": map[string]any{
+			"output": strings.Repeat("B", 1024),
+		},
+		"kind": "text",
+	}
+
+	emitter.Emit(BusEventTextBlock, nil, payload)
+
+	events := inner.eventsByType(BusEventTextBlock)
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1", len(events))
+	}
+	got := events[0].payload.(map[string]any)
+	if got["truncated"] != true {
+		t.Fatalf("payload = %#v, want truncated metadata", got)
+	}
+	if got["maxBytes"] != int64(512) || got["bytesBefore"] == nil || got["message"] == "" {
+		t.Fatalf("payload = %#v, want maxBytes, bytesBefore, and message metadata", got)
+	}
+	if size := mustJSONSize(t, got); size > 512 {
+		t.Fatalf("limited payload JSON size = %d, want <= 512; payload=%#v", size, got)
+	}
+	content, _ := got["content"].(string)
+	if len(content) >= len(originalContent) {
+		t.Fatalf("content length = %d, want less than original %d", len(content), len(originalContent))
+	}
+	if payload["content"] != originalContent {
+		t.Fatalf("original payload content was mutated")
+	}
+}
+
+func TestPayloadLimitEmitterKeepsUTF8Valid(t *testing.T) {
+	inner := &recordingEmitter{}
+	emitter := NewPayloadLimitEmitter(inner, 220)
+	payload := map[string]any{
+		"content": strings.Repeat("你", 120),
+	}
+
+	emitter.Emit(BusEventTextDelta, nil, payload)
+
+	events := inner.eventsByType(BusEventTextDelta)
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1", len(events))
+	}
+	got := events[0].payload.(map[string]any)
+	content, _ := got["content"].(string)
+	if !json.Valid([]byte(`"` + content + `"`)) {
+		t.Fatalf("content is not JSON-valid UTF-8: %q", content)
+	}
+	if size := mustJSONSize(t, got); size > 220 {
+		t.Fatalf("limited payload JSON size = %d, want <= 220; payload=%#v", size, got)
+	}
+}
+
+func mustJSONSize(t *testing.T, value any) int64 {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+	return int64(len(encoded))
 }
 
 // --- BudgetAwareEmitter tests ---

@@ -6,7 +6,7 @@
 
 像用飞书/微信一样，拉群组织 Claude Code、Codex、OpenCode 等 AI Agent 协作完成网页、代码和部署。
 
-[English](README_EN.md) &nbsp;·&nbsp; [产品需求](docs/product-requirements.md) &nbsp;·&nbsp; [系统架构](docs/system-architecture.md) &nbsp;·&nbsp; [API 契约](api/) &nbsp;·&nbsp; [官网](https://hub.vectorcontrol.tech)
+[English](README_EN.md) &nbsp;·&nbsp; [产品需求](docs/architecture/product-requirements.md) &nbsp;·&nbsp; [系统架构](docs/architecture/system-architecture.md) &nbsp;·&nbsp; [API 契约](api/) &nbsp;·&nbsp; [官网](https://hub.vectorcontrol.tech)
 
 <img src="https://img.shields.io/badge/状态-P0--M7_完成-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go" alt="go">
@@ -118,9 +118,9 @@ go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --agent-default claude-code
 常用 Runtime 切换：
 
 ```powershell
-go run ./cmd/agenthub-edge --runner-profile claude-code
-go run ./cmd/agenthub-edge --runner-profile codex
-go run ./cmd/agenthub-edge --runner-profile opencode
+go run ./cmd/agenthub-edge --agent-default claude-code
+go run ./cmd/agenthub-edge --agent-default codex
+go run ./cmd/agenthub-edge --agent-default opencode
 ```
 
 终端 2：Desktop Web UI。
@@ -202,11 +202,13 @@ pnpm build
 ```text
 AgentHub/
 ├── docs/                   # 主文档、handoff、roadmap、archive/reference
-│   ├── product-requirements.md
-│   ├── system-architecture.md
-│   ├── implementation-guide.md
+│   ├── architecture/       # 产品需求、系统架构、实现指南
+│   ├── governance/         # 分支治理、文档规范、安全风险登记
+│   ├── operations/         # 客户端路线图、部署记录
 │   ├── handoff/STATE.md    # 当前状态 SSOT
-│   └── reference/          # 调研和工程规格文档
+│   ├── roadmap.md          # 全局路线图
+│   ├── reference/          # 调研和工程规格文档
+│   └── archive/            # 历史归档
 ├── app/
 │   ├── desktop/            # Tauri 桌面端入口
 │   ├── web/                # Web 工作台和页面预览
@@ -225,15 +227,15 @@ Docker 和部署文件跟随所属模块放置。根级 compose 只用于跨模�
 
 | 文档 | 描述 |
 |---|---|
-| [产品需求文档](docs/product-requirements.md) | 产品定位、用户、核心体验、阶段目标和比赛交付对应 |
-| [系统架构文档](docs/system-architecture.md) | Desktop-Edge-Hub、Agent 产品模型、执行生命周期、通信方式和权威边界 |
-| [功能实现文档](docs/implementation-guide.md) | 实现顺序、接口更新规则、Adapter 细节和验收命令 |
-| [客户端路线图](docs/client-roadmap.md) | Desktop/Edge 客户端方向阶段任务和验收 |
+| [产品需求文档](docs/architecture/product-requirements.md) | 产品定位、用户、核心体验、阶段目标和比赛交付对应 |
+| [系统架构文档](docs/architecture/system-architecture.md) | Desktop-Edge-Hub、Agent 产品模型、执行生命周期、通信方式和权威边界 |
+| [功能实现文档](docs/architecture/implementation-guide.md) | 实现顺序、接口更新规则、Adapter 细节和验收命令 |
+| [客户端路线图](docs/operations/client-roadmap.md) | Desktop/Edge 客户端方向阶段任务和验收 |
 | [API 契约](api/) | REST API 和 WebSocket typed events 的契约入口 |
 | [调研索引](docs/reference/) | 跨仓库调研和工程规格 |
 | [调研与历史归档](docs/archive/) | 旧版架构、协议、memory、workspace 等历史材料 |
 
-在 `D:\Code\TokenDance` workspace 内做跨系统治理时，先看根级 `../AGENTS.md` 和 `../docs/`。其中 `../docs/system-architecture.md`、`../docs/identity-auth.md`、`../docs/design-system.md` 定义 TokenDance 级别的架构、身份鉴权和设计系统边界；本仓库 `docs/` 只负责 AgentHub 实现细节。
+在 `D:\Code\TokenDance` workspace 内做跨系统治理时，先看根级 `../AGENTS.md` 和 `../docs/`。其中 `../docs/architecture/system-architecture.md`、`../docs/identity-auth.md`、`../docs/design-system.md` 定义 TokenDance 级别的架构、身份鉴权和设计系统边界；本仓库 `docs/` 只负责 AgentHub 实现细节。
 
 <br>
 
@@ -246,7 +248,7 @@ TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产�
 | TokenDance ID | 统一第三方登录和账号主体；产品不直接集成 GitHub/Google/飞书 |
 | Hub Server | 拥有 Hub callback、code exchange、Hub user 映射、Hub access/refresh session 和设备证明 |
 | Desktop/Web | 打开系统浏览器或 Web 登录入口，保存 Hub session；不保存第三方 provider token |
-| 兼容 bearer 路径 | `hub-server/internal/middleware/auth.go` 可验证 TokenDance ID RS256/JWKS bearer token，但它只是兼容路径，不能替代 Hub session |
+| 兼容 bearer 路径 | `hub-server/internal/middleware/auth.go` 可验证 TokenDance ID RS256/JWKS bearer token，但验证结果只标记为 `tokendance_bearer`，不能替代 Hub session，也不能满足 Edge `desktop` 设备门禁 |
 | 本地执行 | Local Edge + Desktop 执行不依赖 Hub 登录；需要云端 IM、同步、远控或中继时才需要 Hub session |
 
 <br>
@@ -264,5 +266,5 @@ TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产�
 ---
 
 <div align="center">
-<a href="README_EN.md">English</a> &nbsp;·&nbsp; <a href="docs/product-requirements.md">产品需求</a> &nbsp;·&nbsp; <a href="docs/system-architecture.md">系统架构</a> &nbsp;·&nbsp; <a href="api/">API 契约</a>
+<a href="README_EN.md">English</a> &nbsp;·&nbsp; <a href="docs/architecture/product-requirements.md">产品需求</a> &nbsp;·&nbsp; <a href="docs/architecture/system-architecture.md">系统架构</a> &nbsp;·&nbsp; <a href="api/">API 契约</a>
 </div>

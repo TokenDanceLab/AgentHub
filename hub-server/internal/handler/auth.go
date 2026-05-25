@@ -66,6 +66,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
+	deviceID, ok := normalizeUUID(req.DeviceID)
+	if !ok {
+		FailWithMessage(c, errcode.ErrBadRequest, "device_id must be a UUID")
+		return
+	}
+	req.DeviceID = deviceID
+
 	resp, err := h.service.Login(c.Request.Context(), req.Username, req.Password, req.DeviceType, req.DeviceID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
