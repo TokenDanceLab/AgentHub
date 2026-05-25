@@ -178,6 +178,24 @@ UI
 
 Adapter 必须把原生事件归一到稳定事件族：`text_delta`、`thinking`、`tool_call`、`tool_result`、`file_change`、`permission_requested`、`result`、`usage`。前端只依赖 AgentHub 事件，不直接理解某个 CLI 的私有 JSON。
 
+Hub 参与调度时，当前真实链路是：
+
+```text
+Web workspace
+  -> Hub session/message
+  -> POST /web/agent-tasks
+  -> Hub WS agent.dispatch
+  -> Desktop Hub task bridge
+  -> Local Edge POST /v1/runs
+  -> Edge run.output.batch / run.agent.text_delta / run.agent.text_block
+  -> Desktop POST /edge/agent-tasks/{id}/stream
+  -> Desktop POST /edge/agent-tasks/{id}/done|fail
+  -> Hub message/agent task events
+  -> Web workspace transcript
+```
+
+Desktop 只有在恢复或获取 Hub-issued access token 后才打开 Hub WebSocket 并挂载 Hub task bridge。桥接层维护 `taskId <-> runId` 映射，转发 stdout `run.output.batch` 与结构化 `text_delta` / `text_block`，并缓存可见输出作为 `done.final_content`。Edge 直连 Hub callback 模式同样会把 raw stdout 和结构化文本 stream 到 Hub，并用有界输出缓冲生成最终内容；没有可见输出时才退回 `"Run finished"`。
+
 审批闭环必须进入 `RunEvent` 和 `Approval`：UI 通过 run-scoped approval API 决策；Edge 验证 pending permission registry、runId、requestId 和 one-shot replay；需要 stdin 控制协议的 Runtime 由 adapter 写回对应控制消息。Hub 参与时，Hub 先做 TokenDance ID -> Hub user -> resource/action 授权，再把任务派到目标 Edge；Hub 同步、审计和中继，不直接启动本地 CLI 进程。
 
 ### 关键实现细节
@@ -256,7 +274,7 @@ REST JSON API + WebSocket typed events
 | Edge -> UI | WebSocket typed events | 消息增量、run output、artifact、preview、审批请求 |
 | Edge lifecycle -> AgentAdapter | Go interface + process context | 启动执行、取消执行、读取产物、解析 CLI 输出 |
 | AgentAdapter -> Edge | typed events | 日志、状态、Diff、Artifact、Preview |
-| Edge -> Hub | REST sync + reverse WebSocket | 同步、注册、中继、远程控制 |
+| Edge/Desktop bridge -> Hub | REST callbacks + Hub WebSocket dispatch | 设备注册、Web task dispatch、run stream/done/fail 回传、同步和中继 |
 | Web/Mobile -> Hub | REST JSON + WebSocket | 云端会话、远程查看、远程审批 |
 | Hub -> TokenDance ID | OIDC Authorization Code + PKCE / JWKS | 登录、token 验证、账号映射 |
 | Edge -> MCP / Skill runtime | local process / HTTP / stdio | 工具发现、工具执行、脚本权限控制 |
@@ -288,10 +306,10 @@ UI -> Hub -> Edge -> AgentAdapter -> Agent CLI
 
 ```text
 Agent CLI -> Edge EventStore -> Edge WebSocket Bus -> UI
-Edge EventStore -> Hub Sync -> Web/Mobile
+Edge EventStore -> Desktop bridge -> Hub callbacks -> Web/Mobile
 ```
 
-`edge-server/internal/events/bus.go` 是内存投递组件，负责 seq、短历史 replay 和 WebSocket fanout。EventStore 已完整落地到 Edge 本地存储。
+`edge-server/internal/events/bus.go` 是内存投递组件，负责 seq、短历史 replay 和 WebSocket fanout。EventStore 已完整落地到 Edge 本地存储。Hub task bridge 只同步可见输出和任务终态，不把 stderr diagnostics、secret-bearing local logs 或本地临时产物直接写入 Hub。
 
 ### 同步线
 
