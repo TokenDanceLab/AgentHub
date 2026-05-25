@@ -82,6 +82,10 @@ type App struct {
 	ExecutionTargetHandler *handler.ExecutionTargetHandler
 	AuditHandler           *handler.AuditHandler
 
+	// Relay
+	RelayService *service.RelayService
+	RelayHandler *handler.RelayHandler
+
 	// Goroutine lifecycle
 	coreCtx    context.Context
 	coreCancel context.CancelFunc
@@ -173,6 +177,10 @@ func (a *App) Run(ctx context.Context) error {
 		// Audit service
 		auditSvc := service.NewAuditService(a.DB)
 		a.AuditHandler = handler.NewAuditHandler(auditSvc)
+
+		// Relay service
+		a.RelayService = service.NewRelayService(a.CacheClient, a.mgr)
+		a.RelayHandler = handler.NewRelayHandler(a.RelayService)
 
 	// OIDC Service (optional — only when TokenDance ID client is configured)
 	if a.Config.TokenDanceID.ClientID != "" {
@@ -310,6 +318,7 @@ func (a *App) setupRouter() *gin.Engine {
 		a.ProviderBindingHandler,
 		a.ExecutionTargetHandler,
 		a.AuditHandler,
+		a.RelayHandler,
 	)
 	return r
 }

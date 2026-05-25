@@ -59,6 +59,10 @@ func (m *mockEdgeDeviceService) Register(deviceID, userID, deviceType, appVersio
 	return m.registerFn(deviceID, userID, deviceType, appVersion, capabilities)
 }
 
+func (m *mockEdgeDeviceService) ListDevices(userID string) ([]model.Device, error) {
+	return nil, nil
+}
+
 // ── Test helpers ───────────────────────────────────────────────────────────
 
 func newEdgeGinCtx(method, path string, body any, kv ...string) (*gin.Context, *httptest.ResponseRecorder) {
