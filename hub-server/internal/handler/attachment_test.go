@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -52,6 +53,26 @@ func (m *mockAttachmentService) GetAttachmentByID(ctx context.Context, userID, i
 
 func (m *mockAttachmentService) MaxUploadSize() int64 {
 	return 1024
+}
+
+func (m *mockAttachmentService) StoreBlob(ctx context.Context, hash string, r io.Reader, contentType string) (bool, error) {
+	return true, nil
+}
+
+func (m *mockAttachmentService) GetBlob(ctx context.Context, hash string) (io.ReadCloser, error) {
+	return io.NopCloser(strings.NewReader("")), nil
+}
+
+func (m *mockAttachmentService) DeleteBlob(ctx context.Context, hash string) error {
+	return nil
+}
+
+func (m *mockAttachmentService) BlobLocalPath(hash string) string {
+	relPath := service.PathFromHash(hash)
+	if relPath == "" {
+		return ""
+	}
+	return filepath.Join(".", relPath, hash)
 }
 
 func TestAttachmentUploadRejectsMalformedHashBeforePathDerivation(t *testing.T) {
