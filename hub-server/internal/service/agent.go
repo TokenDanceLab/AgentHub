@@ -228,7 +228,9 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 		return nil, err
 	}
 
-	go s.dispatchTask(ctx, task, ai)
+	// #100: Use context.WithoutCancel so the dispatch goroutine is not
+	// cancelled when the HTTP handler's request context is cancelled.
+	go s.dispatchTask(context.WithoutCancel(ctx), task, ai)
 
 	return task, nil
 }
