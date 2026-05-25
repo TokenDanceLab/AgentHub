@@ -720,5 +720,9 @@
   "welcome.suggestionsLabel": "试试示例：",
   "welcome.target": "执行目标",
   "welcome.tokendance": "TokenDance ID",
-  "welcome.title": "欢迎使用 AgentHub"
+  "welcome.title": "欢迎使用 AgentHub",
+
+  "window.minimize": "最小化",
+  "window.maximize": "最大化",
+  "window.close": "关闭"
 }

@@ -357,6 +357,18 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		return
 	}
 
+	// Close stdin immediately: the prompt is passed via CLI args, not stdin.
+	// An open pipe with no data causes CLI agents (Claude Code) to wait 3s
+	// and warn "no stdin data". Closing the pipe signals EOF immediately.
+	// Interrupt is handled via process signal; permission responses via stdin
+	// will be re-enabled when the full permission bridge is implemented.
+	if stdin != nil {
+		_ = stdin.Close()
+		e.mu.Lock()
+		delete(e.stdins, run.ID)
+		e.mu.Unlock()
+	}
+
 	// Record metrics: run has started successfully
 	if e.metrics != nil {
 		e.metrics.RecordRunStart(adapterLabel)
