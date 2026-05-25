@@ -372,6 +372,16 @@ func (a *App) setupWSManager() {
 		if err != nil {
 			return
 		}
+		senderIsMember := false
+		for _, member := range members {
+			if member.MemberID == userID {
+				senderIsMember = true
+				break
+			}
+		}
+		if !senderIsMember {
+			return
+		}
 		for _, member := range members {
 			if member.MemberID != userID {
 				a.mgr.PushToUser(member.MemberID, frame)
@@ -595,7 +605,7 @@ func (a *App) syncLegacySeqs() {
 
 // ── WebSocket route callbacks ──────────────────────────────────────────────
 
-func (a *App) onRouteSet(userID, deviceType, connID, oldConnID string, wasOffline bool) {
+func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string, wasOffline bool) {
 	ctx := a.coreCtx
 
 	if oldConnID != "" && oldConnID != connID {
@@ -608,7 +618,11 @@ func (a *App) onRouteSet(userID, deviceType, connID, oldConnID string, wasOfflin
 		}
 	}
 
-	a.CacheClient.SetRoute(ctx, userID, deviceType, connID)
+	routeField := deviceType
+	if deviceID != "" {
+		routeField = deviceType + ":" + deviceID
+	}
+	a.CacheClient.SetRoute(ctx, userID, routeField, connID)
 
 	if wasOffline {
 		go a.broadcastOnlineStatus(ctx, userID, true)
@@ -643,12 +657,16 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 	}
 }
 
-func (a *App) onRouteDel(userID, deviceType, connID string) {
+func (a *App) onRouteDel(userID, deviceType, deviceID, connID string) {
 	ctx := a.coreCtx
 
 	kicked, _ := a.CacheClient.IsKicked(ctx, connID)
 	if !kicked {
-		a.CacheClient.DeleteRoute(ctx, userID, deviceType)
+		routeField := deviceType
+		if deviceID != "" {
+			routeField = deviceType + ":" + deviceID
+		}
+		a.CacheClient.DeleteRoute(ctx, userID, routeField)
 		online, _ := a.CacheClient.IsOnline(ctx, userID)
 		if !online {
 			go a.broadcastOnlineStatus(ctx, userID, false)
