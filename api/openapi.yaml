@@ -23,16 +23,6 @@ info:
     ## Status tags
     - `x-agenthub-status: implemented` — 已实现，可直接调用
     - `x-agenthub-status: planned` — 远期规划，尚未实现
-
-    ## Edge local auth
-    Local Edge may be started with `--local-auth-token` or
-    `AGENTHUB_EDGE_AUTH_TOKEN`. When configured, `/v1/health` and CORS
-    preflight requests stay unauthenticated; all other Edge REST APIs require
-    `Authorization: Bearer <token>` or `X-AgentHub-Edge-Token: <token>`.
-    Browser WebSocket clients cannot set custom headers, so `/v1/events` uses
-    the `access_token` query parameter for the same local token. This local
-    token is not a replacement for Hub session/device proof in future remote
-    Edge mode.
 servers:
   - url: http://127.0.0.1:3210
     description: Local Edge Server
@@ -67,17 +57,11 @@ paths:
       tags: [Foundation]
       operationId: openEventStream
       summary: Open WebSocket event stream.
-      description: >
-        WebSocket handshake surface. Event envelope and event types are
-        documented in api/events.md. If Edge local auth is configured, browser
-        clients pass the local token as `access_token` because WebSocket cannot
-        set arbitrary Authorization headers.
+      description: WebSocket handshake surface. Event envelope and event types are documented in api/events.md.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
-      security: [{ edgeLocalAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/PageCursor"
-        - $ref: "#/components/parameters/EdgeAccessToken"
       responses:
         "101":
           description: Switching Protocols.
@@ -399,7 +383,6 @@ paths:
       summary: List runners.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
-      security: [{ edgeLocalAuth: [] }]
       responses:
         "200":
           description: Runner list.
@@ -415,7 +398,6 @@ paths:
       summary: List available agent adapters.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
-      security: [{ edgeLocalAuth: [] }]
       responses:
         "200":
           description: Agent adapter list.
@@ -470,7 +452,6 @@ paths:
       summary: List AgentRuns.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
-      security: [{ edgeLocalAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/ThreadIdQuery"
         - $ref: "#/components/parameters/PageSize"
@@ -488,7 +469,6 @@ paths:
         New callers should pass projectId and threadId explicitly.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
-      security: [{ edgeLocalAuth: [] }]
       requestBody:
         required: false
         content:
@@ -523,7 +503,6 @@ paths:
       summary: Cancel AgentRun.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
-      security: [{ edgeLocalAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -856,7 +835,6 @@ paths:
       summary: Approve or deny a pending permission request.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
-      security: [{ edgeLocalAuth: [] }]
       requestBody:
         required: true
         content:
@@ -896,12 +874,12 @@ paths:
     get:
       tags: [HubSyncRelay]
       operationId: publicStats
-      summary: Bucketed public statistics for official website.
+      summary: Public statistics for official website.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       responses:
         "200":
-          description: Public website stats with lower-bound count buckets and coarse uptime buckets; exact live totals are not exposed.
+          description: Public stats.
 
   /client/auth/register:
     post:
@@ -940,12 +918,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [username, password, device_type, device_id]
+              required: [username, password]
               properties:
                 username: { type: string }
                 password: { type: string }
                 device_type: { type: string }
-                device_id: { type: string, format: uuid }
+                device_id: { type: string }
       responses:
         "200":
           description: JWT tokens.
@@ -1076,26 +1054,6 @@ paths:
         "200":
           description: Task dispatched.
 
-  /edge/devices/register:
-    post:
-      tags: [HubSyncRelay]
-      operationId: hubRegisterEdgeDevice
-      summary: Register or refresh an authenticated desktop Edge device.
-      x-agenthub-status: implemented
-      x-agenthub-owner: Hub
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/HubDeviceRegisterRequest"
-      responses:
-        "200":
-          description: Device registered.
-        "400":
-          description: device_id is missing or not a UUID.
-
   /edge/agent-tasks/{id}/ack:
     parameters:
       - name: id
@@ -1132,12 +1090,6 @@ paths:
           in: path
           required: true
           schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/HubTaskStreamRequest"
       responses:
         "200":
           description: Chunk recorded.
@@ -1155,12 +1107,6 @@ paths:
           in: path
           required: true
           schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/HubTaskDoneRequest"
       responses:
         "200":
           description: Task marked done.
@@ -1183,10 +1129,1318 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/HubTaskFailRequest"
+              type: object
+              required: [error]
+              properties:
+                error:
+                  type: string
       responses:
         "200":
           description: Task marked failed.
+
+  # ═══════════════════════════════════════════════════════════
+  # Hub Server — additional implemented routes
+  # ═══════════════════════════════════════════════════════════
+
+  # ── Auth ──
+
+  /client/auth/change-password:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubChangePassword
+      summary: Change account password.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [old_password, new_password]
+              properties:
+                old_password: { type: string }
+                new_password: { type: string, minLength: 8 }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/auth/oidc/authorize:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubOidcAuthorize
+      summary: Generate OIDC PKCE authorization URL.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code_challenge, code_challenge_method]
+              properties:
+                code_challenge: { type: string }
+                code_challenge_method: { type: string, enum: [S256, plain] }
+                device_type: { type: string }
+                device_id: { type: string }
+      responses:
+        "200":
+          description: Authorization URL.
+
+  /client/auth/oidc/callback:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubOidcCallback
+      summary: OIDC callback — exchange code for tokens.
+      description: No Bearer token required; state parameter prevents CSRF.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, state, code_verifier]
+              properties:
+                code: { type: string }
+                state: { type: string }
+                code_verifier: { type: string }
+                device_type: { type: string }
+                device_id: { type: string }
+      responses:
+        "200":
+          description: JWT tokens.
+
+  # ── Contacts ──
+
+  /client/contacts/{userId}:
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubRemoveContact
+      summary: Remove a contact.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: Removed.
+
+  /client/contacts/{userId}:block:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubBlockContact
+      summary: Block a user.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/contacts/{userId}:unblock:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubUnblockContact
+      summary: Unblock a user.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/contacts/{userId}/remark:
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateRemark
+      summary: Update contact remark.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [remark]
+              properties:
+                remark: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Friend Requests ──
+
+  /client/friend-requests:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListFriendRequests
+      summary: List received friend requests.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/friend-requests/sent:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListSentFriendRequests
+      summary: List sent friend requests.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  # ── Session Members ──
+
+  /client/sessions/{id}/members:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListSessionMembers
+      summary: List session members.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubAddSessionMembers
+      summary: Add members to a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [members]
+              properties:
+                members:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /client/sessions/{id}/members/{memberId}:
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubRemoveSessionMember
+      summary: Remove a member from a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/MemberId"
+      responses:
+        "204":
+          description: Removed.
+
+  /client/sessions/{id}:leave:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubLeaveSession
+      summary: Leave a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Session Management ──
+
+  /client/sessions/{id}:dissolve:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubDissolveGroup
+      summary: Dissolve a group session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}:transfer-owner:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubTransferOwner
+      summary: Transfer session ownership.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_owner_user_id]
+              properties:
+                new_owner_user_id: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/settings:
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateSessionSettings
+      summary: Update session settings.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                avatar_url: { type: string }
+                announcement: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/member-settings:
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateMemberSettings
+      summary: Update member's own session settings.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pinned: { type: boolean }
+                muted: { type: boolean }
+                archived: { type: boolean }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Message Operations ──
+
+  /client/sessions/{id}/messages/search:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubSearchSessionMessages
+      summary: Search messages within a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/messages/search:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubSearchMessages
+      summary: Search messages across all sessions.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/sessions/{id}/messages/{msgId}:recall:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRecallMessage
+      summary: Recall (delete) a message.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/MsgId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/messages/{msgId}:pin:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPinMessage
+      summary: Pin a message.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/MsgId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/messages/{msgId}:unpin:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubUnpinMessage
+      summary: Unpin a message.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/MsgId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/messages/{msgId}:read:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubMarkMessageRead
+      summary: Mark a message as read.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/MsgId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/pins:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListPins
+      summary: List pinned messages in a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/messages:forward:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubForwardMessages
+      summary: Forward messages to another session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_ids, target_session_id]
+              properties:
+                message_ids:
+                  type: array
+                  items:
+                    type: string
+                target_session_id: { type: string }
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  # ── Attachments ──
+
+  /client/attachments:probe:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubProbeAttachment
+      summary: Check if an attachment exists by hash.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hash]
+              properties:
+                hash: { type: string }
+      responses:
+        "200":
+          description: Attachment metadata if present; null if absent.
+
+  /client/attachments:upload:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubUploadAttachment
+      summary: Upload an attachment.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /client/attachments/{id}:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubDownloadAttachment
+      summary: Download an attachment.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Attachment file (binary).
+        "404":
+          $ref: "#/components/responses/Error"
+
+  # ── Notifications ──
+
+  /client/notifications:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListNotifications
+      summary: List notifications.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: unread_only
+          in: query
+          required: false
+          schema: { type: boolean }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/notifications/{id}:read:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubMarkNotificationRead
+      summary: Mark a notification as read.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/notifications:read-all:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubReadAllNotifications
+      summary: Mark all notifications as read.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Custom Agents ──
+
+  /web/custom-agents:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListCustomAgents
+      summary: List custom agents.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateCustomAgent
+      summary: Create a custom agent.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, agent_type, system_prompt]
+              properties:
+                name: { type: string }
+                agent_type: { type: string }
+                system_prompt: { type: string }
+                capability_tags:
+                  type: array
+                  items:
+                    type: string
+                tool_whitelist:
+                  type: array
+                  items:
+                    type: string
+                model_params:
+                  type: object
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /web/custom-agents/{id}:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetCustomAgent
+      summary: Get a custom agent.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateCustomAgent
+      summary: Update a custom agent.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                agent_type: { type: string }
+                system_prompt: { type: string }
+                capability_tags:
+                  type: array
+                  items:
+                    type: string
+                tool_whitelist:
+                  type: array
+                  items:
+                    type: string
+                model_params:
+                  type: object
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteCustomAgent
+      summary: Delete a custom agent.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted.
+
+  # ── Edge / Web ──
+
+  /edge/devices:register:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRegisterDevice
+      summary: Register a device.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_type, device_name]
+              properties:
+                device_type: { type: string }
+                device_name: { type: string }
+                capabilities:
+                  type: object
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /web/agent-tasks/{id}:cancel:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCancelTask
+      summary: Cancel an agent task.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Auth (routes from router.go not yet documented) ──
+
+  /client/auth/refresh:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRefresh
+      summary: Refresh JWT access token using refresh token.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "200":
+          description: New JWT token pair.
+
+  /client/auth/logout:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubLogout
+      summary: Logout and invalidate tokens.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/auth/profile:
+    put:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateProfile
+      summary: Update user profile (nickname, avatar, etc.).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nickname: { type: string }
+                avatar_url: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Contacts (routes from router.go not yet documented) ──
+
+  /client/contacts/search:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubSearchContacts
+      summary: Search contacts by keyword.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/contacts/friend-requests:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubSendFriendRequest
+      summary: Send a friend request.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id: { type: string }
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /client/contacts/friend-requests/{id}:accept:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubAcceptFriendRequest
+      summary: Accept a friend request.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/contacts/friend-requests/{id}:reject:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRejectFriendRequest
+      summary: Reject a friend request.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Sessions (routes from router.go not yet documented) ──
+
+  /client/sessions/{id}/info:
+    put:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateGroupInfo
+      summary: Update group session info (name, avatar, announcement).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                avatar_url: { type: string }
+                announcement: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}:
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteSession
+      summary: Delete session for current user (soft-delete).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted.
+
+  /client/sessions/{id}/messages/sync:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubSyncMessages
+      summary: Get incremental messages after a cursor (sync).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Incremental message batch.
+
+  /client/sessions/{id}:read:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubMarkSessionRead
+      summary: Mark all messages in a session as read.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/agents:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubAddAgentToSession
+      summary: Add an agent to a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_id]
+              properties:
+                agent_id: { type: string }
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /client/sessions/search:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubSearchSessions
+      summary: Search sessions by keyword.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  # ── Messages (individual operations — code paths) ──
+
+  /client/messages/{id}:recall:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRecallMessageDirect
+      summary: Recall (delete) a message.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/MsgId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/messages/{id}:pin:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPinMessageDirect
+      summary: Pin a message.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/MsgId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubUnpinMessageDirect
+      summary: Unpin a message.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/MsgId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/messages/{id}:forward:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubForwardSingleMessage
+      summary: Forward a single message to another session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/MsgId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_session_id]
+              properties:
+                target_session_id: { type: string }
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  # ── Execution Targets ──
+
+  /web/execution-targets:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListExecutionTargets
+      summary: List execution targets.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateExecutionTarget
+      summary: Create an execution target.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type]
+              properties:
+                name: { type: string }
+                type: { type: string }
+                config: { type: object }
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /web/execution-targets/{id}:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetExecutionTarget
+      summary: Get an execution target.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateExecutionTarget
+      summary: Update an execution target.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                type: { type: string }
+                config: { type: object }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteExecutionTarget
+      summary: Delete an execution target.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted.
+
+  /web/execution-targets/{id}:ping:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPingExecutionTarget
+      summary: Ping an execution target to test connectivity.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Audit Events ──
+
+  /web/audit-events:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListAuditEvents
+      summary: List audit events.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  # ── Relay Commands (web) ──
+
+  /web/relay/commands:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateWebRelayCommand
+      summary: Create a relay command.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_id, payload]
+              properties:
+                target_id: { type: string }
+                payload: { type: object }
+      responses:
+        "202":
+          $ref: "#/components/responses/Accepted"
+
+  /web/relay/commands/{id}:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetWebRelayCommand
+      summary: Get a relay command status.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/relay/commands/{id}:ack:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubAckWebRelayCommand
+      summary: Acknowledge a relay command.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Devices (web) ──
+
+  /web/devices:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListDevices
+      summary: List user devices.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
 
   # ── Legacy / Planned (not yet implemented) ──────────────────
 
@@ -1559,17 +2813,6 @@ paths:
           $ref: "#/components/responses/Accepted"
 
 components:
-  securitySchemes:
-    edgeLocalAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: local-edge-token
-      description: Optional local Edge token configured by `--local-auth-token` or `AGENTHUB_EDGE_AUTH_TOKEN`; WebSocket browsers use the `access_token` query parameter.
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: Hub access token
-      description: Hub-issued bearer token for `/client`, `/edge`, and `/web` Hub routes.
   parameters:
     PageSize:
       name: pageSize
@@ -1584,13 +2827,6 @@ components:
       name: pageCursor
       in: query
       required: false
-      schema:
-        type: string
-    EdgeAccessToken:
-      name: access_token
-      in: query
-      required: false
-      description: Local Edge auth token for browser WebSocket clients when Edge local auth is enabled.
       schema:
         type: string
     ProjectIdQuery:
@@ -1619,6 +2855,12 @@ components:
         type: string
     MemberId:
       name: memberId
+      in: path
+      required: true
+      schema:
+        type: string
+    MsgId:
+      name: msgId
       in: path
       required: true
       schema:
@@ -1749,54 +2991,6 @@ components:
         edge_run_id:
           type: string
           description: Alias for run_id for explicit Hub persistence.
-    HubTaskStreamRequest:
-      type: object
-      required: [content]
-      properties:
-        content:
-          type: string
-        run_id:
-          type: string
-          description: Edge run id returned by POST /v1/runs.
-        edge_run_id:
-          type: string
-          description: Alias for run_id for explicit Hub persistence.
-    HubTaskDoneRequest:
-      type: object
-      properties:
-        final_content:
-          type: string
-        run_id:
-          type: string
-          description: Edge run id returned by POST /v1/runs.
-        edge_run_id:
-          type: string
-          description: Alias for run_id for explicit Hub persistence.
-    HubTaskFailRequest:
-      type: object
-      required: [error]
-      properties:
-        error:
-          type: string
-        run_id:
-          type: string
-          description: Edge run id returned by POST /v1/runs.
-        edge_run_id:
-          type: string
-          description: Alias for run_id for explicit Hub persistence.
-    HubDeviceRegisterRequest:
-      type: object
-      required: [device_id]
-      properties:
-        device_id:
-          type: string
-          format: uuid
-        app_version:
-          type: string
-        capabilities:
-          type: array
-          items:
-            type: string
     StartRunRequest:
       type: object
       properties:
