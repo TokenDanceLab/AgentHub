@@ -12,8 +12,26 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@/components/ModelDropdown', () => ({
-  default: ({ placeholder, disabled, ariaLabel }: { placeholder?: string; disabled?: boolean; ariaLabel?: string }) => (
-    <button type="button" disabled={disabled} aria-label={ariaLabel}>
+  default: ({
+    placeholder,
+    disabled,
+    ariaLabel,
+    onChange,
+  }: {
+    placeholder?: string;
+    disabled?: boolean;
+    ariaLabel?: string;
+    onChange?: (value: string) => void;
+  }) => (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-label={ariaLabel}
+      onClick={() => {
+        if (placeholder === 'prompt.model') onChange?.('claude-opus-4-7');
+        if (placeholder === 'prompt.reasoning') onChange?.('max');
+      }}
+    >
       {placeholder}
     </button>
   ),
@@ -382,6 +400,48 @@ describe('PromptInput', () => {
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
 
     expect(onSend).toHaveBeenCalledWith('Do something', 'a1', undefined);
+  });
+
+  it('shows the selected Codex profile route when no model is manually selected', () => {
+    const agents = [makeAgent({ id: 'codex', name: 'Codex Runtime' })];
+    render(
+      <PromptInput agents={agents} selectedAgentId="codex" onSelectAgent={vi.fn()} onSend={vi.fn()} />,
+    );
+
+    const route = screen.getByLabelText('prompt.routePreview');
+    expect(within(route).getByText('anthropic')).toBeInTheDocument();
+    expect(within(route).getByText('claude-sonnet-4-6')).toBeInTheDocument();
+    expect(within(route).getByText('high')).toBeInTheDocument();
+    expect(within(route).getByText('sonnet')).toBeInTheDocument();
+  });
+
+  it('sends the selected Codex profile alias when no model is manually selected', () => {
+    const onSend = vi.fn();
+    const agents = [makeAgent({ id: 'codex', name: 'Codex Runtime' })];
+    render(
+      <PromptInput agents={agents} selectedAgentId="codex" onSelectAgent={vi.fn()} onSend={onSend} />,
+    );
+
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Route through Codex');
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
+
+    expect(onSend).toHaveBeenCalledWith('Route through Codex', 'codex', { model: 'sonnet' });
+  });
+
+  it('lets a manually selected model override the selected agent profile alias', () => {
+    const onSend = vi.fn();
+    const agents = [makeAgent({ id: 'codex', name: 'Codex Runtime' })];
+    render(
+      <PromptInput agents={agents} selectedAgentId="codex" onSelectAgent={vi.fn()} onSend={onSend} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.model' }));
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Use manual model');
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
+
+    expect(onSend).toHaveBeenCalledWith('Use manual model', 'codex', { model: 'claude-opus-4-7' });
   });
 
   it('disables send button when input is empty', () => {
