@@ -3,7 +3,7 @@
 ## 接手前必读
 
 1. `AGENTS.md` — 项目规则和开发约束
-2. `docs/architecture/system-architecture.md` — Hub-Edge-Runner 三层架构
+2. `docs/architecture/system-architecture.md` — Desktop / Edge / Hub 与 Agent Runtime 架构
 3. `docs/architecture/implementation-guide.md` — 实施路线（M1→M2→M3→M4）
 4. `docs/operations/client-roadmap.md` — 客户端路线图和任务状态
 5. `api/openapi.yaml` — REST API 契约
@@ -135,8 +135,8 @@ run.agent.result       — 执行结束（成功/失败、token 用量）
 ### 低优先级
 
 - [x] SQLite 持久化替代 JSON 文件
-- [ ] Runner registry 废弃，迁移到 AdapterRegistry (部分完成)
-- [ ] `client-smoke.ps1` 更新（去掉 `agenthub-runner` 依赖）(部分完成)
+- [x] Runner registry 已降为兼容旧 UI 的 registry；执行入口以 AdapterRegistry + Edge lifecycle 为主
+- [x] `client-smoke.ps1` 已改用 Edge 内置 `agenthub-runner-mock` 兼容 profile，不再依赖独立 `runner/` 目录
 
 ## 关键接口速查
 

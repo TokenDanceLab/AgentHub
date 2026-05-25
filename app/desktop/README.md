@@ -112,7 +112,7 @@ pnpm storybook
 ## 已知限制
 
 - `app/shared/src/ui` 的 React 类型解析和 pnpm 跨包虚拟存储会影响部分 shared-ui 测试/typecheck。改动说明里必须区分既有 shared-ui 限制和本次新增错误。
-- `scripts/client-smoke.ps1` 仍包含已删除 `runner/` 目录的历史检查，修复脚本前不要作为 Desktop/Edge 验收依据。
+- `scripts/client-smoke.ps1` 已对齐当前 Edge Runtime 架构，不再构建已删除的独立 `runner/` 目录；可用 `-EdgeAddr` 跑隔离端口 smoke，也可用 `-EdgeAuthToken` 覆盖本地 Edge token 路径。
 - TokenDance ID 目标路径是 Hub Server 完成 OIDC code exchange 并签发 Hub session；现有 Desktop 端入口不得保存第三方 provider token，也不得直接集成 GitHub/Google/飞书。
 
 ## 文档入口

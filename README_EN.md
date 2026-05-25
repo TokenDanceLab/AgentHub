@@ -153,7 +153,7 @@ pnpm test:e2e
 
 `pnpm build` only builds the frontend and does not need Rust. `pnpm tauri dev` needs Rust and Tauri system dependencies. Playwright uses `http://localhost:5199`.
 
-Note: `scripts/client-smoke.ps1` still includes historical checks for the removed `runner/` directory. Do not use it as the pass/fail source until that script is fixed.
+`scripts/client-smoke.ps1` now matches the current Edge Runtime architecture. It no longer builds the removed standalone `runner/` directory, uses the Edge built-in `agenthub-runner-mock` compatibility profile, and supports `-EdgeAddr` for isolated smoke runs.
 
 ### Verification
 
