@@ -1,32 +1,37 @@
 # AgentHub client local smoke test (Windows / PowerShell)
 #
-# Chains Edge, Runner, Desktop end-to-end verification.
+# Chains Edge and Desktop-facing API end-to-end verification.
 # Run .\scripts\setup.ps1 first, then this script.
 #
 # Usage:
 #   .\scripts\client-smoke.ps1
 #   .\scripts\client-smoke.ps1 -SkipBuild
 #   .\scripts\client-smoke.ps1 -ReuseExistingEdge
+#   .\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228
+#   .\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228 -EdgeAuthToken local-smoke-token
 
 [CmdletBinding()]
 param(
     [switch]$SkipBuild,
-    [switch]$ReuseExistingEdge
+    [switch]$ReuseExistingEdge,
+    [string]$EdgeAddr = "127.0.0.1:3210",
+    [string]$EdgeAuthToken = ""
 )
 
 $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 
-$EdgeAddr = "127.0.0.1:3210"
 $EdgeUrl = "http://$EdgeAddr"
 $EdgeBinary = Join-Path $Root "edge-server/agenthub-edge-tmp.exe"
-$RunnerBinary = Join-Path $Root "runner/agenthub-runner-tmp.exe"
+$EdgeHeaders = @{}
+if (-not [string]::IsNullOrWhiteSpace($EdgeAuthToken)) {
+    $EdgeHeaders["Authorization"] = "Bearer $EdgeAuthToken"
+}
 
 $Passed = 0
 $Failed = 0
 $EdgeProc = $null
 $StartedEdge = $false
-$RunnerContextCheckRequired = -not $ReuseExistingEdge
 
 function Write-Step([string]$text) {
     Write-Host "`n=== $text ===" -ForegroundColor Cyan
@@ -55,6 +60,29 @@ function Test-EdgeHealth() {
     }
 }
 
+function Invoke-EdgeRest {
+    param(
+        [Parameter(Mandatory=$true)][string]$Uri,
+        [string]$Method = "Get",
+        [object]$Body = $null,
+        [int]$TimeoutSec = 5
+    )
+
+    $args = @{
+        Uri = $Uri
+        Method = $Method
+        TimeoutSec = $TimeoutSec
+    }
+    if ($EdgeHeaders.Count -gt 0) {
+        $args.Headers = $EdgeHeaders
+    }
+    if ($null -ne $Body) {
+        $args.Body = $Body
+        $args.ContentType = "application/json"
+    }
+    return Invoke-RestMethod @args
+}
+
 function Format-ProcessArgument([string]$Value) {
     if ($null -eq $Value) {
         return '""'
@@ -72,26 +100,6 @@ function Start-EdgeProcess([string[]]$Arguments) {
     $psi.CreateNoWindow = $true
     $psi.Arguments = (($Arguments | ForEach-Object { Format-ProcessArgument $_ }) -join " ")
     return [System.Diagnostics.Process]::Start($psi)
-}
-
-function Invoke-RunnerMock() {
-    $psi = [System.Diagnostics.ProcessStartInfo]::new()
-    $psi.FileName = $RunnerBinary
-    $psi.Arguments = "--mock"
-    $psi.UseShellExecute = $false
-    $psi.CreateNoWindow = $true
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-
-    $proc = [System.Diagnostics.Process]::Start($psi)
-    $stdout = $proc.StandardOutput.ReadToEnd()
-    $stderr = $proc.StandardError.ReadToEnd()
-    $proc.WaitForExit()
-
-    return [pscustomobject]@{
-        ExitCode = $proc.ExitCode
-        Output = "$stdout`n$stderr"
-    }
 }
 
 function Receive-WebSocketText([System.Net.WebSockets.ClientWebSocket]$ws, [int]$TimeoutMs) {
@@ -143,7 +151,7 @@ function Read-RunOutputText($event) {
     return $text
 }
 
-function Test-WebSocketRunOutput([string]$RunId, [bool]$AssertRunnerContext) {
+function Test-WebSocketRunOutput([string]$RunId, [bool]$AssertBuiltInMockEvents) {
     $script:CurrentRunId = $RunId
     $deadline = [DateTime]::UtcNow.AddSeconds(15)
     $cursor = 0
@@ -159,6 +167,10 @@ function Test-WebSocketRunOutput([string]$RunId, [bool]$AssertRunnerContext) {
         $connectCts.CancelAfter(5000)
         try {
             $uri = "ws://$EdgeAddr/v1/events?cursor=$cursor"
+            if (-not [string]::IsNullOrWhiteSpace($EdgeAuthToken)) {
+                $encodedToken = [System.Uri]::EscapeDataString($EdgeAuthToken)
+                $uri = "$uri&access_token=$encodedToken"
+            }
             $null = $ws.ConnectAsync([Uri]$uri, $connectCts.Token).GetAwaiter().GetResult()
             Assert ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) "WS connected"
 
@@ -190,12 +202,13 @@ function Test-WebSocketRunOutput([string]$RunId, [bool]$AssertRunnerContext) {
                 }
 
                 $stdout += Read-RunOutputText $event
-                if ($AssertRunnerContext) {
-                    if ($stdout.Contains("run=$RunId") -and
-                        $stdout.Contains("project=proj_local") -and
-                        $stdout.Contains("thread=thread_local")) {
-                        Assert $true "Runner stdout context includes run/project/thread"
-                        Write-Host "    matched run.output.batch for $RunId" -ForegroundColor DarkGray
+                if ($AssertBuiltInMockEvents) {
+                    if (($seenCurrentRunTypes -contains "run.started") -and
+                        ($seenCurrentRunTypes -contains "run.output.batch") -and
+                        ($seenCurrentRunTypes -contains "run.finished") -and
+                        $stdout.Contains("Initializing mock runner")) {
+                        Assert $true "built-in mock executor emitted started/output/finished"
+                        Write-Host "    matched built-in mock events for $RunId" -ForegroundColor DarkGray
                         return
                     }
                 } else {
@@ -205,7 +218,7 @@ function Test-WebSocketRunOutput([string]$RunId, [bool]$AssertRunnerContext) {
                             Write-Host "    first event: $preview" -ForegroundColor DarkGray
                         }
                         Write-Host "    current run events: $($seenCurrentRunTypes -join ', ')" -ForegroundColor DarkGray
-                        Write-Host "    skipped Runner context assertion: -ReuseExistingEdge runner configuration is unknown" -ForegroundColor DarkGray
+                        Write-Host "    skipped built-in mock assertion: -ReuseExistingEdge runtime configuration is unknown" -ForegroundColor DarkGray
                         return
                     }
                 }
@@ -232,14 +245,11 @@ function Test-WebSocketRunOutput([string]$RunId, [bool]$AssertRunnerContext) {
     if ($seenCurrentRunTypes.Count -gt 0) {
         Write-Host "    current run events: $($seenCurrentRunTypes -join ', ')" -ForegroundColor DarkGray
     }
-    if ($AssertRunnerContext) {
-        Assert $false "Runner stdout context includes run/project/thread"
-        if ($stdout -ne "") {
-            $seen = $stdout.Substring(0, [Math]::Min(200, $stdout.Length))
-            Write-Host "    stdout seen: $seen" -ForegroundColor DarkGray
-        } else {
-            Write-Host "    stdout seen: <empty>" -ForegroundColor DarkGray
-        }
+    if ($AssertBuiltInMockEvents) {
+        Assert ($seenCurrentRunTypes -contains "run.started") "run.started present"
+        Assert ($seenCurrentRunTypes -contains "run.output.batch") "run.output.batch present"
+        Assert ($seenCurrentRunTypes -contains "run.finished") "run.finished present"
+        Assert ($stdout.Contains("Initializing mock runner")) "built-in mock output present"
     }
 }
 
@@ -280,11 +290,11 @@ try {
             Assert (Test-Path $EdgeBinary) "edge-server binary"
         } finally { Pop-Location }
 
-        Write-Step "Build Runner"
-        Push-Location "$Root/runner"
+        Write-Step "Install Shared Dependencies"
+        Push-Location "$Root/app/shared"
         try {
-            go build -o $RunnerBinary ./cmd/agenthub-runner/
-            Assert (Test-Path $RunnerBinary) "runner binary"
+            pnpm install --frozen-lockfile 2>&1 | Out-Null
+            Assert ($LASTEXITCODE -eq 0) "shared pnpm install"
         } finally { Pop-Location }
 
         Write-Step "Build Desktop (web only)"
@@ -312,12 +322,11 @@ try {
             Fail "edge binary missing: $EdgeBinary"
             throw "edge binary missing"
         }
-        if (-not (Test-Path $RunnerBinary)) {
-            Fail "runner binary missing: $RunnerBinary; run .\scripts\client-smoke.ps1 without -SkipBuild first or build runner/cmd/agenthub-runner"
-            throw "runner binary missing"
+        $edgeArgs = @("--addr", $EdgeAddr, "--runner-profile", "agenthub-runner-mock")
+        if (-not [string]::IsNullOrWhiteSpace($EdgeAuthToken)) {
+            $edgeArgs += @("--local-auth-token", $EdgeAuthToken)
         }
-
-        $EdgeProc = Start-EdgeProcess @("--addr", $EdgeAddr, "--runner-command", $RunnerBinary, "--runner-arg", "--mock")
+        $EdgeProc = Start-EdgeProcess $edgeArgs
         $StartedEdge = $true
 
         $ready = $false
@@ -351,7 +360,7 @@ try {
         # Runners
         Write-Step "GET /v1/runners"
         try {
-            $runners = Invoke-RestMethod -Uri "$EdgeUrl/v1/runners" -TimeoutSec 5
+            $runners = Invoke-EdgeRest -Uri "$EdgeUrl/v1/runners" -TimeoutSec 5
             $count = @($runners.items).Count
             Assert ($count -gt 0) "runners count=$count"
             if ($count -gt 0) {
@@ -366,7 +375,7 @@ try {
         Write-Step "POST /v1/runs"
         $run = $null
         try {
-            $run = Invoke-RestMethod -Uri "$EdgeUrl/v1/runs" -Method Post -TimeoutSec 5
+            $run = Invoke-EdgeRest -Uri "$EdgeUrl/v1/runs" -Method Post -TimeoutSec 5
             Assert ($run.runId -match '^run_') "runId prefix ($($run.runId))"
             Assert ($run.status -eq "queued") "status=queued"
             Assert ($null -ne $run.createdAt) "createdAt non-null"
@@ -377,7 +386,7 @@ try {
         # POST /v1/runs/{runId}:cancel
         Write-Step "POST /v1/runs/{runId}:cancel"
         try {
-            $cancel = Invoke-RestMethod -Uri "$EdgeUrl/v1/runs/run_test:cancel" -Method Post -TimeoutSec 5
+            $cancel = Invoke-EdgeRest -Uri "$EdgeUrl/v1/runs/run_test:cancel" -Method Post -TimeoutSec 5
             Assert ($cancel.runId -eq "run_test") "runId=run_test"
             Assert ($cancel.status -eq "cancelling") "status=cancelling"
         } catch {
@@ -390,26 +399,11 @@ try {
             if ($null -eq $run -or [string]::IsNullOrWhiteSpace($run.runId)) {
                 Fail "WebSocket: POST /v1/runs did not return a runId"
             } else {
-                Test-WebSocketRunOutput $run.runId $RunnerContextCheckRequired
+                Test-WebSocketRunOutput $run.runId (-not $ReuseExistingEdge)
             }
         } catch {
             Fail "WebSocket: $_"
         }
-
-        # ── Mock Runner ──────────────────────────────────
-
-        Write-Step "Mock Runner"
-        Push-Location "$Root/runner"
-        try {
-            if (-not (Test-Path $RunnerBinary)) {
-                Fail "runner binary missing: $RunnerBinary"
-                throw "runner binary missing"
-            }
-            $runnerResult = Invoke-RunnerMock
-            Assert ($runnerResult.ExitCode -eq 0) "runner exit 0"
-            Assert ($runnerResult.Output -match "Installing") "output chunk: Installing"
-            Assert ($runnerResult.Output -match "All tests passed") "output chunk: All tests passed"
-        } finally { Pop-Location }
 
         # ── Go tests ────────────────────────────────────
 
@@ -418,12 +412,6 @@ try {
         try {
             go test ./... 2>&1 | Out-Null
             Assert ($LASTEXITCODE -eq 0) "edge-server tests pass"
-        } finally { Pop-Location }
-
-        Push-Location "$Root/runner"
-        try {
-            go test ./... 2>&1 | Out-Null
-            Assert ($LASTEXITCODE -eq 0) "runner tests pass"
         } finally { Pop-Location }
 
     } finally {
@@ -440,11 +428,11 @@ try {
     Write-Host "========================================" -ForegroundColor Cyan
 
     Write-Host "`nManual UI verification steps:" -ForegroundColor Yellow
-    Write-Host "  1. Start Edge:   cd edge-server; go run ./cmd/agenthub-edge" -ForegroundColor White
+    Write-Host "  1. Start Edge:   cd edge-server; go run ./cmd/agenthub-edge --runner-profile agenthub-runner-mock" -ForegroundColor White
     Write-Host "  2. Start Desktop: cd app/desktop; pnpm tauri dev" -ForegroundColor White
     Write-Host "  3. Verify status bar shows green Online dot" -ForegroundColor White
-    Write-Host "  4. Verify Runner list shows Mock Runner (local) online" -ForegroundColor White
-    Write-Host "  5. Trigger POST /v1/runs and check event log panel updates" -ForegroundColor White
+    Write-Host "  4. Verify Runtime/Target readiness shows Mock Runner (local) online" -ForegroundColor White
+    Write-Host "  5. Trigger POST /v1/runs and check event log panel updates with run.output.batch" -ForegroundColor White
     Write-Host "  6. Stop Edge and verify UI shows red Offline without crash" -ForegroundColor White
 
     exit $(if ($Failed -eq 0) { 0 } else { 1 })

@@ -18,6 +18,7 @@ func AccessLog() gin.HandlerFunc {
 		}
 
 		slog.Info("access",
+			"request_id", GetRequestID(c),
 			"method", c.Request.Method,
 			"path", path,
 			"status", c.Writer.Status(),

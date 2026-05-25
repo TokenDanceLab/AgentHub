@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io"
 
 	"github.com/gin-gonic/gin"
 
@@ -14,10 +17,10 @@ type AgentService interface {
 	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
 	TriggerAgentTask(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error)
 	CancelTask(ctx context.Context, userID, taskID string) error
-	HandleTaskAck(ctx context.Context, taskID string) error
-	HandleTaskStream(ctx context.Context, taskID, content string) error
-	HandleTaskDone(ctx context.Context, taskID, finalContent string) error
-	HandleTaskFail(ctx context.Context, taskID, errMsg string) error
+	HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
+	HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error
+	HandleTaskDone(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
+	HandleTaskFail(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
 }
 
 type AgentHandler struct {
@@ -95,8 +98,24 @@ func (h *AgentHandler) CancelTask(c *gin.Context) {
 
 // TaskAck POST /edge/agent-tasks/:id/ack
 func (h *AgentHandler) TaskAck(c *gin.Context) {
+	var req taskAckReq
+	if c.Request.Body != nil {
+		body, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			Fail(c, errcode.ErrBadRequest)
+			return
+		}
+		if len(bytes.TrimSpace(body)) > 0 {
+			if err := json.Unmarshal(body, &req); err != nil {
+				Fail(c, errcode.ErrBadRequest)
+				return
+			}
+		}
+	}
 	taskID := c.Param("id")
-	if err := h.service.HandleTaskAck(c.Request.Context(), taskID); err != nil {
+	edgeUserID := c.GetString("user_id")
+	edgeDeviceID := c.GetString("device_id")
+	if err := h.service.HandleTaskAck(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID()); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -107,8 +126,22 @@ func (h *AgentHandler) TaskAck(c *gin.Context) {
 	OK(c, nil)
 }
 
+type taskAckReq struct {
+	RunID     string `json:"run_id"`
+	EdgeRunID string `json:"edge_run_id"`
+}
+
+func (r taskAckReq) normalizedRunID() string {
+	if r.EdgeRunID != "" {
+		return r.EdgeRunID
+	}
+	return r.RunID
+}
+
 type taskStreamReq struct {
-	Content string `json:"content" binding:"required"`
+	RunID     string `json:"run_id"`
+	EdgeRunID string `json:"edge_run_id"`
+	Content   string `json:"content" binding:"required"`
 }
 
 // TaskStream POST /edge/agent-tasks/:id/stream
@@ -119,7 +152,9 @@ func (h *AgentHandler) TaskStream(c *gin.Context) {
 		return
 	}
 	taskID := c.Param("id")
-	if err := h.service.HandleTaskStream(c.Request.Context(), taskID, req.Content); err != nil {
+	edgeUserID := c.GetString("user_id")
+	edgeDeviceID := c.GetString("device_id")
+	if err := h.service.HandleTaskStream(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), req.Content); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -131,6 +166,8 @@ func (h *AgentHandler) TaskStream(c *gin.Context) {
 }
 
 type taskDoneReq struct {
+	RunID        string `json:"run_id"`
+	EdgeRunID    string `json:"edge_run_id"`
 	FinalContent string `json:"final_content"`
 }
 
@@ -142,7 +179,9 @@ func (h *AgentHandler) TaskDone(c *gin.Context) {
 		return
 	}
 	taskID := c.Param("id")
-	if err := h.service.HandleTaskDone(c.Request.Context(), taskID, req.FinalContent); err != nil {
+	edgeUserID := c.GetString("user_id")
+	edgeDeviceID := c.GetString("device_id")
+	if err := h.service.HandleTaskDone(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), req.FinalContent); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -154,7 +193,9 @@ func (h *AgentHandler) TaskDone(c *gin.Context) {
 }
 
 type taskFailReq struct {
-	Error string `json:"error" binding:"required"`
+	RunID     string `json:"run_id"`
+	EdgeRunID string `json:"edge_run_id"`
+	Error     string `json:"error" binding:"required"`
 }
 
 // TaskFail POST /edge/agent-tasks/:id/fail
@@ -165,7 +206,9 @@ func (h *AgentHandler) TaskFail(c *gin.Context) {
 		return
 	}
 	taskID := c.Param("id")
-	if err := h.service.HandleTaskFail(c.Request.Context(), taskID, req.Error); err != nil {
+	edgeUserID := c.GetString("user_id")
+	edgeDeviceID := c.GetString("device_id")
+	if err := h.service.HandleTaskFail(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), req.Error); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -174,4 +217,25 @@ func (h *AgentHandler) TaskFail(c *gin.Context) {
 		return
 	}
 	OK(c, nil)
+}
+
+func (r taskStreamReq) normalizedRunID() string {
+	if r.EdgeRunID != "" {
+		return r.EdgeRunID
+	}
+	return r.RunID
+}
+
+func (r taskDoneReq) normalizedRunID() string {
+	if r.EdgeRunID != "" {
+		return r.EdgeRunID
+	}
+	return r.RunID
+}
+
+func (r taskFailReq) normalizedRunID() string {
+	if r.EdgeRunID != "" {
+		return r.EdgeRunID
+	}
+	return r.RunID
 }

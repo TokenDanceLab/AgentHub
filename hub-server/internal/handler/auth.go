@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"log"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
@@ -65,12 +66,21 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
+	deviceID, ok := normalizeUUID(req.DeviceID)
+	if !ok {
+		FailWithMessage(c, errcode.ErrBadRequest, "device_id must be a UUID")
+		return
+	}
+	req.DeviceID = deviceID
+
 	resp, err := h.service.Login(c.Request.Context(), req.Username, req.Password, req.DeviceType, req.DeviceID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
 		}
+		c.Error(err)
+		log.Printf("[LOGIN ERROR] username=%s device_type=%s err=%v", req.Username, req.DeviceType, err)
 		Fail(c, errcode.ErrInternal)
 		return
 	}

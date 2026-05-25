@@ -2,6 +2,7 @@ import { useCallback, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ViewMode } from '@/config/viewRegistry';
 import type { ChatMessage } from '@/components/ChatView.types';
+import type { AgentInfo } from '@shared/types';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import { SkeletonLine } from '@/components/Skeleton';
@@ -15,9 +16,12 @@ interface Props {
   threadsCount: number;
   isStreaming: boolean;
   isConnected: boolean;
+  agents?: AgentInfo[];
+  selectedAgentId?: string;
+  onSelectAgent?: (agentId: string) => void;
   onRetry: (messageId: string) => void;
   onDelete: (messageId: string) => void;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, agentId?: string, opts?: { model?: string }) => void;
 }
 
 /** Determine which view mode to display based on app state. */
@@ -28,8 +32,9 @@ export function resolveViewMode(
   isStreaming: boolean,
   isConnected: boolean,
 ): ViewMode {
-  if (allMessages.length === 0 && threadsCount === 0 && isConnected) return 'welcome';
   if (messages.length === 0 && isStreaming) return 'loading';
+  const hasUserMessage = allMessages.some((message) => message.role === 'user');
+  if (threadsCount === 0 && isConnected && !hasUserMessage) return 'welcome';
   return 'chat';
 }
 
@@ -39,6 +44,9 @@ export default function MainView({
   threadsCount,
   isStreaming,
   isConnected,
+  agents = [],
+  selectedAgentId,
+  onSelectAgent,
   onRetry,
   onDelete,
   onSendMessage,
@@ -49,7 +57,7 @@ export default function MainView({
 
   const handleCreateThread = useCallback(() => {
     const textarea = document.querySelector<HTMLTextAreaElement>(
-      'textarea[placeholder*="Type a message"]',
+      'textarea[aria-label], textarea[placeholder]',
     );
     if (textarea) {
       textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -61,6 +69,9 @@ export default function MainView({
     return (
       <WelcomeScreen
         online={isConnected}
+        agents={agents}
+        selectedAgentId={selectedAgentId}
+        onSelectAgent={onSelectAgent}
         onCreateThread={handleCreateThread}
         onSendMessage={onSendMessage}
       />

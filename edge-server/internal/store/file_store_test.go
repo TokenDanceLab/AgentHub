@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 var _ Repository = (*FileStore)(nil)
@@ -85,6 +86,62 @@ func TestFileStoreRestoresProjectThreadRunItemAndOrder(t *testing.T) {
 	}
 	if got, ok := restored.GetItem("item_a"); !ok || got.Content != "hello" || got.Role != "assistant" {
 		t.Fatalf("GetItem(item_a) = %#v, %v, want restored message item", got, ok)
+	}
+}
+
+func TestFileStoreCleanupRunsPersistsRemovedRunsAndItems(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "store.json")
+
+	s, err := NewFile(path)
+	if err != nil {
+		t.Fatalf("NewFile returned error: %v", err)
+	}
+	project, _ := s.CreateProject("proj_test", "Test Project")
+	thread, err := s.CreateThread("thread_test", project.ID, "Test Thread")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	run, err := s.CreateRun("run_test", project.ID, thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	if _, ok := s.SetRunStatus(run.ID, "finished"); !ok {
+		t.Fatal("SetRunStatus returned ok=false")
+	}
+	if _, err := s.CreateItem(Item{
+		ID:        "item_test",
+		ProjectID: project.ID,
+		ThreadID:  thread.ID,
+		RunID:     run.ID,
+		Type:      "run",
+		Status:    "finished",
+	}); err != nil {
+		t.Fatalf("CreateItem returned error: %v", err)
+	}
+
+	result := s.CleanupRuns(RunCleanupOptions{
+		Now:         time.Now().UTC().Add(48 * time.Hour),
+		TerminalTTL: 24 * time.Hour,
+	})
+	if result.RemovedRuns != 1 || result.RemovedItems != 1 {
+		t.Fatalf("CleanupRuns result = %#v, want one removed run and item", result)
+	}
+
+	restored, err := NewFile(path)
+	if err != nil {
+		t.Fatalf("NewFile restored returned error: %v", err)
+	}
+	if _, ok := restored.GetRun(run.ID); ok {
+		t.Fatal("removed run was restored from snapshot")
+	}
+	if _, ok := restored.GetItem("item_test"); ok {
+		t.Fatal("removed item was restored from snapshot")
+	}
+	if got := restored.ListRuns(thread.ID); len(got) != 0 {
+		t.Fatalf("ListRuns = %#v, want empty after cleanup persistence", got)
+	}
+	if got := restored.ListThreadItems(thread.ID); len(got) != 0 {
+		t.Fatalf("ListThreadItems = %#v, want empty after cleanup persistence", got)
 	}
 }
 

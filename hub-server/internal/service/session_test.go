@@ -72,8 +72,8 @@ func TestCreatePrivateSession_Existing(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
 			AddRow("target-1", "target", "hash", "Target"))
 
-	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members m1`).
-		WithArgs("user-1", "target-1").
+	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members sm1`).
+		WithArgs("user-1", "target-1", "private").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "type"}).
 			AddRow("sess-existing", "private"))
 
@@ -96,8 +96,8 @@ func TestCreatePrivateSession_Success(t *testing.T) {
 			AddRow("target-1", "target", "hash", "Target"))
 
 	// FindPrivateSessionBetween returns empty (no existing session)
-	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members m1`).
-		WithArgs("user-1", "target-1").
+	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members sm1`).
+		WithArgs("user-1", "target-1", "private").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
 	// Transaction: BEGIN
@@ -112,6 +112,35 @@ func TestCreatePrivateSession_Success(t *testing.T) {
 	mock.ExpectCommit()
 
 	svc := NewSessionService(db, testSessionCache(t))
+	resp, err := svc.CreatePrivateSession(context.Background(), "user-1", "target-1")
+	require.NoError(t, err)
+	assert.True(t, resp.Created)
+	assert.Equal(t, "private", resp.Type)
+	assert.NotEmpty(t, resp.SessionID)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCreatePrivateSession_NilCacheDoesNotPanic(t *testing.T) {
+	db, mock, sqlDB := newMockDBSession(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "users" WHERE id = $1 ORDER BY "users"."id" LIMIT $2`)).
+		WithArgs("target-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
+			AddRow("target-1", "target", "hash", "Target"))
+
+	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members sm1`).
+		WithArgs("user-1", "target-1", "private").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "sessions"`)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "session_members"`)).
+		WillReturnResult(sqlmock.NewResult(2, 2))
+	mock.ExpectCommit()
+
+	svc := NewSessionService(db, nil)
 	resp, err := svc.CreatePrivateSession(context.Background(), "user-1", "target-1")
 	require.NoError(t, err)
 	assert.True(t, resp.Created)

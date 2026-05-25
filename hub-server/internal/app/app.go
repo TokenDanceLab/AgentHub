@@ -20,6 +20,7 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/log"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
@@ -39,8 +40,12 @@ type App struct {
 	AdminServer *http.Server
 
 	// Internal runtime state
-	mgr *ws.Manager
-	bus *service.Bus
+	mgr       *ws.Manager
+	bus       *service.Bus
+	startTime time.Time
+
+	// Version is the build version, settable via -ldflags. Defaults to "dev".
+	Version string
 
 	// Service layer
 	AuthService         *service.AuthService
@@ -63,6 +68,8 @@ type App struct {
 	CustomAgentHandler  *handler.CustomAgentHandler
 	AttachmentHandler   *handler.AttachmentHandler
 	NotificationHandler *handler.NotificationHandler
+	HealthHandler       *handler.HealthHandler
+	PublicHandler       *handler.PublicHandler
 
 	// Goroutine lifecycle
 	coreCtx    context.Context
@@ -84,10 +91,19 @@ func New(cfg *config.Config, db *gorm.DB, cacheClient *cache.Client) *App {
 
 // Run starts the Hub Server and blocks until a shutdown signal is received.
 func (a *App) Run(ctx context.Context) error {
-	// JWT security warning
-	if a.Config.JWT.Secret == "" || a.Config.JWT.Secret == "dev-secret-change-in-production" || len(a.Config.JWT.Secret) < 16 {
-		slog.Warn("JWT secret is insecure: using default or too short, set AGENTHUB_JWT_SECRET environment variable")
+	a.startTime = time.Now()
+
+	// Startup health verification: ping DB and Redis to confirm connectivity
+	// before registering routes or starting background goroutines.
+	if sqlDB, err := a.DB.DB(); err == nil {
+		if err := sqlDB.Ping(); err != nil {
+			return fmt.Errorf("database ping failed: %w", err)
+		}
 	}
+	if err := a.CacheClient.GetRDB().Ping(ctx).Err(); err != nil {
+		return fmt.Errorf("redis ping failed: %w", err)
+	}
+	slog.Info("health check passed", "database", "ok", "redis", "ok")
 
 	if a.Config.Server.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -97,6 +113,11 @@ func (a *App) Run(ctx context.Context) error {
 
 	log.Init(&a.Config.Server)
 	defer log.Sync()
+
+	// Initialize TokenDance ID JWKS URI for JWT validation.
+	if a.Config.TokenDanceID.JWKSURI != "" {
+		jwtutil.SetJWKSURI(a.Config.TokenDanceID.JWKSURI)
+	}
 
 	// Legacy: sync existing session seq numbers to Redis
 	go a.syncLegacySeqs()
@@ -127,6 +148,8 @@ func (a *App) Run(ctx context.Context) error {
 	a.CustomAgentHandler = handler.NewCustomAgentHandler(a.AgentService)
 	a.AttachmentHandler = handler.NewAttachmentHandler(a.AttachmentService)
 	a.NotificationHandler = handler.NewNotificationHandler(a.NotificationService)
+	a.HealthHandler = handler.NewHealthHandler(a.DB, a.CacheClient, &a.Config.DB, a.startTime, a.Version)
+	a.PublicHandler = handler.NewPublicHandler(a.DB, a.startTime)
 
 	// Router
 	r := a.setupRouter()
@@ -149,10 +172,10 @@ func (a *App) Run(ctx context.Context) error {
 		Addr:              fmt.Sprintf(":%d", a.Config.Server.Port),
 		Handler:           r,
 		ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
-		MaxHeaderBytes:    1 << 20,
+		ReadTimeout:       config.DefaultServerReadTimeout,
+		WriteTimeout:      config.DefaultServerWriteTimeout,
+		IdleTimeout:       config.DefaultServerIdleTimeout,
+		MaxHeaderBytes:    config.DefaultMaxHeaderBytes,
 	}
 
 	go func() {
@@ -172,36 +195,59 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	slog.Info("shutting down servers...")
 
-	return a.Shutdown(context.Background())
+	ctxShutdown, cancel := context.WithTimeout(context.Background(), config.DefaultShutdownTimeout)
+	defer cancel()
+	return a.Shutdown(ctxShutdown)
 }
 
-// Shutdown gracefully stops all servers and background goroutines.
+// Shutdown gracefully stops all servers and background goroutines with
+// the following order: HTTP → Admin → WS → EventBus → cancel background → DB → Redis.
 func (a *App) Shutdown(ctx context.Context) error {
-	ctxShutdown, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	// Cancel background goroutines
-	if a.coreCancel != nil {
-		a.coreCancel()
-	}
-
-	// Close event bus
-	if a.bus != nil {
-		a.bus.Close()
-	}
-
+	// 1. Stop accepting new HTTP requests.
 	if a.HTTPServer != nil {
-		if err := a.HTTPServer.Shutdown(ctxShutdown); err != nil {
-			slog.Error("server shutdown failed", "error", err)
+		if err := a.HTTPServer.Shutdown(ctx); err != nil {
+			slog.Error("http server shutdown failed", "error", err)
 		}
 	}
+	// 2. Stop admin server (pprof/metrics).
 	if a.AdminServer != nil {
-		if err := a.AdminServer.Shutdown(ctxShutdown); err != nil {
+		if err := a.AdminServer.Shutdown(ctx); err != nil {
 			slog.Error("admin server shutdown failed", "error", err)
 		}
 	}
 
-	slog.Info("servers exited")
+	// 3. Close all WebSocket connections.
+	if a.mgr != nil {
+		a.mgr.Shutdown()
+	}
+
+	// 4. Close event bus (stop publishing events).
+	if a.bus != nil {
+		a.bus.Close()
+	}
+
+	// 5. Cancel background goroutines (scheduler, heartbeat, metrics collector).
+	if a.coreCancel != nil {
+		a.coreCancel()
+	}
+
+	// 6. Close database connection pool.
+	if a.DB != nil {
+		if sqlDB, err := a.DB.DB(); err == nil {
+			if closeErr := sqlDB.Close(); closeErr != nil {
+				slog.Error("db close failed", "error", closeErr)
+			}
+		}
+	}
+
+	// 7. Close Redis connection pool.
+	if a.CacheClient != nil {
+		if err := a.CacheClient.Close(); err != nil {
+			slog.Error("redis close failed", "error", err)
+		}
+	}
+
+	slog.Info("shutdown complete")
 	return nil
 }
 
@@ -209,11 +255,12 @@ func (a *App) Shutdown(ctx context.Context) error {
 func (a *App) setupRouter() *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	router.SetupRoutes(r, a.Config.JWT.Secret, a.CacheClient,
+	router.SetupRoutes(r, a.Config, a.Config.JWT.Secret, a.CacheClient,
 		a.AuthHandler, a.WebSocketHandler, a.DeviceHandler,
 		a.ContactHandler, a.SessionHandler, a.MessageHandler,
 		a.AgentHandler, a.CustomAgentHandler,
 		a.AttachmentHandler, a.NotificationHandler,
+		a.HealthHandler, a.PublicHandler,
 	)
 	return r
 }
@@ -224,7 +271,7 @@ func (a *App) setupWSManager() {
 	a.mgr.OnRouteSet = a.onRouteSet
 	a.mgr.OnRouteDel = a.onRouteDel
 	a.mgr.ResolveMembers = func(sessionID string) []string {
-		ctx := context.Background()
+		ctx := a.coreCtx
 		ids, err := cache.GetOrLoad(a.CacheClient, ctx, "session:members:"+sessionID, config.SessionMemberCacheTTL, func(ctx context.Context) ([]string, error) {
 			members, err := repository.ListActiveMembers(a.DB, sessionID)
 			if err != nil {
@@ -379,7 +426,7 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 // startTaskScheduler periodically scans for expired agent tasks and publishes timeout events.
 func (a *App) startTaskScheduler(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(1 * time.Minute)
+		ticker := time.NewTicker(config.PendingTaskScanInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			tasks, err := repository.ScanExpiredTasks(a.DB)
@@ -394,7 +441,7 @@ func (a *App) startTaskScheduler(ctx context.Context) {
 				if ai != nil {
 					sessionID = ai.SessionID
 				}
-				a.bus.Publish(context.Background(), service.Event{
+				a.bus.Publish(a.coreCtx, service.Event{
 					Type: "agent.timeout",
 					Payload: map[string]interface{}{
 						"task_id":           task.ID,
@@ -414,35 +461,24 @@ func (a *App) startWebSocketCleanup(ctx context.Context) {
 
 // startAdminServer starts the admin HTTP server with pprof and /metrics endpoints.
 func (a *App) startAdminServer() {
-	metrics.Register()
-
 	adminPort := a.Config.Server.AdminPort
-	if adminPort == 0 {
-		adminPort = 6060
-	}
-	adminMux := http.NewServeMux()
-	adminMux.HandleFunc("/debug/pprof/", pprof.Index)
-	adminMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	adminMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	adminMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	adminMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	adminMux.Handle("/metrics", promhttp.Handler())
 	pprofUser := os.Getenv("AGENTHUB_PPROF_USER")
 	pprofPass := os.Getenv("AGENTHUB_PPROF_PASS")
-	adminHandler := http.Handler(adminMux)
-	if pprofUser != "" && pprofPass != "" {
-		adminHandler = pprofBasicAuth(adminMux, pprofUser, pprofPass)
+	if pprofUser == "" || pprofPass == "" {
+		slog.Error("admin server not started: AGENTHUB_PPROF_USER and AGENTHUB_PPROF_PASS must both be set")
+		return
 	}
+	adminHandler := pprofBasicAuth(newAdminMux(), pprofUser, pprofPass)
 	a.AdminServer = &http.Server{
-		Addr:              fmt.Sprintf("127.0.0.1:%d", adminPort),
+		Addr:              adminListenAddr(adminPort),
 		Handler:           adminHandler,
 		ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
+		ReadTimeout:       config.DefaultServerReadTimeout,
+		WriteTimeout:      config.DefaultServerWriteTimeout,
+		IdleTimeout:       config.DefaultServerIdleTimeout,
 	}
 	go func() {
-		slog.Info("admin server starting", "port", adminPort)
+		slog.Info("admin server starting", "addr", a.AdminServer.Addr)
 		if err := a.AdminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("admin server failed", "error", err)
 		}
@@ -452,7 +488,7 @@ func (a *App) startAdminServer() {
 // startMetricsCollector periodically reports DB pool, WS connections, Redis hits, and bus queue length.
 func (a *App) startMetricsCollector(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(15 * time.Second)
+		ticker := time.NewTicker(config.MetricsCollectionInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			if sqlDB, err := a.DB.DB(); err == nil {
@@ -468,7 +504,7 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 
 // syncLegacySeqs copies existing session next_seq values from DB into Redis.
 func (a *App) syncLegacySeqs() {
-	ctx := context.Background()
+	ctx := a.coreCtx
 	var sessions []model.Session
 	if err := a.DB.Select("id, next_seq").Where("next_seq > 0").Find(&sessions).Error; err != nil {
 		slog.Warn("failed to query sessions for seq sync", "error", err)
@@ -488,7 +524,7 @@ func (a *App) syncLegacySeqs() {
 // ── WebSocket route callbacks ──────────────────────────────────────────────
 
 func (a *App) onRouteSet(userID, deviceType, connID, oldConnID string, wasOffline bool) {
-	ctx := context.Background()
+	ctx := a.coreCtx
 
 	if oldConnID != "" && oldConnID != connID {
 		a.CacheClient.MarkKicked(ctx, oldConnID)
@@ -516,16 +552,27 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 	if err != nil || len(tasks) == 0 {
 		return
 	}
+	conn := a.mgr.FindByConnID(connID)
+	edgeDeviceID := ""
+	if conn != nil {
+		edgeDeviceID = conn.DeviceID
+	}
 	for _, taskJSON := range tasks {
 		var payload json.RawMessage
 		if json.Unmarshal([]byte(taskJSON), &payload) == nil {
+			var meta struct {
+				TaskID string `json:"task_id"`
+			}
+			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
+				_ = repository.UpdatePendingTaskDispatched(a.DB, meta.TaskID, edgeDeviceID)
+			}
 			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
 		}
 	}
 }
 
 func (a *App) onRouteDel(userID, deviceType, connID string) {
-	ctx := context.Background()
+	ctx := a.coreCtx
 
 	kicked, _ := a.CacheClient.IsKicked(ctx, connID)
 	if !kicked {
@@ -559,6 +606,26 @@ func (a *App) broadcastOnlineStatus(ctx context.Context, userID string, online b
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+func newAdminMux() http.Handler {
+	metrics.Register()
+
+	adminMux := http.NewServeMux()
+	adminMux.HandleFunc("/debug/pprof/", pprof.Index)
+	adminMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	adminMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	adminMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	adminMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	adminMux.Handle("/metrics", promhttp.Handler())
+	return adminMux
+}
+
+func adminListenAddr(adminPort int) string {
+	if adminPort == 0 {
+		adminPort = 6060
+	}
+	return fmt.Sprintf("127.0.0.1:%d", adminPort)
+}
 
 func pprofBasicAuth(next http.Handler, user, pass string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
