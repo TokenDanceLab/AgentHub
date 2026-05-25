@@ -365,6 +365,7 @@ tokendance_id:
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "agenthub-client")
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "agenthub-secret")
 	t.Setenv("AGENTHUB_TOKENDANCE_ID_REDIRECT_URI", "https://hub.example/client/auth/oidc/callback")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "https://hub.example/auth/tokendance/callback, http://127.0.0.1/callback")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -384,6 +385,15 @@ tokendance_id:
 	}
 	if cfg.TokenDanceID.RedirectURI != "https://hub.example/client/auth/oidc/callback" {
 		t.Errorf("RedirectURI = %q", cfg.TokenDanceID.RedirectURI)
+	}
+	if len(cfg.TokenDanceID.AllowedRedirectURIs) != 2 {
+		t.Fatalf("AllowedRedirectURIs len = %d, want 2", len(cfg.TokenDanceID.AllowedRedirectURIs))
+	}
+	if cfg.TokenDanceID.AllowedRedirectURIs[0] != "https://hub.example/auth/tokendance/callback" {
+		t.Errorf("AllowedRedirectURIs[0] = %q", cfg.TokenDanceID.AllowedRedirectURIs[0])
+	}
+	if cfg.TokenDanceID.AllowedRedirectURIs[1] != "http://127.0.0.1/callback" {
+		t.Errorf("AllowedRedirectURIs[1] = %q", cfg.TokenDanceID.AllowedRedirectURIs[1])
 	}
 }
 

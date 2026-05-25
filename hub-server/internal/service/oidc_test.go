@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -117,7 +118,7 @@ func TestGenerateAuthorizationURL_Success(t *testing.T) {
 	svc, _, _ := setupOIDCTest(t)
 	ctx := context.Background()
 
-	result, err := svc.GenerateAuthorizationURL(ctx, "test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256", "desktop", "11111111-1111-4111-8111-111111111111")
+	result, err := svc.GenerateAuthorizationURL(ctx, "test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256", "desktop", "11111111-1111-4111-8111-111111111111", "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.State)
 	assert.Contains(t, result.AuthorizationURL, "https://id.example.com/oidc/authorize")
@@ -125,13 +126,67 @@ func TestGenerateAuthorizationURL_Success(t *testing.T) {
 	assert.Contains(t, result.AuthorizationURL, "code_challenge=test-challenge")
 	assert.Contains(t, result.AuthorizationURL, "code_challenge_method=S256")
 	assert.Contains(t, result.AuthorizationURL, "state="+result.State)
+	assert.Contains(t, result.AuthorizationURL, "redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fclient%2Fauth%2Foidc%2Fcallback")
+}
+
+func TestGenerateAuthorizationURL_AllowsConfiguredBrowserRedirectURI(t *testing.T) {
+	svc, _, _ := setupOIDCTest(t)
+	svc.cfg.AllowedRedirectURIs = []string{"https://hub.example/auth/tokendance/callback"}
+
+	result, err := svc.GenerateAuthorizationURL(context.Background(),
+		"test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256",
+		"web", "11111111-1111-4111-8111-111111111111",
+		"https://hub.example/auth/tokendance/callback")
+	require.NoError(t, err)
+
+	authURL, err := url.Parse(result.AuthorizationURL)
+	require.NoError(t, err)
+	assert.Equal(t, "https://hub.example/auth/tokendance/callback", authURL.Query().Get("redirect_uri"))
+}
+
+func TestGenerateAuthorizationURL_AllowsDesktopLoopbackDynamicPortWhenRegistered(t *testing.T) {
+	svc, _, _ := setupOIDCTest(t)
+	svc.cfg.AllowedRedirectURIs = []string{"http://127.0.0.1/callback"}
+
+	result, err := svc.GenerateAuthorizationURL(context.Background(),
+		"test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256",
+		"desktop", "11111111-1111-4111-8111-111111111111",
+		"http://127.0.0.1:49152/callback")
+	require.NoError(t, err)
+
+	authURL, err := url.Parse(result.AuthorizationURL)
+	require.NoError(t, err)
+	assert.Equal(t, "http://127.0.0.1:49152/callback", authURL.Query().Get("redirect_uri"))
+}
+
+func TestGenerateAuthorizationURL_RejectsUnlistedRedirectURI(t *testing.T) {
+	svc, _, _ := setupOIDCTest(t)
+
+	_, err := svc.GenerateAuthorizationURL(context.Background(),
+		"test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256",
+		"web", "11111111-1111-4111-8111-111111111111",
+		"https://evil.example/callback")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "redirect_uri is not allowed")
+}
+
+func TestGenerateAuthorizationURL_RejectsWebLoopbackDynamicPort(t *testing.T) {
+	svc, _, _ := setupOIDCTest(t)
+	svc.cfg.AllowedRedirectURIs = []string{"http://127.0.0.1/callback"}
+
+	_, err := svc.GenerateAuthorizationURL(context.Background(),
+		"test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256",
+		"web", "11111111-1111-4111-8111-111111111111",
+		"http://127.0.0.1:49152/callback")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "redirect_uri is not allowed")
 }
 
 func TestHandleCallback_InvalidState(t *testing.T) {
 	svc, _, _ := setupOIDCTest(t)
 	ctx := context.Background()
 
-	_, err := svc.HandleCallback(ctx, "test-code", "invalid-state", "verifier", "desktop", "11111111-1111-4111-8111-111111111111")
+	_, err := svc.HandleCallback(ctx, "test-code", "invalid-state", "verifier", "desktop", "11111111-1111-4111-8111-111111111111", "")
 	require.Error(t, err)
 }
 
@@ -145,13 +200,14 @@ func TestHandleCallback_StateExpired(t *testing.T) {
 		CodeChallengeMethod: "S256",
 		DeviceType:          "desktop",
 		DeviceID:            "11111111-1111-4111-8111-111111111111",
+		RedirectURI:         "http://localhost:8080/client/auth/oidc/callback",
 	}
 	entryJSON, _ := json.Marshal(entry)
 	mr.Set("oidc:state:expired-state", string(entryJSON))
 	// Fast-forward past TTL
 	mr.FastForward(11 * time.Minute)
 
-	_, err := svc.HandleCallback(ctx, "test-code", "expired-state", "verifier", "desktop", "11111111-1111-4111-8111-111111111111")
+	_, err := svc.HandleCallback(ctx, "test-code", "expired-state", "verifier", "desktop", "11111111-1111-4111-8111-111111111111", "")
 	assert.Error(t, err)
 }
 
@@ -159,7 +215,7 @@ func TestGenerateAuthorizationURL_InvalidDeviceType(t *testing.T) {
 	svc, _, _ := setupOIDCTest(t)
 	ctx := context.Background()
 
-	_, err := svc.GenerateAuthorizationURL(ctx, "test-challenge", "S256", "tokendance_bearer", "11111111-1111-4111-8111-111111111111")
+	_, err := svc.GenerateAuthorizationURL(ctx, "test-challenge", "S256", "tokendance_bearer", "11111111-1111-4111-8111-111111111111", "")
 	require.Error(t, err)
 }
 
@@ -167,7 +223,7 @@ func TestGenerateAuthorizationURL_RejectsNonS256PKCEMethod(t *testing.T) {
 	svc, _, _ := setupOIDCTest(t)
 	ctx := context.Background()
 
-	_, err := svc.GenerateAuthorizationURL(ctx, "test-challenge", "plain", "desktop", "11111111-1111-4111-8111-111111111111")
+	_, err := svc.GenerateAuthorizationURL(ctx, "test-challenge", "plain", "desktop", "11111111-1111-4111-8111-111111111111", "")
 	require.Error(t, err)
 }
 
@@ -218,10 +274,10 @@ func TestHandleCallback_SuccessUsesConfiguredJWKSAndIssuesHubSession(t *testing.
 	}, cacheClient)
 
 	deviceID := "11111111-1111-4111-8111-111111111111"
-	authz, err := svc.GenerateAuthorizationURL(context.Background(), "challenge-1", "S256", "desktop", deviceID)
+	authz, err := svc.GenerateAuthorizationURL(context.Background(), "challenge-1", "S256", "desktop", deviceID, "")
 	require.NoError(t, err)
 
-	result, err := svc.HandleCallback(context.Background(), "auth-code-1", authz.State, "verifier-1", "desktop", deviceID)
+	result, err := svc.HandleCallback(context.Background(), "auth-code-1", authz.State, "verifier-1", "desktop", deviceID, "")
 	require.NoError(t, err)
 	require.NotEmpty(t, result.AccessToken)
 	require.NotEmpty(t, result.RefreshToken)
