@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
@@ -742,6 +743,23 @@ func hasArg(args []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func TestSplitHubCallbackTextPreservesUTF8(t *testing.T) {
+	text := "ab你好cd"
+
+	chunks := splitHubCallbackText(text, 4)
+	if len(chunks) < 2 {
+		t.Fatalf("chunks = %#v, want multiple chunks", chunks)
+	}
+	for i, chunk := range chunks {
+		if !utf8.ValidString(chunk) {
+			t.Fatalf("chunk %d = %q is not valid UTF-8", i, chunk)
+		}
+	}
+	if got := strings.Join(chunks, ""); got != text {
+		t.Fatalf("joined chunks = %q, want %q", got, text)
+	}
 }
 
 // ── Result aggregation tests ───────────────────────────────────────────────

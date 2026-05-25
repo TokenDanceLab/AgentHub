@@ -17,9 +17,13 @@ import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { useEdgeStatus } from '@/hooks/useEdgeStatus';
 import { useAgentList } from '@/api/agentQueries';
+import { createHubClient } from '@/api/hubClient';
 import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
 import { useThreads, useThreadMessages } from '@/api/threadQueries';
 import { createThread } from '@/api/edgeClient';
+import { getAccessToken, useAuth } from '@/hooks/useAuth';
+import { useHubEventStream } from '@/hooks/useHubEventStream';
+import { useHubIntegration } from '@/hooks/useHubIntegration';
 import type { StartRunRequest } from '@shared/types';
 import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -97,6 +101,29 @@ function getActiveRunConflictId(error: unknown): string | undefined {
 
 function isEditableShortcutTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable]'));
+}
+
+function DesktopHubTaskBridge() {
+  const hubAuth = useAuth();
+
+  useEffect(() => {
+    if (!hubAuth.isAuthenticated && !hubAuth.token) {
+      void hubAuth.tryAutoLogin();
+    }
+  }, [hubAuth.isAuthenticated, hubAuth.token, hubAuth.tryAutoLogin]);
+
+  if (!hubAuth.isAuthenticated || !hubAuth.token) {
+    return null;
+  }
+
+  return <DesktopHubTaskBridgeActive />;
+}
+
+function DesktopHubTaskBridgeActive() {
+  const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
+  const hubRealtime = useHubEventStream(getAccessToken);
+  useHubIntegration({ hubWS: hubRealtime.hubWS, hubClient });
+  return null;
 }
 
 type TooltipSide = 'top' | 'right' | 'bottom' | 'left';
@@ -497,6 +524,7 @@ export default function App() {
   return (
     <ErrorBoundary>
     <div className={styles.root}>
+      <DesktopHubTaskBridge />
       {/* Top status bar — drag region + window controls */}
       <div className={styles.topBar} data-tauri-drag-region onDoubleClick={handleTopBarDoubleClick}>
         <div className={styles.topBarLeft}>
