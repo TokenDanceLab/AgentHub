@@ -6,13 +6,27 @@ import IMMessageView from '@/components/IM/IMMessageView';
 import IMMessageInput from '@/components/IM/IMMessageInput';
 import { useIMChat } from '@/hooks/useIMChat';
 import { useHubStore } from '@/stores/hubStore';
+import type { HubClient } from '@/api/hubClient';
 import type { HubWSHandle } from '@/api/hubWS';
 import type { ViewProps } from '@/config/viewRegistry';
 import styles from './IMView.module.css';
 
-export default function IMView({ hubWS: hubWsProp }: ViewProps) {
-  const hubWS = (hubWsProp ?? null) as HubWSHandle | null;
-  const { getSessionMessages, contacts, sendMessage, upsertContact } = useIMChat({
+export default function IMView(props: ViewProps) {
+  const hubWS = (props.hubWS ?? null) as HubWSHandle | null;
+  const hubClient = (props.hubClient ?? null) as HubClient | null;
+  const {
+    getSessionMessages,
+    loadSessionMessages,
+    contacts,
+    hubContacts,
+    sendMessage,
+    addContact,
+    createPrivateSession,
+    createGroupSession,
+    status,
+    error,
+  } = useIMChat({
+    hubClient,
     hubWS,
   });
   const userId = useHubStore((s) => s.userId);
@@ -28,22 +42,16 @@ export default function IMView({ hubWS: hubWsProp }: ViewProps) {
 
   const handleSelectContact = useCallback((contact: IMContact) => {
     setActiveSessionId(contact.id);
-  }, []);
+    void loadSessionMessages(contact.id);
+  }, [loadSessionMessages]);
 
   const handleSend = useCallback(
-    (content: string) => {
-      if (!activeSessionId) return;
-      sendMessage(activeSessionId, content);
+    async (content: string) => {
+      if (!activeSessionId) return false;
+      const result = await sendMessage(activeSessionId, content);
+      return result?.ok !== false;
     },
     [activeSessionId, sendMessage],
-  );
-
-  const handleAddContact = useCallback(
-    (name: string) => {
-      const id = `contact-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      upsertContact({ id, name, type: 'user', online: false });
-    },
-    [upsertContact],
   );
 
   // Not authenticated: show a prompt to connect
@@ -64,14 +72,29 @@ export default function IMView({ hubWS: hubWsProp }: ViewProps) {
       <div className={styles.contactPanel}>
         <IMContactList
           contacts={contacts}
+          hubContacts={hubContacts}
           selectedId={activeSessionId ?? undefined}
           onSelect={handleSelectContact}
-          onAdd={handleAddContact}
+          onAddContact={async (userId) => (await addContact(userId)).ok}
+          onCreatePrivateSession={async (userId) => (await createPrivateSession(userId)).ok}
+          onCreateGroupSession={async (name, memberIds) => (await createGroupSession(name, memberIds)).ok}
         />
       </div>
 
       <div className={styles.chatArea}>
-        {activeContact ? (
+        {status === 'loading' ? (
+          <div className={styles.noSelection}>
+            <span>Loading Hub sessions...</span>
+          </div>
+        ) : status === 'error' ? (
+          <div className={styles.noSelection} role="alert">
+            <span>{error ?? 'Hub messages are unavailable.'}</span>
+          </div>
+        ) : contacts.length === 0 ? (
+          <div className={styles.noSelection}>
+            <span>No Hub conversations yet</span>
+          </div>
+        ) : activeContact ? (
           <>
             <div className={styles.chatHeader}>
               <span className={styles.chatTitle}>{activeContact.name}</span>
@@ -86,7 +109,7 @@ export default function IMView({ hubWS: hubWsProp }: ViewProps) {
             <div className={styles.inputArea}>
               <IMMessageInput
                 onSend={handleSend}
-                disabled={!activeSessionId}
+                disabled={!activeSessionId || activeContact.dissolved}
               />
             </div>
           </>

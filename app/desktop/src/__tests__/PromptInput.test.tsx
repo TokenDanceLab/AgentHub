@@ -129,6 +129,25 @@ describe('PromptInput', () => {
     expect(onSend).toHaveBeenCalledWith('Test message', undefined, undefined);
   });
 
+  it('does not send on Shift+Enter', () => {
+    const onSend = vi.fn();
+    render(
+      <PromptInput
+        agents={[]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={onSend}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLTextAreaElement;
+    typeInPrompt(input, 'Line one');
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(input.value).toBe('Line one');
+  });
+
   it('does NOT call onSend when input is empty', () => {
     const onSend = vi.fn();
     render(
