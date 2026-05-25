@@ -1138,6 +1138,787 @@ paths:
         "200":
           description: Task marked failed.
 
+  # ═══════════════════════════════════════════════════════════
+  # Hub Server — additional implemented routes
+  # ═══════════════════════════════════════════════════════════
+
+  # ── Auth ──
+
+  /client/auth/change-password:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubChangePassword
+      summary: Change account password.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [old_password, new_password]
+              properties:
+                old_password: { type: string }
+                new_password: { type: string, minLength: 8 }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/auth/oidc/authorize:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubOidcAuthorize
+      summary: Generate OIDC PKCE authorization URL.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code_challenge, code_challenge_method]
+              properties:
+                code_challenge: { type: string }
+                code_challenge_method: { type: string, enum: [S256, plain] }
+                device_type: { type: string }
+                device_id: { type: string }
+      responses:
+        "200":
+          description: Authorization URL.
+
+  /client/auth/oidc/callback:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubOidcCallback
+      summary: OIDC callback — exchange code for tokens.
+      description: No Bearer token required; state parameter prevents CSRF.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, state, code_verifier]
+              properties:
+                code: { type: string }
+                state: { type: string }
+                code_verifier: { type: string }
+                device_type: { type: string }
+                device_id: { type: string }
+      responses:
+        "200":
+          description: JWT tokens.
+
+  # ── Contacts ──
+
+  /client/contacts/{userId}:
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubRemoveContact
+      summary: Remove a contact.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: Removed.
+
+  /client/contacts/{userId}:block:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubBlockContact
+      summary: Block a user.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/contacts/{userId}:unblock:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubUnblockContact
+      summary: Unblock a user.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/contacts/{userId}/remark:
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateRemark
+      summary: Update contact remark.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [remark]
+              properties:
+                remark: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Friend Requests ──
+
+  /client/friend-requests:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListFriendRequests
+      summary: List received friend requests.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/friend-requests/sent:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListSentFriendRequests
+      summary: List sent friend requests.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  # ── Session Members ──
+
+  /client/sessions/{id}/members:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListSessionMembers
+      summary: List session members.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubAddSessionMembers
+      summary: Add members to a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [members]
+              properties:
+                members:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /client/sessions/{id}/members/{memberId}:
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubRemoveSessionMember
+      summary: Remove a member from a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/MemberId"
+      responses:
+        "204":
+          description: Removed.
+
+  /client/sessions/{id}:leave:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubLeaveSession
+      summary: Leave a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Session Management ──
+
+  /client/sessions/{id}:dissolve:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubDissolveGroup
+      summary: Dissolve a group session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}:transfer-owner:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubTransferOwner
+      summary: Transfer session ownership.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_owner_user_id]
+              properties:
+                new_owner_user_id: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/settings:
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateSessionSettings
+      summary: Update session settings.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                avatar_url: { type: string }
+                announcement: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/member-settings:
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateMemberSettings
+      summary: Update member's own session settings.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pinned: { type: boolean }
+                muted: { type: boolean }
+                archived: { type: boolean }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Message Operations ──
+
+  /client/sessions/{id}/messages/search:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubSearchSessionMessages
+      summary: Search messages within a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/messages/search:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubSearchMessages
+      summary: Search messages across all sessions.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/sessions/{id}/messages/{msgId}:recall:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRecallMessage
+      summary: Recall (delete) a message.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/MsgId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/messages/{msgId}:pin:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPinMessage
+      summary: Pin a message.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/MsgId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/messages/{msgId}:unpin:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubUnpinMessage
+      summary: Unpin a message.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/MsgId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/messages/{msgId}:read:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubMarkMessageRead
+      summary: Mark a message as read.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/MsgId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/sessions/{id}/pins:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListPins
+      summary: List pinned messages in a session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/messages:forward:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubForwardMessages
+      summary: Forward messages to another session.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_ids, target_session_id]
+              properties:
+                message_ids:
+                  type: array
+                  items:
+                    type: string
+                target_session_id: { type: string }
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  # ── Attachments ──
+
+  /client/attachments:probe:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubProbeAttachment
+      summary: Check if an attachment exists by hash.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hash]
+              properties:
+                hash: { type: string }
+      responses:
+        "200":
+          description: Attachment metadata if present; null if absent.
+
+  /client/attachments:upload:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubUploadAttachment
+      summary: Upload an attachment.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /client/attachments/{id}:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubDownloadAttachment
+      summary: Download an attachment.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Attachment file (binary).
+        "404":
+          $ref: "#/components/responses/Error"
+
+  # ── Notifications ──
+
+  /client/notifications:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListNotifications
+      summary: List notifications.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: unread_only
+          in: query
+          required: false
+          schema: { type: boolean }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /client/notifications/{id}:read:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubMarkNotificationRead
+      summary: Mark a notification as read.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /client/notifications:read-all:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubReadAllNotifications
+      summary: Mark all notifications as read.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Custom Agents ──
+
+  /web/custom-agents:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListCustomAgents
+      summary: List custom agents.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateCustomAgent
+      summary: Create a custom agent.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, agent_type, system_prompt]
+              properties:
+                name: { type: string }
+                agent_type: { type: string }
+                system_prompt: { type: string }
+                capability_tags:
+                  type: array
+                  items:
+                    type: string
+                tool_whitelist:
+                  type: array
+                  items:
+                    type: string
+                model_params:
+                  type: object
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /web/custom-agents/{id}:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetCustomAgent
+      summary: Get a custom agent.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateCustomAgent
+      summary: Update a custom agent.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                agent_type: { type: string }
+                system_prompt: { type: string }
+                capability_tags:
+                  type: array
+                  items:
+                    type: string
+                tool_whitelist:
+                  type: array
+                  items:
+                    type: string
+                model_params:
+                  type: object
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteCustomAgent
+      summary: Delete a custom agent.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted.
+
+  # ── Edge / Web ──
+
+  /edge/devices:register:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRegisterDevice
+      summary: Register a device.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_type, device_name]
+              properties:
+                device_type: { type: string }
+                device_name: { type: string }
+                capabilities:
+                  type: object
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /web/agent-tasks/{id}:cancel:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCancelTask
+      summary: Cancel an agent task.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
   # ── Legacy / Planned (not yet implemented) ──────────────────
 
   /v1/auth/login:
@@ -1551,6 +2332,12 @@ components:
         type: string
     MemberId:
       name: memberId
+      in: path
+      required: true
+      schema:
+        type: string
+    MsgId:
+      name: msgId
       in: path
       required: true
       schema:

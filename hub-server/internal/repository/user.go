@@ -1,6 +1,9 @@
 package repository
 
 import (
+	"errors"
+	"time"
+
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
 )
@@ -49,4 +52,45 @@ func GetUsersByIDs(db *gorm.DB, ids []string) (map[string]*model.User, error) {
 		m[users[i].ID] = &users[i]
 	}
 	return m, nil
+}
+
+// FindByTokenDanceSub looks up a user by their TokenDance ID subject claim.
+func FindByTokenDanceSub(db *gorm.DB, sub string) (*model.User, error) {
+	var user model.User
+	err := db.Where("tokendance_sub = ?", sub).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// FindOrCreateByTokenDanceSub looks up an existing user by TokenDance ID sub,
+// or creates a new Hub user account linked to the sub on first login.
+func FindOrCreateByTokenDanceSub(db *gorm.DB, sub string) (*model.User, error) {
+	// Try to find existing user
+	user, err := FindByTokenDanceSub(db, sub)
+	if err == nil {
+		return user, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	// First login — auto-create a Hub user linked to this TokenDance ID sub.
+	// Username is derived from the sub prefix; password is empty (user must use OIDC login).
+	username := "td_" + sub
+	if len(username) > 32 {
+		username = username[:32]
+	}
+	now := time.Now()
+	user = &model.User{
+		Username:              username,
+		Nickname:              sub, // can be changed later
+		TokenDanceSub:         &sub,
+		TokenDanceSubLinkedAt: &now,
+	}
+	if err := CreateUser(db, user); err != nil {
+		return nil, err
+	}
+	return user, nil
 }
