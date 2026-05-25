@@ -180,6 +180,35 @@ export interface CustomAgentRequest {
 
 // ── Auth ─────────────────────────────────────────
 
+export interface OIDCAuthorizeRequest {
+  code_challenge: string;
+  code_challenge_method?: string;
+  device_type: string;
+  device_id: string;
+}
+
+export interface OIDCAuthorizeResponse {
+  state: string;
+  authorization_url: string;
+}
+
+export interface OIDCCallbackRequest {
+  code: string;
+  state: string;
+  code_verifier: string;
+  device_type: string;
+  device_id: string;
+}
+
+export interface OIDCCallbackResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  user: UserProfile;
+}
+
+// ... existing types ...
+
 export interface UpdateProfileRequest {
   nickname?: string;
   avatar_url?: string;
@@ -300,6 +329,20 @@ export function createHubClient(opts: HubClientOptions = {}) {
     changePassword: (data: ChangePasswordRequest) =>
       request<void>('/client/auth/password', {
         method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    // ── OIDC PKCE ─────────────────────────────────
+
+    oidcAuthorize: (data: OIDCAuthorizeRequest) =>
+      request<OIDCAuthorizeResponse>('/client/auth/oidc/authorize', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    oidcCallback: (data: OIDCCallbackRequest) =>
+      request<OIDCCallbackResponse>('/client/auth/oidc/callback', {
+        method: 'POST',
         body: JSON.stringify(data),
       }),
 
