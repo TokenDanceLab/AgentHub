@@ -140,18 +140,24 @@
 
 .inlineCode {
   padding: 1px 5px;
-  border-radius: 3px;
-  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  border-radius: 4px;
+  background: var(--chat-code-bg);
+  color: var(--foreground);
   font-family: var(--font-mono);
   font-size: 0.9em;
+}
+
+[data-theme='light'] .inlineCode {
+  background: var(--chat-code-bg);
+  color: inherit;
 }
 
 /* ── Code block wrapper ─────────────────────── */
 
 .codeBlockWrapper {
   margin: 0.5em 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 4px);
+  border: none;
+  border-radius: 8px;
   overflow: hidden;
 }
 

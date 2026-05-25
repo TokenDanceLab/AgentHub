@@ -1,7 +1,8 @@
 import { useRef, useState, useCallback } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Copy, RefreshCw, Trash2, ArrowDown, MessageSquare, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench } from 'lucide-react';
+import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench } from 'lucide-react';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
@@ -9,7 +10,7 @@ import EmptyState from './EmptyState';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
-import { CollapsibleBlock, Pill, TextShimmer } from '@shared/ui';
+import { TextShimmer } from '@shared/ui';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -197,6 +198,32 @@ function ToolResultRenderer({ result }: { result: ToolResultBlock }) {
   }
 }
 
+function StatusRow({
+  label,
+  meta,
+  children,
+}: {
+  label: string;
+  meta?: string;
+  children?: ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className={styles.statusRow}>
+      <button
+        className={styles.statusRowHeader}
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+      >
+        <span className={styles.chevron + (expanded ? ' ' + styles.chevronDown : '')}>▸</span>
+        <span className={styles.statusRowLabel}>{label}</span>
+        {meta && <span className={styles.statusRowMeta}>{meta}</span>}
+      </button>
+      {expanded && children && <div className={styles.statusRowBody}>{children}</div>}
+    </div>
+  );
+}
+
 // ── DiffCard ──────────────────────────────── (参考: Cline DiffEditRow + CCViewer DiffViewer)
 function DiffCard({ diff }: { diff: FileDiff }) {
   const { t } = useTranslation();
@@ -293,36 +320,31 @@ function BlockRenderer({
 
     case 'session_init':
       return (
-        <CollapsibleBlock
+        <StatusRow
           label={t('chat.sessionInit', { model: block.model ?? 'unknown' })}
-          badge={block.permissionMode ?? undefined}
-          icon="smart_toy"
-          colorScheme="blue"
-          defaultExpanded={false}
+          meta={block.permissionMode ?? undefined}
         >
           {block.tools && block.tools.length > 0 && (
             <div className={styles.sessionMeta}>
               <span className={styles.sessionMetaLabel}>Tools:</span>
               {block.tools.map((tool: string) => (
-                <Pill key={tool} variant="blue">{tool}</Pill>
+                <span key={tool} className={styles.inlinePill}>{tool}</span>
               ))}
             </div>
           )}
-        </CollapsibleBlock>
+        </StatusRow>
       );
 
     case 'result':
       return (
-        <CollapsibleBlock
+        <StatusRow
           label={block.success
             ? t('chat.result.success', {
                 input: String(block.tokenUsage?.input ?? '?'),
                 output: String(block.tokenUsage?.output ?? '?'),
               })
             : t('chat.result.failed', { error: block.error ?? 'unknown error' })}
-          icon={block.success ? 'check_circle' : 'error'}
-          colorScheme={block.success ? 'green' : 'red'}
-          defaultExpanded={false}
+          meta={block.success ? undefined : 'failed'}
         >
           {block.tokenUsage && (
             <div className={styles.tokenUsage}>
@@ -330,7 +352,7 @@ function BlockRenderer({
               <span>↓ {block.tokenUsage.output.toLocaleString()} tokens out</span>
             </div>
           )}
-        </CollapsibleBlock>
+        </StatusRow>
       );
 
     default:

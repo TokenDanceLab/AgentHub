@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Circle, Plus, Square, ArrowUp, LoaderCircle } from 'lucide-react';
+import { Circle, Plus, Settings2, Square, ArrowUp, LoaderCircle } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
 import { useInputDraft } from '@/hooks/useInputDraft';
 import { useMention } from '@/hooks/useMention';
@@ -18,8 +18,6 @@ const COMMON_MODELS = [
 
 const REASONING_EFFORTS = ['low', 'medium', 'high', 'max'] as const;
 type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
-
-const MAX_CHARS = 4000;
 
 interface SendOptions { model?: string; reasoningEffort?: ReasoningEffort; }
 
@@ -190,27 +188,6 @@ export default function PromptInput({
           rows={1}
         />
 
-        <div className={styles.routePreview} aria-label={t('prompt.routePreview')}>
-          <span className={styles.routeChip}>
-            <span>{t('prompt.routeProvider')}</span>
-            <strong>{resolvedRoute.provider ?? t('prompt.routeAuto')}</strong>
-          </span>
-          <span className={styles.routeChip}>
-            <span>{t('prompt.routeModel')}</span>
-            <strong>{resolvedRoute.model ?? t('prompt.routeAuto')}</strong>
-          </span>
-          <span className={styles.routeChip}>
-            <span>{t('prompt.routeReasoning')}</span>
-            <strong>{resolvedRoute.reasoningEffort ?? t('prompt.routeAuto')}</strong>
-          </span>
-          {resolvedRoute.modelAlias && (
-            <span className={styles.routeChip}>
-              <span>{t('prompt.routeAlias')}</span>
-              <strong>{resolvedRoute.modelAlias}</strong>
-            </span>
-          )}
-        </div>
-
         {/* bottom action bar */}
         <div className={styles.actions}>
           <div className={styles.leftGroup}>
@@ -223,10 +200,24 @@ export default function PromptInput({
             >
               <Plus size={16} strokeWidth={2.2} />
             </button>
-            <span className={styles.charCount}>{promptLength}/{MAX_CHARS}</span>
+            <button
+              type="button"
+              className={styles.attachBtn}
+              disabled={disabled || isStarting}
+              title={t('prompt.attachCustom')}
+              aria-label={t('prompt.attachCustom')}
+            >
+              <Settings2 size={15} strokeWidth={2.1} />
+            </button>
           </div>
 
           <div className={styles.rightGroup}>
+            <div className={styles.routePreview} aria-label={t('prompt.routePreview')}>
+              <span className={styles.providerPill}>
+                {resolvedRoute.provider ?? t('prompt.routeAuto')}
+              </span>
+              <span className={styles.contextGlyph} title={selectedAgent?.name ?? t('prompt.routeAuto')} aria-hidden="true" />
+            </div>
             <div className={styles.metaChain}>
               <ModelDropdown
                 options={[
@@ -234,14 +225,13 @@ export default function PromptInput({
                   ...COMMON_MODELS.map((m) => ({ value: m, label: m, group: 'Base Models', desc: modelDesc(m), meta: modelMeta(m), isAgent: false })),
                 ]}
                 value={model} onChange={setModel}
-                placeholder={t('prompt.model')} disabled={disabled || isStarting} ariaLabel={t('prompt.model')}
+                placeholder={resolvedRoute.model ?? t('prompt.model')} disabled={disabled || isStarting} ariaLabel={t('prompt.model')}
                 variant="text"
               />
-              {model && reasoningEffort && <span className={styles.metaDot}>·</span>}
               <ModelDropdown
                 options={REASONING_EFFORTS.map((r) => ({ value: r, label: r, group: 'Reasoning' }))}
                 value={reasoningEffort} onChange={(v) => setReasoningEffort(v as ReasoningEffort | '')}
-              placeholder={t('prompt.reasoning')} disabled={disabled || isStarting} ariaLabel={t('prompt.reasoning')} alignRight
+              placeholder={resolvedRoute.reasoningEffort ?? t('prompt.reasoning')} disabled={disabled || isStarting} ariaLabel={t('prompt.reasoning')} alignRight
               variant="text"
             />
           </div>
