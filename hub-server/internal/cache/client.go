@@ -183,6 +183,13 @@ func (c *Client) PeekSeq(ctx context.Context, sessionID string) (int64, error) {
 	return strconv.ParseInt(s, 10, 64)
 }
 
+// BlacklistRefreshToken stores a refresh token hash in the Redis blacklist
+// with the specified TTL. This allows fast revocation checks without hitting
+// the database.
+func (c *Client) BlacklistRefreshToken(ctx context.Context, tokenHash string, ttl time.Duration) error {
+	return c.rdb.Set(ctx, "rt_blacklist:"+tokenHash, "1", ttl).Err()
+}
+
 // PoolStats exposes the underlying Redis connection pool statistics.
 func (c *Client) PoolStats() *redis.PoolStats {
 	return c.rdb.PoolStats()

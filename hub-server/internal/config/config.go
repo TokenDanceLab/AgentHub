@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -120,8 +121,23 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("redis.port is invalid: %d", c.Redis.Port)
 	}
 
-	// JWT: reject hardcoded defaults.
-	if c.JWT.Secret == "" || c.JWT.Secret == "dev-secret-change-in-production" {
+	// JWT: reject hardcoded defaults and known weak development secrets.
+	// In production (default), any known hardcoded value is fatal.
+	// In dev/test environments these are allowed for convenience.
+	knownHardcodedSecrets := []string{
+		"",
+		"dev-secret-change-in-production",
+		"dev-secret",
+		"test-secret",
+		"my-secret-key",
+		"changeme",
+		"secret",
+		"default",
+		"password",
+		"1234567890123456",
+		"aaaaaaaaaaaaaaaa",
+	}
+	if slices.Contains(knownHardcodedSecrets, c.JWT.Secret) {
 		if os.Getenv("AGENTHUB_JWT_SECRET") == "" {
 			return errors.New("JWT secret must be set via AGENTHUB_JWT_SECRET environment variable; hardcoded defaults are rejected")
 		}

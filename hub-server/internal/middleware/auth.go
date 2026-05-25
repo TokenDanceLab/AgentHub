@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/agenthub/hub-server/internal/config"
@@ -49,6 +50,26 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		c.Set("device_type", claims.DeviceType)
 		c.Set("device_id", claims.DeviceID)
 		c.Set("auth_source", "hub_local")
+		c.Next()
+	}
+}
+
+// RequireLocalAuth is a middleware that blocks requests authenticated via
+// TokenDance ID bearer tokens from mutating Hub-local user resources.
+// TokenDance ID tokens are read-only for local user data (profile, password, etc.).
+// Apply this middleware after AuthMiddleware on write endpoints that modify
+// user-local resources.
+func RequireLocalAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.GetString("auth_source") == "tokendance_id" {
+			handler.Fail(c, &errcode.Error{
+				Code:       "FORBIDDEN",
+				Message:    "TokenDance bearer sessions cannot modify Hub-local user resources",
+				HTTPStatus: http.StatusForbidden,
+			})
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }
