@@ -34,9 +34,12 @@
   "metrics": {
     "aria": "项目指标",
     "activeTasks": "进行中任务",
+    "demoActiveTasks": "演示进行中任务",
     "milestones": "里程碑",
     "sharedFiles": "共享文件",
-    "dryRuns": "试运行"
+    "demoSharedFiles": "演示共享文件",
+    "dryRuns": "试运行",
+    "demoDryRuns": "演示试运行"
   },
   "board": {
     "tabsAria": "项目看板分区",

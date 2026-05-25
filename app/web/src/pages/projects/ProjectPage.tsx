@@ -106,7 +106,7 @@ const initialRisks: RiskItem[] = [
   {
     id: 'risk-no-api',
     title: 'Edge snapshot fallback',
-    detail: 'Live Edge data is preferred; mock preview data is shown only when that section has no snapshot data.',
+    detail: 'Live Edge data is preferred; demo fallback data is labeled when that section has no snapshot data.',
     status: 'Open',
     reviewable: true,
   },
@@ -1249,18 +1249,27 @@ export function ProjectPageInteractive() {
     mode: catalogMode,
     hasSectionSnapshot: hasLiveCatalog && workbenchState.artifacts.length > 0,
   });
+  const shouldUseDemoFallback = catalogMode === 'mock';
   const projectedProjects = hasLiveCatalog && workbenchState.projects.length
     ? workbenchState.projects.map(projectFromApi)
-    : projects;
+    : shouldUseDemoFallback
+      ? projects
+      : [];
   const projectedTasks = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map((run, index) => taskFromRun(run, index, workbenchState.runners))
-    : initialTasks;
+    : shouldUseDemoFallback
+      ? initialTasks
+      : [];
   const projectedFiles = hasLiveCatalog && workbenchState.artifacts.length
     ? workbenchState.artifacts.map(fileFromArtifact)
-    : initialFiles;
+    : shouldUseDemoFallback
+      ? initialFiles
+      : [];
   const projectedRuns = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map(runRecordFromApi)
-    : initialRuns;
+    : shouldUseDemoFallback
+      ? initialRuns
+      : [];
 
   const viewLabels: Record<BoardView, string> = {
     overview: t('sidebar.navOverview'),
@@ -1678,7 +1687,11 @@ export function ProjectPageInteractive() {
               <span className="projectMetricIcon">TK</span>
               <div>
                 <strong>{activeTaskCount}</strong>
-                <span>{t('metrics.activeTasks')}</span>
+                <span>
+                  {shouldUseDemoFallback
+                    ? t('metrics.demoActiveTasks', { defaultValue: t('metrics.activeTasks') })
+                    : t('metrics.activeTasks')}
+                </span>
               </div>
             </article>
             <article className="projectMetric projectGlass">
@@ -1692,14 +1705,22 @@ export function ProjectPageInteractive() {
               <span className="projectMetricIcon">FL</span>
               <div>
                 <strong>{projectedFiles.length}</strong>
-                <span>{t('metrics.sharedFiles')}</span>
+                <span>
+                  {shouldUseDemoFallback
+                    ? t('metrics.demoSharedFiles', { defaultValue: t('metrics.sharedFiles') })
+                    : t('metrics.sharedFiles')}
+                </span>
               </div>
             </article>
             <article className="projectMetric projectGlass">
               <span className={`projectPill ${catalogTone}`}>{catalogLabel}</span>
               <div>
                 <strong>{projectRuns.length}</strong>
-                <span>{t('metrics.dryRuns')}</span>
+                <span>
+                  {shouldUseDemoFallback
+                    ? t('metrics.demoDryRuns', { defaultValue: t('metrics.dryRuns') })
+                    : t('metrics.dryRuns')}
+                </span>
               </div>
             </article>
           </section>
