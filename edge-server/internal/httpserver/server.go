@@ -15,6 +15,7 @@ import (
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runners"
@@ -30,6 +31,8 @@ type Config struct {
 	AdapterRegistry *adapters.Registry // agent adapter registry; nil = none registered
 	AgentDefault    string             // default agent adapter ID; empty = raw stdout capture
 	LocalAuthToken  string             // optional local bearer token for non-health Edge APIs
+	HubURL          string             // Hub server base URL for Edge->Hub direct callbacks
+	HubToken        string             // JWT bearer token for Hub callback authentication
 }
 
 const defaultRESTRequestTimeout = 30 * time.Second
@@ -127,6 +130,14 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		}
 		processExecutor.SetMetrics(edgeMetrics)
 		processExecutor.WithAgentRegistry(agentReg).WithMessageQueue(msgQueue).WithResultAggregator(resultAgg)
+
+		// Wire Hub callback client for Edge-to-Hub direct bridge
+		if cfg.HubURL != "" {
+			hubClient := hub.NewCallbackClient(cfg.HubURL, cfg.HubToken)
+			processExecutor.WithHubCallback(hubClient)
+			slog.Info("edge-to-hub direct callback enabled", "hubURL", cfg.HubURL)
+		}
+
 		executor = processExecutor
 	}
 	configureLocalRunner(reg, cfg.ProcessExecutor, agentAdapterForRegistry(cfg.AdapterRegistry, cfg.AgentDefault), executor)
@@ -290,7 +301,7 @@ func requestHasLocalAuthToken(r *http.Request, want string) bool {
 		candidates = append(candidates, strings.TrimSpace(r.URL.Query().Get("access_token")))
 	}
 	for _, got := range candidates {
-		// Skip TokenDance bearer tokens (td_ prefix) — they are NOT Edge sessions.
+		// Skip TokenDance bearer tokens (td_ prefix) - they are NOT Edge sessions.
 		if strings.HasPrefix(got, "td_") {
 			continue
 		}
