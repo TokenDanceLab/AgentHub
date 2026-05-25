@@ -505,7 +505,11 @@ func (s *SessionService) DeleteForMe(ctx context.Context, currentUserID, session
 		}
 	}
 
-	return repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID)
+	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID); err != nil {
+		return err
+	}
+	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
+	return nil
 }
 
 func (s *SessionService) SearchSessions(ctx context.Context, userID, q string) ([]SessionListItem, error) {
