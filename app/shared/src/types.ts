@@ -11,6 +11,25 @@ export interface HealthResponse {
   checks?: HealthChecks;
 }
 
+export interface HealthCheck {
+  status: string;
+  message?: string;
+}
+
+export interface RunnerHealthCheck {
+  status: string;
+  message?: string;
+  runnerIds?: string[];
+}
+
+export interface HealthChecks {
+  store?: HealthCheck;
+  adapters?: HealthCheck;
+  executor?: HealthCheck;
+  runners?: RunnerHealthCheck;
+  [name: string]: HealthCheck | RunnerHealthCheck | undefined;
+}
+
 export interface PageInfo {
   nextCursor?: string;
   hasMore: boolean;
