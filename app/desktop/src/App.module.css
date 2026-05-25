@@ -514,7 +514,7 @@
 .chatArea {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden; /* scrolling handled by ChatView .stream; avoid nested scroll containers */
 }
 
 /* ── Input area ────────────────────────────── */

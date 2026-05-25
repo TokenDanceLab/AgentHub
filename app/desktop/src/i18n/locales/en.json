@@ -697,5 +697,8 @@
   "connectAgent.url": "Agent URL",
   "connectAgent.connect": "Connect",
   "connectAgent.connected": "Connected",
-  "connectAgent.disconnected": "Disconnected"
+  "connectAgent.disconnected": "Disconnected",
+  "window.minimize": "Minimize",
+  "window.maximize": "Maximize",
+  "window.close": "Close"
 }

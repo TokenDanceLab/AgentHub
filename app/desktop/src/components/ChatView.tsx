@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Copy, RefreshCw, Trash2, ArrowDown, MessageSquare } from 'lucide-react';
+import { Copy, RefreshCw, Trash2, ArrowDown, MessageSquare, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench } from 'lucide-react';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
@@ -22,18 +22,23 @@ interface Props {
 }
 
 // ── Tool icons ───────────────────────────────
-const TOOL_ICONS: Record<string, string> = {
-  Read: '📖',
-  Write: '✏️',
-  Edit: '✏️',
-  Bash: '⚡',
-  Grep: '🔍',
-  Glob: '📂',
-  WebFetch: '🌐',
-  WebSearch: '🌐',
-  Task: '🤖',
-  TodoWrite: '✅',
+const TOOL_ICON_MAP: Record<string, typeof FileText> = {
+  Read: FileText,
+  Write: Pencil,
+  Edit: Pencil,
+  Bash: Terminal,
+  Grep: Search,
+  Glob: FolderOpen,
+  WebFetch: Globe,
+  WebSearch: Globe,
+  Task: Bot,
+  TodoWrite: CheckSquare,
 };
+
+function resolveToolIcon(toolName: string) {
+  const Icon = TOOL_ICON_MAP[toolName] ?? Wrench;
+  return <Icon size={14} />;
+}
 
 function summarizeInput(input: Record<string, unknown>): string {
   const parts: string[] = [];
@@ -121,7 +126,7 @@ function StreamingTextBlock({ content, isStreaming }: { content: string; isStrea
 function ToolUseBlock({ block }: { block: Extract<MessageBlock, { kind: 'tool_use' }> }) {
   const [expanded, setExpanded] = useState(false);
   const [showParams, setShowParams] = useState(false);
-  const icon = TOOL_ICONS[block.toolName] ?? '🔧';
+  const iconEl = resolveToolIcon(block.toolName);
 
   return (
     <div className={styles.toolUseContainer}>
@@ -130,7 +135,7 @@ function ToolUseBlock({ block }: { block: Extract<MessageBlock, { kind: 'tool_us
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
-        <span className={styles.toolIcon}>{icon}</span>
+        <span className={styles.toolIcon}>{iconEl}</span>
         <span className={styles.toolName}>{block.toolName}</span>
         <span className={styles.toolParamSummary}>{summarizeInput(block.input)}</span>
         <span
@@ -373,7 +378,13 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 200,
+    estimateSize: (index: number) => {
+      const msg = messages[index];
+      if (!msg) return 200;
+      if (msg.role === 'system') return 80;
+      if (msg.blocks.some((b) => b.kind === 'tool_use')) return 300;
+      return 160;
+    },
     overscan: 5,
     getItemKey: (index: number) => messages[index].id,
   });
