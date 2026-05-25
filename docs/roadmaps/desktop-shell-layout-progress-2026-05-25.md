@@ -47,6 +47,8 @@ Write scope:
 - Fixed welcome focus behavior by locating the prompt textarea through stable textarea selectors instead of an English-only placeholder.
 - Shared the derived local Agent Profile alias logic across Settings, Welcome, and the prompt composer.
 - Made the bottom prompt composer follow the selected Agent Profile route by default: selecting Codex now previews and sends `sonnet -> claude-sonnet-4-6 / anthropic / high` unless the user manually overrides the model.
+- Replaced shell-level icon-only button `title` hints with a shared glass tooltip behavior for the window controls, mobile toolbar, collapsed rails, sidebar footer, workspace header, and right-panel collapse button.
+- Preserved touch/mobile ergonomics by hiding tooltip popovers on touch-sized viewports while keeping `aria-label` and `aria-describedby` semantics for assistive technology.
 
 ## Verification
 
@@ -80,6 +82,9 @@ Write scope:
 - `cd app/desktop && corepack.cmd pnpm typecheck`
 - `cd app/desktop && python -m json.tool src\i18n\locales\en.json > $null; python -m json.tool src\i18n\locales\zh.json > $null`
 - Playwright composer selected-Agent Profile route check at `1440x960` and `390x844`: with real Local Edge `/v1/agents`, selected Codex from the shell Agent list, verified the bottom composer preview displayed `anthropic / claude-sonnet-4-6 / high / sonnet`, submitted through Enter, and verified the `/v1/runs` body carried `agentId=codex`, `modelAlias=sonnet`, `model=claude-sonnet-4-6`, `provider=anthropic`, `reasoningEffort=high`, with no console errors or horizontal overflow. Screenshots: `app/desktop/screenshots/prompt-selected-agent-profile-route-desktop.png`, `app/desktop/screenshots/prompt-selected-agent-profile-route-mobile.png`.
+- `cd app/desktop && corepack.cmd pnpm typecheck`
+- Playwright shell tooltip check at `1440x960`: with `/v1/threads` mocked empty and real Local Edge status, hovered and keyboard-tabbed to the workspace share icon, verified `role=tooltip`, `aria-describedby`, visible opacity, glass `blur(18px) saturate(1.12)`, no console errors, and no horizontal overflow. Screenshot: `app/desktop/screenshots/shell-icon-tooltips-desktop.png`.
+- Playwright mobile shell check at `390x844`: verified the mobile toolbar keeps tooltip nodes semantically attached but hides popovers with `display: none`, with no console errors or horizontal overflow. Screenshot: `app/desktop/screenshots/shell-icon-tooltips-mobile.png`.
 
 ## Follow-up
 
@@ -90,3 +95,4 @@ Write scope:
 - Next Agent Profile step: replace the derived readiness cards with editable local Profile persistence once the Agent/Profile API boundary lands.
 - Next welcome step: surface a first-run empty state that can create a real thread explicitly once Edge exposes thread creation as a first-class client action.
 - Next composer step: expose the selected Profile alias as a visible editable chip once persisted local Agent Profiles replace the derived mapping.
+- Next shell polish step: move `ShellIconButton` into shared UI once `app/shared/src/ui` type resolution is stable, then apply the same tooltip primitive to Settings and RunDetail icon-only controls.
