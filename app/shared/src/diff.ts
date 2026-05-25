@@ -98,14 +98,16 @@ export function parseUnifiedPatch(patch: string): ParsedPatch {
           const prevLine = lines[lines.length - 1];
           if (prevLine && (prevLine.type === 'context' || prevLine.type === 'deleted')) {
             const lastIdx = beforeLines.length - 1;
-            if (lastIdx >= 0 && beforeLines[lastIdx].endsWith('\n')) {
-              beforeLines[lastIdx] = beforeLines[lastIdx].slice(0, -1);
+            const lastBefore = lastIdx >= 0 ? beforeLines[lastIdx] : undefined;
+            if (lastBefore?.endsWith('\n')) {
+              beforeLines[lastIdx] = lastBefore.slice(0, -1);
             }
           }
           if (prevLine && (prevLine.type === 'context' || prevLine.type === 'added')) {
             const lastIdx = afterLines.length - 1;
-            if (lastIdx >= 0 && afterLines[lastIdx].endsWith('\n')) {
-              afterLines[lastIdx] = afterLines[lastIdx].slice(0, -1);
+            const lastAfter = lastIdx >= 0 ? afterLines[lastIdx] : undefined;
+            if (lastAfter?.endsWith('\n')) {
+              afterLines[lastIdx] = lastAfter.slice(0, -1);
             }
           }
           continue;

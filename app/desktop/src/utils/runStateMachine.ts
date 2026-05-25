@@ -87,6 +87,9 @@ export class RunStateMachine {
 
   /** Attempt a transition. Returns true if the transition is valid. */
   transition(to: RunState): boolean {
+    if (to === this._state) {
+      return true;
+    }
     const valid = TRANSITIONS[this._state];
     if (valid?.includes(to)) {
       this._state = to;

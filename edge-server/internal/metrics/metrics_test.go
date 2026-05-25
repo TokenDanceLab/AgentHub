@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -35,6 +37,22 @@ func TestMetricsWithoutBusDepth(t *testing.T) {
 	// EventBusDepth should be zero-value (nil GaugeFunc)
 	if m.EdgeEventBusDepth != nil {
 		t.Fatal("EdgeEventBusDepth should be nil when busDepthFn is nil")
+	}
+}
+
+func TestMetricsExposeEventBusDroppedTotal(t *testing.T) {
+	m := NewWithBusStats(
+		func() float64 { return 42 },
+		func() float64 { return 7 },
+	)
+
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "edge_event_bus_dropped_total 7") {
+		t.Fatalf("metrics output missing dropped event count: %s", body)
 	}
 }
 

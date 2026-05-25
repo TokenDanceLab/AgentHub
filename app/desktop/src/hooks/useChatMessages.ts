@@ -1,5 +1,6 @@
 // Builds ChatMessage objects from WebSocket agent events.
 // P0-1: Uses RunState enum for typed status values.
+// P0-1: Run lifecycle events invalidate TanStack Query caches; streaming state stays local.
 // Status transitions are validated in runStore; invalid jumps are logged here as warnings.
 
 import { useReducer, useEffect, useRef, useCallback } from 'react';
@@ -9,8 +10,10 @@ import type { EventEnvelope } from '@shared/events';
 import type { ChatMessage, MessageBlock, ToolResultBlock } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useToastStore } from '@/stores/toastStore';
+import { useRunStore } from '@/stores/runStore';
 import { RunState } from '@/utils/runStateMachine';
 import { cancelRun } from '@/api/edgeClient';
+import { queryClient } from '@/api/queryClient';
 
 const MAX_MESSAGES = 500;
 const MAX_OUTPUT_TEXT = 20000;
@@ -154,16 +157,7 @@ function processEvent(state: State, event: EventEnvelope): State {
 
   switch (event.type) {
     case 'run.queued': {
-      const rid = event.payload.runId as string;
-      messages = [
-        ...messages,
-        {
-          id: `run-${rid}`,
-          role: 'system',
-          timestamp: ts,
-          blocks: [{ kind: 'text', content: 'Run queued...' } as MessageBlock],
-        },
-      ];
+      // Silently track – rendering handled by streaming indicator
       break;
     }
 
@@ -177,15 +171,6 @@ function processEvent(state: State, event: EventEnvelope): State {
         changedFiles: [],
         tasks: [],
       };
-      messages = [
-        ...messages,
-        {
-          id: `run-${rid}`,
-          role: 'system',
-          timestamp: ts,
-          blocks: [],
-        },
-      ];
       isStreaming = true;
       agentName = '';
       break;
@@ -444,7 +429,12 @@ function processEvent(state: State, event: EventEnvelope): State {
       isStreaming = false;
       const rid = event.payload.runId as string;
       if (currentRun && currentRun.runId === rid) {
-        if (currentRun.status !== RunState.COMPLETED) {
+        if (
+          currentRun.status !== RunState.RUNNING &&
+          currentRun.status !== RunState.STREAMING &&
+          currentRun.status !== RunState.WAITING_FOR_INPUT &&
+          currentRun.status !== RunState.COMPLETED
+        ) {
           console.warn(
             `[useChatMessages] run.finished: unexpected status ${currentRun.status} → ${RunState.COMPLETED}`,
           );
@@ -654,8 +644,19 @@ export function useChatMessages(online: boolean): ChatState {
 
       // Reset loop detector on new run
       if (event.type === 'run.started') {
-        currentRunIdRef.current = event.payload.runId as string;
+        const runId = event.payload.runId as string;
+        currentRunIdRef.current = runId;
         loopDetectorRef.current.clear();
+        useRunStore.getState().setRun(runId);
+      } else if (event.type === 'run.finished') {
+        useRunStore.getState().setRunState(RunState.COMPLETED);
+        queryClient.invalidateQueries({ queryKey: ['runs'] });
+      } else if (event.type === 'run.failed') {
+        useRunStore.getState().setRunState(RunState.FAILED);
+        queryClient.invalidateQueries({ queryKey: ['runs'] });
+      } else if (event.type === 'run.cancelled') {
+        useRunStore.getState().setRunState(RunState.CANCELLED);
+        queryClient.invalidateQueries({ queryKey: ['runs'] });
       }
 
       dispatch({ type: 'EVENT_RECEIVED', event });
