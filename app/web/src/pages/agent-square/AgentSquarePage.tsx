@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { mockRunners } from '@shared/index';
 
 type AgentCategory = 'Engineering' | 'Design' | 'Operations' | 'Research';
@@ -150,18 +151,6 @@ const initialFavoriteIds = new Set<string>(['refactor', mockRunners[0]?.id].filt
 const initialInstalledIds = new Set<string>(['refactor', mockRunners[0]?.id, mockRunners[1]?.id].filter(Boolean) as string[]);
 const workspaceLimit = 8;
 
-const sortLabels: Record<SortMode, string> = {
-  popular: 'Most staged',
-  rating: 'Highest rated',
-  recent: 'Recently updated',
-};
-
-const viewModeLabels: Record<ViewMode, string> = {
-  all: 'All agents',
-  favorites: 'Only favorites',
-  installed: 'Only locally staged',
-};
-
 function formatInstalls(installs: number): string {
   return `${(installs / 1000).toFixed(1)}k`;
 }
@@ -290,6 +279,20 @@ export function AgentSquarePageInteractive() {
   const [sortMode, setSortMode] = useState<SortMode>('popular');
   const [viewMode, setViewMode] = useState<ViewMode>('all');
 
+  const { t } = useTranslation('agentSquare');
+
+  const sortLabels = useMemo<Record<SortMode, string>>(() => ({
+    popular: t('sort.popular'),
+    rating: t('sort.rating'),
+    recent: t('sort.recent'),
+  }), [t]);
+
+  const viewModeLabels = useMemo<Record<ViewMode, string>>(() => ({
+    all: t('viewMode.all'),
+    favorites: t('viewMode.favorites'),
+    installed: t('viewMode.installed'),
+  }), [t]);
+
   const detailAgent = isDetailOpen ? agents.find((agent) => agent.id === detailAgentId) ?? null : null;
   const hasActiveFilters = activeCategory !== 'All' || query.trim().length > 0 || viewMode !== 'all';
   const workspaceIsFull = installedIds.size >= workspaceLimit;
@@ -382,8 +385,8 @@ export function AgentSquarePageInteractive() {
     setViewMode('all');
     setConfirmation({
       id: `clear-${Date.now()}`,
-      message: 'The catalog is back to the full local preview set.',
-      title: 'Filters cleared',
+      message: t('filters.cleared'),
+      title: t('filters.clearedTitle'),
     });
   }
 
@@ -412,8 +415,8 @@ export function AgentSquarePageInteractive() {
       setConfirmation({
         actionAgentId: agent.id,
         id: `favorite-${agent.id}-${Date.now()}`,
-        message: `${formatInstalls(getDisplayFavoriteCount(agent.id) + (wasFavorite ? -1 : 1))} local saves are now shown on the card.`,
-        title: wasFavorite ? `${agent.name} removed from favorites` : `${agent.name} saved`,
+        message: t('confirm.savesUpdated', { count: formatInstalls(getDisplayFavoriteCount(agent.id) + (wasFavorite ? -1 : 1)) }),
+        title: wasFavorite ? t('confirm.removed', { name: agent.name }) : t('confirm.added', { name: agent.name }),
       });
     }
   }
@@ -430,8 +433,8 @@ export function AgentSquarePageInteractive() {
       setConfirmation({
         actionAgentId: agentId,
         id: `installed-${agentId}-${Date.now()}`,
-        message: 'This agent is already staged in the current workspace.',
-        title: `${agent.name} already locally staged`,
+        message: t('confirm.alreadyStaged'),
+        title: t('confirm.alreadyStagedTitle', { name: agent.name }),
       });
       return;
     }
@@ -440,8 +443,8 @@ export function AgentSquarePageInteractive() {
       setConfirmation({
         actionAgentId: agentId,
         id: `full-${agentId}-${Date.now()}`,
-        message: `The workspace limit is ${workspaceLimit} local agents. Remove one before adding another.`,
-        title: 'Workspace is full',
+        message: t('workspace.full', { limit: workspaceLimit }),
+        title: t('workspace.fullTitle'),
       });
       return;
     }
@@ -455,8 +458,8 @@ export function AgentSquarePageInteractive() {
     setConfirmation({
       actionAgentId: agentId,
       id: `add-${agentId}-${Date.now()}`,
-      message: `${installedIds.size + 1} of ${workspaceLimit} workspace slots are now staged.`,
-      title: `${agent.name} locally staged`,
+      message: t('confirm.staged', { count: installedIds.size + 1, limit: workspaceLimit }),
+      title: t('confirm.stagedTitle', { name: agent.name }),
     });
   }
 
@@ -471,17 +474,17 @@ export function AgentSquarePageInteractive() {
             <div className="asr-brand">
               <span className="asr-brand-mark">AH</span>
               <div className="asr-truncate asr-title">
-                <h2>AGENTHUB</h2>
-                <p className="asr-brand-sub">Agent Square</p>
+                <h2>{t('brand.title')}</h2>
+                <p className="asr-brand-sub">{t('brand.subtitle')}</p>
               </div>
             </div>
 
             <section className="asr-stack">
               <div className="asr-section-head">
-                <h3>Navigation</h3>
+                <h3>{t('sidebar.nav')}</h3>
                 <span className="asr-pill asr-pill-cyan">
                   <span className="asr-status-dot" />
-                  Local
+                  {t('sidebar.local')}
                 </span>
               </div>
 
@@ -495,8 +498,8 @@ export function AgentSquarePageInteractive() {
                     <span className="material-symbols-outlined">storefront</span>
                   </div>
                   <div className="asr-truncate">
-                    <strong className="asr-small">Catalog preview</strong>
-                    <p className="asr-tiny asr-muted asr-truncate">Browse mock agents</p>
+                    <strong className="asr-small">{t('sidebar.catalog')}</strong>
+                    <p className="asr-tiny asr-muted asr-truncate">{t('sidebar.catalogDesc')}</p>
                   </div>
                 </button>
 
@@ -509,8 +512,8 @@ export function AgentSquarePageInteractive() {
                     <span className="material-symbols-outlined">dashboard</span>
                   </div>
                   <div className="asr-truncate">
-                    <strong className="asr-small">Workspace</strong>
-                    <p className="asr-tiny asr-muted asr-truncate">{installedIds.size} locally staged</p>
+                    <strong className="asr-small">{t('sidebar.workspace')}</strong>
+                    <p className="asr-tiny asr-muted asr-truncate">{t('sidebar.workspaceDesc', { count: installedIds.size })}</p>
                   </div>
                 </button>
 
@@ -523,8 +526,8 @@ export function AgentSquarePageInteractive() {
                     <span className="material-symbols-outlined">bookmark</span>
                   </div>
                   <div className="asr-truncate">
-                    <strong className="asr-small">Favorites</strong>
-                    <p className="asr-tiny asr-muted asr-truncate">{favoriteIds.size} saved agents</p>
+                    <strong className="asr-small">{t('sidebar.favorites')}</strong>
+                    <p className="asr-tiny asr-muted asr-truncate">{t('sidebar.favoritesDesc', { count: favoriteIds.size })}</p>
                   </div>
                 </button>
               </div>
@@ -532,8 +535,8 @@ export function AgentSquarePageInteractive() {
 
             <section className="asr-stack">
               <div className="asr-section-head">
-                <h3>Categories</h3>
-                <span className="asr-tiny asr-muted">Preview filters</span>
+                <h3>{t('sidebar.categories')}</h3>
+                <span className="asr-tiny asr-muted">{t('sidebar.categoriesDesc')}</span>
               </div>
               <div className="asr-category-list">
                 {categories.map((category) => (
@@ -543,7 +546,7 @@ export function AgentSquarePageInteractive() {
                     onClick={() => setActiveCategory(category)}
                     type="button"
                   >
-                    <span>{category === 'All' ? 'All agents' : category}</span>
+                    <span>{category === 'All' ? t('categories.all') : category}</span>
                     <span className={cx('asr-pill', category === 'Engineering' && 'asr-pill-cyan', category === 'Design' && 'asr-pill-purple', category === 'Operations' && 'asr-pill-green')}>
                       {categoryCounts.get(category)}
                     </span>
@@ -554,37 +557,37 @@ export function AgentSquarePageInteractive() {
 
             <section className="asr-sidebar-card asr-glass">
               <div className="asr-mini-row">
-                <span className="asr-label asr-muted">Workspace slots</span>
+                <span className="asr-label asr-muted">{t('sidebar.slots')}</span>
                 <strong className="asr-small">{installedIds.size} / {workspaceLimit}</strong>
               </div>
               <div className="asr-progress">
                 <span style={{ width: `${Math.min((installedIds.size / workspaceLimit) * 100, 100)}%` }} />
               </div>
-              <p className="asr-small asr-muted">Locally staged agents stay in this preview; Hub sync is not connected.</p>
+              <p className="asr-small asr-muted">{t('sidebar.slotsDesc')}</p>
             </section>
           </aside>
 
           <main className="asr-main">
             <header className="asr-topbar asr-glass">
               <div>
-                <p className="asr-label asr-muted">Mock catalog</p>
-                <h1>Find the right specialist before a run starts</h1>
-                <p className="asr-small asr-muted">Local catalog preview only. Hub /web/custom-agents is not connected yet.</p>
+                <p className="asr-label asr-muted">{t('header.title')}</p>
+                <h1>{t('header.subtitle')}</h1>
+                <p className="asr-small asr-muted">{t('header.description')}</p>
               </div>
 
               <div className="asr-toolbar">
                 <label className="asr-search">
                   <span className="material-symbols-outlined">search</span>
                   <input
-                    aria-label="Search agents"
+                    aria-label={t('search.ariaLabel')}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search agents or skills"
+                    placeholder={t('search.placeholder')}
                     value={query}
                   />
                 </label>
 
                 <select
-                  aria-label="Sort agents"
+                  aria-label={t('search.sortLabel')}
                   className="asr-select"
                   onChange={(event) => setSortMode(event.target.value as SortMode)}
                   value={sortMode}
@@ -605,7 +608,7 @@ export function AgentSquarePageInteractive() {
                 </div>
                 <div>
                   <strong>{agents.length}</strong>
-                  <span className="asr-small asr-muted">Mock catalog agents</span>
+                  <span className="asr-small asr-muted">{t('stats.curated')}</span>
                 </div>
               </div>
               <div className="asr-metric-card asr-glass">
@@ -614,7 +617,7 @@ export function AgentSquarePageInteractive() {
                 </div>
                 <div>
                   <strong>{installedIds.size}</strong>
-                  <span className="asr-small asr-muted">Local workspace ready</span>
+                  <span className="asr-small asr-muted">{t('stats.ready')}</span>
                 </div>
               </div>
               <div className="asr-metric-card asr-glass">
@@ -623,7 +626,7 @@ export function AgentSquarePageInteractive() {
                 </div>
                 <div>
                   <strong>{favoriteIds.size}</strong>
-                  <span className="asr-small asr-muted">Favorites</span>
+                  <span className="asr-small asr-muted">{t('stats.favorites')}</span>
                 </div>
               </div>
               <div className="asr-metric-card asr-glass">
@@ -632,7 +635,7 @@ export function AgentSquarePageInteractive() {
                 </div>
                 <div>
                   <strong>98%</strong>
-                  <span className="asr-small asr-muted">Preview checks</span>
+                  <span className="asr-small asr-muted">{t('stats.policy')}</span>
                 </div>
               </div>
             </section>
@@ -640,15 +643,15 @@ export function AgentSquarePageInteractive() {
             <section className="asr-market asr-glass">
               <div className="asr-market-head">
                 <div>
-                  <p className="asr-label asr-muted">Local catalog</p>
-                  <h2>Staged specialists</h2>
+                  <p className="asr-label asr-muted">{t('catalog.title')}</p>
+                  <h2>{t('catalog.subtitle')}</h2>
                 </div>
                 <div className="asr-filter-summary">
-                  <span className="asr-pill asr-pill-cyan">Showing {filteredAgents.length} agents</span>
+                  <span className="asr-pill asr-pill-cyan">{t('catalog.showing', { count: filteredAgents.length })}</span>
                   <span className="asr-pill">{viewModeLabels[viewMode]}</span>
                   <button className="asr-button asr-ghost" disabled={!hasActiveFilters} onClick={clearFilters} type="button">
                     <span className="material-symbols-outlined">filter_alt_off</span>
-                    Clear
+                    {t('filters.clear')}
                   </button>
                 </div>
               </div>
@@ -673,7 +676,7 @@ export function AgentSquarePageInteractive() {
                           </div>
                         </div>
                         <button
-                          aria-label={isFavorite ? `Unfavorite ${agent.name}` : `Favorite ${agent.name}`}
+                          aria-label={isFavorite ? t('card.unfavorite', { name: agent.name }) : t('card.favorite', { name: agent.name })}
                           className={cx('asr-icon-button', isFavorite && 'asr-is-favorite')}
                           onClick={() => toggleFavorite(agent.id)}
                           type="button"
@@ -693,14 +696,14 @@ export function AgentSquarePageInteractive() {
                       </div>
 
                       <div className="asr-mini-row">
-                        <span className="asr-small asr-muted">{agent.rating.toFixed(1)} rating</span>
-                        <span className="asr-small asr-muted">{formatInstalls(getDisplayInstalls(agent.id))} staged</span>
+                        <span className="asr-small asr-muted">{t('card.rating', { rating: agent.rating.toFixed(1) })}</span>
+                        <span className="asr-small asr-muted">{t('card.installs', { count: formatInstalls(getDisplayInstalls(agent.id)) })}</span>
                       </div>
 
                       <div className="asr-mini-row">
-                        <span className="asr-small asr-muted">{formatInstalls(getDisplayFavoriteCount(agent.id))} saves</span>
+                        <span className="asr-small asr-muted">{t('card.saves', { count: formatInstalls(getDisplayFavoriteCount(agent.id)) })}</span>
                         <span className={cx('asr-pill', isInstalled ? 'asr-pill-green' : 'asr-pill-cyan')}>
-                          {isInstalled ? 'Locally staged' : 'Available'}
+                          {isInstalled ? t('card.added') : t('card.available')}
                         </span>
                       </div>
 
@@ -712,11 +715,11 @@ export function AgentSquarePageInteractive() {
                           type="button"
                         >
                           <span className="material-symbols-outlined">{isInstalled ? 'check_circle' : 'add'}</span>
-                          {isInstalled ? 'Locally staged' : 'Stage locally'}
+                          {isInstalled ? t('card.added') : t('card.add')}
                         </button>
                         <button className="asr-button asr-ghost" onClick={() => openAgentDetails(agent.id)} type="button">
                           <span className="material-symbols-outlined">open_in_new</span>
-                          Details
+                          {t('card.details')}
                         </button>
                       </div>
                     </article>
@@ -729,12 +732,12 @@ export function AgentSquarePageInteractive() {
                     <span className="material-symbols-outlined">search_off</span>
                   </div>
                   <div>
-                    <h3>No agents match this view</h3>
-                    <p className="asr-small asr-muted">Try another category, remove the search text, or clear the local filters.</p>
+                    <h3>{t('empty.noResults')}</h3>
+                    <p className="asr-small asr-muted">{t('empty.description')}</p>
                   </div>
                   <button className="asr-button asr-primary" disabled={!hasActiveFilters} onClick={clearFilters} type="button">
                     <span className="material-symbols-outlined">filter_alt_off</span>
-                    Clear filters
+                    {t('filters.clearFilters')}
                   </button>
                 </div>
               )}
@@ -746,10 +749,10 @@ export function AgentSquarePageInteractive() {
               <>
                 <div className="asr-drawer-header">
                   <div>
-                    <p className="asr-label asr-muted">Agent detail</p>
+                    <p className="asr-label asr-muted">{t('detail.title')}</p>
                     <h2>{detailAgent.name}</h2>
                   </div>
-                  <button className="asr-icon-button" onClick={() => setIsDetailOpen(false)} type="button" aria-label="Close detail drawer">
+                  <button className="asr-icon-button" onClick={() => setIsDetailOpen(false)} type="button" aria-label={t('detail.close')}>
                     <span className="material-symbols-outlined">close</span>
                   </button>
                 </div>
@@ -766,23 +769,23 @@ export function AgentSquarePageInteractive() {
                   </div>
                   <p className="asr-small asr-muted">{detailAgent.description}</p>
                   <div className="asr-mini-row">
-                    <span className="asr-small asr-muted">Rating</span>
+                    <span className="asr-small asr-muted">{t('detail.rating')}</span>
                     <strong className="asr-small">{detailAgent.rating.toFixed(1)} / 5</strong>
                   </div>
                   <div className="asr-mini-row">
-                    <span className="asr-small asr-muted">Staged count</span>
+                    <span className="asr-small asr-muted">{t('detail.installs')}</span>
                     <strong className="asr-small">{formatInstalls(getDisplayInstalls(detailAgent.id))}</strong>
                   </div>
                   <div className="asr-mini-row">
-                    <span className="asr-small asr-muted">Favorites</span>
+                    <span className="asr-small asr-muted">{t('detail.favorites')}</span>
                     <strong className="asr-small">{formatInstalls(getDisplayFavoriteCount(detailAgent.id))}</strong>
                   </div>
                 </section>
 
                 <section className="asr-stack">
                   <div className="asr-section-head">
-                    <h3>Expected output</h3>
-                    <span className="asr-pill asr-pill-purple">Preview</span>
+                    <h3>{t('detail.outputs')}</h3>
+                    <span className="asr-pill asr-pill-purple">{t('detail.outputsPreview')}</span>
                   </div>
                   <div className="asr-tool-list">
                     {detailAgent.outputs.map((output, outputIndex) => (
@@ -792,7 +795,7 @@ export function AgentSquarePageInteractive() {
                         </div>
                         <div>
                           <strong className="asr-small">{output}</strong>
-                          <p className="asr-tiny asr-muted">Visible in the workspace handoff after staging.</p>
+                          <p className="asr-tiny asr-muted">{t('detail.outputsDesc')}</p>
                         </div>
                       </div>
                     ))}
@@ -801,9 +804,9 @@ export function AgentSquarePageInteractive() {
 
                 <section className="asr-stack">
                   <div className="asr-section-head">
-                    <h3>Workspace state</h3>
+                    <h3>{t('detail.workspaceState')}</h3>
                     <span className={cx('asr-pill', installedIds.has(detailAgent.id) ? 'asr-pill-green' : 'asr-pill-cyan')}>
-                      {installedIds.has(detailAgent.id) ? 'Locally staged' : 'Available'}
+                      {installedIds.has(detailAgent.id) ? t('card.added') : t('card.available')}
                     </span>
                   </div>
                   <div className="asr-activity-list">
@@ -812,8 +815,8 @@ export function AgentSquarePageInteractive() {
                         <span className="material-symbols-outlined">favorite</span>
                       </div>
                       <div>
-                        <strong className="asr-small">{favoriteIds.has(detailAgent.id) ? 'Saved to favorites' : 'Not favorited'}</strong>
-                        <p className="asr-tiny asr-muted">Favorite state updates immediately on the card.</p>
+                        <strong className="asr-small">{favoriteIds.has(detailAgent.id) ? t('detail.favorited') : t('detail.notFavorited')}</strong>
+                        <p className="asr-tiny asr-muted">{t('detail.favoritedDesc')}</p>
                       </div>
                     </div>
                     <div className="asr-activity-row">
@@ -821,8 +824,8 @@ export function AgentSquarePageInteractive() {
                         <span className="material-symbols-outlined">download_done</span>
                       </div>
                       <div>
-                        <strong className="asr-small">{installedIds.has(detailAgent.id) ? 'Local workspace ready' : 'Ready to stage locally'}</strong>
-                        <p className="asr-tiny asr-muted">Local stage state changes the card action and summary count.</p>
+                        <strong className="asr-small">{installedIds.has(detailAgent.id) ? t('detail.ready') : t('detail.readyToAdd')}</strong>
+                        <p className="asr-tiny asr-muted">{t('detail.readyDesc')}</p>
                       </div>
                     </div>
                   </div>
@@ -833,8 +836,8 @@ export function AgentSquarePageInteractive() {
                 <div className="asr-icon-tile asr-cyan">
                   <span className="material-symbols-outlined">ads_click</span>
                 </div>
-                <h2>Select an agent</h2>
-                <p className="asr-small asr-muted">Open details from any visible card to compare output, rating, staged count, and workspace state.</p>
+                <h2>{t('detail.select')}</h2>
+                <p className="asr-small asr-muted">{t('detail.selectDesc')}</p>
               </div>
             )}
           </aside>
@@ -851,7 +854,7 @@ export function AgentSquarePageInteractive() {
             <p className="asr-tiny asr-muted asr-truncate">{confirmation.message}</p>
           </div>
           <button className="asr-button asr-ghost" onClick={() => setConfirmation(null)} type="button">
-            Dismiss
+            {t('common:action.dismiss')}
           </button>
         </div>
       ) : null}
@@ -1081,7 +1084,7 @@ const styles = `
     line-height: 1;
     border-radius: 10px;
     background: linear-gradient(135deg, var(--asr-blue), var(--asr-cyan));
-    box-shadow: 0 10px 22px rgba(37, 99, 235, 0.35);
+    box-shadow: 0 10px 22px var(--brand-glow);
   }
 
   .asr-truncate {
