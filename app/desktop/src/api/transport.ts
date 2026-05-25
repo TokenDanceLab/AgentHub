@@ -9,6 +9,7 @@ export type TransportStatusHandler = (status: TransportStatus) => void;
 
 export interface Transport {
   connect(url?: string): void;
+  reconnect?(url?: string): void;
   send(data: unknown): void;
   close(): void;
   on(event: TransportEvent, handler: TransportMessageHandler | TransportStatusHandler): () => void;
@@ -33,6 +34,7 @@ export class WebSocketTransport implements Transport {
   private queue: unknown[] = [];
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closed = false;
+  private lastConnectUrl: string | null = null;
 
   private maxRetries: number;
   private baseDelay: number;
@@ -59,7 +61,8 @@ export class WebSocketTransport implements Transport {
       return;
     }
 
-    const targetUrl = url ?? this.opts.url;
+    const targetUrl = url ?? this.lastConnectUrl ?? this.opts.url;
+    this.lastConnectUrl = targetUrl;
     const wasDisconnected = this.status === 'disconnected';
     this.setStatus(wasDisconnected ? 'connecting' : 'reconnecting');
 
@@ -100,6 +103,24 @@ export class WebSocketTransport implements Transport {
         this.scheduleReconnect();
       }
     }
+  }
+
+  reconnect(url?: string): void {
+    this.closed = false;
+    this.clearReconnectTimer();
+    if (this.ws) {
+      const ws = this.ws;
+      this.ws = null;
+      ws.onclose = null;
+      ws.onerror = null;
+      try {
+        ws.close();
+      } catch {
+        // Ignore close errors and continue with a fresh connection attempt.
+      }
+    }
+    this.setStatus('disconnected');
+    this.connect(url);
   }
 
   send(data: unknown): void {
