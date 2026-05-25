@@ -182,8 +182,29 @@ function runRecordFromApi(run: Run): RunRecord {
   };
 }
 
+function sourceLabelKey(label: string) {
+  if (label === 'Edge snapshot') return 'source.edgeSnapshot';
+  if (label === 'Offline snapshot') return 'source.offlineSnapshot';
+  if (label === 'Loading snapshot') return 'source.loadingSnapshot';
+  if (label === 'Mock fallback') return 'source.mockFallback';
+  if (label === 'Snapshot unavailable') return 'source.snapshotUnavailable';
+  if (label.startsWith('Local dry-run / ')) return 'source.localDryRun';
+  return 'source.snapshotUnavailable';
+}
+
 function SourceLabel({ source }: { source: WorkbenchSectionSource }) {
-  return <span className={`projectSourceLabel ${source.tone}`}>{source.label}</span>;
+  const { t } = useTranslation('project');
+  const baseLabel = source.label.startsWith('Local dry-run / ')
+    ? source.label.replace('Local dry-run / ', '')
+    : source.label;
+
+  return (
+    <span className={`projectSourceLabel ${source.tone}`}>
+      {source.label.startsWith('Local dry-run / ')
+        ? t('source.localDryRun', { source: t(sourceLabelKey(baseLabel)) })
+        : t(sourceLabelKey(source.label))}
+    </span>
+  );
 }
 
 const pageStyles = `

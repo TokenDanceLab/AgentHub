@@ -115,6 +115,14 @@
   "filter": {
     "all": "All"
   },
+  "source": {
+    "edgeSnapshot": "Edge snapshot",
+    "offlineSnapshot": "Offline snapshot",
+    "loadingSnapshot": "Loading snapshot",
+    "mockFallback": "Demo / mock fallback",
+    "snapshotUnavailable": "Snapshot unavailable",
+    "localDryRun": "Local dry-run / {{source}}"
+  },
   "confirm": {
     "saveValidation": "Add a task title and owner before saving.",
     "taskSaved": "Saved \"{{title}}\" as a local task.",

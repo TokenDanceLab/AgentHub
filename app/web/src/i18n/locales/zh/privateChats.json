@@ -5,19 +5,23 @@
   "search": {
     "ariaLabel": "搜索私聊",
     "placeholder": "搜索人员、交接、代码片段...",
-    "filtering": "{{chatCount}} 个预览聊天和 {{messageCount}} 条本地消息匹配 \"{{query}}\"",
+    "filtering": "{{chatCount}} 个聊天和 {{messageCount}} 条消息匹配 \"{{query}}\"",
     "clear": "清除搜索"
   },
   "sidebar": {
-    "title": "模拟会话",
-    "empty": "没有本地预览聊天匹配此搜索。"
+    "title": "私聊",
+    "empty": "没有可用的 Hub 私聊。"
   },
   "chat": {
     "localPreview": "本地预览线程",
-    "messagesArea": "消息线程"
+    "messagesArea": "消息线程",
+    "readOnly": "已检测到 Hub 会话；本轮 Web 收敛中私聊 REST 暂为只读",
+    "loginRequired": "需要 Hub 会话"
   },
   "status": {
-    "localMock": "本地模拟"
+    "localMock": "本地模拟",
+    "readOnly": "只读",
+    "locked": "需要登录"
   },
   "header": {
     "star": "仅显示关键消息",
@@ -47,14 +51,18 @@
     "messageLabel": "发送消息给 {{name}}",
     "voice": "本地预览中语音备注不可用",
     "send": "追加",
-    "attachmentPanel": "附件面板"
+    "attachmentPanel": "附件面板",
+    "lockedPlaceholder": "登录 Hub 后才能使用私聊",
+    "readOnlyPlaceholder": "私聊在 Hub message REST 接通前暂为只读",
+    "lockedSend": "已锁定",
+    "readOnlySend": "只读"
   },
   "context": {
     "title": "预览上下文",
     "review": "{{count}} 条本地消息 - 已审查 {{progress}}%",
     "open": "打开上下文",
     "reviewTitle": "审查进度",
-    "reviewDetail": "{{keyCount}} 条关键消息、{{unread}} 条未读和 {{drafts}} 条本地草稿在此线程中。Hub /client/ws 和 message/session REST 尚未连接。",
+    "reviewDetail": "此线程中有 {{keyCount}} 条关键消息、{{unread}} 条未读和 {{drafts}} 条未发送本地草稿。Web 接入会话契约前，Hub /client/ws 和 message/session REST 保持锁定。",
     "attachments": "附件",
     "noAttachments": "此会话暂无关联附件。",
     "codeSnippets": "代码片段",
@@ -78,6 +86,12 @@
     "emptyMessage": "请先编写消息或选择附件再发送",
     "moreActions": "更多操作仅限本地预览",
     "contextDetails": "上下文详情仅保留在本地预览中",
-    "dismiss": "忽略"
+    "dismiss": "忽略",
+    "loginRequired": "请先登录 Hub 再使用私聊。",
+    "readOnly": "私聊在 Hub message REST 接通前暂为只读。"
+  },
+  "locked": {
+    "title": "需要 Hub 会话",
+    "description": "在 Web 接入 Hub 会话和消息契约前，私聊不会显示 mock 会话、播放 mock 流或伪造发送成功。"
   }
 }
