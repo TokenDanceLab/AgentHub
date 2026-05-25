@@ -52,6 +52,16 @@ const IMContactList = memo(function IMContactList({
     },
     [t],
   );
+  const statusHintLabel = useCallback(
+    (contact: IMContact) => {
+      if (!contact.statusHint) return contact.lastSeen;
+      const translated = t(contact.statusHint, contact.statusHintParams);
+      if (translated !== contact.statusHint) return translated;
+      if (contact.statusHintParams?.seq) return `${contact.statusHint} ${contact.statusHintParams.seq}`;
+      return contact.statusHint;
+    },
+    [t],
+  );
   const canCompose = Boolean(onAddContact || onCreatePrivateSession || onCreateGroupSession);
 
   const filtered = useMemo(() => {
@@ -261,7 +271,7 @@ const IMContactList = memo(function IMContactList({
                 <div className={styles.itemMeta}>
                   {contact.type}
                   {contact.authority ? ` | ${contact.authority}` : ''}
-                  {contact.lastSeen ? ` | ${contact.lastSeen}` : ''}
+                  {statusHintLabel(contact) ? ` | ${statusHintLabel(contact)}` : ''}
                 </div>
               </div>
               <div

@@ -15,8 +15,8 @@ info:
 
     **Hub Server**: All documented `/client/auth`, `/client/contacts`, `/client/sessions`,
     `/client/messages`, `/edge/*`, `/web/*` endpoints are implemented. Additional routes
-    exist in code but are not yet documented here (~36 routes for session members,
-    message pins, attachments, notifications, custom agents, contacts search/block).
+    exist in code but are not yet documented here (for example session members,
+    message pins, attachments, contacts search/block, and other extended actions).
     Implemented Hub REST endpoints wrap successful bodies as `{ code: "OK", data: ... }`
     and errors as `{ code, message }`; frontend shared helpers unwrap this envelope.
     The legacy `/v1/auth`, `/v1/users`, `/v1/contacts` paths are planned for future
@@ -1056,6 +1056,71 @@ paths:
         "101":
           description: Switching Protocols.
 
+  /client/notifications:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListNotifications
+      summary: List current user's Hub notifications.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: unread_only
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: Hub OK envelope whose data is a list of notifications.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string, example: OK }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/HubNotification"
+
+  /client/notifications/{id}/read:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubMarkNotificationRead
+      summary: Mark one Hub notification as read.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Hub OK envelope with null data.
+
+  /client/notifications/read-all:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubReadAllNotifications
+      summary: Mark all current user's Hub notifications as read.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Hub OK envelope with null data.
+
   /web/agent-tasks:
     post:
       tags: [HubSyncRelay]
@@ -1077,6 +1142,26 @@ paths:
       responses:
         "200":
           description: Task dispatched.
+
+  /web/agent-tasks/{id}/cancel:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCancelTask
+      summary: Cancel a Hub-dispatched agent task from web client.
+      description: >
+        Task bridge currently exposes only web trigger/cancel commands plus Edge
+        ack/stream/done/fail callbacks. There is no listAgentTasks REST query.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Task cancellation requested.
 
   /edge/devices/register:
     post:
@@ -1742,6 +1827,27 @@ components:
             details:
               type: object
               additionalProperties: true
+    HubNotification:
+      type: object
+      required: [id, user_id, type, payload, read, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [mention, friend_request, group_invite, agent_done, system]
+        payload:
+          description: JSON string persisted by Hub; clients may parse it according to notification type.
+          type: string
+        read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
     HubTaskAckRequest:
       type: object
       properties:

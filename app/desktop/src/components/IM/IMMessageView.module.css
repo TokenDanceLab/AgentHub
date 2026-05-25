@@ -145,12 +145,21 @@
 
 /* ── Timestamp ───────────────────────────── */
 
-.timestamp {
+.messageMeta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
   font-size: 10px;
   color: var(--foreground);
-  opacity: 0.4;
-  margin-top: 4px;
-  align-self: flex-end;
+  opacity: 0.45;
+}
+
+.timestamp {
+  font-size: 10px;
+  color: inherit;
 }
 
 /* ── Recalled message ────────────────────── */
