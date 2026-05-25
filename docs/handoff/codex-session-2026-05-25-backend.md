@@ -4,6 +4,37 @@
 
 ---
 
+## 0. 2026-05-25 TokenDance ID 接入部署补记
+
+本轮已把 Hub Server 的 TokenDance ID OIDC 后端接入部署到 hk2，服务器侧未执行构建，只执行本地构建产物的 `docker load` 与 `docker compose ... up -d --no-build --force-recreate`。
+
+### 0.1 已推送 Commit
+
+| Commit | 内容 |
+|--------|------|
+| `8d06b9a` | Hub-owned TokenDance ID OIDC authorize/callback、JWKS 校验、`tokendance_sub` 映射、Hub session 签发 |
+| `45f9ba1` | 生产 compose 传入 TokenDance ID OIDC env，补 redirect URI 配置校验 |
+| `0169c35` | 修复 Hub migration 文件版本序列，避免重复版本导致生产启动失败 |
+| `14e0d42` | 显式兼容 `AGENTHUB_TOKENDANCE_ID_*` 生产 env；保留 `AGENTHUB_TOKENDANCE_*` legacy 名称 |
+
+### 0.2 本地构建与部署证据
+
+- 本地干净快照构建：`git archive HEAD` → `go test ./... -short -count=1` → `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build` → runtime-only Docker image。
+- 已上传并加载到 hk2 的最终产物：`agenthub-hub-14e0d42.tar`，SHA-256 `edd5fc5548f1276a80ef7d5261562b4298f50079f915e6065c455292f12987af`。
+- hk2 最终运行镜像：`deployments-hub-server:14e0d42` / `deployments-hub-server:latest`，image id prefix `ad68c4ed38e1`。
+- hk2 health：`GET http://127.0.0.1:8090/health` 返回 `200`，`database=ok`、`redis=ok`、`migrations=28`。
+- OIDC authorize smoke：`POST /client/auth/oidc/authorize` 返回 `200`，授权 URL 指向 `https://id.vectorcontrol.tech/oidc/authorize`，client id 为 `c_nAKU1mYissxjQOxC`，redirect URI 为 `https://hub.vectorcontrol.tech/client/auth/oidc/callback`，PKCE method 为 `S256`。
+- 负向 smoke：非法 `device_id` 返回 `400 BAD_REQUEST`，message 为 `device_id must be a UUID`。
+- CORS smoke：`Origin: https://hub.vectorcontrol.tech` 返回 `Access-Control-Allow-Origin: https://hub.vectorcontrol.tech`；`Origin: http://localhost:3000` 返回 `403`。
+
+### 0.3 线上修正记录
+
+- hk2 `.env.production` 中旧 CORS 默认包含 localhost，`0169c35` 首次启动在生产 CORS 保护处 panic；已备份并将 `AGENTHUB_CORS_ORIGINS` 收敛为 `https://hub.vectorcontrol.tech`。
+- 因 `0169c35` 已成功把 DB migration 推进到 28，旧 rollback 镜像缺少 0028 migration 文件，不能再直接接管当前 DB；后续回滚需使用包含 0028 migration 的镜像或先做明确 DB 降级计划。
+- 生产 compose 使用 `AGENTHUB_TOKENDANCE_ID_*` 变量；`14e0d42` 修复配置加载器后 OIDC handler 正常注册。
+
+---
+
 ## 1. 本轮完成了什么
 
 ### 1.1 Commit 列表（11 个，d952655 → 6fcf079）
