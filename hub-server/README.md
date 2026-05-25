@@ -273,5 +273,14 @@ go test ./... -short -count=1
 | `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | Hub OIDC client id；启用 TokenDance bearer 兼容路径时用于强制 `aud` 校验 | 待配置 |
 | `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | Hub confidential-client secret；不得提交 | 待配置 |
 | `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI` | OIDC callback URL | `http://localhost:8080/client/auth/oidc/callback` |
+| `AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS` | 允许本轮 PKCE 使用的 Web/native callback 列表，逗号分隔；Desktop loopback 使用注册的无端口 `http://127.0.0.1/callback` | `http://127.0.0.1/callback,http://localhost:5174/auth/tokendance/callback` |
 
 `AGENTHUB_TOKENDANCE_*` 旧变量名仍可被加载器识别，用于兼容早期本地脚本；新配置和部署文档统一使用 `AGENTHUB_TOKENDANCE_ID_*`。
+
+OIDC 结构检查可在仓库根目录运行：
+
+```powershell
+.\scripts\verify-oidc-readiness.ps1
+```
+
+该检查只验证公开仓库里的端点、示例环境变量、Desktop/Web 存储边界和根治理矩阵状态；它不连接生产 TokenDance ID，也不需要或打印真实 `client_secret`。部署态 client 注册、callback、refresh/logout 和截图证据仍属于发布前验收。

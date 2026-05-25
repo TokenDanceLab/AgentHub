@@ -512,7 +512,7 @@ Hub 调度（远程）:
 | cc-switch | provider 健康、切换、配额提示 | 可选账号级状态 | Runtime env 注入边界 | cc-switch CLI/DB | 切换只影响新 run，旧 run 不被打断 |
 | 多端 | 设备列表、当前设备、能力差异 | Device registry/WS presence | 设备 capability 上报 | 无 | 同账号多设备可区分在线/离线/能力 |
 | 远控 | 远程 Execution Target 选择、授权提示 | dispatch/permission/session | 远程 Edge 回调和状态 | 无 | 未授权不能远控，授权后能发起远程 run |
-| 账号鉴权 | TokenDance ID 登录入口、会话状态、登出 | Hub OIDC code exchange 已落地；Web 已接浏览器 PKCE redirect callback 且 Hub token 收敛到 sessionStorage；Desktop 已接本机 callback + Hub exchange，发行版登录/logout/reconnect 证据待补 | 无直接依赖 | TokenDance ID | 入口只指向 TokenDance ID，不直连第三方 OAuth；REST/WS 使用 Hub-issued access token；公开 Web 发布前需要 BFF/HttpOnly cookie 或等价 session 设计 |
+| 账号鉴权 | TokenDance ID 登录入口、会话状态、登出 | Hub OIDC code exchange 已落地；Web 已接浏览器 PKCE redirect callback 且 Hub token 收敛到 sessionStorage；Desktop 已接本机 callback + Hub exchange，Tauri 路径使用系统凭据存储，浏览器开发 fallback 只用 tab-scoped sessionStorage；发行版登录/logout/reconnect 证据待补 | `scripts/verify-oidc-readiness.ps1` | TokenDance ID | 入口只指向 TokenDance ID，不直连第三方 OAuth；REST/WS 使用 Hub-issued access token；公开 Web 发布前需要 BFF/HttpOnly cookie 或等价 session 设计 |
 | 安全审计 | 权限、密钥、命令风险、配置导出检查 | 审计事件存储 | command/permission/security events | gitleaks/本地扫描器 | 导出/截图不含 token，危险配置有警示 |
 
 ##### 批次 D：Run 启动反馈与真实 Edge 验证 `[3d]`
@@ -579,6 +579,7 @@ Hub 调度（远程）:
 - [x] 2026-05-25 Web TypeScript 收紧：`app/web/tsconfig.json` 已恢复 `strict: true`、`strictNullChecks: true`、`noUncheckedIndexedAccess: true` 与 `exactOptionalPropertyTypes: true`，清理 Web/shared optional DTO、Hub/IM adapter、permission、composer、Settings 与 private chat 形状；验证通过 `app/web && corepack pnpm exec tsc -p tsconfig.json --noEmit --strict true`、`corepack pnpm typecheck`、`corepack pnpm build`。
 - [x] 2026-05-25 Web 纯色 Codex App 质感补强：按 `codex-theme-v1` 的 `surface=#25252d`、`ink=#e3e4e6`、`accent=#5d68cc` 改为纯色深灰 surface，移除 `app/web/src` 内全部 `linear/radial/conic-gradient` 与 gradient mask；composer 复用 Desktop 单层 capsule 的 760px 栏宽、17px 输入字号、低边框/低阴影和 14px radius，移除 Web 额外 goal/card 堆叠，空态建议项改成低噪 inline chips；Playwright 桌面/移动 smoke 验证无 console error、无 raw i18n key、无横向溢出、运行时 0 个 gradient 节点且 `backdrop-filter` 生效。截图证据保留为本地 ignored 产物，不进入 Git。
 - [x] 2026-05-26 Web Hub token storage hardening：`app/web/src/api/hubTokenStorage.ts` 改为 access/refresh token 只写 `sessionStorage`，`hubAuth.ts` 的 token-source hint 同步改为 `sessionStorage`，并清理 legacy `localStorage` key；新增 `hubTokenStorage.test.ts` 覆盖 access/refresh token 不落 persistent storage 和旧 key 清理。公开 Web 发布前仍需 BFF/HttpOnly cookie 或等价 session 设计。
+- [x] 2026-05-26 OIDC release-readiness slice：补 `scripts/verify-oidc-readiness.ps1`，检查 Hub OIDC OpenAPI/server wiring、`.env.example`/compose OIDC 变量、Desktop/Web token storage 和根治理矩阵仍为 Partial；补 Desktop 非 Tauri fallback access token 只写 `sessionStorage` 并清理 legacy `localStorage` key。该检查不连接生产、不读取真实 client secret，不能替代部署态 login/callback/logout/reconnect 截图和 smoke。
 - [x] **2026-05-26：`feat/web-agent-closeout-20260526` 已合入并删除本地/远端分支。** WebAgent 产出已成为 `dev/delicious233` 主线的一部分。
 - [x] **2026-05-26：PR #197 已关闭。** 其中安全可独立验证的 `team-hub-authz`、`team-hub-reliability`、`team-adapter-compat` 已直接合入主线；Johnny 聚合分支因 migrations/API/process-executor-test 冲突保留单独审。
 - [ ] 残留分支：`origin/dev/trump` 不作为可信进度来源；`feat/web-desktop-parity` / `origin/worktree-feat+web-desktop-parity` 与当前 WebAgent 主线大幅分叉，删除或 cherry-pick 前必须人工审 diff。

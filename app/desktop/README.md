@@ -118,6 +118,14 @@ pnpm storybook
 - Desktop ESLint 仍有既有 React Hooks/strict cleanup 债；CI 暂时保留为可见但不硬阻断的债务检查，不能把 lint warning-only 当成已清零。
 - `scripts/client-smoke.ps1` 已对齐当前 Edge Runtime 架构，不再构建已删除的独立 `runner/` 目录；可用 `-EdgeAddr` 跑隔离端口 smoke，也可用 `-EdgeAuthToken` 覆盖本地 Edge token 路径。
 - TokenDance ID 目标路径是 Hub Server 完成 OIDC code exchange 并签发 Hub session；现有 Desktop 端入口不得保存第三方 provider token，也不得直接集成 GitHub/Google/飞书。
+- Tauri 打包路径通过系统凭据存储保存 Hub access/refresh session；浏览器开发 fallback 只把 Hub access token 放在 tab-scoped `sessionStorage`，并清理旧 `localStorage` Hub token key。发行版登录/logout/reconnect 仍需要真实截图和 smoke 证据。
+
+TokenDance ID / Hub OIDC 结构检查：
+
+```powershell
+cd D:\Code\TokenDance\AgentHub
+.\scripts\verify-oidc-readiness.ps1
+```
 
 ## 文档入口
 
