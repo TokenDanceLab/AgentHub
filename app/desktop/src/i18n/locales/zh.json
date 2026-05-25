@@ -380,6 +380,7 @@
   "settings.status.snapshot": "真实快照",
   "settings.status.localSource": "本地来源",
   "settings.status.loginLocked": "登录锁定",
+  "settings.status.error": "错误",
   "settings.status.interfaceGap": "接口缺口",
   "settings.online": "在线",
   "settings.offline": "离线",
