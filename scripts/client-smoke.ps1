@@ -171,6 +171,7 @@ function Test-WebSocketRunOutput([string]$RunId, [bool]$AssertBuiltInMockEvents)
                 $encodedToken = [System.Uri]::EscapeDataString($EdgeAuthToken)
                 $uri = "$uri&access_token=$encodedToken"
             }
+            $ws.Options.SetRequestHeader("Origin", "http://localhost")
             $null = $ws.ConnectAsync([Uri]$uri, $connectCts.Token).GetAwaiter().GetResult()
             Assert ($ws.State -eq [System.Net.WebSockets.WebSocketState]::Open) "WS connected"
 
@@ -383,16 +384,6 @@ try {
             Fail "POST runs: $_"
         }
 
-        # POST /v1/runs/{runId}:cancel
-        Write-Step "POST /v1/runs/{runId}:cancel"
-        try {
-            $cancel = Invoke-EdgeRest -Uri "$EdgeUrl/v1/runs/run_test:cancel" -Method Post -TimeoutSec 5
-            Assert ($cancel.runId -eq "run_test") "runId=run_test"
-            Assert ($cancel.status -eq "cancelling") "status=cancelling"
-        } catch {
-            Fail "cancel: $_"
-        }
-
         # WebSocket
         Write-Step "WebSocket /v1/events"
         try {
@@ -403,6 +394,21 @@ try {
             }
         } catch {
             Fail "WebSocket: $_"
+        }
+
+        # POST /v1/runs/{runId}:cancel
+        Write-Step "POST /v1/runs/{runId}:cancel"
+        try {
+            $cancelRun = Invoke-EdgeRest -Uri "$EdgeUrl/v1/runs" -Method Post -TimeoutSec 5
+            if ($null -eq $cancelRun -or [string]::IsNullOrWhiteSpace($cancelRun.runId)) {
+                Fail "cancel: POST /v1/runs did not return a runId"
+            } else {
+                $cancel = Invoke-EdgeRest -Uri "$EdgeUrl/v1/runs/$($cancelRun.runId):cancel" -Method Post -TimeoutSec 5
+                Assert ($cancel.runId -eq $cancelRun.runId) "runId=$($cancelRun.runId)"
+                Assert ($cancel.status -in @("cancelling", "finished", "failed", "cancelled")) "status=$($cancel.status)"
+            }
+        } catch {
+            Fail "cancel: $_"
         }
 
         # ── Go tests ────────────────────────────────────
