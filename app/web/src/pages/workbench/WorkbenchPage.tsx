@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   EventClient,
   createPreview,
@@ -53,13 +54,7 @@ type Particle = {
   y: number;
 };
 
-const workspacePanels: Array<{ id: WorkspacePanel; label: string }> = [
-  { id: 'files', label: 'Changed Files' },
-  { id: 'diff', label: 'Diff' },
-  { id: 'preview', label: 'Preview' },
-  { id: 'logs', label: 'Logs' },
-  { id: 'approval', label: 'Approval' },
-];
+const workspacePanels: WorkspacePanel[] = ['files', 'diff', 'preview', 'logs', 'approval'];
 
 function statusClass(status: string) {
   if (
@@ -257,9 +252,7 @@ function itemToMessage(item: ThreadItem): ThreadMessage {
 }
 
 function artifactDiffLines(artifacts: Artifact[]) {
-  if (!artifacts.length) {
-    return [[' ', 'No artifacts have been created for this run yet.']];
-  }
+  if (!artifacts.length) return [];
 
   return artifacts.slice(0, 8).flatMap((artifact) => [
     ['+', `${artifact.kind}: ${artifact.path}`],
@@ -270,6 +263,7 @@ function artifactDiffLines(artifacts: Artifact[]) {
 export default function WorkbenchPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const localSeqRef = useRef(1_000_000);
+  const { t } = useTranslation('workbench');
   const [state, dispatch] = useReducer(workbenchReducer, undefined, () =>
     workbenchReducer(
       {
@@ -295,6 +289,24 @@ export default function WorkbenchPage() {
   const [isSending, setIsSending] = useState(false);
   const [isStartingRun, setIsStartingRun] = useState(false);
   const [decidingApprovalId, setDecidingApprovalId] = useState<string | undefined>();
+
+  const workspacePanelLabels: Record<WorkspacePanel, string> = {
+    files: t('workspace.tabs.files'),
+    diff: t('workspace.tabs.diff'),
+    preview: t('workspace.tabs.preview'),
+    logs: t('workspace.tabs.logs'),
+    approval: t('workspace.tabs.approval'),
+  };
+
+  const statusLabel = (status: string | undefined) =>
+    t(`status.${status ?? 'idle'}`, { defaultValue: status ?? 'idle' });
+
+  const errorMessage = (msg: string) => {
+    if (msg === 'Edge is unavailable') return t('error.edgeUnavailable');
+    if (msg === 'Edge event stream error') return t('error.edgeEventStream');
+    if (msg.startsWith('Edge API did not respond')) return t('error.edgeApiTimeout');
+    return msg;
+  };
 
   useParticleCanvas(canvasRef);
 
@@ -415,10 +427,10 @@ export default function WorkbenchPage() {
   const approvalState = approval?.status ?? 'pending';
   const approvalLabel =
     approvalState === 'approved'
-      ? 'Approved'
+      ? t('approval.status.approved')
       : approvalState === 'rejected'
-        ? 'Rejected'
-        : 'Pending approval';
+        ? t('approval.status.rejected')
+        : t('approval.status.pending');
   const runArtifacts = state.artifacts.filter((artifact) => !run || artifact.runId === run.runId);
   const preview = pickPreview(state.previews, run?.runId);
   const runLog = run ? state.runLogs[run.runId] : undefined;
@@ -553,37 +565,37 @@ export default function WorkbenchPage() {
   return (
     <div className={styles.workbench}>
       <canvas ref={canvasRef} className={styles.particles} aria-hidden="true" />
-      <aside className={styles.leftRail} aria-label="Project and thread navigation">
+      <aside className={styles.leftRail} aria-label={t('leftRail.ariaLabel')}>
         <div className={styles.brandBlock}>
           <span className={styles.brandMark}>AH</span>
           <div className={styles.brandTitle}>
             <h1>AGENTHUB</h1>
-            <p>Workbench</p>
+            <p>{t('leftRail.workbench')}</p>
           </div>
         </div>
 
         <section className={styles.railSection}>
           <div className={styles.sectionHead}>
-            <span>Project</span>
+            <span>{t('leftRail.project')}</span>
             <span className={`${styles.badge} ${statusClass(state.connection.status)}`}>
-              {state.connection.status}
+              {statusLabel(state.connection.status)}
             </span>
           </div>
           <button className={`${styles.projectCard} ${styles.selectedCard}`} type="button">
             <span className={styles.projectIcon}>AH</span>
             <span>
-              <strong>{activeProject?.name ?? 'No project loaded'}</strong>
-              <small>{activeProject?.description ?? 'Connect Edge to load projects'}</small>
+              <strong>{activeProject?.name ?? t('leftRail.noProject')}</strong>
+              <small>{activeProject?.description ?? t('leftRail.connectEdge')}</small>
             </span>
           </button>
           {state.connection.error ? (
-            <p className={styles.errorText}>{state.connection.error}</p>
+            <p className={styles.errorText}>{errorMessage(state.connection.error)}</p>
           ) : null}
         </section>
 
         <section className={styles.railSection}>
           <div className={styles.sectionHead}>
-            <span>Threads</span>
+            <span>{t('leftRail.threads')}</span>
             <span>{state.threads.length}</span>
           </div>
           <div className={styles.threadList}>
@@ -602,7 +614,7 @@ export default function WorkbenchPage() {
                   <span>
                     <strong>{thread.title ?? thread.id}</strong>
                     <small>
-                      {thread.status} - {thread.projectId}
+                      {statusLabel(thread.status)} - {thread.projectId}
                     </small>
                   </span>
                   <span
@@ -613,14 +625,14 @@ export default function WorkbenchPage() {
                 </button>
               ))
             ) : (
-              <p className={styles.emptyNotice}>No threads returned by Edge.</p>
+              <p className={styles.emptyNotice}>{t('leftRail.noThreads')}</p>
             )}
           </div>
         </section>
 
         <section className={styles.railSection}>
           <div className={styles.sectionHead}>
-            <span>Runner Status</span>
+            <span>{t('leftRail.runners')}</span>
             <span>
               {activeRunnerCount}/{state.runners.length}
             </span>
@@ -636,15 +648,15 @@ export default function WorkbenchPage() {
                   />
                   <span>
                     <strong>{runner.name}</strong>
-                    <small>{runner.capabilities ?? 'adapter ready'}</small>
+                    <small>{runner.capabilities ?? t('runner.adapterReady')}</small>
                   </span>
                   <span className={`${styles.badge} ${statusClass(runner.status)}`}>
-                    {runner.status}
+                    {statusLabel(runner.status)}
                   </span>
                 </div>
               ))
             ) : (
-              <p className={styles.emptyNotice}>No runners are registered.</p>
+              <p className={styles.emptyNotice}>{t('leftRail.noRunners')}</p>
             )}
           </div>
         </section>
@@ -653,17 +665,17 @@ export default function WorkbenchPage() {
       <main className={styles.threadSurface}>
         <header className={styles.threadHeader}>
           <div>
-            <p className={styles.eyebrow}>Thread</p>
-            <h2>{activeThread?.title ?? 'No thread selected'}</h2>
+            <p className={styles.eyebrow}>{t('header.thread')}</p>
+            <h2>{activeThread?.title ?? t('header.noThread')}</h2>
             <p>
               {isOffline
-                ? 'Edge is unavailable. Snapshot data is preserved if it was loaded.'
-                : 'Project, messages, run progress, approval, and artifacts stay in one review path.'}
+                ? t('header.edgeUnavailable')
+                : t('header.subtitle')}
             </p>
           </div>
           <div className={styles.headerActions}>
             <span className={`${styles.statusPill} ${statusClass(run?.status ?? 'idle')}`}>
-              Run {run?.status ?? 'idle'}
+              {t('header.runStatus', { status: statusLabel(run?.status) })}
             </span>
             <button
               className={styles.primaryButton}
@@ -671,37 +683,37 @@ export default function WorkbenchPage() {
               onClick={startActiveRun}
               type="button"
             >
-              {isStartingRun ? 'Starting' : 'Start Run'}
+              {isStartingRun ? t('header.starting') : t('header.startRun')}
             </button>
           </div>
         </header>
 
-        {actionError ? <p className={styles.errorBanner}>{actionError}</p> : null}
+        {actionError ? <p className={styles.errorBanner}>{errorMessage(actionError)}</p> : null}
 
-        <section className={styles.runSummary} aria-label="Run summary">
+        <section className={styles.runSummary} aria-label={t('runSummary.ariaLabel')}>
           <article>
-            <strong>{run?.runId ?? 'No run'}</strong>
+            <strong>{run?.runId ?? t('runSummary.noRun')}</strong>
             <span>AgentRun</span>
           </article>
           <article>
             <strong>{runArtifacts.length}</strong>
-            <span>Artifacts</span>
+            <span>{t('runSummary.artifacts')}</span>
           </article>
           <article>
-            <strong>{approval ? approvalLabel : 'No approval'}</strong>
-            <span>Approval gate</span>
+            <strong>{approval ? approvalLabel : t('runSummary.noApproval')}</strong>
+            <span>{t('runSummary.approvalGate')}</span>
           </article>
           <article>
-            <strong>{preview?.url ?? 'No preview'}</strong>
-            <span>Preview target</span>
+            <strong>{preview?.url ?? t('runSummary.noPreview')}</strong>
+            <span>{t('runSummary.previewTarget')}</span>
           </article>
         </section>
 
-        <section className={styles.messageArea} aria-label="Thread messages and run timeline">
+        <section className={styles.messageArea} aria-label={t('messages.ariaLabel')}>
           <div className={styles.messages}>
             <div className={styles.cardTitle}>
-              <span>IM Message Flow</span>
-              <span className={styles.muted}>@Agent collaboration</span>
+              <span>{t('messages.title')}</span>
+              <span className={styles.muted}>{t('messages.subtitle')}</span>
             </div>
             <div className={styles.messageList}>
               {messages.length ? (
@@ -710,62 +722,62 @@ export default function WorkbenchPage() {
                     <div className={styles.avatar}>{message.author.slice(0, 2).toUpperCase()}</div>
                     <div>
                       <div className={styles.messageMeta}>
-                        <strong>{message.author}</strong>
+                        <strong>{t('message.author.' + message.tone)}</strong>
                         <span>{message.meta}</span>
                       </div>
-                      <p>{message.body}</p>
+                      <p>{message.body === '(empty message)' ? t('message.empty') : message.body}</p>
                     </div>
                   </article>
                 ))
               ) : (
-                <p className={styles.emptyNotice}>No messages loaded for this thread.</p>
+                <p className={styles.emptyNotice}>{t('messages.empty')}</p>
               )}
             </div>
           </div>
 
-          <aside className={styles.runTimeline} aria-label="AgentRun timeline">
+          <aside className={styles.runTimeline} aria-label={t('timeline.ariaLabel')}>
             <div className={styles.cardTitle}>
-              <span>AgentRun Timeline</span>
+              <span>{t('timeline.title')}</span>
               <span className={`${styles.badge} ${statusClass(run?.status ?? 'idle')}`}>
-                {run?.status ?? 'idle'}
+                {statusLabel(run?.status)}
               </span>
             </div>
             <ol>
               <li className={run ? styles.doneStep : undefined}>
                 <strong>run.queued</strong>
-                <span>{run ? 'Thread accepted the owner request.' : 'Waiting for a run.'}</span>
+                <span>{run ? t('timeline.queuedDone') : t('timeline.queuedWaiting')}</span>
               </li>
               <li className={run?.startedAt ? styles.doneStep : undefined}>
                 <strong>run.started</strong>
-                <span>{run?.startedAt ?? 'Runner has not started yet.'}</span>
+                <span>{run?.startedAt ?? t('timeline.startedWaiting')}</span>
               </li>
               <li className={runLog ? styles.activeStep : undefined}>
                 <strong>run.output.batch</strong>
-                <span>{runLog ? 'Logs are available in the workspace panel.' : 'No logs yet.'}</span>
+                <span>{runLog ? t('timeline.logsAvailable') : t('timeline.noLogs')}</span>
               </li>
               <li className={runArtifacts.length ? styles.doneStep : undefined}>
                 <strong>artifact.created</strong>
                 <span>
-                  {runArtifacts.length ? 'Artifacts are reviewable.' : 'No artifacts yet.'}
+                  {runArtifacts.length ? t('timeline.artifactsAvailable') : t('timeline.noArtifacts')}
                 </span>
               </li>
             </ol>
           </aside>
         </section>
 
-        <section className={styles.approvalCard} aria-label="Approval request">
+        <section className={styles.approvalCard} aria-label={t('approval.ariaLabel')}>
           <div>
-            <p className={styles.eyebrow}>Approval request</p>
-            <h3>{approval?.summary ?? 'No approval request'}</h3>
+            <p className={styles.eyebrow}>{t('approval.title')}</p>
+            <h3>{approval?.summary ?? t('approval.empty')}</h3>
             <p>
               {approval
-                ? 'Approval decisions are sent to Edge. The UI updates only after the API call succeeds.'
-                : 'Edge has not returned a pending approval for this run.'}
+                ? t('approval.description')
+                : t('approval.noPending')}
             </p>
           </div>
           <div className={styles.approvalActions}>
             <span className={`${styles.statusPill} ${statusClass(approvalState)}`}>
-              {approval ? approvalLabel : 'Idle'}
+              {approval ? approvalLabel : t('status.idle')}
             </span>
             <button
               className={styles.secondaryButton}
@@ -773,7 +785,7 @@ export default function WorkbenchPage() {
               onClick={() => decide('rejected')}
               type="button"
             >
-              Reject
+              {t('approval.reject')}
             </button>
             <button
               className={styles.primaryButton}
@@ -781,7 +793,7 @@ export default function WorkbenchPage() {
               onClick={() => decide('approved')}
               type="button"
             >
-              Approve
+              {t('approval.approve')}
             </button>
           </div>
         </section>
@@ -793,57 +805,57 @@ export default function WorkbenchPage() {
             queueDraft();
           }}
         >
-          <button className={styles.iconButton} type="button" aria-label="Attach context">
+          <button className={styles.iconButton} type="button" aria-label={t('composer.attach')}>
             +
           </button>
           <textarea
-            aria-label="Message thread"
+            aria-label={t('composer.threadAriaLabel')}
             disabled={!activeThread || isSending}
-            placeholder="Message this Thread with @ClaudeCode / @Codex / @OpenCode..."
+            placeholder={t('composer.placeholder')}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleComposerKeyDown}
             rows={1}
           />
           <button className={styles.primaryButton} disabled={!draft.trim() || isSending} type="submit">
-            {isSending ? 'Sending' : 'Send'}
+            {isSending ? t('composer.sending') : t('composer.send')}
           </button>
         </form>
       </main>
 
-      <aside className={styles.workspacePanel} aria-label="Workbench workspace">
+      <aside className={styles.workspacePanel} aria-label={t('workspace.ariaLabel')}>
         <header className={styles.workspaceHeader}>
           <div>
-            <p className={styles.eyebrow}>Workspace</p>
-            <h2>Files, Diff, Preview, Logs, Approval</h2>
+            <p className={styles.eyebrow}>{t('workspace.title')}</p>
+            <h2>{t('workspace.subtitle')}</h2>
           </div>
           <span className={`${styles.statusPill} ${statusClass(approvalState)}`}>
-            {approval ? approvalLabel : 'Idle'}
+            {approval ? approvalLabel : t('status.idle')}
           </span>
         </header>
 
-        <section className={styles.workspaceSummary} aria-label="Workspace summary">
+        <section className={styles.workspaceSummary} aria-label={t('workspace.summary.ariaLabel')}>
           <article>
-            <span>Artifacts</span>
-            <strong>{runArtifacts.length} files</strong>
+            <span>{t('workspace.summary.artifacts')}</span>
+            <strong>{t('workspace.summary.artifactCount', { count: runArtifacts.length })}</strong>
           </article>
           <article>
-            <span>Risk</span>
+            <span>{t('workspace.summary.risk')}</span>
             <strong className={approval?.status === 'pending' ? styles.warnText : undefined}>
-              {approval?.status === 'pending' ? 'Approval needed' : 'No pending gate'}
+              {approval?.status === 'pending' ? t('workspace.summary.approvalNeeded') : t('workspace.summary.noPendingGate')}
             </strong>
           </article>
         </section>
 
-        <nav className={styles.workspaceTabs} aria-label="Workspace panels">
+        <nav className={styles.workspaceTabs} aria-label={t('workspace.tabs.ariaLabel')}>
           {workspacePanels.map((panel) => (
             <button
-              className={panel.id === activePanel ? styles.activePanelTab : styles.panelTab}
-              key={panel.id}
-              onClick={() => setActivePanel(panel.id)}
+              className={panel === activePanel ? styles.activePanelTab : styles.panelTab}
+              key={panel}
+              onClick={() => setActivePanel(panel)}
               type="button"
             >
-              {panel.label}
+              {workspacePanelLabels[panel]}
             </button>
           ))}
         </nav>
@@ -860,30 +872,36 @@ export default function WorkbenchPage() {
                     <span>
                       <strong>{artifact.path}</strong>
                       <small>
-                        {(artifact.sizeBytes / 1024).toFixed(1)} KB - created{' '}
-                        {artifact.createdAt.slice(0, 10)}
+                        {t('workspace.files.fileInfo', {
+                          size: (artifact.sizeBytes / 1024).toFixed(1),
+                          date: artifact.createdAt.slice(0, 10),
+                        })}
                       </small>
                     </span>
                     <span className={`${styles.badge} ${styles.warn}`}>{artifact.kind}</span>
                   </article>
                 ))
               ) : (
-                <p className={styles.emptyNotice}>No artifacts returned for this run.</p>
+                <p className={styles.emptyNotice}>{t('workspace.empty.artifacts')}</p>
               )}
             </section>
           ) : null}
 
           {activePanel === 'diff' ? (
-            <section className={styles.diffBlock} aria-label="Artifact diff summary">
-              {diffLines.map(([prefix, line], index) => (
-                <div
-                  className={prefix === '+' ? styles.addLine : prefix === '-' ? styles.removeLine : styles.neutralLine}
-                  key={`${prefix}-${line}-${index}`}
-                >
-                  <span>{prefix}</span>
-                  <code>{line}</code>
-                </div>
-              ))}
+            <section className={styles.diffBlock} aria-label={t('workspace.diff.ariaLabel')}>
+              {diffLines.length ? (
+                diffLines.map(([prefix, line], index) => (
+                  <div
+                    className={prefix === '+' ? styles.addLine : prefix === '-' ? styles.removeLine : styles.neutralLine}
+                    key={`${prefix}-${line}-${index}`}
+                  >
+                    <span>{prefix}</span>
+                    <code>{line}</code>
+                  </div>
+                ))
+              ) : (
+                <p className={styles.emptyNotice}>{t('workspace.empty.diffArtifacts')}</p>
+              )}
             </section>
           ) : null}
 
@@ -893,19 +911,19 @@ export default function WorkbenchPage() {
                 <span />
                 <span />
                 <span />
-                <strong>{preview?.url ?? 'preview unavailable'}</strong>
+                <strong>{preview?.url ?? t('workspace.preview.unavailable')}</strong>
               </div>
               <div className={styles.previewCanvas}>
-                <strong>{preview?.status === 'ready' ? 'Preview ready' : 'No preview ready'}</strong>
-                <p>{preview?.url ?? 'Create a preview after a run produces reviewable output.'}</p>
+                <strong>{preview?.status === 'ready' ? t('workspace.preview.ready') : t('workspace.preview.notReady')}</strong>
+                <p>{preview?.url ?? t('workspace.preview.hint')}</p>
                 {run && !preview ? (
                   <button className={styles.secondaryButton} onClick={requestPreview} type="button">
-                    Request Preview
+                    {t('workspace.preview.request')}
                   </button>
                 ) : null}
                 {preview?.url ? (
                   <a className={styles.previewLink} href={preview.url} target="_blank" rel="noreferrer">
-                    Open Preview
+                    {t('workspace.preview.open')}
                   </a>
                 ) : null}
               </div>
@@ -913,14 +931,14 @@ export default function WorkbenchPage() {
           ) : null}
 
           {activePanel === 'logs' ? (
-            <section className={styles.logBlock} aria-label="Run logs">
+            <section className={styles.logBlock} aria-label={t('workspace.logs.ariaLabel')}>
               {runLog?.stdout || runLog?.stderr ? (
                 <>
                   {runLog.stdout ? <code>{runLog.stdout}</code> : null}
                   {runLog.stderr ? <code>{runLog.stderr}</code> : null}
                 </>
               ) : (
-                <code>No run logs returned by Edge.</code>
+                <code>{t('workspace.empty.logs')}</code>
               )}
             </section>
           ) : null}
@@ -934,11 +952,11 @@ export default function WorkbenchPage() {
                   }`}
                 />
                 <div>
-                  <strong>Artifacts</strong>
+                  <strong>{t('workspace.approval.artifacts')}</strong>
                   <p>
                     {runArtifacts.length
-                      ? 'Artifacts are available for review.'
-                      : 'No artifacts are loaded.'}
+                      ? t('workspace.approval.artifactsAvailable')
+                      : t('workspace.approval.noArtifacts')}
                   </p>
                 </div>
               </article>
@@ -949,11 +967,11 @@ export default function WorkbenchPage() {
                   }`}
                 />
                 <div>
-                  <strong>Apply gate</strong>
+                  <strong>{t('workspace.approval.applyGate')}</strong>
                   <p>
                     {approval?.status === 'pending'
-                      ? 'Owner approval is required before apply/discard.'
-                      : 'There is no pending approval request.'}
+                      ? t('workspace.approval.ownerApprovalRequired')
+                      : t('workspace.approval.noPendingRequest')}
                   </p>
                 </div>
               </article>
@@ -964,8 +982,8 @@ export default function WorkbenchPage() {
                   }`}
                 />
                 <div>
-                  <strong>{approval ? approvalLabel : 'Idle'}</strong>
-                  <p>Decision state comes from Edge API or WebSocket events.</p>
+                  <strong>{approval ? approvalLabel : t('status.idle')}</strong>
+                  <p>{t('workspace.approval.decisionSource')}</p>
                 </div>
               </article>
             </section>
