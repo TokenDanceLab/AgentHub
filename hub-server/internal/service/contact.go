@@ -301,14 +301,11 @@ func (s *ContactService) BlockContact(ctx context.Context, currentUserID, target
 		return errcode.UserNotFound
 	}
 
-	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("(user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)",
-			currentUserID, targetUserID, targetUserID, currentUserID).Delete(&model.Friendship{}).Error; err != nil {
-			return err
-		}
-		return repository.CreateFriendship(tx, &model.Friendship{
-			UserID: currentUserID, FriendID: targetUserID, Status: model.StatusBlocked,
-		})
+	// #183: Only upsert the caller→target direction to blocked.
+	// Do not delete the reverse direction — that would wipe a target→caller
+	// blocked row (cross-user data loss).
+	if err := repository.UpsertFriendship(s.db, &model.Friendship{
+		UserID: currentUserID, FriendID: targetUserID, Status: model.StatusBlocked,
 	}); err != nil {
 		return err
 	}

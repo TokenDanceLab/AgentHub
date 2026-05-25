@@ -336,6 +336,11 @@ func TestAddGroupMembers_FailClosedOnIsMemberActiveError(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
 			AddRow("mem-1", "sess-1", "user", "owner-1", "owner"))
 
+	// GetFriendIDs: owner-1 is friends with u2 (#86 friend-boundary check)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT "friend_id" FROM "friendships" WHERE user_id = $1 AND status = $2`)).
+		WithArgs("owner-1", "accepted").
+		WillReturnRows(sqlmock.NewRows([]string{"friend_id"}).AddRow("u2"))
+
 	// IsMemberActive returns DB error — must NOT silently pass
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE`)).
 		WithArgs("sess-1", "user", "u2").
@@ -628,8 +633,8 @@ func TestAddGroupMembers_DeduplicateIDs(t *testing.T) {
 	// getSession: SELECT * FROM "sessions" WHERE id = $1 ORDER BY "sessions"."id" LIMIT $2
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "sessions" WHERE id = $1 ORDER BY "sessions"."id" LIMIT $2`)).
 		WithArgs("sess-1", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved"}).
-			AddRow("sess-1", "group", false))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved", "owner_user_id"}).
+			AddRow("sess-1", "group", false, "user-1"))
 
 	// requireMember: IsMemberActive for user-1
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL`)).
@@ -640,7 +645,12 @@ func TestAddGroupMembers_DeduplicateIDs(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL ORDER BY "session_members"."id" LIMIT $4`)).
 		WithArgs("sess-1", "user", "user-1", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
-			AddRow("mem-1", "sess-1", "user", "user-1", "member"))
+			AddRow("mem-1", "sess-1", "user", "user-1", "owner"))
+
+	// GetFriendIDs: user-1 is friends with user-2 and user-3 (#86 friend-boundary check)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT "friend_id" FROM "friendships" WHERE user_id = $1 AND status = $2`)).
+		WithArgs("user-1", "accepted").
+		WillReturnRows(sqlmock.NewRows([]string{"friend_id"}).AddRow("user-2").AddRow("user-3"))
 
 	// Input has [user-2, user-2, user-3] - deduplicated to [user-2, user-3].
 	// After dedup, only 2 IsMemberActive + 2 IsMemberSoftDeleted checks (not 3+3).
