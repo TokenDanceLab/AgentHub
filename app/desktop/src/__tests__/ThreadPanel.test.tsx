@@ -6,10 +6,18 @@ import ThreadPanel from '@/components/ThreadPanel';
 import type { ThreadInfo } from '@shared/types';
 
 // ── Hoisted mocks (available before vi.mock factory runs) ──
-const { mockThreads, mockRenameMutateAsync, mockDeleteMutateAsync } = vi.hoisted(() => ({
+const {
+  mockThreads,
+  mockCreateMutateAsync,
+  mockRenameMutateAsync,
+  mockDeleteMutateAsync,
+  mockAddToast,
+} = vi.hoisted(() => ({
   mockThreads: [] as ThreadInfo[],
+  mockCreateMutateAsync: vi.fn(),
   mockRenameMutateAsync: vi.fn().mockResolvedValue({}),
   mockDeleteMutateAsync: vi.fn().mockResolvedValue(undefined),
+  mockAddToast: vi.fn(),
 }));
 
 vi.mock('lucide-react', async (importOriginal) => {
@@ -34,7 +42,7 @@ vi.mock('@/stores/toastStore', () => ({
   useToastStore: (selector: any) => {
     const state = {
       toasts: [],
-      addToast: vi.fn(),
+      addToast: mockAddToast,
       removeToast: vi.fn(),
     };
     return selector ? selector(state) : state;
@@ -43,6 +51,7 @@ vi.mock('@/stores/toastStore', () => ({
 
 vi.mock('@/api/threadQueries', () => ({
   useThreads: () => ({ data: { items: mockThreads } }),
+  useCreateThread: () => ({ mutateAsync: mockCreateMutateAsync, isPending: false }),
   useRenameThread: () => ({ mutateAsync: mockRenameMutateAsync }),
   useDeleteThread: () => ({ mutateAsync: mockDeleteMutateAsync }),
 }));
@@ -80,6 +89,7 @@ describe('ThreadPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockThreads.length = 0;
+    mockCreateMutateAsync.mockResolvedValue(makeThread({ threadId: 'created-thread', title: 'New Thread' }));
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -130,17 +140,60 @@ describe('ThreadPanel', () => {
     expect(onSelect).toHaveBeenCalledWith(thread);
   });
 
-  it('invalidates threads query when + button is clicked', () => {
-    const spy = vi.spyOn(queryClient, 'invalidateQueries');
-    renderPanel();
+  it('creates and selects a thread when + button is clicked', async () => {
+    const onSelect = vi.fn();
+    const createdThread = makeThread({ threadId: 'created-1', title: 'Created Thread' });
+    mockCreateMutateAsync.mockResolvedValueOnce(createdThread);
+    renderPanel({ onSelect });
+
     fireEvent.click(screen.getByTitle('thread.create'));
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['threads'] });
+
+    await vi.waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith({});
+      expect(onSelect).toHaveBeenCalledWith(createdThread);
+    });
+  });
+
+  it('creates and selects a thread from the empty state action', async () => {
+    const onSelect = vi.fn();
+    const createdThread = makeThread({ threadId: 'empty-created', title: 'Empty Created' });
+    mockCreateMutateAsync.mockResolvedValueOnce(createdThread);
+    renderPanel({ onSelect });
+
+    fireEvent.click(screen.getByRole('button', { name: 'thread.emptyAction' }));
+
+    await vi.waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith({});
+      expect(onSelect).toHaveBeenCalledWith(createdThread);
+    });
+  });
+
+  it('shows create errors without selecting a thread', async () => {
+    const onSelect = vi.fn();
+    mockCreateMutateAsync.mockRejectedValueOnce(new Error('create failed'));
+    renderPanel({ onSelect });
+
+    fireEvent.click(screen.getByTitle('thread.create'));
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('create failed')).toBeInTheDocument();
+      expect(mockAddToast).toHaveBeenCalledWith({ type: 'error', message: 'create failed' });
+      expect(onSelect).not.toHaveBeenCalled();
+    });
   });
 
   it('disables create button when offline', () => {
     renderPanel({ online: false });
     const createBtn = screen.getByTitle('thread.create');
     expect(createBtn).toBeDisabled();
+  });
+
+  it('does not create a thread when offline empty-state action is disabled', () => {
+    renderPanel({ online: false });
+    const emptyAction = screen.getByRole('button', { name: 'thread.emptyAction' });
+    expect(emptyAction).toBeDisabled();
+    fireEvent.click(emptyAction);
+    expect(mockCreateMutateAsync).not.toHaveBeenCalled();
   });
 
   it('filters threads by search query', () => {

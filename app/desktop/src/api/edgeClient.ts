@@ -92,6 +92,21 @@ export async function fetchThreads(projectId?: string): Promise<ListResponse<Thr
   return safeParse(listResponseSchema(ThreadInfoSchema), await res.json(), 'threads');
 }
 
+export interface CreateThreadRequest {
+  projectId?: string;
+  title?: string;
+}
+
+export async function createThread(req?: CreateThreadRequest): Promise<ThreadInfo> {
+  const res = await fetch(`${BASE}/v1/threads`, {
+    method: 'POST',
+    headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(req ?? {}),
+  });
+  if (!res.ok) throw await parseError(res);
+  return safeParse(ThreadInfoSchema, await res.json(), 'createThread');
+}
+
 export async function fetchRuns(projectId?: string, threadId?: string): Promise<ListResponse<RunInfo>> {
   const params = new URLSearchParams();
   if (projectId) params.set('projectId', projectId);

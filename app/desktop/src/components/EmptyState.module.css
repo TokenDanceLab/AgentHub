@@ -68,6 +68,16 @@
   border-color: color-mix(in oklch, var(--primary) 30%, var(--border));
 }
 
+.action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.action:disabled:hover {
+  background: var(--card);
+  border-color: var(--border);
+}
+
 .action:active {
   transform: scale(0.97);
 }

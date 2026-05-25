@@ -1,9 +1,8 @@
 import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, MessageSquare, Pencil, Trash2, Check, X } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import type { ThreadInfo } from '@shared/types';
-import { useThreads, useRenameThread, useDeleteThread } from '@/api/threadQueries';
+import { useThreads, useCreateThread, useRenameThread, useDeleteThread } from '@/api/threadQueries';
 import { useToastStore } from '@/stores/toastStore';
 import EmptyState from './EmptyState';
 import styles from './ThreadPanel.module.css';
@@ -45,11 +44,11 @@ function relativeTime(
 export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props) {
   const { t } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
-  const queryClient = useQueryClient();
 
   // TanStack Query — server state
   const { data } = useThreads();
   const threads = data?.items ?? [];
+  const createMutation = useCreateThread();
   const renameMutation = useRenameThread();
   const deleteMutation = useDeleteThread();
 
@@ -140,9 +139,18 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
 
   // ── create handler ─────────────────────────
 
-  const handleCreate = () => {
-    // Invalidate queries so Edge-synced threads refresh
-    queryClient.invalidateQueries({ queryKey: ['threads'] });
+  const handleCreate = async () => {
+    if (!online || createMutation.isPending) return;
+    try {
+      const thread = await createMutation.mutateAsync({});
+      setActionError(null);
+      setQuery('');
+      onSelect(thread);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setActionError(msg);
+      addToast({ type: 'error', message: msg });
+    }
   };
 
   // ── helpers ────────────────────────────────
@@ -164,7 +172,7 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
         <button
           className={styles.createBtn}
           onClick={handleCreate}
-          disabled={!online}
+          disabled={!online || createMutation.isPending}
           title={t('thread.create')}
         >
           <Plus size={16} />
@@ -185,7 +193,11 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
           <EmptyState
             title={t('thread.emptyTitle')}
             description={t('thread.emptyDescription')}
-            action={{ label: t('thread.emptyAction'), onClick: handleCreate }}
+            action={{
+              label: t('thread.emptyAction'),
+              onClick: handleCreate,
+              disabled: !online || createMutation.isPending,
+            }}
           />
         ) : (
           <div className={styles.empty}>{t('thread.empty')}</div>

@@ -2,9 +2,11 @@
 // Replaces Zustand threadStore server-state reads and setInterval polling.
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  createThread,
   fetchThreads,
   renameThread,
   deleteThread,
+  type CreateThreadRequest,
 } from './edgeClient';
 import type { ListResponse, ThreadInfo } from '@shared/types';
 
@@ -13,6 +15,23 @@ export function useThreads(projectId?: string) {
     queryKey: ['threads', projectId],
     queryFn: () => fetchThreads(projectId),
     refetchInterval: 10_000, // replaces App.tsx setInterval polling
+  });
+}
+
+export function useCreateThread() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (req?: CreateThreadRequest) => createThread(req),
+    onSuccess: (thread) => {
+      qc.setQueryData<ListResponse<ThreadInfo> | undefined>(['threads', undefined], (prev) => {
+        if (!prev) return prev;
+        if (prev.items.some((item) => item.threadId === thread.threadId)) return prev;
+        return { ...prev, items: [thread, ...prev.items] };
+      });
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['threads'] });
+    },
   });
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchHealth, fetchRunners, startRun, cancelRun } from '../api/edgeClient';
+import { fetchHealth, fetchRunners, createThread, startRun, cancelRun } from '../api/edgeClient';
 
 describe('edgeClient', () => {
   beforeEach(() => {
@@ -133,6 +133,88 @@ describe('edgeClient', () => {
           body: JSON.stringify({
             prompt: 'continue thread',
             threadId: 'thread-1',
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('createThread', () => {
+    it('posts to Edge and returns thread info', async () => {
+      const mock = {
+        threadId: 'thread_created_1',
+        projectId: 'proj_local',
+        title: 'New Thread',
+        status: 'active',
+        createdAt: '2026-05-26T00:00:00Z',
+        updatedAt: '2026-05-26T00:00:00Z',
+      };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mock),
+      } as Response);
+
+      const result = await createThread({ projectId: 'proj_local', title: 'New Thread' });
+
+      expect(result).toEqual(mock);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/threads$/),
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
+          body: JSON.stringify({ projectId: 'proj_local', title: 'New Thread' }),
+        }),
+      );
+    });
+
+    it('sends an empty JSON object when no request is provided', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          threadId: 'thread_created_2',
+          projectId: 'proj_local',
+          title: 'Untitled',
+          status: 'active',
+          createdAt: '2026-05-26T00:00:00Z',
+          updatedAt: '2026-05-26T00:00:00Z',
+        }),
+      } as Response);
+
+      await createThread();
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/threads$/),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({}),
+        }),
+      );
+    });
+
+    it('sends Edge auth token when creating a thread', async () => {
+      localStorage.setItem('agenthub:edge_auth_token', 'local-edge-token');
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          threadId: 'thread_created_3',
+          projectId: 'proj_local',
+          title: 'Untitled',
+          status: 'active',
+          createdAt: '2026-05-26T00:00:00Z',
+          updatedAt: '2026-05-26T00:00:00Z',
+        }),
+      } as Response);
+
+      await createThread();
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/threads$/),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer local-edge-token',
+            'Content-Type': 'application/json',
           }),
         }),
       );

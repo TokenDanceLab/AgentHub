@@ -9,7 +9,7 @@ interface Suggestion {
 interface EmptyStateProps {
   title: string;
   description?: string;
-  action?: { label: string; onClick: () => void };
+  action?: { label: string; onClick: () => void; disabled?: boolean };
   suggestions?: Suggestion[];
 }
 
@@ -20,7 +20,7 @@ export default function EmptyState({ title, description, action, suggestions }: 
         <h2 className={styles.title}>{title}</h2>
         {description && <p className={styles.description}>{description}</p>}
         {action && (
-          <button className={styles.action} onClick={action.onClick}>
+          <button className={styles.action} onClick={action.onClick} disabled={action.disabled}>
             {action.label}
           </button>
         )}
