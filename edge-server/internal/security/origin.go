@@ -24,8 +24,11 @@ func NormalizeShellCommand(cmd string) string {
 
 // IsTrustedLocalOrigin reports whether a browser Origin can control Local Edge.
 func IsTrustedLocalOrigin(origin string) bool {
+	// Reject empty Origin: non-browser clients (curl, scripts) send no
+	// Origin header, and the browser CORS spec always sends Origin for
+	// cross-origin requests. Accepting empty Origin would bypass CORS.
 	if origin == "" {
-		return true
+		return false
 	}
 
 	u, err := url.Parse(origin)
