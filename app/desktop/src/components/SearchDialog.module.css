@@ -62,9 +62,15 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  width: 100%;
   padding: var(--space-sm) var(--space-md);
+  border: none;
   border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
   cursor: pointer;
+  font: inherit;
+  text-align: left;
   transition: background var(--duration-fast);
 }
 .item:hover,

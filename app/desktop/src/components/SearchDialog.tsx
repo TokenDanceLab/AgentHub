@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, User, Bot } from 'lucide-react';
 import { useSearchStore } from '@/stores/searchStore';
 import { useShallow } from 'zustand/shallow';
@@ -42,6 +43,7 @@ interface ResultItem extends ChatMessage {
 // ── Component ────────────────────────────────
 
 export default function SearchDialog({ messages, onSelect }: Props) {
+  const { t } = useTranslation();
   const { open, query, selectedIndex, closeDialog, setQuery, setSelectedIndex } =
     useSearchStore(
       useShallow((s) => ({
@@ -107,6 +109,9 @@ export default function SearchDialog({ messages, onSelect }: Props) {
     <div className={styles.overlay} onClick={closeDialog}>
       <div
         className={styles.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('search.title')}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
@@ -117,38 +122,46 @@ export default function SearchDialog({ messages, onSelect }: Props) {
             className={styles.input}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search messages..."
+            aria-label={t('search.inputLabel')}
+            placeholder={t('search.placeholder')}
             autoFocus
           />
           <kbd className={styles.kbd}>ESC</kbd>
         </div>
         {results.length > 0 && (
-          <div className={styles.results}>
+          <div className={styles.results} role="list" aria-label={t('search.results')}>
             {results.map((msg, i) => (
-              <div
-                key={msg.id}
-                className={`${styles.item} ${i === selectedIndex ? styles.selected : ''}`}
-                onClick={() => {
-                  closeDialog();
-                  onSelect(msg.id);
-                }}
-              >
-                <span className={styles.itemIcon}>
-                  {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
-                </span>
-                <div className={styles.itemContent}>
-                  <span className={styles.itemTitle}>
-                    {msg.role === 'user' ? 'User' : 'Agent'}
+              <div key={msg.id} role="listitem">
+                <button
+                  type="button"
+                  aria-current={i === selectedIndex ? 'true' : undefined}
+                  className={`${styles.item} ${i === selectedIndex ? styles.selected : ''}`}
+                  aria-label={t('search.resultLabel', {
+                    role: t(`search.role.${msg.role}`),
+                    snippet: msg._snippet,
+                  })}
+                  onClick={() => {
+                    closeDialog();
+                    onSelect(msg.id);
+                  }}
+                >
+                  <span className={styles.itemIcon}>
+                    {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
                   </span>
-                  <span className={styles.itemSnippet}>{msg._snippet}</span>
-                </div>
-                <span className={styles.timestamp}>{formatTime(msg.timestamp)}</span>
+                  <div className={styles.itemContent}>
+                    <span className={styles.itemTitle}>
+                      {t(`search.role.${msg.role}`)}
+                    </span>
+                    <span className={styles.itemSnippet}>{msg._snippet}</span>
+                  </div>
+                  <span className={styles.timestamp}>{formatTime(msg.timestamp)}</span>
+                </button>
               </div>
             ))}
           </div>
         )}
         {query && results.length === 0 && (
-          <div className={styles.empty}>No messages found</div>
+          <div className={styles.empty}>{t('search.empty')}</div>
         )}
       </div>
     </div>

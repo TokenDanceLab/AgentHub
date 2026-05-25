@@ -47,6 +47,13 @@
   animation: messageIn 0.2s ease-out;
 }
 
+.messageFocused {
+  border-radius: 10px;
+  outline: 2px solid color-mix(in oklch, var(--primary) 60%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--primary) 16%, transparent);
+  scroll-margin-block: 96px;
+}
+
 .userMsg {
   align-self: flex-end;
   background: #F3F4F6;

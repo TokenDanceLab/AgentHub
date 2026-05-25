@@ -440,6 +440,10 @@ export default function App() {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
   }, []);
 
+  const handleSelectSearchResult = useCallback((messageId: string) => {
+    window.dispatchEvent(new CustomEvent('agenthub:focus-chat-message', { detail: { messageId } }));
+  }, []);
+
   const handleShareWorkspace = useCallback(async () => {
     const title = selectedThread?.title ?? selectedAgent?.name ?? 'AgentHub';
     const summary = [
@@ -895,7 +899,7 @@ export default function App() {
 
       {/* Modals */}
       <Suspense fallback={null}>
-        <Slot name="search-dialog" messages={allMessages} onSelect={() => {}} />
+        <Slot name="search-dialog" messages={allMessages} onSelect={handleSelectSearchResult} />
       </Suspense>
       <Slot name="permission-dialog" requests={permissionRequests} onDecide={handleDecidePermission} />
       <Slot name="shortcut-help" open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />

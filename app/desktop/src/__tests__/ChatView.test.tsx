@@ -1,3 +1,9 @@
+const { mockAddToast, mockRemoveToast, mockScrollToIndex } = vi.hoisted(() => ({
+  mockAddToast: vi.fn(),
+  mockRemoveToast: vi.fn(),
+  mockScrollToIndex: vi.fn(),
+}));
+
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
   return { ...actual };
@@ -20,8 +26,8 @@ vi.mock('@/stores/toastStore', () => ({
   useToastStore: (selector: (s: { toasts: unknown[]; addToast: ReturnType<typeof vi.fn>; removeToast: ReturnType<typeof vi.fn> }) => unknown) => {
     const store = {
       toasts: [],
-      addToast: vi.fn(),
-      removeToast: vi.fn(),
+      addToast: mockAddToast,
+      removeToast: mockRemoveToast,
     };
     return selector(store);
   },
@@ -42,13 +48,13 @@ vi.mock('@tanstack/react-virtual', () => ({
       getVirtualItems: () => items,
       getTotalSize: () => 0,
       measureElement: () => {},
-      scrollToIndex: () => {},
+      scrollToIndex: mockScrollToIndex,
     };
   },
 }));
 
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import ChatView from '@/components/ChatView';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -72,6 +78,12 @@ function makeAgentTextMessage(content: string, id = 'msg-agent-1'): ChatMessage 
 }
 
 describe('ChatView', () => {
+  beforeEach(() => {
+    mockAddToast.mockClear();
+    mockRemoveToast.mockClear();
+    mockScrollToIndex.mockClear();
+  });
+
   it('renders empty state when messages array is empty', () => {
     render(<ChatView messages={[]} />);
     expect(screen.getByText('chat.emptyTitle')).toBeInTheDocument();
@@ -217,5 +229,44 @@ describe('ChatView', () => {
     const { container } = render(<ChatView messages={[]} />);
     const bar = container.querySelector('[class*="streamProgress"]');
     expect(bar).not.toBeInTheDocument();
+  });
+
+  it('focuses a message when the search dialog dispatches a focus event', () => {
+    const messages = [
+      makeUserMessage('First message'),
+      makeAgentTextMessage('Target message from search', 'msg-agent-target'),
+    ];
+    render(<ChatView messages={messages} />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('agenthub:focus-chat-message', {
+          detail: { messageId: 'msg-agent-target' },
+        }),
+      );
+    });
+
+    expect(mockScrollToIndex).toHaveBeenCalledWith(1, { align: 'center' });
+    expect(
+      screen.getByText('Target message from search').closest('[data-message-id]')?.className,
+    ).toContain('messageFocused');
+  });
+
+  it('shows an info toast when a search result is not in the current thread', () => {
+    render(<ChatView messages={[makeUserMessage('Visible message')]} />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('agenthub:focus-chat-message', {
+          detail: { messageId: 'missing-message' },
+        }),
+      );
+    });
+
+    expect(mockScrollToIndex).not.toHaveBeenCalled();
+    expect(mockAddToast).toHaveBeenCalledWith({
+      type: 'info',
+      message: 'search.messageUnavailable',
+    });
   });
 });

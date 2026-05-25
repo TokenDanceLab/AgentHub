@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Copy, RefreshCw, Trash2, ArrowDown, MessageSquare } from 'lucide-react';
@@ -368,6 +368,8 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
   const addToast = useToastStore((s) => s.addToast);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null);
+  const focusTimerRef = useRef<number | null>(null);
 
   // ── Virtualizer ──────────────────────────────
   const virtualizer = useVirtualizer({
@@ -397,6 +399,33 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
     },
   );
 
+  useEffect(() => {
+    const handleFocusMessage = (event: Event) => {
+      const messageId = (event as CustomEvent<{ messageId?: unknown }>).detail?.messageId;
+      if (typeof messageId !== 'string' || messageId.length === 0) return;
+
+      const index = messagesRef.current.findIndex((message) => message.id === messageId);
+      if (index === -1) {
+        addToast({ type: 'info', message: t('search.messageUnavailable') });
+        return;
+      }
+
+      virtualizerRef.current.scrollToIndex(index, { align: 'center' });
+      setFocusedMessageId(messageId);
+      if (focusTimerRef.current !== null) window.clearTimeout(focusTimerRef.current);
+      focusTimerRef.current = window.setTimeout(() => {
+        setFocusedMessageId(null);
+        focusTimerRef.current = null;
+      }, 1800);
+    };
+
+    window.addEventListener('agenthub:focus-chat-message', handleFocusMessage);
+    return () => {
+      window.removeEventListener('agenthub:focus-chat-message', handleFocusMessage);
+      if (focusTimerRef.current !== null) window.clearTimeout(focusTimerRef.current);
+    };
+  }, [addToast, t]);
+
   const showScrollIndicator = isStreaming && !isNearBottom;
 
   const handleCopy = useCallback(async (msg: ChatMessage) => {
@@ -420,7 +449,8 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
       const rt = relativeTime(msg.timestamp);
       return (
         <div
-          className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
+          className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg} ${msg.id === focusedMessageId ? styles.messageFocused : ''}`}
+          data-message-id={msg.id}
         >
           {msg.role === 'agent' && msg.agentName && (
             <div className={styles.agentAvatar}>
@@ -480,7 +510,7 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
         </div>
       );
     },
-    [t, isStreaming, lastMsg?.id, copiedMessageId, handleCopy, onRetry, onDelete],
+    [t, isStreaming, lastMsg?.id, copiedMessageId, focusedMessageId, handleCopy, onRetry, onDelete],
   );
 
   const handleScrollToBottom = useCallback(() => {
