@@ -19,6 +19,12 @@ func GetMessageByID(db *gorm.DB, id string) (*model.Message, error) {
 	return &msg, err
 }
 
+func GetMessageBySessionAndID(db *gorm.DB, sessionID, id string) (*model.Message, error) {
+	var msg model.Message
+	err := db.Where("session_id = ? AND id = ?", sessionID, id).First(&msg).Error
+	return &msg, err
+}
+
 func GetMessagesBySession(db *gorm.DB, sessionID string, beforeSeq int64, limit int) ([]model.Message, error) {
 	if limit <= 0 || limit > config.MaxMessagePageLimit {
 		limit = config.DefaultPaginationLimit
@@ -87,6 +93,12 @@ func ListPinsBySession(db *gorm.DB, sessionID string) ([]model.MessagePin, error
 func GetMessagesByIDs(db *gorm.DB, ids []string) ([]model.Message, error) {
 	var msgs []model.Message
 	err := db.Where("id IN ?", ids).Find(&msgs).Error
+	return msgs, err
+}
+
+func GetMessagesBySessionAndIDs(db *gorm.DB, sessionID string, ids []string) ([]model.Message, error) {
+	var msgs []model.Message
+	err := db.Where("session_id = ? AND id IN ?", sessionID, ids).Find(&msgs).Error
 	return msgs, err
 }
 

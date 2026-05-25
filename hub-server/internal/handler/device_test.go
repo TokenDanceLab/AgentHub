@@ -27,7 +27,7 @@ func TestDeviceHandler_Register_Success(t *testing.T) {
 	h := handler.NewDeviceHandler(svc)
 
 	c, w := newGinCtx("POST", "/edge/devices/register", map[string]any{
-		"device_id":    "dev1",
+		"device_id":    testDeviceID,
 		"app_version":  "1.0.0",
 		"capabilities": []string{"chat", "agent"},
 	}, "user_id", "u1", "device_type", "desktop")
@@ -40,6 +40,39 @@ func TestDeviceHandler_Register_Success(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp.Code != "OK" {
 		t.Fatalf("expected OK, got %s", resp.Code)
+	}
+}
+
+func TestDeviceHandler_Register_InvalidDeviceID(t *testing.T) {
+	called := false
+	svc := &mockDeviceService{
+		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+			called = true
+			return nil, errcode.ErrInternal
+		},
+	}
+	h := handler.NewDeviceHandler(svc)
+
+	c, w := newGinCtx("POST", "/edge/devices/register", map[string]any{
+		"device_id": "dev1",
+	}, "user_id", "u1", "device_type", "desktop")
+	h.Register(c)
+
+	if called {
+		t.Fatal("service should not be called for malformed device_id")
+	}
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+	var resp handler.Response
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.Code != "BAD_REQUEST" {
+		t.Fatalf("expected BAD_REQUEST, got %s", resp.Code)
+	}
+	if resp.Message != "device_id must be a UUID" {
+		t.Fatalf("unexpected message %q", resp.Message)
 	}
 }
 
@@ -66,7 +99,7 @@ func TestDeviceHandler_Register_InternalError(t *testing.T) {
 	h := handler.NewDeviceHandler(svc)
 
 	c, w := newGinCtx("POST", "/edge/devices/register", map[string]any{
-		"device_id": "dev1",
+		"device_id": testDeviceID,
 	}, "user_id", "u1", "device_type", "desktop")
 	h.Register(c)
 

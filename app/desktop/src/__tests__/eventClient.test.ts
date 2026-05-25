@@ -32,6 +32,7 @@ describe('eventClient', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    localStorage.clear();
   });
 
   function lastWs(): MockWebSocket {
@@ -121,5 +122,16 @@ describe('eventClient', () => {
     stream.close();
     // After close, creating another connection should be no-op
     expect(instances).toHaveLength(1); // only the original
+  });
+
+  it('adds Edge auth token to WebSocket URL when stored locally', () => {
+    localStorage.setItem('agenthub:edge_auth_token', 'local-edge-token');
+
+    const stream = createEventStream('ws://127.0.0.1:3210/v1/events?cursor=7');
+
+    const ws = lastWs();
+    expect(ws.url).toContain('cursor=7');
+    expect(ws.url).toContain('access_token=local-edge-token');
+    stream.close();
   });
 });

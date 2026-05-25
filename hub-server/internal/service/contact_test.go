@@ -358,6 +358,29 @@ func TestAcceptFriendRequest_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestAcceptFriendRequest_NilCacheDoesNotPanic(t *testing.T) {
+	db, mock, sqlDB := newMockDBContact(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(sqlcFriendshipByID).
+		WithArgs("req-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
+			AddRow("req-1", "sender", "user-1", model.StatusPending))
+
+	mock.ExpectBegin()
+	mock.ExpectExec(sqlcUpdateFriend).
+		WithArgs(model.StatusAccepted, sqlmock.AnyArg(), "req-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(sqlcInsertFriend).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	svc := NewContactService(db, nil, nil)
+	err := svc.AcceptFriendRequest(context.Background(), "user-1", "req-1")
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ==================== RejectFriendRequest ====================
 
 func TestRejectFriendRequest_NotFound(t *testing.T) {
@@ -572,6 +595,31 @@ func TestListContacts_WithFriends(t *testing.T) {
 	assert.Equal(t, "Buddy", contacts[0].Remark)
 	assert.Equal(t, "friend-b", contacts[1].UserID)
 	assert.Equal(t, "Friend B", contacts[1].Nickname)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestListContacts_NilCacheMarksOffline(t *testing.T) {
+	db, mock, sqlDB := newMockDBContact(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(sqlcFriendshipsByUser).
+		WithArgs("user-1", model.StatusAccepted).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "remark"}).
+			AddRow("f-1", "user-1", "friend-a", model.StatusAccepted, "Buddy").
+			AddRow("f-2", "user-1", "friend-b", model.StatusAccepted, ""))
+
+	mock.ExpectQuery(sqlcUsersByIDs).
+		WithArgs("friend-a", "friend-b").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname", "avatar_url"}).
+			AddRow("friend-a", "friendA", "hash1", "Friend A", "").
+			AddRow("friend-b", "friendB", "hash2", "Friend B", "https://img.url"))
+
+	svc := NewContactService(db, nil, nil)
+	contacts, err := svc.ListContacts(context.Background(), "user-1")
+	require.NoError(t, err)
+	require.Len(t, contacts, 2)
+	assert.False(t, contacts[0].Online)
+	assert.False(t, contacts[1].Online)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
