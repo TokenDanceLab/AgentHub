@@ -113,7 +113,7 @@ export function useAutoScroll(
         flagTimerRef.current = setTimeout(() => {
           flagRef.current = false;
           flagTimerRef.current = undefined;
-        }, 1500);
+        }, 300);
 
         // Use requestAnimationFrame for coordination with DOM paint
         if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current);

@@ -266,17 +266,71 @@ func (p *NDJSONStreamParser) parseResult(scope map[string]any, msg *claudeSDKMes
 	if !success {
 		payload["errors"] = msg.Errors
 	}
+	// Additional result fields from audit Section 5.10
+	if msg.DurationAPIMs > 0 {
+		payload["durationApi"] = msg.DurationAPIMs
+	}
+	if msg.TotalCostUSD > 0 {
+		payload["totalCostUsd"] = msg.TotalCostUSD
+	}
+	if msg.StopReason != "" {
+		payload["stopReason"] = msg.StopReason
+	}
+	if msg.ModelUsage != nil {
+		payload["modelUsage"] = msg.ModelUsage
+	}
+	if msg.PermissionDenials != nil {
+		payload["permissionDenials"] = msg.PermissionDenials
+	}
+	if msg.StructuredOutput != nil {
+		payload["structuredOutput"] = msg.StructuredOutput
+	}
+	if msg.SessionID != "" {
+		payload["sessionId"] = msg.SessionID
+	}
 	p.emit(scope, BusEventResult, payload)
 }
 
 func (p *NDJSONStreamParser) emitSessionInit(scope map[string]any, msg *claudeSDKMessage) {
-	p.emit(scope, BusEventSessionInit, map[string]any{
+	payload := map[string]any{
 		"model":          msg.Model,
 		"tools":          msg.Tools,
 		"mcpServers":     msg.MCPServers,
 		"permissionMode": msg.PermissionMode,
 		"version":        msg.Version,
-	})
+	}
+	// P0: Extract session_id so AgentHub can track sessions for --resume.
+	if msg.SessionID != "" {
+		payload["sessionId"] = msg.SessionID
+	}
+	if msg.UUID != "" {
+		payload["uuid"] = msg.UUID
+	}
+	if msg.CWD != "" {
+		payload["cwd"] = msg.CWD
+	}
+	if len(msg.Agents) > 0 {
+		payload["agents"] = msg.Agents
+	}
+	if len(msg.Skills) > 0 {
+		payload["skills"] = msg.Skills
+	}
+	if len(msg.Plugins) > 0 {
+		payload["plugins"] = msg.Plugins
+	}
+	if len(msg.SlashCommands) > 0 {
+		payload["slashCommands"] = msg.SlashCommands
+	}
+	if msg.APIKeySource != "" {
+		payload["apiKeySource"] = msg.APIKeySource
+	}
+	if len(msg.Betas) > 0 {
+		payload["betas"] = msg.Betas
+	}
+	if msg.OutputStyle != "" {
+		payload["outputStyle"] = msg.OutputStyle
+	}
+	p.emit(scope, BusEventSessionInit, payload)
 }
 
 func (p *NDJSONStreamParser) emitToolResult(scope map[string]any, msg *claudeSDKMessage) {
@@ -406,7 +460,13 @@ func (p *NDJSONStreamParser) emitHookResponse(scope map[string]any, msg *claudeS
 }
 
 func isFileModifyingTool(name string) bool {
-	return name == "Write" || name == "Edit" || name == "NotebookEdit"
+	switch name {
+	case "Write", "Edit", "NotebookEdit",
+		"write", "edit", "apply_patch":
+		return true
+	default:
+		return false
+	}
 }
 
 func (p *NDJSONStreamParser) emit(scope map[string]any, eventType string, payload map[string]any) {
@@ -449,12 +509,29 @@ type claudeSDKMessage struct {
 	MCPServers     []any    `json:"mcp_servers,omitempty"`
 	PermissionMode string   `json:"permissionMode,omitempty"`
 	Version        string   `json:"version,omitempty"`
+	SessionID      string   `json:"session_id,omitempty"`
+	UUID           string   `json:"uuid,omitempty"`
+	CWD            string   `json:"cwd,omitempty"`
+	Agents         []string `json:"agents,omitempty"`
+	Skills         []string `json:"skills,omitempty"`
+	Plugins        []any    `json:"plugins,omitempty"`
+	SlashCommands  []string `json:"slash_commands,omitempty"`
+	APIKeySource   string   `json:"apiKeySource,omitempty"`
+	Betas          []string `json:"betas,omitempty"`
+	OutputStyle    string   `json:"output_style,omitempty"`
 
 	// result fields
-	DurationMs int64        `json:"duration_ms,omitempty"`
-	NumTurns   int          `json:"num_turns,omitempty"`
-	Usage      *claudeUsage `json:"usage,omitempty"`
-	Errors     []string     `json:"errors,omitempty"`
+	DurationMs        int64        `json:"duration_ms,omitempty"`
+	DurationAPIMs     int64        `json:"duration_api_ms,omitempty"`
+	NumTurns          int          `json:"num_turns,omitempty"`
+	Usage             *claudeUsage `json:"usage,omitempty"`
+	ModelUsage        any          `json:"modelUsage,omitempty"`
+	TotalCostUSD      float64      `json:"total_cost_usd,omitempty"`
+	StopReason        string       `json:"stop_reason,omitempty"`
+	PermissionDenials []any        `json:"permission_denials,omitempty"`
+	StructuredOutput  any          `json:"structured_output,omitempty"`
+	IsError           bool         `json:"is_error,omitempty"`
+	Errors            []string     `json:"errors,omitempty"`
 
 	// tool_progress fields
 	ToolUseID      string  `json:"tool_use_id,omitempty"`

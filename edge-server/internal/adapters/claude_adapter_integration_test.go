@@ -225,20 +225,27 @@ func TestClaudeCodeBuildCommandArgs(t *testing.T) {
 		_ = hasModel
 	})
 
-	t.Run("session_resume", func(t *testing.T) {
+	t.Run("session_id", func(t *testing.T) {
 		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
 			Run:       run,
 			Prompt:    "hello",
 			SessionID: "ses_abc",
 		})
-		hasResume := false
-		for _, a := range args {
-			if a == "--resume" {
-				hasResume = true
+		hasSessionID := false
+		hasValue := false
+		for i, a := range args {
+			if a == "--session-id" {
+				hasSessionID = true
+				if i+1 < len(args) && args[i+1] == "ses_abc" {
+					hasValue = true
+				}
 			}
 		}
-		if !hasResume {
-			t.Error("--resume not in args when SessionID set")
+		if !hasSessionID {
+			t.Error("--session-id not in args when SessionID set")
+		}
+		if !hasValue {
+			t.Error("--session-id value missing")
 		}
 	})
 
@@ -285,7 +292,7 @@ func TestClaudeCodeBuildCommandArgs(t *testing.T) {
 		hasEffort := false
 		hasValue := false
 		for i, a := range args {
-			if a == "--reasoning-effort" {
+			if a == "--effort" {
 				hasEffort = true
 				if i+1 < len(args) && args[i+1] == "high" {
 					hasValue = true
@@ -293,34 +300,194 @@ func TestClaudeCodeBuildCommandArgs(t *testing.T) {
 			}
 		}
 		if !hasEffort {
-			t.Error("--reasoning-effort not in args when ReasoningEffort set")
+			t.Error("--effort not in args when ReasoningEffort set")
 		}
 		if !hasValue {
-			t.Error("reasoning-effort value missing after flag")
+			t.Error("effort value missing after flag")
 		}
 	})
 
-	t.Run("max_thinking_tokens", func(t *testing.T) {
+	t.Run("thinking_deprecated_fallback", func(t *testing.T) {
+		// MaxThinkingTokens triggers --thinking enabled fallback since the flag is deprecated.
 		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
 			Run:               run,
 			Prompt:            "hello",
 			MaxThinkingTokens: 16000,
 		})
+		hasThinking := false
+		hasEnabled := false
+		for i, a := range args {
+			if a == "--thinking" {
+				hasThinking = true
+				if i+1 < len(args) && args[i+1] == "enabled" {
+					hasEnabled = true
+				}
+			}
+		}
+		if !hasThinking {
+			t.Error("--thinking not in args when MaxThinkingTokens set (deprecated fallback)")
+		}
+		if !hasEnabled {
+			t.Error("--thinking value not 'enabled' when MaxThinkingTokens set")
+		}
+	})
+
+	t.Run("thinking_mode_explicit", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:          run,
+			Prompt:       "hello",
+			ThinkingMode: "adaptive",
+		})
+		hasThinking := false
+		hasAdaptive := false
+		for i, a := range args {
+			if a == "--thinking" {
+				hasThinking = true
+				if i+1 < len(args) && args[i+1] == "adaptive" {
+					hasAdaptive = true
+				}
+			}
+		}
+		if !hasThinking {
+			t.Error("--thinking not in args when ThinkingMode set")
+		}
+		if !hasAdaptive {
+			t.Error("--thinking value not 'adaptive' when ThinkingMode='adaptive'")
+		}
+	})
+
+	t.Run("json_schema", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:                    run,
+			Prompt:                 "hello",
+			StructuredOutputSchema: `{"type":"object"}`,
+		})
 		hasFlag := false
 		hasValue := false
 		for i, a := range args {
-			if a == "--max-thinking-tokens" {
+			if a == "--json-schema" {
 				hasFlag = true
-				if i+1 < len(args) && args[i+1] == "16000" {
+				if i+1 < len(args) && args[i+1] == `{"type":"object"}` {
 					hasValue = true
 				}
 			}
 		}
 		if !hasFlag {
-			t.Error("--max-thinking-tokens not in args when MaxThinkingTokens set")
+			t.Error("--json-schema not in args when StructuredOutputSchema set")
 		}
 		if !hasValue {
-			t.Error("max-thinking-tokens value missing after flag")
+			t.Error("json-schema value missing")
+		}
+	})
+
+	t.Run("system_prompt", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:          run,
+			Prompt:       "hello",
+			SystemPrompt: "You are a helpful assistant.",
+		})
+		hasFlag := false
+		for _, a := range args {
+			if a == "--system-prompt" {
+				hasFlag = true
+			}
+		}
+		if !hasFlag {
+			t.Error("--system-prompt not in args when SystemPrompt set")
+		}
+	})
+
+	t.Run("append_system_prompt", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:                run,
+			Prompt:             "hello",
+			AppendSystemPrompt: "Always be concise.",
+		})
+		hasFlag := false
+		for _, a := range args {
+			if a == "--append-system-prompt" {
+				hasFlag = true
+			}
+		}
+		if !hasFlag {
+			t.Error("--append-system-prompt not in args when AppendSystemPrompt set")
+		}
+	})
+
+	t.Run("agent_definitions", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:    run,
+			Prompt: "hello",
+			AgentDefinitions: map[string]runnerctx.AgentDefinition{
+				"reviewer": {Description: "reviews code", Prompt: "You are a reviewer", Tools: []string{"Read"}},
+			},
+		})
+		hasAgents := false
+		for _, a := range args {
+			if a == "--agents" {
+				hasAgents = true
+			}
+		}
+		if !hasAgents {
+			t.Error("--agents not in args when AgentDefinitions set")
+		}
+	})
+
+	t.Run("mcp_config", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:       run,
+			Prompt:    "hello",
+			MCPConfig: `{"server":{"command":"node"}}`,
+		})
+		hasFlag := false
+		for _, a := range args {
+			if a == "--mcp-config" {
+				hasFlag = true
+			}
+		}
+		if !hasFlag {
+			t.Error("--mcp-config not in args when MCPConfig set")
+		}
+	})
+
+	t.Run("allowed_tools", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:          run,
+			Prompt:       "hello",
+			AllowedTools: []string{"Read", "Grep"},
+		})
+		var tools []string
+		for i, a := range args {
+			if a == "--allowedTools" && i+1 < len(args) {
+				tools = append(tools, args[i+1])
+			}
+		}
+		if len(tools) != 2 || tools[0] != "Read" || tools[1] != "Grep" {
+			t.Errorf("--allowedTools values = %v, want [Read Grep]", tools)
+		}
+	})
+
+	t.Run("max_budget_usd", func(t *testing.T) {
+		_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+			Run:          run,
+			Prompt:       "hello",
+			MaxBudgetUSD: 5.00,
+		})
+		hasFlag := false
+		hasValue := false
+		for i, a := range args {
+			if a == "--max-budget-usd" {
+				hasFlag = true
+				if i+1 < len(args) && args[i+1] == "5.00" {
+					hasValue = true
+				}
+			}
+		}
+		if !hasFlag {
+			t.Error("--max-budget-usd not in args when MaxBudgetUSD set")
+		}
+		if !hasValue {
+			t.Error("max-budget-usd value missing")
 		}
 	})
 

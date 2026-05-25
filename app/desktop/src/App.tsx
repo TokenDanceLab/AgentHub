@@ -18,7 +18,8 @@ import { useIsMobile } from '@/hooks/useMediaQuery';
 import { useEdgeStatus } from '@/hooks/useEdgeStatus';
 import { useAgentList } from '@/api/agentQueries';
 import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
-import { useThreads } from '@/api/threadQueries';
+import { useThreads, useThreadMessages } from '@/api/threadQueries';
+import { createThread } from '@/api/edgeClient';
 import type { StartRunRequest } from '@shared/types';
 import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -148,12 +149,11 @@ export default function App() {
   const { setOnline, setConnected, wsLatency } = useConnectionStore(
     useShallow((s) => ({ setOnline: s.setOnline, setConnected: s.setConnected, wsLatency: s.wsLatency })),
   );
-  const { selectedThreadId, selectThread } = useThreadStore(
-    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectThread: s.selectThread })),
+  const { selectedThreadId, selectedAgentId, selectThread, selectAgentThread } = useThreadStore(
+    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectedAgentId: s.selectedAgentId, selectThread: s.selectThread, selectAgentThread: s.selectAgentThread })),
   );
   const { data: agentData } = useAgentList(online);
   const agents = agentData?.items ?? [];
-  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>();
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
   const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
@@ -267,7 +267,6 @@ export default function App() {
 
   const handleSend = useCallback(async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string }) => {
     if (runStartPending || runIsActive) {
-      setRightPanelOpen(true);
       addToast({ type: 'info', message: t('error.activeRunExists') });
       return false;
     }
@@ -291,7 +290,6 @@ export default function App() {
       if (agentId) req.agentId = agentId;
       if (selectedThread) req.threadId = selectedThread.threadId;
       setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
-      setRightPanelOpen(true);
       const started = await startRun(req);
       setOptimisticRun({ ...started, outputText: '', toolCalls: [], changedFiles: [] });
       return true;
@@ -300,7 +298,6 @@ export default function App() {
       const activeRunId = getActiveRunConflictId(e);
       if (activeRunId) {
         setOptimisticRun({ runId: activeRunId, status: 'running', outputText: '', toolCalls: [], changedFiles: [] });
-        setRightPanelOpen(true);
         addToast({ type: 'info', message: t('error.activeRunExists') });
         return false;
       }
@@ -321,7 +318,24 @@ export default function App() {
   }, [currentRun?.runId, optimisticRun?.runId]);
 
   const handleSelectThread = useCallback((id: string) => { selectThread(id); setUserMessages([]); }, [selectThread]);
-  const handleSelectAgent = useCallback((id: string) => setSelectedAgentId(id), []);
+  const handleSelectAgent = useCallback(async (agentId: string) => {
+    const store = useThreadStore.getState();
+    const existing = store.agentThreadMap[agentId];
+    if (existing) {
+      store.selectAgentThread(agentId, existing);
+      setUserMessages([]);
+      return;
+    }
+    const agent = agents.find((a) => a.id === agentId);
+    try {
+      const thread = await createThread(agent?.name ? `${agent.name}` : undefined);
+      store.selectAgentThread(agentId, thread.threadId);
+      setUserMessages([]);
+    } catch {
+      // still select the agent visually even if thread creation fails
+      store.selectAgentThread(agentId, '');
+    }
+  }, [agents]);
   const openSettings = useCallback((section: SettingsSectionId = 'general') => {
     setSettingsInitialSection(section);
     setSettingsOpen(true);
@@ -476,16 +490,16 @@ export default function App() {
         <div className={styles.topBarRight}>
           {/* Window controls — no drag region so clicks register */}
           <div className={styles.winControls}>
-            <ShellIconButton className={styles.winBtn} onClick={() => getCurrentWindow().minimize()} label="最小化" tooltipSide="bottom">
+            <ShellIconButton className={styles.winBtn} onClick={() => getCurrentWindow().minimize()} label={t('window.minimize')} tooltipSide="bottom">
               <Minus size={13} />
             </ShellIconButton>
             <ShellIconButton className={styles.winBtn} onClick={async () => {
               const w = getCurrentWindow();
               (await w.isMaximized()) ? w.unmaximize() : w.maximize();
-            }} label="最大化" tooltipSide="bottom">
+            }} label={t('window.maximize')} tooltipSide="bottom">
               <Square size={11} />
             </ShellIconButton>
-            <ShellIconButton className={`${styles.winBtn} ${styles.winBtnClose}`} onClick={() => getCurrentWindow().close()} label="关闭" tooltipSide="bottom">
+            <ShellIconButton className={`${styles.winBtn} ${styles.winBtnClose}`} onClick={() => getCurrentWindow().close()} label={t('window.close')} tooltipSide="bottom">
               <X size={14} />
             </ShellIconButton>
           </div>

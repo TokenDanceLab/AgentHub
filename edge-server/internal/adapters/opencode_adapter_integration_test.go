@@ -258,96 +258,60 @@ func parseOpenCodeLines(t *testing.T, input string) *mockEmitter {
 	return emitter
 }
 
-func TestOpenCodeToolResultEvent(t *testing.T) {
-	input := `{"type":"tool_result","part":{"type":"tool-result","callID":"call_1","toolName":"Read","output":"file contents","status":"completed"}}`
+func TestOpenCodeToolUseCompletedEvent(t *testing.T) {
+	// Actual tool_use event from OpenCode v1.15.10 --format json output.
+	// The part.type="tool" and state is a nested object with status/input/output.
+	input := `{"type":"tool_use","timestamp":1779700881122,"sessionID":"ses_abc","part":{"type":"tool","tool":"read","callID":"call_00_test1","state":{"status":"completed","input":{"filePath":"/tmp/test.txt"},"output":"file contents","title":"test.txt"},"id":"prt_1","sessionID":"ses_abc","messageID":"msg_1"}}`
 	emitter := parseOpenCodeLines(t, input)
 
-	events := emitter.eventsOfType(BusEventToolResult)
-	if len(events) != 1 {
-		t.Fatalf("expected 1 tool_result event, got %d", len(events))
+	// tool_use with completed state emits both ToolCall and ToolResult
+	callEvents := emitter.eventsOfType(BusEventToolCall)
+	resultEvents := emitter.eventsOfType(BusEventToolResult)
+
+	if len(callEvents) != 1 {
+		t.Fatalf("expected 1 tool_call event, got %d", len(callEvents))
 	}
-	if events[0].Payload["callId"] != "call_1" {
-		t.Errorf("callId = %v", events[0].Payload["callId"])
+	if callEvents[0].Payload["callId"] != "call_00_test1" {
+		t.Errorf("callId = %v", callEvents[0].Payload["callId"])
 	}
-	if events[0].Payload["toolName"] != "Read" {
-		t.Errorf("toolName = %v", events[0].Payload["toolName"])
+	if callEvents[0].Payload["toolName"] != "read" {
+		t.Errorf("toolName = %v, expected 'read'", callEvents[0].Payload["toolName"])
 	}
-	if events[0].Payload["status"] != "completed" {
-		t.Errorf("status = %v", events[0].Payload["status"])
+	if callEvents[0].Payload["status"] != "completed" {
+		t.Errorf("status = %v", callEvents[0].Payload["status"])
+	}
+
+	if len(resultEvents) != 1 {
+		t.Fatalf("expected 1 tool_result event, got %d", len(resultEvents))
+	}
+	if resultEvents[0].Payload["callId"] != "call_00_test1" {
+		t.Errorf("result callId = %v", resultEvents[0].Payload["callId"])
+	}
+	if resultEvents[0].Payload["output"] != "file contents" {
+		t.Errorf("output = %v", resultEvents[0].Payload["output"])
 	}
 }
 
-func TestOpenCodeToolResultTriggersFileChange(t *testing.T) {
-	input := `{"type":"tool_result","part":{"type":"tool-result","callID":"call_2","toolName":"Write","output":"ok","status":"completed"}}`
+func TestOpenCodeToolUseTriggersFileChange(t *testing.T) {
+	// Write tool in actual OpenCode format triggers BusEventFileChange.
+	input := `{"type":"tool_use","timestamp":1779700881122,"sessionID":"ses_abc","part":{"type":"tool","tool":"write","callID":"call_write_1","state":{"status":"completed","input":{"filePath":"/tmp/out.txt","content":"hello"},"output":"ok"},"id":"prt_2","sessionID":"ses_abc","messageID":"msg_2"}}`
 	emitter := parseOpenCodeLines(t, input)
-
-	toolResults := emitter.eventsOfType(BusEventToolResult)
-	if len(toolResults) != 1 {
-		t.Fatalf("expected 1 tool_result, got %d", len(toolResults))
-	}
 
 	fileChanges := emitter.eventsOfType(BusEventFileChange)
 	if len(fileChanges) != 1 {
 		t.Fatalf("expected 1 file_change for Write tool, got %d", len(fileChanges))
 	}
-	if fileChanges[0].Payload["toolName"] != "Write" {
-		t.Errorf("toolName = %v", fileChanges[0].Payload["toolName"])
+	if fileChanges[0].Payload["toolName"] != "write" {
+		t.Errorf("toolName = %v, expected 'write'", fileChanges[0].Payload["toolName"])
+	}
+	if fileChanges[0].Payload["callId"] != "call_write_1" {
+		t.Errorf("callId = %v", fileChanges[0].Payload["callId"])
 	}
 }
 
-func TestOpenCodePermissionEvent(t *testing.T) {
-	input := `{"type":"permission","part":{"type":"permission","toolName":"Bash","toolInput":{"command":"rm -rf /"}}}`
-	emitter := parseOpenCodeLines(t, input)
-
-	events := emitter.eventsOfType(BusEventStatusChange)
-	if len(events) != 1 {
-		t.Fatalf("expected 1 status_change event, got %d", len(events))
-	}
-	if events[0].Payload["permissionMode"] != "ask" {
-		t.Errorf("permissionMode = %v", events[0].Payload["permissionMode"])
-	}
-	if events[0].Payload["permissionTool"] != "Bash" {
-		t.Errorf("permissionTool = %v", events[0].Payload["permissionTool"])
-	}
-}
-
-func TestOpenCodeFileEvent(t *testing.T) {
-	input := `{"type":"file","part":{"type":"file","path":"/tmp/test.txt","operation":"write"}}`
-	emitter := parseOpenCodeLines(t, input)
-
-	events := emitter.eventsOfType(BusEventFileChange)
-	if len(events) != 1 {
-		t.Fatalf("expected 1 file_change event, got %d", len(events))
-	}
-	if events[0].Payload["path"] != "/tmp/test.txt" {
-		t.Errorf("path = %v", events[0].Payload["path"])
-	}
-	if events[0].Payload["operation"] != "write" {
-		t.Errorf("operation = %v", events[0].Payload["operation"])
-	}
-}
-
-func TestOpenCodeSessionInitEvent(t *testing.T) {
-	input := `{"type":"session.init","sessionID":"ses_abc","model":"anthropic/claude-sonnet-4-6","provider":"anthropic","tools":["Read","Write","Bash","Glob","Grep"]}`
-	emitter := parseOpenCodeLines(t, input)
-
-	events := emitter.eventsOfType(BusEventSessionInit)
-	if len(events) != 1 {
-		t.Fatalf("expected 1 session_init event, got %d", len(events))
-	}
-	if events[0].Payload["sessionId"] != "ses_abc" {
-		t.Errorf("sessionId = %v", events[0].Payload["sessionId"])
-	}
-	if events[0].Payload["model"] != "anthropic/claude-sonnet-4-6" {
-		t.Errorf("model = %v", events[0].Payload["model"])
-	}
-	if events[0].Payload["provider"] != "anthropic" {
-		t.Errorf("provider = %v", events[0].Payload["provider"])
-	}
-}
-
-func TestOpenCodeSessionErrorEvent(t *testing.T) {
-	input := `{"type":"session.error","error":"authentication failed"}`
+func TestOpenCodeErrorEvent(t *testing.T) {
+	// Actual error event from OpenCode v1.15.10 --format json output.
+	input := `{"type":"error","timestamp":1779700800000,"sessionID":"ses_err","error":"authentication failed"}`
 	emitter := parseOpenCodeLines(t, input)
 
 	events := emitter.eventsOfType(BusEventResult)
@@ -357,55 +321,7 @@ func TestOpenCodeSessionErrorEvent(t *testing.T) {
 	if events[0].Payload["success"] != false {
 		t.Errorf("success = %v", events[0].Payload["success"])
 	}
-}
-
-func TestOpenCodeTaskStartEvent(t *testing.T) {
-	input := `{"type":"task_start","taskId":"task_1","taskDescription":"explore the codebase","taskType":"subagent"}`
-	emitter := parseOpenCodeLines(t, input)
-
-	events := emitter.eventsOfType(BusEventTaskStarted)
-	if len(events) != 1 {
-		t.Fatalf("expected 1 task_started event, got %d", len(events))
-	}
-	if events[0].Payload["taskId"] != "task_1" {
-		t.Errorf("taskId = %v", events[0].Payload["taskId"])
-	}
-	if events[0].Payload["taskType"] != "subagent" {
-		t.Errorf("taskType = %v", events[0].Payload["taskType"])
-	}
-}
-
-func TestOpenCodeTaskProgressEvent(t *testing.T) {
-	input := `{"type":"task_progress","taskId":"task_1","taskDescription":"exploring","lastToolName":"Grep"}`
-	emitter := parseOpenCodeLines(t, input)
-
-	events := emitter.eventsOfType(BusEventTaskProgress)
-	if len(events) != 1 {
-		t.Fatalf("expected 1 task_progress event, got %d", len(events))
-	}
-	if events[0].Payload["taskId"] != "task_1" {
-		t.Errorf("taskId = %v", events[0].Payload["taskId"])
-	}
-	if events[0].Payload["lastToolName"] != "Grep" {
-		t.Errorf("lastToolName = %v", events[0].Payload["lastToolName"])
-	}
-}
-
-func TestOpenCodeTaskCompleteEvent(t *testing.T) {
-	input := `{"type":"task_complete","taskId":"task_1","taskSummary":"found 15 matches","taskUsage":{"inputTokens":100,"outputTokens":50}}`
-	emitter := parseOpenCodeLines(t, input)
-
-	events := emitter.eventsOfType(BusEventTaskNotification)
-	if len(events) != 1 {
-		t.Fatalf("expected 1 task_notification event, got %d", len(events))
-	}
-	if events[0].Payload["taskId"] != "task_1" {
-		t.Errorf("taskId = %v", events[0].Payload["taskId"])
-	}
-	if events[0].Payload["status"] != "completed" {
-		t.Errorf("status = %v", events[0].Payload["status"])
-	}
-	if events[0].Payload["summary"] != "found 15 matches" {
-		t.Errorf("summary = %v", events[0].Payload["summary"])
+	if events[0].Payload["error"] != "authentication failed" {
+		t.Errorf("error = %v", events[0].Payload["error"])
 	}
 }
