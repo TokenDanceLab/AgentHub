@@ -105,6 +105,9 @@ Assert-NotContains "app/desktop/src/api/hubTokenStorage.ts" "localStorage\.setIt
 Assert-Contains "app/web/src/api/hubAuth.ts" "/auth/tokendance/callback" "Web owns browser callback route"
 Assert-Contains "app/web/src/api/hubTokenStorage.ts" "sessionStorage" "Web stores Hub session material in sessionStorage"
 Assert-NotContains "app/web/src/api/hubTokenStorage.ts" "localStorage\.setItem" "Web storage helper does not write Hub tokens to localStorage"
+Assert-Contains "app/desktop/src/api/hubWS.ts" "access_token" "Desktop Hub WebSocket sends Hub access token during upgrade"
+Assert-Contains "app/web/src/api/hubWS.ts" "access_token" "Web Hub WebSocket sends Hub access token during upgrade"
+Assert-Contains "hub-server/internal/handler/ws_test.go" "TestWebSocketRouteAcceptsHubLocalQueryTokenBeforeUpgrade" "Hub tests accept Hub-issued query token before WebSocket upgrade"
 Assert-Contains "app/web/README.md" "BFF/HttpOnly cookie" "Web README keeps high-trust session caveat"
 
 if (-not $SkipWorkspaceDocs) {

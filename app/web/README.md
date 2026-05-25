@@ -26,7 +26,7 @@ cd D:\Code\TokenDance\AgentHub
 .\scripts\verify-oidc-readiness.ps1
 ```
 
-该检查只证明仓库内端点、示例配置、存储策略和治理文档对齐；它不替代部署态 login -> callback -> Hub session -> WebSocket auth -> logout/reconnect 的真实 smoke。
+该检查只证明仓库内端点、示例配置、存储策略、Hub WebSocket upgrade 鉴权和治理文档对齐；它不替代部署态 login -> callback -> Hub session -> WebSocket auth -> logout/reconnect 的真实 smoke。
 
 ## 目录结构
 
