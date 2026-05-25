@@ -67,7 +67,7 @@ func TestMessageHandler_SendMessage_Success(t *testing.T) {
 	h := handler.NewMessageHandler(svc)
 
 	c, w := newGinCtx("POST", "/client/sessions/s1/messages", map[string]string{
-		"client_msg_id": "c1",
+		"client_msg_id": "00000000-0000-0000-0000-000000000001",
 		"content_type":  "text",
 		"content":       "Hello world",
 	}, "user_id", "u1")
@@ -88,7 +88,7 @@ func TestMessageHandler_SendMessage_NotMember(t *testing.T) {
 	h := handler.NewMessageHandler(svc)
 
 	c, w := newGinCtx("POST", "/client/sessions/s1/messages", map[string]string{
-		"client_msg_id": "c1",
+		"client_msg_id": "00000000-0000-0000-0000-000000000001",
 		"content_type":  "text",
 		"content":       "Hello",
 	}, "user_id", "u1")
