@@ -215,7 +215,7 @@ func TestHandleCanUseToolResponseFormat(t *testing.T) {
 	t.Run("silent auto-approve", func(t *testing.T) {
 		handler := &DefaultPermissionHandler{} // nil emitter = silent auto-approve
 		var buf bytes.Buffer
-		err := handler.handleCanUseTool(&buf, "req-fmt", &ControlRequestInner{
+		err := handler.handleCanUseTool(context.Background(), &buf, "req-fmt", &ControlRequestInner{
 			Subtype:  "can_use_tool",
 			ToolName: "Read",
 			ToolUseID: "tu-fmt",
@@ -250,7 +250,7 @@ func TestHandleCanUseToolResponseFormat(t *testing.T) {
 		emitter := &mockEventEmitter{}
 		handler := &DefaultPermissionHandler{emitter: emitter}
 		var buf bytes.Buffer
-		err := handler.handleCanUseTool(&buf, "req-fmt", &ControlRequestInner{
+		err := handler.handleCanUseTool(context.Background(), &buf, "req-fmt", &ControlRequestInner{
 			Subtype:  "can_use_tool",
 			ToolName: "Read",
 			ToolUseID: "tu-fmt",
@@ -287,7 +287,7 @@ func TestHandleCanUseToolResponseFormat(t *testing.T) {
 func TestHandleCanUseToolResponseFields(t *testing.T) {
 	handler := &DefaultPermissionHandler{}
 	var buf bytes.Buffer
-	err := handler.handleCanUseTool(&buf, "req-fields", &ControlRequestInner{
+	err := handler.handleCanUseTool(context.Background(), &buf, "req-fields", &ControlRequestInner{
 		Subtype:  "can_use_tool",
 		ToolName: "Write",
 		ToolUseID: "tu-fields",
@@ -371,7 +371,7 @@ func TestHandleCanUseToolEmitterPayloads(t *testing.T) {
 	emitter := &mockEventEmitter{}
 	handler := &DefaultPermissionHandler{emitter: emitter}
 	var buf bytes.Buffer
-	err := handler.handleCanUseTool(&buf, "req-payload", &ControlRequestInner{
+	err := handler.handleCanUseTool(context.Background(), &buf, "req-payload", &ControlRequestInner{
 		Subtype:  "can_use_tool",
 		ToolName: "Write",
 		ToolUseID: "tu-payload",
