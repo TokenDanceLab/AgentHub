@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
@@ -60,6 +61,7 @@ type ProcessExecutor struct {
 	runOutputs map[string]*runnerctx.RunOutputStore // runID to temp log for output persistence and replay
 	runToAgent map[string]string                    // runID to agentInstanceID for result aggregation
 	hubTasks   map[string]string                    // runID to Hub taskID (for Edge→Hub callbacks)
+	hubOutputs map[string]*hubOutputCollector       // runID to bounded final response collector
 }
 
 func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter, adapterReg *adapters.Registry) (*ProcessExecutor, error) {
@@ -96,6 +98,7 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		runOutputs:                make(map[string]*runnerctx.RunOutputStore),
 		runToAgent:                make(map[string]string),
 		hubTasks:                  make(map[string]string),
+		hubOutputs:                make(map[string]*hubOutputCollector),
 	}, nil
 }
 
@@ -107,6 +110,8 @@ const (
 	defaultMaxConcurrentRuns = 5
 	defaultReadBufferSize    = 32 * 1024
 	defaultRunOutputMaxBytes = 1 * 1024 * 1024 // 1MB cap on run output before temp log write
+	hubCallbackFinalMaxBytes = 32 * 1024
+	hubCallbackChunkMaxBytes = 16 * 1024
 )
 
 type runOutputLimiter struct {
@@ -269,6 +274,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if runCtx.HubTaskID != "" {
 		e.mu.Lock()
 		e.hubTasks[run.ID] = runCtx.HubTaskID
+		e.hubOutputs[run.ID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
 		e.mu.Unlock()
 	}
 
@@ -486,6 +492,10 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 						slog.Warn("process: failed to write output store", "runId", run.ID, "err", err)
 					}
 				}
+				if stream == "stdout" && text != "" {
+					e.recordHubOutput(run.ID, text)
+					e.fireHubStream(run.ID, text)
+				}
 				payload := map[string]any{
 					"runId":  run.ID,
 					"stream": stream,
@@ -595,6 +605,7 @@ func (e *ProcessExecutor) finish(runID string) {
 	delete(e.stdins, runID)
 	delete(e.runToAgent, runID)
 	delete(e.hubTasks, runID)
+	delete(e.hubOutputs, runID)
 	if s, ok := e.runOutputs[runID]; ok {
 		if err := s.Close(); err != nil {
 			slog.Warn("process: failed to close output store", "runId", runID, "err", err)
@@ -659,6 +670,7 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		adapters.NewPayloadLimitEmitter(adapters.NewBusEventEmitter(e.bus), e.maxStructuredPayloadBytes),
 		scope,
 	)
+	emitter = newHubCallbackEmitter(e, run.ID, emitter)
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
@@ -782,6 +794,62 @@ func (e *ProcessExecutor) fireHubAck(runID string) {
 	}()
 }
 
+func (e *ProcessExecutor) recordHubOutput(runID, text string) {
+	if text == "" {
+		return
+	}
+	e.mu.Lock()
+	collector := e.hubOutputs[runID]
+	e.mu.Unlock()
+	if collector == nil {
+		return
+	}
+	collector.Append(text)
+}
+
+func (e *ProcessExecutor) recordHubFinalFallback(runID, text string) {
+	if text == "" {
+		return
+	}
+	e.mu.Lock()
+	collector := e.hubOutputs[runID]
+	e.mu.Unlock()
+	if collector == nil {
+		return
+	}
+	collector.SetFallback(text)
+}
+
+func (e *ProcessExecutor) hubFinalContent(runID string) string {
+	e.mu.Lock()
+	collector := e.hubOutputs[runID]
+	e.mu.Unlock()
+	if collector == nil {
+		return ""
+	}
+	return collector.Final()
+}
+
+// fireHubStream sends a TaskStream callback to Hub for visible runtime output.
+// Errors are logged but never block the run lifecycle.
+func (e *ProcessExecutor) fireHubStream(runID string, content string) {
+	if e.hubCallback == nil || content == "" {
+		return
+	}
+	taskID := e.hubTaskID(runID)
+	if taskID == "" {
+		return
+	}
+	for _, chunk := range splitHubCallbackText(content, hubCallbackChunkMaxBytes) {
+		chunk := chunk
+		go func() {
+			if err := e.hubCallback.TaskStream(context.Background(), taskID, runID, chunk); err != nil {
+				slog.Warn("hub callback stream failed", "taskId", taskID, "runId", runID, "err", err)
+			}
+		}()
+	}
+}
+
 // fireHubDone sends a TaskDone callback to Hub. Called when the run finishes successfully.
 // Errors are logged but never block the run lifecycle.
 func (e *ProcessExecutor) fireHubDone(runID string, runResp map[string]any) {
@@ -792,13 +860,11 @@ func (e *ProcessExecutor) fireHubDone(runID string, runResp map[string]any) {
 	if taskID == "" {
 		return
 	}
+	content := e.hubFinalContent(runID)
+	if content == "" {
+		content = "Run finished"
+	}
 	go func() {
-		content := ""
-		if v, ok := runResp["status"]; ok {
-			if s, ok := v.(string); ok {
-				content = s
-			}
-		}
 		result := hub.TaskResult{
 			RunID:        runID,
 			FinalContent: content,
@@ -807,6 +873,144 @@ func (e *ProcessExecutor) fireHubDone(runID string, runResp map[string]any) {
 			slog.Warn("hub callback done failed", "taskId", taskID, "runId", runID, "err", err)
 		}
 	}()
+}
+
+type hubCallbackEmitter struct {
+	executor *ProcessExecutor
+	runID    string
+	inner    adapters.EventEmitter
+}
+
+func newHubCallbackEmitter(executor *ProcessExecutor, runID string, inner adapters.EventEmitter) adapters.EventEmitter {
+	if executor == nil || inner == nil {
+		return inner
+	}
+	return &hubCallbackEmitter{executor: executor, runID: runID, inner: inner}
+}
+
+func (e *hubCallbackEmitter) Emit(eventType string, scope map[string]any, payload any) {
+	e.inner.Emit(eventType, scope, payload)
+	switch eventType {
+	case adapters.BusEventTextDelta, adapters.BusEventTextBlock:
+		if text := extractHubCallbackText(payload); text != "" {
+			e.executor.recordHubOutput(e.runID, text)
+			e.executor.fireHubStream(e.runID, text)
+		}
+	case adapters.BusEventResult:
+		if text := extractHubCallbackText(payload); text != "" {
+			e.executor.recordHubFinalFallback(e.runID, text)
+		}
+	}
+}
+
+type hubOutputCollector struct {
+	mu        sync.Mutex
+	builder   strings.Builder
+	fallback  string
+	maxBytes  int
+	truncated bool
+}
+
+func newHubOutputCollector(maxBytes int) *hubOutputCollector {
+	if maxBytes <= 0 {
+		maxBytes = hubCallbackFinalMaxBytes
+	}
+	return &hubOutputCollector{maxBytes: maxBytes}
+}
+
+func (c *hubOutputCollector) Append(text string) {
+	if text == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.builder.Len() >= c.maxBytes {
+		c.truncated = true
+		return
+	}
+	remaining := c.maxBytes - c.builder.Len()
+	if len(text) > remaining {
+		text = strings.ToValidUTF8(text[:remaining], "")
+		c.truncated = true
+	}
+	c.builder.WriteString(text)
+}
+
+func (c *hubOutputCollector) SetFallback(text string) {
+	if text == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.fallback == "" {
+		c.fallback = strings.TrimSpace(text)
+	}
+}
+
+func (c *hubOutputCollector) Final() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	content := strings.TrimSpace(c.builder.String())
+	if content == "" {
+		content = c.fallback
+	}
+	if content == "" {
+		return ""
+	}
+	if c.truncated {
+		return content + "\n[output truncated]"
+	}
+	return content
+}
+
+func extractHubCallbackText(payload any) string {
+	payloadMap, ok := payload.(map[string]any)
+	if !ok {
+		return ""
+	}
+	for _, key := range []string{"content", "text", "delta", "output", "result"} {
+		if value, ok := payloadMap[key].(string); ok && value != "" {
+			return value
+		}
+	}
+	if message, ok := payloadMap["message"].(map[string]any); ok {
+		for _, key := range []string{"content", "text"} {
+			if value, ok := message[key].(string); ok && value != "" {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
+func splitHubCallbackText(text string, maxBytes int) []string {
+	if text == "" {
+		return nil
+	}
+	if maxBytes <= 0 || len(text) <= maxBytes {
+		return []string{text}
+	}
+	chunks := make([]string, 0, len(text)/maxBytes+1)
+	for len(text) > 0 {
+		if len(text) <= maxBytes {
+			chunks = append(chunks, text)
+			break
+		}
+		cut := maxBytes
+		for cut > 0 && !utf8.ValidString(text[:cut]) {
+			cut--
+		}
+		if cut == 0 {
+			_, size := utf8.DecodeRuneInString(text)
+			if size <= 0 {
+				size = 1
+			}
+			cut = size
+		}
+		chunks = append(chunks, text[:cut])
+		text = text[cut:]
+	}
+	return chunks
 }
 
 // fireHubFail sends a TaskFail callback to Hub. Called when the run fails or is cancelled.

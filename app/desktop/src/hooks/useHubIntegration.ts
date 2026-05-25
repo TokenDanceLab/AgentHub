@@ -32,8 +32,8 @@ export { useTaskBridgeStore };
 // ── Options ─────────────────────────────────────────
 
 export interface HubIntegrationOptions {
-  /** Hub WebSocket handle (already connected & authenticated). */
-  hubWS: HubWSHandle;
+  /** Hub WebSocket handle (already connected & authenticated). Null disables the bridge. */
+  hubWS: HubWSHandle | null;
   /** Hub REST client for reporting task progress. */
   hubClient: HubClient;
   /** Edge server base URL (default http://127.0.0.1:3210). */
@@ -71,6 +71,19 @@ function getString(data: Record<string, unknown>, key: string): string {
   return typeof v === 'string' ? v : '';
 }
 
+const FINAL_OUTPUT_MAX_CHARS = 32_000;
+
+function extractRunOutputBatch(payload: Record<string, unknown>): string {
+  if (payload.stream !== 'stdout' || !Array.isArray(payload.chunks)) return '';
+  return payload.chunks
+    .map((chunk) => {
+      if (!chunk || typeof chunk !== 'object') return '';
+      const text = (chunk as Record<string, unknown>).text;
+      return typeof text === 'string' ? text : '';
+    })
+    .join('');
+}
+
 // ── Hook ──────────────────────────────────────────────
 
 export function useHubIntegration(
@@ -79,7 +92,21 @@ export function useHubIntegration(
   const { hubWS, hubClient, edgeBaseUrl = 'http://127.0.0.1:3210', onDispatch } = options;
 
   const streamRef = useRef<StreamHandle | null>(null);
+  const outputByRunRef = useRef<Map<string, string>>(new Map());
   const store = useTaskBridgeStore;
+
+  const rememberOutput = useCallback((runId: string, content: string) => {
+    if (!content) return;
+    const prev = outputByRunRef.current.get(runId) ?? '';
+    outputByRunRef.current.set(
+      runId,
+      (prev + content).slice(-FINAL_OUTPUT_MAX_CHARS),
+    );
+  }, []);
+
+  const forgetOutput = useCallback((runId: string) => {
+    outputByRunRef.current.delete(runId);
+  }, []);
 
   // ── Initialise Edge event stream once ─────────────────
 
@@ -104,6 +131,7 @@ export function useHubIntegration(
         case 'run.agent.text_delta': {
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
+            rememberOutput(runId, content);
             hubClient.streamTask(taskId, content, runId).catch(() => {});
           }
           break;
@@ -112,6 +140,16 @@ export function useHubIntegration(
         case 'run.agent.text_block': {
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
+            rememberOutput(runId, content);
+            hubClient.streamTask(taskId, content, runId).catch(() => {});
+          }
+          break;
+        }
+
+        case 'run.output.batch': {
+          const content = extractRunOutputBatch(payload);
+          if (content) {
+            rememberOutput(runId, content);
             hubClient.streamTask(taskId, content, runId).catch(() => {});
           }
           break;
@@ -140,7 +178,7 @@ export function useHubIntegration(
             const output =
               typeof payload.content === 'string'
                 ? payload.content
-                : JSON.stringify(payload);
+                : outputByRunRef.current.get(runId) || JSON.stringify(payload);
             hubClient.doneTask(taskId, output, runId).catch(() => {});
             store.getState().updateTask(taskId, {
               status: 'done',
@@ -158,6 +196,18 @@ export function useHubIntegration(
           }
           // Clean up mapping after terminal event
           store.getState().removeTask(taskId);
+          forgetOutput(runId);
+          break;
+        }
+
+        case 'run.finished': {
+          const output = outputByRunRef.current.get(runId) || 'Run finished';
+          hubClient.doneTask(taskId, output, runId).catch(() => {});
+          store.getState().updateTask(taskId, {
+            status: 'done',
+          });
+          store.getState().removeTask(taskId);
+          forgetOutput(runId);
           break;
         }
 
@@ -172,6 +222,7 @@ export function useHubIntegration(
             error,
           });
           store.getState().removeTask(taskId);
+          forgetOutput(runId);
           break;
         }
 
@@ -182,6 +233,7 @@ export function useHubIntegration(
             error: 'Run cancelled',
           });
           store.getState().removeTask(taskId);
+          forgetOutput(runId);
           break;
         }
       }
@@ -198,6 +250,9 @@ export function useHubIntegration(
   // ── Listen for Hub agent.dispatch and agent.cancel ────
 
   useEffect(() => {
+    if (!hubWS) {
+      return;
+    }
     // ── agent.dispatch: create Edge run ────────────────
     const unsubDispatch = hubWS.on(HUB_EVENTS.AGENT_DISPATCH, async (payload: unknown) => {
       const data = payload as Record<string, unknown> | null;

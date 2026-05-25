@@ -122,13 +122,15 @@ func (m *hubCallbackMock) streamCount() int {
 
 // ── Edge server with CallbackClient helper ──────────────────────────────────
 
-// noopCommand returns a command+args that exits immediately with code 0.
-// On Windows, uses cmd.exe; on Unix, uses echo.
+const noopCommandOutput = "hub-output-done"
+
+// noopCommand returns a command+args that emits a stable stdout line and exits
+// with code 0. The stdout is part of the Hub callback contract under test.
 func noopCommand() (string, []string) {
 	if runtime.GOOS == "windows" {
-		return "cmd", []string{"/c", "exit 0"}
+		return "cmd", []string{"/c", "echo " + noopCommandOutput}
 	}
-	return "echo", []string{"done"}
+	return "echo", []string{noopCommandOutput}
 }
 
 // startEdgeWithHubCallbacks creates an Edge server with:
@@ -234,6 +236,22 @@ func TestHubE2E_RunCompletes_FiresDoneCallback(t *testing.T) {
 	// Give the async callback goroutine a moment to fire
 	time.Sleep(500 * time.Millisecond)
 
+	// Verify Hub received a stream callback with real process stdout.
+	streamCount := mockHub.streamCount()
+	if streamCount < 1 {
+		t.Fatalf("expected at least 1 stream callback, got %d (acks=%d, done=%d, fail=%d)",
+			streamCount, mockHub.ackCount(), mockHub.doneCount(), mockHub.failCount())
+	}
+	mockHub.mu.Lock()
+	var streamContent strings.Builder
+	for _, streamRecord := range mockHub.streamCalls {
+		streamContent.WriteString(streamRecord.Body["content"])
+	}
+	mockHub.mu.Unlock()
+	if !strings.Contains(streamContent.String(), noopCommandOutput) {
+		t.Fatalf("stream callback content = %q, want %q", streamContent.String(), noopCommandOutput)
+	}
+
 	// Verify Hub received the done callback
 	doneCount := mockHub.doneCount()
 	if doneCount < 1 {
@@ -252,9 +270,8 @@ func TestHubE2E_RunCompletes_FiresDoneCallback(t *testing.T) {
 	if doneRecord.Body["run_id"] != runID {
 		t.Errorf("done callback run_id = %q, want %q", doneRecord.Body["run_id"], runID)
 	}
-	// final_content should contain the run status ("finished")
-	if doneRecord.Body["final_content"] == "" {
-		t.Error("done callback final_content should not be empty")
+	if !strings.Contains(doneRecord.Body["final_content"], noopCommandOutput) {
+		t.Errorf("done callback final_content = %q, want stdout %q", doneRecord.Body["final_content"], noopCommandOutput)
 	}
 }
 
