@@ -74,6 +74,22 @@ P0/P1 的第一屏不是普通聊天软件，而是 Agent 工作台：
 
 P1 之后都是增强能力，不阻塞 P0 本地离线闭环。P0 必须做到不依赖 Hub 也能在本机完成 Agent 工作台体验。
 
+### 4.1 产品方向约束
+
+AgentHub 的产品方向是“IM-native Agent collaboration + real Runtime execution”，不是 LangGraph/Dify 式低代码 workflow canvas。可以借鉴竞品的 durable thread、trace、run history、append-only event log 和审批恢复，但用户第一对象仍是：
+
+```text
+Agent Profile -> Execution Target -> Thread -> Run -> RunEvent -> Approval / Artifact
+```
+
+因此下一阶段产品验收应优先看真实 Runtime 闭环：
+
+- Codex、Claude Code、OpenCode 是否通过 Edge adapter 产生结构化 `RunEvent`；
+- Web/Desktop 是否用同一事件模型渲染 transcript、tool timeline、diff、approval、usage；
+- Hub 是否只做身份、授权、同步、中继和审计，不绕过 Edge 直接启动 CLI；
+- TokenDance ID 是否只做身份 SSOT，Hub 是否签发自己的 session/device proof；
+- 公开文案是否把 Codex/Claude Code/OpenCode 写作 Agent Runtime，而不是可管理的业务 Agent 本体。
+
 ## 5. P0 功能验收
 
 | 能力 | 怎样算完成 |
