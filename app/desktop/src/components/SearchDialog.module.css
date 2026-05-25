@@ -10,6 +10,7 @@
 
 .dialog {
   width: 560px;
+  max-width: calc(100vw - (var(--space-lg) * 2));
   max-height: 60vh;
   background: var(--card);
   border: 1px solid var(--border);

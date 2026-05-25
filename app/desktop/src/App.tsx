@@ -7,6 +7,7 @@ import {
   useId,
   Suspense,
   type ButtonHTMLAttributes,
+  type ChangeEvent,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
@@ -30,6 +31,7 @@ import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
 import { useHubStore } from '@/stores/hubStore';
+import { useSearchStore } from '@/stores/searchStore';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { createHubClient, type HubClient } from '@/api/hubClient';
 import type { HubWSHandle } from '@/api/hubWS';
@@ -191,6 +193,16 @@ export default function App() {
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
+  const [focusedMessageId, setFocusedMessageId] = useState<string | undefined>();
+  const [focusRevision, setFocusRevision] = useState(0);
+  const { searchOpen, searchQuery, openSearchDialog, setSearchQuery } = useSearchStore(
+    useShallow((s) => ({
+      searchOpen: s.open,
+      searchQuery: s.query,
+      openSearchDialog: s.openDialog,
+      setSearchQuery: s.setQuery,
+    })),
+  );
   const {
     leftSidebarCollapsed,
     rightPanelOpen,
@@ -366,6 +378,19 @@ export default function App() {
 
   const handleSelectThread = useCallback((id: string) => { selectThread(id); setUserMessages([]); }, [selectThread]);
   const handleSelectAgent = useCallback((id: string) => setSelectedAgentId(id), []);
+  const handleOpenSearch = useCallback(() => {
+    openSearchDialog();
+  }, [openSearchDialog]);
+  const handleSidebarSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const nextQuery = event.currentTarget.value;
+    if (!searchOpen) openSearchDialog();
+    setSearchQuery(nextQuery);
+  }, [openSearchDialog, searchOpen, setSearchQuery]);
+  const handleSearchSelect = useCallback((messageId: string) => {
+    setViewMode('agent');
+    setFocusedMessageId(messageId);
+    setFocusRevision((revision) => revision + 1);
+  }, []);
   const openSettings = useCallback((section: SettingsSectionId = 'general') => {
     setSettingsInitialSection(section);
     setSettingsOpen(true);
@@ -658,7 +683,14 @@ export default function App() {
             {/* Global search */}
             <div className={styles.sidebarSearch}>
               <Search size={14} color="#B0B0B5" />
-              <input type="text" placeholder={t('im.contact.search')} />
+              <input
+                type="search"
+                value={searchOpen ? searchQuery : ''}
+                placeholder={t('search.messagesPlaceholder')}
+                aria-label={t('search.messagesLabel')}
+                onFocus={handleOpenSearch}
+                onChange={handleSidebarSearchChange}
+              />
             </div>
 
             {/* Agents section */}
@@ -797,7 +829,7 @@ export default function App() {
                   </Suspense>
                 </ErrorBoundary>
               ) : (
-                <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
+                <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} focusedMessageId={focusedMessageId} focusRevision={focusRevision} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
               )}
             </div>
 
@@ -895,7 +927,7 @@ export default function App() {
 
       {/* Modals */}
       <Suspense fallback={null}>
-        <Slot name="search-dialog" messages={allMessages} onSelect={() => {}} />
+        <Slot name="search-dialog" messages={allMessages} onSelect={handleSearchSelect} />
       </Suspense>
       <Slot name="permission-dialog" requests={permissionRequests} onDecide={handleDecidePermission} />
       <Slot name="shortcut-help" open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />

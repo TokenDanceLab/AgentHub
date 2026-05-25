@@ -18,6 +18,8 @@ interface Props {
   isConnected: boolean;
   agents?: AgentInfo[];
   selectedAgentId?: string;
+  focusedMessageId?: string;
+  focusRevision?: number;
   onSelectAgent?: (agentId: string) => void;
   onRetry: (messageId: string) => void;
   onDelete: (messageId: string) => void;
@@ -46,6 +48,8 @@ export default function MainView({
   isConnected,
   agents = [],
   selectedAgentId,
+  focusedMessageId,
+  focusRevision,
   onSelectAgent,
   onRetry,
   onDelete,
@@ -106,6 +110,8 @@ export default function MainView({
         <ChatView
           messages={allMessages}
           isStreaming={isStreaming}
+          focusedMessageId={focusedMessageId}
+          focusRevision={focusRevision}
           onRetry={onRetry}
           onDelete={onDelete}
         />

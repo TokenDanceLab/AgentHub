@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, User, Bot } from 'lucide-react';
 import { useSearchStore } from '@/stores/searchStore';
 import { useShallow } from 'zustand/shallow';
@@ -42,6 +43,7 @@ interface ResultItem extends ChatMessage {
 // ── Component ────────────────────────────────
 
 export default function SearchDialog({ messages, onSelect }: Props) {
+  const { t } = useTranslation();
   const { open, query, selectedIndex, closeDialog, setQuery, setSelectedIndex } =
     useSearchStore(
       useShallow((s) => ({
@@ -86,10 +88,12 @@ export default function SearchDialog({ messages, onSelect }: Props) {
     (e: React.KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
+        if (results.length === 0) return;
         setSelectedIndex(Math.min(selectedIndex + 1, results.length - 1));
       }
       if (e.key === 'ArrowUp') {
         e.preventDefault();
+        if (results.length === 0) return;
         setSelectedIndex(Math.max(selectedIndex - 1, 0));
       }
       if (e.key === 'Enter' && results[selectedIndex]) {
@@ -117,7 +121,8 @@ export default function SearchDialog({ messages, onSelect }: Props) {
             className={styles.input}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search messages..."
+            placeholder={t('search.messagesPlaceholder')}
+            aria-label={t('search.messagesLabel')}
             autoFocus
           />
           <kbd className={styles.kbd}>ESC</kbd>
@@ -138,7 +143,7 @@ export default function SearchDialog({ messages, onSelect }: Props) {
                 </span>
                 <div className={styles.itemContent}>
                   <span className={styles.itemTitle}>
-                    {msg.role === 'user' ? 'User' : 'Agent'}
+                    {msg.role === 'user' ? t('search.role.user') : t('search.role.agent')}
                   </span>
                   <span className={styles.itemSnippet}>{msg._snippet}</span>
                 </div>
@@ -148,7 +153,7 @@ export default function SearchDialog({ messages, onSelect }: Props) {
           </div>
         )}
         {query && results.length === 0 && (
-          <div className={styles.empty}>No messages found</div>
+          <div className={styles.empty}>{t('search.noMessages')}</div>
         )}
       </div>
     </div>

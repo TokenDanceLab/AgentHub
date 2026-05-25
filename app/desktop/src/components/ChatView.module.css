@@ -117,6 +117,12 @@
   z-index: 1;
 }
 
+.messageHighlighted {
+  outline: 2px solid color-mix(in oklch, var(--primary) 65%, transparent);
+  outline-offset: 4px;
+  transition: outline-color var(--duration-normal), background var(--duration-normal);
+}
+
 /* ── Agent avatar + name ──────────────────── */
 .agentAvatar {
   display: flex;

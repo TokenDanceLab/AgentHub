@@ -27,6 +27,10 @@ vi.mock('@/stores/toastStore', () => ({
   },
 }));
 
+const virtualizerMock = vi.hoisted(() => ({
+  scrollToIndex: vi.fn(),
+}));
+
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count }: { count: number }) => {
     // No-op virtualizer: render all items at their natural positions
@@ -42,12 +46,12 @@ vi.mock('@tanstack/react-virtual', () => ({
       getVirtualItems: () => items,
       getTotalSize: () => 0,
       measureElement: () => {},
-      scrollToIndex: () => {},
+      scrollToIndex: virtualizerMock.scrollToIndex,
     };
   },
 }));
 
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import ChatView from '@/components/ChatView';
@@ -72,6 +76,10 @@ function makeAgentTextMessage(content: string, id = 'msg-agent-1'): ChatMessage 
 }
 
 describe('ChatView', () => {
+  beforeEach(() => {
+    virtualizerMock.scrollToIndex.mockClear();
+  });
+
   it('renders empty state when messages array is empty', () => {
     render(<ChatView messages={[]} />);
     expect(screen.getByText('chat.emptyTitle')).toBeInTheDocument();
@@ -92,6 +100,23 @@ describe('ChatView', () => {
     const messageDiv = screen.getByText('Hello from agent').closest('div');
     const parent = messageDiv?.parentElement;
     expect(parent?.className).toContain('agentMsg');
+  });
+
+  it('scrolls to the focused message selected from search', () => {
+    render(
+      <ChatView
+        messages={[
+          makeAgentTextMessage('First message', 'msg-agent-1'),
+          makeAgentTextMessage('Find me', 'msg-agent-2'),
+        ]}
+        focusedMessageId="msg-agent-2"
+        focusRevision={1}
+      />,
+    );
+
+    expect(virtualizerMock.scrollToIndex).toHaveBeenCalledWith(1, { align: 'center' });
+    expect(screen.getByText('Find me').closest('[data-message-id="msg-agent-2"]')).toBeInTheDocument();
+    expect(screen.getByText('Find me').closest('div')?.parentElement?.className).toContain('messageHighlighted');
   });
 
   it('renders text blocks inside messages', () => {
