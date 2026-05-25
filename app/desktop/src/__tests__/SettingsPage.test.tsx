@@ -201,7 +201,7 @@ describe('SettingsPage tasks', () => {
     useModelSettingsStore.getState().reset();
   });
 
-  it('renders local runs, Hub bridge history, and the Hub list REST interface gap', () => {
+  it('renders local runs, Hub bridge history, and the Hub list REST interface gap state', () => {
     mockRuns.splice(0, mockRuns.length, {
       runId: 'run_1234567890abcdef',
       projectId: 'proj_local',
@@ -227,7 +227,7 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('proj_local / thread_local')).toBeInTheDocument();
     expect(screen.getByText('Dispatch from TokenDance Hub')).toBeInTheDocument();
     expect(screen.getByText('agent-codex')).toBeInTheDocument();
-    expect(screen.getAllByText('settings.interfaceGap').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('settings.status.interfaceGap').length).toBeGreaterThan(0);
     expect(screen.getAllByText('settings.taskHubSnapshotUnavailable').length).toBeGreaterThan(0);
   });
 
@@ -339,6 +339,7 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('Check this thread')).toBeInTheDocument();
     expect(screen.getAllByText('settings.readOnly').length).toBeGreaterThan(0);
     expect(screen.getByText('settings.onlineImSnapshot')).toBeInTheDocument();
+    expect(screen.getByText('settings.status.snapshot')).toBeInTheDocument();
     expect(screen.queryByText('settings.contractPending')).not.toBeInTheDocument();
     expect(mockHubClient.listContacts).toHaveBeenCalled();
     expect(mockHubClient.listSessions).toHaveBeenCalled();
@@ -386,6 +387,7 @@ describe('SettingsPage tasks', () => {
 
     expect(await screen.findByText('Build Room')).toBeInTheDocument();
     expect(screen.getByText('settings.groupChatHubRooms')).toBeInTheDocument();
+    expect(screen.getByText('settings.status.snapshot')).toBeInTheDocument();
     expect(screen.queryByText('settings.contractPending')).not.toBeInTheDocument();
   });
 
@@ -462,6 +464,7 @@ describe('SettingsPage tasks', () => {
     expect(await screen.findByText('Market Codex')).toBeInTheDocument();
     expect(screen.getByText('streaming')).toBeInTheDocument();
     expect(screen.getByText('toolCalls')).toBeInTheDocument();
+    expect(screen.getByText('settings.status.snapshot')).toBeInTheDocument();
     expect(screen.getByText('settings.marketTokenDancePublish')).toBeInTheDocument();
     expect(screen.getByText('settings.marketGuard')).toBeInTheDocument();
 
@@ -584,7 +587,7 @@ describe('SettingsPage tasks', () => {
     renderSettings('mcp');
 
     expect(screen.getByText('settings.mcpNoRuntimes')).toBeInTheDocument();
-    expect(screen.getAllByText('settings.interfaceGap').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('settings.status.interfaceGap').length).toBeGreaterThan(0);
     expect(screen.queryByText('settings.statusReady')).not.toBeInTheDocument();
   });
 
@@ -636,6 +639,8 @@ describe('SettingsPage tasks', () => {
       defaultProvider: 'openai',
       reasoningEffort: 'max',
     });
+    expect(screen.getByText('settings.modelConfigSource')).toBeInTheDocument();
+    expect(screen.getByText('settings.status.localSource')).toBeInTheDocument();
     expect(screen.getByText('settings.modelLocalGuard')).toBeInTheDocument();
   });
 
@@ -650,6 +655,8 @@ describe('SettingsPage tasks', () => {
 
     const opus = useModelSettingsStore.getState().aliases.find((item) => item.alias === 'opus');
     expect(opus).toMatchObject({ model: 'gpt-5.5', enabled: false });
+    expect(screen.getByText('settings.modelMappingSource')).toBeInTheDocument();
+    expect(screen.getByText('settings.status.localSource')).toBeInTheDocument();
     expect(screen.getByText('settings.modelPolicy')).toBeInTheDocument();
   });
 
@@ -667,6 +674,26 @@ describe('SettingsPage tasks', () => {
     expect(useModelSettingsStore.getState().ccSwitchBridgeEnabled).toBe(true);
     const localProvider = useModelSettingsStore.getState().ccSwitchProviders.find((item) => item.id === 'cc-switch-local');
     expect(localProvider).toMatchObject({ health: 'ready', notes: 'healthy after manual check' });
+    expect(screen.getByText('settings.ccSwitchSource')).toBeInTheDocument();
+    expect(screen.getByText('settings.status.localSource')).toBeInTheDocument();
     expect(screen.getAllByText('settings.ccSwitchHealth').length).toBeGreaterThan(0);
+  });
+
+  it('labels remote control devices with explicit interface gap state', () => {
+    renderSettings('remoteControl');
+    expect(screen.getByText('settings.status.interfaceGap')).toBeInTheDocument();
+  });
+
+  it('labels platform sync with local-source and interface gap states', () => {
+    renderSettings('platforms');
+    expect(screen.getAllByText('settings.status.localSource').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('settings.status.interfaceGap').length).toBeGreaterThan(0);
+  });
+
+  it('labels security audit with local-source and interface gap states', () => {
+    renderSettings('securityAudit');
+    expect(screen.getByText('settings.auditTrailSource')).toBeInTheDocument();
+    expect(screen.getByText('settings.status.localSource')).toBeInTheDocument();
+    expect(screen.getAllByText('settings.status.interfaceGap').length).toBeGreaterThan(0);
   });
 });
