@@ -65,6 +65,15 @@ func (s *SessionService) CreatePrivateSession(ctx context.Context, currentUserID
 		return nil, err
 	}
 
+	// #122: verify both users are friends before creating a private session.
+	f, err := repository.FindFriendshipBetween(s.db, currentUserID, targetUserID)
+	if err != nil {
+		return nil, err
+	}
+	if f == nil || f.Status != model.StatusAccepted {
+		return nil, errcode.FriendNotFriend
+	}
+
 	existing, err := repository.FindPrivateSessionBetween(s.db, currentUserID, targetUserID)
 	if err != nil {
 		return nil, err
