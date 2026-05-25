@@ -85,10 +85,13 @@ go run ./cmd/agenthub-edge --runner-profile opencode
 | `--store-file` / `AGENTHUB_STORE_FILE` | JSON file store 快照路径；为空使用内存 store |
 | `--agent-default` / `AGENTHUB_AGENT_DEFAULT` | 默认 Runtime adapter ID：`claude-code`、`codex`、`opencode` |
 | `--runner-profile` / `AGENTHUB_RUNNER_PROFILE` | 兼容旧名称的 Runtime preset：`agenthub-runner-mock`、`claude-code`、`codex`、`opencode` |
+| `--local-auth-token` / `AGENTHUB_EDGE_AUTH_TOKEN` | 可选本地 Edge token；为空保持本地开发兼容，非空时除 `/v1/health` 和 CORS preflight 外的 Edge API 都需要 token |
 | `--claude-code-path` / `AGENTHUB_CLAUDE_CODE_PATH` | Claude Code CLI 路径，默认 `claude` |
 | `--codex-path` / `AGENTHUB_CODEX_PATH` | Codex CLI 路径，默认 `codex` |
 | `--opencode-path` / `AGENTHUB_OPENCODE_PATH` | OpenCode CLI 路径，默认 `opencode` |
 | `--agent-model` / `AGENTHUB_AGENT_MODEL` | 默认 Runtime 的模型覆盖 |
+
+本地 Edge token 启用后，REST 请求使用 `Authorization: Bearer <token>` 或 `X-AgentHub-Edge-Token: <token>`。浏览器 WebSocket 无法设置自定义 header，所以 `/v1/events` 使用 `?access_token=<token>`。这只覆盖本地回环 Edge 的进程调用边界；Remote/Cloud/Hub relay Target 仍需要 Hub session、device proof、Target 权限和审计。
 
 ## 当前结构
 
@@ -122,7 +125,17 @@ Invoke-RestMethod http://127.0.0.1:3210/v1/health
 Invoke-RestMethod http://127.0.0.1:3210/v1/agents
 ```
 
-注意：根目录 `scripts/client-smoke.ps1` 仍包含已删除 `runner/` 的历史检查，修复脚本前不要把它作为 Edge/ Desktop 链路通过或失败的依据。
+全链路本地 smoke：
+
+```powershell
+# 使用默认 3210 端口；如果已有 Edge 进程，换一个隔离端口
+..\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228
+
+# 验证可选本地 Edge token，覆盖 REST bearer 和 WebSocket access_token
+..\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228 -EdgeAuthToken local-smoke-token
+```
+
+`client-smoke.ps1` 当前使用 Edge 内置 `agenthub-runner-mock` 兼容 profile，不再构建早期已删除的独立 `runner/` 目录。
 
 ## 依赖
 
