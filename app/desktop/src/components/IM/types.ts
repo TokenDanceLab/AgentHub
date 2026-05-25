@@ -5,6 +5,7 @@ export type AuthorityType = 'hub' | 'edge' | 'hybrid';
 export interface IMMessage {
   id: string;
   sessionId: string;
+  clientMsgId?: string;
   senderId: string;
   senderName: string;
   senderType: 'user' | 'agent';
@@ -12,6 +13,7 @@ export interface IMMessage {
   content: string;
   timestamp: string;
   replyToId?: string;
+  recalled?: boolean;
 }
 
 export interface IMContact {
@@ -22,4 +24,5 @@ export interface IMContact {
   online: boolean;
   avatar?: string;
   lastSeen?: string;
+  dissolved?: boolean;
 }
