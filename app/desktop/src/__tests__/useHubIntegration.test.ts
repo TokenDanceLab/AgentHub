@@ -302,6 +302,59 @@ describe('useHubIntegration', () => {
     expect(hubClient.streamTask).toHaveBeenCalledWith('task-1', 'Hello', 'run-1');
   });
 
+  it('streams stdout run.output.batch to Hub and remembers it for final output', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.output.batch', {
+        runId: 'run-1',
+        stream: 'stdout',
+        chunks: [
+          { offset: 0, text: 'stdout part 1\n' },
+          { offset: 14, text: 'stdout part 2\n' },
+        ],
+      }));
+      fireEdgeEvent(makeEvent('run.finished', { runId: 'run-1', status: 'finished' }));
+    });
+
+    expect(hubClient.streamTask).toHaveBeenCalledWith(
+      'task-1',
+      'stdout part 1\nstdout part 2\n',
+      'run-1',
+    );
+    expect(hubClient.doneTask).toHaveBeenCalledWith(
+      'task-1',
+      'stdout part 1\nstdout part 2\n',
+      'run-1',
+    );
+  });
+
+  it('does not stream stderr run.output.batch to Hub', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.output.batch', {
+        runId: 'run-1',
+        stream: 'stderr',
+        chunks: [{ offset: 0, text: 'diagnostic only' }],
+      }));
+    });
+
+    expect(hubClient.streamTask).not.toHaveBeenCalled();
+  });
+
   it('calls doneTask on successful run.agent.result', async () => {
     renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),
@@ -316,6 +369,23 @@ describe('useHubIntegration', () => {
     });
 
     expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'done', 'run-1');
+  });
+
+  it('uses remembered output for successful run.agent.result without content', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.agent.text_block', { runId: 'run-1', content: 'visible answer' }));
+      fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true }));
+    });
+
+    expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'visible answer', 'run-1');
   });
 
   it('calls failTask on failed run.agent.result', async () => {
@@ -362,6 +432,15 @@ describe('useHubIntegration', () => {
     });
 
     expect(hubClient.streamTask).not.toHaveBeenCalled();
+  });
+
+  it('does not subscribe to Hub events when hubWS is null', () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS: null, hubClient }),
+    );
+
+    expect(hubWS.on).not.toHaveBeenCalled();
+    expect((hoisted.mockStream as StreamHandle).subscribe).toHaveBeenCalled();
   });
 
   // ── Hub cancel → Edge cancel ────────────────────────
