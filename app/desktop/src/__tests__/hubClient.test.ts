@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createHubClient, HubError } from '../api/hubClient';
 import type { AuthResponse, UserProfile } from '../api/hubClient';
 import { createHubAuth } from '../api/hubAuth';
+import { clearStoredHubRefreshToken, saveStoredHubRefreshToken } from '../api/hubTokenStorage';
 
 const mockUser: UserProfile = {
   id: 'user_1',
@@ -43,9 +44,10 @@ function mockFetchSequence(responses: Array<{ status: number; data: unknown }>) 
 // ── Tests ────────────────────────────────────────
 
 describe('hubClient', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.restoreAllMocks();
     localStorage.clear();
+    await clearStoredHubRefreshToken();
   });
 
   describe('createHubClient (unauthenticated)', () => {
@@ -253,9 +255,10 @@ describe('hubClient', () => {
 // ── hubAuth tests ────────────────────────────────
 
 describe('hubAuth', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.restoreAllMocks();
     localStorage.clear();
+    await clearStoredHubRefreshToken();
   });
 
   const newAuth = () => createHubAuth(createHubClient({ baseUrl: 'http://test.local' }));
@@ -277,7 +280,7 @@ describe('hubAuth', () => {
       expect(state.isAuthenticated).toBe(true);
       expect(state.user?.username).toBe('testuser');
       expect(localStorage.getItem('agenthub_hub_token')).toBe('jwt_access_123');
-      expect(localStorage.getItem('agenthub_hub_refresh')).toBe('jwt_refresh_456');
+      expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
     });
 
     it('uses the stable desktop device id for legacy login', async () => {
@@ -393,7 +396,7 @@ describe('hubAuth', () => {
 
     it('refreshes token when stored token is expired', async () => {
       localStorage.setItem('agenthub_hub_token', 'expired_token');
-      localStorage.setItem('agenthub_hub_refresh', 'valid_refresh');
+      await saveStoredHubRefreshToken('valid_refresh');
       const auth = newAuth();
 
       mockFetchSequence([
@@ -406,13 +409,15 @@ describe('hubAuth', () => {
 
       expect(result).toBe(true);
       expect(auth.getState().token).toBe('new_token');
+      expect(auth.getState().refreshToken).toBe('new_refresh');
       expect(auth.getState().isAuthenticated).toBe(true);
       expect(localStorage.getItem('agenthub_hub_token')).toBe('new_token');
+      expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
     });
 
     it('returns false and clears state when both token and refresh fail', async () => {
       localStorage.setItem('agenthub_hub_token', 'bad_token');
-      localStorage.setItem('agenthub_hub_refresh', 'bad_refresh');
+      await saveStoredHubRefreshToken('bad_refresh');
       const auth = newAuth();
 
       mockFetchSequence([
