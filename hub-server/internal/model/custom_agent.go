@@ -35,7 +35,48 @@ func (c *CustomAgent) BeforeCreate(tx *gorm.DB) error {
 }
 
 func (c *CustomAgent) BeforeSave(tx *gorm.DB) error {
+	if err := c.normalizeJSONB(); err != nil {
+		return err
+	}
 	return c.validateJSONB()
+}
+
+func (c *CustomAgent) normalizeJSONB() error {
+	// Normalize JSONB fields by unmarshaling and re-marshaling to compact form.
+	if c.CapabilityTags != "" {
+		normalized, err := normalizeJSONValue(c.CapabilityTags)
+		if err != nil {
+			return fmt.Errorf("invalid JSON in capability_tags: %w", err)
+		}
+		c.CapabilityTags = normalized
+	}
+	if c.ToolWhitelist != "" {
+		normalized, err := normalizeJSONValue(c.ToolWhitelist)
+		if err != nil {
+			return fmt.Errorf("invalid JSON in tool_whitelist: %w", err)
+		}
+		c.ToolWhitelist = normalized
+	}
+	if c.ModelParams != "" {
+		normalized, err := normalizeJSONValue(c.ModelParams)
+		if err != nil {
+			return fmt.Errorf("invalid JSON in model_params: %w", err)
+		}
+		c.ModelParams = normalized
+	}
+	return nil
+}
+
+func normalizeJSONValue(raw string) (string, error) {
+	var v any
+	if err := json.Unmarshal([]byte(raw), &v); err != nil {
+		return "", err
+	}
+	normalized, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(normalized), nil
 }
 
 func (c *CustomAgent) Validate() error {
