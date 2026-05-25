@@ -1,16 +1,45 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MessageCircle } from 'lucide-react';
+import { Check, CheckCheck, MessageCircle, X } from 'lucide-react';
 import type { IMContact, IMMessage } from '@/components/IM/types';
 import IMContactList from '@/components/IM/IMContactList';
 import IMMessageView from '@/components/IM/IMMessageView';
 import IMMessageInput from '@/components/IM/IMMessageInput';
 import { useIMChat } from '@/hooks/useIMChat';
 import { useHubStore } from '@/stores/hubStore';
-import type { HubClient } from '@/api/hubClient';
+import type { FriendRequestInfo, HubClient, HubNotification } from '@/api/hubClient';
 import type { HubWSHandle } from '@/api/hubWS';
 import type { ViewProps } from '@/config/viewRegistry';
 import styles from './IMView.module.css';
+
+type ActionState = Record<string, { status: 'pending' | 'error'; error?: string }>;
+
+function contactName(request: FriendRequestInfo): string {
+  return request.nickname || request.username || request.user_id;
+}
+
+function notificationTitle(notification: HubNotification): string {
+  try {
+    const parsed = JSON.parse(notification.payload) as unknown;
+    if (parsed && typeof parsed === 'object') {
+      const record = parsed as Record<string, unknown>;
+      if (typeof record.title === 'string' && record.title) return record.title;
+      if (typeof record.body === 'string' && record.body) return record.body;
+      if (typeof record.message === 'string' && record.message) return record.message;
+    }
+  } catch {
+    if (notification.payload) return notification.payload;
+  }
+  return notification.type || notification.id;
+}
+
+function actionError(actionState: ActionState, keys: string[]): string | undefined {
+  return keys.map((key) => actionState[key]?.error).find(Boolean);
+}
+
+function actionPending(actionState: ActionState, keys: string[]): boolean {
+  return keys.some((key) => actionState[key]?.status === 'pending');
+}
 
 export default function IMView(props: ViewProps) {
   const { t } = useTranslation();
@@ -30,10 +59,18 @@ export default function IMView(props: ViewProps) {
     hubContacts,
     friendRequests,
     notifications,
+    actionState,
+    actionCapabilities,
     sendMessage,
     addContact,
     createPrivateSession,
     createGroupSession,
+    acceptFriendRequest,
+    rejectFriendRequest,
+    markNotificationRead,
+    readAllNotifications,
+    markSessionRead,
+    recallMessage,
     status,
     error,
   } = useIMChat({
@@ -65,6 +102,11 @@ export default function IMView(props: ViewProps) {
     [activeSessionId, sendMessage],
   );
 
+  const unreadNotifications = notifications.filter((notification) => !notification.read);
+  const sessionReadError = activeSessionId
+    ? actionState[`session:${activeSessionId}:read`]?.error
+    : undefined;
+
   // Not authenticated: show a prompt to connect
   if (!authenticated) {
     return (
@@ -93,10 +135,101 @@ export default function IMView(props: ViewProps) {
       </div>
 
       <div className={styles.chatArea}>
-        <div className={styles.chatHeader} aria-label={label('im.snapshot.title', 'Hub IM snapshot')}>
-          <span className={styles.chatType}>{label('im.snapshot.contactRequests', `${friendRequests.length} contact requests`, { count: friendRequests.length })}</span>
-          <span className={styles.chatType}>{label('im.snapshot.notifications', `${notifications.length} notifications`, { count: notifications.length })}</span>
-          <span className={styles.chatType}>{label('im.snapshot.readOnly', 'Read-only summary')}</span>
+        <div className={styles.actionPanel} aria-label={label('im.snapshot.title', 'Hub IM snapshot')}>
+          <div className={styles.actionPanelHeader}>
+            <span className={styles.chatType}>{label('im.snapshot.contactRequests', `${friendRequests.length} contact requests`, { count: friendRequests.length })}</span>
+            <span className={styles.chatType}>{label('im.snapshot.notifications', `${unreadNotifications.length} unread notifications`, { count: unreadNotifications.length })}</span>
+            {!actionCapabilities.friendRequests || !actionCapabilities.notifications ? (
+              <span className={styles.interfaceGap}>{label('im.action.interfaceGap', 'Interface gap')}</span>
+            ) : null}
+          </div>
+
+          {friendRequests.length > 0 || notifications.length > 0 ? (
+            <div className={styles.actionQueues}>
+              {friendRequests.slice(0, 3).map((request) => {
+                const pending = actionPending(actionState, [
+                  `friend:${request.request_id}:accept`,
+                  `friend:${request.request_id}:reject`,
+                ]);
+                const errorText = actionError(actionState, [
+                  `friend:${request.request_id}:accept`,
+                  `friend:${request.request_id}:reject`,
+                ]);
+                return (
+                  <div className={styles.queueItem} key={request.request_id}>
+                    <div className={styles.queueText}>
+                      <strong>{contactName(request)}</strong>
+                      <span>{request.message || label('im.request.noMessage', 'No request message')}</span>
+                      {errorText ? <em role="alert">{errorText}</em> : null}
+                    </div>
+                    <div className={styles.queueActions}>
+                      <button
+                        type="button"
+                        className={styles.iconAction}
+                        onClick={() => void acceptFriendRequest(request.request_id)}
+                        disabled={pending || !actionCapabilities.friendRequests}
+                        aria-label={label('im.request.accept', 'Accept request')}
+                        title={actionCapabilities.friendRequests ? label('im.request.accept', 'Accept request') : label('im.action.interfaceGap', 'Interface gap')}
+                      >
+                        <Check size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.iconAction}
+                        onClick={() => void rejectFriendRequest(request.request_id)}
+                        disabled={pending || !actionCapabilities.friendRequests}
+                        aria-label={label('im.request.reject', 'Reject request')}
+                        title={actionCapabilities.friendRequests ? label('im.request.reject', 'Reject request') : label('im.action.interfaceGap', 'Interface gap')}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {notifications.slice(0, 3).map((notification) => {
+                const pending = actionPending(actionState, [`notification:${notification.id}:read`]);
+                const errorText = actionState[`notification:${notification.id}:read`]?.error;
+                return (
+                  <div className={styles.queueItem} key={notification.id}>
+                    <div className={styles.queueText}>
+                      <strong>{notificationTitle(notification)}</strong>
+                      <span>{notification.read ? label('im.notification.read', 'Read') : label('im.notification.unread', 'Unread')}</span>
+                      {errorText ? <em role="alert">{errorText}</em> : null}
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.iconAction}
+                      onClick={() => void markNotificationRead(notification.id)}
+                      disabled={notification.read || pending || !actionCapabilities.notifications}
+                      aria-label={label('im.notification.markRead', 'Mark notification read')}
+                      title={actionCapabilities.notifications ? label('im.notification.markRead', 'Mark notification read') : label('im.action.interfaceGap', 'Interface gap')}
+                    >
+                      <Check size={14} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {notifications.length > 0 ? (
+            <div className={styles.actionPanelFooter}>
+              {actionState['notification:all:read']?.error ? (
+                <span className={styles.inlineError} role="alert">{actionState['notification:all:read']?.error}</span>
+              ) : null}
+              <button
+                type="button"
+                className={styles.textAction}
+                onClick={() => void readAllNotifications()}
+                disabled={unreadNotifications.length === 0 || actionPending(actionState, ['notification:all:read']) || !actionCapabilities.notifications}
+              >
+                <CheckCheck size={14} />
+                <span>{label('im.notification.readAll', 'Read all')}</span>
+              </button>
+            </div>
+          ) : null}
         </div>
         {status === 'loading' ? (
           <div className={styles.noSelection}>
@@ -113,13 +246,33 @@ export default function IMView(props: ViewProps) {
         ) : activeContact ? (
           <>
             <div className={styles.chatHeader}>
-              <span className={styles.chatTitle}>{activeContact.name}</span>
-              <span className={styles.chatType}>{activeContact.type}</span>
+              <div className={styles.chatHeading}>
+                <span className={styles.chatTitle}>{activeContact.name}</span>
+                <span className={styles.chatType}>{activeContact.type}</span>
+                {sessionReadError ? <span className={styles.inlineError} role="alert">{sessionReadError}</span> : null}
+              </div>
+              <button
+                type="button"
+                className={styles.textAction}
+                onClick={() => activeSessionId && void markSessionRead(activeSessionId)}
+                disabled={!activeSessionId || messages.length === 0 || !actionCapabilities.sessionRead || actionPending(actionState, [`session:${activeSessionId}:read`])}
+                title={actionCapabilities.sessionRead ? label('im.session.markRead', 'Mark session read') : label('im.action.interfaceGap', 'Interface gap')}
+              >
+                <CheckCheck size={14} />
+                <span>{label('im.session.markRead', 'Mark read')}</span>
+              </button>
             </div>
             <div className={styles.messageArea}>
               <IMMessageView
                 messages={messages}
                 currentUserId={userId ?? undefined}
+                canRecall={actionCapabilities.recallMessage}
+                recallingMessageIds={Object.fromEntries(
+                  Object.entries(actionState)
+                    .filter(([key, value]) => key.startsWith('message:') && key.endsWith(':recall') && value.status === 'pending')
+                    .map(([key]) => [key.split(':')[1], true]),
+                )}
+                onRecallMessage={(message: IMMessage) => recallMessage(message)}
               />
             </div>
             <div className={styles.inputArea}>
