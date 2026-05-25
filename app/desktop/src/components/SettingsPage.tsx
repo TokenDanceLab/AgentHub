@@ -392,8 +392,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const schedulerTotalItems = runs.length + bridgedTasks.length;
   const schedulerTargetReadyCount = [
     edgeOnline,
-    hubSessionActive,
     remoteControlReady,
+    false,
     false,
   ].filter(Boolean).length;
   const schedulerLocalMetric = totalRunners > 0 ? runnerSummary : edgeOnline ? t('settings.edgeOnline') : t('settings.edgeOffline');
@@ -790,9 +790,9 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   icon={<Globe2 size={18} />}
                   title={t('settings.targetHubRelay')}
                   description={t('settings.targetHubRelayDesc')}
-                  status={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')}
+                  status={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
                   metric={hubSessionActive ? t('settings.targetHubSignedIn') : t('settings.targetHubSignInRequired')}
-                  connected={hubSessionActive}
+                  connected={false}
                 />
                 <ExecutionTargetCard
                   icon={<Monitor size={18} />}
@@ -1208,9 +1208,9 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     icon={<Globe2 size={18} />}
                     title={t('settings.schedulerRouteHub')}
                     description={t('settings.schedulerRouteHubDesc')}
-                    status={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')}
+                    status={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
                     metric={hubSessionActive ? t('settings.targetHubSignedIn') : t('settings.targetHubSignInRequired')}
-                    connected={hubSessionActive}
+                    connected={false}
                   />
                   <ExecutionTargetCard
                     icon={<Computer size={18} />}

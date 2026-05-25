@@ -297,8 +297,20 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('proj_scheduler / thread_scheduler')).toBeInTheDocument();
     expect(screen.getByText('Schedule this from TokenDance Hub')).toBeInTheDocument();
     expect(screen.getByText('settings.schedulerRouteLocal')).toBeInTheDocument();
+    const hubRouteCard = screen.getByText('settings.schedulerRouteHub').closest('div');
+    expect(hubRouteCard).toHaveTextContent('settings.status.interfaceGap');
+    expect(hubRouteCard).not.toHaveTextContent('settings.enabled');
+    expect(screen.getByText('1/4')).toBeInTheDocument();
     expect(screen.getByText('settings.schedulerPolicyModelMapping')).toBeInTheDocument();
     expect(screen.getByText('settings.schedulerGuard')).toBeInTheDocument();
+  });
+
+  it('marks Hub Relay execution target as an interface gap after login', () => {
+    renderSettings('executionTargets');
+
+    const hubRelayCard = screen.getByText('settings.targetHubRelay').closest('div');
+    expect(hubRelayCard).toHaveTextContent('settings.status.interfaceGap');
+    expect(hubRelayCard).not.toHaveTextContent('settings.enabled');
   });
 
   it('renders Online IM from Hub snapshot without contract placeholder state', async () => {

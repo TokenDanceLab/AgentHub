@@ -674,7 +674,7 @@
   "welcome.configSource": "Config",
   "welcome.execution": "Execution",
   "welcome.identity": "Identity",
-  "welcome.remoteReady": "Remote ready",
+  "welcome.remoteReady": "Remote boundary",
   "welcome.suggestionsLabel": "Try an example:",
   "welcome.suggestion1": "Build a REST API with Express",
   "welcome.suggestion2": "Refactor a React component",

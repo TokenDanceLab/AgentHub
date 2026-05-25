@@ -127,4 +127,22 @@ describe('WelcomeScreen', () => {
       onSendMessage.mock.invocationCallOrder[0],
     );
   });
+
+  it('labels remote execution targets as an interface gap', () => {
+    render(
+      <WelcomeScreen
+        online={true}
+        agents={mockAgents}
+        selectedAgentId="claude-code"
+        onCreateThread={vi.fn()}
+        onSendMessage={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'welcome.target' }));
+
+    expect(screen.getByText('welcome.remoteReady')).toBeInTheDocument();
+    expect(screen.getByText('settings.status.interfaceGap')).toBeInTheDocument();
+    expect(screen.queryByText('settings.statusReady')).not.toBeInTheDocument();
+  });
 });

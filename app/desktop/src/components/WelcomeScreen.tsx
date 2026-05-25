@@ -208,13 +208,13 @@ export default memo(function WelcomeScreen({
                     <strong>{t('welcome.localEdgeTarget')}</strong>
                     <em>{online ? t('welcome.localEdgeReady') : t('welcome.edgeOffline')}</em>
                   </div>
-                  <CheckCircle2 size={17} />
+                  {online ? <CheckCircle2 size={17} /> : <WifiOff size={17} />}
                 </div>
                 <div className={styles.targetGrid}>
                   <Metric label={t('welcome.execution')} value={t('settings.targetLocalEdge')} />
                   <Metric label={t('welcome.approval')} value={t('welcome.approvalAsk')} />
                   <Metric label={t('welcome.identity')} value={t('welcome.tokendance')} />
-                  <Metric label={t('welcome.remoteReady')} value={t('settings.statusReady')} />
+                  <Metric label={t('welcome.remoteReady')} value={t('settings.status.interfaceGap')} />
                 </div>
               </div>
             )}
