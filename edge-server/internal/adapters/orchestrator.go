@@ -131,6 +131,10 @@ func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 // which requires stdin for the control protocol (permission requests, interrupt).
 func (a *OrchestratorAdapter) NeedsStdin() bool { return true }
 
+// Available delegates to the inner ClaudeCodeAdapter's availability check.
+// #177: check binary at startup, report unavailable if missing.
+func (a *OrchestratorAdapter) Available() bool { return a.inner.Available() }
+
 // DefaultOrchestratorPrompt returns the built-in orchestrator system prompt
 // instructing Claude Code how to coordinate multiple sub-agents.
 func DefaultOrchestratorPrompt(availableAgents []string) string {

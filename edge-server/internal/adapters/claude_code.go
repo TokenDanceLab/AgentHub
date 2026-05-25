@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os/exec"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -18,17 +19,20 @@ type ClaudeCodeAdapter struct {
 	model          string // default model (fallback when runCtx.Model is empty)
 	permissionMode string // default permission mode (fallback when runCtx.PermissionMode is empty)
 	maxTurns       int
+	available      bool // #177: true if the CLI binary exists and is executable
 }
 
 // NewClaudeCodeAdapter creates a Claude Code adapter.
 // binaryPath is the path to the claude executable.
 // model and permissionMode serve as defaults when the run context does not specify them.
 func NewClaudeCodeAdapter(binaryPath, model, permissionMode string) *ClaudeCodeAdapter {
+	_, err := exec.LookPath(binaryPath)
 	return &ClaudeCodeAdapter{
 		binaryPath:     binaryPath,
 		model:          model,
 		permissionMode: permissionMode,
 		maxTurns:       50,
+		available:      err == nil,
 	}
 }
 
@@ -179,3 +183,7 @@ func (a *ClaudeCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, s
 // NeedsStdin returns true — Claude Code uses stdin for the control protocol
 // (interrupt, permission responses).
 func (a *ClaudeCodeAdapter) NeedsStdin() bool { return true }
+
+// Available reports whether the claude CLI binary was found at startup.
+// #177: check binary at startup, report unavailable if missing.
+func (a *ClaudeCodeAdapter) Available() bool { return a.available }
