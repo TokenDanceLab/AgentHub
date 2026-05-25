@@ -78,8 +78,8 @@ api/
 
 | 部分 | 主要目标 | 主要目录 | 默认先读 |
 |---|---|---|---|
-| 前端 | Web 工作台、IM 流、Agent Profile 选择、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` | `README.md`、`docs/product-requirements.md`、`docs/system-architecture.md` |
-| 后端 | Hub Server、TokenDance ID 登录、Edge-Hub 通信、账号/群聊/同步/中继、Profile/Skill/MCP/审计 | `hub-server/`、`edge-server/`、`api/` | `README.md`、`docs/system-architecture.md`、`api/README.md` |
+| 前端 | Web 工作台、IM 流、Agent Profile 选择、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` | `README.md`、`docs/architecture/product-requirements.md`、`docs/architecture/system-architecture.md` |
+| 后端 | Hub Server、TokenDance ID 登录、Edge-Hub 通信、账号/群聊/同步/中继、Profile/Skill/MCP/审计 | `hub-server/`、`edge-server/`、`api/` | `README.md`、`docs/architecture/system-architecture.md`、`api/README.md` |
 | 客户端 | Desktop、Edge 本地调度、Agent Runtime adapter、workspace、preview、远控 Target | `app/desktop/`、`edge-server/` | `docs/roadmap.md`、`docs/roadmaps/client.md`、`docs/handoff/STATE.md`、`api/README.md` |
 
 需要论证细节时，再精确读取 1-3 篇 `docs/reference/**`。不要一开始扫描全部 reference。
@@ -234,7 +234,7 @@ version / id / seq / type / scope / sentAt / payload
 - Agent 生成的代码由对应开发者负责审查、测试和解释。
 - 首次克隆后运行 `.\scripts\setup.ps1` 启用本地 hooks；需要参考仓库时运行 `.\scripts\setup.ps1 -Reference core`。
 - 并行开发使用 `.worktrees/`，具体规则见 `AGENTS.md`。
-- 客户端后续以 `docs/roadmap.md`、`docs/roadmaps/client.md` 和 `docs/handoff/STATE.md` 为当前入口；`docs/client-roadmap.md` 仅保留为客户端方向轻量索引，`docs/client-handoff.md` 是历史快照，不作为默认接手指南。
+- 客户端后续以 `docs/roadmap.md`、`docs/roadmaps/client.md` 和 `docs/handoff/STATE.md` 为当前入口；`docs/operations/client-roadmap.md` 仅保留为客户端方向轻量索引，`docs/operations/client-handoff.md` 是历史快照，不作为默认接手指南。
 
 PR 说明按影响选择填写：
 

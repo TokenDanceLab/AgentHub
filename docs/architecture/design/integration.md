@@ -3,7 +3,7 @@
 日期：2026-05-24
 状态：当前（M3a 已完成，M3b 进行中）
 
-> **历史设计快照**：本文保留 2026-05-24 的集成分析，仍包含 `/v1/runners`、RunnerList、旧 Hub JWT 和 M3b 进行中语境。当前权威架构以 `docs/system-architecture.md`、`docs/implementation-guide.md`、`docs/roadmap.md` 和 `docs/handoff/STATE.md` 为准。旧 Runner 表述应理解为 Edge lifecycle + AgentAdapter 的兼容 API 命名，不代表当前存在独立 root-level `runner/` 组件。
+> **历史设计快照**：本文保留 2026-05-24 的集成分析，仍包含 `/v1/runners`、RunnerList、旧 Hub JWT 和 M3b 进行中语境。当前权威架构以 `docs/architecture/system-architecture.md`、`docs/architecture/implementation-guide.md`、`docs/roadmap.md` 和 `docs/handoff/STATE.md` 为准。旧 Runner 表述应理解为 Edge lifecycle + AgentAdapter 的兼容 API 命名，不代表当前存在独立 root-level `runner/` 组件。
 
 ## 1. 系统拓扑
 

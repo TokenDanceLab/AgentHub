@@ -94,4 +94,4 @@ git diff --check
 - 根入口：[../../README.md](../../README.md)
 - API 契约：[../../api/README.md](../../api/README.md)
 - Shared 包：[../shared/README.md](../shared/README.md)
-- 系统架构：[../../docs/system-architecture.md](../../docs/system-architecture.md)
+- 系统架构：[../../docs/architecture/system-architecture.md](../../docs/architecture/system-architecture.md)

@@ -17,8 +17,8 @@
 审查人：1号评委 / Reviewer1  
 模型：gpt-5.5  
 时间：2026-05-23 00:01  
-范围：对 `README.md`、`docs/product-requirements.md`、`docs/system-architecture.md`、`docs/implementation-guide.md` 四份核心文档做交叉 Review，并合并为一份统一报告。  
-审查依据：四份核心文档、`docs/client-roadmap.md`、`api/` 契约、Edge/Runner/Desktop 当前实现、测试与 CI 配置。
+范围：对 `README.md`、`docs/architecture/product-requirements.md`、`docs/architecture/system-architecture.md`、`docs/architecture/implementation-guide.md` 四份核心文档做交叉 Review，并合并为一份统一报告。  
+审查依据：四份核心文档、`docs/operations/client-roadmap.md`、`api/` 契约、Edge/Runner/Desktop 当前实现、测试与 CI 配置。
 
 ## 1. 交叉 Review 结论
 
@@ -161,7 +161,7 @@ cd ..\..
 
 ### 3.2 产品需求的 P0 范围缺少验收口径
 
-`docs/product-requirements.md` 的 P0 必须具备项是正确的，但缺少“每项怎样算完成”。这会导致 M1 mock、完整 P0、P1 能力混在一起。
+`docs/architecture/product-requirements.md` 的 P0 必须具备项是正确的，但缺少“每项怎样算完成”。这会导致 M1 mock、完整 P0、P1 能力混在一起。
 
 合并建议：
 
@@ -171,7 +171,7 @@ cd ..\..
 
 ### 3.3 系统架构缺少 P0 本地拓扑和数据权威
 
-`docs/system-architecture.md` 的 Hub-Edge-Runner 总体架构正确，但对当前 P0/M1 实现者来说，还缺少更具体的边界。
+`docs/architecture/system-architecture.md` 的 Hub-Edge-Runner 总体架构正确，但对当前 P0/M1 实现者来说，还缺少更具体的边界。
 
 合并建议：
 
@@ -182,7 +182,7 @@ cd ..\..
 
 ### 3.4 实现文档没有同步当前 M1 状态
 
-`docs/implementation-guide.md` 仍写“先完成 API foundation，然后进入 Go 服务和 UI 实现”。现在这句话已经落后于实际进度。
+`docs/architecture/implementation-guide.md` 仍写“先完成 API foundation，然后进入 Go 服务和 UI 实现”。现在这句话已经落后于实际进度。
 
 合并建议：
 
@@ -210,7 +210,7 @@ cd ..\..
 1. 当前状态：客户端 M1，已跑通 mock 链路。
 2. 当前可运行方式：Edge + Desktop Web UI + 可选 Tauri。
 3. 当前未完成：Project/Thread/真实 Runner/Diff/Approval/Preview。
-4. 文档导航增加 `docs/client-roadmap.md` 和 `docs/client-handoff.md`。
+4. 文档导航增加 `docs/operations/client-roadmap.md` 和 `docs/operations/client-handoff.md`。
 
 README 不应加入大量任务拆解，避免变成实现文档。
 
@@ -256,10 +256,10 @@ README 不应加入大量任务拆解，避免变成实现文档。
 ## 5. 建议的改文档顺序
 
 1. 先改 `README.md`：修正状态和快速开始，避免入口误导。
-2. 再改 `docs/product-requirements.md`：补 M1/P0 边界和 P0 验收表。
-3. 再改 `docs/system-architecture.md`：补 P0 拓扑、数据权威、EventStore、失败恢复。
-4. 最后改 `docs/implementation-guide.md`：按 M1-M4 拆任务和验收。
-5. 同步检查 `docs/client-roadmap.md`，确保它作为阶段路线图，不和实现文档冲突。
+2. 再改 `docs/architecture/product-requirements.md`：补 M1/P0 边界和 P0 验收表。
+3. 再改 `docs/architecture/system-architecture.md`：补 P0 拓扑、数据权威、EventStore、失败恢复。
+4. 最后改 `docs/architecture/implementation-guide.md`：按 M1-M4 拆任务和验收。
+5. 同步检查 `docs/operations/client-roadmap.md`，确保它作为阶段路线图，不和实现文档冲突。
 6. 如阶段定义影响 API，再同步 `api/openapi.yaml` 和 `api/events.md` 的 phase / owner 标记。
 
 ## 6. 建议合并成的统一摘要
