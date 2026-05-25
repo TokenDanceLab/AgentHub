@@ -54,6 +54,120 @@ export function renderHubContent(content: unknown): string {
   return content == null ? '' : JSON.stringify(content);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseJsonRecord(value: unknown): Record<string, unknown> | null {
+  if (isRecord(value)) return value;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function readString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function normalizeFileAction(value: unknown): 'created' | 'modified' | 'deleted' {
+  if (value === 'created' || value === 'added' || value === 'add') return 'created';
+  if (value === 'deleted' || value === 'removed' || value === 'delete') return 'deleted';
+  return 'modified';
+}
+
+function normalizeToolStatus(value: unknown): 'pending' | 'running' | 'completed' | 'failed' {
+  if (value === 'pending') return 'pending';
+  if (value === 'completed' || value === 'succeeded' || value === 'success') return 'completed';
+  if (value === 'failed' || value === 'error') return 'failed';
+  return 'running';
+}
+
+function stringifyRuntimeValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value == null) return '';
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function mapTokenUsage(value: unknown): { input: number; output: number } | undefined {
+  if (!isRecord(value)) return undefined;
+  const input = value.input ?? value.inputTokens ?? value.prompt_tokens;
+  const output = value.output ?? value.outputTokens ?? value.completion_tokens;
+  return typeof input === 'number' && typeof output === 'number' ? { input, output } : undefined;
+}
+
+function runtimePayloadToBlocks(content: unknown): MessageBlock[] | null {
+  const record = parseJsonRecord(content);
+  if (!record) return null;
+
+  const path = readString(record, 'path') ?? readString(record, 'filePath');
+  if (path && (record.action !== undefined || record.diff !== undefined)) {
+    const block: Extract<MessageBlock, { kind: 'file_change' }> = {
+      kind: 'file_change',
+      path,
+      action: normalizeFileAction(record.action),
+    };
+    const diff = readString(record, 'diff');
+    if (diff) block.diff = diff;
+    return [block];
+  }
+
+  const callId = readString(record, 'callId') ?? readString(record, 'toolUseId');
+  const toolName = readString(record, 'toolName') ?? readString(record, 'tool') ?? readString(record, 'name');
+  const rawInput = record.input ?? record.arguments ?? record.args;
+  if (callId && toolName && rawInput !== undefined) {
+    const block: Extract<MessageBlock, { kind: 'tool_use' }> = {
+      kind: 'tool_use',
+      callId,
+      toolName,
+      input: isRecord(rawInput) ? rawInput : { value: rawInput },
+      status: normalizeToolStatus(record.status),
+      children: [],
+    };
+    return [block];
+  }
+
+  const rawOutput = record.output ?? record.content ?? record.result;
+  if (callId && rawOutput !== undefined) {
+    const output = stringifyRuntimeValue(rawOutput);
+    const failed = record.isError === true || record.error !== undefined || record.status === 'failed';
+    return [
+      {
+        kind: 'tool_use',
+        callId,
+        toolName: toolName ?? 'Tool result',
+        input: {},
+        status: failed ? 'failed' : 'completed',
+        children: [{ kind: 'generic_result', output }],
+      },
+    ];
+  }
+
+  if (typeof record.success === 'boolean') {
+    const block: Extract<MessageBlock, { kind: 'result' }> = {
+      kind: 'result',
+      success: record.success,
+    };
+    const error = readString(record, 'error');
+    if (error) block.error = error;
+    const tokenUsage = mapTokenUsage(record.tokenUsage ?? record.usage);
+    if (tokenUsage) block.tokenUsage = tokenUsage;
+    return [block];
+  }
+
+  return null;
+}
+
 export function hubMessageToChatMessage(msg: HubMessageLike): ChatMessage {
   const sessionId = msg.session_id ?? msg.sessionId ?? '';
   const messageId =
@@ -63,9 +177,12 @@ export function hubMessageToChatMessage(msg: HubMessageLike): ChatMessage {
     `${sessionId}-${msg.seq_id ?? Date.now()}`;
   const senderType = msg.sender_type === 'agent' ? 'agent' : 'user';
   const content = msg.recalled ? '[Message recalled]' : renderHubContent(msg.content);
-  const block: MessageBlock = msg.content_type === 'code'
-    ? { kind: 'code', content }
-    : { kind: 'text', content };
+  const runtimeBlocks = msg.recalled ? null : runtimePayloadToBlocks(msg.content);
+  const blocks: MessageBlock[] = runtimeBlocks ?? [
+    msg.content_type === 'code'
+      ? { kind: 'code', content }
+      : { kind: 'text', content },
+  ];
 
   return {
     id: messageId,
@@ -75,7 +192,7 @@ export function hubMessageToChatMessage(msg: HubMessageLike): ChatMessage {
       senderType === 'agent'
         ? msg.sender?.nickname ?? msg.sender?.username ?? 'Hub Agent'
         : undefined,
-    blocks: [block],
+    blocks,
   };
 }
 
