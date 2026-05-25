@@ -9,9 +9,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
@@ -32,6 +34,11 @@ type OIDCService struct {
 
 // NewOIDCService creates a new OIDCService.
 func NewOIDCService(db *gorm.DB, cfg config.TokenDanceIDConfig, jwtCfg config.JWTConfig, cache *cache.Client) *OIDCService {
+	if cfg.JWKSURI != "" {
+		jwtutil.SetJWKSURI(cfg.JWKSURI)
+	} else if cfg.IssuerURL != "" {
+		jwtutil.SetJWKSURI(strings.TrimRight(cfg.IssuerURL, "/") + "/oidc/jwks")
+	}
 	return &OIDCService{db: db, cfg: cfg, jwtCfg: jwtCfg, cache: cache}
 }
 
@@ -67,8 +74,14 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 	if codeChallengeMethod == "" {
 		codeChallengeMethod = "S256"
 	}
-	if deviceType == "" || deviceID == "" {
-		return nil, errcode.ErrBadRequest
+	codeChallengeMethod = strings.TrimSpace(codeChallengeMethod)
+	if codeChallengeMethod != "S256" {
+		return nil, errcode.ErrBadRequest.WithMessage("code_challenge_method must be S256")
+	}
+	var err error
+	deviceType, deviceID, err = normalizeOIDCDevice(deviceType, deviceID)
+	if err != nil {
+		return nil, err
 	}
 
 	// Generate cryptographically random state (32 bytes -> base64url)
@@ -96,7 +109,7 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 	}
 
 	// Build the TokenDance ID authorization URL
-	authURL, err := url.Parse(s.cfg.IssuerURL + "/oidc/authorize")
+	authURL, err := url.Parse(strings.TrimRight(s.cfg.IssuerURL, "/") + "/oidc/authorize")
 	if err != nil {
 		return nil, fmt.Errorf("parse issuer url: %w", err)
 	}
@@ -104,7 +117,7 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 	q.Set("response_type", "code")
 	q.Set("client_id", s.cfg.ClientID)
 	q.Set("redirect_uri", s.cfg.RedirectURI)
-	q.Set("scope", "openid profile")
+	q.Set("scope", "openid profile email")
 	q.Set("state", state)
 	q.Set("code_challenge", codeChallenge)
 	q.Set("code_challenge_method", codeChallengeMethod)
@@ -119,6 +132,12 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 // HandleCallback validates the OIDC callback, exchanges the authorization code,
 // validates the ID token, maps the TokenDance sub to a Hub user, and issues Hub tokens.
 func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerifier, deviceType, deviceID string) (*CallbackResult, error) {
+	var err error
+	deviceType, deviceID, err = normalizeOIDCDevice(deviceType, deviceID)
+	if err != nil {
+		return nil, err
+	}
+
 	// 1. Atomically consume state from Redis (GetDel = GET + DEL in one command).
 	//    This prevents replay attacks that could exploit the race window between
 	//    separate Get/Delete operations.
@@ -220,7 +239,7 @@ func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier strin
 	form.Set("client_secret", s.cfg.ClientSecret)
 	form.Set("code_verifier", codeVerifier)
 
-	tokenURL := s.cfg.IssuerURL + "/oidc/token"
+	tokenURL := strings.TrimRight(s.cfg.IssuerURL, "/") + "/oidc/token"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("build token request: %w", err)
@@ -247,4 +266,16 @@ func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier strin
 		return nil, fmt.Errorf("parse token response: %w", err)
 	}
 	return &tokenResp, nil
+}
+
+func normalizeOIDCDevice(deviceType, deviceID string) (string, string, error) {
+	deviceType = strings.TrimSpace(deviceType)
+	if !slices.Contains(validDeviceTypes, deviceType) {
+		return "", "", errcode.ErrBadRequest.WithMessage("device_type must be one of desktop, web, cli")
+	}
+	parsed, err := uuid.Parse(strings.TrimSpace(deviceID))
+	if err != nil {
+		return "", "", errcode.ErrBadRequest.WithMessage("device_id must be a UUID")
+	}
+	return deviceType, parsed.String(), nil
 }

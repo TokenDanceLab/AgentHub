@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -35,6 +36,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			created_at DATETIME,
 			updated_at DATETIME
 		)`,
+		`CREATE UNIQUE INDEX idx_users_tokendance_sub ON users(tokendance_sub) WHERE tokendance_sub IS NOT NULL AND tokendance_sub != ''`,
 		`CREATE TABLE devices (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL,
@@ -261,6 +263,31 @@ func TestUserRepo_GetUsersByIDs(t *testing.T) {
 	m, err = GetUsersByIDs(db, []string{"no-such-id"})
 	require.NoError(t, err)
 	assert.Empty(t, m)
+}
+
+func TestUserRepo_FindOrCreateByTokenDanceSubCreatesStableDistinctHubUsers(t *testing.T) {
+	db := setupSQLite(t)
+
+	sub1 := "tokendance-subject-with-a-very-long-shared-prefix-" + strings.Repeat("1", 80)
+	sub2 := "tokendance-subject-with-a-very-long-shared-prefix-" + strings.Repeat("2", 80)
+
+	u1, err := FindOrCreateByTokenDanceSub(db, sub1)
+	require.NoError(t, err)
+	u2, err := FindOrCreateByTokenDanceSub(db, sub2)
+	require.NoError(t, err)
+
+	require.NotEqual(t, u1.ID, u2.ID)
+	require.NotEqual(t, u1.Username, u2.Username)
+	assert.True(t, strings.HasPrefix(u1.Username, "td_"))
+	assert.True(t, len(u1.Username) <= 32)
+	assert.True(t, len(u1.Nickname) <= 64)
+	require.NotNil(t, u1.TokenDanceSub)
+	assert.Equal(t, sub1, *u1.TokenDanceSub)
+
+	again, err := FindOrCreateByTokenDanceSub(db, sub1)
+	require.NoError(t, err)
+	assert.Equal(t, u1.ID, again.ID)
+	assert.Equal(t, u1.Username, again.Username)
 }
 
 // =============================================================================
