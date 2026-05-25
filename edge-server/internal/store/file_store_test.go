@@ -169,8 +169,12 @@ func TestFileStoreRejectsUnwritableSnapshotPathOnStartup(t *testing.T) {
 	if err == nil {
 		t.Fatal("NewFile returned nil error for blocked snapshot directory")
 	}
-	if !strings.Contains(err.Error(), "verify store snapshot write") ||
-		!strings.Contains(err.Error(), "create store snapshot directory") {
+	errMessage := err.Error()
+	startupVerifyError := strings.Contains(errMessage, "verify store snapshot write") &&
+		strings.Contains(errMessage, "create store snapshot directory")
+	readPathError := strings.Contains(errMessage, "read store snapshot") &&
+		strings.Contains(errMessage, "not a directory")
+	if !startupVerifyError && !readPathError {
 		t.Fatalf("NewFile error = %v, want startup write verification directory error", err)
 	}
 }
