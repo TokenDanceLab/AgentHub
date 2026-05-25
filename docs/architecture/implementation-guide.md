@@ -31,7 +31,7 @@ M1 的 Mock Run 已被真实 CLI adapter 完全取代。Edge 通过统一的 `Ag
 | `OrchestratorAdapter` | `orchestrator.go` | 同 Claude Code + orchestrator system prompt | 同 NDJSONStreamParser |
 
 **Claude Code adapter 具体能力**：
-- stdin 双向控制协议：`can_use_tool`（权限审批）、`interrupt`（适配器感知取消）、`set_model`、`set_permission_mode`、`stop_task`
+- stdin 双向控制协议结构：`can_use_tool`（权限审批）、`interrupt`（适配器感知取消）、`set_model`、`set_permission_mode`、`stop_task`。当前 `ProcessExecutor` 为避免 CLI 等待 stdin 会在启动后关闭 stdin；`/v1/permissions/decide` 已完成 run-scoped 决策登记，但真正阻塞式 can_use_tool 回写仍需后续实现。
 - 多轮会话：`--resume <sessionId>`、`--continue`、`--fork-session`
 - 模型选择：`--model`、`--reasoning-effort`、`--max-thinking-tokens`、`--fast`、`--include-partial-messages`
 - 14 种新增系统事件类型（`compact_boundary`、`api_retry`、`task_started/progress/notification`、`session_state_changed`、`hook_started/progress/response`、`tool_use_summary`、`auth_status`、`rate_limit`、`status_change`）

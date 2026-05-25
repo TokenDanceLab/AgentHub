@@ -18,7 +18,7 @@ AgentHub = 本地 Agent 工作台 + IM 式多 Agent 协作 + Hub 网络同步与
 Desktop UI -> Local Edge -> Edge lifecycle -> Agent Runtime Adapter (Claude Code / OpenCode / Codex) -> WebSocket events -> UI
 ```
 
-P0 完整闭环已实现：本地项目、Thread、真实 Agent Runtime adapter、Diff、Apply / Discard、Approval 和 Preview。旧文档中的 Runner 指 Edge lifecycle + AgentAdapter，不再是独立产品组件。
+P0 本地执行主链路已实现：本地项目、Thread、真实 Agent Runtime adapter、WebSocket 事件、基础 Diff/输出展示和 Preview 入口可用。Approval 当前具备事件展示与 run-scoped REST 决策登记；真正阻塞式 stdin 回写和远程 Edge 决策证明仍是后续安全闭环。旧文档中的 Runner 指 Edge lifecycle + AgentAdapter，不再是独立产品组件。
 
 ## 2. 目标用户和场景
 
@@ -103,7 +103,7 @@ Agent Profile -> Execution Target -> Thread -> Run -> RunEvent -> Approval / Art
 | changed files | run 结束后能检测文件变更列表 |
 | Diff 查看 | UI 能展示文本 Diff，并关联到对应 run/artifact |
 | Apply / Discard | 用户能把变更应用回主工作区，或丢弃本次 run |
-| Approval 卡片 | 危险命令、文件写入或部署动作会生成审批请求，用户可接受或拒绝 |
+| Approval 卡片 | 危险命令、文件写入或部署动作会生成审批请求，用户可接受或拒绝；当前完成 run-scoped REST 决策登记，阻塞式 Runtime 回写另行验收 |
 | Preview 面板 | Agent Runtime 或 Edge 能启动预览，并通过 UI 打开 |
 | `.agenthub/` 规则读取 | Edge Context Builder 能读取项目规则、Agent 说明和基础记忆 |
 
