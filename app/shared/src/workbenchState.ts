@@ -264,7 +264,8 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
     case 'run.started':
     case 'run.status.changed':
     case 'run.finished':
-    case 'run.failed': {
+    case 'run.failed':
+    case 'run.cancelled': {
       const runId = text(payload.runId) ?? text(envelope.scope?.runId);
       if (!runId) return withSeq(state, nextSeq);
 
@@ -302,8 +303,12 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
       };
       const chunks =
         event.type === 'run.output.batch'
-          ? chunkTexts(payload.chunks)
+          ? chunkTexts(payload.chunks, text(payload.stream))
           : [{ stream: text(payload.stream), text: text(payload.text) ?? '' }];
+      const notice = truncationNotice(payload);
+      if (notice) {
+        chunks.push({ stream: text(payload.stream), text: notice });
+      }
       const nextLog = chunks.reduce<RunLogs>((acc, chunk) => {
         if (chunk.stream === 'stderr') {
           return { ...acc, stderr: `${acc.stderr}${chunk.text}` };
@@ -535,18 +540,38 @@ function setRunStatus(runs: Run[], runId: string, status: Run['status']): Run[] 
   }));
 }
 
-function chunkTexts(value: unknown): Array<{ stream?: string; text: string }> {
+function chunkTexts(
+  value: unknown,
+  fallbackStream?: string,
+): Array<{ stream?: string; text: string }> {
   if (!Array.isArray(value)) return [];
   return value.map((chunk) => {
     if (chunk && typeof chunk === 'object') {
       const record = chunk as Record<string, unknown>;
       return {
-        stream: text(record.stream),
+        stream: text(record.stream) ?? fallbackStream,
         text: text(record.text) ?? '',
       };
     }
-    return { text: '' };
+    return { stream: fallbackStream, text: '' };
   });
+}
+
+function truncationNotice(payload: Record<string, unknown>): string | undefined {
+  if (payload.truncated !== true) return undefined;
+  const bytesWritten = number(payload.bytesWritten);
+  const bytesBefore = number(payload.bytesBefore);
+  const maxBytes = number(payload.maxBytes);
+  const suffix =
+    bytesWritten !== undefined
+      ? ` after ${bytesWritten} bytes`
+      : bytesBefore !== undefined
+        ? ` after ${bytesBefore} bytes`
+        : maxBytes !== undefined
+          ? ` at ${maxBytes} bytes`
+          : '';
+  const message = text(payload.message);
+  return `\n[output truncated${suffix}${message ? `: ${message}` : ''}]\n`;
 }
 
 function text(value: unknown): string | undefined {
@@ -595,6 +620,7 @@ function runStatus(
   if (eventType === 'run.started') return 'running';
   if (eventType === 'run.finished') return 'finished';
   if (eventType === 'run.failed') return 'failed';
+  if (eventType === 'run.cancelled') return 'cancelled';
   return undefined;
 }
 

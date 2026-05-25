@@ -1,17 +1,71 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ComponentProps } from 'react';
 import '@testing-library/jest-dom/vitest';
 import SettingsPage from '@/components/SettingsPage';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import type { AgentInfo, RunInfo } from '@shared/types';
 import type { AgentTask } from '@/stores/taskBridgeStore';
 
-const { mockAgents, mockCancelRun, mockRefetchRuns, mockRuns, mockTasks } = vi.hoisted(() => ({
+const {
+  mockAgents,
+  mockCancelRun,
+  mockCustomAgents,
+  mockFriendRequests,
+  mockHubAuthState,
+  mockHubClient,
+  mockHubStoreState,
+  mockNotifications,
+  mockRefetchRuns,
+  mockRuns,
+  mockSessions,
+  mockContacts,
+  mockTasks,
+  mockUseHealthState,
+} = vi.hoisted(() => ({
   mockAgents: [] as AgentInfo[],
   mockCancelRun: vi.fn(),
+  mockCustomAgents: [] as Record<string, unknown>[],
+  mockFriendRequests: [] as Record<string, unknown>[],
+  mockHubAuthState: {
+    token: 'hub_access_token' as string | null,
+    refreshToken: 'hub_refresh_token' as string | null,
+    user: { id: 'user_1', username: 'TokenDance User' } as { id: string; username: string } | null,
+    isAuthenticated: true,
+    tokenSource: 'hub',
+  },
+  mockHubClient: {
+    listContacts: vi.fn(),
+    listSessions: vi.fn(),
+    listFriendRequests: vi.fn(),
+    listNotifications: vi.fn(),
+    listCustomAgents: vi.fn(),
+  },
+  mockHubStoreState: {
+    authenticated: true,
+    username: 'TokenDance User',
+    clear: vi.fn(),
+  },
+  mockNotifications: [] as Record<string, unknown>[],
   mockRefetchRuns: vi.fn(),
   mockRuns: [] as RunInfo[],
+  mockSessions: [] as Record<string, unknown>[],
+  mockContacts: [] as Record<string, unknown>[],
   mockTasks: [] as AgentTask[],
+  mockUseHealthState: {
+    online: true,
+    health: {
+      status: 'ok',
+      checks: {
+        runners: {
+          total: 1,
+          available: 1,
+          items: [{ id: 'codex', name: 'Codex Runner', status: 'online', capabilities: ['codex'] }],
+        },
+      },
+    },
+  },
 }));
 
 vi.mock('react-i18next', () => ({
@@ -35,19 +89,7 @@ vi.mock('@/contexts/ThemeContext', () => ({
 }));
 
 vi.mock('@/hooks/useHealth', () => ({
-  useHealth: () => ({
-    online: true,
-    health: {
-      status: 'ok',
-      checks: {
-        runners: {
-          total: 1,
-          available: 1,
-          items: [{ id: 'codex', name: 'Codex Runner', status: 'online', capabilities: ['codex'] }],
-        },
-      },
-    },
-  }),
+  useHealth: () => mockUseHealthState,
 }));
 
 vi.mock('@/api/agentQueries', () => ({
@@ -75,15 +117,12 @@ vi.mock('@/stores/taskBridgeStore', () => ({
 
 vi.mock('@/stores/hubStore', () => ({
   useHubStore: (selector: (state: { authenticated: boolean; username: string; clear: () => void }) => unknown) =>
-    selector({ authenticated: true, username: 'TokenDance User', clear: vi.fn() }),
+    selector(mockHubStoreState),
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
-    token: 'hub_access_token',
-    refreshToken: 'hub_refresh_token',
-    user: { id: 'user_1', username: 'TokenDance User' },
-    isAuthenticated: true,
+    ...mockHubAuthState,
     tokenSource: 'hub',
     login: vi.fn(),
     loginWithTokenDance: vi.fn(),
@@ -92,12 +131,67 @@ vi.mock('@/hooks/useAuth', () => ({
   }),
 }));
 
+vi.mock('@/api/hubClient', () => ({
+  createHubClient: () => mockHubClient,
+}));
+
+function renderSettings(initialSection: ComponentProps<typeof SettingsPage>['initialSection'], props = {}) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection={initialSection} {...props} />
+    </QueryClientProvider>,
+  );
+}
+
 describe('SettingsPage tasks', () => {
   beforeEach(() => {
     mockAgents.splice(0, mockAgents.length);
+    mockCustomAgents.splice(0, mockCustomAgents.length);
+    mockFriendRequests.splice(0, mockFriendRequests.length);
+    mockNotifications.splice(0, mockNotifications.length);
     mockRuns.splice(0, mockRuns.length);
+    mockSessions.splice(0, mockSessions.length);
+    mockContacts.splice(0, mockContacts.length);
     mockTasks.splice(0, mockTasks.length);
     mockCancelRun.mockReset();
+    mockHubClient.listContacts.mockReset();
+    mockHubClient.listSessions.mockReset();
+    mockHubClient.listFriendRequests.mockReset();
+    mockHubClient.listNotifications.mockReset();
+    mockHubClient.listCustomAgents.mockReset();
+    mockHubClient.listContacts.mockImplementation(async () => mockContacts);
+    mockHubClient.listSessions.mockImplementation(async () => mockSessions);
+    mockHubClient.listFriendRequests.mockImplementation(async () => mockFriendRequests);
+    mockHubClient.listNotifications.mockImplementation(async () => mockNotifications);
+    mockHubClient.listCustomAgents.mockImplementation(async () => mockCustomAgents);
+    mockHubStoreState.authenticated = true;
+    mockHubStoreState.username = 'TokenDance User';
+    Object.assign(mockHubAuthState, {
+      token: 'hub_access_token',
+      refreshToken: 'hub_refresh_token',
+      user: { id: 'user_1', username: 'TokenDance User' },
+      isAuthenticated: true,
+      tokenSource: 'hub',
+    });
+    Object.assign(mockUseHealthState, {
+      online: true,
+      health: {
+        status: 'ok',
+        checks: {
+          runners: {
+            total: 1,
+            available: 1,
+            items: [{ id: 'codex', name: 'Codex Runner', status: 'online', capabilities: ['codex'] }],
+          },
+        },
+      },
+    });
     mockRefetchRuns.mockReset();
     localStorage.clear();
     sessionStorage.clear();
@@ -124,7 +218,7 @@ describe('SettingsPage tasks', () => {
       createdAt: '2026-05-25T01:02:00Z',
     });
 
-    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="tasks" />);
+    renderSettings('tasks');
 
     expect(screen.getByText('settings.taskLocalRuns')).toBeInTheDocument();
     expect(screen.getByText('settings.taskHubBridge')).toBeInTheDocument();
@@ -143,7 +237,7 @@ describe('SettingsPage tasks', () => {
       startedAt: '2026-05-25T01:01:00Z',
     });
 
-    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="tasks" />);
+    renderSettings('tasks');
 
     fireEvent.click(screen.getByRole('button', { name: 'settings.taskRefreshRuns' }));
     expect(mockRefetchRuns).toHaveBeenCalledTimes(1);
@@ -188,7 +282,7 @@ describe('SettingsPage tasks', () => {
       createdAt: '2026-05-25T01:02:00Z',
     });
 
-    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="agentScheduling" />);
+    renderSettings('agentScheduling');
 
     expect(screen.getByText('settings.schedulerQueueLive')).toBeInTheDocument();
     expect(screen.getByText('settings.schedulerProfiles')).toBeInTheDocument();
@@ -219,7 +313,7 @@ describe('SettingsPage tasks', () => {
       },
     });
 
-    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="agentProfiles" />);
+    renderSettings('agentProfiles');
 
     expect(screen.getByText('settings.runtimeInventory')).toBeInTheDocument();
     expect(screen.getByText('settings.profileComposition')).toBeInTheDocument();
@@ -239,7 +333,7 @@ describe('SettingsPage tasks', () => {
     expect(screen.getAllByText('settings.executionTargets').length).toBeGreaterThan(0);
   });
 
-  it('renders agent market readiness from local profiles and capabilities', () => {
+  it('renders agent market readiness from Hub CustomAgents and capabilities', async () => {
     mockAgents.splice(0, mockAgents.length, {
       id: 'codex',
       name: 'Codex',
@@ -257,16 +351,85 @@ describe('SettingsPage tasks', () => {
       },
     });
 
-    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="agentMarket" />);
+    mockCustomAgents.splice(0, mockCustomAgents.length, {
+      id: 'agent-market-codex',
+      name: 'Market Codex',
+      agent_type: 'custom',
+      system_prompt: 'Hub market agent',
+      capability_tags: ['streaming', 'toolCalls'],
+      updated_at: '2026-05-25T01:00:00Z',
+    });
+
+    renderSettings('agentMarket');
 
     expect(screen.getByText('settings.marketLocalProfiles')).toBeInTheDocument();
     expect(screen.getByText('settings.marketPublishReady')).toBeInTheDocument();
     expect(screen.getByText('settings.marketInstalledProfiles')).toBeInTheDocument();
-    expect(screen.getByText('Codex')).toBeInTheDocument();
+    expect(await screen.findByText('Market Codex')).toBeInTheDocument();
     expect(screen.getByText('streaming')).toBeInTheDocument();
     expect(screen.getByText('toolCalls')).toBeInTheDocument();
     expect(screen.getByText('settings.marketTokenDancePublish')).toBeInTheDocument();
     expect(screen.getByText('settings.marketGuard')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'settings.marketRefresh' }));
+    expect(mockHubClient.listCustomAgents).toHaveBeenCalledTimes(2);
+  });
+
+  it('requires Hub sign-in for Agent Market and does not render local runtimes as fake market agents', () => {
+    mockHubStoreState.authenticated = false;
+    Object.assign(mockHubAuthState, {
+      token: null,
+      refreshToken: null,
+      user: null,
+      isAuthenticated: false,
+    });
+    mockAgents.splice(0, mockAgents.length, {
+      id: 'codex',
+      name: 'Codex',
+      description: 'Local Codex runtime',
+      status: 'available',
+      capabilities: {
+        streaming: true,
+        toolCalls: true,
+        fileChanges: true,
+        thinkingVisible: false,
+        multiTurn: true,
+        mcpIntegration: false,
+        permissionHooks: false,
+        subAgentSpawn: false,
+      },
+    });
+
+    renderSettings('agentMarket');
+
+    expect(screen.getByText('settings.hubSignInRequired')).toBeInTheDocument();
+    expect(screen.queryByText('Codex')).not.toBeInTheDocument();
+    expect(mockHubClient.listCustomAgents).not.toHaveBeenCalled();
+  });
+
+  it('shows Hub failure for Agent Market instead of falling back to local fake agents', async () => {
+    mockHubClient.listCustomAgents.mockRejectedValueOnce(new Error('hub down'));
+    mockAgents.splice(0, mockAgents.length, {
+      id: 'codex',
+      name: 'Codex',
+      description: 'Local Codex runtime',
+      status: 'available',
+      capabilities: {
+        streaming: true,
+        toolCalls: true,
+        fileChanges: true,
+        thinkingVisible: false,
+        multiTurn: true,
+        mcpIntegration: false,
+        permissionHooks: false,
+        subAgentSpawn: false,
+      },
+    });
+
+    renderSettings('agentMarket');
+
+    expect(await screen.findByText('settings.hubUnavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Codex')).not.toBeInTheDocument();
   });
 
   it('renders MCP runtime capability matrix from local profiles', () => {
@@ -307,7 +470,7 @@ describe('SettingsPage tasks', () => {
       },
     );
 
-    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="mcp" />);
+    renderSettings('mcp');
 
     expect(screen.getByText('settings.mcpRuntimeSupport')).toBeInTheDocument();
     expect(screen.getByText('settings.mcpRuntimeMatrix')).toBeInTheDocument();
@@ -318,12 +481,25 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('settings.mcpGuard')).toBeInTheDocument();
   });
 
+  it('keeps MCP local-source only when Edge is offline', () => {
+    Object.assign(mockUseHealthState, {
+      online: false,
+      health: null,
+    });
+
+    renderSettings('mcp');
+
+    expect(screen.getByText('settings.mcpNoRuntimes')).toBeInTheDocument();
+    expect(screen.getAllByText('settings.contractPending').length).toBeGreaterThan(0);
+    expect(screen.queryByText('settings.statusReady')).not.toBeInTheDocument();
+  });
+
   it('renders account identity boundary from Hub session and local device state', () => {
     localStorage.setItem('agenthub_device_id', '00000000-0000-0000-0000-00000000a001');
     sessionStorage.setItem('td_code_verifier', 'verifier');
     sessionStorage.setItem('td_state', 'state');
 
-    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="account" />);
+    renderSettings('account');
 
     expect(screen.getAllByText('TokenDance User').length).toBeGreaterThan(0);
     expect(screen.getAllByText('settings.hubSession').length).toBeGreaterThan(0);
@@ -332,11 +508,12 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('settings.identityBoundary')).toBeInTheDocument();
     expect(screen.getByText('settings.authTokenSource')).toBeInTheDocument();
     expect(screen.getByText('settings.deviceProof')).toBeInTheDocument();
+    expect(screen.getByText('settings.localOnly')).toBeInTheDocument();
     expect(screen.getByText('settings.accountGuard')).toBeInTheDocument();
   });
 
   it('renders project skill registry with script and review metadata', () => {
-    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="skills" />);
+    renderSettings('skills');
 
     expect(screen.getByText('settings.skillProjectRegistry')).toBeInTheDocument();
     expect(screen.getByText('settings.skillReviewReady')).toBeInTheDocument();
@@ -350,7 +527,7 @@ describe('SettingsPage tasks', () => {
   });
 
   it('persists model defaults from the model configuration panel', () => {
-    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="models" />);
+    renderSettings('models');
 
     fireEvent.change(screen.getByDisplayValue('Auto'), { target: { value: 'gpt-5.5' } });
     fireEvent.change(screen.getByDisplayValue('TokenDance Relay'), { target: { value: 'openai' } });
@@ -365,7 +542,7 @@ describe('SettingsPage tasks', () => {
   });
 
   it('edits model alias routing from the model mapping panel', () => {
-    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="modelMapping" />);
+    renderSettings('modelMapping');
 
     expect(screen.getByText('opus')).toBeInTheDocument();
     fireEvent.change(screen.getAllByDisplayValue('claude-opus-4-7')[0], {
@@ -379,7 +556,7 @@ describe('SettingsPage tasks', () => {
   });
 
   it('edits cc-switch provider health and notes locally', () => {
-    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="ccSwitch" />);
+    renderSettings('ccSwitch');
 
     fireEvent.click(screen.getAllByRole('switch')[0]);
     fireEvent.change(screen.getAllByDisplayValue('Degraded')[0], {

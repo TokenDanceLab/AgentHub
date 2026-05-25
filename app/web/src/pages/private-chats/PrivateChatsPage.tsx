@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { mockThreads, mockMessages, MockEventStream, playMessageStream } from '@shared/index';
+import { mockThreads, mockMessages } from '@shared/index';
+import { useHubSession } from '../../hooks/useHubSession';
 
 type Accent = 'blue' | 'cyan' | 'purple';
 
@@ -901,6 +902,7 @@ function Icon({ name }: { name: string }) {
 
 export function PrivateChatsPageInteractive() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const { hasSession: hasHubSession } = useHubSession();
   const [activeChatId, setActiveChatId] = useState(conversations[0]?.id ?? '');
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [keyOnly, setKeyOnly] = useState(false);
@@ -915,10 +917,12 @@ export function PrivateChatsPageInteractive() {
   const { t } = useTranslation('privateChats');
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
+  const availableConversations = hasHubSession ? conversations : [];
+  const isChatLocked = true;
 
   const conversationSnapshots = useMemo<ConversationSnapshot[]>(
     () =>
-      conversations.map((conversation) => {
+      availableConversations.map((conversation) => {
         const allMessages = [
           ...conversation.messages,
           ...(localMessages[conversation.id] ?? []),
@@ -933,7 +937,7 @@ export function PrivateChatsPageInteractive() {
           currentUnread: unreadByChat[conversation.id] ?? 0,
         };
       }),
-    [localMessages, unreadByChat],
+    [availableConversations, localMessages, unreadByChat],
   );
 
   const activeConversation = useMemo(
@@ -987,49 +991,6 @@ export function PrivateChatsPageInteractive() {
   );
 
   const hasComposerContent = draft.trim().length > 0 || selectedAttachments.length > 0;
-
-  // Mock message stream - simulates local preview responses.
-  useEffect(() => {
-    const stream = new MockEventStream();
-    const activeConv = conversations.find((c) => c.id === activeChatId);
-    if (!activeConv) return;
-    const unsub = stream.onType('message.delta', (event) => {
-      if (event.type === 'message.delta') {
-        const delta = String(event.payload.delta ?? '');
-        const msgId = String(event.payload.messageId ?? '');
-        setLocalMessages((prev) => {
-          const existing = prev[msgId] ?? [];
-          const last = existing[existing.length - 1];
-          if (last && last.isDraft) {
-            return {
-              ...prev,
-              [msgId]: [
-                ...existing.slice(0, -1),
-                { ...last, body: last.body + delta },
-              ],
-            };
-          }
-          const draftMsg: Message = {
-            id: msgId,
-            author: 'Agent',
-            role: 'Agent',
-            time: formatClock(),
-            side: 'left',
-            accent: activeConv.accent,
-            body: delta,
-            isDraft: true,
-          };
-          return { ...prev, [msgId]: [...existing, draftMsg] };
-        });
-      }
-    });
-    playMessageStream(stream, {
-      messageId: `stream-${activeChatId}`,
-      threadId: activeChatId,
-      chunkDelayMs: 80,
-    });
-    return () => { stream.destroy(); unsub(); };
-  }, [activeChatId]);
 
   useEffect(() => {
     if (!notice) {
@@ -1231,6 +1192,11 @@ export function PrivateChatsPageInteractive() {
   const sendDraft = () => {
     const text = draft.trim();
 
+    if (isChatLocked) {
+      showNotice(hasHubSession ? t('notice.readOnly') : t('notice.loginRequired'));
+      return;
+    }
+
     if (!hasComposerContent) {
       showNotice(t('notice.emptyMessage'));
       return;
@@ -1335,9 +1301,9 @@ export function PrivateChatsPageInteractive() {
               <Avatar initials={activeConversation.initials} accent={activeConversation.accent} />
               <div className="pc-title">
                 <h2>{activeConversation.name}</h2>
-                <p>{activeConversation.role} - {t('chat.localPreview')}</p>
+                <p>{activeConversation.role} - {hasHubSession ? t('chat.readOnly') : t('chat.loginRequired')}</p>
               </div>
-              <span className="pc-status">{t('status.localMock')}</span>
+              <span className="pc-status">{hasHubSession ? t('status.readOnly') : t('status.locked')}</span>
             </div>
 
             <div className="pc-actions">
@@ -1372,7 +1338,12 @@ export function PrivateChatsPageInteractive() {
           </header>
 
           <section className="pc-messages" aria-label={t('chat.messagesArea')}>
-            {messages.length > 0 ? (
+            {!hasHubSession ? (
+              <div className="pc-empty">
+                <strong>{t('locked.title')}</strong>
+                <p>{t('locked.description')}</p>
+              </div>
+            ) : messages.length > 0 ? (
               messages.map((message) => {
                 const isKeyed = keyedMessages.includes(message.id);
 
@@ -1512,17 +1483,18 @@ export function PrivateChatsPageInteractive() {
                 <button
                   className={`pc-tool-button ${attachmentsOpen ? 'is-active' : ''}`}
                   onClick={toggleAttachmentPanel}
+                  disabled={isChatLocked}
                   type="button"
                   aria-label={t('composer.attach')}
                 >
                   <Icon name="add" />
                 </button>
-                <button className="pc-tool-button" onClick={insertCodeSnippet} type="button" aria-label={t('composer.insertCode')}>
+                <button className="pc-tool-button" disabled={isChatLocked} onClick={insertCodeSnippet} type="button" aria-label={t('composer.insertCode')}>
                   <Icon name="code" />
                 </button>
                 <button
                   className="pc-tool-button"
-                  disabled={activeConversation.allMessages.length === 0}
+                  disabled={isChatLocked || activeConversation.allMessages.length === 0}
                   onClick={quoteLatestMessage}
                   type="button"
                   aria-label={t('composer.quote')}
@@ -1533,9 +1505,10 @@ export function PrivateChatsPageInteractive() {
 
               <textarea
                 aria-label={t('composer.messageLabel', { name: activeConversation.name })}
+                disabled={isChatLocked}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleComposerKeyDown}
-                placeholder={t('composer.placeholder')}
+                placeholder={hasHubSession ? t('composer.readOnlyPlaceholder') : t('composer.lockedPlaceholder')}
                 value={draft}
               />
 
@@ -1548,9 +1521,9 @@ export function PrivateChatsPageInteractive() {
                 >
                   <Icon name="mic" />
                 </button>
-                <button className="pc-send-button" disabled={!hasComposerContent} onClick={sendDraft} type="button">
+                <button className="pc-send-button" disabled={isChatLocked || !hasComposerContent} onClick={sendDraft} type="button">
                   <Icon name="send" />
-                  {t('composer.send')}
+                  {hasHubSession ? t('composer.readOnlySend') : t('composer.lockedSend')}
                 </button>
               </div>
             </div>
