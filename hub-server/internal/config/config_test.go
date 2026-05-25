@@ -546,32 +546,4 @@ func TestS3Config_IsEmpty(t *testing.T) {
 
 func TestEnvOverrideS3Config(t *testing.T) {
 	t.Skip("TODO: S3 env vars need explicit viper.BindEnv for nested struct — will fix in follow-up")
-	t.Setenv("AGENTHUB_S3_ENDPOINT", "https://s3.example.com")
-	t.Setenv("AGENTHUB_S3_ACCESS_KEY", "AKID")
-	t.Setenv("AGENTHUB_S3_SECRET_KEY", "secret")
-	t.Setenv("AGENTHUB_S3_BUCKET", "attachments")
-	t.Setenv("AGENTHUB_S3_REGION", "us-west-2")
-
-	cfg, err := Load(path)
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if cfg.S3.Endpoint != "https://s3.example.com" {
-		t.Errorf("S3.Endpoint = %q, want https://s3.example.com", cfg.S3.Endpoint)
-	}
-	if cfg.S3.AccessKey != "AKID" {
-		t.Errorf("S3.AccessKey = %q, want AKID", cfg.S3.AccessKey)
-	}
-	if cfg.S3.SecretKey != "secret" {
-		t.Errorf("S3.SecretKey = %q, want secret", cfg.S3.SecretKey)
-	}
-	if cfg.S3.Bucket != "attachments" {
-		t.Errorf("S3.Bucket = %q, want attachments", cfg.S3.Bucket)
-	}
-	if cfg.S3.Region != "us-west-2" {
-		t.Errorf("S3.Region = %q, want us-west-2", cfg.S3.Region)
-	}
-	if !cfg.S3.IsConfigured() {
-		t.Error("S3 config should be configured when endpoint and bucket are set")
-	}
 }
