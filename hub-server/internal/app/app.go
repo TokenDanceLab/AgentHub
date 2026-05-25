@@ -131,7 +131,21 @@ func (a *App) Run(ctx context.Context) error {
 	// Service layer
 	a.AuthService = service.NewAuthService(a.DB, a.Config.JWT, a.CacheClient)
 	a.NotificationService = service.NewNotificationService(a.DB, a.mgr)
-	a.AttachmentService = service.NewAttachmentService(a.DB, a.Config.Upload)
+	// Attachment storage: S3 when configured, otherwise local filesystem.
+	var attachmentStorage service.ObjectStorage
+	if a.Config.S3.IsConfigured() {
+		s3Store, err := service.NewS3StorageFromConfig(ctx, a.Config.S3)
+		if err != nil {
+			slog.Error("failed to init S3 storage, falling back to local", "error", err)
+			attachmentStorage = service.NewLocalStorage()
+		} else {
+			attachmentStorage = s3Store
+			slog.Info("S3 attachment storage configured", "bucket", a.Config.S3.Bucket, "endpoint", a.Config.S3.Endpoint)
+		}
+	} else {
+		attachmentStorage = service.NewLocalStorage()
+	}
+	a.AttachmentService = service.NewAttachmentService(a.DB, a.Config.Upload, attachmentStorage)
 	a.ContactService = service.NewContactService(a.DB, a.bus, a.CacheClient)
 	a.SessionService = service.NewSessionService(a.DB, a.CacheClient)
 	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)
