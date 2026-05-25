@@ -651,12 +651,15 @@ export function useChatMessages(online: boolean): ChatState {
       } else if (event.type === 'run.finished') {
         useRunStore.getState().setRunState(RunState.COMPLETED);
         queryClient.invalidateQueries({ queryKey: ['runs'] });
+        queryClient.invalidateQueries({ queryKey: ['threads'] });
       } else if (event.type === 'run.failed') {
         useRunStore.getState().setRunState(RunState.FAILED);
         queryClient.invalidateQueries({ queryKey: ['runs'] });
+        queryClient.invalidateQueries({ queryKey: ['threads'] });
       } else if (event.type === 'run.cancelled') {
         useRunStore.getState().setRunState(RunState.CANCELLED);
         queryClient.invalidateQueries({ queryKey: ['runs'] });
+        queryClient.invalidateQueries({ queryKey: ['threads'] });
       }
 
       dispatch({ type: 'EVENT_RECEIVED', event });

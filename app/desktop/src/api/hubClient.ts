@@ -79,10 +79,13 @@ export interface Contact {
 // ── Sessions ─────────────────────────────────────
 
 export interface Session {
-  id: string;
+  id?: string;
+  session_id?: string;
   type: string;
   name?: string;
-  owner_user_id: string;
+  owner_user_id?: string;
+  last_message_at?: string;
+  member_count?: number;
   last_message?: Record<string, unknown>;
   members?: SessionMember[];
   created_at?: string;
@@ -206,6 +209,17 @@ export class HubError extends Error {
 
 // ── Client factory ────────────────────────────────
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function unwrapHubResponse<T>(body: unknown): T {
+  if (isRecord(body) && 'code' in body && ('data' in body || 'message' in body)) {
+    return body.data as T;
+  }
+  return body as T;
+}
+
 export interface HubClientOptions {
   baseUrl?: string;
   /** Returns the current JWT token (or null if not authenticated). */
@@ -234,6 +248,12 @@ export function createHubClient(opts: HubClientOptions = {}) {
             res.status,
           );
         }
+        if (body?.message) {
+          throw new AppError(
+            { error: { code: body.code || 'hub_error', message: body.message } },
+            res.status,
+          );
+        }
       } catch (e) {
         if (e instanceof AppError) throw e;
       }
@@ -247,7 +267,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     }
     // 204 No Content for void endpoints
     if (res.status === 204) return undefined as T;
-    return res.json();
+    return unwrapHubResponse<T>(await res.json());
   }
 
   // ── Helpers ────────────────────────────────────

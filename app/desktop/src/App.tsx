@@ -30,7 +30,11 @@ import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
 import { useHubStore } from '@/stores/hubStore';
-import { useAuth } from '@/hooks/useAuth';
+import { getAccessToken, useAuth } from '@/hooks/useAuth';
+import { createHubClient, type HubClient } from '@/api/hubClient';
+import type { HubWSHandle } from '@/api/hubWS';
+import { useHubEventStream } from '@/hooks/useHubEventStream';
+import { useHubIntegration } from '@/hooks/useHubIntegration';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
@@ -133,6 +137,28 @@ function ShellIconButton({
   );
 }
 
+function HubTaskBridge({ hubWS, hubClient }: { hubWS: HubWSHandle; hubClient: HubClient }) {
+  useHubIntegration({ hubWS, hubClient });
+  return null;
+}
+
+function HubRealtimeBridge({
+  hubClient,
+  onHubWSChange,
+}: {
+  hubClient: HubClient;
+  onHubWSChange: (hubWS: HubWSHandle | null) => void;
+}) {
+  const { hubWS } = useHubEventStream(getAccessToken);
+
+  useEffect(() => {
+    onHubWSChange(hubWS);
+    return () => onHubWSChange(null);
+  }, [hubWS, onHubWSChange]);
+
+  return hubWS ? <HubTaskBridge hubWS={hubWS} hubClient={hubClient} /> : null;
+}
+
 export default function App() {
   const { online, health } = useHealth();
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online);
@@ -144,6 +170,7 @@ export default function App() {
 
   const { data: threadData } = useThreads();
   const threads = threadData?.items ?? [];
+  const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
 
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
@@ -188,6 +215,7 @@ export default function App() {
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [hubWS, setHubWS] = useState<HubWSHandle | null>(null);
 
   // Mobile/tablet overlays
   const [navPanelOpen, setNavPanelOpen] = useState(false);
@@ -232,6 +260,7 @@ export default function App() {
   }, [threads, online, addToast, t]);
 
   const selectedThread = threads.find((th) => th.threadId === selectedThreadId);
+  const activeThreadId = selectedThread?.threadId ?? threads[0]?.threadId;
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const displayedRun = currentRun ?? optimisticRun;
   const runIsActive = isRunActiveStatus(displayedRun?.status);
@@ -304,7 +333,7 @@ export default function App() {
         ...useModelSettingsStore.getState().resolveRunRequestOptions(opts),
       };
       if (agentId) req.agentId = agentId;
-      if (selectedThread) req.threadId = selectedThread.threadId;
+      if (activeThreadId) req.threadId = activeThreadId;
       setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
       setRightPanelOpen(true);
       const started = await startRun(req);
@@ -326,7 +355,7 @@ export default function App() {
     } finally {
       setRunStartPending(false);
     }
-  }, [addToast, runIsActive, runStartPending, selectedThread, t]);
+  }, [activeThreadId, addToast, runIsActive, runStartPending, t]);
 
   const handleCancel = useCallback(async () => {
     const runId = currentRun?.runId ?? (optimisticRun?.runId.startsWith('starting-') ? undefined : optimisticRun?.runId);
@@ -486,6 +515,9 @@ export default function App() {
   return (
     <ErrorBoundary>
     <div className={styles.root}>
+      {hubAuthenticated && (
+        <HubRealtimeBridge hubClient={hubClient} onHubWSChange={setHubWS} />
+      )}
       {/* Top status bar — drag region + window controls */}
       <div className={styles.topBar} data-tauri-drag-region onDoubleClick={handleTopBarDoubleClick}>
         <div className={styles.topBarLeft}>
@@ -759,7 +791,11 @@ export default function App() {
             {/* Chat area */}
             <div className={styles.chatArea}>
               {viewMode === 'im' ? (
-                <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
+                <ErrorBoundary>
+                  <Suspense fallback={null}>
+                    <Slot name="im-view" hubClient={hubClient} hubWS={hubWS} />
+                  </Suspense>
+                </ErrorBoundary>
               ) : (
                 <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
               )}
@@ -768,7 +804,7 @@ export default function App() {
             {/* Input area */}
             {viewMode === 'agent' && (
               <div className={styles.inputArea}>
-                <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={selectedThreadId ?? undefined} />
+                <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={activeThreadId} />
               </div>
             )}
           </div>
