@@ -975,7 +975,23 @@ pnpm typecheck                                         # 零错误
 
 ---
 
-### 7.9 修复策略
+### 7.9 B9: S3 对象存储接入（1-2d，🟢 中）
+
+**目标**：附件存储支持 S3 兼容对象存储（中国科技云 / hk1 自部署 MinIO）。
+
+| 子任务 | 文件 | 方案 |
+|--------|------|------|
+| S3 config | `hub-server/internal/config/config.go` | 新增 `S3Config{Endpoint, AccessKey, SecretKey, Bucket, Region, UseSSL}` |
+| Storage 分层 | `hub-server/internal/service/attachment.go` | `Upload()` 分流：`Upload.Dir` 本地 vs S3 `PutObject` |
+| go.mod | `hub-server/go.mod` | 加 `github.com/aws/aws-sdk-go-v2/service/s3` |
+| 部署配置 | `hub-server/deployments/.env.production.example` | 加 `S3_ENDPOINT`、`S3_BUCKET` 等环境变量 |
+| 回退兼容 | — | 无 S3 配置时回退本地 `Upload.Dir`，不破坏现有部署 |
+
+**验收**：`S3_ENDPOINT` 未设置时行为不变，设置后附件写入 S3。
+
+---
+
+### 7.10 修复策略
 
 1. **按批次顺序推进**：B1 → B2 → ... → B7，不跨批次跳跃
 2. **每批次一个 PR**：10 个左右 Issue → 一个 PR，方便 review
