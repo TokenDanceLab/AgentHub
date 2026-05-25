@@ -251,6 +251,14 @@ TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产�
 | 兼容 bearer 路径 | `hub-server/internal/middleware/auth.go` 可验证 TokenDance ID RS256/JWKS bearer token，但验证结果只标记为 `tokendance_bearer`，不能替代 Hub session，也不能满足 Edge `desktop` 设备门禁 |
 | 本地执行 | Local Edge + Desktop 执行不依赖 Hub 登录；需要云端 IM、同步、远控或中继时才需要 Hub session |
 
+OIDC 结构检查：
+
+```powershell
+.\scripts\verify-oidc-readiness.ps1
+```
+
+该检查只证明公开仓库里的 Hub OIDC 端点、示例配置、Desktop/Web Hub session 存储策略和根治理矩阵对齐；它不连接生产 TokenDance ID，不需要真实 `client_secret`，也不替代部署态 login/callback/logout/reconnect 证据。
+
 <br>
 
 ## 参考项目
