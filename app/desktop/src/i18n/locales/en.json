@@ -232,6 +232,7 @@
   "settings.status.snapshot": "Real snapshot",
   "settings.status.localSource": "Local source",
   "settings.status.loginLocked": "Login locked",
+  "settings.status.error": "Error",
   "settings.status.interfaceGap": "Interface gap",
   "settings.online": "Online",
   "settings.offline": "Offline",
