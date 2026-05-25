@@ -32,6 +32,12 @@ func (h *DeviceHandler) Register(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
+	deviceID, ok := normalizeUUID(req.DeviceID)
+	if !ok {
+		FailWithMessage(c, errcode.ErrBadRequest, "device_id must be a UUID")
+		return
+	}
+	req.DeviceID = deviceID
 
 	userID := c.GetString("user_id")
 	deviceType := c.GetString("device_type")

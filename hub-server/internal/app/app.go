@@ -461,28 +461,16 @@ func (a *App) startWebSocketCleanup(ctx context.Context) {
 
 // startAdminServer starts the admin HTTP server with pprof and /metrics endpoints.
 func (a *App) startAdminServer() {
-	metrics.Register()
-
 	adminPort := a.Config.Server.AdminPort
-	if adminPort == 0 {
-		adminPort = 6060
-	}
-	adminMux := http.NewServeMux()
-	adminMux.HandleFunc("/debug/pprof/", pprof.Index)
-	adminMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	adminMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	adminMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	adminMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	adminMux.Handle("/metrics", promhttp.Handler())
 	pprofUser := os.Getenv("AGENTHUB_PPROF_USER")
 	pprofPass := os.Getenv("AGENTHUB_PPROF_PASS")
 	if pprofUser == "" || pprofPass == "" {
 		slog.Error("admin server not started: AGENTHUB_PPROF_USER and AGENTHUB_PPROF_PASS must both be set")
 		return
 	}
-	adminHandler := pprofBasicAuth(adminMux, pprofUser, pprofPass)
+	adminHandler := pprofBasicAuth(newAdminMux(), pprofUser, pprofPass)
 	a.AdminServer = &http.Server{
-		Addr:              fmt.Sprintf("127.0.0.1:%d", adminPort),
+		Addr:              adminListenAddr(adminPort),
 		Handler:           adminHandler,
 		ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
 		ReadTimeout:       config.DefaultServerReadTimeout,
@@ -490,7 +478,7 @@ func (a *App) startAdminServer() {
 		IdleTimeout:       config.DefaultServerIdleTimeout,
 	}
 	go func() {
-		slog.Info("admin server starting", "port", adminPort)
+		slog.Info("admin server starting", "addr", a.AdminServer.Addr)
 		if err := a.AdminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("admin server failed", "error", err)
 		}
@@ -564,9 +552,20 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 	if err != nil || len(tasks) == 0 {
 		return
 	}
+	conn := a.mgr.FindByConnID(connID)
+	edgeDeviceID := ""
+	if conn != nil {
+		edgeDeviceID = conn.DeviceID
+	}
 	for _, taskJSON := range tasks {
 		var payload json.RawMessage
 		if json.Unmarshal([]byte(taskJSON), &payload) == nil {
+			var meta struct {
+				TaskID string `json:"task_id"`
+			}
+			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
+				_ = repository.UpdatePendingTaskDispatched(a.DB, meta.TaskID, edgeDeviceID)
+			}
 			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
 		}
 	}
@@ -607,6 +606,26 @@ func (a *App) broadcastOnlineStatus(ctx context.Context, userID string, online b
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+func newAdminMux() http.Handler {
+	metrics.Register()
+
+	adminMux := http.NewServeMux()
+	adminMux.HandleFunc("/debug/pprof/", pprof.Index)
+	adminMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	adminMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	adminMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	adminMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	adminMux.Handle("/metrics", promhttp.Handler())
+	return adminMux
+}
+
+func adminListenAddr(adminPort int) string {
+	if adminPort == 0 {
+		adminPort = 6060
+	}
+	return fmt.Sprintf("127.0.0.1:%d", adminPort)
+}
 
 func pprofBasicAuth(next http.Handler, user, pass string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

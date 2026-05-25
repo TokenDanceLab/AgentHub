@@ -205,6 +205,12 @@ func (m *Manager) PushToSession(sessionID string, frame Frame) {
 	}
 }
 
+func (m *Manager) FindByConnID(connID string) *Conn {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.conns[connID]
+}
+
 func (m *Manager) FindByUserDevice(userID, deviceType string) *Conn {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

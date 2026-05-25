@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -50,11 +51,42 @@ func (h *PublicHandler) Stats(c *gin.Context) {
 	// Total messages
 	h.db.Model(&model.Message{}).Count(&stats.TotalMessages)
 
-	// Uptime
-	stats.Uptime = time.Since(h.startTime).Truncate(time.Second).String()
+	stats.TotalUsers = publicCountBucket(stats.TotalUsers)
+	stats.TotalAgents = publicCountBucket(stats.TotalAgents)
+	stats.OnlineAgents = publicCountBucket(stats.OnlineAgents)
+	stats.TotalMessages = publicCountBucket(stats.TotalMessages)
+	stats.Uptime = publicUptimeBucket(time.Since(h.startTime))
 
 	c.JSON(200, gin.H{
 		"status": "ok",
 		"data":   stats,
 	})
+}
+
+func publicCountBucket(count int64) int64 {
+	switch {
+	case count <= 0:
+		return 0
+	case count < 10:
+		return 0
+	case count < 100:
+		return count / 10 * 10
+	case count < 1000:
+		return count / 100 * 100
+	default:
+		return count / 1000 * 1000
+	}
+}
+
+func publicUptimeBucket(d time.Duration) string {
+	switch {
+	case d < time.Hour:
+		return "<1h"
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh+", int(d.Hours()))
+	case d < 30*24*time.Hour:
+		return fmt.Sprintf("%dd+", int(d.Hours()/24))
+	default:
+		return "30d+"
+	}
 }

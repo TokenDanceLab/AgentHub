@@ -18,10 +18,10 @@ import (
 
 // mockEdgeAgentService implements handler.AgentService for edge callback tests.
 type mockEdgeAgentService struct {
-	handleTaskAckFn    func(ctx context.Context, taskID, edgeRunID string) error
-	handleTaskStreamFn func(ctx context.Context, taskID, content string) error
-	handleTaskDoneFn   func(ctx context.Context, taskID, finalContent string) error
-	handleTaskFailFn   func(ctx context.Context, taskID, errMsg string) error
+	handleTaskAckFn    func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
+	handleTaskStreamFn func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error
+	handleTaskDoneFn   func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
+	handleTaskFailFn   func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
 
 	addAgentFn    func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
 	triggerTaskFn func(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error)
@@ -37,17 +37,17 @@ func (m *mockEdgeAgentService) TriggerAgentTask(ctx context.Context, userID, tri
 func (m *mockEdgeAgentService) CancelTask(ctx context.Context, userID, taskID string) error {
 	return m.cancelTaskFn(ctx, userID, taskID)
 }
-func (m *mockEdgeAgentService) HandleTaskAck(ctx context.Context, taskID, edgeRunID string) error {
-	return m.handleTaskAckFn(ctx, taskID, edgeRunID)
+func (m *mockEdgeAgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
+	return m.handleTaskAckFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID)
 }
-func (m *mockEdgeAgentService) HandleTaskStream(ctx context.Context, taskID, content string) error {
-	return m.handleTaskStreamFn(ctx, taskID, content)
+func (m *mockEdgeAgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
+	return m.handleTaskStreamFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, content)
 }
-func (m *mockEdgeAgentService) HandleTaskDone(ctx context.Context, taskID, finalContent string) error {
-	return m.handleTaskDoneFn(ctx, taskID, finalContent)
+func (m *mockEdgeAgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
+	return m.handleTaskDoneFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent)
 }
-func (m *mockEdgeAgentService) HandleTaskFail(ctx context.Context, taskID, errMsg string) error {
-	return m.handleTaskFailFn(ctx, taskID, errMsg)
+func (m *mockEdgeAgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {
+	return m.handleTaskFailFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg)
 }
 
 // mockEdgeDeviceService implements handler.DeviceService.
@@ -111,8 +111,9 @@ func TestEdgeDeviceRegister(t *testing.T) {
 	}
 	h := handler.NewDeviceHandler(svc)
 
+	const testDeviceID = "33333333-3333-4333-8333-333333333301"
 	c, w := newEdgeGinCtx("POST", "/edge/devices/register", map[string]any{
-		"device_id":    "edge-device-001",
+		"device_id":    testDeviceID,
 		"app_version":  "2.0.0",
 		"capabilities": []string{"codex", "claude-code"},
 	}, "user_id", "user-1", "device_type", "desktop")
@@ -125,8 +126,8 @@ func TestEdgeDeviceRegister(t *testing.T) {
 	if resp.Code != "OK" {
 		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Message)
 	}
-	if captured.deviceID != "edge-device-001" {
-		t.Errorf("deviceID = %q, want edge-device-001", captured.deviceID)
+	if captured.deviceID != testDeviceID {
+		t.Errorf("deviceID = %q, want %s", captured.deviceID, testDeviceID)
 	}
 	if captured.userID != "user-1" {
 		t.Errorf("userID = %q, want user-1", captured.userID)
@@ -142,8 +143,8 @@ func TestEdgeDeviceRegister(t *testing.T) {
 	data, _ := json.Marshal(resp.Data)
 	var dev map[string]any
 	json.Unmarshal(data, &dev)
-	if dev["id"] != "edge-device-001" {
-		t.Errorf("response device id = %v, want edge-device-001", dev["id"])
+	if dev["id"] != testDeviceID {
+		t.Errorf("response device id = %v, want %s", dev["id"], testDeviceID)
 	}
 }
 
@@ -175,7 +176,7 @@ func TestEdgeDeviceRegisterInternalError(t *testing.T) {
 	h := handler.NewDeviceHandler(svc)
 
 	c, w := newEdgeGinCtx("POST", "/edge/devices/register", map[string]any{
-		"device_id": "edge-device-002",
+		"device_id": "33333333-3333-4333-8333-333333333302",
 	}, "user_id", "user-2", "device_type", "desktop")
 	h.Register(c)
 
@@ -187,10 +188,14 @@ func TestEdgeDeviceRegisterInternalError(t *testing.T) {
 // ── Agent Task Ack ─────────────────────────────────────────────────────────
 
 func TestEdgeAgentTaskAck(t *testing.T) {
+	var ackedEdgeUserID string
+	var ackedEdgeDeviceID string
 	var ackedTaskID string
 	var ackedRunID string
 	svc := &mockEdgeAgentService{
-		handleTaskAckFn: func(ctx context.Context, taskID, edgeRunID string) error {
+		handleTaskAckFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
+			ackedEdgeUserID = edgeUserID
+			ackedEdgeDeviceID = edgeDeviceID
 			ackedTaskID = taskID
 			ackedRunID = edgeRunID
 			return nil
@@ -201,7 +206,7 @@ func TestEdgeAgentTaskAck(t *testing.T) {
 	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-001/ack", map[string]string{
 		"run_id": "run-edge-001",
 	},
-		"user_id", "user-1", "device_type", "desktop")
+		"user_id", "user-1", "device_type", "desktop", "device_id", "device-1")
 	c.Params = gin.Params{{Key: "id", Value: "task-001"}}
 	h.TaskAck(c)
 
@@ -215,6 +220,12 @@ func TestEdgeAgentTaskAck(t *testing.T) {
 	if ackedTaskID != "task-001" {
 		t.Errorf("acked task ID = %q, want task-001", ackedTaskID)
 	}
+	if ackedEdgeUserID != "user-1" {
+		t.Errorf("acked edge user ID = %q, want user-1", ackedEdgeUserID)
+	}
+	if ackedEdgeDeviceID != "device-1" {
+		t.Errorf("acked edge device ID = %q, want device-1", ackedEdgeDeviceID)
+	}
 	if ackedRunID != "run-edge-001" {
 		t.Errorf("acked run ID = %q, want run-edge-001", ackedRunID)
 	}
@@ -222,7 +233,7 @@ func TestEdgeAgentTaskAck(t *testing.T) {
 
 func TestEdgeAgentTaskAckNotFound(t *testing.T) {
 	svc := &mockEdgeAgentService{
-		handleTaskAckFn: func(ctx context.Context, taskID, edgeRunID string) error {
+		handleTaskAckFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
 			return errcode.AgentTaskNotFound
 		},
 	}
@@ -246,12 +257,18 @@ func TestEdgeAgentTaskAckNotFound(t *testing.T) {
 
 func TestEdgeAgentTaskStream(t *testing.T) {
 	var captured struct {
-		taskID  string
-		content string
+		edgeUserID   string
+		edgeDeviceID string
+		taskID       string
+		runID        string
+		content      string
 	}
 	svc := &mockEdgeAgentService{
-		handleTaskStreamFn: func(ctx context.Context, taskID, content string) error {
+		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
+			captured.edgeUserID = edgeUserID
+			captured.edgeDeviceID = edgeDeviceID
 			captured.taskID = taskID
+			captured.runID = edgeRunID
 			captured.content = content
 			return nil
 		},
@@ -260,7 +277,8 @@ func TestEdgeAgentTaskStream(t *testing.T) {
 
 	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-002/stream", map[string]any{
 		"content": "Hello from Edge runner!",
-	}, "user_id", "user-1", "device_type", "desktop")
+		"run_id":  "run-edge-002",
+	}, "user_id", "user-1", "device_type", "desktop", "device_id", "device-1")
 	c.Params = gin.Params{{Key: "id", Value: "task-002"}}
 	h.TaskStream(c)
 
@@ -274,6 +292,15 @@ func TestEdgeAgentTaskStream(t *testing.T) {
 	if captured.taskID != "task-002" {
 		t.Errorf("taskID = %q, want task-002", captured.taskID)
 	}
+	if captured.edgeUserID != "user-1" {
+		t.Errorf("edgeUserID = %q, want user-1", captured.edgeUserID)
+	}
+	if captured.edgeDeviceID != "device-1" {
+		t.Errorf("edgeDeviceID = %q, want device-1", captured.edgeDeviceID)
+	}
+	if captured.runID != "run-edge-002" {
+		t.Errorf("runID = %q, want run-edge-002", captured.runID)
+	}
 	if captured.content != "Hello from Edge runner!" {
 		t.Errorf("content = %q, want 'Hello from Edge runner!'", captured.content)
 	}
@@ -282,7 +309,7 @@ func TestEdgeAgentTaskStream(t *testing.T) {
 func TestEdgeAgentTaskStreamMultipleChunks(t *testing.T) {
 	var chunks []string
 	svc := &mockEdgeAgentService{
-		handleTaskStreamFn: func(ctx context.Context, taskID, content string) error {
+		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
 			chunks = append(chunks, content)
 			return nil
 		},
@@ -307,7 +334,7 @@ func TestEdgeAgentTaskStreamMultipleChunks(t *testing.T) {
 
 func TestEdgeAgentTaskStreamBadRequest(t *testing.T) {
 	svc := &mockEdgeAgentService{
-		handleTaskStreamFn: func(ctx context.Context, taskID, content string) error {
+		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
 			return nil
 		},
 	}
@@ -326,7 +353,7 @@ func TestEdgeAgentTaskStreamBadRequest(t *testing.T) {
 
 func TestEdgeAgentTaskStreamNotFound(t *testing.T) {
 	svc := &mockEdgeAgentService{
-		handleTaskStreamFn: func(ctx context.Context, taskID, content string) error {
+		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
 			return errcode.AgentTaskNotFound
 		},
 	}
@@ -347,12 +374,18 @@ func TestEdgeAgentTaskStreamNotFound(t *testing.T) {
 
 func TestEdgeAgentTaskDone(t *testing.T) {
 	var captured struct {
+		edgeUserID   string
+		edgeDeviceID string
 		taskID       string
+		runID        string
 		finalContent string
 	}
 	svc := &mockEdgeAgentService{
-		handleTaskDoneFn: func(ctx context.Context, taskID, finalContent string) error {
+		handleTaskDoneFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
+			captured.edgeUserID = edgeUserID
+			captured.edgeDeviceID = edgeDeviceID
 			captured.taskID = taskID
+			captured.runID = edgeRunID
 			captured.finalContent = finalContent
 			return nil
 		},
@@ -361,7 +394,8 @@ func TestEdgeAgentTaskDone(t *testing.T) {
 
 	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-005/done", map[string]any{
 		"final_content": "Task completed successfully.",
-	}, "user_id", "user-1", "device_type", "desktop")
+		"run_id":        "run-edge-005",
+	}, "user_id", "user-1", "device_type", "desktop", "device_id", "device-1")
 	c.Params = gin.Params{{Key: "id", Value: "task-005"}}
 	h.TaskDone(c)
 
@@ -375,6 +409,15 @@ func TestEdgeAgentTaskDone(t *testing.T) {
 	if captured.taskID != "task-005" {
 		t.Errorf("taskID = %q, want task-005", captured.taskID)
 	}
+	if captured.edgeUserID != "user-1" {
+		t.Errorf("edgeUserID = %q, want user-1", captured.edgeUserID)
+	}
+	if captured.edgeDeviceID != "device-1" {
+		t.Errorf("edgeDeviceID = %q, want device-1", captured.edgeDeviceID)
+	}
+	if captured.runID != "run-edge-005" {
+		t.Errorf("runID = %q, want run-edge-005", captured.runID)
+	}
 	if captured.finalContent != "Task completed successfully." {
 		t.Errorf("finalContent = %q", captured.finalContent)
 	}
@@ -383,7 +426,7 @@ func TestEdgeAgentTaskDone(t *testing.T) {
 func TestEdgeAgentTaskDoneWithoutContent(t *testing.T) {
 	var called bool
 	svc := &mockEdgeAgentService{
-		handleTaskDoneFn: func(ctx context.Context, taskID, finalContent string) error {
+		handleTaskDoneFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
 			called = true
 			return nil
 		},
@@ -406,7 +449,7 @@ func TestEdgeAgentTaskDoneWithoutContent(t *testing.T) {
 
 func TestEdgeAgentTaskDoneAlreadyFinished(t *testing.T) {
 	svc := &mockEdgeAgentService{
-		handleTaskDoneFn: func(ctx context.Context, taskID, finalContent string) error {
+		handleTaskDoneFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
 			return errcode.ErrBadRequest // task already done/failed/cancelled
 		},
 	}
@@ -427,12 +470,18 @@ func TestEdgeAgentTaskDoneAlreadyFinished(t *testing.T) {
 
 func TestEdgeAgentTaskFail(t *testing.T) {
 	var captured struct {
-		taskID string
-		errMsg string
+		edgeUserID   string
+		edgeDeviceID string
+		taskID       string
+		runID        string
+		errMsg       string
 	}
 	svc := &mockEdgeAgentService{
-		handleTaskFailFn: func(ctx context.Context, taskID, errMsg string) error {
+		handleTaskFailFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {
+			captured.edgeUserID = edgeUserID
+			captured.edgeDeviceID = edgeDeviceID
 			captured.taskID = taskID
+			captured.runID = edgeRunID
 			captured.errMsg = errMsg
 			return nil
 		},
@@ -440,8 +489,9 @@ func TestEdgeAgentTaskFail(t *testing.T) {
 	h := handler.NewAgentHandler(svc)
 
 	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-008/fail", map[string]any{
-		"error": "runner process crashed: signal 11",
-	}, "user_id", "user-1", "device_type", "desktop")
+		"error":  "runner process crashed: signal 11",
+		"run_id": "run-edge-008",
+	}, "user_id", "user-1", "device_type", "desktop", "device_id", "device-1")
 	c.Params = gin.Params{{Key: "id", Value: "task-008"}}
 	h.TaskFail(c)
 
@@ -455,6 +505,15 @@ func TestEdgeAgentTaskFail(t *testing.T) {
 	if captured.taskID != "task-008" {
 		t.Errorf("taskID = %q, want task-008", captured.taskID)
 	}
+	if captured.edgeUserID != "user-1" {
+		t.Errorf("edgeUserID = %q, want user-1", captured.edgeUserID)
+	}
+	if captured.edgeDeviceID != "device-1" {
+		t.Errorf("edgeDeviceID = %q, want device-1", captured.edgeDeviceID)
+	}
+	if captured.runID != "run-edge-008" {
+		t.Errorf("runID = %q, want run-edge-008", captured.runID)
+	}
 	if captured.errMsg != "runner process crashed: signal 11" {
 		t.Errorf("errMsg = %q", captured.errMsg)
 	}
@@ -462,7 +521,7 @@ func TestEdgeAgentTaskFail(t *testing.T) {
 
 func TestEdgeAgentTaskFailBadRequest(t *testing.T) {
 	svc := &mockEdgeAgentService{
-		handleTaskFailFn: func(ctx context.Context, taskID, errMsg string) error {
+		handleTaskFailFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {
 			return nil
 		},
 	}
@@ -485,21 +544,30 @@ func TestEdgeAgentTaskFailBadRequest(t *testing.T) {
 // edge callback endpoints: ack -> stream(s) -> done.
 func TestEdgeTaskLifecycle(t *testing.T) {
 	svc := &mockEdgeAgentService{
-		handleTaskAckFn: func(ctx context.Context, taskID, edgeRunID string) error {
+		handleTaskAckFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
 			if taskID != "lifecycle-task" {
 				t.Errorf("ack: taskID = %q, want lifecycle-task", taskID)
 			}
-			return nil
-		},
-		handleTaskStreamFn: func(ctx context.Context, taskID, content string) error {
-			if taskID != "lifecycle-task" {
-				t.Errorf("stream: taskID = %q, want lifecycle-task", taskID)
+			if edgeUserID != "user-1" {
+				t.Errorf("ack: edgeUserID = %q, want user-1", edgeUserID)
 			}
 			return nil
 		},
-		handleTaskDoneFn: func(ctx context.Context, taskID, finalContent string) error {
+		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
+			if taskID != "lifecycle-task" {
+				t.Errorf("stream: taskID = %q, want lifecycle-task", taskID)
+			}
+			if edgeUserID != "user-1" {
+				t.Errorf("stream: edgeUserID = %q, want user-1", edgeUserID)
+			}
+			return nil
+		},
+		handleTaskDoneFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
 			if taskID != "lifecycle-task" {
 				t.Errorf("done: taskID = %q, want lifecycle-task", taskID)
+			}
+			if edgeUserID != "user-1" {
+				t.Errorf("done: edgeUserID = %q, want user-1", edgeUserID)
 			}
 			if finalContent != "final result" {
 				t.Errorf("done: finalContent = %q, want 'final result'", finalContent)
@@ -544,13 +612,18 @@ func TestEdgeTaskLifecycle(t *testing.T) {
 // TestEdgeTaskLifecycleFail simulates a task that fails after streaming.
 func TestEdgeTaskLifecycleFail(t *testing.T) {
 	svc := &mockEdgeAgentService{
-		handleTaskAckFn: func(ctx context.Context, taskID, edgeRunID string) error { return nil },
-		handleTaskStreamFn: func(ctx context.Context, taskID, content string) error {
+		handleTaskAckFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
 			return nil
 		},
-		handleTaskFailFn: func(ctx context.Context, taskID, errMsg string) error {
+		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
+			return nil
+		},
+		handleTaskFailFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {
 			if taskID != "fail-task" {
 				t.Errorf("fail: taskID = %q, want fail-task", taskID)
+			}
+			if edgeUserID != "user-1" {
+				t.Errorf("fail: edgeUserID = %q, want user-1", edgeUserID)
 			}
 			if errMsg != "OOM killed" {
 				t.Errorf("fail: errMsg = %q, want 'OOM killed'", errMsg)
