@@ -87,6 +87,11 @@
     0 24px 64px rgba(0, 0, 0, 0.26);
 }
 
+.dispatchPanel {
+  min-width: 0;
+  padding: 2px;
+}
+
 .modeRow {
   display: flex;
   gap: 6px;
@@ -126,6 +131,222 @@
 [data-theme='dark'] .modePillActive {
   background: rgba(255, 255, 255, 0.1);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.runtimeList {
+  display: grid;
+  gap: 7px;
+}
+
+.runtimeItem {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.runtimeItem:hover,
+.runtimeItemActive {
+  background: rgba(255, 255, 255, 0.48);
+}
+
+[data-theme='dark'] .runtimeItem:hover,
+[data-theme='dark'] .runtimeItemActive {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.runtimeItem:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.runtimeIcon,
+.profileIcon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.055);
+  color: var(--foreground);
+}
+
+[data-theme='dark'] .runtimeIcon,
+[data-theme='dark'] .profileIcon {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.runtimeText {
+  min-width: 0;
+}
+
+.runtimeText,
+.profileTitle div,
+.targetStatus div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.runtimeText strong,
+.profileTitle strong,
+.targetStatus strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtimeText em,
+.profileTitle em,
+.targetStatus em {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusBadge {
+  min-width: 56px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.055);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 760;
+  text-align: center;
+}
+
+.status_available {
+  background: rgba(52, 199, 89, 0.14);
+  color: #1f8f45;
+}
+
+.status_configuring {
+  background: rgba(255, 204, 0, 0.16);
+  color: #a26a00;
+}
+
+.status_unavailable {
+  background: rgba(255, 69, 58, 0.13);
+  color: #b42318;
+}
+
+[data-theme='dark'] .status_available {
+  color: #7ee29b;
+}
+
+[data-theme='dark'] .status_configuring {
+  color: #ffd66b;
+}
+
+[data-theme='dark'] .status_unavailable {
+  color: #ff9b95;
+}
+
+.emptyRuntime {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.profilePreview,
+.targetPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.profileTitle,
+.targetStatus {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+}
+
+.routeGrid,
+.targetGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.metric {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme='dark'] .metric {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.metric em {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.targetDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #8e8e93;
+  box-shadow: 0 0 0 5px rgba(142, 142, 147, 0.1);
+}
+
+.targetDotOnline {
+  background: #34c759;
+  box-shadow: 0 0 0 5px rgba(52, 199, 89, 0.14);
+}
+
+.targetDotOffline {
+  background: #ff453a;
+  box-shadow: 0 0 0 5px rgba(255, 69, 58, 0.13);
 }
 
 .commandBox {
@@ -259,6 +480,20 @@
   .modePill {
     justify-content: flex-start;
     padding: 0 12px;
+  }
+
+  .runtimeItem {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+
+  .statusBadge {
+    grid-column: 2;
+    width: fit-content;
+  }
+
+  .routeGrid,
+  .targetGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .commandBox {
