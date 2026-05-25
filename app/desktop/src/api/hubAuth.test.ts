@@ -135,7 +135,7 @@ describe('Hub OIDC API contract (mocked)', () => {
       code_challenge: 'test-challenge',
       code_challenge_method: 'S256',
       device_type: 'desktop',
-      device_id: 'test-device-id',
+      device_id: '00000000-0000-0000-0000-00000000a201',
       redirect_uri: 'http://127.0.0.1:49152/callback',
     };
 
@@ -180,7 +180,7 @@ describe('Hub OIDC API contract (mocked)', () => {
       state: 'server-state',
       code_verifier: 'verifier-456',
       device_type: 'desktop',
-      device_id: 'test-device-id',
+      device_id: '00000000-0000-0000-0000-00000000a202',
       redirect_uri: 'http://127.0.0.1:49152/callback',
     };
 
@@ -218,7 +218,7 @@ describe('Hub OIDC API contract (mocked)', () => {
         state: 'bad-state',
         code_verifier: 'verifier',
         device_type: 'desktop',
-        device_id: 'dev-1',
+        device_id: '00000000-0000-0000-0000-00000000a203',
       }),
     });
 
