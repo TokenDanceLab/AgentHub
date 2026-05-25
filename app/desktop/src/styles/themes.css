@@ -5,64 +5,70 @@
    Dark: One Dark Pro inspired — blue-gray layered system
    ═════════════════════════════════════════════════════════════════════ */
 
-/* ── Dark Theme : macOS Liquid Glass ──────────────────────────────────── */
+/* ── Dark Theme : Codex-style Linear Glass ───────────────────────────────
+   Source target: codex-theme-v1 / linear / dark
+   accent #5d68cc, surface #25252d, ink #e3e4e6.
+   Purple is not the default atmosphere; reserve it for explicit semantic
+   states such as skills or local product accents.
+   ───────────────────────────────────────────────────────────────────── */
 :root {
   /* Base layer — deep charcoal, not pure black */
-  --app-bg: #141418;
-  --background: rgba(28, 28, 34, 0.55);
-  --foreground: #E8E8ED;
+  --app-bg: #1f1f27;
+  --background: #1f1f27;
+  --foreground: #e3e4e6;
 
-  /* Cards — semi-transparent glass */
-  --card: rgba(45, 45, 55, 0.55);
-  --card-foreground: #E8E8ED;
-  --popover: rgba(50, 50, 60, 0.72);
-  --popover-foreground: #E8E8ED;
+  /* Cards — Codex-style translucent glass over the dark workspace */
+  --card: rgba(37, 37, 45, 0.82);
+  --card-foreground: #e3e4e6;
+  --popover: rgba(48, 48, 58, 0.88);
+  --popover-foreground: #e3e4e6;
 
-  /* Primary — slightly desaturated for dark mode */
-  --primary: #7C7CE0;
-  --primary-foreground: #FFFFFF;
-  --secondary: rgba(255, 255, 255, 0.06);
-  --secondary-foreground: #E8E8ED;
-  --muted: rgba(255, 255, 255, 0.04);
-  --muted-foreground: #8E8E93;
-  --accent: #7C7CE0;
-  --accent-foreground: #FFFFFF;
+  /* Primary — linear Codex blue, not the old purple atmosphere */
+  --primary: #5d68cc;
+  --primary-foreground: #f4f5ff;
+  --secondary: rgba(255, 255, 255, 0.055);
+  --secondary-foreground: #e3e4e6;
+  --muted: rgba(255, 255, 255, 0.045);
+  --muted-foreground: #a0a1aa;
+  --accent: #5d68cc;
+  --accent-foreground: #f4f5ff;
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
 
   /* Borders — faint white glow for glass edge */
-  --border: rgba(255, 255, 255, 0.06);
-  --input: rgba(255, 255, 255, 0.05);
-  --ring: rgba(124, 124, 224, 0.35);
+  --border: rgba(255, 255, 255, 0.075);
+  --input: rgba(255, 255, 255, 0.06);
+  --ring: rgba(93, 104, 204, 0.42);
 
   /* Status */
-  --success: #34D399;
+  --success: #69c967;
   --success-foreground: #0F172A;
   --warning: #FBBF24;
   --warning-foreground: #0F172A;
   --info: #60A5FA;
   --info-foreground: #0F172A;
 
-  --color-success: #34D399;
+  --color-success: #69c967;
   --color-danger: #EF4444;
   --color-border: rgba(255, 255, 255, 0.06);
 
-  --brand: #7C7CE0;
-  --authority-hub: #7C7CE0;
-  --authority-edge: #34D399;
+  --brand: #5d68cc;
+  --skill: #c2a1ff;
+  --authority-hub: #5d68cc;
+  --authority-edge: #69c967;
   --authority-hybrid: #FBBF24;
 
   --run-queued: rgba(255, 255, 255, 0.08);
-  --run-starting: #7C7CE0;
-  --run-running: #34D399;
-  --run-completed: #34D399;
+  --run-starting: #5d68cc;
+  --run-running: #69c967;
+  --run-completed: #69c967;
   --run-failed: #EF4444;
   --run-cancelled: rgba(255, 255, 255, 0.05);
 
-  --diff-added-bg: rgba(52, 211, 153, 0.08);
-  --diff-added-border: #34D399;
-  --diff-removed-bg: rgba(239, 68, 68, 0.08);
-  --diff-removed-border: #EF4444;
+  --diff-added-bg: rgba(105, 201, 103, 0.1);
+  --diff-added-border: #69c967;
+  --diff-removed-bg: rgba(255, 126, 120, 0.1);
+  --diff-removed-border: #ff7e78;
 
   --scrollbar-thumb: rgba(255, 255, 255, 0.1);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
@@ -72,16 +78,16 @@
   --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.45);
 
   /* Glass panels — layered depth */
-  --sidebar-bg: rgba(30, 30, 38, 0.72);
+  --sidebar-bg: rgba(31, 31, 39, 0.86);
 
-  --surface-base: rgba(28, 28, 34, 0.4);
-  --surface-raised: rgba(45, 45, 55, 0.5);
-  --surface-raised-hover: rgba(55, 55, 65, 0.6);
-  --surface-overlay: rgba(60, 60, 70, 0.7);
+  --surface-base: #1f1f27;
+  --surface-raised: rgba(37, 37, 45, 0.82);
+  --surface-raised-hover: rgba(55, 55, 66, 0.86);
+  --surface-overlay: rgba(60, 60, 72, 0.9);
   --hover-overlay: rgba(255, 255, 255, 0.04);
 
-  --text-weaker: #8E8E93;
-  --text-weakest: #636366;
+  --text-weaker: #a0a1aa;
+  --text-weakest: #6e7079;
 
   /* TokenDance cross-app aliases */
   --td-canvas: var(--app-bg);
@@ -99,23 +105,23 @@
 
   /* ── Chat surface tokens ────────────────────── */
   --chat-agent-bg: transparent;
-  --chat-user-bg: rgba(255, 255, 255, 0.04);
-  --chat-code-bg: rgba(15, 16, 22, 0.55);
-  --chat-thinking-bg: rgba(255, 255, 255, 0.015);
-  --chat-thinking-border: rgba(255, 255, 255, 0.04);
+  --chat-user-bg: rgba(255, 255, 255, 0.045);
+  --chat-code-bg: rgba(255, 255, 255, 0.055);
+  --chat-thinking-bg: rgba(255, 255, 255, 0.02);
+  --chat-thinking-border: rgba(255, 255, 255, 0.055);
 
   /* ── Floating input panel ───────────────────── */
-  --input-panel-bg: rgba(40, 40, 50, 0.35);
-  --input-panel-border: rgba(255, 255, 255, 0.07);
-  --input-panel-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
-  --input-ghost-btn: rgba(255, 255, 255, 0.04);
-  --input-ghost-btn-hover: rgba(255, 255, 255, 0.08);
+  --input-panel-bg: rgba(50, 50, 60, 0.78);
+  --input-panel-border: rgba(255, 255, 255, 0.09);
+  --input-panel-shadow: 0 -10px 34px rgba(0, 0, 0, 0.24);
+  --input-ghost-btn: rgba(255, 255, 255, 0.045);
+  --input-ghost-btn-hover: rgba(255, 255, 255, 0.075);
 
   --agent-card-bg: transparent;
   --agent-card-hover: rgba(255, 255, 255, 0.03);
   --agent-card-active: rgba(255, 255, 255, 0.06);
-  --agent-dot-online: #34D399;
-  --agent-dot-online-glow: 0 0 6px rgba(52, 211, 153, 0.3);
+  --agent-dot-online: #69c967;
+  --agent-dot-online-glow: 0 0 6px rgba(105, 201, 103, 0.3);
 }
 
 /* ── Light Theme — macOS matte gray ────────────────────────────────────── */

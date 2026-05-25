@@ -28,8 +28,8 @@ vi.mock('@/components/ModelDropdown', () => ({
       disabled={disabled}
       aria-label={ariaLabel}
       onClick={() => {
-        if (placeholder === 'prompt.model') onChange?.('claude-opus-4-7');
-        if (placeholder === 'prompt.reasoning') onChange?.('max');
+        if (ariaLabel === 'prompt.model') onChange?.('claude-opus-4-7');
+        if (ariaLabel === 'prompt.reasoning') onChange?.('max');
       }}
     >
       {placeholder}
@@ -410,9 +410,8 @@ describe('PromptInput', () => {
 
     const route = screen.getByLabelText('prompt.routePreview');
     expect(within(route).getByText('anthropic')).toBeInTheDocument();
-    expect(within(route).getByText('claude-sonnet-4-6')).toBeInTheDocument();
-    expect(within(route).getByText('high')).toBeInTheDocument();
-    expect(within(route).getByText('sonnet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'prompt.model' })).toHaveTextContent('claude-sonnet-4-6');
+    expect(screen.getByRole('button', { name: 'prompt.reasoning' })).toHaveTextContent('high');
   });
 
   it('sends the selected Codex profile alias when no model is manually selected', () => {
@@ -491,7 +490,7 @@ describe('PromptInput', () => {
 
     const route = screen.getByLabelText('prompt.routePreview');
     expect(within(route).getByText('openai')).toBeInTheDocument();
-    expect(within(route).getByText('gpt-5.5')).toBeInTheDocument();
-    expect(within(route).getByText('max')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'prompt.model' })).toHaveTextContent('gpt-5.5');
+    expect(screen.getByRole('button', { name: 'prompt.reasoning' })).toHaveTextContent('max');
   });
 });

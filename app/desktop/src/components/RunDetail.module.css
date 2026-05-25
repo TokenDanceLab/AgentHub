@@ -13,14 +13,18 @@
 
 .empty {
   padding: var(--space-lg);
-  color: #B0B0B5;
+  color: var(--text-weakest);
   font-size: 12px;
   text-align: center;
 }
 
 .section {
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(0,0,0,0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+[data-theme='light'] .section {
+  border-bottom-color: rgba(0, 0, 0, 0.04);
 }
 
 .tabContent {
@@ -30,6 +34,8 @@
   flex-direction: column;
   gap: 10px;
   padding: 8px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
   animation: tabFadeIn 0.2s ease-out;
 }
 
@@ -38,18 +44,19 @@
   to   { opacity: 1; }
 }
 
-/* ── Status ────────────────────────────────── */
+/* ── Status tags — transparent bg + bright text ─ */
 .status {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 5px;
+  border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
+  font-family: var(--font-mono);
 }
-.statusDone    { background: rgba(16,185,129,0.08); color: #059669; }
-.statusFailed  { background: rgba(239,68,68,0.08); color: #DC2626; }
-.statusRunning { background: rgba(99,102,241,0.08); color: #4F46E5; }
-.statusPending { background: rgba(0,0,0,0.04); color: #8E8E93; }
+.statusDone    { background: rgba(52, 211, 153, 0.12); color: #4ade80; }
+.statusFailed  { background: rgba(239, 68, 68, 0.12); color: var(--destructive); }
+.statusRunning { background: rgba(99, 102, 241, 0.12); color: var(--primary); }
+.statusPending { background: var(--muted); color: var(--muted-foreground); }
 
 .runId {
   margin-left: 6px;
@@ -58,22 +65,37 @@
   opacity: 0.4;
 }
 
-/* ── Output ────────────────────────────────── */
+/* ── Console output ─────────────────────────── */
 .output {
   margin: 0;
-  padding: 8px;
-  background: rgba(0,0,0,0.02);
-  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 2px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0 6px 6px 0;
   font-size: 11px;
   font-family: var(--font-mono);
-  max-height: 180px;
+  line-height: 1.6;
+  max-height: 200px;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
-  color: var(--foreground);
+  color: var(--muted-foreground);
 }
 
-[data-theme='light'] .output { background: #F1F3F5; }
+.outputWarning {
+  border-left-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.03);
+}
+
+.outputError {
+  border-left-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.03);
+}
+
+[data-theme='light'] .output {
+  background: var(--muted);
+  border-left-color: rgba(0, 0, 0, 0.08);
+}
 
 .emptyStack {
   display: flex;
