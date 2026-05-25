@@ -38,6 +38,8 @@ import { ToastContainer } from '@/components/Toast';
 import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
 import {
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Circle,
   Copy,
@@ -74,9 +76,8 @@ interface OptimisticRun {
 }
 
 const LEFT_SIDEBAR_MIN = 248;
-const LEFT_SIDEBAR_MAX = 520;
-const RIGHT_PANEL_MIN = 272;
-const RIGHT_PANEL_MAX = 560;
+const LEFT_SIDEBAR_MAX = 420;
+const RUN_CARD_MIN_WORKSPACE_WIDTH = 1180;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -164,25 +165,24 @@ export default function App() {
     leftSidebarCollapsed,
     rightPanelOpen,
     leftSidebarWidth,
-    rightPanelWidth,
     setLeftSidebarCollapsed,
     setRightPanelOpen,
     setLeftSidebarWidth,
-    setRightPanelWidth,
   } = useUIStore(
     useShallow((s) => ({
       leftSidebarCollapsed: s.leftSidebarCollapsed,
       rightPanelOpen: s.rightPanelOpen,
       leftSidebarWidth: s.sidebarWidth,
-      rightPanelWidth: s.rightPanelWidth,
       setLeftSidebarCollapsed: s.setLeftSidebarCollapsed,
       setRightPanelOpen: s.setRightPanelOpen,
       setLeftSidebarWidth: s.setSidebarWidth,
-      setRightPanelWidth: s.setRightPanelWidth,
     })),
   );
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
+  const [rightPanelMounted, setRightPanelMounted] = useState(rightPanelOpen);
+  const [workspaceWidth, setWorkspaceWidth] = useState(0);
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
 
   // Mobile/tablet overlays
   const [navPanelOpen, setNavPanelOpen] = useState(false);
@@ -220,9 +220,14 @@ export default function App() {
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const displayedRun = currentRun ?? optimisticRun;
   const runIsActive = isRunActiveStatus(displayedRun?.status);
+  const runCardConstrained = workspaceWidth > 0 && workspaceWidth < RUN_CARD_MIN_WORKSPACE_WIDTH;
+  const effectiveRightPanelOpen = rightPanelOpen && !runCardConstrained;
+  const showRunCardSpace = !!displayedRun && effectiveRightPanelOpen && !isMobile && !workspaceExpanded;
   const composerLocked = runStartPending || runIsActive;
   const allMessages = useMemo(() => {
-    const merged = [...userMessages, ...messages];
+    const merged = [...userMessages, ...messages].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    );
     if (!displayedRun) return merged;
 
     const hasVisibleAgentFeedback = messages.some(
@@ -256,16 +261,40 @@ export default function App() {
       },
     ];
   }, [displayedRun, messages, runIsActive, selectedAgent?.name, t, userMessages]);
+  const effectiveLeftSidebarWidth = clamp(leftSidebarWidth, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
   const shellStyle = {
-    '--left-sidebar-width': `${leftSidebarWidth}px`,
-    '--right-panel-width': `${rightPanelWidth}px`,
+    '--left-sidebar-width': `${effectiveLeftSidebarWidth}px`,
   } as CSSProperties;
 
   useEffect(() => {
     if (currentRun) setOptimisticRun(null);
   }, [currentRun]);
 
-  const handleSend = useCallback(async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string }) => {
+  useEffect(() => {
+    if (effectiveRightPanelOpen) {
+      setRightPanelMounted(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setRightPanelMounted(false), 220);
+    return () => window.clearTimeout(timer);
+  }, [effectiveRightPanelOpen]);
+
+  useEffect(() => {
+    const node = workspaceRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+
+    const updateWidth = () => setWorkspaceWidth(node.getBoundingClientRect().width);
+    updateWidth();
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setWorkspaceWidth(entry.contentRect.width);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const handleSend = useCallback(async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string; permissionMode?: string; workDir?: string }) => {
     if (runStartPending || runIsActive) {
       addToast({ type: 'info', message: t('error.activeRunExists') });
       return false;
@@ -287,6 +316,8 @@ export default function App() {
         prompt,
         ...useModelSettingsStore.getState().resolveRunRequestOptions(opts),
       };
+      if (opts?.permissionMode) req.permissionMode = opts.permissionMode;
+      if (opts?.workDir) req.workDir = opts.workDir;
       if (agentId) req.agentId = agentId;
       if (selectedThread) req.threadId = selectedThread.threadId;
       setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
@@ -345,26 +376,24 @@ export default function App() {
     event.preventDefault();
     const startX = event.clientX;
     const initialLeft = leftSidebarWidth;
-    const initialRight = rightPanelWidth;
 
     const handleMove = (moveEvent: PointerEvent) => {
       if (side === 'left') {
-        setLeftSidebarWidth(clamp(initialLeft + moveEvent.clientX - startX, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX));
-      } else {
-        setRightPanelWidth(clamp(initialRight + startX - moveEvent.clientX, RIGHT_PANEL_MIN, RIGHT_PANEL_MAX));
+        const nextLeft = clamp(initialLeft + moveEvent.clientX - startX, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
+        setLeftSidebarWidth(nextLeft);
       }
     };
 
     const handleUp = () => {
-      document.body.classList.remove(styles.resizing);
+      document.body.classList.remove(styles.resizing ?? '');
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
     };
 
-    document.body.classList.add(styles.resizing);
+    document.body.classList.add(styles.resizing ?? '');
     window.addEventListener('pointermove', handleMove);
     window.addEventListener('pointerup', handleUp, { once: true });
-  }, [leftSidebarWidth, rightPanelWidth]);
+  }, [leftSidebarWidth, setLeftSidebarWidth]);
 
   const handleResizeKeyDown = useCallback((side: 'left' | 'right') => (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const step = event.shiftKey ? 40 : 16;
@@ -377,20 +406,12 @@ export default function App() {
       if (event.key === 'End') nextWidth = LEFT_SIDEBAR_MAX;
       if (nextWidth != null) {
         event.preventDefault();
-        setLeftSidebarWidth(clamp(nextWidth, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX));
+        const clamped = clamp(nextWidth, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
+        setLeftSidebarWidth(clamped);
       }
       return;
     }
-
-    if (event.key === 'ArrowLeft') nextWidth = rightPanelWidth + step;
-    if (event.key === 'ArrowRight') nextWidth = rightPanelWidth - step;
-    if (event.key === 'Home') nextWidth = RIGHT_PANEL_MIN;
-    if (event.key === 'End') nextWidth = RIGHT_PANEL_MAX;
-    if (nextWidth != null) {
-      event.preventDefault();
-      setRightPanelWidth(clamp(nextWidth, RIGHT_PANEL_MIN, RIGHT_PANEL_MAX));
-    }
-  }, [leftSidebarWidth, rightPanelWidth, setLeftSidebarWidth, setRightPanelWidth]);
+  }, [leftSidebarWidth, setLeftSidebarWidth]);
 
   const handleDecidePermission = useCallback((requestId: string, decision: 'allow' | 'deny', reason?: string) => {
     decidePermission(requestId, decision, reason);
@@ -479,6 +500,28 @@ export default function App() {
       {/* Top status bar — drag region + window controls */}
       <div className={styles.topBar} data-tauri-drag-region onDoubleClick={handleTopBarDoubleClick}>
         <div className={styles.topBarLeft}>
+          {!isMobile && !workspaceExpanded && (
+            <ShellIconButton
+              className={styles.topBarSidebarBtn}
+              onClick={() => setLeftSidebarCollapsed(!leftSidebarCollapsed)}
+              label={leftSidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+              tooltipSide="bottom"
+              aria-expanded={!leftSidebarCollapsed}
+            >
+              {leftSidebarCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+            </ShellIconButton>
+          )}
+          <div className={styles.topBarNavCluster} aria-hidden="true">
+            <span className={styles.topBarNavBtn}><ChevronLeft size={14} /></span>
+            <span className={styles.topBarNavBtn}><ChevronRight size={14} /></span>
+          </div>
+          <nav className={styles.appMenu} aria-label={t('menu.title')}>
+            <button type="button">{t('menu.file')}</button>
+            <button type="button">{t('menu.edit')}</button>
+            <button type="button">{t('menu.view')}</button>
+            <button type="button">{t('menu.window')}</button>
+            <button type="button">{t('menu.help')}</button>
+          </nav>
           <span className={styles.statusBadge}>
             <span className={`${styles.statusBadgeDot} ${online ? styles.statusBadgeDotOnline : styles.statusBadgeDotOffline}`} />
             {online ? `Edge ${health?.version ?? 'v1'}` : t('status.offline')}
@@ -552,13 +595,11 @@ export default function App() {
           <div className={`${styles.overlayPanel} ${styles.overlayPanelLeft} ${navPanelOpen ? styles.overlayPanelLeftActive : ''}`}>
             <div className={styles.mobileNavPanel}>
               <div className={styles.sidebarSection}>
-                <div className={styles.sidebarSectionLabel}>{t('agent.title')}</div>
                 <div className={styles.sidebarScroll}>
                   <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
                 </div>
               </div>
               <div className={styles.sidebarSection}>
-                <div className={styles.sidebarSectionLabel}>{t('thread.title')}</div>
                 <div className={styles.sidebarScroll}>
                   <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
                 </div>
@@ -570,35 +611,6 @@ export default function App() {
 
       <div className={styles.body} style={shellStyle}>
         {/* Single sidebar — agents + threads grouped */}
-        {!isMobile && !workspaceExpanded && leftSidebarCollapsed && (
-          <div className={styles.leftRail}>
-            <ShellIconButton
-              className={styles.railBtn}
-              onClick={() => setLeftSidebarCollapsed(false)}
-              label={t('nav.expandSidebar')}
-              tooltipSide="right"
-              aria-expanded="false"
-            >
-              <PanelLeftOpen size={17} />
-            </ShellIconButton>
-            <ShellIconButton className={styles.railBtn} onClick={() => openSettings('general')} label={t('nav.settings')} tooltipSide="right">
-              <Settings size={17} />
-            </ShellIconButton>
-            <ShellIconButton
-              className={styles.railBtn}
-              onClick={() => useHubStore.getState().setShowAuthModal(true)}
-              label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
-              tooltipSide="right"
-              aria-pressed={hubAuthenticated}
-            >
-              {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={17} />}
-            </ShellIconButton>
-            <ShellIconButton className={styles.railBtn} onClick={toggleTheme} label={theme === 'dark' ? t('theme.light') : t('theme.dark')} tooltipSide="right" aria-pressed={theme === 'dark'}>
-              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-            </ShellIconButton>
-          </div>
-        )}
-
         {!isMobile && !workspaceExpanded && !leftSidebarCollapsed && (
           <>
           <div className={styles.sidebar}>
@@ -610,7 +622,6 @@ export default function App() {
 
             {/* Agents section */}
             <div className={styles.sidebarSection}>
-              <div className={styles.sidebarSectionLabel}>{t('agent.title')}</div>
               <div className={styles.sidebarScroll}>
                 <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
               </div>
@@ -618,26 +629,13 @@ export default function App() {
 
             {/* Threads section */}
             <div className={styles.sidebarSection}>
-              <div className={styles.sidebarSectionLabel}>{t('thread.title')}</div>
               <div className={styles.sidebarScroll}>
                 <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
-                {threads.length === 0 && (
-                  <div className={styles.sidebarEmpty}>{t('thread.emptyHint')}</div>
-                )}
               </div>
             </div>
 
             {/* Sidebar footer */}
             <div className={styles.sidebarFooter}>
-              <ShellIconButton
-                className={styles.navIconBtn}
-                onClick={() => setLeftSidebarCollapsed(true)}
-                label={t('nav.collapseSidebar')}
-                tooltipSide="top"
-                aria-expanded="true"
-              >
-                <PanelLeftClose size={16} />
-              </ShellIconButton>
               <ShellIconButton className={styles.navIconBtn} onClick={() => openSettings('general')} label={t('nav.settings')} tooltipSide="top">
                 <Settings size={16} />
               </ShellIconButton>
@@ -672,7 +670,10 @@ export default function App() {
 
         {/* Main zone */}
         <div className={`${styles.main} ${workspaceExpanded ? styles.mainExpanded : ''}`}>
-          <div className={styles.workspace}>
+          <div
+            ref={workspaceRef}
+            className={`${styles.workspace} ${showRunCardSpace ? styles.workspaceWithRunCard : ''}`}
+          >
             {/* Workspace header */}
             <div className={styles.workspaceHeader}>
               <div className={`${styles.workspaceHeaderDot} ${online ? styles.workspaceHeaderDotOnline : styles.workspaceHeaderDotOffline}`} />
@@ -712,15 +713,26 @@ export default function App() {
                 >
                   <Route size={15} />
                 </ShellIconButton>
-                {displayedRun && !rightPanelOpen && (
+                {displayedRun && !effectiveRightPanelOpen && (
                   <ShellIconButton
                     className={styles.workspaceHeaderBtn}
                     onClick={() => setRightPanelOpen(true)}
                     label={t('run.open')}
                     tooltipSide="bottom"
-                    aria-expanded="false"
+                    aria-expanded={effectiveRightPanelOpen}
                   >
                     <PanelRightOpen size={15} />
+                  </ShellIconButton>
+                )}
+                {displayedRun && effectiveRightPanelOpen && (
+                  <ShellIconButton
+                    className={styles.workspaceHeaderBtn}
+                    onClick={() => setRightPanelOpen(false)}
+                    label={t('run.close')}
+                    tooltipSide="bottom"
+                    aria-expanded={effectiveRightPanelOpen}
+                  >
+                    <PanelRightClose size={15} />
                   </ShellIconButton>
                 )}
                 <ShellIconButton
@@ -750,88 +762,33 @@ export default function App() {
                 <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId ?? undefined} onSelectAgent={handleSelectAgent} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={selectedThreadId ?? undefined} />
               </div>
             )}
+
+            {!isMobile && !workspaceExpanded && displayedRun && rightPanelMounted && (
+              <div
+                className={`${styles.rightPanel} ${effectiveRightPanelOpen ? styles.rightPanelOpen : styles.rightPanelClosing}`}
+                role="dialog"
+                aria-label={t('run.title')}
+                aria-hidden={!effectiveRightPanelOpen}
+              >
+                <div className={styles.rightPanelBody}>
+                  <ErrorBoundary>
+                    <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted-foreground)' }}><SkeletonLine width="60%" height="1em" /><SkeletonLine width="40%" height="1em" /></div>}>
+                      <Slot
+                        name="run-detail"
+                        run={displayedRun ? { runId: displayedRun.runId, projectId: '', threadId: selectedThread?.threadId ?? '', status: displayedRun.status } : null}
+                        outputText={displayedRun?.outputText ?? ''}
+                        toolCalls={displayedRun?.toolCalls ?? []}
+                        changedFiles={displayedRun?.changedFiles ?? []}
+                        onCancel={handleCancel}
+                        chatMessages={allMessages}
+                      />
+                    </Suspense>
+                  </ErrorBoundary>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {!isMobile && !workspaceExpanded && displayedRun && rightPanelOpen && (
-          <>
-          <div
-            className={styles.resizeHandle}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label={t('layout.resizeRight')}
-            aria-valuemin={RIGHT_PANEL_MIN}
-            aria-valuemax={RIGHT_PANEL_MAX}
-            aria-valuenow={rightPanelWidth}
-            tabIndex={0}
-            onPointerDown={handleStartResize('right')}
-            onKeyDown={handleResizeKeyDown('right')}
-          />
-          <div className={styles.rightPanel}>
-            <div className={styles.rightPanelHeader}>
-              <div className={styles.rightPanelSegmented}>
-                <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`} type="button" role="tab" aria-selected="true">{t('run.output')}</button>
-                <button className={styles.rightPanelTab} type="button" role="tab" aria-selected="false">{t('run.files')}</button>
-              </div>
-              <ShellIconButton
-                className={styles.rightPanelCollapseBtn}
-                onClick={() => setRightPanelOpen(false)}
-                label={t('run.close')}
-                tooltipSide="left"
-                aria-expanded="true"
-              >
-                <PanelRightClose size={15} />
-              </ShellIconButton>
-            </div>
-            <div className={styles.rightPanelBody}>
-              <ErrorBoundary>
-                <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted-foreground)' }}><SkeletonLine width="60%" height="1em" /><SkeletonLine width="40%" height="1em" /></div>}>
-                  <Slot
-                    name="run-detail"
-                    run={displayedRun ? { runId: displayedRun.runId, projectId: '', threadId: selectedThread?.threadId ?? '', status: displayedRun.status } : null}
-                    outputText={displayedRun?.outputText ?? ''}
-                    toolCalls={displayedRun?.toolCalls ?? []}
-                    changedFiles={displayedRun?.changedFiles ?? []}
-                    onCancel={handleCancel}
-                    chatMessages={allMessages}
-                  />
-                </Suspense>
-              </ErrorBoundary>
-            </div>
-          </div>
-          </>
-        )}
-
-        {!isMobile && !workspaceExpanded && displayedRun && !rightPanelOpen && (
-          <div className={styles.rightRail} aria-label={t('run.collapsedRail')}>
-            <ShellIconButton
-              className={styles.railBtn}
-              onClick={() => setRightPanelOpen(true)}
-              label={t('run.open')}
-              tooltipSide="left"
-              aria-expanded="false"
-            >
-              <PanelRightOpen size={17} />
-            </ShellIconButton>
-            <span className={`${styles.railStatusDot} ${runIsActive ? styles.railStatusDotActive : ''}`} />
-            <ShellIconButton
-              className={styles.railBtn}
-              onClick={() => openSettings('tasks')}
-              label={t('settings.tasks')}
-              tooltipSide="left"
-            >
-              <ClipboardList size={17} />
-            </ShellIconButton>
-            <ShellIconButton
-              className={styles.railBtn}
-              onClick={() => openSettings('agentScheduling')}
-              label={t('settings.agentScheduling')}
-              tooltipSide="left"
-            >
-              <Route size={17} />
-            </ShellIconButton>
-          </div>
-        )}
       </div>
       </>
       )}
