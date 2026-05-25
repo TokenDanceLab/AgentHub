@@ -109,6 +109,8 @@ docs/review/
 !.agents/skills/env-sandbox/**
 !.agents/skills/ui-screenshot/
 !.agents/skills/ui-screenshot/**
+!.agents/skills/dev-team/
+!.agents/skills/dev-team/**
 .cursor/
 .continue/
 
