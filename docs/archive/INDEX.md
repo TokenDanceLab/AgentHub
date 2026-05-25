@@ -10,9 +10,9 @@
 
 | 主题 | 权威文档 |
 |---|---|
-| 产品定位和验收范围 | `docs/product-requirements.md` |
-| 架构、组件职责、术语边界 | `docs/system-architecture.md` |
-| 实现阶段、API 规则、工程边界 | `docs/implementation-guide.md` |
+| 产品定位和验收范围 | `docs/architecture/product-requirements.md` |
+| 架构、组件职责、术语边界 | `docs/architecture/system-architecture.md` |
+| 实现阶段、API 规则、工程边界 | `docs/architecture/implementation-guide.md` |
 | REST 契约 | `api/openapi.yaml`、`api/README.md`、`api/conventions.md` |
 | WebSocket 事件契约 | `api/events.md` |
 | 当前进展和接手状态 | `docs/handoff/STATE.md` |
@@ -42,14 +42,14 @@
 
 | 文档 | 状态 | 阅读方式 |
 |---|---|---|
-| `architecture.md` | 历史方案 | 记录早期 Hub-Edge-Runner 三层和独立 Runner 设想。当前以 `docs/system-architecture.md` 的 Hub/Edge/Desktop + AgentAdapter 为准。 |
+| `architecture.md` | 历史方案 | 记录早期 Hub-Edge-Runner 三层和独立 Runner 设想。当前以 `docs/architecture/system-architecture.md` 的 Hub/Edge/Desktop + AgentAdapter 为准。 |
 | `topology.md` | 历史方案 | 可参考 Edge Node、relay、direct 的场景拆分，但其中 Runner/Cloud Runner/Local Runner 术语需改读为 Edge execution target。 |
 | `architecture-optimization.md` | 历史方案 | 记录 2026-05-21 的架构优化思路。独立 RunnerEndpoint 和 `runner/` 目录建议已过期。 |
 | `agent-loop.md` | 历史方案 | Run 流程可参考，所有 Edge -> Runner API 描述已被 Edge lifecycle + AgentAdapter 替代。 |
 | `module-boundaries.md` | 历史方案 | 早期模块边界记录。`runner/` 归属已过期，当前执行边界在 Edge 内部 lifecycle/adapters。 |
 | `protocol.md` | 历史方案 | REST + WebSocket 原则仍可参考，但 `api/events.schema.json` 和 Edge <-> Runner local API 描述不是当前权威。 |
 | `implementation-plan.md` | 历史计划 | P0-P3 计划已完成并被当前主文档、roadmap 和 handoff 状态替代。 |
-| `project-management.md` | 历史流程 | 只作早期流程记录。当前分支和协作规则以 `AGENTS.md`、`docs/branch-governance.md`、`docs/roadmap.md` 为准。 |
+| `project-management.md` | 历史流程 | 只作早期流程记录。当前分支和协作规则以 `AGENTS.md`、`docs/governance/branch-governance.md`、`docs/roadmap.md` 为准。 |
 | `backend.md` | 历史路线图 | 自声明 superseded（2026-05-23），后端路线图已合并到 `docs/roadmap.md`。所有待办项实际已完成。 |
 | `frontend.md` | 历史路线图 | 自声明 superseded（2026-05-23），前端路线图已合并到 `docs/roadmap.md`。所有待办项实际已完成。 |
 | `client-handoff.md` | 历史交接 | 2026-05-22 历史快照，引用已废弃的 `runner/` 目录、旧分支名 `feat/client-dev`、旧 PR #26。当前客户端接手入口为 `docs/handoff/STATE.md`。 |
@@ -70,7 +70,7 @@
 | `codex-app-reference.md` | Codex App 作为产品体验参考仍可读。 | 不代表 AgentHub 当前架构或 API 契约。 |
 | `product-model.md` | IM-first、多 Agent 工作台的产品表达仍可参考。 | Agent 身份需用 Runtime/Profile/Configuration/Execution Target 术语重写。 |
 | `glossary.md` | 可作为历史术语对照。 | 其中 Runner、Desktop Edge、Cloud Edge、Agent Profile 等定义已落后于当前主文档。 |
-| `language-policy.md` | 中文优先、保留代码标识英文的规则仍可参考。 | 当前长期规则以 `AGENTS.md` 和 `docs/document-standards.md` 为准。 |
+| `language-policy.md` | 中文优先、保留代码标识英文的规则仍可参考。 | 当前长期规则以 `AGENTS.md` 和 `docs/governance/document-standards.md` 为准。 |
 
 ### Build Specs
 
