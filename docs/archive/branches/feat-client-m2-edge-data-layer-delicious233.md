@@ -15,7 +15,7 @@
 - `edge-server/internal/api/`
 - `edge-server/internal/events/`
 - `api/openapi.yaml`
-- `docs/roadmaps/branches/feat-client-m2-edge-data-layer-delicious233.md`
+- `docs/archive/branches/feat-client-m2-edge-data-layer-delicious233.md`
 
 ## 本轮完成
 
