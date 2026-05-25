@@ -26,7 +26,7 @@ describe('uiStore shell layout state', () => {
       leftSidebarCollapsed: true,
       rightPanelOpen: true,
       sidebarWidth: 420,
-      rightPanelWidth: 448,
+      rightPanelWidth: 360,
     });
   });
 
