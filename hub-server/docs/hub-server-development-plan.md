@@ -272,8 +272,8 @@ docs(api): 补全 Hub Server 37 条路由 OpenAPI 声明与 WebSocket 事件契�
 #### 任务 1.1：Migration 0019 — users 表新增 tokendance_sub
 
 **新建文件**：
-- `migrations/0019_token_dance_sub.up.sql`
-- `migrations/0019_token_dance_sub.down.sql`
+- `migrations/0020_token_dance_sub.up.sql`
+- `migrations/0020_token_dance_sub.down.sql`
 
 ```sql
 -- up
@@ -491,8 +491,8 @@ feat(hub): 注册 OIDC handler 路由并完成 app 装配
 #### 任务 2.1：Migration 0020 — agent_profiles 表
 
 **新建文件**：
-- `migrations/0020_agent_profiles.up.sql`
-- `migrations/0020_agent_profiles.down.sql`
+- `migrations/0022_agent_profiles.up.sql`
+- `migrations/0022_agent_profiles.down.sql`
 
 DDL 见需求文档 3.1.2。
 

@@ -475,6 +475,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		ReasoningEffort   string `json:"reasoningEffort"`
 		MaxThinkingTokens int    `json:"maxThinkingTokens"`
 		PermissionMode    string `json:"permissionMode"`
+		WorkDir           string `json:"workDir"`
 		IncludePartial    bool   `json:"includePartial"`
 		HubTaskID         string `json:"hubTaskId"` // Edge-to-Hub direct callback task ID
 	}
@@ -562,6 +563,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			ReasoningEffort:   req.ReasoningEffort,
 			MaxThinkingTokens: req.MaxThinkingTokens,
 			PermissionMode:    req.PermissionMode,
+			WorkDir:           req.WorkDir,
 			IncludePartial:    req.IncludePartial,
 			HubTaskID:         req.HubTaskID,
 		}

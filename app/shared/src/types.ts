@@ -11,14 +11,6 @@ export interface HealthResponse {
   checks?: HealthChecks;
 }
 
-<<<<<<< HEAD
-export interface Runner {
-  id: string;
-  name: string;
-  status: string;
-  capabilities?: string;
-}
-
 export interface HealthCheck {
   status: string;
   detail?: string;
@@ -48,8 +40,6 @@ export interface HealthChecks {
   [name: string]: HealthCheck | RunnerHealthCheck | undefined;
 }
 
-=======
->>>>>>> origin/dev/trump
 export interface PageInfo {
   nextCursor?: string;
   hasMore: boolean;
@@ -90,6 +80,15 @@ export interface Thread {
   status: 'active' | 'archived';
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface ThreadInfo {
+  threadId: string;
+  projectId: string;
+  title: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ThreadItemKind = 'message' | 'code' | 'file' | 'diff' | 'approval';
@@ -139,7 +138,16 @@ export interface Run {
   finishedAt?: string;
 }
 
-<<<<<<< HEAD
+export interface RunInfo {
+  runId: string;
+  projectId: string;
+  threadId: string;
+  status: string;
+  createdAt?: string | undefined;
+  startedAt?: string | undefined;
+  finishedAt?: string | undefined;
+}
+
 // ── Agent types ─────────────────────────────────
 
 export interface AgentCapabilities {
@@ -175,11 +183,8 @@ export interface StartRunRequest {
   modelMappingEnabled?: boolean;
   providerFallbackEnabled?: boolean;
   reasoningEffort?: string;
-=======
-export interface StartRunRequest {
-  projectId?: string;
-  threadId?: string;
->>>>>>> origin/dev/trump
+  permissionMode?: string;
+  workDir?: string;
 }
 
 export interface RunLogs {
