@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageCircle, Plus, UserPlus, Users } from 'lucide-react';
 import type { ContactInfo } from '@/api/hubClient';
 import type { IMContact } from './types';
@@ -43,6 +44,14 @@ const IMContactList = memo(function IMContactList({
   const [groupName, setGroupName] = useState('');
   const [groupMembers, setGroupMembers] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const { t } = useTranslation();
+  const label = useCallback(
+    (key: string, fallback: string) => {
+      const translated = t(key);
+      return translated === key ? fallback : translated;
+    },
+    [t],
+  );
   const canCompose = Boolean(onAddContact || onCreatePrivateSession || onCreateGroupSession);
 
   const filtered = useMemo(() => {
@@ -103,13 +112,13 @@ const IMContactList = memo(function IMContactList({
   return (
     <div className={styles.root}>
       <div className={styles.header}>
-        <span className={styles.title}>Contacts</span>
+        <span className={styles.title}>{label('im.contact.title', 'Contacts')}</span>
         {canCompose && (
           <button
             className={styles.addBtn}
             onClick={() => setShowCompose((v) => !v)}
-            aria-label={showCompose ? 'Cancel Hub compose' : 'Open Hub compose'}
-            title={showCompose ? 'Cancel' : 'Hub actions'}
+            aria-label={showCompose ? label('im.contact.cancelCompose', 'Cancel Hub compose') : label('im.contact.openCompose', 'Open Hub compose')}
+            title={showCompose ? label('common.cancel', 'Cancel') : label('im.contact.hubActions', 'Hub actions')}
           >
             <Plus size={14} />
           </button>
@@ -118,15 +127,15 @@ const IMContactList = memo(function IMContactList({
 
       {showCompose && canCompose && (
         <div className={styles.composeForm}>
-          <div className={styles.composeModes} aria-label="Hub compose mode">
+          <div className={styles.composeModes} aria-label={label('im.contact.composeMode', 'Hub compose mode')}>
             {onAddContact && (
               <button
                 type="button"
                 className={`${styles.modeBtn} ${composeMode === 'contact' ? styles.modeBtnActive : ''}`}
                 onClick={() => setComposeMode('contact')}
                 aria-pressed={composeMode === 'contact'}
-                aria-label="Add contact"
-                title="Add contact"
+                aria-label={label('im.contact.addContact', 'Add contact')}
+                title={label('im.contact.addContact', 'Add contact')}
               >
                 <UserPlus size={14} />
               </button>
@@ -137,8 +146,8 @@ const IMContactList = memo(function IMContactList({
                 className={`${styles.modeBtn} ${composeMode === 'private' ? styles.modeBtnActive : ''}`}
                 onClick={() => setComposeMode('private')}
                 aria-pressed={composeMode === 'private'}
-                aria-label="Create direct chat"
-                title="Create direct chat"
+                aria-label={label('im.contact.createDirectChat', 'Create direct chat')}
+                title={label('im.contact.createDirectChat', 'Create direct chat')}
               >
                 <MessageCircle size={14} />
               </button>
@@ -149,8 +158,8 @@ const IMContactList = memo(function IMContactList({
                 className={`${styles.modeBtn} ${composeMode === 'group' ? styles.modeBtnActive : ''}`}
                 onClick={() => setComposeMode('group')}
                 aria-pressed={composeMode === 'group'}
-                aria-label="Create group chat"
-                title="Create group chat"
+                aria-label={label('im.contact.createGroupChat', 'Create group chat')}
+                title={label('im.contact.createGroupChat', 'Create group chat')}
               >
                 <Users size={14} />
               </button>
@@ -164,13 +173,13 @@ const IMContactList = memo(function IMContactList({
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 onKeyDown={handleAddKeyDown}
-                placeholder="Group name..."
+                placeholder={label('im.contact.groupNamePlaceholder', 'Group name...')}
                 autoFocus
-                aria-label="Group name"
+                aria-label={label('im.contact.groupName', 'Group name')}
               />
-              <div className={styles.memberPicker} aria-label="Group members">
+              <div className={styles.memberPicker} aria-label={label('im.contact.groupMembers', 'Group members')}>
                 {hubContacts.length === 0 ? (
-                  <span className={styles.memberEmpty}>No Hub contacts available</span>
+                  <span className={styles.memberEmpty}>{label('im.contact.noHubContacts', 'No Hub contacts available')}</span>
                 ) : (
                   hubContacts.map((contact) => (
                     <label className={styles.memberOption} key={contact.user_id}>
@@ -192,9 +201,9 @@ const IMContactList = memo(function IMContactList({
                   className={styles.addInput}
                   value={targetUserId}
                   onChange={(e) => setTargetUserId(e.target.value)}
-                  aria-label="Hub contact"
+                  aria-label={label('im.contact.hubContact', 'Hub contact')}
                 >
-                  <option value="">Choose a Hub contact...</option>
+                  <option value="">{label('im.contact.chooseHubContact', 'Choose a Hub contact...')}</option>
                   {hubContacts.map((contact) => (
                     <option key={contact.user_id} value={contact.user_id}>
                       {contact.remark ?? contact.nickname ?? contact.username}
@@ -207,15 +216,15 @@ const IMContactList = memo(function IMContactList({
                 value={targetUserId}
                 onChange={(e) => setTargetUserId(e.target.value)}
                 onKeyDown={handleAddKeyDown}
-                placeholder="Hub user ID..."
+                placeholder={label('im.contact.hubUserIdPlaceholder', 'Hub user ID...')}
                 autoFocus
-                aria-label="Hub user ID"
+                aria-label={label('im.contact.hubUserId', 'Hub user ID')}
               />
             </>
           )}
 
           <button className={styles.addConfirm} onClick={() => void handleSubmit()} disabled={submitting}>
-            {composeMode === 'contact' ? 'Add' : 'Create'}
+            {composeMode === 'contact' ? label('common.add', 'Add') : label('common.create', 'Create')}
           </button>
         </div>
       )}
@@ -225,15 +234,15 @@ const IMContactList = memo(function IMContactList({
           className={styles.searchInput}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search contacts..."
-          aria-label="Search contacts"
+          placeholder={label('im.contact.search', 'Search contacts...')}
+          aria-label={label('im.contact.searchLabel', 'Search contacts')}
         />
       </div>
 
-      <div className={styles.list} role="listbox" aria-label="Contacts">
+      <div className={styles.list} role="listbox" aria-label={label('im.contact.title', 'Contacts')}>
         {filtered.length === 0 ? (
           <div className={styles.empty}>
-            {search ? 'No contacts match your search' : 'No contacts yet'}
+            {search ? label('im.contact.noSearchResults', 'No contacts match your search') : label('im.contact.noContacts', 'No contacts yet')}
           </div>
         ) : (
           filtered.map((contact) => (
@@ -259,8 +268,8 @@ const IMContactList = memo(function IMContactList({
                 className={`${styles.onlineDot} ${
                   contact.online ? styles.onlineDotOn : styles.onlineDotOff
                 }`}
-                aria-label={contact.online ? 'Online' : 'Offline'}
-                title={contact.online ? 'Online' : 'Offline'}
+                aria-label={contact.online ? label('im.contact.online', 'Online') : label('im.contact.offline', 'Offline')}
+                title={contact.online ? label('im.contact.online', 'Online') : label('im.contact.offline', 'Offline')}
               />
             </div>
           ))

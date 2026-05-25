@@ -91,11 +91,22 @@ export type { HubEventType } from './hubEvents';
 
 export {
   createHubClient,
+  HubError,
   isHubResponseEnvelope,
   parseHubError,
   unwrapHubResponse,
 } from './hubClient';
 export type {
+  AddAgentToSessionRequest,
+  AuthResponse,
+  ChangePasswordRequest,
+  Contact,
+  ContactInfo,
+  CreateGroupSessionRequest,
+  CreatePrivateSessionRequest,
+  CustomAgentRequest,
+  Device,
+  FriendRequestInfo,
   HubAddAgentToSessionRequest,
   HubAgentDispatchFrame,
   HubAgentDispatchPayload,
@@ -117,6 +128,7 @@ export type {
   HubKnownFrame,
   HubLoginRequest,
   HubMessage,
+  HubNotification,
   HubRegisterDeviceRequest,
   HubRegisterRequest,
   HubResponseEnvelope,
@@ -130,6 +142,18 @@ export type {
   HubUpdateSessionInfoRequest,
   HubUpdateSessionSettingsRequest,
   HubUserProfile,
+  LoginRequest,
+  MessageResponse,
+  RegisterDeviceRequest,
+  RegisterRequest,
+  ReplyToInfo,
+  SearchResult,
+  SendMessageRequest,
+  SendMessageResponse,
+  Session,
+  SessionMember,
+  UpdateProfileRequest,
+  UserProfile,
 } from './hubClient';
 
 export {

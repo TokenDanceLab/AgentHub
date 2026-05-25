@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { mockThreads, mockMessages } from '@shared/index';
+import type { HubMessage, HubSession } from '@shared/index';
+import { useHubIMSnapshot } from '../../hooks/useHubIMSnapshot';
 import { useHubSession } from '../../hooks/useHubSession';
 
 type Accent = 'blue' | 'cyan' | 'purple';
@@ -74,66 +75,22 @@ type Notice = {
   tone: 'info' | 'success';
 };
 
+type HubConversationLabels = {
+  agent: string;
+  user: string;
+  recalled: string;
+  privateSession: string;
+  privateSessionFallback: string;
+  noRecentMessages: string;
+};
+
 const accentOptions: Accent[] = ['blue', 'cyan', 'purple'];
-
-const conversations: Conversation[] = mockThreads.map((thread, ti) => {
-  const threadMessages = mockMessages.filter((m) => m.threadId === thread.id);
-  const accent = accentOptions[ti % accentOptions.length] ?? 'blue';
-
-  return {
-    id: thread.id,
-    name: thread.title ?? `Thread ${thread.id}`,
-    initials: (thread.title ?? 'T').slice(0, 2).toUpperCase(),
-    role: thread.projectId,
-    time: '10:42',
-    summary: thread.status === 'active' ? 'Active conversation' : 'Archived',
-    unread: ti === 0 ? 2 : ti === 1 ? 0 : 1,
-    accent,
-    messages: threadMessages.map((msg) => ({
-      id: msg.id,
-      author: msg.role === 'user' ? 'You' : 'Agent',
-      role: msg.role === 'user' ? 'Owner' : 'Agent',
-      time: '10:30',
-      side: (msg.role === 'user' ? 'right' : 'left') as 'left' | 'right',
-      body: msg.content,
-      ...(msg.role === 'agent' ? { accent } : {}),
-    })),
-  };
-});
 
 const attachmentOptions: AttachmentOption[] = [
   { id: 'local-context', name: 'local-context.md', detail: 'queued', icon: 'description' },
   { id: 'selection-snippet', name: 'selection.tsx', detail: 'snippet', icon: 'code' },
   { id: 'handoff-checklist', name: 'handoff checklist', detail: 'note', icon: 'tag' },
 ];
-
-const initialUnreadByChat = conversations.reduce<Record<string, number>>((unreadMap, conversation) => {
-  unreadMap[conversation.id] = conversation.unread;
-  return unreadMap;
-}, {});
-
-const emptyConversationSnapshot: ConversationSnapshot = {
-  id: 'empty',
-  name: 'No private chats',
-  initials: 'NA',
-  role: 'Local preview',
-  time: '--:--',
-  summary: 'No conversations are available.',
-  unread: 0,
-  accent: 'blue',
-  messages: [],
-  allMessages: [],
-  currentSummary: 'No conversations are available.',
-  currentTime: '--:--',
-  currentUnread: 0,
-};
-
-function formatClock(date = new Date()) {
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-
-  return `${hours}:${minutes}`;
-}
 
 function getLastMessageSummary(message: Message) {
   const prefix = message.attachments?.length ? `[${message.attachments.length} attachments] ` : '';
@@ -178,6 +135,83 @@ function conversationMatchesQuery(conversation: ConversationSnapshot, query: str
     .toLowerCase();
 
   return searchableText.includes(query) || conversation.allMessages.some((message) => messageMatchesQuery(message, query));
+}
+
+function parseMessageContent(content: string): string {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (typeof parsed === 'string') return parsed;
+    if (typeof parsed === 'object' && parsed !== null) {
+      const record = parsed as Record<string, unknown>;
+      if (typeof record.text === 'string') return record.text;
+    }
+  } catch {
+    // Hub text messages can be plain strings or JSON envelopes.
+  }
+
+  return content;
+}
+
+function formatHubTime(value?: string): string {
+  if (!value) return '--:--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(11, 16) || '--:--';
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function initialsFromName(name: string): string {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || 'PC';
+}
+
+function sessionName(session: HubSession, labels: HubConversationLabels): string {
+  return session.name || `${labels.privateSessionFallback} ${session.session_id || session.id || ''}`.trim();
+}
+
+function messageFromHub(message: HubMessage, accent: Accent, labels: HubConversationLabels): Message {
+  const isAgent = message.sender_type === 'agent';
+  const isUser = message.sender_type === 'user';
+
+  return {
+    id: message.id,
+    author: isAgent ? labels.agent : isUser ? labels.user : message.sender_type,
+    body: message.recalled ? labels.recalled : parseMessageContent(message.content),
+    role: `${message.content_type} / ${message.sender_type}`,
+    side: isAgent ? 'left' : 'right',
+    time: formatHubTime(message.created_at),
+    ...(isAgent ? { accent } : {}),
+  };
+}
+
+function conversationFromHubSession(
+  session: HubSession,
+  messages: HubMessage[],
+  index: number,
+  labels: HubConversationLabels,
+): Conversation {
+  const accent = accentOptions[index % accentOptions.length] ?? 'blue';
+  const name = sessionName(session, labels);
+  const sessionMessages = messages.map((message) => messageFromHub(message, accent, labels));
+  const lastMessage = sessionMessages[sessionMessages.length - 1];
+
+  return {
+    accent,
+    id: session.session_id || session.id || `hub-session-${index}`,
+    initials: initialsFromName(name),
+    messages: sessionMessages,
+    name,
+    role: labels.privateSession,
+    summary: lastMessage?.body || session.announcement || labels.noRecentMessages,
+    time: lastMessage?.time || formatHubTime(session.last_message_at ?? session.updated_at ?? session.created_at),
+    unread: session.unread_count ?? 0,
+  };
 }
 
 const pageStyles = `
@@ -902,31 +936,78 @@ function Icon({ name }: { name: string }) {
 
 export function PrivateChatsPageInteractive() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const { hasSession: hasHubSession } = useHubSession();
-  const [activeChatId, setActiveChatId] = useState(conversations[0]?.id ?? '');
+  const { hasSession: hasHubSession, token } = useHubSession();
+  const hubSnapshot = useHubIMSnapshot(token);
+  const [activeChatId, setActiveChatId] = useState('');
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [keyOnly, setKeyOnly] = useState(false);
-  const [keyedMessages, setKeyedMessages] = useState<string[]>(mockMessages.slice(0, 1).map((m) => m.id));
+  const [keyedMessages, setKeyedMessages] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
-  const [localMessages, setLocalMessages] = useState<Record<string, Message[]>>({});
-  const [unreadByChat, setUnreadByChat] = useState<Record<string, number>>(initialUnreadByChat);
-  const [searchQuery, setSearchQuery] = useState('routing handoff');
+  const [readSessionIds, setReadSessionIds] = useState<Set<string>>(() => new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<string[]>([]);
   const [notice, setNotice] = useState<Notice | null>(null);
 
   const { t } = useTranslation('privateChats');
+  const hubConversationLabels = useMemo<HubConversationLabels>(
+    () => ({
+      agent: t('hub.agent'),
+      user: t('hub.user'),
+      recalled: t('hub.recalled'),
+      privateSession: t('hub.privateSession'),
+      privateSessionFallback: t('hub.privateSessionFallback'),
+      noRecentMessages: t('hub.noRecentMessages'),
+    }),
+    [t],
+  );
+  const emptyConversationSnapshot = useMemo<ConversationSnapshot>(
+    () => ({
+      id: 'empty',
+      name: t('sidebar.emptyTitle'),
+      initials: 'NA',
+      role: t('hub.privateSession'),
+      time: '--:--',
+      summary: t('hub.noConversationsSummary'),
+      unread: 0,
+      accent: 'blue',
+      messages: [],
+      allMessages: [],
+      currentSummary: t('hub.noConversationsSummary'),
+      currentTime: '--:--',
+      currentUnread: 0,
+    }),
+    [t],
+  );
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
-  const availableConversations = hasHubSession ? conversations : [];
+  const conversations = useMemo<Conversation[]>(
+    () =>
+      hubSnapshot.status === 'ready'
+        ? hubSnapshot.sessions.map((session, index) =>
+            conversationFromHubSession(
+              session,
+              hubSnapshot.messagesBySessionId[session.session_id || session.id || ''] ?? [],
+              index,
+              hubConversationLabels,
+            ),
+          )
+        : [],
+    [hubConversationLabels, hubSnapshot.messagesBySessionId, hubSnapshot.sessions, hubSnapshot.status],
+  );
+  const availableConversations = hasHubSession && hubSnapshot.status === 'ready' ? conversations : [];
   const isChatLocked = true;
+  const chatStatusKey = !hasHubSession
+    ? 'locked'
+    : hubSnapshot.status === 'error'
+      ? 'error'
+      : hubSnapshot.status === 'loading'
+        ? 'loading'
+        : 'ready';
 
   const conversationSnapshots = useMemo<ConversationSnapshot[]>(
     () =>
       availableConversations.map((conversation) => {
-        const allMessages = [
-          ...conversation.messages,
-          ...(localMessages[conversation.id] ?? []),
-        ];
+        const allMessages = conversation.messages;
         const lastMessage = allMessages[allMessages.length - 1];
 
         return {
@@ -934,10 +1015,10 @@ export function PrivateChatsPageInteractive() {
           allMessages,
           currentSummary: lastMessage ? getLastMessageSummary(lastMessage) : conversation.summary,
           currentTime: lastMessage?.time ?? conversation.time,
-          currentUnread: unreadByChat[conversation.id] ?? 0,
+          currentUnread: readSessionIds.has(conversation.id) ? 0 : conversation.unread,
         };
       }),
-    [availableConversations, localMessages, unreadByChat],
+    [availableConversations, readSessionIds],
   );
 
   const activeConversation = useMemo(
@@ -945,7 +1026,7 @@ export function PrivateChatsPageInteractive() {
       conversationSnapshots.find((conversation) => conversation.id === activeChatId) ??
       conversationSnapshots[0] ??
       emptyConversationSnapshot,
-    [activeChatId, conversationSnapshots],
+    [activeChatId, conversationSnapshots, emptyConversationSnapshot],
   );
 
   const filteredConversations = useMemo(
@@ -986,11 +1067,36 @@ export function PrivateChatsPageInteractive() {
 
   const reviewProgress = Math.min(
     100,
-    Math.round(((activeKeyCount + selectedAttachments.length + (localMessages[activeConversation.id]?.length ?? 0)) /
+    Math.round(((activeKeyCount + selectedAttachments.length) /
       Math.max(activeConversation.allMessages.length + 2, 1)) * 100),
   );
 
   const hasComposerContent = draft.trim().length > 0 || selectedAttachments.length > 0;
+
+  useEffect(() => {
+    if (conversationSnapshots.length === 0) {
+      if (activeChatId) setActiveChatId('');
+      return;
+    }
+
+    if (!conversationSnapshots.some((conversation) => conversation.id === activeChatId)) {
+      setActiveChatId(conversationSnapshots[0]?.id ?? '');
+    }
+  }, [activeChatId, conversationSnapshots]);
+
+  useEffect(() => {
+    setKeyedMessages((current) => {
+      const next = current.filter((messageId) =>
+        conversationSnapshots.some((conversation) =>
+          conversation.allMessages.some((message) => message.id === messageId),
+        ),
+      );
+      if (next.length === current.length && next.every((messageId, index) => messageId === current[index])) {
+        return current;
+      }
+      return next;
+    });
+  }, [conversationSnapshots]);
 
   useEffect(() => {
     if (!notice) {
@@ -1118,7 +1224,7 @@ export function PrivateChatsPageInteractive() {
     const nextConversation = conversationSnapshots.find((conversation) => conversation.id === chatId);
 
     setActiveChatId(chatId);
-    setUnreadByChat((current) => ({ ...current, [chatId]: 0 }));
+    setReadSessionIds((current) => new Set(current).add(chatId));
 
     if (nextConversation?.currentUnread) {
       showNotice(t('notice.markedRead', { name: nextConversation.name }), 'success');
@@ -1190,40 +1296,10 @@ export function PrivateChatsPageInteractive() {
   };
 
   const sendDraft = () => {
-    const text = draft.trim();
-
     if (isChatLocked) {
       showNotice(hasHubSession ? t('notice.readOnly') : t('notice.loginRequired'));
       return;
     }
-
-    if (!hasComposerContent) {
-      showNotice(t('notice.emptyMessage'));
-      return;
-    }
-
-    const selectedMessageAttachments = selectedAttachments.map(({ name, detail }) => ({ name, detail }));
-
-    const message: Message = {
-      id: `local-${activeConversation.id}-${Date.now()}`,
-      author: 'You',
-      role: 'Local draft',
-      time: formatClock(),
-      side: 'right',
-      body: text || 'Attached selected context for review.',
-      isDraft: true,
-      attachments: selectedMessageAttachments.length > 0 ? selectedMessageAttachments : undefined,
-    };
-
-    setLocalMessages((current) => ({
-      ...current,
-      [activeConversation.id]: [...(current[activeConversation.id] ?? []), message],
-    }));
-    setUnreadByChat((current) => ({ ...current, [activeConversation.id]: 0 }));
-    setSelectedAttachmentIds([]);
-    setAttachmentsOpen(false);
-    setDraft('');
-    showNotice(t('notice.draftAdded'), 'success');
   };
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1301,9 +1377,24 @@ export function PrivateChatsPageInteractive() {
               <Avatar initials={activeConversation.initials} accent={activeConversation.accent} />
               <div className="pc-title">
                 <h2>{activeConversation.name}</h2>
-                <p>{activeConversation.role} - {hasHubSession ? t('chat.readOnly') : t('chat.loginRequired')}</p>
+                <p>
+                  {activeConversation.role} -{' '}
+                  {chatStatusKey === 'error'
+                    ? t('chat.error')
+                    : hasHubSession
+                      ? t('chat.readOnly')
+                      : t('chat.loginRequired')}
+                </p>
               </div>
-              <span className="pc-status">{hasHubSession ? t('status.readOnly') : t('status.locked')}</span>
+              <span className="pc-status">
+                {chatStatusKey === 'error'
+                  ? t('status.error')
+                  : chatStatusKey === 'loading'
+                    ? t('status.loading')
+                    : hasHubSession
+                      ? t('status.readOnly')
+                      : t('status.locked')}
+              </span>
             </div>
 
             <div className="pc-actions">
@@ -1319,6 +1410,7 @@ export function PrivateChatsPageInteractive() {
               </button>
               <button
                 className={`pc-icon-button ${attachmentsOpen ? 'is-active' : ''}`}
+                disabled={isChatLocked}
                 onClick={toggleAttachmentPanel}
                 type="button"
                 aria-expanded={attachmentsOpen}
@@ -1342,6 +1434,16 @@ export function PrivateChatsPageInteractive() {
               <div className="pc-empty">
                 <strong>{t('locked.title')}</strong>
                 <p>{t('locked.description')}</p>
+              </div>
+            ) : hubSnapshot.status === 'loading' ? (
+              <div className="pc-empty">
+                <strong>{t('loading.title')}</strong>
+                <p>{t('loading.description')}</p>
+              </div>
+            ) : hubSnapshot.status === 'error' ? (
+              <div className="pc-empty">
+                <strong>{t('error.title')}</strong>
+                <p>{t('error.description', { error: hubSnapshot.error })}</p>
               </div>
             ) : messages.length > 0 ? (
               messages.map((message) => {
@@ -1554,7 +1656,7 @@ export function PrivateChatsPageInteractive() {
               <h3>{t('context.reviewTitle')}</h3>
               <div className="pc-progress"><span style={{ width: `${reviewProgress}%` }} /></div>
               <p style={{ marginTop: 10 }}>
-                {t('context.reviewDetail', { keyCount: activeKeyCount, unread: activeConversation.currentUnread, drafts: localMessages[activeConversation.id]?.length ?? 0 })}
+                {t('context.reviewDetail', { keyCount: activeKeyCount, unread: activeConversation.currentUnread })}
               </p>
             </section>
 
