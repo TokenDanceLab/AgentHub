@@ -91,7 +91,7 @@ export type HubSessionType = 'private' | 'group' | string;
 export type HubSessionRole = 'owner' | 'admin' | 'member' | string;
 
 export interface HubSession {
-  session_id: string;
+  session_id?: string;
   id?: string;
   type: HubSessionType;
   name?: string;
@@ -206,7 +206,7 @@ export interface HubDevice {
   user_id: string;
   device_type: string;
   app_version?: string;
-  capabilities?: string;
+  capabilities?: string | Record<string, unknown>;
   last_active_at?: string;
   created_at?: string;
 }
@@ -227,7 +227,7 @@ export interface HubCustomAgentRequest {
   model_params?: string;
 }
 
-export interface HubCustomAgent {
+export interface HubCustomAgent extends Record<string, unknown> {
   id: string;
   owner_user_id: string;
   name: string;
@@ -286,6 +286,17 @@ export interface HubTaskDoneRequest extends HubTaskRunRequest {
 
 export interface HubTaskFailRequest extends HubTaskRunRequest {
   error: string;
+}
+
+export interface HubNotification {
+  id: string;
+  type?: string;
+  title?: string;
+  content?: string;
+  message?: string;
+  read?: boolean;
+  created_at?: string;
+  [key: string]: unknown;
 }
 
 export interface HubAgentDispatchPayload {
@@ -364,6 +375,13 @@ export type HubKnownFrame =
   | HubAgentCancelFrame
   | HubFrame<unknown, HubEventType>;
 
+export class HubError extends AppError {
+  constructor(status: number, message: string, code = 'hub_error') {
+    super({ error: { code, message } }, status);
+    this.name = 'HubError';
+  }
+}
+
 export function isHubResponseEnvelope(
   body: unknown,
 ): body is HubResponseEnvelope {
@@ -438,7 +456,7 @@ export async function parseHubError(response: Response): Promise<AppError> {
 
 export function createHubClient(opts: HubClientOptions = {}) {
   const baseUrl = (opts.baseUrl ?? '').replace(/\/+$/, '');
-  const fetchImpl = opts.fetch ?? globalThis.fetch;
+  const fetchImpl = opts.fetch;
 
   async function request<T>(
     path: string,
@@ -453,7 +471,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       headers.set('Authorization', `Bearer ${token}`);
     }
 
-    const response = await fetchImpl(`${baseUrl}${path}`, {
+    const response = await (fetchImpl ?? globalThis.fetch)(`${baseUrl}${path}`, {
       ...options,
       headers,
     });
@@ -550,12 +568,12 @@ export function createHubClient(opts: HubClientOptions = {}) {
         `/client/sessions/search?q=${encodeURIComponent(q)}`,
       ),
     createPrivateSession: (body: HubCreatePrivateSessionRequest) =>
-      request<HubCreateSessionResponse>('/client/sessions/private', {
+      request<HubSession>('/client/sessions/private', {
         method: 'POST',
         body: JSON.stringify(body),
       }),
     createGroupSession: (body: HubCreateGroupSessionRequest) =>
-      request<HubCreateSessionResponse>('/client/sessions/group', {
+      request<HubSession>('/client/sessions/group', {
         method: 'POST',
         body: JSON.stringify(body),
       }),
@@ -675,6 +693,22 @@ export function createHubClient(opts: HubClientOptions = {}) {
         `/client/sessions/${encodeURIComponent(sessionId)}/messages/search${qs(params)}`,
       ),
 
+    listNotifications: (params?: {
+      unread_only?: boolean;
+      limit?: number;
+      offset?: number;
+    }) =>
+      request<HubNotification[]>(
+        `/client/notifications${qs(params ?? {})}`,
+      ),
+    markNotificationRead: (id: string) =>
+      request<void>(
+        `/client/notifications/${encodeURIComponent(id)}/read`,
+        { method: 'POST' },
+      ),
+    readAllNotifications: () =>
+      request<void>('/client/notifications/read-all', { method: 'POST' }),
+
     registerDevice: (body: HubRegisterDeviceRequest) =>
       request<HubDevice>('/edge/devices/register', {
         method: 'POST',
@@ -746,6 +780,37 @@ export function createHubClient(opts: HubClientOptions = {}) {
 }
 
 export type HubClient = ReturnType<typeof createHubClient>;
+
+export type RegisterRequest = HubRegisterRequest;
+export type LoginRequest = HubLoginRequest;
+export type AuthResponse = HubAuthResponse;
+export type UserProfile = HubUserProfile;
+export type UpdateProfileRequest = HubUpdateProfileRequest;
+export type ChangePasswordRequest = HubChangePasswordRequest;
+export type SearchResult = HubSearchResult;
+export type FriendRequestInfo = HubFriendRequest;
+export type ContactInfo = HubContactInfo;
+export interface Contact {
+  id: string;
+  user_id: string;
+  friend_id: string;
+  status: string;
+  remark?: string;
+  friend?: UserProfile;
+  created_at?: string;
+}
+export type Session = HubSession;
+export type SessionMember = HubSessionMember;
+export type CreatePrivateSessionRequest = HubCreatePrivateSessionRequest;
+export type CreateGroupSessionRequest = HubCreateGroupSessionRequest;
+export type SendMessageRequest = HubSendMessageRequest;
+export type SendMessageResponse = HubSendMessageResponse;
+export type ReplyToInfo = HubReplyToInfo;
+export type MessageResponse = HubMessage;
+export type RegisterDeviceRequest = HubRegisterDeviceRequest;
+export type Device = HubDevice;
+export type AddAgentToSessionRequest = HubAddAgentToSessionRequest;
+export type CustomAgentRequest = HubCustomAgentRequest;
 
 async function readJson(response: Response): Promise<unknown> {
   try {

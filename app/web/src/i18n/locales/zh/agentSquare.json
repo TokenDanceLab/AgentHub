@@ -81,6 +81,6 @@
   "source.loading": "正在加载 Hub 目录",
   "source.catalogMock": "Catalog/mock fallback",
   "source.catalogFallbackDetail": "Hub 未返回 CustomAgent，因此显示带明确标签的 catalog/mock fallback。",
-  "source.loginRequiredDetail": "当前没有 Web Hub 会话。显示带明确标签的 catalog/mock fallback，不伪造 Hub 同步成功。",
+  "source.loginRequiredDetail": "当前没有 Web Hub 会话。显示带明确标签的 catalog/mock fallback。",
   "source.errorDetail": "Hub CustomAgent 不可用：{{error}}。显示带明确标签的 catalog/mock fallback。"
 }

@@ -161,6 +161,21 @@ export function useHubIntegration(
           break;
         }
 
+        case 'run.finished': {
+          const output =
+            typeof payload.content === 'string'
+              ? payload.content
+              : typeof payload.output === 'string'
+                ? payload.output
+                : JSON.stringify(payload);
+          hubClient.doneTask(taskId, output, runId).catch(() => {});
+          store.getState().updateTask(taskId, {
+            status: 'done',
+          });
+          store.getState().removeTask(taskId);
+          break;
+        }
+
         case 'run.failed': {
           const error =
             typeof payload.error === 'string'
