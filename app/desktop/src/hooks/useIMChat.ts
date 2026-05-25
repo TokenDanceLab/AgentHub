@@ -15,9 +15,19 @@ import { useToastStore } from '@/stores/toastStore';
 import type { IMMessage, IMContact, AuthorityType } from '@/components/IM/types';
 
 type IMStatus = 'idle' | 'loading' | 'ready' | 'error';
+type IMMessageWithHubState = IMMessage & {
+  seqId?: number;
+  read?: boolean;
+  readBy?: string;
+  readAt?: string;
+};
 
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function readTextContent(content: string): string {
@@ -47,10 +57,11 @@ function hubMessageToIMMessage(
   msg: HubMessage | MessageResponse,
   authority: AuthorityType = 'hub',
 ): IMMessage {
-  return {
+  const record = msg as unknown as Record<string, unknown>;
+  const message: IMMessageWithHubState = {
     id: msg.id,
     sessionId: msg.session_id,
-    clientMsgId: 'client_msg_id' in msg ? msg.client_msg_id : undefined,
+    clientMsgId: readString(record.client_msg_id),
     senderId: msg.sender_id,
     senderName: msg.sender_id,
     senderType: msg.sender_type === 'agent' ? 'agent' : 'user',
@@ -59,7 +70,11 @@ function hubMessageToIMMessage(
     timestamp: msg.created_at ?? new Date().toISOString(),
     replyToId: msg.reply_to_message_id,
     recalled: msg.recalled,
+    seqId: readNumber(record.seq_id),
+    read: Boolean(record.read),
+    readAt: readString(record.read_at),
   };
+  return message;
 }
 
 function sessionToContact(session: Session, contactsByUserId: Map<string, ContactInfo>): IMContact {
@@ -301,7 +316,40 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       );
     });
 
-    const unsubRead = activeHubWS.on(HUB_EVENTS.MESSAGE_READ, () => {});
+    const unsubRead = activeHubWS.on(HUB_EVENTS.MESSAGE_READ, (rawPayload: unknown) => {
+      const payload = rawPayload as Record<string, unknown>;
+      const sessionId = readString(payload.session_id);
+      const readerId = readString(payload.user_id);
+      const lastReadSeq = readNumber(payload.last_read_seq);
+      const readAt = readString(payload.read_at) ?? new Date().toISOString();
+      if (!sessionId || !readerId || lastReadSeq === undefined) return;
+
+      setMessages((prev) => {
+        const current = prev.get(sessionId);
+        if (!current) return prev;
+        const next = new Map(prev);
+        next.set(
+          sessionId,
+          current.map((message) => {
+            const hubMessage = message as IMMessageWithHubState;
+            if (
+              hubMessage.seqId === undefined ||
+              hubMessage.seqId > lastReadSeq ||
+              hubMessage.senderId === readerId
+            ) {
+              return message;
+            }
+            return {
+              ...hubMessage,
+              read: true,
+              readBy: readerId,
+              readAt,
+            } as IMMessage;
+          }),
+        );
+        return next;
+      });
+    });
 
     return () => {
       unsubMessageNew();
@@ -332,7 +380,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
           content_type: 'text',
           content,
         });
-        const confirmed: IMMessage = {
+        const confirmed: IMMessageWithHubState = {
           id: response.message_id,
           sessionId,
           clientMsgId,
@@ -342,6 +390,8 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
           authority: 'hub',
           content,
           timestamp: response.created_at,
+          seqId: response.seq_id,
+          read: false,
         };
         setMessages((prev) => {
           const next = new Map(prev);
@@ -394,6 +444,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       try {
         const session = await client.createPrivateSession({ target_user_id: trimmed });
         upsertContact(sessionToContact(session, contactsByUserIdRef.current));
+        await refreshSessions();
         addToast({ type: 'success', message: 'Direct chat created' });
         return { ok: true };
       } catch (err) {
@@ -402,7 +453,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         return { ok: false };
       }
     },
-    [addToast, authenticated, client, upsertContact],
+    [addToast, authenticated, client, refreshSessions, upsertContact],
   );
 
   const createGroupSession = useCallback(
@@ -423,6 +474,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
           member_ids: trimmedMemberIds,
         });
         upsertContact(sessionToContact(session, contactsByUserIdRef.current));
+        await refreshSessions();
         addToast({ type: 'success', message: 'Group chat created' });
         return { ok: true };
       } catch (err) {
@@ -431,7 +483,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         return { ok: false };
       }
     },
-    [addToast, authenticated, client, upsertContact],
+    [addToast, authenticated, client, refreshSessions, upsertContact],
   );
 
   const getSessionMessages = useCallback(

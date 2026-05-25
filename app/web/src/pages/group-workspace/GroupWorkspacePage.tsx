@@ -1118,6 +1118,7 @@ export function GroupWorkspacePageInteractive() {
     mode: catalogMode,
     tone: catalogTone,
   } = getWorkbenchCatalogState(workbenchState);
+  const shouldUseDemoFallback = catalogMode === 'mock';
   const taskSource = getWorkbenchSectionSource({
     mode: catalogMode,
     hasSectionSnapshot: hasLiveCatalog && workbenchState.runs.length > 0,
@@ -1168,9 +1169,14 @@ export function GroupWorkspacePageInteractive() {
 
   const approved = approval === "approved";
   const needsEdits = approval === "changes";
-  const visibleMembers = workspaceMembers.filter((member) => memberFilter === "all" || member.presence === memberFilter);
-  const onlineCount = workspaceMembers.filter((member) => member.presence === "online").length;
-  const busyCount = workspaceMembers.filter((member) => member.presence === "busy").length;
+  const displayedMembers = hasLiveCatalog && workbenchState.runners.length > 0
+    ? workspaceMembers
+    : shouldUseDemoFallback
+      ? workspaceMembers
+      : [];
+  const visibleMembers = displayedMembers.filter((member) => memberFilter === "all" || member.presence === memberFilter);
+  const onlineCount = displayedMembers.filter((member) => member.presence === "online").length;
+  const busyCount = displayedMembers.filter((member) => member.presence === "busy").length;
   const memberSource = getWorkbenchSectionSource({
     mode: catalogMode,
     hasSectionSnapshot: hasLiveCatalog && workbenchState.runners.length > 0,
@@ -1194,7 +1200,10 @@ export function GroupWorkspacePageInteractive() {
     size: artifact.sizeBytes > 1024 * 1024 ? `${(artifact.sizeBytes / (1024 * 1024)).toFixed(1)} MB` : `${(artifact.sizeBytes / 1024).toFixed(1)} KB`,
     accent: fileAccentPalette[index % fileAccentPalette.length] ?? 'cyan',
   }));
-  const workspaceFiles = [...(hasLiveCatalog && liveFiles.length ? liveFiles : files), ...syncedFiles];
+  const workspaceFiles = [
+    ...(hasLiveCatalog && liveFiles.length ? liveFiles : shouldUseDemoFallback ? files : []),
+    ...syncedFiles,
+  ];
   const fileSource = getWorkbenchSectionSource({
     mode: catalogMode,
     hasSectionSnapshot: hasLiveCatalog && workbenchState.artifacts.length > 0,
@@ -1202,10 +1211,14 @@ export function GroupWorkspacePageInteractive() {
   });
   const displayedBaseTasks = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map((run, index) => taskFromRun(run, index, workbenchState.runners))
-    : baseTasks;
+    : shouldUseDemoFallback
+      ? baseTasks
+      : [];
   const displayedActivities = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map((run, index) => activityFromRun(run, index, workbenchState.runners))
-    : activityLog;
+    : shouldUseDemoFallback || activityLog.length > initialActivities.length
+      ? activityLog
+      : [];
   const activitySource = getWorkbenchSectionSource({
     mode: catalogMode,
     hasSectionSnapshot: hasLiveCatalog && workbenchState.runs.length > 0,
@@ -1477,14 +1490,16 @@ export function GroupWorkspacePageInteractive() {
                 <AccentIcon accent="purple" label="R" />
                 <div className="gwr-truncate">
                   <strong>Mapping Review</strong>
-                  <p className="gwr-tiny gwr-truncate">2 approvals open</p>
+                  <p className="gwr-tiny gwr-truncate">
+                    {t('sidebar.space.demoApprovals', { defaultValue: 'Demo fallback approvals' })}
+                  </p>
                 </div>
               </div>
               <div className="gwr-nav">
                 <AccentIcon accent="cyan" label="F" />
                 <div className="gwr-truncate">
                   <strong>Shared Files</strong>
-                  <p className="gwr-tiny gwr-truncate">{t('sidebar.space.documents', { count: syncState.fileCount })}</p>
+                  <p className="gwr-tiny gwr-truncate">{t('sidebar.space.documents', { count: workspaceFiles.length })}</p>
                 </div>
               </div>
             </div>
@@ -1573,15 +1588,27 @@ export function GroupWorkspacePageInteractive() {
           <section className="gwr-stats">
             <div className="gwr-stat gwr-glass">
               <strong>{onlineCount}</strong>
-              <p className="gwr-small">{t('stat.membersOnline')}</p>
+              <p className="gwr-small">
+                {shouldUseDemoFallback
+                  ? t('stat.demoMembersOnline', { defaultValue: t('stat.membersOnline') })
+                  : t('stat.membersOnline')}
+              </p>
             </div>
             <div className="gwr-stat gwr-glass">
               <strong>{tasks.length}</strong>
-              <p className="gwr-small">{t('stat.sharedTasks')}</p>
+              <p className="gwr-small">
+                {shouldUseDemoFallback
+                  ? t('stat.demoSharedTasks', { defaultValue: t('stat.sharedTasks') })
+                  : t('stat.sharedTasks')}
+              </p>
             </div>
             <div className="gwr-stat gwr-glass">
-              <strong>{syncState.fileCount}</strong>
-              <p className="gwr-small">{t('stat.workspaceFiles')}</p>
+              <strong>{workspaceFiles.length}</strong>
+              <p className="gwr-small">
+                {shouldUseDemoFallback
+                  ? t('stat.demoWorkspaceFiles', { defaultValue: t('stat.workspaceFiles') })
+                  : t('stat.workspaceFiles')}
+              </p>
             </div>
             <div className="gwr-stat gwr-glass">
               <strong>{syncState.progress}%</strong>
@@ -1788,7 +1815,7 @@ export function GroupWorkspacePageInteractive() {
                   <span className="gwr-dot cyan" />
                   <div>
                     <strong>{t('sync.checklist.filesIndexed')}</strong>
-                    <p className="gwr-tiny">{t('sync.checklist.filesDetail', { count: syncState.fileCount })}</p>
+                    <p className="gwr-tiny">{t('sync.checklist.filesDetail', { count: workspaceFiles.length })}</p>
                   </div>
                 </div>
                 <div className="gwr-check">
