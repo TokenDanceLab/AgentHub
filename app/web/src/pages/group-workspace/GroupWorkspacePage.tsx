@@ -6,8 +6,6 @@ import {
   mockWorkspaceFiles,
   getWorkbenchCatalogState,
   getWorkbenchSectionSource,
-  MockEventStream,
-  playRunLifecycle,
   type Run,
   type Runner,
   type WorkbenchSectionSource,
@@ -133,8 +131,29 @@ function activityFromRun(run: Run, index: number, runners: Runner[]): ActivityIt
   };
 }
 
+function sourceLabelKey(label: string) {
+  if (label === 'Edge snapshot') return 'source.edgeSnapshot';
+  if (label === 'Offline snapshot') return 'source.offlineSnapshot';
+  if (label === 'Loading snapshot') return 'source.loadingSnapshot';
+  if (label === 'Mock fallback') return 'source.mockFallback';
+  if (label === 'Snapshot unavailable') return 'source.snapshotUnavailable';
+  if (label.startsWith('Local dry-run / ')) return 'source.localDryRun';
+  return 'source.snapshotUnavailable';
+}
+
 function SourceLabel({ source }: { source: WorkbenchSectionSource }) {
-  return <span className={`gwr-source ${source.tone}`}>{source.label}</span>;
+  const { t } = useTranslation('groupWorkspace');
+  const baseLabel = source.label.startsWith('Local dry-run / ')
+    ? source.label.replace('Local dry-run / ', '')
+    : source.label;
+
+  return (
+    <span className={`gwr-source ${source.tone}`}>
+      {source.label.startsWith('Local dry-run / ')
+        ? t('source.localDryRun', { source: t(sourceLabelKey(baseLabel)) })
+        : t(sourceLabelKey(source.label))}
+    </span>
+  );
 }
 
 const styles = `
@@ -1146,22 +1165,6 @@ export function GroupWorkspacePageInteractive() {
   const pushActivity = (activity: Omit<ActivityItem, "time">) => {
     setActivityLog((current) => [{ ...activity, time: nowLabel() }, ...current].slice(0, 8));
   };
-
-  // Mock event stream feeds a simulated run lifecycle into the demo activity log.
-  useEffect(() => {
-    const stream = new MockEventStream();
-    const unsub = stream.on((event) => {
-      pushActivity({
-        title: event.type,
-        detail: typeof event.payload === 'object' && event.payload && 'text' in event.payload
-          ? String((event.payload as Record<string, unknown>).text).trim().slice(0, 100) || '(output)'
-          : JSON.stringify(event.payload).slice(0, 100),
-        accent: fileAccentPalette[Math.floor(Math.random() * fileAccentPalette.length)] ?? "cyan",
-      });
-    });
-    playRunLifecycle(stream, { stepDelayMs: 1000 });
-    return () => { stream.destroy(); unsub(); };
-  }, []);
 
   const approved = approval === "approved";
   const needsEdits = approval === "changes";
