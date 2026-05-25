@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -232,6 +233,9 @@ func (s *Store) CreateThread(id, projectID, title string) (Thread, error) {
 		return Thread{}, ErrNotFound
 	}
 	if existing, ok := s.threads[id]; ok {
+		if existing.ProjectID != projectID {
+			return Thread{}, fmt.Errorf("thread %q already exists in project %q", id, existing.ProjectID)
+		}
 		return existing, nil
 	}
 	if title == "" {
