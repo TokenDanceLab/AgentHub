@@ -108,7 +108,7 @@ P1 之后都是增强能力，不阻塞 P0 本地离线闭环。P0 必须做到�
 | 阶段 | 目标 | 能力 | 状态 |
 |---|---|---|---|
 | P1 | 多 Agent Thread | @Agent、Reviewer、Orchestrator、Thread fork、多 Agent 围绕同一 Artifact 讨论 | 已完成 |
-| P2 | Identity + Edge-Hub Sync | TokenDance ID OIDC 登录、Hub session、Edge 注册、设备状态、消息/事件同步、Web/Mobile 查看状态和远程审批 | 规划中（Q3） |
+| P2 | Identity + Edge-Hub Sync | TokenDance ID OIDC 登录、Hub session、Edge 注册、设备状态、消息/事件同步、Web/Mobile 查看状态和远程审批 | 进行中：Hub OIDC code exchange 与 Hub-local session 已在 repo 落地；部署配置、Desktop/Web 回调 UX、logout/reconnect 和授权证据仍需闭环 |
 | P3 | Relay / Remote / Cloud | Hub 中继、本地/远程 SSH/Tailscale/Cloud Execution Target、远程 Preview、Artifact Proxy、远控审批 | 规划中（Q3） |
 | P4 | 团队 IM + Agent Platform | 用户、联系人、群组、团队空间、团队 Memory、Agent 市场、Skill/MCP 管理、模型配置、模型映射、cc-switch provider binding、安全审计 | 规划中 |
 
