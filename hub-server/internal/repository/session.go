@@ -58,7 +58,7 @@ func SearchSessions(db *gorm.DB, userID, q string) ([]SessionWithMeta, error) {
 			(SELECT COUNT(*) FROM session_members WHERE session_id = s.id AND left_at IS NULL) as member_count
 		FROM sessions s
 		INNER JOIN session_members sm ON sm.session_id = s.id AND sm.member_id = ? AND sm.left_at IS NULL
-		WHERE (s.type = 'group' OR (s.type = 'private')) AND s.name LIKE ?
+		WHERE s.dissolved = false AND (s.type = 'group' OR (s.type = 'private')) AND s.name LIKE ?
 		ORDER BY s.last_message_at DESC NULLS LAST, s.created_at DESC
 		LIMIT 20
 	`, userID, "%"+q+"%").Scan(&result).Error
@@ -72,6 +72,7 @@ func ListUserSessions(db *gorm.DB, userID string) ([]SessionWithMeta, error) {
 			(SELECT COUNT(*) FROM session_members WHERE session_id = s.id AND left_at IS NULL) as member_count
 		FROM sessions s
 		INNER JOIN session_members sm ON sm.session_id = s.id AND sm.member_id = ? AND sm.left_at IS NULL
+		WHERE s.dissolved = false
 		ORDER BY sm.pinned DESC, COALESCE(s.last_message_at, s.created_at) DESC
 	`, userID).Scan(&result).Error
 	return result, err
