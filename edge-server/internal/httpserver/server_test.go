@@ -247,8 +247,161 @@ func TestCORSHeadersSet(t *testing.T) {
 		t.Fatalf("Access-Control-Allow-Methods = %q", methods)
 	}
 	headers := rec.Header().Get("Access-Control-Allow-Headers")
-	if headers != "Content-Type, Authorization" {
+	if headers != "Content-Type, Authorization, X-AgentHub-Edge-Token" {
 		t.Fatalf("Access-Control-Allow-Headers = %q", headers)
+	}
+}
+
+func TestRESTTimeoutMiddlewareTimesOutNonWebSocketRequests(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	defer close(release)
+
+	handler := restTimeoutMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-release
+		w.WriteHeader(http.StatusOK)
+	}), 10*time.Millisecond)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	select {
+	case <-started:
+	default:
+		t.Fatal("wrapped handler was not called")
+	}
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 timeout", rec.Code)
+	}
+}
+
+func TestRESTTimeoutMiddlewareBypassesWebSocketUpgrade(t *testing.T) {
+	called := false
+	handler := restTimeoutMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusSwitchingProtocols)
+	}), 1*time.Nanosecond)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if !called {
+		t.Fatal("websocket handler was not called")
+	}
+	if rec.Code != http.StatusSwitchingProtocols {
+		t.Fatalf("status = %d, want 101", rec.Code)
+	}
+}
+
+func TestLocalAuthMiddlewareDisabledAllowsRequests(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusAccepted)
+	}), "")
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202", rec.Code)
+	}
+	if !called {
+		t.Fatal("handler was not called")
+	}
+}
+
+func TestLocalAuthMiddlewareRequiresTokenForStateChangingRoutes(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusAccepted)
+	}), "edge-secret")
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+	if called {
+		t.Fatal("handler should not be called without a token")
+	}
+}
+
+func TestLocalAuthMiddlewareAllowsBearerToken(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusAccepted)
+	}), "edge-secret")
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
+	req.Header.Set("Authorization", "Bearer edge-secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202", rec.Code)
+	}
+	if !called {
+		t.Fatal("handler was not called with a valid token")
+	}
+}
+
+func TestLocalAuthMiddlewareAllowsHealthAndOptionsWithoutToken(t *testing.T) {
+	calls := 0
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusOK)
+	}), "edge-secret")
+
+	for _, req := range []*http.Request{
+		httptest.NewRequest(http.MethodGet, "/v1/health", nil),
+		httptest.NewRequest(http.MethodOptions, "/v1/runs", nil),
+	} {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s %s status = %d, want 200", req.Method, req.URL.Path, rec.Code)
+		}
+	}
+	if calls != 2 {
+		t.Fatalf("handler calls = %d, want 2", calls)
+	}
+}
+
+func TestLocalAuthMiddlewareAllowsWebSocketQueryToken(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusSwitchingProtocols)
+	}), "edge-secret")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/events?access_token=edge-secret", nil)
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSwitchingProtocols {
+		t.Fatalf("status = %d, want 101", rec.Code)
+	}
+	if !called {
+		t.Fatal("websocket handler was not called with a valid query token")
 	}
 }
 
@@ -380,6 +533,61 @@ func TestNewHandlerFromConfigWithRegisteredAdapter(t *testing.T) {
 	}
 }
 
+func TestNewHandlerFromConfigRegistersRuntimeRunner(t *testing.T) {
+	reg := adapters.NewRegistry()
+	a := adapters.NewCodexAdapter("codex", "")
+	if err := reg.Register(a); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	handler, err := newHandlerFromConfig(Config{
+		AdapterRegistry: reg,
+		AgentDefault:    "codex",
+	})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	runner, ok := handler.Registry.Get("runner_local_1")
+	if !ok {
+		t.Fatal("runner_local_1 should exist")
+	}
+	if runner.Name != "Codex Runner (local)" {
+		t.Fatalf("runner name = %q, want Codex Runner (local)", runner.Name)
+	}
+	if hasString(runner.Capabilities, "mock") {
+		t.Fatalf("runner capabilities = %v, must not report mock for runtime adapter executor", runner.Capabilities)
+	}
+	for _, want := range []string{"codex", "tool_calls", "file_changes", "multi_turn"} {
+		if !hasString(runner.Capabilities, want) {
+			t.Fatalf("runner capabilities = %v, missing %q", runner.Capabilities, want)
+		}
+	}
+}
+
+func TestNewHandlerFromConfigRegistersProcessRunner(t *testing.T) {
+	handler, err := newHandlerFromConfig(Config{
+		ProcessExecutor: lifecycle.ProcessExecutorConfig{
+			Command: os.Args[0],
+			Args:    []string{"-test.run=TestProcessExecutorWiringHelper", "--"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	runner, ok := handler.Registry.Get("runner_local_1")
+	if !ok {
+		t.Fatal("runner_local_1 should exist")
+	}
+	if runner.Name != "Process Runner (local)" {
+		t.Fatalf("runner name = %q, want Process Runner (local)", runner.Name)
+	}
+	for _, want := range []string{"process", "shell"} {
+		if !hasString(runner.Capabilities, want) {
+			t.Fatalf("runner capabilities = %v, missing %q", runner.Capabilities, want)
+		}
+	}
+}
+
 func TestNewHandlerFromConfigAdapterNotFound(t *testing.T) {
 	reg := adapters.NewRegistry()
 	// Register something different from AgentDefault
@@ -449,6 +657,13 @@ func TestRunReturnsErrorForInvalidConfig(t *testing.T) {
 	}
 }
 
+func TestRunRejectsNonLoopbackAddr(t *testing.T) {
+	err := Run(Config{Addr: ":3211"})
+	if err == nil {
+		t.Fatal("expected Run to reject wildcard listen address")
+	}
+}
+
 func TestRunServerStartAndServeHTTP(t *testing.T) {
 	// Start Run in a goroutine on a random port to exercise the full server
 	// startup path. We verify the server does not exit with an error.
@@ -501,4 +716,13 @@ func sendInterrupt() error {
 		return err
 	}
 	return p.Signal(os.Interrupt)
+}
+
+func hasString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

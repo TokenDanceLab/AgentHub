@@ -53,4 +53,6 @@ if echo "$SUBJECT" | grep -qE '[。\.]$'; then
     exit 1
 fi
 
+bash "$(git rev-parse --show-toplevel)/scripts/check-secrets.sh" --staged
+
 exit 0

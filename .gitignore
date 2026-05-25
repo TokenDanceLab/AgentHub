@@ -10,6 +10,14 @@ coverage/
 playwright-report/
 test-results/
 
+# Generated reports and local test artifacts
+app/desktop/stats.html
+**/coverage.out
+**/coverage.html
+edge-server/cov_full
+edge-server/$covPath
+hub-server/tests/uploads/
+
 # Go
 *.exe
 *.exe~
@@ -99,6 +107,8 @@ docs/review/
 !.agents/skills/adapter-dev/**
 !.agents/skills/env-sandbox/
 !.agents/skills/env-sandbox/**
+!.agents/skills/ui-screenshot/
+!.agents/skills/ui-screenshot/**
 .cursor/
 .continue/
 
@@ -118,4 +128,3 @@ docs/review/*
 !/reference/INDEX.md
 /chat-verify/
 test_store.json
-app/desktop/stats.html

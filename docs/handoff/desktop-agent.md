@@ -3,11 +3,11 @@
 ## 接手前必读
 
 1. `AGENTS.md` — 项目规则和开发约束
-2. `docs/system-architecture.md` — Hub-Edge-Runner 三层架构
-3. `docs/product-requirements.md` — 产品需求（bytedance.md 的工程版）
-4. `docs/implementation-guide.md` — 实施路线（M1→M2→M3→M4）
-5. `docs/client-roadmap.md` — 客户端开发路线图
-6. `docs/client-handoff.md` — 客户端操作手册
+2. `docs/architecture/system-architecture.md` — Hub-Edge-Runner 三层架构
+3. `docs/architecture/product-requirements.md` — 产品需求（bytedance.md 的工程版）
+4. `docs/architecture/implementation-guide.md` — 实施路线（M1→M2→M3→M4）
+5. `docs/operations/client-roadmap.md` — 客户端开发路线图
+6. `docs/operations/client-handoff.md` — 客户端操作手册
 7. `api/openapi.yaml` — REST API 契约
 8. `api/events.md` — WebSocket 事件契约
 9. `~/.claude/plans/structured-imagining-pinwheel.md` — 完整架构方案
@@ -88,21 +88,21 @@ AgentHub Desktop 走 Codex App 路线：
 
 ### 待完成（本次 Desktop 任务）
 
-| # | 任务 | 文件 | 优先级 |
-|---|------|------|--------|
-| 1 | **Tauri Rust sidecar** — 启动/停止 Edge Server 子进程 | `src-tauri/src/edge_manager.rs` | P0 |
-| 2 | **Edge 健康检查** — Rust 侧轮询 + 进程存活监控 | `src-tauri/src/edge_health.rs` | P0 |
-| 3 | **系统托盘** — 右键菜单：显示/隐藏窗口、启动/停止 Edge、退出 | `src-tauri/src/tray.rs` | P0 |
-| 4 | **Tauri commands** — Rust→JS API：`get_edge_status`/`start_edge`/`stop_edge` | `src-tauri/src/commands.rs` | P0 |
-| 5 | **原生通知** — Agent 执行完毕时 Windows toast | `src-tauri/src/notifications.rs` | P1 |
-| 6 | **扩展 shared types** — `Agent`/`AgentCapabilities`/新的 event 类型 | `app/shared/src/types.ts`, `events.ts` | P0 |
-| 7 | **扩展 edgeClient** — `fetchAgents()`/`startRun(prompt, agentId, model)` | `src/api/edgeClient.ts` | P0 |
-| 8 | **AgentList 面板** — 展示可用 Agent（替代 RunnerList） | `src/components/AgentList.tsx` | P0 |
-| 9 | **ChatView 面板** — IM 消息流，支持 text/code block 渲染 | `src/components/ChatView.tsx` | P0 |
-| 10 | **RunDetail 面板** — Agent 执行输出 + tool calls 表格 + file changes diff | `src/components/RunDetail.tsx` | P1 |
-| 11 | **PromptInput 组件** — 输入框 + @Agent 选择器 + 发送按钮 | `src/components/PromptInput.tsx` | P0 |
-| 12 | **ThreadPanel** — 左侧对话列表（创建/切换/搜索） | `src/components/ThreadPanel.tsx` | P1 |
-| 13 | **Agent events 渲染** — `useEventStream` 处理新的 `run.agent.*` 事件 | `src/hooks/useEventStream.ts` | P0 |
+> (M5/M7 已完成 — 2026-05-24)
+
+- [x] **Tauri Rust sidecar** — 启动/停止 Edge Server 子进程 (`src-tauri/src/edge_manager.rs`, P0)
+- [x] **Edge 健康检查** — Rust 侧轮询 + 进程存活监控 (`src-tauri/src/edge_health.rs`, P0)
+- [x] **系统托盘** — 右键菜单：显示/隐藏窗口、启动/停止 Edge、退出 (`src-tauri/src/tray.rs`, P0)
+- [x] **Tauri commands** — Rust→JS API：`get_edge_status`/`start_edge`/`stop_edge` (`src-tauri/src/commands.rs`, P0)
+- [x] **原生通知** — Agent 执行完毕时 Windows toast (`src-tauri/src/notifications.rs`, P1)
+- [x] **扩展 shared types** — `Agent`/`AgentCapabilities`/新的 event 类型 (`app/shared/src/types.ts`, `events.ts`, P0)
+- [x] **扩展 edgeClient** — `fetchAgents()`/`startRun(prompt, agentId, model)` (`src/api/edgeClient.ts`, P0)
+- [x] **AgentList 面板** — 展示可用 Agent（替代 RunnerList）(`src/components/AgentList.tsx`, P0)
+- [x] **ChatView 面板** — IM 消息流，支持 text/code block 渲染 (`src/components/ChatView.tsx`, P0)
+- [x] **RunDetail 面板** — Agent 执行输出 + tool calls 表格 + file changes diff (`src/components/RunDetail.tsx`, P1)
+- [x] **PromptInput 组件** — 输入框 + @Agent 选择器 + 发送按钮 (`src/components/PromptInput.tsx`, P0)
+- [x] **ThreadPanel** — 左侧对话列表（创建/切换/搜索）(`src/components/ThreadPanel.tsx`, P1)
+- [x] **Agent events 渲染** — `useEventStream` 处理新的 `run.agent.*` 事件 (`src/hooks/useEventStream.ts`, P0)
 
 ## 接口边界
 

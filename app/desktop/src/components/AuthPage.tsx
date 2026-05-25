@@ -94,8 +94,8 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
         <div className={styles.logo} aria-hidden="true">
           AH
         </div>
-        <h1 className={styles.appName}>登录 AgentHub</h1>
-        <p className={styles.tagline}>连接 Hub 服务器以同步智能体和会话</p>
+        <h1 className={styles.appName}>{t('auth.title')}</h1>
+        <p className={styles.tagline}>{t('auth.tagline')}</p>
       </div>
 
       {/* Segmented tab switcher */}
@@ -146,6 +146,7 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
             value={hubUrl}
             onChange={handleHubUrlChange}
             placeholder="http://localhost:8080"
+            aria-label={t('auth.hubUrl')}
           />
           <div className={styles.hubStatus}>
             <span className={hubDotClass} aria-hidden="true" />

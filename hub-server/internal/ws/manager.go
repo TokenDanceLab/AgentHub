@@ -7,12 +7,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
 	"github.com/coder/websocket"
 )
-
-const sendBufSize = 256
 
 type Conn struct {
 	ID         string
@@ -63,7 +62,7 @@ func (m *Manager) Count() int {
 func NewConn(ws *websocket.Conn) *Conn {
 	return &Conn{
 		W:    ws,
-		Send: make(chan []byte, sendBufSize),
+		Send: make(chan []byte, config.WSSendBufferSize),
 	}
 }
 
@@ -206,6 +205,12 @@ func (m *Manager) PushToSession(sessionID string, frame Frame) {
 	}
 }
 
+func (m *Manager) FindByConnID(connID string) *Conn {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.conns[connID]
+}
+
 func (m *Manager) FindByUserDevice(userID, deviceType string) *Conn {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -222,7 +227,7 @@ func (m *Manager) FindByUserDevice(userID, deviceType string) *Conn {
 
 func (m *Manager) StartHeartbeat() {
 	go func() {
-		ticker := time.NewTicker(30 * time.Second)
+		ticker := time.NewTicker(config.WSHeartbeatInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			m.pingAll()
@@ -251,13 +256,13 @@ func (m *Manager) pingAll() {
 	m.mu.RUnlock()
 
 	for _, c := range conns {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), config.WSPingTimeout)
 		err := c.W.Ping(ctx)
 		cancel()
 		if err != nil {
 			missed := c.missedPong.Add(1)
 			slog.Warn("ws ping failed", "conn_id", c.ID, "missed", missed)
-			if missed >= 2 {
+			if missed >= config.WSMaxMissedPongs {
 				slog.Info("ws closing stale connection", "conn_id", c.ID)
 				c.Close()
 				m.Unregister(c.ID)
