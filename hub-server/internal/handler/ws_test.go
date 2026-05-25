@@ -4,13 +4,19 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/base64"
+	"math/big"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/middleware"
 	hubws "github.com/agenthub/hub-server/internal/ws"
 	"github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
@@ -57,12 +63,65 @@ func TestWebSocketAuthRejectsTokenDanceBearerToken(t *testing.T) {
 	}
 }
 
+func TestWebSocketRouteRejectsTokenDanceBearerBeforeUpgrade(t *testing.T) {
+	token, issuer, audience, jwks := makeTokenDanceWebSocketTokenWithJWKS(t)
+	jwksServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(jwks))
+	}))
+	t.Cleanup(jwksServer.Close)
+	jwtutil.ResetJWKSCache()
+	jwtutil.SetJWKSURI(jwksServer.URL)
+	t.Cleanup(jwtutil.ResetJWKSCache)
+
+	manager := hubws.NewManager()
+	wsURL := newMiddlewareWebSocketTestServer(t, manager, &config.Config{
+		JWT: config.JWTConfig{Secret: testWSSecret},
+		TokenDanceID: config.TokenDanceIDConfig{
+			IssuerURL: issuer,
+			ClientID:  audience,
+		},
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	conn, resp, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
+		HTTPHeader: http.Header{"Authorization": []string{"Bearer " + token}},
+	})
+	if conn != nil {
+		conn.Close(websocket.StatusNormalClosure, "")
+	}
+	if err == nil {
+		t.Fatal("expected TokenDance bearer route handshake to fail before WebSocket upgrade")
+	}
+	if resp == nil {
+		t.Fatalf("expected HTTP response for rejected upgrade, got err=%v", err)
+	}
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
+	}
+	if got := manager.FindByUserDevice("tokendance-user-ws", "tokendance_bearer"); got != nil {
+		t.Fatal("TokenDance bearer must not register through the WebSocket route")
+	}
+}
+
 func newWebSocketTestServer(t *testing.T, manager *hubws.Manager) string {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	h := handler.NewWebSocketHandler(manager, testWSSecret)
 	r.GET("/client/ws", h.ServeWS)
+	server := httptest.NewServer(r)
+	t.Cleanup(server.Close)
+	return "ws" + strings.TrimPrefix(server.URL, "http") + "/client/ws"
+}
+
+func newMiddlewareWebSocketTestServer(t *testing.T, manager *hubws.Manager, cfg *config.Config) string {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	h := handler.NewWebSocketHandler(manager, testWSSecret)
+	r.GET("/client/ws", middleware.WSAuthMiddleware(cfg), h.ServeWS)
 	server := httptest.NewServer(r)
 	t.Cleanup(server.Close)
 	return "ws" + strings.TrimPrefix(server.URL, "http") + "/client/ws"
@@ -110,22 +169,41 @@ func readFrame(t *testing.T, conn *websocket.Conn) *hubws.Frame {
 
 func makeTokenDanceWebSocketToken(t *testing.T) string {
 	t.Helper()
+	token, _, _, _ := makeTokenDanceWebSocketTokenWithJWKS(t)
+	return token
+}
+
+func makeTokenDanceWebSocketTokenWithJWKS(t *testing.T) (token, issuer, audience, jwks string) {
+	t.Helper()
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatalf("generate RSA key: %v", err)
 	}
+	kid := tokenDanceWebSocketKID(&priv.PublicKey)
+	n := base64.RawURLEncoding.EncodeToString(priv.PublicKey.N.Bytes())
+	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(priv.PublicKey.E)).Bytes())
+	jwks = `{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"` + kid + `","n":"` + n + `","e":"` + e + `"}]}`
+
 	now := time.Now()
+	issuer = "https://id.example"
+	audience = "agenthub-client"
 	claims := jwt.RegisteredClaims{
-		Issuer:    "https://id.example",
+		Issuer:    issuer,
 		Subject:   "tokendance-user-ws",
-		Audience:  jwt.ClaimStrings{"agenthub-client"},
+		Audience:  jwt.ClaimStrings{audience},
 		ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
 		IssuedAt:  jwt.NewNumericDate(now),
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	signed, err := token.SignedString(priv)
+	jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	jwtToken.Header["kid"] = kid
+	signed, err := jwtToken.SignedString(priv)
 	if err != nil {
 		t.Fatalf("sign TokenDance token: %v", err)
 	}
-	return signed
+	return signed, issuer, audience, jwks
+}
+
+func tokenDanceWebSocketKID(pub *rsa.PublicKey) string {
+	hash := sha256.Sum256(pub.N.Bytes())
+	return base64.RawURLEncoding.EncodeToString(hash[:16])
 }
