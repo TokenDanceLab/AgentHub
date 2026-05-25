@@ -72,6 +72,12 @@ func TestCreatePrivateSession_Existing(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
 			AddRow("target-1", "target", "hash", "Target"))
 
+	// #122: friendship check — both users must be accepted friends.
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "friendships" WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $3 AND friend_id = $4) ORDER BY "friendships"."id" LIMIT $5`)).
+		WithArgs("user-1", "target-1", "target-1", "user-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
+			AddRow("f1", "user-1", "target-1", "accepted"))
+
 	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members sm1`).
 		WithArgs("user-1", "target-1", "private").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "type"}).
@@ -94,6 +100,12 @@ func TestCreatePrivateSession_Success(t *testing.T) {
 		WithArgs("target-1", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
 			AddRow("target-1", "target", "hash", "Target"))
+
+	// #122: friendship check — both users must be accepted friends.
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "friendships" WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $3 AND friend_id = $4) ORDER BY "friendships"."id" LIMIT $5`)).
+		WithArgs("user-1", "target-1", "target-1", "user-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
+			AddRow("f1", "user-1", "target-1", "accepted"))
 
 	// FindPrivateSessionBetween returns empty (no existing session)
 	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members sm1`).
@@ -128,6 +140,12 @@ func TestCreatePrivateSession_NilCacheDoesNotPanic(t *testing.T) {
 		WithArgs("target-1", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
 			AddRow("target-1", "target", "hash", "Target"))
+
+	// #122: friendship check — both users must be accepted friends.
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "friendships" WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $3 AND friend_id = $4) ORDER BY "friendships"."id" LIMIT $5`)).
+		WithArgs("user-1", "target-1", "target-1", "user-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
+			AddRow("f1", "user-1", "target-1", "accepted"))
 
 	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members sm1`).
 		WithArgs("user-1", "target-1", "private").
