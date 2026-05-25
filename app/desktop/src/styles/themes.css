@@ -18,9 +18,9 @@
   --foreground: #e3e4e6;
 
   /* Cards — Codex-style translucent glass over the dark workspace */
-  --card: rgba(37, 37, 45, 0.82);
+  --card: #25252d;
   --card-foreground: #e3e4e6;
-  --popover: rgba(48, 48, 58, 0.88);
+  --popover: #30303a;
   --popover-foreground: #e3e4e6;
 
   /* Primary — linear Codex blue, not the old purple atmosphere */
@@ -78,12 +78,12 @@
   --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.45);
 
   /* Glass panels — layered depth */
-  --sidebar-bg: rgba(31, 31, 39, 0.86);
+  --sidebar-bg: #1f1f27;
 
   --surface-base: #1f1f27;
-  --surface-raised: rgba(37, 37, 45, 0.82);
-  --surface-raised-hover: rgba(55, 55, 66, 0.86);
-  --surface-overlay: rgba(60, 60, 72, 0.9);
+  --surface-raised: #25252d;
+  --surface-raised-hover: #333340;
+  --surface-overlay: #3c3c48;
   --hover-overlay: rgba(255, 255, 255, 0.04);
 
   --text-weaker: #a0a1aa;
@@ -111,7 +111,7 @@
   --chat-thinking-border: rgba(255, 255, 255, 0.055);
 
   /* ── Floating input panel ───────────────────── */
-  --input-panel-bg: rgba(50, 50, 60, 0.78);
+  --input-panel-bg: #25252d;
   --input-panel-border: rgba(255, 255, 255, 0.09);
   --input-panel-shadow: 0 -10px 34px rgba(0, 0, 0, 0.24);
   --input-ghost-btn: rgba(255, 255, 255, 0.045);
