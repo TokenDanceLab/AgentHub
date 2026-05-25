@@ -13,6 +13,7 @@
     "./hubClient": "./src/hubClient.ts",
     "./apiClient": "./src/apiClient.ts",
     "./eventClient": "./src/eventClient.ts",
+    "./surfaceMetadata": "./src/surfaceMetadata.ts",
     "./workbenchState": "./src/workbenchState.ts",
     "./mock": "./src/mock.ts",
     "./components": "./src/components/index.ts",
