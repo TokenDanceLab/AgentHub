@@ -245,6 +245,14 @@ TokenDance ID is the cross-product identity entry. Hub session is AgentHub's own
 | Compatibility bearer path | `hub-server/internal/middleware/auth.go` can verify TokenDance ID RS256/JWKS bearer tokens, but this is compatibility-only and does not replace Hub session |
 | Local execution | Local Edge + Desktop execution does not require Hub login; Hub session is required for cloud IM, sync, remote control, or relay |
 
+OIDC structural check:
+
+```powershell
+.\scripts\verify-oidc-readiness.ps1
+```
+
+This check only proves public repository wiring for Hub OIDC endpoints, example configuration, Desktop/Web Hub session storage policy, and the root governance matrix. It does not connect to production TokenDance ID, does not need a real `client_secret`, and does not replace deployed login/callback/logout/reconnect evidence.
+
 <br>
 
 ## References
