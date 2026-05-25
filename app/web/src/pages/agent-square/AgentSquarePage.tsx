@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { mockRunners } from '@shared/index';
+import { useHubCustomAgents, type HubCustomAgent } from '../../hooks/useHubCustomAgents';
+import { useHubSession } from '../../hooks/useHubSession';
 
 type AgentCategory = 'Engineering' | 'Design' | 'Operations' | 'Research';
 
@@ -31,7 +33,7 @@ type Confirmation = {
   title: string;
 };
 
-const agents: Agent[] = [
+const catalogAgents: Agent[] = [
   {
     id: 'refactor',
     name: 'Code Refactor Pro',
@@ -150,6 +152,38 @@ const categories: Array<AgentCategory | 'All'> = ['All', 'Engineering', 'Design'
 const initialFavoriteIds = new Set<string>(['refactor', mockRunners[0]?.id].filter(Boolean) as string[]);
 const initialInstalledIds = new Set<string>(['refactor', mockRunners[0]?.id, mockRunners[1]?.id].filter(Boolean) as string[]);
 const workspaceLimit = 8;
+
+function parseJsonStringArray(value: string | undefined): string[] {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function agentFromHub(agent: HubCustomAgent, index: number): Agent {
+  const tags = parseJsonStringArray(agent.capability_tags);
+  const tone = (['blue', 'cyan', 'purple', 'green'] as const)[index % 4] ?? 'blue';
+
+  return {
+    id: agent.id,
+    name: agent.name,
+    category: 'Engineering',
+    icon: agent.avatar_url ? 'account_circle' : 'smart_toy',
+    tone,
+    summary: agent.system_prompt || `${agent.agent_type} custom agent`,
+    description: agent.system_prompt || `${agent.name} is loaded from Hub /web/custom-agents.`,
+    tags: tags.length ? tags : [agent.agent_type],
+    installs: 0,
+    favoriteCount: 0,
+    rating: 0,
+    updatedDaysAgo: 0,
+    outputs: ['Hub custom agent', 'Session mention target', 'Shared profile contract'],
+  };
+}
 
 function formatInstalls(installs: number): string {
   return `${(installs / 1000).toFixed(1)}k`;
@@ -270,7 +304,7 @@ function ParticleCanvas() {
 
 export function AgentSquarePageInteractive() {
   const [activeCategory, setActiveCategory] = useState<AgentCategory | 'All'>('All');
-  const [detailAgentId, setDetailAgentId] = useState<string | null>(agents[0]?.id ?? null);
+  const [detailAgentId, setDetailAgentId] = useState<string | null>(catalogAgents[0]?.id ?? null);
   const [isDetailOpen, setIsDetailOpen] = useState(true);
   const [favoriteIds, setFavoriteIds] = useState(initialFavoriteIds);
   const [installedIds, setInstalledIds] = useState(initialInstalledIds);
@@ -280,6 +314,26 @@ export function AgentSquarePageInteractive() {
   const [viewMode, setViewMode] = useState<ViewMode>('all');
 
   const { t } = useTranslation('agentSquare');
+  const { hasSession: hasHubSession, token } = useHubSession();
+  const customAgents = useHubCustomAgents(token);
+  const agents = useMemo(
+    () => customAgents.source === 'hub'
+      ? customAgents.agents.map(agentFromHub)
+      : catalogAgents,
+    [customAgents.agents, customAgents.source],
+  );
+  const catalogSourceLabel = customAgents.source === 'hub'
+    ? t('source.hub')
+    : hasHubSession && customAgents.isLoading
+      ? t('source.loading')
+      : t('source.catalogMock');
+  const catalogSourceDetail = customAgents.source === 'hub'
+    ? t('source.hubDetail')
+    : customAgents.error
+      ? t('source.errorDetail', { error: customAgents.error })
+      : hasHubSession
+        ? t('source.catalogFallbackDetail')
+        : t('source.loginRequiredDetail');
 
   const sortLabels = useMemo<Record<SortMode, string>>(() => ({
     popular: t('sort.popular'),
@@ -296,6 +350,17 @@ export function AgentSquarePageInteractive() {
   const detailAgent = isDetailOpen ? agents.find((agent) => agent.id === detailAgentId) ?? null : null;
   const hasActiveFilters = activeCategory !== 'All' || query.trim().length > 0 || viewMode !== 'all';
   const workspaceIsFull = installedIds.size >= workspaceLimit;
+
+  useEffect(() => {
+    if (agents.length === 0) {
+      setDetailAgentId(null);
+      return;
+    }
+
+    if (!detailAgentId || !agents.some((agent) => agent.id === detailAgentId)) {
+      setDetailAgentId(agents[0]?.id ?? null);
+    }
+  }, [agents, detailAgentId]);
 
   const filteredAgents = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -349,7 +414,7 @@ export function AgentSquarePageInteractive() {
     });
 
     return counts;
-  }, []);
+  }, [agents]);
 
   function getDisplayInstalls(agentId: string): number {
     const agent = agents.find((currentAgent) => currentAgent.id === agentId);
@@ -482,9 +547,9 @@ export function AgentSquarePageInteractive() {
             <section className="asr-stack">
               <div className="asr-section-head">
                 <h3>{t('sidebar.nav')}</h3>
-                <span className="asr-pill asr-pill-cyan">
+                <span className={cx('asr-pill', customAgents.source === 'hub' ? 'asr-pill-green' : 'asr-pill-cyan')}>
                   <span className="asr-status-dot" />
-                  {t('sidebar.local')}
+                  {catalogSourceLabel}
                 </span>
               </div>
 
@@ -499,7 +564,7 @@ export function AgentSquarePageInteractive() {
                   </div>
                   <div className="asr-truncate">
                     <strong className="asr-small">{t('sidebar.catalog')}</strong>
-                    <p className="asr-tiny asr-muted asr-truncate">{t('sidebar.catalogDesc')}</p>
+                    <p className="asr-tiny asr-muted asr-truncate">{catalogSourceDetail}</p>
                   </div>
                 </button>
 
@@ -563,16 +628,16 @@ export function AgentSquarePageInteractive() {
               <div className="asr-progress">
                 <span style={{ width: `${Math.min((installedIds.size / workspaceLimit) * 100, 100)}%` }} />
               </div>
-              <p className="asr-small asr-muted">{t('sidebar.slotsDesc')}</p>
+              <p className="asr-small asr-muted">{catalogSourceDetail}</p>
             </section>
           </aside>
 
           <main className="asr-main">
             <header className="asr-topbar asr-glass">
               <div>
-                <p className="asr-label asr-muted">{t('header.title')}</p>
+                <p className="asr-label asr-muted">{catalogSourceLabel}</p>
                 <h1>{t('header.subtitle')}</h1>
-                <p className="asr-small asr-muted">{t('header.description')}</p>
+                <p className="asr-small asr-muted">{catalogSourceDetail}</p>
               </div>
 
               <div className="asr-toolbar">
@@ -608,7 +673,7 @@ export function AgentSquarePageInteractive() {
                 </div>
                 <div>
                   <strong>{agents.length}</strong>
-                  <span className="asr-small asr-muted">{t('stats.curated')}</span>
+                  <span className="asr-small asr-muted">{customAgents.source === 'hub' ? t('stats.hub') : t('stats.curated')}</span>
                 </div>
               </div>
               <div className="asr-metric-card asr-glass">
@@ -643,8 +708,8 @@ export function AgentSquarePageInteractive() {
             <section className="asr-market asr-glass">
               <div className="asr-market-head">
                 <div>
-                  <p className="asr-label asr-muted">{t('catalog.title')}</p>
-                  <h2>{t('catalog.subtitle')}</h2>
+                  <p className="asr-label asr-muted">{catalogSourceLabel}</p>
+                  <h2>{customAgents.source === 'hub' ? t('catalog.hubSubtitle') : t('catalog.subtitle')}</h2>
                 </div>
                 <div className="asr-filter-summary">
                   <span className="asr-pill asr-pill-cyan">{t('catalog.showing', { count: filteredAgents.length })}</span>

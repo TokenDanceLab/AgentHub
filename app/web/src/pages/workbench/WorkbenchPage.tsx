@@ -443,10 +443,29 @@ export default function WorkbenchPage() {
   }, [activeThread?.id, state.threadItems]);
   const diffLines = useMemo(() => artifactDiffLines(runArtifacts), [runArtifacts]);
   const isOffline = state.connection.status === 'disconnected' || state.connection.status === 'error';
+  const isLoading = state.connection.status === 'loading';
+  const hasSnapshotData =
+    state.projects.length > 0 ||
+    state.threads.length > 0 ||
+    state.runners.length > 0 ||
+    state.runs.length > 0 ||
+    state.artifacts.length > 0 ||
+    state.approvals.length > 0 ||
+    state.previews.length > 0;
+  const isActionLocked = isOffline || isLoading || !hasSnapshotData;
+  const stateNotice = isLoading
+    ? t('state.loading')
+    : isOffline && hasSnapshotData
+      ? t('state.offlineSnapshot')
+      : isOffline
+        ? t('state.offlineEmpty')
+        : !hasSnapshotData
+          ? t('state.empty')
+          : undefined;
 
   const queueDraft = async () => {
     const content = draft.trim();
-    if (!content || !activeThread) return;
+    if (!content || !activeThread || isActionLocked) return;
 
     setIsSending(true);
     setActionError(undefined);
@@ -478,7 +497,7 @@ export default function WorkbenchPage() {
   };
 
   const startActiveRun = async () => {
-    if (!activeThread) return;
+    if (!activeThread || isActionLocked) return;
 
     setIsStartingRun(true);
     setActionError(undefined);
@@ -552,7 +571,7 @@ export default function WorkbenchPage() {
   };
 
   const requestPreview = async () => {
-    if (!run) return;
+    if (!run || isActionLocked) return;
 
     setActionError(undefined);
     try {
@@ -679,7 +698,7 @@ export default function WorkbenchPage() {
             </span>
             <button
               className={styles.primaryButton}
-              disabled={!activeThread || isStartingRun}
+            disabled={!activeThread || isStartingRun || isActionLocked}
               onClick={startActiveRun}
               type="button"
             >
@@ -688,6 +707,7 @@ export default function WorkbenchPage() {
           </div>
         </header>
 
+        {stateNotice ? <p className={styles.stateBanner}>{stateNotice}</p> : null}
         {actionError ? <p className={styles.errorBanner}>{errorMessage(actionError)}</p> : null}
 
         <section className={styles.runSummary} aria-label={t('runSummary.ariaLabel')}>
@@ -781,7 +801,7 @@ export default function WorkbenchPage() {
             </span>
             <button
               className={styles.secondaryButton}
-              disabled={!approval || approval.status !== 'pending' || decidingApprovalId === approval.id}
+            disabled={!approval || approval.status !== 'pending' || decidingApprovalId === approval.id || isActionLocked}
               onClick={() => decide('rejected')}
               type="button"
             >
@@ -789,7 +809,7 @@ export default function WorkbenchPage() {
             </button>
             <button
               className={styles.primaryButton}
-              disabled={!approval || approval.status !== 'pending' || decidingApprovalId === approval.id}
+            disabled={!approval || approval.status !== 'pending' || decidingApprovalId === approval.id || isActionLocked}
               onClick={() => decide('approved')}
               type="button"
             >
@@ -810,14 +830,14 @@ export default function WorkbenchPage() {
           </button>
           <textarea
             aria-label={t('composer.threadAriaLabel')}
-            disabled={!activeThread || isSending}
-            placeholder={t('composer.placeholder')}
+            disabled={!activeThread || isSending || isActionLocked}
+            placeholder={isActionLocked ? t('composer.lockedPlaceholder') : t('composer.placeholder')}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleComposerKeyDown}
             rows={1}
           />
-          <button className={styles.primaryButton} disabled={!draft.trim() || isSending} type="submit">
+          <button className={styles.primaryButton} disabled={!draft.trim() || isSending || isActionLocked} type="submit">
             {isSending ? t('composer.sending') : t('composer.send')}
           </button>
         </form>
@@ -917,7 +937,7 @@ export default function WorkbenchPage() {
                 <strong>{preview?.status === 'ready' ? t('workspace.preview.ready') : t('workspace.preview.notReady')}</strong>
                 <p>{preview?.url ?? t('workspace.preview.hint')}</p>
                 {run && !preview ? (
-                  <button className={styles.secondaryButton} onClick={requestPreview} type="button">
+                  <button className={styles.secondaryButton} disabled={isActionLocked} onClick={requestPreview} type="button">
                     {t('workspace.preview.request')}
                   </button>
                 ) : null}

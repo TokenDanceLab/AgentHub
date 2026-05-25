@@ -834,6 +834,11 @@
   transform: translateX(18px);
 }
 
+.switch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .select {
   min-width: 158px;
   height: 34px;
@@ -1064,6 +1069,22 @@
   line-height: 1.4;
 }
 
+.authGapBlock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 78px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 12px;
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+}
+
 .emptyBlock {
   display: flex;
   min-height: 160px;
@@ -1179,7 +1200,8 @@
   .connectionRow,
   .runnerRow,
   .taskRow,
-  .accountCard {
+  .accountCard,
+  .authGapBlock {
     align-items: flex-start;
     flex-wrap: wrap;
   }

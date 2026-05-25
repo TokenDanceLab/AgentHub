@@ -4,8 +4,8 @@
 
   "sidebar.nav": "Navigation",
   "sidebar.local": "Local",
-  "sidebar.catalog": "Catalog preview",
-  "sidebar.catalogDesc": "Browse mock agents",
+  "sidebar.catalog": "Catalog",
+  "sidebar.catalogDesc": "Browse Hub custom agents or the labeled catalog fallback",
   "sidebar.workspace": "Workspace",
   "sidebar.workspaceDesc": "{{count}} locally staged",
   "sidebar.favorites": "Favorites",
@@ -17,7 +17,7 @@
 
   "categories.all": "All agents",
 
-  "header.title": "Mock catalog",
+  "header.title": "Catalog",
   "header.subtitle": "Find the right specialist before a run starts",
   "header.description": "Local catalog preview only. Hub /web/custom-agents is not connected yet.",
 
@@ -33,19 +33,28 @@
   "viewMode.favorites": "Only favorites",
   "viewMode.installed": "Only locally staged",
 
-  "stats.curated": "Mock catalog agents",
+  "stats.curated": "Catalog/mock agents",
+  "stats.hub": "Hub custom agents",
   "stats.ready": "Local workspace ready",
   "stats.favorites": "Favorites",
   "stats.policy": "Preview checks",
 
-  "catalog.title": "Local catalog",
+  "catalog.title": "Catalog",
   "catalog.subtitle": "Staged specialists",
+  "catalog.hubSubtitle": "Hub custom agents",
   "catalog.showing": "Showing {{count}} agents",
 
   "filters.clear": "Clear",
   "filters.clearFilters": "Clear filters",
   "filters.clearedTitle": "Filters cleared",
   "filters.cleared": "The catalog is back to the full local preview set.",
+  "source.hub": "Hub /web/custom-agents",
+  "source.hubDetail": "Loaded from the Hub custom-agent contract for the current Web session.",
+  "source.loading": "Loading Hub catalog",
+  "source.catalogMock": "Catalog/mock fallback",
+  "source.catalogFallbackDetail": "Hub did not return custom agents, so this page is showing the labeled catalog/mock fallback.",
+  "source.loginRequiredDetail": "No Web Hub session is available. Showing the labeled catalog/mock fallback instead of pretending Hub sync succeeded.",
+  "source.errorDetail": "Hub custom agents are unavailable: {{error}}. Showing the labeled catalog/mock fallback.",
 
   "card.details": "Details",
   "card.add": "Stage locally",
