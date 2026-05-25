@@ -7,6 +7,7 @@ import { useMention } from '@/hooks/useMention';
 import MentionPopover from '@/components/MentionPopover';
 import ModelDropdown from '@/components/ModelDropdown';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
+import { useToastStore } from '@/stores/toastStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
 import { useShallow } from 'zustand/shallow';
 import styles from './PromptInput.module.css';
@@ -20,6 +21,7 @@ const REASONING_EFFORTS = ['low', 'medium', 'high', 'max'] as const;
 type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 const MAX_CHARS = 4000;
+const TEXT_ATTACHMENT_EXTENSIONS = /\.(c|cc|cpp|cs|css|csv|diff|go|h|hpp|html|ini|java|js|jsx|json|log|md|markdown|py|rs|sh|sql|toml|ts|tsx|txt|xml|yaml|yml)$/i;
 
 interface SendOptions { model?: string; reasoningEffort?: ReasoningEffort; }
 
@@ -52,12 +54,18 @@ function modelMeta(name: string): string {
   return '';
 }
 
+function isTextAttachment(file: File): boolean {
+  return file.type.startsWith('text/') || file.type === 'application/json' || TEXT_ATTACHMENT_EXTENSIONS.test(file.name);
+}
+
 export default function PromptInput({
   agents, selectedAgentId, onSelectAgent, onSend,
   isStreaming = false, isStarting = false, onCancel, disabled, threadId,
 }: Props) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const addToast = useToastStore((s) => s.addToast);
   const [promptLength, setPromptLength] = useState(0);
   const [model, setModel] = useState<string>('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
@@ -149,6 +157,49 @@ export default function PromptInput({
     clearDraft();
   }, [disabled, isStreaming, isStarting, selectedAgentId, model, selectedAgentAlias, reasoningEffort, onSend, clearDraft, closeMention]);
 
+  const handleAttachClick = useCallback(() => {
+    if (disabled || isStarting || isStreaming) return;
+    fileInputRef.current?.click();
+  }, [disabled, isStarting, isStreaming]);
+
+  const handleAttachFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const target = event.currentTarget;
+    const file = target.files?.[0];
+    target.value = '';
+    if (!file || disabled || isStarting || isStreaming) return;
+
+    if (!isTextAttachment(file)) {
+      addToast({ type: 'warning', message: t('prompt.attachUnsupported') });
+      return;
+    }
+
+    try {
+      const content = await file.text();
+      const trimmedContent = content.trimEnd();
+      if (!trimmedContent.trim()) {
+        addToast({ type: 'warning', message: t('prompt.attachEmpty') });
+        return;
+      }
+
+      const ta = inputRef.current;
+      if (!ta) return;
+      const prefix = ta.value.trim().length > 0 ? '\n\n' : '';
+      const attachmentBlock = `${t('prompt.localAttachmentHeader', { name: file.name })}\n${trimmedContent}`;
+      const nextValue = `${ta.value}${prefix}${attachmentBlock}`;
+      if (nextValue.length > MAX_CHARS) {
+        addToast({ type: 'warning', message: t('prompt.attachTooLarge') });
+        return;
+      }
+
+      ta.value = nextValue;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      ta.focus();
+      addToast({ type: 'success', message: t('prompt.attachInserted', { name: file.name }) });
+    } catch {
+      addToast({ type: 'error', message: t('prompt.attachReadFailed') });
+    }
+  }, [addToast, disabled, isStarting, isStreaming, t]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (mentionHandleKeyDown(e)) return;
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -170,6 +221,16 @@ export default function PromptInput({
       />
 
       <div className={styles.capsule}>
+        <input
+          ref={fileInputRef}
+          className={styles.fileInput}
+          type="file"
+          accept=".c,.cc,.cpp,.cs,.css,.csv,.diff,.go,.h,.hpp,.html,.ini,.java,.js,.jsx,.json,.log,.md,.markdown,.py,.rs,.sh,.sql,.toml,.ts,.tsx,.txt,.xml,.yaml,.yml,text/*,application/json"
+          onChange={handleAttachFile}
+          aria-hidden="true"
+          tabIndex={-1}
+        />
+
         {/* selected agent badge */}
         {selectedAgent && (
           <span className={styles.agentBadge}>
@@ -217,7 +278,8 @@ export default function PromptInput({
             <button
               type="button"
               className={styles.attachBtn}
-              disabled={disabled || isStarting}
+              onClick={handleAttachClick}
+              disabled={disabled || isStarting || isStreaming}
               title={t('prompt.attachCustom')}
               aria-label={t('prompt.attachCustom')}
             >

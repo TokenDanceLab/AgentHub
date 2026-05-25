@@ -42,6 +42,7 @@ import { render, screen, fireEvent, within, waitFor } from '@testing-library/rea
 import '@testing-library/jest-dom/vitest';
 import PromptInput from '@/components/PromptInput';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
+import { useToastStore } from '@/stores/toastStore';
 import type { AgentInfo } from '@shared/types';
 
 // jsdom does not implement scrollIntoView
@@ -74,6 +75,7 @@ describe('PromptInput', () => {
   beforeEach(() => {
     localStorage.clear();
     useModelSettingsStore.getState().reset();
+    useToastStore.setState({ toasts: [] });
   });
 
   it('renders input field with placeholder', () => {
@@ -492,6 +494,78 @@ describe('PromptInput', () => {
 
     const sendBtn = screen.getByRole('button', { name: 'action.startRun' });
     expect(sendBtn).not.toBeDisabled();
+  });
+
+  it('opens the local file picker from the attach button', () => {
+    const { container } = render(
+      <PromptInput
+        agents={[]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={vi.fn()}
+      />,
+    );
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const clickSpy = vi.spyOn(fileInput, 'click').mockImplementation(() => {});
+
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.attachCustom' }));
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('inserts a local text file into the prompt without claiming upload sync', async () => {
+    const { container } = render(
+      <PromptInput
+        agents={[]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLTextAreaElement;
+    typeInPrompt(input, 'Existing prompt');
+    const file = new File(['alpha\nbeta'], 'notes.md', { type: 'text/markdown' });
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(input.value).toContain('Existing prompt\n\nprompt.localAttachmentHeader(name=notes.md)');
+      expect(input.value).toContain('alpha\nbeta');
+    });
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts[toasts.length - 1]).toMatchObject({
+      type: 'success',
+      message: 'prompt.attachInserted(name=notes.md)',
+    });
+  });
+
+  it('labels non-text attachments as an unsupported interface boundary', async () => {
+    const { container } = render(
+      <PromptInput
+        agents={[]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText('prompt.placeholder') as HTMLTextAreaElement;
+    const file = new File(['PNG'], 'image.png', { type: 'image/png' });
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts[toasts.length - 1]).toMatchObject({
+        type: 'warning',
+        message: 'prompt.attachUnsupported',
+      });
+    });
+    expect(input.value).toBe('');
   });
 
   it('shows the resolved model route from persisted settings', () => {
