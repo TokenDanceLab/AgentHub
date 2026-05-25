@@ -1,11 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { HUB_EVENTS } from './hubEvents';
 import { AppError } from './errors';
 import {
   createHubClient,
   HubError,
   parseHubError,
   unwrapHubResponse,
+  type HubAgentDoneFrame,
+  type HubAgentFailedFrame,
+  type HubAgentStreamFrame,
   type HubCustomAgentRequest,
+  type HubDeviceKickedFrame,
+  type HubDeviceOnlineFrame,
+  type HubFriendAcceptedFrame,
+  type HubFriendRequestFrame,
+  type HubNotificationNewFrame,
   type HubSession,
 } from './hubClient';
 
@@ -175,6 +184,74 @@ describe('hubClient helpers', () => {
     expect(fetchMock.mock.calls[2]?.[0]).toBe(
       'http://hub.local/client/notifications/read-all',
     );
+  });
+
+  it('types Hub WS frames used by notifications, social, device, and task bridge events', () => {
+    const deviceOnline: HubDeviceOnlineFrame = {
+      type: HUB_EVENTS.DEVICE_ONLINE,
+      payload: {
+        user_id: 'u1',
+        device_type: 'desktop',
+        device_id: '018f86aa-2f93-7cc0-9c39-000000000001',
+      },
+    };
+    const deviceKicked: HubDeviceKickedFrame = {
+      type: HUB_EVENTS.DEVICE_KICKED,
+      payload: { device_id: '018f86aa-2f93-7cc0-9c39-000000000001', reason: 'replaced' },
+    };
+    const agentStream: HubAgentStreamFrame = {
+      type: HUB_EVENTS.AGENT_STREAM,
+      payload: { task_id: 'task-1', content: 'delta', run_id: 'run-1' },
+    };
+    const agentDone: HubAgentDoneFrame = {
+      type: HUB_EVENTS.AGENT_DONE,
+      payload: { task_id: 'task-1', final_content: 'final', edge_run_id: 'run-1' },
+    };
+    const agentFailed: HubAgentFailedFrame = {
+      type: HUB_EVENTS.AGENT_FAILED,
+      payload: { task_id: 'task-2', error_message: 'boom', run_id: 'run-2' },
+    };
+    const notification: HubNotificationNewFrame = {
+      type: HUB_EVENTS.NOTIFICATION_NEW,
+      payload: {
+        id: '018f86aa-2f93-7cc0-9c39-000000000002',
+        user_id: '018f86aa-2f93-7cc0-9c39-000000000003',
+        type: 'friend_request',
+        payload: '{"request_id":"fr1"}',
+        read: false,
+        created_at: '2026-05-25T01:06:00Z',
+      },
+    };
+    const friendRequest: HubFriendRequestFrame = {
+      type: HUB_EVENTS.FRIEND_REQUEST,
+      payload: { request_id: 'fr1', user_id: 'u2', nickname: 'Friend' },
+    };
+    const friendAccepted: HubFriendAcceptedFrame = {
+      type: HUB_EVENTS.FRIEND_ACCEPTED,
+      payload: { user_id: 'u2', friend_id: 'u1' },
+    };
+
+    expect([
+      deviceOnline.type,
+      deviceKicked.type,
+      agentStream.type,
+      agentDone.type,
+      agentFailed.type,
+      notification.type,
+      friendRequest.type,
+      friendAccepted.type,
+    ]).toEqual([
+      'device.online',
+      'device.kicked',
+      'agent.stream',
+      'agent.done',
+      'agent.failed',
+      'notification.new',
+      'friend.request',
+      'friend.accepted',
+    ]);
+    expect(agentStream.payload?.run_id).toBe('run-1');
+    expect(notification.payload?.read).toBe(false);
   });
 
   it('keeps the legacy HubError shape for Desktop compatibility', () => {
