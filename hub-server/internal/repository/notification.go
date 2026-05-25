@@ -23,8 +23,15 @@ func ListNotifications(db *gorm.DB, userID string, unreadOnly bool, limit, offse
 	return notifs, err
 }
 
-func MarkNotificationRead(db *gorm.DB, notifID string) error {
-	return db.Model(&model.Notification{}).Where("id = ?", notifID).Update("read", true).Error
+func MarkNotificationRead(db *gorm.DB, userID, notifID string) error {
+	result := db.Model(&model.Notification{}).Where("id = ? AND user_id = ?", notifID, userID).Update("read", true)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func MarkAllNotificationsRead(db *gorm.DB, userID string) error {

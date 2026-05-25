@@ -856,7 +856,7 @@ func TestNotificationRepo_CreateAndList(t *testing.T) {
 	assert.Len(t, result, 2)
 
 	// Mark first as read
-	require.NoError(t, MarkNotificationRead(db, n1.ID))
+		require.NoError(t, MarkNotificationRead(db, "user-n1", n1.ID))
 
 	// List unread only
 	result, err = ListNotifications(db, "user-n1", true, 10, 0)

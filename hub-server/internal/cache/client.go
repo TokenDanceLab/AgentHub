@@ -220,3 +220,28 @@ func (c *Client) CheckRateLimit(ctx context.Context, key string, limit int64) (c
 	exceeded = count > limit
 	return
 }
+
+// ── NoOpCache ───────────────────────────────────────────────────────────
+
+// NoOpCache is a safe no-op implementation of all cache interfaces used by
+// services. Tests and offline paths can use this explicitly. Production
+// constructors MUST receive a real *Client — passing nil will panic.
+type NoOpCache struct{}
+
+func (NoOpCache) Invalidate(ctx context.Context, keys ...string) error              { return nil }
+func (NoOpCache) IsOnline(ctx context.Context, userID string) (bool, error)          { return false, nil }
+func (NoOpCache) InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error { return nil }
+func (NoOpCache) AllocateSeq(ctx context.Context, sessionID string) (int64, error)   { return 0, ErrCacheUnavailable }
+func (NoOpCache) GetRoute(ctx context.Context, userID, deviceType string) (string, error) {
+	return "", ErrCacheUnavailable
+}
+func (NoOpCache) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
+	return ErrCacheUnavailable
+}
+func (NoOpCache) BlacklistRefreshToken(ctx context.Context, tokenHash string, ttl time.Duration) error {
+	return nil
+}
+
+// ErrCacheUnavailable is returned by NoOpCache methods that cannot operate
+// without a real Redis connection (e.g. AllocateSeq, GetRoute).
+var ErrCacheUnavailable = errors.New("cache unavailable")
