@@ -1090,6 +1090,12 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HubTaskStreamRequest"
       responses:
         "200":
           description: Chunk recorded.
@@ -1107,6 +1113,12 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HubTaskDoneRequest"
       responses:
         "200":
           description: Task marked done.
@@ -1882,7 +1894,7 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubRegisterDevice
-      summary: Register a device.
+      summary: Register a device with the Hub. Device type is taken from the JWT claim.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1892,15 +1904,28 @@ paths:
           application/json:
             schema:
               type: object
-              required: [device_type, device_name]
+              required: [device_id]
               properties:
-                device_type: { type: string }
-                device_name: { type: string }
+                device_id:
+                  type: string
+                  format: uuid
+                  description: UUID of the physical device (must match JWT device_id claim).
+                app_version:
+                  type: string
+                  description: Optional client application version.
                 capabilities:
-                  type: object
+                  type: array
+                  items: { type: string }
+                  description: Device capability tags (e.g. ["desktop", "edge"]).
       responses:
-        "201":
-          $ref: "#/components/responses/Created"
+        "200":
+          description: Device registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+        "400":
+          $ref: "#/components/responses/BadRequest"
 
   /web/agent-tasks/{id}:cancel:
     post:
@@ -2991,6 +3016,34 @@ components:
         edge_run_id:
           type: string
           description: Alias for run_id for explicit Hub persistence.
+    HubTaskStreamRequest:
+      type: object
+      required: [chunk]
+      properties:
+        chunk:
+          type: string
+          description: NDJSON-encoded agent stream event line.
+        client_msg_id:
+          type: string
+          description: Client-generated message id for idempotent stream dedup.
+        run_id:
+          type: string
+          description: Edge run id.
+        edge_run_id:
+          type: string
+          description: Alias for run_id.
+    HubTaskDoneRequest:
+      type: object
+      properties:
+        run_id:
+          type: string
+          description: Edge run id.
+        edge_run_id:
+          type: string
+          description: Alias for run_id.
+        result:
+          type: string
+          description: Optional final agent output or summary.
     StartRunRequest:
       type: object
       properties:
