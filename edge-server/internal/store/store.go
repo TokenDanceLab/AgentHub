@@ -51,6 +51,17 @@ type Item struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+type RunCleanupOptions struct {
+	Now                      time.Time
+	TerminalTTL              time.Duration
+	MaxTerminalRunsPerThread int
+}
+
+type RunCleanupResult struct {
+	RemovedRuns  int `json:"removedRuns"`
+	RemovedItems int `json:"removedItems"`
+}
+
 type Reader interface {
 	GetProject(id string) (Project, bool)
 	ListProjects() []Project
@@ -81,6 +92,10 @@ type RunLifecycleStore interface {
 	GetRun(id string) (Run, bool)
 	SetRunStatus(id, status string) (Run, bool)
 	SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool)
+}
+
+type RunCleaner interface {
+	CleanupRuns(opts RunCleanupOptions) RunCleanupResult
 }
 
 type Store struct {
@@ -304,6 +319,137 @@ func (s *Store) ListRuns(threadID string) []Run {
 	return runs
 }
 
+func (s *Store) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if opts.Now.IsZero() {
+		opts.Now = time.Now().UTC()
+	}
+
+	type cleanupCandidate struct {
+		id         string
+		threadID   string
+		terminalAt time.Time
+		hasTime    bool
+		order      int
+	}
+
+	candidates := make([]cleanupCandidate, 0, len(s.runOrder))
+	removeRuns := map[string]struct{}{}
+	for idx, id := range s.runOrder {
+		run, ok := s.runs[id]
+		if !ok || !isTerminalRunStatus(run.Status) {
+			continue
+		}
+
+		terminalAt, hasTime := runTerminalTime(run)
+		candidates = append(candidates, cleanupCandidate{
+			id:         id,
+			threadID:   run.ThreadID,
+			terminalAt: terminalAt,
+			hasTime:    hasTime,
+			order:      idx,
+		})
+		if opts.TerminalTTL > 0 && hasTime && !terminalAt.After(opts.Now.Add(-opts.TerminalTTL)) {
+			removeRuns[id] = struct{}{}
+		}
+	}
+
+	if opts.MaxTerminalRunsPerThread > 0 {
+		byThread := make(map[string][]cleanupCandidate)
+		for _, candidate := range candidates {
+			if _, deleting := removeRuns[candidate.id]; deleting {
+				continue
+			}
+			byThread[candidate.threadID] = append(byThread[candidate.threadID], candidate)
+		}
+		for _, threadRuns := range byThread {
+			sort.SliceStable(threadRuns, func(i, j int) bool {
+				left := threadRuns[i]
+				right := threadRuns[j]
+				if left.hasTime && right.hasTime && !left.terminalAt.Equal(right.terminalAt) {
+					return left.terminalAt.After(right.terminalAt)
+				}
+				if left.hasTime != right.hasTime {
+					return left.hasTime
+				}
+				return left.order > right.order
+			})
+			if len(threadRuns) <= opts.MaxTerminalRunsPerThread {
+				continue
+			}
+			for _, candidate := range threadRuns[opts.MaxTerminalRunsPerThread:] {
+				removeRuns[candidate.id] = struct{}{}
+			}
+		}
+	}
+
+	if len(removeRuns) == 0 {
+		return RunCleanupResult{}
+	}
+
+	for id := range removeRuns {
+		delete(s.runs, id)
+	}
+	s.runOrder = filterIDs(s.runOrder, func(id string) bool {
+		_, remove := removeRuns[id]
+		return !remove
+	})
+
+	removedItems := 0
+	for id, item := range s.items {
+		if _, remove := removeRuns[item.RunID]; remove {
+			delete(s.items, id)
+			removedItems++
+		}
+	}
+	if removedItems > 0 {
+		s.itemOrder = filterIDs(s.itemOrder, func(id string) bool {
+			_, ok := s.items[id]
+			return ok
+		})
+	}
+
+	return RunCleanupResult{
+		RemovedRuns:  len(removeRuns),
+		RemovedItems: removedItems,
+	}
+}
+
+func filterIDs(ids []string, keep func(string) bool) []string {
+	filtered := ids[:0]
+	for _, id := range ids {
+		if keep(id) {
+			filtered = append(filtered, id)
+		}
+	}
+	return filtered
+}
+
+func isTerminalRunStatus(status string) bool {
+	switch status {
+	case "cancelled", "failed", "finished":
+		return true
+	default:
+		return false
+	}
+}
+
+func runTerminalTime(run Run) (time.Time, bool) {
+	if run.FinishedAt != "" {
+		if t, err := time.Parse(time.RFC3339, run.FinishedAt); err == nil {
+			return t, true
+		}
+	}
+	if run.CreatedAt != "" {
+		if t, err := time.Parse(time.RFC3339, run.CreatedAt); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
+}
+
 func (s *Store) SetRunStatus(id, status string) (Run, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -315,7 +461,7 @@ func (s *Store) SetRunStatus(id, status string) (Run, bool) {
 	switch status {
 	case "started":
 		run.StartedAt = nowString()
-	case "finished", "failed":
+	case "cancelled", "finished", "failed":
 		run.FinishedAt = nowString()
 	}
 	run.Status = status
