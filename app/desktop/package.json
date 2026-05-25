@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc -p tsconfig.app.json && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",
+    "test:ci": "vitest run --exclude src/__tests__/integration/edge-real.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
@@ -18,7 +19,8 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier --check src",
     "format:fix": "prettier --write src",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.json",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build"
   },

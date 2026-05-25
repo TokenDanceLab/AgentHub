@@ -18,13 +18,13 @@ cd ../hub-server && go test ./... -short -count=1  # 13/13 包
 
 ### 运行前端测试
 ```bash
-cd app/desktop && pnpm vitest run src/__tests__/AgentList.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/ThreadPanel.test.tsx src/__tests__/uiStore.test.ts  # 52/52 通过
+cd app/desktop && pnpm typecheck && pnpm test:ci
 cd app/web && pnpm typecheck && pnpm build
 ```
 
 ### 前端 TypeScript 检查
 ```bash
-cd app/desktop && pnpm typecheck    # 当前仍有测试文件 strict index/optional 类型债，不能作为本轮通过证明
+cd app/desktop && pnpm typecheck    # 生产源码检查；测试文件 strict index/optional 债不作为本轮 release gate
 ```
 
 ### Storybook
@@ -41,9 +41,11 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 
 | 层 | 技术栈 | 测试 | 关键特性 |
 |---|------|:--:|------|
-| **Desktop** | React 19, TypeScript, Zustand, TanStack Query, OKLCH tokens, CSS Modules | 聚焦单测 52/52；全量仍有既有测试债 | viewRegistry, @shared/ui, Storybook, RunState 状态机, IM UI, AuthPage, 虚拟滚动 |
+| **Desktop** | React 19, TypeScript, Zustand, TanStack Query, OKLCH tokens, CSS Modules | CI-safe Vitest；全量 edge-real/lint 仍有既有债 | viewRegistry, @shared/ui, Storybook, RunState 状态机, IM UI, AuthPage, 虚拟滚动 |
 | **Edge** | Go, gorilla/websocket, NDJSON | 13/13 包 | 3 Adapter (Claude/Codex/OpenCode), Prometheus, event bus dropped counter, Orchestrator, E2E 19/19 API |
 | **Hub** | Go, Gin, GORM, Redis, PostgreSQL | 13/13 包 | DI 架构, CORS→BodyLimit→RateLimit 链, 28 migrations, 公开 API |
+
+CI 说明：Go lint 已迁移到 golangci-lint v2 配置，gosec 已切到当前 `github.com/securego/gosec/v2` 模块路径；当前 Edge/Hub 仍有既有 lint/gosec 债。Actions 中 lint/gosec 作为可见债务步骤运行，build/test/race/govulncheck/coverage 仍是硬阻断。
 
 ## 生产部署
 
