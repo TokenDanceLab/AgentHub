@@ -345,14 +345,14 @@ func TestChangePassword_Success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
 			AddRow("user-uuid", "testuser", hash, "Test User"))
 
-	// UpdatePassword
+	// UpdatePasswordAndRevokeTokens (transaction: BEGIN -> update password -> revoke tokens -> COMMIT)
+	mock.ExpectBegin()
 	mock.ExpectExec(sqlUpdateUser).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-
-	// RevokeAllUserTokens
 	mock.ExpectExec(sqlRevokeAllTokens).
 		WithArgs(true, "user-uuid").
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	svc := NewAuthService(db, jwtCfg(), testCacheClient(t))
 	err := svc.ChangePassword(context.Background(), "user-uuid", "oldpassword", "newpassword123")
@@ -370,12 +370,13 @@ func TestChangePassword_NilCacheDoesNotPanic(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
 			AddRow("user-uuid", "testuser", hash, "Test User"))
 
+	mock.ExpectBegin()
 	mock.ExpectExec(sqlUpdateUser).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-
 	mock.ExpectExec(sqlRevokeAllTokens).
 		WithArgs(true, "user-uuid").
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	svc := NewAuthService(db, jwtCfg(), nil)
 	err := svc.ChangePassword(context.Background(), "user-uuid", "oldpassword", "newpassword123")
