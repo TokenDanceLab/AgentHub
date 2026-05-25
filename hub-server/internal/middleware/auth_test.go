@@ -212,6 +212,55 @@ func TestAuthMiddlewareTokenDanceBearerDoesNotSatisfyDesktopDeviceCheck(t *testi
 	}
 }
 
+func TestWSAuthMiddlewareRejectsTokenDanceBearer(t *testing.T) {
+	token, issuer, audience, jwks := makeTokenDanceMiddlewareToken(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(jwks))
+	}))
+	t.Cleanup(server.Close)
+	jwtutil.ResetJWKSCache()
+	jwtutil.SetJWKSURI(server.URL)
+	t.Cleanup(jwtutil.ResetJWKSCache)
+
+	cfg := testConfig()
+	cfg.TokenDanceID.IssuerURL = issuer
+	cfg.TokenDanceID.ClientID = audience
+
+	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
+	WSAuthMiddleware(cfg)(c)
+
+	if !c.IsAborted() {
+		t.Fatal("expected TokenDance bearer to be rejected before WebSocket upgrade")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+	if got := c.GetString("auth_source"); got != "" {
+		t.Fatalf("auth_source = %q, want empty", got)
+	}
+}
+
+func TestWSAuthMiddlewareAcceptsHubLocalQueryToken(t *testing.T) {
+	token := makeToken("user-ws", "web", "device-ws")
+	c, w := ginRequest(http.MethodGet, "/client/ws?access_token="+token, "")
+
+	WSAuthMiddleware(testConfig())(c)
+
+	if c.IsAborted() {
+		t.Fatalf("expected Hub-local WebSocket token to authenticate, status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := c.GetString("auth_source"); got != "hub_local" {
+		t.Fatalf("auth_source = %q, want hub_local", got)
+	}
+	if got := c.GetString("user_id"); got != "user-ws" {
+		t.Fatalf("user_id = %q, want user-ws", got)
+	}
+	if got := c.GetString("device_type"); got != "web" {
+		t.Fatalf("device_type = %q, want web", got)
+	}
+}
+
 func makeTokenDanceMiddlewareToken(t *testing.T) (token, issuer, audience, jwks string) {
 	t.Helper()
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -450,7 +499,6 @@ func TestAccessLogDoesNotModifyResponse(t *testing.T) {
 		t.Fatalf("status = %d, want 201", w.Code)
 	}
 }
-
 
 // --- RequireLocalAuth tests (#158) ---
 

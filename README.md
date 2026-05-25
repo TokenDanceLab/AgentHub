@@ -248,7 +248,7 @@ TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产�
 | TokenDance ID | 统一第三方登录和账号主体；产品不直接集成 GitHub/Google/飞书 |
 | Hub Server | 拥有 Hub OIDC authorize/callback exchange、Hub user 映射、Hub access/refresh session 和 UUID device proof |
 | Desktop/Web | 打开系统浏览器或 Web 登录入口，保存 Hub session；不保存第三方 provider token |
-| 兼容 bearer 路径 | `hub-server/internal/middleware/auth.go` 可验证 TokenDance ID RS256/JWKS bearer token，但验证结果只标记为 `tokendance_bearer`，不能替代 Hub session，也不能满足 Edge `desktop` 设备门禁 |
+| 兼容 bearer 路径 | `hub-server/internal/middleware/auth.go` 可验证 TokenDance ID RS256/JWKS bearer token，但验证结果只标记为 `tokendance_bearer`，不能替代 Hub session，也不能满足 Edge `desktop` 设备门禁；`/client/ws` 只接受 Hub-issued HS256 access token，TokenDance bearer 会在 WebSocket upgrade 或首帧 auth 中被拒绝 |
 | 本地执行 | Local Edge + Desktop 执行不依赖 Hub 登录；需要云端 IM、同步、远控或中继时才需要 Hub session |
 
 OIDC 结构检查：
