@@ -12,11 +12,12 @@ import {
   clearStoredHubRefreshToken,
   loadStoredHubRefreshToken,
   saveStoredHubRefreshToken,
+  loadStoredHubAccessToken,
+  saveStoredHubAccessToken,
+  clearStoredHubAccessToken,
 } from './hubTokenStorage';
 import { useHubStore } from '@/stores/hubStore';
 
-const TOKEN_KEY = 'agenthub_hub_token';
-const REFRESH_KEY = 'agenthub_hub_refresh';
 const TOKEN_SOURCE_KEY = 'agenthub_token_source'; // "tokendance" | "hub"
 
 // ── Types ────────────────────────────────────────
@@ -51,6 +52,11 @@ function isTauri(): boolean {
 }
 
 // ── PKCE helpers ──────────────────────────────────
+
+// Module-level closure for PKCE parameters (non-Tauri fallback path needs them).
+// In Tauri mode they stay in the async function closure and are never written to any storage.
+let pendingCodeVerifier = '';
+let pendingOidcState = '';
 
 function generateCodeVerifier(): string {
   const bytes = new Uint8Array(32);
@@ -95,8 +101,10 @@ function startCallbackServer(): Promise<{ port: number; result: Promise<Callback
           return;
         }
         // In non-Tauri mode we don't have state from the server redirect,
-        // so we use a minimal flow. The state was stored in sessionStorage.
-        const state = sessionStorage.getItem('td_state') || '';
+        // so we use a minimal flow. The state and code_verifier are held in
+        // module-level closure variables (never written to storage).
+        const state = pendingOidcState || '';
+        pendingOidcState = '';
         resolve({ code: code.trim(), state });
       }),
     });
@@ -179,7 +187,8 @@ function startCallbackServer(): Promise<{ port: number; result: Promise<Callback
             reject(new Error('No authorization code provided'));
             return;
           }
-          const state = sessionStorage.getItem('td_state') || '';
+          const state = pendingOidcState || '';
+          pendingOidcState = '';
           resolve({ code: code.trim(), state });
         }),
       };
@@ -219,15 +228,14 @@ export function createHubAuth(client?: HubClient): HubAuth {
   const hubClient = client || createHubClient();
 
   const state: HubAuthState = {
-    token: typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null,
+    // Access token loaded from secure store on tryAutoLogin.
+    // Legacy localStorage read is handled via loadStoredHubAccessToken fallback.
+    token: null,
     refreshToken: null,
     user: null,
     isAuthenticated: false,
     tokenSource: (typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_SOURCE_KEY) : null) as HubAuthState['tokenSource'],
   };
-  if (typeof localStorage !== 'undefined') {
-    localStorage.removeItem(REFRESH_KEY);
-  }
 
   const listeners = new Set<(s: HubAuthState) => void>();
 
@@ -253,9 +261,8 @@ export function createHubAuth(client?: HubClient): HubAuth {
     state.token = token;
     state.refreshToken = refreshToken;
     state.tokenSource = source;
+    await saveStoredHubAccessToken(token);
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(TOKEN_KEY, token);
-      localStorage.removeItem(REFRESH_KEY);
       localStorage.setItem(TOKEN_SOURCE_KEY, source);
     }
 
@@ -343,9 +350,11 @@ export function createHubAuth(client?: HubClient): HubAuth {
 
       const { state: serverState, authorization_url: authUrl } = authorizeResp;
 
-      // Store code_verifier and state for callback
-      sessionStorage.setItem('td_code_verifier', codeVerifier);
-      sessionStorage.setItem('td_state', serverState);
+      // code_verifier and state are held in closure — never written to sessionStorage/localStorage
+      // to prevent same-origin JS from stealing PKCE parameters.
+      // Module-level variables provide a bridge for the non-Tauri fallback path.
+      pendingCodeVerifier = codeVerifier;
+      pendingOidcState = serverState;
 
       // 3. Start local callback server
       const { port, result: callbackResult } = await startCallbackServer();
@@ -368,16 +377,11 @@ export function createHubAuth(client?: HubClient): HubAuth {
       try {
         callback = await callbackResult;
       } catch (err) {
-        // Clean up on failure
-        sessionStorage.removeItem('td_code_verifier');
-        sessionStorage.removeItem('td_state');
         throw err;
       }
 
       // Validate state matches (CSRF protection)
       if (callback.state !== serverState) {
-        sessionStorage.removeItem('td_code_verifier');
-        sessionStorage.removeItem('td_state');
         throw new Error('OIDC state mismatch — possible CSRF attack. Please try again.');
       }
 
@@ -386,16 +390,12 @@ export function createHubAuth(client?: HubClient): HubAuth {
       try {
         tokenResp = await exchangeCodeForToken(callback.code, callback.state, codeVerifier);
       } catch (err) {
-        sessionStorage.removeItem('td_code_verifier');
-        sessionStorage.removeItem('td_state');
         throw new Error(
           `Token exchange failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
         );
       }
 
       // 8. Store tokens and update auth state
-      sessionStorage.removeItem('td_code_verifier');
-      sessionStorage.removeItem('td_state');
       await completeLogin(
         tokenResp.access_token,
         tokenResp.refresh_token,
@@ -426,18 +426,26 @@ export function createHubAuth(client?: HubClient): HubAuth {
       state.isAuthenticated = false;
       state.tokenSource = null;
       if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(REFRESH_KEY);
         localStorage.removeItem(TOKEN_SOURCE_KEY);
       }
+      await clearStoredHubAccessToken();
       await clearStoredHubRefreshToken();
-      sessionStorage.removeItem('td_code_verifier');
-      sessionStorage.removeItem('td_state');
       useHubStore.getState().clear();
       notify();
     },
 
     async tryAutoLogin() {
+      // Load access token from secure store (Tauri) or localStorage fallback
+      if (!state.token) {
+        const stored = await loadStoredHubAccessToken();
+        if (stored) {
+          state.token = stored;
+          // Load token source hint (non-sensitive, kept in localStorage for read on subsequent starts)
+          if (typeof localStorage !== 'undefined') {
+            state.tokenSource = localStorage.getItem(TOKEN_SOURCE_KEY) as HubAuthState['tokenSource'];
+          }
+        }
+      }
       if (!state.token) return false;
       authClient = createHubClient({ getToken });
       try {
@@ -454,11 +462,8 @@ export function createHubAuth(client?: HubClient): HubAuth {
             const res = await refreshClient.refresh(refreshToken);
             state.token = res.access_token;
             state.refreshToken = res.refresh_token;
+            await saveStoredHubAccessToken(res.access_token);
             await saveStoredHubRefreshToken(res.refresh_token);
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(TOKEN_KEY, res.access_token);
-              localStorage.removeItem(REFRESH_KEY);
-            }
             authClient = createHubClient({ getToken });
             state.user = await authClient.me();
             state.isAuthenticated = true;
@@ -475,10 +480,9 @@ export function createHubAuth(client?: HubClient): HubAuth {
         state.isAuthenticated = false;
         state.tokenSource = null;
         if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem(TOKEN_KEY);
-          localStorage.removeItem(REFRESH_KEY);
           localStorage.removeItem(TOKEN_SOURCE_KEY);
         }
+        await clearStoredHubAccessToken();
         await clearStoredHubRefreshToken();
         useHubStore.getState().clear();
         notify();
