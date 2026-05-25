@@ -65,6 +65,10 @@ var (
 	FriendBlocked         = &Error{Code: "FRIEND_BLOCKED", Message: "blocked by user", HTTPStatus: http.StatusForbidden}
 	FriendRequestNotFound = &Error{Code: "FRIEND_REQUEST_NOT_FOUND", Message: "friend request not found", HTTPStatus: http.StatusNotFound}
 
+	FriendRemarkNoRow = &Error{Code: "FRIEND_REMARK_NO_ROW", Message: "remark update affected no rows, friendship may not exist", HTTPStatus: http.StatusNotFound}
+
+	FriendNotFriend = &Error{Code: "FRIEND_NOT_FRIEND", Message: "you are not friends with this user", HTTPStatus: http.StatusForbidden}
+
 	AttachNotFound     = &Error{Code: "ATTACH_NOT_FOUND", Message: "attachment not found", HTTPStatus: http.StatusNotFound}
 	AttachTooLarge     = &Error{Code: "ATTACH_TOO_LARGE", Message: "file exceeds maximum size", HTTPStatus: http.StatusRequestEntityTooLarge}
 	AttachHashMismatch = &Error{Code: "ATTACH_HASH_MISMATCH", Message: "file hash does not match", HTTPStatus: http.StatusBadRequest}
