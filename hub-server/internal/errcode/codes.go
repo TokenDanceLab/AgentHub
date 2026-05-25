@@ -74,6 +74,8 @@ var (
 	WsAuthTimeout = &Error{Code: "WS_AUTH_TIMEOUT", Message: "ws authentication timeout", HTTPStatus: http.StatusUnauthorized}
 	WsAuthFailed  = &Error{Code: "WS_AUTH_FAILED", Message: "ws authentication failed", HTTPStatus: http.StatusUnauthorized}
 
+	ErrNotImplemented = &Error{Code: "NOT_IMPLEMENTED", Message: "endpoint not yet implemented", HTTPStatus: http.StatusNotImplemented}
+
 	// OIDC errors
 	OIDCInvalidState       = &Error{Code: "OIDC_INVALID_STATE", Message: "state is invalid or expired", HTTPStatus: http.StatusBadRequest}
 	OIDCCodeExchangeFailed = &Error{Code: "OIDC_CODE_EXCHANGE_FAILED", Message: "failed to exchange authorization code", HTTPStatus: http.StatusBadRequest}
