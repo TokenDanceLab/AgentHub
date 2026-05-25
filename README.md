@@ -170,6 +170,12 @@ git diff --check
 python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
 ```
 
+Runtime / AgentAdapter / Edge API / Settings 展示边界改动还应运行：
+
+```powershell
+.\scripts\verify-runtime-readiness.ps1
+```
+
 后端改动：
 
 ```powershell

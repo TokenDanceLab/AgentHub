@@ -196,12 +196,12 @@ Web workspace
 
 Desktop 只有在恢复或获取 Hub-issued access token 后才打开 Hub WebSocket 并挂载 Hub task bridge。桥接层维护 `taskId <-> runId` 映射，转发 stdout `run.output.batch` 与结构化 `text_delta` / `text_block`，并缓存可见输出作为 `done.final_content`。Edge 直连 Hub callback 模式同样会把 raw stdout 和结构化文本 stream 到 Hub，并用有界输出缓冲生成最终内容；没有可见输出时才退回 `"Run finished"`。
 
-审批闭环必须进入 `RunEvent` 和 `Approval`：UI 通过 run-scoped approval API 决策；Edge 验证 pending permission registry、runId、requestId 和 one-shot replay；需要 stdin 控制协议的 Runtime 由 adapter 写回对应控制消息。Hub 参与时，Hub 先做 TokenDance ID -> Hub user -> resource/action 授权，再把任务派到目标 Edge；Hub 同步、审计和中继，不直接启动本地 CLI 进程。
+审批闭环必须进入 `RunEvent` 和 `Approval`：UI 通过 run-scoped approval API 决策；Edge 验证 pending permission registry、runId、requestId 和 one-shot replay；需要 stdin 控制协议的 Runtime 由 adapter 写回对应控制消息。当前仓库已经完成 REST 决策登记和重复/错 run 拒绝；真正阻塞式 stdin 回写仍是后续实现，不能把 permission event 展示误写成完整 HITL。Hub 参与时，Hub 先做 TokenDance ID -> Hub user -> resource/action 授权，再把任务派到目标 Edge；Hub 同步、审计和中继，不直接启动本地 CLI 进程。
 
 ### 关键实现细节
 
 **Claude Code adapter**：
-- stdin 双向控制协议：支持 `can_use_tool`（权限审批）、`interrupt`（取消）、`set_model`、`set_permission_mode`、`stop_task` 控制消息
+- stdin 双向控制协议结构：支持 `can_use_tool`（权限审批）、`interrupt`（取消）、`set_model`、`set_permission_mode`、`stop_task` 控制消息；`ProcessExecutor` 目前启动后关闭 stdin，阻塞式权限回写待实现
 - 会话管理：`--resume <sessionId>` 指定会话、`--continue` 继续最近会话、`--fork-session` 分叉会话
 - 模型选择：`--model` + `--reasoning-effort` + `--max-thinking-tokens` + `--fast`
 - 14 种新增 BusEvent 常量：`compact_boundary`、`api_retry`、`task_started`/`task_progress`/`task_notification`、`session_state_changed`、`hook_started`/`hook_progress`/`hook_response`、`tool_use_summary`、`auth_status`、`rate_limit`、`status_change`

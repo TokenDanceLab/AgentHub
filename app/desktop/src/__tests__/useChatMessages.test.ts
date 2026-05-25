@@ -567,6 +567,33 @@ describe('useChatMessages', () => {
     expect(result.current.currentRun?.outputText).toBe('Hello World');
   });
 
+  it('marks permission decisions locally without sending an ignored WebSocket control frame', () => {
+    const { result } = renderHook(() => useChatMessages(true));
+    const stream = vi.mocked(createEventStream).mock.results[0]?.value;
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.agent.permission_requested', {
+          runId: 'run-1',
+          requestId: 'perm-1',
+          toolName: 'Bash',
+          toolInput: { command: 'npm test' },
+        }),
+      );
+    });
+
+    act(() => {
+      result.current.decidePermission('perm-1', 'allow');
+    });
+
+    expect(result.current.permissionRequests[0]).toMatchObject({
+      requestId: 'perm-1',
+      runId: 'run-1',
+      decision: 'allow',
+    });
+    expect(stream?.send).not.toHaveBeenCalled();
+  });
+
   it('clearMessages clears messages and currentRun', () => {
     const { result } = renderHook(() => useChatMessages(true));
 

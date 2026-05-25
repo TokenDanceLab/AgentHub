@@ -74,7 +74,7 @@ type Action =
 
 export interface ChatState extends State {
   clearMessages: () => void;
-  /** Submit a user decision for a pending permission request. */
+  /** Mark a pending permission request as decided after Edge accepts the REST decision. */
   decidePermission: (requestId: string, decision: 'allow' | 'deny', reason?: string) => void;
 }
 
@@ -572,15 +572,6 @@ export function useChatMessages(online: boolean): ChatState {
 
   const decidePermission = useCallback(
     (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
-      // Send decision to Edge via WebSocket
-      const stream = streamRef.current;
-      if (stream) {
-        stream.send({
-          type: 'run.agent.permission_decide',
-          payload: { requestId, decision, reason },
-        });
-      }
-      // Update local state
       dispatch({ type: 'RESOLVE_PERMISSION', requestId, decision, reason });
     },
     [],
