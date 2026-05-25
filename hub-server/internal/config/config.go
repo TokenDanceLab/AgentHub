@@ -265,6 +265,9 @@ func (c *Config) Validate() error {
 		if c.TokenDanceID.ClientSecret == "" {
 			return fmt.Errorf("tokendance_id.client_secret is required when tokendance_id.client_id is set")
 		}
+		if c.TokenDanceID.RedirectURI == "" {
+			return fmt.Errorf("tokendance_id.redirect_uri is required when tokendance_id.client_id is set")
+		}
 	}
 
 	// Upload: if a directory is configured, it must exist.
