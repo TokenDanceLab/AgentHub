@@ -252,10 +252,10 @@ func (s *AttachmentService) GetAttachmentByID(ctx context.Context, userID, id st
 		}
 		return nil, err
 	}
-	if a.UploaderUserID == userID {
-		return a, nil
-	}
-
+	// #81: Always verify active session membership — do not allow
+	// uploader ownership alone to bypass the session member check.
+	// This prevents users who are no longer active session members
+	// from accessing attachments.
 	allowed, err := repository.CanUserAccessReferencedAttachment(s.db, userID, id)
 	if err != nil {
 		return nil, err
