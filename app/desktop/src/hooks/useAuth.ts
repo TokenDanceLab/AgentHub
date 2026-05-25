@@ -31,13 +31,34 @@ export function useAuth() {
     await auth.logout();
   }, []);
 
+  const loginWithTokenDance = useCallback(async () => {
+    await auth.loginWithTokenDance();
+  }, []);
+
+  const continueLocalMode = useCallback(() => {
+    auth.continueLocalMode();
+  }, []);
+
   const tryAutoLogin = useCallback(async () => {
     return auth.tryAutoLogin();
   }, []);
 
   return useMemo(
-    () => ({ ...state, login, logout, tryAutoLogin }),
-    [state.token, state.isAuthenticated, state.user, login, logout, tryAutoLogin],
+    () => ({ ...state, login, loginWithTokenDance, continueLocalMode, logout, tryAutoLogin }),
+    [
+      state.token,
+      state.refreshToken,
+      state.isAuthenticated,
+      state.user,
+      state.authStatus,
+      state.cloudLockedReason,
+      state.tokenSource,
+      login,
+      loginWithTokenDance,
+      continueLocalMode,
+      logout,
+      tryAutoLogin,
+    ],
   );
 }
 
