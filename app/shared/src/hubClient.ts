@@ -290,12 +290,11 @@ export interface HubTaskFailRequest extends HubTaskRunRequest {
 
 export interface HubNotification {
   id: string;
-  type?: string;
-  title?: string;
-  content?: string;
-  message?: string;
-  read?: boolean;
-  created_at?: string;
+  user_id: string;
+  type: string;
+  payload: string;
+  read: boolean;
+  created_at: string;
   [key: string]: unknown;
 }
 
