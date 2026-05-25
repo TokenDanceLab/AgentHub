@@ -1,5 +1,6 @@
 import { useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { RotateCcw } from 'lucide-react';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import type { IMMessage } from './types';
 import styles from './IMMessageView.module.css';
@@ -7,6 +8,9 @@ import styles from './IMMessageView.module.css';
 interface IMMessageViewProps {
   messages: IMMessage[];
   currentUserId?: string;
+  canRecall?: boolean;
+  recallingMessageIds?: Record<string, boolean>;
+  onRecallMessage?: (message: IMMessage) => void | Promise<unknown>;
 }
 
 function formatTime(timestamp: string): string {
@@ -68,9 +72,15 @@ function SenderAvatar({
 const IMMessageBubble = memo(function IMMessageBubble({
   message,
   isOwn,
+  canRecall,
+  recalling,
+  onRecallMessage,
 }: {
   message: IMMessage;
   isOwn: boolean;
+  canRecall: boolean;
+  recalling: boolean;
+  onRecallMessage?: (message: IMMessage) => void | Promise<unknown>;
 }) {
   const { t } = useTranslation();
   const label = (key: string, fallback: string, vars?: Record<string, unknown>) => {
@@ -122,6 +132,21 @@ const IMMessageBubble = memo(function IMMessageBubble({
         ) : isOwn ? (
           <span>{label('im.message.sentStatus', 'Sent through Hub')}</span>
         ) : null}
+        {message.actionError ? (
+          <span className={styles.actionError} role="alert">{message.actionError}</span>
+        ) : null}
+        {isOwn && message.authority === 'hub' && !message.recalled && !isRecalled ? (
+          <button
+            type="button"
+            className={styles.metaAction}
+            onClick={() => onRecallMessage?.(message)}
+            disabled={!canRecall || recalling}
+            aria-label={label('im.message.recall', 'Recall')}
+            title={canRecall ? label('im.message.recall', 'Recall') : label('im.action.interfaceGap', 'Interface gap')}
+          >
+            <RotateCcw size={12} />
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -130,6 +155,9 @@ const IMMessageBubble = memo(function IMMessageBubble({
 const IMMessageView = memo(function IMMessageView({
   messages,
   currentUserId,
+  canRecall = false,
+  recallingMessageIds = {},
+  onRecallMessage,
 }: IMMessageViewProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -159,7 +187,13 @@ const IMMessageView = memo(function IMMessageView({
               key={msg.id}
               className={isOwn ? styles.userRow : styles.agentRow}
             >
-              <IMMessageBubble message={msg} isOwn={isOwn} />
+              <IMMessageBubble
+                message={msg}
+                isOwn={isOwn}
+                canRecall={canRecall}
+                recalling={Boolean(recallingMessageIds[msg.id])}
+                onRecallMessage={onRecallMessage}
+              />
             </div>
           );
         })}
