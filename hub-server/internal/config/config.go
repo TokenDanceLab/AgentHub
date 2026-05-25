@@ -19,11 +19,18 @@ type Config struct {
 	TokenDanceID TokenDanceIDConfig `mapstructure:"tokendance_id"`
 }
 
+// TokenDanceIDConfig holds OIDC/OAuth2 configuration for TokenDance ID integration.
 type TokenDanceIDConfig struct {
-	IssuerURL    string `mapstructure:"issuer_url"`
-	JWKSURI      string `mapstructure:"jwks_uri"`
-	ClientID     string `mapstructure:"client_id"`
+	// IssuerURL is the TokenDance ID issuer base URL (e.g. https://id.vectorcontrol.tech).
+	IssuerURL string `mapstructure:"issuer_url"`
+	// JWKSURI overrides the JWKS endpoint. Derived from issuer_url/.well-known if empty.
+	JWKSURI string `mapstructure:"jwks_uri"`
+	// ClientID is the OIDC client ID registered with TokenDance ID for AgentHub.
+	ClientID string `mapstructure:"client_id"`
+	// ClientSecret is the OIDC client secret. Must be set via environment variable, never in config YAML.
 	ClientSecret string `mapstructure:"client_secret"`
+	// RedirectURI is the Hub-owned OIDC callback URL.
+	RedirectURI string `mapstructure:"redirect_uri"`
 }
 
 type ServerConfig struct {
@@ -132,15 +139,14 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("JWT secret too short: minimum 16 characters required (got %d)", len(c.JWT.Secret))
 	}
 
-	// TokenDance ID: validate URLs if configured.
-	if c.TokenDanceID.IssuerURL != "" {
-		if c.TokenDanceID.JWKSURI == "" {
-			c.TokenDanceID.JWKSURI = c.TokenDanceID.IssuerURL + "/oidc/jwks"
+	// TokenDance ID config is optional; validate only when explicitly configured
+	if c.TokenDanceID.ClientID != "" {
+		if c.TokenDanceID.IssuerURL == "" {
+			return fmt.Errorf("tokendance_id.issuer_url is required when tokendance_id.client_id is set")
 		}
-	} else {
-		// Default to production TokenDance ID
-		c.TokenDanceID.IssuerURL = "https://id.vectorcontrol.tech"
-		c.TokenDanceID.JWKSURI = "https://id.vectorcontrol.tech/oidc/jwks"
+		if c.TokenDanceID.ClientSecret == "" {
+			return fmt.Errorf("tokendance_id.client_secret is required when tokendance_id.client_id is set")
+		}
 	}
 
 	// Upload: if a directory is configured, it must exist.
