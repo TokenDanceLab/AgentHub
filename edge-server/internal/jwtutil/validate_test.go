@@ -22,8 +22,8 @@ func newTestToken(secret string, userID string, expiresIn time.Duration) string 
 }
 
 func TestValidateHubToken_Success(t *testing.T) {
-	token := newTestToken("my-secret-key-32bytes!!", "user-1", 1*time.Hour)
-	claims, err := ValidateHubToken(token, []byte("my-secret-key-32bytes!!"))
+	token := newTestToken("my-secret-key-must-be-32-bytes-long!", "user-1", 1*time.Hour)
+	claims, err := ValidateHubToken(token, []byte("my-secret-key-must-be-32-bytes-long!"))
 	if err != nil {
 		t.Fatalf("ValidateHubToken returned error: %v", err)
 	}
@@ -36,8 +36,8 @@ func TestValidateHubToken_Success(t *testing.T) {
 }
 
 func TestValidateHubToken_Expired(t *testing.T) {
-	token := newTestToken("my-secret-key-32bytes!!", "user-1", -1*time.Hour)
-	_, err := ValidateHubToken(token, []byte("my-secret-key-32bytes!!"))
+	token := newTestToken("my-secret-key-must-be-32-bytes-long!", "user-1", -1*time.Hour)
+	_, err := ValidateHubToken(token, []byte("my-secret-key-must-be-32-bytes-long!"))
 	if err == nil {
 		t.Fatal("expected error for expired token")
 	}
@@ -47,40 +47,54 @@ func TestValidateHubToken_Expired(t *testing.T) {
 }
 
 func TestValidateHubToken_WrongSecret(t *testing.T) {
-	token := newTestToken("correct-secret-key!!", "user-1", 1*time.Hour)
-	_, err := ValidateHubToken(token, []byte("wrong-secret-key!!!!"))
+	token := newTestToken("correct-secret-key-long-enough!!", "user-1", 1*time.Hour)
+	_, err := ValidateHubToken(token, []byte("wrong-secret-key-also-long-enough"))
 	if err == nil {
 		t.Fatal("expected error for wrong secret")
 	}
 }
 
 func TestValidateHubToken_TamperedToken(t *testing.T) {
-	token := newTestToken("my-secret-key-32bytes!!", "user-1", 1*time.Hour)
+	token := newTestToken("my-secret-key-must-be-32-bytes-long!", "user-1", 1*time.Hour)
 	// Tamper with the token by appending garbage
 	tampered := token + "extra_garbage"
-	_, err := ValidateHubToken(tampered, []byte("my-secret-key-32bytes!!"))
+	_, err := ValidateHubToken(tampered, []byte("my-secret-key-must-be-32-bytes-long!"))
 	if err == nil {
 		t.Fatal("expected error for tampered token")
 	}
 }
 
+func TestValidateHubToken_ShortSecret(t *testing.T) {
+	token := newTestToken("short", "user-1", 1*time.Hour)
+	_, err := ValidateHubToken(token, []byte("short"))
+	if err == nil {
+		t.Fatal("expected error for short secret")
+	}
+	if err != ErrSecretTooShort {
+		t.Fatalf("error = %v, want ErrSecretTooShort", err)
+	}
+}
+
 func TestValidateHubToken_EmptyToken(t *testing.T) {
-	_, err := ValidateHubToken("", []byte("my-secret-key-32bytes!!"))
+	_, err := ValidateHubToken("", []byte("my-secret-key-must-be-32-bytes-long!"))
 	if err == nil {
 		t.Fatal("expected error for empty token")
 	}
 }
 
 func TestValidateHubToken_EmptySecret(t *testing.T) {
-	token := newTestToken("my-secret-key-32bytes!!", "user-1", 1*time.Hour)
+	token := newTestToken("my-secret-key-must-be-32-bytes-long!", "user-1", 1*time.Hour)
 	_, err := ValidateHubToken(token, nil)
 	if err == nil {
 		t.Fatal("expected error for empty secret")
 	}
+	if err != ErrSecretEmpty {
+		t.Fatalf("error = %v, want ErrSecretEmpty", err)
+	}
 }
 
 func TestValidateHubToken_InvalidFormat(t *testing.T) {
-	_, err := ValidateHubToken("not-a-valid-jwt", []byte("my-secret-key-32bytes!!"))
+	_, err := ValidateHubToken("not-a-valid-jwt", []byte("my-secret-key-must-be-32-bytes-long!"))
 	if err == nil {
 		t.Fatal("expected error for invalid format")
 	}
@@ -95,8 +109,8 @@ func TestValidateHubToken_EmptyUserID(t *testing.T) {
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	s, _ := token.SignedString([]byte("my-secret-key-32bytes!!"))
-	_, err := ValidateHubToken(s, []byte("my-secret-key-32bytes!!"))
+	s, _ := token.SignedString([]byte("my-secret-key-must-be-32-bytes-long!"))
+	_, err := ValidateHubToken(s, []byte("my-secret-key-must-be-32-bytes-long!"))
 	if err == nil {
 		t.Fatal("expected error for empty user_id")
 	}
@@ -117,7 +131,7 @@ func TestValidateHubToken_RS256TokenRejected(t *testing.T) {
 	// Even though this won't sign properly without a real key, the parse should
 	// reject it because the signing method check fails.
 	s, _ := token.SignedString(jwt.UnsafeAllowNoneSignatureType) // deliberately bad
-	_, err := ValidateHubToken(s, []byte("my-secret-key-32bytes!!"))
+	_, err := ValidateHubToken(s, []byte("my-secret-key-must-be-32-bytes-long!"))
 	if err == nil {
 		t.Fatal("expected error for non-HMAC signing method")
 	}
