@@ -325,3 +325,87 @@ func TestOpenCodeErrorEvent(t *testing.T) {
 		t.Errorf("error = %v", events[0].Payload["error"])
 	}
 }
+
+// --- OpenCode BuildCommand flag tests (--file, --dir, --command) ---
+
+func TestOpenCodeBuildCommandFileFlag(t *testing.T) {
+	adapter := NewOpenCodeAdapter("opencode")
+	_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+		Prompt: "analyze this file",
+		ConfigOverrides: map[string]string{
+			"files": "/path/to/README.md,/path/to/go.mod",
+		},
+	})
+
+	found := false
+	for i, a := range args {
+		if a == "--file" {
+			found = true
+			if i+1 >= len(args) {
+				t.Error("--file has no value")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("--file flag not found in args")
+	}
+}
+
+func TestOpenCodeBuildCommandDirFlag(t *testing.T) {
+	adapter := NewOpenCodeAdapter("opencode")
+	_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+		Prompt:  "list files",
+		WorkDir: "/home/user/project",
+	})
+
+	found := false
+	for i, a := range args {
+		if a == "--dir" && i+1 < len(args) && args[i+1] == "/home/user/project" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("--dir flag not found in args")
+	}
+}
+
+func TestOpenCodeBuildCommandCommandFlag(t *testing.T) {
+	adapter := NewOpenCodeAdapter("opencode")
+	_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+		Prompt: "compact session",
+		ConfigOverrides: map[string]string{
+			"command": "/compact",
+		},
+	})
+
+	found := false
+	for i, a := range args {
+		if a == "--command" && i+1 < len(args) && args[i+1] == "/compact" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("--command flag not found in args")
+	}
+}
+
+func TestOpenCodeBuildCommandNoExtraFlagsWhenEmpty(t *testing.T) {
+	adapter := NewOpenCodeAdapter("opencode")
+	_, args, _, _ := adapter.BuildCommand(runnerctx.RunProcessContext{
+		Prompt: "hello",
+	})
+
+	for _, a := range args {
+		if a == "--file" {
+			t.Error("--file should not be present when no files configured")
+		}
+	}
+	for _, a := range args {
+		if a == "--command" {
+			t.Error("--command should not be present when no command configured")
+		}
+	}
+}
