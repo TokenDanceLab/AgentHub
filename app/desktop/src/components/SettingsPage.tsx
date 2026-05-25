@@ -296,8 +296,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [, setRemoteControlEnabled] = useStoredBooleanState('remoteControl', false);
   const [autoDetectGit, setAutoDetectGit] = useStoredBooleanState('autoDetectGit', true);
   const [worktreeIsolation, setWorktreeIsolation] = useStoredBooleanState('worktreeIsolation', true);
-  const [browserPreview, setBrowserPreview] = useStoredBooleanState('browserPreview', true);
-  const [computerConfirm, setComputerConfirm] = useStoredBooleanState('computerConfirm', true);
   const [, setPlatformSync] = useStoredBooleanState('platformSync', true);
   const [auditTrail, setAuditTrail] = useStoredBooleanState('auditTrail', true);
   const [detailLevel, setDetailLevel] = useStoredValueState<SelectValue>('detailLevel', 'detailed');
@@ -1759,10 +1757,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             <Panel title={t('settings.browser')} description={t('settings.browserDesc')}>
               <SettingRow
                 title={t('settings.browserPreview')}
-                description={t('settings.browserPreviewDesc')}
-                control={
-                  <Switch checked={browserPreview} onChange={setBooleanSetting('browserPreview', setBrowserPreview)} />
-                }
+                description={t('settings.browserPreviewBoundaryDesc')}
+                value={t('settings.status.interfaceGap')}
               />
               <SettingRow title={t('settings.browserEngine')} description="Chromium / Playwright" value="Auto" />
             </Panel>
@@ -1772,13 +1768,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             <Panel title={t('settings.computerUse')} description={t('settings.computerUseDesc')}>
               <SettingRow
                 title={t('settings.computerConfirm')}
-                description={t('settings.computerConfirmDesc')}
-                control={
-                  <Switch
-                    checked={computerConfirm}
-                    onChange={setBooleanSetting('computerConfirm', setComputerConfirm)}
-                  />
-                }
+                description={t('settings.computerConfirmBoundaryDesc')}
+                value={t('settings.status.interfaceGap')}
               />
               <Callout title={t('settings.computerUseGuard')} body={t('settings.computerUseGuardDesc')} />
             </Panel>

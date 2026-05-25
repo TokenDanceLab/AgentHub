@@ -708,6 +708,24 @@ describe('SettingsPage tasks', () => {
     expect(screen.getAllByText('settings.status.interfaceGap').length).toBeGreaterThan(0);
   });
 
+  it('labels browser preview as an unwired Settings interface gap', () => {
+    renderSettings('browser');
+
+    expect(screen.getByText('settings.browserPreview')).toBeInTheDocument();
+    expect(screen.getByText('settings.browserPreviewBoundaryDesc')).toBeInTheDocument();
+    expect(screen.getByText('settings.status.interfaceGap')).toBeInTheDocument();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  });
+
+  it('labels computer-use approval as an unwired Settings interface gap', () => {
+    renderSettings('computerUse');
+
+    expect(screen.getByText('settings.computerConfirm')).toBeInTheDocument();
+    expect(screen.getByText('settings.computerConfirmBoundaryDesc')).toBeInTheDocument();
+    expect(screen.getByText('settings.status.interfaceGap')).toBeInTheDocument();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  });
+
   it('labels security audit with local-source and interface gap states', () => {
     renderSettings('securityAudit');
     expect(screen.getByText('settings.auditTrailSource')).toBeInTheDocument();
