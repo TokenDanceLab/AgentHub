@@ -42,6 +42,7 @@ import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
+import { preferredProfileAlias } from '@/utils/agentProfile';
 import {
   useModelSettingsStore,
   type ProviderHealth,
@@ -1604,14 +1605,6 @@ function countAgentCapabilities(agents: AgentInfo[]) {
     }
   }
   return names.size;
-}
-
-function preferredProfileAlias(agent: AgentInfo) {
-  const id = `${agent.id} ${agent.name}`.toLowerCase();
-  if (id.includes('claude')) return 'opus';
-  if (id.includes('codex')) return 'sonnet';
-  if (id.includes('opencode') || id.includes('open-code')) return 'haiku';
-  return undefined;
 }
 
 function timestampOf(value?: string) {

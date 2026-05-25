@@ -16,6 +16,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
+import { preferredProfileAlias } from '@/utils/agentProfile';
 import type { AgentInfo } from '@shared/types';
 import styles from './WelcomeScreen.module.css';
 
@@ -264,12 +265,4 @@ function Metric({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </span>
   );
-}
-
-function preferredProfileAlias(agent: AgentInfo) {
-  const id = `${agent.id} ${agent.name}`.toLowerCase();
-  if (id.includes('claude')) return 'opus';
-  if (id.includes('codex')) return 'sonnet';
-  if (id.includes('opencode') || id.includes('open-code')) return 'haiku';
-  return undefined;
 }
