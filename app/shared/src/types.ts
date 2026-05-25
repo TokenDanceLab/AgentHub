@@ -13,8 +13,7 @@ export interface HealthResponse {
 
 export interface HealthCheck {
   status: string;
-  detail?: string;
-  [key: string]: unknown;
+  message?: string;
 }
 
 export interface RunnerHealthItem {
@@ -24,12 +23,13 @@ export interface RunnerHealthItem {
   capabilities?: string[];
 }
 
-export interface RunnerHealthCheck extends HealthCheck {
-  total?: number;
-  available?: number;
-  unavailable?: number;
-  statuses?: Record<string, number>;
+export interface RunnerHealthCheck {
+  status: string;
+  message?: string;
+  runnerIds?: string[];
   items?: RunnerHealthItem[];
+  available?: number;
+  total?: number;
 }
 
 export interface HealthChecks {
@@ -135,7 +135,11 @@ export interface StartRunRequest {
   prompt?: string;
   agentId?: string;
   model?: string;
+  provider?: string;
+  modelAlias?: string;
   reasoningEffort?: string;
+  modelMappingEnabled?: boolean;
+  providerFallbackEnabled?: boolean;
 }
 
 // Compatibility aliases for Desktop code that still consumes the original

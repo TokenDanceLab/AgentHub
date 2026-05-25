@@ -33,7 +33,7 @@ type AgentService struct {
 }
 
 func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client) *AgentService {
-	return &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: cacheClient}
+	return &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient)}
 }
 
 // CustomAgent CRUD
@@ -248,16 +248,22 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	payload, _ := json.Marshal(dp)
 
 	// try to push to inviter's edge (desktop) via WebSocket
-	connID, err := s.cacheClient.GetRoute(ctx, ai.InviterUserID, "desktop")
-	if err == nil && connID != "" {
+	cacheClient := resolveAgentCache(s.cacheClient)
+	connID, err := cacheClient.GetRoute(ctx, ai.InviterUserID, "desktop")
+	if err == nil && connID != "" && s.mgr != nil {
+		conn := s.mgr.FindByConnID(connID)
+		if conn == nil {
+			_ = cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload))
+			return
+		}
 		frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
 		s.mgr.PushToConn(connID, frame)
-		_ = repository.UpdatePendingTaskStatus(s.db, task.ID, model.TaskStatusDispatched, "")
+		_ = repository.UpdatePendingTaskDispatched(s.db, task.ID, conn.DeviceID)
 		return
 	}
 
 	// offline: push to Redis pending queue
-	_ = s.cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload))
+	_ = cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload))
 }
 
 // CancelTask cancels a pending task by its ID.
@@ -300,7 +306,7 @@ func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) er
 // allocateSeq returns the next message sequence number for a session.
 // It tries Redis INCR first and falls back to the DB row-level lock.
 func (s *AgentService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
-	seq, err := s.cacheClient.AllocateSeq(ctx, sessionID)
+	seq, err := resolveAgentCache(s.cacheClient).AllocateSeq(ctx, sessionID)
 	if err == nil {
 		return seq, nil
 	}
@@ -316,7 +322,7 @@ func (s *AgentService) allocateSeq(ctx context.Context, sessionID string) (int64
 
 // HandleTaskAck marks a task as running and optionally records the Edge run id
 // that is executing it.
-func (s *AgentService) HandleTaskAck(ctx context.Context, taskID, edgeRunID string) error {
+func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -324,10 +330,10 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, taskID, edgeRunID stri
 		}
 		return err
 	}
+	if _, err := s.authorizeTaskEdgeCallback(task, edgeUserID, edgeDeviceID, edgeRunID); err != nil {
+		return err
+	}
 	if task.Status == model.TaskStatusRunning {
-		if edgeRunID != "" && task.EdgeRunID != "" && task.EdgeRunID != edgeRunID {
-			return errcode.ErrBadRequest
-		}
 		if edgeRunID != "" && task.EdgeRunID == "" {
 			return repository.UpdatePendingTaskStatusWithEdgeRunID(s.db, taskID, model.TaskStatusRunning, "", edgeRunID)
 		}
@@ -340,7 +346,7 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, taskID, edgeRunID stri
 }
 
 // HandleTaskStream inserts an agent message into the session (streaming chunk).
-func (s *AgentService) HandleTaskStream(ctx context.Context, taskID, payload string) error {
+func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, payload string) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -350,6 +356,11 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, taskID, payload str
 	}
 	if task.Status != model.TaskStatusRunning && task.Status != model.TaskStatusDispatched {
 		return errcode.ErrBadRequest
+	}
+
+	ai, err := s.authorizeTaskEdgeCallback(task, edgeUserID, edgeDeviceID, edgeRunID)
+	if err != nil {
+		return err
 	}
 
 	// ensure status is running
@@ -364,11 +375,6 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, taskID, payload str
 		ClientMsgID: uuidv7.Must(),
 		ContentType: model.ContentTypeText,
 		Content:     payload,
-	}
-
-	ai, err := repository.GetAgentInstanceByID(s.db, task.AgentInstanceID)
-	if err != nil {
-		return err
 	}
 	msg.SessionID = ai.SessionID
 
@@ -391,7 +397,7 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, taskID, payload str
 }
 
 // HandleTaskDone marks a task as done and inserts the final content as a message.
-func (s *AgentService) HandleTaskDone(ctx context.Context, taskID, finalContent string) error {
+func (s *AgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -404,7 +410,7 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, taskID, finalContent 
 		return errcode.ErrBadRequest
 	}
 
-	ai, err := repository.GetAgentInstanceByID(s.db, task.AgentInstanceID)
+	ai, err := s.authorizeTaskEdgeCallback(task, edgeUserID, edgeDeviceID, edgeRunID)
 	if err != nil {
 		return err
 	}
@@ -446,7 +452,7 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, taskID, finalContent 
 }
 
 // HandleTaskFail marks a task as failed.
-func (s *AgentService) HandleTaskFail(ctx context.Context, taskID, errMsg string) error {
+func (s *AgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -459,20 +465,39 @@ func (s *AgentService) HandleTaskFail(ctx context.Context, taskID, errMsg string
 		return errcode.ErrBadRequest
 	}
 
-	_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusFailed, errMsg)
-
-	ai, _ := repository.GetAgentInstanceByID(s.db, task.AgentInstanceID)
-	sessionID := ""
-	if ai != nil {
-		sessionID = ai.SessionID
+	ai, err := s.authorizeTaskEdgeCallback(task, edgeUserID, edgeDeviceID, edgeRunID)
+	if err != nil {
+		return err
 	}
+
+	_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusFailed, errMsg)
 
 	s.bus.Publish(ctx, Event{Type: "agent.failed", Payload: map[string]interface{}{
 		"task_id":           taskID,
 		"agent_instance_id": task.AgentInstanceID,
-		"session_id":        sessionID,
+		"session_id":        ai.SessionID,
 		"error":             errMsg,
 	}})
 
 	return nil
+}
+
+func (s *AgentService) authorizeTaskEdgeCallback(task *model.PendingAgentTask, edgeUserID, edgeDeviceID, edgeRunID string) (*model.AgentInstance, error) {
+	if edgeUserID == "" {
+		return nil, errcode.AgentTaskNotFound
+	}
+	ai, err := repository.GetAgentInstanceByID(s.db, task.AgentInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	if ai.InviterUserID != edgeUserID {
+		return nil, errcode.AgentTaskNotFound
+	}
+	if task.EdgeDeviceID != "" && task.EdgeDeviceID != edgeDeviceID {
+		return nil, errcode.AgentTaskNotFound
+	}
+	if task.EdgeRunID != "" && task.EdgeRunID != edgeRunID {
+		return nil, errcode.ErrBadRequest
+	}
+	return ai, nil
 }

@@ -28,7 +28,7 @@ type AuthService struct {
 }
 
 func NewAuthService(db *gorm.DB, jwtCfg config.JWTConfig, cacheClient *cache.Client) *AuthService {
-	return &AuthService{db: db, jwtCfg: jwtCfg, cacheClient: cacheClient}
+	return &AuthService{db: db, jwtCfg: jwtCfg, cacheClient: resolveAuthCache(cacheClient)}
 }
 
 type LoginResponse struct {
@@ -88,6 +88,9 @@ func (s *AuthService) Login(ctx context.Context, username, password, deviceType,
 	if err := repository.UpsertDevice(s.db, &model.Device{
 		ID: deviceID, UserID: user.ID, DeviceType: deviceType, Capabilities: "[]",
 	}); err != nil {
+		if errors.Is(err, repository.ErrDeviceOwnershipMismatch) {
+			return nil, errcode.ErrBadRequest
+		}
 		return nil, err
 	}
 
@@ -171,7 +174,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID, nickname, avata
 	if err := repository.UpdateUser(s.db, user); err != nil {
 		return nil, err
 	}
-	s.cacheClient.Invalidate(ctx, "user:profile:"+userID)
+	resolveAuthCache(s.cacheClient).Invalidate(ctx, "user:profile:"+userID)
 	return user, nil
 }
 
@@ -198,6 +201,6 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID, oldPassword, n
 		return err
 	}
 
-	s.cacheClient.Invalidate(ctx, "user:profile:"+userID)
+	resolveAuthCache(s.cacheClient).Invalidate(ctx, "user:profile:"+userID)
 	return repository.RevokeAllUserTokens(s.db, userID)
 }

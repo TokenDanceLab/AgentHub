@@ -7,6 +7,7 @@
 // (backward compatible with existing callers).
 
 import { WS_URL } from '@/config';
+import { withEdgeAuthQuery } from './edgeAuth';
 import type { Transport, TransportStatus } from './transport';
 import type { EventEnvelope } from '@shared/events';
 
@@ -164,7 +165,7 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
 
   function connectDirect() {
     if (closed) return;
-    const url = lastCursor ? `${baseUrl}?cursor=${encodeURIComponent(lastCursor)}` : baseUrl;
+    const url = withEdgeAuthQuery(lastCursor ? `${baseUrl}?cursor=${encodeURIComponent(lastCursor)}` : baseUrl);
 
     ws = new WebSocket(url);
 

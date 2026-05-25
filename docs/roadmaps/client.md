@@ -5,7 +5,7 @@
 > **Phase 0 已全部完成 (M7)**：P0-1~P0-4 + QW-1~QW-5 全部落地。
 > 下文 `- [ ]` 为历史记录，实际代码已实现。Phase 1/2 为后续规划。
 >
-> 参考：21 个竞品/参考项目 | 实施详情见 `docs/design/client-p0-architecture.md` | 参考模式见 `docs/design/client-reference-patterns.md`
+> 参考：21 个竞品/参考项目 | 实施详情见 `docs/architecture/design/client-p0-architecture.md` | 参考模式见 `docs/architecture/design/client-reference-patterns.md`
 
 ---
 
@@ -49,45 +49,47 @@
 
 #### P0-1: 状态架构重构（5 天）
 
-- [ ] 引入 TanStack Query 服务端状态管理（3 天）
+- [x] 引入 TanStack Query 服务端状态管理（3 天）
   - 新建 `app/desktop/src/api/queryClient.ts`、`threadQueries.ts`、`runQueries.ts`
   - 改造 `useChatMessages.ts`：事件 → `queryClient.invalidateQueries`
   - 改造 `runStore.ts`：删除服务端数据，仅保留 isStreaming 等客户端标志
   - 参考：Multica TanStack Query+Zustand 分离模式
-- [ ] RunState 正式状态机（1 天）
+- [x] RunState 正式状态机（1 天）
   - 状态：`NO_TASK → RUNNING ↔ STREAMING → WAITING_FOR_INPUT / IDLE / COMPLETED / FAILED / CANCELLED`
   - 新增字段：`loopCount`, `errorCount`, `abortController`, `fileReadCache`
   - 参考：Roo-Code AgentLoopState + cline TaskState
-- [ ] Zustand selector 粒度优化（1 天）
+- [x] Zustand selector 粒度优化（1 天）
   - 所有 store 使用 `subscribeWithSelector` 中间件
   - 组件使用 selector 而非全 store 订阅
 
-> 实施详情（代码、风险评估、测试要求）：见 `docs/design/client-p0-architecture.md#p0-1-状态架构重构5-天`
+> 实施详情（代码、风险评估、测试要求）：见 `docs/architecture/design/client-p0-architecture.md#p0-1-状态架构重构5-天`
+> **M5/M7 已完成 — 2026-05-24**
 
 #### P0-2: 输入体验修复（4 天）
 
-- [ ] 非受控输入迁移（1 天）— `PromptInput.tsx` `useState` → `useRef + DOM`
-- [ ] 草稿持久化（1 天）— 新建 `useInputDraft.ts`，localStorage 按 threadId 存储
-- [ ] 工具调用循环检测（1 天）— `useChatMessages.ts` 签名去重，3 次警告 5 次拦截
-- [ ] 文件读取去重缓存（1 天）— `Map<path, {readCount, mtime}>` 缓存
+- [x] 非受控输入迁移（1 天）— `PromptInput.tsx` `useState` → `useRef + DOM`
+- [x] 草稿持久化（1 天）— 新建 `useInputDraft.ts`，localStorage 按 threadId 存储
+- [x] 工具调用循环检测（1 天）— `useChatMessages.ts` 签名去重，3 次警告 5 次拦截
+- [x] 文件读取去重缓存（1 天）— `Map<path, {readCount, mtime}>` 缓存
 
-> 实施详情：见 `docs/design/client-p0-architecture.md#p0-2-输入体验修复4-天`
+> 实施详情：见 `docs/architecture/design/client-p0-architecture.md#p0-2-输入体验修复4-天`
 
 #### P0-3: 连接健壮性（3 天）
 
-- [ ] WebSocket 心跳（0.5 天）— 10s ping/pong + 15s 超时检测
-- [ ] 离线消息队列（1 天）— 新建 `offlineQueue.ts`，断线入队 localStorage，重连后按序发送
-- [ ] 传输层抽象（1 天）— 新建 `transport.ts` Transport 接口，WebSocketTransport / MockTransport 实现
-- [ ] 架构分离（0.5 天）— `useChatMessages.ts` 拆分为 messageProcessor / stateStore / eventBus
+- [x] WebSocket 心跳（0.5 天）— 10s ping/pong + 15s 超时检测
+- [x] 离线消息队列（1 天）— 新建 `offlineQueue.ts`，断线入队 localStorage，重连后按序发送
+- [x] 传输层抽象（1 天）— 新建 `transport.ts` Transport 接口，WebSocketTransport / MockTransport 实现
+- [x] 架构分离（0.5 天）— `useChatMessages.ts` 拆分为 messageProcessor / stateStore / eventBus
 
-> 实施详情：见 `docs/design/client-p0-architecture.md#p0-3-连接健壮性3-天`
+> 实施详情：见 `docs/architecture/design/client-p0-architecture.md#p0-3-连接健壮性3-天`
 
 #### P0-4: 性能基础（2 天）
 
-- [ ] 虚拟滚动（1.5 天）— `@tanstack/react-virtual`，>200 条消息时启用
-- [ ] App.tsx 视图注册表拆分（0.5 天）— 新建 `viewRegistry.ts`，App.tsx 从 500+ 行拆分
+- [x] 虚拟滚动（1.5 天）— `@tanstack/react-virtual`，>200 条消息时启用
+- [x] App.tsx 视图注册表拆分（0.5 天）— 新建 `viewRegistry.ts`，App.tsx 从 500+ 行拆分
 
-> 实施详情：见 `docs/design/client-p0-architecture.md#p0-4-性能基础2-天`
+> 实施详情：见 `docs/architecture/design/client-p0-architecture.md#p0-4-性能基础2-天`
+> **M5/M7 已完成 — 2026-05-24**
 
 ---
 
@@ -263,7 +265,7 @@ npx tsc --noEmit
 # 构建验证
 npm run build
 
-# 具体 P0 验收标准见 docs/design/client-p0-architecture.md 各节
+# 具体 P0 验收标准见 docs/architecture/design/client-p0-architecture.md 各节
 ```
 
 ---
@@ -289,6 +291,6 @@ npm run build
 
 ## 9. 参考文档
 
-- 实施详情：`docs/design/client-p0-architecture.md`
-- 参考模式：`docs/design/client-reference-patterns.md`
+- 实施详情：`docs/architecture/design/client-p0-architecture.md`
+- 参考模式：`docs/architecture/design/client-reference-patterns.md`
 - 相关路线图：`docs/roadmaps/integration.md`、`docs/roadmaps/backend.md`

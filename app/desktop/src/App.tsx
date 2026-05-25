@@ -1,4 +1,16 @@
-import { useState, useEffect, useCallback, useMemo, useRef, Suspense, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  useId,
+  Suspense,
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatMessages } from '@/hooks/useChatMessages';
@@ -13,10 +25,12 @@ import type { ChatMessage } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
 import { useUIStore } from '@/stores/uiStore';
+import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
 import { useHubStore } from '@/stores/hubStore';
+import { useAuth } from '@/hooks/useAuth';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
@@ -84,6 +98,41 @@ function isEditableShortcutTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable]'));
 }
 
+type TooltipSide = 'top' | 'right' | 'bottom' | 'left';
+
+interface ShellIconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-label'> {
+  label: string;
+  ariaLabel?: string;
+  tooltipSide?: TooltipSide;
+  children: ReactNode;
+}
+
+function ShellIconButton({
+  label,
+  ariaLabel,
+  tooltipSide = 'bottom',
+  className,
+  children,
+  type = 'button',
+  ...buttonProps
+}: ShellIconButtonProps) {
+  const tooltipId = useId();
+
+  return (
+    <button
+      {...buttonProps}
+      type={type}
+      className={`${className ?? ''} ${styles.iconTooltipHost}`}
+      aria-label={ariaLabel ?? label}
+      aria-describedby={tooltipId}
+      data-tooltip-side={tooltipSide}
+    >
+      <span className={styles.iconTooltipGlyph} aria-hidden="true">{children}</span>
+      <span id={tooltipId} role="tooltip" className={styles.iconTooltip}>{label}</span>
+    </button>
+  );
+}
+
 export default function App() {
   const { online, health } = useHealth();
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online);
@@ -98,6 +147,8 @@ export default function App() {
 
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
+  const localModeSelected = useHubStore((s) => s.localModeSelected);
+  const hubAuth = useAuth();
   const { setOnline, setConnected, wsLatency } = useConnectionStore(
     useShallow((s) => ({ setOnline: s.setOnline, setConnected: s.setConnected, wsLatency: s.wsLatency })),
   );
@@ -136,9 +187,20 @@ export default function App() {
   );
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   // Mobile/tablet overlays
   const [navPanelOpen, setNavPanelOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    hubAuth.tryAutoLogin().finally(() => {
+      if (!cancelled) setAuthChecked(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hubAuth.tryAutoLogin]);
 
   // Sync health → connection store
   const prevOnlineRef = useRef<boolean | null>(null);
@@ -237,10 +299,11 @@ export default function App() {
       },
     ]);
     try {
-      const req: StartRunRequest = { prompt };
+      const req: StartRunRequest = {
+        prompt,
+        ...useModelSettingsStore.getState().resolveRunRequestOptions(opts),
+      };
       if (agentId) req.agentId = agentId;
-      if (opts?.model) req.model = opts.model;
-      if (opts?.reasoningEffort) req.reasoningEffort = opts.reasoningEffort;
       if (selectedThread) req.threadId = selectedThread.threadId;
       setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
       setRightPanelOpen(true);
@@ -411,6 +474,15 @@ export default function App() {
 
   // ── Render ─────────────────────────────────
 
+  const inLocalMode = !hubAuthenticated && localModeSelected;
+  const hubActionLabel = hubAuthenticated
+    ? t('status.hubConnected')
+    : inLocalMode
+      ? t('status.localMode')
+      : t('status.hubClickToLogin');
+  const showStartupAuthChecking = !authChecked && !hubAuthenticated && !localModeSelected;
+  const showStartupAuthGate = authChecked && !hubAuthenticated && !localModeSelected;
+
   return (
     <ErrorBoundary>
     <div className={styles.root}>
@@ -424,22 +496,23 @@ export default function App() {
           {wsLatency != null && <span className={styles.topBarDim} style={{ marginLeft: 6 }}>{wsLatency}ms</span>}
           {isConnected ? <Wifi size={12} className={styles.topBarDim} /> : <WifiOff size={12} className={styles.topBarDim} />}
           {edgeStatus.lastError && <AlertTriangle size={13} className={styles.topBarDim} style={{ marginLeft: 4 }} aria-label={edgeStatus.lastError} />}
+          {inLocalMode && <span className={styles.topBarDim}>{t('status.localMode')}</span>}
         </div>
         <div className={styles.topBarRight}>
           {/* Window controls — no drag region so clicks register */}
           <div className={styles.winControls}>
-            <button className={styles.winBtn} onClick={() => getCurrentWindow().minimize()} title="最小化" aria-label="最小化">
+            <ShellIconButton className={styles.winBtn} onClick={() => getCurrentWindow().minimize()} label="最小化" tooltipSide="bottom">
               <Minus size={13} />
-            </button>
-            <button className={styles.winBtn} onClick={async () => {
+            </ShellIconButton>
+            <ShellIconButton className={styles.winBtn} onClick={async () => {
               const w = getCurrentWindow();
               (await w.isMaximized()) ? w.unmaximize() : w.maximize();
-            }} title="最大化" aria-label="最大化">
+            }} label="最大化" tooltipSide="bottom">
               <Square size={11} />
-            </button>
-            <button className={`${styles.winBtn} ${styles.winBtnClose}`} onClick={() => getCurrentWindow().close()} title="关闭" aria-label="关闭">
+            </ShellIconButton>
+            <ShellIconButton className={`${styles.winBtn} ${styles.winBtnClose}`} onClick={() => getCurrentWindow().close()} label="关闭" tooltipSide="bottom">
               <X size={14} />
-            </button>
+            </ShellIconButton>
           </div>
         </div>
       </div>
@@ -455,7 +528,17 @@ export default function App() {
         </div>
       )}
 
-      {settingsOpen ? (
+      {showStartupAuthChecking ? (
+        <div className={styles.startupGate} aria-busy="true" />
+      ) : showStartupAuthGate ? (
+        <div className={styles.startupGate}>
+          <AuthPage
+            startup
+            onLoginSuccess={() => useHubStore.getState().setShowAuthModal(false)}
+            onContinueLocal={hubAuth.continueLocalMode}
+          />
+        </div>
+      ) : settingsOpen ? (
         <SettingsPage
           initialSection={settingsInitialSection}
           onBack={() => setSettingsOpen(false)}
@@ -467,19 +550,19 @@ export default function App() {
       {/* Mobile toolbar */}
       {isMobile && (
         <div className={styles.mobileToolbar}>
-          <button className={styles.mobileToolbarBtn} onClick={() => setNavPanelOpen(true)} aria-label={t('nav.openMenu')} aria-expanded={navPanelOpen}>
+          <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => setNavPanelOpen(true)} label={t('nav.openMenu')} aria-expanded={navPanelOpen}>
             <Menu size={17} />
-          </button>
+          </ShellIconButton>
           <span className={styles.mobileToolbarTitle}>{selectedAgent?.name ?? 'AgentHub'}</span>
-          <button className={styles.mobileToolbarBtn} onClick={() => openSettings('general')} aria-label={t('nav.settings')}>
+          <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => openSettings('general')} label={t('nav.settings')}>
             <Settings size={17} />
-          </button>
-          <button className={styles.mobileToolbarBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} aria-label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
+          </ShellIconButton>
+          <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} label={hubActionLabel}>
             {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={17} />}
-          </button>
-          <button className={styles.mobileToolbarBtn} onClick={toggleTheme} aria-label={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-pressed={theme === 'dark'}>
+          </ShellIconButton>
+          <ShellIconButton className={styles.mobileToolbarBtn} onClick={toggleTheme} label={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-pressed={theme === 'dark'}>
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-          </button>
+          </ShellIconButton>
         </div>
       )}
 
@@ -510,30 +593,30 @@ export default function App() {
         {/* Single sidebar — agents + threads grouped */}
         {!isMobile && !workspaceExpanded && leftSidebarCollapsed && (
           <div className={styles.leftRail}>
-            <button
+            <ShellIconButton
               className={styles.railBtn}
               onClick={() => setLeftSidebarCollapsed(false)}
-              title={t('nav.expandSidebar')}
-              aria-label={t('nav.expandSidebar')}
+              label={t('nav.expandSidebar')}
+              tooltipSide="right"
               aria-expanded="false"
             >
               <PanelLeftOpen size={17} />
-            </button>
-            <button className={styles.railBtn} onClick={() => openSettings('general')} title={t('nav.settings')} aria-label={t('nav.settings')}>
+            </ShellIconButton>
+            <ShellIconButton className={styles.railBtn} onClick={() => openSettings('general')} label={t('nav.settings')} tooltipSide="right">
               <Settings size={17} />
-            </button>
-            <button
+            </ShellIconButton>
+            <ShellIconButton
               className={styles.railBtn}
               onClick={() => useHubStore.getState().setShowAuthModal(true)}
-              title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
-              aria-label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
+              label={hubActionLabel}
+              tooltipSide="right"
               aria-pressed={hubAuthenticated}
             >
               {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={17} />}
-            </button>
-            <button className={styles.railBtn} onClick={toggleTheme} title={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-label={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-pressed={theme === 'dark'}>
+            </ShellIconButton>
+            <ShellIconButton className={styles.railBtn} onClick={toggleTheme} label={theme === 'dark' ? t('theme.light') : t('theme.dark')} tooltipSide="right" aria-pressed={theme === 'dark'}>
               {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-            </button>
+            </ShellIconButton>
           </div>
         )}
 
@@ -567,30 +650,30 @@ export default function App() {
 
             {/* Sidebar footer */}
             <div className={styles.sidebarFooter}>
-              <button
+              <ShellIconButton
                 className={styles.navIconBtn}
                 onClick={() => setLeftSidebarCollapsed(true)}
-                title={t('nav.collapseSidebar')}
-                aria-label={t('nav.collapseSidebar')}
+                label={t('nav.collapseSidebar')}
+                tooltipSide="top"
                 aria-expanded="true"
               >
                 <PanelLeftClose size={16} />
-              </button>
-              <button className={styles.navIconBtn} onClick={() => openSettings('general')} title={t('nav.settings')} aria-label={t('nav.settings')}>
+              </ShellIconButton>
+              <ShellIconButton className={styles.navIconBtn} onClick={() => openSettings('general')} label={t('nav.settings')} tooltipSide="top">
                 <Settings size={16} />
-              </button>
-              <button
+              </ShellIconButton>
+              <ShellIconButton
                 className={styles.navIconBtn}
                 onClick={() => useHubStore.getState().setShowAuthModal(true)}
-                title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
-                aria-label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
+                label={hubActionLabel}
+                tooltipSide="top"
                 aria-pressed={hubAuthenticated}
               >
                 {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={16} />}
-              </button>
-              <button className={styles.navIconBtn} onClick={toggleTheme} title={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-label={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-pressed={theme === 'dark'}>
+              </ShellIconButton>
+              <ShellIconButton className={styles.navIconBtn} onClick={toggleTheme} label={theme === 'dark' ? t('theme.light') : t('theme.dark')} tooltipSide="top" aria-pressed={theme === 'dark'}>
                 {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
+              </ShellIconButton>
             </div>
           </div>
           <div
@@ -617,59 +700,59 @@ export default function App() {
               <h2>{selectedAgent ? selectedAgent.name : 'AgentHub'}</h2>
               {selectedThread && <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted-foreground)' }}>{selectedThread.title}</span>}
               <div className={styles.workspaceHeaderActions}>
-                <button
+                <ShellIconButton
                   className={styles.workspaceHeaderBtn}
                   onClick={handleShareWorkspace}
-                  title={t('workspace.share')}
-                  aria-label={t('workspace.share')}
+                  label={t('workspace.share')}
+                  tooltipSide="bottom"
                 >
                   <Copy size={15} />
-                </button>
-                <button
+                </ShellIconButton>
+                <ShellIconButton
                   className={styles.workspaceHeaderBtn}
                   onClick={() => setViewMode((mode) => (mode === 'agent' ? 'im' : 'agent'))}
-                  title={viewMode === 'agent' ? t('im.groupChat') : t('nav.agent')}
-                  aria-label={viewMode === 'agent' ? t('im.groupChat') : t('nav.agent')}
+                  label={viewMode === 'agent' ? t('im.groupChat') : t('nav.agent')}
+                  tooltipSide="bottom"
                   aria-pressed={viewMode === 'im'}
                 >
                   <MessageSquareText size={15} />
-                </button>
-                <button
+                </ShellIconButton>
+                <ShellIconButton
                   className={styles.workspaceHeaderBtn}
                   onClick={() => openSettings('tasks')}
-                  title={t('settings.tasks')}
-                  aria-label={t('settings.tasks')}
+                  label={t('settings.tasks')}
+                  tooltipSide="bottom"
                 >
                   <ClipboardList size={15} />
-                </button>
-                <button
+                </ShellIconButton>
+                <ShellIconButton
                   className={styles.workspaceHeaderBtn}
                   onClick={() => openSettings('agentScheduling')}
-                  title={t('settings.agentScheduling')}
-                  aria-label={t('settings.agentScheduling')}
+                  label={t('settings.agentScheduling')}
+                  tooltipSide="bottom"
                 >
                   <Route size={15} />
-                </button>
+                </ShellIconButton>
                 {displayedRun && !rightPanelOpen && (
-                  <button
+                  <ShellIconButton
                     className={styles.workspaceHeaderBtn}
                     onClick={() => setRightPanelOpen(true)}
-                    title={t('run.open')}
-                    aria-label={t('run.open')}
+                    label={t('run.open')}
+                    tooltipSide="bottom"
                     aria-expanded="false"
                   >
                     <PanelRightOpen size={15} />
-                  </button>
+                  </ShellIconButton>
                 )}
-                <button
+                <ShellIconButton
                   className={styles.workspaceHeaderBtn}
                   onClick={() => setWorkspaceExpanded((v) => !v)}
-                  title={workspaceExpanded ? t('workspace.collapse') : t('workspace.expand')}
-                  aria-label={workspaceExpanded ? t('workspace.collapse') : t('workspace.expand')}
+                  label={workspaceExpanded ? t('workspace.collapse') : t('workspace.expand')}
+                  tooltipSide="bottom"
                   aria-pressed={workspaceExpanded}
                 >
                   {workspaceExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                </button>
+                </ShellIconButton>
               </div>
             </div>
 
@@ -678,7 +761,7 @@ export default function App() {
               {viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
               ) : (
-                <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
+                <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
               )}
             </div>
 
@@ -711,15 +794,15 @@ export default function App() {
                 <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`} type="button" role="tab" aria-selected="true">{t('run.output')}</button>
                 <button className={styles.rightPanelTab} type="button" role="tab" aria-selected="false">{t('run.files')}</button>
               </div>
-              <button
+              <ShellIconButton
                 className={styles.rightPanelCollapseBtn}
                 onClick={() => setRightPanelOpen(false)}
-                title={t('run.close')}
-                aria-label={t('run.close')}
+                label={t('run.close')}
+                tooltipSide="left"
                 aria-expanded="true"
               >
                 <PanelRightClose size={15} />
-              </button>
+              </ShellIconButton>
             </div>
             <div className={styles.rightPanelBody}>
               <ErrorBoundary>
@@ -742,32 +825,32 @@ export default function App() {
 
         {!isMobile && !workspaceExpanded && displayedRun && !rightPanelOpen && (
           <div className={styles.rightRail} aria-label={t('run.collapsedRail')}>
-            <button
+            <ShellIconButton
               className={styles.railBtn}
               onClick={() => setRightPanelOpen(true)}
-              title={t('run.open')}
-              aria-label={t('run.open')}
+              label={t('run.open')}
+              tooltipSide="left"
               aria-expanded="false"
             >
               <PanelRightOpen size={17} />
-            </button>
+            </ShellIconButton>
             <span className={`${styles.railStatusDot} ${runIsActive ? styles.railStatusDotActive : ''}`} />
-            <button
+            <ShellIconButton
               className={styles.railBtn}
               onClick={() => openSettings('tasks')}
-              title={t('settings.tasks')}
-              aria-label={t('settings.tasks')}
+              label={t('settings.tasks')}
+              tooltipSide="left"
             >
               <ClipboardList size={17} />
-            </button>
-            <button
+            </ShellIconButton>
+            <ShellIconButton
               className={styles.railBtn}
               onClick={() => openSettings('agentScheduling')}
-              title={t('settings.agentScheduling')}
-              aria-label={t('settings.agentScheduling')}
+              label={t('settings.agentScheduling')}
+              tooltipSide="left"
             >
               <Route size={17} />
-            </button>
+            </ShellIconButton>
           </div>
         )}
       </div>
@@ -783,7 +866,13 @@ export default function App() {
 
       {showAuthModal && (
         <div className={styles.modalOverlay} onClick={() => useHubStore.getState().setShowAuthModal(false)}>
-          <div className={styles.authModal} onClick={(e) => e.stopPropagation()}>
+          <div
+            className={styles.authModal}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('auth.title')}
+            onClick={(e) => e.stopPropagation()}
+          >
             <AuthPage
               onLoginSuccess={() => useHubStore.getState().setShowAuthModal(false)}
               onClose={() => useHubStore.getState().setShowAuthModal(false)}

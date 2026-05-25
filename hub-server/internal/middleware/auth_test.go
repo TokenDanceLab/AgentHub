@@ -1,12 +1,18 @@
 package middleware
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/base64"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/jwtutil"
@@ -170,6 +176,80 @@ func TestAuthMiddlewareSetsContextValues(t *testing.T) {
 	if got := c.GetString("device_id"); got != "dev-mobile-1" {
 		t.Fatalf("device_id = %q, want dev-mobile-1", got)
 	}
+}
+
+func TestAuthMiddlewareTokenDanceBearerDoesNotSatisfyDesktopDeviceCheck(t *testing.T) {
+	token, issuer, audience, jwks := makeTokenDanceMiddlewareToken(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(jwks))
+	}))
+	t.Cleanup(server.Close)
+	jwtutil.SetJWKSURI(server.URL)
+
+	cfg := testConfig()
+	cfg.TokenDanceID.IssuerURL = issuer
+	cfg.TokenDanceID.ClientID = audience
+
+	c, w := ginRequest(http.MethodPost, "/edge/devices/register", "Bearer "+token)
+	AuthMiddleware(cfg)(c)
+	if c.IsAborted() {
+		t.Fatalf("TokenDance bearer should authenticate before device gate, status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := c.GetString("auth_source"); got != "tokendance_id" {
+		t.Fatalf("auth_source = %q, want tokendance_id", got)
+	}
+	if got := c.GetString("device_type"); got != "tokendance_bearer" {
+		t.Fatalf("device_type = %q, want tokendance_bearer", got)
+	}
+
+	DeviceTypeCheck("desktop")(c)
+	if !c.IsAborted() {
+		t.Fatal("expected TokenDance bearer to be rejected by desktop device gate")
+	}
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", w.Code)
+	}
+}
+
+func makeTokenDanceMiddlewareToken(t *testing.T) (token, issuer, audience, jwks string) {
+	t.Helper()
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	kid := tokenDanceMiddlewareKID(&priv.PublicKey)
+	n := base64.RawURLEncoding.EncodeToString(priv.PublicKey.N.Bytes())
+	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(priv.PublicKey.E)).Bytes())
+	jwks = `{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"` + kid + `","n":"` + n + `","e":"` + e + `"}]}`
+
+	issuer = "https://id.example"
+	audience = "agenthub-client"
+	now := time.Now()
+	claims := jwtutil.TokenDanceClaims{
+		Email:         "user@example.com",
+		EmailVerified: true,
+		Name:          "Test User",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    issuer,
+			Subject:   "tokendance-user-1",
+			Audience:  jwt.ClaimStrings{audience},
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	signed := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	signed.Header["kid"] = kid
+	token, err = signed.SignedString(priv)
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+	return token, issuer, audience, jwks
+}
+
+func tokenDanceMiddlewareKID(pub *rsa.PublicKey) string {
+	hash := sha256.Sum256(pub.N.Bytes())
+	return base64.RawURLEncoding.EncodeToString(hash[:16])
 }
 
 // --- DeviceTypeCheck tests ---

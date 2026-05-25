@@ -23,8 +23,11 @@ func NewAttachmentService(db *gorm.DB, uploadCfg config.UploadConfig) *Attachmen
 	return &AttachmentService{db: db, uploadCfg: uploadCfg}
 }
 
-func (s *AttachmentService) ProbeAttachment(ctx context.Context, hash string) (*model.Attachment, error) {
-	a, err := repository.GetAttachmentByHash(s.db, hash)
+func (s *AttachmentService) ProbeAttachment(ctx context.Context, userID, hash string) (*model.Attachment, error) {
+	if userID == "" {
+		return nil, nil
+	}
+	a, err := repository.GetAttachmentByUploaderAndHash(s.db, userID, hash)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -48,13 +51,27 @@ func (s *AttachmentService) SaveAttachment(ctx context.Context, uploaderID, hash
 	return a, nil
 }
 
-func (s *AttachmentService) GetAttachmentByID(ctx context.Context, id string) (*model.Attachment, error) {
+func (s *AttachmentService) GetAttachmentByID(ctx context.Context, userID, id string) (*model.Attachment, error) {
+	if userID == "" {
+		return nil, errcode.AttachNotFound
+	}
 	a, err := repository.GetAttachmentByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.AttachNotFound
 		}
 		return nil, err
+	}
+	if a.UploaderUserID == userID {
+		return a, nil
+	}
+
+	allowed, err := repository.CanUserAccessReferencedAttachment(s.db, userID, id)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, errcode.AttachNotFound
 	}
 	return a, nil
 }
