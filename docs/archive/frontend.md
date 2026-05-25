@@ -27,8 +27,8 @@
 
 - `api/openapi.yaml`
 - `api/events.md`
-- `docs/product-requirements.md`
-- `docs/system-architecture.md`
+- `docs/architecture/product-requirements.md`
+- `docs/architecture/system-architecture.md`
 
 ## 验收
 

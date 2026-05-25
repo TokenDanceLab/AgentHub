@@ -27,8 +27,8 @@
 
 - `api/openapi.yaml`
 - `api/events.md`
-- `docs/system-architecture.md`
-- `docs/implementation-guide.md`
+- `docs/architecture/system-architecture.md`
+- `docs/architecture/implementation-guide.md`
 
 ## 验收
 
