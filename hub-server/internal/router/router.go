@@ -37,28 +37,34 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 	client := r.Group("/client")
 	{
-		client.GET("/ws", wsHandler.ServeWS)
+		client.GET("/ws", middleware.WSAuthMiddleware(cfg), wsHandler.ServeWS)
 
 		auth := client.Group("/auth")
 		{
 			auth.POST("/register", middleware.RateLimit(cacheClient, config.AuthRegisterRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Register)
 			auth.POST("/login", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Login)
-			auth.POST("/refresh", authHandler.Refresh)
+			auth.POST("/refresh", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Refresh)
 
 			// OIDC (Phase 1)
 			if oidcHandler != nil {
 				auth.POST("/oidc/authorize", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCAuthorize)
-				auth.POST("/oidc/callback", oidcHandler.PostOIDCCallback)
+				auth.POST("/oidc/callback", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCCallback)
 			}
 		}
 
 		authProtected := client.Group("/auth")
 		authProtected.Use(middleware.AuthMiddleware(cfg))
 		{
-			authProtected.POST("/logout", authHandler.Logout)
 			authProtected.GET("/me", authHandler.Me)
-			authProtected.PUT("/profile", authHandler.UpdateProfile)
-			authProtected.PUT("/password", authHandler.ChangePassword)
+		}
+
+		localAuthWrite := client.Group("/auth")
+		localAuthWrite.Use(middleware.AuthMiddleware(cfg))
+		localAuthWrite.Use(middleware.RequireLocalAuth())
+		{
+			localAuthWrite.POST("/logout", authHandler.Logout)
+			localAuthWrite.PUT("/profile", authHandler.UpdateProfile)
+			localAuthWrite.PUT("/password", authHandler.ChangePassword)
 		}
 
 		contacts := client.Group("/contacts")
@@ -160,7 +166,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.GET("/agent-profiles/:id", agentProfileHandler.GetProfile)
 			web.PATCH("/agent-profiles/:id", agentProfileHandler.UpdateProfile)
 			web.DELETE("/agent-profiles/:id", agentProfileHandler.DeleteProfile)
-			web.POST("/agent-profiles/:id/publish", agentProfileHandler.PublishProfile)
+			web.POST("/agent-profiles/:id/publish", middleware.RequireAdmin(), agentProfileHandler.PublishProfile)
 			web.POST("/agent-profiles/:id/install", agentProfileHandler.InstallProfile)
 		}
 
@@ -171,8 +177,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.GET("/skills/:id", skillHandler.GetSkill)
 			web.PUT("/skills/:id", skillHandler.UpdateSkill)
 			web.DELETE("/skills/:id", skillHandler.DeleteSkill)
-			web.POST("/skills/:id/publish", skillHandler.PublishSkill)
-			web.POST("/skills/:id/unpublish", skillHandler.UnpublishSkill)
+			web.POST("/skills/:id/publish", middleware.RequireAdmin(), skillHandler.PublishSkill)
+			web.POST("/skills/:id/unpublish", middleware.RequireAdmin(), skillHandler.UnpublishSkill)
 		}
 
 		// MCP Servers (Phase 3)
@@ -182,8 +188,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.GET("/mcp-servers/:id", mcpHandler.GetMCPServer)
 			web.PUT("/mcp-servers/:id", mcpHandler.UpdateMCPServer)
 			web.DELETE("/mcp-servers/:id", mcpHandler.DeleteMCPServer)
-			web.POST("/mcp-servers/:id/publish", mcpHandler.PublishMCPServer)
-			web.POST("/mcp-servers/:id/unpublish", mcpHandler.UnpublishMCPServer)
+			web.POST("/mcp-servers/:id/publish", middleware.RequireAdmin(), mcpHandler.PublishMCPServer)
+			web.POST("/mcp-servers/:id/unpublish", middleware.RequireAdmin(), mcpHandler.UnpublishMCPServer)
 		}
 
 		// Market (Phase 4)
@@ -214,14 +220,14 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		// Audit Events (Phase 6)
 		if auditHandler != nil {
-			web.GET("/audit-events", auditHandler.ListAuditEvents)
+			web.GET("/audit-events", middleware.RequireAdmin(), auditHandler.ListAuditEvents)
 		}
 
 		// Relay Commands
 		if relayHandler != nil {
-			web.POST("/relay/commands", relayHandler.CreateCommand)
-			web.GET("/relay/commands/:id", relayHandler.GetCommand)
-			web.POST("/relay/commands/:id/ack", relayHandler.AckCommand)
+			web.POST("/relay/commands", middleware.RequireAdmin(), relayHandler.CreateCommand)
+			web.GET("/relay/commands/:id", middleware.RequireAdmin(), relayHandler.GetCommand)
+			web.POST("/relay/commands/:id/ack", middleware.RequireAdmin(), relayHandler.AckCommand)
 		}
 
 		// Devices
