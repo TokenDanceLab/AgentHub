@@ -1,6 +1,6 @@
 # 客户端交接文档 (HANDOFF)
 
-> **历史快照（2026-05-22）**：本文记录早期客户端接手状态，包含已废弃的独立 `runner/`、Mock Runner、RunnerList 和旧分支语境。当前客户端接手入口是 `docs/handoff/STATE.md`、`docs/roadmap.md`、`docs/roadmaps/client.md`、`docs/system-architecture.md`、`docs/implementation-guide.md` 和 `api/` 契约。不要按本文启动 `runner/` 或把 Runner 当作当前产品组件。
+> **历史快照（2026-05-22）**：本文记录早期客户端接手状态，包含已废弃的独立 `runner/`、Mock Runner、RunnerList 和旧分支语境。当前客户端接手入口是 `docs/handoff/STATE.md`、`docs/roadmap.md`、`docs/roadmaps/client.md`、`docs/architecture/system-architecture.md`、`docs/architecture/implementation-guide.md` 和 `api/` 契约。不要按本文启动 `runner/` 或把 Runner 当作当前产品组件。
 
 本文档面向追溯早期 AgentHub 客户端 UI 开发的同学。它不替代当前路线图、架构文档或 API 契约。
 
