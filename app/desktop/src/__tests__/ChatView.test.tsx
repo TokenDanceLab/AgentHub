@@ -77,6 +77,13 @@ describe('ChatView', () => {
     expect(screen.getByText('chat.emptyTitle')).toBeInTheDocument();
   });
 
+  it('does not render empty-state suggestion buttons without a real action', () => {
+    render(<ChatView messages={[]} />);
+    expect(screen.queryByRole('button', { name: 'chat.suggestion.newTask' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'chat.suggestion.explainCode' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'chat.suggestion.fixBugs' })).not.toBeInTheDocument();
+  });
+
   it('renders user messages on the right side', () => {
     const msg = makeUserMessage('Hello from user');
     render(<ChatView messages={[msg]} />);

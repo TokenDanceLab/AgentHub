@@ -499,11 +499,6 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
           <EmptyState
             title={t('chat.emptyTitle')}
             description={t('chat.emptyDescription')}
-            suggestions={[
-              { label: t('chat.suggestion.newTask'), onClick: () => {} },
-              { label: t('chat.suggestion.explainCode'), onClick: () => {} },
-              { label: t('chat.suggestion.fixBugs'), onClick: () => {} },
-            ]}
           />
         ) : (
           <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative', flexShrink: 0 }}>
