@@ -36,6 +36,7 @@
   /* AgentHub-specific */
   --brand:               oklch(0.55 0.16 255);
 
+<<<<<<< HEAD
   /* TokenDance cross-app aliases */
   --td-canvas:           var(--background);
   --td-surface:          var(--card);
@@ -50,6 +51,8 @@
   --td-radius-control:   var(--radius-md);
   --td-radius-panel:     var(--radius-xl);
 
+=======
+>>>>>>> origin/dev/trump
   /* Typography */
   --font-sans:  "Inter Variable", "Inter", system-ui, -apple-system,
                 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -73,6 +76,7 @@
   --space-lg: 1rem;
   --space-xl: 1.5rem;
   --space-2xl: 2rem;
+<<<<<<< HEAD
   --space-3xl: 3rem;
 
   /* Shadows */
@@ -88,6 +92,8 @@
 
   /* Line Height */
   --line-height-relaxed: 1.625;
+=======
+>>>>>>> origin/dev/trump
 
   /* Border Radius */
   --radius-sm:  0.25rem;

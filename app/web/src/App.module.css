@@ -1,27 +1,176 @@
+<<<<<<< HEAD
 :global(body) {
   margin: 0;
   overflow: hidden;
+=======
+:root {
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --surface-alt: #f8fafc;
+  --border: #d8dee8;
+  --border-light: #e0e6ef;
+  --border-subtle: #e4e8f0;
+  --text: #172033;
+  --text-secondary: #39475c;
+  --text-muted: #65758b;
+  --text-overline: #526176;
+  --accent: #1f6feb;
+  --accent-light: #f3f7ff;
+  --accent-lighter: #e9f1ff;
+  --accent-border: #b9cdf6;
+  --accent-gradient: linear-gradient(135deg, #1769e8, #08a7cf);
+  --hover: #f4f6f9;
+  --brand-gradient: var(--accent-gradient);
+  --shadow: rgba(37, 99, 235, 0.2);
+  --success: #087443;
+  --success-bg: #eaf8f0;
+  --success-border: #bde5ca;
+  --success-dot: #16a05d;
+  --warning: #975a16;
+  --warning-bg: #fff5e8;
+  --warning-border: #f3d2a5;
+  --warning-dot: #d97706;
+  --danger: #b42318;
+  --danger-bg: #fff0ee;
+  --danger-border: #f3beb7;
+  --neutral: #526176;
+  --neutral-bg: #f4f6f9;
+  --neutral-border: #dce3ed;
+  --neutral-dot: #9aa6b6;
+  --code-bg: #111827;
+  --code-text: #dbe7ff;
+  --preview-dot: #c8d1df;
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-shadow: rgba(26, 40, 80, 0.14);
+  --owner-bg: #f6f9ff;
+  --agent-bg: #f8fafc;
+  --system-bg: #fffaf3;
+  --white: #ffffff;
+}
+
+[data-theme="dark"] {
+  --bg: #0f1117;
+  --surface: #161b22;
+  --surface-alt: #0d1117;
+  --border: #21262d;
+  --border-light: #30363d;
+  --border-subtle: #21262d;
+  --text: #e1e4e8;
+  --text-secondary: #c9cdd3;
+  --text-muted: #8b949e;
+  --text-overline: #8b949e;
+  --accent: #1769e8;
+  --accent-light: #1c2533;
+  --accent-lighter: #13233b;
+  --accent-border: #30363d;
+  --accent-gradient: linear-gradient(135deg, #1769e8, #08a7cf);
+  --hover: #1c2128;
+  --brand-gradient: var(--accent-gradient);
+  --shadow: rgba(37, 99, 235, 0.35);
+  --success: #3fb950;
+  --success-bg: rgba(63, 185, 80, 0.12);
+  --success-border: rgba(63, 185, 80, 0.25);
+  --success-dot: #3fb950;
+  --warning: #d2991d;
+  --warning-bg: rgba(210, 153, 29, 0.12);
+  --warning-border: rgba(210, 153, 29, 0.3);
+  --warning-dot: #d2991d;
+  --danger: #f85149;
+  --danger-bg: rgba(248, 81, 73, 0.12);
+  --danger-border: rgba(248, 81, 73, 0.25);
+  --neutral: #8b949e;
+  --neutral-bg: #1c2128;
+  --neutral-border: #30363d;
+  --neutral-dot: #484f58;
+  --code-bg: #161b22;
+  --code-text: #c9cdd3;
+  --preview-dot: #30363d;
+  --glass-bg: rgba(22, 27, 34, 0.8);
+  --glass-border: rgba(48, 54, 61, 0.6);
+  --glass-shadow: rgba(0, 0, 0, 0.35);
+  --owner-bg: #1a2130;
+  --agent-bg: #161b22;
+  --system-bg: #1e1c19;
+  --white: #ffffff;
+>>>>>>> origin/dev/trump
 }
 
 .root {
   display: flex;
   flex-direction: column;
   height: 100vh;
+<<<<<<< HEAD
   min-width: 960px;
   overflow: hidden;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+=======
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    Inter,
+    "Segoe UI",
+    Arial,
+    sans-serif;
+}
+
+/* ── Scrollbar ────────────────────────────── */
+/* Track hidden, thumb semi-transparent, smoothly opaque on drag */
+
+.root *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.root *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.root *::-webkit-scrollbar-thumb {
+  background: rgba(100, 120, 160, 0.32);
+  border-radius: 3px;
+  transition: background 0.3s ease;
+}
+
+.root *::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 120, 160, 0.55);
+}
+
+.root *::-webkit-scrollbar-thumb:active {
+  background: rgba(60, 80, 120, 0.8);
+}
+
+/* Firefox */
+.root * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 120, 160, 0.32) transparent;
+}
+
+.root *:hover {
+  scrollbar-color: rgba(100, 120, 160, 0.55) transparent;
+>>>>>>> origin/dev/trump
 }
 
 .toolbar {
   display: flex;
   align-items: center;
+<<<<<<< HEAD
   gap: 24px;
   height: 56px;
   padding: 0 20px;
   border-bottom: 1px solid var(--border);
   background: var(--card);
+=======
+  gap: 14px;
+  height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+>>>>>>> origin/dev/trump
   flex-shrink: 0;
 }
 
@@ -41,10 +190,19 @@
   width: 28px;
   height: 28px;
   border-radius: 6px;
+<<<<<<< HEAD
   background: var(--brand);
   color: #ffffff;
   font-size: 12px;
   letter-spacing: 0;
+=======
+  background: var(--brand-gradient);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  box-shadow: 0 8px 18px var(--shadow);
+>>>>>>> origin/dev/trump
 }
 
 .tabs {
@@ -57,6 +215,7 @@
 
 .tab,
 .activeTab {
+<<<<<<< HEAD
   height: 32px;
   padding: 0 12px;
   border: 1px solid transparent;
@@ -81,6 +240,45 @@
   font-weight: 700;
 }
 
+=======
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tab[data-priority="secondary"] {
+  opacity: 0.72;
+}
+
+.tab:hover {
+  background: var(--hover);
+  color: var(--text);
+  opacity: 1;
+}
+
+.activeTab {
+  border-color: var(--accent-border);
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.activeTab[data-priority="primary"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+>>>>>>> origin/dev/trump
 .preview {
   flex: 1;
   min-height: 0;
@@ -90,3 +288,65 @@
 .preview iframe {
   height: 100% !important;
 }
+<<<<<<< HEAD
+=======
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.iconBtn:hover {
+  background: var(--hover);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.iconBtn svg {
+  width: 17px;
+  height: 17px;
+}
+
+@media (max-width: 820px) {
+  .toolbar {
+    gap: 10px;
+    height: 48px;
+    padding: 0 12px;
+  }
+
+  .brand {
+    min-width: auto;
+  }
+
+  .brand span:last-child {
+    display: none;
+  }
+
+  .tabs {
+    flex: 1 1 auto;
+  }
+
+  .tab,
+  .activeTab {
+    height: 28px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+}
+>>>>>>> origin/dev/trump

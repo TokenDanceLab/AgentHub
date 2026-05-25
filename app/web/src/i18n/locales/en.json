@@ -38,6 +38,7 @@
   "run.output": "Output",
   "run.toolCalls": "Tool Calls",
   "run.fileChanges": "Changed Files",
+<<<<<<< HEAD
   "error.streamError": "Event stream error: {{message}}",
 
   "wb.brand": "AGENTHUB",
@@ -372,4 +373,7 @@
   "pj.status.done": "Done",
   "pj.status.active": "Active",
   "pj.status.later": "Later"
+=======
+  "error.streamError": "Event stream error: {{message}}"
+>>>>>>> origin/dev/trump
 }

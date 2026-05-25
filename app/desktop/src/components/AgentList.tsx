@@ -1,8 +1,16 @@
 import { useTranslation } from 'react-i18next';
+<<<<<<< HEAD
 import { MapPin, Search, Settings2, Sparkles } from 'lucide-react';
 import { useState, useMemo, memo, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
+=======
+import { Search } from 'lucide-react';
+import { useState, useMemo, memo } from 'react';
+import type { AgentInfo } from '@shared/types';
+import { StatusBadge } from '@shared/components';
+import type { StatusVariant } from '@shared/components';
+>>>>>>> origin/dev/trump
 import styles from './AgentList.module.css';
 
 const RUNTIME_ORDER = ['codex', 'claude', 'opencode'];
@@ -28,6 +36,40 @@ interface Props {
   onSelect?: (agentId: string) => void;
 }
 
+<<<<<<< HEAD
+=======
+interface CapItem {
+  label: string;
+  key: string;
+}
+
+function capabilityItems(caps: AgentInfo['capabilities'], t: (key: string) => string): CapItem[] {
+  const items: CapItem[] = [];
+  if (caps.streaming) items.push({ label: t('agent.capability.streaming'), key: 'streaming' });
+  if (caps.toolCalls) items.push({ label: t('agent.capability.toolCalls'), key: 'toolCalls' });
+  if (caps.fileChanges) items.push({ label: t('agent.capability.fileChanges'), key: 'fileChanges' });
+  if (caps.thinkingVisible) items.push({ label: t('agent.capability.thinking'), key: 'thinkingVisible' });
+  if (caps.multiTurn) items.push({ label: t('agent.capability.multiTurn'), key: 'multiTurn' });
+  return items;
+}
+
+const capColorClass: Record<string, string> = {
+  streaming: styles.tagStreaming,
+  toolCalls: styles.tagToolCalls,
+  fileChanges: styles.tagFileChanges,
+  thinkingVisible: styles.tagThinking,
+  multiTurn: styles.tagMultiTurn,
+};
+
+function agentStatusVariant(status: string): StatusVariant {
+  switch (status) {
+    case 'available': return 'online';
+    case 'busy': return 'running';
+    default: return 'offline';
+  }
+}
+
+>>>>>>> origin/dev/trump
 export default memo(function AgentList({ agents, online, selectedId, onSelect }: Props) {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
@@ -105,10 +147,14 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
                 aria-pressed={a.id === selectedId}
                 disabled={a.status !== 'available'}
               >
+<<<<<<< HEAD
                 <span className={styles.avatar}>
                   {agentIcon(a.name) || <Settings2 size={17} />}
                   <span className={`${styles.statusDot} ${styles[`status_${a.status}`]}`} />
                 </span>
+=======
+                <StatusBadge status={agentStatusVariant(a.status)} className={styles.statusDot} />
+>>>>>>> origin/dev/trump
                 <div className={styles.info}>
                   <div className={styles.nameLine}>
                     <span className={styles.name}>{highlightMatch(a.name)}</span>

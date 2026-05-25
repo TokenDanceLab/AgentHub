@@ -127,6 +127,7 @@ AgentHub 后续调用模型中转站时，产品名写 TokenDance Relay / 词元
 - subagent 提示必须包含：目标、允许修改的路径、必须阅读的文档、必须运行的检查、隐私红线。
 - subagent 不自行扩大范围；发现范围不够，停下交回主 Agent。
 
+<<<<<<< HEAD
 ### 模型分配策略
 
 > 实际后端模型映射，AgentHub 项目专用。dev-loop skill 同步更新。
@@ -150,6 +151,11 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 ### 仓库级 Skill
 
 - 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`、`.agents/skills/adapter-dev/`、`.agents/skills/env-sandbox/`、`.agents/skills/ui-screenshot/`、`.agents/skills/dev-team/`。
+=======
+### 仓库级 Skill
+
+- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`。
+>>>>>>> origin/dev/trump
 - 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）必须先读 `.agents/skills/dev-loop/SKILL.md`。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
 - `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
@@ -236,7 +242,19 @@ fix/short-topic
 当前分支状态和合并规则详见 `docs/governance/branch-governance.md`。摘要：
 
 ```
+<<<<<<< HEAD
 feat/* → dev/delicious233 → master
+=======
+Remote (6):
+  origin/master                            ← 稳定（skill 基础设施已上线）
+  origin/dev/delicious233                  ← 主 dev: P1 交互体验推进中
+  origin/dev/trump                         ← Trump dev
+  origin/feat/trump-webui                  ← Web 工作区
+  origin/docs/dev-loop-skill-master        ← 已合并删除
+  origin/feat/backend-foundation           ← 后台预留 (dormant)
+
+本地 worktree: dev/delicious233
+>>>>>>> origin/dev/trump
 ```
 
 | 分支 | 说明 | 状态 |
@@ -257,9 +275,13 @@ feat/* → dev/delicious233 → master
 - 删除已合并的 `feat/*` 分支和对应的 worktree。
 - `dev/trump` 不合并到 `dev/delicious233`，最终由 Trump 自行决定是否 PR。
 
+<<<<<<< HEAD
 开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
 
 P0-P3、M3b、M4、M5、M6、M7 全部完成。详细进度见 `docs/roadmap.md`。
+=======
+当前 P1 进度：P0 级 3/3 ✅ | P1 级 2/4（ThreadPanel/DiffViewer ✅, ChatView/AgentList ❌）
+>>>>>>> origin/dev/trump
 
 进度同步：
 
@@ -389,6 +411,25 @@ pnpm build
 | PR 到 `master` / `dev/*` | 全量 |
 | push 到 `feat/*` | **不触发**（仅在开 PR 后触发） |
 
+<<<<<<< HEAD
+=======
+### 分支治理
+
+```
+master                    ← 稳定发布。CI 必须全绿才能合入。
+dev/delicious233          ← 主开发。所有 feat/* 的合入目标。
+dev/trump                 ← Web 前端合并中继。
+feat/*                    ← 功能分支。开 PR 到 dev 时触发 CI。
+```
+
+规则：
+- `master` 禁止直接 push，必须通过 PR。
+- `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + `pnpm build`。
+- `feat/*` 合并前需要 rebase 到最新 `dev`，解决冲突后再开 PR。
+- 删除已合并的 `feat/*` 分支和对应的 worktree。
+- worktree 放在 `.worktrees/`，已在 `.gitignore`，严禁提交。
+
+>>>>>>> origin/dev/trump
 ### 提交纪律
 
 - **小步提交**：每个逻辑改动完成后立即 commit，不要攒到一天结束。

@@ -750,9 +750,24 @@
 
 .authModal {
   background: var(--card);
+<<<<<<< HEAD
   border-radius: 16px;
   box-shadow: 0 16px 48px -8px rgba(0,0,0,0.12);
   max-height: 90vh;
+=======
+}
+
+.sidebarBrand {
+  padding: var(--space-lg) var(--space-lg) var(--space-md);
+  flex-shrink: 0;
+}
+
+/* ── Right panel wrapper ────────────────── */
+
+.rightPanelWrapper {
+  display: flex;
+  flex-shrink: 0;
+>>>>>>> origin/dev/trump
   overflow-y: auto;
 }
 
