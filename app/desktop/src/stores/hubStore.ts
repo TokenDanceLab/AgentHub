@@ -28,7 +28,9 @@ interface HubState {
   authenticated: boolean;
   userId: string | null;
   username: string | null;
+  showAuthModal: boolean;
   setAuthenticated: (v: boolean, userId?: string | null, username?: string | null) => void;
+  setShowAuthModal: (v: boolean) => void;
   clear: () => void;
 }
 
@@ -39,9 +41,11 @@ export const useHubStore = create<HubState>()(
     authenticated: initial.authenticated,
     userId: initial.userId,
     username: initial.username,
+    showAuthModal: false,
 
     setAuthenticated: (v, userId, username) =>
-      set({ authenticated: v, userId: userId ?? null, username: username ?? null }),
-    clear: () => set({ authenticated: false, userId: null, username: null }),
+      set({ authenticated: v, userId: userId ?? null, username: username ?? null, showAuthModal: false }),
+    setShowAuthModal: (v) => set({ showAuthModal: v }),
+    clear: () => set({ authenticated: false, userId: null, username: null, showAuthModal: false }),
   })),
 );

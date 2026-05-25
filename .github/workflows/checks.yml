@@ -7,7 +7,7 @@ on:
     branches: [master, dev/delicious233, dev/trump]
 
 env:
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.25"
   NODE_VERSION: "22"
   PNPM_VERSION: "10"
 
@@ -31,7 +31,7 @@ jobs:
         run: go build ./...
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v6
         with:
           working-directory: edge-server
           version: v1.64
@@ -123,7 +123,7 @@ jobs:
         run: go build ./...
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v6
         with:
           working-directory: hub-server
           version: v1.64
@@ -245,16 +245,18 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Install shared deps
+        working-directory: app/shared
+        run: pnpm install --frozen-lockfile
+
       - name: Type check
         run: pnpm typecheck
 
       - name: Lint
         run: pnpm lint --max-warnings 10
-        continue-on-error: true
 
       - name: Test Desktop
         run: pnpm test:run
-        continue-on-error: true
 
   # ── Frontend: Web ────────────────────────────
   frontend-web:
@@ -273,15 +275,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-          cache-dependency-path: app/desktop/pnpm-lock.yaml
+          cache-dependency-path: app/web/pnpm-lock.yaml
 
       - name: Install
         run: pnpm install --frozen-lockfile
-        continue-on-error: true
 
       - name: Build Web
         run: pnpm build
-        continue-on-error: true
 
   # ── Validation ───────────────────────────────
   validate:
@@ -299,6 +299,16 @@ jobs:
             git diff --check HEAD^..HEAD
           else
             git diff --check
+          fi
+
+      - name: Secret guard
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bash scripts/check-secrets.sh --range "origin/${{ github.base_ref }}...HEAD"
+          elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            bash scripts/check-secrets.sh --range HEAD^..HEAD
+          else
+            bash scripts/check-secrets.sh --worktree
           fi
 
       - name: Validate OpenAPI YAML

@@ -36,6 +36,9 @@ func TestBuildConfigDefaultsToMemoryStore(t *testing.T) {
 	if len(cfg.RunnerEnv) != 0 {
 		t.Fatalf("RunnerEnv = %#v, want empty", cfg.RunnerEnv)
 	}
+	if cfg.LocalAuthToken != "" {
+		t.Fatalf("LocalAuthToken = %q, want empty", cfg.LocalAuthToken)
+	}
 }
 
 func TestBuildConfigParsesStoreFile(t *testing.T) {
@@ -444,5 +447,178 @@ func TestBuildConfigAgentFlags(t *testing.T) {
 	}
 	if cfg.AgentDefault != "claude-code" {
 		t.Fatalf("AgentDefault = %q", cfg.AgentDefault)
+	}
+}
+
+// --- Environment variable fallback tests ---
+
+func TestBuildConfigEnvVarAddr(t *testing.T) {
+	t.Setenv("AGENTHUB_ADDR", "127.0.0.1:4321")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.Addr != "127.0.0.1:4321" {
+		t.Fatalf("Addr = %q, want 127.0.0.1:4321 from env", cfg.Addr)
+	}
+}
+
+func TestBuildConfigRejectsNonLoopbackAddr(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		env  string
+	}{
+		{"flag wildcard", []string{"--addr", ":4321"}, ""},
+		{"env wildcard", nil, ":4321"},
+		{"ipv4 wildcard", []string{"--addr", "0.0.0.0:4321"}, ""},
+		{"ipv6 wildcard", []string{"--addr", "[::]:4321"}, ""},
+		{"lan ip", []string{"--addr", "192.168.1.10:4321"}, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != "" {
+				t.Setenv("AGENTHUB_ADDR", tt.env)
+			}
+			if _, err := buildConfig(tt.args); err == nil {
+				t.Fatalf("buildConfig(%v) returned nil error", tt.args)
+			}
+		})
+	}
+}
+
+func TestBuildConfigEnvVarStoreFile(t *testing.T) {
+	t.Setenv("AGENTHUB_STORE_FILE", "env-store.json")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.StoreFile != "env-store.json" {
+		t.Fatalf("StoreFile = %q, want env-store.json from env", cfg.StoreFile)
+	}
+}
+
+func TestBuildConfigEnvVarRunnerProfile(t *testing.T) {
+	t.Setenv("AGENTHUB_RUNNER_PROFILE", "claude-code")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.RunnerCommand != "claude" {
+		t.Fatalf("RunnerCommand = %q, want claude from claude-code profile via env", cfg.RunnerCommand)
+	}
+	if cfg.AgentDefault != "claude-code" {
+		t.Fatalf("AgentDefault = %q, want claude-code from env profile", cfg.AgentDefault)
+	}
+}
+
+func TestBuildConfigEnvVarRunnerCommand(t *testing.T) {
+	t.Setenv("AGENTHUB_RUNNER_COMMAND", "my-runner")
+	t.Setenv("AGENTHUB_RUNNER_WORKDIR", "my-workspace")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.RunnerCommand != "my-runner" {
+		t.Fatalf("RunnerCommand = %q, want my-runner from env", cfg.RunnerCommand)
+	}
+	if cfg.RunnerWorkDir != "my-workspace" {
+		t.Fatalf("RunnerWorkDir = %q, want my-workspace from env", cfg.RunnerWorkDir)
+	}
+}
+
+func TestBuildConfigEnvVarAgentFlags(t *testing.T) {
+	t.Setenv("AGENTHUB_CLAUDE_CODE_PATH", "/env/claude")
+	t.Setenv("AGENTHUB_CODEX_PATH", "/env/codex")
+	t.Setenv("AGENTHUB_OPENCODE_PATH", "/env/opencode")
+	t.Setenv("AGENTHUB_AGENT_MODEL", "env-model")
+	t.Setenv("AGENTHUB_AGENT_DEFAULT", "codex")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.ClaudeCodePath != "/env/claude" {
+		t.Fatalf("ClaudeCodePath = %q, want /env/claude", cfg.ClaudeCodePath)
+	}
+	if cfg.CodexPath != "/env/codex" {
+		t.Fatalf("CodexPath = %q, want /env/codex", cfg.CodexPath)
+	}
+	if cfg.OpenCodePath != "/env/opencode" {
+		t.Fatalf("OpenCodePath = %q, want /env/opencode", cfg.OpenCodePath)
+	}
+	if cfg.AgentModel != "env-model" {
+		t.Fatalf("AgentModel = %q, want env-model", cfg.AgentModel)
+	}
+	if cfg.AgentDefault != "codex" {
+		t.Fatalf("AgentDefault = %q, want codex", cfg.AgentDefault)
+	}
+}
+
+func TestBuildConfigParsesLocalAuthTokenFromFlag(t *testing.T) {
+	cfg, err := buildConfig([]string{"--local-auth-token", " edge-secret "})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.LocalAuthToken != "edge-secret" {
+		t.Fatalf("LocalAuthToken = %q, want trimmed token", cfg.LocalAuthToken)
+	}
+}
+
+func TestBuildConfigEnvVarLocalAuthToken(t *testing.T) {
+	t.Setenv("AGENTHUB_EDGE_AUTH_TOKEN", "env-edge-secret")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.LocalAuthToken != "env-edge-secret" {
+		t.Fatalf("LocalAuthToken = %q, want env token", cfg.LocalAuthToken)
+	}
+}
+
+func TestBuildConfigFlagOverridesEnvVar(t *testing.T) {
+	t.Setenv("AGENTHUB_ADDR", "127.0.0.1:9999")
+	cfg, err := buildConfig([]string{"--addr", "127.0.0.1:4321"})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.Addr != "127.0.0.1:4321" {
+		t.Fatalf("Addr = %q, want 127.0.0.1:4321 (flag should override env)", cfg.Addr)
+	}
+}
+
+func TestBuildConfigEnvVarDefaultWhenNotSet(t *testing.T) {
+	// No env vars set -- defaults should apply
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.Addr != "127.0.0.1:3210" {
+		t.Fatalf("Addr = %q, want 127.0.0.1:3210", cfg.Addr)
+	}
+	if cfg.ClaudeCodePath != "claude" {
+		t.Fatalf("ClaudeCodePath = %q, want claude", cfg.ClaudeCodePath)
+	}
+	if cfg.CodexPath != "codex" {
+		t.Fatalf("CodexPath = %q, want codex", cfg.CodexPath)
+	}
+	if cfg.OpenCodePath != "opencode" {
+		t.Fatalf("OpenCodePath = %q, want opencode", cfg.OpenCodePath)
+	}
+}
+
+func TestBuildConfigEnvVarEmptyStringNotUsed(t *testing.T) {
+	// Empty env var should fall through to default
+	t.Setenv("AGENTHUB_ADDR", "")
+	t.Setenv("AGENTHUB_STORE_FILE", "")
+	cfg, err := buildConfig(nil)
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+	if cfg.Addr != "127.0.0.1:3210" {
+		t.Fatalf("Addr = %q, want default when env is empty", cfg.Addr)
+	}
+	if cfg.StoreFile != "" {
+		t.Fatalf("StoreFile = %q, want empty when env is empty", cfg.StoreFile)
 	}
 }

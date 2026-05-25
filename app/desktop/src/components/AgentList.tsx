@@ -6,11 +6,19 @@ import { StatusBadge } from '@shared/components';
 import type { StatusVariant } from '@shared/components';
 import styles from './AgentList.module.css';
 
+function agentIcon(name: string): ReactNode {
+  const n = name.toLowerCase();
+  if (n.includes('claude')) return <ClaudeCode size={20} />;
+  if (n.includes('codex')) return <Codex size={20} />;
+  if (n.includes('opencode')) return <OpenCode size={20} />;
+  return null;
+}
+
 interface Props {
   agents: AgentInfo[];
   online: boolean;
   selectedId?: string;
-  onSelect?: (agent: AgentInfo) => void;
+  onSelect?: (agentId: string) => void;
 }
 
 interface CapItem {
@@ -54,7 +62,7 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
     return agents.filter((a) => a.name.toLowerCase().includes(q));
   }, [agents, searchQuery]);
 
-  function highlightMatch(text: string): React.ReactNode {
+  function highlightMatch(text: string): ReactNode {
     if (!searchQuery.trim()) return text;
     const q = searchQuery.trim();
     const idx = text.toLowerCase().indexOf(q.toLowerCase());
@@ -70,53 +78,62 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
 
   const isEmpty = agents.length === 0;
   const isSearchEmpty = !isEmpty && filteredAgents.length === 0;
+  const availableCount = agents.filter((a) => a.status === 'available').length;
 
   return (
     <nav className={styles.sidebar} aria-label={t('agent.title')}>
-      <div className={styles.title}>{t('agent.title')}</div>
+      <div className={styles.title}>
+        <span>{t('agent.title')}</span>
+        <span className={styles.countPill}>{online ? `${availableCount}/${agents.length}` : t('agent.offline')}</span>
+      </div>
 
       <div className={styles.searchWrapper}>
         <Search size={14} className={styles.searchIcon} />
         <input
           className={styles.searchInput}
           type="text"
-          placeholder="Search agents..."
+          placeholder={t('agent.search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          aria-label="Search agents"
+          aria-label={t('agent.search')}
         />
       </div>
 
       {isEmpty ? (
         <div className={styles.empty}>
-          {online ? t('agent.emptyOnline') : t('agent.emptyOffline')}
+          <Sparkles size={16} />
+          <span>{online ? t('agent.emptyOnline') : t('agent.emptyOffline')}</span>
         </div>
       ) : isSearchEmpty ? (
-        <div className={styles.empty}>No agents match your search</div>
+        <div className={styles.empty}>{t('agent.noMatch')}</div>
       ) : (
         <ul className={styles.list}>
           {filteredAgents.map((a) => (
             <li key={a.id}>
               <button
                 className={`${styles.item} ${a.id === selectedId ? styles.selected : ''}`}
-                onClick={() => onSelect?.(a)}
+                onClick={() => onSelect?.(a.id)}
                 aria-pressed={a.id === selectedId}
+                disabled={a.status !== 'available'}
               >
                 <StatusBadge status={agentStatusVariant(a.status)} className={styles.statusDot} />
                 <div className={styles.info}>
-                  <div className={styles.name}>{highlightMatch(a.name)}</div>
+                  <div className={styles.nameLine}>
+                    <span className={styles.name}>{highlightMatch(a.name)}</span>
+                    <span className={`${styles.statusText} ${styles[`statusText_${a.status}`]}`}>
+                      {t(`agent.status.${a.status}`)}
+                    </span>
+                  </div>
                   {a.description && (
                     <div className={styles.description}>{a.description}</div>
                   )}
-                  <div className={styles.tags}>
-                    {capabilityItems(a.capabilities, t).map((item) => (
-                      <span
-                        key={item.key}
-                        className={`${styles.tag} ${capColorClass[item.key] ?? ''}`}
-                      >
-                        {item.label}
-                      </span>
-                    ))}
+                  <div className={styles.metaLine}>
+                    {a.version && <span className={styles.version}>{a.version}</span>}
+                    <span className={styles.runtimeMeta}>
+                      <MapPin size={10} aria-hidden="true" />
+                      {t('agent.runtime.localEdge')}
+                    </span>
+                    <span className={styles.runtimeMeta}>{t('agent.runtime.cliAdapter')}</span>
                   </div>
                 </div>
               </button>

@@ -2,6 +2,7 @@ mod commands;
 mod edge_health;
 mod edge_manager;
 mod notifications;
+mod secure_store;
 mod tray;
 
 use edge_manager::{resolve_edge_path, EdgeManager};
@@ -21,6 +22,9 @@ pub fn run() {
             commands::get_edge_status,
             commands::start_edge,
             commands::stop_edge,
+            secure_store::clear_hub_refresh_token,
+            secure_store::read_hub_refresh_token,
+            secure_store::store_hub_refresh_token,
             notifications::notify_run_completed,
             notifications::notify_run_failed,
         ])

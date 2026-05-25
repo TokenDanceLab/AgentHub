@@ -8,6 +8,7 @@ export interface HealthResponse {
   status: string;
   version: string;
   edgeId: string;
+  checks?: HealthChecks;
 }
 
 export interface PageInfo {

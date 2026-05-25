@@ -19,6 +19,12 @@ func GetMessageByID(db *gorm.DB, id string) (*model.Message, error) {
 	return &msg, err
 }
 
+func GetMessageBySessionAndID(db *gorm.DB, sessionID, id string) (*model.Message, error) {
+	var msg model.Message
+	err := db.Where("session_id = ? AND id = ?", sessionID, id).First(&msg).Error
+	return &msg, err
+}
+
 func GetMessagesBySession(db *gorm.DB, sessionID string, beforeSeq int64, limit int) ([]model.Message, error) {
 	if limit <= 0 || limit > config.MaxMessagePageLimit {
 		limit = config.DefaultPaginationLimit
@@ -90,6 +96,12 @@ func GetMessagesByIDs(db *gorm.DB, ids []string) ([]model.Message, error) {
 	return msgs, err
 }
 
+func GetMessagesBySessionAndIDs(db *gorm.DB, sessionID string, ids []string) ([]model.Message, error) {
+	var msgs []model.Message
+	err := db.Where("session_id = ? AND id IN ?", sessionID, ids).Find(&msgs).Error
+	return msgs, err
+}
+
 func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]model.Message, error) {
 	var msgs []model.Message
 	query := db.Where("session_id = ?", sessionID).
@@ -104,7 +116,7 @@ func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]
 	if to != "" {
 		query = query.Where("created_at <= ?", to)
 	}
-	err := query.Order("seq_id DESC").Limit(100).Find(&msgs).Error
+	err := query.Order("seq_id DESC").Limit(config.MaxMessagePageLimit).Find(&msgs).Error
 	return msgs, err
 }
 
@@ -117,7 +129,7 @@ func SearchAllMessages(db *gorm.DB, userID, q string) ([]model.Message, error) {
 			AND m.recalled = false
 			AND m.content->>'text' ILIKE ?
 		ORDER BY m.created_at DESC
-		LIMIT 100
-	`, "user", userID, "%"+q+"%").Scan(&msgs).Error
+		LIMIT ?
+	`, "user", userID, "%"+q+"%", config.MaxMessagePageLimit).Scan(&msgs).Error
 	return msgs, err
 }

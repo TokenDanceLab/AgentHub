@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   RunState,
   RunStateMachine,
@@ -28,6 +28,19 @@ describe('RunState enum', () => {
 });
 
 describe('RunStateMachine transitions', () => {
+  it('treats repeated current-state transitions as idempotent', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const sm = new RunStateMachine();
+    sm.transition(RunState.RUNNING);
+    sm.transition(RunState.COMPLETED);
+
+    expect(sm.transition(RunState.COMPLETED)).toBe(true);
+    expect(sm.getState()).toBe(RunState.COMPLETED);
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
   describe('from IDLE', () => {
     it('IDLE → RUNNING succeeds', () => {
       const sm = new RunStateMachine();

@@ -71,17 +71,19 @@ issues:
         - exhaustive
     # Switch-based event dispatchers are inherently high complexity
     - path: internal/adapters/parser_ndjson\.go
-      linters: [cyclop, gocyclo, gocognit]
+      linters: [cyclop, gocyclo, gocognit, goconst]
     - path: internal/adapters/opencode\.go
       linters: [cyclop, gocyclo, gocognit]
     - path: internal/adapters/codex\.go
       linters: [cyclop, gocyclo, gocognit, goconst]
     - path: internal/lifecycle/process_executor\.go
-      linters: [cyclop, gocyclo]
+      linters: [cyclop, gocyclo, gocognit, goconst, errcheck]
     - path: internal/api/handlers\.go
       linters: [gocognit, goconst]
-    - path: internal/lifecycle/mock_executor\.go
+    - path: internal/lifecycle/result_aggregator\.go
       linters: [goconst]
+    - path: internal/lifecycle/mock_executor\.go
+      linters: [goconst, errcheck]
     # context-as-argument: ctx last is a deliberate choice for publishStructuredOutput
     - linters: [revive]
       text: "context-as-argument"

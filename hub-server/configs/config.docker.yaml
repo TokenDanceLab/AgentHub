@@ -1,7 +1,7 @@
 server:
   port: 8080
   log_level: info
-  log_file: "/var/log/hub-server/server.log"
+  log_file: ""
   admin_port: 6060
 db:
   host: postgres

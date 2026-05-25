@@ -72,6 +72,22 @@ func GetPendingTaskByID(db *gorm.DB, id string) (*model.PendingAgentTask, error)
 }
 
 func UpdatePendingTaskStatus(db *gorm.DB, id, status, errMsg string) error {
+	return UpdatePendingTaskStatusWithEdgeRunID(db, id, status, errMsg, "")
+}
+
+func UpdatePendingTaskDispatched(db *gorm.DB, id, edgeDeviceID string) error {
+	now := time.Now()
+	updates := map[string]interface{}{
+		"status":        model.TaskStatusDispatched,
+		"dispatched_at": &now,
+	}
+	if edgeDeviceID != "" {
+		updates["edge_device_id"] = edgeDeviceID
+	}
+	return db.Model(&model.PendingAgentTask{}).Where("id = ?", id).Updates(updates).Error
+}
+
+func UpdatePendingTaskStatusWithEdgeRunID(db *gorm.DB, id, status, errMsg, edgeRunID string) error {
 	updates := map[string]interface{}{"status": status}
 	if status == model.TaskStatusDispatched {
 		now := time.Now()
@@ -83,6 +99,9 @@ func UpdatePendingTaskStatus(db *gorm.DB, id, status, errMsg string) error {
 	}
 	if errMsg != "" {
 		updates["error_message"] = errMsg
+	}
+	if edgeRunID != "" {
+		updates["edge_run_id"] = edgeRunID
 	}
 	return db.Model(&model.PendingAgentTask{}).Where("id = ?", id).Updates(updates).Error
 }

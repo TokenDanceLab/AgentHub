@@ -4,6 +4,7 @@ import { Wifi, WifiOff, Sun, Moon } from 'lucide-react';
 import type { HealthResponse } from '@shared/types';
 import { StatusBadge } from '@shared/components';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useHubStore } from '@/stores/hubStore';
 import styles from './StatusBar.module.css';
 
 interface Props {
@@ -101,18 +102,28 @@ export default memo(function StatusBar({ online, health, isConnected, error, pro
       {hubAuthenticated != null && (
         <>
           <span className={styles.separator} aria-hidden="true" />
-          <Circle
-            size={6}
-            fill="currentColor"
-            style={{ color: hubAuthenticated ? 'var(--color-success)' : 'var(--muted-foreground)' }}
-            aria-hidden="true"
-          />
-          <span
-            className={styles.wsStatus}
-            aria-label={hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
+          <button
+            className={styles.hubBtn}
+            onClick={() => {
+              if (!hubAuthenticated) {
+                useHubStore.getState().setShowAuthModal(true);
+              }
+            }}
+            type="button"
+            title={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
+            aria-label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
           >
-            {hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
-          </span>
+            <Circle
+              size={6}
+              fill="currentColor"
+              style={{ color: hubAuthenticated ? 'var(--color-success)' : 'var(--muted-foreground)' }}
+              aria-hidden="true"
+            />
+            <span className={styles.wsStatus}>
+              {hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
+            </span>
+            {!hubAuthenticated && <LogIn size={12} />}
+          </button>
         </>
       )}
       {errorCount > 0 && (

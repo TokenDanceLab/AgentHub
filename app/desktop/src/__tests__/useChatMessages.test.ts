@@ -109,15 +109,15 @@ describe('useChatMessages', () => {
     expect(result.current.isConnected).toBe(false);
   });
 
-  it('creates system message on run.started', () => {
+  it('initializes run state on run.started without creating a message', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     act(() => {
       eventHandler!(makeEvent('run.started', { runId: 'run-1', status: 'running' }));
     });
 
-    expect(result.current.messages).toHaveLength(1);
-    expect(result.current.messages[0].role).toBe('system');
+    // run.started only sets currentRun + isStreaming; no message is created
+    expect(result.current.messages).toHaveLength(0);
     expect(result.current.isStreaming).toBe(true);
     expect(result.current.currentRun).toMatchObject({
       runId: 'run-1',
@@ -187,11 +187,11 @@ describe('useChatMessages', () => {
       );
     });
 
-    // Should have 2 messages: system (from run.started) + agent (from tool_call)
-    expect(result.current.messages).toHaveLength(2);
-    expect(result.current.messages[1].role).toBe('agent');
-    expect(result.current.messages[1].blocks).toHaveLength(1);
-    expect(result.current.messages[1].blocks[0]).toMatchObject({
+    // Should have 1 message: agent (from tool_call). run.started does not create a message.
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0].role).toBe('agent');
+    expect(result.current.messages[0].blocks).toHaveLength(1);
+    expect(result.current.messages[0].blocks[0]).toMatchObject({
       kind: 'tool_use',
       callId: 'call-1',
       toolName: 'read_file',
@@ -297,9 +297,9 @@ describe('useChatMessages', () => {
     expect(result.current.messages).toHaveLength(1);
     expect(result.current.messages[0].role).toBe('agent');
 
-    // System message (run.started) creates a system message that separates from the agent
+    // System message (session_init) creates a system message that separates from the agent
     act(() => {
-      eventHandler!(makeEvent('run.started', { runId: 'run-2', status: 'running' }));
+      eventHandler!(makeEvent('run.agent.session_init', { runId: 'run-2', model: 'test' }));
     });
 
     // Now another agent event should create a NEW agent message (not merge with previous)

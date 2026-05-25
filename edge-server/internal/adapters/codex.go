@@ -110,7 +110,7 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 	}
 
 	scanner := bufio.NewScanner(stdout)
-	scanner.Buffer(make([]byte, 0, 256*1024), 10*1024*1024)
+	configureAdapterScanner(scanner)
 
 	jsonlMode := false
 	offset := 0
