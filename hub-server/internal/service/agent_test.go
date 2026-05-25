@@ -236,3 +236,29 @@ func TestHandleTaskFail_AlreadyTerminal(t *testing.T) {
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+// ==================== B5: #116 reject agent tasks for dissolved sessions ====================
+
+func TestTriggerAgentTask_RejectsDissolvedSession(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	triggerMsgID := "trigger-msg-dissolved"
+
+	// GetMessageByID
+	mock.ExpectQuery(`FROM "messages" WHERE id =`).
+		WithArgs(triggerMsgID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "sender_type", "sender_id", "content_type", "content", "seq_id", "client_msg_id"}).
+			AddRow(triggerMsgID, "session-dissolved", "user", "user-1", "text", `{"text":"hello"}`, int64(1), "client-1"))
+
+	// GetSessionByID returns dissolved session
+	mock.ExpectQuery(`FROM "sessions" WHERE id =`).
+		WithArgs("session-dissolved", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved", "owner_user_id"}).
+			AddRow("session-dissolved", "group", true, "owner-1"))
+
+	svc := &AgentService{db: db}
+	_, err := svc.TriggerAgentTask(context.Background(), "user-1", triggerMsgID)
+	require.ErrorIs(t, err, errcode.SessionDissolved)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
