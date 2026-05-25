@@ -134,7 +134,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	// Wire orchestrator adapter with runtime dependencies so it can spawn sub-agents.
 	wireOrchestrator(cfg.AdapterRegistry, executor, agentReg, msgQueue)
 
-	return &api.Handler{
+	h := &api.Handler{
 		Bus:             bus,
 		Registry:        reg,
 		Store:           cfg.Store,
@@ -143,7 +143,14 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		AgentRegistry:   agentReg,
 		MessageQueue:    msgQueue,
 		Metrics:         edgeMetrics,
-	}, nil
+	}
+	// Create default project/thread fixtures so POST /v1/runs
+	// with empty projectId/threadId works out of the box.
+	if cfg.Store != nil {
+		_, _ = cfg.Store.CreateProject("proj_local", "Local Project")
+		_, _ = cfg.Store.CreateThread("thread_local", "proj_local", "Local Thread")
+	}
+	return h, nil
 }
 
 func agentAdapterForRegistry(adapterReg *adapters.Registry, agentDefault string) adapters.AgentAdapter {
