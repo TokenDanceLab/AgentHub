@@ -20,6 +20,8 @@ type IMStatus = 'idle' | 'loading' | 'ready' | 'error';
 type IMMessageWithHubState = IMMessage & {
   seqId?: number;
 };
+type IMActionStatus = 'pending' | 'error';
+type IMActionState = Record<string, { status: IMActionStatus; error?: string }>;
 
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
@@ -27,6 +29,14 @@ function readString(value: unknown): string | undefined {
 
 function readNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function isCallable<TMethod extends keyof HubClient>(client: HubClient, method: TMethod): boolean {
+  return typeof client[method] === 'function';
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error && err.message ? err.message : 'Hub action failed';
 }
 
 function readTextContent(content: string): string {
@@ -104,7 +114,17 @@ function sessionToContact(session: Session, contactsByUserId: Map<string, Contac
       session.last_message_at ??
       session.updated_at ??
       session.created_at,
-    statusHint: session.archived ? 'im.session.archived' : undefined,
+    statusHint:
+      session.archived
+        ? 'im.session.archived'
+        : session.unread_count && session.unread_count > 0
+          ? 'im.session.unread'
+          : undefined,
+    statusHintParams:
+      session.unread_count && session.unread_count > 0
+        ? { count: session.unread_count }
+        : undefined,
+    unreadCount: session.unread_count ?? 0,
   };
 }
 
@@ -157,6 +177,8 @@ export interface SendIMMessageResult {
 
 export interface HubIMActionResult {
   ok: boolean;
+  reason?: 'unauthenticated' | 'interface-gap' | 'failed' | 'invalid';
+  error?: string;
 }
 
 export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
@@ -169,12 +191,44 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   const [hubContacts, setHubContacts] = useState<ContactInfo[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequestInfo[]>([]);
   const [notifications, setNotifications] = useState<HubNotification[]>([]);
+  const [actionState, setActionState] = useState<IMActionState>({});
   const [status, setStatus] = useState<IMStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const authenticated = useHubStore((s) => s.authenticated);
   const userId = useHubStore((s) => s.userId);
   const addToast = useToastStore((s) => s.addToast);
   const contactsByUserIdRef = useRef<Map<string, ContactInfo>>(new Map());
+
+  const actionCapabilities = useMemo(
+    () => ({
+      friendRequests:
+        isCallable(client, 'acceptFriendRequest') &&
+        isCallable(client, 'rejectFriendRequest'),
+      notifications:
+        isCallable(client, 'markNotificationRead') &&
+        isCallable(client, 'readAllNotifications'),
+      sessionRead: isCallable(client, 'markRead'),
+      recallMessage: isCallable(client, 'recallMessage'),
+    }),
+    [client],
+  );
+
+  const markActionPending = useCallback((key: string) => {
+    setActionState((prev) => ({ ...prev, [key]: { status: 'pending' } }));
+  }, []);
+
+  const markActionError = useCallback((key: string, message: string) => {
+    setActionState((prev) => ({ ...prev, [key]: { status: 'error', error: message } }));
+  }, []);
+
+  const clearAction = useCallback((key: string) => {
+    setActionState((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (hubWS || !authenticated || !getAccessToken()) {
@@ -215,6 +269,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       setHubContacts([]);
       setFriendRequests([]);
       setNotifications([]);
+      setActionState({});
       setMessages(new Map());
       return;
     }
@@ -427,6 +482,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
           authority: 'hub',
           content,
           timestamp: response.created_at,
+          recalled: false,
           seqId: response.seq_id,
           read: false,
         };
@@ -443,6 +499,289 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       }
     },
     [addToast, authenticated, client, contacts, userId],
+  );
+
+  const acceptFriendRequest = useCallback(
+    async (requestId: string): Promise<HubIMActionResult> => {
+      if (!authenticated) {
+        addToast({ type: 'error', message: 'Connect to Hub to accept contact requests' });
+        return { ok: false, reason: 'unauthenticated' };
+      }
+      if (!actionCapabilities.friendRequests) {
+        const message = 'Hub friend request action interface is not available';
+        markActionError(`friend:${requestId}:accept`, message);
+        return { ok: false, reason: 'interface-gap', error: message };
+      }
+
+      const key = `friend:${requestId}:accept`;
+      markActionPending(key);
+      try {
+        await client.acceptFriendRequest(requestId);
+        clearAction(key);
+        setFriendRequests((prev) => prev.filter((request) => request.request_id !== requestId));
+        addToast({ type: 'success', message: 'Friend request accepted' });
+        void refreshSessions();
+        return { ok: true };
+      } catch (err) {
+        const message = errorMessage(err);
+        markActionError(key, message);
+        addToast({ type: 'error', message: 'Failed to accept friend request' });
+        console.error('Failed to accept friend request:', err);
+        return { ok: false, reason: 'failed', error: message };
+      }
+    },
+    [
+      actionCapabilities.friendRequests,
+      addToast,
+      authenticated,
+      clearAction,
+      client,
+      markActionError,
+      markActionPending,
+      refreshSessions,
+    ],
+  );
+
+  const rejectFriendRequest = useCallback(
+    async (requestId: string): Promise<HubIMActionResult> => {
+      if (!authenticated) {
+        addToast({ type: 'error', message: 'Connect to Hub to reject contact requests' });
+        return { ok: false, reason: 'unauthenticated' };
+      }
+      if (!actionCapabilities.friendRequests) {
+        const message = 'Hub friend request action interface is not available';
+        markActionError(`friend:${requestId}:reject`, message);
+        return { ok: false, reason: 'interface-gap', error: message };
+      }
+
+      const key = `friend:${requestId}:reject`;
+      markActionPending(key);
+      try {
+        await client.rejectFriendRequest(requestId);
+        clearAction(key);
+        setFriendRequests((prev) => prev.filter((request) => request.request_id !== requestId));
+        addToast({ type: 'success', message: 'Friend request rejected' });
+        return { ok: true };
+      } catch (err) {
+        const message = errorMessage(err);
+        markActionError(key, message);
+        addToast({ type: 'error', message: 'Failed to reject friend request' });
+        console.error('Failed to reject friend request:', err);
+        return { ok: false, reason: 'failed', error: message };
+      }
+    },
+    [
+      actionCapabilities.friendRequests,
+      addToast,
+      authenticated,
+      clearAction,
+      client,
+      markActionError,
+      markActionPending,
+    ],
+  );
+
+  const markNotificationRead = useCallback(
+    async (notificationId: string): Promise<HubIMActionResult> => {
+      if (!authenticated) {
+        addToast({ type: 'error', message: 'Connect to Hub to mark notifications read' });
+        return { ok: false, reason: 'unauthenticated' };
+      }
+      if (!actionCapabilities.notifications) {
+        const message = 'Hub notification read interface is not available';
+        markActionError(`notification:${notificationId}:read`, message);
+        return { ok: false, reason: 'interface-gap', error: message };
+      }
+
+      const key = `notification:${notificationId}:read`;
+      markActionPending(key);
+      try {
+        await client.markNotificationRead(notificationId);
+        clearAction(key);
+        setNotifications((prev) =>
+          prev.map((notification) =>
+            notification.id === notificationId ? { ...notification, read: true } : notification,
+          ),
+        );
+        return { ok: true };
+      } catch (err) {
+        const message = errorMessage(err);
+        markActionError(key, message);
+        addToast({ type: 'error', message: 'Failed to mark notification read' });
+        console.error('Failed to mark notification read:', err);
+        return { ok: false, reason: 'failed', error: message };
+      }
+    },
+    [
+      actionCapabilities.notifications,
+      addToast,
+      authenticated,
+      clearAction,
+      client,
+      markActionError,
+      markActionPending,
+    ],
+  );
+
+  const readAllNotifications = useCallback(async (): Promise<HubIMActionResult> => {
+    if (!authenticated) {
+      addToast({ type: 'error', message: 'Connect to Hub to mark notifications read' });
+      return { ok: false, reason: 'unauthenticated' };
+    }
+    if (!actionCapabilities.notifications) {
+      const message = 'Hub notification read-all interface is not available';
+      markActionError('notification:all:read', message);
+      return { ok: false, reason: 'interface-gap', error: message };
+    }
+
+    const key = 'notification:all:read';
+    markActionPending(key);
+    try {
+      await client.readAllNotifications();
+      clearAction(key);
+      setNotifications((prev) => prev.map((notification) => ({ ...notification, read: true })));
+      return { ok: true };
+    } catch (err) {
+      const message = errorMessage(err);
+      markActionError(key, message);
+      addToast({ type: 'error', message: 'Failed to mark all notifications read' });
+      console.error('Failed to mark all notifications read:', err);
+      return { ok: false, reason: 'failed', error: message };
+    }
+  }, [
+    actionCapabilities.notifications,
+    addToast,
+    authenticated,
+    clearAction,
+    client,
+    markActionError,
+    markActionPending,
+  ]);
+
+  const markSessionRead = useCallback(
+    async (sessionId: string): Promise<HubIMActionResult> => {
+      if (!authenticated) {
+        addToast({ type: 'error', message: 'Connect to Hub to mark sessions read' });
+        return { ok: false, reason: 'unauthenticated' };
+      }
+      if (!actionCapabilities.sessionRead) {
+        const message = 'Hub session read interface is not available';
+        markActionError(`session:${sessionId}:read`, message);
+        return { ok: false, reason: 'interface-gap', error: message };
+      }
+
+      const current = messages.get(sessionId) ?? [];
+      const lastReadSeq = current.reduce((max, message) => {
+        const seqId = (message as IMMessageWithHubState).seqId;
+        return seqId !== undefined && seqId > max ? seqId : max;
+      }, 0);
+      if (lastReadSeq <= 0) {
+        const message = 'No Hub message sequence is loaded for this session';
+        markActionError(`session:${sessionId}:read`, message);
+        return { ok: false, reason: 'invalid', error: message };
+      }
+
+      const key = `session:${sessionId}:read`;
+      markActionPending(key);
+      try {
+        await client.markRead(sessionId, lastReadSeq);
+        clearAction(key);
+        setContacts((prev) =>
+          prev.map((contact) =>
+            contact.id === sessionId
+              ? {
+                  ...contact,
+                  unreadCount: 0,
+                  statusHint: 'im.session.markedRead',
+                  statusHintParams: { seq: lastReadSeq },
+                }
+              : contact,
+          ),
+        );
+        return { ok: true };
+      } catch (err) {
+        const message = errorMessage(err);
+        markActionError(key, message);
+        addToast({ type: 'error', message: 'Failed to mark Hub session read' });
+        console.error('Failed to mark Hub session read:', err);
+        return { ok: false, reason: 'failed', error: message };
+      }
+    },
+    [
+      actionCapabilities.sessionRead,
+      addToast,
+      authenticated,
+      clearAction,
+      client,
+      markActionError,
+      markActionPending,
+      messages,
+    ],
+  );
+
+  const recallMessage = useCallback(
+    async (message: IMMessage): Promise<HubIMActionResult> => {
+      if (!authenticated) {
+        addToast({ type: 'error', message: 'Connect to Hub to recall messages' });
+        return { ok: false, reason: 'unauthenticated' };
+      }
+      if (!actionCapabilities.recallMessage) {
+        const error = 'Hub message recall interface is not available';
+        markActionError(`message:${message.id}:recall`, error);
+        return { ok: false, reason: 'interface-gap', error };
+      }
+      if (message.recalled) return { ok: true };
+
+      const key = `message:${message.id}:recall`;
+      markActionPending(key);
+      try {
+        await client.recallMessage(message.id);
+        clearAction(key);
+        setMessages((prev) => {
+          const next = new Map(prev);
+          next.set(
+            message.sessionId,
+            (next.get(message.sessionId) ?? []).map((item) =>
+              item.id === message.id
+                ? {
+                    ...item,
+                    recalled: true,
+                    content: '[Message recalled]',
+                    actionError: undefined,
+                  }
+                : item,
+            ),
+          );
+          return next;
+        });
+        return { ok: true };
+      } catch (err) {
+        const messageText = errorMessage(err);
+        markActionError(key, messageText);
+        setMessages((prev) => {
+          const next = new Map(prev);
+          next.set(
+            message.sessionId,
+            (next.get(message.sessionId) ?? []).map((item) =>
+              item.id === message.id ? { ...item, actionError: messageText } : item,
+            ),
+          );
+          return next;
+        });
+        addToast({ type: 'error', message: 'Failed to recall Hub message' });
+        console.error('Failed to recall IM message:', err);
+        return { ok: false, reason: 'failed', error: messageText };
+      }
+    },
+    [
+      actionCapabilities.recallMessage,
+      addToast,
+      authenticated,
+      clearAction,
+      client,
+      markActionError,
+      markActionPending,
+    ],
   );
 
   const addContact = useCallback(
@@ -543,6 +882,8 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
     hubContacts,
     friendRequests,
     notifications,
+    actionState,
+    actionCapabilities,
     status,
     error,
     sendMessage,
@@ -555,5 +896,11 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
     addContact,
     createPrivateSession,
     createGroupSession,
+    acceptFriendRequest,
+    rejectFriendRequest,
+    markNotificationRead,
+    readAllNotifications,
+    markSessionRead,
+    recallMessage,
   } as const;
 }
