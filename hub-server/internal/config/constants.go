@@ -65,6 +65,12 @@ const SessionMemberCacheTTL = 5 * time.Minute
 // tasks are scanned by the background scheduler and published as timeout events.
 const PendingTaskTTL = 24 * time.Hour
 
+// RunningTaskHeartbeatTTL is the expiration extension applied to running tasks
+// each time the Hub receives a stream callback. If no callback arrives within
+// this window, the background scheduler will mark the task as timed out.
+// #132: ensures long-running agent tasks are eventually expired on inactivity.
+const RunningTaskHeartbeatTTL = 10 * time.Minute
+
 // PendingTaskScanInterval controls how often expired pending tasks are scanned.
 const PendingTaskScanInterval = time.Minute
 

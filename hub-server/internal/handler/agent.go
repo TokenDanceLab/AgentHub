@@ -18,7 +18,7 @@ type AgentService interface {
 	TriggerAgentTask(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error)
 	CancelTask(ctx context.Context, userID, taskID string) error
 	HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
-	HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error
+	HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content, clientMsgID string) error
 	HandleTaskDone(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
 	HandleTaskFail(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
 }
@@ -139,9 +139,10 @@ func (r taskAckReq) normalizedRunID() string {
 }
 
 type taskStreamReq struct {
-	RunID     string `json:"run_id"`
-	EdgeRunID string `json:"edge_run_id"`
-	Content   string `json:"content" binding:"required"`
+	RunID       string `json:"run_id"`
+	EdgeRunID   string `json:"edge_run_id"`
+	Content     string `json:"content" binding:"required"`
+	ClientMsgID string `json:"client_msg_id"`
 }
 
 // TaskStream POST /edge/agent-tasks/:id/stream
@@ -154,7 +155,7 @@ func (h *AgentHandler) TaskStream(c *gin.Context) {
 	taskID := c.Param("id")
 	edgeUserID := c.GetString("user_id")
 	edgeDeviceID := c.GetString("device_id")
-	if err := h.service.HandleTaskStream(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), req.Content); err != nil {
+	if err := h.service.HandleTaskStream(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), req.Content, req.ClientMsgID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
