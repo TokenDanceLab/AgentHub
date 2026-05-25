@@ -918,12 +918,15 @@ paths:
           application/json:
             schema:
               type: object
-              required: [username, password]
+              required: [username, password, device_type, device_id]
               properties:
                 username: { type: string }
                 password: { type: string }
-                device_type: { type: string }
-                device_id: { type: string }
+                device_type: { type: string, enum: [desktop, web, cli] }
+                device_id:
+                  type: string
+                  format: uuid
+                  description: Stable UUID for this Desktop/Web/CLI device. Web clients must send device_type=web; Desktop/Edge clients must send device_type=desktop.
       responses:
         "200":
           description: JWT tokens.
