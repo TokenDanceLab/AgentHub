@@ -17,7 +17,7 @@ Web 不直接启动 Codex/OpenCode/Claude Code，也不直接访问本地 Agent 
 | Agent Configuration | 模型、Skill、MCP、审批策略、工作目录、上下文来源等配置摘要 |
 | Execution Target | Local/Remote/Cloud/Relay target 的位置、在线状态和权限 |
 
-TokenDance ID 登录最终由 Hub Server 完成 OIDC code exchange 并签发 Hub session。Web 入口不得直接集成 GitHub/Google/飞书，也不得保存第三方 provider token。
+TokenDance ID 登录最终由 Hub Server 完成 OIDC code exchange 并签发 Hub session。Web 入口不得直接集成 GitHub/Google/飞书，也不得保存第三方 provider token。当前 Web Hub access/refresh token 只保存在 tab-scoped `sessionStorage` 并清理旧 `localStorage` token key；公开 Web 发布前仍应升级为 BFF/HttpOnly cookie 或等价 server-owned session。
 
 ## 目录结构
 
