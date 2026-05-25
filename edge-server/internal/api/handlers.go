@@ -470,6 +470,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		MaxThinkingTokens int    `json:"maxThinkingTokens"`
 		PermissionMode    string `json:"permissionMode"`
 		IncludePartial    bool   `json:"includePartial"`
+		HubTaskID         string `json:"hubTaskId"` // Edge-to-Hub direct callback task ID
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
@@ -556,6 +557,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			MaxThinkingTokens: req.MaxThinkingTokens,
 			PermissionMode:    req.PermissionMode,
 			IncludePartial:    req.IncludePartial,
+			HubTaskID:         req.HubTaskID,
 		}
 		if err := h.Executor.Start(run, runCtx); err != nil {
 			if failed, ok := repository.SetRunStatusIf(run.ID, "failed", "queued"); ok {
