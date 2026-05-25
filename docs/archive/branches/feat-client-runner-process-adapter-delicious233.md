@@ -15,7 +15,7 @@
 - `edge-server/internal/httpserver/`
 - `docs/roadmap.md`
 - `docs/roadmaps/client.md`
-- `docs/roadmaps/branches/feat-client-runner-process-adapter-delicious233.md`
+- `docs/archive/branches/feat-client-runner-process-adapter-delicious233.md`
 
 ## 已完成
 

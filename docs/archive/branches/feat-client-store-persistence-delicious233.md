@@ -11,7 +11,7 @@
 - `edge-server/internal/store/`
 - `docs/roadmap.md`
 - `docs/roadmaps/client.md`
-- `docs/roadmaps/branches/feat-client-store-persistence-delicious233.md`
+- `docs/archive/branches/feat-client-store-persistence-delicious233.md`
 
 ## 已完成
 

@@ -13,7 +13,7 @@
 - `edge-server/internal/store/`
 - `docs/roadmap.md`
 - `docs/roadmaps/client.md`
-- `docs/roadmaps/branches/feat-client-edge-store-file-flag-delicious233.md`
+- `docs/archive/branches/feat-client-edge-store-file-flag-delicious233.md`
 
 ## 已完成
 
