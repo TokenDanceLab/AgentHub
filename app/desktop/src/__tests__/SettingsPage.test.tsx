@@ -203,6 +203,27 @@ describe('SettingsPage tasks', () => {
     useModelSettingsStore.getState().reset();
   });
 
+  it('stores custom instructions as an explicit local draft', () => {
+    renderSettings('personalization');
+
+    const editor = screen.getByLabelText('settings.instructions') as HTMLTextAreaElement;
+    expect(screen.getByText('settings.instructionsLocalStatus')).toBeInTheDocument();
+    expect(editor).toHaveValue('');
+
+    fireEvent.change(editor, { target: { value: 'Prefer concise status updates.' } });
+
+    expect(editor).toHaveValue('Prefer concise status updates.');
+    expect(localStorage.getItem('agenthub-settings.customInstructions')).toBe('Prefer concise status updates.');
+  });
+
+  it('loads stored custom instructions into the local draft editor', () => {
+    localStorage.setItem('agenthub-settings.customInstructions', 'Keep local-only notes visible.');
+
+    renderSettings('personalization');
+
+    expect(screen.getByLabelText('settings.instructions')).toHaveValue('Keep local-only notes visible.');
+  });
+
   it('renders local runs, Hub bridge history, and the Hub list REST interface gap state', () => {
     mockRuns.splice(0, mockRuns.length, {
       runId: 'run_1234567890abcdef',

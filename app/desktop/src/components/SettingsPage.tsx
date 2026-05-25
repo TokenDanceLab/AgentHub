@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Bot,
   Check,
-  ChevronRight,
   ClipboardList,
   Code2,
   Computer,
@@ -302,6 +301,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [auditTrail, setAuditTrail] = useStoredBooleanState('auditTrail', true);
   const [detailLevel, setDetailLevel] = useStoredValueState<SelectValue>('detailLevel', 'detailed');
   const [approvalMode, setApprovalMode] = useStoredValueState<SelectValue>('approvalMode', 'ask');
+  const [customInstructions, setCustomInstructions] = useStoredValueState<string>('customInstructions', '');
   const defaultModel = useModelSettingsStore((s) => s.defaultModel);
   const defaultProvider = useModelSettingsStore((s) => s.defaultProvider);
   const modelReasoningEffort = useModelSettingsStore((s) => s.reasoningEffort);
@@ -677,7 +677,28 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           {active === 'personalization' && (
             <Panel title={t('settings.personalization')} description={t('settings.personalizationDesc')}>
               <SettingRow title={t('settings.displayName')} description={username ?? 'AgentHub User'} value="Local" />
-              <SettingRow title={t('settings.instructions')} description={t('settings.instructionsDesc')} action />
+              <div className={styles.instructionsEditor}>
+                <label htmlFor="settings-custom-instructions">
+                  <strong>{t('settings.instructions')}</strong>
+                  <span>{t('settings.instructionsDesc')}</span>
+                </label>
+                <textarea
+                  id="settings-custom-instructions"
+                  aria-label={t('settings.instructions')}
+                  value={customInstructions}
+                  maxLength={2000}
+                  placeholder={t('settings.instructionsPlaceholder')}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setCustomInstructions(value);
+                    writeStoredValue('customInstructions', value);
+                  }}
+                />
+                <div className={styles.instructionsMeta}>
+                  <span>{t('settings.instructionsLocalStatus')}</span>
+                  <span>{customInstructions.length}/2000</span>
+                </div>
+              </div>
               <Callout title={t('settings.personalizationNote')} body={t('settings.personalizationNoteDesc')} />
             </Panel>
           )}
@@ -2514,13 +2535,11 @@ function SettingRow({
   description,
   value,
   control,
-  action,
 }: {
   title: string;
   description: string;
   value?: string;
   control?: ReactNode;
-  action?: boolean;
 }) {
   return (
     <div className={styles.settingRow}>
@@ -2529,7 +2548,6 @@ function SettingRow({
         <span>{description}</span>
       </div>
       {control ?? (value ? <span className={styles.settingValue}>{value}</span> : null)}
-      {action ? <ChevronRight size={17} className={styles.rowChevron} /> : null}
     </div>
   );
 }
