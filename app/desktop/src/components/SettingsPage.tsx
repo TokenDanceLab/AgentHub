@@ -828,7 +828,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<ShieldCheck size={18} />}
                   label={t('settings.taskHubSnapshot')}
-                  value={t('settings.interfaceGap')}
+                  value={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
                   detail={hubSessionActive ? t('settings.taskHubSnapshotUnavailable') : t('settings.taskHubBridgeSignedOut')}
                 />
               </div>
@@ -858,7 +858,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     </div>
                     <div className={styles.taskSectionActions}>
                       <span className={styles.statusPill}>
-                        {hubSessionActive ? t('settings.interfaceGap') : t('settings.signedOut')}
+                        {hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
                       </span>
                     </div>
                   </div>
@@ -871,7 +871,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     onAction={onOpenAuth}
                   />
                 ) : (
-                  <EmptyBlock title={t('settings.interfaceGap')} description={t('settings.taskHubSnapshotUnavailable')} />
+                  <EmptyBlock title={t('settings.status.interfaceGap')} description={t('settings.taskHubSnapshotUnavailable')} />
                 )}
               </div>
               <div className={styles.taskSection}>
@@ -978,7 +978,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     {hubSessionActive ? (
                       <div className={styles.taskSectionActions}>
                         <span className={`${styles.statusPill} ${hubIMSnapshotQuery.isError ? '' : styles.statusPillOn}`}>
-                          {hubIMSnapshotQuery.isError ? t('settings.hubUnavailable') : t('settings.enabled')}
+                          {hubIMSnapshotQuery.isError ? t('settings.hubUnavailable') : t('settings.status.snapshot')}
                         </span>
                         <button
                           type="button"
@@ -1105,7 +1105,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow
                 title={t('settings.groupChatModeration')}
                 description={t('settings.groupChatModerationDesc')}
-                value={hubSessionActive && !hubIMSnapshotQuery.isError ? t('settings.statusInProgress') : t('settings.signedOut')}
+                value={hubSessionActive && !hubIMSnapshotQuery.isError ? t('settings.status.snapshot') : t('settings.status.loginLocked')}
               />
             </Panel>
           )}
@@ -1187,7 +1187,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     icon={<Computer size={18} />}
                     title={t('settings.schedulerRouteRemote')}
                     description={t('settings.schedulerRouteRemoteDesc')}
-                    status={t('settings.interfaceGap')}
+                    status={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
                     metric="SSH / Tailscale"
                     connected={remoteControlReady}
                   />
@@ -1219,7 +1219,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.schedulerPolicyRemote')}
                     description={t('settings.schedulerPolicyRemoteDesc')}
-                    status={t('settings.interfaceGap')}
+                    status={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
                   />
                   <CapabilityCard
                     title={t('settings.schedulerPolicyApproval')}
@@ -1266,7 +1266,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Globe2 size={18} />}
                   label={t('settings.marketHubSync')}
-                  value={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')}
+                  value={hubSessionActive && !customAgentsQuery.isError ? t('settings.status.snapshot') : t('settings.status.loginLocked')}
                   detail={hubSessionActive ? t('settings.marketHubSyncDesc') : t('settings.marketHubSyncSignedOut')}
                 />
               </div>
@@ -1324,12 +1324,12 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.agentReviewFlow')}
                     description={t('settings.agentReviewFlowDesc')}
-                    status={t('settings.interfaceGap')}
+                    status={t('settings.status.interfaceGap')}
                   />
                   <CapabilityCard
                     title={t('settings.marketTokenDancePublish')}
                     description={t('settings.marketTokenDancePublishDesc')}
-                    status={hubSessionActive ? t('settings.interfaceGap') : t('settings.notConfigured')}
+                    status={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
                   />
                 </div>
               </div>
@@ -1378,8 +1378,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Globe2 size={18} />}
                   label={t('settings.mcpHubSync')}
-                  value={t('settings.interfaceGap')}
-                  detail={t('settings.mcpHubSyncNoInterface')}
+                  value={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
+                  detail={hubSessionActive ? t('settings.mcpHubSyncNoInterface') : t('settings.mcpHubSyncSignedOut')}
                 />
               </div>
               <SettingRow
@@ -1421,7 +1421,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.mcpTokenDanceHub')}
                     description={t('settings.mcpTokenDanceHubDesc')}
-                    status={t('settings.interfaceGap')}
+                    status={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
                   />
                   <CapabilityCard
                     title={t('settings.mcpRemoteServer')}
@@ -1458,8 +1458,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Globe2 size={18} />}
                   label={t('settings.skillHubSync')}
-                  value={t('settings.interfaceGap')}
-                  detail={t('settings.skillHubSyncNoInterface')}
+                  value={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
+                  detail={hubSessionActive ? t('settings.skillHubSyncNoInterface') : t('settings.skillHubSyncSignedOut')}
                 />
               </div>
               <SettingRow
@@ -1525,6 +1525,11 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           {active === 'models' && (
             <Panel title={t('settings.models')} description={t('settings.modelsDesc')}>
               <SettingRow
+                title={t('settings.modelConfigSource')}
+                description={t('settings.modelConfigSourceDesc')}
+                value={t('settings.status.localSource')}
+              />
+              <SettingRow
                 title={t('settings.modelDefault')}
                 description={t('settings.modelDefaultDesc')}
                 control={
@@ -1569,6 +1574,11 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           {active === 'modelMapping' && (
             <Panel title={t('settings.modelMapping')} description={t('settings.modelMappingDesc')}>
               <SettingRow
+                title={t('settings.modelMappingSource')}
+                description={t('settings.modelMappingSourceDesc')}
+                value={t('settings.status.localSource')}
+              />
+              <SettingRow
                 title={t('settings.enableModelMapping')}
                 description={t('settings.enableModelMappingDesc')}
                 control={<Switch checked={modelMappingEnabled} onChange={setModelMappingEnabled} />}
@@ -1601,6 +1611,11 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'ccSwitch' && (
             <Panel title={t('settings.ccSwitch')} description={t('settings.ccSwitchDesc')}>
+              <SettingRow
+                title={t('settings.ccSwitchSource')}
+                description={t('settings.ccSwitchSourceDesc')}
+                value={t('settings.status.localSource')}
+              />
               <SettingRow
                 title={t('settings.ccSwitchBridge')}
                 description={t('settings.ccSwitchBridgeDesc')}
@@ -1664,7 +1679,11 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 control={<Switch checked={false} onChange={setBooleanSetting('remoteControl', setRemoteControlEnabled)} disabled />}
               />
               <SettingRow title={t('settings.remoteControlApproval')} description={t('settings.remoteControlApprovalDesc')} value={t('settings.approvalMode.ask')} />
-              <SettingRow title={t('settings.remoteControlDevices')} description={t('settings.remoteControlDevicesDesc')} value={t('settings.interfaceGap')} />
+              <SettingRow
+                title={t('settings.remoteControlDevices')}
+                description={t('settings.remoteControlDevicesDesc')}
+                value={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
+              />
             </Panel>
           )}
 
@@ -1743,11 +1762,16 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 description={t('settings.platformSyncDesc')}
                 control={<Switch checked={false} onChange={setBooleanSetting('platformSync', setPlatformSync)} disabled />}
               />
+              <SettingRow
+                title={t('settings.platformSyncSource')}
+                description={t('settings.platformSyncSourceDesc')}
+                value={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
+              />
               <div className={styles.capabilityGrid}>
-                <CapabilityCard title="macOS" description={t('settings.platformMacosDesc')} status={t('settings.statusReady')} />
-                <CapabilityCard title="Windows" description={t('settings.platformWindowsDesc')} status={t('settings.statusReady')} />
-                <CapabilityCard title="Android" description={t('settings.platformAndroidDesc')} status={t('settings.statusPlanned')} />
-                <CapabilityCard title="Web" description={t('settings.platformWebDesc')} status={t('settings.statusPlanned')} />
+                <CapabilityCard title="macOS" description={t('settings.platformMacosDesc')} status={t('settings.status.localSource')} />
+                <CapabilityCard title="Windows" description={t('settings.platformWindowsDesc')} status={t('settings.status.localSource')} />
+                <CapabilityCard title="Android" description={t('settings.platformAndroidDesc')} status={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')} />
+                <CapabilityCard title="Web" description={t('settings.platformWebDesc')} status={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')} />
               </div>
             </Panel>
           )}
@@ -1845,8 +1869,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 description={t('settings.auditTrailDesc')}
                 control={<Switch checked={auditTrail} onChange={setBooleanSetting('auditTrail', setAuditTrail)} />}
               />
-              <SettingRow title={t('settings.permissionLedger')} description={t('settings.permissionLedgerDesc')} value={t('settings.statusPlanned')} />
-              <SettingRow title={t('settings.secretScan')} description={t('settings.secretScanDesc')} value={t('settings.statusPlanned')} />
+              <SettingRow
+                title={t('settings.auditTrailSource')}
+                description={t('settings.auditTrailSourceDesc')}
+                value={auditTrail ? t('settings.status.localSource') : t('settings.notConfigured')}
+              />
+              <SettingRow title={t('settings.permissionLedger')} description={t('settings.permissionLedgerDesc')} value={t('settings.status.interfaceGap')} />
+              <SettingRow title={t('settings.secretScan')} description={t('settings.secretScanDesc')} value={t('settings.status.interfaceGap')} />
               <Callout title={t('settings.securityGuard')} body={t('settings.securityGuardDesc')} />
             </Panel>
           )}
