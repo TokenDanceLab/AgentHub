@@ -11,11 +11,11 @@
 | 当前进展、并行工作、阻塞 | `docs/handoff/STATE.md` |
 | 全局路线和验收 | `docs/roadmap.md` |
 | 客户端详细阶段任务 | `docs/roadmaps/client.md` |
-| 架构边界和术语 | `docs/system-architecture.md` |
-| 实现顺序和目录边界 | `docs/implementation-guide.md` |
+| 架构边界和术语 | `docs/architecture/system-architecture.md` |
+| 实现顺序和目录边界 | `docs/architecture/implementation-guide.md` |
 | REST / WebSocket 契约 | `api/README.md`、`api/openapi.yaml`、`api/events.md` |
 
-合并方向：`feat/* -> dev/delicious233 -> master`。详细分支管理见 `AGENTS.md` 和 `docs/branch-governance.md`。
+合并方向：`feat/* -> dev/delicious233 -> master`。详细分支管理见 `AGENTS.md` 和 `docs/governance/branch-governance.md`。
 
 ## 2. 当前状态
 
@@ -48,7 +48,7 @@ Desktop UI -> Local Edge -> Edge lifecycle -> Agent Runtime adapter
 
 1. 先改 `api/openapi.yaml` 或 `api/events.md`。
 2. 再改 Go 服务和 TypeScript 调用。
-3. 同步 `docs/system-architecture.md` 或 `docs/implementation-guide.md` 的边界说明。
+3. 同步 `docs/architecture/system-architecture.md` 或 `docs/architecture/implementation-guide.md` 的边界说明。
 4. PR 说明写清影响：前端、后端、客户端。
 
 ## 4. 客户端写入范围
@@ -79,7 +79,7 @@ hub-server/**
 - [ ] 把 Desktop Settings 中 IM 群聊、MCP、模型映射、cc-switch、远控/审计继续接到真实 Hub/Edge/API 或本机配置源。
 - [ ] 补 runStore / TanStack Query active run 列表同步链，减少只靠 optimistic run 的状态差异。
 - [ ] 决定 `/v1/runners`、`runner.*` 是否长期作为 deprecated compatibility，并规划 Runtime/Target 命名迁移。
-- [ ] Web UI 移植继续保持 `.worktrees/webui-desktop-port` 独立，合并前处理落后主分支和产品入口确认。
+- [ ] Web UI 移植继续保持独立分支开发，合并前处理落后主分支和产品入口确认。
 
 ## 6. 验证命令
 
@@ -125,8 +125,8 @@ AGENTS.md
 docs/handoff/STATE.md
 docs/roadmap.md
 docs/roadmaps/client.md
-docs/system-architecture.md
-docs/implementation-guide.md
+docs/architecture/system-architecture.md
+docs/architecture/implementation-guide.md
 api/README.md
 api/openapi.yaml
 api/events.md
