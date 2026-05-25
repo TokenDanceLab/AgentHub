@@ -28,6 +28,9 @@ pub fn run() {
             secure_store::clear_hub_refresh_token,
             secure_store::read_hub_refresh_token,
             secure_store::store_hub_refresh_token,
+            secure_store::clear_hub_access_token,
+            secure_store::read_hub_access_token,
+            secure_store::store_hub_access_token,
             notifications::notify_run_completed,
             notifications::notify_run_failed,
         ])
