@@ -96,6 +96,26 @@
   --td-focus: var(--ring);
   --td-radius-control: var(--radius-md);
   --td-radius-panel: var(--radius-xl);
+
+  /* ── Chat surface tokens ────────────────────── */
+  --chat-agent-bg: transparent;
+  --chat-user-bg: rgba(255, 255, 255, 0.04);
+  --chat-code-bg: rgba(15, 16, 22, 0.55);
+  --chat-thinking-bg: rgba(255, 255, 255, 0.015);
+  --chat-thinking-border: rgba(255, 255, 255, 0.04);
+
+  /* ── Floating input panel ───────────────────── */
+  --input-panel-bg: rgba(40, 40, 50, 0.35);
+  --input-panel-border: rgba(255, 255, 255, 0.07);
+  --input-panel-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
+  --input-ghost-btn: rgba(255, 255, 255, 0.04);
+  --input-ghost-btn-hover: rgba(255, 255, 255, 0.08);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(255, 255, 255, 0.03);
+  --agent-card-active: rgba(255, 255, 255, 0.06);
+  --agent-dot-online: #34D399;
+  --agent-dot-online-glow: 0 0 6px rgba(52, 211, 153, 0.3);
 }
 
 /* ── Light Theme — macOS matte gray ────────────────────────────────────── */
@@ -181,6 +201,26 @@
   --td-focus: var(--ring);
   --td-radius-control: var(--radius-md);
   --td-radius-panel: var(--radius-xl);
+
+  /* ── Chat surface tokens ────────────────────── */
+  --chat-agent-bg: transparent;
+  --chat-user-bg: rgba(0, 0, 0, 0.03);
+  --chat-code-bg: rgba(0, 0, 0, 0.03);
+  --chat-thinking-bg: rgba(0, 0, 0, 0.015);
+  --chat-thinking-border: rgba(0, 0, 0, 0.05);
+
+  /* ── Floating input panel ───────────────────── */
+  --input-panel-bg: rgba(255, 255, 255, 0.55);
+  --input-panel-border: rgba(0, 0, 0, 0.06);
+  --input-panel-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
+  --input-ghost-btn: rgba(0, 0, 0, 0.03);
+  --input-ghost-btn-hover: rgba(0, 0, 0, 0.06);
+
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(0, 0, 0, 0.03);
+  --agent-card-active: rgba(0, 0, 0, 0.05);
+  --agent-dot-online: #22c55e;
+  --agent-dot-online-glow: 0 0 6px rgba(34, 197, 94, 0.25);
 }
 
 /* ── Shared glass/backdrop utilities ──────────────────────────────────── */

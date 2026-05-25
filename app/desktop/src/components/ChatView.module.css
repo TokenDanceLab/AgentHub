@@ -32,56 +32,50 @@
   font-size: var(--font-size-sm);
 }
 
-/* ── Message blocks (bubble-free, spacing-driven) ── */
+/* ── Message blocks (borderless document flow) ── */
 
 .message {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   max-width: 80%;
   padding: 0;
   border-radius: 0;
   font-size: var(--font-size-sm);
-  line-height: 1.55;
+  line-height: 1.65;
   overflow: visible;
   animation: messageIn 0.2s ease-out;
 }
 
+/* User: subtle tint, no bubble */
 .userMsg {
   align-self: flex-end;
-  background: #F3F4F6;
+  background: var(--chat-user-bg);
   color: var(--foreground);
   border: none;
-  border-radius: 10px 10px 2px 10px;
-  padding: 6px 10px;
+  border-radius: 8px;
+  padding: 8px 12px;
+  max-width: 75%;
 }
 
-[data-theme='dark'] .userMsg {
-  background: rgba(255,255,255,0.08);
-  color: #E8E8ED;
-}
-
-.userMsg .messageFooter {
-  display: none;
-}
-
+/* Agent: pure text on canvas, no background */
 .agentMsg {
   align-self: flex-start;
-  background: transparent;
+  background: var(--chat-agent-bg);
   color: var(--foreground);
   border: none;
 }
 
 .agentMsg:hover {
-  background: rgba(0,0,0,0.015);
+  background: transparent;
 }
 
 .systemMsg {
   align-self: center;
   background: transparent;
   border: none;
-  opacity: 0.5;
+  opacity: 0.45;
   font-size: var(--font-size-xs);
   max-width: 100%;
   padding: var(--space-xs) 0;
@@ -200,28 +194,46 @@
   color: var(--foreground);
 }
 
-/* ── Thinking ────────────────────────────── */
+/* ── Thinking accordion ────────────────────── */
 
-.thinking {
-  margin: var(--space-xs) 0;
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: 4px;
-  background: color-mix(in oklch, var(--foreground) 5%, transparent);
-}
-
-/* ── Tool call ───────────────────────────── */
-
-.toolInput,
-.toolOutput {
-  margin-top: var(--space-xs);
-  padding: var(--space-xs);
-  background: var(--background);
-  border-radius: 3px;
+.thinkingToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-left: 2px solid var(--chat-thinking-border);
+  border-radius: 0 4px 4px 0;
+  background: var(--chat-thinking-bg);
+  cursor: pointer;
   font-size: var(--font-size-xs);
   font-family: var(--font-mono);
-  overflow-x: auto;
-  max-height: 200px;
+  color: var(--muted-foreground);
+  transition: background var(--duration-fast), border-color var(--duration-fast);
+}
+
+.thinkingToggle:hover {
+  background: color-mix(in oklch, var(--chat-thinking-bg) 80%, var(--hover-overlay));
+  border-left-color: var(--muted-foreground);
+}
+
+.thinkingLen {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.4;
+}
+
+.thinkingContent {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  white-space: pre-wrap;
+  max-height: 16rem;
   overflow-y: auto;
+  border-left: 2px solid var(--chat-thinking-border);
+  margin-left: 0;
 }
 
 /* ── File change ─────────────────────────── */
@@ -300,43 +312,48 @@
   transform: rotate(90deg);
 }
 
-/* Thinking block */
+/* Thinking accordion trigger + content */
 .thinkingToggle {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   width: 100%;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border: none;
-  border-radius: var(--radius-sm);
-  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+  border-left: 2px solid var(--chat-thinking-border);
+  border-radius: 0 4px 4px 0;
+  background: var(--chat-thinking-bg);
   cursor: pointer;
   font-size: var(--font-size-xs);
-  opacity: 0.7;
-  transition: opacity var(--duration-fast);
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  transition: background var(--duration-fast), border-color var(--duration-fast);
 }
 .thinkingToggle:hover {
-  opacity: 1;
+  background: color-mix(in oklch, var(--chat-thinking-bg) 80%, var(--hover-overlay));
+  border-left-color: var(--muted-foreground);
 }
 .thinkingLen {
   margin-left: auto;
   font-size: 10px;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 .thinkingContent {
   padding: var(--space-xs) var(--space-sm);
   font-size: var(--font-size-xs);
-  opacity: 0.65;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
   white-space: pre-wrap;
-  max-height: 12rem;
+  max-height: 16rem;
   overflow-y: auto;
+  border-left: 2px solid var(--chat-thinking-border);
 }
 
-/* Tool use block (conditional rendering, no <details>) */
+/* Tool use block — borderless card */
 .toolUseContainer {
   margin: 4px 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--chat-thinking-border);
+  border-radius: 6px;
   overflow: hidden;
 }
 .toolUseHeader {
@@ -346,13 +363,26 @@
   width: 100%;
   padding: 6px 10px;
   border: none;
-  background: color-mix(in oklch, var(--primary) 8%, transparent);
+  background: transparent;
   cursor: pointer;
   font-size: var(--font-size-xs);
   transition: background var(--duration-fast);
 }
 .toolUseHeader:hover {
-  background: color-mix(in oklch, var(--primary) 14%, transparent);
+  background: var(--hover-overlay);
+}
+
+.toolInput,
+.toolOutput {
+  margin-top: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--chat-code-bg);
+  border-radius: 4px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  max-height: 200px;
+  overflow-y: auto;
 }
 .toolIcon {
   font-size: 14px;
@@ -407,59 +437,42 @@
 
 .toolUseBody {
   padding: var(--space-xs) var(--space-sm);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--chat-thinking-border);
 }
 .showParamsBtn {
   padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: var(--background);
+  border: none;
+  border-radius: 4px;
+  background: var(--chat-code-bg);
   color: var(--muted-foreground);
   font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
   cursor: pointer;
   margin-bottom: var(--space-xs);
 }
 .showParamsBtn:hover {
   color: var(--foreground);
+  background: color-mix(in oklch, var(--chat-code-bg) 85%, var(--hover-overlay));
 }
 
-.readResult {
-  padding: 4px 0;
-  font-size: var(--font-size-xs);
-  font-family: var(--font-mono);
-}
-.bashResult {
-  margin-top: var(--space-xs);
-}
-.toolStderr {
-  color: var(--destructive);
-}
-.exitCode {
-  display: inline-block;
-  margin-top: 2px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 10px;
-  background: var(--border);
-}
-
-/* ── Diff Card inline ─────────────────────── */
+/* ── Diff card — left-border emphasis, no box ── */
 .diffCard {
   margin: var(--space-xs) 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: none;
+  border-left: 3px solid var(--muted-foreground);
+  border-radius: 0;
   overflow: hidden;
+  opacity: 0.85;
 }
 .diffCardHeader {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 8px;
-  background: var(--background);
-  border-bottom: 1px solid var(--border);
+  padding: 4px 0 4px 8px;
+  background: transparent;
+  border-bottom: none;
   font-size: var(--font-size-xs);
-  position: sticky;
-  top: 0;
+  font-family: var(--font-mono);
 }
 .diffAdded {
   font-weight: var(--font-weight-medium);
@@ -538,45 +551,36 @@
   word-break: break-word;
 }
 
-/* ── Code ────────────────────────────────── */
+/* ── Code block — warm dark, no border ────── */
 
 .codeBlock {
   position: relative;
   margin: var(--space-xs) 0;
-  padding: var(--space-sm);
-  background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: var(--font-size-xs);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--chat-code-bg);
+  border: none;
+  border-radius: 8px;
+  font-size: var(--font-size-sm);
   font-family: var(--font-mono);
+  line-height: 1.6;
   overflow-x: auto;
 }
 
-.codeLang {
-  position: absolute;
-  top: 2px;
-  right: 8px;
-  font-size: 10px;
-  opacity: 0.5;
-  text-transform: uppercase;
-}
-
-/* ── Highlighted Code Block ───────────────── */
-
 .codeBlockHighlighted {
   margin: var(--space-xs) 0;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: none;
+  border-radius: 8px;
   overflow: hidden;
+  background: var(--chat-code-bg);
 }
 
 .codeBlockHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 8px;
-  background: color-mix(in oklch, var(--foreground) 8%, transparent);
-  border-bottom: 1px solid var(--border);
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .codeLangBadge {
@@ -584,6 +588,16 @@
   font-family: var(--font-mono);
   color: var(--muted-foreground);
   text-transform: lowercase;
+}
+
+.codeLang {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  font-size: 10px;
+  opacity: 0.35;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
 }
 
 .copyBtn {
