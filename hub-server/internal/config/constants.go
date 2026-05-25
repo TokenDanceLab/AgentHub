@@ -38,6 +38,9 @@ const DefaultServerReadTimeout = 30 * time.Second
 // DefaultServerIdleTimeout is the IdleTimeout applied to the main HTTP server.
 const DefaultServerIdleTimeout = 120 * time.Second
 
+// DefaultMaxUploadSize is the fallback max upload size when not configured.
+const DefaultMaxUploadSize int64 = 50 << 20 // 50 MB
+
 // DefaultMaxHeaderBytes caps incoming HTTP request headers.
 const DefaultMaxHeaderBytes = 1 << 20
 
@@ -97,6 +100,9 @@ const MaxPinsPerSession int64 = 50
 
 // ForwardMessageConcurrency limits concurrent writes during message forwarding.
 const ForwardMessageConcurrency = 8
+
+// MaxForwardTargets limits the number of target sessions for message forwarding.
+const MaxForwardTargets = 50
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 
