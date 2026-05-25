@@ -241,14 +241,14 @@ When working inside the `D:\Code\TokenDance` workspace, read root `../AGENTS.md`
 
 ## TokenDance ID Auth Boundary
 
-TokenDance ID is the cross-product identity entry. Hub session is AgentHub's own product session. Final browser/desktop login must be implemented by Hub Server as the TokenDance ID relying party: OIDC Authorization Code + PKCE code exchange, issuer/audience/JWKS ID token validation, `tokendance_sub` to Hub user mapping, and Hub-local access/refresh session issuance.
+TokenDance ID is the cross-product identity entry. Hub session is AgentHub's own product session. Hub Server now provides the TokenDance ID relying-party flow: OIDC Authorization Code + PKCE authorize/callback, issuer/audience/JWKS ID token validation, `tokendance_sub` to Hub user mapping, and Hub-local access/refresh session issuance. Release readiness still depends on deployed client registration, Desktop/Web callback UX, logout/reconnect flows, and screenshot/smoke evidence.
 
 | Item | Boundary |
 |---|---|
 | TokenDance ID | Owns unified third-party login and account identity; products do not integrate GitHub/Google/Feishu directly |
 | Hub Server | Owns Hub callback, code exchange, Hub user mapping, Hub access/refresh sessions, and device proof |
 | Desktop/Web | Opens browser/Web login and stores Hub session; does not store third-party provider tokens |
-| Compatibility bearer path | `hub-server/internal/middleware/auth.go` can verify TokenDance ID RS256/JWKS bearer tokens, but this is compatibility-only and does not replace Hub session |
+| Compatibility bearer path | `hub-server/internal/middleware/auth.go` can verify TokenDance ID RS256/JWKS bearer tokens, but this is identity-only compatibility; it does not replace Hub session and does not satisfy desktop device proof |
 | Local execution | Local Edge + Desktop execution does not require Hub login; Hub session is required for cloud IM, sync, remote control, or relay |
 
 OIDC structural check:
