@@ -329,5 +329,11 @@ func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targ
 }
 
 func (s *ContactService) UpdateRemark(ctx context.Context, currentUserID, friendUserID, remark string) error {
-	return repository.UpdateFriendshipRemark(s.db, currentUserID, friendUserID, remark)
+	if err := repository.UpdateFriendshipRemark(s.db, currentUserID, friendUserID, remark); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errcode.FriendRemarkNoRow
+		}
+		return err
+	}
+	return nil
 }
