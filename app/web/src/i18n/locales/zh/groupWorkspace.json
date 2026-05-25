@@ -32,6 +32,7 @@
   "stat.workspaceFiles": "工作区文件",
   "stat.demoWorkspaceFiles": "演示工作区文件",
   "stat.dryRunReadiness": "试运行就绪度",
+  "stat.demoDryRunReadiness": "演示试运行就绪度",
   "task.board": "共享任务看板",
   "task.coordinationPlan": "当前协调计划",
   "task.board.backlog": "待办",
@@ -43,6 +44,9 @@
   "task.tag.active": "进行中",
   "task.tag.done": "已完成",
   "task.tag.queue": "排队中",
+  "task.tag.demoActive": "演示进行中",
+  "task.tag.demoDone": "演示已完成",
+  "task.tag.demoQueue": "演示排队中",
   "task.owner": "负责人：{{name}}",
   "task.reassign": "重新分配",
   "task.progressAria": "{{title}} 进度",
@@ -127,5 +131,8 @@
     "mockFallback": "演示 / mock fallback",
     "snapshotUnavailable": "快照不可用",
     "localDryRun": "本地 dry-run / {{source}}"
-  }
+  },
+  "demo.detail": "演示/mock fallback 数据：{{detail}}",
+  "demo.summary": "演示/mock fallback 任务：{{summary}}",
+  "demo.role": "演示/mock fallback 成员：{{role}}"
 }

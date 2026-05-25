@@ -4,7 +4,7 @@
   "sidebar.nav": "导航",
   "sidebar.local": "本地",
   "sidebar.catalog": "目录",
-  "sidebar.catalogDesc": "浏览 Hub CustomAgent，或带明确标签的 catalog/mock fallback",
+  "sidebar.catalogDesc": "浏览 Hub CustomAgent，或带明确标签的 catalog fallback",
   "sidebar.workspace": "工作区",
   "sidebar.workspaceDesc": "{{count}} 个已本地暂存",
   "sidebar.favorites": "收藏",
@@ -26,7 +26,7 @@
   "viewMode.all": "全部智能体",
   "viewMode.favorites": "仅收藏",
   "viewMode.installed": "仅本地暂存",
-  "stats.curated": "Catalog/mock 智能体",
+  "stats.curated": "Catalog fallback 智能体",
   "stats.ready": "本地工作区就绪",
   "stats.favorites": "收藏",
   "stats.policy": "预览检查",
@@ -79,8 +79,8 @@
   "source.hub": "Hub /web/custom-agents",
   "source.hubDetail": "已从当前 Web 会话的 Hub CustomAgent 契约加载。",
   "source.loading": "正在加载 Hub 目录",
-  "source.catalogMock": "Catalog/mock fallback",
-  "source.catalogFallbackDetail": "Hub 未返回 CustomAgent，因此显示带明确标签的 catalog/mock fallback。",
-  "source.loginRequiredDetail": "当前没有 Web Hub 会话。显示带明确标签的 catalog/mock fallback。",
-  "source.errorDetail": "Hub CustomAgent 不可用：{{error}}。显示带明确标签的 catalog/mock fallback。"
+  "source.catalogMock": "Catalog fallback",
+  "source.catalogFallbackDetail": "Hub 未返回 CustomAgent，因此显示带明确标签的 catalog fallback。",
+  "source.loginRequiredDetail": "当前没有 Web Hub 会话。显示带明确标签的 catalog fallback。",
+  "source.errorDetail": "Hub CustomAgent 不可用：{{error}}。显示带明确标签的 catalog fallback。"
 }
