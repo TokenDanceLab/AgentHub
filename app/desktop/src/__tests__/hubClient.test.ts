@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createHubClient, HubError } from '../api/hubClient';
 import type { AuthResponse, UserProfile } from '../api/hubClient';
 import { createHubAuth } from '../api/hubAuth';
-import { clearStoredHubRefreshToken, saveStoredHubRefreshToken } from '../api/hubTokenStorage';
+import { clearStoredHubRefreshToken, loadStoredHubRefreshToken, saveStoredHubRefreshToken } from '../api/hubTokenStorage';
 
 const mockUser: UserProfile = {
   id: 'user_1',
@@ -213,7 +213,8 @@ describe('hubClient', () => {
       const sessions = [{ id: 's1', type: 'private', name: 'DM', owner_user_id: 'u1' }];
       mockFetch(200, sessions);
       const res = await client.listSessions();
-      expect(res[0].id).toBe('s1');
+      expect(res).toHaveLength(1);
+      expect(res[0]?.id).toBe('s1');
     });
 
     it('createPrivateSession POSTs target_user_id', async () => {
@@ -279,7 +280,39 @@ describe('hubAuth', () => {
       expect(state.refreshToken).toBe('jwt_refresh_456');
       expect(state.isAuthenticated).toBe(true);
       expect(state.user?.username).toBe('testuser');
-      expect(localStorage.getItem('agenthub_hub_token')).toBe('jwt_access_123');
+      expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
+      expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
+      expect(await loadStoredHubRefreshToken()).toBe('jwt_refresh_456');
+    });
+
+    it('enters local mode and records onboarding without Hub tokens', () => {
+      const auth = newAuth();
+
+      auth.continueLocalMode();
+
+      const state = auth.getState();
+      expect(state.authStatus).toBe('local');
+      expect(state.cloudLockedReason).toBe('not_signed_in');
+      expect(state.isAuthenticated).toBe(false);
+      expect(state.token).toBeNull();
+      expect(state.refreshToken).toBeNull();
+      expect(localStorage.getItem('agenthub_onboarding_seen')).toBe('true');
+      expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
+      expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
+    });
+
+    it('marks TokenDance login as pending when the desktop callback is not configured', async () => {
+      const auth = newAuth();
+
+      await expect(auth.loginWithTokenDance()).rejects.toThrow(
+        'TokenDance ID desktop callback is not connected yet.',
+      );
+
+      const state = auth.getState();
+      expect(state.authStatus).toBe('tokenDancePending');
+      expect(state.cloudLockedReason).toBe('tokenDance_pending');
+      expect(state.isAuthenticated).toBe(false);
+      expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
       expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
     });
 
@@ -297,6 +330,28 @@ describe('hubAuth', () => {
       const [, init] = vi.mocked(globalThis.fetch).mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string);
       expect(body.device_id).toBe('00000000-0000-0000-0000-00000000a001');
+    });
+
+    it('rolls back tokens when login succeeds but me fails', async () => {
+      const auth = newAuth();
+
+      mockFetchSequence([
+        { status: 200, data: mockAuthResponse },
+        { status: 500, data: { error: { code: 'me_failed', message: 'profile unavailable' } } },
+      ]);
+
+      await expect(auth.login('alice', 'hunter2')).rejects.toThrow('profile unavailable');
+
+      const state = auth.getState();
+      expect(state.token).toBeNull();
+      expect(state.refreshToken).toBeNull();
+      expect(state.user).toBeNull();
+      expect(state.isAuthenticated).toBe(false);
+      expect(state.authStatus).toBe('error');
+      expect(state.cloudLockedReason).toBe('hub_unreachable');
+      expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
+      expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
+      expect(await loadStoredHubRefreshToken()).toBeNull();
     });
 
     it('notifies subscribers on login', async () => {
@@ -382,25 +437,29 @@ describe('hubAuth', () => {
       expect(auth.getState().isAuthenticated).toBe(false);
     });
 
-    it('returns true and fetches user when token is valid', async () => {
-      localStorage.setItem('agenthub_hub_token', 'stored_token');
+    it('returns true and fetches user from a stored refresh token', async () => {
+      await saveStoredHubRefreshToken('valid_refresh');
       const auth = newAuth();
 
-      mockFetch(200, mockUser);
+      mockFetchSequence([
+        { status: 200, data: { access_token: 'new_token', refresh_token: 'new_refresh', expires_in: 900 } },
+        { status: 200, data: mockUser },
+      ]);
       const result = await auth.tryAutoLogin();
 
       expect(result).toBe(true);
       expect(auth.getState().isAuthenticated).toBe(true);
       expect(auth.getState().user?.id).toBe('user_1');
+      expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
+      expect(await loadStoredHubRefreshToken()).toBe('new_refresh');
     });
 
-    it('refreshes token when stored token is expired', async () => {
+    it('refreshes access token without persisting it to localStorage', async () => {
       localStorage.setItem('agenthub_hub_token', 'expired_token');
       await saveStoredHubRefreshToken('valid_refresh');
       const auth = newAuth();
 
       mockFetchSequence([
-        { status: 401, data: { error: { code: 'token_expired', message: 'Token expired' } } }, // me() fails
         { status: 200, data: { access_token: 'new_token', refresh_token: 'new_refresh', expires_in: 900 } }, // refresh
         { status: 200, data: mockUser }, // me() succeeds
       ]);
@@ -411,8 +470,9 @@ describe('hubAuth', () => {
       expect(auth.getState().token).toBe('new_token');
       expect(auth.getState().refreshToken).toBe('new_refresh');
       expect(auth.getState().isAuthenticated).toBe(true);
-      expect(localStorage.getItem('agenthub_hub_token')).toBe('new_token');
+      expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
       expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
+      expect(await loadStoredHubRefreshToken()).toBe('new_refresh');
     });
 
     it('returns false and clears state when both token and refresh fail', async () => {
@@ -421,7 +481,6 @@ describe('hubAuth', () => {
       const auth = newAuth();
 
       mockFetchSequence([
-        { status: 401, data: { error: { code: 'token_expired', message: 'Token expired' } } },
         { status: 401, data: { error: { code: 'refresh_failed', message: 'Invalid refresh' } } },
       ]);
 
