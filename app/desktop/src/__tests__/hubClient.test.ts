@@ -217,6 +217,21 @@ describe('hubClient', () => {
       expect(res[0]?.id).toBe('s1');
     });
 
+    it('unwraps Hub response envelopes', async () => {
+      mockFetch(200, {
+        code: 'OK',
+        data: [{ session_id: 's-envelope', type: 'private', name: 'DM' }],
+      });
+      const res = await client.listSessions();
+      expect(res).toHaveLength(1);
+      expect(res[0]?.session_id).toBe('s-envelope');
+    });
+
+    it('uses Hub envelope message on errors', async () => {
+      mockFetch(400, { code: 'BAD_REQUEST', message: 'invalid session' });
+      await expect(client.listSessions()).rejects.toThrow('invalid session');
+    });
+
     it('createPrivateSession POSTs target_user_id', async () => {
       const fetchSpy = mockFetch(200, { id: 's_new', type: 'private', owner_user_id: 'u1' });
       const res = await client.createPrivateSession({ target_user_id: 'user_b' });
