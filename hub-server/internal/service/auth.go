@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"slices"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -226,9 +228,17 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID, nickname, avata
 		return nil, err
 	}
 	if nickname != "" {
+		nickname = strings.TrimSpace(nickname)
+		if len(nickname) < 1 || len(nickname) > 50 {
+			return nil, errcode.UserInvalidParam
+		}
 		user.Nickname = nickname
 	}
 	if avatarURL != "" {
+		avatarURL = strings.TrimSpace(avatarURL)
+		if err := validateAvatarURL(avatarURL); err != nil {
+			return nil, errcode.UserInvalidParam
+		}
 		user.AvatarURL = avatarURL
 	}
 	if err := repository.UpdateUser(s.db, user); err != nil {
@@ -262,5 +272,24 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID, oldPassword, n
 	}
 
 	resolveAuthCache(s.cacheClient).Invalidate(ctx, "user:profile:"+userID)
+	return nil
+}
+
+// validateAvatarURL checks that the given URL is well-formed and uses an
+// allowed scheme (http or https).
+func validateAvatarURL(raw string) error {
+	if len(raw) > 2048 {
+		return errors.New("avatar URL too long")
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return errors.New("avatar URL scheme must be http or https")
+	}
+	if u.Host == "" {
+		return errors.New("avatar URL has no host")
+	}
 	return nil
 }

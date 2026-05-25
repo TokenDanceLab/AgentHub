@@ -10,6 +10,8 @@ package adapters
 import (
 	"context"
 	"regexp"
+
+	"github.com/agenthub/edge-server/internal/security"
 )
 
 // SecurityHook validates tool calls against the AgentHub security policy.
@@ -119,12 +121,14 @@ func extractCommand(input map[string]any) string {
 }
 
 // containsDangerousPattern returns true when cmd matches any of the
-// blocked patterns defined in dangerousPatternsRE.
+// blocked patterns defined in dangerousPatternsRE. Input is normalized
+// (whitespace collapsed, comments stripped) before matching.
 func (h *SecurityHook) containsDangerousPattern(cmd string) bool {
 	if cmd == "" {
 		return false
 	}
-	return dangerousPatternsRE.MatchString(cmd)
+	normalized := security.NormalizeShellCommand(cmd)
+	return dangerousPatternsRE.MatchString(normalized)
 }
 
 func truncate(s string, n int) string {
