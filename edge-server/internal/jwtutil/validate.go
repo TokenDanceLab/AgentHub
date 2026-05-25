@@ -16,11 +16,19 @@ type HubClaims struct {
 	jwt.RegisteredClaims
 }
 
+const (
+	// minSecretLen is the minimum length for an HMAC-SHA256 secret.
+	// Keys shorter than 32 bytes are vulnerable to brute-force attacks.
+	minSecretLen = 32
+)
+
 var (
-	ErrTokenExpired = errors.New("hub token has expired")
-	ErrTokenInvalid = errors.New("hub token is invalid")
-	ErrSecretEmpty  = errors.New("hub jwt secret is empty")
-	ErrTokenEmpty   = errors.New("hub token is empty")
+	ErrTokenExpired    = errors.New("hub token has expired")
+	ErrTokenInvalid    = errors.New("hub token is invalid")
+	ErrSecretEmpty     = errors.New("hub jwt secret is empty")
+	ErrSecretTooShort  = errors.New("hub jwt secret is too short")
+	ErrTokenEmpty      = errors.New("hub token is empty")
+	errAlgMismatch     = errors.New("hub token is invalid")
 )
 
 // ValidateHubToken validates a Hub-issued HS256 JWT against the shared secret.
@@ -32,13 +40,16 @@ func ValidateHubToken(tokenStr string, secret []byte) (*HubClaims, error) {
 	if len(secret) == 0 {
 		return nil, ErrSecretEmpty
 	}
+	if len(secret) < minSecretLen {
+		return nil, ErrSecretTooShort
+	}
 	if tokenStr == "" {
 		return nil, ErrTokenEmpty
 	}
 
 	token, err := jwt.ParseWithClaims(tokenStr, &HubClaims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method in hub token")
+			return nil, errAlgMismatch
 		}
 		return secret, nil
 	},
