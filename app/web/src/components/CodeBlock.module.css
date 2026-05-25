@@ -1,0 +1,83 @@
+.wrapper {
+  position: relative;
+  margin: var(--space-xs) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  overflow: hidden;
+}
+
+/* ── Header bar ──────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 10px;
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.lang {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  opacity: 0.6;
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── Copy button ─────────────────────────────── */
+.copyBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-fast), background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast);
+}
+
+.wrapper:hover .copyBtn {
+  opacity: 1;
+}
+
+.copyBtn:hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+
+.copyBtn:active {
+  transform: scale(0.94);
+}
+
+/* ── Plain text fallback ─────────────────────── */
+.plain {
+  margin: 0;
+  padding: var(--space-sm);
+  background: var(--background);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  overflow-x: auto;
+}
+
+.plain code {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ── Mobile ──────────────────────────────────── */
+@media (max-width: 767px) {
+  .copyBtn {
+    opacity: 1; /* always visible on touch */
+    width: 32px;
+    height: 32px;
+  }
+
+  .header {
+    padding: 5px 10px;
+  }
+}

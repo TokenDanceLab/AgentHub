@@ -1,0 +1,168 @@
+/* ═════════════════════════════════════════════════════════════════════
+   ContextUsage — Token usage visualization with context budget bar
+   Ported from OpenCode session-context-tab, adapted for AgentHub design tokens
+   ═════════════════════════════════════════════════════════════════════ */
+
+.section {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/* ── Context Bar ───────────────────────────── */
+
+.bar {
+  height: 8px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--surface-base);
+  display: flex;
+}
+
+.barWarning {
+  box-shadow: 0 0 6px var(--warning);
+}
+
+.barDanger {
+  box-shadow: 0 0 6px var(--destructive);
+  animation: pulseWarning 2s ease-in-out infinite;
+}
+
+.segment {
+  height: 100%;
+  transition: width var(--duration-slow) var(--ease-out);
+}
+
+/* ── Usage Text ────────────────────────────── */
+
+.usageText {
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+  opacity: 0.7;
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── Stats Grid ────────────────────────────── */
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-xs);
+}
+
+.statRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statLabel {
+  font-size: var(--font-size-2xs);
+  color: var(--foreground);
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.statValue {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── Legend ────────────────────────────────── */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-sm);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-xs);
+  flex-shrink: 0;
+}
+
+.legendLabel {
+  color: var(--foreground);
+  opacity: 0.7;
+}
+
+.legendValue {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  color: var(--foreground);
+  opacity: 0.5;
+}
+
+/* ── Cost ──────────────────────────────────── */
+
+.costRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--border);
+}
+
+.costLabel {
+  font-size: var(--font-size-xs);
+  color: var(--foreground);
+  opacity: 0.5;
+}
+
+.costValue {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-semibold);
+  color: var(--success);
+}
+
+/* ── Compact Mode ──────────────────────────── */
+
+.compact .bar {
+  height: 4px;
+}
+
+.compact .usageText {
+  font-size: var(--font-size-2xs);
+}
+
+/* ── Warning Animation ─────────────────────── */
+
+@keyframes pulseWarning {
+  0%,
+  100% {
+    box-shadow: 0 0 6px var(--destructive);
+  }
+  50% {
+    box-shadow: 0 0 12px var(--destructive);
+  }
+}
+
+/* ── Responsive: Mobile (< 768px) ──────────── */
+
+@media (max-width: 767px) {
+  .section {
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .statsGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .legend {
+    gap: var(--space-xs);
+  }
+}

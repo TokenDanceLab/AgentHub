@@ -199,9 +199,7 @@ export function useAutoScroll(
 
     // New message arrived
     if (deps.messages.length > prev) {
-      if (!userScrolledRef.current) {
-        scrollToBottom(false);
-      }
+      scrollToBottom(true);
     }
   }, [deps.messages.length, scrollToBottom]);
 
