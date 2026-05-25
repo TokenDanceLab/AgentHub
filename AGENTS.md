@@ -149,7 +149,7 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 
 ### 仓库级 Skill
 
-- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`。
+- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`、`.agents/skills/adapter-dev/`、`.agents/skills/env-sandbox/`、`.agents/skills/ui-screenshot/`。
 - 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）必须先读 `.agents/skills/dev-loop/SKILL.md`。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
 - `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
@@ -241,10 +241,13 @@ feat/* → dev/maintainer → master
 
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
-| **dev/maintainer** | 主开发分支，唯一事实源 | 活跃 |
+| **dev/maintainer** | 主开发分支，唯一事实源 | ✅ 活跃 |
 | master | PR-only 稳定快照，Q2 里程碑后同步 | 滞后（勿直接 clone 使用） |
-| dev/contributor-b | contributor-b 的 Web 前端（`feat/frontend-page-preview`），不合并 | 独立开发 |
-| dev/contributor-a | 已过期 | 待清理 |
+| **dev/contributor-b** | contributor-b 的 Web 前端，不合并 | 独立开发 |
+| ~~dev/contributor-a~~ | 已过期 | ✅ 已清理 |
+| ~~codex/contributor-a-fork~~ | Codex 实验分支 | ✅ 已清理 |
+| ~~codex/contributor-b-ui-fork~~ | Codex UI fork | ✅ 已清理 |
+| ~~feat/agent-runtime-expansion~~ | Runtime 扩展 | ✅ 已清理 |
 
 规则：
 - `master` 禁止直接 push，必须通过 PR。
