@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { mockThreads, mockMessages, MockEventStream, playMessageStream } from '@shared/index';
 
 type Accent = 'blue' | 'cyan' | 'purple';
@@ -282,7 +283,7 @@ const pageStyles = `
     line-height: 1;
     border-radius: 10px;
     background: var(--accent-gradient);
-    box-shadow: 0 10px 22px var(--shadow);
+    box-shadow: 0 10px 22px var(--brand-glow);
   }
   .pc-chat-header,
   .pc-context-header {
@@ -911,6 +912,8 @@ export function PrivateChatsPageInteractive() {
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<string[]>([]);
   const [notice, setNotice] = useState<Notice | null>(null);
 
+  const { t } = useTranslation('privateChats');
+
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
   const conversationSnapshots = useMemo<ConversationSnapshot[]>(
@@ -1157,7 +1160,7 @@ export function PrivateChatsPageInteractive() {
     setUnreadByChat((current) => ({ ...current, [chatId]: 0 }));
 
     if (nextConversation?.currentUnread) {
-      showNotice(`${nextConversation.name} marked as read`, 'success');
+      showNotice(t('notice.markedRead', { name: nextConversation.name }), 'success');
     }
   };
 
@@ -1176,7 +1179,7 @@ export function PrivateChatsPageInteractive() {
     );
 
     if (attachment) {
-      showNotice(`${isSelected ? 'Removed' : 'Selected'} ${attachment.name}`);
+      showNotice(isSelected ? t('notice.removed', { name: attachment.name }) : t('notice.selected', { name: attachment.name }));
     }
   };
 
@@ -1186,7 +1189,7 @@ export function PrivateChatsPageInteractive() {
     setSelectedAttachmentIds((current) =>
       current.filter((currentAttachmentId) => currentAttachmentId !== attachmentId),
     );
-    showNotice(`${attachment?.name ?? 'Attachment'} removed`);
+    showNotice(t('notice.attachmentRemoved', { name: attachment?.name ?? 'Attachment' }));
   };
 
   const toggleKeyedMessage = (messageId: string) => {
@@ -1200,14 +1203,16 @@ export function PrivateChatsPageInteractive() {
     );
 
     showNotice(
-      `${isKeyed ? 'Removed from' : 'Marked as'} key: ${message?.author ?? 'message'}`,
+      isKeyed
+        ? t('notice.removeKey', { author: message?.author ?? 'message' })
+        : t('notice.markKey', { author: message?.author ?? 'message' }),
       isKeyed ? 'info' : 'success',
     );
   };
 
   const insertCodeSnippet = () => {
     setDraft((current) => `${current}${current ? '\n\n' : ''}\`\`\`tsx\n// paste selected snippet here\n\`\`\``);
-    showNotice('Code block inserted into the local draft');
+    showNotice(t('notice.codeInserted'));
   };
 
   const quoteLatestMessage = () => {
@@ -1220,14 +1225,14 @@ export function PrivateChatsPageInteractive() {
     }
 
     setDraft((current) => `${current}${current ? '\n\n' : ''}> ${source.body.slice(0, 120)}`);
-    showNotice(`Quoted ${source.author}'s latest context`);
+    showNotice(t('notice.quoted', { author: source.author }));
   };
 
   const sendDraft = () => {
     const text = draft.trim();
 
     if (!hasComposerContent) {
-      showNotice('Write a message or select an attachment before sending');
+      showNotice(t('notice.emptyMessage'));
       return;
     }
 
@@ -1252,7 +1257,7 @@ export function PrivateChatsPageInteractive() {
     setSelectedAttachmentIds([]);
     setAttachmentsOpen(false);
     setDraft('');
-    showNotice('Local draft appended to this preview thread', 'success');
+    showNotice(t('notice.draftAdded'), 'success');
   };
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1275,25 +1280,25 @@ export function PrivateChatsPageInteractive() {
             <span className="pc-brand-mark">AH</span>
             <div className="pc-title">
               <h2>AGENTHUB</h2>
-              <p className="pc-brand-sub">Private Chats</p>
+              <p className="pc-brand-sub">{t('brand.subtitle')}</p>
             </div>
           </div>
 
           <div className="pc-search">
             <Icon name="search" />
             <input
-              aria-label="Search private chats"
+              aria-label={t('search.ariaLabel')}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search people, handoffs, snippets..."
+              placeholder={t('search.placeholder')}
               type="search"
               value={searchQuery}
             />
           </div>
 
-          <div className="pc-section-title">Mock Conversations</div>
+          <div className="pc-section-title">{t('sidebar.title')}</div>
           {normalizedSearch ? (
             <div className="pc-filter-note">
-              {filteredConversations.length} preview chats and {messages.length} local messages match "{searchQuery.trim()}"
+              {t('search.filtering', { chatCount: filteredConversations.length, messageCount: messages.length, query: searchQuery.trim() })}
             </div>
           ) : null}
           <div className="pc-chat-list">
@@ -1319,7 +1324,7 @@ export function PrivateChatsPageInteractive() {
                 </button>
               ))
             ) : (
-              <div className="pc-empty">No local preview chats match this search.</div>
+              <div className="pc-empty">{t('sidebar.empty')}</div>
             )}
           </div>
         </aside>
@@ -1330,9 +1335,9 @@ export function PrivateChatsPageInteractive() {
               <Avatar initials={activeConversation.initials} accent={activeConversation.accent} />
               <div className="pc-title">
                 <h2>{activeConversation.name}</h2>
-                <p>{activeConversation.role} - local preview thread</p>
+                <p>{activeConversation.role} - {t('chat.localPreview')}</p>
               </div>
-              <span className="pc-status">Local mock</span>
+              <span className="pc-status">{t('status.localMock')}</span>
             </div>
 
             <div className="pc-actions">
@@ -1342,7 +1347,7 @@ export function PrivateChatsPageInteractive() {
                 onClick={() => setKeyOnly((current) => !current)}
                 type="button"
                 aria-pressed={keyOnly}
-                aria-label="Show key messages only"
+                aria-label={t('header.star')}
               >
                 <Icon name="star" />
               </button>
@@ -1351,22 +1356,22 @@ export function PrivateChatsPageInteractive() {
                 onClick={toggleAttachmentPanel}
                 type="button"
                 aria-expanded={attachmentsOpen}
-                aria-label="Open attachments"
+                aria-label={t('header.attachments')}
               >
                 <Icon name="attach_file" />
               </button>
               <button
                 className="pc-icon-button"
-                onClick={() => showNotice('More actions are local-preview only')}
+                onClick={() => showNotice(t('notice.moreActions'))}
                 type="button"
-                aria-label="More actions"
+                aria-label={t('header.more')}
               >
                 <Icon name="more_horiz" />
               </button>
             </div>
           </header>
 
-          <section className="pc-messages" aria-label="Message thread">
+          <section className="pc-messages" aria-label={t('chat.messagesArea')}>
             {messages.length > 0 ? (
               messages.map((message) => {
                 const isKeyed = keyedMessages.includes(message.id);
@@ -1391,7 +1396,7 @@ export function PrivateChatsPageInteractive() {
                           type="button"
                           aria-pressed={isKeyed}
                         >
-                          {isKeyed ? 'Keyed' : 'Mark key'}
+                          {isKeyed ? t('key.keyed') : t('key.markKey')}
                         </button>
                       </div>
 
@@ -1422,7 +1427,7 @@ export function PrivateChatsPageInteractive() {
                           <div className="pc-code-card">
                             <header>
                               <span>{message.code.file}</span>
-                              <span>snippet</span>
+                              <span>{t('code.snippet')}</span>
                             </header>
                             <pre>
                               {message.code.lines.map((line, index) => (
@@ -1439,10 +1444,10 @@ export function PrivateChatsPageInteractive() {
             ) : (
               <div className="pc-empty">
                 {keyOnly
-                  ? 'No key messages match the current view.'
+                  ? t('messages.empty.keyMessages')
                   : normalizedSearch
-                    ? 'No messages match this search in the selected conversation.'
-                    : 'This local preview thread is empty.'}
+                    ? t('messages.empty.noResults')
+                    : t('messages.empty.threadEmpty')}
               </div>
             )}
           </section>
@@ -1454,18 +1459,18 @@ export function PrivateChatsPageInteractive() {
                 <span className="pc-confirm-actions">
                   {normalizedSearch ? (
                     <button className="pc-chip" onClick={() => setSearchQuery('')} type="button">
-                      Clear search
+                      {t('search.clear')}
                     </button>
                   ) : null}
                   <button className="pc-chip" onClick={() => setNotice(null)} type="button">
-                    Dismiss
+                    {t('notice.dismiss')}
                   </button>
                 </span>
               </div>
             ) : null}
 
             {attachmentsOpen ? (
-              <div className="pc-attachment-tray pc-glass" aria-label="Attachment panel">
+              <div className="pc-attachment-tray pc-glass" aria-label={t('composer.attachmentPanel')}>
                 {attachmentOptions.map((attachment) => {
                   const isSelected = selectedAttachmentIds.includes(attachment.id);
 
@@ -1486,14 +1491,14 @@ export function PrivateChatsPageInteractive() {
             ) : null}
 
             {selectedAttachments.length > 0 ? (
-              <div className="pc-selected-attachments" aria-label="Selected attachments">
+              <div className="pc-selected-attachments" aria-label={t('context.selectedAttachments')}>
                 {selectedAttachments.map((attachment) => (
                   <button
                     className="pc-attachment is-active"
                     key={attachment.id}
                     onClick={() => removeAttachment(attachment.id)}
                     type="button"
-                    aria-label={`Remove ${attachment.name}`}
+                    aria-label={t('attachment.remove', { name: attachment.name })}
                   >
                     <Icon name={attachment.icon} />
                     {attachment.name} - {attachment.detail}
@@ -1508,11 +1513,11 @@ export function PrivateChatsPageInteractive() {
                   className={`pc-tool-button ${attachmentsOpen ? 'is-active' : ''}`}
                   onClick={toggleAttachmentPanel}
                   type="button"
-                  aria-label="Toggle attachment panel"
+                  aria-label={t('composer.attach')}
                 >
                   <Icon name="add" />
                 </button>
-                <button className="pc-tool-button" onClick={insertCodeSnippet} type="button" aria-label="Insert code">
+                <button className="pc-tool-button" onClick={insertCodeSnippet} type="button" aria-label={t('composer.insertCode')}>
                   <Icon name="code" />
                 </button>
                 <button
@@ -1520,17 +1525,17 @@ export function PrivateChatsPageInteractive() {
                   disabled={activeConversation.allMessages.length === 0}
                   onClick={quoteLatestMessage}
                   type="button"
-                  aria-label="Quote selected message"
+                  aria-label={t('composer.quote')}
                 >
                   <Icon name="format_quote" />
                 </button>
               </div>
 
               <textarea
-                aria-label={`Message ${activeConversation.name}`}
+                aria-label={t('composer.messageLabel', { name: activeConversation.name })}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleComposerKeyDown}
-                placeholder="Write a local preview note, paste a code fragment, or attach handoff context..."
+                placeholder={t('composer.placeholder')}
                 value={draft}
               />
 
@@ -1539,13 +1544,13 @@ export function PrivateChatsPageInteractive() {
                   className="pc-tool-button"
                   disabled
                   type="button"
-                  aria-label="Voice note unavailable in local preview"
+                  aria-label={t('composer.voice')}
                 >
                   <Icon name="mic" />
                 </button>
                 <button className="pc-send-button" disabled={!hasComposerContent} onClick={sendDraft} type="button">
                   <Icon name="send" />
-                  Append
+                  {t('composer.send')}
                 </button>
               </div>
             </div>
@@ -1555,17 +1560,17 @@ export function PrivateChatsPageInteractive() {
         <aside className="pc-context-panel pc-panel pc-glass">
           <header className="pc-header pc-context-header">
             <div className="pc-title">
-              <div className="pc-eyebrow">Preview Context</div>
+              <div className="pc-eyebrow">{t('context.title')}</div>
               <h2>{activeConversation.name}</h2>
               <p>
-                {activeConversation.allMessages.length} local messages - {reviewProgress}% reviewed
+                {t('context.review', { count: activeConversation.allMessages.length, progress: reviewProgress })}
               </p>
             </div>
             <button
               className="pc-icon-button"
-              onClick={() => showNotice('Context details stay in this local preview')}
+              onClick={() => showNotice(t('notice.contextDetails'))}
               type="button"
-              aria-label="Open context"
+              aria-label={t('context.open')}
             >
               <Icon name="open_in_new" />
             </button>
@@ -1573,16 +1578,15 @@ export function PrivateChatsPageInteractive() {
 
           <div className="pc-context-body">
             <section className="pc-mini-card">
-              <h3>Review Progress</h3>
+              <h3>{t('context.reviewTitle')}</h3>
               <div className="pc-progress"><span style={{ width: `${reviewProgress}%` }} /></div>
               <p style={{ marginTop: 10 }}>
-                {activeKeyCount} key messages, {activeConversation.currentUnread} unread, and{' '}
-                {localMessages[activeConversation.id]?.length ?? 0} local drafts in this thread. Hub /client/ws and message/session REST are not connected yet.
+                {t('context.reviewDetail', { keyCount: activeKeyCount, unread: activeConversation.currentUnread, drafts: localMessages[activeConversation.id]?.length ?? 0 })}
               </p>
             </section>
 
             <section className="pc-mini-card">
-              <h3>Attachments</h3>
+              <h3>{t('context.attachments')}</h3>
               {activeAttachments.length > 0 ? (
                 <ul>
                   {activeAttachments.map((attachment, index) => (
@@ -1592,17 +1596,17 @@ export function PrivateChatsPageInteractive() {
                   ))}
                 </ul>
               ) : (
-                <p>No linked attachments for this conversation yet.</p>
+                <p>{t('context.noAttachments')}</p>
               )}
             </section>
 
             <section className="pc-mini-card">
-              <h3>Code Snippets</h3>
+              <h3>{t('context.codeSnippets')}</h3>
               {activeCodeBlock ? (
                 <div className="pc-code-card">
                   <header>
                     <span>{activeCodeBlock.file}</span>
-                    <span>local</span>
+                    <span>{t('code.local')}</span>
                   </header>
                   <pre>
                     {activeCodeBlock.lines.map((line, index) => (
@@ -1611,12 +1615,12 @@ export function PrivateChatsPageInteractive() {
                   </pre>
                 </div>
               ) : (
-                <p>No code snippets are linked to this private chat.</p>
+                <p>{t('context.noSnippets')}</p>
               )}
             </section>
 
             <section className="pc-mini-card">
-              <h3>Visible State</h3>
+              <h3>{t('context.tags')}</h3>
               <div className="pc-chip-row">
                 <span className="pc-chip">chat: {activeConversation.name}</span>
                 <span className="pc-chip">attachments: {attachmentsOpen ? 'open' : 'closed'}</span>

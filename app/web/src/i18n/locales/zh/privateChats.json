@@ -1,0 +1,83 @@
+{
+  "brand": {
+    "subtitle": "私聊"
+  },
+  "search": {
+    "ariaLabel": "搜索私聊",
+    "placeholder": "搜索人员、交接、代码片段...",
+    "filtering": "{{chatCount}} 个预览聊天和 {{messageCount}} 条本地消息匹配 \"{{query}}\"",
+    "clear": "清除搜索"
+  },
+  "sidebar": {
+    "title": "模拟会话",
+    "empty": "没有本地预览聊天匹配此搜索。"
+  },
+  "chat": {
+    "localPreview": "本地预览线程",
+    "messagesArea": "消息线程"
+  },
+  "status": {
+    "localMock": "本地模拟"
+  },
+  "header": {
+    "star": "仅显示关键消息",
+    "attachments": "打开附件",
+    "more": "更多操作"
+  },
+  "messages": {
+    "empty": {
+      "keyMessages": "当前视图没有匹配的关键消息。",
+      "noResults": "所选会话中没有匹配此搜索的消息。",
+      "threadEmpty": "此本地预览线程为空。"
+    }
+  },
+  "key": {
+    "markKey": "标记为关键",
+    "keyed": "已标记"
+  },
+  "code": {
+    "snippet": "代码片段",
+    "local": "本地"
+  },
+  "composer": {
+    "placeholder": "编写本地预览笔记、粘贴代码片段或附加交接上下文...",
+    "attach": "切换附件面板",
+    "insertCode": "插入代码",
+    "quote": "引用所选消息",
+    "messageLabel": "发送消息给 {{name}}",
+    "voice": "本地预览中语音备注不可用",
+    "send": "追加",
+    "attachmentPanel": "附件面板"
+  },
+  "context": {
+    "title": "预览上下文",
+    "review": "{{count}} 条本地消息 - 已审查 {{progress}}%",
+    "open": "打开上下文",
+    "reviewTitle": "审查进度",
+    "reviewDetail": "{{keyCount}} 条关键消息、{{unread}} 条未读和 {{drafts}} 条本地草稿在此线程中。Hub /client/ws 和 message/session REST 尚未连接。",
+    "attachments": "附件",
+    "noAttachments": "此会话暂无关联附件。",
+    "codeSnippets": "代码片段",
+    "noSnippets": "此私聊没有关联的代码片段。",
+    "tags": "可见状态",
+    "selectedAttachments": "已选附件"
+  },
+  "attachment": {
+    "remove": "移除 {{name}}"
+  },
+  "notice": {
+    "markedRead": "{{name}} 已标记为已读",
+    "selected": "已选择 {{name}}",
+    "removed": "已移除 {{name}}",
+    "attachmentRemoved": "{{name}} 已移除",
+    "markKey": "已标记为关键: {{author}}",
+    "removeKey": "已取消关键标记: {{author}}",
+    "codeInserted": "代码块已插入到本地草稿",
+    "quoted": "已引用 {{author}} 的最新上下文",
+    "draftAdded": "本地草稿已追加到此预览线程",
+    "emptyMessage": "请先编写消息或选择附件再发送",
+    "moreActions": "更多操作仅限本地预览",
+    "contextDetails": "上下文详情仅保留在本地预览中",
+    "dismiss": "忽略"
+  }
+}
