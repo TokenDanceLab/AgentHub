@@ -956,6 +956,10 @@ pnpm typecheck                                         # 零错误
 | 69 | 删除 tracked Desktop bundle analyzer 输出 | `.gitignore` | `app/desktop/stats.html` |
 | 114 | dev/smoke 脚本更新（runner 已移除） | `scripts/client-smoke.ps1` | 更新引用 |
 
+**2026-05-26 Worker A CI 定位记录**：
+- PR #199 合入后 `Cross-platform build (windows-latest)` 红灯定位到 `edge-server/internal/lifecycle` 的 `TestProcessExecutorPublishesOutputAndFinished`：Windows runner 实际 stdout 为 `"stdout chunk\n"`，测试期望包含动态 `run=run_TestProcessExecutorPublishesOutputAndFinished_...`。
+- 同一 run 的 go-edge、go-hub、ubuntu/macOS cross-build、frontend、validate 均通过；该问题属于 Edge Go 后端测试跨平台断言/命令输出差异，不在本轮 `api/**`、`docs/**`、`app/shared/**` 修复范围内，后续由 Edge/CI worker 在 `edge-server/internal/lifecycle/process_executor_test.go` 或 CI Windows 命令路径收口。
+
 **验收**：
 - CI 全绿
 - `git status` 无 tracked build artifacts
