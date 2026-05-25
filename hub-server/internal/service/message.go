@@ -644,6 +644,13 @@ func (s *MessageService) MarkRead(ctx context.Context, userID, sessionID string,
 		return errcode.SessionNotMember
 	}
 
+	member, err := repository.GetActiveMember(s.db, sessionID, model.MemberTypeUser, userID)
+	if err != nil {
+		return err
+	}
+	if lastReadSeq <= member.LastReadSeq {
+		return nil
+	}
 	if err := repository.UpdateLastReadSeq(s.db, sessionID, userID, lastReadSeq); err != nil {
 		return err
 	}
