@@ -13,6 +13,7 @@ import (
 	"github.com/coder/websocket"
 )
 
+// Conn represents a single WebSocket connection tracked by the Manager.
 type Conn struct {
 	ID         string
 	UserID     string
@@ -22,6 +23,11 @@ type Conn struct {
 	Send       chan []byte
 	missedPong atomic.Int32
 	mu         sync.Mutex
+
+	// closed is set atomically before the Send channel is closed.  PushToConn
+	// checks this flag as a best-effort guard against sending on a closed
+	// channel; a recover() inside PushToConn provides a hard safety net.
+	closed atomic.Bool
 }
 
 func (c *Conn) SetAuth(userID, deviceType, deviceID string) {
@@ -32,10 +38,24 @@ func (c *Conn) SetAuth(userID, deviceType, deviceID string) {
 	c.DeviceID = deviceID
 }
 
+// Close closes the underlying WebSocket connection. It is safe to call
+// multiple times and tolerates a nil *websocket.Conn (useful in tests).
 func (c *Conn) Close() {
-	c.W.Close(websocket.StatusNormalClosure, "")
+	if c.W != nil {
+		c.W.Close(websocket.StatusNormalClosure, "")
+	}
 }
 
+// closeSend closes the Send channel exactly once and marks the connection as
+// closed so PushToConn can avoid a panic on closed-channel send.
+func (c *Conn) closeSend() {
+	if c.closed.CompareAndSwap(false, true) {
+		close(c.Send)
+	}
+}
+
+// Manager is the global WebSocket connection registry. It tracks connections
+// by ID and per-user device type.
 type Manager struct {
 	OnRouteSet     func(userID, deviceType, connID, oldConnID string, wasOffline bool)
 	OnRouteDel     func(userID, deviceType, connID string)
@@ -121,6 +141,9 @@ func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) {
 	}
 }
 
+// Unregister removes a connection from the registry and closes its Send
+// channel. It is safe to call multiple times (idempotent); after a
+// connection has been removed, subsequent calls are no-ops.
 func (m *Manager) Unregister(connID string) {
 	m.mu.Lock()
 	c, ok := m.conns[connID]
@@ -148,10 +171,13 @@ func (m *Manager) Unregister(connID string) {
 		m.OnRouteDel(userID, deviceType, connIDForDel)
 	}
 
-	close(c.Send)
+	c.closeSend()
 	slog.Info("ws disconnected", "conn_id", connID, "user_id", c.UserID)
 }
 
+// PushToConn sends a frame to a single connection.  It protects against
+// sending on a closed channel via a recover safety net, so callers never
+// panic even during shutdown races.
 func (m *Manager) PushToConn(connID string, frame Frame) {
 	m.mu.RLock()
 	c, ok := m.conns[connID]
@@ -159,10 +185,23 @@ func (m *Manager) PushToConn(connID string, frame Frame) {
 	if !ok {
 		return
 	}
+	if c.closed.Load() {
+		return
+	}
 	data, err := frame.Marshal()
 	if err != nil {
 		return
 	}
+
+	// recover catches the race where closeSend() is called between the
+	// c.closed.Load() check above and the channel send below.
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Warn("ws push recovered from closed-channel send",
+				"conn_id", connID, "recover", r)
+		}
+	}()
+
 	select {
 	case c.Send <- data:
 	default:
@@ -235,13 +274,17 @@ func (m *Manager) StartHeartbeat() {
 	}()
 }
 
-// Shutdown closes all WebSocket connections and clears the internal maps.
-// Call after the HTTP server has stopped accepting new connections.
+// Shutdown closes all WebSocket connections and cleans up internal state.
+// It closes each connection's Send channel first (unblocking writeLoop
+// goroutines), then closes the WebSocket connection (unblocking readLoop
+// goroutines), and finally clears the registry maps.  This ensures that
+// all connection-scoped goroutines will eventually exit rather than leak.
 func (m *Manager) Shutdown() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for id, c := range m.conns {
-		c.Close()
+		c.closeSend() // Unblock writeLoop goroutine (blocks on <-c.Send)
+		c.Close()     // Unblock readLoop goroutine (blocks on Read)
 		delete(m.conns, id)
 	}
 	m.byUser = make(map[string]map[string]string)
