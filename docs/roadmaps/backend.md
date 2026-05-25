@@ -16,7 +16,7 @@
 
 围绕 Hub-Edge-Runner 主线，先把 Hub / Edge 的接口边界和同步模型写稳，再逐步实现服务。
 
-## 近期任务
+## 下一阶段任务
 
 - [ ] 补齐 Hub Server health、device registry、sync 占位接口。
 - [ ] 明确 Edge-Hub event ack 和断线恢复字段。
