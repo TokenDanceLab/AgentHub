@@ -14,6 +14,9 @@ type RunProcessContext struct {
 	Model   string // Model override
 	WorkDir string // Working directory
 
+	// Hub callback bridging
+	HubTaskID string // Hub agent task ID (for Edge→Hub direct callbacks)
+
 	// Session continuity
 	SessionID    string // Specific session to resume
 	ContinueLast bool   // Resume most recent session
