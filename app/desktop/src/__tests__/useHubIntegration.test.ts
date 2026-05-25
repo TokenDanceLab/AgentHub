@@ -50,11 +50,13 @@ const hoisted = vi.hoisted(() => {
     },
     removeTask: (taskId: string) => {
       const task = storeTasks.find((t) => t.taskId === taskId);
-      storeTasks = storeTasks.filter((t) => t.taskId !== taskId);
       if (task?.runId) {
         const next = { ...storeRunToTask };
         delete next[task.runId];
         storeRunToTask = next;
+      }
+      if (task?.status !== 'done' && task?.status !== 'failed') {
+        storeTasks = storeTasks.filter((t) => t.taskId !== taskId);
       }
     },
     getActiveTasks: () => storeTasks.filter((t) => t.status === 'queued' || t.status === 'running'),
@@ -318,6 +320,29 @@ describe('useHubIntegration', () => {
     expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'done', 'run-1');
   });
 
+  it('calls doneTask on run.finished when adapter result is absent', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.finished', { runId: 'run-1', output: 'finished output' }));
+    });
+
+    expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'finished output', 'run-1');
+    expect(hoisted.storeTasks).toEqual([
+      expect.objectContaining({
+        taskId: 'task-1',
+        status: 'done',
+      }),
+    ]);
+    expect(hoisted.storeRunToTask).toEqual({});
+  });
+
   it('calls failTask on failed run.agent.result', async () => {
     renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),
@@ -362,6 +387,29 @@ describe('useHubIntegration', () => {
     });
 
     expect(hubClient.streamTask).not.toHaveBeenCalled();
+  });
+
+  it('keeps terminal task records after result while clearing run mapping', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true, content: 'done' }));
+    });
+
+    expect(hoisted.storeTasks).toEqual([
+      expect.objectContaining({
+        taskId: 'task-1',
+        runId: 'run-1',
+        status: 'done',
+      }),
+    ]);
+    expect(hoisted.storeRunToTask).toEqual({});
   });
 
   // ── Hub cancel → Edge cancel ────────────────────────

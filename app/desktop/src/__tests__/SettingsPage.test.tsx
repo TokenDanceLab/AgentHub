@@ -10,6 +10,7 @@ import type { AgentTask } from '@/stores/taskBridgeStore';
 
 const {
   mockAgents,
+  mockAgentTasks,
   mockCancelRun,
   mockCustomAgents,
   mockFriendRequests,
@@ -25,6 +26,7 @@ const {
   mockUseHealthState,
 } = vi.hoisted(() => ({
   mockAgents: [] as AgentInfo[],
+  mockAgentTasks: [] as Record<string, unknown>[],
   mockCancelRun: vi.fn(),
   mockCustomAgents: [] as Record<string, unknown>[],
   mockFriendRequests: [] as Record<string, unknown>[],
@@ -41,6 +43,8 @@ const {
     listFriendRequests: vi.fn(),
     listNotifications: vi.fn(),
     listCustomAgents: vi.fn(),
+    listAgentTasks: vi.fn(),
+    registerDevice: vi.fn(),
   },
   mockHubStoreState: {
     authenticated: true,
@@ -152,6 +156,7 @@ function renderSettings(initialSection: ComponentProps<typeof SettingsPage>['ini
 describe('SettingsPage tasks', () => {
   beforeEach(() => {
     mockAgents.splice(0, mockAgents.length);
+    mockAgentTasks.splice(0, mockAgentTasks.length);
     mockCustomAgents.splice(0, mockCustomAgents.length);
     mockFriendRequests.splice(0, mockFriendRequests.length);
     mockNotifications.splice(0, mockNotifications.length);
@@ -165,11 +170,15 @@ describe('SettingsPage tasks', () => {
     mockHubClient.listFriendRequests.mockReset();
     mockHubClient.listNotifications.mockReset();
     mockHubClient.listCustomAgents.mockReset();
+    mockHubClient.listAgentTasks.mockReset();
+    mockHubClient.registerDevice.mockReset();
     mockHubClient.listContacts.mockImplementation(async () => mockContacts);
     mockHubClient.listSessions.mockImplementation(async () => mockSessions);
     mockHubClient.listFriendRequests.mockImplementation(async () => mockFriendRequests);
     mockHubClient.listNotifications.mockImplementation(async () => mockNotifications);
     mockHubClient.listCustomAgents.mockImplementation(async () => mockCustomAgents);
+    mockHubClient.listAgentTasks.mockImplementation(async () => mockAgentTasks);
+    mockHubClient.registerDevice.mockImplementation(async () => ({ id: 'dev-1' }));
     mockHubStoreState.authenticated = true;
     mockHubStoreState.username = 'TokenDance User';
     Object.assign(mockHubAuthState, {
@@ -198,7 +207,7 @@ describe('SettingsPage tasks', () => {
     useModelSettingsStore.getState().reset();
   });
 
-  it('renders local runs and bridged Hub tasks', () => {
+  it('renders local runs, Hub task snapshot, and bridged Hub tasks', async () => {
     mockRuns.splice(0, mockRuns.length, {
       runId: 'run_1234567890abcdef',
       projectId: 'proj_local',
@@ -217,6 +226,15 @@ describe('SettingsPage tasks', () => {
       dispatchPayload: {},
       createdAt: '2026-05-25T01:02:00Z',
     });
+    mockAgentTasks.splice(0, mockAgentTasks.length, {
+      task_id: 'task_hub_snapshot_1',
+      agent_id: 'agent-hub',
+      prompt: 'Snapshot from Hub listAgentTasks',
+      session_id: 'thread_hub',
+      edge_run_id: 'run_hub_snapshot_1',
+      status: 'running',
+      created_at: '2026-05-25T01:03:00Z',
+    });
 
     renderSettings('tasks');
 
@@ -225,6 +243,8 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('proj_local / thread_local')).toBeInTheDocument();
     expect(screen.getByText('Dispatch from TokenDance Hub')).toBeInTheDocument();
     expect(screen.getByText('agent-codex')).toBeInTheDocument();
+    expect(await screen.findByText('Snapshot from Hub listAgentTasks')).toBeInTheDocument();
+    expect(mockHubClient.listAgentTasks).toHaveBeenCalled();
   });
 
   it('refreshes and cancels active local runs from the task panel', () => {
@@ -293,6 +313,89 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('settings.schedulerRouteLocal')).toBeInTheDocument();
     expect(screen.getByText('settings.schedulerPolicyModelMapping')).toBeInTheDocument();
     expect(screen.getByText('settings.schedulerGuard')).toBeInTheDocument();
+  });
+
+  it('renders Online IM from Hub snapshot without contract placeholder state', async () => {
+    mockContacts.splice(0, mockContacts.length, {
+      user_id: 'friend-1',
+      username: 'alice',
+      nickname: 'Alice',
+      online: true,
+      type: 'friend',
+    });
+    mockSessions.splice(0, mockSessions.length, {
+      session_id: 'sess-im-1',
+      type: 'private',
+      name: 'Alice DM',
+      member_count: 2,
+      updated_at: '2026-05-25T01:04:00Z',
+    });
+    mockFriendRequests.splice(0, mockFriendRequests.length, {
+      request_id: 'fr-1',
+      user_id: 'friend-2',
+      username: 'bob',
+      nickname: 'Bob',
+      message: 'hi',
+      created_at: '2026-05-25T01:05:00Z',
+    });
+    mockNotifications.splice(0, mockNotifications.length, {
+      id: 'notif-1',
+      title: 'Mention',
+      created_at: '2026-05-25T01:06:00Z',
+    });
+
+    renderSettings('onlineIm');
+
+    expect(await screen.findByText('Alice DM')).toBeInTheDocument();
+    expect(screen.getByText('settings.onlineImSnapshot')).toBeInTheDocument();
+    expect(screen.queryByText('settings.contractPending')).not.toBeInTheDocument();
+    expect(mockHubClient.listContacts).toHaveBeenCalled();
+    expect(mockHubClient.listSessions).toHaveBeenCalled();
+    expect(mockHubClient.listFriendRequests).toHaveBeenCalled();
+    expect(mockHubClient.listNotifications).toHaveBeenCalledWith({ limit: 20 });
+  });
+
+  it('locks Online IM while signed out and skips Hub snapshot calls', () => {
+    mockHubStoreState.authenticated = false;
+    Object.assign(mockHubAuthState, {
+      token: null,
+      refreshToken: null,
+      user: null,
+      isAuthenticated: false,
+    });
+
+    renderSettings('onlineIm');
+
+    expect(screen.getByText('settings.hubSignInRequired')).toBeInTheDocument();
+    expect(screen.getAllByText('settings.onlineImSignedOutDesc').length).toBeGreaterThan(0);
+    expect(mockHubClient.listContacts).not.toHaveBeenCalled();
+    expect(mockHubClient.listSessions).not.toHaveBeenCalled();
+  });
+
+  it('renders Group Chat from real Hub group sessions', async () => {
+    mockSessions.splice(
+      0,
+      mockSessions.length,
+      {
+        session_id: 'sess-group-1',
+        type: 'group',
+        name: 'Build Room',
+        member_count: 3,
+        updated_at: '2026-05-25T01:04:00Z',
+      },
+      {
+        session_id: 'sess-private-1',
+        type: 'private',
+        name: 'Alice DM',
+        member_count: 2,
+      },
+    );
+
+    renderSettings('groupChat');
+
+    expect(await screen.findByText('Build Room')).toBeInTheDocument();
+    expect(screen.getByText('settings.groupChatHubRooms')).toBeInTheDocument();
+    expect(screen.queryByText('settings.contractPending')).not.toBeInTheDocument();
   });
 
   it('renders runtime inventory separately from profile composition', () => {
@@ -494,7 +597,7 @@ describe('SettingsPage tasks', () => {
     expect(screen.queryByText('settings.statusReady')).not.toBeInTheDocument();
   });
 
-  it('renders account identity boundary from Hub session and local device state', () => {
+  it('renders account identity boundary from Hub session and registered device state', async () => {
     localStorage.setItem('agenthub_device_id', '00000000-0000-0000-0000-00000000a001');
     sessionStorage.setItem('td_code_verifier', 'verifier');
     sessionStorage.setItem('td_state', 'state');
@@ -504,11 +607,15 @@ describe('SettingsPage tasks', () => {
     expect(screen.getAllByText('TokenDance User').length).toBeGreaterThan(0);
     expect(screen.getAllByText('settings.hubSession').length).toBeGreaterThan(0);
     expect(screen.getByText('settings.desktopDevice')).toBeInTheDocument();
+    expect((await screen.findAllByText('settings.deviceStatus.registered')).length).toBeGreaterThan(0);
     expect(screen.getByText('00000000...a001')).toBeInTheDocument();
     expect(screen.getByText('settings.identityBoundary')).toBeInTheDocument();
     expect(screen.getByText('settings.authTokenSource')).toBeInTheDocument();
     expect(screen.getByText('settings.deviceProof')).toBeInTheDocument();
-    expect(screen.getByText('settings.localOnly')).toBeInTheDocument();
+    expect(mockHubClient.registerDevice).toHaveBeenCalledWith({
+      device_id: '00000000-0000-0000-0000-00000000a001',
+      app_version: expect.any(String),
+    });
     expect(screen.getByText('settings.accountGuard')).toBeInTheDocument();
   });
 

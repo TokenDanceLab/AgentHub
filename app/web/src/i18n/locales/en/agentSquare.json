@@ -53,7 +53,7 @@
   "source.loading": "Loading Hub catalog",
   "source.catalogMock": "Catalog/mock fallback",
   "source.catalogFallbackDetail": "Hub did not return custom agents, so this page is showing the labeled catalog/mock fallback.",
-  "source.loginRequiredDetail": "No Web Hub session is available. Showing the labeled catalog/mock fallback instead of pretending Hub sync succeeded.",
+  "source.loginRequiredDetail": "No Web Hub session is available. Showing the labeled catalog/mock fallback.",
   "source.errorDetail": "Hub custom agents are unavailable: {{error}}. Showing the labeled catalog/mock fallback.",
 
   "card.details": "Details",
