@@ -1412,6 +1412,182 @@ func TestRefreshTokenRepo_Revoke(t *testing.T) {
 }
 
 // =============================================================================
+// B2 data-integrity tests — atomic status, password+token, pin limit
+// =============================================================================
+
+func TestPendingTaskRepo_AtomicStatusUpdate(t *testing.T) {
+	db := setupSQLite(t)
+
+	expireAt := time.Now().Add(time.Hour)
+	task := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-atomic",
+		TriggeredByUserID: "user-t",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusDispatched,
+		ExpireAt:          expireAt,
+	}
+	require.NoError(t, CreatePendingTask(db, task))
+
+	// Atomic transition: dispatched → running (should succeed)
+	rows, err := UpdatePendingTaskStatusAtomic(db, task.ID, model.TaskStatusDispatched, model.TaskStatusRunning, "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+
+	fetched, err := GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusRunning, fetched.Status)
+
+	// Atomic transition with wrong old status (should fail — 0 rows)
+	rows, err = UpdatePendingTaskStatusAtomic(db, task.ID, model.TaskStatusDispatched, model.TaskStatusDone, "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rows, "should not transition from running when oldStatus is dispatched")
+
+	// Verify status unchanged
+	fetched, err = GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusRunning, fetched.Status)
+
+	// Atomic transition: running → done (should succeed)
+	rows, err = UpdatePendingTaskStatusAtomic(db, task.ID, model.TaskStatusRunning, model.TaskStatusDone, "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+
+	fetched, err = GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusDone, fetched.Status)
+	assert.NotNil(t, fetched.FinishedAt)
+}
+
+func TestPendingTaskRepo_AtomicWithEdgeRunID(t *testing.T) {
+	db := setupSQLite(t)
+
+	expireAt := time.Now().Add(time.Hour)
+	task := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-edge",
+		TriggeredByUserID: "user-t",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusDispatched,
+		ExpireAt:          expireAt,
+	}
+	require.NoError(t, CreatePendingTask(db, task))
+
+	// Atomic: dispatched → running with edgeRunID
+	rows, err := UpdatePendingTaskStatusAtomicWithEdgeRunID(db, task.ID, model.TaskStatusDispatched, model.TaskStatusRunning, "", "run-001")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+
+	fetched, err := GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusRunning, fetched.Status)
+	assert.Equal(t, "run-001", fetched.EdgeRunID)
+
+	// Non-atomic edgeRunID update on an already empty edgeRunID
+	// (after clearing it for test, we verify that duplicating calls is a no-op)
+	err = UpdatePendingTaskEdgeRunID(db, task.ID, "run-002")
+	// edge_run_id is already "run-001" so WHERE edge_run_id = '' matches 0 rows
+	assert.NoError(t, err)
+	fetched, err = GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "run-001", fetched.EdgeRunID, "edgeRunID should not be overwritten")
+}
+
+func TestPendingTaskRepo_AtomicFailClosed(t *testing.T) {
+	db := setupSQLite(t)
+
+	expireAt := time.Now().Add(time.Hour)
+	task := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-failclosed",
+		TriggeredByUserID: "user-t",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusRunning,
+		ExpireAt:          expireAt,
+	}
+	require.NoError(t, CreatePendingTask(db, task))
+
+	// Simulate a race: first writer marks it done
+	rows, err := UpdatePendingTaskStatusAtomic(db, task.ID, model.TaskStatusRunning, model.TaskStatusDone, "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+
+	// Second writer tries to mark it failed — 0 rows (fail closed)
+	rows, err = UpdatePendingTaskStatusAtomic(db, task.ID, model.TaskStatusRunning, model.TaskStatusFailed, "boom")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rows, "second writer should get 0 rows affected")
+
+	// Status should remain done
+	fetched, err := GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusDone, fetched.Status)
+}
+
+func TestUserRepo_UpdatePasswordAndRevokeTokens(t *testing.T) {
+	db := setupSQLite(t)
+
+	// Create user
+	user := &model.User{Username: "pwuser", PasswordHash: "old-hash", Nickname: "PW"}
+	require.NoError(t, CreateUser(db, user))
+
+	// Create a couple of refresh tokens
+	rt1 := &model.RefreshToken{
+		UserID: user.ID, DeviceType: "desktop", DeviceID: "dev-1",
+		TokenHash: "hash1", ExpiresAt: time.Now().Add(time.Hour),
+	}
+	rt2 := &model.RefreshToken{
+		UserID: user.ID, DeviceType: "mobile", DeviceID: "dev-2",
+		TokenHash: "hash2", ExpiresAt: time.Now().Add(time.Hour),
+	}
+	require.NoError(t, UpsertRefreshToken(db, rt1))
+	require.NoError(t, UpsertRefreshToken(db, rt2))
+
+	// Atomic: update password + revoke all tokens
+	err := UpdatePasswordAndRevokeTokens(db, user.ID, "new-hash")
+	require.NoError(t, err)
+
+	// Verify password updated
+	fetchedUser, err := GetUserByID(db, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "new-hash", fetchedUser.PasswordHash)
+
+	// Verify all tokens revoked
+	rt1Check, err := FindRefreshTokenByHash(db, "hash1")
+	require.NoError(t, err)
+	assert.True(t, rt1Check.Revoked)
+
+	rt2Check, err := FindRefreshTokenByHash(db, "hash2")
+	require.NoError(t, err)
+	assert.True(t, rt2Check.Revoked)
+}
+
+func TestMessageRepo_PinMessageAtomic(t *testing.T) {
+	db := setupSQLite(t)
+
+	s := &model.Session{Type: model.SessionTypeGroup, Name: "pin-test"}
+	require.NoError(t, CreateSession(db, s))
+
+	pin := func(msgID, userID string) error {
+		return PinMessageAtomic(db, &model.MessagePin{
+			SessionID:      s.ID,
+			MessageID:      msgID,
+			PinnedByUserID: userID,
+		}, 3) // low limit for testing
+	}
+
+	// Pin 3 messages — all should succeed
+	require.NoError(t, pin("msg-1", "user-1"))
+	require.NoError(t, pin("msg-2", "user-1"))
+	require.NoError(t, pin("msg-3", "user-1"))
+
+	// 4th pin should fail with limit exceeded
+	err := pin("msg-4", "user-1")
+	assert.ErrorIs(t, err, ErrPinLimitExceeded)
+
+	// Verify count
+	count, err := CountPinsBySession(db, s.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), count)
+}
+
+// =============================================================================
 // Helpers
 // =============================================================================
 

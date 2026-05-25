@@ -257,10 +257,10 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID, oldPassword, n
 		return err
 	}
 
-	if err := repository.UpdatePassword(s.db, userID, string(hash)); err != nil {
+	if err := repository.UpdatePasswordAndRevokeTokens(s.db, userID, string(hash)); err != nil {
 		return err
 	}
 
 	resolveAuthCache(s.cacheClient).Invalidate(ctx, "user:profile:"+userID)
-	return repository.RevokeAllUserTokens(s.db, userID)
+	return nil
 }
