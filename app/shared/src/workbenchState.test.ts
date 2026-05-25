@@ -210,6 +210,37 @@ describe('workbenchReducer', () => {
     });
   });
 
+  it('handles cancelled runs and truncated batched stderr output', () => {
+    const state = reduceEvents([
+      event(1, 'run.queued', {
+        runId: 'run-1',
+        projectId: 'proj-1',
+        threadId: 'thread-1',
+      }),
+      event(2, 'run.output.batch', {
+        runId: 'run-1',
+        stream: 'stderr',
+        chunks: [{ offset: 0, text: 'partial error' }],
+        truncated: true,
+        bytesWritten: 4194304,
+        message: 'run output truncated after 4194304 bytes',
+      }),
+      event(3, 'run.cancelled', {
+        runId: 'run-1',
+        finishedAt: '2026-05-24T10:02:00.000Z',
+      }),
+    ]);
+
+    expect(state.runs[0]).toMatchObject({
+      runId: 'run-1',
+      status: 'cancelled',
+      finishedAt: '2026-05-24T10:02:00.000Z',
+    });
+    expect(state.runLogs['run-1']?.stdout).toBe('');
+    expect(state.runLogs['run-1']?.stderr).toContain('partial error');
+    expect(state.runLogs['run-1']?.stderr).toContain('output truncated');
+  });
+
   it('keeps event state when a stale snapshot arrives after events', () => {
     const eventState = reduceEvents([
       event(1, 'message.created', {

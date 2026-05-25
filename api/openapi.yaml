@@ -17,6 +17,8 @@ info:
     `/client/messages`, `/edge/*`, `/web/*` endpoints are implemented. Additional routes
     exist in code but are not yet documented here (~36 routes for session members,
     message pins, attachments, notifications, custom agents, contacts search/block).
+    Implemented Hub REST endpoints wrap successful bodies as `{ code: "OK", data: ... }`
+    and errors as `{ code, message }`; frontend shared helpers unwrap this envelope.
     The legacy `/v1/auth`, `/v1/users`, `/v1/contacts` paths are planned for future
     migration and not currently implemented.
 
