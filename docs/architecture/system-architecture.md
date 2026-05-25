@@ -80,7 +80,7 @@ UI 中的“运行位置”必须显示 Target、设备、工作目录、在线�
 
 ### 2.4 TokenDance ID、鉴权和安全审计
 
-TokenDance ID 是跨端身份入口；Hub 本地 session 是 AgentHub 的产品会话。最终浏览器/桌面登录应由 Hub Server 完成 TokenDance ID OIDC code exchange、验证 issuer/audience、映射 `tokendance_sub` 到 Hub user，再签发 Hub access/refresh session。现有 TokenDance bearer-token middleware 只是身份兼容路径，验证通过后标记为 `tokendance_bearer`，不能替代完整 Hub session，也不能满足 `/edge` 的 `desktop` 设备门禁。
+TokenDance ID 是跨端身份入口；Hub 本地 session 是 AgentHub 的产品会话。Hub Server 已提供 `POST /client/auth/oidc/authorize` 和 `POST /client/auth/oidc/callback` 完成 TokenDance ID OIDC code exchange、issuer/audience/JWKS 校验、`tokendance_sub` 到 Hub user 映射，以及 Hub access/refresh session 与 UUID device proof 签发。现有 TokenDance bearer-token middleware 只是身份兼容路径，验证通过后标记为 `tokendance_bearer`，不能替代完整 Hub session，也不能满足 `/edge` 的 `desktop` 设备门禁。
 
 安全审计必须覆盖：
 

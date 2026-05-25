@@ -354,7 +354,7 @@ type OIDCService struct {
 1. `GenerateAuthorizationURL(ctx, codeChallenge, codeChallengeMethod, deviceType, deviceID) (state, url, error)`
    - 生成 32 字节随机 state
    - 保存到 Redis：`state:{state}` → `{codeChallenge, deviceType, deviceID, createdAt}`，TTL 10min
-   - 构造 TokenDance ID `/oidc/auth` URL
+   - 构造 TokenDance ID `/oidc/authorize` URL
    - 返回 state 和完整 authorization_url
 
 2. `HandleCallback(ctx, code, state, codeVerifier, deviceType, deviceID) (accessToken, refreshToken, user, error)`

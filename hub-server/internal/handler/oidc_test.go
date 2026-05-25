@@ -38,7 +38,7 @@ func TestOIDCHandler_PostOIDCAuthorize_Success(t *testing.T) {
 		"code_challenge":        "challenge123",
 		"code_challenge_method": "S256",
 		"device_type":           "desktop",
-		"device_id":             "dev-1",
+		"device_id":             testDeviceID,
 	})
 	h.PostOIDCAuthorize(c)
 
@@ -73,6 +73,58 @@ func TestOIDCHandler_PostOIDCAuthorize_MissingFields(t *testing.T) {
 	}
 }
 
+func TestOIDCHandler_PostOIDCAuthorize_InvalidDeviceIDDoesNotCallService(t *testing.T) {
+	called := false
+	svc := &mockOIDCService{
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID string) (*service.AuthorizationResult, error) {
+			called = true
+			return &service.AuthorizationResult{State: "bad", AuthorizationURL: "https://id.example/oidc/authorize"}, nil
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/oidc/authorize", map[string]string{
+		"code_challenge":        "challenge123",
+		"code_challenge_method": "S256",
+		"device_type":           "desktop",
+		"device_id":             "not-a-uuid",
+	})
+	h.PostOIDCAuthorize(c)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if called {
+		t.Fatal("service should not be called for malformed device_id")
+	}
+}
+
+func TestOIDCHandler_PostOIDCAuthorize_InvalidDeviceTypeDoesNotCallService(t *testing.T) {
+	called := false
+	svc := &mockOIDCService{
+		authorizeFn: func(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID string) (*service.AuthorizationResult, error) {
+			called = true
+			return &service.AuthorizationResult{State: "bad", AuthorizationURL: "https://id.example/oidc/authorize"}, nil
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/oidc/authorize", map[string]string{
+		"code_challenge":        "challenge123",
+		"code_challenge_method": "S256",
+		"device_type":           "tokendance_bearer",
+		"device_id":             testDeviceID,
+	})
+	h.PostOIDCAuthorize(c)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if called {
+		t.Fatal("service should not be called for invalid device_type")
+	}
+}
+
 func TestOIDCHandler_PostOIDCCallback_Success(t *testing.T) {
 	svc := &mockOIDCService{
 		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID string) (*service.CallbackResult, error) {
@@ -91,7 +143,7 @@ func TestOIDCHandler_PostOIDCCallback_Success(t *testing.T) {
 		"state":         "state-123",
 		"code_verifier": "verifier",
 		"device_type":   "desktop",
-		"device_id":     "dev-1",
+		"device_id":     testDeviceID,
 	})
 	h.PostOIDCCallback(c)
 
@@ -104,6 +156,33 @@ func TestOIDCHandler_PostOIDCCallback_Success(t *testing.T) {
 	}
 	if !contains(w.Body.String(), "access-token-xxx") {
 		t.Fatalf("expected response to contain access token, got %s", w.Body.String())
+	}
+}
+
+func TestOIDCHandler_PostOIDCCallback_InvalidDeviceIDDoesNotCallService(t *testing.T) {
+	called := false
+	svc := &mockOIDCService{
+		callbackFn: func(ctx context.Context, code, state, codeVerifier, deviceType, deviceID string) (*service.CallbackResult, error) {
+			called = true
+			return &service.CallbackResult{AccessToken: "bad"}, nil
+		},
+	}
+	h := handler.NewOIDCHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/auth/oidc/callback", map[string]string{
+		"code":          "auth-code",
+		"state":         "state-123",
+		"code_verifier": "verifier",
+		"device_type":   "desktop",
+		"device_id":     "not-a-uuid",
+	})
+	h.PostOIDCCallback(c)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if called {
+		t.Fatal("service should not be called for malformed device_id")
 	}
 }
 
@@ -120,7 +199,7 @@ func TestOIDCHandler_PostOIDCCallback_InvalidState(t *testing.T) {
 		"state":         "bad-state",
 		"code_verifier": "verifier",
 		"device_type":   "desktop",
-		"device_id":     "dev-1",
+		"device_id":     testDeviceID,
 	})
 	h.PostOIDCCallback(c)
 

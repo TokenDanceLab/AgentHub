@@ -241,12 +241,12 @@ Docker 和部署文件跟随所属模块放置。根级 compose 只用于跨模�
 
 ## TokenDance ID 鉴权边界
 
-TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产品会话。最终浏览器/桌面登录必须由 Hub Server 作为 TokenDance ID relying party 完成 OIDC Authorization Code + PKCE 的 code exchange、验证 ID token 的 issuer/audience/JWKS、把 `tokendance_sub` 映射到 Hub user，再签发 Hub 本地 access/refresh session。
+TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产品会话。Hub Server 已提供 TokenDance ID relying-party 登录交换：`POST /client/auth/oidc/authorize` 生成 PKCE 授权 URL 和一次性 state，`POST /client/auth/oidc/callback` 完成 code exchange、验证 ID token 的 issuer/audience/JWKS、把 `tokendance_sub` 映射到 Hub user，再签发 Hub 本地 access/refresh session。
 
 | 项 | 当前边界 |
 |---|---|
 | TokenDance ID | 统一第三方登录和账号主体；产品不直接集成 GitHub/Google/飞书 |
-| Hub Server | 拥有 Hub callback、code exchange、Hub user 映射、Hub access/refresh session 和设备证明 |
+| Hub Server | 拥有 Hub OIDC authorize/callback exchange、Hub user 映射、Hub access/refresh session 和 UUID device proof |
 | Desktop/Web | 打开系统浏览器或 Web 登录入口，保存 Hub session；不保存第三方 provider token |
 | 兼容 bearer 路径 | `hub-server/internal/middleware/auth.go` 可验证 TokenDance ID RS256/JWKS bearer token，但验证结果只标记为 `tokendance_bearer`，不能替代 Hub session，也不能满足 Edge `desktop` 设备门禁 |
 | 本地执行 | Local Edge + Desktop 执行不依赖 Hub 登录；需要云端 IM、同步、远控或中继时才需要 Hub session |

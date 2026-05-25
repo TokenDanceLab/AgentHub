@@ -5,7 +5,7 @@
 # Prerequisites:
 #   - TokenDance ID is running (default: http://localhost:3000)
 #
-# Output: Exports AGENTHUB_TOKENDANCE_* env vars and writes to stdout
+# Output: Exports AGENTHUB_TOKENDANCE_ID_* env vars and writes to stdout
 
 param([string]$TokenDanceUrl = "http://localhost:3000")
 
@@ -107,9 +107,9 @@ if (-not $Secret) {
 Write-Host ""
 Write-Host "=== Add these to your hub-server\.env ===" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "AGENTHUB_TOKENDANCE_ISSUER_URL=$TokenDanceUrl"
-Write-Host "AGENTHUB_TOKENDANCE_CLIENT_ID=$ClientId"
-Write-Host "AGENTHUB_TOKENDANCE_CLIENT_SECRET=$Secret"
-Write-Host "AGENTHUB_TOKENDANCE_REDIRECT_URI=http://127.0.0.1:PORT_IDX/callback"
+Write-Host "AGENTHUB_TOKENDANCE_ID_ISSUER_URL=$TokenDanceUrl"
+Write-Host "AGENTHUB_TOKENDANCE_ID_CLIENT_ID=$ClientId"
+Write-Host "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=$Secret"
+Write-Host "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=http://127.0.0.1:PORT_IDX/callback"
 Write-Host ""
 Write-Host "Done. Keep the client_secret safe — it will never be shown again." -ForegroundColor Yellow
