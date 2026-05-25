@@ -111,6 +111,14 @@ docs/review/
 !.agents/skills/ui-screenshot/**
 !.agents/skills/dev-team/
 !.agents/skills/dev-team/**
+# Screenshots and raster images — dev artifacts, not production assets
+screenshots/
+**/screenshots/
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
 .cursor/
 .continue/
 
