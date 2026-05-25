@@ -78,9 +78,16 @@
 }
 
 .selected {
-  border-color: rgba(99,102,241,0.22);
-  background: rgba(99,102,241,0.1);
-  color: var(--primary);
+  border-color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  color: var(--foreground);
+  box-shadow: inset 3px 0 0 var(--primary);
+  transform: scale(1.01);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.selected:hover {
+  background: color-mix(in oklch, var(--primary) 16%, transparent);
 }
 
 [data-theme='dark'] .item {
@@ -92,8 +99,13 @@
 }
 
 [data-theme='dark'] .selected {
-  border-color: rgba(129,140,248,0.26);
-  background: rgba(129,140,248,0.12);
+  border-color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+[data-theme='dark'] .selected:hover {
+  background: color-mix(in oklch, var(--primary) 18%, transparent);
 }
 
 .avatar {
