@@ -9,6 +9,8 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
+var ErrPinLimitExceeded = errors.New("pin limit exceeded for session")
+
 func InsertMessage(db *gorm.DB, msg *model.Message) error {
 	return db.Create(msg).Error
 }
@@ -72,6 +74,33 @@ func UpdateMessageRecalled(db *gorm.DB, id string) error {
 
 func InsertPin(db *gorm.DB, pin *model.MessagePin) error {
 	return db.Create(pin).Error
+}
+
+// PinMessageAtomic inserts a pin within a transaction that locks the session row
+// to serialize concurrent pin operations and atomically checks the per-session limit.
+func PinMessageAtomic(db *gorm.DB, pin *model.MessagePin, maxPins int64) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Lock the session row to serialize concurrent pin operations.
+		// PostgreSQL uses FOR UPDATE; SQLite (tests) skips row locking.
+		if tx.Dialector.Name() == "postgres" {
+			var sessionID string
+			if err := tx.Raw("SELECT id FROM sessions WHERE id = ? FOR UPDATE", pin.SessionID).Scan(&sessionID).Error; err != nil {
+				return err
+			}
+			if sessionID == "" {
+				return gorm.ErrRecordNotFound
+			}
+		}
+
+		var count int64
+		if err := tx.Model(&model.MessagePin{}).Where("session_id = ?", pin.SessionID).Count(&count).Error; err != nil {
+			return err
+		}
+		if count >= maxPins {
+			return ErrPinLimitExceeded
+		}
+		return tx.Create(pin).Error
+	})
 }
 
 func DeletePin(db *gorm.DB, sessionID, messageID string) error {

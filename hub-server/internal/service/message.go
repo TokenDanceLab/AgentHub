@@ -447,20 +447,15 @@ func (s *MessageService) PinMessage(ctx context.Context, userID, sessionID, msgI
 		return errcode.MsgNotFound
 	}
 
-	count, err := repository.CountPinsBySession(s.db, sessionID)
-	if err != nil {
-		return err
-	}
-	if count >= config.MaxPinsPerSession {
-		return errcode.MsgPinLimitExceeded
-	}
-
 	pin := &model.MessagePin{
 		SessionID:      sessionID,
 		MessageID:      msgID,
 		PinnedByUserID: userID,
 	}
-	if err := repository.InsertPin(s.db, pin); err != nil {
+	if err := repository.PinMessageAtomic(s.db, pin, config.MaxPinsPerSession); err != nil {
+		if errors.Is(err, repository.ErrPinLimitExceeded) {
+			return errcode.MsgPinLimitExceeded
+		}
 		if strings.Contains(err.Error(), "duplicate key") {
 			return nil
 		}
