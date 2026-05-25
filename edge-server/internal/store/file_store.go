@@ -132,6 +132,7 @@ func (f *FileStore) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 func (f *FileStore) SetRunStatus(id, status string) (Run, bool) {
 	run, ok := f.store.SetRunStatus(id, status)
 	if ok {
+		// Persist error is surfaced via LastPersistError() for callers.
 		_ = f.persist()
 	}
 	return run, ok
@@ -140,6 +141,7 @@ func (f *FileStore) SetRunStatus(id, status string) (Run, bool) {
 func (f *FileStore) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool) {
 	run, ok := f.store.SetRunStatusIf(id, status, allowedCurrent...)
 	if ok {
+		// Persist error is surfaced via LastPersistError() for callers.
 		_ = f.persist()
 	}
 	return run, ok
