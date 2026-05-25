@@ -158,15 +158,15 @@ UserRepository 新增:
 
 #### 2.1.5 新增 Model/Migration
 
-**Migration 0022: `users` 表新增字段**
+**Migration 0020: `users` 表新增字段**
 
 ```sql
--- 0022_token_dance_sub.up.sql
+-- 0020_token_dance_sub.up.sql
 ALTER TABLE users ADD COLUMN tokendance_sub VARCHAR(255);
 CREATE UNIQUE INDEX idx_users_tokendance_sub ON users(tokendance_sub) WHERE tokendance_sub IS NOT NULL AND tokendance_sub != '';
 ALTER TABLE users ADD COLUMN tokendance_sub_linked_at TIMESTAMPTZ;
 
--- 0022_token_dance_sub.down.sql
+-- 0020_token_dance_sub.down.sql
 DROP INDEX IF EXISTS idx_users_tokendance_sub;
 ALTER TABLE users DROP COLUMN IF EXISTS tokendance_sub_linked_at;
 ALTER TABLE users DROP COLUMN IF EXISTS tokendance_sub;

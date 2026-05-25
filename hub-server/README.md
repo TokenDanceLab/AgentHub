@@ -219,9 +219,12 @@ Hub 只做路由、队列、权限和状态持久化；Agent Runtime 进程仍�
 | 0016_workspace_refactor | 工作区模型调整 |
 | 0017_devices_unique | 设备唯一约束修正 |
 | 0018_pending_agent_task_edge_run_id | task↔run 映射持久化 |
-| 0022_token_dance_sub | TokenDance ID 用户映射 |
-| 0023_agent_profiles | Agent Profile 持久化 |
-| 0024_execution_targets | Execution Target 管理 |
+| 0019_pending_agent_task_edge_device_id | task↔edge device 映射持久化 |
+| 0020_token_dance_sub | TokenDance ID 用户映射 |
+| 0021_devices_allow_multiple_same_type | 允许同类型多设备 |
+| 0022_agent_profiles | Agent Profile 持久化 |
+| 0023_execution_targets | Execution Target 管理 |
+| 0024_message_attachments | 消息附件 |
 | 0025_skills | Skill 目录 |
 | 0026_mcp_servers | MCP Server 注册表 |
 | 0027_provider_bindings | Provider Binding |

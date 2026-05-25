@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-25 integration sweep | 基线：dev/delicious233 @ 45f9ba1 | 当前集成分支：feat/team-integration-sweep
+最后更新：2026-05-25 integration sweep | 基线：dev/delicious233 @ 69085d5 | 当前集成分支：feat/team-integration-sweep
 
 ## 快速上手
 
@@ -12,12 +12,12 @@ git checkout dev/delicious233
 
 ## 当前 integration 事实
 
-- 当前 integration worktree：`.worktrees/team-integration-sweep`；本轮已合入四个候选分支并追加 runtime/WS/docs 修复，具体 HEAD 以 `git log -1` 为准。
-- 主 worktree 为 `dev/delicious233 @ 45f9ba1`，且仍有 UIUX、OIDC、Web 相关 dirty 改动；不要把主 worktree 当作干净可合并基线。
-- 当前 `git worktree list` 为 23 条，包含新 integration worktree、多条 `team-*` 候选 worktree、detached verification worktree 和仍在工作的 Web parity worktree。
-- Web parity worktree：`.claude/worktrees/feat+web-desktop-parity` / `worktree-feat+web-desktop-parity`，仍在工作；状态只能写为进行中。
+- 当前 integration 分支：`feat/team-integration-sweep`；本轮已合入四个候选分支并追加 runtime/WS/docs 修复，具体 HEAD 以 `git log -1` 为准。当前验证 worktree 是 `.worktrees/team-integration-verify`。
+- 主 worktree 为 `dev/delicious233 @ 69085d5`，且仍有 UIUX、OIDC、Web 相关 dirty 改动；不要把主 worktree 当作干净可合并基线。
+- 当前 worktree 数量以 `git worktree list` 实时输出为准；不要复用旧的 23 条记录。
+- Web parity 分支：`worktree-feat+web-desktop-parity`，仍需实时核验路径；状态只能写为进行中。
 - 候选分支统一标注为 `integration 中处理`，除非 integration sweep 已记录冲突处理、diff 和 fresh 验证。
-- Hub migrations 当前有 28 个 `.up.sql` 文件；integration 分支已将后续平台 migrations 重排到 `0022`-`0028`，但仍需 schema/migration smoke 后才能声明 migration chain clean。
+- Hub migrations 当前有 28 个 `.up.sql` 文件；latest dev + integration 已协调为 `0020`-`0028` 连续平台 migrations，但仍需 schema/migration smoke 后才能声明 migration chain clean。
 - 本轮 integration 验证已通过：`edge-server && go test ./... -short -count=1`、`hub-server && go test ./... -short -count=1`、OpenAPI YAML 解析、migration `.up.sql` 版本唯一性检查和 `git diff --check`。
 
 ### 运行后端测试
@@ -52,7 +52,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 |---|------|:--:|------|
 | **Desktop** | React 19, TypeScript, Zustand, TanStack Query, OKLCH tokens, CSS Modules | 551/560 | viewRegistry, @shared/ui, Storybook, RunState 状态机, IM UI, AuthPage, 虚拟滚动 |
 | **Edge** | Go, gorilla/websocket, NDJSON | 13/13 包 | 3 Adapter (Claude/Codex/OpenCode), Prometheus, event bus dropped counter, Orchestrator, E2E 19/19 API |
-| **Hub** | Go, Gin, GORM, Redis, PostgreSQL | 13/13 包 | DI 架构, CORS→BodyLimit→RateLimit 链, 28 个 `.up.sql` migration 文件；integration 已重排后续平台 migrations 到 `0022`-`0028` |
+| **Hub** | Go, Gin, GORM, Redis, PostgreSQL | 13/13 包 | DI 架构, CORS→BodyLimit→RateLimit 链, 28 个 `.up.sql` migration 文件；latest dev + integration 已协调到 `0020`-`0028` |
 
 ## 生产部署
 
@@ -241,7 +241,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 ## 当前阻塞 / 已知问题
 
 - api.hub.vectorcontrol.tech 无 SSL（HTTP only）— （待排期）
-- Hub migration 链需要单独验证：integration 已将后续平台 migrations 重排到 `0022`-`0028`；完成 schema/migration smoke 前，不要声明 schema/migration 已清理干净。
+- Hub migration 链需要单独验证：latest dev + integration 已协调为 `0020`-`0028` 连续后缀；完成 schema/migration smoke 前，不要声明 schema/migration 已清理干净。
 - 服务器磁盘 29GB 总量偏小，需定期清理 Docker 镜像 — （运维任务）
 
 ## 本地开发

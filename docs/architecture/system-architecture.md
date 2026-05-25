@@ -186,7 +186,7 @@ Desktop App
 
 当前架构边界：
 
-- Hub Server 已完整实现三层架构（Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。当前 integration 分支中 migrations 目录有 28 个 `.up.sql` 文件；原 `0019`、`0020`、`0021` 重号已重排到 `0022`-`0028`，仍需在目标环境验证 migration chain 后才能声明 schema clean。
+- Hub Server 已完整实现三层架构（Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。当前 integration 分支中 migrations 目录有 28 个 `.up.sql` 文件；latest dev + integration 已协调到 `0020`-`0028` 连续平台 migrations，仍需在目标环境验证 migration chain 后才能声明 schema clean。
 - Web/Mobile 可通过 Hub 远程查看和审批。
 - Desktop UI 默认只连接本机 Local Edge。
 - Edge 才能启动 Agent CLI 进程，UI 不直接启动 Agent CLI。
@@ -262,7 +262,7 @@ Edge EventStore -> Hub Sync -> Web/Mobile
 Edge EventStore -> Hub Sync -> other devices
 ```
 
-本地 EventStore 语义已完整实现。Hub Server 也已完整实现三层架构（Gin + GORM + Redis + PostgreSQL），提供账号、IM、多端同步和中继能力。迁移文件当前是 integration 验证项：`hub-server/migrations` 有 28 个 `.up.sql`，integration 分支已把后续平台 migration 重排到 `0022`-`0028`，合入主线前仍需跑 schema/migration smoke。
+本地 EventStore 语义已完整实现。Hub Server 也已完整实现三层架构（Gin + GORM + Redis + PostgreSQL），提供账号、IM、多端同步和中继能力。迁移文件当前是 integration 验证项：`hub-server/migrations` 有 28 个 `.up.sql`，latest dev + integration 已把后续平台 migration 协调到 `0020`-`0028`，合入主线前仍需跑 schema/migration smoke。
 
 ## 7. EventStore 和恢复语义
 

@@ -6,7 +6,7 @@
 >
 > 本文是 AgentHub 全部七层（Desktop / Edge / Hub / CI/CD / Testing / Documentation / Engineering Standards）的**唯一事实源**，取代各方向分散路线图。每项任务均引用审计报告具体发现，含文件路径、优先级和工期。
 
-> **Integration sweep 快照（2026-05-25）**：主开发基线是 `dev/delicious233 @ 45f9ba1`；当前集成分支是 `feat/team-integration-sweep`；主 worktree dirty 且仍有 UIUX、OIDC、Web 并行改动；当前 23 个 worktree，Web parity worktree `.claude/worktrees/feat+web-desktop-parity` / `worktree-feat+web-desktop-parity` 仍在工作。`feat/team-adapter-compat`、`feat/team-hub-reliability`、`feat/team-hub-authz`、`feat/team-johnny-merge` 已进入 integration 分支，并已追加 runtime context、WS route、permission decider 和文档修复；最终合入主线仍需 PR/merge 决策。
+> **Integration sweep 快照（2026-05-25）**：主开发基线是 `dev/delicious233 @ 69085d5`；当前集成分支是 `feat/team-integration-sweep`；主 worktree dirty 且仍有 UIUX、OIDC、Web 并行改动；worktree 数量和路径以 `git worktree list` 实时输出为准，Web parity 分支 `worktree-feat+web-desktop-parity` 仍需单独核验。`feat/team-adapter-compat`、`feat/team-hub-reliability`、`feat/team-hub-authz`、`feat/team-johnny-merge` 已进入 integration 分支，并已追加 runtime context、WS route、permission decider 和文档修复；最终合入主线仍需 PR/merge 决策。
 
 ---
 
@@ -18,7 +18,7 @@
 |------|--------|---------|---------|----------|
 | **Desktop** | React 19 + Tauri 2 + Zustand + TanStack Query | viewRegistry 9视图、IM UI、AuthPage、RunState 状态机、传输层抽象 | 519 tests（34 files） | tsc 严格模式，ESLint + Prettier |
 | **Edge Server** | Go (net/http + gorilla/websocket) | 3 Adapter、24 NDJSON、Orchestrator P1-P2、Prometheus、E2E 19/19 API | 13/13 包（530 funcs） | CI 硬阈值 75%，race/gosec/govulncheck |
-| **Hub Server** | Go (Gin + GORM + Redis + PG) | DI 架构、13 包有测试、CORS+RateLimit+BodyLimit 中间件链、28 个 `.up.sql` migration 文件；integration 已重排后续平台 migrations 到 `0022`-`0028` | 13/13 包（历史记录，integration sweep 仍需重新跑全量） | CI 硬阈值 40%，golangci-lint/gitleaks |
+| **Hub Server** | Go (Gin + GORM + Redis + PG) | DI 架构、13 包有测试、CORS+RateLimit+BodyLimit 中间件链、28 个 `.up.sql` migration 文件；latest dev + integration 已协调到 `0020`-`0028` | 13/13 包（历史记录，integration sweep 仍需重新跑全量） | CI 硬阈值 40%，golangci-lint/gitleaks |
 | **Web** | React + Vite | Web parity worktree 仍在工作，旧 webui-desktop-port 只作历史输入 | integration 中处理 | 不做硬性要求 |
 | **CI/CD** | GitHub Actions | 8 job: go-edge/go-hub/benchmark/docker/cross-build/frontend/validate/gitleaks | 全绿 | race/gosec/govulncheck/覆盖率硬阻断 |
 | **官网** | Next.js 16 + Tailwind v4 | hub.vectorcontrol.tech — LiveStats + ConnectAgent | 14/20 tests | 静态导出，nginx on hk2 |

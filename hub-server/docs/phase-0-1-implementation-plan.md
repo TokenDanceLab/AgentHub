@@ -68,8 +68,8 @@ Step 4: 全量验证 (串行)
 ### Agent-C 任务卡 — Migration + Model
 
 **Migration 文件**:
-- `hub-server/migrations/0022_token_dance_sub.up.sql`
-- `hub-server/migrations/0022_token_dance_sub.down.sql`
+- `hub-server/migrations/0020_token_dance_sub.up.sql`
+- `hub-server/migrations/0020_token_dance_sub.down.sql`
 
 ```sql
 -- up

@@ -7,10 +7,10 @@
 ## 已核对事实
 
 - 当前 integration 分支：`feat/team-integration-sweep`；本轮已合入四个候选分支并追加 follow-up 修复，具体 HEAD 以 `git log -1` 为准。
-- 主开发基线：`dev/delicious233`，主 worktree HEAD `45f9ba1`。
+- 主开发基线：`dev/delicious233`，主 worktree HEAD `69085d5`。
 - 主 worktree dirty，仍有 UIUX、OIDC、Web 相关并行改动；integration 文档不能把这些改动写成已合并或已验证。
-- 当前 `git worktree list` 为 23 条，包含新 integration worktree、多条 `team-*` 候选 worktree、两个 detached verification worktree，以及仍在工作的 Web parity worktree。
-- Web parity worktree 是 `.claude/worktrees/feat+web-desktop-parity` / `worktree-feat+web-desktop-parity`，仍在工作；旧 `feat/webui-desktop-port` 不能代表当前 Web 状态。
+- 当前登记的 worktree 以 `git worktree list` 实时输出为准；本轮用于验证的是 `.worktrees/team-integration-verify`。
+- Web parity 分支 `worktree-feat+web-desktop-parity` 仍保留；具体 worktree 路径需实时核验，旧 `feat/webui-desktop-port` 不能代表当前 Web 状态。
 
 ## 候选分支状态用语
 
@@ -49,13 +49,15 @@
 
 ## Migration 状态
 
-`hub-server/migrations` 当前有 28 个 `.up.sql` 文件。`feat/team-johnny-merge` 合入 integration 后，原来的 `0019`、`0020`、`0021` 重号已经在 integration 中重排为连续后缀：
+`hub-server/migrations` 当前有 28 个 `.up.sql` 文件。`dev/delicious233` 的 migration sequence 修复已合入 integration；最终连续后缀如下：
 
 | 新编号 | 文件 |
 |---|---|
-| `0022` | `0022_token_dance_sub.up.sql` |
-| `0023` | `0023_agent_profiles.up.sql` |
-| `0024` | `0024_execution_targets.up.sql` |
+| `0020` | `0020_token_dance_sub.up.sql` |
+| `0021` | `0021_devices_allow_multiple_same_type.up.sql` |
+| `0022` | `0022_agent_profiles.up.sql` |
+| `0023` | `0023_execution_targets.up.sql` |
+| `0024` | `0024_message_attachments.up.sql` |
 | `0025` | `0025_skills.up.sql` |
 | `0026` | `0026_mcp_servers.up.sql` |
 | `0027` | `0027_provider_bindings.up.sql` |
@@ -64,6 +66,6 @@
 处理要求：
 
 - `.down.sql` 已随同 `.up.sql` 重命名；后续如果修改 migration 文件名，必须保持 up/down 配对。
-- 更新引用旧 `0019_token_dance_sub`、`0020_agent_profiles`、`0021_execution_targets` 名称的文档和验证记录。
+- 更新引用旧 `0019_token_dance_sub`、`0020_agent_profiles`、`0021_execution_targets` 或 integration 临时 `0022_token_dance_sub` 名称的文档和验证记录。
 - 重新跑 migration 相关测试或最小 schema smoke 后，才能写“migration chain clean”。
 - 在确认目标环境 `schema_migrations` 状态前，不要把 renumber 直接用于生产回滚说明。
