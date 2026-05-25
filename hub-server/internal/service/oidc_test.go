@@ -111,7 +111,7 @@ func TestGenerateAuthorizationURL_Success(t *testing.T) {
 	result, err := svc.GenerateAuthorizationURL(ctx, "test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256", "desktop", "device-123")
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.State)
-	assert.Contains(t, result.AuthorizationURL, "https://id.example.com/oidc/auth")
+	assert.Contains(t, result.AuthorizationURL, "https://id.example.com/oidc/authorize")
 	assert.Contains(t, result.AuthorizationURL, "response_type=code")
 	assert.Contains(t, result.AuthorizationURL, "code_challenge=test-challenge")
 	assert.Contains(t, result.AuthorizationURL, "code_challenge_method=S256")
