@@ -1,6 +1,6 @@
 # AgentHub Security Risk Register
 
-Last reviewed: 2026-05-25
+Last reviewed: 2026-05-26
 
 This register tracks security, privacy, reliability, network, disk, and logic risks for AgentHub. It is a living queue for audit loops; update status and evidence when a finding is fixed or intentionally accepted.
 
@@ -21,7 +21,7 @@ This register tracks security, privacy, reliability, network, disk, and logic ri
 | AH-SR-004 | High | Open | Edge Server can start local agent CLI processes without authentication if bound beyond loopback. Empty `Origin` is trusted for non-browser clients, so `curl` can call state-changing endpoints if it reaches the port. | `edge-server/cmd/agenthub-edge/main.go:103`, `edge-server/internal/security/origin.go:9`, `edge-server/internal/api/handlers.go:426`, `edge-server/internal/api/handlers.go:518`, `edge-server/internal/lifecycle/process_executor.go:273` | Keep Edge loopback-only unless explicit remote mode adds bearer/API-key auth and operator acknowledgement. |
 | AH-SR-005 | High | Mitigated in repo; remote-mode auth/blocking approval still open | Edge permission decisions previously accepted arbitrary `requestId` and `decision`. The endpoint now requires `runId` + `requestId`, consumes a one-shot pending permission registry populated from `run.agent.permission_requested`, rejects unknown/wrong-run/replayed decisions, and documents `runId` as required. | `edge-server/internal/api/permission_registry.go:30`, `edge-server/internal/api/handlers.go:40`, `edge-server/internal/api/handlers.go:790`, `edge-server/internal/events/bus.go:114`, `edge-server/internal/adapters/event_emitter.go:24`, `edge-server/internal/lifecycle/process_executor.go:516`, `api/openapi.yaml:831` | Add authenticated/signed Desktop decision proof before non-loopback remote Edge mode, and separately design true blocking approval before claiming human-in-the-loop permission enforcement. |
 | AH-SR-006 | Medium | Mitigated in repo; client/deploy verification required | Hub WebSocket auth is intentionally Hub-session-only: the first frame must carry a Hub-local HS256 access token, and valid TokenDance RS256 bearer tokens are rejected instead of becoming WebSocket sessions. Hub OIDC callback now mints those Hub-local access/refresh sessions after TokenDance ID validation, preserving Hub session/device routing. | `hub-server/internal/handler/ws.go`, `hub-server/internal/handler/ws_test.go`, `hub-server/internal/service/oidc.go`, `hub-server/internal/service/oidc_test.go`, `api/events.md` | Verify Desktop/Web login stores Hub-issued access tokens for REST/WebSocket auth and clears/reconnects them correctly; do not wire raw TokenDance bearer tokens directly into Hub WebSocket routing. |
-| AH-SR-007 | Medium | Open | Desktop stores Hub access and refresh tokens in browser `localStorage`. Any renderer XSS or compromised same-origin code can read long-lived refresh credentials. | `app/desktop/src/api/hubAuth.ts:11`, `app/desktop/src/api/hubAuth.ts:130`, `app/desktop/src/api/hubAuth.ts:156` | Move refresh tokens to Tauri secure storage or OS keychain; keep access tokens in memory where practical. |
+| AH-SR-007 | Medium | Partially mitigated in repo; browser release storage model open | Desktop packaged mode stores Hub access/refresh tokens through Tauri commands backed by the OS credential store, and the non-Tauri refresh-token fallback is process-memory only. Web now stores Hub access/refresh tokens and the token-source hint in `sessionStorage` and clears legacy `localStorage` token keys on load/save. Residual browser-release risk remains because same-tab XSS can still read `sessionStorage`; public Web should move to a BFF/HttpOnly-cookie or equivalent server-owned session model before broad release. | `app/desktop/src/api/hubTokenStorage.ts:1`, `app/desktop/src-tauri/src/secure_store.rs:1`, `app/web/src/api/hubTokenStorage.ts:1`, `app/web/src/api/hubAuth.ts:122`, `app/web/src/stores/hubStore.ts:1`, `app/web/src/api/hubTokenStorage.test.ts:1` | Run packaged Desktop OS credential-store smoke and Web auth/storage smoke; design the Web BFF/HttpOnly-cookie session before public browser release. |
 
 ## P1 / Medium
 
@@ -43,6 +43,11 @@ This register tracks security, privacy, reliability, network, disk, and logic ri
 ## Recent Mitigation Evidence
 
 - 2026-05-25: Hub TokenDance ID OIDC exchange was implemented in repo. `/client/auth/oidc/authorize` now binds PKCE S256 state to a UUID Hub device proof, `/client/auth/oidc/callback` exchanges code with TokenDance ID, validates ID token through the configured JWKS/issuer/audience path, maps `tokendance_sub`, and issues Hub-local access/refresh sessions.
+- 2026-05-26: `AH-SR-007` browser token exposure was further reduced in repo. Desktop packaged mode uses the Tauri OS credential-store path for Hub access/refresh tokens, while Web now stores Hub access/refresh tokens and the token-source hint in `sessionStorage` and clears legacy `localStorage` token keys on load/save. This is not the final public Web posture; BFF/HttpOnly-cookie session ownership remains the release target.
+- Fresh focused checks passed for `AH-SR-007` Web storage:
+  - `cd app; corepack.cmd pnpm --filter agenthub-web test -- src/api/hubTokenStorage.test.ts src/stores/hubStore.test.ts`
+  - `cd app; corepack.cmd pnpm --filter agenthub-web typecheck`
+  - `cd app; corepack.cmd pnpm --filter agenthub-web build` passed with the existing Vite large-chunk warning.
 - Fresh focused checks passed:
   - `cd hub-server; go test ./internal/service -run "TestGenerateAuthorizationURL_(InvalidDeviceType|RejectsNonS256PKCEMethod)|TestHandleCallback_SuccessUsesConfiguredJWKSAndIssuesHubSession" -count=1`
   - `cd hub-server; go test ./internal/handler -run "TestOIDCHandler_PostOIDC" -count=1`
