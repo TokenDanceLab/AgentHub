@@ -24,6 +24,10 @@ type config struct {
 	RunnerWorkDir  string
 	LocalAuthToken string
 
+	// Hub callback configuration (Edge→Hub direct bridge)
+	HubURL   string // Hub server base URL for Edge callback reporting
+	HubToken string // JWT bearer token for authenticating with Hub
+
 	// Agent adapter configuration
 	AgentDefault   string // default agent adapter ID
 	ClaudeCodePath string // path to claude binary
@@ -75,6 +79,8 @@ func main() {
 		AdapterRegistry: adapterReg,
 		AgentDefault:    cfg.AgentDefault,
 		LocalAuthToken:  cfg.LocalAuthToken,
+		HubURL:          cfg.HubURL,
+		HubToken:        cfg.HubToken,
 	}
 	if cfg.RunnerCommand != "" {
 		serverConfig.ProcessExecutor = lifecycle.ProcessExecutorConfig{
@@ -109,6 +115,8 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.RunnerCommand, "runner-command", getEnv("AGENTHUB_RUNNER_COMMAND", ""), "local process executable to run for each run; empty uses the built-in mock executor")
 	fs.StringVar(&cfg.RunnerWorkDir, "runner-workdir", getEnv("AGENTHUB_RUNNER_WORKDIR", ""), "working directory for --runner-command; empty inherits the edge process working directory")
 	fs.StringVar(&cfg.LocalAuthToken, "local-auth-token", getEnv("AGENTHUB_EDGE_AUTH_TOKEN", ""), "optional local bearer token required for Edge APIs other than /v1/health")
+	fs.StringVar(&cfg.HubURL, "hub-url", getEnv("AGENTHUB_HUB_URL", ""), "Hub server base URL for Edge→Hub direct callback reporting (e.g. https://hub.example.com)")
+	fs.StringVar(&cfg.HubToken, "hub-token", getEnv("AGENTHUB_HUB_TOKEN", ""), "JWT bearer token for authenticating callback requests to Hub")
 	fs.Var(&cfg.RunnerArgs, "runner-arg", "argument passed to --runner-command; may be repeated")
 	fs.Var(&cfg.RunnerEnv, "runner-env", "environment variable passed to --runner-command as KEY=VALUE; may be repeated")
 
