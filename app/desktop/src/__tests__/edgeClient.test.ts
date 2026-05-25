@@ -115,6 +115,28 @@ describe('edgeClient', () => {
         }),
       );
     });
+
+    it('preserves threadId in the request body', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ runId: 'run_abc123', status: 'queued', threadId: 'thread-1' }),
+      } as Response);
+
+      await startRun({
+        prompt: 'continue thread',
+        threadId: 'thread-1',
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/runs$/),
+        expect.objectContaining({
+          body: JSON.stringify({
+            prompt: 'continue thread',
+            threadId: 'thread-1',
+          }),
+        }),
+      );
+    });
   });
 
   describe('cancelRun', () => {
