@@ -2,11 +2,11 @@
 // Manages auth-frame handshake, typed event routing, and reconnection
 // via the Transport abstraction.
 //
-// Protocol (matching hub-server/internal/handler/ws.go + ws/frame.go):
-//   1. WebSocket connects to ws://host/client/ws
-//   2. Client sends: {"type":"auth","payload":{"access_token":"<jwt>"}}
-//   3. Server responds: {"type":"auth.ok","payload":null}
-//      or:  {"type":"auth.fail","payload":{"reason":"..."}}
+// Protocol (matching hub-server/internal/router/router.go + ws/frame.go):
+//   1. WebSocket connects to ws://host/client/ws?access_token=<hub-jwt>
+//   2. Hub validates the Hub-issued token during HTTP upgrade.
+//   3. Server responds after upgrade: {"type":"auth.ok","payload":null}
+//      or rejects the upgrade before a WebSocket is established.
 //   4. After auth, bidirectional events flow with {type, payload} framing.
 //
 // Reconnection: The underlying Transport handles exponential-backoff
@@ -30,7 +30,7 @@ export interface HubWSOptions {
   transport?: Transport;
   /** Called after the auth handshake succeeds. */
   onAuthSuccess?: () => void;
-  /** Called when the server rejects the auth frame. */
+  /** Called when the server rejects WebSocket authentication after upgrade. */
   onAuthFail?: (reason: string) => void;
 }
 
@@ -59,11 +59,26 @@ export interface HubWSHandle {
 
 // ── Implementation ───────────────────────────────
 
+function withAccessToken(url: string, token: string | null): string {
+  if (!token) return url;
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set('access_token', token);
+    return parsed.toString();
+  } catch {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}access_token=${encodeURIComponent(token)}`;
+  }
+}
+
 export function createHubWS(opts: HubWSOptions): HubWSHandle {
+  const baseUrl = opts.url ?? HUB_WS_URL;
+  const authURL = () => withAccessToken(baseUrl, opts.getToken());
+
   const transport: Transport =
     opts.transport ??
     new WebSocketTransport({
-      url: opts.url ?? HUB_WS_URL,
+      url: authURL(),
       maxRetries: 10,
     });
 
@@ -77,10 +92,6 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
   transport.on('status', (status: TransportStatus) => {
     if (status === 'connected') {
       authenticated = false;
-      const token = opts.getToken();
-      if (token) {
-        transport.send({ type: HUB_EVENTS.AUTH, payload: { access_token: token } });
-      }
     }
     if (status === 'disconnected') {
       authenticated = false;
@@ -152,7 +163,7 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
 
   return {
     connect(): void {
-      transport.connect();
+      transport.connect(authURL());
     },
 
     send(type: string, payload: unknown): void {
@@ -193,10 +204,11 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
 
     reconnect(): void {
       authenticated = false;
-      if (transport.getStatus() !== 'disconnected') {
-        transport.close();
+      if (transport.reconnect) {
+        transport.reconnect(authURL());
+        return;
       }
-      transport.connect();
+      transport.connect(authURL());
     },
 
     getStatus(): TransportStatus {

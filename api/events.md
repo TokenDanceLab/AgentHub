@@ -203,14 +203,14 @@ Hub Server 提供独立的 WebSocket 事件系统，与 Edge Server 的 `EventEn
 ### 7.1 连接
 
 ```text
-ws://host:8080/client/ws
+ws://host:8080/client/ws?access_token=<hub-issued-access-token>
 ```
 
 连接流程：
 
-1. 建立 WebSocket 连接。
-2. 客户端必须在第一帧发送 `auth` 事件。
-3. 服务端验证 token 后返回 `auth.ok` 或 `auth.fail`。
+1. 客户端使用 Hub-issued HS256 access token 建立 WebSocket 连接。浏览器客户端通过 `access_token` query 参数传递；能设置请求头的原生客户端也可用 `Authorization: Bearer <token>`。
+2. Hub 在 HTTP upgrade 前验证 token；TokenDance ID RS256 bearer token 不能通过 `/client/ws`。
+3. 升级成功后服务端发送 `auth.ok`；验证失败时在升级前返回 401，不建立 WebSocket。
 4. 认证通过后，客户端可发送 `typing` 事件；服务端推送实时事件。
 5. 心跳：服务端定期发送 WebSocket ping，客户端需要回复 pong。连续未回复 pong 将导致断连。
 
@@ -235,15 +235,9 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 方向 | 说明 |
 |------|------|------|
-| `auth` | Client→Hub | 认证请求，payload: `{ access_token }` |
-| `auth.ok` | Hub→Client | 认证成功，payload: `{ user_id, device_id }` |
-| `auth.fail` | Hub→Client | 认证失败，payload: `{ reason }` |
-
-**auth 示例 — 客户端发送：**
-
-```json
-{"type":"auth","payload":{"access_token":"eyJhbGciOiJIUzI1NiIs..."}}
-```
+| `auth` | Client→Hub | 历史帧认证，仅用于未挂 `WSAuthMiddleware` 的测试/兼容入口；主路由 `/client/ws` 使用 upgrade 前 token |
+| `auth.ok` | Hub→Client | 认证成功，payload: `{ user_id, device_id }` 或 `null` |
+| `auth.fail` | Hub→Client | 认证失败，payload: `{ reason }`；主路由通常在 upgrade 前返回 401 |
 
 **auth.ok 示例 — 服务端响应：**
 
@@ -326,8 +320,8 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 ### 7.4 代码示例
 
 ```json
-// 客户端发送认证
-{"type":"auth","payload":{"access_token":"eyJhbGciOiJIUzI1NiIs..."}}
+// 客户端连接主路由
+"ws://host:8080/client/ws?access_token=eyJhbGciOiJIUzI1NiIs..."
 
 // 服务端响应认证成功
 {"type":"auth.ok","payload":{"user_id":"user_01HX...","device_id":"device_01HX..."}}

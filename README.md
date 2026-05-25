@@ -263,7 +263,7 @@ OIDC 结构检查：
 .\scripts\verify-oidc-readiness.ps1
 ```
 
-该检查只证明公开仓库里的 Hub OIDC 端点、示例配置、Desktop/Web Hub session 存储策略和根治理矩阵对齐；它不连接生产 TokenDance ID，不需要真实 `client_secret`，也不替代部署态 login/callback/logout/reconnect 证据。
+该检查只证明公开仓库里的 Hub OIDC 端点、示例配置、Desktop/Web Hub session 存储策略、Hub WebSocket upgrade 鉴权和根治理矩阵对齐；它不连接生产 TokenDance ID，不需要真实 `client_secret`，也不替代部署态 login/callback/logout/reconnect 证据。
 
 <br>
 

@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -102,6 +103,28 @@ func TestWebSocketRouteRejectsTokenDanceBearerBeforeUpgrade(t *testing.T) {
 	}
 	if got := manager.FindByUserDevice("tokendance-user-ws", "tokendance_bearer"); got != nil {
 		t.Fatal("TokenDance bearer must not register through the WebSocket route")
+	}
+}
+
+func TestWebSocketRouteAcceptsHubLocalQueryTokenBeforeUpgrade(t *testing.T) {
+	token, err := jwtutil.GenerateAccessToken("user-ws-query", "web", "device-ws-query", testWSSecret, time.Hour)
+	if err != nil {
+		t.Fatalf("generate access token: %v", err)
+	}
+
+	manager := hubws.NewManager()
+	wsURL := newMiddlewareWebSocketTestServer(t, manager, &config.Config{
+		JWT: config.JWTConfig{Secret: testWSSecret},
+	})
+	conn := dialWebSocket(t, wsURL+"?access_token="+url.QueryEscape(token))
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	frame := readFrame(t, conn)
+	if frame.Type != hubws.TypeAuthOK {
+		t.Fatalf("frame type = %q, want %q", frame.Type, hubws.TypeAuthOK)
+	}
+	if got := manager.FindByUserDevice("user-ws-query", "web"); got == nil {
+		t.Fatal("expected Hub-local query token to register WebSocket session")
 	}
 }
 
