@@ -42,6 +42,9 @@ Write scope:
 - Extended the shared `StartRunRequest` client contract with optional `provider`, `modelAlias`, `modelMappingEnabled`, and `providerFallbackEnabled` routing metadata so Edge/Hub can consume the same TokenDance model-routing envelope later.
 - Added a compact run-route preview inside the prompt composer so users can see the resolved Provider, model, reasoning effort, and alias before dispatch.
 - Turned Settings > Agent Profiles into a local Profile readiness view: Runtime inventory stays separate, and derived Profile cards now compose Runtime + model route + alias + configuration sources + Local Edge execution target.
+- Upgraded the welcome screen into a live Agent dispatch launcher: it now reads real Local Edge Runtime adapters, previews the selected Profile route, supports Runtime/Profile/Target mode switching, and sends suggestion prompts with both `agentId` and the resolved Profile alias.
+- Fixed the empty-thread welcome decision so stale agent-only Edge events no longer hide the welcome launcher before the user sends anything.
+- Fixed welcome focus behavior by locating the prompt textarea through stable textarea selectors instead of an English-only placeholder.
 
 ## Verification
 
@@ -66,6 +69,11 @@ Write scope:
 - `cd app/desktop && corepack.cmd pnpm vitest run src\__tests__\SettingsPage.test.tsx src\__tests__\modelSettingsStore.test.ts`
 - `cd app/desktop && corepack.cmd pnpm typecheck`
 - Playwright Settings Agent Profiles check at `1440x960` and `390x844`: real Local Edge data produced Claude Code / Codex / OpenCode local Profile cards, mapped to `opus` / `sonnet` / `haiku` model routes, with no console errors or warnings, no raw i18n keys, and no horizontal overflow. Screenshots: `app/desktop/screenshots/settings-agent-profiles-local-profiles.png`, `app/desktop/screenshots/settings-agent-profiles-local-profiles-mobile.png`.
+- `cd app/desktop && python -m json.tool src\i18n\locales\en.json > $null`
+- `cd app/desktop && python -m json.tool src\i18n\locales\zh.json > $null`
+- `cd app/desktop && corepack.cmd pnpm vitest run src\__tests__\WelcomeScreen.test.tsx src\__tests__\MainView.test.ts src\__tests__\modelSettingsStore.test.ts`
+- `cd app/desktop && corepack.cmd pnpm typecheck`
+- Playwright welcome dispatch check at `1440x960` and `390x844`: with `/v1/threads` mocked empty and real Local Edge `/v1/agents`, selected Codex Runtime, previewed `sonnet -> claude-sonnet-4-6 / anthropic / high`, submitted a suggestion, and verified the `/v1/runs` request body carried `agentId=codex`, `modelAlias=sonnet`, `model=claude-sonnet-4-6`, `provider=anthropic`, with no console errors, raw i18n keys, or horizontal overflow. Screenshots: `app/desktop/screenshots/welcome-dispatch-profile-desktop.png`, `app/desktop/screenshots/welcome-dispatch-profile-mobile.png`.
 
 ## Follow-up
 
@@ -74,3 +82,4 @@ Write scope:
 - Teach Edge/Hub to persist or act on the optional model-routing metadata once the current Edge/API edits settle; Desktop already sends it.
 - Sync the same model/cc-switch settings with Hub/TokenDance ID once the account/auth boundary is stable.
 - Next Agent Profile step: replace the derived readiness cards with editable local Profile persistence once the Agent/Profile API boundary lands.
+- Next welcome step: surface a first-run empty state that can create a real thread explicitly once Edge exposes thread creation as a first-class client action.
