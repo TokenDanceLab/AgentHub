@@ -28,6 +28,21 @@ vi.mock('@/hooks/useIMChat', () => ({
       { user_id: 'user-b', username: 'alice', nickname: 'Alice', online: true, type: 'friend' },
       { user_id: 'user-c', username: 'bob', nickname: 'Bob', online: false, type: 'friend' },
     ],
+    friendRequests: [
+      { request_id: 'fr-1', user_id: 'user-d', username: 'dana', nickname: 'Dana', message: 'hi', created_at: '2026-05-25T00:00:00Z' },
+    ],
+    notifications: [
+      {
+        id: 'notif-1',
+        user_id: 'user-1',
+        type: 'mention',
+        payload: JSON.stringify({ title: 'Mention' }),
+        read: false,
+        created_at: '2026-05-25T00:00:00Z',
+      },
+    ],
+    status: 'ready',
+    error: null,
     sendMessage: vi.fn(),
     getSessionMessages: vi.fn(() => []),
     loadSessionMessages: vi.fn(),
@@ -74,6 +89,14 @@ describe('IMView', () => {
   it('renders Select a contact placeholder when no contact selected', () => {
     render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
     expect(screen.getByText('Select a contact to start messaging')).toBeInTheDocument();
+  });
+
+  it('shows read-only Hub request and notification summary', () => {
+    render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
+    expect(screen.getByLabelText('Hub IM snapshot')).toBeInTheDocument();
+    expect(screen.getByText('1 contact requests')).toBeInTheDocument();
+    expect(screen.getByText('1 notifications')).toBeInTheDocument();
+    expect(screen.getByText('Read-only summary')).toBeInTheDocument();
   });
 
   it('shows empty message area when no contact selected', () => {
