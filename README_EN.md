@@ -6,7 +6,7 @@
 
 Chat with AI Agents like teammates. @mention them, create group chats, and keep code, diffs, approvals, and previews in one conversation thread.
 
-[中文文档](README.md) &nbsp;·&nbsp; [Product Requirements](docs/product-requirements.md) &nbsp;·&nbsp; [System Architecture](docs/system-architecture.md) &nbsp;·&nbsp; [API](api/) &nbsp;·&nbsp; [Website](https://hub.vectorcontrol.tech)
+[中文文档](README.md) &nbsp;·&nbsp; [Product Requirements](docs/architecture/product-requirements.md) &nbsp;·&nbsp; [System Architecture](docs/architecture/system-architecture.md) &nbsp;·&nbsp; [API](api/) &nbsp;·&nbsp; [Website](https://hub.vectorcontrol.tech)
 
 <img src="https://img.shields.io/badge/status-P0--M7_complete-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go" alt="go">
@@ -116,9 +116,9 @@ go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --agent-default claude-code
 Common runtime presets:
 
 ```powershell
-go run ./cmd/agenthub-edge --runner-profile claude-code
-go run ./cmd/agenthub-edge --runner-profile codex
-go run ./cmd/agenthub-edge --runner-profile opencode
+go run ./cmd/agenthub-edge --agent-default claude-code
+go run ./cmd/agenthub-edge --agent-default codex
+go run ./cmd/agenthub-edge --agent-default opencode
 ```
 
 Terminal 2: Desktop Web UI.
@@ -196,11 +196,13 @@ Known limitation: `app/shared/src/ui` React type resolution and pnpm cross-packa
 ```text
 AgentHub/
 ├── docs/                   # primary docs, handoff, roadmap, archive/reference
-│   ├── product-requirements.md
-│   ├── system-architecture.md
-│   ├── implementation-guide.md
+│   ├── architecture/       # product requirements, system architecture, implementation guide
+│   ├── governance/         # branch governance, doc standards, security risk register
+│   ├── operations/         # client roadmap, deployment records
 │   ├── handoff/STATE.md    # current project-state SSOT
-│   └── reference/          # research and engineering specifications
+│   ├── roadmap.md          # master roadmap
+│   ├── reference/          # research and engineering specifications
+│   └── archive/            # historical archive
 ├── app/
 │   ├── desktop/            # Tauri desktop app
 │   ├── web/                # Web workspace and page preview
@@ -219,15 +221,15 @@ Docker and deployment files live with the module that needs them. Root compose i
 
 | Document | Description |
 |---|---|
-| [Product Requirements](docs/product-requirements.md) | Product positioning, users, core experience, phases and competition deliverables |
-| [System Architecture](docs/system-architecture.md) | Desktop-Edge-Hub, Agent product model, execution lifecycle, communication and authority boundaries |
-| [Implementation Guide](docs/implementation-guide.md) | Implementation order, API update rules, adapter details and checks |
-| [Client Roadmap](docs/client-roadmap.md) | Desktop/Edge client milestones and acceptance checks |
+| [Product Requirements](docs/architecture/product-requirements.md) | Product positioning, users, core experience, phases and competition deliverables |
+| [System Architecture](docs/architecture/system-architecture.md) | Desktop-Edge-Hub, Agent product model, execution lifecycle, communication and authority boundaries |
+| [Implementation Guide](docs/architecture/implementation-guide.md) | Implementation order, API update rules, adapter details and checks |
+| [Client Roadmap](docs/operations/client-roadmap.md) | Desktop/Edge client milestones and acceptance checks |
 | [API Contract](api/) | REST API and WebSocket typed event contract entrypoint |
 | [Research Index](docs/reference/) | Cross-repo research and engineering specifications |
 | [Archive](docs/archive/) | Previous detailed docs for architecture, protocol, memory, workspace and planning |
 
-When working inside the `D:\Code\TokenDance` workspace, read root `../AGENTS.md` and `../docs/` for TokenDance-level governance first. Root `../docs/system-architecture.md`, `../docs/identity-auth.md`, and `../docs/design-system.md` define cross-product architecture, identity/auth, and design boundaries; this repository's `docs/` folder owns AgentHub implementation details.
+When working inside the `D:\Code\TokenDance` workspace, read root `../AGENTS.md` and `../docs/` for TokenDance-level governance first. Root `../docs/architecture/system-architecture.md`, `../docs/identity-auth.md`, and `../docs/design-system.md` define cross-product architecture, identity/auth, and design boundaries; this repository's `docs/` folder owns AgentHub implementation details.
 
 <br>
 
@@ -258,5 +260,5 @@ TokenDance ID is the cross-product identity entry. Hub session is AgentHub's own
 ---
 
 <div align="center">
-<a href="README.md">中文文档</a> &nbsp;·&nbsp; <a href="docs/product-requirements.md">Product</a> &nbsp;·&nbsp; <a href="docs/system-architecture.md">Architecture</a> &nbsp;·&nbsp; <a href="api/">API</a>
+<a href="README.md">中文文档</a> &nbsp;·&nbsp; <a href="docs/architecture/product-requirements.md">Product</a> &nbsp;·&nbsp; <a href="docs/architecture/system-architecture.md">Architecture</a> &nbsp;·&nbsp; <a href="api/">API</a>
 </div>
