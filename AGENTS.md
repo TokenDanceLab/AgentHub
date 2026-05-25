@@ -18,9 +18,9 @@
 人类同学先读：
 
 1. `README.md`
-2. `docs/product-requirements.md`
-3. `docs/system-architecture.md`
-4. `docs/implementation-guide.md`
+2. `docs/architecture/product-requirements.md`
+3. `docs/architecture/system-architecture.md`
+4. `docs/architecture/implementation-guide.md`
 
 Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 
@@ -28,13 +28,13 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 2. 读 `docs/handoff/STATE.md` — 当前项目状态、阻塞、部署信息（新 Agent 接手必读）。
 3. 明确任务卡：目标、所属方向、写入范围、接口影响、验收命令。
 4. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
-5. 只读相关主文档章节：产品不清读 `docs/product-requirements.md`；边界不清读 `docs/system-architecture.md`；实现顺序不清读 `docs/implementation-guide.md`。
+5. 只读相关主文档章节：产品不清读 `docs/architecture/product-requirements.md`；边界不清读 `docs/architecture/system-architecture.md`；实现顺序不清读 `docs/architecture/implementation-guide.md`。
 6. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
 7. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Relay 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity-auth.md`、`../docs/authorization-model.md`、`../docs/security-risk-governance.md`、`../docs/unified-login.md`、`../docs/feishu-agenthub-integration.md`、`../docs/product-matrix.md`、`../docs/relay-productization.md`、`../docs/ecosystem-execution-queue.md`、`../docs/agent-seo-i18n-packaging.md`、`../docs/i18n-parity-matrix.md`、`../docs/design-system.md`、`../docs/design-implementation-playbook.md` 或 `../docs/visual-qa-matrix.md` 中相关文档。
-8. 做统一登录、Feishu/Lark、Relay、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem-product-backlog.md`、`../docs/ecosystem-execution-queue.md` 和 `docs/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
+8. 做统一登录、Feishu/Lark、Relay、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem-product-backlog.md`、`../docs/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
 9. 把跨系统治理工作拆成 issue 时，优先使用 `.github/ISSUE_TEMPLATE/tokendance-governance.md`，并对照 `../docs/governance-scorecard.md`、`../docs/governance-evidence-ledger.md`、`../docs/issue-templates.md` 和对应 `TD-P0-*` / `TD-P1-*` 队列 ID 写验收标准。
 10. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
-11. 客户端 M1 任务读 `docs/client-roadmap.md`。
+11. 客户端 M1 任务读 `docs/operations/client-roadmap.md`。
 12. 需要论证时最多读 1-3 篇精确的 `docs/reference/**`。
 
 `docs/archive/` 只在追溯旧方案时读。`reference/**` 是第三方源码镜像，默认不改、不翻译、不全文扫描。
@@ -52,7 +52,7 @@ AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个�
 共享边界：
 
 - API 契约写在 `api/`。
-- Edge Server 同时连接前端和 Hub，改动前先看 `docs/system-architecture.md`。
+- Edge Server 同时连接前端和 Hub，改动前先看 `docs/architecture/system-architecture.md`。
 - 跨两个方向的改动先在 PR 描述里写清楚影响面。
 - 开发者必须审查自己 Agent 生成的代码、文档和命令输出；不要把未看懂的 Agent 改动直接合入。
 
@@ -93,7 +93,7 @@ AgentHub 角色、组织、项目、Thread、Run、Approval、Agent Profile、In
 
 ### 安全风险治理边界
 
-AgentHub 的 `docs/security-risk-register.md` 是本仓库风险事实源；跨仓库分级、状态词、发布门禁和 accepted-risk 规则见 `../docs/security-risk-governance.md`。
+AgentHub 的 `docs/governance/security-risk-register.md` 是本仓库风险事实源；跨仓库分级、状态词、发布门禁和 accepted-risk 规则见 `../docs/security-risk-governance.md`。
 
 - 涉及 Hub 登录/session、Edge 远程执行、Desktop/Web token storage、Feishu/Lark action、Relay API key、integration secret、公开 stats 或 generated artifact 的风险变更，必须同步更新本仓库风险表。
 - Critical/High 风险在未修复、未验证或未显式 accepted 之前阻断公开发布；accepted risk 必须写 owner、日期、原因、补偿控制和复查触发条件。
@@ -181,7 +181,7 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 
 **类型检查**：`pnpm typecheck` 在 desktop 和 web 各跑一次。当前 `app/shared/src/ui` 存在 React 类型解析 / pnpm 跨包虚拟存储的既有限制；提交说明必须区分既有 shared-ui 限制和本次新增错误。
 
-前端架构详见 `docs/system-architecture.md` 前端章节。
+前端架构详见 `docs/architecture/system-architecture.md` 前端章节。
 
 ## 4. Git 规则
 
@@ -233,7 +233,7 @@ fix/short-topic
 
 ### 分支治理
 
-当前分支状态和合并规则详见 `docs/branch-governance.md`。摘要：
+当前分支状态和合并规则详见 `docs/governance/branch-governance.md`。摘要：
 
 ```
 feat/* → dev/maintainer → master
@@ -287,7 +287,7 @@ P0-P3、M3b、M4、M5、M6、M7 全部完成。详细进度见 `docs/roadmap.md`
 
 - 主文档只保留三份：产品需求、系统架构、功能实现。
 - `docs/roadmap.md` 和 `docs/roadmaps/` 只记录持续开发目标、当前进展、验证和下一步，不承载完整产品或架构说明。
-- `docs/client-roadmap.md` 是客户端 M1 并行开发路线图；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
+- `docs/operations/client-roadmap.md` 是客户端 M1 并行开发路线图；完成后可归档进 `docs/archive/`，不要长期扩写成第二套实现文档。
 - AgentHub 自有文档中文优先；`README_EN.md` 是唯一常规英文入口。
 - 新增长期说明先考虑合并进三份主文档，不要随手新增根级文档。
 - 详细调研放 `docs/reference/`。
