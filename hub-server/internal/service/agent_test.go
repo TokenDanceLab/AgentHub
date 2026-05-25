@@ -238,6 +238,96 @@ func TestHandleTaskFail_AlreadyTerminal(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// ==================== #109: lifecycle enforcement ====================
+
+func TestHandleTaskDone_RejectsQueuedTask(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	svc := &AgentService{db: db}
+
+	taskID := "task-queued"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusQueued, "dev-1", "run-001"))
+
+	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", taskID, "run-001", "final")
+	assert.Error(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskFail_RejectsQueuedTask(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	svc := &AgentService{db: db}
+
+	taskID := "task-queued-fail"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusQueued, "dev-1", "run-001"))
+
+	err := svc.HandleTaskFail(context.Background(), "user-1", "dev-1", taskID, "run-001", "error")
+	assert.Error(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskDone_AcceptsDispatchedTask(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	bus := newTestBus(t)
+	svc := &AgentService{db: db, bus: bus}
+
+	taskID := "task-dispatched-done"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusDispatched, "dev-1", "run-001"))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "claude", "sess-1", "user-1"))
+
+	mock.ExpectExec(sqlmUpdateTask).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", taskID, "run-001", "")
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// ==================== #99: offline-replayed tasks ====================
+
+func TestHandleTaskAck_QueuedToDispatched(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	svc := &AgentService{db: db}
+
+	taskID := "task-queued-ack"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusQueued, "dev-1", ""))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "claude", "sess-1", "user-1"))
+
+	// queued → dispatched (offline-replayed task)
+	mock.ExpectExec(sqlmUpdateTask).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", taskID, "run-001")
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ==================== B5: #116 reject agent tasks for dissolved sessions ====================
 
 func TestTriggerAgentTask_RejectsDissolvedSession(t *testing.T) {
