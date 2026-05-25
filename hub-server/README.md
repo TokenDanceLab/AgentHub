@@ -28,17 +28,17 @@ Hub 是账号、云端 IM、多端同步、远程中继和审计权威。Local E
 | ORM | GORM + PostgreSQL 16 |
 | 缓存 | go-redis (Redis 7) |
 | 配置 | Viper (YAML + `AGENTHUB_` 环境变量覆盖) |
-| 认证 | Hub 本地 access/refresh session；TokenDance ID RS256/JWKS bearer middleware 仅作兼容路径 |
+| 认证 | Hub 本地 access/refresh session；TokenDance ID OIDC Authorization Code + PKCE；TokenDance ID RS256/JWKS bearer middleware 仅作兼容路径 |
 | ID 生成 | UUIDv7 |
 | 迁移 | golang-migrate |
 | 日志 | zap + zapslog |
 
 ## TokenDance ID 边界
 
-TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产品会话。最终浏览器/桌面登录必须由 Hub Server 作为 TokenDance ID relying party 完成：
+TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产品会话。Hub Server 作为 TokenDance ID relying party 已实现后端登录交换：
 
-1. Desktop/Web 打开 TokenDance ID Authorization Code + PKCE 登录。
-2. Hub-owned callback 接收 code。
+1. Desktop/Web 生成 PKCE verifier/challenge，调用 `POST /client/auth/oidc/authorize`。
+2. Hub 记录一次性 state、device proof，并返回 TokenDance ID authorization URL。
 3. Hub Server 完成 code exchange。
 4. Hub Server 校验 ID token 的 issuer、audience、exp、JWKS 签名。
 5. Hub Server 把 `tokendance_sub` 映射到 Hub user。
@@ -48,8 +48,8 @@ TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产�
 
 | 项 | 当前说明 |
 |---|---|
-| Hub OIDC callback | 目标归 Hub Server；不要把 AgentHub Home 静态站 callback 当成 Hub API callback |
-| Code exchange | 目标由 Hub Server 完成；产品客户端不得保存第三方 provider token |
+| Hub OIDC callback | `POST /client/auth/oidc/callback` 由 Hub Server 交换 code 并签发 Hub session；不要把 AgentHub Home 静态站 callback 当成 Hub API callback |
+| Code exchange | 由 Hub Server 完成；产品客户端不得保存第三方 provider token |
 | Hub session | AgentHub API 的长期授权边界；浏览器/桌面最终消费 Hub access/refresh session |
 | Bearer middleware | 兼容已签发 TokenDance ID bearer token；需要配置 TokenDance issuer 和 AgentHub client id；不创建 Hub refresh session |
 | JWKS validation | 校验 RS256 签名、`kid`、`exp`、TokenDance issuer 和 AgentHub client audience |
@@ -273,3 +273,5 @@ go test ./... -short -count=1
 | `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | Hub OIDC client id；启用 TokenDance bearer 兼容路径时用于强制 `aud` 校验 | 待配置 |
 | `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | Hub confidential-client secret；不得提交 | 待配置 |
 | `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI` | OIDC callback URL | `http://localhost:8080/client/auth/oidc/callback` |
+
+`AGENTHUB_TOKENDANCE_*` 旧变量名仍可被加载器识别，用于兼容早期本地脚本；新配置和部署文档统一使用 `AGENTHUB_TOKENDANCE_ID_*`。
