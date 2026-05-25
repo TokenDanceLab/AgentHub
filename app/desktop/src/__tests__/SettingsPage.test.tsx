@@ -5,6 +5,8 @@ import type { ComponentProps } from 'react';
 import '@testing-library/jest-dom/vitest';
 import SettingsPage from '@/components/SettingsPage';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
+import enLocale from '@/i18n/locales/en.json';
+import zhLocale from '@/i18n/locales/zh.json';
 import type { AgentInfo, RunInfo } from '@shared/types';
 import type { AgentTask } from '@/stores/taskBridgeStore';
 
@@ -339,12 +341,21 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('Check this thread')).toBeInTheDocument();
     expect(screen.getAllByText('settings.readOnly').length).toBeGreaterThan(0);
     expect(screen.getByText('settings.onlineImSnapshot')).toBeInTheDocument();
-    expect(screen.getByText('settings.status.snapshot')).toBeInTheDocument();
+    expect(screen.getAllByText('settings.status.snapshot').length).toBeGreaterThan(0);
     expect(screen.queryByText('settings.contractPending')).not.toBeInTheDocument();
     expect(mockHubClient.listContacts).toHaveBeenCalled();
     expect(mockHubClient.listSessions).toHaveBeenCalled();
     expect(mockHubClient.listFriendRequests).toHaveBeenCalled();
     expect(mockHubClient.listNotifications).toHaveBeenCalledWith({ limit: 20 });
+  });
+
+  it('does not label pending Online IM queries as real snapshots', () => {
+    mockHubClient.listContacts.mockImplementation(() => new Promise(() => undefined));
+
+    renderSettings('onlineIm');
+
+    expect(screen.getAllByText('settings.loading').length).toBeGreaterThan(0);
+    expect(screen.queryByText('settings.status.snapshot')).not.toBeInTheDocument();
   });
 
   it('locks Online IM while signed out and skips Hub snapshot calls', () => {
@@ -526,7 +537,14 @@ describe('SettingsPage tasks', () => {
     renderSettings('agentMarket');
 
     expect(await screen.findByText('settings.hubUnavailable')).toBeInTheDocument();
+    expect(screen.getByText('settings.status.error')).toBeInTheDocument();
+    expect(screen.queryByText('settings.status.snapshot')).not.toBeInTheDocument();
     expect(screen.queryByText('Codex')).not.toBeInTheDocument();
+  });
+
+  it('defines localized settings status error labels', () => {
+    expect(enLocale['settings.status.error']).toBe('Error');
+    expect(zhLocale['settings.status.error']).toBe('错误');
   });
 
   it('renders MCP runtime capability matrix from local profiles', () => {
