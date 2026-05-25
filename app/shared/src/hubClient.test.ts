@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from './errors';
 import {
   createHubClient,
+  HubError,
   parseHubError,
   unwrapHubResponse,
   type HubCustomAgentRequest,
@@ -90,5 +91,40 @@ describe('hubClient helpers', () => {
     expect(fetchMock.mock.calls[2]?.[0]).toBe('http://hub.local/edge/agent-tasks/task-1/ack');
     expect(fetchMock.mock.calls[3]?.[0]).toBe('http://hub.local/web/agent-tasks');
     expect(customAgent.agent_type).toBe('codex');
+  });
+
+  it('requests notification endpoints', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK', data: [{ id: 'n1', read: false }] }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK' }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK' }));
+
+    const client = createHubClient({ baseUrl: 'http://hub.local' });
+
+    await expect(client.listNotifications({ unread_only: true, limit: 10 })).resolves.toEqual([
+      { id: 'n1', read: false },
+    ]);
+    await expect(client.markNotificationRead('n1')).resolves.toBeUndefined();
+    await expect(client.readAllNotifications()).resolves.toBeUndefined();
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'http://hub.local/client/notifications?unread_only=true&limit=10',
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      'http://hub.local/client/notifications/n1/read',
+    );
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      'http://hub.local/client/notifications/read-all',
+    );
+  });
+
+  it('keeps the legacy HubError shape for Desktop compatibility', () => {
+    const error = new HubError(401, 'Unauthorized', 'auth_failed');
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error.name).toBe('HubError');
+    expect(error.status).toBe(401);
+    expect(error.code).toBe('auth_failed');
+    expect(error.message).toBe('Unauthorized');
   });
 });

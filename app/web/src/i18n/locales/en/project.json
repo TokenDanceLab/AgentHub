@@ -34,9 +34,12 @@
   "metrics": {
     "aria": "Project metrics",
     "activeTasks": "Active tasks",
+    "demoActiveTasks": "Demo active tasks",
     "milestones": "Milestones",
     "sharedFiles": "Shared files",
-    "dryRuns": "Dry runs"
+    "demoSharedFiles": "Demo shared files",
+    "dryRuns": "Dry runs",
+    "demoDryRuns": "Demo dry runs"
   },
   "board": {
     "tabsAria": "Project board sections",
