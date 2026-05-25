@@ -84,7 +84,7 @@ func TestMain(m *testing.M) {
 	agentService := service.NewAgentService(db, bus, mgr, cacheClient)
 	agentHandler := handler.NewAgentHandler(agentService)
 	customAgentHandler := handler.NewCustomAgentHandler(agentService)
-	attachmentService := service.NewAttachmentService(db, cfg.Upload, service.NewLocalStorage())
+	attachmentService := service.NewAttachmentService(db, cfg.Upload, service.NewLocalStorage(cfg.Upload.Dir))
 	attachmentHandler := handler.NewAttachmentHandler(attachmentService)
 	notificationService := service.NewNotificationService(db, mgr)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
