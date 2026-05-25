@@ -41,6 +41,7 @@ describe('errors', () => {
       expect(err).toBeInstanceOf(Error);
       expect(err.name).toBe('AppError');
       expect(err.code).toBe('runner_offline');
+      expect(err.status).toBe(409);
       expect(err.message).toBe('Runner 不在线');
       expect(err.traceId).toBe('trace_1');
     });
@@ -60,8 +61,27 @@ describe('errors', () => {
 
       const err = await parseError(res);
       expect(err.code).toBe('not_found');
+      expect(err.status).toBe(404);
       expect(err.message).toBe('thread not found');
       expect(err.traceId).toBe('trace_abc');
+    });
+
+    it('preserves top-level active run fields in details', async () => {
+      const res = {
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        json: () =>
+          Promise.resolve({
+            error: { code: 'active_run_exists', message: 'active run exists' },
+            runId: 'run_active_1',
+          }),
+      } as Response;
+
+      const err = await parseError(res);
+      expect(err.code).toBe('active_run_exists');
+      expect(err.status).toBe(409);
+      expect(err.details?.runId).toBe('run_active_1');
     });
 
     it('falls back to generic error on malformed body', async () => {

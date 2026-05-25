@@ -42,7 +42,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			last_active_at DATETIME NOT NULL DEFAULT (datetime('now')),
 			created_at DATETIME
 		)`,
-		`CREATE UNIQUE INDEX idx_devices_user_type ON devices(user_id, device_type)`,
+		`CREATE INDEX idx_devices_user_type ON devices(user_id, device_type)`,
 		`CREATE TABLE sessions (
 			id TEXT PRIMARY KEY,
 			type TEXT NOT NULL,
@@ -87,6 +87,13 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			pinned_by_user_id TEXT NOT NULL,
 			pinned_at DATETIME,
 			PRIMARY KEY (session_id, message_id)
+		)`,
+		`CREATE TABLE message_attachments (
+			session_id TEXT NOT NULL,
+			message_id TEXT NOT NULL,
+			attachment_id TEXT NOT NULL,
+			created_at DATETIME,
+			PRIMARY KEY (message_id, attachment_id)
 		)`,
 		`CREATE TABLE friendships (
 			id TEXT PRIMARY KEY,
@@ -147,6 +154,8 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			triggered_by_user_id TEXT NOT NULL,
 			trigger_message_id TEXT NOT NULL,
 			status TEXT NOT NULL,
+			edge_run_id TEXT DEFAULT '',
+			edge_device_id TEXT DEFAULT '',
 			error_message TEXT DEFAULT '',
 			created_at DATETIME,
 			dispatched_at DATETIME,
@@ -272,9 +281,9 @@ func TestDeviceRepo_Upsert(t *testing.T) {
 	assert.Equal(t, "desktop", fetched.DeviceType)
 	assert.Equal(t, "1.0.0", fetched.AppVersion)
 
-	// Second upsert: updates (same user_id + device_type)
+	// Second upsert: same physical device updates by device ID.
 	device2 := &model.Device{
-		ID:           "dev-001-v2",
+		ID:           "dev-001",
 		UserID:       "user-001",
 		DeviceType:   "desktop",
 		AppVersion:   "2.0.0",
@@ -287,6 +296,34 @@ func TestDeviceRepo_Upsert(t *testing.T) {
 	// Verify the original row was updated.
 	fetched, err = GetDeviceByID(db, "dev-001")
 	require.NoError(t, err)
+	assert.Equal(t, "2.0.0", fetched.AppVersion)
+
+	// A second desktop for the same user is a distinct device and must keep its
+	// own row so refresh_tokens.device_id can reference it.
+	device3 := &model.Device{
+		ID:           "dev-001-second-desktop",
+		UserID:       "user-001",
+		DeviceType:   "desktop",
+		AppVersion:   "1.0.0",
+		Capabilities: `["chat"]`,
+	}
+	require.NoError(t, UpsertDevice(db, device3))
+	fetched, err = GetDeviceByID(db, "dev-001-second-desktop")
+	require.NoError(t, err)
+	assert.Equal(t, "user-001", fetched.UserID)
+	assert.Equal(t, "desktop", fetched.DeviceType)
+
+	stolen := &model.Device{
+		ID:           "dev-001",
+		UserID:       "user-attacker",
+		DeviceType:   "desktop",
+		AppVersion:   "9.9.9",
+		Capabilities: `[]`,
+	}
+	require.Error(t, UpsertDevice(db, stolen))
+	fetched, err = GetDeviceByID(db, "dev-001")
+	require.NoError(t, err)
+	assert.Equal(t, "user-001", fetched.UserID)
 	assert.Equal(t, "2.0.0", fetched.AppVersion)
 }
 
@@ -586,6 +623,51 @@ func TestMessageRepo_Pins(t *testing.T) {
 	count, err = CountPinsBySession(db, s.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), count)
+}
+
+func TestMessageAttachmentRepo_CreateAndAccess(t *testing.T) {
+	db := setupSQLite(t)
+	s := createTestSession(t, db)
+
+	member := &model.SessionMember{
+		SessionID:  s.ID,
+		MemberType: model.MemberTypeUser,
+		MemberID:   "viewer-1",
+		Role:       model.MemberRoleMember,
+	}
+	require.NoError(t, CreateSessionMember(db, member))
+
+	msg := &model.Message{
+		SessionID:   s.ID,
+		SeqID:       1,
+		ClientMsgID: "attach-client-1",
+		SenderType:  model.SenderTypeUser,
+		SenderID:    "owner-1",
+		ContentType: model.ContentTypeFile,
+		Content:     `{"attachment_id":"att-1"}`,
+	}
+	require.NoError(t, InsertMessage(db, msg))
+
+	refs := []model.MessageAttachment{{
+		SessionID:    s.ID,
+		MessageID:    msg.ID,
+		AttachmentID: "att-1",
+	}}
+	require.NoError(t, CreateMessageAttachmentReferences(db, refs))
+	require.NoError(t, CreateMessageAttachmentReferences(db, refs))
+
+	allowed, err := CanUserAccessReferencedAttachment(db, "viewer-1", "att-1")
+	require.NoError(t, err)
+	assert.True(t, allowed)
+
+	allowed, err = CanUserAccessReferencedAttachment(db, "outsider-1", "att-1")
+	require.NoError(t, err)
+	assert.False(t, allowed)
+
+	require.NoError(t, SoftDeleteMember(db, s.ID, model.MemberTypeUser, "viewer-1"))
+	allowed, err = CanUserAccessReferencedAttachment(db, "viewer-1", "att-1")
+	require.NoError(t, err)
+	assert.False(t, allowed)
 }
 
 func TestMessageRepo_GetByIDs(t *testing.T) {
@@ -978,6 +1060,21 @@ func TestPendingTaskRepo_CRUD(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, model.TaskStatusDispatched, fetched.Status)
 	assert.NotNil(t, fetched.DispatchedAt)
+
+	err = UpdatePendingTaskDispatched(db, task.ID, "device-edge-1")
+	require.NoError(t, err)
+	fetched, err = GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusDispatched, fetched.Status)
+	assert.Equal(t, "device-edge-1", fetched.EdgeDeviceID)
+
+	// Update status to running and persist the Edge run mapping.
+	err = UpdatePendingTaskStatusWithEdgeRunID(db, task.ID, model.TaskStatusRunning, "", "run-edge-1")
+	require.NoError(t, err)
+	fetched, err = GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusRunning, fetched.Status)
+	assert.Equal(t, "run-edge-1", fetched.EdgeRunID)
 
 	// Update status to done
 	err = UpdatePendingTaskStatus(db, task.ID, model.TaskStatusDone, "")

@@ -10,20 +10,35 @@ export interface ErrorBody {
     traceId?: string;
     details?: Record<string, unknown>;
   };
+  [key: string]: unknown;
 }
 
 export class AppError extends Error {
   code: string;
+  status: number;
   traceId?: string;
   details?: Record<string, unknown>;
+  rawBody?: unknown;
 
-  constructor(body: ErrorBody, status: number) {
+  constructor(body: ErrorBody, status: number, rawBody: unknown = body) {
     super(body.error.message);
     this.name = 'AppError';
     this.code = body.error.code;
+    this.status = status;
     this.traceId = body.error.traceId;
-    this.details = body.error.details;
+    this.details = normalizeDetails(body);
+    this.rawBody = rawBody;
   }
+}
+
+function normalizeDetails(body: ErrorBody): Record<string, unknown> | undefined {
+  const details = { ...(body.error.details ?? {}) };
+  for (const key of ['runId', 'projectId', 'threadId']) {
+    if (details[key] === undefined && body[key] !== undefined) {
+      details[key] = body[key];
+    }
+  }
+  return Object.keys(details).length > 0 ? details : undefined;
 }
 
 export function isErrorResponse(body: unknown): body is ErrorBody {

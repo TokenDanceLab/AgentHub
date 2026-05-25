@@ -431,50 +431,52 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
             </div>
           )}
 
-          <span
-            className={styles.timestamp}
-            title={rt.exact}
-            aria-label={rt.exact}
-          >
-            {rt.relative}
-          </span>
-
-          <div className={styles.actionBar}>
-            <button
-              className={styles.actionBtn}
-              title="Copy"
-              onClick={() => handleCopy(msg)}
-            >
-              <Copy size={14} />
-            </button>
-            {onRetry && (
-              <button
-                className={styles.actionBtn}
-                title="Retry"
-                onClick={() => onRetry(msg.id)}
-              >
-                <RefreshCw size={14} />
-              </button>
-            )}
-            {onDelete && (
-              <button
-                className={styles.actionBtn}
-                title="Delete"
-                onClick={() => onDelete(msg.id)}
-              >
-                <Trash2 size={14} />
-              </button>
-            )}
-          </div>
-          {copiedMessageId === msg.id && (
-            <span className={styles.copyToast}>Copied!</span>
-          )}
           {msg.blocks.map((block, i) => {
             if (block.kind === 'text' && isStreaming && msg.id === lastMsg?.id) {
               return <StreamingTextBlock key={i} content={block.content} isStreaming={true} />;
             }
             return <BlockRenderer key={i} block={block} t={t} />;
           })}
+
+          <div className={styles.messageFooter}>
+            <span
+              className={styles.timestamp}
+              title={rt.exact}
+              aria-label={rt.exact}
+            >
+              {rt.relative}
+            </span>
+            <div className={styles.actionBar}>
+              <button
+                className={styles.actionBtn}
+                title="Copy"
+                onClick={() => handleCopy(msg)}
+              >
+                <Copy size={14} />
+              </button>
+              {onRetry && (
+                <button
+                  className={styles.actionBtn}
+                  title="Retry"
+                  onClick={() => onRetry(msg.id)}
+                >
+                  <RefreshCw size={14} />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  className={styles.actionBtn}
+                  title="Delete"
+                  onClick={() => onDelete(msg.id)}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+          {copiedMessageId === msg.id && (
+            <span className={styles.copyToast}>Copied!</span>
+          )}
         </div>
       );
     },
@@ -495,9 +497,13 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
       >
         {messages.length === 0 ? (
           <EmptyState
-            icon={<MessageSquare size={24} />}
             title={t('chat.emptyTitle')}
             description={t('chat.emptyDescription')}
+            suggestions={[
+              { label: t('chat.suggestion.newTask'), onClick: () => {} },
+              { label: t('chat.suggestion.explainCode'), onClick: () => {} },
+              { label: t('chat.suggestion.fixBugs'), onClick: () => {} },
+            ]}
           />
         ) : (
           <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative', flexShrink: 0 }}>

@@ -19,6 +19,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 )
 
 func newMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
@@ -190,7 +191,7 @@ func TestLogin_Success(t *testing.T) {
 
 	// UpsertRefreshToken: lookup then create
 	mock.ExpectQuery(sqlRTByUserDevice).
-		WithArgs("user-uuid", "desktop", sqlmock.AnyArg(), 1).
+		WithArgs("user-uuid", "desktop", "dev-1", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 	mock.ExpectExec(sqlInsertRT).
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -201,6 +202,12 @@ func TestLogin_Success(t *testing.T) {
 	assert.NotEmpty(t, resp.AccessToken)
 	assert.NotEmpty(t, resp.RefreshToken)
 	assert.Equal(t, int64(900), resp.ExpiresIn)
+
+	claims, err := jwtutil.ParseToken(resp.AccessToken, jwtCfg().Secret)
+	require.NoError(t, err)
+	assert.Equal(t, "user-uuid", claims.UserID)
+	assert.Equal(t, "desktop", claims.DeviceType)
+	assert.Equal(t, "dev-1", claims.DeviceID)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -353,6 +360,29 @@ func TestChangePassword_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestChangePassword_NilCacheDoesNotPanic(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	hash := hashPW("oldpassword")
+	mock.ExpectQuery(sqlUserByID).
+		WithArgs("user-uuid", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
+			AddRow("user-uuid", "testuser", hash, "Test User"))
+
+	mock.ExpectExec(sqlUpdateUser).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	mock.ExpectExec(sqlRevokeAllTokens).
+		WithArgs(true, "user-uuid").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	svc := NewAuthService(db, jwtCfg(), nil)
+	err := svc.ChangePassword(context.Background(), "user-uuid", "oldpassword", "newpassword123")
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ==================== UpdateProfile ====================
 
 func TestUpdateProfile_Success(t *testing.T) {
@@ -369,6 +399,25 @@ func TestUpdateProfile_Success(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	svc := NewAuthService(db, jwtCfg(), testCacheClient(t))
+	user, err := svc.UpdateProfile(context.Background(), "user-uuid", "New Name", "https://img.com/a.png")
+	require.NoError(t, err)
+	assert.Equal(t, "New Name", user.Nickname)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUpdateProfile_NilCacheDoesNotPanic(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(sqlUserByID).
+		WithArgs("user-uuid", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname", "avatar_url"}).
+			AddRow("user-uuid", "testuser", "hashed", "Old Name", ""))
+
+	mock.ExpectExec(sqlUpdateUser).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	svc := NewAuthService(db, jwtCfg(), nil)
 	user, err := svc.UpdateProfile(context.Background(), "user-uuid", "New Name", "https://img.com/a.png")
 	require.NoError(t, err)
 	assert.Equal(t, "New Name", user.Nickname)

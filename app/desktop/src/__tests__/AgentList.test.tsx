@@ -11,6 +11,12 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('@lobehub/icons', () => ({
+  ClaudeCode: ({ size }: { size?: number }) => <span data-testid="claude-icon" style={{ width: size, height: size }} />,
+  Codex: ({ size }: { size?: number }) => <span data-testid="codex-icon" style={{ width: size, height: size }} />,
+  OpenCode: ({ size }: { size?: number }) => <span data-testid="opencode-icon" style={{ width: size, height: size }} />,
+}));
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -28,6 +34,9 @@ function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
       fileChanges: false,
       thinkingVisible: false,
       multiTurn: false,
+      mcpIntegration: false,
+      permissionHooks: false,
+      subAgentSpawn: false,
     },
     ...overrides,
   };
@@ -67,7 +76,7 @@ describe('AgentList', () => {
     expect(notSelectedBtn?.className).not.toContain('selected');
   });
 
-  it('shows capability tags for agents', () => {
+  it('shows runtime metadata instead of basic capability tags', () => {
     const agents = [
       makeAgent({
         id: 'a1',
@@ -78,12 +87,17 @@ describe('AgentList', () => {
           fileChanges: false,
           thinkingVisible: false,
           multiTurn: false,
+          mcpIntegration: false,
+          permissionHooks: false,
+          subAgentSpawn: false,
         },
       }),
     ];
     render(<AgentList agents={agents} online={true} />);
-    expect(screen.getByText('agent.capability.streaming')).toBeInTheDocument();
-    expect(screen.getByText('agent.capability.toolCalls')).toBeInTheDocument();
+    expect(screen.getByText('agent.runtime.localEdge')).toBeInTheDocument();
+    expect(screen.getByText('agent.runtime.cliAdapter')).toBeInTheDocument();
+    expect(screen.queryByText('agent.capability.streaming')).not.toBeInTheDocument();
+    expect(screen.queryByText('agent.capability.toolCalls')).not.toBeInTheDocument();
   });
 
   it('calls onSelect when an agent is clicked', () => {
@@ -92,7 +106,7 @@ describe('AgentList', () => {
     render(<AgentList agents={[agent]} online={true} onSelect={onSelect} />);
     fireEvent.click(screen.getByText('ClickMe'));
     expect(onSelect).toHaveBeenCalledTimes(1);
-    expect(onSelect).toHaveBeenCalledWith(agent);
+    expect(onSelect).toHaveBeenCalledWith('a1');
   });
 
   it('renders title', () => {

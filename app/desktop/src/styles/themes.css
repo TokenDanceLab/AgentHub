@@ -1,156 +1,209 @@
 /* ═════════════════════════════════════════════════════════════════════
-   AgentHub Theme Variables — Dark (default) & Light
+   AgentHub Theme Variables — macOS-inspired Dark & Light
    Toggled via data-theme attribute on <html>
-   Dark theme: One Dark Pro inspired — blue-gray layered system
+   Light: macOS matte gray backdrop, floating white cards, soft shadows
+   Dark: One Dark Pro inspired — blue-gray layered system
    ═════════════════════════════════════════════════════════════════════ */
 
-/* ── Dark Theme (default) : One Dark Pro ──────────────────────────────── */
+/* ── Dark Theme : macOS Liquid Glass ──────────────────────────────────── */
 :root {
-  /* Semantic Colors */
-  --background: oklch(0.18 0.008 252);  /* #21252B — base */
-  --foreground: oklch(0.74 0.012 252);  /* #ABB2BF — primary text */
-  --card: oklch(0.21 0.009 252);        /* #282C34 — card surfaces */
-  --card-foreground: oklch(0.74 0.012 252);
-  --popover: oklch(0.22 0.010 252);
-  --popover-foreground: oklch(0.74 0.012 252);
-  --primary: oklch(0.62 0.19 265);      /* #528BFF — accent blue */
-  --primary-foreground: oklch(0.97 0.003 252);
-  --secondary: oklch(0.22 0.010 252);
-  --secondary-foreground: oklch(0.74 0.012 252);
-  --muted: oklch(0.22 0.010 252);
-  --muted-foreground: oklch(0.55 0.012 252); /* #6A7380 — visible dim text */
-  --accent: oklch(0.62 0.19 265);
-  --accent-foreground: oklch(0.97 0.003 252);
-  --destructive: oklch(0.58 0.20 20);
-  --destructive-foreground: oklch(0.97 0.003 252);
-  --border: oklch(0.13 0.006 252);       /* #181A1F */
-  --input: oklch(0.16 0.007 252);        /* #1E2227 — depressed */
-  --ring: oklch(0.62 0.19 265);          /* #528BFF */
+  /* Base layer — deep charcoal, not pure black */
+  --app-bg: #141418;
+  --background: rgba(28, 28, 34, 0.55);
+  --foreground: #E8E8ED;
 
-  /* Extended Semantic */
-  --success: oklch(0.78 0.11 145);       /* #98C379 — One Dark green */
-  --success-foreground: oklch(0.15 0.008 252);
-  --warning: oklch(0.72 0.14 80);
-  --warning-foreground: oklch(0.15 0.008 252);
-  --info: oklch(0.68 0.14 240);          /* #61AFEF — soft blue */
-  --info-foreground: oklch(0.15 0.008 252);
+  /* Cards — semi-transparent glass */
+  --card: rgba(45, 45, 55, 0.55);
+  --card-foreground: #E8E8ED;
+  --popover: rgba(50, 50, 60, 0.72);
+  --popover-foreground: #E8E8ED;
 
-  /* Legacy aliases */
-  --color-success: oklch(0.78 0.11 145);
-  --color-danger: oklch(0.58 0.20 20);
-  --color-border: oklch(0.15 0.007 252);
+  /* Primary — slightly desaturated for dark mode */
+  --primary: #7C7CE0;
+  --primary-foreground: #FFFFFF;
+  --secondary: rgba(255, 255, 255, 0.06);
+  --secondary-foreground: #E8E8ED;
+  --muted: rgba(255, 255, 255, 0.04);
+  --muted-foreground: #8E8E93;
+  --accent: #7C7CE0;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
 
-  /* Brand */
-  --brand: oklch(0.62 0.19 265);
+  /* Borders — faint white glow for glass edge */
+  --border: rgba(255, 255, 255, 0.06);
+  --input: rgba(255, 255, 255, 0.05);
+  --ring: rgba(124, 124, 224, 0.35);
 
-  /* Authority */
-  --authority-hub: oklch(0.62 0.19 265);
-  --authority-edge: oklch(0.78 0.11 145);
-  --authority-hybrid: oklch(0.72 0.14 80);
+  /* Status */
+  --success: #34D399;
+  --success-foreground: #0F172A;
+  --warning: #FBBF24;
+  --warning-foreground: #0F172A;
+  --info: #60A5FA;
+  --info-foreground: #0F172A;
 
-  /* Run Status */
-  --run-queued: oklch(0.33 0.006 252);
-  --run-starting: oklch(0.62 0.19 265);
-  --run-running: oklch(0.78 0.11 145);
-  --run-completed: oklch(0.78 0.11 145);
-  --run-failed: oklch(0.58 0.20 20);
-  --run-cancelled: oklch(0.30 0.006 252);
+  --color-success: #34D399;
+  --color-danger: #EF4444;
+  --color-border: rgba(255, 255, 255, 0.06);
 
-  /* Diff */
-  --diff-added-bg: oklch(0.20 0.04 145);
-  --diff-added-border: oklch(0.78 0.11 145);
-  --diff-removed-bg: oklch(0.20 0.04 20);
-  --diff-removed-border: oklch(0.58 0.20 20);
+  --brand: #7C7CE0;
+  --authority-hub: #7C7CE0;
+  --authority-edge: #34D399;
+  --authority-hybrid: #FBBF24;
 
-  /* Scrollbar */
-  --scrollbar-thumb: oklch(0.28 0.010 252);
-  --scrollbar-thumb-hover: oklch(0.36 0.012 252);
+  --run-queued: rgba(255, 255, 255, 0.08);
+  --run-starting: #7C7CE0;
+  --run-running: #34D399;
+  --run-completed: #34D399;
+  --run-failed: #EF4444;
+  --run-cancelled: rgba(255, 255, 255, 0.05);
+
+  --diff-added-bg: rgba(52, 211, 153, 0.08);
+  --diff-added-border: #34D399;
+  --diff-removed-bg: rgba(239, 68, 68, 0.08);
+  --diff-removed-border: #EF4444;
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
   --scrollbar-track: transparent;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.45);
 
-  /* Surface Layers — One Dark Pro layering */
-  --surface: oklch(0.22 0.010 252);               /* alias */
-  --surface-base: oklch(0.18 0.008 252);           /* nav/topbar/sidebars = #21252B */
-  --surface-raised: oklch(0.21 0.009 252);         /* cards/headers = #282C34 */
-  --surface-raised-hover: oklch(0.24 0.012 252);   /* hover lifts */
-  --surface-overlay: oklch(0.26 0.014 252);        /* dropdown/popover */
+  /* Glass panels — layered depth */
+  --sidebar-bg: rgba(30, 30, 38, 0.72);
 
-  /* Hover Overlay */
-  --hover-overlay: oklch(1 0 0 / 0.06);
+  --surface-base: rgba(28, 28, 34, 0.4);
+  --surface-raised: rgba(45, 45, 55, 0.5);
+  --surface-raised-hover: rgba(55, 55, 65, 0.6);
+  --surface-overlay: rgba(60, 60, 70, 0.7);
+  --hover-overlay: rgba(255, 255, 255, 0.04);
+
+  --text-weaker: #8E8E93;
+  --text-weakest: #636366;
+
+  /* TokenDance cross-app aliases */
+  --td-canvas: var(--app-bg);
+  --td-surface: var(--surface-raised);
+  --td-tint: var(--secondary);
+  --td-ink: var(--foreground);
+  --td-ink-muted: var(--muted-foreground);
+  --td-line: var(--border);
+  --td-plum: var(--brand);
+  --td-moss: var(--success);
+  --td-danger: var(--destructive);
+  --td-focus: var(--ring);
+  --td-radius-control: var(--radius-md);
+  --td-radius-panel: var(--radius-xl);
 }
 
-/* ── Light Theme ─────────────────────────────────────────────────────── */
+/* ── Light Theme — macOS matte gray ────────────────────────────────────── */
 [data-theme='light'] {
-  --background: oklch(0.985 0.002 260);
-  --foreground: oklch(0.14 0.005 260); /* → text-strong */
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.14 0.005 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.14 0.005 260);
-  --primary: oklch(0.21 0.006 286);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.965 0.003 260);
-  --secondary-foreground: oklch(0.21 0.006 286);
-  --muted: oklch(0.965 0.003 260);
-  --muted-foreground: oklch(0.55 0.012 260); /* → text-weak */
-  --accent: oklch(0.965 0.003 260);
-  --accent-foreground: oklch(0.21 0.006 286);
-  --destructive: oklch(0.58 0.24 27);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.9 0.005 260);
-  --input: oklch(0.9 0.005 260);
-  --ring: oklch(0.62 0.015 260);
+  --app-bg: #F4F4F5;
+  --sidebar-bg: rgba(246, 246, 247, 0.75);
 
-  --success: oklch(0.58 0.18 150);
-  --success-foreground: oklch(0.985 0 0);
-  --warning: oklch(0.7 0.18 85);
-  --warning-foreground: oklch(0.14 0.005 260);
-  --info: oklch(0.6 0.12 230);
-  --info-foreground: oklch(0.985 0 0);
+  --background: #FFFFFF;
+  --foreground: oklch(0.18 0.005 260);
+  --card: #FFFFFF;
+  --card-foreground: oklch(0.18 0.005 260);
+  --popover: rgba(255, 255, 255, 0.92);
+  --popover-foreground: oklch(0.18 0.005 260);
+  --primary: oklch(0.48 0.18 265);
+  --primary-foreground: #FFFFFF;
+  --secondary: oklch(0.96 0.003 260);
+  --secondary-foreground: oklch(0.18 0.005 260);
+  --muted: #F4F4F5;
+  --muted-foreground: #8E8E93;
+  --accent: oklch(0.96 0.003 260);
+  --accent-foreground: oklch(0.18 0.005 260);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: #FFFFFF;
+  --border: rgba(0, 0, 0, 0.06);
+  --input: rgba(0, 0, 0, 0.04);
+  --ring: rgba(99, 102, 241, 0.25);
 
-  --color-success: oklch(0.58 0.18 150);
-  --color-danger: oklch(0.58 0.24 27);
-  --color-border: oklch(0.85 0.005 260);
+  --success: oklch(0.55 0.16 150);
+  --success-foreground: #FFFFFF;
+  --warning: oklch(0.68 0.17 85);
+  --warning-foreground: oklch(0.18 0.005 260);
+  --info: oklch(0.55 0.11 230);
+  --info-foreground: #FFFFFF;
 
-  --brand: oklch(0.55 0.16 255);
+  --color-success: oklch(0.55 0.16 150);
+  --color-danger: oklch(0.55 0.22 25);
+  --color-border: rgba(0, 0, 0, 0.06);
 
-  --authority-hub: oklch(0.6 0.18 250);
-  --authority-edge: oklch(0.6 0.18 150);
-  --authority-hybrid: oklch(0.65 0.18 65);
+  --brand: oklch(0.48 0.18 265);
+  --authority-hub: oklch(0.52 0.16 250);
+  --authority-edge: oklch(0.55 0.16 150);
+  --authority-hybrid: oklch(0.62 0.17 65);
 
-  --run-queued: oklch(0.55 0.02 260);
-  --run-starting: oklch(0.62 0.15 250);
-  --run-running: oklch(0.62 0.18 150);
-  --run-completed: oklch(0.58 0.18 150);
-  --run-failed: oklch(0.55 0.22 25);
-  --run-cancelled: oklch(0.5 0.02 260);
+  --run-queued: oklch(0.65 0.01 260);
+  --run-starting: oklch(0.52 0.14 250);
+  --run-running: oklch(0.55 0.16 150);
+  --run-completed: oklch(0.55 0.16 150);
+  --run-failed: oklch(0.50 0.20 25);
+  --run-cancelled: oklch(0.60 0.01 260);
 
-  --diff-added-bg: oklch(0.92 0.06 150);
-  --diff-added-border: oklch(0.58 0.18 150);
-  --diff-removed-bg: oklch(0.92 0.06 25);
-  --diff-removed-border: oklch(0.58 0.24 25);
+  --diff-added-bg: oklch(0.94 0.04 150);
+  --diff-added-border: oklch(0.60 0.16 150);
+  --diff-removed-bg: oklch(0.94 0.04 25);
+  --diff-removed-border: oklch(0.55 0.22 25);
 
-  --scrollbar-thumb: oklch(0.75 0.01 260);
-  --scrollbar-thumb-hover: oklch(0.65 0.01 260);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.12);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.20);
   --scrollbar-track: transparent;
 
-  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.08);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 8px -1px rgba(0, 0, 0, 0.02);
 
-  /* Surface Layers */
-  --surface: oklch(0.98 0.002 260);             /* alias — most common panel bg */
-  --surface-base: oklch(0.98 0.002 260);         /* bottom container */
-  --surface-raised: oklch(1.0 0 0);              /* cards/panels */
-  --surface-raised-hover: oklch(0.96 0.003 260); /* hover elevation */
-  --surface-overlay: oklch(0.94 0.004 260);      /* dropdown/popover */
+  --surface-base: #F4F4F5;
+  --surface-raised: #FFFFFF;
+  --surface-raised-hover: #F8F8F9;
+  --surface-overlay: rgba(255, 255, 255, 0.85);
 
-  /* Hover Overlay */
-  --hover-overlay: oklch(1 0 0 / 0.06);
+  --hover-overlay: rgba(0, 0, 0, 0.04);
 
-  /* Text helpers — light mode */
-  --text-weaker:  oklch(0.55 0.012 260);
-  --text-weakest: oklch(0.65 0.008 260);
+  --text-weaker: #8E8E93;
+  --text-weakest: #B0B0B5;
+
+  /* TokenDance cross-app aliases */
+  --td-canvas: var(--app-bg);
+  --td-surface: var(--surface-raised);
+  --td-tint: var(--secondary);
+  --td-ink: var(--foreground);
+  --td-ink-muted: var(--muted-foreground);
+  --td-line: var(--border);
+  --td-plum: var(--brand);
+  --td-moss: var(--success);
+  --td-danger: var(--destructive);
+  --td-focus: var(--ring);
+  --td-radius-control: var(--radius-md);
+  --td-radius-panel: var(--radius-xl);
+}
+
+/* ── Shared glass/backdrop utilities ──────────────────────────────────── */
+[data-theme='light'] .glass-panel {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+[data-theme='light'] .glass-sidebar {
+  background: rgba(246, 246, 247, 0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+[data-theme='dark'] .glass-panel {
+  background: rgba(45, 45, 55, 0.45);
+  backdrop-filter: blur(40px) saturate(1.2);
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+}
+
+[data-theme='dark'] .glass-sidebar {
+  background: rgba(35, 35, 45, 0.55);
+  backdrop-filter: blur(40px) saturate(1.2);
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
 }

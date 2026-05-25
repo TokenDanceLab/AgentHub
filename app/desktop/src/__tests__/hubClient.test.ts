@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createHubClient, HubError } from '../api/hubClient';
 import type { AuthResponse, UserProfile } from '../api/hubClient';
 import { createHubAuth } from '../api/hubAuth';
+import { clearStoredHubRefreshToken, saveStoredHubRefreshToken } from '../api/hubTokenStorage';
 
 const mockUser: UserProfile = {
   id: 'user_1',
@@ -43,9 +44,10 @@ function mockFetchSequence(responses: Array<{ status: number; data: unknown }>) 
 // ── Tests ────────────────────────────────────────
 
 describe('hubClient', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.restoreAllMocks();
     localStorage.clear();
+    await clearStoredHubRefreshToken();
   });
 
   describe('createHubClient (unauthenticated)', () => {
@@ -199,12 +201,11 @@ describe('hubClient', () => {
     });
 
     it('sendFriendRequest POSTs correctly', async () => {
-      const fetchSpy = mockFetch(200, { id: 'fr_1' });
-      const res = await client.sendFriendRequest('user_b', 'Hello!');
-      expect(res.id).toBe('fr_1');
+      const fetchSpy = mockFetch(200, {});
+      await client.sendFriendRequest('user_b', 'Hello!');
       const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string);
-      expect(body.user_id).toBe('user_b');
+      expect(body.friend_id).toBe('user_b');
       expect(body.message).toBe('Hello!');
     });
 
@@ -215,13 +216,13 @@ describe('hubClient', () => {
       expect(res[0].id).toBe('s1');
     });
 
-    it('createPrivateSession POSTs user_id', async () => {
+    it('createPrivateSession POSTs target_user_id', async () => {
       const fetchSpy = mockFetch(200, { id: 's_new', type: 'private', owner_user_id: 'u1' });
-      const res = await client.createPrivateSession({ user_id: 'user_b' });
+      const res = await client.createPrivateSession({ target_user_id: 'user_b' });
       expect(res.id).toBe('s_new');
       const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string);
-      expect(body.user_id).toBe('user_b');
+      expect(body.target_user_id).toBe('user_b');
     });
 
     it('registerDevice POSTs device info', async () => {
@@ -229,13 +230,14 @@ describe('hubClient', () => {
       const fetchSpy = mockFetch(200, device);
       const res = await client.registerDevice({
         device_id: 'dev_1',
-        device_type: 'desktop',
         app_version: '1.0',
+        capabilities: ['webgl', 'gpu'],
       });
       expect(res.id).toBe('dev_1');
       const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string);
       expect(body.device_id).toBe('dev_1');
+      expect(body.capabilities).toEqual(['webgl', 'gpu']);
     });
   });
 
@@ -253,9 +255,10 @@ describe('hubClient', () => {
 // ── hubAuth tests ────────────────────────────────
 
 describe('hubAuth', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.restoreAllMocks();
     localStorage.clear();
+    await clearStoredHubRefreshToken();
   });
 
   const newAuth = () => createHubAuth(createHubClient({ baseUrl: 'http://test.local' }));
@@ -277,7 +280,23 @@ describe('hubAuth', () => {
       expect(state.isAuthenticated).toBe(true);
       expect(state.user?.username).toBe('testuser');
       expect(localStorage.getItem('agenthub_hub_token')).toBe('jwt_access_123');
-      expect(localStorage.getItem('agenthub_hub_refresh')).toBe('jwt_refresh_456');
+      expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
+    });
+
+    it('uses the stable desktop device id for legacy login', async () => {
+      localStorage.setItem('agenthub_device_id', '00000000-0000-0000-0000-00000000a001');
+      const auth = newAuth();
+
+      mockFetchSequence([
+        { status: 200, data: mockAuthResponse },
+        { status: 200, data: mockUser },
+      ]);
+
+      await auth.login('alice', 'hunter2');
+
+      const [, init] = vi.mocked(globalThis.fetch).mock.calls[0] as [string, RequestInit];
+      const body = JSON.parse(init.body as string);
+      expect(body.device_id).toBe('00000000-0000-0000-0000-00000000a001');
     });
 
     it('notifies subscribers on login', async () => {
@@ -377,7 +396,7 @@ describe('hubAuth', () => {
 
     it('refreshes token when stored token is expired', async () => {
       localStorage.setItem('agenthub_hub_token', 'expired_token');
-      localStorage.setItem('agenthub_hub_refresh', 'valid_refresh');
+      await saveStoredHubRefreshToken('valid_refresh');
       const auth = newAuth();
 
       mockFetchSequence([
@@ -390,13 +409,15 @@ describe('hubAuth', () => {
 
       expect(result).toBe(true);
       expect(auth.getState().token).toBe('new_token');
+      expect(auth.getState().refreshToken).toBe('new_refresh');
       expect(auth.getState().isAuthenticated).toBe(true);
       expect(localStorage.getItem('agenthub_hub_token')).toBe('new_token');
+      expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
     });
 
     it('returns false and clears state when both token and refresh fail', async () => {
       localStorage.setItem('agenthub_hub_token', 'bad_token');
-      localStorage.setItem('agenthub_hub_refresh', 'bad_refresh');
+      await saveStoredHubRefreshToken('bad_refresh');
       const auth = newAuth();
 
       mockFetchSequence([
@@ -429,9 +450,13 @@ describe('hubAuth', () => {
     });
   });
 
-  describe('getState returns a snapshot', () => {
-    it('returns a copy, not the live state object', async () => {
+  describe('getState snapshot stability', () => {
+    it('returns a stable frozen snapshot until auth state changes', async () => {
       const auth = newAuth();
+
+      const initialSnapshot = auth.getState();
+      expect(auth.getState()).toBe(initialSnapshot);
+      expect(Object.isFrozen(initialSnapshot)).toBe(true);
 
       mockFetchSequence([
         { status: 200, data: mockAuthResponse },
@@ -440,9 +465,14 @@ describe('hubAuth', () => {
       await auth.login('alice', 'hunter2');
 
       const snapshot = auth.getState();
-      snapshot.isAuthenticated = false; // mutate copy
+      expect(snapshot).not.toBe(initialSnapshot);
+      expect(auth.getState()).toBe(snapshot);
+      expect(Object.isFrozen(snapshot)).toBe(true);
 
-      expect(auth.getState().isAuthenticated).toBe(true); // original unchanged
+      expect(() => {
+        snapshot.isAuthenticated = false;
+      }).toThrow(TypeError);
+      expect(auth.getState().isAuthenticated).toBe(true);
     });
   });
 

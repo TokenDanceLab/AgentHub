@@ -30,3 +30,34 @@ func TestIsTrustedLocalOrigin(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateLocalListenAddr(t *testing.T) {
+	tests := []struct {
+		name    string
+		addr    string
+		wantErr bool
+	}{
+		{"default loopback", "127.0.0.1:3210", false},
+		{"localhost", "localhost:3210", false},
+		{"ipv6 loopback", "[::1]:3210", false},
+		{"tauri localhost", "tauri.localhost:3210", false},
+		{"wildcard host", ":3210", true},
+		{"ipv4 wildcard", "0.0.0.0:3210", true},
+		{"ipv6 wildcard", "[::]:3210", true},
+		{"lan ip", "192.168.1.10:3210", true},
+		{"remote hostname", "edge.example.com:3210", true},
+		{"missing port", "127.0.0.1", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateLocalListenAddr(tt.addr)
+			if tt.wantErr && err == nil {
+				t.Fatalf("ValidateLocalListenAddr(%q) returned nil error", tt.addr)
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("ValidateLocalListenAddr(%q) returned error: %v", tt.addr, err)
+			}
+		})
+	}
+}

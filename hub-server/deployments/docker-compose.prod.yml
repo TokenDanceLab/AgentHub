@@ -104,6 +104,7 @@ services:
       AGENTHUB_JWT_ACCESS_TTL: ${AGENTHUB_JWT_ACCESS_TTL:-15m}
       AGENTHUB_JWT_REFRESH_TTL: ${AGENTHUB_JWT_REFRESH_TTL:-720h}
       # 服务
+      AGENTHUB_ENV: production
       AGENTHUB_SERVER_PORT: "8080"
       AGENTHUB_SERVER_LOG_LEVEL: ${AGENTHUB_SERVER_LOG_LEVEL:-info}
       AGENTHUB_SERVER_ADMIN_PORT: "6060"
@@ -112,7 +113,7 @@ services:
       # PPROF 管理认证（生产必须设置）
       AGENTHUB_PPROF_USER: ${AGENTHUB_PPROF_USER:-admin}
       AGENTHUB_PPROF_PASS: ${AGENTHUB_PPROF_PASS:?必须设置 AGENTHUB_PPROF_PASS}
-      # CORS（允许官网和本地开发）
+      # CORS（生产只允许正式前端域名）
       AGENTHUB_CORS_ORIGINS: ${AGENTHUB_CORS_ORIGINS:-https://hub.vectorcontrol.tech}
     ports:
       - "127.0.0.1:8080:8080"   # 仅本地回环，由 Caddy/nginx 反代

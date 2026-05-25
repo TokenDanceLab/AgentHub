@@ -301,6 +301,16 @@ jobs:
             git diff --check
           fi
 
+      - name: Secret guard
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bash scripts/check-secrets.sh --range "origin/${{ github.base_ref }}...HEAD"
+          elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            bash scripts/check-secrets.sh --range HEAD^..HEAD
+          else
+            bash scripts/check-secrets.sh --worktree
+          fi
+
       - name: Validate OpenAPI YAML
         run: |
           python -m pip install --quiet PyYAML

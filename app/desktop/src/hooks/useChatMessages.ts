@@ -173,7 +173,6 @@ function processEvent(state: State, event: EventEnvelope): State {
       };
       isStreaming = true;
       agentName = '';
-      useRunStore.getState().setRun(rid);
       break;
     }
 
@@ -430,15 +429,18 @@ function processEvent(state: State, event: EventEnvelope): State {
       isStreaming = false;
       const rid = event.payload.runId as string;
       if (currentRun && currentRun.runId === rid) {
-        if (currentRun.status !== RunState.COMPLETED) {
+        if (
+          currentRun.status !== RunState.RUNNING &&
+          currentRun.status !== RunState.STREAMING &&
+          currentRun.status !== RunState.WAITING_FOR_INPUT &&
+          currentRun.status !== RunState.COMPLETED
+        ) {
           console.warn(
             `[useChatMessages] run.finished: unexpected status ${currentRun.status} → ${RunState.COMPLETED}`,
           );
         }
         currentRun = { ...currentRun, status: RunState.COMPLETED };
       }
-      useRunStore.getState().setRunState(RunState.COMPLETED);
-      queryClient.invalidateQueries({ queryKey: ['runs'] });
       break;
     }
 
@@ -453,8 +455,6 @@ function processEvent(state: State, event: EventEnvelope): State {
         }
         currentRun = { ...currentRun, status: RunState.FAILED };
       }
-      useRunStore.getState().setRunState(RunState.FAILED);
-      queryClient.invalidateQueries({ queryKey: ['runs'] });
       break;
     }
 
@@ -473,8 +473,6 @@ function processEvent(state: State, event: EventEnvelope): State {
         }
         currentRun = { ...currentRun, status: RunState.CANCELLED };
       }
-      useRunStore.getState().setRunState(RunState.CANCELLED);
-      queryClient.invalidateQueries({ queryKey: ['runs'] });
       break;
     }
 
@@ -646,8 +644,19 @@ export function useChatMessages(online: boolean): ChatState {
 
       // Reset loop detector on new run
       if (event.type === 'run.started') {
-        currentRunIdRef.current = event.payload.runId as string;
+        const runId = event.payload.runId as string;
+        currentRunIdRef.current = runId;
         loopDetectorRef.current.clear();
+        useRunStore.getState().setRun(runId);
+      } else if (event.type === 'run.finished') {
+        useRunStore.getState().setRunState(RunState.COMPLETED);
+        queryClient.invalidateQueries({ queryKey: ['runs'] });
+      } else if (event.type === 'run.failed') {
+        useRunStore.getState().setRunState(RunState.FAILED);
+        queryClient.invalidateQueries({ queryKey: ['runs'] });
+      } else if (event.type === 'run.cancelled') {
+        useRunStore.getState().setRunState(RunState.CANCELLED);
+        queryClient.invalidateQueries({ queryKey: ['runs'] });
       }
 
       dispatch({ type: 'EVENT_RECEIVED', event });
