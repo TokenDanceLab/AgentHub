@@ -45,6 +45,8 @@ Write scope:
 - Upgraded the welcome screen into a live Agent dispatch launcher: it now reads real Local Edge Runtime adapters, previews the selected Profile route, supports Runtime/Profile/Target mode switching, and sends suggestion prompts with both `agentId` and the resolved Profile alias.
 - Fixed the empty-thread welcome decision so stale agent-only Edge events no longer hide the welcome launcher before the user sends anything.
 - Fixed welcome focus behavior by locating the prompt textarea through stable textarea selectors instead of an English-only placeholder.
+- Shared the derived local Agent Profile alias logic across Settings, Welcome, and the prompt composer.
+- Made the bottom prompt composer follow the selected Agent Profile route by default: selecting Codex now previews and sends `sonnet -> claude-sonnet-4-6 / anthropic / high` unless the user manually overrides the model.
 
 ## Verification
 
@@ -74,6 +76,10 @@ Write scope:
 - `cd app/desktop && corepack.cmd pnpm vitest run src\__tests__\WelcomeScreen.test.tsx src\__tests__\MainView.test.ts src\__tests__\modelSettingsStore.test.ts`
 - `cd app/desktop && corepack.cmd pnpm typecheck`
 - Playwright welcome dispatch check at `1440x960` and `390x844`: with `/v1/threads` mocked empty and real Local Edge `/v1/agents`, selected Codex Runtime, previewed `sonnet -> claude-sonnet-4-6 / anthropic / high`, submitted a suggestion, and verified the `/v1/runs` request body carried `agentId=codex`, `modelAlias=sonnet`, `model=claude-sonnet-4-6`, `provider=anthropic`, with no console errors, raw i18n keys, or horizontal overflow. Screenshots: `app/desktop/screenshots/welcome-dispatch-profile-desktop.png`, `app/desktop/screenshots/welcome-dispatch-profile-mobile.png`.
+- `cd app/desktop && corepack.cmd pnpm vitest run src\__tests__\PromptInput.test.tsx src\__tests__\WelcomeScreen.test.tsx src\__tests__\SettingsPage.test.tsx src\__tests__\modelSettingsStore.test.ts`
+- `cd app/desktop && corepack.cmd pnpm typecheck`
+- `cd app/desktop && python -m json.tool src\i18n\locales\en.json > $null; python -m json.tool src\i18n\locales\zh.json > $null`
+- Playwright composer selected-Agent Profile route check at `1440x960` and `390x844`: with real Local Edge `/v1/agents`, selected Codex from the shell Agent list, verified the bottom composer preview displayed `anthropic / claude-sonnet-4-6 / high / sonnet`, submitted through Enter, and verified the `/v1/runs` body carried `agentId=codex`, `modelAlias=sonnet`, `model=claude-sonnet-4-6`, `provider=anthropic`, `reasoningEffort=high`, with no console errors or horizontal overflow. Screenshots: `app/desktop/screenshots/prompt-selected-agent-profile-route-desktop.png`, `app/desktop/screenshots/prompt-selected-agent-profile-route-mobile.png`.
 
 ## Follow-up
 
@@ -83,3 +89,4 @@ Write scope:
 - Sync the same model/cc-switch settings with Hub/TokenDance ID once the account/auth boundary is stable.
 - Next Agent Profile step: replace the derived readiness cards with editable local Profile persistence once the Agent/Profile API boundary lands.
 - Next welcome step: surface a first-run empty state that can create a real thread explicitly once Edge exposes thread creation as a first-class client action.
+- Next composer step: expose the selected Profile alias as a visible editable chip once persisted local Agent Profiles replace the derived mapping.
