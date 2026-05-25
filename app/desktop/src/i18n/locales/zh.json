@@ -15,6 +15,7 @@
   "agent.open": "打开代理面板",
   "agent.runtime.cliAdapter": "CLI 适配器",
   "agent.runtime.localEdge": "本地 Edge",
+  "agent.runtime.other": "其他",
   "agent.search": "搜索智能体...",
   "agent.offline": "离线",
   "agent.status.available": "可用",

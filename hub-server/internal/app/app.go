@@ -57,19 +57,34 @@ type App struct {
 	NotificationService *service.NotificationService
 	DeviceService       *service.DeviceService
 
+	// OIDC (optional — only when TokenDance ID is configured)
+	OIDCService *service.OIDCService
+	OIDCHandler *handler.OIDCHandler
+
 	// Handler layer
-	AuthHandler         *handler.AuthHandler
-	WebSocketHandler    *handler.WebSocketHandler
-	DeviceHandler       *handler.DeviceHandler
-	ContactHandler      *handler.ContactHandler
-	SessionHandler      *handler.SessionHandler
-	MessageHandler      *handler.MessageHandler
-	AgentHandler        *handler.AgentHandler
-	CustomAgentHandler  *handler.CustomAgentHandler
-	AttachmentHandler   *handler.AttachmentHandler
-	NotificationHandler *handler.NotificationHandler
-	HealthHandler       *handler.HealthHandler
-	PublicHandler       *handler.PublicHandler
+	AuthHandler          *handler.AuthHandler
+	WebSocketHandler     *handler.WebSocketHandler
+	DeviceHandler        *handler.DeviceHandler
+	ContactHandler       *handler.ContactHandler
+	SessionHandler       *handler.SessionHandler
+	MessageHandler       *handler.MessageHandler
+	AgentHandler         *handler.AgentHandler
+	CustomAgentHandler   *handler.CustomAgentHandler
+	AttachmentHandler    *handler.AttachmentHandler
+	NotificationHandler  *handler.NotificationHandler
+	HealthHandler        *handler.HealthHandler
+	PublicHandler        *handler.PublicHandler
+	AgentProfileHandler  *handler.AgentProfileHandler
+	SkillHandler         *handler.SkillHandler
+	MCPServerHandler     *handler.MCPServerHandler
+	MarketHandler        *handler.MarketHandler
+	ProviderBindingHandler *handler.ProviderBindingHandler
+	ExecutionTargetHandler *handler.ExecutionTargetHandler
+	AuditHandler           *handler.AuditHandler
+
+	// Relay
+	RelayService *service.RelayService
+	RelayHandler *handler.RelayHandler
 
 	// Goroutine lifecycle
 	coreCtx    context.Context
@@ -151,6 +166,41 @@ func (a *App) Run(ctx context.Context) error {
 	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)
 	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient)
 	a.DeviceService = service.NewDeviceService(a.DB)
+
+	// Agent Profile service
+	agentProfileSvc := service.NewAgentProfileService(a.DB)
+	a.AgentProfileHandler = handler.NewAgentProfileHandler(agentProfileSvc)
+
+	// Skill + MCP Server services
+	skillSvc := service.NewSkillService(a.DB)
+	a.SkillHandler = handler.NewSkillHandler(skillSvc)
+	mcpSvc := service.NewMCPService(a.DB)
+	a.MCPServerHandler = handler.NewMCPServerHandler(mcpSvc)
+
+	// Market handler (reuses AgentProfileService)
+	a.MarketHandler = handler.NewMarketHandler(agentProfileSvc)
+
+		// Provider Binding service
+		pbSvc := service.NewProviderBindingService(a.DB)
+		a.ProviderBindingHandler = handler.NewProviderBindingHandler(pbSvc)
+
+		// Execution Target service
+		targetSvc := service.NewExecutionTargetService(a.DB)
+		a.ExecutionTargetHandler = handler.NewExecutionTargetHandler(targetSvc)
+
+		// Audit service
+		auditSvc := service.NewAuditService(a.DB)
+		a.AuditHandler = handler.NewAuditHandler(auditSvc)
+
+		// Relay service
+		a.RelayService = service.NewRelayService(a.CacheClient, a.mgr)
+		a.RelayHandler = handler.NewRelayHandler(a.RelayService)
+
+	// OIDC Service (optional — only when TokenDance ID client is configured)
+	if a.Config.TokenDanceID.ClientID != "" {
+		a.OIDCService = service.NewOIDCService(a.DB, a.Config.TokenDanceID, a.Config.JWT, a.CacheClient)
+		a.OIDCHandler = handler.NewOIDCHandler(a.OIDCService)
+	}
 
 	// Handler layer
 	a.AuthHandler = handler.NewAuthHandler(a.AuthService)
@@ -275,6 +325,14 @@ func (a *App) setupRouter() *gin.Engine {
 		a.AgentHandler, a.CustomAgentHandler,
 		a.AttachmentHandler, a.NotificationHandler,
 		a.HealthHandler, a.PublicHandler,
+		a.OIDCHandler,
+		a.AgentProfileHandler,
+		a.SkillHandler, a.MCPServerHandler,
+		a.MarketHandler,
+		a.ProviderBindingHandler,
+		a.ExecutionTargetHandler,
+		a.AuditHandler,
+		a.RelayHandler,
 	)
 	return r
 }
