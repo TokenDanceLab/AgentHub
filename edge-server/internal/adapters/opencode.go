@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"os/exec"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -16,11 +17,13 @@ import (
 // Phase 2: opencode run "prompt" --format json — structured JSON events.
 type OpenCodeAdapter struct {
 	binaryPath string
+	available  bool // #177: true if the CLI binary exists and is executable
 }
 
 // NewOpenCodeAdapter creates an OpenCode adapter.
 func NewOpenCodeAdapter(binaryPath string) *OpenCodeAdapter {
-	return &OpenCodeAdapter{binaryPath: binaryPath}
+	_, err := exec.LookPath(binaryPath)
+	return &OpenCodeAdapter{binaryPath: binaryPath, available: err == nil}
 }
 
 func (a *OpenCodeAdapter) Metadata() AdapterMetadata {
@@ -130,6 +133,10 @@ func (a *OpenCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, std
 // NeedsStdin returns false — OpenCode runs in batch mode with the prompt
 // passed as a CLI argument, so it does NOT read stdin.
 func (a *OpenCodeAdapter) NeedsStdin() bool { return false }
+
+// Available reports whether the opencode CLI binary was found at startup.
+// #177: check binary at startup, report unavailable if missing.
+func (a *OpenCodeAdapter) Available() bool { return a.available }
 
 func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
 	// Forward sessionID to scope if present

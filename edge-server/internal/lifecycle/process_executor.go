@@ -431,9 +431,10 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		parserCtx = context.WithValue(ctx, adapters.CtxBudgetKey, runCtx.Budget)
 	}
 
+	var parseErr error
 	if adapter != nil {
 		wg.Add(1)
-		go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx)
+		go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx, &parseErr)
 	} else {
 		// Raw capture: stdout goes to run.output.batch events
 		wg.Add(1)
@@ -451,6 +452,12 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if waitErr != nil {
 		e.publishFailed(run, waitErr)
 		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": waitErr.Error()})
+		return
+	}
+	// #179: fail the run when structured output parsing fails critically
+	if parseErr != nil {
+		e.publishFailed(run, fmt.Errorf("structured output parse error: %w", parseErr))
+		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": parseErr.Error()})
 		return
 	}
 	finished, ok := e.store.SetRunStatusIf(run.ID, "finished", "started")
@@ -644,7 +651,7 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 
 // publishStructuredOutput uses the configured AgentAdapter to parse the CLI's
 // native protocol and emit typed events to the bus.
-func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.Run, stdout io.Reader, stdin io.Writer, adapter adapters.AgentAdapter, ctx context.Context) {
+func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.Run, stdout io.Reader, stdin io.Writer, adapter adapters.AgentAdapter, ctx context.Context, parseErr *error) {
 	defer wg.Done()
 	scope := runScope(run)
 	var emitter adapters.EventEmitter = adapters.NewScopedEventEmitter(
@@ -660,6 +667,7 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
 		slog.Error("structured output parse error", "runId", run.ID, "err", err)
+		*parseErr = err
 	}
 }
 

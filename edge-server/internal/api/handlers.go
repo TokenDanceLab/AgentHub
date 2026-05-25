@@ -423,12 +423,18 @@ func (h *Handler) GetAgents(w http.ResponseWriter, r *http.Request) {
 	metadataList := h.AdapterRegistry.List()
 	agents := make([]map[string]any, 0, len(metadataList))
 	for _, m := range metadataList {
+		status := "available"
+		if a, ok := h.AdapterRegistry.Get(m.ID); ok {
+			if !a.Available() {
+				status = "unavailable"
+			}
+		}
 		info := map[string]any{
 			"id":          m.ID,
 			"name":        m.Name,
 			"description": m.Description,
 			"version":     m.Version,
-			"status":      "available",
+			"status":      status,
 		}
 		if a, ok := h.AdapterRegistry.Get(m.ID); ok {
 			info["capabilities"] = a.Capabilities()
@@ -595,6 +601,15 @@ func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 	if h.Executor != nil {
 		result := h.Executor.Cancel(runID)
 		if result.Found {
+			// #108: align cancel response with OpenAPI spec
+			// Terminal runs (finished/failed/cancelled) are already done; return OK with current status
+			if isTerminalRunStatus(result.Status) {
+				writeJSON(w, http.StatusOK, acceptedResponse(map[string]any{
+					"runId":  runID,
+					"status": result.Status,
+				}))
+				return
+			}
 			writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
 				"runId":  runID,
 				"status": result.Status,
@@ -602,19 +617,26 @@ func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// #108: check store as fallback; return 404 for missing run instead of silently accepting
 	if repository := ensureStore(h); repository != nil {
 		if run, ok := repository.GetRun(runID); ok {
-			writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
+			writeJSON(w, http.StatusOK, acceptedResponse(map[string]any{
 				"runId":  runID,
 				"status": run.Status,
 			}))
 			return
 		}
 	}
-	writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
-		"runId":  runID,
-		"status": "cancelling",
-	}))
+	writeJSON(w, http.StatusNotFound, errorResponse("not_found", "run not found"))
+}
+
+func isTerminalRunStatus(status string) bool {
+	switch status {
+	case "finished", "failed", "cancelled":
+		return true
+	default:
+		return false
+	}
 }
 
 // ---------------------------------------------------------------------------
