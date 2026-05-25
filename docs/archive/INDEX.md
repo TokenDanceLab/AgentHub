@@ -50,6 +50,10 @@
 | `protocol.md` | 历史方案 | REST + WebSocket 原则仍可参考，但 `api/events.schema.json` 和 Edge <-> Runner local API 描述不是当前权威。 |
 | `implementation-plan.md` | 历史计划 | P0-P3 计划已完成并被当前主文档、roadmap 和 handoff 状态替代。 |
 | `project-management.md` | 历史流程 | 只作早期流程记录。当前分支和协作规则以 `AGENTS.md`、`docs/branch-governance.md`、`docs/roadmap.md` 为准。 |
+| `backend.md` | 历史路线图 | 自声明 superseded（2026-05-23），后端路线图已合并到 `docs/roadmap.md`。所有待办项实际已完成。 |
+| `frontend.md` | 历史路线图 | 自声明 superseded（2026-05-23），前端路线图已合并到 `docs/roadmap.md`。所有待办项实际已完成。 |
+| `client-handoff.md` | 历史交接 | 2026-05-22 历史快照，引用已废弃的 `runner/` 目录、旧分支名 `feat/client-dev`、旧 PR #26。当前客户端接手入口为 `docs/handoff/STATE.md`。 |
+| `desktop-shell-layout-progress-2026-05-25.md` | 进度记录 | Desktop shell 布局进度快照。已完成项已合入 `docs/roadmap.md` batch B，8 项后续 TODO 已提取到群聊评论。 |
 
 ### 可参考原则 - 需要按新术语重解释
 
