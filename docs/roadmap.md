@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-25（Desktop run 启动反馈 + Web 生态控制台补强 + 文档架构 sweep）
+最后更新：2026-05-25（Desktop Tasks/Agent Scheduling 实数据面 + Edge raw output cap/REST timeout/local auth + Hub cache fallback/public stats buckets + dev compose loopback + client-smoke 23/23 + Web readiness/surface picker）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -290,9 +290,9 @@ Hub 调度（远程）:
   - 验收：`TestHandleTaskStreamPersistsAgentMessageWithClientMsgIDAndRedisSeq`、`TestHandleTaskDoneUsesDBSeqFallbackAndPublishesFinalEvents`
 
 - [x] **P2-9: UpsertDevice ON CONFLICT 字段修正** `[0.5d]`
-  - 文件：`hub-server/internal/repository/device.go:10-14`
-  - 方案：`ON CONFLICT (id)` → `ON CONFLICT (user_id, device_type)`
-  - 验收：`TestDeviceRepo_Upsert` 覆盖同用户同设备类型、不同 device id 的重复注册更新
+  - 文件：`hub-server/internal/repository/device.go`, `hub-server/migrations/0020_devices_allow_multiple_same_type.up.sql`
+  - 方案：按 `device_id` 做 `ON CONFLICT (id)` 更新，`(user_id, device_type)` 降为非唯一索引；同用户同设备类型可拥有多个物理设备，跨用户或跨类型复用同一 `device_id` 拒绝为客户端错误
+  - 验收：`TestDeviceRepo_Upsert` 覆盖同物理设备更新、同用户同类型新增第二设备、跨用户抢占同一 `device_id` 拒绝
 
 - [x] **P2-10: WebSocket 丢帧告警 + 计数** `[0.5d]`
   - 文件：`hub-server/internal/handler/ws.go:143-147`, `hub-server/internal/ws/manager.go:164-167`
@@ -409,7 +409,7 @@ Hub 调度（远程）:
 
 > 参考：`docs/review/backend-engineering-standards.md` 第 3 节（CI/CD Pipeline）
 
-##### 已接入（近期 commit `1bbe365` 完成）
+##### 已接入（commit `1bbe365` 完成）
 
 - [x] Edge: `-race` 竞态检测
 - [x] Edge: `gosec` 安全扫描
@@ -575,6 +575,7 @@ Hub 调度（远程）:
 |---|---|---|---|---|---|
 | Agent Profile | Runtime + Model + Configuration 管理入口、可用 Profile 摘要 | 后续 Profile 持久化/同步 | `/v1/agents`、runner health | TokenDance ID profile sync / Agent Market | 2026-05-25 已接 Settings 预览与 Edge 真实状态，待接 Hub 存储 |
 | Execution Target | Local Edge / Hub Relay / SSH/Tailscale / Cloud Edge 目标入口 | dispatch/permission/session | `/v1/health.checks.runners` | SSH/Tailscale/Hub Relay | 2026-05-25 已接 Settings 预览与移动端验证，待接远程目标注册 |
+| 任务列表 | 本地 Run 概览、最近 Run、Hub task bridge 队列、审批入口 | pending task / ack / sync | `/v1/runs`、`useTaskBridgeStore` | TokenDance ID task sync / Hub dispatch | 2026-05-25 已接 Settings Tasks 实数据面，桌面 + 375px Playwright 无横向溢出 |
 | 在线 IM | 会话、联系人、在线状态、通知入口 | session/message/device/WS sync | Desktop 桥接 Hub dispatch | 无 | 登录后能看到会话与在线状态，断线重连不丢未读 |
 | Agent 市场 | 搜索、安装入口、详情页、能力标签 | CustomAgent/模板/评分/使用统计 | 安装后 Runtime 可执行性检查 | 模板包/Skill 包源 | 搜索安装后出现在 Agent Manager |
 | Skill 管理 | 已安装/可安装/启用状态 | 可选同步用户配置 | 本地 skill discovery 与启停 | 本地 skill registry | 无效 skill 有明确错误，启用状态可恢复 |
@@ -592,18 +593,48 @@ Hub 调度（远程）:
 - [x] Settings / TokenDance ID 登录入口 / Agent Manager 已完成 Playwright 截图验证，当前无裸 i18n key 和 console error。
 - [x] 真实 Edge `/v1/agents` 已验证返回 Claude Code / Codex / OpenCode 三个可用 Runtime；能力 chips 已在前端显示。
 - [x] 使用稳定输入抓包验证 `POST /v1/runs` 返回 202，说明 Edge 接受 run 并进入异步执行链路。
-- [x] Hub dispatch bridge 已持久化 `taskId` -> Edge `runId` 映射：`pending_agent_tasks.edge_run_id` + `/edge/agent-tasks/{id}/ack` 接收 `run_id`，Desktop ack 时回传 Edge run id。
+- [x] Hub dispatch bridge 已持久化 `taskId` -> Edge `runId` / `edge_device_id` 映射：`pending_agent_tasks.edge_run_id` + `edge_device_id` 绑定执行任务的具体 Desktop，`/edge/agent-tasks/{id}/ack|stream|done|fail` 接收 `run_id`/`edge_run_id`，Desktop 在 ack、stream、done、fail 回调中回传 Edge run id。
+- [x] Hub Agent callback 安全验收：service/handler 覆盖错误 user/device/run id 拒绝，真实 Postgres/Redis HTTP 集成覆盖同用户错误 Desktop device 和错误 run id 拒绝；离线 pending-task replay 在重新推送到具体 WS conn 时写入 `edge_device_id`，route 存在但 manager/conn 不可用时回落 pending queue，不误标 dispatched。
 - [x] 真实 Codex-profile Edge WebSocket smoke 已通过：临时 Edge `--runner-profile codex` 产生 `run.agent.text_block: OK`、`run.agent.result`、`run.finished`，证明 Agent CLI -> Edge adapter -> event bus -> WS 链路可用。
 - [x] Edge runner 状态已对齐真实 executor：runtime adapter executor 下 `/v1/runners` 和 `/v1/health.checks.runners` 显示 `Codex Runner (local)`，不再误报默认 Mock Runner。
 - [x] Edge permission decision spoofing 已做 server 侧缓解：`/v1/permissions/decide` 必须匹配 pending `runId/requestId`，未知、错 run、重复 decision 均拒绝；adapter 权限事件补齐 run/project/thread scope，OpenAPI 已把 `runId` 标为必填。
+- [x] Edge raw run output 已加 per-run 字节预算：`ProcessExecutor` stdout/stderr 共享 4 MiB 默认上限，超限时截断 temp-file 持久化和 `run.output.batch` 文本，并用 `truncated/maxBytes/bytesWritten/message` 标记兼容事件。
+- [x] Edge structured adapter payload 已加单事件预算：`run.agent.*` map payload 在进入 EventBus 前按默认 1 MiB JSON payload 上限递归截断字符串字段，附加 `truncated/maxBytes/bytesBefore/message`，必要时降级为 `dropped: true` metadata-only payload；orchestrator 内部 dispatch 解析仍在截断前进行。
+- [x] Hub `device_id` UUID 边界已做 server 侧缓解：`/client/auth/login` 和 `/edge/devices/register` 在 handler 层 trim/parse UUID，非法值返回 `BAD_REQUEST` 且不会调用 service/repository；OpenAPI 已把登录和 Edge 设备注册请求的 `device_id` 标为 UUID。
+- [x] Hub `device_id` UUID 边界已过真实 Postgres/Redis 集成验证：临时 `docker compose up -d postgres redis` 使用 `15432/16380`，跑通 `TestEdgeDevice` 的 register → login → me → desktop login → authenticated `/edge/devices/register` 链路，并修正 `tests` helper 让每个测试用户/设备类型使用稳定但不同的 UUID，避免真实 `devices.id` 主键冲突。
+- [x] Hub 多设备登录语义已对齐真实 Postgres：`devices(user_id, device_type)` 改为非唯一索引，登录/设备注册按 `device_id` upsert；同用户两个 desktop UUID 可分别登录并刷新 token，另一个用户复用已归属 `device_id` 返回 `BAD_REQUEST` 而不是 `INTERNAL_ERROR`。
+- [x] Hub `AH-SR-010` Redis/cache nil 行为已做 service 层缓解：Auth/Contact/Session/Message/Agent 构造器和方法统一经 `resolve*Cache` 处理 nil 与 typed-nil cache；测试/离线路径用 no-op/fallback cache 避免 panic，Message/Agent seq 仍走 DB fallback，生产 `App.Run` 继续 Redis ping fail-fast。
+- [x] Hub cache fallback 验收：`go test ./internal/service -run "Test(ResolveCacheUsesNoopForTypedNilClient|SendMessage_NilCacheUsesDBSeqFallback|ChangePassword_NilCacheDoesNotPanic|UpdateProfile_NilCacheDoesNotPanic|AcceptFriendRequest_NilCacheDoesNotPanic|ListContacts_NilCacheMarksOffline|CreatePrivateSession_NilCacheDoesNotPanic|HandleTaskDoneNilCacheUsesDBSeqFallback)$" -count=1 -v`、`go test ./internal/service -count=1`、`go test ./... -short -count=1` 均通过。
+- [x] Hub `AH-SR-008` dev compose 暴露面已收敛：`docker-compose.yml` 默认通过 `AGENTHUB_BIND_HOST=127.0.0.1` 只把 PostgreSQL、Redis、Hub API、Hub admin/metrics 发布到本机回环；远程开发需要显式设置 `AGENTHUB_BIND_HOST=0.0.0.0`，生产 compose 保持内部网络/loopback 发布。
+- [x] Dev compose loopback 验收：`docker compose config --services`、`docker compose config` 解析通过。
+- [x] Hub `AH-SR-011` 公开 stats 已改为官网可用但不暴露精确 live totals：`/api/public/stats` 保持原字段名和数字类型，但 user/agent/message/online 数值返回下限桶，uptime 返回 `<1h`/小时/天/`30d+` 粗粒度桶。
+- [x] Edge `AH-SR-015` REST timeout 已和 WebSocket 拆开：`WriteTimeout=0` 继续服务 `/v1/events` 长连接，非 WebSocket REST 请求通过 30s middleware 兜底超时。
+- [x] Public stats/REST timeout 验收：`hub-server && go test ./internal/handler -run TestPublicStatsBucketsCountsAndUptime -count=1`、`edge-server && go test ./internal/httpserver -run "TestRESTTimeoutMiddleware" -count=1`、`hub-server && go test ./... -short -count=1`、`edge-server && go test ./... -short -count=1` 均通过。
+- [x] Edge `AH-SR-014` 本地调用边界已做可选 token 缓解：`--local-auth-token` / `AGENTHUB_EDGE_AUTH_TOKEN` 非空时，除 `/v1/health` 和 CORS preflight 外的 Edge REST API 需要 `Authorization: Bearer <token>` 或 `X-AgentHub-Edge-Token`，浏览器 WebSocket 使用 `/v1/events?access_token=<token>`；默认空 token 保持本地开发兼容，远程 Edge 仍需 Hub session/device proof 设计。
+- [x] Edge local auth 验收：`edge-server && go test ./internal/httpserver ./cmd/agenthub-edge -count=1`、`edge-server && go test ./... -short -count=1`、`hub-server && go test ./... -short -count=1`、`app/desktop && pnpm vitest run src/__tests__/edgeClient.test.ts src/__tests__/eventClient.test.ts`、`app/desktop && pnpm exec tsc --noEmit`、`.\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228 -EdgeAuthToken local-smoke-token`（23/23）均通过。
+- [x] Hub `AH-SR-022` message pin 跨 session 泄露已做 server 侧缓解：pin 创建前通过 `(session_id, message_id)` 确认目标消息属于当前 session；pins 列表 hydration 改为同 session 范围查询，历史或恶意 cross-session `message_pins` 行不会在 API 输出中暴露其他 session 消息。
+- [x] Message pin 安全验收：`hub-server && go test ./internal/service -run "Test(PinMessage|ListPinnedMessages)" -count=1`、`hub-server && AGENTHUB_DB_PORT=15432 AGENTHUB_REDIS_PORT=16380 AGENTHUB_JWT_SECRET=<test-secret> go test ./tests -run "Test(MessagePinRejectsCrossSessionMessage|ListPinsDoesNotLeakHistoricalCrossSessionPin)$" -count=1 -v`、`hub-server && go test ./internal/repository ./internal/service ./internal/handler -count=1`、`hub-server && go test ./... -short -count=1` 均通过；剩余是历史坏 pin 行清理或 DB 复合约束设计。
+- [x] Hub `AH-SR-021` attachment 共享已做 server 侧缓解：新增 `message_attachments` 引用表，file message 发送时抽取并校验 UUID attachment 引用，发送者必须是 uploader 或已通过现有会话引用获权；下载允许 uploader 或引用所在 session 的 active user member，局外人保持 `ATTACH_NOT_FOUND`。
+- [x] Attachment 共享验收：TDD 红灯覆盖 session member 下载失败、file message 不落引用、非法 `attachment_id`、引用他人附件；实现后 `go test ./internal/service -run "Test(GetAttachmentByIDAllowsSessionMemberForReferencedAttachment|SendMessage_FileContent)" -count=1 -v`、`go test ./internal/repository -run "TestMessageAttachmentRepo_CreateAndAccess|TestAttachmentRepo_CreateAndGet|TestMessageRepo_(Pins|InsertAndGet)" -count=1 -v`、真实 PostgreSQL/Redis 下 `go test ./tests -run TestAttachmentDownloadAllowsSessionMemberAfterFileMessage -count=1 -v` 均通过。
+- [x] `client-smoke.ps1` 已对齐当前 Edge runtime 架构：不再构建已删除的独立 `runner/` 目录，改用 Edge 内置 `--runner-profile agenthub-runner-mock`，并新增 `-EdgeAddr` 便于用隔离端口跑 smoke。
+- [x] Client/Edge smoke 验收：`app/shared/pnpm-lock.yaml` 已同步 shared React 类型/dev 依赖，`app/desktop && pnpm build` 通过；`.\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228` 通过 23/23，覆盖 Edge build、shared 依赖安装、Desktop web build、`/v1/health`、`/v1/runners`、`POST /v1/runs`、cancel、WebSocket `run.started` / `run.output.batch` / `run.finished` 和 Edge Go tests。
 - [x] Desktop Settings `Agent Profiles` / `Execution Targets` 已完成 Playwright 桌面和 375px 移动端验证，截图见 `app/desktop/screenshots/settings-agent-profiles.png`、`settings-execution-targets.png`、`settings-execution-targets-mobile.png`。
+- [x] Desktop Settings `Tasks` 已从预留 surface 接入真实数据面：`useRuns()` 读取 `/v1/runs`，`useTaskBridgeStore` 展示 Hub dispatch bridge task，任务页展示本地 run 总数/active 数、Hub bridge 总数/active 数、最近 run 和桥接任务队列。
+- [x] Tasks 验收：`pnpm vitest run src/__tests__/SettingsPage.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/errors.test.ts src/__tests__/Toast.test.tsx` 通过 43/43；`python -m json.tool src/i18n/locales/{en,zh}.json` 与 `git diff --check` 通过；Playwright 桌面和 375px 移动端无横向溢出、无 raw i18n key，截图见 `app/desktop/screenshots/settings-tasks-real-runs.png`、`app/desktop/screenshots/settings-tasks-real-runs-mobile.png`。
+- [x] Run 状态机幂等修复：重复 terminal run event / WebSocket replay 下 `RunStateMachine.transition(COMPLETED)` 不再产生 `COMPLETED -> COMPLETED` warning；`pnpm vitest run src/__tests__/runStateMachine.test.ts src/__tests__/useChatMessages.test.ts src/__tests__/SettingsPage.test.tsx` 通过 72/72，Playwright 桌面和 375px 移动端复测 `logs: []`，截图见 `app/desktop/screenshots/settings-tasks-runstate-idempotent.png`、`settings-tasks-runstate-idempotent-mobile.png`。
+- [x] Desktop Settings `Agent Scheduling` 已从占位行推进到真实调度概览：复用 `useRuns()`、`useTaskBridgeStore`、`useAgentList()`、`useHealth()` 和设置开关，展示调度队列、Agent Profile、Execution Target readiness、模型映射/cc-switch/远控/审批策略输入，并明确“调度选择 Profile/Model/Target，流式输出/工具调用/文件修改是 Run 基础能力”的边界。
+- [x] Agent Scheduling 验收：`pnpm vitest run src/__tests__/SettingsPage.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/errors.test.ts src/__tests__/Toast.test.tsx` 通过 44/44；`python -m json.tool src/i18n/locales/{en,zh}.json` 与 `git diff --check -- app/desktop/src/...` 通过；Playwright 桌面和 375px 移动端无 console error、无 raw i18n key、无横向溢出，截图见 `app/desktop/screenshots/settings-agent-scheduling-real-data.png`、`app/desktop/screenshots/settings-agent-scheduling-real-data-mobile.png`。
+- [x] Desktop Settings `Agent Market` 已从预留入口推进到真实本地 Profile/发布准备视图：复用 `useAgentList()`、TokenDance ID 登录状态和 Agent capability 字段，展示本地 Agent Profile 数、可发布 Profile、能力覆盖、Hub 发布状态、已安装 Profile 卡片和发布审核清单。
+- [x] Agent Market 验收：`pnpm vitest run src/__tests__/SettingsPage.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/errors.test.ts src/__tests__/Toast.test.tsx` 通过 45/45；`python -m json.tool src/i18n/locales/{en,zh}.json` 与 `git diff --check -- app/desktop/src/...` 通过；Playwright 桌面和 375px 移动端无 console error、无 raw i18n key、无横向溢出，真实页面读到 OpenCode / Claude Code / Codex 三个本地 Profile，截图见 `app/desktop/screenshots/settings-agent-market-real-profiles.png`、`app/desktop/screenshots/settings-agent-market-real-profiles-mobile.png`。
+- [x] Desktop Settings `Skill Management` 已从单行路径推进到项目级 registry 概览：基于当前 `.agents/skills/*/SKILL.md` 快照展示 7 个仓库级 Skill、6/7 可审核状态、1 个含脚本 Skill、1 个 references Skill、Hub sync 边界和脚本审计入口。
+- [x] Skill Management 验收：`pnpm vitest run src/__tests__/SettingsPage.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/errors.test.ts src/__tests__/Toast.test.tsx` 通过 46/46；`python -m json.tool src/i18n/locales/{en,zh}.json` 与 `git diff --check -- app/desktop/src/...` 通过；Playwright 桌面和 375px 移动端无 console error、无 raw i18n key、无横向溢出，截图见 `app/desktop/screenshots/settings-skill-registry-real-data.png`、`app/desktop/screenshots/settings-skill-registry-real-data-mobile.png`。
 - [x] 2026-05-25 客户端 run start 反馈已落地：提交后显示 queued 乐观运行、启动中禁用输入与重复提交、409 `active_run_exists` 会打开现有 run、显示 toast，并保留未接受的草稿。
 - [x] 前端依赖：`AppError` 保留 HTTP status 和顶层 `runId` 到 details；`PromptInput` 支持 async send result；`ToastContainer` 已挂回 App shell。
 - [ ] 后续补强：把 runStore/TanStack Query 中 active run 订阅和历史 run 列表刷新接到同一条状态链，避免只靠 optimistic run。
 - [x] Edge 依赖：202 accepted、409 active_run_exists、health degraded、runner availability 字段稳定。
 - [x] Hub 依赖：Hub dispatch 桥接到 Edge run 时保留 taskId/runId 映射。
 - [x] 验收：`pnpm vitest run src/__tests__/errors.test.ts src/__tests__/PromptInput.test.tsx src/__tests__/Toast.test.tsx` 通过 42/42；Playwright 模拟 Edge 409 覆盖草稿保留、toast 可见、无横向溢出，截图见 `app/desktop/screenshots/run-start-active-conflict.png`。
-- [ ] live Edge 注意：当前 127.0.0.1:3210 用真实 runtime 连续双 POST 未稳定复现 409，观测到两个 202；server fake executor 单测覆盖 409，后续需确认 live Edge 是否为旧进程或真实 runtime 完成太快。
+- [x] Active-run 真实 HTTP smoke 已复现 409：临时 Edge `127.0.0.1:3227` 使用可控慢 `powershell Start-Sleep` runner，连续同 thread `POST /v1/runs` 返回 first `202`、second `409 active_run_exists`，且 409 body 带回首个 active `runId`；说明真实 server + `ProcessExecutor` 路径有效，先前 3210 双 202 更可能是旧进程或真实 runtime 过快完成。
 
 ##### Web UI 移植工作树状态 `[并行]`
 
@@ -612,13 +643,17 @@ Hub 调度（远程）:
 - [x] 验证：`corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build` 通过；Playwright 375px 复测 `docScrollWidth=375`、switch `52x44`、无 console error。
 - [x] 2026-05-25 Web worker 补强：`app/web/README.md` 已说明 `/` 生态控制台、`/workbench-preview` 旧工作台、TokenDance 生态边界和验证命令；生态控制台新增身份边界、协作同步、Agent runtime、运维护栏等入口，并补响应式 lane 布局与测试。
 - [x] Web worker 验证：`corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx` 通过 4/4，`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web` 通过。
-- [ ] 合并前待办：验证 clean install 下 React alias/workaround 是否仍必要；确认 `/` 入口替换是否作为正式 Web 产品方向；worktree 当前仍落后 `origin/dev/delicious233` 5 个提交，不能直接合并。
+- [x] 2026-05-25 Web worker 二次补强：`EcosystemConsole` 新增 `Feature readiness` 面板，按 TokenDance ecosystem lane 派生 ready/review/planned 数量和平均进度；测试补到 5/5，`typecheck`、`build`、`git diff --check -- app/web` 通过。
+- [x] 2026-05-25 Web worker 三次补强：`EcosystemConsole` 新增移动端/平板 `Jump to surface` picker，可直达 TokenDance ID、Hub、cc-switch、Remote control、audit 等生态入口；窄屏顺序调整为 workspace 优先、detail 次之、长侧边导航最后；测试补到 6/6，`typecheck`、`build`、`git diff --check -- app/web` 通过。
+- [ ] 合并前待办：验证 clean install 下 React alias/workaround 是否仍必要；确认 `/` 入口替换是否作为正式 Web 产品方向；worktree 当前仍落后 `origin/dev/delicious233` 9 个提交，不能直接合并。
 
 ##### 文档架构 sweep `[并行]`
 
 - [x] 2026-05-25 gpt-5.5 xhigh 文档 worker 已写入 `docs/inbox/doc-architecture-sweep-2026-05-25.md`。
+- [x] 2026-05-25 Codex follow-up 文档 worker 已写入 `docs/inbox/doc-architecture-sweep-codex-followup-2026-05-25.md`，确认主文档已基本对齐，剩余风险集中在 Runner 兼容 API 命名和旧 client handoff 入口。
 - [x] 结论：主文档已基本对齐 Runtime/Profile/Configuration/Execution Target、TokenDance ID、IM、多端、远控、Skill/MCP、cc-switch、安全审计等边界。
-- [ ] 文档待办：补 `/v1/runners`、`runner.*` 作为历史兼容命名的说明；归档或改写 `docs/client-roadmap.md`、`docs/client-handoff.md`、`docs/design/integration.md` 等仍含旧独立 `runner/` 语义的文档。
+- [x] 旧 client smoke 文档入口已最小收口：`docs/client-roadmap.md`、`docs/implementation-guide.md`、`edge-server/README.md` 已说明早期独立 `runner/` 目录废弃，`client-smoke.ps1` 使用 Edge 内置 mock executor 和 `-EdgeAddr`。
+- [ ] 文档待办：补 `/v1/runners`、`runner.*` 作为历史兼容命名的说明；归档或改写 `docs/client-handoff.md`、`docs/design/integration.md` 等仍含旧独立 `runner/` 语义的文档。
 - [ ] API 待办：决定 `/v1/runners`、`runner_offline`、`runner.online/offline` 是否长期保留为 deprecated compatibility，新增 schema 优先 Runtime/Profile/Execution Target 命名。
 
 ---

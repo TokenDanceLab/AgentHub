@@ -16,7 +16,7 @@
 
 等待 UI 设计稿收敛，同时准备从 Mock 数据接入真实 Edge REST / WebSocket 接口。
 
-## 近期任务
+## 下一阶段任务
 
 - [ ] 梳理前端状态模型：Project / Conversation / Thread / Run / Item。
 - [ ] 定义 API client 边界，避免组件直接拼 REST URL。

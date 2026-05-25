@@ -102,7 +102,7 @@ pnpm build
 pnpm test:e2e
 ```
 
-Desktop UI 小改可按影响面运行定向 Vitest / Playwright，并在 PR 或 handoff 中写清未跑全量的原因。`scripts/client-smoke.ps1` 仍含历史检查；修复前不要把它作为唯一验收依据。
+Desktop UI 小改可按影响面运行定向 Vitest / Playwright，并在 PR 或 handoff 中写清未跑全量的原因。`scripts/client-smoke.ps1` 当前已改用 Edge 内置 mock executor，不再依赖旧 `runner/`；本机已有 Edge 时可用 `-EdgeAddr 127.0.0.1:<port>` 跑隔离 smoke。
 
 ## 7. 交给子 Agent 的方式
 

@@ -23,6 +23,16 @@ info:
     ## Status tags
     - `x-agenthub-status: implemented` — 已实现，可直接调用
     - `x-agenthub-status: planned` — 远期规划，尚未实现
+
+    ## Edge local auth
+    Local Edge may be started with `--local-auth-token` or
+    `AGENTHUB_EDGE_AUTH_TOKEN`. When configured, `/v1/health` and CORS
+    preflight requests stay unauthenticated; all other Edge REST APIs require
+    `Authorization: Bearer <token>` or `X-AgentHub-Edge-Token: <token>`.
+    Browser WebSocket clients cannot set custom headers, so `/v1/events` uses
+    the `access_token` query parameter for the same local token. This local
+    token is not a replacement for Hub session/device proof in future remote
+    Edge mode.
 servers:
   - url: http://127.0.0.1:3210
     description: Local Edge Server
@@ -57,11 +67,17 @@ paths:
       tags: [Foundation]
       operationId: openEventStream
       summary: Open WebSocket event stream.
-      description: WebSocket handshake surface. Event envelope and event types are documented in api/events.md.
+      description: >
+        WebSocket handshake surface. Event envelope and event types are
+        documented in api/events.md. If Edge local auth is configured, browser
+        clients pass the local token as `access_token` because WebSocket cannot
+        set arbitrary Authorization headers.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
+      security: [{ edgeLocalAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/PageCursor"
+        - $ref: "#/components/parameters/EdgeAccessToken"
       responses:
         "101":
           description: Switching Protocols.
@@ -383,6 +399,7 @@ paths:
       summary: List runners.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
+      security: [{ edgeLocalAuth: [] }]
       responses:
         "200":
           description: Runner list.
@@ -398,6 +415,7 @@ paths:
       summary: List available agent adapters.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
+      security: [{ edgeLocalAuth: [] }]
       responses:
         "200":
           description: Agent adapter list.
@@ -452,6 +470,7 @@ paths:
       summary: List AgentRuns.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
+      security: [{ edgeLocalAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/ThreadIdQuery"
         - $ref: "#/components/parameters/PageSize"
@@ -469,6 +488,7 @@ paths:
         New callers should pass projectId and threadId explicitly.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
+      security: [{ edgeLocalAuth: [] }]
       requestBody:
         required: false
         content:
@@ -503,6 +523,7 @@ paths:
       summary: Cancel AgentRun.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
+      security: [{ edgeLocalAuth: [] }]
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -835,6 +856,7 @@ paths:
       summary: Approve or deny a pending permission request.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security: [{ edgeLocalAuth: [] }]
       requestBody:
         required: true
         content:
@@ -874,12 +896,12 @@ paths:
     get:
       tags: [HubSyncRelay]
       operationId: publicStats
-      summary: Public statistics for official website.
+      summary: Bucketed public statistics for official website.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       responses:
         "200":
-          description: Public stats.
+          description: Public website stats with lower-bound count buckets and coarse uptime buckets; exact live totals are not exposed.
 
   /client/auth/register:
     post:
@@ -918,12 +940,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [username, password]
+              required: [username, password, device_type, device_id]
               properties:
                 username: { type: string }
                 password: { type: string }
                 device_type: { type: string }
-                device_id: { type: string }
+                device_id: { type: string, format: uuid }
       responses:
         "200":
           description: JWT tokens.
@@ -1054,6 +1076,26 @@ paths:
         "200":
           description: Task dispatched.
 
+  /edge/devices/register:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRegisterEdgeDevice
+      summary: Register or refresh an authenticated desktop Edge device.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HubDeviceRegisterRequest"
+      responses:
+        "200":
+          description: Device registered.
+        "400":
+          description: device_id is missing or not a UUID.
+
   /edge/agent-tasks/{id}/ack:
     parameters:
       - name: id
@@ -1090,6 +1132,12 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HubTaskStreamRequest"
       responses:
         "200":
           description: Chunk recorded.
@@ -1107,6 +1155,12 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HubTaskDoneRequest"
       responses:
         "200":
           description: Task marked done.
@@ -1129,11 +1183,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [error]
-              properties:
-                error:
-                  type: string
+              $ref: "#/components/schemas/HubTaskFailRequest"
       responses:
         "200":
           description: Task marked failed.
@@ -1509,6 +1559,17 @@ paths:
           $ref: "#/components/responses/Accepted"
 
 components:
+  securitySchemes:
+    edgeLocalAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: local-edge-token
+      description: Optional local Edge token configured by `--local-auth-token` or `AGENTHUB_EDGE_AUTH_TOKEN`; WebSocket browsers use the `access_token` query parameter.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Hub access token
+      description: Hub-issued bearer token for `/client`, `/edge`, and `/web` Hub routes.
   parameters:
     PageSize:
       name: pageSize
@@ -1523,6 +1584,13 @@ components:
       name: pageCursor
       in: query
       required: false
+      schema:
+        type: string
+    EdgeAccessToken:
+      name: access_token
+      in: query
+      required: false
+      description: Local Edge auth token for browser WebSocket clients when Edge local auth is enabled.
       schema:
         type: string
     ProjectIdQuery:
@@ -1681,6 +1749,54 @@ components:
         edge_run_id:
           type: string
           description: Alias for run_id for explicit Hub persistence.
+    HubTaskStreamRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        run_id:
+          type: string
+          description: Edge run id returned by POST /v1/runs.
+        edge_run_id:
+          type: string
+          description: Alias for run_id for explicit Hub persistence.
+    HubTaskDoneRequest:
+      type: object
+      properties:
+        final_content:
+          type: string
+        run_id:
+          type: string
+          description: Edge run id returned by POST /v1/runs.
+        edge_run_id:
+          type: string
+          description: Alias for run_id for explicit Hub persistence.
+    HubTaskFailRequest:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        run_id:
+          type: string
+          description: Edge run id returned by POST /v1/runs.
+        edge_run_id:
+          type: string
+          description: Alias for run_id for explicit Hub persistence.
+    HubDeviceRegisterRequest:
+      type: object
+      required: [device_id]
+      properties:
+        device_id:
+          type: string
+          format: uuid
+        app_version:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
     StartRunRequest:
       type: object
       properties:
