@@ -9,7 +9,7 @@ import (
 	"github.com/agenthub/hub-server/internal/middleware"
 )
 
-func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler) {
+func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler) {
 	r.Use(middleware.CORS())
 	r.Use(middleware.APIVersion())
 	r.Use(middleware.BodyLimit(config.DefaultRequestBodyLimit))
@@ -44,6 +44,12 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			auth.POST("/register", middleware.RateLimit(cacheClient, config.AuthRegisterRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Register)
 			auth.POST("/login", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Login)
 			auth.POST("/refresh", authHandler.Refresh)
+
+			// OIDC (Phase 1)
+			if oidcHandler != nil {
+				auth.POST("/oidc/authorize", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCAuthorize)
+				auth.POST("/oidc/callback", oidcHandler.PostOIDCCallback)
+			}
 		}
 
 		authProtected := client.Group("/auth")
@@ -146,5 +152,79 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		web.POST("/custom-agents", customAgentHandler.Create)
 		web.PUT("/custom-agents/:id", customAgentHandler.Update)
 		web.DELETE("/custom-agents/:id", customAgentHandler.Delete)
+
+		// Agent Profiles (Phase 2)
+		if agentProfileHandler != nil {
+			web.GET("/agent-profiles", agentProfileHandler.ListProfiles)
+			web.POST("/agent-profiles", agentProfileHandler.CreateProfile)
+			web.GET("/agent-profiles/:id", agentProfileHandler.GetProfile)
+			web.PATCH("/agent-profiles/:id", agentProfileHandler.UpdateProfile)
+			web.DELETE("/agent-profiles/:id", agentProfileHandler.DeleteProfile)
+			web.POST("/agent-profiles/:id/publish", agentProfileHandler.PublishProfile)
+			web.POST("/agent-profiles/:id/install", agentProfileHandler.InstallProfile)
+		}
+
+		// Skills (Phase 3)
+		if skillHandler != nil {
+			web.GET("/skills", skillHandler.ListSkills)
+			web.POST("/skills", skillHandler.CreateSkill)
+			web.GET("/skills/:id", skillHandler.GetSkill)
+			web.PUT("/skills/:id", skillHandler.UpdateSkill)
+			web.DELETE("/skills/:id", skillHandler.DeleteSkill)
+			web.POST("/skills/:id/publish", skillHandler.PublishSkill)
+			web.POST("/skills/:id/unpublish", skillHandler.UnpublishSkill)
+		}
+
+		// MCP Servers (Phase 3)
+		if mcpHandler != nil {
+			web.GET("/mcp-servers", mcpHandler.ListMCPServers)
+			web.POST("/mcp-servers", mcpHandler.CreateMCPServer)
+			web.GET("/mcp-servers/:id", mcpHandler.GetMCPServer)
+			web.PUT("/mcp-servers/:id", mcpHandler.UpdateMCPServer)
+			web.DELETE("/mcp-servers/:id", mcpHandler.DeleteMCPServer)
+			web.POST("/mcp-servers/:id/publish", mcpHandler.PublishMCPServer)
+			web.POST("/mcp-servers/:id/unpublish", mcpHandler.UnpublishMCPServer)
+		}
+
+		// Market (Phase 4)
+		if marketHandler != nil {
+			web.GET("/market/profiles", marketHandler.SearchMarketProfiles)
+			web.GET("/market/profiles/:id", marketHandler.GetMarketProfile)
+			web.POST("/market/profiles/:id/install", marketHandler.InstallMarketProfile)
+			web.POST("/market/profiles/:id/rate", marketHandler.RateMarketProfile)
+		}
+
+		// Provider Bindings (Phase 4)
+		if pbHandler != nil {
+			web.GET("/provider-bindings", pbHandler.List)
+			web.POST("/provider-bindings", pbHandler.Create)
+			web.PUT("/provider-bindings/:id", pbHandler.Update)
+			web.DELETE("/provider-bindings/:id", pbHandler.Delete)
+		}
+
+		// Execution Targets (Phase 5)
+		if targetHandler != nil {
+			web.GET("/execution-targets", targetHandler.ListTargets)
+			web.POST("/execution-targets", targetHandler.CreateTarget)
+			web.GET("/execution-targets/:id", targetHandler.GetTarget)
+			web.PATCH("/execution-targets/:id", targetHandler.UpdateTarget)
+			web.DELETE("/execution-targets/:id", targetHandler.DeleteTarget)
+			web.POST("/execution-targets/:id/ping", targetHandler.PingTarget)
+		}
+
+		// Audit Events (Phase 6)
+		if auditHandler != nil {
+			web.GET("/audit-events", auditHandler.ListAuditEvents)
+		}
+
+		// Relay Commands
+		if relayHandler != nil {
+			web.POST("/relay/commands", relayHandler.CreateCommand)
+			web.GET("/relay/commands/:id", relayHandler.GetCommand)
+			web.POST("/relay/commands/:id/ack", relayHandler.AckCommand)
+		}
+
+		// Devices
+		web.GET("/devices", deviceHandler.ListDevices)
 	}
 }

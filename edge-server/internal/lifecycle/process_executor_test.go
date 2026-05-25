@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,6 +18,8 @@ import (
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/store"
 )
+
+const processExecutorHelperRunFlag = "-test.run=^TestProcessExecutorHelper$"
 
 func TestProcessExecutorRequiresCommand(t *testing.T) {
 	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{}, nil, nil)
@@ -303,7 +306,7 @@ func TestProcessExecutorRunsCommandWithInjectedContext(t *testing.T) {
 
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
 		Command: os.Args[0],
-		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "success"},
+		Args:    []string{processExecutorHelperRunFlag, "--", "success"},
 		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
 	}, nil, nil)
 	if err != nil {
@@ -381,7 +384,7 @@ func TestProcessExecutorRunsCommandInConfiguredWorkDir(t *testing.T) {
 	_, ch, _ := bus.Subscribe(0)
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
 		Command: os.Args[0],
-		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "pwd"},
+		Args:    []string{processExecutorHelperRunFlag, "--", "pwd"},
 		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
 		WorkDir: workDir,
 	}, nil, nil)
@@ -432,7 +435,7 @@ func TestProcessExecutorExpandsRunPlaceholdersInArgs(t *testing.T) {
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
 		Command: os.Args[0],
 		Args: []string{
-			"-test.run=TestProcessExecutorHelper",
+			processExecutorHelperRunFlag,
 			"--",
 			"--run={{run.id}}",
 			"--project={{ run.projectId }}",
@@ -468,7 +471,7 @@ func TestProcessExecutorExpandsRunPlaceholdersInEnv(t *testing.T) {
 	_, ch, _ := bus.Subscribe(0)
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
 		Command: os.Args[0],
-		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "env"},
+		Args:    []string{processExecutorHelperRunFlag, "--", "env"},
 		Env: append(os.Environ(),
 			"AGENTHUB_PROCESS_EXECUTOR_HELPER=1",
 			"PROFILE_RUN={{run.id}}",
@@ -503,7 +506,7 @@ func TestProcessExecutorExpandsRunPlaceholdersInExtraEnv(t *testing.T) {
 	_, ch, _ := bus.Subscribe(0)
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
 		Command: os.Args[0],
-		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "env"},
+		Args:    []string{processExecutorHelperRunFlag, "--", "env"},
 		Env:     nil,
 		ExtraEnv: []string{
 			"AGENTHUB_PROCESS_EXECUTOR_HELPER=1",
@@ -537,7 +540,7 @@ func TestProcessExecutorExtraEnvDoesNotTemplateParentEnvironment(t *testing.T) {
 
 	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{
 		Command:  os.Args[0],
-		Args:     []string{"-test.run=TestProcessExecutorHelper", "--", "env"},
+		Args:     []string{processExecutorHelperRunFlag, "--", "env"},
 		Env:      nil,
 		ExtraEnv: []string{"PROFILE_RUN={{run.id}}"},
 	}, nil, nil)
@@ -558,7 +561,7 @@ func TestProcessExecutorNilEnvSanitizesParentEnvironment(t *testing.T) {
 	_, ch, _ := bus.Subscribe(0)
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
 		Command: os.Args[0],
-		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "sanitized-env"},
+		Args:    []string{processExecutorHelperRunFlag, "--", "sanitized-env"},
 		Env:     nil,
 		ExtraEnv: []string{
 			"AGENTHUB_PROCESS_EXECUTOR_HELPER=1",
@@ -806,7 +809,7 @@ func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleS
 
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
 		Command: os.Args[0],
-		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", mode},
+		Args:    []string{processExecutorHelperRunFlag, "--", mode},
 		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
 	}, nil, nil)
 	if err != nil {
@@ -815,11 +818,50 @@ func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleS
 	return executor
 }
 
+func TestProcessExecutorHelperRunsFromModeArgument(t *testing.T) {
+	cmd := exec.Command(os.Args[0], processExecutorHelperRunFlag, "--", "success")
+	cmd.Env = withoutEnvKey(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER")
+	cmd.Env = append(cmd.Env,
+		"AGENTHUB_RUN_ID=run_helper",
+		"AGENTHUB_PROJECT_ID=proj_helper",
+		"AGENTHUB_THREAD_ID=thread_helper",
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("helper command returned error: %v\n%s", err, output)
+	}
+	text := string(output)
+	for _, want := range []string{
+		"stdout chunk",
+		"stderr chunk",
+		"run=run_helper",
+		"project=proj_helper",
+		"thread=thread_helper",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("helper output = %q, want %q", text, want)
+		}
+	}
+}
+
+func withoutEnvKey(env []string, key string) []string {
+	filtered := make([]string, 0, len(env))
+	for _, kv := range env {
+		name, _, _ := strings.Cut(kv, "=")
+		if strings.EqualFold(name, key) {
+			continue
+		}
+		filtered = append(filtered, kv)
+	}
+	return filtered
+}
+
 func TestProcessExecutorHelper(t *testing.T) {
-	if os.Getenv("AGENTHUB_PROCESS_EXECUTOR_HELPER") != "1" {
+	mode, ok := processExecutorHelperMode()
+	if !ok {
 		return
 	}
-	mode := os.Args[len(os.Args)-1]
 	switch mode {
 	case "success":
 		fmt.Fprint(os.Stdout, "stdout chunk\n")
@@ -867,7 +909,26 @@ func TestProcessExecutorHelper(t *testing.T) {
 	os.Exit(0)
 }
 
-// ── Result aggregation tests ───────────────────────────────────────────────
+func processExecutorHelperMode() (string, bool) {
+	if os.Getenv("AGENTHUB_PROCESS_EXECUTOR_HELPER") != "1" && !hasArg(os.Args, processExecutorHelperRunFlag) {
+		return "", false
+	}
+	if len(os.Args) == 0 {
+		return "", false
+	}
+	return os.Args[len(os.Args)-1], true
+}
+
+func hasArg(args []string, want string) bool {
+	for _, arg := range args {
+		if arg == want {
+			return true
+		}
+	}
+	return false
+}
+
+// —— Result aggregation tests ———————————————————————————————————————————————
 
 func TestSendSubAgentResult_Completed(t *testing.T) {
 	bus := events.NewBus(100)
@@ -894,7 +955,7 @@ func TestSendSubAgentResult_Completed(t *testing.T) {
 
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
 		Command: os.Args[0],
-		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "success"},
+		Args:    []string{processExecutorHelperRunFlag, "--", "success"},
 		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
 	}, nil, nil)
 	if err != nil {
@@ -954,7 +1015,7 @@ func TestSendSubAgentResult_Error(t *testing.T) {
 
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
 		Command: os.Args[0],
-		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "success"},
+		Args:    []string{processExecutorHelperRunFlag, "--", "success"},
 		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
 	}, nil, nil)
 	if err != nil {
@@ -991,7 +1052,7 @@ func TestSendSubAgentResult_NoRegistryNoCrash(t *testing.T) {
 
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
 		Command: os.Args[0],
-		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "success"},
+		Args:    []string{processExecutorHelperRunFlag, "--", "success"},
 		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
 	}, nil, nil)
 	if err != nil {
@@ -1022,7 +1083,7 @@ func TestSendSubAgentResult_NonSubAgentNoAction(t *testing.T) {
 
 	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
 		Command: os.Args[0],
-		Args:    []string{"-test.run=TestProcessExecutorHelper", "--", "success"},
+		Args:    []string{processExecutorHelperRunFlag, "--", "success"},
 		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
 	}, nil, nil)
 	if err != nil {
