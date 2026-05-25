@@ -50,7 +50,21 @@ func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		validateToken(c, cfg, tokenStr)
+
+		// WebSocket sessions must be Hub-issued sessions. TokenDance ID bearer
+		// tokens prove identity only and must not bypass the Hub session/device
+		// handshake by authenticating at the upgrade middleware layer.
+		claims, err := jwtutil.ParseToken(tokenStr, cfg.JWT.Secret)
+		if err != nil {
+			handler.Fail(c, errcode.AuthInvalidToken)
+			c.Abort()
+			return
+		}
+		c.Set("user_id", claims.UserID)
+		c.Set("device_type", claims.DeviceType)
+		c.Set("device_id", claims.DeviceID)
+		c.Set("auth_source", "hub_local")
+		c.Next()
 	}
 }
 
