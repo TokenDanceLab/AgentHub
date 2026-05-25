@@ -254,6 +254,26 @@ export type {
 } from './workbenchDataMode';
 
 export {
+  SURFACE_METADATA,
+  SURFACE_STATUS_METADATA,
+  getSurfaceByDesktopSectionId,
+  getSurfaceByWebRoute,
+  getSurfaceMetadata,
+  getSurfaceStatusMetadata,
+  getSurfacesByCategory,
+  surfaceMetadataById,
+  surfaceStatusById,
+} from './surfaceMetadata';
+export type {
+  SurfaceCategory,
+  SurfaceId,
+  SurfaceMetadata,
+  SurfacePlatform,
+  SurfaceStatus,
+  SurfaceStatusMetadata,
+} from './surfaceMetadata';
+
+export {
   mockProject,
   mockProjects,
   mockThreads,
