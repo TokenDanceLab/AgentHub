@@ -16,10 +16,20 @@ export interface HealthCheck {
   message?: string;
 }
 
+export interface RunnerHealthItem {
+  id: string;
+  name: string;
+  status: string;
+  capabilities?: string[];
+}
+
 export interface RunnerHealthCheck {
   status: string;
   message?: string;
   runnerIds?: string[];
+  items?: RunnerHealthItem[];
+  available?: number;
+  total?: number;
 }
 
 export interface HealthChecks {
@@ -125,7 +135,11 @@ export interface StartRunRequest {
   prompt?: string;
   agentId?: string;
   model?: string;
+  provider?: string;
+  modelAlias?: string;
   reasoningEffort?: string;
+  modelMappingEnabled?: boolean;
+  providerFallbackEnabled?: boolean;
 }
 
 // Compatibility aliases for Desktop code that still consumes the original
