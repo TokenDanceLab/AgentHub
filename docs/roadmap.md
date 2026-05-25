@@ -652,7 +652,7 @@ Hub 调度（远程）:
 - [x] 2026-05-25 gpt-5.5 xhigh 文档 worker 已写入 `docs/inbox/doc-architecture-sweep-2026-05-25.md`。
 - [x] 2026-05-25 Codex follow-up 文档 worker 已写入 `docs/inbox/doc-architecture-sweep-codex-followup-2026-05-25.md`，确认主文档已基本对齐，剩余风险集中在 Runner 兼容 API 命名和旧 client handoff 入口。
 - [x] 结论：主文档已基本对齐 Runtime/Profile/Configuration/Execution Target、TokenDance ID、IM、多端、远控、Skill/MCP、cc-switch、安全审计等边界。
-- [x] 旧 client smoke 文档入口已最小收口：`docs/client-roadmap.md`、`docs/implementation-guide.md`、`edge-server/README.md` 已说明早期独立 `runner/` 目录废弃，`client-smoke.ps1` 使用 Edge 内置 mock executor 和 `-EdgeAddr`。
+- [x] 旧 client smoke 文档入口已最小收口：`docs/operations/client-roadmap.md`、`docs/architecture/implementation-guide.md`、`edge-server/README.md` 已说明早期独立 `runner/` 目录废弃，`client-smoke.ps1` 使用 Edge 内置 mock executor 和 `-EdgeAddr`。
 - [ ] 文档待办：补 `/v1/runners`、`runner.*` 作为历史兼容命名的说明；归档或改写 `docs/client-handoff.md`、`docs/design/integration.md` 等仍含旧独立 `runner/` 语义的文档。
 - [ ] API 待办：决定 `/v1/runners`、`runner_offline`、`runner.online/offline` 是否长期保留为 deprecated compatibility，新增 schema 优先 Runtime/Profile/Execution Target 命名。
 
@@ -1127,7 +1127,7 @@ pnpm typecheck                                         # 零错误
 | | `docs/reference/cross-comparison/02-im-ux.md` | IM/UX 设计建议 |
 | **设计** | `docs/design/client-p0-architecture.md` | Desktop P0 实施细节 |
 | | `docs/design/client-reference-patterns.md` | Desktop 参考模式 |
-| **架构** | `docs/system-architecture.md` | 系统架构文档 |
-| | `docs/product-requirements.md` | 产品需求文档 |
-| | `docs/implementation-guide.md` | 功能实现文档 |
+| **架构** | `docs/architecture/system-architecture.md` | 系统架构文档 |
+| | `docs/architecture/product-requirements.md` | 产品需求文档 |
+| | `docs/architecture/implementation-guide.md` | 功能实现文档 |
 | **规则** | `AGENTS.md` | 项目开发规则和约定 |
