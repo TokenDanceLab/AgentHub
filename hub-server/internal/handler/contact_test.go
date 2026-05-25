@@ -314,15 +314,47 @@ func TestContactHandler_UpdateRemark_Success(t *testing.T) {
 	}
 }
 
-func TestContactHandler_UpdateRemark_BadRequest(t *testing.T) {
-	svc := &mockContactService{}
+func TestContactHandler_UpdateRemark_ClearRemark(t *testing.T) {
+	cleared := false
+	svc := &mockContactService{
+		updateRemarkFn: func(ctx context.Context, currentUserID, friendUserID, remark string) error {
+			if remark == "" {
+				cleared = true
+			}
+			return nil
+		},
+	}
 	h := handler.NewContactHandler(svc)
 
-	c, w := newGinCtx("PUT", "/client/contacts/u2/remark", map[string]string{}, "user_id", "u1")
+	c, w := newGinCtx("PUT", "/client/contacts/u2/remark", map[string]string{
+		"remark": "",
+	}, "user_id", "u1")
 	c.Params = gin.Params{{Key: "user_id", Value: "u2"}}
 	h.UpdateRemark(c)
 
-	if w.Code != 400 {
-		t.Fatalf("expected 400, got %d", w.Code)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if !cleared {
+		t.Fatal("expected remark to be cleared (empty string)")
+	}
+}
+
+func TestContactHandler_UpdateRemark_NotFound(t *testing.T) {
+	svc := &mockContactService{
+		updateRemarkFn: func(ctx context.Context, currentUserID, friendUserID, remark string) error {
+			return errcode.FriendRemarkNoRow
+		},
+	}
+	h := handler.NewContactHandler(svc)
+
+	c, w := newGinCtx("PUT", "/client/contacts/nonexistent/remark", map[string]string{
+		"remark": "test",
+	}, "user_id", "u1")
+	c.Params = gin.Params{{Key: "user_id", Value: "nonexistent"}}
+	h.UpdateRemark(c)
+
+	if w.Code != 404 {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
 	}
 }
