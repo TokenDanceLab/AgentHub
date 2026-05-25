@@ -38,8 +38,25 @@ interface ModelSettingsState {
   toggleAlias: (alias: string) => void;
   setCcSwitchBridgeEnabled: (value: boolean) => void;
   updateProvider: (id: string, updates: Partial<Omit<CcSwitchProvider, 'id'>>) => void;
+  resolveRunRequestOptions: (input?: RunModelSettingsInput) => ResolvedRunModelSettings;
   reset: () => void;
 }
+
+export interface RunModelSettingsInput {
+  model?: string;
+  reasoningEffort?: string;
+}
+
+export interface ResolvedRunModelSettings {
+  model?: string;
+  provider?: string;
+  reasoningEffort?: string;
+  modelAlias?: string;
+  modelMappingEnabled: boolean;
+  providerFallbackEnabled: boolean;
+}
+
+const DEFAULT_REASONING_EFFORT: ReasoningEffortPreference = 'high';
 
 const DEFAULT_ALIASES: ModelAliasMapping[] = [
   {
@@ -92,13 +109,34 @@ const DEFAULT_CC_SWITCH_PROVIDERS: CcSwitchProvider[] = [
 const cloneAliases = () => DEFAULT_ALIASES.map((item) => ({ ...item }));
 const cloneCcSwitchProviders = () => DEFAULT_CC_SWITCH_PROVIDERS.map((item) => ({ ...item }));
 
+function resolveRunRequestOptions(state: ModelSettingsState, input: RunModelSettingsInput = {}): ResolvedRunModelSettings {
+  const requestedModel = input.model?.trim() ?? '';
+  const defaultModel = state.defaultModel.trim();
+  const candidateModel = requestedModel || (defaultModel && defaultModel !== 'auto' ? defaultModel : '');
+  const alias = state.modelMappingEnabled && candidateModel
+    ? state.aliases.find((item) => item.enabled && item.alias === candidateModel)
+    : undefined;
+  const model = alias?.model ?? candidateModel;
+  const provider = alias?.provider ?? (state.defaultProvider.trim() || undefined);
+  const reasoningEffort = input.reasoningEffort?.trim() || alias?.reasoningEffort || state.reasoningEffort;
+
+  return {
+    ...(model ? { model } : {}),
+    ...(provider ? { provider } : {}),
+    ...(reasoningEffort ? { reasoningEffort } : {}),
+    ...(alias ? { modelAlias: alias.alias } : {}),
+    modelMappingEnabled: state.modelMappingEnabled,
+    providerFallbackEnabled: state.providerFallbackEnabled,
+  };
+}
+
 export const useModelSettingsStore = create<ModelSettingsState>()(
   subscribeWithSelector(
     persist(
-      (set) => ({
+      (set, get) => ({
         defaultModel: 'auto',
         defaultProvider: 'tokendance-relay',
-        reasoningEffort: 'high',
+        reasoningEffort: DEFAULT_REASONING_EFFORT,
         providerFallbackEnabled: true,
         modelMappingEnabled: true,
         aliases: cloneAliases(),
@@ -129,11 +167,12 @@ export const useModelSettingsStore = create<ModelSettingsState>()(
               item.id === id ? { ...item, ...updates } : item,
             ),
           })),
+        resolveRunRequestOptions: (input): ResolvedRunModelSettings => resolveRunRequestOptions(get(), input),
         reset: () =>
           set({
             defaultModel: 'auto',
             defaultProvider: 'tokendance-relay',
-            reasoningEffort: 'high',
+            reasoningEffort: DEFAULT_REASONING_EFFORT,
             providerFallbackEnabled: true,
             modelMappingEnabled: true,
             aliases: cloneAliases(),
