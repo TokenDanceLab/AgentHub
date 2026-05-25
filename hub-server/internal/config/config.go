@@ -12,11 +12,12 @@ import (
 )
 
 type Config struct {
-	Server      ServerConfig      `mapstructure:"server"`
-	DB          DBConfig          `mapstructure:"db"`
-	Redis       RedisConfig       `mapstructure:"redis"`
-	JWT         JWTConfig         `mapstructure:"jwt"`
-	Upload      UploadConfig      `mapstructure:"upload"`
+	Server       ServerConfig       `mapstructure:"server"`
+	DB           DBConfig           `mapstructure:"db"`
+	Redis        RedisConfig        `mapstructure:"redis"`
+	JWT          JWTConfig          `mapstructure:"jwt"`
+	Upload       UploadConfig       `mapstructure:"upload"`
+	S3           S3Config           `mapstructure:"s3"`
 	TokenDanceID TokenDanceIDConfig `mapstructure:"tokendance_id"`
 }
 
@@ -69,6 +70,23 @@ type JWTConfig struct {
 type UploadConfig struct {
 	Dir     string `mapstructure:"dir"`
 	MaxSize int64  `mapstructure:"max_size"`
+}
+
+// S3Config holds S3-compatible object storage settings for attachments.
+// When Endpoint/Bucket are empty, the server falls back to local filesystem storage.
+type S3Config struct {
+	Endpoint  string `mapstructure:"endpoint"`
+	AccessKey string `mapstructure:"access_key"`
+	SecretKey string `mapstructure:"secret_key"`
+	Bucket    string `mapstructure:"bucket"`
+	Region    string `mapstructure:"region"`
+	UseSSL    bool   `mapstructure:"use_ssl"`
+}
+
+// IsConfigured returns true when enough S3 settings are present to attempt
+// S3-backed attachment storage.
+func (s S3Config) IsConfigured() bool {
+	return s.Endpoint != "" && s.Bucket != ""
 }
 
 func Load(configPath string) (*Config, error) {
