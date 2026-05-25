@@ -41,6 +41,8 @@ Desktop currently consumes these Hub event types:
 
 Hub REST remains the snapshot source for `/client/contacts`, `/client/sessions`, and `/client/sessions/{id}/messages`. `/client/ws` is used for live updates and must not be the only source of IM state after refresh or reconnect.
 
+Shared frontend contract note: Hub REST responses use `{ "code": "OK", "data": ... }`; Hub WebSocket frames use `{ "type": "...", "seq_id": 42, "payload": ... }` and are intentionally separate from Edge `EventEnvelope`.
+
 AgentHub 使用 WebSocket typed events 推送实时状态。REST API 用于发起命令和查询，WebSocket 只负责事件投递。
 
 > **Implementation Status (2026-05-24)**: Edge Server events (run.*, runner.*) are
@@ -227,7 +229,7 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `preview.stopped` | P1 | 预览停止 |
 | `run.finished` | P0 | AgentRun 正常结束 |
 | `run.failed` | P0 | AgentRun 失败 |
-| `run.cancelled` | P1 | AgentRun 已取消（已实现，补文档） |
+| `run.cancelled` | P1 | AgentRun 已取消；payload 至少包含 `runId`，可带 `finishedAt` 和 `reason` |
 | `run.agent.text_delta` | P0 | Agent 流式文本增量（CLI-agnostic） |
 | `run.agent.text_block` | P0 | Agent 完整文本块 |
 | `run.agent.thinking` | P0 | Agent 思考/推理内容（可折叠显示） |

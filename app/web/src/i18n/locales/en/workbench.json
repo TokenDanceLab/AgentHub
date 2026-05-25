@@ -41,6 +41,12 @@
     "startRun": "Start Run",
     "starting": "Starting"
   },
+  "state": {
+    "loading": "Loading the Edge snapshot. Actions stay locked until the reducer has real data.",
+    "offlineSnapshot": "Edge is offline. Showing the last reducer snapshot; write actions are locked.",
+    "offlineEmpty": "Edge is unavailable and no snapshot has been loaded. No mock success state is shown.",
+    "empty": "No Edge snapshot data is available yet. Start Edge to load projects, threads, runners, and runs."
+  },
   "runSummary": {
     "ariaLabel": "Run summary",
     "noRun": "No run",
@@ -92,6 +98,7 @@
     "attach": "Attach context",
     "threadAriaLabel": "Message thread",
     "placeholder": "Message this Thread with @ClaudeCode / @Codex / @OpenCode...",
+    "lockedPlaceholder": "Connect Edge and load a snapshot before sending",
     "sending": "Sending",
     "send": "Send"
   },
