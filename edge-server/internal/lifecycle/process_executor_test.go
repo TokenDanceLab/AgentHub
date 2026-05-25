@@ -744,7 +744,7 @@ func hasArg(args []string, want string) bool {
 	return false
 }
 
-// ── Result aggregation tests ───────────────────────────────────────────────
+// Result aggregation tests.
 
 func TestSendSubAgentResult_Completed(t *testing.T) {
 	bus := events.NewBus(100)
