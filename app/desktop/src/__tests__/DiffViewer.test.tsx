@@ -160,11 +160,11 @@ describe('DiffViewer', () => {
     expect(onAccept).toHaveBeenCalledWith('src/accept.ts');
   });
 
-  it('does not call onAcceptFile when no handler provided', () => {
+  it('does not render accept action when no handler is provided', () => {
     const files = [makeFile({ filePath: 'src/accept.ts' })];
     render(<DiffViewer files={files} />);
     const panel = getDiffPanel();
-    expect(() => fireEvent.click(within(panel).getByLabelText('Accept file'))).not.toThrow();
+    expect(within(panel).queryByLabelText('Accept file')).not.toBeInTheDocument();
   });
 
   // ── Reject callback ────────────────────────────
@@ -178,11 +178,11 @@ describe('DiffViewer', () => {
     expect(onReject).toHaveBeenCalledWith('src/reject.ts');
   });
 
-  it('does not call onRejectFile when no handler provided', () => {
+  it('does not render reject action when no handler is provided', () => {
     const files = [makeFile({ filePath: 'src/reject.ts' })];
     render(<DiffViewer files={files} />);
     const panel = getDiffPanel();
-    expect(() => fireEvent.click(within(panel).getByLabelText('Reject file'))).not.toThrow();
+    expect(within(panel).queryByLabelText('Reject file')).not.toBeInTheDocument();
   });
 
   // ── Hunk headers ───────────────────────────────

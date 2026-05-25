@@ -167,22 +167,26 @@ function FileDiffSection({
           </span>
         </button>
 
-        <button
-          className={`${styles.actionBtn} ${styles.acceptBtn} ${accepted ? styles.acceptBtnActive : ''}`}
-          onClick={handleAccept}
-          title={accepted ? 'Undo accept' : 'Accept all changes in this file'}
-          aria-label={accepted ? 'Undo accept' : 'Accept file'}
-        >
-          <Check size={14} />
-        </button>
-        <button
-          className={`${styles.actionBtn} ${styles.rejectBtn} ${rejected ? styles.rejectBtnActive : ''}`}
-          onClick={handleReject}
-          title={rejected ? 'Undo reject' : 'Reject all changes in this file'}
-          aria-label={rejected ? 'Undo reject' : 'Reject file'}
-        >
-          <X size={14} />
-        </button>
+        {onAcceptFile && (
+          <button
+            className={`${styles.actionBtn} ${styles.acceptBtn} ${accepted ? styles.acceptBtnActive : ''}`}
+            onClick={handleAccept}
+            title={accepted ? 'Undo accept' : 'Accept all changes in this file'}
+            aria-label={accepted ? 'Undo accept' : 'Accept file'}
+          >
+            <Check size={14} />
+          </button>
+        )}
+        {onRejectFile && (
+          <button
+            className={`${styles.actionBtn} ${styles.rejectBtn} ${rejected ? styles.rejectBtnActive : ''}`}
+            onClick={handleReject}
+            title={rejected ? 'Undo reject' : 'Reject all changes in this file'}
+            aria-label={rejected ? 'Undo reject' : 'Reject file'}
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
 
       {expanded && (

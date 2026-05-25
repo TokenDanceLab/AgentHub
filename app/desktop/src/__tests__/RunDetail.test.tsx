@@ -17,6 +17,7 @@ import '@testing-library/jest-dom/vitest';
 import RunDetail from '@/components/RunDetail';
 import { RunState } from '@/utils/runStateMachine';
 import type { RunInfo } from '@shared/types';
+import type { FileDiff } from '@/components/ChatView.types';
 
 function makeRun(overrides: Partial<RunInfo> = {}): RunInfo {
   return {
@@ -25,6 +26,24 @@ function makeRun(overrides: Partial<RunInfo> = {}): RunInfo {
     threadId: 'thread-1',
     status: RunState.RUNNING,
     ...overrides,
+  };
+}
+
+function makeDiff(): FileDiff {
+  return {
+    filePath: 'src/preview.ts',
+    status: 'modified',
+    additions: 1,
+    deletions: 1,
+    hunks: [
+      {
+        header: '@@ -1,2 +1,2 @@',
+        lines: [
+          { type: 'deleted', oldLineNumber: 1, content: 'old line' },
+          { type: 'added', newLineNumber: 1, content: 'new line' },
+        ],
+      },
+    ],
   };
 }
 
@@ -177,5 +196,23 @@ describe('RunDetail', () => {
       />,
     );
     expect(screen.queryByText('action.cancelRun')).not.toBeInTheDocument();
+  });
+
+  it('renders diff previews as read-only when no apply handlers are connected', () => {
+    const run = makeRun({ status: RunState.COMPLETED });
+    render(
+      <RunDetail
+        run={run}
+        toolCalls={[]}
+        changedFiles={[{ path: 'src/preview.ts', action: 'modified', timestamp: '2025-01-01T00:00:00Z' }]}
+        outputText=""
+        diffs={[makeDiff()]}
+      />,
+    );
+
+    expect(screen.getByText('run.preview')).toBeInTheDocument();
+    expect(screen.getAllByText('src/preview.ts').length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText('Accept file')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Reject file')).not.toBeInTheDocument();
   });
 });
