@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { useTranslation } from 'react-i18next';
 import {
   mockRunners,
   mockRuns,
@@ -100,25 +101,6 @@ const initialActivities: ActivityItem[] = mockRuns.map((run, i) => ({
   time: run.createdAt.slice(11, 16),
   accent: activityAccentPalette[i % activityAccentPalette.length] ?? "cyan",
 }));
-
-const laneLabels: Record<TaskStatus, string> = {
-  backlog: "Backlog",
-  active: "In progress",
-  review: "Review",
-};
-
-const memberFilterOptions: Array<{ id: MemberFilter; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "online", label: "Online" },
-  { id: "busy", label: "Busy" },
-  { id: "offline", label: "Offline" },
-];
-
-const presenceLabels: Record<MemberPresence, string> = {
-  online: "Online",
-  busy: "Busy",
-  offline: "Offline",
-};
 
 function memberFromRunner(runner: Runner, index: number): Member {
   return {
@@ -354,7 +336,7 @@ const styles = `
   color: var(--white);
   border-radius: 10px;
   background: linear-gradient(135deg, var(--gwr-blue), var(--gwr-cyan));
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 10px 22px var(--brand-glow);
   font-size: 16px;
   font-weight: 900;
   line-height: 1;
@@ -1081,6 +1063,33 @@ function MemberAvatar({ member }: { member: Member }) {
 }
 
 export function GroupWorkspacePageInteractive() {
+  const { t } = useTranslation('groupWorkspace');
+
+  const laneLabels: Record<TaskStatus, string> = {
+    backlog: t('task.board.backlog'),
+    active: t('task.board.inProgress'),
+    review: t('task.board.review'),
+  };
+
+  const memberFilterOptions: Array<{ id: MemberFilter; label: string }> = [
+    { id: "all", label: t('member.filter.all') },
+    { id: "online", label: t('member.filter.online') },
+    { id: "busy", label: t('member.filter.busy') },
+    { id: "offline", label: t('member.filter.offline') },
+  ];
+
+  const presenceLabels: Record<MemberPresence, string> = {
+    online: t('member.status.online'),
+    busy: t('member.status.busy'),
+    offline: t('member.status.offline'),
+  };
+
+  const tagLabels: Record<string, string> = {
+    Active: t('task.tag.active'),
+    Done: t('task.tag.done'),
+    Queue: t('task.tag.queue'),
+  };
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const workbenchState = useWorkbenchProjection();
   const {
@@ -1099,7 +1108,7 @@ export function GroupWorkspacePageInteractive() {
   const [syncState, setSyncState] = useState<SyncState>({
     complete: false,
     fileCount: 12,
-    lastSyncedAt: "Not synced",
+    lastSyncedAt: t('sync.checklist.notSynced'),
     progress: 82,
     revision: 0,
   });
@@ -1109,8 +1118,8 @@ export function GroupWorkspacePageInteractive() {
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
   const [noteDraft, setNoteDraft] = useState("");
   const [confirmation, setConfirmation] = useState<Confirmation>({
-    detail: "Local controls are wired for review, dry-run sync, assignment, member presence, and notes.",
-    title: "Local workspace ready",
+    detail: t('confirm.readyDetail'),
+    title: t('confirm.ready'),
     tone: "info",
   });
 
@@ -1164,7 +1173,7 @@ export function GroupWorkspacePageInteractive() {
     hasSectionSnapshot: hasLiveCatalog && workbenchState.runners.length > 0,
     hasLocalDryRun: hasLocalMemberChanges,
   });
-  const approvalLabel = approved ? "Approved" : needsEdits ? "Changes requested" : "Awaiting approval";
+  const approvalLabel = approved ? t('approval.status.approved') : needsEdits ? t('approval.status.changesRequested') : t('approval.status.awaitingApproval');
   const approvalLocked = !approved;
   const syncedFiles: FileItem[] = syncState.revision
     ? [
@@ -1209,9 +1218,9 @@ export function GroupWorkspacePageInteractive() {
           progress: approval === "approved" ? 100 : approval === "changes" ? 60 : 82,
           summary:
             approval === "approved"
-              ? "Approved for dry-run sync. Snapshot action is unlocked."
+              ? t('task.summary.approved')
               : approval === "changes"
-                ? "Reviewer requested one visible edit before approval."
+                ? t('task.summary.changesRequested')
                 : task.summary,
         };
       }
@@ -1220,7 +1229,7 @@ export function GroupWorkspacePageInteractive() {
         return {
           ...task,
           progress: syncState.progress,
-          summary: `Dry-run snapshot synced at ${syncState.lastSyncedAt}.`,
+          summary: t('task.summary.synced', { time: syncState.lastSyncedAt }),
         };
       }
 
@@ -1243,8 +1252,8 @@ export function GroupWorkspacePageInteractive() {
       accent: "blue",
     });
     showConfirmation({
-      title: "Approval saved",
-      detail: "Parser v2 is approved. The local dry-run snapshot button is now enabled.",
+      title: t('confirm.approvalSaved'),
+      detail: t('confirm.approvalSavedDetail'),
       tone: "success",
     });
   };
@@ -1262,8 +1271,8 @@ export function GroupWorkspacePageInteractive() {
       accent: "purple",
     });
     showConfirmation({
-      title: "Changes requested",
-      detail: "Approval state changed and local dry-run sync is locked while the review is open.",
+      title: t('confirm.changesRequested'),
+      detail: t('confirm.changesRequestedDetail'),
       tone: "warning",
     });
   };
@@ -1277,8 +1286,8 @@ export function GroupWorkspacePageInteractive() {
       accent: "teal",
     });
     showConfirmation({
-      title: "Review reassigned",
-      detail: `Parser v2 is now assigned to ${nextOwner}.`,
+      title: t('confirm.reviewReassigned'),
+      detail: t('confirm.reviewReassignedDetail', { owner: nextOwner }),
       tone: "info",
     });
   };
@@ -1286,8 +1295,8 @@ export function GroupWorkspacePageInteractive() {
   const syncSnapshot = () => {
     if (!approved) {
       showConfirmation({
-        title: "Local sync is locked",
-        detail: "Approve parser v2 before running the local dry-run snapshot.",
+        title: t('confirm.syncLocked'),
+        detail: t('confirm.syncLockedDetail'),
         tone: "warning",
       });
       return;
@@ -1308,8 +1317,8 @@ export function GroupWorkspacePageInteractive() {
       accent: "cyan",
     });
     showConfirmation({
-      title: "Dry-run snapshot synced",
-      detail: `Local files, progress, and last dry-run time now reflect revision ${nextRevision}.`,
+      title: t('confirm.snapshotSynced'),
+      detail: t('confirm.snapshotSyncedDetail', { revision: nextRevision }),
       tone: "success",
     });
   };
@@ -1340,8 +1349,8 @@ export function GroupWorkspacePageInteractive() {
       accent: selectedMember.accent,
     });
     showConfirmation({
-      title: "Member status updated",
-      detail: `${selectedMember.name} switched to ${presenceLabels[nextPresence]}.`,
+      title: t('confirm.memberStatusUpdated'),
+      detail: t('confirm.memberStatusUpdatedDetail', { name: selectedMember.name, status: presenceLabels[nextPresence] }),
       tone: nextPresence === "offline" ? "warning" : "info",
     });
   };
@@ -1349,11 +1358,11 @@ export function GroupWorkspacePageInteractive() {
   const selectMemberFilter = (filter: MemberFilter) => {
     setMemberFilter(filter);
     showConfirmation({
-      title: "Member filter changed",
+      title: t('confirm.memberFilterChanged'),
       detail:
         filter === "all"
-          ? "Showing every workspace member."
-          : `Showing only members marked ${presenceLabels[filter].toLowerCase()}.`,
+          ? t('confirm.memberFilterAll')
+          : t('confirm.memberFilterSpecific', { filter: presenceLabels[filter] }),
       tone: "info",
     });
   };
@@ -1362,8 +1371,8 @@ export function GroupWorkspacePageInteractive() {
     const trimmedNote = noteDraft.trim();
     if (!trimmedNote) {
       showConfirmation({
-        title: "Note is empty",
-        detail: "Write a collaboration note before sending it to the activity flow.",
+        title: t('confirm.noteEmpty'),
+        detail: t('confirm.noteEmptyDetail'),
         tone: "warning",
       });
       return;
@@ -1376,8 +1385,8 @@ export function GroupWorkspacePageInteractive() {
     });
     setNoteDraft("");
     showConfirmation({
-      title: "Note posted",
-      detail: "The note was added to the activity flow and the composer was cleared.",
+      title: t('confirm.notePosted'),
+      detail: t('confirm.notePostedDetail'),
       tone: "success",
     });
   };
@@ -1395,7 +1404,7 @@ export function GroupWorkspacePageInteractive() {
     setNoteDraft((current) => `${current}${current ? " " : ""}${token}`);
     showConfirmation({
       title: confirmationTitle,
-      detail: "Composer content was updated locally.",
+      detail: t('confirm.composerUpdated'),
       tone: "info",
     });
   };
@@ -1411,8 +1420,8 @@ export function GroupWorkspacePageInteractive() {
       accent: "cyan",
     });
     showConfirmation({
-      title: "File placeholder added",
-      detail: "The file counter changed locally for this interactive preview.",
+      title: t('confirm.filePlaceholderAdded'),
+      detail: t('confirm.filePlaceholderDetail'),
       tone: "info",
     });
   };
@@ -1424,8 +1433,8 @@ export function GroupWorkspacePageInteractive() {
       accent: "teal",
     });
     showConfirmation({
-      title: "Export prepared",
-      detail: "No file was downloaded. The action is captured in the activity flow.",
+      title: t('confirm.exportPrepared'),
+      detail: t('confirm.exportPreparedDetail'),
       tone: "success",
     });
   };
@@ -1441,13 +1450,13 @@ export function GroupWorkspacePageInteractive() {
             <span className="gwr-mark">AH</span>
             <div className="gwr-truncate gwr-title">
               <h2>AGENTHUB</h2>
-              <p className="gwr-brand-sub">Group Workspace</p>
+              <p className="gwr-brand-sub">{t('sidebar.brandSubtitle')}</p>
             </div>
           </div>
 
           <section className="gwr-section">
             <div className="gwr-section-head">
-              <h2>Spaces</h2>
+              <h2>{t('sidebar.spaces')}</h2>
               <span className="gwr-pill cyan">
                 <span className="gwr-dot cyan" />
                 {catalogLabel}
@@ -1458,7 +1467,7 @@ export function GroupWorkspacePageInteractive() {
                 <AccentIcon accent="blue" label="S" />
                 <div className="gwr-truncate">
                   <strong>Legacy Migration</strong>
-                  <p className="gwr-tiny gwr-truncate">Local dry-run sync</p>
+                  <p className="gwr-tiny gwr-truncate">{t('sidebar.space.localDryRunSync')}</p>
                 </div>
               </div>
               <div className="gwr-nav">
@@ -1472,7 +1481,7 @@ export function GroupWorkspacePageInteractive() {
                 <AccentIcon accent="cyan" label="F" />
                 <div className="gwr-truncate">
                   <strong>Shared Files</strong>
-                  <p className="gwr-tiny gwr-truncate">{syncState.fileCount} documents</p>
+                  <p className="gwr-tiny gwr-truncate">{t('sidebar.space.documents', { count: syncState.fileCount })}</p>
                 </div>
               </div>
             </div>
@@ -1480,15 +1489,15 @@ export function GroupWorkspacePageInteractive() {
 
           <section className="gwr-section">
             <div className="gwr-section-head">
-              <h2>Members</h2>
+              <h2>{t('sidebar.members')}</h2>
               <div className="gwr-actions">
                 <SourceLabel source={memberSource} />
                 <span className="gwr-tiny">
-                  {onlineCount} online / {busyCount} busy
+                  {t('sidebar.members.onlineBusy', { online: onlineCount, busy: busyCount })}
                 </span>
               </div>
             </div>
-            <div className="gwr-filters" role="group" aria-label="Filter members by status">
+            <div className="gwr-filters" role="group" aria-label={t('member.filter.aria')}>
               {memberFilterOptions.map((option) => (
                 <button
                   className={option.id === memberFilter ? "gwr-filter is-active" : "gwr-filter"}
@@ -1518,7 +1527,7 @@ export function GroupWorkspacePageInteractive() {
                 </button>
               ))}
               {visibleMembers.length === 0 ? (
-                <div className="gwr-empty">No members match this status filter. Pick another filter or cycle a member status.</div>
+                <div className="gwr-empty">{t('member.empty')}</div>
               ) : null}
             </div>
           </section>
@@ -1526,12 +1535,12 @@ export function GroupWorkspacePageInteractive() {
           <div className="gwr-spacer" />
           <section className="gwr-sync">
             <div className="gwr-row">
-              <span className="gwr-eyebrow">Workspace Health</span>
+              <span className="gwr-eyebrow">{t('sidebar.workspaceHealth')}</span>
               <span className={`gwr-pill ${catalogTone}`}>
                 {catalogLabel}
               </span>
             </div>
-            <p className="gwr-small">{catalogDetail} Last local sync: {syncState.lastSyncedAt}.</p>
+            <p className="gwr-small">{catalogDetail} {t('sidebar.lastLocalSync', { time: syncState.lastSyncedAt })}</p>
           </section>
         </aside>
 
@@ -1539,21 +1548,21 @@ export function GroupWorkspacePageInteractive() {
           <header className="gwr-top gwr-glass">
             <div className="gwr-title">
               <p className="gwr-eyebrow">Legacy Migration Room</p>
-              <h1>Shared operations cockpit</h1>
+              <h1>{t('header.title')}</h1>
               <p className="gwr-small">
-                Members, tasks, files, approvals, and local dry-run status stay visible in one working surface.
+                {t('header.subtitle')}
               </p>
             </div>
             <div className="gwr-actions">
-              <div className="gwr-search" aria-label="Search workspace">
-                <span>Search</span>
-                <span className="gwr-truncate">tasks, files, members</span>
+              <div className="gwr-search" aria-label={t('header.searchAria')}>
+                <span>{t('header.search')}</span>
+                <span className="gwr-truncate">{t('header.searchPlaceholder')}</span>
               </div>
               <button className="gwr-button" type="button" onClick={exportSummary}>
-                Export
+                {t('header.export')}
               </button>
               <button className="gwr-button primary" type="button" onClick={assignSecurity}>
-                Assign review
+                {t('header.assignReview')}
               </button>
             </div>
           </header>
@@ -1561,19 +1570,19 @@ export function GroupWorkspacePageInteractive() {
           <section className="gwr-stats">
             <div className="gwr-stat gwr-glass">
               <strong>{onlineCount}</strong>
-              <p className="gwr-small">Online members</p>
+              <p className="gwr-small">{t('stat.membersOnline')}</p>
             </div>
             <div className="gwr-stat gwr-glass">
               <strong>{tasks.length}</strong>
-              <p className="gwr-small">Shared tasks</p>
+              <p className="gwr-small">{t('stat.sharedTasks')}</p>
             </div>
             <div className="gwr-stat gwr-glass">
               <strong>{syncState.fileCount}</strong>
-              <p className="gwr-small">Workspace files</p>
+              <p className="gwr-small">{t('stat.workspaceFiles')}</p>
             </div>
             <div className="gwr-stat gwr-glass">
               <strong>{syncState.progress}%</strong>
-              <p className="gwr-small">Dry-run readiness</p>
+              <p className="gwr-small">{t('stat.dryRunReadiness')}</p>
             </div>
           </section>
 
@@ -1585,11 +1594,11 @@ export function GroupWorkspacePageInteractive() {
             <button
               className="gwr-icon-button"
               type="button"
-              aria-label="Dismiss confirmation"
+              aria-label={t('confirm.dismiss')}
               onClick={() =>
                 showConfirmation({
-                  title: "Status bar cleared",
-                  detail: "The next local action will appear here.",
+                  title: t('confirm.statusBarCleared'),
+                  detail: t('confirm.statusBarClearedDetail'),
                   tone: "info",
                 })
               }
@@ -1602,8 +1611,8 @@ export function GroupWorkspacePageInteractive() {
             <div className="gwr-column gwr-glass">
               <div className="gwr-section-head">
                 <div className="gwr-title">
-                  <p className="gwr-eyebrow">Shared Task Board</p>
-                  <h2>Current coordination plan</h2>
+                  <p className="gwr-eyebrow">{t('task.board')}</p>
+                  <h2>{t('task.coordinationPlan')}</h2>
                 </div>
                 <SourceLabel source={taskSource} />
               </div>
@@ -1619,20 +1628,20 @@ export function GroupWorkspacePageInteractive() {
                       <article className="gwr-card" key={task.id}>
                         <div className="gwr-row">
                           <span className={task.status === "review" ? "gwr-pill purple" : "gwr-pill cyan"}>
-                            {task.tag}
+                            {tagLabels[task.tag] || task.tag}
                           </span>
                           <span className="gwr-tiny">{task.progress}%</span>
                         </div>
                         <h3>{task.title}</h3>
                         <p className="gwr-small">{task.summary}</p>
-                        <div className="gwr-progress" aria-label={`${task.title} progress`}>
+                        <div className="gwr-progress" aria-label={t('task.progressAria', { title: task.title })}>
                           <span style={{ width: `${task.progress}%` }} />
                         </div>
                         <div className="gwr-row">
-                          <span className="gwr-tiny">Owner: {task.owner}</span>
+                          <span className="gwr-tiny">{t('task.owner', { name: task.owner })}</span>
                           {task.id === "approve" ? (
                             <button className="gwr-button" type="button" onClick={assignSecurity}>
-                              Reassign
+                              {t('task.reassign')}
                             </button>
                           ) : null}
                         </div>
@@ -1646,8 +1655,8 @@ export function GroupWorkspacePageInteractive() {
             <aside className="gwr-feed gwr-glass">
               <div className="gwr-section-head">
                 <div className="gwr-title">
-                  <p className="gwr-eyebrow">Activity Flow</p>
-                  <h2>Workspace pulse</h2>
+                  <p className="gwr-eyebrow">{t('activity.title')}</p>
+                  <h2>{t('activity.subtitle')}</h2>
                 </div>
                 <SourceLabel source={activitySource} />
               </div>
@@ -1671,24 +1680,24 @@ export function GroupWorkspacePageInteractive() {
                     <button
                       className="gwr-icon-button"
                       type="button"
-                      aria-label="Mention member"
-                      onClick={() => fillComposer("@group", "Mention inserted")}
+                      aria-label={t('composer.mentionAria')}
+                      onClick={() => fillComposer("@group", t('confirm.mentionInserted'))}
                     >
                       @
                     </button>
                     <button
                       className="gwr-icon-button"
                       type="button"
-                      aria-label="Attach file"
-                      onClick={() => fillComposer("[attachment]", "Attachment marker inserted")}
+                      aria-label={t('composer.attachAria')}
+                      onClick={() => fillComposer("[attachment]", t('confirm.attachmentInserted'))}
                     >
                       +
                     </button>
                     <button
                       className="gwr-icon-button"
                       type="button"
-                      aria-label="Create task"
-                      onClick={() => fillComposer("#task", "Task marker inserted")}
+                      aria-label={t('composer.taskAria')}
+                      onClick={() => fillComposer("#task", t('confirm.taskMarkerInserted'))}
                     >
                       T
                     </button>
@@ -1696,16 +1705,16 @@ export function GroupWorkspacePageInteractive() {
                   <span className="gwr-pill cyan">@group</span>
                 </div>
                 <textarea
-                  aria-label="Workspace message"
-                  placeholder="Send a coordination note to this workspace..."
+                  aria-label={t('composer.messageAria')}
+                  placeholder={t('composer.placeholder')}
                   value={noteDraft}
                   onChange={(event) => setNoteDraft(event.target.value)}
                   onKeyDown={handleComposerKeyDown}
                 />
                 <div className="gwr-row">
-                  <span className="gwr-tiny">{noteDraft.trim() ? `${noteDraft.trim().length} characters ready` : "Draft is empty."}</span>
+                  <span className="gwr-tiny">{noteDraft.trim() ? t('composer.charactersReady', { count: noteDraft.trim().length }) : t('composer.draftEmpty')}</span>
                   <button className="gwr-button primary" type="button" disabled={!noteDraft.trim()} onClick={sendNote}>
-                    Send note
+                    {t('composer.send')}
                   </button>
                 </div>
               </div>
@@ -1717,8 +1726,8 @@ export function GroupWorkspacePageInteractive() {
           <section className="gwr-section">
             <div className="gwr-section-head">
               <div className="gwr-title">
-                <p className="gwr-eyebrow">Approval</p>
-                <h2>Parser v2 ready</h2>
+                <p className="gwr-eyebrow">{t('approval.title')}</p>
+                <h2>{t('approval.parserReady')}</h2>
               </div>
               <span className={approved ? "gwr-pill green" : needsEdits ? "gwr-pill purple" : "gwr-pill"}>
                 {approvalLabel}
@@ -1727,21 +1736,21 @@ export function GroupWorkspacePageInteractive() {
             <div className="gwr-approval">
               <div className="gwr-row">
                 <strong>{approvalLabel}</strong>
-                <span className="gwr-tiny">Owner: {taskOwner}</span>
+                <span className="gwr-tiny">{t('approval.owner', { name: taskOwner })}</span>
               </div>
               <p className="gwr-small">
                 {approved
-                  ? "Parser diff is approved. Local dry-run controls are now visible and enabled."
+                  ? t('approval.detail.approved')
                   : needsEdits
-                    ? "A requested-edit state is visible on the review card and board."
-                    : "Parser diff is staged, security checks passed, and local dry-run sync remains locked until approval."}
+                    ? t('approval.detail.changesRequested')
+                    : t('approval.detail.awaitingApproval')}
               </p>
               <div className="gwr-actions">
                 <button className="gwr-button warning" type="button" onClick={requestEdits}>
-                  Request edits
+                  {t('approval.requestEdits')}
                 </button>
                 <button className="gwr-button primary" type="button" onClick={approveParser}>
-                  Approve
+                  {t('approval.approve')}
                 </button>
               </div>
             </div>
@@ -1750,17 +1759,17 @@ export function GroupWorkspacePageInteractive() {
           <section className="gwr-section">
             <div className="gwr-section-head">
               <div className="gwr-title">
-                <p className="gwr-eyebrow">Local Sync Status</p>
-                <h2>Dry-run snapshot</h2>
+                <p className="gwr-eyebrow">{t('sync.title')}</p>
+                <h2>{t('sync.subtitle')}</h2>
               </div>
               <span className={`gwr-pill ${syncState.complete ? "green" : "cyan"}`}>{syncState.progress}%</span>
             </div>
             <div className="gwr-sync">
               <div className="gwr-row">
-                <span className="gwr-small">Dry-run readiness</span>
-                <strong>{syncState.complete ? "Local synced" : approved ? "Unlocked" : "Locked"}</strong>
+                <span className="gwr-small">{t('sync.readiness')}</span>
+                <strong>{syncState.complete ? t('sync.status.synced') : approved ? t('sync.status.unlocked') : t('sync.status.locked')}</strong>
               </div>
-              <div className="gwr-progress" aria-label="Dry-run readiness">
+              <div className="gwr-progress" aria-label={t('sync.readinessAria')}>
                 <span style={{ width: `${syncState.progress}%` }} />
               </div>
               <button
@@ -1769,28 +1778,28 @@ export function GroupWorkspacePageInteractive() {
                 disabled={approvalLocked}
                 onClick={syncSnapshot}
               >
-                {syncState.complete ? "Run local sync again" : approved ? "Run local sync" : "Approve to run"}
+                {syncState.complete ? t('sync.runAgain') : approved ? t('sync.run') : t('sync.approveToRun')}
               </button>
               <div className="gwr-checks">
                 <div className="gwr-check">
                   <span className="gwr-dot cyan" />
                   <div>
-                    <strong>Files indexed</strong>
-                    <p className="gwr-tiny">{syncState.fileCount} workspace files available.</p>
+                    <strong>{t('sync.checklist.filesIndexed')}</strong>
+                    <p className="gwr-tiny">{t('sync.checklist.filesDetail', { count: syncState.fileCount })}</p>
                   </div>
                 </div>
                 <div className="gwr-check">
                   <span className="gwr-dot purple" />
                   <div>
-                    <strong>Assignments visible</strong>
-                    <p className="gwr-tiny">Review owner is {taskOwner}.</p>
+                    <strong>{t('sync.checklist.assignments')}</strong>
+                    <p className="gwr-tiny">{t('sync.checklist.assignmentsDetail', { owner: taskOwner })}</p>
                   </div>
                 </div>
                 <div className="gwr-check">
                   <span className="gwr-dot" />
                   <div>
-                    <strong>Last local sync</strong>
-                    <p className="gwr-tiny">{syncState.lastSyncedAt}.</p>
+                    <strong>{t('sync.checklist.lastSync')}</strong>
+                    <p className="gwr-tiny">{t('sync.checklist.lastSyncDetail', { time: syncState.lastSyncedAt })}</p>
                   </div>
                 </div>
               </div>
@@ -1800,12 +1809,12 @@ export function GroupWorkspacePageInteractive() {
           <section className="gwr-section">
             <div className="gwr-section-head">
               <div className="gwr-title">
-                <p className="gwr-eyebrow">Shared Files</p>
-                <h2>Workspace documents</h2>
+                <p className="gwr-eyebrow">{t('files.title')}</p>
+                <h2>{t('files.subtitle')}</h2>
               </div>
               <div className="gwr-actions">
                 <SourceLabel source={fileSource} />
-                <button className="gwr-icon-button" type="button" aria-label="Add file" onClick={createLocalFile}>
+                <button className="gwr-icon-button" type="button" aria-label={t('files.addAria')} onClick={createLocalFile}>
                   +
                 </button>
               </div>
@@ -1821,7 +1830,7 @@ export function GroupWorkspacePageInteractive() {
                   <span className="gwr-tiny">{file.size}</span>
                 </div>
               ))}
-              {workspaceFiles.length === 0 ? <div className="gwr-empty">No files are visible in this workspace.</div> : null}
+              {workspaceFiles.length === 0 ? <div className="gwr-empty">{t('files.empty')}</div> : null}
             </div>
           </section>
         </aside>

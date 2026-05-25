@@ -145,7 +145,7 @@
   font-size: 16px;
   font-weight: 900;
   line-height: 1;
-  box-shadow: 0 10px 22px var(--shadow);
+  box-shadow: 0 10px 22px var(--brand-glow);
 }
 
 .railSection {

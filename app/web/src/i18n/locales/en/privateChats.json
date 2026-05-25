@@ -1,0 +1,83 @@
+{
+  "brand": {
+    "subtitle": "Private Chats"
+  },
+  "search": {
+    "ariaLabel": "Search private chats",
+    "placeholder": "Search people, handoffs, snippets...",
+    "filtering": "{{chatCount}} preview chats and {{messageCount}} local messages match \"{{query}}\"",
+    "clear": "Clear search"
+  },
+  "sidebar": {
+    "title": "Mock Conversations",
+    "empty": "No local preview chats match this search."
+  },
+  "chat": {
+    "localPreview": "local preview thread",
+    "messagesArea": "Message thread"
+  },
+  "status": {
+    "localMock": "Local mock"
+  },
+  "header": {
+    "star": "Show key messages only",
+    "attachments": "Open attachments",
+    "more": "More actions"
+  },
+  "messages": {
+    "empty": {
+      "keyMessages": "No key messages match the current view.",
+      "noResults": "No messages match this search in the selected conversation.",
+      "threadEmpty": "This local preview thread is empty."
+    }
+  },
+  "key": {
+    "markKey": "Mark key",
+    "keyed": "Keyed"
+  },
+  "code": {
+    "snippet": "snippet",
+    "local": "local"
+  },
+  "composer": {
+    "placeholder": "Write a local preview note, paste a code fragment, or attach handoff context...",
+    "attach": "Toggle attachment panel",
+    "insertCode": "Insert code",
+    "quote": "Quote selected message",
+    "messageLabel": "Message {{name}}",
+    "voice": "Voice note unavailable in local preview",
+    "send": "Append",
+    "attachmentPanel": "Attachment panel"
+  },
+  "context": {
+    "title": "Preview Context",
+    "review": "{{count}} local messages - {{progress}}% reviewed",
+    "open": "Open context",
+    "reviewTitle": "Review Progress",
+    "reviewDetail": "{{keyCount}} key messages, {{unread}} unread, and {{drafts}} local drafts in this thread. Hub /client/ws and message/session REST are not connected yet.",
+    "attachments": "Attachments",
+    "noAttachments": "No linked attachments for this conversation yet.",
+    "codeSnippets": "Code Snippets",
+    "noSnippets": "No code snippets are linked to this private chat.",
+    "tags": "Visible State",
+    "selectedAttachments": "Selected attachments"
+  },
+  "attachment": {
+    "remove": "Remove {{name}}"
+  },
+  "notice": {
+    "markedRead": "{{name}} marked as read",
+    "selected": "Selected {{name}}",
+    "removed": "Removed {{name}}",
+    "attachmentRemoved": "{{name}} removed",
+    "markKey": "Marked as key: {{author}}",
+    "removeKey": "Removed from key: {{author}}",
+    "codeInserted": "Code block inserted into the local draft",
+    "quoted": "Quoted {{author}}'s latest context",
+    "draftAdded": "Local draft appended to this preview thread",
+    "emptyMessage": "Write a message or select an attachment before sending",
+    "moreActions": "More actions are local-preview only",
+    "contextDetails": "Context details stay in this local preview",
+    "dismiss": "Dismiss"
+  }
+}
