@@ -26,7 +26,7 @@ type ContactService struct {
 }
 
 func NewContactService(db *gorm.DB, bus *Bus, cacheClient *cache.Client) *ContactService {
-	return &ContactService{db: db, bus: bus, cacheClient: cacheClient}
+	return &ContactService{db: db, bus: bus, cacheClient: resolveContactCache(cacheClient)}
 }
 
 type SearchResult struct {
@@ -219,7 +219,7 @@ func (s *ContactService) AcceptFriendRequest(ctx context.Context, userID, reques
 		return err
 	}
 
-	s.cacheClient.Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
+	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
 	return nil
 }
 
@@ -234,7 +234,7 @@ func (s *ContactService) RejectFriendRequest(ctx context.Context, userID, reques
 	if err := s.db.Delete(r).Error; err != nil {
 		return err
 	}
-	s.cacheClient.Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
+	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
 	return nil
 }
 
@@ -265,7 +265,7 @@ func (s *ContactService) ListContacts(ctx context.Context, userID string) ([]Con
 		if !ok {
 			continue
 		}
-		online, _ := s.cacheClient.IsOnline(ctx, friend.ID)
+		online, _ := resolveContactCache(s.cacheClient).IsOnline(ctx, friend.ID)
 		result = append(result, ContactInfo{
 			UserID:    friend.ID,
 			Username:  friend.Username,
@@ -287,7 +287,7 @@ func (s *ContactService) RemoveContact(ctx context.Context, currentUserID, frien
 	if err := repository.DeleteFriendshipPair(s.db, currentUserID, friendUserID); err != nil {
 		return err
 	}
-	s.cacheClient.Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+friendUserID)
+	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+friendUserID)
 	return nil
 }
 
@@ -312,7 +312,7 @@ func (s *ContactService) BlockContact(ctx context.Context, currentUserID, target
 	}); err != nil {
 		return err
 	}
-	s.cacheClient.Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
+	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
 	return nil
 }
 
@@ -324,7 +324,7 @@ func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targ
 	if err := s.db.Delete(f).Error; err != nil {
 		return err
 	}
-	s.cacheClient.Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
+	resolveContactCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
 	return nil
 }
 

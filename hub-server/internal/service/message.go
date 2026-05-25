@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 
@@ -31,11 +33,11 @@ type MessageService struct {
 }
 
 func NewMessageService(db *gorm.DB, bus *Bus, cacheClient *cache.Client) *MessageService {
-	return &MessageService{db: db, bus: bus, cacheClient: cacheClient}
+	return &MessageService{db: db, bus: bus, cacheClient: resolveMessageCache(cacheClient)}
 }
 
 func (s *MessageService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
-	seq, err := s.cacheClient.AllocateSeq(ctx, sessionID)
+	seq, err := resolveMessageCache(s.cacheClient).AllocateSeq(ctx, sessionID)
 	if err == nil {
 		return seq, nil
 	}
@@ -104,6 +106,10 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 		}
 		content = string(contentBytes)
 	}
+	attachmentIDs, ok := attachmentIDsFromContent(req.ContentType, content)
+	if !ok {
+		return nil, errcode.ErrBadRequest
+	}
 
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, senderUserID)
 	if err != nil {
@@ -149,6 +155,12 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 		}, nil
 	}
 
+	for _, attachmentID := range attachmentIDs {
+		if err := s.ensureAttachmentReferenceAllowed(senderUserID, attachmentID); err != nil {
+			return nil, err
+		}
+	}
+
 	msg := &model.Message{
 		SessionID:    sessionID,
 		ClientMsgID:  req.ClientMsgID,
@@ -168,6 +180,19 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		if err := repository.InsertMessage(tx, msg); err != nil {
 			return err
+		}
+		if len(attachmentIDs) > 0 {
+			refs := make([]model.MessageAttachment, 0, len(attachmentIDs))
+			for _, attachmentID := range attachmentIDs {
+				refs = append(refs, model.MessageAttachment{
+					SessionID:    sessionID,
+					MessageID:    msg.ID,
+					AttachmentID: attachmentID,
+				})
+			}
+			if err := repository.CreateMessageAttachmentReferences(tx, refs); err != nil {
+				return err
+			}
 		}
 		return repository.TouchSessionLastMessage(tx, sessionID)
 	})
@@ -192,6 +217,92 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 		SeqID:     msg.SeqID,
 		CreatedAt: msg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}, nil
+}
+
+func attachmentIDsFromContent(contentType, content string) ([]string, bool) {
+	if contentType != model.ContentTypeFile {
+		return nil, true
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal([]byte(content), &payload); err != nil {
+		return nil, true
+	}
+
+	seen := make(map[string]struct{})
+	ids := make([]string, 0, 1)
+	add := func(value interface{}) bool {
+		id, ok := value.(string)
+		if !ok {
+			return true
+		}
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return true
+		}
+		parsed, err := uuid.Parse(id)
+		if err != nil {
+			return false
+		}
+		id = parsed.String()
+		if _, exists := seen[id]; exists {
+			return true
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+		return true
+	}
+
+	if !add(payload["attachment_id"]) {
+		return nil, false
+	}
+
+	if rawIDs, ok := payload["attachment_ids"].([]interface{}); ok {
+		for _, rawID := range rawIDs {
+			if !add(rawID) {
+				return nil, false
+			}
+		}
+	}
+
+	if rawAttachments, ok := payload["attachments"].([]interface{}); ok {
+		for _, rawAttachment := range rawAttachments {
+			attachment, ok := rawAttachment.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if !add(attachment["attachment_id"]) {
+				return nil, false
+			}
+			if !add(attachment["id"]) {
+				return nil, false
+			}
+		}
+	}
+
+	return ids, true
+}
+
+func (s *MessageService) ensureAttachmentReferenceAllowed(userID, attachmentID string) error {
+	attachment, err := repository.GetAttachmentByID(s.db, attachmentID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errcode.AttachNotFound
+		}
+		return err
+	}
+	if attachment.UploaderUserID == userID {
+		return nil
+	}
+
+	allowed, err := repository.CanUserAccessReferencedAttachment(s.db, userID, attachmentID)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return errcode.AttachNotFound
+	}
+	return nil
 }
 
 func (s *MessageService) GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]MessageResponse, error) {
@@ -332,6 +443,10 @@ func (s *MessageService) PinMessage(ctx context.Context, userID, sessionID, msgI
 		return errcode.SessionNotMember
 	}
 
+	if _, err := repository.GetMessageBySessionAndID(s.db, sessionID, msgID); err != nil {
+		return errcode.MsgNotFound
+	}
+
 	count, err := repository.CountPinsBySession(s.db, sessionID)
 	if err != nil {
 		return err
@@ -401,7 +516,7 @@ func (s *MessageService) ListPinnedMessages(ctx context.Context, userID, session
 		return []MessageResponse{}, nil
 	}
 
-	msgs, err := repository.GetMessagesByIDs(s.db, msgIDs)
+	msgs, err := repository.GetMessagesBySessionAndIDs(s.db, sessionID, msgIDs)
 	if err != nil {
 		return nil, err
 	}
