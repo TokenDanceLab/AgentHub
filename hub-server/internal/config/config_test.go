@@ -422,6 +422,37 @@ tokendance_id:
 	}
 }
 
+func TestValidateTokenDanceIDRequiresRedirectURI(t *testing.T) {
+	cfg := &Config{
+		DB: DBConfig{
+			Host: "localhost",
+			Port: 5432,
+			User: "agenthub",
+			Name: "agenthub",
+		},
+		Redis: RedisConfig{
+			Host: "localhost",
+			Port: 6379,
+		},
+		JWT: JWTConfig{
+			Secret: "strong-agenthub-secret",
+		},
+		TokenDanceID: TokenDanceIDConfig{
+			IssuerURL:    "https://id.example",
+			ClientID:     "agenthub-client",
+			ClientSecret: "agenthub-secret",
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected missing TokenDance ID redirect URI to be rejected")
+	}
+	if !strings.Contains(err.Error(), "tokendance_id.redirect_uri") {
+		t.Fatalf("Validate() error = %q, want tokendance_id.redirect_uri", err.Error())
+	}
+}
+
 // --- DSN / Addr edge cases ---
 
 func TestDBConfigDSNZeroValues(t *testing.T) {
