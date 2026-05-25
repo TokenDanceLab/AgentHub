@@ -2,7 +2,9 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   createHubClient,
   type ContactInfo,
+  type FriendRequestInfo,
   type HubClient,
+  type HubNotification,
   type MessageResponse,
   type Session,
 } from '@/api/hubClient';
@@ -17,9 +19,6 @@ import type { IMMessage, IMContact, AuthorityType } from '@/components/IM/types'
 type IMStatus = 'idle' | 'loading' | 'ready' | 'error';
 type IMMessageWithHubState = IMMessage & {
   seqId?: number;
-  read?: boolean;
-  readBy?: string;
-  readAt?: string;
 };
 
 function readString(value: unknown): string | undefined {
@@ -105,6 +104,7 @@ function sessionToContact(session: Session, contactsByUserId: Map<string, Contac
       session.last_message_at ??
       session.updated_at ??
       session.created_at,
+    statusHint: session.archived ? 'im.session.archived' : undefined,
   };
 }
 
@@ -167,6 +167,8 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   const [messages, setMessages] = useState<Map<string, IMMessage[]>>(new Map());
   const [contacts, setContacts] = useState<IMContact[]>([]);
   const [hubContacts, setHubContacts] = useState<ContactInfo[]>([]);
+  const [friendRequests, setFriendRequests] = useState<FriendRequestInfo[]>([]);
+  const [notifications, setNotifications] = useState<HubNotification[]>([]);
   const [status, setStatus] = useState<IMStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const authenticated = useHubStore((s) => s.authenticated);
@@ -211,6 +213,8 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       setError(null);
       setContacts([]);
       setHubContacts([]);
+      setFriendRequests([]);
+      setNotifications([]);
       setMessages(new Map());
       return;
     }
@@ -218,20 +222,26 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
     setStatus('loading');
     setError(null);
     try {
-      const [contactSnapshot, sessionSnapshot] = await Promise.all([
+      const [contactSnapshot, sessionSnapshot, friendRequestSnapshot, notificationSnapshot] = await Promise.all([
         client.listContacts(),
         client.listSessions(),
+        client.listFriendRequests(),
+        client.listNotifications({ limit: 20 }),
       ]);
       const contactsByUserId = new Map(contactSnapshot.map((contact) => [contact.user_id, contact]));
       contactsByUserIdRef.current = contactsByUserId;
       setHubContacts(contactSnapshot);
+      setFriendRequests(friendRequestSnapshot);
+      setNotifications(notificationSnapshot);
       setContacts(sessionSnapshot.map((session) => sessionToContact(session, contactsByUserId)));
       setStatus('ready');
     } catch (err) {
       setContacts([]);
       setHubContacts([]);
+      setFriendRequests([]);
+      setNotifications([]);
       setStatus('error');
-      setError('Hub messages are unavailable.');
+      setError('im.state.unavailable');
       addToast({ type: 'error', message: 'Failed to load Hub sessions' });
       console.error('Failed to load IM sessions:', err);
     }
@@ -292,12 +302,22 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         );
         return next;
       });
+      setContacts((prev) =>
+        prev.map((contact) =>
+          contact.id === sessionId
+            ? { ...contact, statusHint: 'im.session.messageRecalled' }
+            : contact,
+        ),
+      );
     });
 
     const upsertSessionFromPayload = (payload: unknown) => {
       const session = getPayloadSession(payload);
       if (session && sessionIdOf(session)) {
-        upsertContact(sessionToContact(session, contactsByUserIdRef.current));
+        upsertContact({
+          ...sessionToContact(session, contactsByUserIdRef.current),
+          statusHint: 'im.session.updated',
+        });
       }
     };
 
@@ -310,7 +330,13 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       setContacts((prev) =>
         prev.map((contact) =>
           contact.id === sessionId
-            ? { ...contact, dissolved: true, online: false, lastSeen: 'Dissolved' }
+            ? {
+                ...contact,
+                dissolved: true,
+                online: false,
+                lastSeen: 'Dissolved',
+                statusHint: 'im.session.dissolved',
+              }
             : contact,
         ),
       );
@@ -349,6 +375,17 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         );
         return next;
       });
+      setContacts((prev) =>
+        prev.map((contact) =>
+          contact.id === sessionId
+            ? {
+                ...contact,
+                statusHint: 'im.session.readThrough',
+                statusHintParams: { seq: lastReadSeq },
+              }
+            : contact,
+        ),
+      );
     });
 
     return () => {
@@ -504,6 +541,8 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
     messages,
     contacts,
     hubContacts,
+    friendRequests,
+    notifications,
     status,
     error,
     sendMessage,

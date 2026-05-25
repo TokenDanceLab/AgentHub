@@ -100,6 +100,28 @@ const initialActivities: ActivityItem[] = mockRuns.map((run, i) => ({
   accent: activityAccentPalette[i % activityAccentPalette.length] ?? "cyan",
 }));
 
+function withDemoDetail<T extends { detail: string }>(item: T, label: (detail: string) => string): T {
+  return {
+    ...item,
+    detail: label(item.detail),
+  };
+}
+
+function demoMember(member: Member, label: (role: string) => string): Member {
+  return {
+    ...member,
+    role: label(member.role),
+  };
+}
+
+function demoTask(task: WorkspaceTask, label: (summary: string) => string): WorkspaceTask {
+  return {
+    ...task,
+    summary: label(task.summary),
+    tag: task.tag === 'Active' ? 'Demo active' : task.tag === 'Done' ? 'Demo done' : 'Demo queue',
+  };
+}
+
 function memberFromRunner(runner: Runner, index: number): Member {
   return {
     initials: runner.name.split(' ').map((word) => word[0]).join('').toUpperCase().slice(0, 2) || 'AG',
@@ -1107,6 +1129,9 @@ export function GroupWorkspacePageInteractive() {
     Active: t('task.tag.active'),
     Done: t('task.tag.done'),
     Queue: t('task.tag.queue'),
+    'Demo active': t('task.tag.demoActive'),
+    'Demo done': t('task.tag.demoDone'),
+    'Demo queue': t('task.tag.demoQueue'),
   };
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1119,6 +1144,9 @@ export function GroupWorkspacePageInteractive() {
     tone: catalogTone,
   } = getWorkbenchCatalogState(workbenchState);
   const shouldUseDemoFallback = catalogMode === 'mock';
+  const demoDetailLabel = (detail: string) => t('demo.detail', { detail });
+  const demoSummaryLabel = (summary: string) => t('demo.summary', { summary });
+  const demoRoleLabel = (role: string) => t('demo.role', { role });
   const taskSource = getWorkbenchSectionSource({
     mode: catalogMode,
     hasSectionSnapshot: hasLiveCatalog && workbenchState.runs.length > 0,
@@ -1142,6 +1170,22 @@ export function GroupWorkspacePageInteractive() {
     title: t('confirm.ready'),
     tone: "info",
   });
+  const demoMembers = useMemo(
+    () => workspaceMembers.map((member) => demoMember(member, demoRoleLabel)),
+    [t, workspaceMembers],
+  );
+  const demoFiles = useMemo(
+    () => files.map((file) => withDemoDetail(file, demoDetailLabel)),
+    [t],
+  );
+  const demoActivities = useMemo(
+    () => activityLog.map((activity) => withDemoDetail(activity, demoDetailLabel)),
+    [activityLog, t],
+  );
+  const demoBaseTasks = useMemo(
+    () => baseTasks.map((task) => demoTask(task, demoSummaryLabel)),
+    [t],
+  );
 
   useParticleCanvas(canvasRef);
 
@@ -1172,7 +1216,7 @@ export function GroupWorkspacePageInteractive() {
   const displayedMembers = hasLiveCatalog && workbenchState.runners.length > 0
     ? workspaceMembers
     : shouldUseDemoFallback
-      ? workspaceMembers
+      ? demoMembers
       : [];
   const visibleMembers = displayedMembers.filter((member) => memberFilter === "all" || member.presence === memberFilter);
   const onlineCount = displayedMembers.filter((member) => member.presence === "online").length;
@@ -1201,7 +1245,7 @@ export function GroupWorkspacePageInteractive() {
     accent: fileAccentPalette[index % fileAccentPalette.length] ?? 'cyan',
   }));
   const workspaceFiles = [
-    ...(hasLiveCatalog && liveFiles.length ? liveFiles : shouldUseDemoFallback ? files : []),
+    ...(hasLiveCatalog && liveFiles.length ? liveFiles : shouldUseDemoFallback ? demoFiles : []),
     ...syncedFiles,
   ];
   const fileSource = getWorkbenchSectionSource({
@@ -1212,12 +1256,14 @@ export function GroupWorkspacePageInteractive() {
   const displayedBaseTasks = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map((run, index) => taskFromRun(run, index, workbenchState.runners))
     : shouldUseDemoFallback
-      ? baseTasks
+      ? demoBaseTasks
       : [];
   const displayedActivities = hasLiveCatalog && workbenchState.runs.length
     ? workbenchState.runs.map((run, index) => activityFromRun(run, index, workbenchState.runners))
     : shouldUseDemoFallback || activityLog.length > initialActivities.length
-      ? activityLog
+      ? shouldUseDemoFallback
+        ? demoActivities
+        : activityLog
       : [];
   const activitySource = getWorkbenchSectionSource({
     mode: catalogMode,
@@ -1491,7 +1537,7 @@ export function GroupWorkspacePageInteractive() {
                 <div className="gwr-truncate">
                   <strong>Mapping Review</strong>
                   <p className="gwr-tiny gwr-truncate">
-                    {t('sidebar.space.demoApprovals', { defaultValue: 'Demo fallback approvals' })}
+                    {t('sidebar.space.demoApprovals')}
                   </p>
                 </div>
               </div>
@@ -1612,7 +1658,11 @@ export function GroupWorkspacePageInteractive() {
             </div>
             <div className="gwr-stat gwr-glass">
               <strong>{syncState.progress}%</strong>
-              <p className="gwr-small">{t('stat.dryRunReadiness')}</p>
+              <p className="gwr-small">
+                {shouldUseDemoFallback
+                  ? t('stat.demoDryRunReadiness')
+                  : t('stat.dryRunReadiness')}
+              </p>
             </div>
           </section>
 
