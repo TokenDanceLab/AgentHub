@@ -25,7 +25,7 @@ type Config struct {
 type TokenDanceIDConfig struct {
 	// IssuerURL is the TokenDance ID issuer base URL (e.g. https://id.vectorcontrol.tech).
 	IssuerURL string `mapstructure:"issuer_url"`
-	// JWKSURI overrides the JWKS endpoint. Derived from issuer_url/.well-known if empty.
+	// JWKSURI overrides the JWKS endpoint. Derived from issuer_url/oidc/jwks when empty.
 	JWKSURI string `mapstructure:"jwks_uri"`
 	// ClientID is the OIDC client ID registered with TokenDance ID for AgentHub.
 	ClientID string `mapstructure:"client_id"`
@@ -139,7 +139,7 @@ func Load(configPath string) (*Config, error) {
 
 	// Auto-derive JWKS URI from issuer URL when not explicitly set.
 	if cfg.TokenDanceID.JWKSURI == "" && cfg.TokenDanceID.IssuerURL != "" {
-		cfg.TokenDanceID.JWKSURI = cfg.TokenDanceID.IssuerURL + "/.well-known/jwks.json"
+		cfg.TokenDanceID.JWKSURI = cfg.TokenDanceID.IssuerURL + "/oidc/jwks"
 	}
 
 	return &cfg, nil
