@@ -100,9 +100,9 @@ agent_test.go
 
 | 优先级 | 任务 | 来源 |
 |--------|------|------|
-| **P1-1** | 消息操作按钮行常驻化 | Codex 对比分析：当前 actionBar 只有 hover 才显示，竞品常驻 |
-| **P1-2** | 输入框加 "+ 自定义" 附件按钮 | Codex 对比分析：UI 占位即可，后端功能后续实现 |
-| **P1-3** | 顶部标题栏功能图标 | 分享、全屏展开两个图标 |
+| [x] **P1-1** | 消息操作按钮行常驻化 | Codex 已完成 — 当前 actionBar 常驻显示 |
+| [x] **P1-2** | 输入框加 "+ 自定义" 附件按钮 | Codex 已完成 — UI 占位已实现 |
+| [x] **P1-3** | 顶部标题栏功能图标 | Codex 已完成 — 分享、全屏展开图标已添加 |
 | P2 | 右侧面板内容结构化 | 输出/来源分组卡片 |
 | P2 | 侧边栏折叠 (Ctrl+B) | 汉堡菜单 + 快捷键 |
 | P2 | 终端面板嵌入 | 需要 Tauri shell 能力 |
@@ -132,9 +132,9 @@ agent_test.go
 |------|------|
 | `AGENTS.md` | 项目规则、Git 流程、分支治理、前端规范 |
 | `docs/roadmap.md` | 全局路线图、已完成/待办清单 |
-| `docs/system-architecture.md` | 系统架构 |
-| `docs/implementation-guide.md` | 实现指南 |
-| `docs/branch-governance.md` | 分支治理详细规则 |
+| `docs/architecture/system-architecture.md` | 系统架构 |
+| `docs/architecture/implementation-guide.md` | 实现指南 |
+| `docs/governance/branch-governance.md` | 分支治理详细规则 |
 | `docs/handoff/STATE.md` | 跨 session 状态文件 |
 | `.agents/skills/dev-loop/SKILL.md` | 长程开发引擎 |
 | `.agents/skills/ui-screenshot/SKILL.md` | **新增** UI 截图自动化 |

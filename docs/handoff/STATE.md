@@ -52,7 +52,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 | Hub API | http://api.hub.vectorcontrol.tech | nginx:80 → Docker `127.0.0.1:8090` |
 | Hub 代码 | `/opt/agenthub-hub/` (dev/delicious233) | Docker Compose |
 
-详细部署记录：`docs/deployment-record.md`
+详细部署记录：`docs/operations/deployment-record.md`
 
 ## 当前进度
 
@@ -75,7 +75,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - ✅ i18n 跟随系统语言（navigator.language）
 
 ### 本轮进展（2026-05-25）
-- Desktop：项目文档后台 sweep 已完成，`docs/system-architecture.md` / `docs/product-requirements.md` / `docs/implementation-guide.md` / `docs/roadmap.md` / README 系列 / archive + ADR 索引已统一 Runtime/Profile/Configuration/Execution Target、TokenDance ID、Hub/Edge/Desktop/Web 边界。
+- Desktop：项目文档后台 sweep 已完成，`docs/architecture/system-architecture.md` / `docs/architecture/product-requirements.md` / `docs/architecture/implementation-guide.md` / `docs/roadmap.md` / README 系列 / archive + ADR 索引已统一 Runtime/Profile/Configuration/Execution Target、TokenDance ID、Hub/Edge/Desktop/Web 边界。
 - Desktop：设置页按 Codex App 截图方向重构为全屏设置工作台，并新增任务列表、IM 群聊、Agent 调度、在线 IM、Agent 市场、Skill/MCP、模型配置、模型映射、cc-switch、多端、远控、账号鉴权和安全审计等一等入口；顶部快捷图标可直达任务列表和 Agent 调度分区。
 - Desktop：Settings 已新增 `Agent Profiles` 与 `Execution Targets` 两个一级页面，把用户概念明确拆成 Agent Profile（Runtime + Model + Configuration）和 Execution Target（Local Edge / Hub Relay / SSH/Tailscale / Cloud Edge）；页面直接消费 `useHealth()` 与 `useAgentList()`，`HealthResponse`/Zod schema 已保留 `/v1/health.checks.runners` 扩展字段，Connections 页同步显示 Edge runner summary。
 - Desktop：TokenDance ID 登录入口已作为账号体系主入口进入登录页和 Settings/账号页；当前保留 PKCE 状态写入，OIDC callback 捕获与 Hub token exchange 仍属后续实现。
@@ -84,7 +84,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - Desktop：移动端工具栏已补 Settings、Hub 登录、主题切换与菜单入口；375px Playwright 验证无横向溢出。
 - Desktop：`useChatMessages` reducer 内的 runStore/queryClient 副作用已移到事件处理路径，修复 React “setState while rendering” console error；合法 `RUNNING/STREAMING/WAITING_FOR_INPUT -> COMPLETED` 不再输出误报 warning。
 - Desktop：真实接口验证 `http://127.0.0.1:3210/v1/health` ok，`POST /v1/runs` 返回 202 accepted；右栏关闭/重开、Settings 任务/群聊/调度入口、i18n raw key、移动端布局均通过 Playwright 检查，截图见 `app/desktop/screenshots/shell-right-panel-real-run-closed.png`、`app/desktop/screenshots/settings-tasks-im-scheduling.png`。
-- Web：已派 gpt-5.5 xhigh worker `Hegel` 在独立 worktree `D:\Code\TokenDance\AgentHub\.worktrees\webui-desktop-port` / `feat/webui-desktop-port` 推进 Web UI 移植，硬约束 TokenDance ID、设备/Hub 同步、在线 IM/群聊、任务列表、Agent 调度、市场、Skill/MCP、模型映射、cc-switch、远控与审计入口。
+- Web：~~已派 gpt-5.5 xhigh worker `Hegel` 在独立 worktree `D:\Code\TokenDance\AgentHub\.worktrees\webui-desktop-port` / `feat/webui-desktop-port` 推进 Web UI 移植，硬约束 TokenDance ID、设备/Hub 同步、在线 IM/群聊、任务列表、Agent 调度、市场、Skill/MCP、模型映射、cc-switch、远控与审计入口。~~ (分支已于 2026-05-25 清理；Web UI 路线保留 `dev/trump` 分支)
 - Web：gpt-5.5 xhigh 只读审查 `Ampere` 已完成，结论是 worktree 暂不合并；已修复审查指出的移动端 `.workspace` 固定行/裁切、外层 `App.module.css min-width: 960px` 横向溢出，以及 Toggle 缺少 switch 语义/accessible name/44px 触控高度。保留待处理风险：React alias/workaround 需要 clean install 证明，`/` 替换为生态控制台需要产品确认。
 - Desktop/shared：`app/shared/pnpm-lock.yaml` 已同步 `@types/react`、`@types/react-dom`、`typescript` 等已声明 dev dependency；此前 `pnpm exec tsc --noEmit` / Desktop build 受 shared React 类型 lockfile 过期阻塞的问题已解除，`app/desktop && pnpm build` 已通过。
 - Desktop：新增验证已通过 Settings `Agent Profiles` / `Execution Targets` Playwright 桌面和 375px 移动端检查：无 console error、无 raw i18n key、无横向溢出；截图见 `app/desktop/screenshots/settings-agent-profiles.png`、`app/desktop/screenshots/settings-execution-targets.png`、`app/desktop/screenshots/settings-execution-targets-mobile.png`。Web worktree 验证已通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`，移动端复测 `docScrollWidth=375`、switch `52x44`、无 console error，截图见 `.worktrees/webui-desktop-port/app/web/screenshots/ecosystem-console-mobile-fixed.png`。
@@ -102,9 +102,9 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - Desktop：Skill Management 验证已通过 `pnpm vitest run src/__tests__/SettingsPage.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/errors.test.ts src/__tests__/Toast.test.tsx`（46/46）、`python -m json.tool src/i18n/locales/{en,zh}.json`、`git diff --check -- app/desktop/src/...`；Playwright 桌面和 375px 移动端检查 `logs: []`、无 raw i18n key、无横向溢出，截图见 `app/desktop/screenshots/settings-skill-registry-real-data.png`、`app/desktop/screenshots/settings-skill-registry-real-data-mobile.png`。
 - Desktop/Edge 注意：当前 live Edge `http://127.0.0.1:3210` health 和 agents 在线，返回 Claude Code / Codex / OpenCode；此前真实连续双 POST 到 `thread_local` 观测到两个 202。2026-05-25 已用临时 Edge `127.0.0.1:3227` + 可控慢 `powershell Start-Sleep` runner 复现真实 HTTP 路径 first 202、second 409 `active_run_exists`，且 409 body 带回首个 active `runId`；先前 3210 现象更可能是旧进程或真实 runtime 过快完成。
 - Docs：gpt-5.5 xhigh 文档架构 worker 已写入 `docs/inbox/doc-architecture-sweep-2026-05-25.md`。结论是主文档已基本对齐 Runtime/Profile/Configuration/Execution Target、TokenDance ID、IM、多端、远控、Skill/MCP、cc-switch、安全审计等边界；剩余风险集中在 `/v1/runners` / `runner.*` 的历史兼容命名，以及 `docs/client-handoff.md`、`docs/design/integration.md` 等旧独立 `runner/` 文档需要归档或改写。
-- Web：gpt-5.5 xhigh Web worker 已在 `.worktrees/webui-desktop-port/app/web` 内补强生态控制台。`app/web/README.md` 已说明 `/` 生态控制台、`/workbench-preview` 旧工作台、TokenDance 生态边界和验证命令；`EcosystemConsole` 新增身份边界、协作同步、Agent runtime、运维护栏等入口，并补响应式 lane 布局和测试。验证通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`（4/4）、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web`。
-- Web：gpt-5.5 xhigh worker `McClintock` 已继续在 `.worktrees/webui-desktop-port/app/web` 内新增 `Feature readiness` 面板，按 TokenDance ecosystem lane 派生 ready/review/planned 数量和平均进度。验证通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`（5/5）、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web`。该 worktree 当前落后 `origin/dev/delicious233` 8 个提交，未做 rebase/merge，不建议直接合并。
-- Web：gpt-5.5 xhigh worker `Herschel` 已继续在 `.worktrees/webui-desktop-port/app/web` 内新增移动端/平板 `Jump to surface` picker，可直达 TokenDance ID、Hub、cc-switch、Remote control、audit 等生态入口；窄屏顺序调整为 workspace 优先、detail 次之、长侧边导航最后。验证通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`（6/6）、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web`。该 worktree 当前落后 `origin/dev/delicious233` 9 个提交，未做 rebase/merge，不建议直接合并。
+- Web：~~gpt-5.5 xhigh Web worker 已在 `.worktrees/webui-desktop-port/app/web` 内补强生态控制台。~~ (worktree 已随分支清理；`app/web/README.md` 已说明 `/` 生态控制台、`/workbench-preview` 旧工作台、TokenDance 生态边界和验证命令；`EcosystemConsole` 新增身份边界、协作同步、Agent runtime、运维护栏等入口，并补响应式 lane 布局和测试。验证通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`（4/4）、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web`。)
+- Web：~~gpt-5.5 xhigh worker `McClintock` 已继续在 `.worktrees/webui-desktop-port/app/web` 内新增 `Feature readiness` 面板，按 TokenDance ecosystem lane 派生 ready/review/planned 数量和平均进度。~~ (worktree 已随分支清理) 验证通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`（5/5）、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web`。该 worktree 当前落后 `origin/dev/delicious233` 8 个提交，未做 rebase/merge，不建议直接合并。
+- Web：~~gpt-5.5 xhigh worker `Herschel` 已继续在 `.worktrees/webui-desktop-port/app/web` 内新增移动端/平板 `Jump to surface` picker，可直达 TokenDance ID、Hub、cc-switch、Remote control、audit 等生态入口；窄屏顺序调整为 workspace 优先、detail 次之、长侧边导航最后。~~ (worktree 已随分支清理) 验证通过 `corepack.cmd pnpm exec vitest run src/pages/ecosystem/EcosystemConsole.test.tsx`（6/6）、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm build`、`git diff --check -- app/web`。该 worktree 当前落后 `origin/dev/delicious233` 9 个提交，未做 rebase/merge，不建议直接合并。
 - Hub：`CancelTask` 已通过 `AgentInstance` 解析真实 `SessionID` 后发布 `agent.cancel`，避免把 `AgentInstanceID` 误作为 `session_id`；回归测试 `TestCancelTaskPublishesResolvedSessionID` 已覆盖。
 - Hub：auth middleware 测试已适配 `AuthMiddleware(*config.Config)` 签名，当前 HEAD `19fcaa1` 已包含该修复。
 - Hub：Agent 任务回调链新增服务层回归测试，覆盖 `HandleTaskStream` 生成 `client_msg_id`、走 Redis seq、发布 `message.new`，以及 `HandleTaskDone` 在 Redis 失败时走 DB fallback、写最终消息并发布 `agent.done`。
@@ -160,7 +160,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - Edge：active-run 真实 HTTP smoke 已用可控慢 runner 收口；后续若 3210 真实 runtime 仍出现双 202，应重点确认当前进程版本和 runtime 是否在第二个 POST 前已完成。
 - Edge：raw output cap 和 structured adapter payload cap 已 repo 内缓解；后续用 live runtime 做截断 metadata smoke，确认真实 Codex/Claude/OpenCode adapter 事件在客户端可读。
 - Edge：下一步若继续权限链路，要做真正阻塞式审批和远程 Edge 决策认证；当前修复只关闭 REST 任意 requestId 伪造和重复消费。
-- Docs：处理 `docs/inbox/doc-architecture-sweep-2026-05-25.md` 的最小建议：先在 API/架构文档标注 Runner 兼容命名，再归档或改写旧 `docs/client-handoff.md`、`docs/design/integration.md`。
+- Docs：处理 `docs/inbox/doc-architecture-sweep-2026-05-25.md` 的最小建议：先在 API/架构文档标注 Runner 兼容命名，再归档或改写旧 `docs/operations/client-handoff.md`、`docs/design/integration.md`。
 - Docs：Codex follow-up 已写入 `docs/inbox/doc-architecture-sweep-codex-followup-2026-05-25.md`，确认最小补丁应优先改 `docs/implementation-guide.md` 的旧 client 文档入口，并在 API docs 标注 `/v1/runners` / `runner.*` 是历史兼容命名。
 - Web：继续保持 `D:\Code\TokenDance\AgentHub\.worktrees\webui-desktop-port` 独立；下一步验证 clean install 下 React alias 是否仍必要，处理落后 `origin/dev/delicious233` 9 个提交的问题，再决定是否把 `/` 生态控制台入口合回主线。
 - 后端：保留当前 Hub/Edge 并行改动，不回退；Hub `device_id` UUID 边界、多设备登录 schema、Hub cache fallback、Hub public stats bucket、dev compose loopback、Edge REST timeout、Edge local auth、Edge active-run smoke 和当前 `client-smoke` 23/23 已收口，后续优先做部署态 Hub 登录/设备注册验证、runner degraded/offline 与 Hub task/IM/scheduling API 的客户端消费；若继续安全队列，下一批可处理 `AH-SR-016/017` 部署态 CORS/admin 暴露验证，或开始 Remote/Cloud Edge 的 Hub session/device proof 设计。
@@ -181,7 +181,7 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 - [x] P0-3: WebSocket 心跳 + 离线队列 + Transport 抽象
 - [x] P0-4: 虚拟滚动 + App.tsx 568→343 行
 
-### 已知问题（预存，非阻塞）
+### 已知问题（预存，非阻塞）(持续监控)
 - 5 个 shared/ui 测试文件无法加载（pnpm 跨包虚拟存储）
 - AuthPage 4 个测试失败
 - hubClient getState snapshot 测试失败

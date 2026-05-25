@@ -3,9 +3,9 @@
 ## 接手前必读
 
 1. `AGENTS.md` — 项目规则和开发约束
-2. `docs/system-architecture.md` — Hub-Edge-Runner 三层架构
-3. `docs/implementation-guide.md` — 实施路线（M1→M2→M3→M4）
-4. `docs/roadmaps/client.md` — 客户端路线图和任务状态
+2. `docs/architecture/system-architecture.md` — Hub-Edge-Runner 三层架构
+3. `docs/architecture/implementation-guide.md` — 实施路线（M1→M2→M3→M4）
+4. `docs/operations/client-roadmap.md` — 客户端路线图和任务状态
 5. `api/openapi.yaml` — REST API 契约
 6. `api/events.md` — WebSocket 事件契约
 7. `api/conventions.md` — API 命名、分页、错误格式约定
@@ -100,43 +100,43 @@ run.agent.result       — 执行结束（成功/失败、token 用量）
 
 ### 高优先级
 
-1. **`GET /v1/agents` 端点实现** — `handlers.go` 中新增 handler，从 `AdapterRegistry.List()` 返回可用 agent 列表
+- [x] **`GET /v1/agents` 端点实现** — `handlers.go` 中新增 handler，从 `AdapterRegistry.List()` 返回可用 agent 列表 (M5 完成)
 
-2. **`POST /v1/runs` 扩展** — 接收请求中的 `agentId`/`prompt`/`model` 字段：
+- [x] **`POST /v1/runs` 扩展** — 接收请求中的 `agentId`/`prompt`/`model` 字段 (M5 完成)：
    - 用 `AdapterRegistry.Resolve(agentId)` 查找 adapter
    - 调用 `adapter.BuildCommand(ctx)` 获取 command/args/env/workDir
    - 传给 ProcessExecutor 启动，而非用硬编码的 RunnerProfile
-   - 当前 handler 还是用旧的 RunnerProfile 方式创建 run，需要改为 adapter-aware
+   - 当前 handler 已改为 adapter-aware
 
-3. **Adapter 集成测试** — 用真实 `claude -p "say hello"` 验证完整链路：
+- [x] **Adapter 集成测试** — 用真实 `claude -p "say hello"` 验证完整链路 (M7 完成)：
    ```powershell
    .\agenthub-edge --agent-default claude-code --claude-code-path "~/.local/bin/claude.exe" --store-file .\test_store.json
    ```
    然后 `curl -X POST http://127.0.0.1:3210/v1/runs -H "Content-Type: application/json" -d '{"prompt":"say hello"}'`
 
-4. **Real Claude Code 端到端验证** — 用 WebSocket 订阅事件流，确认收到 `run.agent.*` 结构化事件
+- [x] **Real Claude Code 端到端验证** — 用 WebSocket 订阅事件流，确认收到 `run.agent.*` 结构化事件 (M7 完成)
 
 ### 中优先级
 
-5. **CodexAdapter Phase 2** — 从 `codex exec` 升级到 `codex app-server --listen stdio://`（JSON-RPC 全双工流式）
+- [ ] **CodexAdapter Phase 2** — 从 `codex exec` 升级到 `codex app-server --listen stdio://`（JSON-RPC 全双工流式）(部分完成)
    - 需要实现 `parser_jsonrpc.go` — JSON-RPC 2.0 协议解析
    - 支持 `item/*/delta` 实时通知
 
-6. **OpenCodeAdapter Phase 2** — 从 `opencode run` 升级到 `opencode serve --port N`（REST + SSE 流式）
+- [ ] **OpenCodeAdapter Phase 2** — 从 `opencode run` 升级到 `opencode serve --port N`（REST + SSE 流式）(部分完成)
 
-7. **OrchestratorAdapter 完善** — 实现 sub-agent spawn 拦截逻辑：
+- [ ] **OrchestratorAdapter 完善** — 实现 sub-agent spawn 拦截逻辑 (部分完成)：
    - Edge 监听 orchestrator 的 tool call
    - 匹配 spawn_subagent 模式
    - 创建子 Run 并分派到对应 AgentAdapter
    - 聚合结果回主 Thread
 
-8. **`POST /v1/runs/{id}:cancel` 打通** — 取消时通过 adapter 发送中断信号（Claude Code: stdin 写 control_request interrupt）
+- [ ] **`POST /v1/runs/{id}:cancel` 打通** — 取消时通过 adapter 发送中断信号（Claude Code: stdin 写 control_request interrupt）(部分完成)
 
 ### 低优先级
 
-9. SQLite 持久化替代 JSON 文件
-10. Runner registry 废弃，迁移到 AdapterRegistry
-11. `client-smoke.ps1` 更新（去掉 `agenthub-runner` 依赖）
+- [x] SQLite 持久化替代 JSON 文件
+- [ ] Runner registry 废弃，迁移到 AdapterRegistry (部分完成)
+- [ ] `client-smoke.ps1` 更新（去掉 `agenthub-runner` 依赖）(部分完成)
 
 ## 关键接口速查
 
