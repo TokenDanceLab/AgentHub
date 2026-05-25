@@ -589,3 +589,84 @@ func TestCodexNonJSONOutput(t *testing.T) {
 		t.Errorf("line0 = %v", events[0].Payload["content"])
 	}
 }
+
+// --- Codex BuildCommand flag tests ---
+
+func TestCodexBuildCommandImageFlag(t *testing.T) {
+	adapter := NewCodexAdapter("codex", "gpt-5")
+	_, args, _, _ := adapter.BuildCommand(RunProcessContext{
+		Prompt: "analyze image",
+		ConfigOverrides: map[string]string{
+			"image": "/path/to/screenshot.png",
+		},
+	})
+
+	found := false
+	for _, a := range args {
+		if a == "--image" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("--image flag not found in args")
+	}
+}
+
+func TestCodexBuildCommandAddDirFlag(t *testing.T) {
+	adapter := NewCodexAdapter("codex", "gpt-5")
+	_, args, _, _ := adapter.BuildCommand(RunProcessContext{
+		Prompt:  "list files",
+		WorkDir: "/home/user/project",
+	})
+
+	found := false
+	for i, a := range args {
+		if a == "--add-dir" && i+1 < len(args) && args[i+1] == "/home/user/project" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("--add-dir flag not found in args")
+	}
+}
+
+func TestCodexBuildCommandWebSearchModeViaConfig(t *testing.T) {
+	adapter := NewCodexAdapter("codex", "gpt-5")
+	_, args, _, _ := adapter.BuildCommand(RunProcessContext{
+		Prompt: "search the web",
+		ConfigOverrides: map[string]string{
+			"web_search_mode": "basic",
+		},
+	})
+
+	found := false
+	for i, a := range args {
+		if a == "-c" && i+1 < len(args) && args[i+1] == "web_search_mode=basic" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("-c web_search_mode=basic not found in args")
+	}
+}
+
+func TestCodexBuildCommandNoExtraFlagsWhenEmpty(t *testing.T) {
+	adapter := NewCodexAdapter("codex", "gpt-5")
+	_, args, _, _ := adapter.BuildCommand(RunProcessContext{
+		Prompt: "hello",
+	})
+
+	for _, a := range args {
+		if a == "--image" {
+			t.Error("--image should not be present when no image is configured")
+		}
+	}
+	for _, a := range args {
+		if a == "--add-dir" {
+			t.Error("--add-dir should not be present when no WorkDir is set")
+		}
+	}
+}
