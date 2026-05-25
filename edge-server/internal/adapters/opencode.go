@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os/exec"
+	"strings"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -88,6 +89,25 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 	// Permission mode: bypassPermissions maps to --dangerously-skip-permissions
 	if ctx.PermissionMode == "bypassPermissions" {
 		args = append(args, "--dangerously-skip-permissions")
+	}
+
+	// Attach files via --file (supports comma-separated list via ConfigOverrides)
+	if files, ok := ctx.ConfigOverrides["files"]; ok && files != "" {
+		for _, f := range splitComma(files) {
+			if f != "" {
+				args = append(args, "--file", f)
+			}
+		}
+	}
+
+	// Working directory as --dir (supplemental to process workDir)
+	if ctx.WorkDir != "" {
+		args = append(args, "--dir", ctx.WorkDir)
+	}
+
+	// Slash command via --command (e.g., /compact)
+	if cmd, ok := ctx.ConfigOverrides["command"]; ok && cmd != "" {
+		args = append(args, "--command", cmd)
 	}
 
 	args = append(args, prompt)
@@ -290,4 +310,17 @@ type opencodeTokens struct {
 type opencodeCache struct {
 	Write int `json:"write"`
 	Read  int `json:"read"`
+}
+
+// splitComma splits a comma-separated string into trimmed, non-empty tokens.
+func splitComma(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

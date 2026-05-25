@@ -215,9 +215,9 @@ func TestHandleCanUseToolResponseFormat(t *testing.T) {
 	t.Run("silent auto-approve", func(t *testing.T) {
 		handler := &DefaultPermissionHandler{} // nil emitter = silent auto-approve
 		var buf bytes.Buffer
-		err := handler.handleCanUseTool(&buf, "req-fmt", &ControlRequestInner{
-			Subtype:  "can_use_tool",
-			ToolName: "Read",
+		err := handler.handleCanUseTool(context.Background(), &buf, "req-fmt", &ControlRequestInner{
+			Subtype:   "can_use_tool",
+			ToolName:  "Read",
 			ToolUseID: "tu-fmt",
 		})
 		if err != nil {
@@ -250,9 +250,9 @@ func TestHandleCanUseToolResponseFormat(t *testing.T) {
 		emitter := &mockEventEmitter{}
 		handler := &DefaultPermissionHandler{emitter: emitter}
 		var buf bytes.Buffer
-		err := handler.handleCanUseTool(&buf, "req-fmt", &ControlRequestInner{
-			Subtype:  "can_use_tool",
-			ToolName: "Read",
+		err := handler.handleCanUseTool(context.Background(), &buf, "req-fmt", &ControlRequestInner{
+			Subtype:   "can_use_tool",
+			ToolName:  "Read",
 			ToolUseID: "tu-fmt",
 		})
 		if err != nil {
@@ -287,11 +287,11 @@ func TestHandleCanUseToolResponseFormat(t *testing.T) {
 func TestHandleCanUseToolResponseFields(t *testing.T) {
 	handler := &DefaultPermissionHandler{}
 	var buf bytes.Buffer
-	err := handler.handleCanUseTool(&buf, "req-fields", &ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "Write",
+	err := handler.handleCanUseTool(context.Background(), &buf, "req-fields", &ControlRequestInner{
+		Subtype:   "can_use_tool",
+		ToolName:  "Write",
 		ToolUseID: "tu-fields",
-		Input:    map[string]any{"file": "/tmp/test.txt", "content": "hello"},
+		Input:     map[string]any{"file": "/tmp/test.txt", "content": "hello"},
 	})
 	if err != nil {
 		t.Fatalf("handleCanUseTool: %v", err)
@@ -336,8 +336,8 @@ func TestDefaultPermissionHandlerAlwaysAllows(t *testing.T) {
 	tools := []string{"Bash", "Read", "Write", "Grep", "WebFetch", "WebSearch", "Task", "AskUserQuestion"}
 	for _, tool := range tools {
 		inner, _ := json.Marshal(ControlRequestInner{
-			Subtype:  "can_use_tool",
-			ToolName: tool,
+			Subtype:   "can_use_tool",
+			ToolName:  tool,
 			ToolUseID: "tu-" + tool,
 		})
 		msg := ControlMessage{
@@ -371,11 +371,11 @@ func TestHandleCanUseToolEmitterPayloads(t *testing.T) {
 	emitter := &mockEventEmitter{}
 	handler := &DefaultPermissionHandler{emitter: emitter}
 	var buf bytes.Buffer
-	err := handler.handleCanUseTool(&buf, "req-payload", &ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "Write",
+	err := handler.handleCanUseTool(context.Background(), &buf, "req-payload", &ControlRequestInner{
+		Subtype:   "can_use_tool",
+		ToolName:  "Write",
 		ToolUseID: "tu-payload",
-		Input:    map[string]any{"file_path": "/out.txt", "content": "hi"},
+		Input:     map[string]any{"file_path": "/out.txt", "content": "hi"},
 	})
 	if err != nil {
 		t.Fatalf("handleCanUseTool: %v", err)
