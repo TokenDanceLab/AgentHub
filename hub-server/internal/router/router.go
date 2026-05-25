@@ -9,7 +9,7 @@ import (
 	"github.com/agenthub/hub-server/internal/middleware"
 )
 
-func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler) {
+func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler) {
 	r.Use(middleware.CORS())
 	r.Use(middleware.APIVersion())
 	r.Use(middleware.BodyLimit(config.DefaultRequestBodyLimit))
@@ -146,5 +146,16 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		web.POST("/custom-agents", customAgentHandler.Create)
 		web.PUT("/custom-agents/:id", customAgentHandler.Update)
 		web.DELETE("/custom-agents/:id", customAgentHandler.Delete)
+
+		// Execution Targets
+		web.GET("/execution-targets", targetHandler.ListTargets)
+		web.POST("/execution-targets", targetHandler.CreateTarget)
+		web.GET("/execution-targets/:id", targetHandler.GetTarget)
+		web.PATCH("/execution-targets/:id", targetHandler.UpdateTarget)
+		web.DELETE("/execution-targets/:id", targetHandler.DeleteTarget)
+		web.POST("/execution-targets/:id/ping", targetHandler.PingTarget)
+
+		// Audit Events
+		web.GET("/audit-events", auditHandler.ListAuditEvents)
 	}
 }
