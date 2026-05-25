@@ -148,10 +148,11 @@ func (b *Bus) Subscribe(cursor int64) (int64, <-chan EventEnvelope, []EventEnvel
 	ch := make(chan EventEnvelope, subscriberChannelBufferSize)
 	b.subs = append(b.subs, subscriber{id: id, ch: ch})
 
-	// Replay events after cursor.
+	// Replay events starting from exact cursor position.
+	// cursor=N means "I last saw event N-1", so replay starts at seq >= cursor.
 	var replay []EventEnvelope
 	for _, evt := range b.history {
-		if evt.Seq > cursor {
+		if evt.Seq >= cursor {
 			replay = append(replay, evt)
 		}
 	}
