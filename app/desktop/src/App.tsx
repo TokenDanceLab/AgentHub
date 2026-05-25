@@ -440,12 +440,19 @@ export default function App() {
     }
   }, [leftSidebarWidth, setLeftSidebarWidth]);
 
-  const handleDecidePermission = useCallback((requestId: string, decision: 'allow' | 'deny', reason?: string) => {
-    decidePermission(requestId, decision, reason);
-    if (currentRun?.runId) {
-      decidePermissionRest({ runId: currentRun.runId, requestId, decision, reason }).catch(() => {});
+  const handleDecidePermission = useCallback(async (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
+    const request = permissionRequests.find((item) => item.requestId === requestId);
+    if (!request?.runId) {
+      addToast({ type: 'error', message: t('toast.error') });
+      return;
     }
-  }, [decidePermission, currentRun?.runId]);
+    try {
+      await decidePermissionRest({ runId: request.runId, requestId, decision, reason });
+      decidePermission(requestId, decision, reason);
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addToast, decidePermission, permissionRequests, t]);
 
   const handleRetry = useCallback((messageId: string) => {
     const msg = allMessages.find((m) => m.id === messageId);
