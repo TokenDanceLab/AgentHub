@@ -22,12 +22,24 @@ type Client struct {
 }
 
 // NewClient creates a new cache client backed by the given Redis connection.
+// Passing nil will produce a non-functional client whose methods return
+// errors rather than panicking; always pass a valid *redis.Client.
 func NewClient(rdb *redis.Client) *Client {
 	return &Client{rdb: rdb}
 }
 
+// isReady reports whether the underlying Redis connection is available.
+func (c *Client) isReady() bool {
+	return c != nil && c.rdb != nil
+}
+
 // GetRDB returns the underlying Redis client for advanced operations (e.g., rate limiting).
+// Returns nil if called on a nil *Client (defensive guard against wiring errors).
 func (c *Client) GetRDB() *redis.Client {
+	if c == nil || c.rdb == nil {
+		slog.Error("cache.Client.GetRDB called on nil or uninitialized client")
+		return nil
+	}
 	return c.rdb
 }
 
