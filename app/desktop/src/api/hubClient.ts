@@ -185,6 +185,7 @@ export interface OIDCAuthorizeRequest {
   code_challenge_method?: string;
   device_type: string;
   device_id: string;
+  redirect_uri?: string;
 }
 
 export interface OIDCAuthorizeResponse {
@@ -198,6 +199,7 @@ export interface OIDCCallbackRequest {
   code_verifier: string;
   device_type: string;
   device_id: string;
+  redirect_uri?: string;
 }
 
 export interface OIDCCallbackResponse {
