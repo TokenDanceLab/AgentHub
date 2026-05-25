@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"os/exec"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -17,11 +18,13 @@ import (
 type CodexAdapter struct {
 	binaryPath string
 	model      string
+	available  bool // #177: true if the CLI binary exists and is executable
 }
 
 // NewCodexAdapter creates a Codex adapter.
 func NewCodexAdapter(binaryPath, model string) *CodexAdapter {
-	return &CodexAdapter{binaryPath: binaryPath, model: model}
+	_, err := exec.LookPath(binaryPath)
+	return &CodexAdapter{binaryPath: binaryPath, model: model, available: err == nil}
 }
 
 func (a *CodexAdapter) Metadata() AdapterMetadata {
@@ -168,6 +171,10 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 // NeedsStdin returns false — Codex uses JSONL output via --json flag
 // and does NOT require bidirectional stdin communication.
 func (a *CodexAdapter) NeedsStdin() bool { return false }
+
+// Available reports whether the codex CLI binary was found at startup.
+// #177: check binary at startup, report unavailable if missing.
+func (a *CodexAdapter) Available() bool { return a.available }
 
 // --- Event types ---
 
