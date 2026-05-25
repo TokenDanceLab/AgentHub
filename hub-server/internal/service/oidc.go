@@ -96,7 +96,7 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 	}
 
 	// Build the TokenDance ID authorization URL
-	authURL, err := url.Parse(s.cfg.IssuerURL + "/oidc/auth")
+	authURL, err := url.Parse(s.cfg.IssuerURL + "/oidc/authorize")
 	if err != nil {
 		return nil, fmt.Errorf("parse issuer url: %w", err)
 	}
