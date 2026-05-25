@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"time"
 )
 
 var errCacheUnavailable = errors.New("cache unavailable")
@@ -14,6 +15,10 @@ var errCacheUnavailable = errors.New("cache unavailable")
 type noopCache struct{}
 
 func (noopCache) Invalidate(ctx context.Context, keys ...string) error { return nil }
+
+func (noopCache) BlacklistRefreshToken(ctx context.Context, tokenHash string, ttl time.Duration) error {
+	return nil
+}
 
 func (noopCache) IsOnline(ctx context.Context, userID string) (bool, error) {
 	return false, nil

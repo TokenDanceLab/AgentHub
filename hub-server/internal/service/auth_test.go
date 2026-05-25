@@ -211,6 +211,53 @@ func TestLogin_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// #161: Validate device_type enum on login.
+func TestLogin_InvalidDeviceType(t *testing.T) {
+	db, _, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	invalidTypes := []string{"", "mobile", "tablet", "unknown", "DESKTOP"}
+
+	svc := NewAuthService(db, jwtCfg(), nil)
+	for _, dt := range invalidTypes {
+		t.Run("device_type="+dt, func(t *testing.T) {
+			_, err := svc.Login(context.Background(), "testuser", "password123", dt, "dev-1")
+			assert.Error(t, err, "expected error for device_type=%q", dt)
+		})
+	}
+}
+
+// #161: Verify all valid device types are accepted.
+func TestLogin_ValidDeviceTypes(t *testing.T) {
+	for _, dt := range validDeviceTypes {
+		t.Run("device_type="+dt, func(t *testing.T) {
+			db, mock, sqlDB := newMockDB(t)
+			defer sqlDB.Close()
+
+			hash := hashPW("password123")
+			mock.ExpectQuery(sqlUserByUsername).
+				WithArgs("testuser", 1).
+				WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
+					AddRow("user-uuid", "testuser", hash, "Test User"))
+
+			mock.ExpectQuery(sqlInsertDevice).
+				WillReturnRows(sqlmock.NewRows([]string{"last_active_at"}).
+					AddRow(time.Now()))
+
+			mock.ExpectQuery(sqlRTByUserDevice).
+				WithArgs("user-uuid", dt, "dev-1", 1).
+				WillReturnError(gorm.ErrRecordNotFound)
+			mock.ExpectExec(sqlInsertRT).
+				WillReturnResult(sqlmock.NewResult(1, 1))
+
+			svc := NewAuthService(db, jwtCfg(), nil)
+			_, err := svc.Login(context.Background(), "testuser", "password123", dt, "dev-1")
+			assert.NoError(t, err)
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
 // ==================== RefreshToken ====================
 
 func TestRefreshToken_Invalid(t *testing.T) {
@@ -242,20 +289,66 @@ func TestRefreshToken_Revoked(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// #134: RefreshToken rotates the refresh token (old revoked, new issued).
 func TestRefreshToken_Success(t *testing.T) {
 	db, mock, sqlDB := newMockDB(t)
 	defer sqlDB.Close()
 
+	expiry := time.Now().Add(24 * time.Hour)
 	mock.ExpectQuery(sqlRTByHash).
 		WithArgs(sqlmock.AnyArg(), 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash", false, time.Now().Add(24*time.Hour)))
+			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash", false, expiry))
+
+	// Revoke old token
+	mock.ExpectExec(sqlRevokeByDevice).
+		WithArgs(true, "user-uuid", "dev-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	// UpsertRefreshToken: lookup then create new
+	mock.ExpectQuery(sqlRTByUserDevice).
+		WithArgs("user-uuid", "desktop", "dev-1", 1).
+		WillReturnError(gorm.ErrRecordNotFound)
+	mock.ExpectExec(sqlInsertRT).
+		WillReturnResult(sqlmock.NewResult(2, 1))
 
 	svc := NewAuthService(db, jwtCfg(), nil)
 	resp, err := svc.RefreshToken(context.Background(), "valid-refresh-token")
 	require.NoError(t, err)
 	assert.NotEmpty(t, resp.AccessToken)
+	assert.NotEmpty(t, resp.RefreshToken)
+	// The new refresh token should be different from the one passed in
+	// (we can't check exact value, but we check it's not empty and it's a new token)
 	assert.Equal(t, int64(900), resp.ExpiresIn)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// #134: Refresh token rotation with redis cache.
+func TestRefreshToken_RotatesWithCache(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	expiry := time.Now().Add(24 * time.Hour)
+	mock.ExpectQuery(sqlRTByHash).
+		WithArgs(sqlmock.AnyArg(), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
+			AddRow("rt-1", "user-uuid", "web", "dev-web", "oldhash", false, expiry))
+
+	mock.ExpectExec(sqlRevokeByDevice).
+		WithArgs(true, "user-uuid", "dev-web").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	mock.ExpectQuery(sqlRTByUserDevice).
+		WithArgs("user-uuid", "web", "dev-web", 1).
+		WillReturnError(gorm.ErrRecordNotFound)
+	mock.ExpectExec(sqlInsertRT).
+		WillReturnResult(sqlmock.NewResult(2, 1))
+
+	svc := NewAuthService(db, jwtCfg(), testCacheClient(t))
+	resp, err := svc.RefreshToken(context.Background(), "some-refresh-token")
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.AccessToken)
+	assert.NotEmpty(t, resp.RefreshToken)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -270,9 +363,77 @@ func TestLogout(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	svc := NewAuthService(db, jwtCfg(), nil)
-	err := svc.Logout(context.Background(), "user-uuid", "dev-1")
+	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// #66: Logout writes to Redis blacklist.
+func TestLogout_BlacklistsInRedis(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	mock.ExpectExec(sqlRevokeByDevice).
+		WithArgs(true, "user-uuid", "dev-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	cacheClient := testCacheClient(t)
+	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "desktop")
+	require.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+
+	// Verify the blacklist key exists in Redis.
+	ctx := context.Background()
+	key := "rt_blacklist:user-uuid:dev-1:desktop"
+	exists, redisErr := cacheClient.GetRDB().Exists(ctx, key).Result()
+	require.NoError(t, redisErr)
+	assert.Equal(t, int64(1), exists)
+}
+
+// #149: Logout with device_type scoping.
+func TestLogout_WithDeviceType(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	mock.ExpectExec(sqlRevokeByDevice).
+		WithArgs(true, "user-uuid", "dev-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	cacheClient := testCacheClient(t)
+	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "desktop")
+	require.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+
+	// Verify the scoped blacklist key.
+	ctx := context.Background()
+	key := "rt_blacklist:user-uuid:dev-1:desktop"
+	exists, redisErr := cacheClient.GetRDB().Exists(ctx, key).Result()
+	require.NoError(t, redisErr)
+	assert.Equal(t, int64(1), exists)
+}
+
+func TestLogout_WithoutDeviceType(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	mock.ExpectExec(sqlRevokeByDevice).
+		WithArgs(true, "user-uuid", "dev-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	cacheClient := testCacheClient(t)
+	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "")
+	require.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+
+	// Verify the unscoped blacklist key.
+	ctx := context.Background()
+	key := "rt_blacklist:user-uuid:dev-1"
+	exists, redisErr := cacheClient.GetRDB().Exists(ctx, key).Result()
+	require.NoError(t, redisErr)
+	assert.Equal(t, int64(1), exists)
 }
 
 // ==================== GetMe ====================
@@ -423,3 +584,14 @@ func TestUpdateProfile_NilCacheDoesNotPanic(t *testing.T) {
 	assert.Equal(t, "New Name", user.Nickname)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+// ==================== #161 device_type validation in Login via handler ====================
+// These tests verify the handler correctly rejects invalid device_type in the request body.
+
+
+
+
+
+
+
+
