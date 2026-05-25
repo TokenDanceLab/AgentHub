@@ -43,6 +43,7 @@ import { useAgentList } from '@/api/agentQueries';
 import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
+import { useDeviceRegistration } from '@/hooks/useDeviceRegistration';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
 import {
@@ -52,6 +53,7 @@ import {
   type ResolvedRunModelSettings,
 } from '@/stores/modelSettingsStore';
 import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
+import type { ContactInfo, FriendRequestInfo, HubClient, Session } from '@/api/hubClient';
 import styles from './SettingsPage.module.css';
 
 export type SectionId =
@@ -125,6 +127,17 @@ interface CustomAgentMarketItem {
   source: string;
   updatedAt?: string;
 }
+
+interface HubIMSnapshot {
+  contacts: ContactInfo[];
+  sessions: Session[];
+  friendRequests: FriendRequestInfo[];
+  notifications: Record<string, unknown>[];
+}
+
+type HubClientWithOptionalTasks = HubClient & {
+  listAgentTasks?: () => Promise<Record<string, unknown>[]>;
+};
 
 const STORAGE_PREFIX = 'agenthub-settings.';
 const DEVICE_ID_KEY = 'agenthub_device_id';
@@ -312,15 +325,41 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const updateCcSwitchProvider = useModelSettingsStore((s) => s.updateProvider);
   const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
   const hubSessionActive = hubAuthenticated || hubAuth.isAuthenticated;
-  const settingsHubClient = useMemo(
-    () => createHubClient({ getToken: () => hubAuth.token ?? null }),
+  const settingsHubClient = useMemo<HubClientWithOptionalTasks>(
+    () => createHubClient({ getToken: () => hubAuth.token ?? null }) as HubClientWithOptionalTasks,
     [hubAuth.token],
   );
+  const deviceRegistration = useDeviceRegistration(hubSessionActive ? settingsHubClient : null);
   const shouldLoadAgentMarket = hubSessionActive && active === 'agentMarket';
+  const shouldLoadIMSnapshot = hubSessionActive && (active === 'onlineIm' || active === 'groupChat');
+  const shouldLoadHubTaskSnapshot =
+    hubSessionActive &&
+    (active === 'tasks' || active === 'agentScheduling') &&
+    typeof settingsHubClient.listAgentTasks === 'function';
   const customAgentsQuery = useQuery({
     queryKey: ['hub-settings', 'custom-agents', hubAuth.token],
     queryFn: () => settingsHubClient.listCustomAgents(),
     enabled: shouldLoadAgentMarket,
+    retry: false,
+  });
+  const hubIMSnapshotQuery = useQuery<HubIMSnapshot>({
+    queryKey: ['hub-settings', 'im-snapshot', hubAuth.token],
+    queryFn: async () => {
+      const [contacts, sessions, friendRequests, notifications] = await Promise.all([
+        settingsHubClient.listContacts(),
+        settingsHubClient.listSessions(),
+        settingsHubClient.listFriendRequests(),
+        settingsHubClient.listNotifications({ limit: 20 }),
+      ]);
+      return { contacts, sessions, friendRequests, notifications };
+    },
+    enabled: shouldLoadIMSnapshot,
+    retry: false,
+  });
+  const hubAgentTasksQuery = useQuery({
+    queryKey: ['hub-settings', 'agent-tasks', hubAuth.token],
+    queryFn: async () => settingsHubClient.listAgentTasks?.() ?? [],
+    enabled: shouldLoadHubTaskSnapshot,
     retry: false,
   });
   const agents = agentData?.items ?? [];
@@ -355,9 +394,19 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const recentRuns = getRecentRuns(runs, 5);
   const activeHubTasks = bridgedTasks.filter(isActiveBridgeTask).length;
   const recentBridgeTasks = getRecentTasks(bridgedTasks, 5);
+  const hubTaskSnapshot = (hubAgentTasksQuery.data ?? []).map(normalizeHubAgentTask);
+  const recentHubTaskSnapshot = getRecentTasks(hubTaskSnapshot, 5);
+  const activeHubTaskSnapshot = hubTaskSnapshot.filter(isActiveBridgeTask).length;
+  const imSnapshot = hubIMSnapshotQuery.data;
+  const imContacts = imSnapshot?.contacts ?? [];
+  const imSessions = imSnapshot?.sessions ?? [];
+  const imFriendRequests = imSnapshot?.friendRequests ?? [];
+  const imNotifications = imSnapshot?.notifications ?? [];
+  const imGroupSessions = imSessions.filter((session) => session.type === 'group');
+  const imPrivateSessions = imSessions.filter((session) => session.type !== 'group');
   const remoteControlReady = false;
-  const schedulerActiveItems = activeRuns + activeHubTasks;
-  const schedulerTotalItems = runs.length + bridgedTasks.length;
+  const schedulerActiveItems = activeRuns + activeHubTasks + activeHubTaskSnapshot;
+  const schedulerTotalItems = runs.length + bridgedTasks.length + hubTaskSnapshot.length;
   const schedulerTargetReadyCount = [
     edgeOnline,
     hubSessionActive,
@@ -382,7 +431,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
       : tokenSource === 'hub'
         ? t('settings.hubLocalLogin')
         : t('settings.notConfigured');
-  const deviceId = readBrowserStorage('local', DEVICE_ID_KEY);
+  const deviceId = deviceRegistration.deviceId ?? readBrowserStorage('local', DEVICE_ID_KEY);
   const pkceStateReady =
     Boolean(readBrowserStorage('session', TD_CODE_VERIFIER_KEY)) && Boolean(readBrowserStorage('session', TD_STATE_KEY));
   const handleSignOut = () => {
@@ -740,6 +789,14 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   connected={hubSessionActive}
                 />
                 <ExecutionTargetCard
+                  icon={<Monitor size={18} />}
+                  title={t('settings.desktopDevice')}
+                  description={t('settings.desktopDeviceDesc')}
+                  status={t(`settings.deviceStatus.${deviceRegistration.status}`)}
+                  metric={deviceId ? shortId(deviceId) : t('settings.desktopDeviceMissingDesc')}
+                  connected={deviceRegistration.status === 'registered'}
+                />
+                <ExecutionTargetCard
                   icon={<Server size={18} />}
                   title={t('settings.targetSsh')}
                   description={t('settings.targetSshDesc')}
@@ -787,9 +844,21 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 />
                 <SummaryCard
                   icon={<ShieldCheck size={18} />}
-                  label={t('settings.taskApprovalQueue')}
-                  value={t('settings.statusPlanned')}
-                  detail={t('settings.taskApprovalQueueDesc')}
+                  label={t('settings.taskHubSnapshot')}
+                  value={
+                    hubAgentTasksQuery.isLoading
+                      ? t('settings.loading')
+                      : `${activeHubTaskSnapshot}/${hubTaskSnapshot.length}`
+                  }
+                  detail={
+                    !hubSessionActive
+                      ? t('settings.taskHubBridgeSignedOut')
+                      : hubAgentTasksQuery.isError
+                        ? t('settings.hubUnavailable')
+                        : shouldLoadHubTaskSnapshot
+                          ? t('settings.taskHubSnapshotDesc')
+                          : t('settings.taskHubSnapshotUnavailable')
+                  }
                 />
               </div>
               <SettingRow
@@ -809,6 +878,58 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 value={runsError ? t('settings.edgeOffline') : t('settings.statusInProgress')}
               />
               <SettingRow title={t('settings.taskRunBinding')} description={t('settings.taskRunBindingDesc')} value={t('settings.statusInProgress')} />
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <div className={styles.taskSectionTitleRow}>
+                    <div>
+                      <strong>{t('settings.taskHubSnapshot')}</strong>
+                      <span>{t('settings.taskHubSnapshotDesc')}</span>
+                    </div>
+                    <div className={styles.taskSectionActions}>
+                      <span className={`${styles.statusPill} ${hubSessionActive && !hubAgentTasksQuery.isError ? styles.statusPillOn : ''}`}>
+                        {!hubSessionActive
+                          ? t('settings.signedOut')
+                          : hubAgentTasksQuery.isError
+                            ? t('settings.hubUnavailable')
+                            : shouldLoadHubTaskSnapshot
+                              ? t('settings.enabled')
+                              : t('settings.interfaceGap')}
+                      </span>
+                      {shouldLoadHubTaskSnapshot ? (
+                        <button
+                          type="button"
+                          className={styles.secondaryBtn}
+                          onClick={() => void hubAgentTasksQuery.refetch()}
+                          disabled={hubAgentTasksQuery.isFetching}
+                        >
+                          <RefreshCw size={15} />
+                          {hubAgentTasksQuery.isFetching ? t('settings.taskRefreshingRuns') : t('settings.taskRefreshRuns')}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+                {!hubSessionActive ? (
+                  <AuthGapBlock
+                    title={t('settings.hubSignInRequired')}
+                    description={t('settings.taskHubBridgeSignedOut')}
+                    actionLabel={t('settings.signIn')}
+                    onAction={onOpenAuth}
+                  />
+                ) : hubAgentTasksQuery.isError ? (
+                  <EmptyBlock title={t('settings.hubUnavailable')} description={t('settings.taskHubSnapshotErrorDesc')} />
+                ) : !shouldLoadHubTaskSnapshot ? (
+                  <EmptyBlock title={t('settings.interfaceGap')} description={t('settings.taskHubSnapshotUnavailable')} />
+                ) : recentHubTaskSnapshot.length > 0 ? (
+                  <div className={styles.taskList}>
+                    {recentHubTaskSnapshot.map((task) => (
+                      <HubTaskRow key={`hub-snapshot-${task.taskId}`} task={task} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.taskNoHubSnapshot')} description={t('settings.taskNoHubSnapshotDesc')} />
+                )}
+              </div>
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
                   <div className={styles.taskSectionTitleRow}>
@@ -867,21 +988,87 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'onlineIm' && (
             <Panel title={t('settings.onlineIm')} description={t('settings.onlineImDesc')}>
-              <div className={styles.capabilityGrid}>
-                <CapabilityCard
-                  title={t('settings.onlineImSessions')}
-                  description={t('settings.onlineImSessionsDesc')}
-                  status={hubSessionActive ? t('settings.contractPending') : t('settings.signedOut')}
+              {!hubSessionActive ? (
+                <AuthGapBlock
+                  title={t('settings.hubSignInRequired')}
+                  description={t('settings.onlineImSignedOutDesc')}
+                  actionLabel={t('settings.signIn')}
+                  onAction={onOpenAuth}
                 />
+              ) : hubIMSnapshotQuery.isError ? (
+                <EmptyBlock title={t('settings.hubUnavailable')} description={t('settings.onlineImHubErrorDesc')} />
+              ) : null}
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<MessageSquareText size={18} />}
+                  label={t('settings.onlineImSessions')}
+                  value={hubIMSnapshotQuery.isLoading ? t('settings.loading') : `${imSessions.length}`}
+                  detail={hubSessionActive ? t('settings.onlineImSessionsDesc') : t('settings.onlineImSignedOutDesc')}
+                />
+                <SummaryCard
+                  icon={<UserCircle size={18} />}
+                  label={t('settings.onlineImContacts')}
+                  value={hubIMSnapshotQuery.isLoading ? t('settings.loading') : `${imContacts.length}`}
+                  detail={t('settings.onlineImContactsDesc')}
+                />
+                <SummaryCard
+                  icon={<ShieldCheck size={18} />}
+                  label={t('settings.onlineImFriendRequests')}
+                  value={hubIMSnapshotQuery.isLoading ? t('settings.loading') : `${imFriendRequests.length}`}
+                  detail={t('settings.onlineImFriendRequestsDesc')}
+                />
+                <SummaryCard
+                  icon={<Globe2 size={18} />}
+                  label={t('settings.onlineImNotifications')}
+                  value={hubIMSnapshotQuery.isLoading ? t('settings.loading') : `${imNotifications.length}`}
+                  detail={t('settings.onlineImNotificationsDesc')}
+                />
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <div className={styles.taskSectionTitleRow}>
+                    <div>
+                      <strong>{t('settings.onlineImSnapshot')}</strong>
+                      <span>{t('settings.onlineImSnapshotDesc')}</span>
+                    </div>
+                    {hubSessionActive ? (
+                      <div className={styles.taskSectionActions}>
+                        <span className={`${styles.statusPill} ${hubIMSnapshotQuery.isError ? '' : styles.statusPillOn}`}>
+                          {hubIMSnapshotQuery.isError ? t('settings.hubUnavailable') : t('settings.enabled')}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.secondaryBtn}
+                          onClick={() => void hubIMSnapshotQuery.refetch()}
+                          disabled={hubIMSnapshotQuery.isFetching}
+                        >
+                          <RefreshCw size={15} />
+                          {hubIMSnapshotQuery.isFetching ? t('settings.taskRefreshingRuns') : t('settings.taskRefreshRuns')}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                {hubSessionActive && !hubIMSnapshotQuery.isError && imSessions.length > 0 ? (
+                  <div className={styles.taskList}>
+                    {imSessions.slice(0, 5).map((session) => (
+                      <HubSessionRow key={sessionIdOfSettings(session)} session={session} />
+                    ))}
+                  </div>
+                ) : hubSessionActive && !hubIMSnapshotQuery.isError ? (
+                  <EmptyBlock title={t('settings.onlineImNoSessions')} description={t('settings.onlineImNoSessionsDesc')} />
+                ) : null}
+              </div>
+              <div className={styles.capabilityGrid}>
                 <CapabilityCard
                   title={t('settings.onlineImPresence')}
                   description={t('settings.onlineImPresenceDesc')}
-                  status={t('settings.contractPending')}
+                  status={deviceRegistration.status === 'registered' ? t('settings.statusReady') : t(`settings.deviceStatus.${deviceRegistration.status}`)}
                 />
                 <CapabilityCard
-                  title={t('settings.onlineImNotifications')}
-                  description={t('settings.onlineImNotificationsDesc')}
-                  status={hubSessionActive ? t('settings.contractPending') : t('settings.signedOut')}
+                  title={t('settings.onlineImNotificationActions')}
+                  description={t('settings.onlineImNotificationActionsDesc')}
+                  status={hubSessionActive && !hubIMSnapshotQuery.isError ? t('settings.enabled') : t('settings.signedOut')}
                 />
               </div>
             </Panel>
@@ -889,6 +1076,42 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'groupChat' && (
             <Panel title={t('settings.groupChat')} description={t('settings.groupChatDesc')}>
+              {!hubSessionActive ? (
+                <AuthGapBlock
+                  title={t('settings.hubSignInRequired')}
+                  description={t('settings.onlineImSignedOutDesc')}
+                  actionLabel={t('settings.signIn')}
+                  onAction={onOpenAuth}
+                />
+              ) : hubIMSnapshotQuery.isError ? (
+                <EmptyBlock title={t('settings.hubUnavailable')} description={t('settings.onlineImHubErrorDesc')} />
+              ) : null}
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<MessageSquareText size={18} />}
+                  label={t('settings.groupChatRooms')}
+                  value={hubIMSnapshotQuery.isLoading ? t('settings.loading') : `${imGroupSessions.length}`}
+                  detail={t('settings.groupChatRoomsDesc')}
+                />
+                <SummaryCard
+                  icon={<UserCircle size={18} />}
+                  label={t('settings.onlineImContacts')}
+                  value={hubIMSnapshotQuery.isLoading ? t('settings.loading') : `${imContacts.length}`}
+                  detail={t('settings.onlineImContactsDesc')}
+                />
+                <SummaryCard
+                  icon={<Bot size={18} />}
+                  label={t('settings.groupChatAgents')}
+                  value={`${agents.length}`}
+                  detail={edgeOnline ? t('settings.groupChatAgentsDesc') : t('settings.edgeOffline')}
+                />
+                <SummaryCard
+                  icon={<Globe2 size={18} />}
+                  label={t('settings.onlineImSessions')}
+                  value={hubIMSnapshotQuery.isLoading ? t('settings.loading') : `${imPrivateSessions.length}/${imSessions.length}`}
+                  detail={t('settings.groupChatSessionMixDesc')}
+                />
+              </div>
               <SettingRow
                 title={t('settings.enableGroupChat')}
                 description={t('settings.enableGroupChatDesc')}
@@ -896,21 +1119,30 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <Switch
                     checked={hubSessionActive && groupChatEnabled}
                     onChange={setBooleanSetting('groupChat', setGroupChatEnabled)}
-                    disabled
+                    disabled={!hubSessionActive}
                   />
                 }
               />
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.groupChatHubRooms')}</strong>
+                  <span>{t('settings.groupChatHubRoomsDesc')}</span>
+                </div>
+                {hubSessionActive && !hubIMSnapshotQuery.isError && imGroupSessions.length > 0 ? (
+                  <div className={styles.taskList}>
+                    {imGroupSessions.slice(0, 5).map((session) => (
+                      <HubSessionRow key={`group-${sessionIdOfSettings(session)}`} session={session} />
+                    ))}
+                  </div>
+                ) : hubSessionActive && !hubIMSnapshotQuery.isError ? (
+                  <EmptyBlock title={t('settings.groupChatNoRooms')} description={t('settings.groupChatNoRoomsDesc')} />
+                ) : null}
+              </div>
               <SettingRow
-                title={t('settings.groupChatAgents')}
-                description={t('settings.groupChatAgentsDesc')}
-                value={hubSessionActive ? t('settings.contractPending') : t('settings.signedOut')}
+                title={t('settings.groupChatModeration')}
+                description={t('settings.groupChatModerationDesc')}
+                value={hubSessionActive && !hubIMSnapshotQuery.isError ? t('settings.statusInProgress') : t('settings.signedOut')}
               />
-              <SettingRow
-                title={t('settings.groupChatRooms')}
-                description={t('settings.groupChatRoomsDesc')}
-                value={hubSessionActive ? t('settings.contractPending') : t('settings.signedOut')}
-              />
-              <SettingRow title={t('settings.groupChatModeration')} description={t('settings.groupChatModerationDesc')} value={t('settings.contractPending')} />
             </Panel>
           )}
 
@@ -952,10 +1184,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <strong>{t('settings.schedulerLiveQueue')}</strong>
                   <span>{t('settings.schedulerLiveQueueDesc')}</span>
                 </div>
-                {recentRuns.length > 0 || recentBridgeTasks.length > 0 ? (
+                {recentRuns.length > 0 || recentBridgeTasks.length > 0 || recentHubTaskSnapshot.length > 0 ? (
                   <div className={styles.taskList}>
                     {recentRuns.slice(0, 3).map((run) => (
                       <TaskRunRow key={`scheduler-${run.runId}`} run={run} />
+                    ))}
+                    {recentHubTaskSnapshot.slice(0, 3).map((task) => (
+                      <HubTaskRow key={`scheduler-hub-snapshot-${task.taskId}`} task={task} />
                     ))}
                     {recentBridgeTasks.slice(0, 3).map((task) => (
                       <HubTaskRow key={`scheduler-${task.taskId}`} task={task} />
@@ -1440,9 +1675,23 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 name="Hub"
                 description={hubSessionActive ? t('status.hubConnected') : t('status.hubDisconnected')}
                 connected={hubSessionActive}
+                onlineLabel={t('settings.online')}
+                offlineLabel={t('settings.offline')}
               />
-              <ConnectionRow name="Edge" description={`${t('settings.edgeLocal')} · ${runnerSummary}`} connected={edgeOnline} />
-              <ConnectionRow name="WebSocket" description={t('status.wsConnected')} connected={edgeOnline} />
+              <ConnectionRow
+                name="Edge"
+                description={`${t('settings.edgeLocal')} · ${runnerSummary}`}
+                connected={edgeOnline}
+                onlineLabel={t('settings.online')}
+                offlineLabel={t('settings.offline')}
+              />
+              <ConnectionRow
+                name="WebSocket"
+                description={t('status.wsConnected')}
+                connected={edgeOnline}
+                onlineLabel={t('settings.online')}
+                offlineLabel={t('settings.offline')}
+              />
             </Panel>
           )}
 
@@ -1578,13 +1827,19 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Monitor size={18} />}
                   label={t('settings.desktopDevice')}
-                  value={deviceId ? shortId(deviceId) : t('settings.notConfigured')}
-                  detail={deviceId ? t('settings.desktopDeviceDesc') : t('settings.desktopDeviceMissingDesc')}
+                  value={t(`settings.deviceStatus.${deviceRegistration.status}`)}
+                  detail={
+                    deviceRegistration.status === 'error'
+                      ? deviceRegistration.error ?? t('settings.desktopDeviceRegisterFailed')
+                      : deviceId
+                        ? shortId(deviceId)
+                        : t('settings.desktopDeviceMissingDesc')
+                  }
                 />
                 <SummaryCard
                   icon={<Route size={18} />}
                   label={t('settings.syncScope')}
-                  value={hubSessionActive ? t('settings.contractPending') : t('settings.signedOut')}
+                  value={deviceRegistration.status === 'registered' ? t('settings.enabled') : t('settings.signedOut')}
                   detail={t('settings.syncScopeDesc')}
                 />
               </div>
@@ -1612,7 +1867,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.deviceProof')}
                     description={t('settings.deviceProofDesc')}
-                    status={deviceId ? t('settings.localOnly') : t('settings.signedOut')}
+                    status={t(`settings.deviceStatus.${deviceRegistration.status}`)}
                   />
                 </div>
               </div>
@@ -1777,6 +2032,31 @@ function HubTaskRow({ task }: { task: AgentTask }) {
       </div>
       <span className={`${styles.statusPill} ${isActiveBridgeTask(task) ? styles.statusPillOn : ''}`}>
         {t(`settings.taskStatus.${task.status}`, { defaultValue: task.status })}
+      </span>
+    </div>
+  );
+}
+
+function HubSessionRow({ session }: { session: Session }) {
+  const { t } = useTranslation();
+  const sessionId = sessionIdOfSettings(session);
+  const timestamp = session.last_message_at ?? session.updated_at ?? session.created_at;
+  return (
+    <div className={styles.taskRow}>
+      <div className={styles.connectionIcon}>
+        <MessageSquareText size={17} />
+      </div>
+      <div className={styles.settingCopy}>
+        <strong>{session.name || shortId(sessionId)}</strong>
+        <span>{sessionId}</span>
+        <div className={styles.taskMeta}>
+          <span>{session.type}</span>
+          <span>{t('settings.memberCount', { count: session.member_count ?? session.members?.length ?? 0 })}</span>
+          <span>{formatTimestamp(timestamp)}</span>
+        </div>
+      </div>
+      <span className={`${styles.statusPill} ${styles.statusPillOn}`}>
+        {t('settings.enabled')}
       </span>
     </div>
   );
@@ -2171,7 +2451,19 @@ function SettingRow({
   );
 }
 
-function ConnectionRow({ name, description, connected }: { name: string; description: string; connected: boolean }) {
+function ConnectionRow({
+  name,
+  description,
+  connected,
+  onlineLabel,
+  offlineLabel,
+}: {
+  name: string;
+  description: string;
+  connected: boolean;
+  onlineLabel: string;
+  offlineLabel: string;
+}) {
   return (
     <div className={styles.connectionRow}>
       <div className={styles.connectionIcon}>
@@ -2182,7 +2474,7 @@ function ConnectionRow({ name, description, connected }: { name: string; descrip
         <span>{description}</span>
       </div>
       <span className={`${styles.statusPill} ${connected ? styles.statusPillOn : ''}`}>
-        {connected ? 'Online' : 'Offline'}
+        {connected ? onlineLabel : offlineLabel}
       </span>
     </div>
   );
@@ -2247,6 +2539,64 @@ function normalizeCustomAgent(raw: Record<string, unknown>): CustomAgentMarketIt
     source: '/web/custom-agents',
     updatedAt: readUnknownString(raw.updated_at) ?? readUnknownString(raw.created_at),
   };
+}
+
+function normalizeHubAgentTask(raw: Record<string, unknown>): AgentTask {
+  const taskId =
+    readUnknownString(raw.task_id) ??
+    readUnknownString(raw.taskId) ??
+    readUnknownString(raw.id) ??
+    'hub-task';
+  const status = normalizeTaskStatus(readUnknownString(raw.status));
+  return {
+    taskId,
+    agentId:
+      readUnknownString(raw.agent_id) ??
+      readUnknownString(raw.agentId) ??
+      readUnknownString(raw.agent_type) ??
+      readUnknownString(raw.agent_instance_id) ??
+      'hub-agent',
+    prompt:
+      readUnknownString(raw.prompt) ??
+      readUnknownString(raw.content) ??
+      readUnknownString(raw.final_content) ??
+      taskId,
+    threadId: readUnknownString(raw.thread_id) ?? readUnknownString(raw.session_id),
+    runId: readUnknownString(raw.run_id) ?? readUnknownString(raw.edge_run_id),
+    status,
+    dispatchPayload: raw,
+    error: readUnknownString(raw.error),
+    createdAt:
+      readUnknownString(raw.created_at) ??
+      readUnknownString(raw.updated_at) ??
+      new Date(0).toISOString(),
+  };
+}
+
+function normalizeTaskStatus(value?: string): AgentTask['status'] {
+  switch (value) {
+    case 'queued':
+    case 'pending':
+      return 'queued';
+    case 'running':
+    case 'acknowledged':
+    case 'streaming':
+      return 'running';
+    case 'done':
+    case 'completed':
+    case 'succeeded':
+      return 'done';
+    case 'failed':
+    case 'cancelled':
+    case 'canceled':
+      return 'failed';
+    default:
+      return 'queued';
+  }
+}
+
+function sessionIdOfSettings(session: Session) {
+  return session.session_id ?? session.id ?? 'session';
 }
 
 function readUnknownString(value: unknown): string | undefined {
