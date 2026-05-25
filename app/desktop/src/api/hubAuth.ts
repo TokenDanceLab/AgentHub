@@ -53,9 +53,8 @@ function isTauri(): boolean {
 
 // ── PKCE helpers ──────────────────────────────────
 
-// Module-level closure for PKCE parameters (non-Tauri fallback path needs them).
-// In Tauri mode they stay in the async function closure and are never written to any storage.
-let pendingCodeVerifier = '';
+// Module-level state bridge for the non-Tauri fallback path.
+// In Tauri mode PKCE values stay in the async function closure and are never written to storage.
 let pendingOidcState = '';
 
 function generateCodeVerifier(): string {
@@ -208,16 +207,28 @@ async function exchangeCodeForToken(
   code: string,
   state: string,
   codeVerifier: string,
+  redirectUri: string,
+  deviceId: string,
 ): Promise<HubTokenResponse> {
   const client = createHubClient();
 
-  const body = {
+  const body: {
+    code: string;
+    state: string;
+    code_verifier: string;
+    device_type: string;
+    device_id: string;
+    redirect_uri?: string;
+  } = {
     code,
     state,
     code_verifier: codeVerifier,
     device_type: 'desktop',
-    device_id: getOrCreateDeviceId(),
+    device_id: deviceId,
   };
+  if (redirectUri) {
+    body.redirect_uri = redirectUri;
+  }
 
   return client.oidcCallback(body);
 }
@@ -285,33 +296,14 @@ export function createHubAuth(client?: HubClient): HubAuth {
   /**
    * Build the redirect_uri used in the OIDC flow.
    * - In Tauri: `http://127.0.0.1:{port}/callback` (captured by local HTTP server)
-   * - Fallback: `agenthub://callback` (captured by Tauri deep-link)
+   * - Fallback: empty string, so Hub uses its configured backend callback and
+   *   the user can manually paste the code from that callback URL.
    */
   function buildRedirectUri(port: number): string {
     if (port > 0) {
       return `http://127.0.0.1:${port}/callback`;
     }
-    // Fallback: use custom URI scheme for deep-link
-    return 'agenthub://callback';
-  }
-
-  /**
-   * Replace the redirect_uri query parameter in an authorization URL.
-   * The Hub returns a URL with its own configured redirect_uri;
-   * we replace it with our local callback server address.
-   */
-  function patchRedirectUri(authUrl: string, redirectUri: string): string {
-    try {
-      const url = new URL(authUrl);
-      url.searchParams.set('redirect_uri', redirectUri);
-      return url.toString();
-    } catch {
-      // If URL parsing fails, do a simple string replacement
-      return authUrl.replace(
-        /redirect_uri=[^&]*/,
-        `redirect_uri=${encodeURIComponent(redirectUri)}`,
-      );
-    }
+    return '';
   }
 
   return {
@@ -329,19 +321,39 @@ export function createHubAuth(client?: HubClient): HubAuth {
       // 1. Generate PKCE parameters
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await computeCodeChallenge(codeVerifier);
-
-      // 2. Call Hub to get the authorization URL and server-generated state
-      const authClient = createHubClient();
       const deviceId = getOrCreateDeviceId();
+
+      let callbackResult: Promise<CallbackResult> | null = null;
+      let redirectUri = '';
+      if (isTauri()) {
+        const callbackServer = await startCallbackServer();
+        callbackResult = callbackServer.result;
+        redirectUri = buildRedirectUri(callbackServer.port);
+      }
+
+      // 2. Call Hub to bind PKCE/state/device and get the authorization URL.
+      // For Tauri, the local loopback callback is sent before Hub creates the
+      // state so Hub and TokenDance ID use the same redirect_uri end to end.
+      const authClient = createHubClient();
 
       let authorizeResp: { state: string; authorization_url: string };
       try {
-        authorizeResp = await authClient.oidcAuthorize({
+        const authorizeBody: {
+          code_challenge: string;
+          code_challenge_method: string;
+          device_type: string;
+          device_id: string;
+          redirect_uri?: string;
+        } = {
           code_challenge: codeChallenge,
           code_challenge_method: 'S256',
           device_type: 'desktop',
           device_id: deviceId,
-        });
+        };
+        if (redirectUri) {
+          authorizeBody.redirect_uri = redirectUri;
+        }
+        authorizeResp = await authClient.oidcAuthorize(authorizeBody);
       } catch (err) {
         throw new Error(
           `Failed to start OIDC login: ${err instanceof Error ? err.message : 'Unknown error'}`,
@@ -350,26 +362,22 @@ export function createHubAuth(client?: HubClient): HubAuth {
 
       const { state: serverState, authorization_url: authUrl } = authorizeResp;
 
-      // code_verifier and state are held in closure — never written to sessionStorage/localStorage
+      // code_verifier stays in closure — never written to sessionStorage/localStorage
       // to prevent same-origin JS from stealing PKCE parameters.
-      // Module-level variables provide a bridge for the non-Tauri fallback path.
-      pendingCodeVerifier = codeVerifier;
+      // The state bridge is only for the non-Tauri manual-code fallback.
       pendingOidcState = serverState;
 
-      // 3. Start local callback server
-      const { port, result: callbackResult } = await startCallbackServer();
-
-      // 4. Build redirect URI and patch the authorization URL
-      const redirectUri = buildRedirectUri(port);
-      const finalAuthUrl = patchRedirectUri(authUrl, redirectUri);
-
-      // 5. Open browser for user authentication
-      const opened = window.open(finalAuthUrl, '_blank');
+      // 3. Open browser for user authentication.
+      const opened = window.open(authUrl, '_blank');
       if (!opened) {
         throw new Error(
           'Popup blocked — please allow popups for AgentHub to use TokenDance ID login. ' +
           'You can also use username/password login below.',
         );
+      }
+
+      if (!callbackResult) {
+        callbackResult = (await startCallbackServer()).result;
       }
 
       // 6. Wait for the callback to arrive
@@ -388,7 +396,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       // 7. Exchange the code for Hub tokens
       let tokenResp: HubTokenResponse;
       try {
-        tokenResp = await exchangeCodeForToken(callback.code, callback.state, codeVerifier);
+        tokenResp = await exchangeCodeForToken(callback.code, callback.state, codeVerifier, redirectUri, deviceId);
       } catch (err) {
         throw new Error(
           `Token exchange failed: ${err instanceof Error ? err.message : 'Unknown error'}`,

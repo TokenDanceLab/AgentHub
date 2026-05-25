@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,12 +64,13 @@ type stateEntry struct {
 	CodeChallengeMethod string `json:"code_challenge_method"`
 	DeviceType          string `json:"device_type"`
 	DeviceID            string `json:"device_id"`
+	RedirectURI         string `json:"redirect_uri"`
 	CreatedAt           int64  `json:"created_at"`
 }
 
 // GenerateAuthorizationURL creates a random state, stores PKCE parameters in Redis,
 // and returns the full TokenDance ID authorization URL.
-func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID string) (*AuthorizationResult, error) {
+func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*AuthorizationResult, error) {
 	if codeChallenge == "" {
 		return nil, errcode.ErrBadRequest
 	}
@@ -80,6 +83,10 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 	}
 	var err error
 	deviceType, deviceID, err = normalizeOIDCDevice(deviceType, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	redirectURI, err = normalizeOIDCRedirectURI(redirectURI, s.cfg.RedirectURI, s.cfg.AllowedRedirectURIs, deviceType)
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +104,7 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 		CodeChallengeMethod: codeChallengeMethod,
 		DeviceType:          deviceType,
 		DeviceID:            deviceID,
+		RedirectURI:         redirectURI,
 		CreatedAt:           time.Now().Unix(),
 	}
 	entryJSON, err := json.Marshal(entry)
@@ -116,7 +124,7 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 	q := authURL.Query()
 	q.Set("response_type", "code")
 	q.Set("client_id", s.cfg.ClientID)
-	q.Set("redirect_uri", s.cfg.RedirectURI)
+	q.Set("redirect_uri", redirectURI)
 	q.Set("scope", "openid profile email")
 	q.Set("state", state)
 	q.Set("code_challenge", codeChallenge)
@@ -131,7 +139,7 @@ func (s *OIDCService) GenerateAuthorizationURL(ctx context.Context, codeChalleng
 
 // HandleCallback validates the OIDC callback, exchanges the authorization code,
 // validates the ID token, maps the TokenDance sub to a Hub user, and issues Hub tokens.
-func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerifier, deviceType, deviceID string) (*CallbackResult, error) {
+func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*CallbackResult, error) {
 	var err error
 	deviceType, deviceID, err = normalizeOIDCDevice(deviceType, deviceID)
 	if err != nil {
@@ -156,9 +164,15 @@ func (s *OIDCService) HandleCallback(ctx context.Context, code, state, codeVerif
 	if entry.DeviceType != deviceType || entry.DeviceID != deviceID {
 		return nil, errcode.OIDCInvalidState
 	}
+	if redirectURI == "" {
+		redirectURI = entry.RedirectURI
+	}
+	if redirectURI != entry.RedirectURI {
+		return nil, errcode.OIDCInvalidState
+	}
 
 	// 2. Exchange authorization code for tokens at TokenDance ID
-	tokenResponse, err := s.exchangeCode(ctx, code, codeVerifier)
+	tokenResponse, err := s.exchangeCode(ctx, code, codeVerifier, entry.RedirectURI)
 	if err != nil {
 		return nil, errcode.OIDCCodeExchangeFailed
 	}
@@ -230,11 +244,11 @@ type tokenEndpointResponse struct {
 }
 
 // exchangeCode POSTs the authorization code to TokenDance ID's token endpoint.
-func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier string) (*tokenEndpointResponse, error) {
+func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier, redirectURI string) (*tokenEndpointResponse, error) {
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", code)
-	form.Set("redirect_uri", s.cfg.RedirectURI)
+	form.Set("redirect_uri", redirectURI)
 	form.Set("client_id", s.cfg.ClientID)
 	form.Set("client_secret", s.cfg.ClientSecret)
 	form.Set("code_verifier", codeVerifier)
@@ -278,4 +292,83 @@ func normalizeOIDCDevice(deviceType, deviceID string) (string, string, error) {
 		return "", "", errcode.ErrBadRequest.WithMessage("device_id must be a UUID")
 	}
 	return deviceType, parsed.String(), nil
+}
+
+func normalizeOIDCRedirectURI(requested, fallback string, allowed []string, deviceType string) (string, error) {
+	redirectURI := strings.TrimSpace(requested)
+	if redirectURI == "" {
+		redirectURI = strings.TrimSpace(fallback)
+	}
+	parsed, err := url.Parse(redirectURI)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.Fragment != "" {
+		return "", errcode.ErrBadRequest.WithMessage("redirect_uri must be an absolute http(s) URL without fragment")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", errcode.ErrBadRequest.WithMessage("redirect_uri must use http or https")
+	}
+	normalized := parsed.String()
+	if !oidcRedirectAllowed(normalized, fallback, allowed, deviceType) {
+		return "", errcode.ErrBadRequest.WithMessage("redirect_uri is not allowed for this TokenDance ID client")
+	}
+	return normalized, nil
+}
+
+func oidcRedirectAllowed(requested, fallback string, allowed []string, deviceType string) bool {
+	for _, registered := range oidcAllowedRedirectCandidates(fallback, allowed) {
+		registered = strings.TrimSpace(registered)
+		if registered == "" {
+			continue
+		}
+		if registered == requested {
+			return true
+		}
+		if (deviceType == "desktop" || deviceType == "cli") && oidcLoopbackRedirectMatch(registered, requested) {
+			return true
+		}
+	}
+	return false
+}
+
+func oidcAllowedRedirectCandidates(fallback string, allowed []string) []string {
+	candidates := make([]string, 0, len(allowed)+1)
+	if fallback = strings.TrimSpace(fallback); fallback != "" {
+		candidates = append(candidates, fallback)
+	}
+	return append(candidates, allowed...)
+}
+
+func oidcLoopbackRedirectMatch(registered, requested string) bool {
+	regURL, err := url.Parse(registered)
+	if err != nil {
+		return false
+	}
+	reqURL, err := url.Parse(requested)
+	if err != nil {
+		return false
+	}
+	if regURL.Scheme != "http" || reqURL.Scheme != "http" {
+		return false
+	}
+	if regURL.User != nil || reqURL.User != nil {
+		return false
+	}
+	if regURL.Fragment != "" || reqURL.Fragment != "" {
+		return false
+	}
+	if regURL.Port() != "" || reqURL.Port() == "" {
+		return false
+	}
+	port, err := strconv.Atoi(reqURL.Port())
+	if err != nil || port < 1 || port > 65535 {
+		return false
+	}
+	if regURL.EscapedPath() != reqURL.EscapedPath() || regURL.RawQuery != reqURL.RawQuery {
+		return false
+	}
+	regIP := net.ParseIP(regURL.Hostname())
+	reqIP := net.ParseIP(reqURL.Hostname())
+	if regIP == nil || reqIP == nil || !regIP.IsLoopback() || !reqIP.IsLoopback() {
+		return false
+	}
+	return regIP.Equal(reqIP)
 }
