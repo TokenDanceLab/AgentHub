@@ -41,6 +41,14 @@ function mockFetchSequence(responses: Array<{ status: number; data: unknown }>) 
   }
 }
 
+function getHeader(init: RequestInit, name: string): string | null {
+  const headers = init.headers;
+  if (headers instanceof Headers) {
+    return headers.get(name);
+  }
+  return (headers as Record<string, string> | undefined)?.[name] ?? null;
+}
+
 // ── Tests ────────────────────────────────────────
 
 describe('hubClient', () => {
@@ -155,7 +163,7 @@ describe('hubClient', () => {
       await client.me();
 
       const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-      expect((init.headers as Record<string, string>).Authorization).toBe('Bearer my_jwt_token');
+      expect(getHeader(init, 'Authorization')).toBe('Bearer my_jwt_token');
     });
 
     it('omits Authorization header when getToken returns null', async () => {
@@ -168,7 +176,7 @@ describe('hubClient', () => {
       await client.register({ username: 'x', password: 'y', nickname: 'z' });
 
       const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-      expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+      expect(getHeader(init, 'Authorization')).toBeNull();
     });
 
     it('me() fetches user profile', async () => {
@@ -264,6 +272,14 @@ describe('hubClient', () => {
       await client.me();
       const [url] = fetchSpy.mock.calls[0] as [string];
       expect(url).toBe('http://test.local/client/auth/me');
+    });
+
+    it('uses the Desktop HUB_URL default when baseUrl is omitted', async () => {
+      const client = createHubClient();
+      const fetchSpy = mockFetch(200, mockUser);
+      await client.me();
+      const [url] = fetchSpy.mock.calls[0] as [string];
+      expect(url).toBe('http://localhost:8080/client/auth/me');
     });
   });
 });
