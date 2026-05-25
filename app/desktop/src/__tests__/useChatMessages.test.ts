@@ -20,6 +20,7 @@ import { createEventStream } from '@/api/eventClient';
 import { cancelRun } from '@/api/edgeClient';
 import { useToastStore } from '@/stores/toastStore';
 import { useChatMessages } from '@/hooks/useChatMessages';
+import { queryClient } from '@/api/queryClient';
 import { RunState } from '@/utils/runStateMachine';
 import type { EventEnvelope } from '@shared/events';
 
@@ -48,6 +49,7 @@ describe('useChatMessages', () => {
       id: 'run-1',
       status: 'cancelled',
     } as any);
+    vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined);
     const addToast = vi.fn();
     vi.mocked(useToastStore.getState).mockReturnValue({ addToast } as any);
     vi.mocked(createEventStream).mockReturnValue({
@@ -222,6 +224,22 @@ describe('useChatMessages', () => {
 
     expect(result.current.currentRun?.status).toBe(RunState.COMPLETED);
     expect(result.current.isStreaming).toBe(false);
+  });
+
+  it('invalidates run and thread queries on terminal run events', () => {
+    renderHook(() => useChatMessages(true));
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    invalidateSpy.mockClear();
+
+    act(() => {
+      eventHandler!(makeEvent('run.finished', { runId: 'run-1', status: 'finished' }));
+      eventHandler!(makeEvent('run.failed', { runId: 'run-2', status: 'failed' }));
+      eventHandler!(makeEvent('run.cancelled', { runId: 'run-3', status: 'cancelled' }));
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledTimes(6);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['runs'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['threads'] });
   });
 
   it('updates currentRun status on run.failed', () => {

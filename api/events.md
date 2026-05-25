@@ -1,5 +1,46 @@
 # WebSocket Events
 
+### Hub `/client/ws` frame format
+
+Hub WebSocket frames are not `EventEnvelope`. They use the Hub-local frame:
+
+```json
+{
+  "type": "message.new",
+  "seq_id": 42,
+  "payload": {}
+}
+```
+
+Desktop authenticates by sending the first frame after connect:
+
+```json
+{
+  "type": "auth",
+  "payload": {
+    "access_token": "<Hub access token>"
+  }
+}
+```
+
+The server replies with `auth.ok` or `auth.fail`. Desktop ignores application events until `auth.ok` is received.
+
+Desktop currently consumes these Hub event types:
+
+| type | payload | Desktop behavior |
+|---|---|---|
+| `message.new` | Hub message object with `id`, `session_id`, `seq_id`, `sender_type`, `sender_id`, `content_type`, `content`, `recalled`, `created_at` | Append or confirm the message in the matching IM session, deduplicated by message id. |
+| `message.recall` | Message id/session payload | Mark the matching message as recalled instead of deleting local history. |
+| `message.read` | `session_id`, `user_id`, `last_read_seq` | Update read metadata when a UI surface needs it; safe to ignore for v1 rendering. |
+| `session.created` | Hub session object or `session_id` payload | Add or refresh the IM session list. |
+| `session.info_updated` | `session_id` plus changed metadata | Update the session row title/avatar/announcement. |
+| `session.dissolved` | `session_id` | Remove the session from active send targets or mark it unavailable. |
+| `session.member_joined` / `session.member_left` | `session_id`, member metadata | Refresh session membership when shown. |
+| `agent.dispatch` | Hub agent task payload with `task_id`, `session_id`, prompt/content and agent metadata | Desktop starts a Local Edge run and reports ack/stream/done/fail through Hub REST callbacks. |
+| `agent.cancel` | `task_id` | Desktop cancels the mapped Local Edge run if it is still active. |
+
+Hub REST remains the snapshot source for `/client/contacts`, `/client/sessions`, and `/client/sessions/{id}/messages`. `/client/ws` is used for live updates and must not be the only source of IM state after refresh or reconnect.
+
 AgentHub 使用 WebSocket typed events 推送实时状态。REST API 用于发起命令和查询，WebSocket 只负责事件投递。
 
 > **Implementation Status (2026-05-24)**: Edge Server events (run.*, runner.*) are
