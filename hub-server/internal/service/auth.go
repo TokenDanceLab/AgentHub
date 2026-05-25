@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -19,7 +21,11 @@ import (
 // authCache is the subset of *cache.Client methods used by AuthService.
 type authCache interface {
 	Invalidate(ctx context.Context, keys ...string) error
+	BlacklistRefreshToken(ctx context.Context, tokenHash string, ttl time.Duration) error
 }
+
+// validDeviceTypes enumerates the allowed device_type values for Hub login.
+var validDeviceTypes = []string{"desktop", "web", "cli"}
 
 type AuthService struct {
 	db          *gorm.DB
@@ -73,6 +79,15 @@ func (s *AuthService) Register(ctx context.Context, username, password, nickname
 }
 
 func (s *AuthService) Login(ctx context.Context, username, password, deviceType, deviceID string) (*LoginResponse, error) {
+	// Validate device_type against the allowed enum (#161).
+	if !slices.Contains(validDeviceTypes, deviceType) {
+		return nil, &errcode.Error{
+			Code:       errcode.ErrBadRequest.Code,
+			Message:    fmt.Sprintf("device_type must be one of desktop, web, cli (got %q)", deviceType),
+			HTTPStatus: errcode.ErrBadRequest.HTTPStatus,
+		}
+	}
+
 	user, err := repository.GetUserByUsername(s.db, username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -122,6 +137,8 @@ func (s *AuthService) Login(ctx context.Context, username, password, deviceType,
 	}, nil
 }
 
+// RefreshToken validates a refresh token, issues a new access token,
+// and rotates the refresh token (#134: old one is revoked, new one is issued).
 func (s *AuthService) RefreshToken(ctx context.Context, rawRefreshToken string) (*LoginResponse, error) {
 	tokenHash := jwtutil.HashRefreshToken(rawRefreshToken)
 	rt, err := repository.FindRefreshTokenByHash(s.db, tokenHash)
@@ -132,20 +149,63 @@ func (s *AuthService) RefreshToken(ctx context.Context, rawRefreshToken string) 
 		return nil, errcode.AuthRefreshInvalid
 	}
 
+	// Rotate: revoke the old refresh token.
+	if err := repository.RevokeRefreshTokensByUserDevice(s.db, rt.UserID, rt.DeviceID); err != nil {
+		return nil, err
+	}
+
+	// Blacklist the old token hash in Redis for the remaining TTL (#134).
+	remainingTTL := time.Until(rt.ExpiresAt)
+	if remainingTTL > 0 {
+		_ = resolveAuthCache(s.cacheClient).BlacklistRefreshToken(ctx, tokenHash, remainingTTL)
+	}
+
+	// Issue a new access token.
 	accessToken, err := jwtutil.GenerateAccessToken(rt.UserID, rt.DeviceType, rt.DeviceID,
 		s.jwtCfg.Secret, s.jwtCfg.AccessTTL)
 	if err != nil {
 		return nil, err
 	}
 
+	// Issue a new refresh token.
+	rawRefresh, err := jwtutil.GenerateRefreshToken()
+	if err != nil {
+		return nil, err
+	}
+
+	newTokenHash := jwtutil.HashRefreshToken(rawRefresh)
+	newRT := &model.RefreshToken{
+		UserID:     rt.UserID,
+		DeviceType: rt.DeviceType,
+		DeviceID:   rt.DeviceID,
+		TokenHash:  newTokenHash,
+		ExpiresAt:  time.Now().Add(s.jwtCfg.RefreshTTL),
+	}
+	if err := repository.UpsertRefreshToken(s.db, newRT); err != nil {
+		return nil, err
+	}
+
 	return &LoginResponse{
 		AccessToken:  accessToken,
-		RefreshToken: rawRefreshToken,
+		RefreshToken: rawRefresh,
 		ExpiresIn:    int64(s.jwtCfg.AccessTTL.Seconds()),
 	}, nil
 }
 
-func (s *AuthService) Logout(ctx context.Context, userID, deviceID string) error {
+// Logout revokes all refresh tokens for the given user and device,
+// both in the database and in the Redis blacklist (#66).
+// If deviceType is non-empty, the Redis blacklist is scoped by device_type (#149).
+func (s *AuthService) Logout(ctx context.Context, userID, deviceID, deviceType string) error {
+	// Write to Redis blacklist so token validation can check without hitting DB (#66).
+	// BlacklistRefreshToken prepends "rt_blacklist:" internally, so we only pass the
+	// logical key suffix here.
+	blacklistKey := userID + ":" + deviceID
+	if deviceType != "" {
+		blacklistKey = userID + ":" + deviceID + ":" + deviceType
+	}
+	_ = resolveAuthCache(s.cacheClient).BlacklistRefreshToken(ctx, blacklistKey, s.jwtCfg.RefreshTTL)
+
+	// Also revoke in the database (source of truth).
 	return repository.RevokeRefreshTokensByUserDevice(s.db, userID, deviceID)
 }
 

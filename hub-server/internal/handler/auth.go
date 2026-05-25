@@ -15,7 +15,7 @@ type AuthService interface {
 	Register(ctx context.Context, username, password, nickname string) (*model.User, error)
 	Login(ctx context.Context, username, password, deviceType, deviceID string) (*service.LoginResponse, error)
 	RefreshToken(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error)
-	Logout(ctx context.Context, userID, deviceID string) error
+	Logout(ctx context.Context, userID, deviceID, deviceType string) error
 	GetMe(ctx context.Context, userID string) (*model.User, error)
 	UpdateProfile(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error)
 	ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error
@@ -112,7 +112,9 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	userID := c.GetString("user_id")
 	deviceID := c.GetString("device_id")
-	if err := h.service.Logout(c.Request.Context(), userID, deviceID); err != nil {
+	// Scope revocation by device_type if provided as a query parameter (#149).
+	deviceType := c.Query("device_type")
+	if err := h.service.Logout(c.Request.Context(), userID, deviceID, deviceType); err != nil {
 		Fail(c, errcode.ErrInternal)
 		return
 	}

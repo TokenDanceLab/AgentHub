@@ -290,6 +290,10 @@ func requestHasLocalAuthToken(r *http.Request, want string) bool {
 		candidates = append(candidates, strings.TrimSpace(r.URL.Query().Get("access_token")))
 	}
 	for _, got := range candidates {
+		// Skip TokenDance bearer tokens (td_ prefix) — they are NOT Edge sessions.
+		if strings.HasPrefix(got, "td_") {
+			continue
+		}
 		if constantTimeEqual(got, want) {
 			return true
 		}

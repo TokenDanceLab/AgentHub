@@ -450,3 +450,80 @@ func TestAccessLogDoesNotModifyResponse(t *testing.T) {
 		t.Fatalf("status = %d, want 201", w.Code)
 	}
 }
+
+
+// --- RequireLocalAuth tests (#158) ---
+
+func requireLocalAuthGinCtx(authSource string) (*gin.Context, *httptest.ResponseRecorder) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/client/auth/password", nil)
+	c.Set("auth_source", authSource)
+	return c, w
+}
+
+func TestRequireLocalAuthAllowsLocalAuth(t *testing.T) {
+	c, w := requireLocalAuthGinCtx("hub_local")
+	called := false
+	next := func(c *gin.Context) { called = true }
+
+	handler := RequireLocalAuth()
+	handler(c)
+	if !c.IsAborted() {
+		next(c)
+	}
+
+	if c.IsAborted() {
+		t.Fatal("expected request not to be aborted for local auth")
+	}
+	if !called {
+		t.Fatal("expected next handler to be called")
+	}
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+}
+
+func TestRequireLocalAuthBlocksTokenDanceAuth(t *testing.T) {
+	c, w := requireLocalAuthGinCtx("tokendance_id")
+	called := false
+	next := func(c *gin.Context) { called = true }
+
+	handler := RequireLocalAuth()
+	handler(c)
+	if !c.IsAborted() {
+		next(c)
+	}
+
+	if !c.IsAborted() {
+		t.Fatal("expected request to be aborted for TokenDance auth")
+	}
+	if called {
+		t.Fatal("expected next handler NOT to be called")
+	}
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", w.Code)
+	}
+}
+
+func TestRequireLocalAuthAllowsEmptyAuthSource(t *testing.T) {
+	c, w := requireLocalAuthGinCtx("")
+	called := false
+	next := func(c *gin.Context) { called = true }
+
+	handler := RequireLocalAuth()
+	handler(c)
+	if !c.IsAborted() {
+		next(c)
+	}
+
+	if c.IsAborted() {
+		t.Fatal("expected request not to be aborted when auth_source is empty")
+	}
+	if !called {
+		t.Fatal("expected next handler to be called")
+	}
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+}
