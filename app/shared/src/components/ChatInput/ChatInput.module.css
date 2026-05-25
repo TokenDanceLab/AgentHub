@@ -1,0 +1,84 @@
+.wrap {
+  width: 100%;
+}
+
+/* ── Composer Grid ───────────────────────────────────────── */
+.composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  min-height: 88px;
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+}
+
+/* ── Textarea ────────────────────────────────────────────── */
+.textarea {
+  min-height: 58px;
+  max-height: 160px;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: 0;
+  padding: var(--space-md) 14px;
+  background: oklch(1 0 0 / 0.64);
+  color: var(--foreground);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  font-family: inherit;
+}
+
+.textarea::placeholder {
+  color: var(--muted-foreground);
+}
+
+.textarea:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px oklch(0.55 0.16 255 / 0.12);
+}
+
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Send Button ─────────────────────────────────────────── */
+.sendBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  height: 42px;
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--brand), var(--info));
+  color: var(--primary-foreground);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  box-shadow: 0 8px 20px oklch(0.55 0.16 255 / 0.23);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: opacity 150ms;
+}
+
+.sendBtn:hover {
+  opacity: 0.92;
+}
+
+.sendBtn:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ── Send Icon (inline SVG) ──────────────────────────────── */
+.sendIcon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
