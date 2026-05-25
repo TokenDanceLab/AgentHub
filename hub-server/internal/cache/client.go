@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -97,7 +98,23 @@ func (c *Client) DeleteRoute(ctx context.Context, userID, deviceType string) err
 
 // GetRoute returns the connection ID for a user device.
 func (c *Client) GetRoute(ctx context.Context, userID, deviceType string) (string, error) {
-	return c.rdb.HGet(ctx, routeKey(userID), deviceType).Result()
+	// Try exact match first (backward compatible)
+	connID, err := c.rdb.HGet(ctx, routeKey(userID), deviceType).Result()
+	if err == nil {
+		return connID, nil
+	}
+	// Scan for compound keys (deviceType:deviceID)
+	all, scanErr := c.rdb.HGetAll(ctx, routeKey(userID)).Result()
+	if scanErr != nil {
+		return "", scanErr
+	}
+	prefix := deviceType + ":"
+	for field, val := range all {
+		if strings.HasPrefix(field, prefix) {
+			return val, nil
+		}
+	}
+	return "", redis.Nil
 }
 
 // IsOnline reports whether the user has at least one active device route.

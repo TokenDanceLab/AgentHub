@@ -708,11 +708,40 @@ func TestMarkRead_Success(t *testing.T) {
 		WithArgs("sess-1", "user", "user-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
+	// GetActiveMember returns last_read_seq=10, which is less than the new 42
+	mock.ExpectQuery(sqlmSessionMember).
+		WithArgs("sess-1", "user", "user-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role", "last_read_seq"}).
+			AddRow("mem-1", "sess-1", "user", "user-1", "member", 10))
+
 	mock.ExpectExec(sqlmUpdateMember).
 		WithArgs(42, "sess-1", "user", "user-1", 42).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	svc := &MessageService{db: db, bus: newTestBus(t)}
+	err := svc.MarkRead(context.Background(), "user-1", "sess-1", 42)
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// Test that MarkRead rejects seq <= current last_read_seq (no-op + no bus publish).
+func TestMarkRead_SeqNotAdvanced(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(sqlmSessionMember).
+		WithArgs("sess-1", "user", "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	// GetActiveMember returns last_read_seq=50, which is GREATER than 42
+	mock.ExpectQuery(sqlmSessionMember).
+		WithArgs("sess-1", "user", "user-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role", "last_read_seq"}).
+			AddRow("mem-1", "sess-1", "user", "user-1", "member", 50))
+
+	// No UpdateLastReadSeq and no bus publish expected
+
+	svc := &MessageService{db: db}
 	err := svc.MarkRead(context.Background(), "user-1", "sess-1", 42)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())

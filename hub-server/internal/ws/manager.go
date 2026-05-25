@@ -37,8 +37,8 @@ func (c *Conn) Close() {
 }
 
 type Manager struct {
-	OnRouteSet     func(userID, deviceType, connID, oldConnID string, wasOffline bool)
-	OnRouteDel     func(userID, deviceType, connID string)
+	OnRouteSet     func(userID, deviceType, deviceID, connID, oldConnID string, wasOffline bool)
+	OnRouteDel     func(userID, deviceType, deviceID, connID string)
 	ResolveMembers func(sessionID string) []string
 
 	mu     sync.RWMutex
@@ -79,7 +79,7 @@ func (m *Manager) Register(c *Conn) error {
 		if m.byUser[c.UserID] == nil {
 			m.byUser[c.UserID] = make(map[string]string)
 		}
-		m.byUser[c.UserID][c.DeviceType] = c.ID
+		m.byUser[c.UserID][c.ID] = c.ID
 	}
 	m.mu.Unlock()
 
@@ -97,16 +97,21 @@ func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) {
 	}
 
 	oldConnID := ""
-	if m.byUser[userID] != nil {
-		oldConnID = m.byUser[userID][deviceType]
+	if m.byUser[userID] == nil {
+		m.byUser[userID] = make(map[string]string)
+	}
+	// Find existing connection of same device type (for oldConnID tracking)
+	for _, existingCID := range m.byUser[userID] {
+		if ec, ok := m.conns[existingCID]; ok && ec.DeviceType == deviceType {
+			oldConnID = existingCID
+			break
+		}
 	}
 
 	wasOffline := len(m.byUser[userID]) == 0
 
-	if m.byUser[userID] == nil {
-		m.byUser[userID] = make(map[string]string)
-	}
-	m.byUser[userID][deviceType] = connID
+	// Use connID as route key to prevent same-type devices from overwriting each other
+	m.byUser[userID][connID] = connID
 
 	c.mu.Lock()
 	c.UserID = userID
@@ -117,7 +122,7 @@ func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) {
 	m.mu.Unlock()
 
 	if m.OnRouteSet != nil {
-		m.OnRouteSet(userID, deviceType, connID, oldConnID, wasOffline)
+		m.OnRouteSet(userID, deviceType, deviceID, connID, oldConnID, wasOffline)
 	}
 }
 
@@ -131,7 +136,7 @@ func (m *Manager) Unregister(connID string) {
 	delete(m.conns, connID)
 	if c.UserID != "" {
 		if devs, ok := m.byUser[c.UserID]; ok {
-			delete(devs, c.DeviceType)
+			delete(devs, c.ID)
 			if len(devs) == 0 {
 				delete(m.byUser, c.UserID)
 			}
@@ -140,12 +145,13 @@ func (m *Manager) Unregister(connID string) {
 
 	userID := c.UserID
 	deviceType := c.DeviceType
+	deviceID := c.DeviceID
 	connIDForDel := c.ID
 
 	m.mu.Unlock()
 
 	if userID != "" && m.OnRouteDel != nil {
-		m.OnRouteDel(userID, deviceType, connIDForDel)
+		m.OnRouteDel(userID, deviceType, deviceID, connIDForDel)
 	}
 
 	close(c.Send)
@@ -218,11 +224,13 @@ func (m *Manager) FindByUserDevice(userID, deviceType string) *Conn {
 	if !ok {
 		return nil
 	}
-	connID, ok := devs[deviceType]
-	if !ok {
-		return nil
+	// Iterate connections to find one matching the requested device type
+	for _, connID := range devs {
+		if c, ok := m.conns[connID]; ok && c.DeviceType == deviceType {
+			return c
+		}
 	}
-	return m.conns[connID]
+	return nil
 }
 
 func (m *Manager) StartHeartbeat() {
