@@ -625,10 +625,11 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	}
 
 	msgType := agents.MsgTypeResult
-	if status == "failed" || status == "cancelled" {
+	switch status {
+	case "failed", "cancelled":
 		msgType = agents.MsgTypeError
 		e.agentRegistry.SetStatus(agentID, agents.StatusError, "")
-	} else if status == "finished" {
+	case "finished":
 		e.agentRegistry.SetStatus(agentID, agents.StatusCompleted, "")
 	}
 

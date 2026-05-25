@@ -1,7 +1,6 @@
 package adapters
 
 import (
-	"crypto/rand"
 	"fmt"
 	"strings"
 	"sync"
@@ -84,12 +83,6 @@ func newTestBus(t *testing.T) *events.Bus {
 	return events.NewBus(128)
 }
 
-func genTestID() string {
-	b := make([]byte, 4)
-	_, _ = rand.Read(b)
-	return fmt.Sprintf("%x", b)
-}
-
 // ── dispatchInterceptor tests ───────────────────────────────────────────────
 
 func TestDispatchInterceptor_DetectsDispatchJSON(t *testing.T) {
@@ -111,7 +104,7 @@ func TestDispatchInterceptor_DetectsDispatchJSON(t *testing.T) {
 
 	// Emit a text block containing a dispatch JSON line.
 	interceptor.Emit(BusEventTextBlock, nil, map[string]any{
-		"text": `{"action":"dispatch","agent":"codex","task":"Write unit tests","role":"worker"}`,
+		"text":    `{"action":"dispatch","agent":"codex","task":"Write unit tests","role":"worker"}`,
 		"content": `{"action":"dispatch","agent":"codex","task":"Write unit tests","role":"worker"}`,
 	})
 

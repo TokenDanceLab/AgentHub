@@ -88,11 +88,14 @@ pnpm tauri dev
 
 ```powershell
 cd D:\Code\TokenDance\AgentHub\app\desktop
-pnpm test
-pnpm build
 pnpm typecheck
+pnpm test:ci
+pnpm build
+pnpm test
 pnpm test:e2e
 ```
+
+`pnpm typecheck` 覆盖生产源码；测试文件仍有 strict index/optional 类型债，不能用作本轮 release gate。`pnpm test:ci` 是 CI-safe Vitest 套件，排除需要真实 Edge origin/auth 对齐的 `edge-real` 集成测试；本地全量 `pnpm test` 可用于排查这些集成链路。
 
 Playwright 配置会自动启动 `pnpm dev --port 5199`，baseURL 是 `http://localhost:5199`。需要完整在线链路时先启动 Edge 并确认：
 
@@ -112,6 +115,7 @@ pnpm storybook
 ## 已知限制
 
 - `app/shared/src/ui` 的 React 类型解析和 pnpm 跨包虚拟存储会影响部分 shared-ui 测试/typecheck。改动说明里必须区分既有 shared-ui 限制和本次新增错误。
+- Desktop ESLint 仍有既有 React Hooks/strict cleanup 债；CI 暂时保留为可见但不硬阻断的债务检查，不能把 lint warning-only 当成已清零。
 - `scripts/client-smoke.ps1` 已对齐当前 Edge Runtime 架构，不再构建已删除的独立 `runner/` 目录；可用 `-EdgeAddr` 跑隔离端口 smoke，也可用 `-EdgeAuthToken` 覆盖本地 Edge token 路径。
 - TokenDance ID 目标路径是 Hub Server 完成 OIDC code exchange 并签发 Hub session；现有 Desktop 端入口不得保存第三方 provider token，也不得直接集成 GitHub/Google/飞书。
 
