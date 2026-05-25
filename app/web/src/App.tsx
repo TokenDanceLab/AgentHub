@@ -1,17 +1,35 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { getSurfaceMetadata, type SurfaceId, type SurfaceStatus } from '@shared/surfaceMetadata';
 import i18n, { type AppLanguage, normalizeLanguage, setLanguagePreference } from '@/i18n';
 import { router } from '@/router';
 import styles from '@/App.module.css';
 
 type Theme = 'light' | 'dark';
+type SourceTone = 'demo' | 'catalog' | 'locked' | 'error';
 
-type PreviewTab = {
+type ShellPage = {
+  description: string;
   label: string;
   path: string;
   priority: 'primary' | 'secondary';
+  source: SurfaceStatus;
+  workspace: string;
 };
+
+const WEB_SURFACE_ROUTES = [
+  { id: 'web.workbench', path: '/', workspaceKey: 'shell.workspace.localEdge', priority: 'primary' },
+  { id: 'web.agentSquare', path: '/agent-square', workspaceKey: 'shell.workspace.catalog', priority: 'secondary' },
+  { id: 'web.privateChats', path: '/chats', workspaceKey: 'shell.workspace.hubSession', priority: 'secondary' },
+  { id: 'web.groupWorkspace', path: '/group/workbench', workspaceKey: 'shell.workspace.group', priority: 'secondary' },
+  { id: 'web.projectPreview', path: '/project/agent-hub', workspaceKey: 'shell.workspace.project', priority: 'secondary' },
+] as const satisfies readonly {
+  id: SurfaceId;
+  path: string;
+  workspaceKey: string;
+  priority: 'primary' | 'secondary';
+}[];
 
 function readTheme(): Theme {
   try {
@@ -59,34 +77,20 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement | null>(null);
 
-  const previewTabs = useMemo<PreviewTab[]>(
-    () => [
-      {
-        path: '/',
-        label: t('nav.workbench'),
-        priority: 'primary',
-      },
-      {
-        path: '/agent-square',
-        label: t('nav.agentSquare'),
-        priority: 'secondary',
-      },
-      {
-        path: '/chats',
-        label: t('nav.privateChats'),
-        priority: 'secondary',
-      },
-      {
-        path: '/group/workbench',
-        label: t('nav.groupWorkspace'),
-        priority: 'secondary',
-      },
-      {
-        path: '/project/agent-hub',
-        label: t('nav.projectPreview'),
-        priority: 'secondary',
-      },
-    ],
+  const shellPages = useMemo<ShellPage[]>(
+    () =>
+      WEB_SURFACE_ROUTES.map((route) => {
+        const surface = getSurfaceMetadata(route.id);
+
+        return {
+          path: route.path,
+          label: t(surface.labelKey),
+          description: t(surface.descriptionKey),
+          workspace: t(route.workspaceKey),
+          source: surface.defaultStatus,
+          priority: route.priority,
+        };
+      }),
     [t],
   );
 
@@ -163,27 +167,35 @@ export default function App() {
     [pathname],
   );
 
+  const activePage = useMemo(() => (
+    shellPages.find((page) => isActiveTab(page.path)) ?? shellPages[0]!
+  ), [isActiveTab, shellPages]);
+
+  const sourceTone = sourceToneFromStatus(activePage.source);
+  const sourceLabel = t(sourceLabelKey(activePage.source));
+  const sourceDetail = t(sourceDetailKey(activePage.source));
+
   return (
     <div className={styles.root} data-theme={theme}>
       <header className={styles.toolbar}>
         <div className={styles.brand}>
           <span className={styles.brandMark}>AH</span>
-          <span>{t('brand.webPreview')}</span>
+          <span className={styles.brandCopy}>
+            <strong>AgentHub</strong>
+            <span>{t('shell.brand.surface')}</span>
+          </span>
         </div>
 
-        <nav className={styles.tabs} aria-label={t('nav.previewPages')}>
-          {previewTabs.map((page) => (
-            <button
-              className={isActiveTab(page.path) ? styles.activeTab : styles.tab}
-              data-priority={page.priority}
-              key={page.path}
-              onClick={() => void router.navigate(page.path)}
-              type="button"
-            >
-              {page.label}
-            </button>
-          ))}
-        </nav>
+        <div className={styles.toolbarMeta} aria-label={t('shell.toolbar.status')}>
+          <span className={styles.statusChip} data-tone="error">
+            <span className={styles.statusDot} />
+            {t('shell.status.edgeUnavailable')}
+          </span>
+          <span className={styles.statusChip} data-tone={sourceTone}>
+            <span className={styles.statusDot} />
+            {sourceLabel}
+          </span>
+        </div>
 
         <div className={styles.actions} ref={settingsRef}>
           <button
@@ -262,11 +274,112 @@ export default function App() {
         </div>
       </header>
 
-      <main className={styles.preview}>
-        <Suspense fallback={<LoadingFallback />}>
-          <RouterProvider router={router} />
-        </Suspense>
-      </main>
+      <div className={styles.shell}>
+        <aside className={styles.sidebar} aria-label={t('shell.sidebar.label')}>
+          <div className={styles.sidebarHeader}>
+            <span className={styles.sidebarTitle}>{t('shell.sidebar.pages')}</span>
+            <span className={styles.sidebarCount}>{shellPages.length}</span>
+          </div>
+          <nav className={styles.navList} aria-label={t('nav.previewPages')}>
+            {shellPages.map((page) => (
+              <button
+                className={isActiveTab(page.path) ? styles.activeNavItem : styles.navItem}
+                data-priority={page.priority}
+                key={page.path}
+                onClick={() => void router.navigate(page.path)}
+                type="button"
+              >
+                <span className={styles.navGlyph} aria-hidden="true">{page.label.slice(0, 1)}</span>
+                <span className={styles.navText}>
+                  <span>{page.label}</span>
+                  <small>{page.workspace}</small>
+                </span>
+                <span
+                  className={styles.navSourceDot}
+                  data-tone={sourceToneFromStatus(page.source)}
+                  aria-label={t(sourceLabelKey(page.source))}
+                />
+              </button>
+            ))}
+          </nav>
+
+          <div className={styles.sidebarFooter}>
+            <span className={styles.footerLabel}>{t('shell.sidebar.boundary')}</span>
+            <p>{t('shell.sidebar.boundary.detail')}</p>
+          </div>
+        </aside>
+
+        <main className={styles.mainSurface}>
+          <div className={styles.contentToolbar}>
+            <div className={styles.contentTitle}>
+              <span className={styles.workspaceKicker}>{activePage.workspace}</span>
+              <h1>{activePage.label}</h1>
+            </div>
+            <span className={styles.contentStatus} data-tone={sourceTone}>{sourceLabel}</span>
+          </div>
+          <p className={styles.contentDescription}>{activePage.description}</p>
+          <section className={styles.routerSurface} aria-label={activePage.label}>
+            <Suspense fallback={<LoadingFallback />}>
+              <RouterProvider router={router} />
+            </Suspense>
+          </section>
+        </main>
+
+        <aside className={styles.statusPanel} aria-label={t('shell.statusPanel.label')}>
+          <div className={styles.panelBlock}>
+            <span className={styles.panelLabel}>{t('shell.statusPanel.current')}</span>
+            <strong>{activePage.label}</strong>
+            <p>{activePage.description}</p>
+          </div>
+
+          <div className={styles.panelBlock}>
+            <span className={styles.panelLabel}>{t('shell.statusPanel.source')}</span>
+            <span className={styles.sourceBadge} data-tone={sourceTone}>
+              <span className={styles.statusDot} />
+              {sourceLabel}
+            </span>
+            <p>{sourceDetail}</p>
+          </div>
+
+          <div className={styles.panelBlock}>
+            <span className={styles.panelLabel}>{t('shell.statusPanel.routes')}</span>
+            <div className={styles.routeStack}>
+              {shellPages.map((page) => (
+                <button
+                  className={isActiveTab(page.path) ? styles.activeRouteItem : styles.routeItem}
+                  key={page.path}
+                  onClick={() => void router.navigate(page.path)}
+                  type="button"
+                >
+                  <span>{page.label}</span>
+                  <small>{page.path}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
+      </div>
     </div>
   );
+}
+
+function sourceToneFromStatus(status: SurfaceStatus): SourceTone {
+  if (status === 'catalogFallback') return 'catalog';
+  if (status === 'loginLocked') return 'locked';
+  if (status === 'demoFallback') return 'demo';
+  return 'error';
+}
+
+function sourceLabelKey(status: SurfaceStatus) {
+  if (status === 'catalogFallback') return 'surface.status.catalogFallback.label';
+  if (status === 'loginLocked') return 'surface.status.loginLocked.label';
+  if (status === 'demoFallback') return 'surface.status.demoFallback.label';
+  return 'surface.status.error.label';
+}
+
+function sourceDetailKey(status: SurfaceStatus) {
+  if (status === 'catalogFallback') return 'surface.status.catalogFallback.description';
+  if (status === 'loginLocked') return 'surface.status.loginLocked.description';
+  if (status === 'demoFallback') return 'surface.status.demoFallback.description';
+  return 'surface.status.error.description';
 }
