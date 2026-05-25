@@ -61,6 +61,11 @@ func (s *DeviceService) List(userID string) ([]model.Device, error) {
 	return devices, err
 }
 
+// ListDevices is an alias for List to match the handler interface.
+func (s *DeviceService) ListDevices(userID string) ([]model.Device, error) {
+	return s.List(userID)
+}
+
 // Update refreshes a device’s last-active timestamp, app version, and
 // capabilities.  Only fields that are provided should change.
 func (s *DeviceService) Update(deviceID, appVersion string, capabilities []string) error {

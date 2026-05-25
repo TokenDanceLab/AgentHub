@@ -18,6 +18,7 @@
   "agent.status.configuring": "Configuring",
   "agent.runtime.localEdge": "Local Edge",
   "agent.runtime.cliAdapter": "CLI adapter",
+  "agent.runtime.other": "Other",
   "agent.capability.streaming": "Streaming",
   "agent.capability.toolCalls": "Tool Calls",
   "agent.capability.fileChanges": "File Changes",

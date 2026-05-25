@@ -18,6 +18,10 @@ func (m *mockDeviceService) Register(deviceID, userID, deviceType, appVersion st
 	return m.registerFn(deviceID, userID, deviceType, appVersion, capabilities)
 }
 
+func (m *mockDeviceService) ListDevices(userID string) ([]model.Device, error) {
+	return nil, nil
+}
+
 func TestDeviceHandler_Register_Success(t *testing.T) {
 	svc := &mockDeviceService{
 		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
