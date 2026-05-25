@@ -445,3 +445,74 @@ func TestLoadYAMLEnvVarNotSetForNonSecretField(t *testing.T) {
 		t.Errorf("Server.LogLevel = %q, want info (from YAML, not env)", cfg.Server.LogLevel)
 	}
 }
+
+
+// #101: Reject known hardcoded JWT secrets in production.
+func TestJWTSecretKnownHardcodedRejected(t *testing.T) {
+	knownHardcoded := []string{
+		"dev-secret",
+		"test-secret",
+		"my-secret-key",
+		"changeme",
+		"secret",
+		"default",
+		"password",
+		"1234567890123456",
+		"aaaaaaaaaaaaaaaa",
+	}
+	for _, secret := range knownHardcoded {
+		t.Run("secret="+secret, func(t *testing.T) {
+			yaml := `
+jwt:
+  secret: ` + secret + `
+  access_ttl: 15m
+  refresh_ttl: 720h
+`
+			path := writeTempConfig(t, yaml)
+			// No env var set — hardcoded value should be rejected.
+			cfg, err := Load(path)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if err := cfg.Validate(); err == nil {
+				t.Errorf("expected error for hardcoded JWT secret %q, got nil", secret)
+			}
+		})
+	}
+}
+
+
+
+// #101: Known hardcoded secret overridden by env var should pass.
+func TestJWTSecretHardcodedOverriddenByEnv(t *testing.T) {
+	yaml := `
+server:
+  port: 8080
+db:
+  host: localhost
+  port: 5432
+  user: agenthub
+  name: agenthub
+redis:
+  host: localhost
+  port: 6379
+jwt:
+  secret: dev-secret
+  access_ttl: 15m
+  refresh_ttl: 720h
+`
+	path := writeTempConfig(t, yaml)
+	t.Setenv("AGENTHUB_JWT_SECRET", "real-production-secret!!")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.JWT.Secret != "real-production-secret!!" {
+		t.Errorf("JWT.Secret = %q, want real-production-secret!! (env override)", cfg.JWT.Secret)
+	}
+	// Validate should pass because env var overrides the hardcoded value.
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, expected success when env overrides hardcoded", err)
+	}
+}
