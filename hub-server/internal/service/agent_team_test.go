@@ -859,6 +859,13 @@ func TestAgentTeamService_GetTeamRunStateProjectsDependenciesAndBudget(t *testin
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
 	team, _, executor, run := seedAgentTeamRun(t, db)
+	reviewerProfileID := "profile-reviewer"
+	reviewer := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: &reviewerProfileID,
+		Role:           model.TeamMemberRoleReviewer,
+	}
+	require.NoError(t, repository.AddTeamMember(db, reviewer))
 	pending := &model.PendingAgentTask{
 		AgentInstanceID:   "agent-executor",
 		TriggeredByUserID: "user-1",
@@ -885,6 +892,23 @@ func TestAgentTeamService_GetTeamRunStateProjectsDependenciesAndBudget(t *testin
 		Objective:        "Child task",
 	}
 	require.NoError(t, repository.CreateTeamTask(db, child))
+	conflictingPending := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-reviewer",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "message-2",
+		Status:            model.TaskStatusDone,
+		EdgeRunID:         "edge-run-reviewer",
+		ExpireAt:          time.Now().Add(time.Hour),
+	}
+	require.NoError(t, db.Create(conflictingPending).Error)
+	conflictingTask := &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: reviewer.ID,
+		Status:           model.TeamTaskStatusDone,
+		Objective:        "Review same file",
+		RunID:            &conflictingPending.ID,
+	}
+	require.NoError(t, repository.CreateTeamTask(db, conflictingTask))
 
 	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
 		TaskID:          pending.ID,
@@ -926,6 +950,14 @@ func TestAgentTeamService_GetTeamRunStateProjectsDependenciesAndBudget(t *testin
 		EventType:       "run.agent.file_change",
 		Payload:         `{"path":"hub-server/internal/service/agent_team.go","action":"modified","toolName":"apply_patch","status":"completed"}`,
 	}))
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          conflictingPending.ID,
+		EdgeRunID:       "edge-run-reviewer",
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-reviewer",
+		EventType:       "run.agent.file_change",
+		Payload:         `{"path":"./hub-server/internal/service/agent_team.go","action":"modified","toolName":"review_patch","status":"completed"}`,
+	}))
 
 	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
 	require.NoError(t, err)
@@ -940,22 +972,34 @@ func TestAgentTeamService_GetTeamRunStateProjectsDependenciesAndBudget(t *testin
 	assert.Equal(t, int64(200000), state.Budget.TokenLimit)
 	assert.Equal(t, int64(198000), state.Budget.RemainingTokens)
 	assert.Equal(t, 86.5, state.Budget.UsagePercent)
-	assert.Equal(t, 1, state.Budget.RunCount)
+	assert.Equal(t, 2, state.Budget.RunCount)
 	assert.Equal(t, 1, state.Budget.ContextWarnings)
 	require.Len(t, state.Approvals, 1)
 	assert.Equal(t, pending.ID, state.Approvals[0].AgentTaskID)
+	assert.Equal(t, root.ID, state.Approvals[0].TeamTaskID)
+	assert.Equal(t, executor.ID, state.Approvals[0].MemberID)
 	assert.Equal(t, "req-1", state.Approvals[0].RequestID)
 	assert.Equal(t, "Bash", state.Approvals[0].ToolName)
 	assert.Equal(t, "tool-1", state.Approvals[0].ToolUseID)
 	assert.Equal(t, "allow", state.Approvals[0].Status)
 	assert.Equal(t, "safe command", state.Approvals[0].Reason)
 	require.NotNil(t, state.Approvals[0].DecidedAt)
-	require.Len(t, state.Artifacts, 1)
+	require.Len(t, state.Artifacts, 2)
 	assert.Equal(t, pending.ID, state.Artifacts[0].AgentTaskID)
+	assert.Equal(t, root.ID, state.Artifacts[0].TeamTaskID)
+	assert.Equal(t, executor.ID, state.Artifacts[0].MemberID)
 	assert.Equal(t, "hub-server/internal/service/agent_team.go", state.Artifacts[0].Path)
 	assert.Equal(t, "modified", state.Artifacts[0].Action)
 	assert.Equal(t, "apply_patch", state.Artifacts[0].ToolName)
 	assert.Equal(t, "completed", state.Artifacts[0].Status)
+	assert.Equal(t, state.Artifacts[0].ConflictID, state.Artifacts[1].ConflictID)
+	require.Len(t, state.Conflicts, 1)
+	assert.Equal(t, "hub-server/internal/service/agent_team.go", state.Conflicts[0].Path)
+	assert.Equal(t, "pending", state.Conflicts[0].Status)
+	assert.ElementsMatch(t, []string{pending.ID, conflictingPending.ID}, state.Conflicts[0].AgentTaskIDs)
+	assert.ElementsMatch(t, []string{root.ID, conflictingTask.ID}, state.Conflicts[0].TeamTaskIDs)
+	assert.ElementsMatch(t, []string{executor.ID, reviewer.ID}, state.Conflicts[0].MemberIDs)
+	assert.ElementsMatch(t, []string{"modified"}, state.Conflicts[0].Actions)
 }
 
 func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {

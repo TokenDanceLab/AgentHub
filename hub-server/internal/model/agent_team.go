@@ -293,6 +293,7 @@ type TeamRunState struct {
 	Assignments    []TeamAssignmentState      `json:"assignments"`
 	Approvals      []TeamApprovalState        `json:"approvals"`
 	Artifacts      []TeamArtifactState        `json:"artifacts"`
+	Conflicts      []TeamConflictState        `json:"conflicts"`
 	RunEvents      []TeamRunEventState        `json:"run_events"`
 	RouteLog       []CoordinatorRouteDecision `json:"route_log"`
 	Budget         *TeamBudget                `json:"budget,omitempty"`
@@ -332,26 +333,49 @@ type TeamTaskDependencyState struct {
 
 // TeamApprovalState summarizes approval requests and decisions in a TeamRun.
 type TeamApprovalState struct {
-	AgentTaskID string     `json:"agent_task_id"`
-	EdgeRunID   string     `json:"edge_run_id,omitempty"`
-	RequestID   string     `json:"request_id"`
-	ToolName    string     `json:"tool_name,omitempty"`
-	ToolUseID   string     `json:"tool_use_id,omitempty"`
-	Status      string     `json:"status"`
-	Reason      string     `json:"reason,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	DecidedAt   *time.Time `json:"decided_at,omitempty"`
+	AgentTaskID  string     `json:"agent_task_id"`
+	TeamTaskID   string     `json:"team_task_id,omitempty"`
+	AssignmentID string     `json:"assignment_id,omitempty"`
+	MemberID     string     `json:"member_id,omitempty"`
+	EdgeRunID    string     `json:"edge_run_id,omitempty"`
+	RequestID    string     `json:"request_id"`
+	ToolName     string     `json:"tool_name,omitempty"`
+	ToolUseID    string     `json:"tool_use_id,omitempty"`
+	Status       string     `json:"status"`
+	Reason       string     `json:"reason,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	DecidedAt    *time.Time `json:"decided_at,omitempty"`
 }
 
 // TeamArtifactState summarizes file/artifact-producing runtime events.
 type TeamArtifactState struct {
-	AgentTaskID string    `json:"agent_task_id"`
-	EdgeRunID   string    `json:"edge_run_id,omitempty"`
-	Path        string    `json:"path"`
-	Action      string    `json:"action,omitempty"`
-	ToolName    string    `json:"tool_name,omitempty"`
-	Status      string    `json:"status,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	AgentTaskID  string    `json:"agent_task_id"`
+	TeamTaskID   string    `json:"team_task_id,omitempty"`
+	AssignmentID string    `json:"assignment_id,omitempty"`
+	MemberID     string    `json:"member_id,omitempty"`
+	EdgeRunID    string    `json:"edge_run_id,omitempty"`
+	Path         string    `json:"path"`
+	Action       string    `json:"action,omitempty"`
+	ToolName     string    `json:"tool_name,omitempty"`
+	Status       string    `json:"status,omitempty"`
+	ConflictID   string    `json:"conflict_id,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// TeamConflictState summarizes a file-level conflict detected from multiple
+// task/member file-change events in one TeamRun.
+type TeamConflictState struct {
+	ConflictID    string    `json:"conflict_id"`
+	Path          string    `json:"path"`
+	Status        string    `json:"status"`
+	AgentTaskIDs  []string  `json:"agent_task_ids"`
+	TeamTaskIDs   []string  `json:"team_task_ids,omitempty"`
+	AssignmentIDs []string  `json:"assignment_ids,omitempty"`
+	MemberIDs     []string  `json:"member_ids,omitempty"`
+	EdgeRunIDs    []string  `json:"edge_run_ids,omitempty"`
+	Actions       []string  `json:"actions,omitempty"`
+	FirstSeenAt   time.Time `json:"first_seen_at"`
+	LastSeenAt    time.Time `json:"last_seen_at"`
 }
 
 // TeamAssignmentState is a resolved assignment with runtime info.

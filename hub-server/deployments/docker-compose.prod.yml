@@ -17,6 +17,9 @@ services:
     image: postgres:16-alpine
     container_name: agenthub-postgres
     restart: unless-stopped
+    mem_limit: ${AGENTHUB_POSTGRES_MEM_LIMIT:-512m}
+    cpus: ${AGENTHUB_POSTGRES_CPUS:-1.0}
+    pids_limit: ${AGENTHUB_POSTGRES_PIDS_LIMIT:-256}
     environment:
       POSTGRES_DB: ${AGENTHUB_DB_NAME:-agenthub}
       POSTGRES_USER: ${AGENTHUB_DB_USER:-agenthub}
@@ -45,6 +48,9 @@ services:
     image: redis:7-alpine
     container_name: agenthub-redis
     restart: unless-stopped
+    mem_limit: ${AGENTHUB_REDIS_CONTAINER_MEM_LIMIT:-384m}
+    cpus: ${AGENTHUB_REDIS_CPUS:-0.5}
+    pids_limit: ${AGENTHUB_REDIS_PIDS_LIMIT:-128}
     command: >
       redis-server
       --appendonly yes
@@ -79,6 +85,9 @@ services:
     pull_policy: never
     container_name: agenthub-hub
     restart: unless-stopped
+    mem_limit: ${AGENTHUB_HUB_MEM_LIMIT:-256m}
+    cpus: ${AGENTHUB_HUB_CPUS:-1.0}
+    pids_limit: ${AGENTHUB_HUB_PIDS_LIMIT:-256}
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,8 +106,8 @@ services:
       AGENTHUB_REDIS_PORT: "6379"
       AGENTHUB_REDIS_PASSWORD: ${AGENTHUB_REDIS_PASSWORD}
       AGENTHUB_REDIS_DB: "0"
-      AGENTHUB_REDIS_POOL_SIZE: "100"
-      AGENTHUB_REDIS_MIN_IDLE_CONNS: "10"
+      AGENTHUB_REDIS_POOL_SIZE: ${AGENTHUB_REDIS_POOL_SIZE:-20}
+      AGENTHUB_REDIS_MIN_IDLE_CONNS: ${AGENTHUB_REDIS_MIN_IDLE_CONNS:-2}
       # JWT（生产环境必须设置强密钥）
       AGENTHUB_JWT_SECRET: ${AGENTHUB_JWT_SECRET:?必须设置 AGENTHUB_JWT_SECRET（至少32字符）}
       AGENTHUB_JWT_ACCESS_TTL: ${AGENTHUB_JWT_ACCESS_TTL:-15m}

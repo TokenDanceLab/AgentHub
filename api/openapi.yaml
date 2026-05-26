@@ -4681,6 +4681,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TeamArtifactState"
+        conflicts:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamConflictState"
         run_events:
           type: array
           items:
@@ -4735,6 +4739,9 @@ components:
       type: object
       properties:
         agent_task_id: { type: string, format: uuid }
+        team_task_id: { type: string, format: uuid }
+        assignment_id: { type: string, format: uuid }
+        member_id: { type: string, format: uuid }
         edge_run_id: { type: string }
         request_id: { type: string }
         tool_name: { type: string }
@@ -4748,12 +4755,45 @@ components:
       type: object
       properties:
         agent_task_id: { type: string, format: uuid }
+        team_task_id: { type: string, format: uuid }
+        assignment_id: { type: string, format: uuid }
+        member_id: { type: string, format: uuid }
         edge_run_id: { type: string }
         path: { type: string }
         action: { type: string }
         tool_name: { type: string }
         status: { type: string }
+        conflict_id: { type: string }
         created_at: { type: string, format: date-time }
+
+    TeamConflictState:
+      type: object
+      properties:
+        conflict_id: { type: string }
+        path: { type: string }
+        status:
+          type: string
+          enum: [pending, resolved]
+        agent_task_ids:
+          type: array
+          items: { type: string, format: uuid }
+        team_task_ids:
+          type: array
+          items: { type: string, format: uuid }
+        assignment_ids:
+          type: array
+          items: { type: string, format: uuid }
+        member_ids:
+          type: array
+          items: { type: string, format: uuid }
+        edge_run_ids:
+          type: array
+          items: { type: string }
+        actions:
+          type: array
+          items: { type: string }
+        first_seen_at: { type: string, format: date-time }
+        last_seen_at: { type: string, format: date-time }
 
     TeamAssignmentState:
       type: object
