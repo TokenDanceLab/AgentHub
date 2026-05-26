@@ -257,12 +257,12 @@ Desktop App
 |---|---|---|
 | 1. Desktop 本地离线 | ✅ 已实现 | Desktop -> Local Edge -> Claude Code / Codex / OpenCode 本地运行闭环成立，不依赖 Hub。 |
 | 2. Desktop 本地在线 | 🟡 基本实现 | Hub OIDC exchange、Hub-local session、WS auth 和设备注册链路已在仓内落地；部署态 login/logout/reconnect 与截图证据仍需补齐。 |
-| 3. Desktop 直连远程 Desktop | ❌ 未实现 | Remote Edge over SSH/Tailscale 还缺目标注册、路由、授权、workspace allowlist 和远程审批证明。 |
+| 3. Desktop 直连远程 Desktop | ❌ 未实现 | Local Edge 已有 `/v1/runs` workspace allowlist 护栏；Remote Edge over SSH/Tailscale 仍缺目标注册、路由、授权、远程 allowlist 同步和远程审批证明。 |
 | 4. Desktop 中继到远程 Desktop | ❌ 未实现 | Hub Relay 到任意远程 Desktop Edge 还不是通用产品链路。 |
 | 5. Desktop 直连云 | ❌ 未实现 | Cloud Edge / hosted target 仍是架构目标。 |
 | 6. Desktop 中继到云 | ❌ 未实现 | Hub -> Cloud Edge 调度、租户隔离、凭据隔离和资源限额未落地。 |
 | 7. Web 中继到 Desktop | 🟡 最小闭环 | Web -> Hub task -> Desktop bridge -> Local Edge -> typed stream / replay -> Web 已在仓内打通；仍需部署态 smoke、Web session 姿态和 live E2E 截图。 |
-| 8. Web 中继到云 | ❌ 未实现 | 依赖 Cloud Edge 注册、Hub relay routing、workspace allowlist 和审计闭环。 |
+| 8. Web 中继到云 | ❌ 未实现 | 依赖 Cloud Edge 注册、Hub relay routing、云端 workspace policy 和审计闭环。 |
 
 因此当前可对外表达为：本地执行闭环已完成，Web 控制当前 Desktop 的仓内最小闭环已完成；远程和云相关能力仍在 P3/P4，不应写成 8/8。
 
@@ -429,7 +429,7 @@ REST snapshot 至少应能按 Project、Thread、Run、Item、Artifact 重建 UI
 | P0 | Desktop UI -> Local Edge -> AgentAdapter -> Agent CLI (完整闭环) | ✅ |
 | P1 | Local Edge + 多 Agent Thread | 已完成 |
 | P2 | Edge <-> Hub 同步，TokenDance ID 登录，Web/Mobile 查看和审批 | 进行中：Hub OIDC code exchange 与 Hub-local session 已在 repo 落地；部署配置、Desktop/Web 回调 UX、logout/reconnect 和授权证据仍需闭环 |
-| P3 | Hub Relay -> Local/Remote/Cloud Edge -> AgentAdapter，远程控制和预览代理 | 规划中（Q3）；Execution Target 基础 CRUD 已有，但远程/云 target 注册、workspace allowlist、relay routing 和远程审批未完成 |
+| P3 | Hub Relay -> Local/Remote/Cloud Edge -> AgentAdapter，远程控制和预览代理 | 规划中（Q3）；Execution Target 基础 CRUD、policy 字段和 Local Edge workspace allowlist 护栏已有，但远程/云 target 注册、allowlist 同步、relay routing 和远程审批未完成 |
 | P4 | 完整团队 IM、Agent 市场、Skill/MCP 管理、模型配置和安全审计 | 规划中 |
 
 ## 11. 文档分层
