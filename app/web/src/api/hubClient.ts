@@ -255,6 +255,42 @@ export interface AgentProfileListResponse {
   };
 }
 
+// ── Execution targets ───────────────────────────
+
+export type ExecutionTargetType = 'local_edge' | 'hub_relay' | 'remote_ssh' | 'tailscale' | 'cloud_edge';
+export type ExecutionTargetTrustLevel = 'local' | 'remote' | 'cloud' | 'relay';
+export type ExecutionTargetHealthState = 'unknown' | 'healthy' | 'degraded' | 'offline';
+
+export interface ExecutionTarget {
+  id: string;
+  owner_id?: string;
+  device_id?: string;
+  name: string;
+  target_type: ExecutionTargetType;
+  endpoint?: string;
+  host?: string;
+  port?: number | string;
+  workspace_root?: string;
+  capabilities?: string;
+  metadata?: string;
+  workspace_allowlist?: string[] | string;
+  trust_level?: ExecutionTargetTrustLevel;
+  health_state?: ExecutionTargetHealthState;
+  auth_method?: string;
+  is_online?: boolean;
+  last_seen_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ExecutionTargetListResponse {
+  items: ExecutionTarget[];
+  page: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
+}
+
 // ── Auth ─────────────────────────────────────────
 
 export interface OIDCAuthorizeRequest {
@@ -743,6 +779,18 @@ export function createHubClient(opts: HubClientOptions = {}) {
       pageSize?: number;
     }) =>
       request<AgentProfileListResponse>(`/web/agent-profiles${qs(params ?? {})}`),
+
+    // ── Execution targets ────────────────────────
+
+    listExecutionTargets: (params?: {
+      target_type?: ExecutionTargetType | string;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<ExecutionTargetListResponse>(`/web/execution-targets${qs(params ?? {})}`),
+
+    pingExecutionTarget: (id: string) =>
+      request<void>(`/web/execution-targets/${encodeURIComponent(id)}/ping`, { method: 'POST' }),
   };
 }
 

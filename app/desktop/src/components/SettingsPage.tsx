@@ -38,6 +38,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useHubStore } from '@/stores/hubStore';
 import { APP_VERSION, HUB_URL } from '@/config';
 import { useAgentList } from '@/api/agentQueries';
+import { useHubExecutionTargets, usePingHubExecutionTarget } from '@/api/executionTargetQueries';
 import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,6 +51,7 @@ import {
   type ResolvedRunModelSettings,
 } from '@/stores/modelSettingsStore';
 import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
+import type { ExecutionTarget, ExecutionTargetHealthState, ExecutionTargetType } from '@/api/hubClient';
 import styles from './SettingsPage.module.css';
 
 export type SectionId =
@@ -243,10 +245,46 @@ function readBrowserStorage(storage: 'local' | 'session', key: string) {
   }
 }
 
+function isHubTargetConnected(target: ExecutionTarget) {
+  return target.is_online || target.health_state === 'healthy';
+}
+
+function filterTargetsByType(targets: ExecutionTarget[], types: ExecutionTargetType[]) {
+  const typeSet = new Set<ExecutionTargetType>(types);
+  return targets.filter((target) => typeSet.has(target.target_type));
+}
+
+function countTargetsByHealth(targets: ExecutionTarget[], health: ExecutionTargetHealthState) {
+  return targets.filter((target) => (target.health_state ?? 'unknown') === health).length;
+}
+
+function getTargetGroupHealth(targets: ExecutionTarget[]): ExecutionTargetHealthState {
+  if (targets.some((target) => target.health_state === 'healthy' || target.is_online)) return 'healthy';
+  if (targets.some((target) => target.health_state === 'degraded')) return 'degraded';
+  if (targets.some((target) => target.health_state === 'offline')) return 'offline';
+  return 'unknown';
+}
+
+function formatTargetEndpoint(target: ExecutionTarget) {
+  if (target.host && target.port) return `${target.host}:${target.port}`;
+  if (target.host) return target.host;
+  if (target.workspace_root) return target.workspace_root;
+  if (target.device_id) return shortId(target.device_id);
+  return '';
+}
+
 export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'general' }: Props) {
   const { t } = useTranslation();
   const { themeMode, setThemeMode } = useTheme();
   const hubAuth = useAuth();
+  const hubInventoryEnabled = hubAuth.isAuthenticated && Boolean(hubAuth.token);
+  const hubTargetsQuery = useHubExecutionTargets({
+    enabled: hubInventoryEnabled,
+    getToken: () => hubAuth.token,
+  });
+  const pingHubTargetMutation = usePingHubExecutionTarget({
+    getToken: () => hubAuth.token,
+  });
   const { online: edgeOnline, health } = useHealth();
   const { data: agentData } = useAgentList(edgeOnline);
   const {
@@ -323,6 +361,49 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const runnerSummary = edgeOnline
     ? t('settings.runnerSummary', { available: availableRunners, total: totalRunners })
     : t('settings.edgeOffline');
+  const hubTargets = hubTargetsQuery.data?.items ?? [];
+  const hubOnlineTargets = hubTargets.filter(isHubTargetConnected).length;
+  const hubHealthyTargets = countTargetsByHealth(hubTargets, 'healthy');
+  const hubDegradedTargets = countTargetsByHealth(hubTargets, 'degraded');
+  const hubOfflineTargets = countTargetsByHealth(hubTargets, 'offline');
+  const hubUnknownTargets = countTargetsByHealth(hubTargets, 'unknown');
+  const hubRelayTargets = filterTargetsByType(hubTargets, ['hub_relay']);
+  const remoteHubTargets = filterTargetsByType(hubTargets, ['remote_ssh', 'tailscale']);
+  const cloudHubTargets = filterTargetsByType(hubTargets, ['cloud_edge']);
+  const hubTargetErrorMessage = hubTargetsQuery.error instanceof Error
+    ? hubTargetsQuery.error.message
+    : t('settings.targetHubErrorDesc');
+  const hubTargetInventoryDetail = !hubInventoryEnabled
+    ? t('settings.targetHubSignedOutDesc')
+    : hubTargetsQuery.isLoading
+      ? t('settings.targetHubLoading')
+      : hubTargetsQuery.isError
+        ? t('settings.targetHubError')
+        : hubTargets.length > 0
+          ? t('settings.targetCountSummary', { online: hubOnlineTargets, total: hubTargets.length })
+          : t('settings.targetHubEmpty');
+  const targetHealthBreakdown = t('settings.targetHealthBreakdown', {
+    healthy: hubHealthyTargets,
+    degraded: hubDegradedTargets,
+    offline: hubOfflineTargets,
+    unknown: hubUnknownTargets,
+  });
+  const getHubTargetGroupStatus = (targets: ExecutionTarget[]) => {
+    if (!hubInventoryEnabled) return t('settings.targetHubSignInRequired');
+    if (hubTargetsQuery.isLoading) return t('settings.targetHubLoading');
+    if (hubTargetsQuery.isError) return t('settings.targetHubError');
+    if (targets.length === 0) return t('settings.targetHubEmpty');
+    return t(`settings.targetHealth.${getTargetGroupHealth(targets)}`);
+  };
+  const getHubTargetGroupMetric = (targets: ExecutionTarget[]) => {
+    if (!hubInventoryEnabled) return t('settings.targetHubSignInRequired');
+    if (hubTargetsQuery.isLoading) return t('settings.targetHubLoading');
+    if (hubTargetsQuery.isError) return t('settings.targetHubError');
+    return t('settings.targetCountSummary', {
+      online: targets.filter(isHubTargetConnected).length,
+      total: targets.length,
+    });
+  };
   const runs = runData?.items ?? [];
   const activeRuns = runs.filter(isActiveRun).length;
   const latestRun = getRecentRuns(runs, 1)[0];
@@ -333,7 +414,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const schedulerTotalItems = runs.length + bridgedTasks.length;
   const schedulerTargetReadyCount = [
     edgeOnline,
-    hubAuthenticated,
+    hubOnlineTargets > 0,
     remoteControlEnabled,
     false,
   ].filter(Boolean).length;
@@ -694,6 +775,26 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'executionTargets' && (
             <Panel title={t('settings.executionTargets')} description={t('settings.executionTargetsDesc')}>
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<Monitor size={18} />}
+                  label={t('settings.targetLocalInventory')}
+                  value={`${availableRunners}/${totalRunners}`}
+                  detail={edgeOnline ? runnerSummary : t('settings.edgeOffline')}
+                />
+                <SummaryCard
+                  icon={<Globe2 size={18} />}
+                  label={t('settings.targetHubInventory')}
+                  value={hubTargetsQuery.isLoading ? t('settings.loading') : `${hubOnlineTargets}/${hubTargets.length}`}
+                  detail={hubTargetInventoryDetail}
+                />
+                <SummaryCard
+                  icon={<ShieldCheck size={18} />}
+                  label={t('settings.targetHubHealth')}
+                  value={hubTargets.length > 0 ? `${hubHealthyTargets}/${hubTargets.length}` : t('settings.noData')}
+                  detail={targetHealthBreakdown}
+                />
+              </div>
               <div className={styles.targetGrid}>
                 <ExecutionTargetCard
                   icon={<Monitor size={18} />}
@@ -707,23 +808,25 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   icon={<Globe2 size={18} />}
                   title={t('settings.targetHubRelay')}
                   description={t('settings.targetHubRelayDesc')}
-                  status={hubAuthenticated ? t('settings.enabled') : t('settings.notConfigured')}
-                  metric={hubAuthenticated ? t('settings.targetHubSignedIn') : t('settings.targetHubSignInRequired')}
-                  connected={hubAuthenticated}
+                  status={getHubTargetGroupStatus(hubRelayTargets)}
+                  metric={getHubTargetGroupMetric(hubRelayTargets)}
+                  connected={hubRelayTargets.some(isHubTargetConnected)}
                 />
                 <ExecutionTargetCard
                   icon={<Server size={18} />}
                   title={t('settings.targetSsh')}
                   description={t('settings.targetSshDesc')}
-                  status={t('settings.statusPlanned')}
-                  metric="SSH / Tailscale"
+                  status={getHubTargetGroupStatus(remoteHubTargets)}
+                  metric={getHubTargetGroupMetric(remoteHubTargets)}
+                  connected={remoteHubTargets.some(isHubTargetConnected)}
                 />
                 <ExecutionTargetCard
                   icon={<Computer size={18} />}
                   title={t('settings.targetCloudEdge')}
                   description={t('settings.targetCloudEdgeDesc')}
-                  status={t('settings.statusPlanned')}
-                  metric="Cloud Edge"
+                  status={getHubTargetGroupStatus(cloudHubTargets)}
+                  metric={getHubTargetGroupMetric(cloudHubTargets)}
+                  connected={cloudHubTargets.some(isHubTargetConnected)}
                 />
               </div>
               {runnerItems.length > 0 ? (
@@ -733,6 +836,35 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               ) : (
                 <Callout title={t('settings.runnerInventory')} body={t('settings.runnerInventoryDesc')} />
               )}
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.targetHubInventory')}</strong>
+                  <span>{t('settings.targetHubInventoryDesc')}</span>
+                </div>
+                {!hubInventoryEnabled ? (
+                  <EmptyBlock
+                    title={t('settings.targetHubSignInRequired')}
+                    description={t('settings.targetHubSignedOutDesc')}
+                  />
+                ) : hubTargetsQuery.isLoading ? (
+                  <EmptyBlock title={t('settings.targetHubLoading')} description={t('settings.targetHubLoadingDesc')} />
+                ) : hubTargetsQuery.isError ? (
+                  <EmptyBlock title={t('settings.targetHubError')} description={hubTargetErrorMessage} />
+                ) : hubTargets.length > 0 ? (
+                  <div className={styles.runnerList}>
+                    {hubTargets.map((target) => (
+                      <HubExecutionTargetRow
+                        key={target.id}
+                        target={target}
+                        pinging={pingHubTargetMutation.isPending && pingHubTargetMutation.variables === target.id}
+                        onPing={(targetId) => pingHubTargetMutation.mutate(targetId)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.targetHubEmpty')} description={t('settings.targetHubEmptyDesc')} />
+                )}
+              </div>
             </Panel>
           )}
 
@@ -2065,6 +2197,63 @@ function RunnerRow({ runner }: { runner: RunnerHealthItem }) {
       <span className={`${styles.statusPill} ${runner.status === 'online' ? styles.statusPillOn : ''}`}>
         {runner.status}
       </span>
+    </div>
+  );
+}
+
+function HubExecutionTargetRow({
+  target,
+  pinging,
+  onPing,
+}: {
+  target: ExecutionTarget;
+  pinging: boolean;
+  onPing: (targetId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const health = target.health_state ?? 'unknown';
+  const endpoint = formatTargetEndpoint(target);
+
+  return (
+    <div className={styles.runnerRow}>
+      <div className={styles.connectionIcon}>
+        {target.target_type === 'cloud_edge' ? (
+          <Computer size={17} />
+        ) : target.target_type === 'hub_relay' ? (
+          <Globe2 size={17} />
+        ) : (
+          <Server size={17} />
+        )}
+      </div>
+      <div className={styles.settingCopy}>
+        <strong>{target.name}</strong>
+        <span>{t(`settings.targetType.${target.target_type}`, { defaultValue: target.target_type })}</span>
+        <div className={styles.taskMeta}>
+          {target.trust_level ? (
+            <span>{t(`settings.targetTrust.${target.trust_level}`, { defaultValue: target.trust_level })}</span>
+          ) : null}
+          {endpoint ? <span>{endpoint}</span> : null}
+          <span>
+            {target.last_seen_at
+              ? t('settings.targetLastSeen', { time: formatTimestamp(target.last_seen_at) })
+              : t('settings.targetNeverSeen')}
+          </span>
+        </div>
+      </div>
+      <span className={`${styles.statusPill} ${isHubTargetConnected(target) ? styles.statusPillOn : ''}`}>
+        {t(`settings.targetHealth.${health}`, { defaultValue: health })}
+      </span>
+      <button
+        type="button"
+        className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
+        onClick={() => onPing(target.id)}
+        disabled={pinging}
+        aria-label={t('settings.targetPing')}
+        title={t('settings.targetPing')}
+      >
+        <RefreshCw size={15} />
+        {pinging ? t('settings.targetPinging') : t('settings.targetPing')}
+      </button>
     </div>
   );
 }
