@@ -166,6 +166,30 @@ export interface AddAgentToSessionRequest {
   display_name: string;
 }
 
+export interface PendingAgentTask {
+  id: string;
+  agent_instance_id: string;
+  triggered_by_user_id: string;
+  trigger_message_id: string;
+  target_id?: string;
+  status: string;
+  edge_run_id?: string;
+  edge_device_id?: string;
+  error_message?: string;
+  created_at?: string;
+  dispatched_at?: string;
+  finished_at?: string;
+  expire_at?: string;
+}
+
+export interface TriggerAgentTaskOptions {
+  agent_instance_id?: string;
+  agent_type?: string;
+  custom_agent_id?: string;
+  model_params?: string;
+  target_id?: string;
+}
+
 export interface AgentTaskStreamEventOptions {
   runId?: string;
   clientMsgId?: string;
@@ -681,10 +705,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
         body: JSON.stringify(data),
       }),
 
-    triggerAgentTask: (triggerMessageId: string) =>
-      request<Record<string, unknown>>('/web/agent-tasks', {
+    triggerAgentTask: (triggerMessageId: string, options: TriggerAgentTaskOptions = {}) =>
+      request<PendingAgentTask>('/web/agent-tasks', {
         method: 'POST',
-        body: JSON.stringify({ trigger_message_id: triggerMessageId }),
+        body: JSON.stringify({ trigger_message_id: triggerMessageId, ...options }),
       }),
 
     cancelAgentTask: (taskId: string) =>

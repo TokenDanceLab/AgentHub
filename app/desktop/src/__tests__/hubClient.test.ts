@@ -315,6 +315,31 @@ describe('hubClient', () => {
       expect(url).toBe('http://test.local/web/execution-targets/target-relay-1/ping');
       expect(init.method).toBe('POST');
     });
+
+    it('passes target_id when triggering a Hub agent task', async () => {
+      const fetchSpy = mockFetch(200, {
+        code: 'ok',
+        data: {
+          id: 'task-1',
+          agent_instance_id: 'agent-1',
+          triggered_by_user_id: 'user_1',
+          trigger_message_id: 'msg-1',
+          target_id: 'target-relay-1',
+          status: 'queued',
+        },
+      });
+
+      const res = await client.triggerAgentTask('msg-1', { target_id: 'target-relay-1' });
+
+      expect(res.target_id).toBe('target-relay-1');
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('http://test.local/web/agent-tasks');
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(init.body as string)).toEqual({
+        trigger_message_id: 'msg-1',
+        target_id: 'target-relay-1',
+      });
+    });
   });
 
   describe('baseUrl handling', () => {

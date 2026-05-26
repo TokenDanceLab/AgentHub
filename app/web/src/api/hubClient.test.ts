@@ -137,4 +137,37 @@ describe('createHubClient', () => {
       }),
     );
   });
+
+  it('passes target_id when triggering a Hub agent task', async () => {
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify({
+        code: 'ok',
+        data: {
+          id: 'task-1',
+          agent_instance_id: 'agent-1',
+          triggered_by_user_id: 'user-1',
+          trigger_message_id: 'msg-1',
+          target_id: 'target-1',
+          status: 'queued',
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createHubClient({
+      baseUrl: 'https://hub.example.test',
+      getToken: () => 'hub-access',
+    });
+    const res = await client.triggerAgentTask('msg-1', { target_id: 'target-1' });
+
+    expect(res.target_id).toBe('target-1');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://hub.example.test/web/agent-tasks',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ trigger_message_id: 'msg-1', target_id: 'target-1' }),
+      }),
+    );
+  });
 });
