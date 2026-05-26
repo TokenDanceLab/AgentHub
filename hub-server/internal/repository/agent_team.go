@@ -108,6 +108,13 @@ func UpdateAssignmentStatus(db *gorm.DB, id string, status string, result string
 	return db.Model(&model.AgentTeamAssignment{}).Where("id = ?", id).Updates(updates).Error
 }
 
+func UpdateAssignmentDispatchBinding(db *gorm.DB, id, pendingTaskID string) error {
+	return db.Model(&model.AgentTeamAssignment{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"status": model.AssignmentStatusDispatched,
+		"run_id": pendingTaskID,
+	}).Error
+}
+
 func CountActiveAssignmentsByMember(db *gorm.DB, memberID string) (int64, error) {
 	var count int64
 	err := db.Model(&model.AgentTeamAssignment{}).
@@ -150,6 +157,19 @@ func ListTeamTasksByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamTask, e
 	var tasks []model.AgentTeamTask
 	err := db.Where("team_run_id = ?", teamRunID).Order("created_at ASC").Find(&tasks).Error
 	return tasks, err
+}
+
+func GetTeamTaskByAssignmentID(db *gorm.DB, assignmentID string) (*model.AgentTeamTask, error) {
+	var task model.AgentTeamTask
+	err := db.Where("assignment_id = ?", assignmentID).First(&task).Error
+	return &task, err
+}
+
+func UpdateTeamTaskDispatchBinding(db *gorm.DB, id, pendingTaskID string) error {
+	return db.Model(&model.AgentTeamTask{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"status": model.TeamTaskStatusDispatched,
+		"run_id": pendingTaskID,
+	}).Error
 }
 
 // AgentTeamEvent
