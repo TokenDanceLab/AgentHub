@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hubMessageToChatMessage } from './hubAdapters';
+import { hubMessageToChatMessage, projectRunDetail } from './hubAdapters';
 
 describe('hubMessageToChatMessage runtime payloads', () => {
   it('renders bridged tool calls as tool blocks instead of JSON text', () => {
@@ -73,5 +73,76 @@ describe('hubMessageToChatMessage runtime payloads', () => {
     });
 
     expect(message.blocks).toEqual([{ kind: 'text', content: 'not a tool result' }]);
+  });
+
+  it('projects runtime blocks into RunDetail data', () => {
+    const messages = [
+      hubMessageToChatMessage({
+        id: 'msg-text',
+        session_id: 'sess-1',
+        sender_type: 'agent',
+        created_at: '2026-05-26T10:00:00.000Z',
+        content_type: 'text',
+        content: JSON.stringify({ content: 'analysis complete' }),
+      }),
+      hubMessageToChatMessage({
+        id: 'msg-tool-call',
+        session_id: 'sess-1',
+        sender_type: 'agent',
+        created_at: '2026-05-26T10:00:01.000Z',
+        content_type: 'text',
+        content: JSON.stringify({
+          callId: 'call-1',
+          toolName: 'Bash',
+          input: { command: 'pnpm test' },
+          status: 'running',
+        }),
+      }),
+      hubMessageToChatMessage({
+        id: 'msg-tool-result',
+        session_id: 'sess-1',
+        sender_type: 'agent',
+        created_at: '2026-05-26T10:00:02.000Z',
+        content_type: 'text',
+        content: JSON.stringify({
+          callId: 'call-1',
+          toolName: 'Bash',
+          output: 'all tests passed',
+          status: 'completed',
+        }),
+      }),
+      hubMessageToChatMessage({
+        id: 'msg-file',
+        session_id: 'sess-1',
+        sender_type: 'agent',
+        created_at: '2026-05-26T10:00:03.000Z',
+        content_type: 'text',
+        content: JSON.stringify({
+          path: 'src/App.tsx',
+          action: 'modified',
+          diff: '@@ -1 +1 @@',
+        }),
+      }),
+    ];
+
+    expect(projectRunDetail(messages)).toEqual({
+      outputText: 'analysis complete',
+      toolCalls: [
+        {
+          callId: 'call-1',
+          toolName: 'Bash',
+          status: 'completed',
+          timestamp: '2026-05-26T10:00:01.000Z',
+          output: 'all tests passed',
+        },
+      ],
+      changedFiles: [
+        {
+          path: 'src/App.tsx',
+          action: 'modified',
+          timestamp: '2026-05-26T10:00:03.000Z',
+        },
+      ],
+    });
   });
 });

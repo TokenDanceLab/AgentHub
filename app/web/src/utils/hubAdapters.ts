@@ -23,6 +23,20 @@ export interface HubThreadInfo extends ThreadInfo {
   sessionType: string;
 }
 
+export interface RunDetailToolCall {
+  callId: string;
+  toolName: string;
+  status: string;
+  timestamp: string;
+  output?: string;
+}
+
+export interface RunDetailProjection {
+  outputText: string;
+  toolCalls: RunDetailToolCall[];
+  changedFiles: Array<{ path: string; action: string; timestamp: string }>;
+}
+
 export function newClientMessageId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -166,6 +180,82 @@ function runtimePayloadToBlocks(content: unknown): MessageBlock[] | null {
   }
 
   return null;
+}
+
+function toolResultOutput(children: Extract<MessageBlock, { kind: 'tool_use' }>['children']): string | undefined {
+  if (!children || children.length === 0) return undefined;
+  const output = children
+    .map((child) => {
+      switch (child.kind) {
+        case 'read_result':
+          return child.content ?? `${child.filePath} (${child.lineCount} lines)`;
+        case 'write_result':
+        case 'edit_result':
+          return child.diff ? JSON.stringify(child.diff) : child.filePath;
+        case 'bash_result':
+          return [child.stdout, child.stderr].filter(Boolean).join('\n');
+        case 'generic_result':
+          return child.output;
+        default:
+          return '';
+      }
+    })
+    .filter(Boolean)
+    .join('\n');
+  return output || undefined;
+}
+
+export function projectRunDetail(messages: ChatMessage[]): RunDetailProjection {
+  const outputParts: string[] = [];
+  const toolCallsById = new Map<string, RunDetailToolCall>();
+  const changedFiles: RunDetailProjection['changedFiles'] = [];
+
+  for (const message of messages) {
+    if (message.role !== 'agent') continue;
+
+    for (const block of message.blocks) {
+      switch (block.kind) {
+        case 'text':
+        case 'code':
+          if (block.content.trim()) outputParts.push(block.content);
+          break;
+
+        case 'tool_use': {
+          const existing = toolCallsById.get(block.callId);
+          const output = toolResultOutput(block.children);
+          const mergedOutput = output ?? existing?.output;
+          const projected: RunDetailToolCall = {
+            callId: block.callId,
+            toolName: existing?.toolName && existing.toolName !== 'Tool result'
+              ? existing.toolName
+              : block.toolName,
+            status: block.status,
+            timestamp: existing?.timestamp ?? message.timestamp,
+          };
+          if (mergedOutput) projected.output = mergedOutput;
+          toolCallsById.set(block.callId, projected);
+          break;
+        }
+
+        case 'file_change':
+          changedFiles.push({
+            path: block.path,
+            action: block.action,
+            timestamp: message.timestamp,
+          });
+          break;
+
+        default:
+          break;
+      }
+    }
+  }
+
+  return {
+    outputText: outputParts.join('\n\n'),
+    toolCalls: [...toolCallsById.values()],
+    changedFiles,
+  };
 }
 
 export function hubMessageToChatMessage(msg: HubMessageLike): ChatMessage {
