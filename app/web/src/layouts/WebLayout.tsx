@@ -59,14 +59,27 @@ function resolveHubAgentType(agent?: AgentInfo): string {
   return 'codex';
 }
 
+function stringFromRecord(record: Record<string, unknown> | undefined, keys: string[]): string | undefined {
+  if (!record) return undefined;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return undefined;
+}
+
 function resolveHubModelParams(agent?: AgentInfo, opts?: { model?: string; reasoningEffort?: string }): string | undefined {
-  const params: Record<string, string> = {};
+  const params: Record<string, unknown> = {};
   const model = agent?.model || opts?.model;
   const provider = agent?.provider;
   const reasoningEffort = agent?.reasoningEffort || opts?.reasoningEffort;
+  const workDir = stringFromRecord(agent?.targetPreferences, ['work_dir', 'workDir']);
   if (model) params.model = model;
   if (provider) params.provider = provider;
   if (reasoningEffort) params.reasoning_effort = reasoningEffort;
+  if (agent?.permissionMode) params.permission_mode = agent.permissionMode;
+  if (agent?.toolAllowlist?.length) params.tool_allowlist = agent.toolAllowlist;
+  if (workDir) params.work_dir = workDir;
   return Object.keys(params).length > 0 ? JSON.stringify(params) : undefined;
 }
 
