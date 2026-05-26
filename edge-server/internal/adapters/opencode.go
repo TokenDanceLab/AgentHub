@@ -1,7 +1,6 @@
 package adapters
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"io"
@@ -129,25 +128,15 @@ func (a *OpenCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, std
 		"runId":     run.ID,
 	}
 
-	scanner := bufio.NewScanner(stdout)
-	configureAdapterScanner(scanner)
-
-	for scanner.Scan() {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
+	return ScanLines(ctx, stdout, func(line []byte) error {
 		var evt opencodeEvent
 		if err := json.Unmarshal(line, &evt); err != nil {
 			slog.Debug("opencode: skipping unparseable line", "err", err)
-			continue
+			return nil
 		}
 		a.dispatch(scope, emitter, &evt)
-	}
-	return scanner.Err()
+		return nil
+	})
 }
 
 // NeedsStdin returns false — OpenCode runs in batch mode with the prompt

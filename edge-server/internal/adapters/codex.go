@@ -1,7 +1,6 @@
 package adapters
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"io"
@@ -132,21 +131,10 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 		"runId":     run.ID,
 	}
 
-	scanner := bufio.NewScanner(stdout)
-	configureAdapterScanner(scanner)
-
 	jsonlMode := false
 	offset := 0
 
-	for scanner.Scan() {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
-
+	return ScanLines(ctx, stdout, func(line []byte) error {
 		if !jsonlMode {
 			var probe json.RawMessage
 			if json.Unmarshal(line, &probe) == nil {
@@ -163,7 +151,7 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 					"offset":  offset,
 				})
 				offset += len(line)
-				continue
+				return nil
 			}
 			a.dispatchCodexEvent(scope, emitter, &evt)
 		} else {
@@ -174,8 +162,8 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 			})
 			offset += len(line)
 		}
-	}
-	return scanner.Err()
+		return nil
+	})
 }
 
 // NeedsStdin returns false — Codex uses JSONL output via --json flag

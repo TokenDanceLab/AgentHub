@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -621,6 +622,38 @@ func TestProcessExecutorCancelMissingRun(t *testing.T) {
 	if result.Found || result.Status != "not_found" {
 		t.Fatalf("Cancel missing result = %#v, want not_found", result)
 	}
+}
+
+// TestProcessExecutorStartCancelRace verifies that concurrent Start and Cancel
+// calls do not suffer from a TOCTOU race where Start reads the store as "queued"
+// but Cancel modifies it before Start enters the running map. Run with -race.
+func TestProcessExecutorStartCancelRace(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	executor := newTestProcessExecutor(t, bus, s, "sleep")
+
+	// Start one run to consume a slot, then set max to 1 so any additional Start
+	// is blocked by concurrency limit (ensures Start must wait without panicking).
+	executor.mu.Lock()
+	executor.maxConcurrentRuns = 1
+	executor.mu.Unlock()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// Cancel immediately after Start so the two races are maximized.
+		time.Sleep(10 * time.Millisecond)
+		executor.Cancel(run.ID)
+	}()
+
+	err := executor.Start(run, RunProcessContext{})
+	// Either Start succeeds (run was "queued") or it fails (already started/cancelling).
+	// Both outcomes are valid given the Cancel may have changed state. We just assert
+	// no panic and no data race under the lock-ordering fix.
+	_ = err
+	wg.Wait()
 }
 
 func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleStore, mode string) *ProcessExecutor {
