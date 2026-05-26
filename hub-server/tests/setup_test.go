@@ -109,10 +109,12 @@ func TestMain(m *testing.M) {
 	auditHandler := handler.NewAuditHandler(auditService)
 	relayService := service.NewRelayService(cacheClient, mgr)
 	relayHandler := handler.NewRelayHandler(relayService)
+	agentTeamService := service.NewAgentTeamService(db, agentService, cacheClient)
+	agentTeamHandler := handler.NewAgentTeamHandler(agentTeamService)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
-	router.SetupRoutes(r, cfg, cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler, healthHandler, publicHandler, oidcHandler, agentProfileHandler, skillHandler, mcpHandler, marketHandler, pbHandler, targetHandler, auditHandler, relayHandler)
+	router.SetupRoutes(r, cfg, cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler, healthHandler, publicHandler, oidcHandler, agentProfileHandler, skillHandler, mcpHandler, marketHandler, pbHandler, targetHandler, auditHandler, relayHandler, agentTeamHandler)
 
 	ts = httptest.NewServer(r)
 	client = ts.Client()

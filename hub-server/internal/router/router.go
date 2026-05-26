@@ -9,7 +9,7 @@ import (
 	"github.com/agenthub/hub-server/internal/middleware"
 )
 
-func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler) {
+func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler, agentTeamHandler *handler.AgentTeamHandler) {
 	r.Use(middleware.CORS())
 	r.Use(middleware.APIVersion())
 	r.Use(middleware.BodyLimit(config.DefaultRequestBodyLimit))
@@ -241,5 +241,19 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		// Devices
 		web.GET("/devices", deviceHandler.ListDevices)
+
+		// Agent Teams
+		if agentTeamHandler != nil {
+			web.POST("/agent-teams", agentTeamHandler.CreateTeam)
+			web.GET("/agent-teams", agentTeamHandler.ListTeams)
+			web.GET("/agent-teams/:id", agentTeamHandler.GetTeam)
+			web.PUT("/agent-teams/:id", agentTeamHandler.UpdateTeam)
+			web.DELETE("/agent-teams/:id", agentTeamHandler.DeleteTeam)
+			web.POST("/agent-teams/:id/members", agentTeamHandler.AddMember)
+			web.DELETE("/agent-teams/:id/members/:member_id", agentTeamHandler.RemoveMember)
+			web.POST("/agent-teams/:id/runs", agentTeamHandler.StartRun)
+			web.GET("/agent-teams/:id/runs", agentTeamHandler.ListRuns)
+			web.GET("/agent-teams/:id/runs/:run_id", agentTeamHandler.GetRun)
+		}
 	}
 }

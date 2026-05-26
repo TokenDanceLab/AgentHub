@@ -81,6 +81,10 @@ type App struct {
 	ProviderBindingHandler *handler.ProviderBindingHandler
 	ExecutionTargetHandler *handler.ExecutionTargetHandler
 	AuditHandler           *handler.AuditHandler
+	AgentTeamHandler       *handler.AgentTeamHandler
+
+	// AgentTeam
+	AgentTeamService *service.AgentTeamService
 
 	// Relay
 	RelayService *service.RelayService
@@ -191,6 +195,10 @@ func (a *App) Run(ctx context.Context) error {
 	// Audit service
 	auditSvc := service.NewAuditService(a.DB)
 	a.AuditHandler = handler.NewAuditHandler(auditSvc)
+
+	// AgentTeam service
+	a.AgentTeamService = service.NewAgentTeamService(a.DB, a.AgentService, a.CacheClient)
+	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
 
 	// Relay service
 	a.RelayService = service.NewRelayService(a.CacheClient, a.mgr)
@@ -333,6 +341,7 @@ func (a *App) setupRouter() *gin.Engine {
 		a.ExecutionTargetHandler,
 		a.AuditHandler,
 		a.RelayHandler,
+		a.AgentTeamHandler,
 	)
 	return r
 }
