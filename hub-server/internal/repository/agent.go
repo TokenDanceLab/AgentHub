@@ -185,3 +185,25 @@ func BumpRunningTaskExpireAt(db *gorm.DB, id string, ttl time.Duration) error {
 		Where("id = ? AND status = ?", id, model.TaskStatusRunning).
 		Update("expire_at", newExpire).Error
 }
+
+func CreateAgentRunEventWithNextSeq(db *gorm.DB, event *model.AgentRunEvent) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		var maxSeq int64
+		if err := tx.Model(&model.AgentRunEvent{}).
+			Where("task_id = ?", event.TaskID).
+			Select("COALESCE(MAX(event_seq), 0)").
+			Scan(&maxSeq).Error; err != nil {
+			return err
+		}
+		event.EventSeq = maxSeq + 1
+		return tx.Create(event).Error
+	})
+}
+
+func ListAgentRunEventsByTaskID(db *gorm.DB, taskID string) ([]model.AgentRunEvent, error) {
+	var events []model.AgentRunEvent
+	err := db.Where("task_id = ?", taskID).
+		Order("event_seq ASC, created_at ASC, id ASC").
+		Find(&events).Error
+	return events, err
+}
