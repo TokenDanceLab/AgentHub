@@ -219,6 +219,50 @@ describe('useHubIntegration', () => {
     }
   }
 
+  function fetchCallEndingWith(path: string) {
+    const call = fetchMock.mock.calls.find(([input]) => String(input).endsWith(path));
+    if (!call) {
+      throw new Error(`fetch call ending with ${path} not found`);
+    }
+    return call;
+  }
+
+  function fetchBodyFor(path: string) {
+    const [, init] = fetchCallEndingWith(path);
+    return JSON.parse(String((init as RequestInit).body));
+  }
+
+  function fetchCallCountEndingWith(path: string) {
+    return fetchMock.mock.calls.filter(([input]) => String(input).endsWith(path)).length;
+  }
+
+  function mockRunSequence(...runIds: string[]) {
+    const queue = [...runIds];
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.endsWith('/v1/threads')) {
+        return new Response(JSON.stringify({ threadId: 'thread-ok' }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/v1/runs')) {
+        const runId = queue.shift() ?? 'run-1';
+        return new Response(
+          JSON.stringify({
+            id: runId,
+            runId,
+            projectId: 'proj',
+            threadId: 'sess',
+            status: 'started',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+  }
+
   // ── agent.dispatch → Edge run ──────────────────────────
 
   it('acks task and starts Edge run on agent.dispatch', async () => {
@@ -239,8 +283,24 @@ describe('useHubIntegration', () => {
         headers: { 'Content-Type': 'application/json' },
       }),
     );
-    const fetchBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const threadBody = fetchBodyFor('/v1/threads');
+    expect(threadBody.threadId).toBe('sess-1');
+    expect(threadBody.projectId).toBe('proj_local');
+    const fetchBody = fetchBodyFor('/v1/runs');
     expect(fetchBody.threadId).toBe('sess-1');
+    expect(fetchBody.agentId).toBe('claude-code');
+  });
+
+  it('normalizes legacy Claude agent ids before starting Edge run', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({ agent_type: 'claude' }));
+    });
+
+    const fetchBody = fetchBodyFor('/v1/runs');
     expect(fetchBody.agentId).toBe('claude-code');
   });
 
@@ -503,31 +563,7 @@ describe('useHubIntegration', () => {
   // ── Concurrent tasks ──────────────────────────────────
 
   it('handles concurrent agent.dispatch events independently', async () => {
-    fetchMock
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'run-A',
-            runId: 'run-A',
-            projectId: 'proj',
-            threadId: 'sess-A',
-            status: 'started',
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'run-B',
-            runId: 'run-B',
-            projectId: 'proj',
-            threadId: 'sess-B',
-            status: 'started',
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      );
+    mockRunSequence('run-A', 'run-B');
 
     const { result } = renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),
@@ -544,17 +580,12 @@ describe('useHubIntegration', () => {
     expect(result.current.getTaskByRunId('run-B')?.taskId).toBe('task-B');
     expect(hubClient.ackTask).toHaveBeenCalledWith('task-A', 'run-A');
     expect(hubClient.ackTask).toHaveBeenCalledWith('task-B', 'run-B');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchCallCountEndingWith('/v1/threads')).toBe(2);
+    expect(fetchCallCountEndingWith('/v1/runs')).toBe(2);
   });
 
   it('cleans up mapping for one task without affecting others', async () => {
-    fetchMock
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ id: 'run-A', runId: 'run-A', projectId: 'proj', threadId: 'sess-A', status: 'started' }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ id: 'run-B', runId: 'run-B', projectId: 'proj', threadId: 'sess-B', status: 'started' }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
-      );
+    mockRunSequence('run-A', 'run-B');
 
     renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),
@@ -624,7 +655,7 @@ describe('useHubIntegration', () => {
       );
     });
 
-    const fetchBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const fetchBody = fetchBodyFor('/v1/runs');
     expect(fetchBody.model).toBe('claude-sonnet-4-6');
   });
 
@@ -640,7 +671,7 @@ describe('useHubIntegration', () => {
       );
     });
 
-    const fetchBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const fetchBody = fetchBodyFor('/v1/runs');
     expect(fetchBody.model).toBeUndefined();
   });
 

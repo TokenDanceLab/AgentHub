@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -38,11 +39,70 @@ func newMockDBAgent(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
 	return gormDB, mock, sqlDB
 }
 
+type mockAgentCache struct {
+	routeID    string
+	pushedUser string
+	pushed     []string
+}
+
+func (m *mockAgentCache) GetRoute(ctx context.Context, userID, deviceType string) (string, error) {
+	return m.routeID, nil
+}
+
+func (m *mockAgentCache) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
+	m.pushedUser = userID
+	m.pushed = append(m.pushed, taskJSON)
+	return nil
+}
+
+func (m *mockAgentCache) AllocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	return 0, nil
+}
+
 const (
-	sqlmTaskByID    = `FROM "pending_agent_tasks" WHERE id =`
-	sqlmAgentByID   = `FROM "agent_instances" WHERE id =`
-	sqlmUpdateTask  = `UPDATE "pending_agent_tasks" SET`
+	sqlmTaskByID   = `FROM "pending_agent_tasks" WHERE id =`
+	sqlmAgentByID  = `FROM "agent_instances" WHERE id =`
+	sqlmUpdateTask = `UPDATE "pending_agent_tasks" SET`
 )
+
+func TestPromptFromMessage_TextPayload(t *testing.T) {
+	msg := &model.Message{
+		ContentType: model.ContentTypeText,
+		Content:     `{"text":"Run real Codex against this repo"}`,
+	}
+
+	require.Equal(t, "Run real Codex against this repo", promptFromMessage(msg))
+}
+
+func TestDispatchTaskIncludesPrompt(t *testing.T) {
+	db, _, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "claude-code",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Claude",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run the real runtime")
+
+	require.Equal(t, "user-1", cache.pushedUser)
+	require.Len(t, cache.pushed, 1)
+	var payload dispatchPayload
+	require.NoError(t, json.Unmarshal([]byte(cache.pushed[0]), &payload))
+	require.Equal(t, "Run the real runtime", payload.Prompt)
+	require.Equal(t, "claude-code", payload.AgentType)
+	require.Equal(t, "sess-1", payload.SessionID)
+}
 
 // ==================== CancelTask ====================
 
