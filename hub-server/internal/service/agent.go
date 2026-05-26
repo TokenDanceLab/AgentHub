@@ -236,6 +236,34 @@ func selectAgentInstance(agents []model.AgentInstance, targetAgentInstanceID, ta
 	return nil, errcode.AgentNotFound
 }
 
+func mergeModelParams(base, override string) string {
+	base = strings.TrimSpace(base)
+	override = strings.TrimSpace(override)
+	if base == "" {
+		return override
+	}
+	if override == "" {
+		return base
+	}
+
+	var merged map[string]any
+	if err := json.Unmarshal([]byte(base), &merged); err != nil || merged == nil {
+		return override
+	}
+	var incoming map[string]any
+	if err := json.Unmarshal([]byte(override), &incoming); err != nil || incoming == nil {
+		return override
+	}
+	for key, value := range incoming {
+		merged[key] = value
+	}
+	data, err := json.Marshal(merged)
+	if err != nil {
+		return override
+	}
+	return string(data)
+}
+
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.
 func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams string) (*model.PendingAgentTask, error) {
 	msg, err := repository.GetMessageByID(s.db, triggerMessageID)
@@ -323,9 +351,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 			dp.ToolWhitelist = ca.ToolWhitelist
 		}
 	}
-	if strings.TrimSpace(modelParams) != "" {
-		dp.ModelParams = modelParams
-	}
+	dp.ModelParams = mergeModelParams(dp.ModelParams, modelParams)
 
 	payload, _ := json.Marshal(dp)
 
