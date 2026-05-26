@@ -1,0 +1,398 @@
+/* ═══════════════════════════════════════════════════════════════════
+   DiffReviewPanel — Side-by-side diff review with line-level accept/reject
+   Uses OKLCH via CSS variables only — no hardcoded colors
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Root ─────────────────────────────────────────────────────── */
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--card);
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.fileName {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.stats {
+  display: flex;
+  gap: var(--space-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+  flex-shrink: 0;
+}
+
+.statsAdded {
+  color: var(--diff-added-border);
+}
+
+.statsDeleted {
+  color: var(--diff-removed-border);
+}
+
+.statsModified {
+  color: var(--warning);
+}
+
+.toolbarActions {
+  display: flex;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+
+.toolbarBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-2xs);
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast),
+    border-color var(--duration-fast);
+}
+
+.toolbarBtn:hover {
+  background: var(--hover-overlay);
+  color: var(--foreground);
+}
+
+.acceptAllBtn {
+  border-color: var(--diff-added-border);
+  color: var(--diff-added-border);
+}
+
+.acceptAllBtn:hover {
+  background: var(--diff-added-bg);
+}
+
+.rejectAllBtn {
+  border-color: var(--diff-removed-border);
+  color: var(--diff-removed-border);
+}
+
+.rejectAllBtn:hover {
+  background: var(--diff-removed-bg);
+}
+
+/* ── File tabs ────────────────────────────────────────────────── */
+.fileTabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.fileTab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-xs) var(--space-md);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--duration-fast), border-color var(--duration-fast);
+}
+
+.fileTab:hover {
+  color: var(--foreground);
+}
+
+.fileTabActive {
+  color: var(--foreground);
+  border-bottom-color: var(--primary);
+}
+
+.fileTabBadge {
+  font-size: var(--font-size-2xs);
+  padding: 0 4px;
+  border-radius: var(--radius-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.fileTabBadgeAdded {
+  background: var(--diff-added-bg);
+  color: var(--diff-added-border);
+}
+
+.fileTabBadgeDeleted {
+  background: var(--diff-removed-bg);
+  color: var(--diff-removed-border);
+}
+
+.fileTabBadgeModified {
+  background: color-mix(in oklch, var(--warning) 12%, transparent);
+  color: var(--warning);
+}
+
+/* ── Diff Content ─────────────────────────────────────────────── */
+.diffContent {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* ── Side-by-side columns ─────────────────────────────────────── */
+.sideBySide {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100%;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.columnLeft {
+  border-right: 1px solid var(--border);
+}
+
+.columnHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  user-select: none;
+}
+
+/* ── Diff Rows ────────────────────────────────────────────────── */
+.diffRow {
+  display: flex;
+  min-height: 22px;
+  position: relative;
+  border-bottom: 1px solid transparent;
+}
+
+.diffRowContext {
+  color: var(--muted-foreground);
+}
+
+.diffRowAdded {
+  background: var(--diff-added-bg);
+  border-bottom-color: color-mix(in oklch, var(--diff-added-bg) 85%, transparent);
+}
+
+.diffRowDeleted {
+  background: var(--diff-removed-bg);
+  border-bottom-color: color-mix(in oklch, var(--diff-removed-bg) 85%, transparent);
+}
+
+.diffRowModified {
+  background: color-mix(in oklch, var(--warning) 6%, transparent);
+  border-bottom-color: color-mix(in oklch, var(--warning) 8%, transparent);
+}
+
+.diffRowModified::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--warning);
+}
+
+.diffRowAdded::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--diff-added-border);
+}
+
+.diffRowDeleted::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--diff-removed-border);
+}
+
+.diffRowEmpty {
+  background: color-mix(in oklch, var(--muted-foreground) 4%, transparent);
+  color: transparent;
+}
+
+/* ── Line number gutter ───────────────────────────────────────── */
+.lineNum {
+  width: 44px;
+  min-width: 44px;
+  padding: 0 6px;
+  text-align: right;
+  color: var(--muted-foreground);
+  opacity: 0.4;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.diffRowAdded .lineNum,
+.diffRowDeleted .lineNum,
+.diffRowModified .lineNum {
+  opacity: 0.6;
+}
+
+/* ── Line content ─────────────────────────────────────────────── */
+.lineContent {
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--space-md) 0 var(--space-xs);
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Line actions (accept/reject) ─────────────────────────────── */
+.lineActions {
+  display: flex;
+  gap: 1px;
+  padding: 0 4px;
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+  flex-shrink: 0;
+}
+
+.diffRow:hover .lineActions {
+  opacity: 1;
+}
+
+.lineActionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--duration-fast), border-color var(--duration-fast),
+    color var(--duration-fast);
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.lineAcceptBtn {
+  color: var(--diff-added-border);
+}
+
+.lineAcceptBtn:hover {
+  background: var(--diff-added-bg);
+  border-color: var(--diff-added-border);
+}
+
+.lineAcceptBtnActive {
+  background: var(--diff-added-bg);
+  border-color: var(--diff-added-border);
+}
+
+.lineRejectBtn {
+  color: var(--diff-removed-border);
+}
+
+.lineRejectBtn:hover {
+  background: var(--diff-removed-bg);
+  border-color: var(--diff-removed-border);
+}
+
+.lineRejectBtnActive {
+  background: var(--diff-removed-bg);
+  border-color: var(--diff-removed-border);
+}
+
+/* Line state — accepted (dimmed) or rejected (dimmed + strikethrough) */
+.diffRowAccepted {
+  opacity: 0.45;
+}
+
+.diffRowRejected {
+  opacity: 0.35;
+}
+
+.diffRowRejected .lineContent {
+  text-decoration: line-through;
+}
+
+/* ── Empty state ───────────────────────────────────────────────── */
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 120px;
+  padding: var(--space-xl);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sideBySide {
+    grid-template-columns: 1fr;
+  }
+
+  .columnLeft {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .toolbar {
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+  }
+}
