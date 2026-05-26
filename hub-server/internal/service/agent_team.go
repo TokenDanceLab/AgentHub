@@ -489,6 +489,8 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		Tasks:        make([]model.TeamTaskState, 0, len(tasks)),
 		Dependencies: make([]model.TeamTaskDependencyState, 0),
 		Assignments:  make([]model.TeamAssignmentState, 0, len(assignments)),
+		Approvals:    []model.TeamApprovalState{},
+		Artifacts:    []model.TeamArtifactState{},
 		RunEvents:    make([]model.TeamRunEventState, 0, len(runEvents)),
 		RouteLog:     []model.CoordinatorRouteDecision{},
 	}
@@ -590,6 +592,7 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 			CreatedAt:   event.CreatedAt,
 		})
 	}
+	state.Approvals, state.Artifacts = projectTeamRuntimeSummaries(runEvents)
 	state.Budget = projectTeamBudget(runEvents, len(agentTaskIDs))
 
 	for _, event := range events {
@@ -611,6 +614,89 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	}
 
 	return state, nil
+}
+
+func projectTeamRuntimeSummaries(runEvents []model.AgentRunEvent) ([]model.TeamApprovalState, []model.TeamArtifactState) {
+	approvals := []model.TeamApprovalState{}
+	artifacts := []model.TeamArtifactState{}
+	approvalIndex := map[string]int{}
+	for _, event := range runEvents {
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
+			continue
+		}
+		switch event.EventType {
+		case "run.agent.permission_requested":
+			requestID := firstJSONString(payload, "requestId", "request_id")
+			toolUseID := firstJSONString(payload, "toolUseId", "tool_use_id")
+			key := firstNonEmptyString(requestID, toolUseID)
+			if key == "" {
+				continue
+			}
+			status := firstNonEmptyString(firstJSONString(payload, "status"), "pending")
+			approvalIndex[key] = len(approvals)
+			approvals = append(approvals, model.TeamApprovalState{
+				AgentTaskID: event.TaskID,
+				EdgeRunID:   event.EdgeRunID,
+				RequestID:   requestID,
+				ToolName:    firstJSONString(payload, "toolName", "tool_name"),
+				ToolUseID:   toolUseID,
+				Status:      status,
+				CreatedAt:   event.CreatedAt,
+			})
+		case "run.agent.permission_decided":
+			requestID := firstJSONString(payload, "requestId", "request_id")
+			toolUseID := firstJSONString(payload, "toolUseId", "tool_use_id")
+			key := firstNonEmptyString(requestID, toolUseID)
+			if key == "" {
+				continue
+			}
+			decision := firstNonEmptyString(firstJSONString(payload, "decision", "status"), "decided")
+			decidedAt := event.CreatedAt
+			if idx, ok := approvalIndex[key]; ok {
+				approvals[idx].Status = decision
+				approvals[idx].Reason = firstJSONString(payload, "reason")
+				approvals[idx].DecidedAt = &decidedAt
+				if approvals[idx].RequestID == "" {
+					approvals[idx].RequestID = requestID
+				}
+				if approvals[idx].ToolUseID == "" {
+					approvals[idx].ToolUseID = toolUseID
+				}
+				if approvals[idx].ToolName == "" {
+					approvals[idx].ToolName = firstJSONString(payload, "toolName", "tool_name")
+				}
+				continue
+			}
+			approvalIndex[key] = len(approvals)
+			approvals = append(approvals, model.TeamApprovalState{
+				AgentTaskID: event.TaskID,
+				EdgeRunID:   event.EdgeRunID,
+				RequestID:   requestID,
+				ToolName:    firstJSONString(payload, "toolName", "tool_name"),
+				ToolUseID:   toolUseID,
+				Status:      decision,
+				Reason:      firstJSONString(payload, "reason"),
+				CreatedAt:   event.CreatedAt,
+				DecidedAt:   &decidedAt,
+			})
+		case "run.agent.file_change":
+			path := firstJSONString(payload, "path", "filePath", "file_path")
+			if path == "" {
+				continue
+			}
+			artifacts = append(artifacts, model.TeamArtifactState{
+				AgentTaskID: event.TaskID,
+				EdgeRunID:   event.EdgeRunID,
+				Path:        path,
+				Action:      firstJSONString(payload, "action"),
+				ToolName:    firstJSONString(payload, "toolName", "tool_name"),
+				Status:      firstJSONString(payload, "status"),
+				CreatedAt:   event.CreatedAt,
+			})
+		}
+	}
+	return approvals, artifacts
 }
 
 func projectTeamBudget(runEvents []model.AgentRunEvent, runCount int) *model.TeamBudget {
@@ -697,6 +783,28 @@ func tokenUsageFields(values map[string]any) (input, output, total int64) {
 		total = input + output
 	}
 	return input, output, total
+}
+
+func firstJSONString(values map[string]any, keys ...string) string {
+	for _, key := range keys {
+		value, ok := values[key]
+		if !ok {
+			continue
+		}
+		if text, ok := value.(string); ok {
+			return strings.TrimSpace(text)
+		}
+	}
+	return ""
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func firstJSONInt(values map[string]any, keys ...string) int64 {
