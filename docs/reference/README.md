@@ -10,6 +10,7 @@
 想看全貌 → cross-comparison/00-synthesis.md
 想看最佳实践 → cross-comparison/10-best-practices-playbook.md
 想做架构判断/ADR/RAG Memory/权限双轴 → cross-comparison/12-awesome-architecture-study.md
+想看产品方向/长期路线 → cross-comparison/14-product-direction-competitive-roadmap.md
 想做 UI → projects/multica/ · projects/opencode/ · projects/lobehub/ · projects/cherry-studio/
 想做安全 → projects/claude-code-sdk/ · cross-comparison/07-permission-models.md
 想做适配器 → cross-comparison/01-adapters.md · projects/aionui/
@@ -43,9 +44,9 @@
 
 每个项目目录包含该项目的 overview、架构分析、可采纳模式等。
 
-### cross-comparison/ -- 跨项目对比研究（14 篇）
+### cross-comparison/ -- 跨项目对比研究（15 篇）
 
-`00-synthesis.md`（总报告） · `01-adapters.md` · `02-im-ux.md` · `03-orchestration.md` · `04-sandbox-tools.md` · `05-undo-rollback.md` · `06-realtime-sync.md` · `07-permission-models.md` · `08-ui-beautify-plan.md` · `09-prompt-engineering.md` · `10-best-practices-playbook.md` · `11-bytedance-feature-map.md` · `12-awesome-architecture-study.md` · `13-agentteam-competitive-roadmap.md`
+`00-synthesis.md`（总报告） · `01-adapters.md` · `02-im-ux.md` · `03-orchestration.md` · `04-sandbox-tools.md` · `05-undo-rollback.md` · `06-realtime-sync.md` · `07-permission-models.md` · `08-ui-beautify-plan.md` · `09-prompt-engineering.md` · `10-best-practices-playbook.md` · `11-bytedance-feature-map.md` · `12-awesome-architecture-study.md` · `13-agentteam-competitive-roadmap.md` · `14-product-direction-competitive-roadmap.md`
 
 ### web-research/ -- 生态调研
 
