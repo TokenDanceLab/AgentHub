@@ -87,6 +87,7 @@ func TestExecutionTargetPingIsOwnerScoped(t *testing.T) {
 	require.NoError(t, db.Where("id = ?", "target-1").First(&target).Error)
 	require.True(t, target.IsOnline)
 	require.NotNil(t, target.LastSeenAt)
+	require.Equal(t, "healthy", target.HealthState)
 }
 
 func TestExecutionTargetPingRejectsUnsupportedTargetType(t *testing.T) {
@@ -103,6 +104,46 @@ func TestExecutionTargetPingRejectsUnsupportedTargetType(t *testing.T) {
 	var target model.ExecutionTarget
 	require.NoError(t, db.Where("id = ?", "target-unknown").First(&target).Error)
 	require.False(t, target.IsOnline)
+}
+
+func TestExecutionTargetPingRequiresLiveProofForRemoteTargets(t *testing.T) {
+	tests := []struct {
+		targetType string
+		trustLevel string
+	}{
+		{targetType: "remote_ssh", trustLevel: "remote"},
+		{targetType: "tailscale", trustLevel: "remote"},
+		{targetType: "cloud_edge", trustLevel: "cloud"},
+		{targetType: "hub_relay", trustLevel: "relay"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.targetType, func(t *testing.T) {
+			db := newExecutionTargetTestDB(t)
+			require.NoError(t, db.Create(&model.ExecutionTarget{
+				ID:                 "target-" + tt.targetType,
+				OwnerID:            "owner-1",
+				Name:               "Remote target",
+				TargetType:         tt.targetType,
+				WorkspaceRoot:      "/workspace",
+				WorkspaceAllowlist: `["/workspace"]`,
+				TrustLevel:         tt.trustLevel,
+				HealthState:        "unknown",
+				Capabilities:       "{}",
+				Metadata:           "{}",
+			}).Error)
+			svc := NewExecutionTargetService(db)
+
+			err := svc.Ping(context.Background(), "target-"+tt.targetType, "owner-1")
+			require.ErrorIs(t, err, errcode.TargetNotRoutable)
+
+			var target model.ExecutionTarget
+			require.NoError(t, db.Where("id = ?", "target-"+tt.targetType).First(&target).Error)
+			require.False(t, target.IsOnline)
+			require.Nil(t, target.LastSeenAt)
+			require.Equal(t, "unknown", target.HealthState)
+		})
+	}
 }
 
 func TestExecutionTargetCreateDefaultsPolicyFields(t *testing.T) {
