@@ -1,6 +1,6 @@
 # AgentHub Hub Server — 生产部署记录
 
-最后更新：2026-05-25
+最后更新：2026-05-27
 
 ## 部署拓扑
 
@@ -77,6 +77,7 @@ curl http://api.hub.vectorcontrol.tech/api/public/stats
 
 | 时间 (UTC) | 镜像 | 变更 | 验证 |
 |:--|:--|:--|:--|
+| 2026-05-26 17:27 | `ghcr.io/tokendancelab/agenthub-hub:latest` → `sha256:300cc8e8ddad...` | 本机预构建镜像传输到 hk2，发布 `POST /web/agent-teams/{id}/runs/{run_id}/route-decisions`、typed route accepted/rejected TeamEvent 审计和 TeamRun 任务总数 guardrail；服务器未执行 build；保留 `rollback-before-at3-route-20260526-1726z` 回滚镜像 | Docker health `healthy`；本地/公网 `/health` migrations=36；未登录访问 route decision endpoint 返回 401；Hub ~8 MiB、PG ~19 MiB、Redis ~3 MiB |
 | 2026-05-26 16:59 | `ghcr.io/tokendancelab/agenthub-hub:latest` → `sha256:919673032e59...` | 本机预构建镜像传输到 hk2，发布 TeamEvent append/list 与 TeamRunState replay API；服务器未执行 build | Docker health `healthy`；`/health` migrations=36；公网 `/health` OK；未登录访问 state route 返回 401 |
 | 2026-05-26 16:40 | `ghcr.io/tokendancelab/agenthub-hub:latest` → `sha256:55c372b7041b...` | 本机预构建镜像传输到 hk2，升级到 commit `b77591d` 并执行 migration 0036 | Docker health `healthy`；`/health` migrations=36；公网 `/api/public/stats` OK |
 

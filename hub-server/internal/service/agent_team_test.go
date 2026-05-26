@@ -511,6 +511,94 @@ func TestAgentTeamService_GetTeamRunStateReplaysEvents(t *testing.T) {
 	assert.Equal(t, executor.ID, state.RouteLog[0].NextWorker)
 }
 
+func TestAgentTeamService_HandleRouteDecisionCreatesAssignmentAndAuditEvents(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, supervisor, executor, run := seedAgentTeamRun(t, db)
+
+	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+		Action:       "delegate",
+		NextWorker:   executor.ID,
+		Instructions: "Implement the replay UI",
+		Reasoning:    "executor owns UI work",
+		Context:      "state endpoint is ready",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, assignment)
+	assert.Equal(t, supervisor.ID, assignment.FromMemberID)
+	assert.Equal(t, executor.ID, assignment.ToMemberID)
+	assert.Equal(t, model.AssignmentTypeDelegate, assignment.Type)
+	assert.Equal(t, model.AssignmentStatusPending, assignment.Status)
+	assert.Equal(t, 1, assignment.Depth)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, model.TeamEventRouteDecided, events[0].Type)
+	assert.Equal(t, model.TeamEventAssignmentCreated, events[1].Type)
+
+	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
+	require.NoError(t, err)
+	require.Len(t, state.RouteLog, 1)
+	assert.Equal(t, "delegate", state.RouteLog[0].Action)
+	require.Len(t, state.Assignments, 1)
+	assert.Equal(t, assignment.ID, state.Assignments[0].AssignmentID)
+	assert.Equal(t, 1, state.Members[1].ActiveTasks)
+}
+
+func TestAgentTeamService_HandleRouteDecisionRejectsMissingWorkerWithAuditEvent(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, _, _, run := seedAgentTeamRun(t, db)
+
+	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+		Action:       "delegate",
+		NextWorker:   "missing-member",
+		Instructions: "Do work",
+	})
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, assignment)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, model.TeamEventRouteRejected, events[0].Type)
+	assert.Contains(t, events[0].Payload, "next_worker")
+}
+
+func TestAgentTeamService_HandleRouteDecisionRejectsWhenTaskLimitReached(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, supervisor, executor, run := seedAgentTeamRun(t, db)
+	for i := 0; i < model.MaxTasksPerTeamRun; i++ {
+		require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
+			TeamRunID:    run.ID,
+			FromMemberID: supervisor.ID,
+			ToMemberID:   executor.ID,
+			Type:         model.AssignmentTypeDelegate,
+			TaskPrompt:   "existing task",
+			Status:       model.AssignmentStatusDone,
+			Depth:        1,
+		}))
+	}
+
+	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+		Action:       "delegate",
+		NextWorker:   executor.ID,
+		Instructions: "one more task",
+	})
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, assignment)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, model.TeamEventRouteRejected, events[0].Type)
+	assert.Contains(t, events[0].Payload, "task limit")
+}
+
 func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -571,6 +659,37 @@ func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 		require.NoError(t, db.Exec(ddl).Error)
 	}
 	return db
+}
+
+func seedAgentTeamRun(t *testing.T, db *gorm.DB) (*model.AgentTeam, *model.AgentTeamMember, *model.AgentTeamMember, *model.AgentTeamRun) {
+	t.Helper()
+	team := &model.AgentTeam{OwnerID: "user-1", Name: "Route Team"}
+	require.NoError(t, repository.CreateTeam(db, team))
+
+	supervisorProfileID := "profile-supervisor"
+	executorProfileID := "profile-executor"
+	supervisor := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: &supervisorProfileID,
+		Role:           model.TeamMemberRoleSupervisor,
+	}
+	executor := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: &executorProfileID,
+		Role:           model.TeamMemberRoleExecutor,
+	}
+	require.NoError(t, repository.AddTeamMember(db, supervisor))
+	require.NoError(t, repository.AddTeamMember(db, executor))
+
+	run := &model.AgentTeamRun{
+		TeamID:         team.ID,
+		SessionID:      "session-1",
+		TriggerUserID:  "user-1",
+		TriggerMessage: "ship it",
+		Status:         model.TeamRunStatusRunning,
+	}
+	require.NoError(t, repository.CreateTeamRun(db, run))
+	return team, supervisor, executor, run
 }
 
 func stringPtr(value string) *string {

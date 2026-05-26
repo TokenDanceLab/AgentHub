@@ -632,7 +632,7 @@ Hub 调度（远程）:
 	  - `feat/agentteam-core`：✅ Hub 端 AgentTeam/TeamMember/TeamRun 模型、migration、CRUD API 与 StartTeamRun 最小闭环已落地。
 	  - `feat/agentteam-assignment`：✅ TeamAssignment 模型、migration、CRUD、基础委派权限、最大深度/活跃任务/cycle guard 与状态机接口已落地。
 	  - `feat/agentteam-run-state`：🔄 TeamEvent model/migration、append/list repository、TeamRunState replay service 与 `GET /web/agent-teams/{id}/runs/{run_id}/state` 已落地并部署；剩余 TeamTask 一等化、RunEvent/approval/artifact 汇总、budget projection。
-	  - `feat/agentteam-delegation-guard`：最大深度 3 层、单 Agent 活跃子任务上限 5、同链禁止重复、超时 30min、预算继承。
+	  - `feat/agentteam-delegation-guard`：🔄 typed `CoordinatorRouteDecision` Web 入口、accepted/rejected TeamEvent 审计和 `MAX_TASKS_PER_TEAM_RUN` 拦截已落地；剩余 route repeats、budget、timeout 和 Edge/Supervisor parser 接入。
 	  - `feat/agentteam-orchestrator-refactor`：Edge OrchestratorAdapter 不再自己做子 Agent spawn，改为输出 delegation 指令回 Hub，由 Hub 创建 TeamAssignment 并 dispatch。
 	  - `feat/agentteam-local-smoke`：Hub→Desktop→Edge 完整 TeamRun，两个真实 Runtime Profile（Codex + Claude Code）的委派/聚合/审批 smoke。
 	- [ ] 残留分支：`origin/dev/trump` 不作为可信进度来源；`feat/web-desktop-parity` / `origin/worktree-feat+web-desktop-parity` 与当前 WebAgent 主线大幅分叉，删除或 cherry-pick 前必须人工审 diff。
@@ -680,6 +680,7 @@ Hub 调度（远程）:
   - 保留旧文本 JSON dispatch 兼容，但新 TeamRun 只消费 typed route。
   - Guardrails：`MAX_DELEGATION_DEPTH`、`MAX_ACTIVE_SUBAGENTS_PER_RUN`、`MAX_ROUTE_REPEATS`、`MAX_TASKS_PER_TEAM_RUN`、budget、timeout、ancestor/cycle reject、context budget、compact/checkpoint。
   - 验收：非法 route 被拒绝且可审计；重复委派、超深度、超预算不会启动 Runtime。
+  - 2026-05-27 进展：Hub 已新增 `POST /web/agent-teams/{id}/runs/{run_id}/route-decisions`，合法 `delegate/review/approve` 会创建 `TeamAssignment` 并写 `team.route.decided` + `assignment.created`；非法 worker/schema/任务总数超限会写 `team.route.rejected` 后返回 400。当前仍未接 Edge supervisor 输出 parser、route repeat、budget、timeout 和 RunEvent 自动绑定。
 
 - [ ] **AT-4: Local TeamRun smoke with two real Runtime Profiles** `[4-6d]` `[P1]`
   - Dispatch：TeamTask 复用现有 Hub `/web/agent-tasks` 和 Desktop bridge，每个 task 绑定 Edge `run_id`。
