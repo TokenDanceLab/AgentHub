@@ -36,7 +36,7 @@
 | Execution Target | 安全、审计、可控 | 远程灵活性 vs workspace allowlist / device proof |
 | RAG / Memory | 可溯源、权限正确、召回质量 | 语义召回 vs 隐私/成本/污染风险 |
 | Agent Runtime | 任务成功率、上下文有效性 | 自治程度 vs HITL / 沙箱 |
-| TokenDance Relay 调用 | 低附加延迟、key 隔离、计费准确 | 统一入口 vs 单点治理复杂度 |
+| TokenDance Gateway 调用 | 低附加延迟、key 隔离、计费准确 | 统一入口 vs 单点治理复杂度 |
 
 ### 2.2 ADR 应记录“为什么”，不是复述“是什么”
 
@@ -148,15 +148,15 @@ AgentHub 采纳：
 - Context Builder 需要显式预算：system / AGENTS.md / memory / recent messages / selected artifacts / retrieval / user prompt 各自占用多少。
 - 模型路由应从 Profile 的 model mapping 进入，不要让前端临时拼字符串。
 
-### 3.5 AI 网关 / TokenDance Relay
+### 3.5 AI 网关 / TokenDance Gateway
 
 外部模板结论：AI 网关价值在治理：统一接口、key 管理、限流、计费、故障转移、流式透传和观测。网关不跑模型，也不应泄露上游 key。
 
 AgentHub 采纳：
 
-- TokenDance Relay API key 与 TokenDance ID access token 必须继续严格分层。
-- Browser Web 只能拿 Hub session，不能拿 Relay API key。
-- Hub/Edge 可以持有 Relay API key 或引用 provider binding，但必须进入审计。
+- TokenDance API key 与 TokenDance ID access token 必须继续严格分层。
+- Browser Web 只能拿 Hub session，不能拿 TokenDance API key。
+- Hub/Edge 可以持有 TokenDance API key 或引用 provider binding，但必须进入审计。
 - 任何 Relay 调用要保留 usage 记录，未来进入 Profile 成本视图。
 - 网关链路必须流式透传，不能为了计费/审计缓冲完整输出再回传。
 
@@ -264,5 +264,5 @@ AgentHub 采纳：
 - 做 Memory/RAG：先读本文 3.2、3.3、3.7，再写 ADR-RAG-001。
 - 做权限/审批：先读本文 3.6，再对照 `07-permission-models.md`。
 - 做 Execution Target：先读本文 4.2 和 5，再对照 `system-architecture.md` 的 Target 模型。
-- 做 TokenDance Relay：先读本文 3.5，再对照根 workspace 的 Relay 产品化文档。
+- 做 TokenDance Gateway：先读本文 3.5，再对照根 workspace 的 Gateway 产品化文档。
 - 做 roadmap closeout：把“已实现”改成带证据的状态，避免把参考模板或 UI 预留当实现证明。
