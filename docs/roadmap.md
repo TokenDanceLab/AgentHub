@@ -603,6 +603,14 @@ Hub 调度（远程）:
 - [ ] Web follow-up：继续把 Settings/Agent Market/Execution Target 面从 preview fallback 收敛到 Hub Agent Profile、registered Edge target 和 Hub task lifecycle；公开 Web 发布前补 BFF/HttpOnly cookie 或等价 server-owned session。Agent Profile 配置已能进入 runtime start request，下一步要补 registered Edge target/workspace allowlist 和运行时配置的 UI 可编辑闭环。
 - [ ] Runtime history follow-up：Hub typed RunEvent 已有最小持久化、owner-scoped read API、Web replay/WS consumption 和 RunDetail 投影；下一步是补状态筛选、token/step/elapsed/approval/artifact 摘要，并把 Edge/adapter 的 approval/artifact payload 统一到 AgentHub event shape。两个 Home 仍是低风险 product/docs OIDC 个性化站点，不作为 runtime 控制台；需要 runtime 展示时应深链到 AgentHub Web/Hub session。Edge 仍保留完整本地 EventStore，前端只消费 AgentHub 事件族，不直读 Codex/Claude Code/OpenCode 私有 JSON。bytedance.md 功能差距和竞品方向见 `docs/reference/cross-comparison/11-bytedance-feature-map.md`。
 - [ ] Eight-scenario follow-up：当前不是 8/8。已完成 1（Desktop 本地离线），2（Desktop 本地在线）和 7（Web 中继当前 Desktop）仍需部署/截图/高信任 Web session 证据；3/4/5/6/8 远程/云执行场景仍未实现，下一批应优先做 registered Edge target、workspace allowlist、target health、Hub relay routing 和远程审批证明。
+- [ ] Cherry/Aion UI reference follow-up：Cherry Studio 调研已补到 `docs/reference/projects/cherry-studio/`，AionUi 继续作为 action-first Home、team composition、runtime auto-detection、scheduling/approval ergonomics 的参考。下一批 UI 只借鉴可证明的交互模式：operational Home、Settings row/group primitives、typed message blocks、tool group waiting state、composer scopes、artifact preview；不复制 Cherry 的 renderer-as-SSOT、provider secret 持久化、Web 直连本地 Runtime 或第三方直接登录。
+- [ ] 下一批 worktree 建议：
+  - `feat/runtime-event-blocks-ui`：`app/web/src/utils/hubAdapters.ts`、Web/desktop RunDetail/ChatView/shared block primitives；验收 Web/Desktop focused Vitest + typecheck + Web-Hub boundary。
+  - `feat/operational-home-console`：Web/Desktop Home surfaces、Agent/Profile/Target query composition、TokenDance ID session state；验收 Playwright 桌面/移动截图、无 raw i18n key、无浏览器直连 Local Edge。
+- [ ] Execution Target dispatch 拆分建议：
+  - `feat/hub-target-id-dispatch-contract`：`api/openapi.yaml`、`api/events.md`、Hub task model/repository/service/handler 和 ExecutionTarget service；给 `/web/agent-tasks` 增加 `target_id`，校验 owner、target type、deleted state 和 `workspace_allowlist`，把 `target_id` 持久化并进入 `agent.dispatch` payload。
+  - `feat/hub-edge-target-routing`：Hub dispatch/app/ws/cache/pending-task 相关代码，必要时只让 Desktop bridge 透传 payload；有 `target_id` 时按 target 绑定 `device_id` route 派发，离线队列按 target/device 隔离，禁止 fallback 到第一个 online desktop。
+  - `feat/runtime-typed-control-callbacks`：Edge hub callback、ProcessExecutor、adapter callback tests、Hub stream handler/service/app 和 API docs；把 Codex/Claude Code/OpenCode 的 `run.agent.*`、`run.output.batch`、permission/control event 统一以 `event_type + payload` 上报 Hub，继续持久化到 `agent_run_events` 并保持聊天兼容投影。
 - [ ] 残留分支：`origin/dev/trump` 不作为可信进度来源；`feat/web-desktop-parity` / `origin/worktree-feat+web-desktop-parity` 与当前 WebAgent 主线大幅分叉，删除或 cherry-pick 前必须人工审 diff。
 
 ##### 文档架构 sweep `[并行]`
