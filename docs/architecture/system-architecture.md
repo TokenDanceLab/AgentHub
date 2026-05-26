@@ -141,7 +141,7 @@ AgentHub 不应照搬 LangGraph/Dify 的 graph/workflow DSL，也不应把 Claud
 
 ## 3. 当前已完成拓扑
 
-P0-P3 已全部完成，M4 8/8 已交付。真实 Agent CLI 集成通过统一 AgentAdapter 接口对接三种 CLI：
+当前仓库已经完成本地执行主链路和 Web 中继到当前 Desktop 的最小链路，但还不是完整 8 个部署场景 8/8。旧里程碑里的 `M4 8/8` 指的是 M4 工程任务清单，不等于远程/云执行拓扑全部完成。真实 Agent CLI 集成通过统一 AgentAdapter 接口对接三种 CLI：
 
 ```text
 Desktop Web UI
@@ -229,7 +229,7 @@ Hub dispatch payload 必须带触发消息提取出的 `prompt`，`agent_type` �
 
 adapter 包包含 32 个单元测试（覆盖 24 种 NDJSON 消息类型解析、控制协议、边界情况）和 14 个集成测试（覆盖 Claude Code 和 OpenCode 的端到端执行、工具调用、取消、stdin 控制、命令行参数构建）。
 
-当前本地拓扑（P0-P3 已全部完成）：
+当前本地拓扑（本地执行闭环已完成）：
 
 ```text
 Desktop App
@@ -250,6 +250,21 @@ Desktop App
 - Desktop UI 默认只连接本机 Local Edge。
 - Edge 才能启动 Agent CLI 进程，UI 不直接启动 Agent CLI。
 - Agent CLI 只能在授权 workspace 或 worktree 内执行。
+
+### 3.2 八个部署场景现状
+
+| 场景 | 状态 | 当前证据 / 缺口 |
+|---|---|---|
+| 1. Desktop 本地离线 | ✅ 已实现 | Desktop -> Local Edge -> Claude Code / Codex / OpenCode 本地运行闭环成立，不依赖 Hub。 |
+| 2. Desktop 本地在线 | 🟡 基本实现 | Hub OIDC exchange、Hub-local session、WS auth 和设备注册链路已在仓内落地；部署态 login/logout/reconnect 与截图证据仍需补齐。 |
+| 3. Desktop 直连远程 Desktop | ❌ 未实现 | Remote Edge over SSH/Tailscale 还缺目标注册、路由、授权、workspace allowlist 和远程审批证明。 |
+| 4. Desktop 中继到远程 Desktop | ❌ 未实现 | Hub Relay 到任意远程 Desktop Edge 还不是通用产品链路。 |
+| 5. Desktop 直连云 | ❌ 未实现 | Cloud Edge / hosted target 仍是架构目标。 |
+| 6. Desktop 中继到云 | ❌ 未实现 | Hub -> Cloud Edge 调度、租户隔离、凭据隔离和资源限额未落地。 |
+| 7. Web 中继到 Desktop | 🟡 最小闭环 | Web -> Hub task -> Desktop bridge -> Local Edge -> typed stream / replay -> Web 已在仓内打通；仍需部署态 smoke、Web session 姿态和 live E2E 截图。 |
+| 8. Web 中继到云 | ❌ 未实现 | 依赖 Cloud Edge 注册、Hub relay routing、workspace allowlist 和审计闭环。 |
+
+因此当前可对外表达为：本地执行闭环已完成，Web 控制当前 Desktop 的仓内最小闭环已完成；远程和云相关能力仍在 P3/P4，不应写成 8/8。
 
 ## 4. 组件职责
 
@@ -414,7 +429,7 @@ REST snapshot 至少应能按 Project、Thread、Run、Item、Artifact 重建 UI
 | P0 | Desktop UI -> Local Edge -> AgentAdapter -> Agent CLI (完整闭环) | ✅ |
 | P1 | Local Edge + 多 Agent Thread | 已完成 |
 | P2 | Edge <-> Hub 同步，TokenDance ID 登录，Web/Mobile 查看和审批 | 进行中：Hub OIDC code exchange 与 Hub-local session 已在 repo 落地；部署配置、Desktop/Web 回调 UX、logout/reconnect 和授权证据仍需闭环 |
-| P3 | Hub Relay -> Local/Remote/Cloud Edge -> AgentAdapter，远程控制和预览代理 | 规划中（Q3） |
+| P3 | Hub Relay -> Local/Remote/Cloud Edge -> AgentAdapter，远程控制和预览代理 | 规划中（Q3）；Execution Target 基础 CRUD 已有，但远程/云 target 注册、workspace allowlist、relay routing 和远程审批未完成 |
 | P4 | 完整团队 IM、Agent 市场、Skill/MCP 管理、模型配置和安全审计 | 规划中 |
 
 ## 11. 文档分层
