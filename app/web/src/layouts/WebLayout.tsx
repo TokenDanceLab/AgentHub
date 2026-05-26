@@ -34,8 +34,7 @@ import { useHubWSConnection } from '@/hooks/useHubWSConnection';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { AppError } from '@shared/errors';
 import type { AgentInfo, RunInfo } from '@shared/types';
-import type { ChatMessage } from '@/components/ChatView.types';
-import { newClientMessageId, type HubThreadInfo } from '@/utils/hubAdapters';
+import { newClientMessageId, projectRunDetail, type HubThreadInfo } from '@/utils/hubAdapters';
 import { Slot } from '@/views/viewRegistry';
 import AuthPage from '@/components/AuthPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -44,6 +43,7 @@ import { ToastContainer } from '@/components/Toast';
 import styles from './WebLayout.module.css';
 
 type MainSurface = 'workspace' | 'messages' | 'settings';
+type WebRunInfo = RunInfo & ReturnType<typeof projectRunDetail>;
 
 function resolveHubAgentType(agent?: AgentInfo): string {
   const key = `${agent?.runtimeId ?? ''} ${agent?.id ?? ''} ${agent?.name ?? ''} ${agent?.description ?? ''}`.toLowerCase();
@@ -66,15 +66,6 @@ function resolveHubModelParams(agent?: AgentInfo, opts?: { model?: string; reaso
 
 function isAgentMissing(error: unknown): boolean {
   return error instanceof AppError && error.code === 'AGENT_NOT_FOUND';
-}
-
-function messageText(messages: ChatMessage[]): string {
-  return messages
-    .filter((message) => message.role === 'agent')
-    .flatMap((message) => message.blocks)
-    .filter((block) => block.kind === 'text' || block.kind === 'code')
-    .map((block) => block.content)
-    .join('\n\n');
 }
 
 export default function WebLayout() {
@@ -107,7 +98,7 @@ export default function WebLayout() {
   const selectAgentThread = useThreadStore((s) => s.selectAgentThread);
   const { data: agentData } = useAgentList(true);
   const { data: threadData } = useThreads();
-  const [optimisticRun, setOptimisticRun] = useState<(RunInfo & { outputText: string; toolCalls: []; changedFiles: [] }) | null>(null);
+  const [optimisticRun, setOptimisticRun] = useState<WebRunInfo | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
   const [mainSurface, setMainSurface] = useState<MainSurface>('workspace');
   const agents = agentData?.items ?? [];
@@ -125,7 +116,8 @@ export default function WebLayout() {
     authenticated: hubAuthenticated,
     hubWS: hubRealtime.hubWS,
   });
-  const outputText = useMemo(() => messageText(hubMessages), [hubMessages]);
+  const runDetail = useMemo(() => projectRunDetail(hubMessages), [hubMessages]);
+  const { outputText, toolCalls, changedFiles } = runDetail;
 
   useEffect(() => {
     setOnline(online, health);
@@ -280,9 +272,9 @@ export default function WebLayout() {
   const handleCancel = useCallback(async () => {
     if (!optimisticRun) return;
     await hubClient.cancelAgentTask(optimisticRun.runId);
-    setOptimisticRun({ ...optimisticRun, status: 'cancelled', finishedAt: new Date().toISOString(), outputText, toolCalls: [], changedFiles: [] });
+    setOptimisticRun({ ...optimisticRun, status: 'cancelled', finishedAt: new Date().toISOString(), outputText, toolCalls, changedFiles });
     addToast({ type: 'info', message: t('webChat.taskCancelled') });
-  }, [addToast, hubClient, optimisticRun, outputText, t]);
+  }, [addToast, changedFiles, hubClient, optimisticRun, outputText, t, toolCalls]);
 
   useEffect(() => {
     if (!hubRealtime.hubWS) return;
@@ -295,8 +287,8 @@ export default function WebLayout() {
           status,
           finishedAt: finished ? new Date().toISOString() : current.finishedAt,
           outputText,
-          toolCalls: [],
-          changedFiles: [],
+          toolCalls,
+          changedFiles,
         };
       });
       if (task.task_id === optimisticRun?.runId && task.error) {
@@ -311,7 +303,7 @@ export default function WebLayout() {
       unsubFailed();
       unsubCancel();
     };
-  }, [addToast, hubRealtime.hubWS, optimisticRun?.runId, outputText]);
+  }, [addToast, changedFiles, hubRealtime.hubWS, optimisticRun?.runId, outputText, toolCalls]);
 
   const shellProps = useMemo(
     () => ({
@@ -331,8 +323,8 @@ export default function WebLayout() {
       threadsCount: threads.length,
       requests: [],
       run: optimisticRun,
-      toolCalls: optimisticRun?.toolCalls ?? [],
-      changedFiles: optimisticRun?.changedFiles ?? [],
+      toolCalls: optimisticRun ? toolCalls : [],
+      changedFiles: optimisticRun ? changedFiles : [],
       outputText,
       onSelectAgent: handleSelectAgent,
       onSelect: handleSelectThread,
@@ -364,6 +356,8 @@ export default function WebLayout() {
       online,
       optimisticRun,
       outputText,
+      toolCalls,
+      changedFiles,
       removeMessage,
       runStartPending,
       selectedThreadId,
