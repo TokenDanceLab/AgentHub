@@ -276,6 +276,47 @@ describe('hubClient', () => {
     });
   });
 
+  describe('execution targets', () => {
+    const client = createHubClient({ baseUrl: 'http://test.local', getToken: () => 'tok' });
+
+    it('lists Hub execution targets from the web inventory endpoint', async () => {
+      const fetchSpy = mockFetch(200, {
+        code: 'ok',
+        data: {
+          items: [
+            {
+              id: 'target-relay-1',
+              owner_id: 'user_1',
+              name: 'Hub relay alpha',
+              target_type: 'hub_relay',
+              health_state: 'healthy',
+              is_online: true,
+            },
+          ],
+          page: { hasMore: false, nextCursor: '' },
+        },
+      });
+
+      const res = await client.listExecutionTargets();
+
+      expect(res.items[0].name).toBe('Hub relay alpha');
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('http://test.local/web/execution-targets');
+      expect(init.method).toBeUndefined();
+      expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
+    });
+
+    it('pings a Hub execution target through the web endpoint', async () => {
+      const fetchSpy = mockFetch(200, { code: 'ok', data: null });
+
+      await client.pingExecutionTarget('target-relay-1');
+
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('http://test.local/web/execution-targets/target-relay-1/ping');
+      expect(init.method).toBe('POST');
+    });
+  });
+
   describe('baseUrl handling', () => {
     it('strips trailing slash from baseUrl', async () => {
       const client = createHubClient({ baseUrl: 'http://test.local/' });
