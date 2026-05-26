@@ -75,3 +75,49 @@ func ListTeamRunsByTeam(db *gorm.DB, teamID string) ([]model.AgentTeamRun, error
 func UpdateTeamRunStatus(db *gorm.DB, runID, status string) error {
 	return db.Model(&model.AgentTeamRun{}).Where("id = ?", runID).Update("status", status).Error
 }
+
+// AgentTeamAssignment
+
+func CreateAssignment(db *gorm.DB, a *model.AgentTeamAssignment) error {
+	return db.Create(a).Error
+}
+
+func GetAssignmentByID(db *gorm.DB, id string) (*model.AgentTeamAssignment, error) {
+	var a model.AgentTeamAssignment
+	err := db.Where("id = ?", id).First(&a).Error
+	return &a, err
+}
+
+func ListAssignmentsByTeamRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamAssignment, error) {
+	var as []model.AgentTeamAssignment
+	err := db.Where("team_run_id = ?", teamRunID).Order("created_at ASC").Find(&as).Error
+	return as, err
+}
+
+func UpdateAssignmentStatus(db *gorm.DB, id string, status string, result string) error {
+	updates := map[string]interface{}{
+		"status": status,
+		"result": result,
+	}
+	return db.Model(&model.AgentTeamAssignment{}).Where("id = ?", id).Updates(updates).Error
+}
+
+func CountActiveAssignmentsByMember(db *gorm.DB, memberID string) (int64, error) {
+	var count int64
+	err := db.Model(&model.AgentTeamAssignment{}).
+		Where("from_member_id = ? AND status IN (?, ?, ?)", memberID,
+			model.AssignmentStatusPending,
+			model.AssignmentStatusDispatched,
+			model.AssignmentStatusRunning).
+		Count(&count).Error
+	return count, err
+}
+
+// GetAssignmentByToMember returns the most recent assignment where the given
+// member was the target (to_member_id) within a team run. Used for ancestor chain walking.
+func GetAssignmentByToMember(db *gorm.DB, teamRunID, toMemberID string) (*model.AgentTeamAssignment, error) {
+	var a model.AgentTeamAssignment
+	err := db.Where("team_run_id = ? AND to_member_id = ?", teamRunID, toMemberID).
+		Order("depth DESC").First(&a).Error
+	return &a, err
+}

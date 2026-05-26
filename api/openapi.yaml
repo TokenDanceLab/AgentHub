@@ -2783,6 +2783,154 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+  /web/agent-teams/{id}/runs/{run_id}/assignments:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateTeamAssignment
+      summary: Create a team assignment (delegation) from a supervisor to an executor.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_member_id, to_member_id, task_prompt]
+              properties:
+                from_member_id:
+                  type: string
+                  format: uuid
+                to_member_id:
+                  type: string
+                  format: uuid
+                type:
+                  type: string
+                  enum: [delegate, review, approve, notify]
+                  default: delegate
+                task_prompt:
+                  type: string
+                context:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListTeamAssignments
+      summary: List all assignments for a team run.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/dispatch:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: assignment_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubDispatchTeamAssignment
+      summary: Dispatch a pending assignment to the target agent.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/complete:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: assignment_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCompleteTeamAssignment
+      summary: Mark a running assignment as completed with result.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [result]
+              properties:
+                result:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/fail:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: assignment_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubFailTeamAssignment
+      summary: Mark an assignment as failed with a reason.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
   # ── Legacy / Planned (not yet implemented) ──────────────────
 
   /v1/auth/login:
@@ -3962,6 +4110,27 @@ components:
         status:
           type: string
           enum: [queued, running, completed, failed, cancelled]
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AgentTeamAssignment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        team_run_id: { type: string, format: uuid }
+        from_member_id: { type: string, format: uuid }
+        to_member_id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [delegate, review, approve, notify]
+        task_prompt: { type: string }
+        context: { type: string }
+        status:
+          type: string
+          enum: [pending, dispatched, running, done, failed, cancelled]
+        run_id: { type: string, format: uuid }
+        result: { type: string }
+        depth: { type: integer }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
