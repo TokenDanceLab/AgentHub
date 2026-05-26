@@ -157,7 +157,7 @@ export function useHubIntegration(
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
             rememberOutput(runId, content);
-            hubClient.streamTask(taskId, content, runId).catch(() => {});
+            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
           }
           break;
         }
@@ -166,7 +166,7 @@ export function useHubIntegration(
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
             rememberOutput(runId, content);
-            hubClient.streamTask(taskId, content, runId).catch(() => {});
+            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
           }
           break;
         }
@@ -175,7 +175,7 @@ export function useHubIntegration(
           const content = extractRunOutputBatch(payload);
           if (content) {
             rememberOutput(runId, content);
-            hubClient.streamTask(taskId, content, runId).catch(() => {});
+            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
           }
           break;
         }
@@ -183,7 +183,7 @@ export function useHubIntegration(
         case 'run.agent.thinking': {
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
-            hubClient.streamTask(taskId, content, runId).catch(() => {});
+            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
           }
           break;
         }
@@ -191,13 +191,14 @@ export function useHubIntegration(
         case 'run.agent.tool_call':
         case 'run.agent.tool_result':
         case 'run.agent.file_change':
-          // Forward tool metadata for chat visibility
+          // Forward the canonical typed runtime event so Hub can persist and replay it.
           hubClient
-            .streamTask(taskId, JSON.stringify(payload), runId)
+            .streamTaskEvent(taskId, event.type, payload, { runId })
             .catch(() => {});
           break;
 
         case 'run.agent.result': {
+          hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
           const success = payload.success !== false;
           if (success) {
             const output =

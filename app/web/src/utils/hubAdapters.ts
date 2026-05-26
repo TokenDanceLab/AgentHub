@@ -37,6 +37,18 @@ export interface RunDetailProjection {
   changedFiles: Array<{ path: string; action: string; timestamp: string }>;
 }
 
+export interface AgentRunEventLike {
+  id?: string;
+  task_id?: string;
+  edge_run_id?: string;
+  session_id?: string;
+  agent_instance_id?: string;
+  event_seq?: number;
+  event_type?: string;
+  payload?: unknown;
+  created_at?: string;
+}
+
 export function newClientMessageId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -90,6 +102,14 @@ function readString(record: Record<string, unknown>, key: string): string | unde
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
+function readFirstString(record: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = readString(record, key);
+    if (value) return value;
+  }
+  return undefined;
+}
+
 function normalizeFileAction(value: unknown): 'created' | 'modified' | 'deleted' {
   if (value === 'created' || value === 'added' || value === 'add') return 'created';
   if (value === 'deleted' || value === 'removed' || value === 'delete') return 'deleted';
@@ -120,24 +140,64 @@ function mapTokenUsage(value: unknown): { input: number; output: number } | unde
   return typeof input === 'number' && typeof output === 'number' ? { input, output } : undefined;
 }
 
+function outputBatchText(record: Record<string, unknown>): string | undefined {
+  if (record.stream !== undefined && record.stream !== 'stdout') return undefined;
+  if (!Array.isArray(record.chunks)) return undefined;
+  const text = record.chunks
+    .map((chunk) => (isRecord(chunk) && typeof chunk.text === 'string' ? chunk.text : ''))
+    .join('');
+  return text || undefined;
+}
+
+function fileChangeBlocksFromRecord(record: Record<string, unknown>): MessageBlock[] {
+  const files = Array.isArray(record.files)
+    ? record.files
+    : Array.isArray(record.changes)
+      ? record.changes
+      : null;
+
+  if (files) {
+    return files.flatMap((file) => {
+      if (!isRecord(file)) return [];
+      const path = readFirstString(file, ['path', 'filePath', 'file_path']);
+      if (!path) return [];
+      const block: Extract<MessageBlock, { kind: 'file_change' }> = {
+        kind: 'file_change',
+        path,
+        action: normalizeFileAction(file.action ?? file.kind ?? file.status),
+      };
+      const diff = readString(file, 'diff');
+      if (diff) block.diff = diff;
+      return [block];
+    });
+  }
+
+  const path = readFirstString(record, ['path', 'filePath', 'file_path']);
+  if (!path || (record.action === undefined && record.kind === undefined && record.diff === undefined)) {
+    return [];
+  }
+  const block: Extract<MessageBlock, { kind: 'file_change' }> = {
+    kind: 'file_change',
+    path,
+    action: normalizeFileAction(record.action ?? record.kind ?? record.status),
+  };
+  const diff = readString(record, 'diff');
+  if (diff) block.diff = diff;
+  return [block];
+}
+
 function runtimePayloadToBlocks(content: unknown): MessageBlock[] | null {
   const record = parseJsonRecord(content);
   if (!record) return null;
 
-  const path = readString(record, 'path') ?? readString(record, 'filePath');
-  if (path && (record.action !== undefined || record.diff !== undefined)) {
-    const block: Extract<MessageBlock, { kind: 'file_change' }> = {
-      kind: 'file_change',
-      path,
-      action: normalizeFileAction(record.action),
-    };
-    const diff = readString(record, 'diff');
-    if (diff) block.diff = diff;
-    return [block];
-  }
+  const batchText = outputBatchText(record);
+  if (batchText) return [{ kind: 'text', content: batchText }];
 
-  const callId = readString(record, 'callId') ?? readString(record, 'toolUseId');
-  const toolName = readString(record, 'toolName') ?? readString(record, 'tool') ?? readString(record, 'name');
+  const fileBlocks = fileChangeBlocksFromRecord(record);
+  if (fileBlocks.length > 0) return fileBlocks;
+
+  const callId = readFirstString(record, ['callId', 'toolUseId', 'tool_use_id', 'callID']);
+  const toolName = readFirstString(record, ['toolName', 'tool', 'name']);
   const rawInput = record.input ?? record.arguments ?? record.args;
   if (callId && toolName && rawInput !== undefined) {
     const block: Extract<MessageBlock, { kind: 'tool_use' }> = {
@@ -180,6 +240,80 @@ function runtimePayloadToBlocks(content: unknown): MessageBlock[] | null {
   }
 
   return null;
+}
+
+function parseRunEventPayload(payload: unknown): unknown {
+  if (typeof payload !== 'string') return payload;
+  const trimmed = payload.trim();
+  if (!trimmed) return '';
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return payload;
+  }
+}
+
+function runtimeEventToBlocks(event: AgentRunEventLike): MessageBlock[] {
+  const eventType = event.event_type ?? '';
+  const payload = parseRunEventPayload(event.payload);
+  const record = parseJsonRecord(payload);
+
+  switch (eventType) {
+    case 'run.agent.session_init':
+      return [
+        {
+          kind: 'session_init',
+          model: record ? readFirstString(record, ['model']) : undefined,
+          tools: record && Array.isArray(record.tools)
+            ? record.tools.filter((tool): tool is string => typeof tool === 'string')
+            : undefined,
+          permissionMode: record ? readFirstString(record, ['permissionMode', 'permission_mode']) : undefined,
+        },
+      ];
+
+    case 'run.agent.text_delta':
+    case 'run.agent.text_block': {
+      const content = record ? readFirstString(record, ['content', 'text', 'delta']) : undefined;
+      const text = content ?? (typeof payload === 'string' ? payload : stringifyRuntimeValue(payload));
+      if (!text) return [];
+      if (record?.contentType === 'code') {
+        const block: Extract<MessageBlock, { kind: 'code' }> = { kind: 'code', content: text };
+        const language = readString(record, 'language');
+        if (language) block.language = language;
+        return [block];
+      }
+      return [{ kind: 'text', content: text }];
+    }
+
+    case 'run.agent.thinking': {
+      const content = record ? readFirstString(record, ['content', 'text', 'delta']) : undefined;
+      const text = content ?? (typeof payload === 'string' ? payload : '');
+      return text ? [{ kind: 'thinking', content: text }] : [];
+    }
+
+    case 'run.output.batch': {
+      if (!record) return [];
+      const text = outputBatchText(record);
+      return text ? [{ kind: 'text', content: text }] : [];
+    }
+
+    default:
+      return runtimePayloadToBlocks(payload) ?? [];
+  }
+}
+
+export function agentRunEventToChatMessage(event: AgentRunEventLike): ChatMessage {
+  const blocks = runtimeEventToBlocks(event);
+  const fallback = stringifyRuntimeValue(parseRunEventPayload(event.payload));
+  const messageId =
+    event.id ??
+    `${event.task_id ?? event.session_id ?? 'run-event'}-${event.event_seq ?? event.created_at ?? Date.now()}`;
+  return {
+    id: messageId,
+    role: event.event_type === 'run.agent.session_init' ? 'system' : 'agent',
+    timestamp: event.created_at ?? new Date().toISOString(),
+    blocks: blocks.length > 0 ? blocks : [{ kind: 'text', content: fallback }],
+  };
 }
 
 function toolResultOutput(children: Extract<MessageBlock, { kind: 'tool_use' }>['children']): string | undefined {
@@ -258,6 +392,10 @@ export function projectRunDetail(messages: ChatMessage[]): RunDetailProjection {
   };
 }
 
+export function projectRunEvents(events: AgentRunEventLike[]): RunDetailProjection {
+  return projectRunDetail(events.map((event) => agentRunEventToChatMessage(event)));
+}
+
 export function hubMessageToChatMessage(msg: HubMessageLike): ChatMessage {
   const sessionId = msg.session_id ?? msg.sessionId ?? '';
   const messageId =
@@ -291,6 +429,21 @@ export function mergeChatMessages(current: ChatMessage[], incoming: ChatMessage[
   for (const msg of current) byId.set(msg.id, msg);
   for (const msg of incoming) byId.set(msg.id, msg);
   return [...byId.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+}
+
+export function mergeAgentRunEvents<T extends AgentRunEventLike>(current: T[], incoming: T[]): T[] {
+  const byKey = new Map<string, T>();
+  for (const event of current) {
+    byKey.set(event.id ?? `${event.task_id ?? 'task'}-${event.event_seq ?? event.created_at ?? ''}`, event);
+  }
+  for (const event of incoming) {
+    byKey.set(event.id ?? `${event.task_id ?? 'task'}-${event.event_seq ?? event.created_at ?? ''}`, event);
+  }
+  return [...byKey.values()].sort((a, b) => {
+    const seq = (a.event_seq ?? 0) - (b.event_seq ?? 0);
+    if (seq !== 0) return seq;
+    return (a.created_at ?? '').localeCompare(b.created_at ?? '');
+  });
 }
 
 export function sessionToThreadInfo(session: Session): HubThreadInfo {
