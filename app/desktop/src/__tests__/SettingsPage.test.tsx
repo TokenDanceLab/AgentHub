@@ -320,8 +320,6 @@ describe('SettingsPage tasks', () => {
 
   it('renders account identity boundary from Hub session and local device state', () => {
     localStorage.setItem('agenthub_device_id', '00000000-0000-0000-0000-00000000a001');
-    sessionStorage.setItem('td_code_verifier', 'verifier');
-    sessionStorage.setItem('td_state', 'state');
 
     render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="account" />);
 
