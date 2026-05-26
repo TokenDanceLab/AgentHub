@@ -10,6 +10,7 @@
     "./types": "./src/types.ts",
     "./events": "./src/events.ts",
     "./errors": "./src/errors.ts",
+    "./hubEvents": "./src/hubEvents.ts",
     "./hubClient": "./src/hubClient.ts",
     "./apiClient": "./src/apiClient.ts",
     "./eventClient": "./src/eventClient.ts",
