@@ -498,7 +498,7 @@
   "settings.modelDefault": "Default model",
   "settings.modelDefaultDesc": "Auto-select by agent, task type, and availability.",
   "settings.modelDefaultProvider": "Default provider",
-  "settings.modelDefaultProviderDesc": "Prefer TokenDance Relay, direct providers, or cc-switch local routing before a run is dispatched.",
+  "settings.modelDefaultProviderDesc": "Prefer TokenDance Gateway, direct providers, or cc-switch local routing before a run is dispatched.",
   "settings.modelReasoning": "Reasoning effort",
   "settings.modelReasoningDesc": "Keep reasoning controls in the prompt composer and run request.",
   "settings.modelProviderFallback": "Provider fallback",

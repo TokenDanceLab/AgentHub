@@ -445,7 +445,7 @@ describe('SettingsPage tasks', () => {
     render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="models" />);
 
     fireEvent.change(screen.getByDisplayValue('Auto'), { target: { value: 'gpt-5.5' } });
-    fireEvent.change(screen.getByDisplayValue('TokenDance Relay'), { target: { value: 'openai' } });
+    fireEvent.change(screen.getByDisplayValue('TokenDance Gateway'), { target: { value: 'openai' } });
     fireEvent.change(screen.getByDisplayValue('High'), { target: { value: 'max' } });
 
     expect(useModelSettingsStore.getState()).toMatchObject({
