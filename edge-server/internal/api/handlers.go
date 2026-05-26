@@ -24,6 +24,7 @@ import (
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
+	"github.com/agenthub/edge-server/internal/skills"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -33,11 +34,12 @@ type Handler struct {
 	Registry           *runners.Registry
 	Store              store.Repository
 	Executor           lifecycle.RunExecutor
-	AdapterRegistry    *adapters.Registry // nil if no agent adapters configured
-	AgentRegistry      *agents.Registry   // runtime agent instance registry
-	MessageQueue       *agents.Queue      // inter-agent message queue
+	AdapterRegistry    *adapters.Registry     // nil if no agent adapters configured
+	AgentRegistry      *agents.Registry       // runtime agent instance registry
+	MessageQueue       *agents.Queue          // inter-agent message queue
 	Metrics            *metrics.EdgeMetrics
-	WorkspaceAllowlist []string // optional absolute/relative roots allowed for request workDir
+	WorkspaceAllowlist []string               // optional absolute/relative roots allowed for request workDir
+	SkillRegistry      *skills.SkillRegistry  // optional SKILL.md registry; nil = no skills injection
 
 	PermissionRegistry *PermissionRegistry
 
@@ -629,6 +631,11 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			ConfigOverrides:    req.ConfigOverrides,
 			Ephemeral:          req.Ephemeral,
 			HubTaskID:          req.HubTaskID,
+		}
+		// Inject Skills directory context (SKILL.md discovery) into the system prompt.
+		// The SkillRegistry is shared across runs and lazily lists name+description.
+		if h.SkillRegistry != nil {
+			runCtx.SkillsPrompt = h.SkillRegistry.SystemPromptContext()
 		}
 		if err := h.Executor.Start(run, runCtx); err != nil {
 			if failed, ok := repository.SetRunStatusIf(run.ID, "failed", "queued"); ok {

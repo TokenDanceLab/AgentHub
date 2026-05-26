@@ -21,6 +21,7 @@ import (
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
+	"github.com/agenthub/edge-server/internal/skills"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -53,6 +54,7 @@ type Config struct {
 	HubURL             string             // Hub server base URL for Edge->Hub direct callbacks
 	HubToken           string             // JWT bearer token for Hub callback authentication
 	WorkspaceAllowlist []string           // optional roots allowed for request workDir
+	SkillsDirs         []string           // optional SKILL.md search dirs; empty = use defaults
 }
 
 const defaultRESTRequestTimeout = 30 * time.Second
@@ -165,6 +167,19 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	// Wire orchestrator adapter with runtime dependencies so it can spawn sub-agents.
 	wireOrchestrator(cfg.AdapterRegistry, executor, agentReg, msgQueue)
 
+	// Build SkillRegistry from configured directories. Discovery failure is
+	// non-fatal — skills injection is purely optional.
+	skillsDirs := cfg.SkillsDirs
+	if len(skillsDirs) == 0 {
+		skillsDirs = skills.DefaultDirs("")
+	}
+	skillReg := skills.NewSkillRegistry(skillsDirs)
+	if err := skillReg.Discover(); err != nil {
+		slog.Warn("skill discovery failed; skills will not be injected", "err", err)
+	} else if skillReg.Count() > 0 {
+		slog.Info("loaded skills", "count", skillReg.Count(), "dirs", skillsDirs)
+	}
+
 	h := &api.Handler{
 		Bus:                bus,
 		Registry:           reg,
@@ -175,6 +190,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		MessageQueue:       msgQueue,
 		Metrics:            edgeMetrics,
 		WorkspaceAllowlist: append([]string(nil), cfg.WorkspaceAllowlist...),
+		SkillRegistry:      skillReg,
 	}
 	// Create default project/thread fixtures so POST /v1/runs
 	// with empty projectId/threadId works out of the box.
