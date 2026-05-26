@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -614,6 +615,68 @@ func TestAgentTeamService_HandleRouteDecisionRejectsWhenTaskLimitReached(t *test
 	assert.Contains(t, events[0].Payload, "task limit")
 }
 
+func TestAgentTeamService_HandleRouteDecisionRejectsWhenActiveSubagentLimitReached(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, supervisor, executor, run := seedAgentTeamRun(t, db)
+	for i := 0; i < model.MaxActiveSubAgentsPerRun; i++ {
+		require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
+			TeamRunID:    run.ID,
+			FromMemberID: supervisor.ID,
+			ToMemberID:   executor.ID,
+			Type:         model.AssignmentTypeDelegate,
+			TaskPrompt:   "active task",
+			Status:       model.AssignmentStatusRunning,
+			Depth:        1,
+		}))
+	}
+
+	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+		Action:       "delegate",
+		NextWorker:   executor.ID,
+		Instructions: "blocked by active limit",
+	})
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, assignment)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, model.TeamEventRouteRejected, events[0].Type)
+	assert.Contains(t, events[0].Payload, "active subagent limit")
+}
+
+func TestAgentTeamService_HandleRouteDecisionRejectsWhenRouteRepeatLimitReached(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, _, executor, run := seedAgentTeamRun(t, db)
+	repeated := model.CoordinatorRouteDecision{
+		Action:       "delegate",
+		NextWorker:   executor.ID,
+		Instructions: "repeat me",
+		Reasoning:    "same route",
+	}
+	for i := 0; i < model.MaxRouteRepeats; i++ {
+		require.NoError(t, repository.AppendTeamEvent(db, &model.AgentTeamEvent{
+			TeamRunID: run.ID,
+			Type:      model.TeamEventRouteDecided,
+			Payload:   mustJSON(t, repeated),
+		}))
+	}
+
+	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, repeated)
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, assignment)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, model.MaxRouteRepeats+1)
+	assert.Equal(t, model.TeamEventRouteRejected, events[len(events)-1].Type)
+	assert.Contains(t, events[len(events)-1].Payload, "route repeat limit")
+}
+
 func TestAgentTeamService_ListTeamTasksIsOwnerScoped(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
@@ -916,6 +979,13 @@ func seedAgentTeamRun(t *testing.T, db *gorm.DB) (*model.AgentTeam, *model.Agent
 
 func stringPtr(value string) *string {
 	return &value
+}
+
+func mustJSON(t *testing.T, value any) string {
+	t.Helper()
+	data, err := json.Marshal(value)
+	require.NoError(t, err)
+	return string(data)
 }
 
 func seedTeamRunSession(t *testing.T, db *gorm.DB, sessionID, userID string, executor *model.AgentTeamMember) {

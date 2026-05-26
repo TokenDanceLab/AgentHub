@@ -200,6 +200,7 @@ func (AgentTeamTask) TableName() string {
 const (
 	MaxDelegationDepth       = 3
 	MaxActiveSubAgentsPerRun = 5
+	MaxRouteRepeats          = 3
 	MaxTasksPerTeamRun       = 20
 	DefaultAssignmentTimeout = 30 * time.Minute
 )

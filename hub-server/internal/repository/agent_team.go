@@ -126,6 +126,17 @@ func CountActiveAssignmentsByMember(db *gorm.DB, memberID string) (int64, error)
 	return count, err
 }
 
+func CountActiveAssignmentsByTeamRun(db *gorm.DB, teamRunID string) (int64, error) {
+	var count int64
+	err := db.Model(&model.AgentTeamAssignment{}).
+		Where("team_run_id = ? AND status IN (?, ?, ?)", teamRunID,
+			model.AssignmentStatusPending,
+			model.AssignmentStatusDispatched,
+			model.AssignmentStatusRunning).
+		Count(&count).Error
+	return count, err
+}
+
 // GetAssignmentByToMember returns the most recent assignment where the given
 // member was the target (to_member_id) within a team run. Used for ancestor chain walking.
 func GetAssignmentByToMember(db *gorm.DB, teamRunID, toMemberID string) (*model.AgentTeamAssignment, error) {
