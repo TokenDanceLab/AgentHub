@@ -803,5 +803,25 @@
 
   "window.minimize": "最小化",
   "window.maximize": "最大化",
-  "window.close": "关闭"
+  "window.close": "关闭",
+  "nav.home": "首页",
+  "home.activeRuns": "活跃运行",
+  "home.viewAllRuns": "查看全部运行",
+  "home.pendingApprovals": "待审批",
+  "home.reviewApprovals": "查看审批",
+  "home.targetHealth": "目标健康",
+  "home.online": "在线",
+  "home.offline": "离线",
+  "home.edgeConnected": "Edge 已连接",
+  "home.edgeDisconnected": "Edge 已断开",
+  "home.recentThreads": "最近线程",
+  "home.viewAll": "查看全部",
+  "home.noRecentThreads": "暂无最近线程。开始一个新线程。",
+  "home.newThread": "新建线程",
+  "home.quickStartLabel": "快速开始",
+  "home.quickStart1": "审查代码库并提出改进建议",
+  "home.quickStart2": "为此模块编写单元测试",
+  "home.quickStart3": "解释一个复杂函数",
+  "settings.searchPlaceholder": "搜索设置..."
 }
+
