@@ -2748,6 +2748,33 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+  /web/agent-teams/{id}/runs/{run_id}/route-decisions:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubHandleTeamRouteDecision
+      summary: Consume a typed supervisor route decision and record accepted or rejected TeamEvent audit entries.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CoordinatorRouteDecision"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
   /web/agent-teams/{id}/runs/{run_id}/assignments:
     parameters:
       - name: id

@@ -164,6 +164,18 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.permission_requested` | P1 | Agent 请求权限审批 |
 | `run.agent.permission_decided` | P1 | 权限审批结果 |
 
+### AgentTeam / TeamRun
+
+| type | 阶段 | 说明 |
+|---|---|---|
+| `team.route.decided` | P1 | Supervisor typed route decision 已接受，payload 为 `CoordinatorRouteDecision` |
+| `team.route.rejected` | P1 | Supervisor route decision 被 guardrail 或 schema 校验拒绝，payload 包含 `decision` 和 `reason` |
+| `assignment.created` | P1 | TeamAssignment 已创建 |
+| `assignment.dispatched` | P1 | TeamAssignment 已派发到目标 Agent |
+| `assignment.completed` | P1 | TeamAssignment 完成 |
+| `assignment.failed` | P1 | TeamAssignment 失败 |
+| `assignment.cancelled` | P1 | TeamAssignment 取消 |
+
 ### Hub / Sync / Relay
 
 | type | 阶段 | 说明 |

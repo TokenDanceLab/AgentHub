@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -532,6 +533,76 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	return state, nil
 }
 
+// HandleRouteDecision consumes a typed supervisor route decision and records
+// the accepted or rejected route in the TeamEvent log.
+func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error) {
+	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+		return nil, err
+	}
+	run, err := repository.GetTeamRunByID(s.db, runID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentTaskNotFound
+		}
+		return nil, err
+	}
+	if run.TeamID != teamID {
+		return nil, errcode.AgentTaskNotFound
+	}
+
+	decision.Action = strings.ToLower(strings.TrimSpace(decision.Action))
+	if !model.ValidActions()[decision.Action] {
+		return nil, s.rejectRouteDecision(runID, decision, "invalid action")
+	}
+
+	if decision.Action == "finish" {
+		return nil, s.finishRouteDecision(runID, decision)
+	}
+
+	if strings.TrimSpace(decision.NextWorker) == "" {
+		return nil, s.rejectRouteDecision(runID, decision, "next_worker is required")
+	}
+	if strings.TrimSpace(decision.Instructions) == "" {
+		return nil, s.rejectRouteDecision(runID, decision, "instructions are required")
+	}
+
+	members, err := repository.ListTeamMembers(s.db, teamID)
+	if err != nil {
+		return nil, err
+	}
+	supervisor, worker := findSupervisorAndWorker(members, decision.NextWorker)
+	if supervisor == nil {
+		return nil, s.rejectRouteDecision(runID, decision, "supervisor member is required")
+	}
+	if worker == nil {
+		return nil, s.rejectRouteDecision(runID, decision, "next_worker is not a team member")
+	}
+
+	taskCount, err := repository.CountAssignmentsByTeamRun(s.db, runID)
+	if err != nil {
+		return nil, err
+	}
+	if taskCount >= model.MaxTasksPerTeamRun {
+		return nil, s.rejectRouteDecision(runID, decision, "task limit reached")
+	}
+
+	assignment, err := s.CreateAssignment(ctx, userID, runID, supervisor.ID, worker.ID, routeAssignmentType(decision.Action), decision.Instructions, decision.Context)
+	if err != nil {
+		if appendErr := s.appendRouteRejected(runID, decision, err.Error()); appendErr != nil {
+			return nil, appendErr
+		}
+		return nil, err
+	}
+
+	if err := s.appendTeamEvent(runID, model.TeamEventRouteDecided, decision); err != nil {
+		return nil, err
+	}
+	if err := s.appendTeamEvent(runID, model.TeamEventAssignmentCreated, assignment); err != nil {
+		return nil, err
+	}
+	return assignment, nil
+}
+
 func payloadString(payload string, keys ...string) string {
 	var values map[string]string
 	if err := json.Unmarshal([]byte(payload), &values); err != nil {
@@ -543,6 +614,79 @@ func payloadString(payload string, keys ...string) string {
 		}
 	}
 	return ""
+}
+
+func (s *AgentTeamService) finishRouteDecision(runID string, decision model.CoordinatorRouteDecision) error {
+	if err := s.appendTeamEvent(runID, model.TeamEventRouteDecided, decision); err != nil {
+		return err
+	}
+	status := model.TeamRunStatusCompleted
+	eventType := model.TeamEventRunCompleted
+	payload := map[string]string{"summary": decision.Summary}
+	if strings.TrimSpace(decision.BlockedReason) != "" {
+		status = model.TeamRunStatusFailed
+		eventType = model.TeamEventRunFailed
+		payload = map[string]string{"blocked_reason": decision.BlockedReason}
+	}
+	if err := repository.UpdateTeamRunStatus(s.db, runID, status); err != nil {
+		return err
+	}
+	return s.appendTeamEvent(runID, eventType, payload)
+}
+
+func (s *AgentTeamService) rejectRouteDecision(runID string, decision model.CoordinatorRouteDecision, reason string) error {
+	if err := s.appendRouteRejected(runID, decision, reason); err != nil {
+		return err
+	}
+	return errcode.ErrBadRequest
+}
+
+func (s *AgentTeamService) appendRouteRejected(runID string, decision model.CoordinatorRouteDecision, reason string) error {
+	return s.appendTeamEvent(runID, model.TeamEventRouteRejected, map[string]any{
+		"decision": decision,
+		"reason":   reason,
+	})
+}
+
+func (s *AgentTeamService) appendTeamEvent(runID, eventType string, payload any) error {
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return repository.AppendTeamEvent(s.db, &model.AgentTeamEvent{
+		TeamRunID: runID,
+		Type:      eventType,
+		Payload:   string(payloadBytes),
+	})
+}
+
+func findSupervisorAndWorker(members []model.AgentTeamMember, workerID string) (*model.AgentTeamMember, *model.AgentTeamMember) {
+	var supervisor *model.AgentTeamMember
+	var worker *model.AgentTeamMember
+	for i := range members {
+		member := &members[i]
+		if supervisor == nil && member.Role == model.TeamMemberRoleSupervisor {
+			supervisor = member
+		}
+		if member.ID == workerID {
+			worker = member
+		}
+	}
+	if supervisor == nil && len(members) > 0 {
+		supervisor = &members[0]
+	}
+	return supervisor, worker
+}
+
+func routeAssignmentType(action string) string {
+	switch action {
+	case "review":
+		return model.AssignmentTypeReview
+	case "approve":
+		return model.AssignmentTypeApprove
+	default:
+		return model.AssignmentTypeDelegate
+	}
 }
 
 // --- TeamAssignment ---
