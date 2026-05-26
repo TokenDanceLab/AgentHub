@@ -30,6 +30,15 @@ cd D:\Code\TokenDance\AgentHub
 
 该检查只证明仓库内端点、示例配置、存储策略、Hub WebSocket upgrade 鉴权和治理文档对齐；它不替代部署态 login -> callback -> Hub session -> WebSocket auth -> logout/reconnect 的真实 smoke。
 
+Web Hub-only 边界检查：
+
+```powershell
+cd D:\Code\TokenDance\AgentHub
+.\scripts\verify-web-hub-boundary.ps1
+```
+
+该检查会阻断浏览器端重新引入 Local Edge loopback、`/v1/runs`、`/v1/events`、旧 Edge 事件流 hook 或 Desktop-only Hub-Edge bridge。Web 中 `api/edgeClient.ts` 只保留 Hub-only 兼容 stub，用于预览状态和未登录 fallback。
+
 ## 目录结构
 
 ```text
@@ -97,7 +106,7 @@ git diff --check
 ## 已知限制
 
 - 页面中仍有从早期 HTML 原型迁移来的静态内容和远程资源引用；网络不可用时视觉效果可能不完整。
-- `baseUrl` 的 TypeScript 7.0 弃用提示来自编辑器，不是当前编译错误。
+- `baseUrl` 的 TypeScript 7.0 弃用提示来自编辑器，不是当前仓内 TypeScript 5.8 编译错误。
 - Web 的真实远程执行、审批和多端同步必须通过 Hub session + Edge target，不能绕过 Hub 直接控制任意 Edge。
 
 ## 文档入口

@@ -500,7 +500,7 @@ func TestAccessLogDoesNotModifyResponse(t *testing.T) {
 	}
 }
 
-// --- RequireLocalAuth tests (#158) ---
+// --- RequireHubSession / RequireLocalAuth tests ---
 
 func requireLocalAuthGinCtx(authSource string) (*gin.Context, *httptest.ResponseRecorder) {
 	w := httptest.NewRecorder()
@@ -510,19 +510,19 @@ func requireLocalAuthGinCtx(authSource string) (*gin.Context, *httptest.Response
 	return c, w
 }
 
-func TestRequireLocalAuthAllowsLocalAuth(t *testing.T) {
+func TestRequireHubSessionAllowsHubLocalAuth(t *testing.T) {
 	c, w := requireLocalAuthGinCtx("hub_local")
 	called := false
 	next := func(c *gin.Context) { called = true }
 
-	handler := RequireLocalAuth()
+	handler := RequireHubSession()
 	handler(c)
 	if !c.IsAborted() {
 		next(c)
 	}
 
 	if c.IsAborted() {
-		t.Fatal("expected request not to be aborted for local auth")
+		t.Fatal("expected request not to be aborted for Hub-local auth")
 	}
 	if !called {
 		t.Fatal("expected next handler to be called")
@@ -532,12 +532,12 @@ func TestRequireLocalAuthAllowsLocalAuth(t *testing.T) {
 	}
 }
 
-func TestRequireLocalAuthBlocksTokenDanceAuth(t *testing.T) {
+func TestRequireHubSessionBlocksTokenDanceAuth(t *testing.T) {
 	c, w := requireLocalAuthGinCtx("tokendance_id")
 	called := false
 	next := func(c *gin.Context) { called = true }
 
-	handler := RequireLocalAuth()
+	handler := RequireHubSession()
 	handler(c)
 	if !c.IsAborted() {
 		next(c)
@@ -554,24 +554,37 @@ func TestRequireLocalAuthBlocksTokenDanceAuth(t *testing.T) {
 	}
 }
 
-func TestRequireLocalAuthAllowsEmptyAuthSource(t *testing.T) {
+func TestRequireHubSessionBlocksEmptyAuthSource(t *testing.T) {
 	c, w := requireLocalAuthGinCtx("")
 	called := false
 	next := func(c *gin.Context) { called = true }
 
-	handler := RequireLocalAuth()
+	handler := RequireHubSession()
 	handler(c)
 	if !c.IsAborted() {
 		next(c)
 	}
 
-	if c.IsAborted() {
-		t.Fatal("expected request not to be aborted when auth_source is empty")
+	if !c.IsAborted() {
+		t.Fatal("expected request to be aborted when auth_source is empty")
 	}
-	if !called {
-		t.Fatal("expected next handler to be called")
+	if called {
+		t.Fatal("expected next handler NOT to be called")
 	}
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", w.Code)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", w.Code)
+	}
+}
+
+func TestRequireLocalAuthDelegatesToHubSession(t *testing.T) {
+	c, w := requireLocalAuthGinCtx("tokendance_id")
+
+	RequireLocalAuth()(c)
+
+	if !c.IsAborted() {
+		t.Fatal("expected RequireLocalAuth alias to require Hub-local auth")
+	}
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", w.Code)
 	}
 }
