@@ -10,6 +10,7 @@ import type {
   ListResponse,
   RunInfo,
   ThreadInfo,
+  ThreadItemInfo,
   StartRunRequest,
 } from '@shared/types';
 import { parseError } from '@shared/errors';
@@ -20,6 +21,7 @@ import {
   AgentInfoSchema,
   RunInfoSchema,
   ThreadInfoSchema,
+  ThreadItemInfoSchema,
   safeParse,
   listResponseSchema,
 } from './schemas';
@@ -31,6 +33,7 @@ export type {
   ListResponse,
   RunInfo,
   ThreadInfo,
+  ThreadItemInfo,
   StartRunRequest,
 };
 
@@ -90,6 +93,36 @@ export async function fetchThreads(projectId?: string): Promise<ListResponse<Thr
   const res = await fetch(`${BASE}/v1/threads${params}`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
   return safeParse(listResponseSchema(ThreadInfoSchema), await res.json(), 'threads');
+}
+
+export interface CreateThreadRequest {
+  projectId?: string;
+  threadId?: string;
+  title?: string;
+}
+
+export async function createThread(req: CreateThreadRequest = {}): Promise<ThreadInfo> {
+  const res = await fetch(`${BASE}/v1/threads`, {
+    method: 'POST',
+    headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) throw await parseError(res);
+  return safeParse(ThreadInfoSchema, await res.json(), 'createThread');
+}
+
+export async function fetchThreadItems(
+  threadId: string,
+): Promise<ListResponse<ThreadItemInfo>> {
+  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/items`, {
+    headers: edgeAuthHeaders(),
+  });
+  if (!res.ok) throw await parseError(res);
+  return safeParse(
+    listResponseSchema(ThreadItemInfoSchema),
+    await res.json(),
+    'threadItems',
+  );
 }
 
 export async function fetchRuns(projectId?: string, threadId?: string): Promise<ListResponse<RunInfo>> {
