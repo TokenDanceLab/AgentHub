@@ -95,6 +95,32 @@
   background: rgba(255, 255, 255, 0.065);
 }
 
+.sidebarSearch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  background: var(--input);
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+.sidebarSearch input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: var(--font-size-sm);
+  color: var(--foreground);
+  outline: none;
+  font-family: var(--font-sans);
+}
+
+.sidebarSearch input::placeholder {
+  color: var(--muted-foreground);
+}
+
 .nav {
   flex: 1;
   min-height: 0;

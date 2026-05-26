@@ -778,5 +778,25 @@
   "connectAgent.disconnected": "Disconnected",
   "window.minimize": "Minimize",
   "window.maximize": "Maximize",
-  "window.close": "Close"
+  "window.close": "Close",
+  "nav.home": "Home",
+  "home.activeRuns": "Active Runs",
+  "home.viewAllRuns": "View all runs",
+  "home.pendingApprovals": "Pending Approvals",
+  "home.reviewApprovals": "Review approvals",
+  "home.targetHealth": "Target Health",
+  "home.online": "Online",
+  "home.offline": "Offline",
+  "home.edgeConnected": "Edge connected",
+  "home.edgeDisconnected": "Edge disconnected",
+  "home.recentThreads": "Recent Threads",
+  "home.viewAll": "View all",
+  "home.noRecentThreads": "No recent threads. Start a new thread to begin.",
+  "home.newThread": "New Thread",
+  "home.quickStartLabel": "Quick Start",
+  "home.quickStart1": "Review the codebase and suggest improvements",
+  "home.quickStart2": "Write unit tests for this module",
+  "home.quickStart3": "Explain a complex function",
+  "settings.searchPlaceholder": "Search settings..."
 }
+

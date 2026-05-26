@@ -1,0 +1,286 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  padding: var(--space-xl) var(--space-2xl);
+  overflow-y: auto;
+  height: 100%;
+}
+
+/* ── Top stats row ──────────────────────── */
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.statCard:hover {
+  border-color: var(--ring);
+}
+
+.statLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+}
+
+.statValue {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--foreground);
+  line-height: 1.2;
+}
+
+.statFooter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--primary);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  align-self: flex-start;
+}
+
+.statFooter:hover {
+  text-decoration: underline;
+}
+
+/* ── Health indicator ──────────────────── */
+
+.healthStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.healthDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.healthDotGreen {
+  background: var(--color-success);
+}
+
+.healthDotYellow {
+  background: var(--warning);
+}
+
+.healthDotRed {
+  background: var(--color-danger);
+}
+
+/* ── Recent threads section ────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionTitle {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--foreground);
+}
+
+.sectionLink {
+  font-size: var(--font-size-xs);
+  color: var(--primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+
+.sectionLink:hover {
+  text-decoration: underline;
+}
+
+/* ── Thread list ───────────────────────── */
+
+.threadList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.threadItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.threadItem:hover {
+  background: var(--surface-raised-hover);
+}
+
+.threadItemIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--secondary);
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+.threadItemBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.threadItemTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.threadItemMeta {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.threadItemTime {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+/* ── Empty state ───────────────────────── */
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  border: 1px dashed var(--border);
+}
+
+/* ── Bottom CTA section ────────────────── */
+
+.ctaSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+.ctaButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-xl);
+  border-radius: var(--radius-lg);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--ease-out);
+  align-self: flex-start;
+}
+
+.ctaButton:hover {
+  opacity: 0.9;
+}
+
+.quickStart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.quickStartLabel {
+  font-size: var(--font-size-xs);
+  color: var(--muted-foreground);
+  font-weight: var(--font-weight-medium);
+}
+
+.quickStartChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-full);
+  background: var(--secondary);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+
+.chip:hover {
+  background: var(--surface-raised-hover);
+  border-color: var(--ring);
+}
+
+/* ── Responsive ────────────────────────── */
+
+@media (max-width: 1023px) {
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+}

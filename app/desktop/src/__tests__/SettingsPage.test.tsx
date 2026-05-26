@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import SettingsPage from '@/components/SettingsPage';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
@@ -485,5 +485,52 @@ describe('SettingsPage tasks', () => {
     const localProvider = useModelSettingsStore.getState().ccSwitchProviders.find((item) => item.id === 'cc-switch-local');
     expect(localProvider).toMatchObject({ health: 'ready', notes: 'healthy after manual check' });
     expect(screen.getAllByText('settings.ccSwitchHealth').length).toBeGreaterThan(0);
+  });
+});
+
+describe('SettingsPage search', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    useModelSettingsStore.getState().reset();
+  });
+
+  it('renders search input in sidebar', () => {
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="general" />);
+
+    const searchInput = screen.getByPlaceholderText('settings.searchPlaceholder');
+    expect(searchInput).toBeInTheDocument();
+  });
+
+  it('filters nav items by search query', () => {
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="general" />);
+
+    const searchInput = screen.getByPlaceholderText('settings.searchPlaceholder');
+    fireEvent.change(searchInput, { target: { value: 'appearance' } });
+
+    // Scope nav queries to the sidebar <nav> to avoid matching content headings
+    const nav = screen.getByRole('navigation');
+    expect(within(nav).getByText('settings.appearance')).toBeInTheDocument();
+    expect(within(nav).queryByText('settings.general')).not.toBeInTheDocument();
+  });
+
+  it('shows all nav items when search is empty', () => {
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="general" />);
+
+    const nav = screen.getByRole('navigation');
+    expect(within(nav).getByText('settings.general')).toBeInTheDocument();
+    expect(within(nav).getByText('settings.appearance')).toBeInTheDocument();
+    expect(within(nav).getByText('settings.account')).toBeInTheDocument();
+  });
+
+  it('shows no items when search matches nothing', () => {
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="general" />);
+
+    const searchInput = screen.getByPlaceholderText('settings.searchPlaceholder');
+    fireEvent.change(searchInput, { target: { value: 'zzzdoesnotexistzzz' } });
+
+    const nav = screen.getByRole('navigation');
+    expect(within(nav).queryByText('settings.general')).not.toBeInTheDocument();
+    expect(within(nav).queryByText('settings.appearance')).not.toBeInTheDocument();
   });
 });
