@@ -2748,6 +2748,27 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+  /web/agent-teams/{id}/runs/{run_id}/events:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListTeamEvents
+      summary: List append-only TeamEvent entries for a team run.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
   /web/agent-teams/{id}/runs/{run_id}/route-decisions:
     parameters:
       - name: id
