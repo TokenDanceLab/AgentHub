@@ -1833,6 +1833,22 @@ paths:
                           $ref: "#/components/schemas/AgentProfile"
                       page:
                         $ref: "#/components/schemas/PageInfo"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateAgentProfile
+      summary: Create a new Agent Profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgentProfileRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
 
   /web/custom-agents:
     get:
@@ -3229,6 +3245,460 @@ paths:
         "202":
           $ref: "#/components/responses/Accepted"
 
+  # ═══════════════════════════════════════════════════════════
+  # Hub Server — additional /web routes (Phase 2–6)
+  # ═══════════════════════════════════════════════════════════
+
+  # ── Agent Profiles (CRUD beyond GET list) ──
+
+  /web/agent-profiles/{profileId}:
+    parameters:
+      - name: profileId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetAgentProfile
+      summary: Get an Agent Profile by id.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateAgentProfile
+      summary: Update an Agent Profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentProfileRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteAgentProfile
+      summary: Delete an Agent Profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Deleted.
+
+  /web/agent-profiles/{profileId}:publish:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPublishAgentProfile
+      summary: Publish an Agent Profile to the marketplace (admin only).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/agent-profiles/{profileId}:install:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubInstallAgentProfile
+      summary: Install an Agent Profile from the marketplace.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Skills ──
+
+  /web/skills:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListSkills
+      summary: List skills owned by the current user.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateSkill
+      summary: Create a skill.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSkillRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /web/skills/{skillId}:
+    parameters:
+      - name: skillId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetSkill
+      summary: Get a skill.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    put:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateSkill
+      summary: Update a skill.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSkillRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteSkill
+      summary: Delete a skill.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Deleted.
+
+  /web/skills/{skillId}:publish:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPublishSkill
+      summary: Publish a skill to the marketplace (admin only).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/skills/{skillId}:unpublish:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubUnpublishSkill
+      summary: Unpublish a skill from the marketplace (admin only).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── MCP Servers ──
+
+  /web/mcp-servers:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListMCPServers
+      summary: List MCP servers owned by the current user.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateMCPServer
+      summary: Create an MCP server.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMCPServerRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /web/mcp-servers/{serverId}:
+    parameters:
+      - name: serverId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetMCPServer
+      summary: Get an MCP server.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    put:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateMCPServer
+      summary: Update an MCP server.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMCPServerRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteMCPServer
+      summary: Delete an MCP server.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Deleted.
+
+  /web/mcp-servers/{serverId}:publish:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPublishMCPServer
+      summary: Publish an MCP server to the marketplace (admin only).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/mcp-servers/{serverId}:unpublish:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubUnpublishMCPServer
+      summary: Unpublish an MCP server from the marketplace (admin only).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Provider Bindings ──
+
+  /web/provider-bindings:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListProviderBindings
+      summary: List provider bindings.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateProviderBinding
+      summary: Create a provider binding.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProviderBindingRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /web/provider-bindings/{bindingId}:
+    parameters:
+      - name: bindingId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateProviderBinding
+      summary: Update a provider binding.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProviderBindingRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteProviderBinding
+      summary: Delete a provider binding.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Deleted.
+
+  # ── Market ──
+
+  /web/market/profiles:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubSearchMarketProfiles
+      summary: Search published Agent Profiles in the marketplace.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+          description: Search keyword for profile name or description.
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /web/market/profiles/{profileId}:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetMarketProfile
+      summary: Get a published marketplace profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/market/profiles/{profileId}:install:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubInstallMarketProfile
+      summary: Install a marketplace profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/market/profiles/{profileId}:rate:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRateMarketProfile
+      summary: Rate a marketplace profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -4059,6 +4529,285 @@ components:
         run_id: { type: string, format: uuid }
         result: { type: string }
         depth: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateAgentProfileRequest:
+      type: object
+      required: [name, runtime_id]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        runtime_id:
+          type: string
+          description: Agent Runtime id such as codex, claude-code, or opencode.
+        model:
+          type: string
+        provider:
+          type: string
+        reasoning_effort:
+          type: string
+        permission_mode:
+          type: string
+        model_mapping:
+          type: object
+          additionalProperties: true
+        skills:
+          type: array
+          items:
+            type: string
+            format: uuid
+        mcp_servers:
+          type: array
+          items:
+            type: string
+            format: uuid
+        tool_allowlist:
+          type: array
+          items:
+            type: string
+        approval_policy:
+          type: object
+          additionalProperties: true
+        target_preferences:
+          type: object
+          additionalProperties: true
+        context_budget_max_tokens:
+          type: integer
+        is_public:
+          type: boolean
+
+    UpdateAgentProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        runtime_id:
+          type: string
+        model:
+          type: string
+        provider:
+          type: string
+        reasoning_effort:
+          type: string
+        permission_mode:
+          type: string
+        model_mapping:
+          type: object
+          additionalProperties: true
+        skills:
+          type: array
+          items:
+            type: string
+            format: uuid
+        mcp_servers:
+          type: array
+          items:
+            type: string
+            format: uuid
+        tool_allowlist:
+          type: array
+          items:
+            type: string
+        approval_policy:
+          type: object
+          additionalProperties: true
+        target_preferences:
+          type: object
+          additionalProperties: true
+        context_budget_max_tokens:
+          type: integer
+        is_public:
+          type: boolean
+
+    Skill:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        owner_id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        skill_type: { type: string }
+        config: { type: object, additionalProperties: true }
+        is_public: { type: boolean }
+        install_count: { type: integer }
+        version: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateSkillRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        skill_type:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+        is_public:
+          type: boolean
+
+    UpdateSkillRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        skill_type:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+        is_public:
+          type: boolean
+
+    MCPServer:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        owner_id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        transport: { type: string }
+        command: { type: string }
+        args: { type: string }
+        env: { type: string }
+        url: { type: string }
+        headers: { type: string }
+        is_public: { type: boolean }
+        install_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateMCPServerRequest:
+      type: object
+      required: [name, transport]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        transport:
+          type: string
+          enum: [stdio, sse, streamable]
+        command:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        url:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        is_public:
+          type: boolean
+
+    UpdateMCPServerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        transport:
+          type: string
+          enum: [stdio, sse, streamable]
+        command:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        url:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        is_public:
+          type: boolean
+
+    ProviderBinding:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        owner_id: { type: string, format: uuid }
+        provider: { type: string }
+        api_base: { type: string }
+        api_key: { type: string }
+        models: { type: string }
+        is_default: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateProviderBindingRequest:
+      type: object
+      required: [provider]
+      properties:
+        provider:
+          type: string
+        api_base:
+          type: string
+        api_key:
+          type: string
+        models:
+          type: array
+          items:
+            type: string
+        is_default:
+          type: boolean
+
+    UpdateProviderBindingRequest:
+      type: object
+      properties:
+        provider:
+          type: string
+        api_base:
+          type: string
+        api_key:
+          type: string
+        models:
+          type: array
+          items:
+            type: string
+        is_default:
+          type: boolean
+
+    Device:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        owner_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+        device_type: { type: string }
+        device_name: { type: string }
+        app_version: { type: string }
+        is_online: { type: boolean }
+        last_seen_at: { type: string, format: date-time }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
