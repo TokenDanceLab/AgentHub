@@ -2818,6 +2818,38 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+  /web/agent-teams/{id}/runs/{run_id}/conflicts/{conflict_id}/resolve:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: conflict_id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubResolveTeamConflict
+      summary: Resolve a projected TeamRun file conflict and append an auditable TeamEvent.
+      description: Validates that the conflict still exists in the replayed TeamRunState, records the human decision as team.conflict.resolved, and marks the conflict resolved on subsequent state replay.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamConflictResolveRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
   /web/agent-teams/{id}/runs/{run_id}/assignments:
     parameters:
       - name: id
@@ -4794,6 +4826,27 @@ components:
           items: { type: string }
         first_seen_at: { type: string, format: date-time }
         last_seen_at: { type: string, format: date-time }
+        resolution:
+          type: string
+          enum: [accept_agent_task, manual_merge, keep_all, discard_all, blocked]
+        resolved_by: { type: string, format: uuid }
+        resolved_at: { type: string, format: date-time }
+        reason: { type: string }
+        selected_agent_task_id: { type: string, format: uuid }
+
+    TeamConflictResolveRequest:
+      type: object
+      required: [resolution]
+      properties:
+        path: { type: string }
+        resolution:
+          type: string
+          enum: [accept_agent_task, manual_merge, keep_all, discard_all, blocked]
+        selected_agent_task_id:
+          type: string
+          format: uuid
+          description: Required when resolution is accept_agent_task.
+        reason: { type: string }
 
     TeamAssignmentState:
       type: object

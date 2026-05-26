@@ -636,10 +636,98 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		case model.TeamEventRunFailed:
 			state.Status = model.TeamRunStatusFailed
 			state.TerminalReason = payloadString(event.Payload, "reason", "blocked_reason")
+		case model.TeamEventConflictResolved:
+			var resolution model.TeamConflictResolution
+			if err := json.Unmarshal([]byte(event.Payload), &resolution); err == nil {
+				applyConflictResolution(state.Conflicts, resolution)
+			}
 		}
 	}
 
 	return state, nil
+}
+
+func (s *AgentTeamService) ResolveConflict(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error) {
+	resolution.ConflictID = strings.TrimSpace(resolution.ConflictID)
+	resolution.Path = normalizedArtifactPath(resolution.Path)
+	resolution.Resolution = strings.ToLower(strings.TrimSpace(resolution.Resolution))
+	resolution.SelectedAgentTaskID = strings.TrimSpace(resolution.SelectedAgentTaskID)
+	resolution.Reason = strings.TrimSpace(resolution.Reason)
+	if resolution.ConflictID == "" && resolution.Path != "" {
+		resolution.ConflictID = conflictIDForPath(resolution.Path)
+	}
+	if resolution.ConflictID == "" || !validConflictResolution(resolution.Resolution) {
+		return nil, errcode.ErrBadRequest
+	}
+
+	state, err := s.GetTeamRunState(ctx, userID, teamID, runID)
+	if err != nil {
+		return nil, err
+	}
+	conflict := findConflict(state.Conflicts, resolution.ConflictID)
+	if conflict == nil {
+		return nil, errcode.ErrBadRequest
+	}
+	if conflict.Status == model.TeamConflictStatusResolved {
+		return nil, errcode.ErrBadRequest
+	}
+	if resolution.Path == "" {
+		resolution.Path = conflict.Path
+	}
+	if resolution.Resolution == model.TeamConflictResolutionAcceptAgentTask && !stringInSlice(conflict.AgentTaskIDs, resolution.SelectedAgentTaskID) {
+		return nil, errcode.ErrBadRequest
+	}
+	now := time.Now().UTC()
+	resolution.ResolvedBy = userID
+	resolution.ResolvedAt = now
+	if err := s.appendTeamEvent(runID, model.TeamEventConflictResolved, resolution); err != nil {
+		return nil, err
+	}
+	resolved := *conflict
+	resolved.Status = model.TeamConflictStatusResolved
+	resolved.Resolution = resolution.Resolution
+	resolved.ResolvedBy = resolution.ResolvedBy
+	resolved.ResolvedAt = &now
+	resolved.Reason = resolution.Reason
+	resolved.SelectedTask = resolution.SelectedAgentTaskID
+	return &resolved, nil
+}
+
+func findConflict(conflicts []model.TeamConflictState, conflictID string) *model.TeamConflictState {
+	for i := range conflicts {
+		if conflicts[i].ConflictID == conflictID {
+			return &conflicts[i]
+		}
+	}
+	return nil
+}
+
+func validConflictResolution(resolution string) bool {
+	switch resolution {
+	case model.TeamConflictResolutionAcceptAgentTask,
+		model.TeamConflictResolutionManualMerge,
+		model.TeamConflictResolutionKeepAll,
+		model.TeamConflictResolutionDiscardAll,
+		model.TeamConflictResolutionBlocked:
+		return true
+	default:
+		return false
+	}
+}
+
+func applyConflictResolution(conflicts []model.TeamConflictState, resolution model.TeamConflictResolution) {
+	for i := range conflicts {
+		if conflicts[i].ConflictID != resolution.ConflictID {
+			continue
+		}
+		resolvedAt := resolution.ResolvedAt
+		conflicts[i].Status = model.TeamConflictStatusResolved
+		conflicts[i].Resolution = resolution.Resolution
+		conflicts[i].ResolvedBy = resolution.ResolvedBy
+		conflicts[i].ResolvedAt = &resolvedAt
+		conflicts[i].Reason = resolution.Reason
+		conflicts[i].SelectedTask = resolution.SelectedAgentTaskID
+	}
 }
 
 type teamRuntimeTaskRef struct {
@@ -769,7 +857,7 @@ func projectTeamConflicts(artifacts []model.TeamArtifactState) []model.TeamConfl
 				conflict: model.TeamConflictState{
 					ConflictID:  conflictIDForPath(path),
 					Path:        path,
-					Status:      "pending",
+					Status:      model.TeamConflictStatusPending,
 					FirstSeenAt: artifact.CreatedAt,
 					LastSeenAt:  artifact.CreatedAt,
 				},
@@ -852,6 +940,19 @@ func appendUniqueString(values []string, value string) []string {
 		}
 	}
 	return append(values, value)
+}
+
+func stringInSlice(values []string, value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	for _, existing := range values {
+		if existing == value {
+			return true
+		}
+	}
+	return false
 }
 
 func projectTeamBudget(runEvents []model.AgentRunEvent, runCount int) *model.TeamBudget {
