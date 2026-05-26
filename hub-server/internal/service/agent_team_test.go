@@ -1002,6 +1002,137 @@ func TestAgentTeamService_GetTeamRunStateProjectsDependenciesAndBudget(t *testin
 	assert.ElementsMatch(t, []string{"modified"}, state.Conflicts[0].Actions)
 }
 
+func TestAgentTeamService_ResolveConflictAppendsEventAndUpdatesReplay(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, _, executor, run := seedAgentTeamRun(t, db)
+	reviewerProfileID := "profile-reviewer"
+	reviewer := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: &reviewerProfileID,
+		Role:           model.TeamMemberRoleReviewer,
+	}
+	require.NoError(t, repository.AddTeamMember(db, reviewer))
+	firstTaskID := "agent-task-one"
+	secondTaskID := "agent-task-two"
+	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: executor.ID,
+		Status:           model.TeamTaskStatusDone,
+		Objective:        "Change shared file",
+		RunID:            &firstTaskID,
+	}))
+	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: reviewer.ID,
+		Status:           model.TeamTaskStatusDone,
+		Objective:        "Review shared file",
+		RunID:            &secondTaskID,
+	}))
+	for _, event := range []model.AgentRunEvent{
+		{
+			TaskID:          firstTaskID,
+			EdgeRunID:       "edge-one",
+			SessionID:       run.SessionID,
+			AgentInstanceID: "agent-one",
+			EventType:       "run.agent.file_change",
+			Payload:         `{"path":"shared.txt","action":"modified","status":"completed"}`,
+		},
+		{
+			TaskID:          secondTaskID,
+			EdgeRunID:       "edge-two",
+			SessionID:       run.SessionID,
+			AgentInstanceID: "agent-two",
+			EventType:       "run.agent.file_change",
+			Payload:         `{"path":"./shared.txt","action":"modified","status":"completed"}`,
+		},
+	} {
+		require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &event))
+	}
+
+	conflictID := conflictIDForPath("shared.txt")
+	resolved, err := svc.ResolveConflict(context.Background(), "user-1", team.ID, run.ID, model.TeamConflictResolution{
+		ConflictID:          conflictID,
+		Resolution:          model.TeamConflictResolutionAcceptAgentTask,
+		SelectedAgentTaskID: firstTaskID,
+		Reason:              "Use executor result",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resolved)
+	assert.Equal(t, model.TeamConflictStatusResolved, resolved.Status)
+	assert.Equal(t, model.TeamConflictResolutionAcceptAgentTask, resolved.Resolution)
+	assert.Equal(t, firstTaskID, resolved.SelectedTask)
+	assert.Equal(t, "user-1", resolved.ResolvedBy)
+	require.NotNil(t, resolved.ResolvedAt)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, model.TeamEventConflictResolved, events[0].Type)
+	assert.Contains(t, events[0].Payload, firstTaskID)
+
+	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
+	require.NoError(t, err)
+	require.Len(t, state.Conflicts, 1)
+	assert.Equal(t, model.TeamConflictStatusResolved, state.Conflicts[0].Status)
+	assert.Equal(t, model.TeamConflictResolutionAcceptAgentTask, state.Conflicts[0].Resolution)
+	assert.Equal(t, firstTaskID, state.Conflicts[0].SelectedTask)
+}
+
+func TestAgentTeamService_ResolveConflictRejectsTaskOutsideConflict(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, _, executor, run := seedAgentTeamRun(t, db)
+	reviewerProfileID := "profile-reviewer"
+	reviewer := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: &reviewerProfileID,
+		Role:           model.TeamMemberRoleReviewer,
+	}
+	require.NoError(t, repository.AddTeamMember(db, reviewer))
+	taskID := "agent-task-one"
+	otherTaskID := "agent-task-two"
+	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: executor.ID,
+		Status:           model.TeamTaskStatusDone,
+		Objective:        "Change shared file",
+		RunID:            &taskID,
+	}))
+	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: reviewer.ID,
+		Status:           model.TeamTaskStatusDone,
+		Objective:        "Review shared file",
+		RunID:            &otherTaskID,
+	}))
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          taskID,
+		EdgeRunID:       "edge-one",
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-one",
+		EventType:       "run.agent.file_change",
+		Payload:         `{"path":"shared.txt","action":"modified","status":"completed"}`,
+	}))
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          otherTaskID,
+		EdgeRunID:       "edge-two",
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-two",
+		EventType:       "run.agent.file_change",
+		Payload:         `{"path":"shared.txt","action":"modified","status":"completed"}`,
+	}))
+
+	resolved, err := svc.ResolveConflict(context.Background(), "user-1", team.ID, run.ID, model.TeamConflictResolution{
+		ConflictID:          conflictIDForPath("shared.txt"),
+		Resolution:          model.TeamConflictResolutionAcceptAgentTask,
+		SelectedAgentTaskID: "missing-task",
+	})
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, resolved)
+}
+
 func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
