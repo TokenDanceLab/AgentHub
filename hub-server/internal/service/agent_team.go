@@ -219,16 +219,29 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		}
 		return nil, err
 	}
-	if team.OwnerID != userID {
-		return nil, errcode.AgentNotFound
-	}
-
 	members, err := repository.ListTeamMembers(s.db, teamID)
 	if err != nil {
 		return nil, err
 	}
 	if len(members) == 0 {
 		return nil, errcode.ErrBadRequest
+	}
+
+	// Allow owner or team member (user who owns any agent profile in the team).
+	if team.OwnerID != userID {
+		isMember := false
+		for _, m := range members {
+			if m.AgentProfileID != nil && *m.AgentProfileID != "" {
+				ca, caErr := repository.GetCustomAgentByID(s.db, *m.AgentProfileID)
+				if caErr == nil && ca.OwnerUserID == userID {
+					isMember = true
+					break
+				}
+			}
+		}
+		if !isMember {
+			return nil, errcode.AgentNotFound
+		}
 	}
 
 	// Find the supervisor: first member with role=supervisor, or first member.
@@ -260,6 +273,16 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		Status:         model.TeamRunStatusQueued,
 	}
 
+	// Collect custom agent IDs for batch query.
+	var customAgentIDs []string
+	for _, m := range members {
+		if m.AgentProfileID != nil && *m.AgentProfileID != "" {
+			customAgentIDs = append(customAgentIDs, *m.AgentProfileID)
+		}
+	}
+
+	var supervisorAIID string
+
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		if err := repository.CreateSession(tx, session); err != nil {
 			return err
@@ -275,13 +298,23 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 			return err
 		}
 
+		// Batch query all custom agents referenced by team members.
+		customAgentMap := make(map[string]*model.CustomAgent)
+		if len(customAgentIDs) > 0 {
+			var agents []model.CustomAgent
+			if err := tx.Where("id IN ? AND deleted_at IS NULL", customAgentIDs).Find(&agents).Error; err == nil {
+				for i := range agents {
+					customAgentMap[agents[i].ID] = &agents[i]
+				}
+			}
+		}
+
 		// Create agent instances for each team member.
 		for i := range members {
 			m := &members[i]
 			displayName := team.Name + " Agent"
-			if m.AgentProfileID != nil && *m.AgentProfileID != "" {
-				ca, err := repository.GetCustomAgentByID(tx, *m.AgentProfileID)
-				if err == nil {
+			if m.AgentProfileID != nil {
+				if ca, ok := customAgentMap[*m.AgentProfileID]; ok {
 					displayName = ca.Name
 				}
 			}
@@ -293,12 +326,16 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 			}
 			if m.AgentProfileID != nil && *m.AgentProfileID != "" {
 				ai.CustomAgentID = m.AgentProfileID
-				if ca, err := repository.GetCustomAgentByID(tx, *m.AgentProfileID); err == nil {
+				if ca, ok := customAgentMap[*m.AgentProfileID]; ok {
 					ai.AgentType = ca.AgentType
 				}
 			}
 			if err := repository.CreateAgentInstance(tx, ai); err != nil {
 				return err
+			}
+			// Track supervisor agent instance ID.
+			if m.ID == supervisorMember.ID {
+				supervisorAIID = ai.ID
 			}
 			sm := &model.SessionMember{
 				SessionID:  session.ID,
@@ -331,22 +368,9 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 			return err
 		}
 
-		// Find the supervisor agent instance.
-		supervisorAgentInstanceID := ""
-		agents, listErr := repository.ListAgentInstancesBySession(tx, session.ID)
-		if listErr != nil || len(agents) == 0 {
+		// Verify we have a supervisor agent instance.
+		if supervisorAIID == "" {
 			return errcode.AgentNotFound
-		}
-		// Match supervisor by custom_agent_id.
-		for i := range agents {
-			agent := &agents[i]
-			if supervisorMember.AgentProfileID != nil && agent.CustomAgentID != nil && *agent.CustomAgentID == *supervisorMember.AgentProfileID {
-				supervisorAgentInstanceID = agent.ID
-				break
-			}
-		}
-		if supervisorAgentInstanceID == "" {
-			supervisorAgentInstanceID = agents[0].ID
 		}
 
 		// Persist the run record now so TriggerAgentTask can reference it.
@@ -372,25 +396,6 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		}
 	}
 
-	// Now trigger the supervisor agent task.
-	// We need to find the supervisor agent instance ID from the session.
-	agents, err := repository.ListAgentInstancesBySession(s.db, session.ID)
-	if err != nil || len(agents) == 0 {
-		_ = repository.UpdateTeamRunStatus(s.db, run.ID, model.TeamRunStatusFailed)
-		return run, errcode.AgentNotFound
-	}
-
-	var supervisorAIID string
-	for i := range agents {
-		agent := &agents[i]
-		if supervisorMember.AgentProfileID != nil && agent.CustomAgentID != nil && *agent.CustomAgentID == *supervisorMember.AgentProfileID {
-			supervisorAIID = agent.ID
-			break
-		}
-	}
-	if supervisorAIID == "" {
-		supervisorAIID = agents[0].ID
-	}
 
 	// Trigger the task. This dispatches asynchronously.
 	if _, err := s.agentSvc.TriggerAgentTask(ctx, userID, "", supervisorAIID, "", "", "", ""); err != nil {
