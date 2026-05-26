@@ -31,7 +31,7 @@ type mockEdgeAgentService struct {
 func (m *mockEdgeAgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
 	return m.addAgentFn(ctx, userID, sessionID, agentType, customAgentID, displayName)
 }
-func (m *mockEdgeAgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error) {
+func (m *mockEdgeAgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams string) (*model.PendingAgentTask, error) {
 	return m.triggerTaskFn(ctx, userID, triggerMessageID)
 }
 func (m *mockEdgeAgentService) CancelTask(ctx context.Context, userID, taskID string) error {

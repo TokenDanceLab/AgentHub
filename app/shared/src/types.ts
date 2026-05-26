@@ -166,6 +166,11 @@ export interface AgentInfo {
   name: string;
   description?: string;
   version?: string;
+  profileId?: string;
+  runtimeId?: string;
+  model?: string;
+  provider?: string;
+  reasoningEffort?: string;
   status: 'available' | 'unavailable' | 'configuring';
   capabilities: AgentCapabilities;
 }

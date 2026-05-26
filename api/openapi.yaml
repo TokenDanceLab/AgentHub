@@ -7,11 +7,12 @@ info:
     message deltas, approvals and artifact notifications are delivered through
     WebSocket typed events documented in api/events.md.
 
-    ## Implementation Status (2026-05-24)
+    ## Implementation Status (2026-05-26)
 
     **Edge Server**: Core endpoints (health/runs/threads/projects/agents/events/permissions)
-    are fully implemented. P0 endpoints for approvals, artifacts, previews, workspaces,
-    and runner management are declared but not yet implemented — see phase tags.
+    are implemented. `/v1/runners` remains a compatibility surface for runtime/
+    target health; new architecture language should use Agent Runtime, Agent
+    Profile, and Execution Target.
 
     **Hub Server**: All documented `/client/auth`, `/client/contacts`, `/client/sessions`,
     `/client/messages`, `/edge/*`, `/web/*` endpoints are implemented. Additional routes
@@ -36,7 +37,7 @@ tags:
   - name: IMProject
     description: Project, conversation, thread, message and item APIs.
   - name: ExecutionRunner
-    description: Runner, AgentRun, approval, artifact, preview and workspace APIs.
+    description: Agent Runtime, compatibility runner health, AgentRun, approval, artifact, preview and workspace APIs.
   - name: HubSyncRelay
     description: Auth, user, contact, group, device, edge, sync, relay and cloud APIs.
 
@@ -57,9 +58,17 @@ paths:
       tags: [Foundation]
       operationId: openEventStream
       summary: Open WebSocket event stream.
-      description: WebSocket handshake surface. Event envelope and event types are documented in api/events.md.
+      description: >
+        Local Edge WebSocket handshake surface. Event envelope and event types are
+        documented in api/events.md. When local Edge auth is enabled, browser
+        clients use `access_token` query auth; native clients may use the same
+        local Edge token through Authorization or X-AgentHub-Edge-Token.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
+      security:
+        - edgeWebSocketQueryToken: []
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/PageCursor"
       responses:
@@ -452,6 +461,9 @@ paths:
       summary: List AgentRuns.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ThreadIdQuery"
         - $ref: "#/components/parameters/PageSize"
@@ -469,6 +481,9 @@ paths:
         New callers should pass projectId and threadId explicitly.
       x-agenthub-phase: P0
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       requestBody:
         required: false
         content:
@@ -1054,6 +1069,18 @@ paths:
               properties:
                 trigger_message_id:
                   type: string
+                agent_instance_id:
+                  type: string
+                  description: Optional exact AgentInstance id to dispatch. When provided, Hub must not fall back to another agent.
+                agent_type:
+                  type: string
+                  description: Optional Edge Runtime adapter id such as codex, claude-code, or opencode.
+                custom_agent_id:
+                  type: string
+                  description: Optional CustomAgent id to dispatch. When provided, Hub must not fall back to another custom agent.
+                model_params:
+                  type: string
+                  description: Optional JSON string with model/provider/reasoning hints copied into the agent.dispatch payload.
       responses:
         "200":
           description: Task dispatched.
@@ -2903,6 +2930,37 @@ paths:
           $ref: "#/components/responses/Accepted"
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Hub HS256 access token
+      description: >
+        Hub-issued access token minted by Hub Server after password login or
+        TokenDance ID OIDC exchange. Do not send a raw TokenDance ID RS256
+        bearer token or a Relay API key to Hub REST/WebSocket endpoints.
+    edgeBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Local Edge token
+      description: >
+        Optional Local Edge token configured by AGENTHUB_EDGE_AUTH_TOKEN or
+        --local-auth-token. This is only the loopback Edge process boundary and
+        is not a Hub session, TokenDance ID token, or Relay API key.
+    edgeLocalToken:
+      type: apiKey
+      in: header
+      name: X-AgentHub-Edge-Token
+      description: >
+        Header alternative for the optional Local Edge token when Authorization
+        is already owned by another caller context.
+    edgeWebSocketQueryToken:
+      type: apiKey
+      in: query
+      name: access_token
+      description: >
+        Browser WebSocket transport for the optional Local Edge token on
+        /v1/events. Hub WebSocket uses Hub-issued access tokens separately.
   parameters:
     PageSize:
       name: pageSize
