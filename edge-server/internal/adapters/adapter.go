@@ -131,6 +131,7 @@ const (
 	BusEventSessionMetrics      = "run.agent.session_metrics"
 	BusEventContextUsage        = "run.agent.context_usage"
 	BusEventContextWarning      = "run.agent.context_warning"
+	BusEventContextCompaction   = "run.agent.context_compaction"
 )
 
 // Context keys for adapter-level context propagation.
