@@ -128,6 +128,30 @@ func GetAssignmentByToMember(db *gorm.DB, teamRunID, toMemberID string) (*model.
 	return &a, err
 }
 
+// AgentTeamTask
+
+func CreateTeamTask(db *gorm.DB, task *model.AgentTeamTask) error {
+	if task.InputRefs == "" {
+		task.InputRefs = "{}"
+	}
+	if task.Attempt == 0 {
+		task.Attempt = 1
+	}
+	if task.RiskLevel == "" {
+		task.RiskLevel = model.TeamTaskRiskNormal
+	}
+	if task.Status == "" {
+		task.Status = model.TeamTaskStatusPending
+	}
+	return db.Create(task).Error
+}
+
+func ListTeamTasksByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamTask, error) {
+	var tasks []model.AgentTeamTask
+	err := db.Where("team_run_id = ?", teamRunID).Order("created_at ASC").Find(&tasks).Error
+	return tasks, err
+}
+
 // AgentTeamEvent
 
 func AppendTeamEvent(db *gorm.DB, event *model.AgentTeamEvent) error {
