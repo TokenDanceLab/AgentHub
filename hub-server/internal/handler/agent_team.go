@@ -23,6 +23,7 @@ type AgentTeamService interface {
 	GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
 	GetTeamRunState(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error)
 	ListTeamRuns(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
+	ListTeamEvents(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
 	HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
 
 	// TeamAssignment
@@ -261,6 +262,23 @@ func (h *AgentTeamHandler) GetRunState(c *gin.Context) {
 		return
 	}
 	OK(c, state)
+}
+
+// ListTeamEvents GET /web/agent-teams/:id/runs/:run_id/events
+func (h *AgentTeamHandler) ListTeamEvents(c *gin.Context) {
+	userID := c.GetString("user_id")
+	teamID := c.Param("id")
+	runID := c.Param("run_id")
+	events, err := h.service.ListTeamEvents(c.Request.Context(), userID, teamID, runID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, events)
 }
 
 // HandleRouteDecision POST /web/agent-teams/:id/runs/:run_id/route-decisions
