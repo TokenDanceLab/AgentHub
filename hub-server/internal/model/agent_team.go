@@ -265,6 +265,42 @@ func (AgentTeamEvent) TableName() string {
 	return "agent_team_events"
 }
 
+// AgentTeamArtifact is a durable index for file/artifact-producing runtime
+// events inside a TeamRun. The source of truth remains AgentRunEvent; this
+// table makes team/member/task/tool provenance queryable without replaying.
+type AgentTeamArtifact struct {
+	ID             string    `gorm:"primaryKey;type:uuid" json:"id"`
+	TeamRunID      string    `gorm:"type:uuid;not null;index" json:"team_run_id"`
+	TeamTaskID     *string   `gorm:"type:uuid;index" json:"team_task_id,omitempty"`
+	AssignmentID   *string   `gorm:"type:uuid;index" json:"assignment_id,omitempty"`
+	MemberID       *string   `gorm:"type:uuid;index" json:"member_id,omitempty"`
+	AgentTaskID    *string   `gorm:"type:uuid;index" json:"agent_task_id,omitempty"`
+	EdgeRunID      string    `gorm:"type:varchar(128);index" json:"edge_run_id,omitempty"`
+	SourceEventID  *string   `gorm:"type:uuid;index" json:"source_event_id,omitempty"`
+	EventSeq       int64     `gorm:"not null;default:0" json:"event_seq"`
+	Path           string    `gorm:"type:text;not null" json:"path"`
+	NormalizedPath string    `gorm:"type:text;not null;index" json:"normalized_path"`
+	Action         string    `gorm:"type:varchar(64)" json:"action,omitempty"`
+	ToolName       string    `gorm:"type:varchar(128)" json:"tool_name,omitempty"`
+	Status         string    `gorm:"type:varchar(64)" json:"status,omitempty"`
+	ConflictID     string    `gorm:"type:text;index" json:"conflict_id,omitempty"`
+	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt      time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (a *AgentTeamArtifact) BeforeCreate(tx *gorm.DB) error {
+	id, err := uuidv7.New()
+	if err != nil {
+		return err
+	}
+	a.ID = id
+	return nil
+}
+
+func (AgentTeamArtifact) TableName() string {
+	return "agent_team_artifacts"
+}
+
 // Event type constants for AgentTeamEvent.
 const (
 	TeamEventAssignmentCreated    = "assignment.created"
@@ -350,17 +386,19 @@ type TeamApprovalState struct {
 
 // TeamArtifactState summarizes file/artifact-producing runtime events.
 type TeamArtifactState struct {
-	AgentTaskID  string    `json:"agent_task_id"`
-	TeamTaskID   string    `json:"team_task_id,omitempty"`
-	AssignmentID string    `json:"assignment_id,omitempty"`
-	MemberID     string    `json:"member_id,omitempty"`
-	EdgeRunID    string    `json:"edge_run_id,omitempty"`
-	Path         string    `json:"path"`
-	Action       string    `json:"action,omitempty"`
-	ToolName     string    `json:"tool_name,omitempty"`
-	Status       string    `json:"status,omitempty"`
-	ConflictID   string    `json:"conflict_id,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
+	AgentTaskID   string    `json:"agent_task_id"`
+	TeamTaskID    string    `json:"team_task_id,omitempty"`
+	AssignmentID  string    `json:"assignment_id,omitempty"`
+	MemberID      string    `json:"member_id,omitempty"`
+	EdgeRunID     string    `json:"edge_run_id,omitempty"`
+	SourceEventID string    `json:"source_event_id,omitempty"`
+	EventSeq      int64     `json:"event_seq,omitempty"`
+	Path          string    `json:"path"`
+	Action        string    `json:"action,omitempty"`
+	ToolName      string    `json:"tool_name,omitempty"`
+	Status        string    `json:"status,omitempty"`
+	ConflictID    string    `json:"conflict_id,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // TeamConflictState summarizes a file-level conflict detected from multiple

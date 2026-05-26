@@ -1000,6 +1000,22 @@ func TestAgentTeamService_GetTeamRunStateProjectsDependenciesAndBudget(t *testin
 	assert.ElementsMatch(t, []string{root.ID, conflictingTask.ID}, state.Conflicts[0].TeamTaskIDs)
 	assert.ElementsMatch(t, []string{executor.ID, reviewer.ID}, state.Conflicts[0].MemberIDs)
 	assert.ElementsMatch(t, []string{"modified"}, state.Conflicts[0].Actions)
+
+	indexed, err := repository.ListTeamArtifactsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, indexed, 2)
+	assert.Equal(t, run.ID, indexed[0].TeamRunID)
+	require.NotNil(t, indexed[0].TeamTaskID)
+	assert.Equal(t, root.ID, *indexed[0].TeamTaskID)
+	require.NotNil(t, indexed[0].MemberID)
+	assert.Equal(t, executor.ID, *indexed[0].MemberID)
+	require.NotNil(t, indexed[0].AgentTaskID)
+	assert.Equal(t, pending.ID, *indexed[0].AgentTaskID)
+	require.NotNil(t, indexed[0].SourceEventID)
+	assert.NotEmpty(t, *indexed[0].SourceEventID)
+	assert.Equal(t, "apply_patch", indexed[0].ToolName)
+	assert.Equal(t, "hub-server/internal/service/agent_team.go", indexed[0].NormalizedPath)
+	assert.Equal(t, state.Artifacts[0].ConflictID, indexed[0].ConflictID)
 }
 
 func TestAgentTeamService_ResolveConflictAppendsEventAndUpdatesReplay(t *testing.T) {
@@ -1225,6 +1241,25 @@ func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 			type TEXT NOT NULL,
 			payload TEXT NOT NULL DEFAULT '{}',
 			created_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_artifacts (
+			id TEXT PRIMARY KEY,
+			team_run_id TEXT NOT NULL,
+			team_task_id TEXT,
+			assignment_id TEXT,
+			member_id TEXT,
+			agent_task_id TEXT,
+			edge_run_id TEXT,
+			source_event_id TEXT,
+			event_seq INTEGER NOT NULL DEFAULT 0,
+			path TEXT NOT NULL,
+			normalized_path TEXT NOT NULL,
+			action TEXT,
+			tool_name TEXT,
+			status TEXT,
+			conflict_id TEXT,
+			created_at DATETIME,
+			updated_at DATETIME
 		)`,
 		`CREATE TABLE sessions (
 			id TEXT PRIMARY KEY,
