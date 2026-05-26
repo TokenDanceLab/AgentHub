@@ -6,7 +6,7 @@ This file maps TokenDance system-level governance work into AgentHub-owned execu
 
 ## Root Inputs
 
-Read these first when the work crosses identity, authorization, Feishu/Lark, Relay, design, i18n, security, or packaging boundaries.
+Read these first when the work crosses identity, authorization, Feishu/Lark, Gateway, design, i18n, security, or packaging boundaries.
 
 （跨仓库引用 — 文件位于 D:\Code\TokenDance\docs\）
 
@@ -29,7 +29,7 @@ Read these first when the work crosses identity, authorization, Feishu/Lark, Rel
 | TD-P0-FEISHU-01 | Hub integration | `hub-server/`, `api/openapi.yaml`, `api/events.md`, future integration docs | `/integrations/feishu/events` and `/integrations/feishu/card-actions`; signature/decrypt path; `message_id` idempotency; 3 second card callback behavior; async queue evidence |
 | TD-P1-HUB-02 | Hub authorization | Hub handler/service layers, Agent/Profile/Run/Thread/Integration code | Resource/action allow/deny tests for org/project/thread/run/profile/integration secrets after TokenDance ID identity mapping |
 | TD-P0-DESIGN-01 | Desktop/Web surfaces | `app/desktop/`, `app/web/`, shared UI stories/tests | Screenshots for changed real work surfaces from `../../docs/visual-qa-matrix.md`; token usage or layout evidence; mobile/narrow check where applicable |
-| TD-P0-I18N-01 | Desktop/Web public/user copy | UI dictionaries or user-visible strings | zh/en copy parity for login, errors, Feishu, Relay, Agent terms; focused tests or review notes for changed strings |
+| TD-P0-I18N-01 | Desktop/Web public/user copy | UI dictionaries or user-visible strings | zh/en copy parity for login, errors, Feishu, Gateway, Agent terms; focused tests or review notes for changed strings |
 | TD-P0-SEC-01 | Security/risk | `docs/governance/security-risk-register.md`, auth/session/Edge execution/integration code | Risk finding updated with severity/status/evidence; Critical/High fixed, verified, or explicitly accepted before release-ready claims |
 
 Current TD-P0-HUB-01 status: Hub Server has repo-level implementation and tests for TokenDance ID authorize/callback exchange, configured JWKS validation, `tokendance_sub` mapping, Hub-local access/refresh token issuance, and UUID device proof. Remaining evidence before product-level closure is Desktop/Web callback UX, Hub session storage/logout/reconnect behavior, deployment config proof, and screenshots.
@@ -39,7 +39,7 @@ Current TD-P0-HUB-01 status: Hub Server has repo-level implementation and tests 
 1. Every repo issue, roadmap row, or PR for the queue items above should reference the relevant `TD-P0-*` / `TD-P1-*` ID.
 2. Hub login work must keep TokenDance ID as identity provider and Hub Server as product session issuer.
 3. Feishu/Lark work must treat Feishu as collaboration context, not AgentHub login.
-4. Relay calls must use Relay API keys only on trusted server/local runtime planes; browser UI and Feishu cards must not expose them.
+4. Gateway calls must use TokenDance API keys only on trusted server/local runtime planes; browser UI and Feishu cards must not expose them.
 5. Visible UI claims need screenshot evidence, not only CSS/token diffs.
 6. Private server evidence belongs in `(部署服务器路径)`, not in AgentHub docs.
 
