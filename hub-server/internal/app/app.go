@@ -52,6 +52,7 @@ type App struct {
 	SessionService      *service.SessionService
 	MessageService      *service.MessageService
 	AgentService        *service.AgentService
+	AgentControlService *service.AgentControlService
 	AttachmentService   *service.AttachmentService
 	NotificationService *service.NotificationService
 	DeviceService       *service.DeviceService
@@ -168,6 +169,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.SessionService = service.NewSessionService(a.DB, a.CacheClient)
 	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)
 	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient)
+	a.AgentControlService = service.NewAgentControlService(a.CacheClient, a.mgr)
 	a.DeviceService = service.NewDeviceService(a.DB)
 
 	// Agent Profile service
@@ -197,6 +199,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// AgentTeam service
 	a.AgentTeamService = service.NewAgentTeamService(a.DB, a.AgentService, a.CacheClient)
+	a.AgentTeamService.SetControlService(a.AgentControlService)
 	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
 
 	// Relay service
@@ -648,6 +651,7 @@ func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string,
 	if deviceType == "desktop" {
 		if deviceID != "" {
 			go a.pushPendingTargetTasks(ctx, userID, deviceID, connID)
+			go a.pushPendingAgentControls(ctx, userID, deviceID, connID)
 		}
 		go a.pushPendingTasks(ctx, userID, connID)
 	}
@@ -668,6 +672,19 @@ func (a *App) pushPendingTargetTasks(ctx context.Context, userID, deviceID, conn
 				_ = a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, deviceID)
 			}
 			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+		}
+	}
+}
+
+func (a *App) pushPendingAgentControls(ctx context.Context, userID, deviceID, connID string) {
+	controls, err := a.CacheClient.PopPendingAgentControlsForDevice(ctx, userID, deviceID)
+	if err != nil || len(controls) == 0 {
+		return
+	}
+	for _, controlJSON := range controls {
+		var payload json.RawMessage
+		if json.Unmarshal([]byte(controlJSON), &payload) == nil {
+			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentControl, payload))
 		}
 	}
 }

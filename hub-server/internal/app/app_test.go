@@ -294,3 +294,50 @@ func TestOnRouteSetReplaysTargetQueueOnlyForConnectedDevice(t *testing.T) {
 	require.Equal(t, model.TaskStatusDispatched, stored.Status)
 	require.Equal(t, "dev-b", stored.EdgeDeviceID)
 }
+
+func TestOnRouteSetReplaysPendingAgentControlsToExactDevice(t *testing.T) {
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	cacheClient := cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+
+	mgr := ws.NewManager()
+	connA := ws.NewConn(nil)
+	connB := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connA))
+	require.NoError(t, mgr.Register(connB))
+	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
+	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+
+	a := &App{
+		CacheClient: cacheClient,
+		mgr:         mgr,
+		coreCtx:     context.Background(),
+	}
+	require.NoError(t, cacheClient.PushPendingAgentControl(context.Background(), "user-1", "dev-b", `{"kind":"permission.decide","approval_id":"approval-b"}`))
+
+	a.onRouteSet("user-1", "desktop", "dev-a", connA.ID, "", false)
+	select {
+	case <-connA.Send:
+		t.Fatal("device A consumed device B control queue")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	a.onRouteSet("user-1", "desktop", "dev-b", connB.ID, "", false)
+	select {
+	case data := <-connB.Send:
+		var frame struct {
+			Type    string `json:"type"`
+			Payload struct {
+				Kind       string `json:"kind"`
+				ApprovalID string `json:"approval_id"`
+			} `json:"payload"`
+		}
+		require.NoError(t, json.Unmarshal(data, &frame))
+		require.Equal(t, ws.TypeAgentControl, frame.Type)
+		require.Equal(t, "permission.decide", frame.Payload.Kind)
+		require.Equal(t, "approval-b", frame.Payload.ApprovalID)
+	case <-time.After(time.Second):
+		t.Fatal("device B did not replay its control queue")
+	}
+}
