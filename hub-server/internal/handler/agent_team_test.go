@@ -150,11 +150,59 @@ func TestAgentTeamHandler_ResolveConflict(t *testing.T) {
 	assert.Contains(t, w.Body.String(), model.TeamConflictStatusResolved)
 }
 
+func TestAgentTeamHandler_DecideApproval(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	called := false
+	svc := &mockAgentTeamService{
+		decideApproval: func(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error) {
+			called = true
+			assert.Equal(t, "user-1", userID)
+			assert.Equal(t, "team-1", teamID)
+			assert.Equal(t, "run-1", runID)
+			assert.Equal(t, "req-1", approvalID)
+			assert.Equal(t, "allow", decision.Decision)
+			assert.Equal(t, "Reviewed command", decision.Reason)
+			return &model.TeamApprovalState{
+				ApprovalID: approvalID,
+				RequestID:  approvalID,
+				Status:     decision.Decision,
+				Reason:     decision.Reason,
+				EdgeControl: &model.TeamApprovalEdgeControl{
+					RunID:     "edge-run-1",
+					RequestID: approvalID,
+					Decision:  decision.Decision,
+					Reason:    decision.Reason,
+				},
+			}, nil
+		},
+	}
+	h := NewAgentTeamHandler(svc)
+
+	r := gin.New()
+	r.POST("/web/agent-teams/:id/runs/:run_id/approvals/:approval_id/decide", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.DecideApproval(c)
+	})
+
+	body := bytes.NewBufferString(`{"decision":"allow","reason":"Reviewed command"}`)
+	req := httptest.NewRequest(http.MethodPost, "/web/agent-teams/team-1/runs/run-1/approvals/req-1/decide", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.True(t, called)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "edge-run-1")
+	assert.Contains(t, w.Body.String(), "allow")
+}
+
 type mockAgentTeamService struct {
 	handleRouteDecision func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
 	listTeamTasks       func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
 	listTeamEvents      func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
 	resolveConflict     func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
+	decideApproval      func(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
 }
 
 func (m *mockAgentTeamService) CreateTeam(ctx context.Context, userID, name, description string) (*model.AgentTeam, error) {
@@ -251,4 +299,11 @@ func (m *mockAgentTeamService) ResolveConflict(ctx context.Context, userID, team
 		return nil, nil
 	}
 	return m.resolveConflict(ctx, userID, teamID, runID, resolution)
+}
+
+func (m *mockAgentTeamService) DecideApproval(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error) {
+	if m.decideApproval == nil {
+		return nil, nil
+	}
+	return m.decideApproval(ctx, userID, teamID, runID, approvalID, decision)
 }
