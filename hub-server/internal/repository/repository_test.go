@@ -181,6 +181,34 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			revoked INTEGER NOT NULL DEFAULT 0,
 			created_at DATETIME
 		)`,
+		`CREATE TABLE agent_teams (
+			id TEXT PRIMARY KEY,
+			owner_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			avatar_url TEXT DEFAULT '',
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_members (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			agent_profile_id TEXT,
+			role TEXT NOT NULL DEFAULT 'executor',
+			position INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME,
+			FOREIGN KEY (team_id) REFERENCES agent_teams(id) ON DELETE CASCADE
+		)`,
+		`CREATE TABLE agent_team_runs (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			session_id TEXT,
+			trigger_user_id TEXT NOT NULL,
+			trigger_message TEXT DEFAULT '',
+			status TEXT NOT NULL DEFAULT 'queued',
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
 	}
 	for _, ddl := range tables {
 		require.NoError(t, db.Exec(ddl).Error, "DDL: %s", ddl[:60])
