@@ -7,7 +7,7 @@ async function loadAuthModule() {
   return import('./hubAuth');
 }
 
-describe('web Hub auth device boundary', () => {
+describe('web Hub auth token auto-login', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     localStorage.clear();
@@ -15,23 +15,15 @@ describe('web Hub auth device boundary', () => {
     localStorage.setItem('agenthub_device_id', DEVICE_ID);
   });
 
-  it('uses web device_type for legacy Hub password login', async () => {
+  it('restores session from stored access token', async () => {
+    // Simulate a stored access token from a previous session
+    sessionStorage.setItem('agenthub_hub_token', 'stored-access-token');
+
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
 
-      if (url.endsWith('/client/auth/login')) {
-        return new Response(
-          JSON.stringify({
-            access_token: 'hub-access',
-            refresh_token: 'hub-refresh',
-            expires_in: 3600,
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        );
-      }
-
       if (url.endsWith('/client/auth/me')) {
-        expect(init?.headers).toMatchObject({ Authorization: 'Bearer hub-access' });
+        expect(init?.headers).toMatchObject({ Authorization: 'Bearer stored-access-token' });
         return new Response(
           JSON.stringify({
             id: '00000000-0000-0000-0000-00000000b101',
@@ -50,20 +42,9 @@ describe('web Hub auth device boundary', () => {
     const { createHubAuth } = await loadAuthModule();
     const auth = createHubAuth();
 
-    await auth.login('alice', 'correct horse battery staple');
-
-    const loginCall = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/client/auth/login'));
-    expect(loginCall).toBeDefined();
-    const [, init] = loginCall!;
-    const body = JSON.parse(String(init?.body));
-
-    expect(body).toMatchObject({
-      username: 'alice',
-      password: 'correct horse battery staple',
-      device_type: 'web',
-      device_id: DEVICE_ID,
-    });
-    expect(sessionStorage.getItem('agenthub_token_source')).toBe('hub');
+    const ok = await auth.tryAutoLogin();
+    expect(ok).toBe(true);
     expect(auth.getState().isAuthenticated).toBe(true);
+    expect(auth.getState().user?.username).toBe('alice');
   });
 });

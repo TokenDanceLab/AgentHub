@@ -35,7 +35,6 @@ export interface HubAuthState {
 export interface HubAuth {
   getState: () => HubAuthState;
   subscribe: (fn: (state: HubAuthState) => void) => () => void;
-  login: (username: string, password: string) => Promise<void>;
   loginWithTokenDance: () => Promise<void>;
   logout: () => Promise<void>;
   tryAutoLogin: () => Promise<boolean>;
@@ -297,18 +296,6 @@ export function createHubAuth(client?: HubClient): HubAuth {
       });
 
       window.location.assign(authUrl);
-    },
-
-    // ── Legacy Hub username/password login ──
-    async login(username: string, password: string) {
-      const res = await hubClient.login({
-        username,
-        password,
-        device_type: 'web',
-        device_id: getOrCreateDeviceId(),
-      });
-
-      await completeLogin(res.access_token, res.refresh_token, 'hub');
     },
 
     async logout() {

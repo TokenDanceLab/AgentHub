@@ -4,10 +4,8 @@ import { X, ChevronDown } from 'lucide-react';
 import type { UserProfile } from '@/api/hubClient';
 import { HUB_URL } from '@/config';
 import LoginForm from '@/components/LoginForm';
-import RegisterForm from '@/components/RegisterForm';
 import styles from './AuthPage.module.css';
 
-type Page = 'login' | 'register';
 type HubStatus = 'connected' | 'disconnected' | 'checking';
 
 interface Props {
@@ -17,7 +15,6 @@ interface Props {
 
 export default function AuthPage({ onLoginSuccess, onClose }: Props) {
   const { t } = useTranslation();
-  const [page, setPage] = useState<Page>('login');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [hubUrl, setHubUrl] = useState(() => {
     try {
@@ -67,10 +64,6 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
     [onLoginSuccess],
   );
 
-  const handleRegisterSuccess = useCallback(() => {
-    setPage('login');
-  }, []);
-
   const hubDotClass = [
     styles.hubStatusDot,
     hubStatus === 'connected'
@@ -98,33 +91,7 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
         <p className={styles.tagline}>{t('auth.tagline')}</p>
       </div>
 
-      {/* Segmented tab switcher */}
-      <div className={styles.tabs}>
-        <button
-          className={`${styles.tab} ${page === 'login' ? styles.tabActive : ''}`}
-          onClick={() => setPage('login')}
-        >
-          {t('auth.login')}
-        </button>
-        <button
-          className={`${styles.tab} ${page === 'register' ? styles.tabActive : ''}`}
-          onClick={() => setPage('register')}
-        >
-          {t('auth.register')}
-        </button>
-      </div>
-
-      {page === 'login' ? (
-        <LoginForm
-          onSuccess={handleLoginSuccess}
-          onSwitchToRegister={() => setPage('register')}
-        />
-      ) : (
-        <RegisterForm
-          onSuccess={handleRegisterSuccess}
-          onSwitchToLogin={() => setPage('login')}
-        />
-      )}
+      <LoginForm onSuccess={handleLoginSuccess} />
 
       {/* Collapsible advanced settings */}
       <button
