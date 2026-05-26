@@ -257,7 +257,7 @@ func TestAgentTeamService_GetTeamRun(t *testing.T) {
 
 	// Get run
 	runRows := sqlmock.NewRows([]string{"id", "team_id", "session_id", "trigger_user_id", "trigger_message", "status", "created_at", "updated_at"}).
-		AddRow("run-1", "team-1", nil, "user-1", "hello", "completed", time.Now(), time.Now())
+		AddRow("run-1", "team-1", "session-1", "user-1", "hello", "completed", time.Now(), time.Now())
 	mock.ExpectQuery(`SELECT * FROM "agent_team_runs"`).
 		WillReturnRows(runRows)
 
@@ -279,7 +279,7 @@ func TestAgentTeamService_GetTeamRunWrongTeam(t *testing.T) {
 
 	// Get run (different team)
 	runRows := sqlmock.NewRows([]string{"id", "team_id", "session_id", "trigger_user_id", "trigger_message", "status", "created_at", "updated_at"}).
-		AddRow("run-1", "team-2", nil, "user-1", "hello", "completed", time.Now(), time.Now())
+		AddRow("run-1", "team-2", "session-2", "user-1", "hello", "completed", time.Now(), time.Now())
 	mock.ExpectQuery(`SELECT * FROM "agent_team_runs"`).
 		WillReturnRows(runRows)
 
@@ -301,8 +301,8 @@ func TestAgentTeamService_ListTeamRuns(t *testing.T) {
 
 	// List runs
 	runRows := sqlmock.NewRows([]string{"id", "team_id", "session_id", "trigger_user_id", "trigger_message", "status", "created_at", "updated_at"}).
-		AddRow("run-1", "team-1", nil, "user-1", "msg1", "completed", time.Now(), time.Now()).
-		AddRow("run-2", "team-1", nil, "user-1", "msg2", "running", time.Now(), time.Now())
+		AddRow("run-1", "team-1", "session-1", "user-1", "msg1", "completed", time.Now(), time.Now()).
+		AddRow("run-2", "team-1", "session-2", "user-1", "msg2", "running", time.Now(), time.Now())
 	mock.ExpectQuery(`SELECT * FROM "agent_team_runs"`).
 		WillReturnRows(runRows)
 
@@ -317,4 +317,118 @@ func newMockAgentTeamDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
 	t.Helper()
 	db, mock, _ := newMockDBAgent(t)
 	return db, mock
+}
+
+// mockAgentTeamAgentSvc implements agentTeamAgentSvc for tests.
+type mockAgentTeamAgentSvc struct{}
+
+func (m *mockAgentTeamAgentSvc) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
+	return nil
+}
+
+func (m *mockAgentTeamAgentSvc) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
+	return &model.PendingAgentTask{ID: "task-1"}, nil
+}
+
+// --- StartTeamRun tests ---
+
+func TestAgentTeamService_StartTeamRun_TeamNotFound(t *testing.T) {
+	db, mock := newMockAgentTeamDB(t)
+	svc := NewAgentTeamService(db, nil, nil)
+
+	mock.ExpectQuery(`SELECT * FROM "agent_teams"`).
+		WillReturnError(gorm.ErrRecordNotFound)
+
+	_, err := svc.StartTeamRun(context.Background(), "user-1", "team-1", "hello")
+	require.Error(t, err)
+	assert.Equal(t, errcode.AgentNotFound, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAgentTeamService_StartTeamRun_EmptyMembers(t *testing.T) {
+	db, mock := newMockAgentTeamDB(t)
+	svc := NewAgentTeamService(db, nil, nil)
+
+	// Get team
+	teamRows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
+		AddRow("team-1", "user-1", "My Team", "", "", time.Now(), time.Now())
+	mock.ExpectQuery(`SELECT * FROM "agent_teams"`).
+		WillReturnRows(teamRows)
+
+	// List members (empty)
+	mock.ExpectQuery(`SELECT * FROM "agent_team_members"`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "team_id", "agent_profile_id", "role", "position", "created_at"}))
+
+	_, err := svc.StartTeamRun(context.Background(), "user-1", "team-1", "hello")
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
+	db, mock := newMockAgentTeamDB(t)
+	agentSvc := &mockAgentTeamAgentSvc{}
+	svc := NewAgentTeamService(db, agentSvc, nil)
+
+	now := time.Now()
+	agentProfileID := "agent-1"
+
+	// Get team
+	teamRows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
+		AddRow("team-1", "user-1", "My Team", "desc", "", now, now)
+	mock.ExpectQuery(`SELECT * FROM "agent_teams"`).
+		WillReturnRows(teamRows)
+
+	// List members (one supervisor)
+	memberRows := sqlmock.NewRows([]string{"id", "team_id", "agent_profile_id", "role", "position", "created_at"}).
+		AddRow("member-1", "team-1", agentProfileID, "supervisor", 0, now)
+	mock.ExpectQuery(`SELECT * FROM "agent_team_members"`).
+		WillReturnRows(memberRows)
+
+	// Transaction: Begin
+	mock.ExpectBegin()
+
+	// CreateSession
+	mock.ExpectExec(`INSERT INTO "sessions"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// CreateSessionMember (owner)
+	mock.ExpectExec(`INSERT INTO "session_members"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// Batch query custom agents
+	agentRows := sqlmock.NewRows([]string{"id", "owner_user_id", "name", "avatar_url", "agent_type", "system_prompt", "capability_tags", "tool_whitelist", "model_params", "deleted_at", "created_at", "updated_at"}).
+		AddRow("agent-1", "user-1", "My Agent", "", "codex", "prompt", "[]", "[]", "{}", nil, now, now)
+	mock.ExpectQuery(`SELECT * FROM "custom_agents" WHERE id IN`).
+		WillReturnRows(agentRows)
+
+	// CreateAgentInstance
+	mock.ExpectExec(`INSERT INTO "agent_instances"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// CreateSessionMember (agent)
+	mock.ExpectExec(`INSERT INTO "session_members"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// AllocateSeqID (UPDATE ... RETURNING next_seq)
+	mock.ExpectQuery(`UPDATE sessions SET next_seq`).
+		WillReturnRows(sqlmock.NewRows([]string{"next_seq"}).AddRow(1))
+
+	// InsertMessage
+	mock.ExpectExec(`INSERT INTO "messages"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// CreateTeamRun
+	mock.ExpectExec(`INSERT INTO "agent_team_runs"`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// Transaction: Commit
+	mock.ExpectCommit()
+
+	run, err := svc.StartTeamRun(context.Background(), "user-1", "team-1", "hello")
+	require.NoError(t, err)
+	assert.NotNil(t, run)
+	assert.Equal(t, "team-1", run.TeamID)
+	assert.Equal(t, model.TeamRunStatusRunning, run.Status)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
