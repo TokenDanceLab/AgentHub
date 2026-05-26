@@ -1149,6 +1149,111 @@ func TestAgentTeamService_ResolveConflictRejectsTaskOutsideConflict(t *testing.T
 	assert.Nil(t, resolved)
 }
 
+func TestAgentTeamService_DecideApprovalAppendsEventAndUpdatesReplay(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, _, executor, run := seedAgentTeamRun(t, db)
+	pending := &model.PendingAgentTask{
+		ID:                "agent-task-approval",
+		AgentInstanceID:   "agent-executor",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-approval",
+		Status:            model.TaskStatusRunning,
+		EdgeRunID:         "edge-run-approval",
+		ExpireAt:          time.Now().Add(time.Hour),
+	}
+	require.NoError(t, db.Create(pending).Error)
+	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: executor.ID,
+		Status:           model.TeamTaskStatusRunning,
+		Objective:        "Run gated command",
+		RunID:            &pending.ID,
+	}))
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          pending.ID,
+		EdgeRunID:       pending.EdgeRunID,
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-executor",
+		EventType:       "run.agent.permission_requested",
+		Payload:         `{"requestId":"req-approval","toolUseId":"tool-approval","toolName":"Bash","status":"pending"}`,
+	}))
+
+	decided, err := svc.DecideApproval(context.Background(), "user-1", team.ID, run.ID, "req-approval", model.TeamApprovalDecision{
+		Decision: "allow",
+		Reason:   "Known safe command",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, decided)
+	assert.Equal(t, "req-approval", decided.ApprovalID)
+	assert.Equal(t, "allow", decided.Status)
+	assert.Equal(t, "user-1", decided.DecidedBy)
+	require.NotNil(t, decided.EdgeControl)
+	assert.Equal(t, pending.EdgeRunID, decided.EdgeControl.RunID)
+	assert.Equal(t, "req-approval", decided.EdgeControl.RequestID)
+	assert.Equal(t, "allow", decided.EdgeControl.Decision)
+	assert.Equal(t, "Known safe command", decided.EdgeControl.Reason)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, model.TeamEventApprovalDecided, events[0].Type)
+	assert.Contains(t, events[0].Payload, `"edge_control"`)
+	assert.Contains(t, events[0].Payload, `"runId":"edge-run-approval"`)
+
+	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
+	require.NoError(t, err)
+	require.Len(t, state.Approvals, 1)
+	assert.Equal(t, "req-approval", state.Approvals[0].ApprovalID)
+	assert.Equal(t, "allow", state.Approvals[0].Status)
+	assert.Equal(t, "Known safe command", state.Approvals[0].Reason)
+	assert.Equal(t, "user-1", state.Approvals[0].DecidedBy)
+	require.NotNil(t, state.Approvals[0].DecidedAt)
+	require.NotNil(t, state.Approvals[0].EdgeControl)
+	assert.Equal(t, "edge-run-approval", state.Approvals[0].EdgeControl.RunID)
+}
+
+func TestAgentTeamService_DecideApprovalRejectsAlreadyDecided(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, _, executor, run := seedAgentTeamRun(t, db)
+	taskID := "agent-task-decided"
+	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: executor.ID,
+		Status:           model.TeamTaskStatusRunning,
+		Objective:        "Run gated command",
+		RunID:            &taskID,
+	}))
+	for _, event := range []model.AgentRunEvent{
+		{
+			TaskID:          taskID,
+			EdgeRunID:       "edge-run-decided",
+			SessionID:       run.SessionID,
+			AgentInstanceID: "agent-executor",
+			EventType:       "run.agent.permission_requested",
+			Payload:         `{"requestId":"req-decided","toolUseId":"tool-decided","toolName":"Bash","status":"pending"}`,
+		},
+		{
+			TaskID:          taskID,
+			EdgeRunID:       "edge-run-decided",
+			SessionID:       run.SessionID,
+			AgentInstanceID: "agent-executor",
+			EventType:       "run.agent.permission_decided",
+			Payload:         `{"requestId":"req-decided","decision":"deny","reason":"too broad"}`,
+		},
+	} {
+		require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &event))
+	}
+
+	decided, err := svc.DecideApproval(context.Background(), "user-1", team.ID, run.ID, "req-decided", model.TeamApprovalDecision{
+		Decision: "allow",
+	})
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, decided)
+}
+
 func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)

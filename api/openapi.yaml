@@ -2818,6 +2818,38 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+  /web/agent-teams/{id}/runs/{run_id}/approvals/{approval_id}/decide:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: approval_id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubDecideTeamApproval
+      summary: Record a TeamRun approval decision and return the Edge control payload.
+      description: Validates that the approval is still pending, appends a team.approval.decided TeamEvent, and returns a payload shaped for Edge POST /v1/permissions/decide delivery by the Desktop/Edge bridge.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamApprovalDecisionRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
   /web/agent-teams/{id}/runs/{run_id}/conflicts/{conflict_id}/resolve:
     parameters:
       - name: id
@@ -4770,6 +4802,7 @@ components:
     TeamApprovalState:
       type: object
       properties:
+        approval_id: { type: string }
         agent_task_id: { type: string, format: uuid }
         team_task_id: { type: string, format: uuid }
         assignment_id: { type: string, format: uuid }
@@ -4780,8 +4813,35 @@ components:
         tool_use_id: { type: string }
         status: { type: string }
         reason: { type: string }
+        decided_by: { type: string, format: uuid }
         created_at: { type: string, format: date-time }
         decided_at: { type: string, format: date-time }
+        edge_control:
+          $ref: "#/components/schemas/TeamApprovalEdgeControl"
+
+    TeamApprovalDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [allow, deny]
+        reason: { type: string }
+
+    TeamApprovalEdgeControl:
+      type: object
+      required: [runId, requestId, decision]
+      properties:
+        runId:
+          type: string
+          description: Local Edge run id to send to Edge /v1/permissions/decide.
+        requestId:
+          type: string
+          description: Edge permission request id.
+        decision:
+          type: string
+          enum: [allow, deny]
+        reason: { type: string }
 
     TeamArtifactState:
       type: object
