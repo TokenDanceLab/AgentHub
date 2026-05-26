@@ -21,7 +21,7 @@ CREATE TABLE agent_team_members (
 CREATE TABLE agent_team_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     team_id UUID NOT NULL REFERENCES agent_teams(id),
-    session_id UUID REFERENCES sessions(id),
+    session_id UUID NOT NULL REFERENCES sessions(id),
     trigger_user_id UUID NOT NULL REFERENCES users(id),
     trigger_message TEXT,
     status VARCHAR(20) NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'completed', 'failed', 'cancelled')),

@@ -75,7 +75,7 @@ const (
 type AgentTeamRun struct {
 	ID             string    `gorm:"primaryKey;type:uuid" json:"id"`
 	TeamID         string    `gorm:"type:uuid;not null" json:"team_id"`
-	SessionID      *string   `gorm:"type:uuid" json:"session_id,omitempty"`
+	SessionID      string    `gorm:"type:uuid;not null" json:"session_id"`
 	TriggerUserID  string    `gorm:"type:uuid;not null" json:"trigger_user_id"`
 	TriggerMessage string    `gorm:"type:text" json:"trigger_message,omitempty"`
 	Status         string    `gorm:"type:varchar(20);not null;default:queued" json:"status"`
@@ -100,4 +100,51 @@ func (AgentTeamRun) TableName() string {
 type TeamDetail struct {
 	*AgentTeam
 	Members []AgentTeamMember `json:"members"`
+}
+
+// AssignmentType and AssignmentStatus constants.
+const (
+	AssignmentTypeDelegate = "delegate"
+	AssignmentTypeReview   = "review"
+	AssignmentTypeApprove  = "approve"
+	AssignmentTypeNotify   = "notify"
+)
+
+const (
+	AssignmentStatusPending    = "pending"
+	AssignmentStatusDispatched = "dispatched"
+	AssignmentStatusRunning    = "running"
+	AssignmentStatusDone       = "done"
+	AssignmentStatusFailed     = "failed"
+	AssignmentStatusCancelled  = "cancelled"
+)
+
+// AgentTeamAssignment represents a structured delegation from one team member to another.
+type AgentTeamAssignment struct {
+	ID           string    `gorm:"primaryKey;type:uuid" json:"id"`
+	TeamRunID    string    `gorm:"type:uuid;not null" json:"team_run_id"`
+	FromMemberID string    `gorm:"type:uuid;not null" json:"from_member_id"`
+	ToMemberID   string    `gorm:"type:uuid;not null" json:"to_member_id"`
+	Type         string    `gorm:"type:varchar(20);not null;default:delegate" json:"type"`
+	TaskPrompt   string    `gorm:"type:text;not null" json:"task_prompt"`
+	Context      string    `gorm:"type:text" json:"context,omitempty"`
+	Status       string    `gorm:"type:varchar(20);not null;default:pending" json:"status"`
+	RunID        *string   `gorm:"type:uuid" json:"run_id,omitempty"`
+	Result       string    `gorm:"type:text" json:"result,omitempty"`
+	Depth        int       `gorm:"not null;default:0" json:"depth"`
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (a *AgentTeamAssignment) BeforeCreate(tx *gorm.DB) error {
+	id, err := uuidv7.New()
+	if err != nil {
+		return err
+	}
+	a.ID = id
+	return nil
+}
+
+func (AgentTeamAssignment) TableName() string {
+	return "agent_team_assignments"
 }
