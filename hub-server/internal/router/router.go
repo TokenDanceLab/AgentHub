@@ -245,6 +245,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 			web.POST("/agent-teams/:id/runs", agentTeamHandler.StartRun)
 			web.GET("/agent-teams/:id/runs", agentTeamHandler.ListRuns)
 			web.GET("/agent-teams/:id/runs/:run_id", agentTeamHandler.GetRun)
+			web.GET("/agent-teams/:id/runs/:run_id/state", agentTeamHandler.GetRunState)
 			web.POST("/agent-teams/:id/runs/:run_id/assignments", agentTeamHandler.CreateAssignment)
 			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/dispatch", agentTeamHandler.DispatchAssignment)
 			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/complete", agentTeamHandler.CompleteAssignment)

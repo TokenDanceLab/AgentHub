@@ -30,7 +30,7 @@ Cloudflare DNS (api.hub.vectorcontrol.tech A → 38.76.183.116, DNS-only)
 |:--|:--|:--|:--|
 | `agenthub-postgres` | postgres:16-alpine | 5432（仅容器网络） | `agenthub_pg_data` |
 | `agenthub-redis` | redis:7-alpine (AOF) | 6379（仅容器网络） | `agenthub_redis_data` |
-| `agenthub-hub` | 本地构建（golang:1.25 → alpine:3.21） | 127.0.0.1:8090:8080 | `agenthub_uploads` |
+| `agenthub-hub` | 预构建镜像（服务器只 `docker load`，不编译） | 127.0.0.1:8090:8080 | `agenthub_uploads` |
 
 ## nginx 配置
 
@@ -56,10 +56,11 @@ cd /opt/agenthub-hub
 # 拉取最新代码
 git pull origin dev/delicious233
 
-# 部署
+# 部署：先在开发机/CI 构建镜像并传到服务器，服务器只加载镜像，不运行 build
 cd hub-server
 source deployments/.env.production
-sudo -E docker compose -f deployments/docker-compose.prod.yml up -d --build hub-server
+sudo docker load -i /tmp/agenthub-hub-latest.tar
+sudo -E docker compose -f deployments/docker-compose.prod.yml up -d --no-build hub-server
 
 # 查看日志
 sudo docker compose -f deployments/docker-compose.prod.yml logs -f hub-server
@@ -71,6 +72,13 @@ curl http://api.hub.vectorcontrol.tech/health
 # 公开统计
 curl http://api.hub.vectorcontrol.tech/api/public/stats
 ```
+
+## 最近部署
+
+| 时间 (UTC) | 镜像 | 变更 | 验证 |
+|:--|:--|:--|:--|
+| 2026-05-26 16:59 | `ghcr.io/tokendancelab/agenthub-hub:latest` → `sha256:919673032e59...` | 本机预构建镜像传输到 hk2，发布 TeamEvent append/list 与 TeamRunState replay API；服务器未执行 build | Docker health `healthy`；`/health` migrations=36；公网 `/health` OK；未登录访问 state route 返回 401 |
+| 2026-05-26 16:40 | `ghcr.io/tokendancelab/agenthub-hub:latest` → `sha256:55c372b7041b...` | 本机预构建镜像传输到 hk2，升级到 commit `b77591d` 并执行 migration 0036 | Docker health `healthy`；`/health` migrations=36；公网 `/api/public/stats` OK |
 
 ## 与 AIhub 隔离
 

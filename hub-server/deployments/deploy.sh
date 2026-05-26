@@ -7,6 +7,7 @@ COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml"
 ENV_FILE="$SCRIPT_DIR/.env.production"
 BACKUP_DIR="$SCRIPT_DIR/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+HUB_IMAGE="${AGENTHUB_HUB_IMAGE:-ghcr.io/tokendancelab/agenthub-hub:latest}"
 
 # Colors
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -21,6 +22,12 @@ check_prereqs() {
     command -v docker >/dev/null 2>&1 || err "Docker not installed"
     command -v docker compose >/dev/null 2>&1 || err "Docker Compose not installed"
     [ -f "$ENV_FILE" ] || err ".env.production not found at $ENV_FILE. Run: bash $PROJECT_DIR/scripts/generate-secrets.sh"
+    set -a
+    # shellcheck disable=SC1090
+    . "$ENV_FILE"
+    set +a
+    HUB_IMAGE="${AGENTHUB_HUB_IMAGE:-$HUB_IMAGE}"
+    docker image inspect "$HUB_IMAGE" >/dev/null 2>&1 || err "Hub image $HUB_IMAGE not loaded. Build on a dev/CI machine, transfer it, then run: docker load -i <image.tar>"
     log "Pre-flight checks passed"
 }
 
@@ -36,14 +43,11 @@ backup_current() {
 
 # Deploy
 deploy() {
-    log "Building and deploying..."
+    log "Deploying preloaded image $HUB_IMAGE..."
     cd "$PROJECT_DIR"
 
-    # Build with no cache for clean build
-    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --no-cache hub-server
-
     # Start/update services
-    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans
+    AGENTHUB_HUB_IMAGE="$HUB_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build --no-deps --remove-orphans hub-server
 
     log "Deploy completed"
 }
@@ -55,8 +59,8 @@ health_check() {
     local retry=0
 
     while [ $retry -lt $max_retries ]; do
-        if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
-            local health_json=$(curl -s http://localhost:8080/health)
+        if curl -sf http://localhost:8090/health > /dev/null 2>&1; then
+            local health_json=$(curl -s http://localhost:8090/health)
             log "Health check PASSED: $health_json"
             return 0
         fi
@@ -70,7 +74,7 @@ health_check() {
 # Verify public API
 verify_public_api() {
     log "Verifying public API..."
-    curl -sf http://localhost:8080/api/public/stats > /dev/null 2>&1 && \
+    curl -sf http://localhost:8090/api/public/stats > /dev/null 2>&1 && \
         log "Public API OK" || \
         warn "Public API not responding (may need DB migration)"
 }
@@ -85,8 +89,8 @@ cleanup() {
 rollback() {
     log "Rolling back to previous version..."
     cd "$PROJECT_DIR"
-    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down
-    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans
+    AGENTHUB_HUB_IMAGE="$HUB_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down
+    AGENTHUB_HUB_IMAGE="$HUB_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build --no-deps --remove-orphans hub-server
     health_check
 }
 

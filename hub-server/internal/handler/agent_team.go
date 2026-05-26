@@ -21,6 +21,7 @@ type AgentTeamService interface {
 	RemoveTeamMember(ctx context.Context, userID, teamID, memberID string) error
 	StartTeamRun(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error)
 	GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
+	GetTeamRunState(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error)
 	ListTeamRuns(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
 
 	// TeamAssignment
@@ -242,6 +243,23 @@ func (h *AgentTeamHandler) GetRun(c *gin.Context) {
 		return
 	}
 	OK(c, run)
+}
+
+// GetRunState GET /web/agent-teams/:id/runs/:run_id/state
+func (h *AgentTeamHandler) GetRunState(c *gin.Context) {
+	userID := c.GetString("user_id")
+	teamID := c.Param("id")
+	runID := c.Param("run_id")
+	state, err := h.service.GetTeamRunState(c.Request.Context(), userID, teamID, runID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, state)
 }
 
 // --- Assignment Request types ---
