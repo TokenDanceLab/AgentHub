@@ -63,16 +63,25 @@ type PermissionRequest struct {
 
 // PermissionDecision is the response to a permission request.
 type PermissionDecision struct {
-	Behavior string // "allow" or "deny"
-	Message  string // explanation for deny
+	Behavior      string // "allow" or "deny"
+	UpdatedInput  any    // modified tool input (optional)
+	Message       string // explanation for deny
+	DecisionClass string // optional classification (e.g. "user_approved")
 }
 
+// PermissionDecider is a callback invoked when the CLI requests tool permission.
+// The handler blocks until the decider returns a decision, then writes the
+// control_response back to the CLI. This enables bridging to Desktop's approval UI.
+//
+// When decider is nil, the DefaultPermissionHandler falls back to auto-approve.
+type PermissionDecider func(ctx context.Context, req PermissionRequest) PermissionDecision
+
 // DefaultPermissionHandler auto-approves all tool use (bypassPermissions equivalent).
-// Replace with a proper approval engine for production use.
-// For production, use EventEmittingPermissionHandler which emits events to the bus
-// and allows Desktop to make the decision.
+// For production use, supply a PermissionDecider via NewBridgedPermissionHandler
+// to bridge to Desktop's approval UI.
 type DefaultPermissionHandler struct {
-	emitter EventEmitter // nil = silent auto-approve; non-nil = emit permission events
+	emitter EventEmitter      // nil = silent auto-approve; non-nil = emit permission events
+	decider PermissionDecider // nil = auto-approve all; non-nil = block until decision
 }
 
 func (h *DefaultPermissionHandler) HandleControlRequest(ctx context.Context, stdin io.Writer, msg ControlMessage) error {
@@ -83,9 +92,27 @@ func (h *DefaultPermissionHandler) HandleControlRequest(ctx context.Context, std
 
 	switch inner.Subtype {
 	case "can_use_tool":
-		return h.handleCanUseTool(stdin, msg.RequestID, &inner)
+		return h.handleCanUseTool(ctx, stdin, msg.RequestID, &inner)
 	case "initialize":
 		// CLI requesting session init — acknowledge
+		return nil
+	case "get_context_usage":
+		slog.Debug("control: get_context_usage not implemented (stub)")
+		return nil
+	case "mcp_status":
+		slog.Debug("control: mcp_status not implemented (stub)")
+		return nil
+	case "mcp_set_servers":
+		slog.Debug("control: mcp_set_servers not implemented (stub)")
+		return nil
+	case "get_settings":
+		slog.Debug("control: get_settings not implemented (stub)")
+		return nil
+	case "apply_flag_settings":
+		slog.Debug("control: apply_flag_settings not implemented (stub)")
+		return nil
+	case "hook_callback":
+		slog.Debug("control: hook_callback not implemented (stub)")
 		return nil
 	default:
 		slog.Debug("control: unhandled request subtype", "subtype", inner.Subtype)
@@ -93,7 +120,7 @@ func (h *DefaultPermissionHandler) HandleControlRequest(ctx context.Context, std
 	}
 }
 
-func (h *DefaultPermissionHandler) handleCanUseTool(stdin io.Writer, requestID string, inner *ControlRequestInner) error {
+func (h *DefaultPermissionHandler) handleCanUseTool(ctx context.Context, stdin io.Writer, requestID string, inner *ControlRequestInner) error {
 	// Emit permission_requested so Desktop can display approval UI
 	if h.emitter != nil {
 		h.emitter.Emit("run.agent.permission_requested", nil, map[string]any{
@@ -104,15 +131,32 @@ func (h *DefaultPermissionHandler) handleCanUseTool(stdin io.Writer, requestID s
 		})
 	}
 
+	// Wait for decision: if a decider is configured, block until Desktop responds.
+	// Otherwise fall back to auto-approve.
+	var decision PermissionDecision
+	if h.decider != nil {
+		decision = h.decider(ctx, PermissionRequest{
+			RequestID: requestID,
+			ToolName:  inner.ToolName,
+			ToolUseID: inner.ToolUseID,
+			Input:     inner.Input,
+		})
+	} else {
+		decision = PermissionDecision{Behavior: "allow"}
+	}
+
 	resp := ControlMessage{
 		Type:      "control_response",
 		RequestID: requestID,
 	}
 	innerResp := ControlResponseInner{
-		Subtype:   "success",
-		RequestID: requestID,
-		Behavior:  "allow",
-		ToolUseID: inner.ToolUseID,
+		Subtype:       "success",
+		RequestID:     requestID,
+		Behavior:      decision.Behavior,
+		ToolUseID:     inner.ToolUseID,
+		UpdatedInput:  decision.UpdatedInput,
+		Message:       decision.Message,
+		DecisionClass: decision.DecisionClass,
 	}
 	raw, err := json.Marshal(innerResp)
 	if err != nil {
@@ -129,25 +173,79 @@ func (h *DefaultPermissionHandler) handleCanUseTool(stdin io.Writer, requestID s
 		return fmt.Errorf("write control_response: %w", err)
 	}
 
-	// Emit permission_decided after auto-approval
+	// Emit permission_decided after decision
 	if h.emitter != nil {
 		h.emitter.Emit("run.agent.permission_decided", nil, map[string]any{
 			"requestId": requestID,
 			"toolName":  inner.ToolName,
 			"toolUseId": inner.ToolUseID,
-			"decision":  "allow",
+			"decision":  decision.Behavior,
 		})
 	}
 
-	slog.Debug("control: auto-allowed tool", "tool", inner.ToolName, "toolUseId", inner.ToolUseID)
+	slog.Debug("control: permission decided", "tool", inner.ToolName, "toolUseId", inner.ToolUseID, "decision", decision.Behavior)
 	return nil
 }
 
 // NewEventEmittingPermissionHandler creates a handler that emits permission events
-// to the EventEmitter while still auto-approving all tools.
+// to the EventEmitter while auto-approving all tools (no decider = auto-approve).
 // This allows Desktop to observe permission activity without blocking execution.
 func NewEventEmittingPermissionHandler(emitter EventEmitter) *DefaultPermissionHandler {
 	return &DefaultPermissionHandler{emitter: emitter}
+}
+
+// NewBridgedPermissionHandler creates a handler that blocks on the provided
+// PermissionDecider for each can_use_tool request. Desktop should bridge the
+// approval UI through the decider callback. The emitter is used to publish
+// permission_requested/permission_decided events for observability.
+func NewBridgedPermissionHandler(emitter EventEmitter, decider PermissionDecider) *DefaultPermissionHandler {
+	return &DefaultPermissionHandler{emitter: emitter, decider: decider}
+}
+
+// ChannelPermissionDecider bridges the permission decider to a channel-based
+// protocol suitable for the Desktop event bus. Send a PermissionRequest on
+// the requests channel and block until a PermissionDecision arrives on the
+// decisions channel (matched by RequestID).
+//
+// Usage from Desktop-side:
+//
+//	decider := adapters.NewChannelPermissionDecider(reqCh, decCh)
+//	handler := adapters.NewBridgedPermissionHandler(emitter, decider.Decide)
+//	go func() {
+//	    for req := range reqCh {
+//	        decision := showApprovalUI(req) // blocks until user responds
+//	        decCh <- decision
+//	    }
+//	}()
+func NewChannelPermissionDecider(requests chan<- PermissionRequest, decisions <-chan PermissionDecision) *ChannelPermissionDecider {
+	return &ChannelPermissionDecider{
+		requests:  requests,
+		decisions: decisions,
+	}
+}
+
+// ChannelPermissionDecider bridges permission decisions over channels.
+type ChannelPermissionDecider struct {
+	requests  chan<- PermissionRequest
+	decisions <-chan PermissionDecision
+}
+
+// Decide implements PermissionDecider by sending the request on the requests
+// channel and blocking until the matching decision arrives on the decisions
+// channel. The context is passed through for cancellation/timeout propagation.
+func (d *ChannelPermissionDecider) Decide(ctx context.Context, req PermissionRequest) PermissionDecision {
+	select {
+	case d.requests <- req:
+	case <-ctx.Done():
+		return PermissionDecision{Behavior: "deny", Message: "context cancelled before request could be sent"}
+	}
+
+	select {
+	case decision := <-d.decisions:
+		return decision
+	case <-ctx.Done():
+		return PermissionDecision{Behavior: "deny", Message: "context cancelled while waiting for decision"}
+	}
 }
 
 // WriteInterrupt sends an interrupt control_request to the CLI via stdin.

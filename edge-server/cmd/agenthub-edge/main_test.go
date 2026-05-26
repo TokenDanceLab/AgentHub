@@ -39,6 +39,9 @@ func TestBuildConfigDefaultsToMemoryStore(t *testing.T) {
 	if cfg.LocalAuthToken != "" {
 		t.Fatalf("LocalAuthToken = %q, want empty", cfg.LocalAuthToken)
 	}
+	if len(cfg.WorkspaceAllowlist) != 0 {
+		t.Fatalf("WorkspaceAllowlist = %#v, want empty", []string(cfg.WorkspaceAllowlist))
+	}
 }
 
 func TestBuildConfigParsesStoreFile(t *testing.T) {
@@ -73,6 +76,24 @@ func TestBuildConfigParsesStoreFile(t *testing.T) {
 	}
 	if got, want := []string(cfg.RunnerEnv), []string{"AGENTHUB_PROFILE_RUN={{run.id}}", "AGENTHUB_PROFILE_THREAD={{run.threadId}}"}; strings.Join(got, "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("RunnerEnv = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildConfigParsesWorkspaceAllowlist(t *testing.T) {
+	envRootA := filepath.Join(t.TempDir(), "env-a")
+	envRootB := filepath.Join(t.TempDir(), "env-b")
+	flagRoot := filepath.Join(t.TempDir(), "flag")
+	t.Setenv("AGENTHUB_WORKSPACE_ALLOWLIST", envRootA+string(os.PathListSeparator)+envRootB)
+
+	cfg, err := buildConfig([]string{"--workspace-allowlist", flagRoot})
+	if err != nil {
+		t.Fatalf("buildConfig returned error: %v", err)
+	}
+
+	got := []string(cfg.WorkspaceAllowlist)
+	want := []string{envRootA, envRootB, flagRoot}
+	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("WorkspaceAllowlist = %#v, want %#v", got, want)
 	}
 }
 

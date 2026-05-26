@@ -52,6 +52,15 @@ func SetJWKSURI(uri string) {
 	defaultJWKSCache.jwksURI = uri
 }
 
+// ResetJWKSCache clears the JWKS cache. For use in tests when switching
+// between mock TokenDance ID servers.
+func ResetJWKSCache() {
+	defaultJWKSCache.mu.Lock()
+	defer defaultJWKSCache.mu.Unlock()
+	defaultJWKSCache.keys = nil
+	defaultJWKSCache.fetched = time.Time{}
+}
+
 // fetchJWKS fetches the JWKS from TokenDance ID and caches the parsed RSA public keys.
 func (c *jwksCache) fetchJWKS() error {
 	c.mu.RLock()

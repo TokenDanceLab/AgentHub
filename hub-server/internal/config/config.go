@@ -3,7 +3,9 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -11,19 +13,41 @@ import (
 )
 
 type Config struct {
-	Server      ServerConfig      `mapstructure:"server"`
-	DB          DBConfig          `mapstructure:"db"`
-	Redis       RedisConfig       `mapstructure:"redis"`
-	JWT         JWTConfig         `mapstructure:"jwt"`
-	Upload      UploadConfig      `mapstructure:"upload"`
+	Server       ServerConfig       `mapstructure:"server"`
+	DB           DBConfig           `mapstructure:"db"`
+	Redis        RedisConfig        `mapstructure:"redis"`
+	JWT          JWTConfig          `mapstructure:"jwt"`
+	Upload       UploadConfig       `mapstructure:"upload"`
+	S3           S3Config           `mapstructure:"s3"`
 	TokenDanceID TokenDanceIDConfig `mapstructure:"tokendance_id"`
 }
 
+// TokenDanceIDConfig holds OIDC/OAuth2 configuration for TokenDance ID integration.
 type TokenDanceIDConfig struct {
-	IssuerURL    string `mapstructure:"issuer_url"`
-	JWKSURI      string `mapstructure:"jwks_uri"`
-	ClientID     string `mapstructure:"client_id"`
+	// IssuerURL is the TokenDance ID issuer base URL (e.g. https://id.vectorcontrol.tech).
+	IssuerURL string `mapstructure:"issuer_url"`
+	// JWKSURI overrides the JWKS endpoint. Derived from issuer_url/oidc/jwks when empty.
+	JWKSURI string `mapstructure:"jwks_uri"`
+	// ClientID is the OIDC client ID registered with TokenDance ID for AgentHub.
+	ClientID string `mapstructure:"client_id"`
+	// ClientSecret is the OIDC client secret. Must be set via environment variable, never in config YAML.
 	ClientSecret string `mapstructure:"client_secret"`
+	// RedirectURI is the Hub-owned OIDC callback URL.
+	RedirectURI string `mapstructure:"redirect_uri"`
+	// AllowedRedirectURIs lists additional browser/native callbacks accepted for one OIDC round trip.
+	AllowedRedirectURIs []string `mapstructure:"allowed_redirect_uris"`
+}
+
+// LogValue implements slog.LogValuer to redact secrets when config is logged.
+func (t TokenDanceIDConfig) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("issuer_url", t.IssuerURL),
+		slog.String("jwks_uri", t.JWKSURI),
+		slog.String("client_id", t.ClientID),
+		slog.String("client_secret", "[REDACTED]"),
+		slog.String("redirect_uri", t.RedirectURI),
+		slog.Any("allowed_redirect_uris", t.AllowedRedirectURIs),
+	)
 }
 
 type ServerConfig struct {
@@ -46,6 +70,17 @@ func (d DBConfig) DSN() string {
 		d.Host, d.Port, d.User, d.Password, d.Name)
 }
 
+// LogValue implements slog.LogValuer to redact secrets when config is logged.
+func (d DBConfig) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("host", d.Host),
+		slog.Int("port", d.Port),
+		slog.String("user", d.User),
+		slog.String("password", "[REDACTED]"),
+		slog.String("name", d.Name),
+	)
+}
+
 type RedisConfig struct {
 	Host         string `mapstructure:"host"`
 	Port         int    `mapstructure:"port"`
@@ -59,15 +94,65 @@ func (r RedisConfig) Addr() string {
 	return fmt.Sprintf("%s:%d", r.Host, r.Port)
 }
 
+// LogValue implements slog.LogValuer to redact secrets when config is logged.
+func (r RedisConfig) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("host", r.Host),
+		slog.Int("port", r.Port),
+		slog.String("password", "[REDACTED]"),
+		slog.Int("db", r.DB),
+		slog.Int("pool_size", r.PoolSize),
+		slog.Int("min_idle_conns", r.MinIdleConns),
+	)
+}
+
 type JWTConfig struct {
 	Secret     string        `mapstructure:"secret"`
 	AccessTTL  time.Duration `mapstructure:"access_ttl"`
 	RefreshTTL time.Duration `mapstructure:"refresh_ttl"`
 }
 
+// LogValue implements slog.LogValuer to redact secrets when config is logged.
+func (j JWTConfig) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("secret", "[REDACTED]"),
+		slog.Duration("access_ttl", j.AccessTTL),
+		slog.Duration("refresh_ttl", j.RefreshTTL),
+	)
+}
+
 type UploadConfig struct {
 	Dir     string `mapstructure:"dir"`
 	MaxSize int64  `mapstructure:"max_size"`
+}
+
+// S3Config holds S3-compatible object storage settings for attachments.
+// When Endpoint/Bucket are empty, the server falls back to local filesystem storage.
+type S3Config struct {
+	Endpoint  string `mapstructure:"endpoint"`
+	AccessKey string `mapstructure:"access_key"`
+	SecretKey string `mapstructure:"secret_key"`
+	Bucket    string `mapstructure:"bucket"`
+	Region    string `mapstructure:"region"`
+	UseSSL    bool   `mapstructure:"use_ssl"`
+}
+
+// IsConfigured returns true when enough S3 settings are present to attempt
+// S3-backed attachment storage.
+func (s S3Config) IsConfigured() bool {
+	return s.Endpoint != "" && s.Bucket != ""
+}
+
+// LogValue implements slog.LogValuer to redact secrets when config is logged.
+func (s S3Config) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("endpoint", s.Endpoint),
+		slog.String("access_key", "[REDACTED]"),
+		slog.String("secret_key", "[REDACTED]"),
+		slog.String("bucket", s.Bucket),
+		slog.String("region", s.Region),
+		slog.Bool("use_ssl", s.UseSSL),
+	)
 }
 
 func Load(configPath string) (*Config, error) {
@@ -91,7 +176,55 @@ func Load(configPath string) (*Config, error) {
 		cfg.JWT.Secret = envSecret
 	}
 
+	// Explicit env var overrides for TokenDance ID.
+	// Viper AutomaticEnv handles nesting with underscores but these
+	// belt-and-suspenders overrides guarantee the env vars take precedence
+	// regardless of config file content.
+	if envIssuer := firstEnv("AGENTHUB_TOKENDANCE_ID_ISSUER_URL", "AGENTHUB_TOKENDANCE_ISSUER_URL"); envIssuer != "" {
+		cfg.TokenDanceID.IssuerURL = envIssuer
+	}
+	if envJWKS := firstEnv("AGENTHUB_TOKENDANCE_ID_JWKS_URI", "AGENTHUB_TOKENDANCE_JWKS_URI"); envJWKS != "" {
+		cfg.TokenDanceID.JWKSURI = envJWKS
+	}
+	if envClientID := firstEnv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "AGENTHUB_TOKENDANCE_CLIENT_ID"); envClientID != "" {
+		cfg.TokenDanceID.ClientID = envClientID
+	}
+	if envClientSecret := firstEnv("AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "AGENTHUB_TOKENDANCE_CLIENT_SECRET"); envClientSecret != "" {
+		cfg.TokenDanceID.ClientSecret = envClientSecret
+	}
+	if envRedirectURI := firstEnv("AGENTHUB_TOKENDANCE_ID_REDIRECT_URI", "AGENTHUB_TOKENDANCE_REDIRECT_URI"); envRedirectURI != "" {
+		cfg.TokenDanceID.RedirectURI = envRedirectURI
+	}
+	if envAllowedRedirectURIs := firstEnv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "AGENTHUB_TOKENDANCE_ALLOWED_REDIRECT_URIS"); envAllowedRedirectURIs != "" {
+		cfg.TokenDanceID.AllowedRedirectURIs = splitEnvList(envAllowedRedirectURIs)
+	}
+
+	// Auto-derive JWKS URI from issuer URL when not explicitly set.
+	if cfg.TokenDanceID.JWKSURI == "" && cfg.TokenDanceID.IssuerURL != "" {
+		cfg.TokenDanceID.JWKSURI = cfg.TokenDanceID.IssuerURL + "/oidc/jwks"
+	}
+
 	return &cfg, nil
+}
+
+func firstEnv(names ...string) string {
+	for _, name := range names {
+		if value := os.Getenv(name); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func splitEnvList(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
 
 // Validate checks that the loaded configuration is usable at startup.
@@ -120,10 +253,28 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("redis.port is invalid: %d", c.Redis.Port)
 	}
 
-	// JWT: reject hardcoded defaults.
-	if c.JWT.Secret == "" || c.JWT.Secret == "dev-secret-change-in-production" {
-		if os.Getenv("AGENTHUB_JWT_SECRET") == "" {
-			return errors.New("JWT secret must be set via AGENTHUB_JWT_SECRET environment variable; hardcoded defaults are rejected")
+	// JWT: reject hardcoded defaults and known weak development secrets.
+	// In production (default), any known hardcoded value is fatal.
+	// In dev/test environments these are allowed for convenience.
+	knownHardcodedSecrets := []string{
+		"",
+		"dev-secret-change-in-production",
+		"dev-secret",
+		"test-secret",
+		"my-secret-key",
+		"changeme",
+		"secret",
+		"default",
+		"password",
+		"1234567890123456",
+		"aaaaaaaaaaaaaaaa",
+	}
+	if slices.Contains(knownHardcodedSecrets, c.JWT.Secret) {
+		// Also check the env-var value against the blocklist to prevent
+		// bypass by setting AGENTHUB_JWT_SECRET to the same weak value.
+		envSecret := os.Getenv("AGENTHUB_JWT_SECRET")
+		if envSecret == "" || slices.Contains(knownHardcodedSecrets, envSecret) {
+			return errors.New("JWT secret must be set via AGENTHUB_JWT_SECRET environment variable with a strong, non-default value; hardcoded defaults are rejected")
 		}
 	}
 
@@ -132,15 +283,17 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("JWT secret too short: minimum 16 characters required (got %d)", len(c.JWT.Secret))
 	}
 
-	// TokenDance ID: validate URLs if configured.
-	if c.TokenDanceID.IssuerURL != "" {
-		if c.TokenDanceID.JWKSURI == "" {
-			c.TokenDanceID.JWKSURI = c.TokenDanceID.IssuerURL + "/oidc/jwks"
+	// TokenDance ID config is optional; validate only when explicitly configured
+	if c.TokenDanceID.ClientID != "" {
+		if c.TokenDanceID.IssuerURL == "" {
+			return fmt.Errorf("tokendance_id.issuer_url is required when tokendance_id.client_id is set")
 		}
-	} else {
-		// Default to production TokenDance ID
-		c.TokenDanceID.IssuerURL = "https://id.vectorcontrol.tech"
-		c.TokenDanceID.JWKSURI = "https://id.vectorcontrol.tech/oidc/jwks"
+		if c.TokenDanceID.ClientSecret == "" {
+			return fmt.Errorf("tokendance_id.client_secret is required when tokendance_id.client_id is set")
+		}
+		if c.TokenDanceID.RedirectURI == "" {
+			return fmt.Errorf("tokendance_id.redirect_uri is required when tokendance_id.client_id is set")
+		}
 	}
 
 	// Upload: if a directory is configured, it must exist.

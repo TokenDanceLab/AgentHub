@@ -16,8 +16,8 @@ export interface ErrorBody {
 export class AppError extends Error {
   code: string;
   status: number;
-  traceId?: string;
-  details?: Record<string, unknown>;
+  traceId: string | undefined;
+  details: Record<string, unknown> | undefined;
   rawBody?: unknown;
 
   constructor(body: ErrorBody, status: number, rawBody: unknown = body) {

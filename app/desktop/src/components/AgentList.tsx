@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import { MapPin, Search, Settings2, Sparkles } from 'lucide-react';
+import { Search, Settings2, Sparkles } from 'lucide-react';
 import { useState, useMemo, memo, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
 import styles from './AgentList.module.css';
+
+const RUNTIME_ORDER = ['codex', 'claude', 'opencode'];
 
 function agentIcon(name: string): ReactNode {
   const n = name.toLowerCase();
@@ -11,6 +13,12 @@ function agentIcon(name: string): ReactNode {
   if (n.includes('codex')) return <Codex size={20} />;
   if (n.includes('opencode')) return <OpenCode size={20} />;
   return null;
+}
+
+function runtimeRank(agent: AgentInfo): number {
+  const n = agent.name.toLowerCase();
+  const idx = RUNTIME_ORDER.findIndex((key) => n.includes(key));
+  return idx === -1 ? RUNTIME_ORDER.length : idx;
 }
 
 interface Props {
@@ -23,12 +31,25 @@ interface Props {
 export default memo(function AgentList({ agents, online, selectedId, onSelect }: Props) {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
+  const [otherExpanded, setOtherExpanded] = useState(false);
+
+  const { primaryAgents, otherAgents } = useMemo(() => {
+    const ordered = [...agents].sort((a, b) => {
+      const rankDiff = runtimeRank(a) - runtimeRank(b);
+      if (rankDiff !== 0) return rankDiff;
+      return a.name.localeCompare(b.name);
+    });
+    const primary = ordered.filter((a) => runtimeRank(a) < RUNTIME_ORDER.length);
+    const other = ordered.filter((a) => runtimeRank(a) >= RUNTIME_ORDER.length);
+    return { primaryAgents: primary, otherAgents: other };
+  }, [agents]);
 
   const filteredAgents = useMemo(() => {
-    if (!searchQuery.trim()) return agents;
+    const visibleAgents = otherExpanded ? [...primaryAgents, ...otherAgents] : primaryAgents;
+    if (!searchQuery.trim()) return visibleAgents;
     const q = searchQuery.toLowerCase();
-    return agents.filter((a) => a.name.toLowerCase().includes(q));
-  }, [agents, searchQuery]);
+    return visibleAgents.filter((a) => a.name.toLowerCase().includes(q));
+  }, [otherAgents, otherExpanded, primaryAgents, searchQuery]);
 
   function highlightMatch(text: string): ReactNode {
     if (!searchQuery.trim()) return text;
@@ -45,7 +66,7 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
   }
 
   const isEmpty = agents.length === 0;
-  const isSearchEmpty = !isEmpty && filteredAgents.length === 0;
+  const isSearchEmpty = !isEmpty && filteredAgents.length === 0 && (searchQuery.trim() || otherAgents.length === 0);
   const availableCount = agents.filter((a) => a.status === 'available').length;
 
   return (
@@ -95,21 +116,23 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
                       {t(`agent.status.${a.status}`)}
                     </span>
                   </div>
-                  {a.description && (
-                    <div className={styles.description}>{a.description}</div>
-                  )}
-                  <div className={styles.metaLine}>
-                    {a.version && <span className={styles.version}>{a.version}</span>}
-                    <span className={styles.runtimeMeta}>
-                      <MapPin size={10} aria-hidden="true" />
-                      {t('agent.runtime.localEdge')}
-                    </span>
-                    <span className={styles.runtimeMeta}>{t('agent.runtime.cliAdapter')}</span>
-                  </div>
                 </div>
               </button>
             </li>
           ))}
+          {otherAgents.length > 0 && !searchQuery.trim() && (
+            <li>
+              <button
+                type="button"
+                className={styles.otherToggle}
+                onClick={() => setOtherExpanded((v) => !v)}
+                aria-expanded={otherExpanded}
+              >
+                <span>{t('agent.runtime.other')}</span>
+                <span className={styles.otherCount}>{otherAgents.length}</span>
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </nav>

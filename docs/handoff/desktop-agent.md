@@ -3,7 +3,7 @@
 ## 接手前必读
 
 1. `AGENTS.md` — 项目规则和开发约束
-2. `docs/architecture/system-architecture.md` — Hub-Edge-Runner 三层架构
+2. `docs/architecture/system-architecture.md` — Desktop / Edge / Hub 与 Agent Runtime 架构
 3. `docs/architecture/product-requirements.md` — 产品需求（bytedance.md 的工程版）
 4. `docs/architecture/implementation-guide.md` — 实施路线（M1→M2→M3→M4）
 5. `docs/operations/client-roadmap.md` — 客户端开发路线图

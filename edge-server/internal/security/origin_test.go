@@ -8,7 +8,7 @@ func TestIsTrustedLocalOrigin(t *testing.T) {
 		origin string
 		want   bool
 	}{
-		{"empty origin for local tools", "", true},
+		{"empty origin rejected (non-browser client)", "", false},
 		{"vite localhost", "http://localhost:5199", true},
 		{"vite default port", "http://localhost:5173", true},
 		{"loopback ip", "http://127.0.0.1:5199", true},

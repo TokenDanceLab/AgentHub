@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -30,9 +31,12 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			password_hash TEXT NOT NULL,
 			nickname TEXT NOT NULL,
 			avatar_url TEXT DEFAULT '',
+			tokendance_sub TEXT DEFAULT NULL,
+			tokendance_sub_linked_at DATETIME DEFAULT NULL,
 			created_at DATETIME,
 			updated_at DATETIME
 		)`,
+		`CREATE UNIQUE INDEX idx_users_tokendance_sub ON users(tokendance_sub) WHERE tokendance_sub IS NOT NULL AND tokendance_sub != ''`,
 		`CREATE TABLE devices (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL,
@@ -48,6 +52,8 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			type TEXT NOT NULL,
 			name TEXT DEFAULT '',
 			avatar_url TEXT DEFAULT '',
+			tokendance_sub TEXT DEFAULT NULL,
+			tokendance_sub_linked_at DATETIME DEFAULT NULL,
 			announcement TEXT DEFAULT '',
 			owner_user_id TEXT,
 			next_seq INTEGER NOT NULL DEFAULT 0,
@@ -139,6 +145,8 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			owner_user_id TEXT NOT NULL,
 			name TEXT NOT NULL,
 			avatar_url TEXT DEFAULT '',
+			tokendance_sub TEXT DEFAULT NULL,
+			tokendance_sub_linked_at DATETIME DEFAULT NULL,
 			agent_type TEXT NOT NULL,
 			system_prompt TEXT NOT NULL DEFAULT '',
 			capability_tags TEXT DEFAULT '[]',
@@ -153,6 +161,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			agent_instance_id TEXT NOT NULL,
 			triggered_by_user_id TEXT NOT NULL,
 			trigger_message_id TEXT NOT NULL,
+			target_id TEXT,
 			status TEXT NOT NULL,
 			edge_run_id TEXT DEFAULT '',
 			edge_device_id TEXT DEFAULT '',
@@ -171,6 +180,49 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			expires_at DATETIME NOT NULL,
 			revoked INTEGER NOT NULL DEFAULT 0,
 			created_at DATETIME
+		)`,
+		`CREATE TABLE agent_teams (
+			id TEXT PRIMARY KEY,
+			owner_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			avatar_url TEXT DEFAULT '',
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_members (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			agent_profile_id TEXT,
+			role TEXT NOT NULL DEFAULT 'executor',
+			position INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME,
+			FOREIGN KEY (team_id) REFERENCES agent_teams(id) ON DELETE CASCADE
+		)`,
+		`CREATE TABLE agent_team_runs (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			session_id TEXT,
+			trigger_user_id TEXT NOT NULL,
+			trigger_message TEXT DEFAULT '',
+			status TEXT NOT NULL DEFAULT 'queued',
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_assignments (
+			id TEXT PRIMARY KEY,
+			team_run_id TEXT NOT NULL,
+			from_member_id TEXT NOT NULL,
+			to_member_id TEXT NOT NULL,
+			type TEXT NOT NULL DEFAULT 'delegate',
+			task_prompt TEXT NOT NULL,
+			context TEXT DEFAULT '',
+			status TEXT NOT NULL DEFAULT 'pending',
+			run_id TEXT,
+			result TEXT DEFAULT '',
+			depth INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME,
+			updated_at DATETIME
 		)`,
 	}
 	for _, ddl := range tables {
@@ -255,6 +307,31 @@ func TestUserRepo_GetUsersByIDs(t *testing.T) {
 	m, err = GetUsersByIDs(db, []string{"no-such-id"})
 	require.NoError(t, err)
 	assert.Empty(t, m)
+}
+
+func TestUserRepo_FindOrCreateByTokenDanceSubCreatesStableDistinctHubUsers(t *testing.T) {
+	db := setupSQLite(t)
+
+	sub1 := "tokendance-subject-with-a-very-long-shared-prefix-" + strings.Repeat("1", 80)
+	sub2 := "tokendance-subject-with-a-very-long-shared-prefix-" + strings.Repeat("2", 80)
+
+	u1, err := FindOrCreateByTokenDanceSub(db, sub1)
+	require.NoError(t, err)
+	u2, err := FindOrCreateByTokenDanceSub(db, sub2)
+	require.NoError(t, err)
+
+	require.NotEqual(t, u1.ID, u2.ID)
+	require.NotEqual(t, u1.Username, u2.Username)
+	assert.True(t, strings.HasPrefix(u1.Username, "td_"))
+	assert.True(t, len(u1.Username) <= 32)
+	assert.True(t, len(u1.Nickname) <= 64)
+	require.NotNil(t, u1.TokenDanceSub)
+	assert.Equal(t, sub1, *u1.TokenDanceSub)
+
+	again, err := FindOrCreateByTokenDanceSub(db, sub1)
+	require.NoError(t, err)
+	assert.Equal(t, u1.ID, again.ID)
+	assert.Equal(t, u1.Username, again.Username)
 }
 
 // =============================================================================
@@ -747,6 +824,37 @@ func TestFriendshipRepo_StatusTransitions(t *testing.T) {
 	assert.Equal(t, "Bestie", fetched.Remark)
 }
 
+func TestFriendshipRepo_UpdateRemarkNoRows(t *testing.T) {
+	db := setupSQLite(t)
+
+	// No friendship rows exist, so UpdateFriendshipRemark should return ErrRecordNotFound.
+	err := UpdateFriendshipRemark(db, "user-x", "user-y", "remark")
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	// Create a friendship with pending status - remark should NOT be updatable
+	f := &model.Friendship{UserID: "user-x", FriendID: "user-y", Status: model.StatusPending}
+	require.NoError(t, CreateFriendship(db, f))
+
+	err = UpdateFriendshipRemark(db, "user-x", "user-y", "remark")
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound, "pending friendship should not allow remark update")
+
+	// Update to accepted - remark SHOULD be updatable
+	require.NoError(t, UpdateFriendshipByID(db, f.ID, model.StatusAccepted))
+	err = UpdateFriendshipRemark(db, "user-x", "user-y", "cleared")
+	require.NoError(t, err)
+
+	fetched, err := GetFriendshipByID(db, f.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "cleared", fetched.Remark)
+
+	// Clearing remark to empty string
+	err = UpdateFriendshipRemark(db, "user-x", "user-y", "")
+	require.NoError(t, err)
+	fetched, err = GetFriendshipByID(db, f.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "", fetched.Remark)
+}
+
 func TestFriendshipRepo_Lists(t *testing.T) {
 	db := setupSQLite(t)
 
@@ -850,7 +958,7 @@ func TestNotificationRepo_CreateAndList(t *testing.T) {
 	assert.Len(t, result, 2)
 
 	// Mark first as read
-	require.NoError(t, MarkNotificationRead(db, n1.ID))
+	require.NoError(t, MarkNotificationRead(db, "user-n1", n1.ID))
 
 	// List unread only
 	result, err = ListNotifications(db, "user-n1", true, 10, 0)
@@ -1148,6 +1256,94 @@ func TestPendingTaskRepo_CancelTasksByAgent(t *testing.T) {
 	assert.Equal(t, model.TaskStatusQueued, fetched.Status)
 }
 
+func TestPendingTaskRepo_ScanExpiredTasks(t *testing.T) {
+	db := setupSQLite(t)
+
+	// Create tasks with different statuses and expire times
+	// Expired queued
+	task1 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusQueued,
+		ExpireAt:          time.Now().Add(-time.Hour), // expired
+	}
+	// Expired dispatched
+	task2 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-2",
+		Status:            model.TaskStatusDispatched,
+		ExpireAt:          time.Now().Add(-time.Hour), // expired
+	}
+	// Expired running (#132: running tasks should also be scanned)
+	task3 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-3",
+		Status:            model.TaskStatusRunning,
+		ExpireAt:          time.Now().Add(-time.Hour), // expired
+	}
+	// Not expired yet
+	task4 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-4",
+		Status:            model.TaskStatusQueued,
+		ExpireAt:          time.Now().Add(time.Hour), // not expired
+	}
+	// Expired but already done (terminal states excluded)
+	task5 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-5",
+		Status:            model.TaskStatusDone,
+		ExpireAt:          time.Now().Add(-time.Hour), // expired but done
+	}
+	// Expired but already failed (terminal states excluded)
+	task6 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-6",
+		Status:            model.TaskStatusFailed,
+		ExpireAt:          time.Now().Add(-time.Hour), // expired but failed
+	}
+	// Expired but already cancelled (terminal states excluded)
+	task7 := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-scan",
+		TriggeredByUserID: "user-scan",
+		TriggerMessageID:  "msg-7",
+		Status:            model.TaskStatusCancelled,
+		ExpireAt:          time.Now().Add(-time.Hour), // expired but cancelled
+	}
+
+	require.NoError(t, CreatePendingTask(db, task1))
+	require.NoError(t, CreatePendingTask(db, task2))
+	require.NoError(t, CreatePendingTask(db, task3))
+	require.NoError(t, CreatePendingTask(db, task4))
+	require.NoError(t, CreatePendingTask(db, task5))
+	require.NoError(t, CreatePendingTask(db, task6))
+	require.NoError(t, CreatePendingTask(db, task7))
+
+	tasks, err := ScanExpiredTasks(db)
+	require.NoError(t, err)
+
+	// Should only return tasks 1, 2, 3 (expired and in non-terminal states)
+	assert.Len(t, tasks, 3)
+
+	taskIDs := make(map[string]bool)
+	for _, t := range tasks {
+		taskIDs[t.ID] = true
+	}
+	assert.True(t, taskIDs[task1.ID], "expired queued task should be returned")
+	assert.True(t, taskIDs[task2.ID], "expired dispatched task should be returned")
+	assert.True(t, taskIDs[task3.ID], "expired running task should be returned (#132)")
+	assert.False(t, taskIDs[task4.ID], "non-expired task should not be returned")
+	assert.False(t, taskIDs[task5.ID], "expired done task should not be returned")
+	assert.False(t, taskIDs[task6.ID], "expired failed task should not be returned")
+	assert.False(t, taskIDs[task7.ID], "expired cancelled task should not be returned")
+}
+
 // =============================================================================
 // SessionMember repository tests
 // =============================================================================
@@ -1409,6 +1605,182 @@ func TestRefreshTokenRepo_Revoke(t *testing.T) {
 	found, err = FindRefreshTokenByHash(db, "h3")
 	require.NoError(t, err)
 	assert.True(t, found.Revoked)
+}
+
+// =============================================================================
+// B2 data-integrity tests — atomic status, password+token, pin limit
+// =============================================================================
+
+func TestPendingTaskRepo_AtomicStatusUpdate(t *testing.T) {
+	db := setupSQLite(t)
+
+	expireAt := time.Now().Add(time.Hour)
+	task := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-atomic",
+		TriggeredByUserID: "user-t",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusDispatched,
+		ExpireAt:          expireAt,
+	}
+	require.NoError(t, CreatePendingTask(db, task))
+
+	// Atomic transition: dispatched → running (should succeed)
+	rows, err := UpdatePendingTaskStatusAtomic(db, task.ID, model.TaskStatusDispatched, model.TaskStatusRunning, "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+
+	fetched, err := GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusRunning, fetched.Status)
+
+	// Atomic transition with wrong old status (should fail — 0 rows)
+	rows, err = UpdatePendingTaskStatusAtomic(db, task.ID, model.TaskStatusDispatched, model.TaskStatusDone, "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rows, "should not transition from running when oldStatus is dispatched")
+
+	// Verify status unchanged
+	fetched, err = GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusRunning, fetched.Status)
+
+	// Atomic transition: running → done (should succeed)
+	rows, err = UpdatePendingTaskStatusAtomic(db, task.ID, model.TaskStatusRunning, model.TaskStatusDone, "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+
+	fetched, err = GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusDone, fetched.Status)
+	assert.NotNil(t, fetched.FinishedAt)
+}
+
+func TestPendingTaskRepo_AtomicWithEdgeRunID(t *testing.T) {
+	db := setupSQLite(t)
+
+	expireAt := time.Now().Add(time.Hour)
+	task := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-edge",
+		TriggeredByUserID: "user-t",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusDispatched,
+		ExpireAt:          expireAt,
+	}
+	require.NoError(t, CreatePendingTask(db, task))
+
+	// Atomic: dispatched → running with edgeRunID
+	rows, err := UpdatePendingTaskStatusAtomicWithEdgeRunID(db, task.ID, model.TaskStatusDispatched, model.TaskStatusRunning, "", "run-001")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+
+	fetched, err := GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusRunning, fetched.Status)
+	assert.Equal(t, "run-001", fetched.EdgeRunID)
+
+	// Non-atomic edgeRunID update on an already empty edgeRunID
+	// (after clearing it for test, we verify that duplicating calls is a no-op)
+	err = UpdatePendingTaskEdgeRunID(db, task.ID, "run-002")
+	// edge_run_id is already "run-001" so WHERE edge_run_id = '' matches 0 rows
+	assert.NoError(t, err)
+	fetched, err = GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "run-001", fetched.EdgeRunID, "edgeRunID should not be overwritten")
+}
+
+func TestPendingTaskRepo_AtomicFailClosed(t *testing.T) {
+	db := setupSQLite(t)
+
+	expireAt := time.Now().Add(time.Hour)
+	task := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-failclosed",
+		TriggeredByUserID: "user-t",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusRunning,
+		ExpireAt:          expireAt,
+	}
+	require.NoError(t, CreatePendingTask(db, task))
+
+	// Simulate a race: first writer marks it done
+	rows, err := UpdatePendingTaskStatusAtomic(db, task.ID, model.TaskStatusRunning, model.TaskStatusDone, "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+
+	// Second writer tries to mark it failed — 0 rows (fail closed)
+	rows, err = UpdatePendingTaskStatusAtomic(db, task.ID, model.TaskStatusRunning, model.TaskStatusFailed, "boom")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rows, "second writer should get 0 rows affected")
+
+	// Status should remain done
+	fetched, err := GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusDone, fetched.Status)
+}
+
+func TestUserRepo_UpdatePasswordAndRevokeTokens(t *testing.T) {
+	db := setupSQLite(t)
+
+	// Create user
+	user := &model.User{Username: "pwuser", PasswordHash: "old-hash", Nickname: "PW"}
+	require.NoError(t, CreateUser(db, user))
+
+	// Create a couple of refresh tokens
+	rt1 := &model.RefreshToken{
+		UserID: user.ID, DeviceType: "desktop", DeviceID: "dev-1",
+		TokenHash: "hash1", ExpiresAt: time.Now().Add(time.Hour),
+	}
+	rt2 := &model.RefreshToken{
+		UserID: user.ID, DeviceType: "mobile", DeviceID: "dev-2",
+		TokenHash: "hash2", ExpiresAt: time.Now().Add(time.Hour),
+	}
+	require.NoError(t, UpsertRefreshToken(db, rt1))
+	require.NoError(t, UpsertRefreshToken(db, rt2))
+
+	// Atomic: update password + revoke all tokens
+	err := UpdatePasswordAndRevokeTokens(db, user.ID, "new-hash")
+	require.NoError(t, err)
+
+	// Verify password updated
+	fetchedUser, err := GetUserByID(db, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "new-hash", fetchedUser.PasswordHash)
+
+	// Verify all tokens revoked
+	rt1Check, err := FindRefreshTokenByHash(db, "hash1")
+	require.NoError(t, err)
+	assert.True(t, rt1Check.Revoked)
+
+	rt2Check, err := FindRefreshTokenByHash(db, "hash2")
+	require.NoError(t, err)
+	assert.True(t, rt2Check.Revoked)
+}
+
+func TestMessageRepo_PinMessageAtomic(t *testing.T) {
+	db := setupSQLite(t)
+
+	s := &model.Session{Type: model.SessionTypeGroup, Name: "pin-test"}
+	require.NoError(t, CreateSession(db, s))
+
+	pin := func(msgID, userID string) error {
+		return PinMessageAtomic(db, &model.MessagePin{
+			SessionID:      s.ID,
+			MessageID:      msgID,
+			PinnedByUserID: userID,
+		}, 3) // low limit for testing
+	}
+
+	// Pin 3 messages — all should succeed
+	require.NoError(t, pin("msg-1", "user-1"))
+	require.NoError(t, pin("msg-2", "user-1"))
+	require.NoError(t, pin("msg-3", "user-1"))
+
+	// 4th pin should fail with limit exceeded
+	err := pin("msg-4", "user-1")
+	assert.ErrorIs(t, err, ErrPinLimitExceeded)
+
+	// Verify count
+	count, err := CountPinsBySession(db, s.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), count)
 }
 
 // =============================================================================

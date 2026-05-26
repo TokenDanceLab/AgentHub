@@ -133,8 +133,8 @@ func TestSubscribeCursorReplay(t *testing.T) {
 	b.Publish("e2", nil, 2) // seq=2
 	b.Publish("e3", nil, 3) // seq=3
 
-	// Subscribe with cursor=1: should replay seq 2 and 3.
-	_, ch, replay := b.Subscribe(1)
+	// Subscribe with cursor=2: replay starts from exact cursor, so seq 2 and 3.
+	_, ch, replay := b.Subscribe(2)
 
 	if len(replay) != 2 {
 		t.Fatalf("replay length = %d, want 2", len(replay))

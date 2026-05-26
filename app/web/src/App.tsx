@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -360,6 +361,20 @@ export default function App() {
         </aside>
       </div>
     </div>
+=======
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { queryClient } from '@/api/queryClient';
+import WebLayout from '@/layouts/WebLayout';
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <WebLayout />
+      </ThemeProvider>
+    </QueryClientProvider>
+>>>>>>> origin/dev/delicious233
   );
 }
 

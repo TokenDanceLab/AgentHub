@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 :root {
   --bg: #eef1f5;
   --surface: #ffffff;
@@ -90,12 +91,18 @@
   --agent-bg: #161b22;
   --system-bg: #1e1c19;
   --white: #ffffff;
+=======
+:global(body) {
+  margin: 0;
+  overflow: hidden;
+>>>>>>> origin/dev/delicious233
 }
 
 .root {
   display: flex;
   flex-direction: column;
   height: 100vh;
+<<<<<<< HEAD
   min-width: 0;
   overflow: hidden;
   background: var(--bg);
@@ -141,16 +148,31 @@
 
 .root *:hover {
   scrollbar-color: rgba(100, 120, 160, 0.55) transparent;
+=======
+  min-width: 960px;
+  overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+>>>>>>> origin/dev/delicious233
 }
 
 .toolbar {
   display: flex;
   align-items: center;
+<<<<<<< HEAD
   gap: 14px;
   height: 52px;
   padding: 0 16px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
+=======
+  gap: 24px;
+  height: 56px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+>>>>>>> origin/dev/delicious233
   flex-shrink: 0;
 }
 
@@ -182,19 +204,63 @@
   width: 28px;
   height: 28px;
   border-radius: 6px;
+<<<<<<< HEAD
   background: var(--brand-gradient);
   color: #ffffff;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0;
   box-shadow: 0 8px 18px var(--brand-glow);
+=======
+  background: var(--brand);
+  color: #ffffff;
+  font-size: 12px;
+  letter-spacing: 0;
+>>>>>>> origin/dev/delicious233
 }
 
 .toolbarMeta {
   display: flex;
   align-items: center;
+<<<<<<< HEAD
   gap: 8px;
   min-width: 0;
+=======
+  gap: 4px;
+  height: 100%;
+  overflow-x: auto;
+}
+
+.tab,
+.activeTab {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background: var(--secondary);
+  color: var(--foreground);
+}
+
+.activeTab {
+  border-color: var(--border);
+  background: var(--accent);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.preview {
+  flex: 1;
+  min-height: 0;
+>>>>>>> origin/dev/delicious233
   overflow: hidden;
 }
 
@@ -558,6 +624,7 @@
   background: var(--accent-light);
   color: var(--accent);
 }
+<<<<<<< HEAD
 
 .actions {
   display: flex;
@@ -791,3 +858,5 @@
     width: min(210px, calc(100vw - 16px));
   }
 }
+=======
+>>>>>>> origin/dev/delicious233

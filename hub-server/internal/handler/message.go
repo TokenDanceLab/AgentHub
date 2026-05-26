@@ -43,6 +43,15 @@ func (h *MessageHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
+	if req.ClientMsgID != "" {
+		if normalized, ok := normalizeUUID(req.ClientMsgID); !ok {
+			Fail(c, errcode.ErrBadRequest)
+			return
+		} else {
+			req.ClientMsgID = normalized
+		}
+	}
+
 	result, err := h.service.SendMessage(c.Request.Context(), sessionID, userID, req)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {

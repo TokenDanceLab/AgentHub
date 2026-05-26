@@ -19,7 +19,7 @@ import (
 // mockEdgeAgentService implements handler.AgentService for edge callback tests.
 type mockEdgeAgentService struct {
 	handleTaskAckFn    func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
-	handleTaskStreamFn func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error
+	handleTaskStreamFn func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error
 	handleTaskDoneFn   func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
 	handleTaskFailFn   func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
 
@@ -31,7 +31,7 @@ type mockEdgeAgentService struct {
 func (m *mockEdgeAgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
 	return m.addAgentFn(ctx, userID, sessionID, agentType, customAgentID, displayName)
 }
-func (m *mockEdgeAgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error) {
+func (m *mockEdgeAgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
 	return m.triggerTaskFn(ctx, userID, triggerMessageID)
 }
 func (m *mockEdgeAgentService) CancelTask(ctx context.Context, userID, taskID string) error {
@@ -40,14 +40,17 @@ func (m *mockEdgeAgentService) CancelTask(ctx context.Context, userID, taskID st
 func (m *mockEdgeAgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
 	return m.handleTaskAckFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID)
 }
-func (m *mockEdgeAgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
-	return m.handleTaskStreamFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, content)
+func (m *mockEdgeAgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
+	return m.handleTaskStreamFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, stream)
 }
 func (m *mockEdgeAgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
 	return m.handleTaskDoneFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent)
 }
 func (m *mockEdgeAgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {
 	return m.handleTaskFailFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg)
+}
+func (m *mockEdgeAgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string) ([]model.AgentRunEvent, error) {
+	return nil, nil
 }
 
 // mockEdgeDeviceService implements handler.DeviceService.
@@ -57,6 +60,10 @@ type mockEdgeDeviceService struct {
 
 func (m *mockEdgeDeviceService) Register(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 	return m.registerFn(deviceID, userID, deviceType, appVersion, capabilities)
+}
+
+func (m *mockEdgeDeviceService) ListDevices(userID string) ([]model.Device, error) {
+	return nil, nil
 }
 
 // ── Test helpers ───────────────────────────────────────────────────────────
@@ -264,12 +271,12 @@ func TestEdgeAgentTaskStream(t *testing.T) {
 		content      string
 	}
 	svc := &mockEdgeAgentService{
-		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
+		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 			captured.edgeUserID = edgeUserID
 			captured.edgeDeviceID = edgeDeviceID
 			captured.taskID = taskID
 			captured.runID = edgeRunID
-			captured.content = content
+			captured.content = stream.Content
 			return nil
 		},
 	}
@@ -309,8 +316,8 @@ func TestEdgeAgentTaskStream(t *testing.T) {
 func TestEdgeAgentTaskStreamMultipleChunks(t *testing.T) {
 	var chunks []string
 	svc := &mockEdgeAgentService{
-		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
-			chunks = append(chunks, content)
+		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
+			chunks = append(chunks, stream.Content)
 			return nil
 		},
 	}
@@ -334,7 +341,7 @@ func TestEdgeAgentTaskStreamMultipleChunks(t *testing.T) {
 
 func TestEdgeAgentTaskStreamBadRequest(t *testing.T) {
 	svc := &mockEdgeAgentService{
-		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
+		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 			return nil
 		},
 	}
@@ -353,7 +360,7 @@ func TestEdgeAgentTaskStreamBadRequest(t *testing.T) {
 
 func TestEdgeAgentTaskStreamNotFound(t *testing.T) {
 	svc := &mockEdgeAgentService{
-		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
+		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 			return errcode.AgentTaskNotFound
 		},
 	}
@@ -553,7 +560,7 @@ func TestEdgeTaskLifecycle(t *testing.T) {
 			}
 			return nil
 		},
-		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
+		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 			if taskID != "lifecycle-task" {
 				t.Errorf("stream: taskID = %q, want lifecycle-task", taskID)
 			}
@@ -615,7 +622,7 @@ func TestEdgeTaskLifecycleFail(t *testing.T) {
 		handleTaskAckFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
 			return nil
 		},
-		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
+		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 			return nil
 		},
 		handleTaskFailFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {

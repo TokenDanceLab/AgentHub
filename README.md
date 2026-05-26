@@ -159,7 +159,7 @@ cd app/desktop
 pnpm test:e2e
 ```
 
-注意：`scripts/client-smoke.ps1` 仍包含已删除 `runner/` 目录的历史检查，修复前不要把它作为通过/失败依据。
+`scripts/client-smoke.ps1` 已对齐当前 Edge Runtime 架构，不再构建已删除的独立 `runner/` 目录；它使用 Edge 内置 `agenthub-runner-mock` 兼容 profile，并支持 `-EdgeAddr` 在隔离端口运行。
 
 ### 当前验证命令
 
@@ -168,6 +168,18 @@ pnpm test:e2e
 ```powershell
 git diff --check
 python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
+```
+
+Runtime / AgentAdapter / Edge API / Settings 展示边界改动还应运行：
+
+```powershell
+.\scripts\verify-runtime-readiness.ps1
+```
+
+Web Hub/Local Edge 边界改动还应运行：
+
+```powershell
+.\scripts\verify-web-hub-boundary.ps1
 ```
 
 后端改动：
@@ -241,15 +253,23 @@ Docker 和部署文件跟随所属模块放置。根级 compose 只用于跨模�
 
 ## TokenDance ID 鉴权边界
 
-TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产品会话。最终浏览器/桌面登录必须由 Hub Server 作为 TokenDance ID relying party 完成 OIDC Authorization Code + PKCE 的 code exchange、验证 ID token 的 issuer/audience/JWKS、把 `tokendance_sub` 映射到 Hub user，再签发 Hub 本地 access/refresh session。
+TokenDance ID 是跨产品身份入口；Hub session 是 AgentHub 自己的产品会话。Hub Server 已提供 TokenDance ID relying-party 登录交换：`POST /client/auth/oidc/authorize` 生成 PKCE 授权 URL 和一次性 state，`POST /client/auth/oidc/callback` 完成 code exchange、验证 ID token 的 issuer/audience/JWKS、把 `tokendance_sub` 映射到 Hub user，再签发 Hub 本地 access/refresh session。
 
 | 项 | 当前边界 |
 |---|---|
 | TokenDance ID | 统一第三方登录和账号主体；产品不直接集成 GitHub/Google/飞书 |
-| Hub Server | 拥有 Hub callback、code exchange、Hub user 映射、Hub access/refresh session 和设备证明 |
+| Hub Server | 拥有 Hub OIDC authorize/callback exchange、Hub user 映射、Hub access/refresh session 和 UUID device proof |
 | Desktop/Web | 打开系统浏览器或 Web 登录入口，保存 Hub session；不保存第三方 provider token |
-| 兼容 bearer 路径 | `hub-server/internal/middleware/auth.go` 可验证 TokenDance ID RS256/JWKS bearer token，但验证结果只标记为 `tokendance_bearer`，不能替代 Hub session，也不能满足 Edge `desktop` 设备门禁 |
+| 兼容 bearer 路径 | `hub-server/internal/middleware/auth.go` 可验证 TokenDance ID RS256/JWKS bearer token，但验证结果只标记为 `tokendance_bearer`，不能替代 Hub session，也不能满足 Edge `desktop` 设备门禁；`/client/ws` 只接受 Hub-issued HS256 access token，TokenDance bearer 会在 WebSocket upgrade 或首帧 auth 中被拒绝 |
 | 本地执行 | Local Edge + Desktop 执行不依赖 Hub 登录；需要云端 IM、同步、远控或中继时才需要 Hub session |
+
+OIDC 结构检查：
+
+```powershell
+.\scripts\verify-oidc-readiness.ps1
+```
+
+该检查只证明公开仓库里的 Hub OIDC 端点、示例配置、Desktop/Web Hub session 存储策略、Hub WebSocket upgrade 鉴权和根治理矩阵对齐；它不连接生产 TokenDance ID，不需要真实 `client_secret`，也不替代部署态 login/callback/logout/reconnect 证据。
 
 <br>
 
