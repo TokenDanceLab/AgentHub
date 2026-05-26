@@ -456,6 +456,29 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	waitErr := cmd.Wait()
 	wg.Wait()
 
+	// Context budget compaction check: after the stream completes, evaluate
+	// whether the context budget exceeded the auto-compaction threshold.
+	// When triggered, we log the budget state and emit a compaction event
+	// so upstream session managers can compact the actual message history.
+	if runCtx.Budget != nil && runCtx.Budget.ShouldCompact() {
+		usagePct := runCtx.Budget.UsagePercent()
+		tokensUsed := runCtx.Budget.UsedTokens.Load()
+		remaining := runCtx.Budget.Remaining()
+		slog.Info("process: context compaction threshold reached",
+			"runId", run.ID,
+			"usagePercent", usagePct,
+			"tokensUsed", tokensUsed,
+			"tokensRemaining", remaining,
+		)
+		e.bus.Publish(adapters.BusEventContextCompaction, runScope(run), map[string]any{
+			"runId":           run.ID,
+			"usagePercent":    usagePct,
+			"tokensUsed":      tokensUsed,
+			"tokensRemaining": remaining,
+			"threshold":       runnerctx.CompactionThreshold,
+		})
+	}
+
 	if ctx.Err() != nil || e.runStatus(run.ID) == "cancelling" {
 		e.publishCancelled(run)
 		e.sendSubAgentResult(run.ID, "cancelled", nil)
