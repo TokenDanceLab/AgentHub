@@ -47,7 +47,7 @@ type MainSurface = 'workspace' | 'messages' | 'settings';
 
 function resolveHubAgentType(agent?: AgentInfo): string {
   const key = `${agent?.id ?? ''} ${agent?.name ?? ''}`.toLowerCase();
-  if (key.includes('claude')) return 'claude';
+  if (key.includes('claude')) return 'claude-code';
   if (key.includes('codex') || key.includes('gpt')) return 'codex';
   if (key.includes('opencode')) return 'opencode';
   return 'codex';

@@ -71,6 +71,31 @@ function getString(data: Record<string, unknown>, key: string): string {
   return typeof v === 'string' ? v : '';
 }
 
+function normalizeRuntimeAgentId(agentId: string): string {
+  const key = agentId.trim().toLowerCase();
+  if (!key) return '';
+  if (key === 'claude' || key.includes('claude-code') || key.includes('claude')) return 'claude-code';
+  if (key.includes('opencode')) return 'opencode';
+  if (key.includes('codex') || key.includes('gpt')) return 'codex';
+  return key;
+}
+
+async function ensureEdgeThread(edgeBaseUrl: string, threadId: string, title: string): Promise<void> {
+  const resp = await fetch(`${edgeBaseUrl}/v1/threads`, {
+    method: 'POST',
+    headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      projectId: 'proj_local',
+      threadId,
+      title,
+    }),
+  });
+  if (!resp.ok) {
+    const errorText = await resp.text().catch(() => 'Unknown error');
+    throw new Error(`Edge POST /v1/threads returned ${resp.status}: ${errorText}`);
+  }
+}
+
 const FINAL_OUTPUT_MAX_CHARS = 32_000;
 
 function extractRunOutputBatch(payload: Record<string, unknown>): string {
@@ -262,12 +287,12 @@ export function useHubIntegration(
       }
 
       const taskId = data.task_id;
-      const agentId = getString(data, 'agent_type') || getString(data, 'agent_id');
+      const agentId = normalizeRuntimeAgentId(getString(data, 'agent_type') || getString(data, 'agent_id'));
       const prompt = getString(data, 'prompt') || getString(data, 'content');
       const threadId =
         getString(data, 'thread_id') ||
         getString(data, 'session_id') ||
-        undefined;
+        'hub-dispatch';
       const model = tryParseModel(data.model_params) || getString(data, 'model') || undefined;
 
       // Build initial task record
@@ -285,11 +310,17 @@ export function useHubIntegration(
 
       // Create Edge run
       try {
+        await ensureEdgeThread(
+          edgeBaseUrl,
+          threadId,
+          getString(data, 'display_name') || 'Hub dispatch',
+        );
+
         const runResp = await fetch(`${edgeBaseUrl}/v1/runs`, {
           method: 'POST',
           headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
-            threadId: threadId || 'hub-dispatch',
+            threadId,
             prompt: prompt || undefined,
             agentId: agentId || undefined,
             model,
