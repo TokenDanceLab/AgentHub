@@ -2515,13 +2515,24 @@ paths:
           application/json:
             schema:
               type: object
-              required: [target_id, payload]
+              required: [command_type, payload]
+              description: Provide target_edge_id. The legacy target_id alias is accepted for clients generated from the earlier web relay schema.
               properties:
-                target_id: { type: string }
-                payload: { type: object }
+                target_edge_id:
+                  type: string
+                  description: Target Edge connection/user id that should receive the relay command.
+                target_id:
+                  type: string
+                  deprecated: true
+                  description: Backward-compatible alias for target_edge_id.
+                command_type:
+                  type: string
+                  description: Relay command type, for example run.cancel.
+                payload:
+                  type: object
       responses:
-        "202":
-          $ref: "#/components/responses/Accepted"
+        "200":
+          $ref: "#/components/responses/Ok"
 
   /web/relay/commands/{id}:
     get:
@@ -2540,7 +2551,7 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /web/relay/commands/{id}:ack:
+  /web/relay/commands/{id}/ack:
     post:
       tags: [HubSyncRelay]
       operationId: hubAckWebRelayCommand
