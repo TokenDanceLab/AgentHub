@@ -3568,13 +3568,15 @@ paths:
     get:
       tags: [HubSyncRelay]
       operationId: hubGetSkill
-      summary: Get a skill.
+      summary: Get an owner-scoped skill.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Error"
     put:
       tags: [HubSyncRelay]
       operationId: hubUpdateSkill
@@ -3678,13 +3680,15 @@ paths:
     get:
       tags: [HubSyncRelay]
       operationId: hubGetMCPServer
-      summary: Get an MCP server.
+      summary: Get an owner-scoped MCP server.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Error"
     put:
       tags: [HubSyncRelay]
       operationId: hubUpdateMCPServer
