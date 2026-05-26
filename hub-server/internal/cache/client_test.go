@@ -311,6 +311,21 @@ func TestSetRoute_Overwrites(t *testing.T) {
 	assert.Equal(t, "conn-new", conn)
 }
 
+func TestGetRouteForDeviceDoesNotFallbackToOtherDesktop(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	require.NoError(t, c.SetRoute(ctx, "user-target", "desktop:dev-a", "conn-a"))
+	require.NoError(t, c.SetRoute(ctx, "user-target", "desktop:dev-b", "conn-b"))
+
+	conn, err := c.GetRouteForDevice(ctx, "user-target", "desktop", "dev-b")
+	require.NoError(t, err)
+	assert.Equal(t, "conn-b", conn)
+
+	_, err = c.GetRouteForDevice(ctx, "user-target", "desktop", "dev-c")
+	assert.ErrorIs(t, err, redis.Nil)
+}
+
 // ==================== Online Status & Kick ====================
 
 func TestIsOnline(t *testing.T) {
@@ -481,6 +496,27 @@ func TestPendingTaskCount_MultipleUsers(t *testing.T) {
 	c3, err := c.PendingTaskCount(ctx, "u3")
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), c3)
+}
+
+func TestPendingTargetTasksAreIsolatedByDeviceAndTarget(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-a", "dev-a", `{"task_id":"a1"}`))
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-b", "dev-a", `{"task_id":"b1"}`))
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-a", "dev-b", `{"task_id":"a2"}`))
+
+	devATasks, err := c.PopPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{`{"task_id":"a1"}`, `{"task_id":"b1"}`}, devATasks)
+
+	devASecondPop, err := c.PopPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	assert.Empty(t, devASecondPop)
+
+	devBTasks, err := c.PopPendingTargetTasksForDevice(ctx, "user-target", "dev-b")
+	require.NoError(t, err)
+	require.Equal(t, []string{`{"task_id":"a2"}`}, devBTasks)
 }
 
 // ==================== Sequence Allocation ====================

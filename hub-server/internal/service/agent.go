@@ -22,7 +22,9 @@ import (
 // agentCache is the subset of *cache.Client methods used by AgentService.
 type agentCache interface {
 	GetRoute(ctx context.Context, userID, deviceType string) (string, error)
+	GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error)
 	PushPendingTask(ctx context.Context, userID, taskJSON string) error
+	PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error
 	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
 }
 
@@ -191,6 +193,12 @@ type dispatchPayload struct {
 	ToolWhitelist    string `json:"tool_whitelist,omitempty"`
 }
 
+type dispatchTargetSnapshot struct {
+	ID         string
+	TargetType string
+	DeviceID   string
+}
+
 func normalizeRuntimeAgentType(agentType string) string {
 	key := strings.TrimSpace(strings.ToLower(agentType))
 	if key == "" {
@@ -297,9 +305,14 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 		return nil, errcode.SessionNotMember
 	}
 
-	targetID, err = s.validateDispatchTarget(ctx, userID, targetID)
+	dispatchTarget, err := s.validateDispatchTarget(ctx, userID, targetID)
 	if err != nil {
 		return nil, err
+	}
+	if dispatchTarget != nil {
+		targetID = dispatchTarget.ID
+	} else {
+		targetID = ""
 	}
 
 	task := &model.PendingAgentTask{
@@ -309,6 +322,9 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 		TargetID:          targetID,
 		Status:            model.TaskStatusQueued,
 		ExpireAt:          time.Now().Add(config.PendingTaskTTL),
+	}
+	if dispatchTarget != nil {
+		task.EdgeDeviceID = dispatchTarget.DeviceID
 	}
 	if err := repository.CreatePendingTask(s.db, task); err != nil {
 		return nil, err
@@ -321,26 +337,44 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 	return task, nil
 }
 
-func (s *AgentService) validateDispatchTarget(ctx context.Context, userID, targetID string) (string, error) {
+func (s *AgentService) validateDispatchTarget(ctx context.Context, userID, targetID string) (*dispatchTargetSnapshot, error) {
 	targetID = strings.TrimSpace(targetID)
 	if targetID == "" {
-		return "", nil
+		return nil, nil
 	}
 	target, err := repository.GetExecutionTargetByID(s.db.WithContext(ctx), targetID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", errcode.UserNotFound
+			return nil, errcode.TargetNotFound
 		}
-		return "", err
+		return nil, err
 	}
 	if target.OwnerID != userID {
-		return "", errcode.AuthDeviceMismatch
+		return nil, errcode.TargetNotFound
 	}
 	switch target.TargetType {
 	case "local_edge", "hub_relay":
-		return target.ID, nil
+		if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
+			return nil, errcode.TargetNotRoutable.WithMessage("execution target is not bound to a device")
+		}
+		deviceID := strings.TrimSpace(*target.DeviceID)
+		device, err := repository.GetDeviceByID(s.db.WithContext(ctx), deviceID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
+			}
+			return nil, err
+		}
+		if device.UserID != userID || device.DeviceType != "desktop" {
+			return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
+		}
+		return &dispatchTargetSnapshot{
+			ID:         target.ID,
+			TargetType: target.TargetType,
+			DeviceID:   deviceID,
+		}, nil
 	default:
-		return "", errcode.ErrBadRequest.WithMessage("execution target type is not dispatchable yet")
+		return nil, errcode.TargetNotRoutable.WithMessage("execution target type is not dispatchable yet")
 	}
 }
 
@@ -386,8 +420,17 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 
 	payload, _ := json.Marshal(dp)
 
-	// try to push to inviter's edge (desktop) via WebSocket
 	cacheClient := resolveAgentCache(s.cacheClient)
+	if task.TargetID != "" {
+		if task.EdgeDeviceID == "" {
+			slog.Error("target-bound agent task missing edge device id", "task_id", task.ID, "user_id", ai.InviterUserID, "target_id", task.TargetID)
+			return
+		}
+		s.dispatchTargetBoundTask(ctx, cacheClient, task, ai.InviterUserID, task.EdgeDeviceID, payload)
+		return
+	}
+
+	// try to push to inviter's edge (desktop) via WebSocket
 	connID, err := cacheClient.GetRoute(ctx, ai.InviterUserID, "desktop")
 	if err == nil && connID != "" && s.mgr != nil {
 		conn := s.mgr.FindByConnID(connID)
@@ -407,6 +450,32 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
 		slog.Error("failed to push agent task to offline queue", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 	}
+}
+
+func (s *AgentService) dispatchTargetBoundTask(ctx context.Context, cacheClient agentCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) {
+	queueTargetTask := func(reason string, err error) {
+		if pushErr := cacheClient.PushPendingTargetTask(ctx, userID, task.TargetID, deviceID, string(payload)); pushErr != nil {
+			slog.Error("failed to push target-bound agent task to offline queue", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", pushErr)
+			return
+		}
+		if err != nil {
+			slog.Info("queued target-bound agent task", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", err)
+		}
+	}
+
+	connID, err := cacheClient.GetRouteForDevice(ctx, userID, "desktop", deviceID)
+	if err != nil || connID == "" || s.mgr == nil {
+		queueTargetTask("route unavailable", err)
+		return
+	}
+	conn := s.mgr.FindByConnID(connID)
+	if conn == nil || conn.UserID != userID || conn.DeviceType != "desktop" || conn.DeviceID != deviceID {
+		queueTargetTask("connection mismatch", nil)
+		return
+	}
+	frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
+	s.mgr.PushToConn(connID, frame)
+	_ = repository.UpdatePendingTaskDispatched(s.db, task.ID, deviceID)
 }
 
 // CancelTask cancels a pending task by its ID.

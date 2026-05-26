@@ -1089,7 +1089,7 @@ paths:
                 target_id:
                   type: string
                   format: uuid
-                  description: Optional owner-scoped ExecutionTarget id. Hub validates owner and dispatchable target type, persists it on the pending task, and includes it in agent.dispatch; exact remote/cloud target routing is a later slice.
+                  description: Optional owner-scoped ExecutionTarget id. Hub validates owner, dispatchable target type, and bound desktop device, persists target_id and edge_device_id on the pending task, routes agent.dispatch only to that device, and queues offline work in a target/device queue without falling back to another desktop. Remote/cloud targets still require future relay/provisioning work before they are product-complete.
       responses:
         "200":
           description: Task dispatched.
@@ -3176,6 +3176,7 @@ components:
         device_id:
           type: string
           format: uuid
+          description: Bound Hub desktop device id. Current target-bound dispatch requires an owner-owned desktop device; remote/cloud routing remains future work.
           description: Stable Hub device UUID; must match the callback request.
         redirect_uri:
           type: string

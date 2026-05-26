@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/stretchr/testify/require"
 )
 
 func TestManagerShutdown_ClosesAllConnections(t *testing.T) {
@@ -250,6 +251,47 @@ func TestConnCloseSend_ExactlyOnce(t *testing.T) {
 	// Drain the closed channel.
 	for range c.Send {
 	}
+}
+
+func TestManagerSetAuthKeepsDifferentDesktopDevicesOnline(t *testing.T) {
+	m := NewManager()
+	routeEvents := make([]string, 0, 2)
+	m.OnRouteSet = func(userID, deviceType, deviceID, connID, oldConnID string, wasOffline bool) {
+		routeEvents = append(routeEvents, oldConnID)
+	}
+
+	connA := &Conn{Send: make(chan []byte, 4)}
+	connB := &Conn{Send: make(chan []byte, 4)}
+	require.NoError(t, m.Register(connA))
+	require.NoError(t, m.Register(connB))
+
+	m.SetAuth(connA.ID, "user-route", "desktop", "dev-a")
+	m.SetAuth(connB.ID, "user-route", "desktop", "dev-b")
+
+	require.Len(t, routeEvents, 2)
+	require.Equal(t, "", routeEvents[0])
+	require.Equal(t, "", routeEvents[1])
+	require.NotNil(t, m.FindByConnID(connA.ID))
+	require.NotNil(t, m.FindByConnID(connB.ID))
+}
+
+func TestManagerSetAuthReportsOldConnForSameDesktopDeviceReconnect(t *testing.T) {
+	m := NewManager()
+	routeEvents := make([]string, 0, 2)
+	m.OnRouteSet = func(userID, deviceType, deviceID, connID, oldConnID string, wasOffline bool) {
+		routeEvents = append(routeEvents, oldConnID)
+	}
+
+	connOld := &Conn{Send: make(chan []byte, 4)}
+	connNew := &Conn{Send: make(chan []byte, 4)}
+	require.NoError(t, m.Register(connOld))
+	require.NoError(t, m.Register(connNew))
+
+	m.SetAuth(connOld.ID, "user-route", "desktop", "dev-a")
+	m.SetAuth(connNew.ID, "user-route", "desktop", "dev-a")
+
+	require.Len(t, routeEvents, 2)
+	require.Equal(t, connOld.ID, routeEvents[1])
 }
 
 func TestWebSocketManagerShutdownFullLifecycle(t *testing.T) {

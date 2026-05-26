@@ -98,6 +98,13 @@ func (c *Client) Invalidate(ctx context.Context, keys ...string) error {
 
 func routeKey(userID string) string { return "device_route:" + userID }
 
+func routeField(deviceType, deviceID string) string {
+	if deviceID == "" {
+		return deviceType
+	}
+	return deviceType + ":" + deviceID
+}
+
 // SetRoute records the WebSocket connection for a user device.
 func (c *Client) SetRoute(ctx context.Context, userID, deviceType, connID string) error {
 	return c.rdb.HSet(ctx, routeKey(userID), deviceType, connID).Err()
@@ -127,6 +134,15 @@ func (c *Client) GetRoute(ctx context.Context, userID, deviceType string) (strin
 		}
 	}
 	return "", redis.Nil
+}
+
+// GetRouteForDevice returns the exact connection route for a device. It does
+// not fall back to another device of the same type.
+func (c *Client) GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error) {
+	if deviceID == "" {
+		return "", redis.Nil
+	}
+	return c.rdb.HGet(ctx, routeKey(userID), routeField(deviceType, deviceID)).Result()
 }
 
 // IsOnline reports whether the user has at least one active device route.
@@ -161,6 +177,14 @@ func (c *Client) IsKicked(ctx context.Context, connID string) (bool, error) {
 
 func pendingTaskKey(userID string) string { return "pending_tasks:" + userID }
 
+func pendingTargetTaskKey(userID, targetID, deviceID string) string {
+	return "pending_tasks:" + userID + ":device:" + deviceID + ":target:" + targetID
+}
+
+func pendingTargetTaskIndexKey(userID, deviceID string) string {
+	return "pending_tasks:" + userID + ":device:" + deviceID + ":targets"
+}
+
 // PushPendingTask pushes a task JSON to the user's offline pending queue.
 func (c *Client) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
 	return c.rdb.LPush(ctx, pendingTaskKey(userID), taskJSON).Err()
@@ -189,6 +213,48 @@ func (c *Client) PopPendingTasks(ctx context.Context, userID string) ([]string, 
 // PendingTaskCount returns the number of pending tasks for a user.
 func (c *Client) PendingTaskCount(ctx context.Context, userID string) (int64, error) {
 	return c.rdb.LLen(ctx, pendingTaskKey(userID)).Result()
+}
+
+// PushPendingTargetTask pushes a task JSON to a target/device-specific offline
+// queue so target-bound dispatch cannot be replayed to a different desktop.
+func (c *Client) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	pipe := c.rdb.TxPipeline()
+	pipe.SAdd(ctx, pendingTargetTaskIndexKey(userID, deviceID), targetID)
+	pipe.LPush(ctx, pendingTargetTaskKey(userID, targetID, deviceID), taskJSON)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// PopPendingTargetTasksForDevice pops all target-bound pending tasks for one
+// device and clears only that device's target queues.
+func (c *Client) PopPendingTargetTasksForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
+	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
+	targetIDs, err := c.rdb.SMembers(ctx, indexKey).Result()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]string, 0)
+	for _, targetID := range targetIDs {
+		key := pendingTargetTaskKey(userID, targetID, deviceID)
+		tasks, err := c.rdb.LRange(ctx, key, 0, -1).Result()
+		if err != nil {
+			return nil, err
+		}
+		if len(tasks) > 0 {
+			c.rdb.Del(ctx, key)
+		}
+		c.rdb.SRem(ctx, indexKey, targetID)
+		for _, t := range tasks {
+			var raw json.RawMessage
+			if json.Unmarshal([]byte(t), &raw) == nil {
+				result = append(result, t)
+			}
+		}
+	}
+	if len(targetIDs) == 0 {
+		c.rdb.Del(ctx, indexKey)
+	}
+	return result, nil
 }
 
 // ── Sequence numbers (from seq.go) ────────────────────────────────────
@@ -257,15 +323,26 @@ func (c *Client) CheckRateLimit(ctx context.Context, key string, limit int64) (c
 // constructors MUST receive a real *Client — passing nil will panic.
 type NoOpCache struct{}
 
-func (NoOpCache) Invalidate(ctx context.Context, keys ...string) error              { return nil }
-func (NoOpCache) IsOnline(ctx context.Context, userID string) (bool, error)          { return false, nil }
+func (NoOpCache) Invalidate(ctx context.Context, keys ...string) error                   { return nil }
+func (NoOpCache) IsOnline(ctx context.Context, userID string) (bool, error)              { return false, nil }
 func (NoOpCache) InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error { return nil }
-func (NoOpCache) AllocateSeq(ctx context.Context, sessionID string) (int64, error)   { return 0, ErrCacheUnavailable }
+func (NoOpCache) AllocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	return 0, ErrCacheUnavailable
+}
 func (NoOpCache) GetRoute(ctx context.Context, userID, deviceType string) (string, error) {
+	return "", ErrCacheUnavailable
+}
+func (NoOpCache) GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error) {
 	return "", ErrCacheUnavailable
 }
 func (NoOpCache) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
 	return ErrCacheUnavailable
+}
+func (NoOpCache) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	return ErrCacheUnavailable
+}
+func (NoOpCache) PopPendingTargetTasksForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
+	return nil, ErrCacheUnavailable
 }
 func (NoOpCache) BlacklistRefreshToken(ctx context.Context, tokenHash string, ttl time.Duration) error {
 	return nil
