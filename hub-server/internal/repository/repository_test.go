@@ -224,6 +224,21 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			created_at DATETIME,
 			updated_at DATETIME
 		)`,
+		`CREATE TABLE agent_team_tasks (
+			id TEXT PRIMARY KEY,
+			team_run_id TEXT NOT NULL,
+			assignment_id TEXT,
+			assignee_member_id TEXT NOT NULL,
+			parent_task_id TEXT,
+			status TEXT NOT NULL DEFAULT 'pending',
+			objective TEXT NOT NULL,
+			input_refs TEXT NOT NULL DEFAULT '{}',
+			run_id TEXT,
+			attempt INTEGER NOT NULL DEFAULT 1,
+			risk_level TEXT NOT NULL DEFAULT 'normal',
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
 		`CREATE TABLE agent_team_events (
 			id TEXT PRIMARY KEY,
 			team_run_id TEXT NOT NULL,

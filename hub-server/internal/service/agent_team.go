@@ -460,6 +460,10 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	if err != nil {
 		return nil, err
 	}
+	tasks, err := repository.ListTeamTasksByRun(s.db, runID)
+	if err != nil {
+		return nil, err
+	}
 	events, err := repository.ListTeamEventsByRun(s.db, runID)
 	if err != nil {
 		return nil, err
@@ -470,6 +474,7 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		TeamID:      run.TeamID,
 		Status:      run.Status,
 		Members:     make([]model.TeamMemberState, 0, len(members)),
+		Tasks:       make([]model.TeamTaskState, 0, len(tasks)),
 		Assignments: make([]model.TeamAssignmentState, 0, len(assignments)),
 		RouteLog:    []model.CoordinatorRouteDecision{},
 	}
@@ -512,6 +517,32 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		}
 	}
 
+	for _, task := range tasks {
+		assignmentID := ""
+		if task.AssignmentID != nil {
+			assignmentID = *task.AssignmentID
+		}
+		parentTaskID := ""
+		if task.ParentTaskID != nil {
+			parentTaskID = *task.ParentTaskID
+		}
+		runIDValue := ""
+		if task.RunID != nil {
+			runIDValue = *task.RunID
+		}
+		state.Tasks = append(state.Tasks, model.TeamTaskState{
+			TaskID:           task.ID,
+			AssignmentID:     assignmentID,
+			AssigneeMemberID: task.AssigneeMemberID,
+			ParentTaskID:     parentTaskID,
+			Status:           task.Status,
+			Objective:        task.Objective,
+			RunID:            runIDValue,
+			Attempt:          task.Attempt,
+			RiskLevel:        task.RiskLevel,
+		})
+	}
+
 	for _, event := range events {
 		switch event.Type {
 		case model.TeamEventRouteDecided:
@@ -531,6 +562,31 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	}
 
 	return state, nil
+}
+
+// ListTeamTasks returns first-class TeamTask rows for a run after owner checks.
+func (s *AgentTeamService) ListTeamTasks(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error) {
+	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+		return nil, err
+	}
+	run, err := repository.GetTeamRunByID(s.db, runID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentTaskNotFound
+		}
+		return nil, err
+	}
+	if run.TeamID != teamID {
+		return nil, errcode.AgentTaskNotFound
+	}
+	tasks, err := repository.ListTeamTasksByRun(s.db, runID)
+	if err != nil {
+		return nil, err
+	}
+	if tasks == nil {
+		tasks = []model.AgentTeamTask{}
+	}
+	return tasks, nil
 }
 
 // ListTeamEvents returns append-only events for a team run after owner checks.
@@ -618,11 +674,27 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 		}
 		return nil, err
 	}
+	task := &model.AgentTeamTask{
+		TeamRunID:        runID,
+		AssignmentID:     &assignment.ID,
+		AssigneeMemberID: worker.ID,
+		Status:           model.TeamTaskStatusPending,
+		Objective:        decision.Instructions,
+		InputRefs:        "{}",
+		Attempt:          1,
+		RiskLevel:        model.TeamTaskRiskNormal,
+	}
+	if err := repository.CreateTeamTask(s.db, task); err != nil {
+		return nil, err
+	}
 
 	if err := s.appendTeamEvent(runID, model.TeamEventRouteDecided, decision); err != nil {
 		return nil, err
 	}
 	if err := s.appendTeamEvent(runID, model.TeamEventAssignmentCreated, assignment); err != nil {
+		return nil, err
+	}
+	if err := s.appendTeamEvent(runID, model.TeamEventTaskCreated, task); err != nil {
 		return nil, err
 	}
 	return assignment, nil

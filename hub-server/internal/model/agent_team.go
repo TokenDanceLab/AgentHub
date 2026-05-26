@@ -149,6 +149,52 @@ func (AgentTeamAssignment) TableName() string {
 	return "agent_team_assignments"
 }
 
+// TeamTask status and risk constants.
+const (
+	TeamTaskStatusPending    = "pending"
+	TeamTaskStatusDispatched = "dispatched"
+	TeamTaskStatusRunning    = "running"
+	TeamTaskStatusDone       = "done"
+	TeamTaskStatusFailed     = "failed"
+	TeamTaskStatusCancelled  = "cancelled"
+)
+
+const (
+	TeamTaskRiskNormal = "normal"
+	TeamTaskRiskHigh   = "high"
+)
+
+// AgentTeamTask represents a first-class task inside a TeamRun. It can be
+// created from a route decision and later bound to a concrete Edge/Hub run.
+type AgentTeamTask struct {
+	ID               string    `gorm:"primaryKey;type:uuid" json:"id"`
+	TeamRunID        string    `gorm:"type:uuid;not null" json:"team_run_id"`
+	AssignmentID     *string   `gorm:"type:uuid" json:"assignment_id,omitempty"`
+	AssigneeMemberID string    `gorm:"type:uuid;not null" json:"assignee_member_id"`
+	ParentTaskID     *string   `gorm:"type:uuid" json:"parent_task_id,omitempty"`
+	Status           string    `gorm:"type:varchar(20);not null;default:pending" json:"status"`
+	Objective        string    `gorm:"type:text;not null" json:"objective"`
+	InputRefs        string    `gorm:"type:jsonb;not null;default:'{}'" json:"input_refs"`
+	RunID            *string   `gorm:"type:varchar(128)" json:"run_id,omitempty"`
+	Attempt          int       `gorm:"not null;default:1" json:"attempt"`
+	RiskLevel        string    `gorm:"type:varchar(20);not null;default:normal" json:"risk_level"`
+	CreatedAt        time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt        time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (t *AgentTeamTask) BeforeCreate(tx *gorm.DB) error {
+	id, err := uuidv7.New()
+	if err != nil {
+		return err
+	}
+	t.ID = id
+	return nil
+}
+
+func (AgentTeamTask) TableName() string {
+	return "agent_team_tasks"
+}
+
 // ── Delegation guardrail constants (ADR-006) ──────────────────────
 
 const (
@@ -166,10 +212,10 @@ type CoordinatorRouteDecision struct {
 	Action string `json:"action"` // delegate | review | approve | finish
 
 	// delegate / review / approve
-	NextWorker   string `json:"next_worker,omitempty"`   // AgentTeamMember.ID
-	Instructions string `json:"instructions,omitempty"`  // task prompt
-	Reasoning    string `json:"reasoning,omitempty"`     // why this delegation
-	Context      string `json:"context,omitempty"`       // additional context for the worker
+	NextWorker   string `json:"next_worker,omitempty"`  // AgentTeamMember.ID
+	Instructions string `json:"instructions,omitempty"` // task prompt
+	Reasoning    string `json:"reasoning,omitempty"`    // why this delegation
+	Context      string `json:"context,omitempty"`      // additional context for the worker
 
 	// approve
 	Approved bool   `json:"approved,omitempty"`
@@ -218,11 +264,12 @@ func (AgentTeamEvent) TableName() string {
 
 // Event type constants for AgentTeamEvent.
 const (
-	TeamEventAssignmentCreated   = "assignment.created"
+	TeamEventAssignmentCreated    = "assignment.created"
 	TeamEventAssignmentDispatched = "assignment.dispatched"
 	TeamEventAssignmentCompleted  = "assignment.completed"
 	TeamEventAssignmentFailed     = "assignment.failed"
 	TeamEventAssignmentCancelled  = "assignment.cancelled"
+	TeamEventTaskCreated          = "team.task.created"
 	TeamEventRouteDecided         = "team.route.decided"
 	TeamEventRouteRejected        = "team.route.rejected"
 	TeamEventRunStarted           = "team.run.started"
@@ -234,14 +281,15 @@ const (
 // TeamRunState is the materialized view of a team run derived by replaying
 // AgentTeamEvent entries. It is computed on demand; not persisted separately.
 type TeamRunState struct {
-	RunID       string                      `json:"run_id"`
-	TeamID      string                      `json:"team_id"`
-	Status      string                      `json:"status"`
-	Members     []TeamMemberState           `json:"members"`
-	Assignments []TeamAssignmentState       `json:"assignments"`
-	RouteLog    []CoordinatorRouteDecision  `json:"route_log"`
-	Budget      *TeamBudget                 `json:"budget,omitempty"`
-	TerminalReason string                  `json:"terminal_reason,omitempty"`
+	RunID          string                     `json:"run_id"`
+	TeamID         string                     `json:"team_id"`
+	Status         string                     `json:"status"`
+	Members        []TeamMemberState          `json:"members"`
+	Tasks          []TeamTaskState            `json:"tasks"`
+	Assignments    []TeamAssignmentState      `json:"assignments"`
+	RouteLog       []CoordinatorRouteDecision `json:"route_log"`
+	Budget         *TeamBudget                `json:"budget,omitempty"`
+	TerminalReason string                     `json:"terminal_reason,omitempty"`
 }
 
 // TeamMemberState is a member's status within a team run.
@@ -251,6 +299,19 @@ type TeamMemberState struct {
 	Role           string `json:"role"`
 	ActiveTasks    int    `json:"active_tasks"`
 	CompletedTasks int    `json:"completed_tasks"`
+}
+
+// TeamTaskState is a recoverable TeamTask projection for TeamRunState.
+type TeamTaskState struct {
+	TaskID           string `json:"task_id"`
+	AssignmentID     string `json:"assignment_id,omitempty"`
+	AssigneeMemberID string `json:"assignee_member_id"`
+	ParentTaskID     string `json:"parent_task_id,omitempty"`
+	Status           string `json:"status"`
+	Objective        string `json:"objective"`
+	RunID            string `json:"run_id,omitempty"`
+	Attempt          int    `json:"attempt"`
+	RiskLevel        string `json:"risk_level"`
 }
 
 // TeamAssignmentState is a resolved assignment with runtime info.
