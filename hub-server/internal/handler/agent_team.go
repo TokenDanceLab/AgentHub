@@ -26,6 +26,7 @@ type AgentTeamService interface {
 	ListTeamTasks(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
 	ListTeamEvents(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
 	HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
+	DecideApproval(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
 	ResolveConflict(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
 
 	// TeamAssignment
@@ -347,6 +348,11 @@ type resolveConflictReq struct {
 	Reason              string `json:"reason,omitempty"`
 }
 
+type decideApprovalReq struct {
+	Decision string `json:"decision" binding:"required"`
+	Reason   string `json:"reason,omitempty"`
+}
+
 // --- Assignment Handlers ---
 
 // CreateAssignment POST /web/agent-teams/:id/runs/:run_id/assignments
@@ -470,4 +476,29 @@ func (h *AgentTeamHandler) ResolveConflict(c *gin.Context) {
 		return
 	}
 	OK(c, conflict)
+}
+
+// DecideApproval POST /web/agent-teams/:id/runs/:run_id/approvals/:approval_id/decide
+func (h *AgentTeamHandler) DecideApproval(c *gin.Context) {
+	var req decideApprovalReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	teamID := c.Param("id")
+	runID := c.Param("run_id")
+	approval, err := h.service.DecideApproval(c.Request.Context(), userID, teamID, runID, c.Param("approval_id"), model.TeamApprovalDecision{
+		Decision: req.Decision,
+		Reason:   req.Reason,
+	})
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, approval)
 }

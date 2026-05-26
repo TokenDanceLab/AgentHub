@@ -644,10 +644,75 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 			if err := json.Unmarshal([]byte(event.Payload), &resolution); err == nil {
 				applyConflictResolution(state.Conflicts, resolution)
 			}
+		case model.TeamEventApprovalDecided:
+			var decision model.TeamApprovalDecision
+			if err := json.Unmarshal([]byte(event.Payload), &decision); err == nil {
+				applyApprovalDecision(state.Approvals, decision)
+			}
 		}
 	}
 
 	return state, nil
+}
+
+func (s *AgentTeamService) DecideApproval(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error) {
+	approvalID = strings.TrimSpace(approvalID)
+	decision.Decision = strings.ToLower(strings.TrimSpace(decision.Decision))
+	decision.Reason = strings.TrimSpace(decision.Reason)
+	if approvalID == "" || !validApprovalDecision(decision.Decision) {
+		return nil, errcode.ErrBadRequest
+	}
+
+	state, err := s.GetTeamRunState(ctx, userID, teamID, runID)
+	if err != nil {
+		return nil, err
+	}
+	approval := findApproval(state.Approvals, approvalID)
+	if approval == nil {
+		return nil, errcode.ErrBadRequest
+	}
+	if !pendingApprovalStatus(approval.Status) {
+		return nil, errcode.ErrBadRequest
+	}
+	if strings.TrimSpace(approval.RequestID) == "" || strings.TrimSpace(approval.EdgeRunID) == "" {
+		return nil, errcode.ErrBadRequest
+	}
+
+	now := time.Now().UTC()
+	edgeControl := &model.TeamApprovalEdgeControl{
+		RunID:     approval.EdgeRunID,
+		RequestID: approval.RequestID,
+		Decision:  decision.Decision,
+		Reason:    decision.Reason,
+	}
+	record := model.TeamApprovalDecision{
+		ApprovalID:   firstNonEmptyString(approval.ApprovalID, approvalIDFor(approval.RequestID, approval.ToolUseID)),
+		AgentTaskID:  approval.AgentTaskID,
+		TeamTaskID:   approval.TeamTaskID,
+		AssignmentID: approval.AssignmentID,
+		MemberID:     approval.MemberID,
+		EdgeRunID:    approval.EdgeRunID,
+		RequestID:    approval.RequestID,
+		ToolName:     approval.ToolName,
+		ToolUseID:    approval.ToolUseID,
+		Decision:     decision.Decision,
+		Reason:       decision.Reason,
+		DecidedBy:    userID,
+		DecidedAt:    now,
+		EdgeControl:  edgeControl,
+	}
+	if err := s.appendTeamEvent(runID, model.TeamEventApprovalDecided, record); err != nil {
+		return nil, err
+	}
+
+	decided := *approval
+	decided.ApprovalID = record.ApprovalID
+	decided.Status = record.Decision
+	decided.Reason = record.Reason
+	decided.DecidedBy = record.DecidedBy
+	decided.DecidedAt = &now
+	decided.EdgeControl = edgeControl
+	return &decided, nil
 }
 
 func (s *AgentTeamService) ResolveConflict(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error) {
@@ -715,6 +780,75 @@ func validConflictResolution(resolution string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func findApproval(approvals []model.TeamApprovalState, approvalID string) *model.TeamApprovalState {
+	approvalID = strings.TrimSpace(approvalID)
+	for i := range approvals {
+		if approvalMatchesID(approvals[i], approvalID) {
+			return &approvals[i]
+		}
+	}
+	return nil
+}
+
+func approvalMatchesID(approval model.TeamApprovalState, approvalID string) bool {
+	approvalID = strings.TrimSpace(approvalID)
+	if approvalID == "" {
+		return false
+	}
+	return approval.ApprovalID == approvalID ||
+		approval.RequestID == approvalID ||
+		approval.ToolUseID == approvalID
+}
+
+func validApprovalDecision(decision string) bool {
+	switch decision {
+	case "allow", "deny":
+		return true
+	default:
+		return false
+	}
+}
+
+func pendingApprovalStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "", "pending", "requested", "awaiting":
+		return true
+	default:
+		return false
+	}
+}
+
+func applyApprovalDecision(approvals []model.TeamApprovalState, decision model.TeamApprovalDecision) {
+	if decision.ApprovalID == "" {
+		decision.ApprovalID = approvalIDFor(decision.RequestID, decision.ToolUseID)
+	}
+	for i := range approvals {
+		if !approvalMatchesID(approvals[i], decision.ApprovalID) {
+			continue
+		}
+		approvals[i].ApprovalID = firstNonEmptyString(approvals[i].ApprovalID, decision.ApprovalID)
+		approvals[i].AgentTaskID = firstNonEmptyString(approvals[i].AgentTaskID, decision.AgentTaskID)
+		approvals[i].TeamTaskID = firstNonEmptyString(approvals[i].TeamTaskID, decision.TeamTaskID)
+		approvals[i].AssignmentID = firstNonEmptyString(approvals[i].AssignmentID, decision.AssignmentID)
+		approvals[i].MemberID = firstNonEmptyString(approvals[i].MemberID, decision.MemberID)
+		approvals[i].EdgeRunID = firstNonEmptyString(approvals[i].EdgeRunID, decision.EdgeRunID)
+		approvals[i].RequestID = firstNonEmptyString(approvals[i].RequestID, decision.RequestID)
+		approvals[i].ToolName = firstNonEmptyString(approvals[i].ToolName, decision.ToolName)
+		approvals[i].ToolUseID = firstNonEmptyString(approvals[i].ToolUseID, decision.ToolUseID)
+		approvals[i].Status = firstNonEmptyString(decision.Decision, approvals[i].Status)
+		approvals[i].Reason = firstNonEmptyString(decision.Reason, approvals[i].Reason)
+		approvals[i].DecidedBy = firstNonEmptyString(decision.DecidedBy, approvals[i].DecidedBy)
+		if !decision.DecidedAt.IsZero() {
+			decidedAt := decision.DecidedAt
+			approvals[i].DecidedAt = &decidedAt
+		}
+		if decision.EdgeControl != nil {
+			approvals[i].EdgeControl = decision.EdgeControl
+		}
+		return
 	}
 }
 
@@ -796,6 +930,7 @@ func projectTeamRuntimeSummaries(runEvents []model.AgentRunEvent, taskRefs map[s
 			status := firstNonEmptyString(firstJSONString(payload, "status"), "pending")
 			approvalIndex[key] = len(approvals)
 			approvals = append(approvals, model.TeamApprovalState{
+				ApprovalID:   approvalIDFor(requestID, toolUseID),
 				AgentTaskID:  event.TaskID,
 				TeamTaskID:   ref.TeamTaskID,
 				AssignmentID: ref.AssignmentID,
@@ -834,6 +969,7 @@ func projectTeamRuntimeSummaries(runEvents []model.AgentRunEvent, taskRefs map[s
 			approvalIndex[key] = len(approvals)
 			ref := taskRefs[event.TaskID]
 			approvals = append(approvals, model.TeamApprovalState{
+				ApprovalID:   approvalIDFor(requestID, toolUseID),
 				AgentTaskID:  event.TaskID,
 				TeamTaskID:   ref.TeamTaskID,
 				AssignmentID: ref.AssignmentID,
@@ -870,6 +1006,10 @@ func projectTeamRuntimeSummaries(runEvents []model.AgentRunEvent, taskRefs map[s
 		}
 	}
 	return approvals, artifacts
+}
+
+func approvalIDFor(requestID, toolUseID string) string {
+	return firstNonEmptyString(requestID, toolUseID)
 }
 
 func projectTeamConflicts(artifacts []model.TeamArtifactState) []model.TeamConflictState {

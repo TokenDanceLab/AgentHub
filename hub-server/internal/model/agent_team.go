@@ -315,6 +315,7 @@ const (
 	TeamEventRunCompleted         = "team.run.completed"
 	TeamEventRunFailed            = "team.run.failed"
 	TeamEventAgentMessage         = "agent.message"
+	TeamEventApprovalDecided      = "team.approval.decided"
 	TeamEventConflictResolved     = "team.conflict.resolved"
 )
 
@@ -370,18 +371,49 @@ type TeamTaskDependencyState struct {
 
 // TeamApprovalState summarizes approval requests and decisions in a TeamRun.
 type TeamApprovalState struct {
-	AgentTaskID  string     `json:"agent_task_id"`
-	TeamTaskID   string     `json:"team_task_id,omitempty"`
-	AssignmentID string     `json:"assignment_id,omitempty"`
-	MemberID     string     `json:"member_id,omitempty"`
-	EdgeRunID    string     `json:"edge_run_id,omitempty"`
-	RequestID    string     `json:"request_id"`
-	ToolName     string     `json:"tool_name,omitempty"`
-	ToolUseID    string     `json:"tool_use_id,omitempty"`
-	Status       string     `json:"status"`
-	Reason       string     `json:"reason,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
-	DecidedAt    *time.Time `json:"decided_at,omitempty"`
+	ApprovalID   string                   `json:"approval_id"`
+	AgentTaskID  string                   `json:"agent_task_id"`
+	TeamTaskID   string                   `json:"team_task_id,omitempty"`
+	AssignmentID string                   `json:"assignment_id,omitempty"`
+	MemberID     string                   `json:"member_id,omitempty"`
+	EdgeRunID    string                   `json:"edge_run_id,omitempty"`
+	RequestID    string                   `json:"request_id"`
+	ToolName     string                   `json:"tool_name,omitempty"`
+	ToolUseID    string                   `json:"tool_use_id,omitempty"`
+	Status       string                   `json:"status"`
+	Reason       string                   `json:"reason,omitempty"`
+	DecidedBy    string                   `json:"decided_by,omitempty"`
+	CreatedAt    time.Time                `json:"created_at"`
+	DecidedAt    *time.Time               `json:"decided_at,omitempty"`
+	EdgeControl  *TeamApprovalEdgeControl `json:"edge_control,omitempty"`
+}
+
+// TeamApprovalDecision records a human approval decision for a TeamRun approval
+// and carries the Edge control payload that a Desktop/Edge bridge can deliver.
+type TeamApprovalDecision struct {
+	ApprovalID   string                   `json:"approval_id,omitempty"`
+	AgentTaskID  string                   `json:"agent_task_id,omitempty"`
+	TeamTaskID   string                   `json:"team_task_id,omitempty"`
+	AssignmentID string                   `json:"assignment_id,omitempty"`
+	MemberID     string                   `json:"member_id,omitempty"`
+	EdgeRunID    string                   `json:"edge_run_id,omitempty"`
+	RequestID    string                   `json:"request_id,omitempty"`
+	ToolName     string                   `json:"tool_name,omitempty"`
+	ToolUseID    string                   `json:"tool_use_id,omitempty"`
+	Decision     string                   `json:"decision"`
+	Reason       string                   `json:"reason,omitempty"`
+	DecidedBy    string                   `json:"decided_by,omitempty"`
+	DecidedAt    time.Time                `json:"decided_at,omitempty"`
+	EdgeControl  *TeamApprovalEdgeControl `json:"edge_control,omitempty"`
+}
+
+// TeamApprovalEdgeControl is shaped as the JSON body accepted by Edge
+// POST /v1/permissions/decide, with the local Edge run id as runId.
+type TeamApprovalEdgeControl struct {
+	RunID     string `json:"runId"`
+	RequestID string `json:"requestId"`
+	Decision  string `json:"decision"`
+	Reason    string `json:"reason,omitempty"`
 }
 
 // TeamArtifactState summarizes file/artifact-producing runtime events.
