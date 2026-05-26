@@ -115,7 +115,7 @@ describe('hubClient helpers', () => {
     await expect(client.triggerAgentTask('m1')).resolves.toMatchObject({ id: 't1' });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('http://hub.local/web/custom-agents');
-    expect(fetchMock.mock.calls[1]?.[0]).toBe('http://hub.local/edge/devices/register');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('http://hub.local/edge/devices:register');
     expect(fetchMock.mock.calls[2]?.[0]).toBe('http://hub.local/edge/agent-tasks/task-1/ack');
     expect(fetchMock.mock.calls[3]?.[0]).toBe('http://hub.local/edge/agent-tasks/task-1/stream');
     expect(fetchMock.mock.calls[4]?.[0]).toBe('http://hub.local/edge/agent-tasks/task-1/done');
@@ -123,7 +123,9 @@ describe('hubClient helpers', () => {
     expect(fetchMock.mock.calls[6]?.[0]).toBe('http://hub.local/web/agent-tasks');
     expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({
       device_id: 'dev1',
-      capabilities: ['run'],
+      device_name: 'dev1',
+      device_type: 'desktop',
+      capabilities: { run: true },
     });
     expect(JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body))).toEqual({ run_id: 'run-1' });
     expect(JSON.parse(String(fetchMock.mock.calls[3]?.[1]?.body))).toEqual({
@@ -179,11 +181,73 @@ describe('hubClient helpers', () => {
       'http://hub.local/client/notifications?unread_only=true&limit=10',
     );
     expect(fetchMock.mock.calls[1]?.[0]).toBe(
-      'http://hub.local/client/notifications/n1/read',
+      'http://hub.local/client/notifications/n1:read',
     );
     expect(fetchMock.mock.calls[2]?.[0]).toBe(
-      'http://hub.local/client/notifications/read-all',
+      'http://hub.local/client/notifications:read-all',
     );
+  });
+
+  it('falls back to dev/trump legacy Hub paths when master routes are absent', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ code: 'NOT_FOUND', message: 'missing' }, { status: 404 }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK' }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'NOT_FOUND', message: 'missing' }, { status: 404 }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK' }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'NOT_FOUND', message: 'missing' }, { status: 404 }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK', data: { id: 'dev1', user_id: 'u1', device_type: 'desktop' } }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'NOT_FOUND', message: 'missing' }, { status: 404 }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK' }));
+
+    const client = createHubClient({ baseUrl: 'http://hub.local' });
+
+    await expect(client.markNotificationRead('n1')).resolves.toBeUndefined();
+    await expect(client.readAllNotifications()).resolves.toBeUndefined();
+    await expect(client.registerDevice({ device_id: 'dev1' })).resolves.toMatchObject({ id: 'dev1' });
+    await expect(client.cancelAgentTask('task-1')).resolves.toBeUndefined();
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'http://hub.local/client/notifications/n1:read',
+      'http://hub.local/client/notifications/n1/read',
+      'http://hub.local/client/notifications:read-all',
+      'http://hub.local/client/notifications/read-all',
+      'http://hub.local/edge/devices:register',
+      'http://hub.local/edge/devices/register',
+      'http://hub.local/web/agent-tasks/task-1:cancel',
+      'http://hub.local/web/agent-tasks/task-1/cancel',
+    ]);
+  });
+
+  it('exposes master web management and OIDC contract endpoints without wiring the callback flow', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK', data: { state: 's1', authorization_url: 'https://id.local/auth' } }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK', data: { items: [{ id: 'target-1', name: 'Local Edge', type: 'local_edge' }], page: { hasMore: false } } }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK', data: { items: [{ id: 'audit-1', action: 'target.ping' }], page: { hasMore: false } } }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK', data: { id: 'relay-1', target_id: 'target-1', status: 'queued' } }))
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK' }));
+
+    const client = createHubClient({ baseUrl: 'http://hub.local' });
+
+    await expect(client.oidcAuthorize({ code_challenge: 'challenge' })).resolves.toEqual({
+      state: 's1',
+      authorization_url: 'https://id.local/auth',
+    });
+    await expect(client.listExecutionTargets()).resolves.toMatchObject({
+      items: [{ id: 'target-1' }],
+    });
+    await expect(client.listAuditEvents({ pageSize: 5 })).resolves.toMatchObject({
+      items: [{ id: 'audit-1' }],
+    });
+    await expect(client.createRelayCommand({ target_id: 'target-1', payload: { op: 'ping' } })).resolves.toMatchObject({ id: 'relay-1' });
+    await expect(client.ackRelayCommand('relay-1')).resolves.toBeUndefined();
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'http://hub.local/client/auth/oidc/authorize',
+      'http://hub.local/web/execution-targets',
+      'http://hub.local/web/audit-events?pageSize=5',
+      'http://hub.local/web/relay/commands',
+      'http://hub.local/web/relay/commands/relay-1:ack',
+    ]);
   });
 
   it('types Hub WS frames used by notifications, social, device, and task bridge events', () => {
