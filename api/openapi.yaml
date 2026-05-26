@@ -4670,6 +4670,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TeamAssignmentState"
+        approvals:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamApprovalState"
+        artifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamArtifactState"
         run_events:
           type: array
           items:
@@ -4719,6 +4727,30 @@ components:
         task_id: { type: string, format: uuid }
         depends_on_task_id: { type: string, format: uuid }
         kind: { type: string }
+
+    TeamApprovalState:
+      type: object
+      properties:
+        agent_task_id: { type: string, format: uuid }
+        edge_run_id: { type: string }
+        request_id: { type: string }
+        tool_name: { type: string }
+        tool_use_id: { type: string }
+        status: { type: string }
+        reason: { type: string }
+        created_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time }
+
+    TeamArtifactState:
+      type: object
+      properties:
+        agent_task_id: { type: string, format: uuid }
+        edge_run_id: { type: string }
+        path: { type: string }
+        action: { type: string }
+        tool_name: { type: string }
+        status: { type: string }
+        created_at: { type: string, format: date-time }
 
     TeamAssignmentState:
       type: object

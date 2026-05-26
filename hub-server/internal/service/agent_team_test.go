@@ -830,6 +830,30 @@ func TestAgentTeamService_GetTeamRunStateProjectsDependenciesAndBudget(t *testin
 		EventType:       "run.agent.context_warning",
 		Payload:         `{"usagePercent":86.5,"threshold":85}`,
 	}))
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          pending.ID,
+		EdgeRunID:       "edge-run-budget",
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-executor",
+		EventType:       "run.agent.permission_requested",
+		Payload:         `{"requestId":"req-1","toolUseId":"tool-1","toolName":"Bash","status":"pending"}`,
+	}))
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          pending.ID,
+		EdgeRunID:       "edge-run-budget",
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-executor",
+		EventType:       "run.agent.permission_decided",
+		Payload:         `{"requestId":"req-1","decision":"allow","reason":"safe command"}`,
+	}))
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          pending.ID,
+		EdgeRunID:       "edge-run-budget",
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-executor",
+		EventType:       "run.agent.file_change",
+		Payload:         `{"path":"hub-server/internal/service/agent_team.go","action":"modified","toolName":"apply_patch","status":"completed"}`,
+	}))
 
 	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
 	require.NoError(t, err)
@@ -846,6 +870,20 @@ func TestAgentTeamService_GetTeamRunStateProjectsDependenciesAndBudget(t *testin
 	assert.Equal(t, 86.5, state.Budget.UsagePercent)
 	assert.Equal(t, 1, state.Budget.RunCount)
 	assert.Equal(t, 1, state.Budget.ContextWarnings)
+	require.Len(t, state.Approvals, 1)
+	assert.Equal(t, pending.ID, state.Approvals[0].AgentTaskID)
+	assert.Equal(t, "req-1", state.Approvals[0].RequestID)
+	assert.Equal(t, "Bash", state.Approvals[0].ToolName)
+	assert.Equal(t, "tool-1", state.Approvals[0].ToolUseID)
+	assert.Equal(t, "allow", state.Approvals[0].Status)
+	assert.Equal(t, "safe command", state.Approvals[0].Reason)
+	require.NotNil(t, state.Approvals[0].DecidedAt)
+	require.Len(t, state.Artifacts, 1)
+	assert.Equal(t, pending.ID, state.Artifacts[0].AgentTaskID)
+	assert.Equal(t, "hub-server/internal/service/agent_team.go", state.Artifacts[0].Path)
+	assert.Equal(t, "modified", state.Artifacts[0].Action)
+	assert.Equal(t, "apply_patch", state.Artifacts[0].ToolName)
+	assert.Equal(t, "completed", state.Artifacts[0].Status)
 }
 
 func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {

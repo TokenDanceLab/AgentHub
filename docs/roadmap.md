@@ -631,7 +631,7 @@ Hub 调度（远程）:
 	- [ ] AgentTeam 实现路线（按顺序）：
 	  - `feat/agentteam-core`：✅ Hub 端 AgentTeam/TeamMember/TeamRun 模型、migration、CRUD API 与 StartTeamRun 最小闭环已落地。
 	  - `feat/agentteam-assignment`：✅ TeamAssignment 模型、migration、CRUD、基础委派权限、最大深度/活跃任务/cycle guard 与状态机接口已落地。
-	  - `feat/agentteam-run-state`：🔄 TeamEvent model/migration、append/list repository、TeamTask 一等化、TeamRunState replay service 与 `GET /web/agent-teams/{id}/runs/{run_id}/state` 已落地并部署；TeamRun supervisor task 与 Assignment dispatch 已绑定真实 Hub pending task，TeamRunState 已合并 AgentRunEvent runtime 摘要、TeamTask dependencies 和 runtime budget projection；剩余 approval/artifact 汇总。
+	  - `feat/agentteam-run-state`：✅ TeamEvent model/migration、append/list repository、TeamTask 一等化、TeamRunState replay service 与 `GET /web/agent-teams/{id}/runs/{run_id}/state` 已落地并部署；TeamRun supervisor task 与 Assignment dispatch 已绑定真实 Hub pending task，TeamRunState 已合并 AgentRunEvent runtime 摘要、TeamTask dependencies、runtime budget projection、approval summary 和 artifact/file-change summary。
 	  - `feat/agentteam-delegation-guard`：🔄 typed `CoordinatorRouteDecision` Web 入口、accepted/rejected TeamEvent 审计、`MAX_TASKS_PER_TEAM_RUN`、`MAX_ACTIVE_SUBAGENTS_PER_RUN` 和 `MAX_ROUTE_REPEATS` 拦截已落地；剩余 budget、timeout 和 Edge/Supervisor parser 接入。
 	  - `feat/agentteam-orchestrator-refactor`：Edge OrchestratorAdapter 不再自己做子 Agent spawn，改为输出 delegation 指令回 Hub，由 Hub 创建 TeamAssignment 并 dispatch。
 	  - `feat/agentteam-local-smoke`：Hub→Desktop→Edge 完整 TeamRun，两个真实 Runtime Profile（Codex + Claude Code）的委派/聚合/审批 smoke。
@@ -669,11 +669,11 @@ Hub 调度（远程）:
   - Web/Desktop：Settings 或 Workspace 中增加 Team list、member table、readiness summary；不做 canvas-first builder。
   - 验收：owner-scoped CRUD、跨 owner 403/404、Web Hub-only boundary、OpenAPI/events/docs 同步。
 
-- [ ] **AT-2: TeamRun / TeamTask / TeamEvent + TeamRunState** `[5-7d]` `[P1]`
+- [x] **AT-2: TeamRun / TeamTask / TeamEvent + TeamRunState** `[5-7d]` `[P1]`
   - Hub model/migration/API：`team_runs`、`team_tasks`、`team_events`；新增 `GET /web/team-runs/{id}`、`GET /web/team-runs/{id}/events` 或等价 read API。
   - Projection：从 TeamEvent / RunEvent 派生 `TeamRunState`，包含 members、tasks、dependencies、route decisions、approvals、budgets、terminal reason。
   - 验收：Hub/Edge replay 后 UI 可恢复同一个 TeamRun 的任务树和状态，不依赖内存 queue。
-  - 2026-05-27 进展：Hub 已新增 `agent_team_tasks` model/migration、owner-scoped `GET /web/agent-teams/{id}/runs/{run_id}/tasks`、`agent_team_events` append/list、TeamRunState replay projection、state endpoint 和 events 读取 API；accepted route decision 会同步创建 TeamAssignment 与 TeamTask 并写 `team.task.created`。TeamRun supervisor task 现在使用真实 trigger message，Assignment dispatch 会创建 assignment prompt message、触发 Hub pending task、绑定 `agent_task_id` / `edge_run_id`，并在 TeamRunState 中从 pending task 同步 dispatched/running/done/fail 状态。TeamRunState 也会按 TeamTask/Assignment 绑定的 Hub task id 合并 `agent_run_events` 摘要，并从 `parent_task_id` 派生 dependencies、从 `run.agent.result` / context usage events 汇总 budget。当前 projection 覆盖 members、tasks、dependencies、assignments、route decisions、terminal reason、Hub task binding、Edge run id、runtime event 摘要和 budget。剩余 approval/artifact 汇总后再关闭 AT-2。
+  - 2026-05-27 进展：Hub 已新增 `agent_team_tasks` model/migration、owner-scoped `GET /web/agent-teams/{id}/runs/{run_id}/tasks`、`agent_team_events` append/list、TeamRunState replay projection、state endpoint 和 events 读取 API；accepted route decision 会同步创建 TeamAssignment 与 TeamTask 并写 `team.task.created`。TeamRun supervisor task 现在使用真实 trigger message，Assignment dispatch 会创建 assignment prompt message、触发 Hub pending task、绑定 `agent_task_id` / `edge_run_id`，并在 TeamRunState 中从 pending task 同步 dispatched/running/done/fail 状态。TeamRunState 也会按 TeamTask/Assignment 绑定的 Hub task id 合并 `agent_run_events` 摘要，并从 `parent_task_id` 派生 dependencies、从 `run.agent.result` / context usage events 汇总 budget、从 `run.agent.permission_*` 派生 approvals、从 `run.agent.file_change` 派生 artifacts。当前后端 projection 覆盖 members、tasks、dependencies、assignments、route decisions、terminal reason、Hub task binding、Edge run id、runtime event 摘要、budget、approval summary 和 artifact/file-change summary；双真实 Runtime Profile 的 live 群组 E2E 归 AT-4 验收。
 
 - [ ] **AT-3: Structured Supervisor route + delegation guardrails** `[4-5d]` `[P1]`
   - 定义 `CoordinatorRouteDecision{next_worker,instructions,reasoning,finish,blocked_reason,correlation_id}`，新增 `team.route.decided` / `team.route.rejected` 事件。
