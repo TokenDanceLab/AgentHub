@@ -470,6 +470,10 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	if err != nil {
 		return nil, err
 	}
+	runEvents, err := repository.ListAgentRunEventsByTaskIDs(s.db, teamAgentTaskIDs(assignments, tasks))
+	if err != nil {
+		return nil, err
+	}
 	events, err := repository.ListTeamEventsByRun(s.db, runID)
 	if err != nil {
 		return nil, err
@@ -482,6 +486,7 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		Members:     make([]model.TeamMemberState, 0, len(members)),
 		Tasks:       make([]model.TeamTaskState, 0, len(tasks)),
 		Assignments: make([]model.TeamAssignmentState, 0, len(assignments)),
+		RunEvents:   make([]model.TeamRunEventState, 0, len(runEvents)),
 		RouteLog:    []model.CoordinatorRouteDecision{},
 	}
 
@@ -565,6 +570,17 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		})
 	}
 
+	for _, event := range runEvents {
+		state.RunEvents = append(state.RunEvents, model.TeamRunEventState{
+			AgentTaskID: event.TaskID,
+			EdgeRunID:   event.EdgeRunID,
+			EventSeq:    event.EventSeq,
+			EventType:   event.EventType,
+			Payload:     event.Payload,
+			CreatedAt:   event.CreatedAt,
+		})
+	}
+
 	for _, event := range events {
 		switch event.Type {
 		case model.TeamEventRouteDecided:
@@ -587,6 +603,22 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 }
 
 func (s *AgentTeamService) pendingTaskSnapshotByID(assignments []model.AgentTeamAssignment, tasks []model.AgentTeamTask) (map[string]model.PendingAgentTask, error) {
+	ids := teamAgentTaskIDs(assignments, tasks)
+	if len(ids) == 0 {
+		return map[string]model.PendingAgentTask{}, nil
+	}
+	pendingTasks, err := repository.ListPendingTasksByIDs(s.db, ids)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[string]model.PendingAgentTask, len(pendingTasks))
+	for _, pending := range pendingTasks {
+		byID[pending.ID] = pending
+	}
+	return byID, nil
+}
+
+func teamAgentTaskIDs(assignments []model.AgentTeamAssignment, tasks []model.AgentTeamTask) []string {
 	ids := make([]string, 0, len(assignments)+len(tasks))
 	seen := make(map[string]struct{}, len(assignments)+len(tasks))
 	addID := func(id string) {
@@ -610,18 +642,7 @@ func (s *AgentTeamService) pendingTaskSnapshotByID(assignments []model.AgentTeam
 			addID(*task.RunID)
 		}
 	}
-	if len(ids) == 0 {
-		return map[string]model.PendingAgentTask{}, nil
-	}
-	pendingTasks, err := repository.ListPendingTasksByIDs(s.db, ids)
-	if err != nil {
-		return nil, err
-	}
-	byID := make(map[string]model.PendingAgentTask, len(pendingTasks))
-	for _, pending := range pendingTasks {
-		byID[pending.ID] = pending
-	}
-	return byID, nil
+	return ids
 }
 
 func teamTaskStatusFromPending(status string) string {

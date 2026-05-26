@@ -288,6 +288,7 @@ type TeamRunState struct {
 	Members        []TeamMemberState          `json:"members"`
 	Tasks          []TeamTaskState            `json:"tasks"`
 	Assignments    []TeamAssignmentState      `json:"assignments"`
+	RunEvents      []TeamRunEventState        `json:"run_events"`
 	RouteLog       []CoordinatorRouteDecision `json:"route_log"`
 	Budget         *TeamBudget                `json:"budget,omitempty"`
 	TerminalReason string                     `json:"terminal_reason,omitempty"`
@@ -328,6 +329,16 @@ type TeamAssignmentState struct {
 	RunID        string `json:"run_id,omitempty"`
 	AgentTaskID  string `json:"agent_task_id,omitempty"`
 	EdgeRunID    string `json:"edge_run_id,omitempty"`
+}
+
+// TeamRunEventState is a runtime event projected into TeamRunState.
+type TeamRunEventState struct {
+	AgentTaskID string    `json:"agent_task_id"`
+	EdgeRunID   string    `json:"edge_run_id,omitempty"`
+	EventSeq    int64     `json:"event_seq"`
+	EventType   string    `json:"event_type"`
+	Payload     string    `json:"payload"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // TeamBudget tracks token/resource usage for a team run.
