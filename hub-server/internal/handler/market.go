@@ -14,7 +14,7 @@ import (
 // MarketService is the subset of *service.AgentProfileService used by MarketHandler.
 type MarketService interface {
 	SearchMarket(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*service.ListResult, error)
-	Get(ctx context.Context, id string) (*model.AgentProfile, error)
+	GetPublic(ctx context.Context, id string) (*model.AgentProfile, error)
 	Install(ctx context.Context, id, installerID string) (*model.AgentProfile, error)
 	Rate(ctx context.Context, profileID, raterID string, score int) (float64, int, error)
 }
@@ -56,17 +56,13 @@ func (h *MarketHandler) SearchMarketProfiles(c *gin.Context) {
 // GetMarketProfile handles GET /web/market/profiles/:id.
 func (h *MarketHandler) GetMarketProfile(c *gin.Context) {
 	id := c.Param("id")
-	profile, err := h.svc.Get(c.Request.Context(), id)
+	profile, err := h.svc.GetPublic(c.Request.Context(), id)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
 		}
 		Fail(c, errcode.ErrInternal)
-		return
-	}
-	if !profile.IsPublic {
-		Fail(c, errcode.AgentNotFound.WithMessage("profile is not public"))
 		return
 	}
 	OK(c, profile)
