@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -432,6 +434,137 @@ func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
 	}
 	if ctx.ConfigOverrides["reasoning_summary"] != "auto" {
 		t.Fatalf("config overrides = %#v", ctx.ConfigOverrides)
+	}
+}
+
+func TestPostRunsAllowsWorkDirWithinWorkspaceAllowlist(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+
+	allowedRoot := filepath.Join(t.TempDir(), "workspace")
+	workDir := filepath.Join(allowedRoot, "project-a")
+	if err := os.MkdirAll(workDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	h.WorkspaceAllowlist = []string{allowedRoot}
+
+	body, err := json.Marshal(map[string]any{
+		"projectId": "proj_local",
+		"threadId":  "thread_local",
+		"workDir":   workDir,
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(string(body)))
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+	if executor.contexts[0].WorkDir != workDir {
+		t.Fatalf("executor workDir = %q, want %q", executor.contexts[0].WorkDir, workDir)
+	}
+}
+
+func TestPostRunsRejectsWorkDirOutsideWorkspaceAllowlist(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+
+	parent := t.TempDir()
+	allowedRoot := filepath.Join(parent, "allowed")
+	escapedWorkDir := filepath.Join(allowedRoot, "..", "outside")
+	if err := os.MkdirAll(allowedRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll allowed root returned error: %v", err)
+	}
+	if err := os.MkdirAll(escapedWorkDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	h.WorkspaceAllowlist = []string{allowedRoot}
+
+	body, err := json.Marshal(map[string]any{
+		"projectId": "proj_local",
+		"threadId":  "thread_local",
+		"workDir":   escapedWorkDir,
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(string(body)))
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	errObj, ok := resp["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("error body = %#v, want error object", resp)
+	}
+	if errObj["code"] != "workspace_not_allowed" {
+		t.Fatalf("error code = %#v, want workspace_not_allowed", errObj["code"])
+	}
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+	if runs := h.Store.ListRuns("thread_local"); len(runs) != 0 {
+		t.Fatalf("stored runs = %d, want 0", len(runs))
+	}
+}
+
+func TestPostRunsRejectsSymlinkEscapeFromWorkspaceAllowlist(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+
+	parent := t.TempDir()
+	allowedRoot := filepath.Join(parent, "allowed")
+	outsideRoot := filepath.Join(parent, "outside")
+	if err := os.MkdirAll(allowedRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll allowed root returned error: %v", err)
+	}
+	if err := os.MkdirAll(outsideRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll outside root returned error: %v", err)
+	}
+	linkPath := filepath.Join(allowedRoot, "linked-outside")
+	if err := os.Symlink(outsideRoot, linkPath); err != nil {
+		t.Skipf("symlink creation unavailable in this environment: %v", err)
+	}
+	h.WorkspaceAllowlist = []string{allowedRoot}
+
+	body, err := json.Marshal(map[string]any{
+		"projectId": "proj_local",
+		"threadId":  "thread_local",
+		"workDir":   linkPath,
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(string(body)))
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
 	}
 }
 

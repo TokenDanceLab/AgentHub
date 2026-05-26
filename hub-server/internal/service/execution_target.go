@@ -31,6 +31,7 @@ func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req
 	if req.Name == "" {
 		return nil, errcode.ErrBadRequest
 	}
+	normalizeExecutionTargetDefaults(req)
 	if err := req.Validate(); err != nil {
 		return nil, errcode.ErrBadRequest.WithMessage(err.Error())
 	}
@@ -92,6 +93,15 @@ func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string,
 	if req.WorkspaceRoot != "" {
 		t.WorkspaceRoot = req.WorkspaceRoot
 	}
+	if req.WorkspaceAllowlist != "" {
+		t.WorkspaceAllowlist = req.WorkspaceAllowlist
+	}
+	if req.TrustLevel != "" {
+		t.TrustLevel = req.TrustLevel
+	}
+	if req.HealthState != "" {
+		t.HealthState = req.HealthState
+	}
 	if req.AuthMethod != "" {
 		t.AuthMethod = req.AuthMethod
 	}
@@ -112,6 +122,27 @@ func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string,
 		return nil, err
 	}
 	return t, nil
+}
+
+func normalizeExecutionTargetDefaults(t *model.ExecutionTarget) {
+	if t.TargetType == "" {
+		t.TargetType = "local_edge"
+	}
+	if t.WorkspaceAllowlist == "" {
+		t.WorkspaceAllowlist = "[]"
+	}
+	if t.TrustLevel == "" {
+		t.TrustLevel = "local"
+	}
+	if t.HealthState == "" {
+		t.HealthState = "unknown"
+	}
+	if t.Capabilities == "" {
+		t.Capabilities = "{}"
+	}
+	if t.Metadata == "" {
+		t.Metadata = "{}"
+	}
 }
 
 func (s *ExecutionTargetService) Delete(ctx context.Context, id, ownerID string) error {
@@ -158,6 +189,6 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 	case "remote_ssh", "tailscale", "cloud_edge", "hub_relay":
 		return repository.UpdateTargetOnlineStatus(s.db, id, true)
 	default:
-		return repository.UpdateTargetOnlineStatus(s.db, id, true)
+		return errcode.ErrBadRequest.WithMessage("unsupported target_type")
 	}
 }
