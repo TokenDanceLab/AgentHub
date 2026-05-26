@@ -66,6 +66,11 @@ export function mapHubAgentProfileToAgentInfo(profile: AgentProfile): AgentInfo 
   return {
     id: profile.id,
     name: profile.name,
+    profileId: profile.id,
+    ...(runtimeID ? { runtimeId: runtimeID } : {}),
+    ...(profile.model ? { model: profile.model } : {}),
+    ...(profile.provider ? { provider: profile.provider } : {}),
+    ...(profile.reasoning_effort ? { reasoningEffort: profile.reasoning_effort } : {}),
     ...(descriptionParts.length > 0 ? { description: descriptionParts.join(' - ') } : {}),
     ...(profile.version != null ? { version: String(profile.version) } : {}),
     status: runtimeID ? 'available' : 'configuring',

@@ -28,6 +28,10 @@ describe('web agent profile queries', () => {
     expect(agent).toMatchObject({
       id: '00000000-0000-0000-0000-00000000c101',
       name: 'Reviewer',
+      profileId: '00000000-0000-0000-0000-00000000c101',
+      runtimeId: 'codex',
+      provider: 'openai',
+      model: 'gpt-5.5',
       description: 'Reviews risky patches - Runtime: codex - Model: openai/gpt-5.5',
       version: '3',
       status: 'available',
