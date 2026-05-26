@@ -38,6 +38,7 @@ import { useHubStore } from '@/stores/hubStore';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
+import HomeDashboard from '@/components/HomeDashboard';
 import { ToastContainer } from '@/components/Toast';
 import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
 import {
@@ -47,6 +48,7 @@ import {
   ClipboardList,
   Circle,
   Copy,
+  Home,
   MessageSquareText,
   LogIn,
   Maximize2,
@@ -192,17 +194,21 @@ export default function App() {
     leftSidebarCollapsed,
     rightPanelOpen,
     leftSidebarWidth,
+    leftSidebarView,
     setLeftSidebarCollapsed,
     setRightPanelOpen,
     setLeftSidebarWidth,
+    setLeftSidebarView,
   } = useUIStore(
     useShallow((s) => ({
       leftSidebarCollapsed: s.leftSidebarCollapsed,
       rightPanelOpen: s.rightPanelOpen,
       leftSidebarWidth: s.sidebarWidth,
+      leftSidebarView: s.leftSidebarView,
       setLeftSidebarCollapsed: s.setLeftSidebarCollapsed,
       setRightPanelOpen: s.setRightPanelOpen,
       setLeftSidebarWidth: s.setSidebarWidth,
+      setLeftSidebarView: s.setLeftSidebarView,
     })),
   );
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
@@ -375,13 +381,14 @@ export default function App() {
     }
   }, [currentRun?.runId, optimisticRun?.runId]);
 
-  const handleSelectThread = useCallback((id: string) => { selectThread(id); setUserMessages([]); }, [selectThread]);
+  const handleSelectThread = useCallback((id: string) => { selectThread(id); setUserMessages([]); setLeftSidebarView('thread'); }, [selectThread, setLeftSidebarView]);
   const handleSelectAgent = useCallback(async (agentId: string) => {
     const store = useThreadStore.getState();
     const existing = store.agentThreadMap[agentId];
     if (existing) {
       store.selectAgentThread(agentId, existing);
       setUserMessages([]);
+      setLeftSidebarView('thread');
       return;
     }
     const agent = agents.find((a) => a.id === agentId);
@@ -389,11 +396,12 @@ export default function App() {
       const thread = await createThread(agent?.name ? `${agent.name}` : undefined);
       store.selectAgentThread(agentId, thread.threadId);
       setUserMessages([]);
+      setLeftSidebarView('thread');
     } catch {
       // still select the agent visually even if thread creation fails
       store.selectAgentThread(agentId, '');
     }
-  }, [agents]);
+  }, [agents, setLeftSidebarView]);
   const openSettings = useCallback((section: SettingsSectionId = 'general') => {
     setSettingsInitialSection(section);
     setSettingsOpen(true);
@@ -649,6 +657,18 @@ export default function App() {
         {!isMobile && !workspaceExpanded && !leftSidebarCollapsed && (
           <>
           <div className={styles.sidebar}>
+            {/* Home nav */}
+            <div className={styles.sidebarHomeNav}>
+              <ShellIconButton
+                className={`${styles.navIconBtn} ${leftSidebarView === 'home' ? styles.navIconBtnActive : ''}`}
+                onClick={() => setLeftSidebarView('home')}
+                label={t('nav.home')}
+                tooltipSide="right"
+              >
+                <Home size={16} />
+              </ShellIconButton>
+            </div>
+
             {/* Global search */}
             <div className={styles.sidebarSearch}>
               <Search size={14} color="#B0B0B5" />
@@ -784,7 +804,29 @@ export default function App() {
 
             {/* Chat area */}
             <div className={styles.chatArea}>
-              {viewMode === 'im' ? (
+              {leftSidebarView === 'home' ? (
+                <HomeDashboard
+                  onNewThread={async () => {
+                    try {
+                      const thread = await createThread();
+                      handleSelectThread(thread.threadId);
+                    } catch {
+                      // continue
+                    }
+                  }}
+                  onSelectThread={handleSelectThread}
+                  onQuickStart={async (prompt) => {
+                    try {
+                      const thread = await createThread();
+                      handleSelectThread(thread.threadId);
+                      handleSend(prompt);
+                    } catch {
+                      // continue
+                    }
+                  }}
+                  permissionCount={permissionRequests.length}
+                />
+              ) : viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
               ) : (
                 <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
@@ -792,7 +834,7 @@ export default function App() {
             </div>
 
             {/* Input area */}
-            {viewMode === 'agent' && (
+            {leftSidebarView !== 'home' && viewMode === 'agent' && (
               <div className={styles.inputArea}>
                 <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId ?? undefined} onSelectAgent={handleSelectAgent} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={selectedThreadId ?? undefined} />
               </div>
