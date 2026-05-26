@@ -171,6 +171,9 @@ export interface AgentInfo {
   model?: string;
   provider?: string;
   reasoningEffort?: string;
+  permissionMode?: string;
+  toolAllowlist?: string[];
+  targetPreferences?: Record<string, unknown>;
   status: 'available' | 'unavailable' | 'configuring';
   capabilities: AgentCapabilities;
 }
@@ -188,8 +191,17 @@ export interface StartRunRequest {
   modelMappingEnabled?: boolean;
   providerFallbackEnabled?: boolean;
   reasoningEffort?: string;
+  thinkingMode?: string;
+  maxThinkingTokens?: number;
   permissionMode?: string;
   workDir?: string;
+  includePartial?: boolean;
+  systemPrompt?: string;
+  appendSystemPrompt?: string;
+  allowedTools?: string[];
+  configOverrides?: Record<string, string>;
+  ephemeral?: boolean;
+  hubTaskId?: string;
 }
 
 export interface RunLogs {
