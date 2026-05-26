@@ -99,7 +99,9 @@ func (s *AgentTeamService) UpdateTeam(ctx context.Context, userID, teamID, name,
 	if name != "" {
 		team.Name = name
 	}
-	team.Description = description
+	if description != "" {
+		team.Description = description
+	}
 	return repository.UpdateTeam(s.db, team)
 }
 
@@ -132,14 +134,15 @@ func (s *AgentTeamService) AddTeamMember(ctx context.Context, userID, teamID, ag
 	}
 
 	// Validate the agent profile exists and is owned by the user.
-	if agentProfileID != "" {
-		ca, err := repository.GetCustomAgentByID(s.db, agentProfileID)
-		if err != nil {
-			return errcode.AgentNotFound
-		}
-		if ca.OwnerUserID != userID {
-			return errcode.AgentNotFound
-		}
+	if agentProfileID == "" {
+		return errcode.ErrBadRequest
+	}
+	ca, err := repository.GetCustomAgentByID(s.db, agentProfileID)
+	if err != nil {
+		return errcode.AgentNotFound
+	}
+	if ca.OwnerUserID != userID {
+		return errcode.AgentNotFound
 	}
 
 	// Validate role.
@@ -151,11 +154,9 @@ func (s *AgentTeamService) AddTeamMember(ctx context.Context, userID, teamID, ag
 	}
 
 	member := &model.AgentTeamMember{
-		TeamID: teamID,
-		Role:   role,
-	}
-	if agentProfileID != "" {
-		member.AgentProfileID = &agentProfileID
+		TeamID:         teamID,
+		Role:           role,
+		AgentProfileID: &agentProfileID,
 	}
 	return repository.AddTeamMember(s.db, member)
 }
@@ -349,7 +350,7 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		}
 
 		// Persist the run record now so TriggerAgentTask can reference it.
-		run.SessionID = &session.ID
+		run.SessionID = session.ID
 		run.Status = model.TeamRunStatusRunning
 		if err := repository.CreateTeamRun(tx, run); err != nil {
 			return err
@@ -361,9 +362,6 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		return nil
 	})
 	if err != nil {
-		// If the transaction failed, create a failed run record.
-		run.Status = model.TeamRunStatusFailed
-		_ = repository.CreateTeamRun(s.db, run)
 		return nil, err
 	}
 
@@ -431,4 +429,250 @@ func (s *AgentTeamService) ListTeamRuns(ctx context.Context, userID, teamID stri
 		return nil, err
 	}
 	return repository.ListTeamRunsByTeam(s.db, teamID)
+}
+
+// --- TeamAssignment ---
+
+const (
+	maxAssignmentDepth  = 3
+	maxActiveAssignments = 5
+)
+
+// CreateAssignment creates a new team assignment (delegation) from a supervisor
+// member to an executor member.
+func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error) {
+	if taskPrompt == "" {
+		return nil, errcode.ErrBadRequest
+	}
+	if aType == "" {
+		aType = model.AssignmentTypeDelegate
+	}
+
+	// 1. Query TeamRun and verify trigger user.
+	run, err := repository.GetTeamRunByID(s.db, teamRunID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentTaskNotFound
+		}
+		return nil, err
+	}
+	if run.TriggerUserID != userID {
+		return nil, errcode.AgentTaskNotFound
+	}
+
+	// 2. Query fromMember and verify role is supervisor.
+	fromMember, err := repository.GetTeamMemberByID(s.db, fromMemberID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentNotFound
+		}
+		return nil, err
+	}
+	if fromMember.Role != model.TeamMemberRoleSupervisor {
+		return nil, errcode.ErrBadRequest
+	}
+
+	// 3. Query toMember and verify same team.
+	toMember, err := repository.GetTeamMemberByID(s.db, toMemberID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentNotFound
+		}
+		return nil, err
+	}
+	if toMember.TeamID != fromMember.TeamID {
+		return nil, errcode.ErrBadRequest
+	}
+	if fromMemberID == toMemberID {
+		return nil, errcode.ErrBadRequest
+	}
+
+	// 4. Build ancestor chain and compute depth.
+	ancestorDepth := 0
+	var ancestorIDs []string // member IDs in the chain (both from and to)
+	parentID := fromMemberID
+	for {
+		parentAssignment, aErr := repository.GetAssignmentByToMember(s.db, teamRunID, parentID)
+		if aErr != nil {
+			if errors.Is(aErr, gorm.ErrRecordNotFound) {
+				break // root of chain
+			}
+			return nil, aErr
+		}
+		ancestorDepth = parentAssignment.Depth
+		ancestorIDs = append(ancestorIDs, parentAssignment.FromMemberID, parentAssignment.ToMemberID)
+		parentID = parentAssignment.FromMemberID
+	}
+
+	newDepth := ancestorDepth + 1
+	if newDepth > maxAssignmentDepth {
+		return nil, errcode.ErrBadRequest
+	}
+
+	// 5. Check active assignments limit.
+	activeCount, err := repository.CountActiveAssignmentsByMember(s.db, fromMemberID)
+	if err != nil {
+		return nil, err
+	}
+	if activeCount >= maxActiveAssignments {
+		return nil, errcode.ErrBadRequest
+	}
+
+	// 6. Check no duplicate member in ancestor chain.
+	for _, mid := range ancestorIDs {
+		if mid == toMemberID {
+			return nil, errcode.ErrBadRequest
+		}
+	}
+
+	// 7. Create assignment.
+	assignment := &model.AgentTeamAssignment{
+		TeamRunID:    teamRunID,
+		FromMemberID: fromMemberID,
+		ToMemberID:   toMemberID,
+		Type:         aType,
+		TaskPrompt:   taskPrompt,
+		Context:      contextStr,
+		Status:       model.AssignmentStatusPending,
+		Depth:        newDepth,
+	}
+	if err := repository.CreateAssignment(s.db, assignment); err != nil {
+		return nil, err
+	}
+	return assignment, nil
+}
+
+// DispatchAssignment dispatches a pending assignment to the target agent.
+func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assignmentID string) error {
+	// 1. Query assignment and verify team run owner.
+	a, err := repository.GetAssignmentByID(s.db, assignmentID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errcode.AgentTaskNotFound
+		}
+		return err
+	}
+
+	run, err := repository.GetTeamRunByID(s.db, a.TeamRunID)
+	if err != nil {
+		return err
+	}
+	if run.TriggerUserID != userID {
+		return errcode.AgentTaskNotFound
+	}
+
+	if a.Status != model.AssignmentStatusPending && a.Status != model.AssignmentStatusDispatched {
+		return errcode.ErrBadRequest
+	}
+
+	// 2. Update status to dispatched.
+	if err := repository.UpdateAssignmentStatus(s.db, assignmentID, model.AssignmentStatusDispatched, ""); err != nil {
+		return err
+	}
+
+	// 3. Find the target agent instance in the team run's session.
+	if run.SessionID == "" {
+		return errcode.AgentNotFound
+	}
+
+	toMember, err := repository.GetTeamMemberByID(s.db, a.ToMemberID)
+	if err != nil {
+		return err
+	}
+
+	agents, err := repository.ListAgentInstancesBySession(s.db, run.SessionID)
+	if err != nil || len(agents) == 0 {
+		return errcode.AgentNotFound
+	}
+
+	var targetAIID string
+	for i := range agents {
+		agent := &agents[i]
+		if toMember.AgentProfileID != nil && agent.CustomAgentID != nil && *agent.CustomAgentID == *toMember.AgentProfileID {
+			targetAIID = agent.ID
+			break
+		}
+	}
+	if targetAIID == "" {
+		return errcode.AgentNotFound
+	}
+
+	// 4. Trigger the agent task. The assignment_id, team_run_id, task_prompt, and context
+	//    are passed so the agent knows its delegation context.
+	_, triggerErr := s.agentSvc.TriggerAgentTask(ctx, userID, "", targetAIID, "", "", "", "")
+	if triggerErr != nil {
+		slog.Error("failed to trigger dispatch for assignment", "assignment_id", assignmentID, "error", triggerErr)
+		return triggerErr
+	}
+
+	return nil
+}
+
+// CompleteAssignment marks a running assignment as done with the given result.
+func (s *AgentTeamService) CompleteAssignment(ctx context.Context, userID, assignmentID string, result string) error {
+	a, err := repository.GetAssignmentByID(s.db, assignmentID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errcode.AgentTaskNotFound
+		}
+		return err
+	}
+
+	run, err := repository.GetTeamRunByID(s.db, a.TeamRunID)
+	if err != nil {
+		return err
+	}
+	if run.TriggerUserID != userID {
+		return errcode.AgentTaskNotFound
+	}
+
+	if a.Status != model.AssignmentStatusRunning {
+		return errcode.ErrBadRequest
+	}
+
+	return repository.UpdateAssignmentStatus(s.db, assignmentID, model.AssignmentStatusDone, result)
+}
+
+// FailAssignment marks an assignment as failed with the given reason.
+func (s *AgentTeamService) FailAssignment(ctx context.Context, userID, assignmentID string, reason string) error {
+	a, err := repository.GetAssignmentByID(s.db, assignmentID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errcode.AgentTaskNotFound
+		}
+		return err
+	}
+
+	run, err := repository.GetTeamRunByID(s.db, a.TeamRunID)
+	if err != nil {
+		return err
+	}
+	if run.TriggerUserID != userID {
+		return errcode.AgentTaskNotFound
+	}
+
+	return repository.UpdateAssignmentStatus(s.db, assignmentID, model.AssignmentStatusFailed, reason)
+}
+
+// ListAssignments returns all assignments for a team run, verifying owner access.
+func (s *AgentTeamService) ListAssignments(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error) {
+	run, err := repository.GetTeamRunByID(s.db, teamRunID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentTaskNotFound
+		}
+		return nil, err
+	}
+	if run.TriggerUserID != userID {
+		return nil, errcode.AgentTaskNotFound
+	}
+
+	as, err := repository.ListAssignmentsByTeamRun(s.db, teamRunID)
+	if err != nil {
+		return nil, err
+	}
+	if as == nil {
+		as = []model.AgentTeamAssignment{}
+	}
+	return as, nil
 }
