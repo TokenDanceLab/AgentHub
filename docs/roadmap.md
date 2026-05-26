@@ -627,7 +627,14 @@ Hub 调度（远程）:
   - `feat/org-workspace-authz-foundation`：org/project/workspace/team membership、permission key、Profile/Configuration 可见性、audit event schema；只做最小 RBAC，不做复杂策略语言。
   - `feat/registered-remote-edge-proof`：Remote Edge device proof、target health、workspace allowlist sync、target-bound dispatch、remote approval、preview/artifact proxy。
   - `feat/cloud-edge-lease-contract`：Cloud workspace provider、WorkspaceSpec、status state machine、startup grace、session key、quota、exposed URL policy。
-- [ ] 残留分支：`origin/dev/trump` 不作为可信进度来源；`feat/web-desktop-parity` / `origin/worktree-feat+web-desktop-parity` 与当前 WebAgent 主线大幅分叉，删除或 cherry-pick 前必须人工审 diff。
+	- [x] ADR-006 Agent 间通信模型已决策（2026-05-26）：Agent 间通信走结构化委派（TeamAssignment），不走自由聊天（IM message）。Hub 是 Agent 通信的单一事实源，Edge local MessageQueue 将弃用。IM 消息只作为可选的人可读投影。
+	- [ ] AgentTeam 实现路线（按顺序）：
+	  - `feat/agentteam-core`：🔄 进行中。AgentTeam/TeamMember/TeamRun 模型 + migration 0033 + CRUD API + StartTeamRun 最小闭环。
+	  - `feat/agentteam-assignment`：TeamAssignment 模型 + migration + CRUD + 委派权限（supervisor→anyone，executor→无，reviewer→只审批）+ 状态机（pending→dispatched→running→done/failed/cancelled）。
+	  - `feat/agentteam-delegation-guard`：最大深度 3 层、单 Agent 活跃子任务上限 5、同链禁止重复、超时 30min、预算继承。
+	  - `feat/agentteam-orchestrator-refactor`：Edge OrchestratorAdapter 不再自己做子 Agent spawn，改为输出 delegation 指令回 Hub，由 Hub 创建 TeamAssignment 并 dispatch。
+	  - `feat/agentteam-local-smoke`：Hub→Desktop→Edge 完整 TeamRun，两个真实 Runtime Profile（Codex + Claude Code）的委派/聚合/审批 smoke。
+	- [ ] 残留分支：`origin/dev/trump` 不作为可信进度来源；`feat/web-desktop-parity` / `origin/worktree-feat+web-desktop-parity` 与当前 WebAgent 主线大幅分叉，删除或 cherry-pick 前必须人工审 diff。
 
 ##### 文档架构 sweep `[并行]`
 
