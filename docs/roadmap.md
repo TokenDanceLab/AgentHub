@@ -631,7 +631,7 @@ Hub 调度（远程）:
 	- [ ] AgentTeam 实现路线（按顺序）：
 	  - `feat/agentteam-core`：✅ Hub 端 AgentTeam/TeamMember/TeamRun 模型、migration、CRUD API 与 StartTeamRun 最小闭环已落地。
 	  - `feat/agentteam-assignment`：✅ TeamAssignment 模型、migration、CRUD、基础委派权限、最大深度/活跃任务/cycle guard 与状态机接口已落地。
-	  - `feat/agentteam-run-state`：🔄 TeamEvent model/migration、append/list repository、TeamRunState replay service 与 `GET /web/agent-teams/{id}/runs/{run_id}/state` 已落地并部署；剩余 TeamTask 一等化、RunEvent/approval/artifact 汇总、budget projection。
+	  - `feat/agentteam-run-state`：🔄 TeamEvent model/migration、append/list repository、TeamTask 一等化、TeamRunState replay service 与 `GET /web/agent-teams/{id}/runs/{run_id}/state` 已落地并部署；TeamRun supervisor task 与 Assignment dispatch 已绑定真实 Hub pending task；剩余 approval/artifact 汇总、budget projection 和更完整 RunEvent 摘要。
 	  - `feat/agentteam-delegation-guard`：🔄 typed `CoordinatorRouteDecision` Web 入口、accepted/rejected TeamEvent 审计和 `MAX_TASKS_PER_TEAM_RUN` 拦截已落地；剩余 route repeats、budget、timeout 和 Edge/Supervisor parser 接入。
 	  - `feat/agentteam-orchestrator-refactor`：Edge OrchestratorAdapter 不再自己做子 Agent spawn，改为输出 delegation 指令回 Hub，由 Hub 创建 TeamAssignment 并 dispatch。
 	  - `feat/agentteam-local-smoke`：Hub→Desktop→Edge 完整 TeamRun，两个真实 Runtime Profile（Codex + Claude Code）的委派/聚合/审批 smoke。
@@ -673,7 +673,7 @@ Hub 调度（远程）:
   - Hub model/migration/API：`team_runs`、`team_tasks`、`team_events`；新增 `GET /web/team-runs/{id}`、`GET /web/team-runs/{id}/events` 或等价 read API。
   - Projection：从 TeamEvent / RunEvent 派生 `TeamRunState`，包含 members、tasks、dependencies、route decisions、approvals、budgets、terminal reason。
   - 验收：Hub/Edge replay 后 UI 可恢复同一个 TeamRun 的任务树和状态，不依赖内存 queue。
-  - 2026-05-27 进展：Hub 已新增 `agent_team_tasks` model/migration、owner-scoped `GET /web/agent-teams/{id}/runs/{run_id}/tasks`、`agent_team_events` append/list、TeamRunState replay projection、state endpoint 和 events 读取 API；accepted route decision 会同步创建 TeamAssignment 与 TeamTask 并写 `team.task.created`。当前 projection 覆盖 members、tasks、assignments、route decisions、terminal reason。剩余 dependency、approval/artifact、budget 与 RunEvent merge 后再关闭 AT-2。
+  - 2026-05-27 进展：Hub 已新增 `agent_team_tasks` model/migration、owner-scoped `GET /web/agent-teams/{id}/runs/{run_id}/tasks`、`agent_team_events` append/list、TeamRunState replay projection、state endpoint 和 events 读取 API；accepted route decision 会同步创建 TeamAssignment 与 TeamTask 并写 `team.task.created`。TeamRun supervisor task 现在使用真实 trigger message，Assignment dispatch 会创建 assignment prompt message、触发 Hub pending task、绑定 `agent_task_id` / `edge_run_id`，并在 TeamRunState 中从 pending task 同步 dispatched/running/done/fail 状态。当前 projection 覆盖 members、tasks、assignments、route decisions、terminal reason、Hub task binding 和 Edge run id。剩余 dependency、approval/artifact、budget 与更完整 RunEvent 摘要后再关闭 AT-2。
 
 - [ ] **AT-3: Structured Supervisor route + delegation guardrails** `[4-5d]` `[P1]`
   - 定义 `CoordinatorRouteDecision{next_worker,instructions,reasoning,finish,blocked_reason,correlation_id}`，新增 `team.route.decided` / `team.route.rejected` 事件。
@@ -686,6 +686,7 @@ Hub 调度（远程）:
   - Dispatch：TeamTask 复用现有 Hub `/web/agent-tasks` 和 Desktop bridge，每个 task 绑定 Edge `run_id`。
   - Runtime：至少 Codex + Claude Code 或 Codex + OpenCode 两个真实 Runtime Profile 参与同一个 TeamRun。
   - UI：TeamRun Console 展示 task board、member status、subagent activity row、branch switch、typed team blocks、pending approval count、result blocks。
+  - 2026-05-27 进展：Hub 后端 dispatch binding 已补齐到真实 `/web/agent-tasks` pending task；仍需 Desktop/Edge live smoke 证明两个真实 Runtime Profile 在同一 TeamRun 中完成委派与回传。
   - 验收：一个 TeamRun 可并行/串行派发两个本地 Profile，Hub 可 replay 全部 TeamEvent，Web/Desktop 可恢复状态。
 
 - [ ] **AT-5: Artifact / Approval / Conflict 一等化** `[4-6d]` `[P1-P2]`
