@@ -673,7 +673,7 @@ Hub 调度（远程）:
   - Hub model/migration/API：`team_runs`、`team_tasks`、`team_events`；新增 `GET /web/team-runs/{id}`、`GET /web/team-runs/{id}/events` 或等价 read API。
   - Projection：从 TeamEvent / RunEvent 派生 `TeamRunState`，包含 members、tasks、dependencies、route decisions、approvals、budgets、terminal reason。
   - 验收：Hub/Edge replay 后 UI 可恢复同一个 TeamRun 的任务树和状态，不依赖内存 queue。
-  - 2026-05-27 进展：Hub 已新增 `agent_team_events` append/list、TeamRunState replay projection 和 owner-scoped state endpoint；当前 projection 覆盖 members、assignments、route decisions、terminal reason。剩余 task/dependency、approval/artifact、budget 与 RunEvent merge 后再关闭 AT-2。
+  - 2026-05-27 进展：Hub 已新增 `agent_team_events` append/list、TeamRunState replay projection、owner-scoped state endpoint 和 `GET /web/agent-teams/{id}/runs/{run_id}/events` 显式事件读取 API；当前 projection 覆盖 members、assignments、route decisions、terminal reason。剩余 task/dependency、approval/artifact、budget 与 RunEvent merge 后再关闭 AT-2。
 
 - [ ] **AT-3: Structured Supervisor route + delegation guardrails** `[4-5d]` `[P1]`
   - 定义 `CoordinatorRouteDecision{next_worker,instructions,reasoning,finish,blocked_reason,correlation_id}`，新增 `team.route.decided` / `team.route.rejected` 事件。
