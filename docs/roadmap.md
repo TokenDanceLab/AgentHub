@@ -629,8 +629,9 @@ Hub 调度（远程）:
   - `feat/cloud-edge-lease-contract`：Cloud workspace provider、WorkspaceSpec、status state machine、startup grace、session key、quota、exposed URL policy。
 	- [x] ADR-006 Agent 间通信模型已决策（2026-05-26）：Agent 间通信走结构化委派（TeamAssignment），不走自由聊天（IM message）。Hub 是 Agent 通信的单一事实源，Edge local MessageQueue 将弃用。IM 消息只作为可选的人可读投影。
 	- [ ] AgentTeam 实现路线（按顺序）：
-	  - `feat/agentteam-core`：🔄 进行中。AgentTeam/TeamMember/TeamRun 模型 + migration 0033 + CRUD API + StartTeamRun 最小闭环。
-	  - `feat/agentteam-assignment`：TeamAssignment 模型 + migration + CRUD + 委派权限（supervisor→anyone，executor→无，reviewer→只审批）+ 状态机（pending→dispatched→running→done/failed/cancelled）。
+	  - `feat/agentteam-core`：✅ Hub 端 AgentTeam/TeamMember/TeamRun 模型、migration、CRUD API 与 StartTeamRun 最小闭环已落地。
+	  - `feat/agentteam-assignment`：✅ TeamAssignment 模型、migration、CRUD、基础委派权限、最大深度/活跃任务/cycle guard 与状态机接口已落地。
+	  - `feat/agentteam-run-state`：🔄 TeamEvent model/migration、append/list repository、TeamRunState replay service 与 `GET /web/agent-teams/{id}/runs/{run_id}/state` 已落地并部署；剩余 TeamTask 一等化、RunEvent/approval/artifact 汇总、budget projection。
 	  - `feat/agentteam-delegation-guard`：最大深度 3 层、单 Agent 活跃子任务上限 5、同链禁止重复、超时 30min、预算继承。
 	  - `feat/agentteam-orchestrator-refactor`：Edge OrchestratorAdapter 不再自己做子 Agent spawn，改为输出 delegation 指令回 Hub，由 Hub 创建 TeamAssignment 并 dispatch。
 	  - `feat/agentteam-local-smoke`：Hub→Desktop→Edge 完整 TeamRun，两个真实 Runtime Profile（Codex + Claude Code）的委派/聚合/审批 smoke。
@@ -672,6 +673,7 @@ Hub 调度（远程）:
   - Hub model/migration/API：`team_runs`、`team_tasks`、`team_events`；新增 `GET /web/team-runs/{id}`、`GET /web/team-runs/{id}/events` 或等价 read API。
   - Projection：从 TeamEvent / RunEvent 派生 `TeamRunState`，包含 members、tasks、dependencies、route decisions、approvals、budgets、terminal reason。
   - 验收：Hub/Edge replay 后 UI 可恢复同一个 TeamRun 的任务树和状态，不依赖内存 queue。
+  - 2026-05-27 进展：Hub 已新增 `agent_team_events` append/list、TeamRunState replay projection 和 owner-scoped state endpoint；当前 projection 覆盖 members、assignments、route decisions、terminal reason。剩余 task/dependency、approval/artifact、budget 与 RunEvent merge 后再关闭 AT-2。
 
 - [ ] **AT-3: Structured Supervisor route + delegation guardrails** `[4-5d]` `[P1]`
   - 定义 `CoordinatorRouteDecision{next_worker,instructions,reasoning,finish,blocked_reason,correlation_id}`，新增 `team.route.decided` / `team.route.rejected` 事件。
