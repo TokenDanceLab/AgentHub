@@ -11,7 +11,6 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/handler"
 )
 
 // RateLimit returns a middleware that enforces a sliding-window rate limit
@@ -40,7 +39,7 @@ func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func
 		pipe.Expire(ctx, key, window+config.RateLimitExpiryBuffer)
 
 		if _, err := pipe.Exec(ctx); err != nil {
-			handler.Fail(c, errcode.ErrInternal)
+			fail(c, errcode.ErrInternal)
 			c.Abort()
 			return
 		}
@@ -53,7 +52,7 @@ func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func
 				retryAfter = int(window.Seconds())
 			}
 			c.Header("Retry-After", fmt.Sprint(retryAfter))
-			handler.Fail(c, errcode.New("RATE_LIMITED", "too many requests, please slow down", http.StatusTooManyRequests))
+			fail(c, errcode.New("RATE_LIMITED", "too many requests, please slow down", http.StatusTooManyRequests))
 			c.Abort()
 			return
 		}

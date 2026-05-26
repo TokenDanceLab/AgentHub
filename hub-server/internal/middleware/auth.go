@@ -8,7 +8,6 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/gin-gonic/gin"
 )
@@ -25,7 +24,7 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" || !strings.HasPrefix(header, "Bearer ") {
-			handler.Fail(c, errcode.AuthInvalidToken)
+			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
 		}
@@ -48,7 +47,7 @@ func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			tokenStr = c.Query("access_token")
 		}
 		if tokenStr == "" {
-			handler.Fail(c, errcode.AuthInvalidToken)
+			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
 		}
@@ -58,7 +57,7 @@ func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		// handshake by authenticating at the upgrade middleware layer.
 		claims, err := jwtutil.ParseToken(tokenStr, cfg.JWT.Secret)
 		if err != nil {
-			handler.Fail(c, errcode.AuthInvalidToken)
+			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
 		}
@@ -88,7 +87,7 @@ func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
 	// Fallback to local HS256 JWT.
 	claims, err := jwtutil.ParseToken(tokenStr, cfg.JWT.Secret)
 	if err != nil {
-		handler.Fail(c, errcode.AuthInvalidToken)
+		fail(c, errcode.AuthInvalidToken)
 		c.Abort()
 		return
 	}
@@ -105,7 +104,7 @@ func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
 func RequireHubSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.GetString("auth_source") != "hub_local" {
-			handler.Fail(c, &errcode.Error{
+			fail(c, &errcode.Error{
 				Code:       "FORBIDDEN",
 				Message:    "Hub-issued session is required for this API",
 				HTTPStatus: http.StatusForbidden,
@@ -135,12 +134,12 @@ func RequireAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetString("user_id")
 		if userID == "" {
-			handler.Fail(c, errcode.AuthInvalidToken)
+			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
 		}
 		if len(adminUsers) == 0 {
-			handler.Fail(c, &errcode.Error{
+			fail(c, &errcode.Error{
 				Code:       "FORBIDDEN",
 				Message:    "admin access not configured — set AGENTHUB_ADMIN_USERS",
 				HTTPStatus: http.StatusForbidden,
@@ -154,7 +153,7 @@ func RequireAdmin() gin.HandlerFunc {
 				return
 			}
 		}
-		handler.Fail(c, &errcode.Error{
+		fail(c, &errcode.Error{
 			Code:       "FORBIDDEN",
 			Message:    "admin access required",
 			HTTPStatus: http.StatusForbidden,

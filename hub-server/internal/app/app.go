@@ -24,7 +24,6 @@ import (
 	"github.com/agenthub/hub-server/internal/log"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/router"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -354,7 +353,7 @@ func (a *App) setupWSManager() {
 	a.mgr.ResolveMembers = func(sessionID string) []string {
 		ctx := a.coreCtx
 		ids, err := cache.GetOrLoad(a.CacheClient, ctx, "session:members:"+sessionID, config.SessionMemberCacheTTL, func(ctx context.Context) ([]string, error) {
-			members, err := repository.ListActiveMembers(a.DB, sessionID)
+			members, err := a.SessionService.ListActiveMembers(sessionID)
 			if err != nil {
 				return nil, err
 			}
@@ -377,7 +376,7 @@ func (a *App) setupWSManager() {
 			"user_id":    userID,
 			"session_id": sessionID,
 		})
-		members, err := repository.ListActiveMembers(a.DB, sessionID)
+		members, err := a.SessionService.ListActiveMembers(sessionID)
 		if err != nil {
 			return
 		}
@@ -470,7 +469,7 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 
 		taskID, _ := payload["task_id"].(string)
 		if taskID != "" {
-			task, err := repository.GetPendingTaskByID(a.DB, taskID)
+			task, err := a.AgentService.GetPendingTaskByID(taskID)
 			if err == nil && task != nil {
 				a.NotificationService.Notify(ctx, task.TriggeredByUserID, model.TypeAgentDone, map[string]interface{}{
 					"task_id":           payload["task_id"],
@@ -529,14 +528,14 @@ func (a *App) startTaskScheduler(ctx context.Context) {
 		ticker := time.NewTicker(config.PendingTaskScanInterval)
 		defer ticker.Stop()
 		for range ticker.C {
-			tasks, err := repository.ScanExpiredTasks(a.DB)
+			tasks, err := a.AgentService.ScanExpiredTasks()
 			if err != nil {
 				slog.Warn("failed to scan expired agent tasks", "error", err)
 				continue
 			}
 			for _, task := range tasks {
-				_ = repository.UpdatePendingTaskStatus(a.DB, task.ID, model.TaskStatusTimeout, "")
-				ai, _ := repository.GetAgentInstanceByID(a.DB, task.AgentInstanceID)
+				_ = a.AgentService.UpdatePendingTaskStatus(task.ID, model.TaskStatusTimeout, "")
+				ai, _ := a.AgentService.GetAgentInstanceByID(task.AgentInstanceID)
 				sessionID := ""
 				if ai != nil {
 					sessionID = ai.SessionID
@@ -666,7 +665,7 @@ func (a *App) pushPendingTargetTasks(ctx context.Context, userID, deviceID, conn
 				TaskID string `json:"task_id"`
 			}
 			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
-				_ = repository.UpdatePendingTaskDispatched(a.DB, meta.TaskID, deviceID)
+				_ = a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, deviceID)
 			}
 			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
 		}
@@ -690,7 +689,7 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 				TaskID string `json:"task_id"`
 			}
 			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
-				_ = repository.UpdatePendingTaskDispatched(a.DB, meta.TaskID, edgeDeviceID)
+				_ = a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, edgeDeviceID)
 			}
 			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
 		}
@@ -715,7 +714,7 @@ func (a *App) onRouteDel(userID, deviceType, deviceID, connID string) {
 }
 
 func (a *App) broadcastOnlineStatus(ctx context.Context, userID string, online bool) {
-	friendIDs, err := repository.GetFriendIDs(a.DB, userID)
+	friendIDs, err := a.ContactService.GetFriendIDs(userID)
 	if err != nil || len(friendIDs) == 0 {
 		return
 	}

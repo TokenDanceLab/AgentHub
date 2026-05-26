@@ -198,6 +198,9 @@ func (e *ProcessExecutor) WithHubCallback(c *hub.CallbackClient) *ProcessExecuto
 }
 
 func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	current, ok := e.store.GetRun(run.ID)
 	if !ok {
 		return store.ErrNotFound
@@ -206,24 +209,20 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 		return ErrRunAlreadyStarted
 	}
 
-	e.mu.Lock()
 	max := e.maxConcurrentRuns
 	if max <= 0 {
 		max = defaultMaxConcurrentRuns
 	}
 	if len(e.running) >= max {
-		e.mu.Unlock()
 		return ErrTooManyConcurrentRuns
 	}
 	if _, ok := e.running[run.ID]; ok {
-		e.mu.Unlock()
 		return ErrRunAlreadyStarted
 	}
 	// Create context and atomically insert cancel into the map while holding
 	// the lock, so a concurrent Cancel can never miss the cancel func.
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRunTimeout)
 	e.running[run.ID] = cancel
-	e.mu.Unlock()
 
 	runCtx.Run = run
 	go e.run(ctx, run, runCtx)
