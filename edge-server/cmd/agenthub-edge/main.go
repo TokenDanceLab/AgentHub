@@ -37,6 +37,9 @@ type config struct {
 	CodexPath      string // path to codex binary
 	OpenCodePath   string // path to opencode binary
 	AgentModel     string // model override for the default agent
+
+	// SKILL.md discovery
+	SkillsDirs repeatedString // additional dirs to search for SKILL.md files
 }
 
 type repeatedString []string
@@ -145,6 +148,9 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.CodexPath, "codex-path", getEnv("AGENTHUB_CODEX_PATH", "codex"), "path to codex binary")
 	fs.StringVar(&cfg.OpenCodePath, "opencode-path", getEnv("AGENTHUB_OPENCODE_PATH", "opencode"), "path to opencode binary")
 	fs.StringVar(&cfg.AgentModel, "agent-model", getEnv("AGENTHUB_AGENT_MODEL", ""), "model override for the default agent (e.g. claude-sonnet-4-6)")
+
+	cfg.SkillsDirs = append(cfg.SkillsDirs, splitPathList(getEnv("AGENTHUB_SKILLS_DIRS", ""))...)
+	fs.Var(&cfg.SkillsDirs, "skills-dir", "directory containing SKILL.md subdirectories; may be repeated; defaults to .agents/skills and .codex/skills")
 
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
