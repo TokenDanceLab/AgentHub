@@ -274,11 +274,34 @@ func (p *NDJSONStreamParser) parseResult(scope map[string]any, msg *claudeSDKMes
 	}
 	if msg.StructuredOutput != nil {
 		payload["structuredOutput"] = msg.StructuredOutput
+		p.emitRouteDecision(scope, msg.StructuredOutput)
 	}
 	if msg.SessionID != "" {
 		payload["sessionId"] = msg.SessionID
 	}
 	p.emit(scope, BusEventResult, payload)
+}
+
+func (p *NDJSONStreamParser) emitRouteDecision(scope map[string]any, structuredOutput any) {
+	decision, ok := normalizeRouteDecisionPayload(structuredOutput)
+	if !ok {
+		return
+	}
+	p.emit(scope, BusEventRouteDecision, decision)
+}
+
+func normalizeRouteDecisionPayload(value any) (map[string]any, bool) {
+	payload, ok := value.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	action, _ := payload["action"].(string)
+	switch action {
+	case "delegate", "review", "approve", "finish":
+		return payload, true
+	default:
+		return nil, false
+	}
 }
 
 func (p *NDJSONStreamParser) emitSessionInit(scope map[string]any, msg *claudeSDKMessage) {

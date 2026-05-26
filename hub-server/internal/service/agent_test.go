@@ -161,6 +161,93 @@ func TestDispatchTaskIncludesTargetID(t *testing.T) {
 	require.Equal(t, "target-1", payload.TargetID)
 }
 
+func TestDispatchTaskIncludesTeamRunContext(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	for _, ddl := range []string{
+		`CREATE TABLE custom_agents (
+			id TEXT PRIMARY KEY,
+			owner_user_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			avatar_url TEXT DEFAULT '',
+			agent_type TEXT NOT NULL,
+			system_prompt TEXT NOT NULL,
+			capability_tags TEXT DEFAULT '[]',
+			tool_whitelist TEXT DEFAULT '[]',
+			model_params TEXT DEFAULT '{}',
+			deleted_at DATETIME,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE agent_teams (
+			id TEXT PRIMARY KEY,
+			owner_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			avatar_url TEXT DEFAULT '',
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_members (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			agent_profile_id TEXT,
+			role TEXT NOT NULL,
+			position INTEGER DEFAULT 0,
+			created_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_runs (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			session_id TEXT NOT NULL,
+			trigger_user_id TEXT NOT NULL,
+			trigger_message TEXT DEFAULT '',
+			status TEXT NOT NULL,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+	} {
+		require.NoError(t, db.Exec(ddl).Error)
+	}
+	now := time.Now()
+	require.NoError(t, db.Exec(`INSERT INTO custom_agents (id, owner_user_id, name, agent_type, system_prompt, capability_tags, tool_whitelist, model_params, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"profile-supervisor", "user-1", "Supervisor", "claude-code", "Coordinate the team", "[]", "[]", `{"model":"claude-sonnet-4-6"}`, now, now).Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_teams (id, owner_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		"team-1", "user-1", "Backend Team", now, now).Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_team_members (id, team_id, agent_profile_id, role, position, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"member-supervisor", "team-1", "profile-supervisor", model.TeamMemberRoleSupervisor, 0, now).Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_team_runs (id, team_id, session_id, trigger_user_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"run-team-1", "team-1", "sess-1", "user-1", model.TeamRunStatusRunning, now, now).Error)
+
+	profileID := "profile-supervisor"
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "claude-code",
+		CustomAgentID: &profileID,
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Supervisor",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Route this team run", "")
+
+	require.Len(t, cache.pushed, 1)
+	var payload dispatchPayload
+	require.NoError(t, json.Unmarshal([]byte(cache.pushed[0]), &payload))
+	require.Equal(t, "team-1", payload.TeamID)
+	require.Equal(t, "run-team-1", payload.TeamRunID)
+	require.Equal(t, "member-supervisor", payload.TeamMemberID)
+	require.Equal(t, model.TeamMemberRoleSupervisor, payload.TeamMemberRole)
+	require.Equal(t, "profile-supervisor", payload.CustomAgentID)
+	require.JSONEq(t, `{"model":"claude-sonnet-4-6"}`, payload.ModelParams)
+}
+
 func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
 	mgr := ws.NewManager()
