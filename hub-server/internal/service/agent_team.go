@@ -764,6 +764,20 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 	if taskCount >= model.MaxTasksPerTeamRun {
 		return nil, s.rejectRouteDecision(runID, decision, "task limit reached")
 	}
+	activeCount, err := repository.CountActiveAssignmentsByTeamRun(s.db, runID)
+	if err != nil {
+		return nil, err
+	}
+	if activeCount >= model.MaxActiveSubAgentsPerRun {
+		return nil, s.rejectRouteDecision(runID, decision, "active subagent limit reached")
+	}
+	repeatCount, err := s.countMatchingRouteDecisions(runID, decision)
+	if err != nil {
+		return nil, err
+	}
+	if repeatCount >= model.MaxRouteRepeats {
+		return nil, s.rejectRouteDecision(runID, decision, "route repeat limit reached")
+	}
 
 	assignment, err := s.CreateAssignment(ctx, userID, runID, supervisor.ID, worker.ID, routeAssignmentType(decision.Action), decision.Instructions, decision.Context)
 	if err != nil {
@@ -843,6 +857,32 @@ func (s *AgentTeamService) appendRouteRejected(runID string, decision model.Coor
 	})
 }
 
+func (s *AgentTeamService) countMatchingRouteDecisions(runID string, decision model.CoordinatorRouteDecision) (int, error) {
+	events, err := repository.ListTeamEventsByRun(s.db, runID)
+	if err != nil {
+		return 0, err
+	}
+	targetAction := strings.ToLower(strings.TrimSpace(decision.Action))
+	targetWorker := strings.TrimSpace(decision.NextWorker)
+	targetInstructions := strings.TrimSpace(decision.Instructions)
+	count := 0
+	for _, event := range events {
+		if event.Type != model.TeamEventRouteDecided {
+			continue
+		}
+		var previous model.CoordinatorRouteDecision
+		if err := json.Unmarshal([]byte(event.Payload), &previous); err != nil {
+			continue
+		}
+		if strings.ToLower(strings.TrimSpace(previous.Action)) == targetAction &&
+			strings.TrimSpace(previous.NextWorker) == targetWorker &&
+			strings.TrimSpace(previous.Instructions) == targetInstructions {
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (s *AgentTeamService) appendTeamEvent(runID, eventType string, payload any) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
@@ -885,11 +925,6 @@ func routeAssignmentType(action string) string {
 }
 
 // --- TeamAssignment ---
-
-const (
-	maxAssignmentDepth   = 3
-	maxActiveAssignments = 5
-)
 
 // CreateAssignment creates a new team assignment (delegation) from a supervisor
 // member to an executor member.
@@ -958,16 +993,16 @@ func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRun
 	}
 
 	newDepth := ancestorDepth + 1
-	if newDepth > maxAssignmentDepth {
+	if newDepth > model.MaxDelegationDepth {
 		return nil, errcode.ErrBadRequest
 	}
 
-	// 5. Check active assignments limit.
-	activeCount, err := repository.CountActiveAssignmentsByMember(s.db, fromMemberID)
+	// 5. Check active assignments limit for this team run.
+	activeCount, err := repository.CountActiveAssignmentsByTeamRun(s.db, teamRunID)
 	if err != nil {
 		return nil, err
 	}
-	if activeCount >= maxActiveAssignments {
+	if activeCount >= model.MaxActiveSubAgentsPerRun {
 		return nil, errcode.ErrBadRequest
 	}
 
