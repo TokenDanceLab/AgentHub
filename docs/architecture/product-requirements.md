@@ -12,13 +12,13 @@ AgentHub 是一个 IM 形态的多 Agent 协作平台。
 AgentHub = 本地 Agent 工作台 + IM 式多 Agent 协作 + Hub 网络同步与中继
 ```
 
-当前仓库已完成 P0-P3 全部任务，M3b 与 M4 均已交付。全链路已跑通：
+当前仓库的最强证据集中在 P0 本地执行主链路：Desktop/Edge 能启动真实 Agent Runtime，并把结构化事件回到 UI。P1/P2 的 Hub IM、TokenDance ID、多端同步和 Web 查看已经有代码落点，但仍按“部分闭环”管理，不能把仓内 wiring、结构检查或历史分支记录当成部署态完成证明。
 
 ```text
 Desktop UI -> Local Edge -> Edge lifecycle -> Agent Runtime Adapter (Claude Code / OpenCode / Codex) -> WebSocket events -> UI
 ```
 
-P0 本地执行主链路已实现：本地项目、Thread、真实 Agent Runtime adapter、WebSocket 事件、基础 Diff/输出展示和 Preview 入口可用。Approval 当前具备事件展示与 run-scoped REST 决策登记；真正阻塞式 stdin 回写和远程 Edge 决策证明仍是后续安全闭环。旧文档中的 Runner 指 Edge lifecycle + AgentAdapter，不再是独立产品组件。
+P0 本地执行主链路已实现：本地项目、Thread、真实 Agent Runtime adapter、WebSocket 事件、基础 Diff/输出展示和 Preview 入口可用。Approval 当前具备事件展示与 run-scoped REST 决策登记；真正阻塞式 stdin 回写和远程 Edge 决策证明仍是后续安全闭环。旧文档中的 Runner 指 Edge lifecycle + AgentAdapter，不再是独立产品组件。TokenDance ID 接入当前以 Hub OIDC code exchange、Hub-local session、Web/Desktop 登录入口和 Hub WebSocket session gate 为仓内证据；部署态 login/callback/logout/reconnect smoke 仍是 P0 后续验收。
 
 ## 2. 目标用户和场景
 
@@ -26,7 +26,7 @@ P0 本地执行主链路已实现：本地项目、Thread、真实 Agent Runtime
 |---|---|---|
 | 学生/开发者 | 在本地项目里让 Agent 写代码、审查 Diff、启动预览 | 能选择本地项目，创建 Thread，启动一次 AgentRun，并看到日志、Diff 和 Preview |
 | 小团队 | 像群聊一样组织多个 Agent Profile 协作完成任务 | 能在同一个 Thread 中 @Agent Profile，查看不同 Agent 的进度、产物和审查意见 |
-| 比赛评审 | 快速看懂产品定位、技术路线、可演示流程和 AI 协作记录 | 能启动 Local Edge/Desktop，创建 AgentRun，看到 WebSocket 事件和 UI 实时更新，并理解 P0-P3 全部完成的状态 |
+| 比赛评审 | 快速看懂产品定位、技术路线、可演示流程和 AI 协作记录 | 能启动 Local Edge/Desktop，创建 AgentRun，看到 WebSocket 事件和 UI 实时更新，并理解 P0 本地主链路已落地、P1/P2 多端与身份链路仍需真实 smoke 的边界 |
 | 后续 Agent | 根据文档继续拆任务、补接口、写实现 | 能从 README、本文、系统架构、实现指南定位当前阶段和下一步任务 |
 
 ## 3. 核心体验
@@ -123,7 +123,7 @@ Agent Profile -> Execution Target -> Thread -> Run -> RunEvent -> Approval / Art
 
 | 阶段 | 目标 | 能力 | 状态 |
 |---|---|---|---|
-| P1 | 多 Agent Thread | @Agent、Reviewer、Orchestrator、Thread fork、多 Agent 围绕同一 Artifact 讨论 | 已完成 |
+| P1 | 多 Agent Thread | @Agent、Reviewer、Orchestrator、Thread fork、多 Agent 围绕同一 Artifact 讨论 | 部分完成：Hub group/session、Agent Profile、Orchestrator 和 Web/ Desktop 表面已有落点；仍缺两条以上真实 Runtime Profile 的群组 E2E、聚合 transcript 和冲突处理证据 |
 | P2 | Identity + Edge-Hub Sync | TokenDance ID OIDC 登录、Hub session、Edge 注册、设备状态、消息/事件同步、Web/Mobile 查看状态和远程审批 | 进行中：Hub OIDC code exchange 与 Hub-local session 已在 repo 落地；部署配置、Desktop/Web 回调 UX、logout/reconnect 和授权证据仍需闭环 |
 | P3 | Relay / Remote / Cloud | Hub 中继、本地/远程 SSH/Tailscale/Cloud Execution Target、远程 Preview、Artifact Proxy、远控审批 | 规划中（Q3） |
 | P4 | 团队 IM + Agent Platform | 用户、联系人、群组、团队空间、团队 Memory、Agent 市场、Skill/MCP 管理、模型配置、模型映射、cc-switch provider binding、安全审计 | 规划中 |
