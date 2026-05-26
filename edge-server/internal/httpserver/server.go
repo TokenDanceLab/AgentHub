@@ -43,15 +43,16 @@ func HubUserIDFromContext(ctx context.Context) string {
 
 // Config holds server configuration.
 type Config struct {
-	Addr            string
-	Store           store.Repository
-	ProcessExecutor lifecycle.ProcessExecutorConfig
-	AdapterRegistry *adapters.Registry // agent adapter registry; nil = none registered
-	AgentDefault    string             // default agent adapter ID; empty = raw stdout capture
-	LocalAuthToken  string             // optional local bearer token for non-health Edge APIs
-	HubJWTSecret    string             // shared secret for validating Hub-issued HS256 JWTs
-	HubURL          string             // Hub server base URL for Edge->Hub direct callbacks
-	HubToken        string             // JWT bearer token for Hub callback authentication
+	Addr               string
+	Store              store.Repository
+	ProcessExecutor    lifecycle.ProcessExecutorConfig
+	AdapterRegistry    *adapters.Registry // agent adapter registry; nil = none registered
+	AgentDefault       string             // default agent adapter ID; empty = raw stdout capture
+	LocalAuthToken     string             // optional local bearer token for non-health Edge APIs
+	HubJWTSecret       string             // shared secret for validating Hub-issued HS256 JWTs
+	HubURL             string             // Hub server base URL for Edge->Hub direct callbacks
+	HubToken           string             // JWT bearer token for Hub callback authentication
+	WorkspaceAllowlist []string           // optional roots allowed for request workDir
 }
 
 const defaultRESTRequestTimeout = 30 * time.Second
@@ -165,14 +166,15 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	wireOrchestrator(cfg.AdapterRegistry, executor, agentReg, msgQueue)
 
 	h := &api.Handler{
-		Bus:             bus,
-		Registry:        reg,
-		Store:           cfg.Store,
-		Executor:        executor,
-		AdapterRegistry: cfg.AdapterRegistry,
-		AgentRegistry:   agentReg,
-		MessageQueue:    msgQueue,
-		Metrics:         edgeMetrics,
+		Bus:                bus,
+		Registry:           reg,
+		Store:              cfg.Store,
+		Executor:           executor,
+		AdapterRegistry:    cfg.AdapterRegistry,
+		AgentRegistry:      agentReg,
+		MessageQueue:       msgQueue,
+		Metrics:            edgeMetrics,
+		WorkspaceAllowlist: append([]string(nil), cfg.WorkspaceAllowlist...),
 	}
 	// Create default project/thread fixtures so POST /v1/runs
 	// with empty projectId/threadId works out of the box.

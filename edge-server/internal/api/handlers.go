@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,14 +29,15 @@ import (
 
 // Handler holds dependencies for HTTP and WebSocket handlers.
 type Handler struct {
-	Bus             *events.Bus
-	Registry        *runners.Registry
-	Store           store.Repository
-	Executor        lifecycle.RunExecutor
-	AdapterRegistry *adapters.Registry // nil if no agent adapters configured
-	AgentRegistry   *agents.Registry   // runtime agent instance registry
-	MessageQueue    *agents.Queue      // inter-agent message queue
-	Metrics         *metrics.EdgeMetrics
+	Bus                *events.Bus
+	Registry           *runners.Registry
+	Store              store.Repository
+	Executor           lifecycle.RunExecutor
+	AdapterRegistry    *adapters.Registry // nil if no agent adapters configured
+	AgentRegistry      *agents.Registry   // runtime agent instance registry
+	MessageQueue       *agents.Queue      // inter-agent message queue
+	Metrics            *metrics.EdgeMetrics
+	WorkspaceAllowlist []string // optional absolute/relative roots allowed for request workDir
 
 	PermissionRegistry *PermissionRegistry
 
@@ -76,6 +78,50 @@ func errorResponse(code, message string) map[string]any {
 			"traceId": genID("trace_"),
 		},
 	}
+}
+
+func normalizedRealPath(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	realPath, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Clean(realPath), nil
+}
+
+func isPathWithin(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel))
+}
+
+func (h *Handler) validateWorkDirAllowed(workDir string) error {
+	if workDir == "" || len(h.WorkspaceAllowlist) == 0 {
+		return nil
+	}
+	candidate, err := normalizedRealPath(workDir)
+	if err != nil {
+		return err
+	}
+	for _, root := range h.WorkspaceAllowlist {
+		root = strings.TrimSpace(root)
+		if root == "" {
+			continue
+		}
+		allowedRoot, err := normalizedRealPath(root)
+		if err != nil {
+			continue
+		}
+		if isPathWithin(allowedRoot, candidate) {
+			return nil
+		}
+	}
+	return fmt.Errorf("workDir is outside the Edge workspace allowlist")
 }
 
 func ensureStore(h *Handler) store.Repository {
@@ -508,6 +554,11 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	if _, ok := repository.GetProject(req.ProjectID); !ok {
 		h.runCreateMu.Unlock()
 		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project or thread not found"))
+		return
+	}
+	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
+		h.runCreateMu.Unlock()
+		writeJSON(w, http.StatusForbidden, errorResponse("workspace_not_allowed", err.Error()))
 		return
 	}
 	if active, ok := activeRunForThread(repository.ListRuns(req.ThreadID)); ok {

@@ -814,7 +814,7 @@ web.POST("/execution-targets", targetHandler.Create)
 web.GET("/execution-targets/:id", targetHandler.Get)
 web.PATCH("/execution-targets/:id", targetHandler.Update)
 web.DELETE("/execution-targets/:id", targetHandler.Delete)
-web.POST("/execution-targets/:id:ping", targetHandler.Ping)
+web.POST("/execution-targets/:id/ping", targetHandler.Ping)
 ```
 
 `Ping` 逻辑：
