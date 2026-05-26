@@ -40,3 +40,30 @@ type AgentRunEventInput struct {
 	Content     string          `json:"content,omitempty"`
 	ClientMsgID string          `json:"client_msg_id,omitempty"`
 }
+
+type AgentRunEventFilter struct {
+	EventType string `json:"event_type,omitempty"`
+	AfterSeq  int64  `json:"after_seq,omitempty"`
+	Limit     int    `json:"limit,omitempty"`
+}
+
+type AgentRunEventSummary struct {
+	TaskID           string         `json:"task_id"`
+	EdgeRunID        string         `json:"edge_run_id,omitempty"`
+	Status           string         `json:"status"`
+	TotalEvents      int            `json:"total_events"`
+	LastEventSeq     int64          `json:"last_event_seq"`
+	EventTypeCounts  map[string]int `json:"event_type_counts"`
+	ToolCallCount    int            `json:"tool_call_count"`
+	StepCount        int            `json:"step_count"`
+	ArtifactCount    int            `json:"artifact_count"`
+	ApprovalCount    int            `json:"approval_count"`
+	PendingApprovals int            `json:"pending_approvals"`
+	DecidedApprovals int            `json:"decided_approvals"`
+	InputTokens      int            `json:"input_tokens"`
+	OutputTokens     int            `json:"output_tokens"`
+	OutputBytes      int            `json:"output_bytes"`
+	StartedAt        *time.Time     `json:"started_at,omitempty"`
+	FinishedAt       *time.Time     `json:"finished_at,omitempty"`
+	ElapsedMs        int64          `json:"elapsed_ms,omitempty"`
+}

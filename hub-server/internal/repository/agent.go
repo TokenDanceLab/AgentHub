@@ -210,10 +210,22 @@ func CreateAgentRunEventWithNextSeq(db *gorm.DB, event *model.AgentRunEvent) err
 }
 
 func ListAgentRunEventsByTaskID(db *gorm.DB, taskID string) ([]model.AgentRunEvent, error) {
+	return ListAgentRunEventsByTaskIDFiltered(db, taskID, model.AgentRunEventFilter{})
+}
+
+func ListAgentRunEventsByTaskIDFiltered(db *gorm.DB, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error) {
 	var events []model.AgentRunEvent
-	err := db.Where("task_id = ?", taskID).
-		Order("event_seq ASC, created_at ASC, id ASC").
-		Find(&events).Error
+	query := db.Where("task_id = ?", taskID)
+	if filter.EventType != "" {
+		query = query.Where("event_type = ?", filter.EventType)
+	}
+	if filter.AfterSeq > 0 {
+		query = query.Where("event_seq > ?", filter.AfterSeq)
+	}
+	if filter.Limit > 0 {
+		query = query.Limit(filter.Limit)
+	}
+	err := query.Order("event_seq ASC, created_at ASC, id ASC").Find(&events).Error
 	return events, err
 }
 
