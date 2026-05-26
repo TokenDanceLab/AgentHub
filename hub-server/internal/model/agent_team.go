@@ -310,6 +310,8 @@ type TeamTaskState struct {
 	Status           string `json:"status"`
 	Objective        string `json:"objective"`
 	RunID            string `json:"run_id,omitempty"`
+	AgentTaskID      string `json:"agent_task_id,omitempty"`
+	EdgeRunID        string `json:"edge_run_id,omitempty"`
 	Attempt          int    `json:"attempt"`
 	RiskLevel        string `json:"risk_level"`
 }
@@ -323,6 +325,8 @@ type TeamAssignmentState struct {
 	Status       string `json:"status"`
 	Depth        int    `json:"depth"`
 	RunID        string `json:"run_id,omitempty"`
+	AgentTaskID  string `json:"agent_task_id,omitempty"`
+	EdgeRunID    string `json:"edge_run_id,omitempty"`
 }
 
 // TeamBudget tracks token/resource usage for a team run.

@@ -172,7 +172,7 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `team.route.rejected` | P1 | Supervisor route decision 被 guardrail 或 schema 校验拒绝，payload 包含 `decision` 和 `reason` |
 | `team.task.created` | P1 | TeamTask 已从 accepted route decision 创建 |
 | `assignment.created` | P1 | TeamAssignment 已创建 |
-| `assignment.dispatched` | P1 | TeamAssignment 已派发到目标 Agent |
+| `assignment.dispatched` | P1 | TeamAssignment 已派发到目标 Agent，payload 包含 `assignment_id`、`team_task_id` 和 Hub `agent_task_id` |
 | `assignment.completed` | P1 | TeamAssignment 完成 |
 | `assignment.failed` | P1 | TeamAssignment 失败 |
 | `assignment.cancelled` | P1 | TeamAssignment 取消 |
