@@ -203,6 +203,8 @@ const (
 	MaxRouteRepeats          = 3
 	MaxTasksPerTeamRun       = 20
 	DefaultAssignmentTimeout = 30 * time.Minute
+	MaxTeamRunBudgetTokens   = int64(200_000)
+	MaxTeamRunBudgetUsagePct = 95.0
 )
 
 // CoordinatorRouteDecision is the typed output a supervisor agent emits to
