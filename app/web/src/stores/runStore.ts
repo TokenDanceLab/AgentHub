@@ -1,6 +1,6 @@
 // Run UI store — client-only state for the active run session.
-// P0-1: Server data (outputText, toolCalls, changedFiles) removed —
-// those belong in TanStack Query or Hub message adapters, not this UI store.
+// P0-1: Server data (outputText, toolCalls, changedFiles) removed.
+// Web streaming output is sourced from Hub messages, not a browser Edge stream.
 // RunState and AgentLoopState are formal state machine types from @/utils/runStateMachine.
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
