@@ -162,6 +162,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 	{
 		web.POST("/agent-tasks", agentHandler.TriggerTask)
 		web.POST("/agent-tasks/:id/cancel", agentHandler.CancelTask)
+		web.GET("/agent-tasks/:id/events", agentHandler.TaskEvents)
 		web.GET("/custom-agents", customAgentHandler.List)
 		web.POST("/custom-agents", customAgentHandler.Create)
 		web.PUT("/custom-agents/:id", customAgentHandler.Update)

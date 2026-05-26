@@ -1,0 +1,162 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	"github.com/glebarez/sqlite"
+	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
+
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/ws"
+)
+
+func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+
+	ddl := []string{
+		`CREATE TABLE sessions (
+			id TEXT PRIMARY KEY,
+			type TEXT NOT NULL,
+			next_seq INTEGER NOT NULL DEFAULT 0,
+			last_message_at DATETIME,
+			dissolved BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at DATETIME
+		)`,
+		`CREATE TABLE agent_instances (
+			id TEXT PRIMARY KEY,
+			agent_type TEXT NOT NULL,
+			custom_agent_id TEXT,
+			session_id TEXT NOT NULL,
+			inviter_user_id TEXT NOT NULL,
+			workspace_id TEXT,
+			display_name TEXT NOT NULL,
+			created_at DATETIME
+		)`,
+		`CREATE TABLE pending_agent_tasks (
+			id TEXT PRIMARY KEY,
+			agent_instance_id TEXT NOT NULL,
+			triggered_by_user_id TEXT NOT NULL,
+			trigger_message_id TEXT NOT NULL,
+			status TEXT NOT NULL,
+			edge_run_id TEXT,
+			edge_device_id TEXT,
+			error_message TEXT,
+			created_at DATETIME,
+			dispatched_at DATETIME,
+			finished_at DATETIME,
+			expire_at DATETIME NOT NULL
+		)`,
+		`CREATE TABLE messages (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			seq_id INTEGER NOT NULL,
+			client_msg_id TEXT NOT NULL,
+			sender_type TEXT NOT NULL,
+			sender_id TEXT NOT NULL,
+			content_type TEXT NOT NULL,
+			content TEXT NOT NULL,
+			reply_to_message_id TEXT,
+			recalled BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at DATETIME
+		)`,
+		`CREATE UNIQUE INDEX idx_messages_session_client_msg ON messages (session_id, client_msg_id)`,
+		`CREATE TABLE agent_run_events (
+			id TEXT PRIMARY KEY,
+			task_id TEXT NOT NULL,
+			edge_run_id TEXT,
+			session_id TEXT NOT NULL,
+			agent_instance_id TEXT NOT NULL,
+			event_seq INTEGER NOT NULL,
+			event_type TEXT NOT NULL,
+			payload TEXT NOT NULL,
+			created_at DATETIME
+		)`,
+	}
+	for _, stmt := range ddl {
+		require.NoError(t, db.Exec(stmt).Error)
+	}
+
+	now := time.Now()
+	require.NoError(t, db.Exec(
+		`INSERT INTO sessions (id, type, next_seq, dissolved, created_at) VALUES (?, ?, ?, ?, ?)`,
+		"sess-1", "group", 0, false, now,
+	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO agent_instances (id, agent_type, session_id, inviter_user_id, display_name, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"agent-1", "codex", "sess-1", "user-1", "Codex", now,
+	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, edge_run_id, edge_device_id, created_at, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"task-1", "agent-1", "user-1", "msg-1", model.TaskStatusRunning, "run-1", "dev-1", now, now.Add(time.Hour),
+	).Error)
+
+	return db
+}
+
+func TestHandleTaskStreamPersistsTypedRunEventAndProjection(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	bus := newTestBus(t)
+	agentStream := make(chan *model.AgentRunEvent, 1)
+	bus.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event Event) {
+		if payload, ok := event.Payload.(*model.AgentRunEvent); ok {
+			agentStream <- payload
+		}
+	})
+
+	svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
+	payload := json.RawMessage(`{"type":"run.agent.tool_call","callId":"call-1","toolName":"read_file"}`)
+	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
+		EventType:   "run.agent.tool_call",
+		Payload:     payload,
+		ClientMsgID: "11111111-1111-4111-8111-111111111111",
+	})
+	require.NoError(t, err)
+
+	var persisted model.AgentRunEvent
+	require.NoError(t, db.Where("task_id = ?", "task-1").First(&persisted).Error)
+	require.Equal(t, int64(1), persisted.EventSeq)
+	require.Equal(t, "run.agent.tool_call", persisted.EventType)
+	require.JSONEq(t, string(payload), persisted.Payload)
+
+	var projected model.Message
+	require.NoError(t, db.Where("session_id = ? AND client_msg_id = ?", "sess-1", "11111111-1111-4111-8111-111111111111").First(&projected).Error)
+	require.Equal(t, model.ContentTypeText, projected.ContentType)
+	require.JSONEq(t, string(payload), projected.Content)
+
+	select {
+	case event := <-agentStream:
+		require.Equal(t, persisted.TaskID, event.TaskID)
+		require.Equal(t, persisted.EventType, event.EventType)
+	case <-time.After(time.Second):
+		t.Fatal("agent.stream event was not published")
+	}
+}
+
+func TestListTaskRunEventsIsOwnerScoped(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	require.NoError(t, db.Create(&model.AgentRunEvent{
+		TaskID:          "task-1",
+		EdgeRunID:       "run-1",
+		SessionID:       "sess-1",
+		AgentInstanceID: "agent-1",
+		EventSeq:        1,
+		EventType:       model.RunEventTypeOutputBatch,
+		Payload:         `{"content":"hello"}`,
+	}).Error)
+
+	svc := &AgentService{db: db}
+	events, err := svc.ListTaskRunEvents(context.Background(), "user-1", "task-1")
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.Equal(t, model.RunEventTypeOutputBatch, events[0].EventType)
+
+	_, err = svc.ListTaskRunEvents(context.Background(), "other-user", "task-1")
+	require.ErrorIs(t, err, errcode.AgentTaskNotFound)
+}

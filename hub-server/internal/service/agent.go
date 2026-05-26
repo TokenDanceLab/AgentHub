@@ -445,8 +445,9 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDevice
 	return nil
 }
 
-// HandleTaskStream inserts an agent message into the session (streaming chunk).
-func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, payload, clientMsgID string) error {
+// HandleTaskStream records a typed runtime event and keeps the existing
+// message.new projection for current Web/Desktop chat consumers.
+func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -463,9 +464,14 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 		return err
 	}
 
+	eventType, eventPayload, messageContent, err := normalizeRunEventInput(stream)
+	if err != nil {
+		return err
+	}
+
 	// #130: idempotent stream-to-message — skip if a message with this client_msg_id already exists
-	if clientMsgID != "" {
-		existing, _ := repository.GetMessageByClientMsgID(s.db, ai.SessionID, clientMsgID)
+	if stream.ClientMsgID != "" {
+		existing, _ := repository.GetMessageByClientMsgID(s.db, ai.SessionID, stream.ClientMsgID)
 		if existing != nil {
 			return nil // already persisted, idempotent
 		}
@@ -479,17 +485,26 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 	// #132: bump expire_at to keep running task alive while activity continues
 	_ = repository.BumpRunningTaskExpireAt(s.db, taskID, config.RunningTaskHeartbeatTTL)
 
+	runEvent := &model.AgentRunEvent{
+		TaskID:          taskID,
+		EdgeRunID:       firstNonEmpty(edgeRunID, task.EdgeRunID),
+		SessionID:       ai.SessionID,
+		AgentInstanceID: task.AgentInstanceID,
+		EventType:       eventType,
+		Payload:         eventPayload,
+	}
+
 	msg := &model.Message{
 		SessionID:   "", // will be set from agent instance
 		SenderType:  model.SenderTypeAgent,
 		SenderID:    task.AgentInstanceID,
 		ClientMsgID: uuidv7.Must(),
 		ContentType: model.ContentTypeText,
-		Content:     payload,
+		Content:     messageContent,
 	}
 	// #130: use caller-provided client_msg_id when available for dedup
-	if clientMsgID != "" {
-		msg.ClientMsgID = clientMsgID
+	if stream.ClientMsgID != "" {
+		msg.ClientMsgID = stream.ClientMsgID
 	}
 	msg.SessionID = ai.SessionID
 
@@ -500,6 +515,9 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 	msg.SeqID = seq
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if err := repository.CreateAgentRunEventWithNextSeq(tx, runEvent); err != nil {
+			return err
+		}
 		return repository.InsertMessage(tx, msg)
 	})
 	if err != nil {
@@ -510,8 +528,93 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 	_ = repository.TouchSessionLastMessage(s.db, ai.SessionID)
 
 	s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
+	s.bus.Publish(ctx, Event{Type: ws.TypeAgentStream, Payload: runEvent})
 
 	return nil
+}
+
+func (s *AgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string) ([]model.AgentRunEvent, error) {
+	task, err := repository.GetPendingTaskByID(s.db, taskID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentTaskNotFound
+		}
+		return nil, err
+	}
+	if task.TriggeredByUserID != userID {
+		return nil, errcode.AgentTaskNotFound
+	}
+	return repository.ListAgentRunEventsByTaskID(s.db, taskID)
+}
+
+func normalizeRunEventInput(stream model.AgentRunEventInput) (eventType, payload, messageContent string, err error) {
+	eventType = strings.TrimSpace(stream.EventType)
+	content := strings.TrimSpace(stream.Content)
+
+	if len(stream.Payload) > 0 {
+		if !json.Valid(stream.Payload) {
+			return "", "", "", errcode.ErrBadRequest
+		}
+		payload = string(stream.Payload)
+	} else if content != "" {
+		if json.Valid([]byte(content)) {
+			payload = content
+		} else {
+			wrapped, marshalErr := json.Marshal(map[string]string{"content": stream.Content})
+			if marshalErr != nil {
+				return "", "", "", marshalErr
+			}
+			payload = string(wrapped)
+		}
+	} else {
+		return "", "", "", errcode.ErrBadRequest
+	}
+
+	if eventType == "" {
+		eventType = inferRunEventType(payload)
+	}
+	if eventType == "" {
+		eventType = model.RunEventTypeOutputBatch
+	}
+
+	messageContent = content
+	if messageContent == "" {
+		messageContent = payload
+	}
+	if !json.Valid([]byte(messageContent)) {
+		wrapped, marshalErr := json.Marshal(map[string]string{"content": messageContent})
+		if marshalErr != nil {
+			return "", "", "", marshalErr
+		}
+		messageContent = string(wrapped)
+	}
+
+	return eventType, payload, messageContent, nil
+}
+
+func inferRunEventType(payload string) string {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(payload), &fields); err != nil {
+		return ""
+	}
+	for _, key := range []string{"event_type", "type"} {
+		if raw, ok := fields[key]; ok {
+			var value string
+			if err := json.Unmarshal(raw, &value); err == nil {
+				return strings.TrimSpace(value)
+			}
+		}
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // HandleTaskDone marks a task as done and inserts the final content as a message.

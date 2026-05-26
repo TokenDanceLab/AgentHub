@@ -15,7 +15,7 @@ set -euo pipefail
 TOKENDANCE_URL="${1:-http://localhost:3000}"
 CLIENT_NAME="AgentHub Desktop"
 CLIENT_ID="agenthub-desktop"
-REDIRECT_URIS='["http://127.0.0.1:PORT_IDX/callback","agenthub://callback"]'
+REDIRECT_URIS='["http://127.0.0.1/callback","http://localhost:5174/auth/tokendance/callback"]'
 GRANT_TYPES='["authorization_code"]'
 SCOPES='["openid","profile","email"]'
 
@@ -81,6 +81,7 @@ echo ""
 echo "AGENTHUB_TOKENDANCE_ID_ISSUER_URL=$TOKENDANCE_URL"
 echo "AGENTHUB_TOKENDANCE_ID_CLIENT_ID=$CLIENT_ID"
 echo "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=$SECRET"
-echo "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=http://127.0.0.1:PORT_IDX/callback"
+echo "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=http://127.0.0.1/callback"
+echo "AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS=http://127.0.0.1/callback,http://localhost:5174/auth/tokendance/callback"
 echo ""
 echo "Done. Keep the client_secret safe — it will never be shown again."
