@@ -1,0 +1,122 @@
+/* ThreadPanel — inline items within sidebar (no outer panel) */
+
+/* ── Hidden: App sidebar provides search + header ─ */
+.sidebar, .header, .title, .createBtn, .search, .actionError { display: none; }
+
+/* ── List ──────────────────────────────────── */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Item ──────────────────────────────────── */
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.item:hover { background: rgba(255, 255, 255, 0.045); }
+
+.selected {
+  background: rgba(255, 255, 255, 0.065);
+  color: var(--foreground);
+  box-shadow: inset 2px 0 0 color-mix(in oklch, var(--primary) 74%, var(--foreground));
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.itemRow .item { flex: 1; min-width: 0; }
+
+/* ── Info ──────────────────────────────────── */
+.itemInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.name {
+  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  font-size: 11px;
+  color: #B0B0B5;
+}
+
+/* ── Unread dot ────────────────────────────── */
+.unreadDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+}
+
+/* ── Actions ───────────────────────────────── */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.itemRow:hover .actions { opacity: 1; }
+
+.actionBtn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #8E8E93;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.1s;
+}
+.actionBtn:hover { background: rgba(255, 255, 255, 0.06); color: var(--foreground); }
+
+.editRow, .confirmRow { display: flex; align-items: center; gap: 6px; padding: 4px 12px; }
+.editInput {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 8px;
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+  outline: none;
+}
+
+.empty {
+  padding: 8px 12px;
+  color: #B0B0B5;
+  font-size: 11px;
+  text-align: center;
+}

@@ -1,47 +1,63 @@
 package middleware
 
 import (
+	"net/http"
+	"os"
 	"strings"
+	"sync"
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/gin-gonic/gin"
 )
 
-// AuthMiddleware returns a Gin middleware that validates JWT bearer tokens.
-// It supports dual-mode authentication:
-// 1. TokenDance ID RS256 JWT (if configured) — primary, validated via JWKS
-// 2. Local HS256 JWT — fallback for legacy Hub-issued tokens
+// AuthMiddleware returns a Gin middleware that validates JWT bearer tokens and
+// classifies the auth source.
+// It supports dual-mode identity parsing:
+// 1. TokenDance ID RS256 JWT (if configured) — identity compatibility only
+// 2. Local HS256 JWT — Hub-issued product session
 //
 // User identity (user_id, device_type, device_id) is injected into the Gin context.
+// Product APIs must add RequireHubSession after this middleware.
 func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" || !strings.HasPrefix(header, "Bearer ") {
-			handler.Fail(c, errcode.AuthInvalidToken)
+			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
 		}
 		tokenStr := strings.TrimPrefix(header, "Bearer ")
+		validateToken(c, cfg, tokenStr)
+	}
+}
 
-		// Try TokenDance ID RS256 JWT first (if TokenDance ID is configured).
-		if cfg.TokenDanceID.IssuerURL != "" && cfg.TokenDanceID.ClientID != "" {
-			if claims, err := jwtutil.ParseTokenDanceJWT(tokenStr, cfg.TokenDanceID.IssuerURL, cfg.TokenDanceID.ClientID); err == nil {
-				c.Set("user_id", claims.Subject)
-				c.Set("device_type", "tokendance_bearer")
-				c.Set("device_id", "")
-				c.Set("auth_source", "tokendance_id")
-				c.Next()
-				return
-			}
+// WSAuthMiddleware returns a Gin middleware that validates JWT tokens for
+// WebSocket upgrade requests. It checks the Authorization header first (for
+// native clients), then falls back to the "access_token" query parameter
+// (for browser WebSocket clients which cannot set custom headers).
+func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var tokenStr string
+		header := c.GetHeader("Authorization")
+		if header != "" && strings.HasPrefix(header, "Bearer ") {
+			tokenStr = strings.TrimPrefix(header, "Bearer ")
+		} else {
+			tokenStr = c.Query("access_token")
+		}
+		if tokenStr == "" {
+			fail(c, errcode.AuthInvalidToken)
+			c.Abort()
+			return
 		}
 
-		// Fallback to local HS256 JWT.
+		// WebSocket sessions must be Hub-issued sessions. TokenDance ID bearer
+		// tokens prove identity only and must not bypass the Hub session/device
+		// handshake by authenticating at the upgrade middleware layer.
 		claims, err := jwtutil.ParseToken(tokenStr, cfg.JWT.Secret)
 		if err != nil {
-			handler.Fail(c, errcode.AuthInvalidToken)
+			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
 		}
@@ -51,4 +67,120 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		c.Set("auth_source", "hub_local")
 		c.Next()
 	}
+}
+
+// validateToken is a shared helper that validates a JWT token string and sets
+// Gin context values. Used by both AuthMiddleware and WSAuthMiddleware.
+func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
+	// Try TokenDance ID RS256 JWT first (if TokenDance ID is configured).
+	if cfg.TokenDanceID.IssuerURL != "" && cfg.TokenDanceID.ClientID != "" {
+		if claims, err := jwtutil.ParseTokenDanceJWT(tokenStr, cfg.TokenDanceID.IssuerURL, cfg.TokenDanceID.ClientID); err == nil {
+			c.Set("user_id", claims.Subject)
+			c.Set("device_type", "tokendance_bearer")
+			c.Set("device_id", "")
+			c.Set("auth_source", "tokendance_id")
+			c.Next()
+			return
+		}
+	}
+
+	// Fallback to local HS256 JWT.
+	claims, err := jwtutil.ParseToken(tokenStr, cfg.JWT.Secret)
+	if err != nil {
+		fail(c, errcode.AuthInvalidToken)
+		c.Abort()
+		return
+	}
+	c.Set("user_id", claims.UserID)
+	c.Set("device_type", claims.DeviceType)
+	c.Set("device_id", claims.DeviceID)
+	c.Set("auth_source", "hub_local")
+	c.Next()
+}
+
+// RequireHubSession is a middleware that requires a Hub-issued local session.
+// TokenDance ID bearer tokens prove identity only; they must not authorize Hub
+// product APIs, device routing, Web task dispatch, or user-local resources.
+func RequireHubSession() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.GetString("auth_source") != "hub_local" {
+			fail(c, &errcode.Error{
+				Code:       "FORBIDDEN",
+				Message:    "Hub-issued session is required for this API",
+				HTTPStatus: http.StatusForbidden,
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// RequireLocalAuth is kept for existing call sites. Local Hub auth and Hub
+// session are the same boundary after TokenDance ID OIDC exchange.
+func RequireLocalAuth() gin.HandlerFunc {
+	return RequireHubSession()
+}
+
+// RequireAdmin is a middleware that restricts access to admin users.
+// Admin user IDs are read from the comma-separated AGENTHUB_ADMIN_USERS
+// environment variable. If the variable is empty, all requests are denied
+// (fail-closed) to prevent accidental open access.
+//
+// This middleware MUST be applied after AuthMiddleware, which populates the
+// "user_id" context value.
+func RequireAdmin() gin.HandlerFunc {
+	adminUsers := getAdminUsers()
+	return func(c *gin.Context) {
+		userID := c.GetString("user_id")
+		if userID == "" {
+			fail(c, errcode.AuthInvalidToken)
+			c.Abort()
+			return
+		}
+		if len(adminUsers) == 0 {
+			fail(c, &errcode.Error{
+				Code:       "FORBIDDEN",
+				Message:    "admin access not configured — set AGENTHUB_ADMIN_USERS",
+				HTTPStatus: http.StatusForbidden,
+			})
+			c.Abort()
+			return
+		}
+		for _, admin := range adminUsers {
+			if admin == userID {
+				c.Next()
+				return
+			}
+		}
+		fail(c, &errcode.Error{
+			Code:       "FORBIDDEN",
+			Message:    "admin access required",
+			HTTPStatus: http.StatusForbidden,
+		})
+		c.Abort()
+	}
+}
+
+// getAdminUsers reads and caches the AGENTHUB_ADMIN_USERS env var.
+var (
+	adminUsersOnce sync.Once
+	adminUsersList []string
+)
+
+func getAdminUsers() []string {
+	adminUsersOnce.Do(func() {
+		s := os.Getenv("AGENTHUB_ADMIN_USERS")
+		if s == "" {
+			return
+		}
+		parts := strings.Split(s, ",")
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				adminUsersList = append(adminUsersList, p)
+			}
+		}
+	})
+	return adminUsersList
 }

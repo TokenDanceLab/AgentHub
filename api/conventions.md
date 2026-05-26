@@ -141,7 +141,7 @@ P0 本地模式可以先把权限实现成单用户，但文档中的权限边�
 
 ```text
 阶段：P0 / P1 / P2 / P3 / P4
-归属：Hub / Edge / Runner
+归属：Hub / Edge（Runtime adapter 属于 Edge；Runner 只保留为兼容命名）
 权限：local / user / project.member / ...
 事件：会触发哪些 WebSocket event
 ```

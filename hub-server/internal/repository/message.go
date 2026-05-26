@@ -9,6 +9,8 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
+var ErrPinLimitExceeded = errors.New("pin limit exceeded for session")
+
 func InsertMessage(db *gorm.DB, msg *model.Message) error {
 	return db.Create(msg).Error
 }
@@ -74,6 +76,33 @@ func InsertPin(db *gorm.DB, pin *model.MessagePin) error {
 	return db.Create(pin).Error
 }
 
+// PinMessageAtomic inserts a pin within a transaction that locks the session row
+// to serialize concurrent pin operations and atomically checks the per-session limit.
+func PinMessageAtomic(db *gorm.DB, pin *model.MessagePin, maxPins int64) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Lock the session row to serialize concurrent pin operations.
+		// PostgreSQL uses FOR UPDATE; SQLite (tests) skips row locking.
+		if tx.Dialector.Name() == "postgres" {
+			var sessionID string
+			if err := tx.Raw("SELECT id FROM sessions WHERE id = ? FOR UPDATE", pin.SessionID).Scan(&sessionID).Error; err != nil {
+				return err
+			}
+			if sessionID == "" {
+				return gorm.ErrRecordNotFound
+			}
+		}
+
+		var count int64
+		if err := tx.Model(&model.MessagePin{}).Where("session_id = ?", pin.SessionID).Count(&count).Error; err != nil {
+			return err
+		}
+		if count >= maxPins {
+			return ErrPinLimitExceeded
+		}
+		return tx.Create(pin).Error
+	})
+}
+
 func DeletePin(db *gorm.DB, sessionID, messageID string) error {
 	return db.Delete(&model.MessagePin{}, "session_id = ? AND message_id = ?", sessionID, messageID).Error
 }
@@ -120,16 +149,30 @@ func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]
 	return msgs, err
 }
 
-func SearchAllMessages(db *gorm.DB, userID, q string) ([]model.Message, error) {
+func SearchAllMessages(db *gorm.DB, userID, q, contentType, from, to string) ([]model.Message, error) {
 	var msgs []model.Message
-	err := db.Raw(`
-		SELECT m.* FROM messages m
+	sql := `SELECT m.* FROM messages m
 		INNER JOIN session_members sm ON m.session_id = sm.session_id
 		WHERE sm.member_type = ? AND sm.member_id = ? AND sm.left_at IS NULL
 			AND m.recalled = false
-			AND m.content->>'text' ILIKE ?
-		ORDER BY m.created_at DESC
-		LIMIT ?
-	`, "user", userID, "%"+q+"%", config.MaxMessagePageLimit).Scan(&msgs).Error
+			AND m.content->>'text' ILIKE ?`
+	args := []interface{}{"user", userID, "%" + q + "%"}
+
+	if contentType != "" {
+		sql += " AND m.content_type = ?"
+		args = append(args, contentType)
+	}
+	if from != "" {
+		sql += " AND m.created_at >= ?"
+		args = append(args, from)
+	}
+	if to != "" {
+		sql += " AND m.created_at <= ?"
+		args = append(args, to)
+	}
+	sql += " ORDER BY m.created_at DESC LIMIT ?"
+	args = append(args, config.MaxMessagePageLimit)
+
+	err := db.Raw(sql, args...).Scan(&msgs).Error
 	return msgs, err
 }

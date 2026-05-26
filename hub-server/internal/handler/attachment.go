@@ -24,6 +24,10 @@ type AttachmentService interface {
 	SaveAttachment(ctx context.Context, uploaderID, hash, mimeType, originalName string, size int64) (*model.Attachment, error)
 	GetAttachmentByID(ctx context.Context, userID, id string) (*model.Attachment, error)
 	MaxUploadSize() int64
+	StoreBlob(ctx context.Context, hash string, r io.Reader, contentType string) (bool, error)
+	GetBlob(ctx context.Context, hash string) (io.ReadCloser, error)
+	DeleteBlob(ctx context.Context, hash string) error
+	BlobLocalPath(hash string) string
 }
 
 type AttachmentHandler struct {
@@ -95,7 +99,6 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
-	filePath := filepath.Join(absDir, hash)
 
 	tmpFile, err := os.CreateTemp(absDir, "."+hash+".*.tmp")
 	if err != nil {
@@ -124,17 +127,24 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	createdBlob, err := commitAttachmentBlob(tmpPath, filePath)
+	// MIME sniff from the temp file before committing to storage.
+	mimeType, err := sniffAttachmentMimeType(tmpPath)
 	if err != nil {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
 
-	mimeType, err := sniffAttachmentMimeType(tmpPath)
+	// Commit the blob to object storage (local or S3).
+	// Re-open the temp file for reading.
+	src, err := os.Open(tmpPath)
 	if err != nil {
-		if createdBlob {
-			_ = os.Remove(filePath)
-		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	defer src.Close()
+
+	createdBlob, err := h.service.StoreBlob(c.Request.Context(), hash, src, mimeType)
+	if err != nil {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
@@ -142,7 +152,7 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 	a, err := h.service.SaveAttachment(c.Request.Context(), userID, hash, mimeType, originalName, written)
 	if err != nil {
 		if createdBlob {
-			_ = os.Remove(filePath)
+			_ = h.service.DeleteBlob(c.Request.Context(), hash)
 		}
 		Fail(c, errcode.ErrInternal)
 		return
@@ -165,60 +175,29 @@ func (h *AttachmentHandler) Download(c *gin.Context) {
 		return
 	}
 
-	relPath := service.PathFromHash(a.Hash)
-	if relPath == "" {
-		Fail(c, errcode.AttachNotFound)
-		return
-	}
-	absPath := filepath.Join(".", relPath, a.Hash)
-	if _, err := os.Stat(absPath); os.IsNotExist(err) {
-		Fail(c, errcode.AttachNotFound)
-		return
-	}
-
-	c.Header("Content-Type", safeAttachmentContentType(a.MimeType))
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Content-Disposition", formatAttachmentDisposition(a.OriginalName))
-	c.File(absPath)
-}
 
-func commitAttachmentBlob(tmpPath, filePath string) (bool, error) {
-	dst, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
-	if err != nil {
-		if os.IsExist(err) {
-			return false, nil
+	// Fast path: local storage — serve the file directly.
+	if localPath := h.service.BlobLocalPath(a.Hash); localPath != "" {
+		if _, err := os.Stat(localPath); os.IsNotExist(err) {
+			Fail(c, errcode.AttachNotFound)
+			return
 		}
-		return false, err
+		c.Header("Content-Type", safeAttachmentContentType(a.MimeType))
+		c.File(localPath)
+		return
 	}
 
-	keepDestination := false
-	defer func() {
-		if !keepDestination {
-			_ = os.Remove(filePath)
-		}
-	}()
-
-	src, err := os.Open(tmpPath)
+	// Remote storage: stream from S3.
+	reader, err := h.service.GetBlob(c.Request.Context(), a.Hash)
 	if err != nil {
-		_ = dst.Close()
-		return true, err
+		Fail(c, errcode.AttachNotFound)
+		return
 	}
+	defer reader.Close()
 
-	_, copyErr := io.Copy(dst, src)
-	closeSrcErr := src.Close()
-	closeDstErr := dst.Close()
-	if copyErr != nil {
-		return true, copyErr
-	}
-	if closeSrcErr != nil {
-		return true, closeSrcErr
-	}
-	if closeDstErr != nil {
-		return true, closeDstErr
-	}
-
-	keepDestination = true
-	return true, nil
+	c.DataFromReader(http.StatusOK, a.Size, safeAttachmentContentType(a.MimeType), reader, nil)
 }
 
 func sniffAttachmentMimeType(filePath string) (string, error) {

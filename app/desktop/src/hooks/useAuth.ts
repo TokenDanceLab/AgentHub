@@ -1,7 +1,7 @@
 // React hook wrapping createHubAuth() for use in components.
-// Provides reactive auth state (login/register/logout/autoLogin) backed by JWT tokens.
+// Provides reactive auth state (TokenDance ID login/logout/autoLogin) backed by JWT tokens.
 
-import { useSyncExternalStore, useCallback, useMemo } from 'react';
+import { useSyncExternalStore, useCallback } from 'react';
 import { createHubAuth } from '@/api/hubAuth';
 import type { HubAuthState } from '@/api/hubAuth';
 
@@ -20,46 +20,23 @@ export function useAuth() {
     auth.getState,
   );
 
-  const login = useCallback(
-    async (username: string, password: string) => {
-      await auth.login(username, password);
-    },
-    [],
-  );
-
-  const logout = useCallback(async () => {
-    await auth.logout();
-  }, []);
-
   const loginWithTokenDance = useCallback(async () => {
     await auth.loginWithTokenDance();
   }, []);
 
-  const continueLocalMode = useCallback(() => {
-    auth.continueLocalMode();
+  const logout = useCallback(async () => {
+    await auth.logout();
   }, []);
 
   const tryAutoLogin = useCallback(async () => {
     return auth.tryAutoLogin();
   }, []);
 
-  return useMemo(
-    () => ({ ...state, login, loginWithTokenDance, continueLocalMode, logout, tryAutoLogin }),
-    [
-      state.token,
-      state.refreshToken,
-      state.isAuthenticated,
-      state.user,
-      state.authStatus,
-      state.cloudLockedReason,
-      state.tokenSource,
-      login,
-      loginWithTokenDance,
-      continueLocalMode,
-      logout,
-      tryAutoLogin,
-    ],
-  );
+  return { ...state, loginWithTokenDance, logout, tryAutoLogin } as HubAuthState & {
+    loginWithTokenDance: () => Promise<void>;
+    logout: () => Promise<void>;
+    tryAutoLogin: () => Promise<boolean>;
+  };
 }
 
 export function getAccessToken(): string | null {

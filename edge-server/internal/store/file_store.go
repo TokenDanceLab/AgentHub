@@ -40,6 +40,10 @@ func NewFile(path string) (*FileStore, error) {
 		return nil, errors.New("store file path is required")
 	}
 
+	if err := ensureFileSnapshotDirectory(path); err != nil {
+		return nil, fmt.Errorf("verify store snapshot write: %w", err)
+	}
+
 	s := New()
 	if err := loadFileSnapshot(path, s); err != nil {
 		return nil, err
@@ -132,6 +136,7 @@ func (f *FileStore) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 func (f *FileStore) SetRunStatus(id, status string) (Run, bool) {
 	run, ok := f.store.SetRunStatus(id, status)
 	if ok {
+		// Persist error is surfaced via LastPersistError() for callers.
 		_ = f.persist()
 	}
 	return run, ok
@@ -140,6 +145,7 @@ func (f *FileStore) SetRunStatus(id, status string) (Run, bool) {
 func (f *FileStore) SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool) {
 	run, ok := f.store.SetRunStatusIf(id, status, allowedCurrent...)
 	if ok {
+		// Persist error is surfaced via LastPersistError() for callers.
 		_ = f.persist()
 	}
 	return run, ok
@@ -184,6 +190,21 @@ func (f *FileStore) persist() error {
 	return err
 }
 
+func ensureFileSnapshotDirectory(path string) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create store snapshot directory: %w", err)
+	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		return fmt.Errorf("stat store snapshot directory: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("create store snapshot directory: %s is not a directory", dir)
+	}
+	return nil
+}
+
 func loadFileSnapshot(path string, s *Store) error {
 	content, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -209,10 +230,10 @@ func loadFileSnapshot(path string, s *Store) error {
 }
 
 func saveFileSnapshot(path string, snapshot fileSnapshot) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create store snapshot directory: %w", err)
+	if err := ensureFileSnapshotDirectory(path); err != nil {
+		return err
 	}
+	dir := filepath.Dir(path)
 
 	temp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
 	if err != nil {

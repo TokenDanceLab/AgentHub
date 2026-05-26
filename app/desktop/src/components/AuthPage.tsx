@@ -4,22 +4,17 @@ import { X, ChevronDown } from 'lucide-react';
 import type { UserProfile } from '@/api/hubClient';
 import { HUB_URL } from '@/config';
 import LoginForm from '@/components/LoginForm';
-import RegisterForm from '@/components/RegisterForm';
 import styles from './AuthPage.module.css';
 
-type Page = 'login' | 'register';
 type HubStatus = 'connected' | 'disconnected' | 'checking';
 
 interface Props {
   onLoginSuccess: (user: UserProfile) => void;
   onClose?: () => void;
-  onContinueLocal?: () => void;
-  startup?: boolean;
 }
 
-export default function AuthPage({ onLoginSuccess, onClose, onContinueLocal, startup = false }: Props) {
+export default function AuthPage({ onLoginSuccess, onClose }: Props) {
   const { t } = useTranslation();
-  const [page, setPage] = useState<Page>('login');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [hubUrl, setHubUrl] = useState(() => {
     try {
@@ -69,10 +64,6 @@ export default function AuthPage({ onLoginSuccess, onClose, onContinueLocal, sta
     [onLoginSuccess],
   );
 
-  const handleRegisterSuccess = useCallback(() => {
-    setPage('login');
-  }, []);
-
   const hubDotClass = [
     styles.hubStatusDot,
     hubStatus === 'connected'
@@ -85,8 +76,8 @@ export default function AuthPage({ onLoginSuccess, onClose, onContinueLocal, sta
   return (
     <div className={styles.page}>
       {/* Close button */}
-      {onClose && !startup && (
-        <button className={styles.closeBtn} onClick={onClose} title={t('auth.close')}>
+      {onClose && (
+        <button className={styles.closeBtn} onClick={onClose} title="关闭">
           <X size={16} />
         </button>
       )}
@@ -97,36 +88,10 @@ export default function AuthPage({ onLoginSuccess, onClose, onContinueLocal, sta
           AH
         </div>
         <h1 className={styles.appName}>{t('auth.title')}</h1>
-        <p className={styles.tagline}>{startup ? t('auth.startupTagline') : t('auth.tagline')}</p>
+        <p className={styles.tagline}>{t('auth.tagline')}</p>
       </div>
 
-      {page === 'login' ? (
-        <LoginForm
-          onSuccess={handleLoginSuccess}
-          onSwitchToRegister={() => setPage('register')}
-        />
-      ) : (
-        <RegisterForm
-          onSuccess={handleRegisterSuccess}
-          onSwitchToLogin={() => setPage('login')}
-        />
-      )}
-
-      {startup && (
-        <div className={styles.localModePanel}>
-          <div>
-            <strong>{t('auth.localModeTitle')}</strong>
-            <p>{t('auth.localModeDesc')}</p>
-          </div>
-          <button
-            type="button"
-            className={styles.localModeButton}
-            onClick={onContinueLocal}
-          >
-            {t('auth.continueLocal')}
-          </button>
-        </div>
-      )}
+      <LoginForm onSuccess={handleLoginSuccess} />
 
       {/* Collapsible advanced settings */}
       <button
@@ -137,7 +102,7 @@ export default function AuthPage({ onLoginSuccess, onClose, onContinueLocal, sta
         <span className={`${styles.advancedToggleIcon} ${showAdvanced ? styles.advancedToggleIconOpen : ''}`}>
           <ChevronDown size={14} />
         </span>
-        {t('auth.advancedSettings')}
+        高级设置
       </button>
 
       {showAdvanced && (

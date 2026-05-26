@@ -222,10 +222,10 @@ func TestHandleControlRequestInvalidJSON(t *testing.T) {
 
 func TestHandleCanUseToolSilentAutoApprove(t *testing.T) {
 	inner, _ := json.Marshal(ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "Bash",
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
 		ToolUseID: "tooluse-1",
-		Input:    map[string]any{"command": "ls"},
+		Input:     map[string]any{"command": "ls"},
 	})
 	msg := ControlMessage{
 		Type:      "control_request",
@@ -269,10 +269,10 @@ func TestHandleCanUseToolSilentAutoApprove(t *testing.T) {
 func TestHandleCanUseToolWithEmitter(t *testing.T) {
 	emitter := &mockEventEmitter{}
 	inner, _ := json.Marshal(ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "WebFetch",
+		Subtype:   "can_use_tool",
+		ToolName:  "WebFetch",
 		ToolUseID: "tooluse-2",
-		Input:    map[string]any{"url": "https://example.com"},
+		Input:     map[string]any{"url": "https://example.com"},
 	})
 	msg := ControlMessage{
 		Type:      "control_request",
@@ -420,10 +420,10 @@ func TestHandleCanUseToolVariousTools(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.toolName, func(t *testing.T) {
 			inner, _ := json.Marshal(ControlRequestInner{
-				Subtype:  "can_use_tool",
-				ToolName: tt.toolName,
+				Subtype:   "can_use_tool",
+				ToolName:  tt.toolName,
 				ToolUseID: "tu-" + tt.toolName,
-				Input:    tt.input,
+				Input:     tt.input,
 			})
 			msg := ControlMessage{
 				Type:      "control_request",
@@ -494,8 +494,8 @@ func TestWriteStopTaskWriteError(t *testing.T) {
 
 func TestHandleCanUseToolWriteError(t *testing.T) {
 	inner, _ := json.Marshal(ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "Bash",
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
 		ToolUseID: "tu-err",
 	})
 	msg := ControlMessage{
@@ -513,8 +513,8 @@ func TestHandleCanUseToolWriteError(t *testing.T) {
 func TestHandleCanUseToolEventsOrdered(t *testing.T) {
 	emitter := &mockEventEmitter{}
 	inner, _ := json.Marshal(ControlRequestInner{
-		Subtype:  "can_use_tool",
-		ToolName: "Bash",
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
 		ToolUseID: "tu-ordered",
 	})
 
@@ -535,5 +535,168 @@ func TestHandleCanUseToolEventsOrdered(t *testing.T) {
 	}
 	if events[1].eventType != "run.agent.permission_decided" {
 		t.Fatal("second event must be permission_decided")
+	}
+}
+
+// TestPermissionDeciderCallback verifies that a bridged permission handler
+// blocks until the PermissionDecider callback returns a decision.
+func TestPermissionDeciderCallback(t *testing.T) {
+	inner, _ := json.Marshal(ControlRequestInner{
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
+		ToolUseID: "tu-decide",
+	})
+
+	deciderCalled := false
+	decider := func(ctx context.Context, req PermissionRequest) PermissionDecision {
+		deciderCalled = true
+		if req.ToolName != "Bash" {
+			t.Errorf("ToolName = %q, want Bash", req.ToolName)
+		}
+		if req.ToolUseID != "tu-decide" {
+			t.Errorf("ToolUseID = %q, want tu-decide", req.ToolUseID)
+		}
+		return PermissionDecision{Behavior: "allow", Message: "approved by test"}
+	}
+
+	handler := NewBridgedPermissionHandler(nil, decider)
+	var buf bytes.Buffer
+	if err := handler.HandleControlRequest(context.Background(), &buf, ControlMessage{
+		Type: "control_request", RequestID: "r-decide", Request: inner,
+	}); err != nil {
+		t.Fatalf("HandleControlRequest: %v", err)
+	}
+
+	if !deciderCalled {
+		t.Fatal("decider was not called")
+	}
+
+	var resp ControlMessage
+	if err := json.Unmarshal(buf.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	var innerResp ControlResponseInner
+	if err := json.Unmarshal(resp.Response, &innerResp); err != nil {
+		t.Fatalf("inner unmarshal: %v", err)
+	}
+	if innerResp.Behavior != "allow" {
+		t.Fatalf("Behavior = %q, want allow", innerResp.Behavior)
+	}
+	if innerResp.Message != "approved by test" {
+		t.Fatalf("Message = %q, want 'approved by test'", innerResp.Message)
+	}
+}
+
+// TestPermissionDeciderDeny verifies that a decider can deny a tool and the
+// denial is propagated correctly in the control_response.
+func TestPermissionDeciderDeny(t *testing.T) {
+	inner, _ := json.Marshal(ControlRequestInner{
+		Subtype:   "can_use_tool",
+		ToolName:  "Bash",
+		ToolUseID: "tu-deny",
+	})
+
+	decider := func(ctx context.Context, req PermissionRequest) PermissionDecision {
+		return PermissionDecision{Behavior: "deny", Message: "blocked by policy"}
+	}
+
+	handler := NewBridgedPermissionHandler(nil, decider)
+	var buf bytes.Buffer
+	if err := handler.HandleControlRequest(context.Background(), &buf, ControlMessage{
+		Type: "control_request", RequestID: "r-deny", Request: inner,
+	}); err != nil {
+		t.Fatalf("HandleControlRequest: %v", err)
+	}
+
+	var resp ControlMessage
+	if err := json.Unmarshal(buf.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	var innerResp ControlResponseInner
+	if err := json.Unmarshal(resp.Response, &innerResp); err != nil {
+		t.Fatalf("inner unmarshal: %v", err)
+	}
+	if innerResp.Behavior != "deny" {
+		t.Fatalf("Behavior = %q, want deny", innerResp.Behavior)
+	}
+	if innerResp.Message != "blocked by policy" {
+		t.Fatalf("Message = %q, want 'blocked by policy'", innerResp.Message)
+	}
+}
+
+// TestChannelPermissionDecider verifies that the channel-based decider
+// correctly bridges permission requests over Go channels.
+func TestChannelPermissionDecider(t *testing.T) {
+	inner, _ := json.Marshal(ControlRequestInner{
+		Subtype:   "can_use_tool",
+		ToolName:  "Read",
+		ToolUseID: "tu-channel",
+	})
+
+	reqCh := make(chan PermissionRequest, 1)
+	decCh := make(chan PermissionDecision, 1)
+
+	decider := NewChannelPermissionDecider(reqCh, decCh)
+
+	// Simulate Desktop picking up the request in a goroutine
+	go func() {
+		req := <-reqCh
+		if req.ToolName != "Read" {
+			t.Errorf("ToolName = %q, want Read", req.ToolName)
+		}
+		decCh <- PermissionDecision{Behavior: "allow", DecisionClass: "user_approved"}
+	}()
+
+	handler := NewBridgedPermissionHandler(nil, decider.Decide)
+	var buf bytes.Buffer
+	if err := handler.HandleControlRequest(context.Background(), &buf, ControlMessage{
+		Type: "control_request", RequestID: "r-channel", Request: inner,
+	}); err != nil {
+		t.Fatalf("HandleControlRequest: %v", err)
+	}
+
+	var resp ControlMessage
+	if err := json.Unmarshal(buf.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	var innerResp ControlResponseInner
+	if err := json.Unmarshal(resp.Response, &innerResp); err != nil {
+		t.Fatalf("inner unmarshal: %v", err)
+	}
+	if innerResp.Behavior != "allow" {
+		t.Fatalf("Behavior = %q, want allow", innerResp.Behavior)
+	}
+	if innerResp.DecisionClass != "user_approved" {
+		t.Fatalf("DecisionClass = %q, want user_approved", innerResp.DecisionClass)
+	}
+}
+
+// TestControlProtocolMissingSubtypes ensures stub handlers for subtypes
+// that are not yet fully implemented do not panic or error.
+func TestControlProtocolMissingSubtypes(t *testing.T) {
+	subtypes := []string{
+		"get_context_usage",
+		"mcp_status",
+		"mcp_set_servers",
+		"get_settings",
+		"apply_flag_settings",
+		"hook_callback",
+	}
+	for _, subtype := range subtypes {
+		t.Run(subtype, func(t *testing.T) {
+			inner, _ := json.Marshal(ControlRequestInner{Subtype: subtype})
+			handler := &DefaultPermissionHandler{}
+			var buf bytes.Buffer
+			err := handler.HandleControlRequest(context.Background(), &buf, ControlMessage{
+				Type: "control_request", RequestID: "r-stub", Request: inner,
+			})
+			if err != nil {
+				t.Fatalf("HandleControlRequest for %q returned error: %v", subtype, err)
+			}
+			// Stubs should not write a response (silent no-op)
+			if buf.Len() > 0 {
+				t.Logf("stub %q wrote %d bytes (expected silent no-op)", subtype, buf.Len())
+			}
+		})
 	}
 }
