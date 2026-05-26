@@ -15,7 +15,7 @@ import (
 // AgentService is the subset of *service.AgentService used by AgentHandler.
 type AgentService interface {
 	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
-	TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams string) (*model.PendingAgentTask, error)
+	TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)
 	CancelTask(ctx context.Context, userID, taskID string) error
 	HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
 	HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error
@@ -64,6 +64,7 @@ type triggerTaskReq struct {
 	AgentType        string `json:"agent_type,omitempty"`
 	CustomAgentID    string `json:"custom_agent_id,omitempty"`
 	ModelParams      string `json:"model_params,omitempty"`
+	TargetID         string `json:"target_id,omitempty"`
 }
 
 // TriggerTask POST /web/agent-tasks
@@ -82,6 +83,7 @@ func (h *AgentHandler) TriggerTask(c *gin.Context) {
 		req.AgentType,
 		req.CustomAgentID,
 		req.ModelParams,
+		req.TargetID,
 	)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {

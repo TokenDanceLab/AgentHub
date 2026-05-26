@@ -10,6 +10,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/postgres"
@@ -103,6 +104,35 @@ func TestDispatchTaskIncludesPrompt(t *testing.T) {
 	require.Equal(t, "claude-code", payload.AgentType)
 	require.Equal(t, `{"model":"claude-sonnet-4-6"}`, payload.ModelParams)
 	require.Equal(t, "sess-1", payload.SessionID)
+}
+
+func TestDispatchTaskIncludesTargetID(t *testing.T) {
+	db, _, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		TargetID:          "target-1",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run the selected target", "")
+
+	require.Equal(t, "user-1", cache.pushedUser)
+	require.Len(t, cache.pushed, 1)
+	var payload dispatchPayload
+	require.NoError(t, json.Unmarshal([]byte(cache.pushed[0]), &payload))
+	require.Equal(t, "target-1", payload.TargetID)
 }
 
 func TestMergeModelParamsLetsDispatchOverrideProfileDefaults(t *testing.T) {
@@ -447,7 +477,119 @@ func TestTriggerAgentTask_RejectsDissolvedSession(t *testing.T) {
 			AddRow("session-dissolved", "group", true, "owner-1"))
 
 	svc := &AgentService{db: db}
-	_, err := svc.TriggerAgentTask(context.Background(), "user-1", triggerMsgID, "", "", "", "")
+	_, err := svc.TriggerAgentTask(context.Background(), "user-1", triggerMsgID, "", "", "", "", "")
 	require.ErrorIs(t, err, errcode.SessionDissolved)
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTriggerAgentTaskRejectsTargetOwnedByAnotherUser(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+
+	_, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-other")
+
+	require.ErrorIs(t, err, errcode.AuthDeviceMismatch)
+	var count int64
+	require.NoError(t, db.Table("pending_agent_tasks").Count(&count).Error)
+	require.Equal(t, int64(0), count)
+}
+
+func TestTriggerAgentTaskStoresAndDispatchesOwnedTarget(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, name, target_type, workspace_allowlist, trust_level, health_state, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"target-local", "user-1", "Local workstation", "local_edge", `["/workspace"]`, "local", "healthy", "{}", "{}").Error)
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+
+	task, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-local")
+
+	require.NoError(t, err)
+	require.Equal(t, "target-local", task.TargetID)
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
+	require.Equal(t, "target-local", stored.TargetID)
+	require.Len(t, cache.pushed, 1)
+	var payload dispatchPayload
+	require.NoError(t, json.Unmarshal([]byte(cache.pushed[0]), &payload))
+	require.Equal(t, "target-local", payload.TargetID)
+}
+
+func newAgentTaskTargetContractDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	for _, ddl := range []string{
+		`CREATE TABLE sessions (
+			id TEXT PRIMARY KEY,
+			type TEXT NOT NULL,
+			dissolved BOOLEAN DEFAULT FALSE,
+			owner_user_id TEXT
+		)`,
+		`CREATE TABLE messages (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			sender_type TEXT NOT NULL,
+			sender_id TEXT NOT NULL,
+			content_type TEXT NOT NULL,
+			content TEXT NOT NULL,
+			seq_id INTEGER NOT NULL,
+			client_msg_id TEXT NOT NULL
+		)`,
+		`CREATE TABLE session_members (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			member_type TEXT NOT NULL,
+			member_id TEXT NOT NULL,
+			role TEXT NOT NULL,
+			left_at DATETIME
+		)`,
+		`CREATE TABLE agent_instances (
+			id TEXT PRIMARY KEY,
+			agent_type TEXT NOT NULL,
+			custom_agent_id TEXT,
+			session_id TEXT NOT NULL,
+			inviter_user_id TEXT NOT NULL,
+			display_name TEXT NOT NULL
+		)`,
+		`CREATE TABLE pending_agent_tasks (
+			id TEXT PRIMARY KEY,
+			agent_instance_id TEXT NOT NULL,
+			triggered_by_user_id TEXT NOT NULL,
+			trigger_message_id TEXT NOT NULL,
+			target_id TEXT,
+			status TEXT NOT NULL,
+			edge_run_id TEXT DEFAULT '',
+			edge_device_id TEXT DEFAULT '',
+			error_message TEXT DEFAULT '',
+			created_at DATETIME,
+			dispatched_at DATETIME,
+			finished_at DATETIME,
+			expire_at DATETIME NOT NULL
+		)`,
+		`CREATE TABLE execution_targets (
+			id TEXT PRIMARY KEY,
+			owner_id TEXT NOT NULL,
+			device_id TEXT,
+			name TEXT NOT NULL,
+			target_type TEXT NOT NULL DEFAULT 'local_edge',
+			workspace_allowlist TEXT DEFAULT '[]',
+			trust_level TEXT DEFAULT 'local',
+			health_state TEXT DEFAULT 'unknown',
+			capabilities TEXT DEFAULT '{}',
+			metadata TEXT DEFAULT '{}',
+			deleted_at DATETIME
+		)`,
+	} {
+		require.NoError(t, db.Exec(ddl).Error)
+	}
+	require.NoError(t, db.Exec(`INSERT INTO sessions (id, type, dissolved, owner_user_id) VALUES (?, ?, ?, ?)`, "sess-1", model.SessionTypeGroup, false, "user-1").Error)
+	require.NoError(t, db.Exec(`INSERT INTO messages (id, session_id, sender_type, sender_id, content_type, content, seq_id, client_msg_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"msg-1", "sess-1", model.SenderTypeUser, "user-1", model.ContentTypeText, `{"text":"run"}`, int64(1), "client-1").Error)
+	require.NoError(t, db.Exec(`INSERT INTO session_members (id, session_id, member_type, member_id, role) VALUES (?, ?, ?, ?, ?)`,
+		"member-1", "sess-1", model.MemberTypeUser, "user-1", model.MemberRoleMember).Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_instances (id, agent_type, session_id, inviter_user_id, display_name) VALUES (?, ?, ?, ?, ?)`,
+		"agent-1", "codex", "sess-1", "user-1", "Codex").Error)
+	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, name, target_type, workspace_allowlist, trust_level, health_state, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"target-other", "other-user", "Other target", "local_edge", `["/workspace"]`, "local", "unknown", "{}", "{}").Error)
+	return db
 }
