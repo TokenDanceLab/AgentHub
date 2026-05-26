@@ -161,6 +161,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			agent_instance_id TEXT NOT NULL,
 			triggered_by_user_id TEXT NOT NULL,
 			trigger_message_id TEXT NOT NULL,
+			target_id TEXT,
 			status TEXT NOT NULL,
 			edge_run_id TEXT DEFAULT '',
 			edge_device_id TEXT DEFAULT '',
@@ -914,7 +915,7 @@ func TestNotificationRepo_CreateAndList(t *testing.T) {
 	assert.Len(t, result, 2)
 
 	// Mark first as read
-		require.NoError(t, MarkNotificationRead(db, "user-n1", n1.ID))
+	require.NoError(t, MarkNotificationRead(db, "user-n1", n1.ID))
 
 	// List unread only
 	result, err = ListNotifications(db, "user-n1", true, 10, 0)
