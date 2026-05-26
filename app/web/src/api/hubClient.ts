@@ -188,6 +188,18 @@ export interface PendingAgentTask {
   expire_at?: string;
 }
 
+export interface AgentRunEvent {
+  id: string;
+  task_id: string;
+  edge_run_id?: string;
+  session_id: string;
+  agent_instance_id: string;
+  event_seq: number;
+  event_type: string;
+  payload: unknown;
+  created_at: string;
+}
+
 export interface TriggerAgentTaskOptions {
   agent_instance_id?: string;
   agent_type?: string;
@@ -698,6 +710,9 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     cancelAgentTask: (taskId: string) =>
       request<void>(`/web/agent-tasks/${encodeURIComponent(taskId)}/cancel`, { method: 'POST' }),
+
+    listTaskRunEvents: (taskId: string) =>
+      request<AgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events`),
 
     // ── Custom agents ─────────────────────────────
 
