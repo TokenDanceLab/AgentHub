@@ -255,3 +255,42 @@ func TestAgentTeamRepo_ListAssignmentsEmpty(t *testing.T) {
 	assert.NotNil(t, list)
 	assert.Len(t, list, 0)
 }
+
+func TestAgentTeamRepo_AppendAndListTeamEvents(t *testing.T) {
+	db := setupSQLite(t)
+
+	team := &model.AgentTeam{OwnerID: "user-1", Name: "Event Team"}
+	require.NoError(t, CreateTeam(db, team))
+
+	run := &model.AgentTeamRun{
+		TeamID:         team.ID,
+		TriggerUserID:  "user-1",
+		TriggerMessage: "test",
+		Status:         model.TeamRunStatusRunning,
+	}
+	require.NoError(t, CreateTeamRun(db, run))
+
+	started := &model.AgentTeamEvent{
+		TeamRunID: run.ID,
+		Type:      model.TeamEventRunStarted,
+		Payload:   `{"status":"running"}`,
+	}
+	require.NoError(t, AppendTeamEvent(db, started))
+	assert.Equal(t, 1, started.Seq)
+
+	completed := &model.AgentTeamEvent{
+		TeamRunID: run.ID,
+		Type:      model.TeamEventRunCompleted,
+		Payload:   `{"summary":"done"}`,
+	}
+	require.NoError(t, AppendTeamEvent(db, completed))
+	assert.Equal(t, 2, completed.Seq)
+
+	events, err := ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, model.TeamEventRunStarted, events[0].Type)
+	assert.Equal(t, model.TeamEventRunCompleted, events[1].Type)
+	assert.Equal(t, 1, events[0].Seq)
+	assert.Equal(t, 2, events[1].Seq)
+}

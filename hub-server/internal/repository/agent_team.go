@@ -121,3 +121,28 @@ func GetAssignmentByToMember(db *gorm.DB, teamRunID, toMemberID string) (*model.
 		Order("depth DESC").First(&a).Error
 	return &a, err
 }
+
+// AgentTeamEvent
+
+func AppendTeamEvent(db *gorm.DB, event *model.AgentTeamEvent) error {
+	if event.Payload == "" {
+		event.Payload = "{}"
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		var maxSeq int
+		if err := tx.Model(&model.AgentTeamEvent{}).
+			Where("team_run_id = ?", event.TeamRunID).
+			Select("COALESCE(MAX(seq), 0)").
+			Scan(&maxSeq).Error; err != nil {
+			return err
+		}
+		event.Seq = maxSeq + 1
+		return tx.Create(event).Error
+	})
+}
+
+func ListTeamEventsByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamEvent, error) {
+	var events []model.AgentTeamEvent
+	err := db.Where("team_run_id = ?", teamRunID).Order("seq ASC, created_at ASC").Find(&events).Error
+	return events, err
+}

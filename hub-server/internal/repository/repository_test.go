@@ -224,6 +224,14 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			created_at DATETIME,
 			updated_at DATETIME
 		)`,
+		`CREATE TABLE agent_team_events (
+			id TEXT PRIMARY KEY,
+			team_run_id TEXT NOT NULL,
+			seq INTEGER NOT NULL,
+			type TEXT NOT NULL,
+			payload TEXT NOT NULL DEFAULT '{}',
+			created_at DATETIME
+		)`,
 	}
 	for _, ddl := range tables {
 		require.NoError(t, db.Exec(ddl).Error, "DDL: %s", ddl[:60])

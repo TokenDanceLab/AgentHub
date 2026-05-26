@@ -4,7 +4,7 @@
 
 | 组件 | 最低版本 | 说明 |
 |------|---------|------|
-| Go | 1.25 | 构建所需 |
+| Go | 1.25 | 开发机/CI 构建所需；生产服务器不编译 |
 | PostgreSQL | 16 | 主数据库 |
 | Redis | 7 | 缓存 / 会话 / WebSocket 路由 |
 
@@ -58,7 +58,7 @@ copy .env.example .env
 docker compose up -d
 ```
 
-生产部署参考 `deployments/docker-compose.prod.yml`，镜像构建入口为 `deployments/Dockerfile`。
+生产部署参考 `deployments/docker-compose.prod.yml`。生产服务器只加载开发机/CI 构建好的镜像并执行 `docker compose up -d --no-build`；不得在服务器上运行 `docker compose build`。镜像构建入口为 `deployments/Dockerfile`。
 
 ## 生产部署
 
@@ -110,7 +110,7 @@ systemctl enable --now hub-server
 ### 方案 B：Docker 单容器
 
 ```powershell
-# 构建镜像
+# 在开发机/CI 构建镜像
 docker build -f deployments/Dockerfile -t hub-server:latest .
 
 # 运行
