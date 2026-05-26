@@ -26,6 +26,7 @@ type AgentTeamService interface {
 	ListTeamTasks(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
 	ListTeamEvents(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
 	HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
+	ResolveConflict(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
 
 	// TeamAssignment
 	CreateAssignment(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error)
@@ -339,6 +340,13 @@ type failAssignmentReq struct {
 	Reason string `json:"reason" binding:"required"`
 }
 
+type resolveConflictReq struct {
+	Path                string `json:"path,omitempty"`
+	Resolution          string `json:"resolution" binding:"required"`
+	SelectedAgentTaskID string `json:"selected_agent_task_id,omitempty"`
+	Reason              string `json:"reason,omitempty"`
+}
+
 // --- Assignment Handlers ---
 
 // CreateAssignment POST /web/agent-teams/:id/runs/:run_id/assignments
@@ -434,4 +442,32 @@ func (h *AgentTeamHandler) ListAssignments(c *gin.Context) {
 		as = []model.AgentTeamAssignment{}
 	}
 	OK(c, as)
+}
+
+// ResolveConflict POST /web/agent-teams/:id/runs/:run_id/conflicts/:conflict_id/resolve
+func (h *AgentTeamHandler) ResolveConflict(c *gin.Context) {
+	var req resolveConflictReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	teamID := c.Param("id")
+	runID := c.Param("run_id")
+	conflict, err := h.service.ResolveConflict(c.Request.Context(), userID, teamID, runID, model.TeamConflictResolution{
+		ConflictID:          c.Param("conflict_id"),
+		Path:                req.Path,
+		Resolution:          req.Resolution,
+		SelectedAgentTaskID: req.SelectedAgentTaskID,
+		Reason:              req.Reason,
+	})
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, conflict)
 }

@@ -108,10 +108,53 @@ func TestAgentTeamHandler_ListTeamTasks(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "task-1")
 }
 
+func TestAgentTeamHandler_ResolveConflict(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	called := false
+	svc := &mockAgentTeamService{
+		resolveConflict: func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error) {
+			called = true
+			assert.Equal(t, "user-1", userID)
+			assert.Equal(t, "team-1", teamID)
+			assert.Equal(t, "run-1", runID)
+			assert.Equal(t, "file:shared.txt", resolution.ConflictID)
+			assert.Equal(t, model.TeamConflictResolutionAcceptAgentTask, resolution.Resolution)
+			assert.Equal(t, "task-1", resolution.SelectedAgentTaskID)
+			assert.Equal(t, "Reviewed diff", resolution.Reason)
+			return &model.TeamConflictState{
+				ConflictID:   resolution.ConflictID,
+				Path:         "shared.txt",
+				Status:       model.TeamConflictStatusResolved,
+				Resolution:   resolution.Resolution,
+				SelectedTask: resolution.SelectedAgentTaskID,
+			}, nil
+		},
+	}
+	h := NewAgentTeamHandler(svc)
+
+	r := gin.New()
+	r.POST("/web/agent-teams/:id/runs/:run_id/conflicts/:conflict_id/resolve", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.ResolveConflict(c)
+	})
+
+	body := bytes.NewBufferString(`{"resolution":"accept_agent_task","selected_agent_task_id":"task-1","reason":"Reviewed diff"}`)
+	req := httptest.NewRequest(http.MethodPost, "/web/agent-teams/team-1/runs/run-1/conflicts/file:shared.txt/resolve", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.True(t, called)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), model.TeamConflictStatusResolved)
+}
+
 type mockAgentTeamService struct {
 	handleRouteDecision func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
 	listTeamTasks       func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
 	listTeamEvents      func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
+	resolveConflict     func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
 }
 
 func (m *mockAgentTeamService) CreateTeam(ctx context.Context, userID, name, description string) (*model.AgentTeam, error) {
@@ -201,4 +244,11 @@ func (m *mockAgentTeamService) ListTeamTasks(ctx context.Context, userID, teamID
 		return nil, nil
 	}
 	return m.listTeamTasks(ctx, userID, teamID, runID)
+}
+
+func (m *mockAgentTeamService) ResolveConflict(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error) {
+	if m.resolveConflict == nil {
+		return nil, nil
+	}
+	return m.resolveConflict(ctx, userID, teamID, runID, resolution)
 }
