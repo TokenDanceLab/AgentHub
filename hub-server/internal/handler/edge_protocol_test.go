@@ -364,6 +364,57 @@ func TestTriggerTaskPassesTargetID(t *testing.T) {
 	}
 }
 
+func TestTaskEventsPassesQueryFiltersToService(t *testing.T) {
+	var gotFilter model.AgentRunEventFilter
+	agentSvc := &mockAgentService{
+		listTaskRunEventsFn: func(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error) {
+			gotFilter = filter
+			return []model.AgentRunEvent{{TaskID: taskID, EventSeq: 3, EventType: "run.agent.tool_call", Payload: `{}`}}, nil
+		},
+	}
+	h := handler.NewAgentHandler(agentSvc)
+
+	c, w := newGinCtx("GET", "/web/agent-tasks/task-1/events?event_type=run.agent.tool_call&after_seq=2&limit=10", nil, "user_id", "u1")
+	c.Params = gin.Params{{Key: "id", Value: "task-1"}}
+	h.TaskEvents(c)
+
+	assertStatus(t, w, 200)
+	assertOK(t, w)
+	if gotFilter.EventType != "run.agent.tool_call" || gotFilter.AfterSeq != 2 || gotFilter.Limit != 10 {
+		t.Fatalf("unexpected filter: %+v", gotFilter)
+	}
+}
+
+func TestTaskEventSummaryReturnsRuntimeSummary(t *testing.T) {
+	agentSvc := &mockAgentService{
+		taskRunEventSummaryFn: func(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error) {
+			return &model.AgentRunEventSummary{
+				TaskID:      taskID,
+				Status:      model.TaskStatusDone,
+				TotalEvents: 2,
+			}, nil
+		},
+	}
+	h := handler.NewAgentHandler(agentSvc)
+
+	c, w := newGinCtx("GET", "/web/agent-tasks/task-1/events/summary", nil, "user_id", "u1")
+	c.Params = gin.Params{{Key: "id", Value: "task-1"}}
+	h.TaskEventSummary(c)
+
+	assertStatus(t, w, 200)
+	resp := parseResp(t, w)
+	if resp.Code != "OK" {
+		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Message)
+	}
+	payload, ok := resp.Data.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected object data, got %T", resp.Data)
+	}
+	if payload["task_id"] != "task-1" || payload["status"] != model.TaskStatusDone {
+		t.Fatalf("unexpected summary payload: %v", payload)
+	}
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────
 
 // mockAgentService satisfies handler.AgentService.
@@ -376,6 +427,8 @@ type mockAgentService struct {
 	handleStreamFn          func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error
 	handleDoneFn            func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
 	handleFailFn            func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
+	listTaskRunEventsFn     func(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error)
+	taskRunEventSummaryFn   func(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error)
 }
 
 func (m *mockAgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
@@ -423,7 +476,16 @@ func (m *mockAgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeD
 	}
 	return nil
 }
-func (m *mockAgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string) ([]model.AgentRunEvent, error) {
+func (m *mockAgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error) {
+	if m.listTaskRunEventsFn != nil {
+		return m.listTaskRunEventsFn(ctx, userID, taskID, filter)
+	}
+	return nil, nil
+}
+func (m *mockAgentService) GetTaskRunEventSummary(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error) {
+	if m.taskRunEventSummaryFn != nil {
+		return m.taskRunEventSummaryFn(ctx, userID, taskID)
+	}
 	return nil, nil
 }
 
