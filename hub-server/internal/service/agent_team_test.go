@@ -533,9 +533,10 @@ func TestAgentTeamService_HandleRouteDecisionCreatesAssignmentAndAuditEvents(t *
 
 	events, err := repository.ListTeamEventsByRun(db, run.ID)
 	require.NoError(t, err)
-	require.Len(t, events, 2)
+	require.Len(t, events, 3)
 	assert.Equal(t, model.TeamEventRouteDecided, events[0].Type)
 	assert.Equal(t, model.TeamEventAssignmentCreated, events[1].Type)
+	assert.Equal(t, model.TeamEventTaskCreated, events[2].Type)
 
 	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
 	require.NoError(t, err)
@@ -544,6 +545,11 @@ func TestAgentTeamService_HandleRouteDecisionCreatesAssignmentAndAuditEvents(t *
 	require.Len(t, state.Assignments, 1)
 	assert.Equal(t, assignment.ID, state.Assignments[0].AssignmentID)
 	assert.Equal(t, 1, state.Members[1].ActiveTasks)
+	require.Len(t, state.Tasks, 1)
+	assert.Equal(t, assignment.ID, state.Tasks[0].AssignmentID)
+	assert.Equal(t, executor.ID, state.Tasks[0].AssigneeMemberID)
+	assert.Equal(t, "Implement the replay UI", state.Tasks[0].Objective)
+	assert.Equal(t, model.TeamTaskStatusPending, state.Tasks[0].Status)
 }
 
 func TestAgentTeamService_HandleRouteDecisionRejectsMissingWorkerWithAuditEvent(t *testing.T) {
@@ -597,6 +603,30 @@ func TestAgentTeamService_HandleRouteDecisionRejectsWhenTaskLimitReached(t *test
 	require.Len(t, events, 1)
 	assert.Equal(t, model.TeamEventRouteRejected, events[0].Type)
 	assert.Contains(t, events[0].Payload, "task limit")
+}
+
+func TestAgentTeamService_ListTeamTasksIsOwnerScoped(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, _, executor, run := seedAgentTeamRun(t, db)
+	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: executor.ID,
+		Status:           model.TeamTaskStatusPending,
+		Objective:        "Build task board",
+		InputRefs:        "{}",
+		Attempt:          1,
+		RiskLevel:        model.TeamTaskRiskNormal,
+	}))
+
+	tasks, err := svc.ListTeamTasks(context.Background(), "user-1", team.ID, run.ID)
+	require.NoError(t, err)
+	require.Len(t, tasks, 1)
+	assert.Equal(t, "Build task board", tasks[0].Objective)
+
+	_, err = svc.ListTeamTasks(context.Background(), "other-user", team.ID, run.ID)
+	require.Error(t, err)
+	assert.Equal(t, errcode.AgentNotFound, err)
 }
 
 func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
@@ -663,6 +693,21 @@ func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 			run_id TEXT,
 			result TEXT DEFAULT '',
 			depth INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_tasks (
+			id TEXT PRIMARY KEY,
+			team_run_id TEXT NOT NULL,
+			assignment_id TEXT,
+			assignee_member_id TEXT NOT NULL,
+			parent_task_id TEXT,
+			status TEXT NOT NULL DEFAULT 'pending',
+			objective TEXT NOT NULL,
+			input_refs TEXT NOT NULL DEFAULT '{}',
+			run_id TEXT,
+			attempt INTEGER NOT NULL DEFAULT 1,
+			risk_level TEXT NOT NULL DEFAULT 'normal',
 			created_at DATETIME,
 			updated_at DATETIME
 		)`,

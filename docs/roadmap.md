@@ -673,14 +673,14 @@ Hub 调度（远程）:
   - Hub model/migration/API：`team_runs`、`team_tasks`、`team_events`；新增 `GET /web/team-runs/{id}`、`GET /web/team-runs/{id}/events` 或等价 read API。
   - Projection：从 TeamEvent / RunEvent 派生 `TeamRunState`，包含 members、tasks、dependencies、route decisions、approvals、budgets、terminal reason。
   - 验收：Hub/Edge replay 后 UI 可恢复同一个 TeamRun 的任务树和状态，不依赖内存 queue。
-  - 2026-05-27 进展：Hub 已新增 `agent_team_events` append/list、TeamRunState replay projection、owner-scoped state endpoint 和 `GET /web/agent-teams/{id}/runs/{run_id}/events` 显式事件读取 API；当前 projection 覆盖 members、assignments、route decisions、terminal reason。剩余 task/dependency、approval/artifact、budget 与 RunEvent merge 后再关闭 AT-2。
+  - 2026-05-27 进展：Hub 已新增 `agent_team_tasks` model/migration、owner-scoped `GET /web/agent-teams/{id}/runs/{run_id}/tasks`、`agent_team_events` append/list、TeamRunState replay projection、state endpoint 和 events 读取 API；accepted route decision 会同步创建 TeamAssignment 与 TeamTask 并写 `team.task.created`。当前 projection 覆盖 members、tasks、assignments、route decisions、terminal reason。剩余 dependency、approval/artifact、budget 与 RunEvent merge 后再关闭 AT-2。
 
 - [ ] **AT-3: Structured Supervisor route + delegation guardrails** `[4-5d]` `[P1]`
   - 定义 `CoordinatorRouteDecision{next_worker,instructions,reasoning,finish,blocked_reason,correlation_id}`，新增 `team.route.decided` / `team.route.rejected` 事件。
   - 保留旧文本 JSON dispatch 兼容，但新 TeamRun 只消费 typed route。
   - Guardrails：`MAX_DELEGATION_DEPTH`、`MAX_ACTIVE_SUBAGENTS_PER_RUN`、`MAX_ROUTE_REPEATS`、`MAX_TASKS_PER_TEAM_RUN`、budget、timeout、ancestor/cycle reject、context budget、compact/checkpoint。
   - 验收：非法 route 被拒绝且可审计；重复委派、超深度、超预算不会启动 Runtime。
-  - 2026-05-27 进展：Hub 已新增 `POST /web/agent-teams/{id}/runs/{run_id}/route-decisions`，合法 `delegate/review/approve` 会创建 `TeamAssignment` 并写 `team.route.decided` + `assignment.created`；非法 worker/schema/任务总数超限会写 `team.route.rejected` 后返回 400。当前仍未接 Edge supervisor 输出 parser、route repeat、budget、timeout 和 RunEvent 自动绑定。
+  - 2026-05-27 进展：Hub 已新增 `POST /web/agent-teams/{id}/runs/{run_id}/route-decisions`，合法 `delegate/review/approve` 会创建 `TeamAssignment` + `TeamTask` 并写 `team.route.decided` + `assignment.created` + `team.task.created`；非法 worker/schema/任务总数超限会写 `team.route.rejected` 后返回 400。当前仍未接 Edge supervisor 输出 parser、route repeat、budget、timeout 和 RunEvent 自动绑定。
 
 - [ ] **AT-4: Local TeamRun smoke with two real Runtime Profiles** `[4-6d]` `[P1]`
   - Dispatch：TeamTask 复用现有 Hub `/web/agent-tasks` 和 Desktop bridge，每个 task 绑定 Edge `run_id`。

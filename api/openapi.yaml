@@ -2769,6 +2769,27 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+  /web/agent-teams/{id}/runs/{run_id}/tasks:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListTeamTasks
+      summary: List first-class TeamTask rows for a team run.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
   /web/agent-teams/{id}/runs/{run_id}/route-decisions:
     parameters:
       - name: id
@@ -4601,6 +4622,29 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
+    AgentTeamTask:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        team_run_id: { type: string, format: uuid }
+        assignment_id: { type: string, format: uuid }
+        assignee_member_id: { type: string, format: uuid }
+        parent_task_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [pending, dispatched, running, done, failed, cancelled]
+        objective: { type: string }
+        input_refs:
+          type: object
+          additionalProperties: true
+        run_id: { type: string }
+        attempt: { type: integer }
+        risk_level:
+          type: string
+          enum: [normal, high]
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
     TeamRunState:
       type: object
       properties:
@@ -4613,6 +4657,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TeamMemberState"
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamTaskState"
         assignments:
           type: array
           items:
@@ -4637,6 +4685,23 @@ components:
           enum: [supervisor, executor, reviewer]
         active_tasks: { type: integer }
         completed_tasks: { type: integer }
+
+    TeamTaskState:
+      type: object
+      properties:
+        task_id: { type: string, format: uuid }
+        assignment_id: { type: string, format: uuid }
+        assignee_member_id: { type: string, format: uuid }
+        parent_task_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [pending, dispatched, running, done, failed, cancelled]
+        objective: { type: string }
+        run_id: { type: string }
+        attempt: { type: integer }
+        risk_level:
+          type: string
+          enum: [normal, high]
 
     TeamAssignmentState:
       type: object
