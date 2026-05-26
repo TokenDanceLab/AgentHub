@@ -287,6 +287,7 @@ type TeamRunState struct {
 	Status         string                     `json:"status"`
 	Members        []TeamMemberState          `json:"members"`
 	Tasks          []TeamTaskState            `json:"tasks"`
+	Dependencies   []TeamTaskDependencyState  `json:"dependencies"`
 	Assignments    []TeamAssignmentState      `json:"assignments"`
 	RunEvents      []TeamRunEventState        `json:"run_events"`
 	RouteLog       []CoordinatorRouteDecision `json:"route_log"`
@@ -318,6 +319,13 @@ type TeamTaskState struct {
 	RiskLevel        string `json:"risk_level"`
 }
 
+// TeamTaskDependencyState is a recoverable dependency edge between TeamTasks.
+type TeamTaskDependencyState struct {
+	TaskID          string `json:"task_id"`
+	DependsOnTaskID string `json:"depends_on_task_id"`
+	Kind            string `json:"kind"`
+}
+
 // TeamAssignmentState is a resolved assignment with runtime info.
 type TeamAssignmentState struct {
 	AssignmentID string `json:"assignment_id"`
@@ -343,7 +351,13 @@ type TeamRunEventState struct {
 
 // TeamBudget tracks token/resource usage for a team run.
 type TeamBudget struct {
-	TotalTokensUsed int64 `json:"total_tokens_used"`
-	TokenLimit      int64 `json:"token_limit"`
-	RunCount        int   `json:"run_count"`
+	TotalTokensUsed int64   `json:"total_tokens_used"`
+	InputTokens     int64   `json:"input_tokens,omitempty"`
+	OutputTokens    int64   `json:"output_tokens,omitempty"`
+	TokenLimit      int64   `json:"token_limit"`
+	RemainingTokens int64   `json:"remaining_tokens,omitempty"`
+	UsagePercent    float64 `json:"usage_percent,omitempty"`
+	RunCount        int     `json:"run_count"`
+	ContextWarnings int     `json:"context_warnings,omitempty"`
+	Compactions     int     `json:"compactions,omitempty"`
 }
