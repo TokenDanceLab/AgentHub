@@ -340,6 +340,15 @@ function FileChangeBlock({ block }: { block: Extract<MessageBlock, { kind: 'file
   const actionLabel = t(`chat.fileAction.${block.action}`, { defaultValue: block.action });
   const hasDiff = diff.preview.length > 0;
 
+  const handleReviewChanges = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.dispatchEvent(
+      new CustomEvent('agenthub:review-changes', {
+        detail: { path: block.path, action: block.action, diff: block.diff },
+      }),
+    );
+  };
+
   return (
     <div className={styles.fileChange}>
       <button
@@ -361,6 +370,15 @@ function FileChangeBlock({ block }: { block: Extract<MessageBlock, { kind: 'file
           />
         )}
       </button>
+      {hasDiff && (
+        <button
+          className={styles.reviewChangesBtn}
+          type="button"
+          onClick={handleReviewChanges}
+        >
+          {t('chat.reviewChanges')}
+        </button>
+      )}
       {expanded && hasDiff && (
         <pre className={styles.fileChangeDiff}>
           {diff.preview.join('\n')}
