@@ -1057,6 +1057,21 @@ paths:
           in: path
           required: true
           schema: { type: string }
+        - name: event_type
+          in: query
+          required: false
+          schema: { type: string }
+          description: Optional exact runtime event type filter.
+        - name: after_seq
+          in: query
+          required: false
+          schema: { type: integer, format: int64, minimum: 0 }
+          description: Return only events with event_seq greater than this value.
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, maximum: 500 }
+          description: Optional maximum number of events. Values above 500 are clamped by Hub.
       responses:
         "200":
           description: Ordered runtime events for replay.
@@ -1070,6 +1085,32 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/AgentRunEvent"
+
+  /web/agent-tasks/{id}/events/summary:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetTaskRunEventSummary
+      summary: Summarize typed runtime event history for an agent task.
+      description: Owner-scoped runtime history summary with task status, event counts, tokens, elapsed time, approval, artifact, output and tool-call aggregates.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Runtime event summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  data:
+                    $ref: "#/components/schemas/AgentRunEventSummary"
 
   /edge/agent-tasks/{id}/ack:
     parameters:
@@ -4221,6 +4262,52 @@ components:
         created_at:
           type: string
           format: date-time
+    AgentRunEventSummary:
+      type: object
+      properties:
+        task_id:
+          type: string
+        edge_run_id:
+          type: string
+        status:
+          type: string
+          description: Current Hub pending task status.
+        total_events:
+          type: integer
+        last_event_seq:
+          type: integer
+          format: int64
+        event_type_counts:
+          type: object
+          additionalProperties:
+            type: integer
+        tool_call_count:
+          type: integer
+        step_count:
+          type: integer
+        artifact_count:
+          type: integer
+        approval_count:
+          type: integer
+        pending_approvals:
+          type: integer
+        decided_approvals:
+          type: integer
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        output_bytes:
+          type: integer
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        elapsed_ms:
+          type: integer
+          format: int64
     HubTaskDoneRequest:
       type: object
       properties:
