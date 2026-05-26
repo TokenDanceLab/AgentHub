@@ -3367,6 +3367,9 @@ components:
             Reasoning effort level. Claude Code values: low, medium, high, max.
             Codex values: minimal, low, medium, high, xhigh.
             OpenCode: passed as --variant for thinking control.
+        thinkingMode:
+          type: string
+          description: Thinking mode override for runtimes that expose an explicit thinking switch.
         maxThinkingTokens:
           type: integer
           description: Maximum thinking token budget (Claude Code --max-thinking-tokens).
@@ -3381,6 +3384,28 @@ components:
         includePartial:
           type: boolean
           description: Include partial stream_event messages for real-time deltas (Claude Code --include-partial-messages).
+        systemPrompt:
+          type: string
+          description: Runtime system prompt override, usually derived from a Hub CustomAgent/Profile policy.
+        appendSystemPrompt:
+          type: string
+          description: Additional prompt text appended to the runtime default system prompt.
+        allowedTools:
+          type: array
+          items:
+            type: string
+          description: Tool allowlist passed to runtimes that support tool-scoped execution.
+        configOverrides:
+          type: object
+          additionalProperties:
+            type: string
+          description: Runtime-specific key/value config overrides, currently consumed by Codex as -c entries.
+        ephemeral:
+          type: boolean
+          description: Request a no-persistent-session run for runtimes that support it.
+        hubTaskId:
+          type: string
+          description: Optional Hub task id for Edge-owned Hub callbacks. Desktop bridge usually streams callbacks itself and should avoid duplicate callback paths.
     AgentInfo:
       type: object
       required: [id, name, status]
@@ -3397,6 +3422,30 @@ components:
         version:
           type: string
           description: CLI version if detected.
+        runtimeId:
+          type: string
+          description: Normalized Agent Runtime id for Hub AgentProfile-backed entries.
+        model:
+          type: string
+          description: Model hint for a Hub AgentProfile-backed entry.
+        provider:
+          type: string
+          description: Provider hint for a Hub AgentProfile-backed entry.
+        reasoningEffort:
+          type: string
+          description: Reasoning effort hint for a Hub AgentProfile-backed entry.
+        permissionMode:
+          type: string
+          description: Runtime permission policy hint for a Hub AgentProfile-backed entry.
+        toolAllowlist:
+          type: array
+          items:
+            type: string
+          description: Tool allowlist projected from Hub AgentProfile tool_allowlist.
+        targetPreferences:
+          type: object
+          additionalProperties: true
+          description: Execution target hints projected from Hub AgentProfile target_preferences.
         status:
           type: string
           description: '"available" if the agent CLI is configured and reachable.'

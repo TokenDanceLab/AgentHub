@@ -196,7 +196,7 @@ Web workspace
 
 Desktop 只有在恢复或获取 Hub-issued access token 后才打开 Hub WebSocket 并挂载 Hub task bridge。桥接层维护 `taskId <-> runId` 映射，转发 stdout `run.output.batch` 与结构化 `text_delta` / `text_block`，并缓存可见输出作为 `done.final_content`。Edge 直连 Hub callback 模式同样会把 raw stdout 和结构化文本 stream 到 Hub，并用有界输出缓冲生成最终内容；没有可见输出时才退回 `"Run finished"`。
 
-Hub dispatch payload 必须带触发消息提取出的 `prompt`，`agent_type` 使用 Edge Runtime adapter id（`claude-code`、`codex`、`opencode`）。Desktop bridge 在启动 Local Edge run 前先用 Hub `session_id`/`thread_id` 确保本地 Edge thread 存在，再调用 `POST /v1/runs`；否则真实 Web→Hub→Desktop 路径会在 Edge `project or thread not found` 或未知 `agentId` 处失败。
+Hub dispatch payload 必须带触发消息提取出的 `prompt`，`agent_type` 使用 Edge Runtime adapter id（`claude-code`、`codex`、`opencode`）。Hub Agent Profile / CustomAgent 的运行配置必须以 secret-free payload 下发：`model_params` 承载 model/provider/reasoning/permission/workdir 等策略提示，CustomAgent 可下发 `system_prompt` 和 `tool_whitelist`，Desktop bridge 再翻译为 Edge `POST /v1/runs` 的 `model`、`reasoningEffort`、`permissionMode`、`workDir`、`systemPrompt`、`allowedTools` 等字段。Edge API 必须把这些字段继续传入 `RunProcessContext`，由 Codex、Claude Code、OpenCode adapter 各自映射到 CLI 参数。Desktop bridge 在启动 Local Edge run 前先用 Hub `session_id`/`thread_id` 确保本地 Edge thread 存在，再调用 `POST /v1/runs`；否则真实 Web→Hub→Desktop 路径会在 Edge `project or thread not found` 或未知 `agentId` 处失败。
 
 审批闭环必须进入 `RunEvent` 和 `Approval`：UI 通过 run-scoped approval API 决策；Edge 验证 pending permission registry、runId、requestId 和 one-shot replay；需要 stdin 控制协议的 Runtime 由 adapter 写回对应控制消息。当前仓库已经完成 REST 决策登记和重复/错 run 拒绝；真正阻塞式 stdin 回写仍是后续实现，不能把 permission event 展示误写成完整 HITL。Hub 参与时，Hub 先做 TokenDance ID -> Hub user -> resource/action 授权，再把任务派到目标 Edge；Hub 同步、审计和中继，不直接启动本地 CLI 进程。
 

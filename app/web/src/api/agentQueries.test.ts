@@ -21,7 +21,11 @@ describe('web agent profile queries', () => {
       runtime_id: 'codex',
       provider: 'openai',
       model: 'gpt-5.5',
+      reasoning_effort: 'high',
+      permission_mode: 'plan',
       mcp_servers: '[{"name":"github"}]',
+      tool_allowlist: '["Read","Grep"]',
+      target_preferences: '{"work_dir":"D:\\\\Code\\\\TokenDance\\\\AgentHub"}',
       version: 3,
     });
 
@@ -32,6 +36,10 @@ describe('web agent profile queries', () => {
       runtimeId: 'codex',
       provider: 'openai',
       model: 'gpt-5.5',
+      reasoningEffort: 'high',
+      permissionMode: 'plan',
+      toolAllowlist: ['Read', 'Grep'],
+      targetPreferences: { work_dir: 'D:\\Code\\TokenDance\\AgentHub' },
       description: 'Reviews risky patches - Runtime: codex - Model: openai/gpt-5.5',
       version: '3',
       status: 'available',

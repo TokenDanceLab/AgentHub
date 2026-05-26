@@ -139,8 +139,8 @@ Assert-LiteralContains "edge-server/cmd/agenthub-edge/main.go" "adapters.NewCode
 Assert-LiteralContains "edge-server/cmd/agenthub-edge/main.go" "adapters.NewOpenCodeAdapter" "Edge registers OpenCode adapter"
 
 Step "Run lifecycle and Hub bridge"
-Assert-LiteralContains "edge-server/internal/api/handlers.go" 'AgentID           string `json:"agentId"`' "POST /v1/runs accepts agentId"
-Assert-LiteralContains "edge-server/internal/api/handlers.go" 'HubTaskID         string `json:"hubTaskId"`' "POST /v1/runs accepts hubTaskId"
+Assert-Contains "edge-server/internal/api/handlers.go" 'AgentID\s+string\s+`json:"agentId"`' "POST /v1/runs accepts agentId"
+Assert-Contains "edge-server/internal/api/handlers.go" 'HubTaskID\s+string\s+`json:"hubTaskId"`' "POST /v1/runs accepts hubTaskId"
 Assert-Contains "edge-server/internal/api/handlers.go" "invalid_agent_id" "unknown agentId is rejected"
 Assert-LiteralContains "edge-server/internal/api/handlers.go" "h.Executor.Start(run, runCtx)" "POST /v1/runs starts executor"
 Assert-LiteralContains "edge-server/internal/lifecycle/process_executor.go" "adapter.BuildCommand(adapters.RunProcessContext{" "ProcessExecutor calls adapter BuildCommand"

@@ -35,14 +35,16 @@ func (r *recordingRepository) CreateProject(id, name string) (store.Project, err
 }
 
 type fakeRunExecutor struct {
-	started []store.Run
-	cancel  lifecycle.CancelResult
-	cancels []string
-	err     error
+	started  []store.Run
+	contexts []lifecycle.RunProcessContext
+	cancel   lifecycle.CancelResult
+	cancels  []string
+	err      error
 }
 
-func (f *fakeRunExecutor) Start(run store.Run, _ lifecycle.RunProcessContext) error {
+func (f *fakeRunExecutor) Start(run store.Run, ctx lifecycle.RunProcessContext) error {
 	f.started = append(f.started, run)
+	f.contexts = append(f.contexts, ctx)
 	return f.err
 }
 
@@ -375,6 +377,61 @@ func TestPostRunsBindsProjectAndThread(t *testing.T) {
 	}
 	if executor.started[0].ID != runID {
 		t.Fatalf("executor started run = %#v, want run %q", executor.started[0], runID)
+	}
+}
+
+func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+
+	body := `{
+		"projectId":"proj_local",
+		"threadId":"thread_local",
+		"prompt":"review this patch",
+		"agentId":"codex",
+		"model":"gpt-5.5",
+		"reasoningEffort":"high",
+		"thinkingMode":"adaptive",
+		"permissionMode":"plan",
+		"workDir":"D:\\Code\\TokenDance\\AgentHub",
+		"includePartial":true,
+		"systemPrompt":"You are a careful reviewer.",
+		"appendSystemPrompt":"Keep output concise.",
+		"allowedTools":["Read","Grep"],
+		"configOverrides":{"reasoning_summary":"auto"},
+		"ephemeral":true
+	}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(executor.contexts) != 1 {
+		t.Fatalf("executor contexts = %d, want 1", len(executor.contexts))
+	}
+	ctx := executor.contexts[0]
+	if ctx.Prompt != "review this patch" || ctx.AgentID != "codex" || ctx.Model != "gpt-5.5" {
+		t.Fatalf("basic run context = %#v", ctx)
+	}
+	if ctx.ReasoningEffort != "high" || ctx.ThinkingMode != "adaptive" || ctx.PermissionMode != "plan" {
+		t.Fatalf("runtime policy context = %#v", ctx)
+	}
+	if ctx.WorkDir != `D:\Code\TokenDance\AgentHub` || !ctx.IncludePartial || !ctx.Ephemeral {
+		t.Fatalf("execution context = %#v", ctx)
+	}
+	if ctx.SystemPrompt != "You are a careful reviewer." || ctx.AppendSystemPrompt != "Keep output concise." {
+		t.Fatalf("system prompt context = %#v", ctx)
+	}
+	if len(ctx.AllowedTools) != 2 || ctx.AllowedTools[0] != "Read" || ctx.AllowedTools[1] != "Grep" {
+		t.Fatalf("allowed tools = %#v", ctx.AllowedTools)
+	}
+	if ctx.ConfigOverrides["reasoning_summary"] != "auto" {
+		t.Fatalf("config overrides = %#v", ctx.ConfigOverrides)
 	}
 }
 
