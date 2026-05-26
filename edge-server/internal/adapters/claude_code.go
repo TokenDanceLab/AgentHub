@@ -110,8 +110,16 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	if ctx.SystemPrompt != "" {
 		args = append(args, "--system-prompt", ctx.SystemPrompt)
 	}
-	if ctx.AppendSystemPrompt != "" {
-		args = append(args, "--append-system-prompt", ctx.AppendSystemPrompt)
+	appendPrompt := ctx.AppendSystemPrompt
+	if ctx.SkillsPrompt != "" {
+		if appendPrompt != "" {
+			appendPrompt = ctx.SkillsPrompt + "\n\n" + appendPrompt
+		} else {
+			appendPrompt = ctx.SkillsPrompt
+		}
+	}
+	if appendPrompt != "" {
+		args = append(args, "--append-system-prompt", appendPrompt)
 	}
 
 	// Custom agent definitions (--agents JSON)
