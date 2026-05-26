@@ -105,6 +105,20 @@ func TestDispatchTaskIncludesPrompt(t *testing.T) {
 	require.Equal(t, "sess-1", payload.SessionID)
 }
 
+func TestMergeModelParamsLetsDispatchOverrideProfileDefaults(t *testing.T) {
+	merged := mergeModelParams(
+		`{"model":"claude-sonnet-4-6","reasoning_effort":"medium","permission_mode":"default"}`,
+		`{"reasoning_effort":"high","work_dir":"D:\\Code\\TokenDance"}`,
+	)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal([]byte(merged), &got))
+	require.Equal(t, "claude-sonnet-4-6", got["model"])
+	require.Equal(t, "high", got["reasoning_effort"])
+	require.Equal(t, "default", got["permission_mode"])
+	require.Equal(t, `D:\Code\TokenDance`, got["work_dir"])
+}
+
 func TestSelectAgentInstanceHonorsRequestedRuntime(t *testing.T) {
 	agents := []model.AgentInstance{
 		{ID: "agent-claude", AgentType: "claude-code"},

@@ -55,13 +55,17 @@ export interface HubIntegrationHandle {
 
 // ── Helpers ──────────────────────────────────────────
 
-function tryParseModel(modelParams: unknown): string | undefined {
-  if (typeof modelParams !== 'string') return undefined;
+function parseRecord(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+  if (typeof value !== 'string') return {};
   try {
-    const parsed = JSON.parse(modelParams);
-    return typeof parsed.model === 'string' ? parsed.model : undefined;
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -71,6 +75,47 @@ function getString(data: Record<string, unknown>, key: string): string {
   return typeof v === 'string' ? v : '';
 }
 
+function getFirstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return undefined;
+}
+
+function getFirstBoolean(...values: unknown[]): boolean | undefined {
+  for (const value of values) {
+    if (typeof value === 'boolean') return value;
+  }
+  return undefined;
+}
+
+function getFirstNumber(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  return undefined;
+}
+
+function parseStringArray(value: unknown): string[] | undefined {
+  let source = value;
+  if (typeof value === 'string') {
+    try {
+      source = JSON.parse(value);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!Array.isArray(source)) return undefined;
+  const values = source.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+  return values.length > 0 ? values : undefined;
+}
+
+function parseStringRecord(value: unknown): Record<string, string> | undefined {
+  const record = parseRecord(value);
+  const entries = Object.entries(record).filter((entry): entry is [string, string] => typeof entry[1] === 'string');
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
 function normalizeRuntimeAgentId(agentId: string): string {
   const key = agentId.trim().toLowerCase();
   if (!key) return '';
@@ -78,6 +123,32 @@ function normalizeRuntimeAgentId(agentId: string): string {
   if (key.includes('opencode')) return 'opencode';
   if (key.includes('codex') || key.includes('gpt')) return 'codex';
   return key;
+}
+
+function buildEdgeRunBody(data: Record<string, unknown>, threadId: string, prompt: string, agentId: string): Record<string, unknown> {
+  const modelParams = parseRecord(data.model_params);
+  const allowedTools = parseStringArray(data.tool_whitelist)
+    ?? parseStringArray(modelParams.tool_allowlist)
+    ?? parseStringArray(modelParams.allowed_tools)
+    ?? parseStringArray(modelParams.allowedTools);
+
+  return {
+    threadId,
+    prompt: prompt || undefined,
+    agentId: agentId || undefined,
+    model: getFirstString(modelParams.model, data.model),
+    reasoningEffort: getFirstString(modelParams.reasoning_effort, modelParams.reasoningEffort, data.reasoning_effort, data.reasoningEffort),
+    thinkingMode: getFirstString(modelParams.thinking_mode, modelParams.thinkingMode, data.thinking_mode, data.thinkingMode),
+    maxThinkingTokens: getFirstNumber(modelParams.max_thinking_tokens, modelParams.maxThinkingTokens, data.max_thinking_tokens, data.maxThinkingTokens),
+    permissionMode: getFirstString(modelParams.permission_mode, modelParams.permissionMode, data.permission_mode, data.permissionMode),
+    workDir: getFirstString(modelParams.work_dir, modelParams.workDir, data.work_dir, data.workDir),
+    includePartial: getFirstBoolean(modelParams.include_partial, modelParams.includePartial, data.include_partial, data.includePartial),
+    systemPrompt: getFirstString(data.system_prompt, data.systemPrompt, modelParams.system_prompt, modelParams.systemPrompt),
+    appendSystemPrompt: getFirstString(modelParams.append_system_prompt, modelParams.appendSystemPrompt, data.append_system_prompt, data.appendSystemPrompt),
+    allowedTools,
+    configOverrides: parseStringRecord(modelParams.config_overrides) ?? parseStringRecord(modelParams.configOverrides),
+    ephemeral: getFirstBoolean(modelParams.ephemeral, data.ephemeral),
+  };
 }
 
 async function ensureEdgeThread(edgeBaseUrl: string, threadId: string, title: string): Promise<void> {
@@ -294,7 +365,6 @@ export function useHubIntegration(
         getString(data, 'thread_id') ||
         getString(data, 'session_id') ||
         'hub-dispatch';
-      const model = tryParseModel(data.model_params) || getString(data, 'model') || undefined;
 
       // Build initial task record
       const task: AgentTask = {
@@ -320,12 +390,7 @@ export function useHubIntegration(
         const runResp = await fetch(`${edgeBaseUrl}/v1/runs`, {
           method: 'POST',
           headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({
-            threadId,
-            prompt: prompt || undefined,
-            agentId: agentId || undefined,
-            model,
-          }),
+          body: JSON.stringify(buildEdgeRunBody(data, threadId, prompt, agentId)),
         });
 
         if (!runResp.ok) {

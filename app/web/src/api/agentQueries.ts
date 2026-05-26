@@ -40,6 +40,23 @@ function parseJSONArray(value: string | undefined): unknown[] {
   }
 }
 
+function parseJSONObject(value: string | undefined): Record<string, unknown> | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseStringArray(value: string | undefined): string[] | undefined {
+  const parsed = parseJSONArray(value).filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+  return parsed.length > 0 ? parsed : undefined;
+}
+
 function normalizeRuntimeID(runtimeID: string | undefined): string {
   return (runtimeID || '').trim().toLowerCase();
 }
@@ -57,6 +74,8 @@ function capabilitiesForProfile(profile: AgentProfile): AgentCapabilities {
 export function mapHubAgentProfileToAgentInfo(profile: AgentProfile): AgentInfo {
   const runtimeID = normalizeRuntimeID(profile.runtime_id);
   const modelHint = [profile.provider, profile.model].filter(Boolean).join('/');
+  const toolAllowlist = parseStringArray(profile.tool_allowlist);
+  const targetPreferences = parseJSONObject(profile.target_preferences);
   const descriptionParts = [
     profile.description?.trim(),
     runtimeID ? `Runtime: ${runtimeID}` : undefined,
@@ -71,6 +90,9 @@ export function mapHubAgentProfileToAgentInfo(profile: AgentProfile): AgentInfo 
     ...(profile.model ? { model: profile.model } : {}),
     ...(profile.provider ? { provider: profile.provider } : {}),
     ...(profile.reasoning_effort ? { reasoningEffort: profile.reasoning_effort } : {}),
+    ...(profile.permission_mode ? { permissionMode: profile.permission_mode } : {}),
+    ...(toolAllowlist ? { toolAllowlist } : {}),
+    ...(targetPreferences ? { targetPreferences } : {}),
     ...(descriptionParts.length > 0 ? { description: descriptionParts.join(' - ') } : {}),
     ...(profile.version != null ? { version: String(profile.version) } : {}),
     status: runtimeID ? 'available' : 'configuring',

@@ -305,6 +305,49 @@ describe('useHubIntegration', () => {
     expect(fetchBody.agentId).toBe('claude-code');
   });
 
+  it('passes Hub profile runtime config into Edge run request', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
+        agent_type: 'codex',
+        system_prompt: 'You are a careful reviewer.',
+        tool_whitelist: '["Read","Grep"]',
+        model_params: JSON.stringify({
+          model: 'gpt-5.5',
+          reasoning_effort: 'high',
+          thinking_mode: 'adaptive',
+          permission_mode: 'plan',
+          work_dir: 'D:\\Code\\TokenDance\\AgentHub',
+          include_partial: true,
+          max_thinking_tokens: 4096,
+          append_system_prompt: 'Keep output concise.',
+          config_overrides: { reasoning_summary: 'auto' },
+          ephemeral: true,
+        }),
+      }));
+    });
+
+    const fetchBody = fetchBodyFor('/v1/runs');
+    expect(fetchBody).toMatchObject({
+      agentId: 'codex',
+      model: 'gpt-5.5',
+      reasoningEffort: 'high',
+      thinkingMode: 'adaptive',
+      permissionMode: 'plan',
+      workDir: 'D:\\Code\\TokenDance\\AgentHub',
+      includePartial: true,
+      maxThinkingTokens: 4096,
+      systemPrompt: 'You are a careful reviewer.',
+      appendSystemPrompt: 'Keep output concise.',
+      allowedTools: ['Read', 'Grep'],
+      configOverrides: { reasoning_summary: 'auto' },
+      ephemeral: true,
+    });
+  });
+
   it('maps taskId → runId and runId → taskId bidirectionally', async () => {
     const { result } = renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),

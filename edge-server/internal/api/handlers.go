@@ -464,20 +464,26 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		ProjectID         string `json:"projectId"`
-		ThreadID          string `json:"threadId"`
-		Prompt            string `json:"prompt"`
-		AgentID           string `json:"agentId"`
-		Model             string `json:"model"`
-		SessionID         string `json:"sessionId"`
-		Continue          bool   `json:"continue"`
-		Fork              bool   `json:"fork"`
-		ReasoningEffort   string `json:"reasoningEffort"`
-		MaxThinkingTokens int    `json:"maxThinkingTokens"`
-		PermissionMode    string `json:"permissionMode"`
-		WorkDir           string `json:"workDir"`
-		IncludePartial    bool   `json:"includePartial"`
-		HubTaskID         string `json:"hubTaskId"` // Edge-to-Hub direct callback task ID
+		ProjectID          string            `json:"projectId"`
+		ThreadID           string            `json:"threadId"`
+		Prompt             string            `json:"prompt"`
+		AgentID            string            `json:"agentId"`
+		Model              string            `json:"model"`
+		SessionID          string            `json:"sessionId"`
+		Continue           bool              `json:"continue"`
+		Fork               bool              `json:"fork"`
+		ReasoningEffort    string            `json:"reasoningEffort"`
+		ThinkingMode       string            `json:"thinkingMode"`
+		MaxThinkingTokens  int               `json:"maxThinkingTokens"`
+		PermissionMode     string            `json:"permissionMode"`
+		WorkDir            string            `json:"workDir"`
+		IncludePartial     bool              `json:"includePartial"`
+		SystemPrompt       string            `json:"systemPrompt"`
+		AppendSystemPrompt string            `json:"appendSystemPrompt"`
+		AllowedTools       []string          `json:"allowedTools"`
+		ConfigOverrides    map[string]string `json:"configOverrides"`
+		Ephemeral          bool              `json:"ephemeral"`
+		HubTaskID          string            `json:"hubTaskId"` // Edge-to-Hub direct callback task ID
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
@@ -553,19 +559,25 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.Executor != nil {
 		runCtx := lifecycle.RunProcessContext{
-			Run:               run,
-			Prompt:            req.Prompt,
-			AgentID:           req.AgentID,
-			Model:             req.Model,
-			SessionID:         req.SessionID,
-			ContinueLast:      req.Continue,
-			ForkSession:       req.Fork,
-			ReasoningEffort:   req.ReasoningEffort,
-			MaxThinkingTokens: req.MaxThinkingTokens,
-			PermissionMode:    req.PermissionMode,
-			WorkDir:           req.WorkDir,
-			IncludePartial:    req.IncludePartial,
-			HubTaskID:         req.HubTaskID,
+			Run:                run,
+			Prompt:             req.Prompt,
+			AgentID:            req.AgentID,
+			Model:              req.Model,
+			SessionID:          req.SessionID,
+			ContinueLast:       req.Continue,
+			ForkSession:        req.Fork,
+			ReasoningEffort:    req.ReasoningEffort,
+			ThinkingMode:       req.ThinkingMode,
+			MaxThinkingTokens:  req.MaxThinkingTokens,
+			PermissionMode:     req.PermissionMode,
+			WorkDir:            req.WorkDir,
+			IncludePartial:     req.IncludePartial,
+			SystemPrompt:       req.SystemPrompt,
+			AppendSystemPrompt: req.AppendSystemPrompt,
+			AllowedTools:       req.AllowedTools,
+			ConfigOverrides:    req.ConfigOverrides,
+			Ephemeral:          req.Ephemeral,
+			HubTaskID:          req.HubTaskID,
 		}
 		if err := h.Executor.Start(run, runCtx); err != nil {
 			if failed, ok := repository.SetRunStatusIf(run.ID, "failed", "queued"); ok {
