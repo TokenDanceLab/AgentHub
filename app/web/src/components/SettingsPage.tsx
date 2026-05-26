@@ -116,8 +116,7 @@ interface ProjectSkill {
 
 const STORAGE_PREFIX = 'agenthub-settings.';
 const DEVICE_ID_KEY = 'agenthub_device_id';
-const TD_CODE_VERIFIER_KEY = 'td_code_verifier';
-const TD_STATE_KEY = 'td_state';
+const OIDC_PENDING_KEY = 'agenthub_oidc_pkce_pending';
 
 const MODEL_OPTIONS = [
   ['auto', 'Auto'],
@@ -245,6 +244,24 @@ function readBrowserStorage(storage: 'local' | 'session', key: string) {
   }
 }
 
+function hasPendingBrowserOIDC() {
+  const raw = readBrowserStorage('session', OIDC_PENDING_KEY);
+  if (!raw) return false;
+  try {
+    const pending = JSON.parse(raw) as {
+      state?: unknown;
+      codeVerifier?: unknown;
+      deviceId?: unknown;
+      redirectUri?: unknown;
+    };
+    return [pending.state, pending.codeVerifier, pending.deviceId, pending.redirectUri].every(
+      (value) => typeof value === 'string' && value.length > 0,
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'general' }: Props) {
   const { t } = useTranslation();
   const { themeMode, setThemeMode } = useTheme();
@@ -360,8 +377,9 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
         ? t('settings.hubLocalLogin')
         : t('settings.notConfigured');
   const deviceId = readBrowserStorage('local', DEVICE_ID_KEY);
-  const pkceStateReady =
-    Boolean(readBrowserStorage('session', TD_CODE_VERIFIER_KEY)) && Boolean(readBrowserStorage('session', TD_STATE_KEY));
+  const oidcRoundTripPending = hasPendingBrowserOIDC();
+  const tokenDanceOidcStatus = tokenSource === 'tokendance' ? t('settings.statusReady') : t('settings.statusInProgress');
+  const tokenDanceOidcDesc = oidcRoundTripPending ? t('settings.tokenDanceOidcPendingDesc') : t('settings.tokenDanceOidcDesc');
   const handleSignOut = () => {
     void hubAuth.logout();
   };
@@ -1528,8 +1546,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   />
                   <CapabilityCard
                     title="TokenDance ID OIDC"
-                    description={t('settings.tokenDanceOidcDesc')}
-                    status={pkceStateReady ? t('settings.statusInProgress') : t('settings.statusPlanned')}
+                    description={tokenDanceOidcDesc}
+                    status={tokenDanceOidcStatus}
                   />
                   <CapabilityCard
                     title={t('settings.authTokenSource')}
