@@ -2,8 +2,10 @@ package adapters
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os/exec"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -17,17 +19,20 @@ type ClaudeCodeAdapter struct {
 	model          string // default model (fallback when runCtx.Model is empty)
 	permissionMode string // default permission mode (fallback when runCtx.PermissionMode is empty)
 	maxTurns       int
+	available      bool // #177: true if the CLI binary exists and is executable
 }
 
 // NewClaudeCodeAdapter creates a Claude Code adapter.
 // binaryPath is the path to the claude executable.
 // model and permissionMode serve as defaults when the run context does not specify them.
 func NewClaudeCodeAdapter(binaryPath, model, permissionMode string) *ClaudeCodeAdapter {
+	_, err := exec.LookPath(binaryPath)
 	return &ClaudeCodeAdapter{
 		binaryPath:     binaryPath,
 		model:          model,
 		permissionMode: permissionMode,
 		maxTurns:       50,
+		available:      err == nil,
 	}
 }
 
@@ -80,13 +85,58 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 		args = append(args, "--permission-mode", permMode)
 	}
 
-	// Reasoning effort & thinking budget
+	// Reasoning effort (--effort)
 	if ctx.ReasoningEffort != "" {
 		effort := ResolveReasoningEffort("claude-code", ctx.ReasoningEffort)
-		args = append(args, "--reasoning-effort", effort)
+		args = append(args, "--effort", effort)
 	}
-	if ctx.MaxThinkingTokens > 0 {
-		args = append(args, "--max-thinking-tokens", fmt.Sprintf("%d", ctx.MaxThinkingTokens))
+
+	// Thinking mode (--thinking) replaces deprecated --max-thinking-tokens.
+	// Ref: claude-code-source/src/main.tsx line 976 — --max-thinking-tokens is hidden & deprecated.
+	// Accepted values: "enabled", "adaptive", "disabled".
+	if ctx.ThinkingMode != "" {
+		args = append(args, "--thinking", ctx.ThinkingMode)
+	} else if ctx.MaxThinkingTokens > 0 {
+		// Fallback for callers still using the deprecated field: enable thinking.
+		args = append(args, "--thinking", "enabled")
+	}
+
+	// Structured output (--json-schema)
+	if ctx.StructuredOutputSchema != "" {
+		args = append(args, "--json-schema", ctx.StructuredOutputSchema)
+	}
+
+	// System prompt customization
+	if ctx.SystemPrompt != "" {
+		args = append(args, "--system-prompt", ctx.SystemPrompt)
+	}
+	if ctx.AppendSystemPrompt != "" {
+		args = append(args, "--append-system-prompt", ctx.AppendSystemPrompt)
+	}
+
+	// Custom agent definitions (--agents JSON)
+	if len(ctx.AgentDefinitions) > 0 {
+		agentsJSON, err := json.Marshal(ctx.AgentDefinitions)
+		if err == nil {
+			args = append(args, "--agents", string(agentsJSON))
+		}
+	}
+
+	// MCP server config (--mcp-config)
+	if ctx.MCPConfig != "" {
+		args = append(args, "--mcp-config", ctx.MCPConfig)
+	}
+
+	// Tool allowlisting (--allowedTools)
+	if len(ctx.AllowedTools) > 0 {
+		for _, t := range ctx.AllowedTools {
+			args = append(args, "--allowedTools", t)
+		}
+	}
+
+	// Spending cap (--max-budget-usd)
+	if ctx.MaxBudgetUSD > 0 {
+		args = append(args, "--max-budget-usd", fmt.Sprintf("%.2f", ctx.MaxBudgetUSD))
 	}
 
 	// Fast mode
@@ -101,7 +151,8 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 
 	// Session continuity from run context
 	if ctx.SessionID != "" {
-		args = append(args, "--resume", ctx.SessionID)
+		// --session-id for explicit ID assignment; --resume for picking up existing session
+		args = append(args, "--session-id", ctx.SessionID)
 	} else if ctx.ContinueLast {
 		args = append(args, "--continue")
 	}
@@ -132,3 +183,7 @@ func (a *ClaudeCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, s
 // NeedsStdin returns true — Claude Code uses stdin for the control protocol
 // (interrupt, permission responses).
 func (a *ClaudeCodeAdapter) NeedsStdin() bool { return true }
+
+// Available reports whether the claude CLI binary was found at startup.
+// #177: check binary at startup, report unavailable if missing.
+func (a *ClaudeCodeAdapter) Available() bool { return a.available }

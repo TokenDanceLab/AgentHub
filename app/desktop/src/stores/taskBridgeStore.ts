@@ -65,6 +65,7 @@ export const useTaskBridgeStore = create<TaskBridgeState>()(
         if (idx < 0) return s;
 
         const oldTask = s.tasks[idx];
+        if (!oldTask) return s;
         const updated = { ...oldTask, ...updates };
 
         const newTasks = [...s.tasks];

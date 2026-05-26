@@ -65,6 +65,15 @@ func (s *SessionService) CreatePrivateSession(ctx context.Context, currentUserID
 		return nil, err
 	}
 
+	// #122: verify both users are friends before creating a private session.
+	f, err := repository.FindFriendshipBetween(s.db, currentUserID, targetUserID)
+	if err != nil {
+		return nil, err
+	}
+	if f == nil || f.Status != model.StatusAccepted {
+		return nil, errcode.FriendNotFriend
+	}
+
 	existing, err := repository.FindPrivateSessionBetween(s.db, currentUserID, targetUserID)
 	if err != nil {
 		return nil, err
@@ -99,26 +108,25 @@ func (s *SessionService) CreateGroupSession(ctx context.Context, ownerUserID, na
 	if len(name) == 0 || len(name) > config.MaxGroupNameLength {
 		return nil, errcode.ErrBadRequest
 	}
-	if len(memberIDs) == 0 {
-		return nil, errcode.ErrBadRequest
-	}
 
-	friendIDs, err := repository.GetFriendIDs(s.db, ownerUserID)
-	if err != nil {
-		return nil, err
-	}
-	friendSet := make(map[string]bool)
-	for _, id := range friendIDs {
-		friendSet[id] = true
-	}
-	for _, mid := range memberIDs {
-		if !friendSet[mid] {
-			return nil, errcode.ErrBadRequest
+	if len(memberIDs) > 0 {
+		friendIDs, err := repository.GetFriendIDs(s.db, ownerUserID)
+		if err != nil {
+			return nil, err
+		}
+		friendSet := make(map[string]bool)
+		for _, id := range friendIDs {
+			friendSet[id] = true
+		}
+		for _, mid := range memberIDs {
+			if !friendSet[mid] {
+				return nil, errcode.ErrBadRequest
+			}
 		}
 	}
 
 	session := &model.Session{Type: model.SessionTypeGroup, Name: name, OwnerUserID: &ownerUserID}
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := repository.CreateSession(tx, session); err != nil {
 			return err
 		}
@@ -212,13 +220,46 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 		return errcode.ErrBadRequest
 	}
 
-	_, err = s.requireMember(ctx, sessionID, currentUserID)
+	// #86: Only the group owner can add members, and members must be friends.
+	member, err := s.requireMember(ctx, sessionID, currentUserID)
 	if err != nil {
 		return err
 	}
+	if member.Role != model.MemberRoleOwner {
+		return errcode.GroupNotOwner
+	}
+
+	// Re-apply friend-boundary check: owner can only invite friends into the group.
+	friendIDs, err := repository.GetFriendIDs(s.db, currentUserID)
+	if err != nil {
+		return err
+	}
+	friendSet := make(map[string]bool)
+	for _, id := range friendIDs {
+		friendSet[id] = true
+	}
+	for _, mid := range memberIDs {
+		if !friendSet[mid] {
+			return errcode.ErrBadRequest
+		}
+	}
+
+	// Deduplicate member IDs to prevent duplicate key violations
+	seen := make(map[string]bool, len(memberIDs))
+	unique := make([]string, 0, len(memberIDs))
+	for _, mid := range memberIDs {
+		if !seen[mid] {
+			seen[mid] = true
+			unique = append(unique, mid)
+		}
+	}
+	memberIDs = unique
 
 	for _, mid := range memberIDs {
-		active, _ := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, mid)
+		active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, mid)
+		if err != nil {
+			return err
+		}
 		if active {
 			return errcode.GroupAlreadyMember
 		}
@@ -227,7 +268,10 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 	members := make([]*model.SessionMember, 0, len(memberIDs))
 	for _, mid := range memberIDs {
 		// Reactivate soft-deleted members instead of creating duplicates.
-		softDeleted, _ := repository.IsMemberSoftDeleted(s.db, sessionID, model.MemberTypeUser, mid)
+		softDeleted, err := repository.IsMemberSoftDeleted(s.db, sessionID, model.MemberTypeUser, mid)
+		if err != nil {
+			return err
+		}
 		if softDeleted {
 			if err := repository.ReactivateMember(s.db, sessionID, model.MemberTypeUser, mid, model.MemberRoleMember); err != nil {
 				return err
@@ -264,9 +308,28 @@ func (s *SessionService) RemoveGroupMember(ctx context.Context, currentUserID, s
 		return errcode.GroupNotOwner
 	}
 
-	active, _ := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, targetUserID)
+	// #97: prevent owner from removing themselves
+	if session.OwnerUserID != nil && targetUserID == *session.OwnerUserID {
+		return errcode.GroupOwnerCannotLeave
+	}
+
+	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, targetUserID)
+	if err != nil {
+		return err
+	}
 	if !active {
 		return errcode.SessionNotMember
+	}
+
+	// #135: clean up agents invited by the removed member
+	agents, err := repository.ListAgentInstancesByInviter(s.db, sessionID, targetUserID)
+	if err != nil {
+		return err
+	}
+	for _, agent := range agents {
+		_ = repository.CancelTasksByAgentInstance(s.db, agent.ID)
+		_ = repository.DeleteAgentInstance(s.db, agent.ID)
+		_ = repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeAgent, agent.ID)
 	}
 
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, targetUserID); err != nil {
@@ -291,7 +354,10 @@ func (s *SessionService) LeaveGroup(ctx context.Context, currentUserID, sessionI
 	}
 
 	if member.Role == model.MemberRoleOwner {
-		members, _ := repository.ListActiveMembers(s.db, sessionID)
+		members, err := repository.ListActiveMembers(s.db, sessionID)
+		if err != nil {
+			return err
+		}
 		otherActive := false
 		for _, m := range members {
 			if m.MemberID != currentUserID {
@@ -305,7 +371,10 @@ func (s *SessionService) LeaveGroup(ctx context.Context, currentUserID, sessionI
 	}
 
 	// P11.3: clean up agents invited by this user
-	agents, _ := repository.ListAgentInstancesByInviter(s.db, sessionID, currentUserID)
+	agents, err := repository.ListAgentInstancesByInviter(s.db, sessionID, currentUserID)
+	if err != nil {
+		return err
+	}
 	for _, agent := range agents {
 		_ = repository.CancelTasksByAgentInstance(s.db, agent.ID)
 		_ = repository.DeleteAgentInstance(s.db, agent.ID)
@@ -336,7 +405,10 @@ func (s *SessionService) TransferGroupOwnership(ctx context.Context, currentUser
 		return errcode.GroupNotOwner
 	}
 
-	targetActive, _ := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, newOwnerID)
+	targetActive, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, newOwnerID)
+	if err != nil {
+		return err
+	}
 	if !targetActive {
 		return errcode.SessionNotMember
 	}
@@ -382,9 +454,13 @@ func (s *SessionService) UpdateGroupInfo(ctx context.Context, currentUserID, ses
 		return errcode.ErrBadRequest
 	}
 
-	_, err = s.requireMember(ctx, sessionID, currentUserID)
+	member, err := s.requireMember(ctx, sessionID, currentUserID)
 	if err != nil {
 		return err
+	}
+	// #112: require owner authority for group info updates
+	if member.Role != model.MemberRoleOwner {
+		return errcode.GroupNotOwner
 	}
 
 	if name != nil {
@@ -416,15 +492,51 @@ func (s *SessionService) UpdateMemberSettings(ctx context.Context, currentUserID
 }
 
 func (s *SessionService) DeleteForMe(ctx context.Context, currentUserID, sessionID string) error {
-	_, err := s.getSession(ctx, sessionID)
+	session, err := s.getSession(ctx, sessionID)
 	if err != nil {
 		return err
 	}
-	_, err = s.requireMember(ctx, sessionID, currentUserID)
+	member, err := s.requireMember(ctx, sessionID, currentUserID)
 	if err != nil {
 		return err
 	}
-	return repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID)
+
+	// #113: group owner must transfer or dissolve before leaving
+	if session.Type == model.SessionTypeGroup && member.Role == model.MemberRoleOwner {
+		members, err := repository.ListActiveMembers(s.db, sessionID)
+		if err != nil {
+			return err
+		}
+		otherActive := false
+		for _, m := range members {
+			if m.MemberID != currentUserID && m.MemberType == model.MemberTypeUser {
+				otherActive = true
+				break
+			}
+		}
+		if otherActive {
+			return errcode.GroupOwnerCannotLeave
+		}
+	}
+
+	// #135: clean up agents invited by this user
+	if session.Type == model.SessionTypeGroup {
+		agents, err := repository.ListAgentInstancesByInviter(s.db, sessionID, currentUserID)
+		if err != nil {
+			return err
+		}
+		for _, agent := range agents {
+			_ = repository.CancelTasksByAgentInstance(s.db, agent.ID)
+			_ = repository.DeleteAgentInstance(s.db, agent.ID)
+			_ = repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeAgent, agent.ID)
+		}
+	}
+
+	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID); err != nil {
+		return err
+	}
+	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
+	return nil
 }
 
 func (s *SessionService) SearchSessions(ctx context.Context, userID, q string) ([]SessionListItem, error) {
@@ -459,4 +571,9 @@ func (s *SessionService) SearchSessions(ctx context.Context, userID, q string) (
 		}
 	}
 	return result, nil
+}
+
+// ListActiveMembers returns all active (non-left) members of a session. Thin wrapper over repository.ListActiveMembers.
+func (s *SessionService) ListActiveMembers(sessionID string) ([]*model.SessionMember, error) {
+	return repository.ListActiveMembers(s.db, sessionID)
 }

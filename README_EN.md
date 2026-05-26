@@ -153,7 +153,7 @@ pnpm test:e2e
 
 `pnpm build` only builds the frontend and does not need Rust. `pnpm tauri dev` needs Rust and Tauri system dependencies. Playwright uses `http://localhost:5199`.
 
-Note: `scripts/client-smoke.ps1` still includes historical checks for the removed `runner/` directory. Do not use it as the pass/fail source until that script is fixed.
+`scripts/client-smoke.ps1` now matches the current Edge Runtime architecture. It no longer builds the removed standalone `runner/` directory, uses the Edge built-in `agenthub-runner-mock` compatibility profile, and supports `-EdgeAddr` for isolated smoke runs.
 
 ### Verification
 
@@ -162,6 +162,12 @@ Docs/API changes:
 ```powershell
 git diff --check
 python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
+```
+
+Runtime / AgentAdapter / Edge API / Settings display boundary changes should also run:
+
+```powershell
+.\scripts\verify-runtime-readiness.ps1
 ```
 
 Backend changes:
@@ -235,15 +241,23 @@ When working inside the `D:\Code\TokenDance` workspace, read root `../AGENTS.md`
 
 ## TokenDance ID Auth Boundary
 
-TokenDance ID is the cross-product identity entry. Hub session is AgentHub's own product session. Final browser/desktop login must be implemented by Hub Server as the TokenDance ID relying party: OIDC Authorization Code + PKCE code exchange, issuer/audience/JWKS ID token validation, `tokendance_sub` to Hub user mapping, and Hub-local access/refresh session issuance.
+TokenDance ID is the cross-product identity entry. Hub session is AgentHub's own product session. Hub Server now provides the TokenDance ID relying-party flow: OIDC Authorization Code + PKCE authorize/callback, issuer/audience/JWKS ID token validation, `tokendance_sub` to Hub user mapping, and Hub-local access/refresh session issuance. Release readiness still depends on deployed client registration, Desktop/Web callback UX, logout/reconnect flows, and screenshot/smoke evidence.
 
 | Item | Boundary |
 |---|---|
 | TokenDance ID | Owns unified third-party login and account identity; products do not integrate GitHub/Google/Feishu directly |
 | Hub Server | Owns Hub callback, code exchange, Hub user mapping, Hub access/refresh sessions, and device proof |
 | Desktop/Web | Opens browser/Web login and stores Hub session; does not store third-party provider tokens |
-| Compatibility bearer path | `hub-server/internal/middleware/auth.go` can verify TokenDance ID RS256/JWKS bearer tokens, but this is compatibility-only and does not replace Hub session |
+| Compatibility bearer path | `hub-server/internal/middleware/auth.go` can verify TokenDance ID RS256/JWKS bearer tokens, but this is identity-only compatibility; it does not replace Hub session and does not satisfy desktop device proof |
 | Local execution | Local Edge + Desktop execution does not require Hub login; Hub session is required for cloud IM, sync, remote control, or relay |
+
+OIDC structural check:
+
+```powershell
+.\scripts\verify-oidc-readiness.ps1
+```
+
+This check only proves public repository wiring for Hub OIDC endpoints, example configuration, Desktop/Web Hub session storage policy, and the root governance matrix. It does not connect to production TokenDance ID, does not need a real `client_secret`, and does not replace deployed login/callback/logout/reconnect evidence.
 
 <br>
 

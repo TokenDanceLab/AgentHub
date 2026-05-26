@@ -34,8 +34,9 @@ Hub Server 通过 `AGENTHUB_` 前缀的环境变量覆盖配置文件中的值�
 | `AGENTHUB_JWT_REFRESH_TTL` | Refresh Token 有效期 | `720h` |
 | `AGENTHUB_TOKENDANCE_ID_ISSUER_URL` | TokenDance ID issuer，用于 RS256 bearer-token 兼容路径 | `https://id.vectorcontrol.tech` |
 | `AGENTHUB_TOKENDANCE_ID_JWKS_URI` | TokenDance ID JWKS；为空时由 issuer 拼出 `/oidc/jwks` | `https://id.vectorcontrol.tech/oidc/jwks` |
-| `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | Hub OIDC client id；启用 TokenDance bearer 兼容路径时必填，用于强制 `aud` 校验 | — |
-| `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | 预留给未来 confidential-client flow；只从 secret store 注入 | — |
+| `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | Hub OIDC client id；用于 Hub code exchange 和 TokenDance bearer 兼容路径的 `aud` 校验 | — |
+| `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | Hub confidential-client secret；只从 secret store 注入，不得写入仓库 | — |
+| `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI` | Hub OIDC callback/exchange redirect URI，必须与 TokenDance ID client 注册值一致 | — |
 | `AGENTHUB_UPLOAD_DIR` | 上传文件存储目录 | `./uploads` |
 | `AGENTHUB_UPLOAD_MAX_SIZE` | 上传文件最大字节数 | `10485760` |
 | `AGENTHUB_PPROF_USER` | 管理端点 HTTP Basic 用户名 | **必填** |
@@ -43,7 +44,9 @@ Hub Server 通过 `AGENTHUB_` 前缀的环境变量覆盖配置文件中的值�
 
 `AGENTHUB_JWT_SECRET` 必须通过环境变量设置；配置文件中的硬编码默认值会被拒绝。参见 `.env.example`。
 
-TokenDance ID 相关变量只启用 Hub Server 对 TokenDance ID RS256 bearer token 的兼容校验路径。启用该路径时必须配置 issuer、JWKS 和 Hub client id；Hub 会校验 RS256 签名、`exp`、`iss` 和 `aud`。当前 Hub Server 还没有最终定稿的 TokenDance ID 浏览器登录 callback，也不会为 TokenDance ID bearer token 自动创建 Hub refresh session；完整边界见 `../README.md` 的 TokenDance ID 兼容鉴权章节。
+TokenDance ID 相关变量启用 Hub Server 的 TokenDance ID OIDC Authorization Code + PKCE 登录交换，同时保留 RS256 bearer token 兼容校验路径。Hub OIDC callback/exchange 路由为 `POST /client/auth/oidc/callback`：服务端用 `client_secret` 交换 code、校验 ID token 的 RS256/JWKS、`exp`、`iss`、`aud`，再签发 Hub 本地 access/refresh session 和 device proof。TokenDance ID bearer token 兼容路径仍只作为身份校验，不会自动创建 Hub refresh session，也不能作为 Edge `desktop` device proof。完整边界见 `../README.md` 的 TokenDance ID 鉴权章节。
+
+`AGENTHUB_TOKENDANCE_*` 旧变量名仍被配置加载器兼容；生产和新文档统一使用 `AGENTHUB_TOKENDANCE_ID_*`。
 
 ## 快速启动（Docker Compose）
 

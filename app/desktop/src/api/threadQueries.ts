@@ -5,6 +5,8 @@ import {
   createThread,
   fetchThreadItems,
   fetchThreads,
+  fetchThreadItems,
+  createThread,
   renameThread,
   deleteThread,
   type CreateThreadRequest,
@@ -15,7 +17,7 @@ export function useThreads(projectId?: string) {
   return useQuery<ListResponse<ThreadInfo>>({
     queryKey: ['threads', projectId],
     queryFn: () => fetchThreads(projectId),
-    refetchInterval: 10_000, // replaces App.tsx setInterval polling
+    refetchInterval: 10_000,
   });
 }
 
@@ -25,16 +27,6 @@ export function useThreadItems(threadId?: string) {
     queryKey: ['threadItems', threadId],
     queryFn: () => fetchThreadItems(threadId!),
     refetchInterval: 10_000,
-  });
-}
-
-export function useCreateThread() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (req: CreateThreadRequest) => createThread(req),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['threads'] });
-    },
   });
 }
 
@@ -86,5 +78,25 @@ export function useDeleteThread() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['threads'] });
     },
+  });
+}
+
+export function useCreateThread() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ title, threadId }: { title?: string; threadId?: string }) =>
+      createThread(title, threadId),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['threads'] });
+    },
+  });
+}
+
+export function useThreadMessages(threadId: string | null) {
+  return useQuery({
+    queryKey: ['threadItems', threadId],
+    queryFn: () => fetchThreadItems(threadId!),
+    enabled: !!threadId,
+    staleTime: 5_000,
   });
 }
