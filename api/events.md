@@ -172,6 +172,7 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `team.route.decided` | P1 | Supervisor typed route decision 已接受，payload 为 `CoordinatorRouteDecision` |
 | `team.route.rejected` | P1 | Supervisor route decision 被 schema、任务数、活跃 subagent 或重复 route guardrail 拒绝，payload 包含 `decision` 和 `reason` |
 | `team.task.created` | P1 | TeamTask 已从 accepted route decision 创建 |
+| `team.approval.decided` | P1 | TeamRun approval 人工决策已记录，payload 包含 `approval_id`、`agent_task_id`、`edge_run_id`、`decision`、`decided_by`、`edge_control` |
 | `assignment.created` | P1 | TeamAssignment 已创建 |
 | `assignment.dispatched` | P1 | TeamAssignment 已派发到目标 Agent，payload 包含 `assignment_id`、`team_task_id` 和 Hub `agent_task_id` |
 | `assignment.completed` | P1 | TeamAssignment 完成 |
@@ -316,6 +317,7 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 | `agent.done` | Edge→Hub | agent 任务完成，payload: `{ task_id, result_summary, usage{} }` |
 | `agent.failed` | Edge→Hub | agent 任务失败，payload: `{ task_id, error }` |
 | `agent.cancel` | Hub→Edge | 取消 agent 任务，payload: `{ task_id }` |
+| `agent.control` | Hub→Edge | 设备级控制命令，payload: `{ kind, agent_task_id?, target_id?, edge_device_id, team_id?, team_run_id?, team_task_id?, assignment_id?, member_id?, approval_id?, edge_control? }`。当前 `kind=permission.decide` 用于把 TeamRun approval decision 投递给拥有该 Edge run 的 exact Desktop/Edge；`edge_control` 可直接转为 Edge `POST /v1/permissions/decide` body。目标 device 离线时进入 user/device 专属控制队列，reconnect 只 replay 同一 device，禁止 fallback 到其它 Desktop。 |
 | `agent.timeout` | Hub→Edge | 任务超时，payload: `{ task_id }` |
 
 #### Notification 事件（Hub→Client）
@@ -351,4 +353,7 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 // Hub 推送 typed runtime event
 {"type":"agent.stream","payload":{"id":"evt_01HX...","task_id":"task_01HX...","edge_run_id":"run_01HX...","session_id":"sess_01HX...","agent_instance_id":"agent_01HX...","event_seq":1,"event_type":"run.agent.tool_call","payload":{"callId":"call_1","toolName":"read_file"},"created_at":"2026-05-25T12:00:00Z"}}
+
+// Hub 推送 exact-device permission decision control
+{"type":"agent.control","payload":{"kind":"permission.decide","agent_task_id":"task_01HX...","edge_device_id":"device_01HX...","team_id":"team_01HX...","team_run_id":"run_team_01HX...","approval_id":"req_01HX...","edge_control":{"runId":"edge_run_01HX...","requestId":"req_01HX...","decision":"allow","reason":"Known safe command"}}}
 ```

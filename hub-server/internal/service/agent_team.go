@@ -30,10 +30,15 @@ type agentTeamCache interface {
 	InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error
 }
 
+type agentTeamControlSvc interface {
+	DeliverToDesktopDevice(ctx context.Context, userID, deviceID string, payload model.AgentControlPayload) error
+}
+
 type AgentTeamService struct {
 	db          *gorm.DB
 	agentSvc    agentTeamAgentSvc
 	cacheClient agentTeamCache
+	controlSvc  agentTeamControlSvc
 }
 
 func NewAgentTeamService(db *gorm.DB, agentSvc agentTeamAgentSvc, cacheClient *cache.Client) *AgentTeamService {
@@ -42,6 +47,10 @@ func NewAgentTeamService(db *gorm.DB, agentSvc agentTeamAgentSvc, cacheClient *c
 		agentSvc:    agentSvc,
 		cacheClient: resolveAgentTeamCache(cacheClient),
 	}
+}
+
+func (s *AgentTeamService) SetControlService(controlSvc agentTeamControlSvc) {
+	s.controlSvc = controlSvc
 }
 
 func resolveAgentTeamCache(c *cache.Client) agentTeamCache {
@@ -678,6 +687,23 @@ func (s *AgentTeamService) DecideApproval(ctx context.Context, userID, teamID, r
 		return nil, errcode.ErrBadRequest
 	}
 
+	edgeDeviceID := ""
+	targetID := ""
+	if s.controlSvc != nil {
+		if strings.TrimSpace(approval.AgentTaskID) == "" {
+			return nil, errcode.ErrBadRequest
+		}
+		pendingTask, err := repository.GetPendingTaskByID(s.db, approval.AgentTaskID)
+		if err != nil {
+			return nil, errcode.ErrBadRequest
+		}
+		if pendingTask.TriggeredByUserID != userID || strings.TrimSpace(pendingTask.EdgeDeviceID) == "" {
+			return nil, errcode.ErrBadRequest
+		}
+		edgeDeviceID = strings.TrimSpace(pendingTask.EdgeDeviceID)
+		targetID = strings.TrimSpace(pendingTask.TargetID)
+	}
+
 	now := time.Now().UTC()
 	edgeControl := &model.TeamApprovalEdgeControl{
 		RunID:     approval.EdgeRunID,
@@ -703,6 +729,23 @@ func (s *AgentTeamService) DecideApproval(ctx context.Context, userID, teamID, r
 	}
 	if err := s.appendTeamEvent(runID, model.TeamEventApprovalDecided, record); err != nil {
 		return nil, err
+	}
+	if s.controlSvc != nil {
+		if err := s.controlSvc.DeliverToDesktopDevice(ctx, userID, edgeDeviceID, model.AgentControlPayload{
+			Kind:         model.AgentControlKindPermissionDecide,
+			AgentTaskID:  record.AgentTaskID,
+			TargetID:     targetID,
+			EdgeDeviceID: edgeDeviceID,
+			TeamID:       teamID,
+			TeamRunID:    runID,
+			TeamTaskID:   record.TeamTaskID,
+			AssignmentID: record.AssignmentID,
+			MemberID:     record.MemberID,
+			ApprovalID:   record.ApprovalID,
+			EdgeControl:  edgeControl,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	decided := *approval
