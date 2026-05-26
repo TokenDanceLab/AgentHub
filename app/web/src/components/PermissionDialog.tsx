@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Shield, ShieldCheck, ShieldX, X, ChevronDown, ChevronUp } from 'lucide-react';
-import type { PermissionRequestItem } from '@/hooks/useChatMessages';
+import type { PermissionRequestItem } from '@/types/permissions';
 import styles from './PermissionDialog.module.css';
 
 interface Props {
