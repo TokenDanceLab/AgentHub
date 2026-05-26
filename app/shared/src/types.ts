@@ -183,6 +183,19 @@ export interface ThreadInfo {
   updatedAt: string;
 }
 
+export interface ThreadItemInfo {
+  itemId: string;
+  projectId: string;
+  threadId: string;
+  runId?: string;
+  type: string;
+  role?: string;
+  status: string;
+  content?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RunLogs {
   runId: string;
   stdout: string;

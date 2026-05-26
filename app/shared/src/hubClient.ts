@@ -50,6 +50,30 @@ export interface HubChangePasswordRequest {
   new_password: string;
 }
 
+export interface HubOidcAuthorizeRequest {
+  code_challenge: string;
+  code_challenge_method?: 'S256' | 'plain';
+  device_type?: string;
+  device_id?: string;
+}
+
+export interface HubOidcAuthorizeResponse {
+  state: string;
+  authorization_url: string;
+}
+
+export interface HubOidcCallbackRequest {
+  code: string;
+  state: string;
+  code_verifier: string;
+  device_type?: string;
+  device_id?: string;
+}
+
+export interface HubOidcCallbackResponse extends HubAuthResponse {
+  user?: HubUserProfile;
+}
+
 export type HubContactType = 'user' | 'agent' | string;
 export type HubRelationship =
   | 'stranger'
@@ -197,8 +221,10 @@ export interface HubMessage {
 
 export interface HubRegisterDeviceRequest {
   device_id: string;
+  device_type?: string;
+  device_name?: string;
   app_version?: string;
-  capabilities?: string[];
+  capabilities?: string[] | Record<string, unknown>;
 }
 
 export interface HubDevice {
@@ -206,7 +232,7 @@ export interface HubDevice {
   user_id: string;
   device_type: string;
   app_version?: string;
-  capabilities?: string | Record<string, unknown>;
+  capabilities?: string | string[] | Record<string, unknown>;
   last_active_at?: string;
   created_at?: string;
 }
@@ -297,6 +323,67 @@ export interface HubNotification {
   payload: string;
   read: boolean;
   created_at: string;
+  [key: string]: unknown;
+}
+
+export interface HubPageInfo {
+  nextCursor?: string;
+  hasMore: boolean;
+}
+
+export interface HubListResponse<T> {
+  items: T[];
+  page: HubPageInfo;
+}
+
+export type HubExecutionTargetType =
+  | 'local_edge'
+  | 'remote_edge'
+  | 'cloud_edge'
+  | 'hub_relay'
+  | string;
+
+export interface HubExecutionTarget {
+  id: string;
+  name: string;
+  type: HubExecutionTargetType;
+  status?: string;
+  config?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+}
+
+export interface HubExecutionTargetRequest {
+  name: string;
+  type: HubExecutionTargetType;
+  config?: Record<string, unknown>;
+}
+
+export interface HubAuditEvent {
+  id: string;
+  actor_user_id?: string;
+  action: string;
+  resource_type?: string;
+  resource_id?: string;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+export interface HubRelayCommandRequest {
+  target_id: string;
+  payload: Record<string, unknown>;
+}
+
+export interface HubRelayCommand {
+  id: string;
+  target_id?: string;
+  status?: string;
+  payload?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
   [key: string]: unknown;
 }
 
@@ -579,6 +666,28 @@ export function createHubClient(opts: HubClientOptions = {}) {
     return unwrapHubResponse<T>(await readJson(response), response.status);
   }
 
+  async function requestWithFallback<T>(
+    paths: readonly string[],
+    options: RequestInit = {},
+  ): Promise<T> {
+    let fallbackError: unknown;
+
+    for (let index = 0; index < paths.length; index += 1) {
+      const path = paths[index]!;
+      try {
+        return await request<T>(path, options);
+      } catch (error) {
+        if (index < paths.length - 1 && isRouteFallbackError(error)) {
+          fallbackError = error;
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw fallbackError;
+  }
+
   return {
     request,
 
@@ -604,9 +713,34 @@ export function createHubClient(opts: HubClientOptions = {}) {
         method: 'PUT',
         body: JSON.stringify(body),
       }),
-    changePassword: (body: HubChangePasswordRequest) =>
-      request<void>('/client/auth/password', {
-        method: 'PUT',
+    changePassword: async (body: HubChangePasswordRequest) => {
+      const payload = JSON.stringify(body);
+      try {
+        return await request<void>('/client/auth/change-password', {
+          method: 'POST',
+          body: payload,
+        });
+      } catch (error) {
+        if (isRouteFallbackError(error)) {
+          return request<void>('/client/auth/password', {
+            method: 'PUT',
+            body: payload,
+          });
+        }
+        throw error;
+      }
+    },
+    oidcAuthorize: (body: HubOidcAuthorizeRequest) =>
+      request<HubOidcAuthorizeResponse>('/client/auth/oidc/authorize', {
+        method: 'POST',
+        body: JSON.stringify({
+          code_challenge_method: 'S256',
+          ...body,
+        }),
+      }),
+    oidcCallback: (body: HubOidcCallbackRequest) =>
+      request<HubOidcCallbackResponse>('/client/auth/oidc/callback', {
+        method: 'POST',
         body: JSON.stringify(body),
       }),
 
@@ -795,17 +929,23 @@ export function createHubClient(opts: HubClientOptions = {}) {
         `/client/notifications${qs(params ?? {})}`,
       ),
     markNotificationRead: (id: string) =>
-      request<void>(
-        `/client/notifications/${encodeURIComponent(id)}/read`,
+      requestWithFallback<void>(
+        [
+          `/client/notifications/${encodeURIComponent(id)}:read`,
+          `/client/notifications/${encodeURIComponent(id)}/read`,
+        ],
         { method: 'POST' },
       ),
     readAllNotifications: () =>
-      request<void>('/client/notifications/read-all', { method: 'POST' }),
+      requestWithFallback<void>(
+        ['/client/notifications:read-all', '/client/notifications/read-all'],
+        { method: 'POST' },
+      ),
 
     registerDevice: (body: HubRegisterDeviceRequest) =>
-      request<HubDevice>('/edge/devices/register', {
+      requestWithFallback<HubDevice>(['/edge/devices:register', '/edge/devices/register'], {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify(normalizeRegisterDeviceRequest(body)),
       }),
     ackTask: (taskId: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/ack`, {
@@ -848,10 +988,60 @@ export function createHubClient(opts: HubClientOptions = {}) {
         body: JSON.stringify({ trigger_message_id: triggerMessageId }),
       }),
     cancelAgentTask: (taskId: string) =>
-      request<void>(
-        `/web/agent-tasks/${encodeURIComponent(taskId)}/cancel`,
+      requestWithFallback<void>(
+        [
+          `/web/agent-tasks/${encodeURIComponent(taskId)}:cancel`,
+          `/web/agent-tasks/${encodeURIComponent(taskId)}/cancel`,
+        ],
         { method: 'POST' },
       ),
+
+    listExecutionTargets: () =>
+      request<HubListResponse<HubExecutionTarget>>('/web/execution-targets'),
+    createExecutionTarget: (body: HubExecutionTargetRequest) =>
+      request<HubExecutionTarget>('/web/execution-targets', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    getExecutionTarget: (id: string) =>
+      request<HubExecutionTarget>(
+        `/web/execution-targets/${encodeURIComponent(id)}`,
+      ),
+    updateExecutionTarget: (
+      id: string,
+      body: Partial<HubExecutionTargetRequest>,
+    ) =>
+      request<HubExecutionTarget>(
+        `/web/execution-targets/${encodeURIComponent(id)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        },
+      ),
+    deleteExecutionTarget: (id: string) =>
+      request<void>(`/web/execution-targets/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }),
+    pingExecutionTarget: (id: string) =>
+      request<HubExecutionTarget>(
+        `/web/execution-targets/${encodeURIComponent(id)}:ping`,
+        { method: 'POST' },
+      ),
+    listAuditEvents: (params?: { pageSize?: number; pageCursor?: string }) =>
+      request<HubListResponse<HubAuditEvent>>(
+        `/web/audit-events${qs(params ?? {})}`,
+      ),
+    createRelayCommand: (body: HubRelayCommandRequest) =>
+      request<HubRelayCommand>('/web/relay/commands', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    getRelayCommand: (id: string) =>
+      request<HubRelayCommand>(`/web/relay/commands/${encodeURIComponent(id)}`),
+    ackRelayCommand: (id: string) =>
+      request<void>(`/web/relay/commands/${encodeURIComponent(id)}:ack`, {
+        method: 'POST',
+      }),
 
     listCustomAgents: () =>
       request<HubCustomAgent[]>('/web/custom-agents'),
@@ -904,6 +1094,37 @@ export type RegisterDeviceRequest = HubRegisterDeviceRequest;
 export type Device = HubDevice;
 export type AddAgentToSessionRequest = HubAddAgentToSessionRequest;
 export type CustomAgentRequest = HubCustomAgentRequest;
+
+function isRouteFallbackError(error: unknown): boolean {
+  return error instanceof AppError && (error.status === 404 || error.status === 405);
+}
+
+function normalizeRegisterDeviceRequest(
+  body: HubRegisterDeviceRequest,
+): HubRegisterDeviceRequest & {
+  device_name: string;
+  device_type: string;
+  capabilities?: Record<string, unknown>;
+} {
+  const normalized = {
+    ...body,
+    device_name: body.device_name ?? body.device_id,
+    device_type: body.device_type ?? 'desktop',
+  };
+
+  if (Array.isArray(body.capabilities)) {
+    return {
+      ...normalized,
+      capabilities: Object.fromEntries(body.capabilities.map((capability) => [capability, true])),
+    };
+  }
+
+  return normalized as HubRegisterDeviceRequest & {
+    device_name: string;
+    device_type: string;
+    capabilities?: Record<string, unknown>;
+  };
+}
 
 async function readJson(response: Response): Promise<unknown> {
   try {

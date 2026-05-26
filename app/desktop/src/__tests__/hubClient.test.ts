@@ -258,10 +258,13 @@ describe('hubClient', () => {
         capabilities: ['webgl', 'gpu'],
       });
       expect(res.id).toBe('dev_1');
-      const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('http://test.local/edge/devices:register');
       const body = JSON.parse(init.body as string);
       expect(body.device_id).toBe('dev_1');
-      expect(body.capabilities).toEqual(['webgl', 'gpu']);
+      expect(body.device_name).toBe('dev_1');
+      expect(body.device_type).toBe('desktop');
+      expect(body.capabilities).toEqual({ webgl: true, gpu: true });
     });
   });
 
