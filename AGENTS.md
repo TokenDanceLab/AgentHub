@@ -257,14 +257,14 @@ feat/* → dev/delicious233 → master
 规则：
 - `master` 禁止直接 push，必须通过 PR。
 - `master` 目前滞后于 `dev/delicious233` 300+ commits，始终从 `dev/delicious233` 开始工作。
-- `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + `pnpm build`。
+- `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + 对应前端真实构建入口。Web 优先用 `corepack.cmd pnpm typecheck` + `corepack.cmd pnpm exec vite build`，避免把 Windows wrapper/lifecycle 债误判为 Vite 构建失败。
 - `feat/*` 合并前需要 rebase 到最新 `dev/delicious233`，解决冲突后再开 PR。
 - 删除已合并的 `feat/*` 分支和对应的 worktree。
 - Trump、Johnny 聚合和旧 Web parity 残留分支不合并到 `dev/delicious233`，除非先单独审查并拆成可验证的小 patch。
 
 开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
 
-P0-P3、M3b、M4、M5、M6、M7 全部完成。详细进度见 `docs/roadmap.md`。
+P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P1/P2 的 TokenDance ID、多端、Hub replay 和远程审批仍按 `docs/roadmap.md` 的部分闭环继续推进。
 
 进度同步：
 
@@ -360,8 +360,8 @@ pnpm build
 pnpm typecheck
 
 cd ..\web
-pnpm typecheck
-pnpm build
+corepack.cmd pnpm typecheck
+corepack.cmd pnpm exec vite build
 ```
 
 前端和客户端测试要求：
