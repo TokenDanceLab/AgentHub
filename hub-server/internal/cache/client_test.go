@@ -519,6 +519,28 @@ func TestPendingTargetTasksAreIsolatedByDeviceAndTarget(t *testing.T) {
 	require.Equal(t, []string{`{"task_id":"a2"}`}, devBTasks)
 }
 
+func TestPendingAgentControlsAreIsolatedByDevice(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-a", `{"kind":"permission.decide","approval_id":"approval-a"}`))
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-b", `{"kind":"permission.decide","approval_id":"approval-b"}`))
+
+	devAControls, err := c.PopPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Len(t, devAControls, 1)
+	require.JSONEq(t, `{"kind":"permission.decide","approval_id":"approval-a"}`, devAControls[0])
+
+	devASecondPop, err := c.PopPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Empty(t, devASecondPop)
+
+	devBControls, err := c.PopPendingAgentControlsForDevice(ctx, "user-control", "dev-b")
+	require.NoError(t, err)
+	require.Len(t, devBControls, 1)
+	require.JSONEq(t, `{"kind":"permission.decide","approval_id":"approval-b"}`, devBControls[0])
+}
+
 // ==================== Sequence Allocation ====================
 
 func TestInitSeqIfAbsent_PeekSeq_AllocateSeq(t *testing.T) {
