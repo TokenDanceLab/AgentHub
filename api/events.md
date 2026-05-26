@@ -121,12 +121,12 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `item.created` | P0 | Thread Item 创建 |
 | `item.updated` | P0 | Thread Item 状态更新 |
 
-### Execution / Runner
+### Execution / Runtime
 
 | type | 阶段 | 说明 |
 |---|---|---|
-| `runner.online` | P0 | Runner 在线 |
-| `runner.offline` | P0 | Runner 离线 |
+| `runner.online` | P0 | Runtime/target compatibility event: legacy Runner 在线 |
+| `runner.offline` | P0 | Runtime/target compatibility event: legacy Runner 离线 |
 | `run.queued` | P0 | AgentRun 已排队 |
 | `run.started` | P0 | AgentRun 已启动 |
 | `run.output` | P0 | 单条 stdout/stderr 输出 |
@@ -297,7 +297,7 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 方向 | 说明 |
 |------|------|------|
-| `agent.dispatch` | Hub→Edge | 分发 agent 任务，payload: `{ task_id, agent_instance_id, agent_type, session_id, prompt, trigger_message_id, trigger_user_id, display_name, model_params? }`；`agent_type` 必须是 Edge Runtime adapter id（如 `claude-code`、`codex`、`opencode`），`prompt` 来自触发消息文本 |
+| `agent.dispatch` | Hub→Edge | 分发 agent 任务，payload: `{ task_id, agent_instance_id, agent_type, session_id, prompt, trigger_message_id, trigger_user_id, display_name, model_params? }`；`agent_type` 必须是 Edge Runtime adapter id（如 `claude-code`、`codex`、`opencode`），`prompt` 来自触发消息文本。Web 触发可用 `agent_type` / `agent_instance_id` / `custom_agent_id` 指定目标；目标缺失时 Hub 返回 agent not found，不静默派给其他 Runtime。 |
 | `agent.stream` | Edge→Hub | agent 流式输出，payload: `{ task_id, content, content_type }` |
 | `agent.done` | Edge→Hub | agent 任务完成，payload: `{ task_id, result_summary, usage{} }` |
 | `agent.failed` | Edge→Hub | agent 任务失败，payload: `{ task_id, error }` |

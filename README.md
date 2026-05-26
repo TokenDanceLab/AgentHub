@@ -176,6 +176,12 @@ Runtime / AgentAdapter / Edge API / Settings 展示边界改动还应运行：
 .\scripts\verify-runtime-readiness.ps1
 ```
 
+Web Hub/Local Edge 边界改动还应运行：
+
+```powershell
+.\scripts\verify-web-hub-boundary.ps1
+```
+
 后端改动：
 
 ```powershell
