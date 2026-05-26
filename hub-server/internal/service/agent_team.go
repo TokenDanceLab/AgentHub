@@ -533,6 +533,31 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	return state, nil
 }
 
+// ListTeamEvents returns append-only events for a team run after owner checks.
+func (s *AgentTeamService) ListTeamEvents(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error) {
+	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+		return nil, err
+	}
+	run, err := repository.GetTeamRunByID(s.db, runID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentTaskNotFound
+		}
+		return nil, err
+	}
+	if run.TeamID != teamID {
+		return nil, errcode.AgentTaskNotFound
+	}
+	events, err := repository.ListTeamEventsByRun(s.db, runID)
+	if err != nil {
+		return nil, err
+	}
+	if events == nil {
+		events = []model.AgentTeamEvent{}
+	}
+	return events, nil
+}
+
 // HandleRouteDecision consumes a typed supervisor route decision and records
 // the accepted or rejected route in the TeamEvent log.
 func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error) {

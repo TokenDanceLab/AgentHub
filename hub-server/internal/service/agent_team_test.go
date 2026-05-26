@@ -599,6 +599,26 @@ func TestAgentTeamService_HandleRouteDecisionRejectsWhenTaskLimitReached(t *test
 	assert.Contains(t, events[0].Payload, "task limit")
 }
 
+func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, _, _, run := seedAgentTeamRun(t, db)
+	require.NoError(t, repository.AppendTeamEvent(db, &model.AgentTeamEvent{
+		TeamRunID: run.ID,
+		Type:      model.TeamEventRouteRejected,
+		Payload:   `{"reason":"invalid action"}`,
+	}))
+
+	events, err := svc.ListTeamEvents(context.Background(), "user-1", team.ID, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, model.TeamEventRouteRejected, events[0].Type)
+
+	_, err = svc.ListTeamEvents(context.Background(), "other-user", team.ID, run.ID)
+	require.Error(t, err)
+	assert.Equal(t, errcode.AgentNotFound, err)
+}
+
 func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
