@@ -5,10 +5,10 @@
 # DB/Redis 端口不对外暴露，仅 Docker 内部网络访问。
 #
 # 部署步骤（在 hk2 上执行）：
-#   1. 拉取代码：git clone 或 scp 整个 hub-server/ 目录
+#   1. 在开发机/CI 构建镜像并传输到服务器，服务器只执行 docker load
 #   2. 配置环境变量（必须设置 AGENTHUB_JWT_SECRET）
-#   3. docker compose up -d
-#   4. 配置 Caddy/nginx 反代：api.hub.vectorcontrol.tech → localhost:8080
+#   3. docker compose up -d --no-build
+#   4. 配置 nginx 反代：api.hub.vectorcontrol.tech → 127.0.0.1:8090
 # ──────────────────────────────────────────────
 
 services:
@@ -75,9 +75,8 @@ services:
 
   # ── Hub Server ─────────────────────────────
   hub-server:
-    build:
-      context: ..
-      dockerfile: ./deployments/Dockerfile
+    image: ${AGENTHUB_HUB_IMAGE:-ghcr.io/tokendancelab/agenthub-hub:latest}
+    pull_policy: never
     container_name: agenthub-hub
     restart: unless-stopped
     depends_on:
@@ -85,6 +84,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    dns: 127.0.0.11
     environment:
       # 数据库（连接 Docker 网络内的独立 PG）
       AGENTHUB_DB_HOST: postgres
@@ -123,7 +123,7 @@ services:
       AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub.vectorcontrol.tech/client/auth/oidc/callback}
       AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-}
     ports:
-      - "127.0.0.1:8080:8080"   # 仅本地回环，由 Caddy/nginx 反代
+      - "127.0.0.1:8090:8080"   # 仅本地回环，由 nginx 反代
       - "127.0.0.1:6060:6060"   # pprof/metrics 仅本地访问
     volumes:
       - agenthub_uploads:/app/uploads

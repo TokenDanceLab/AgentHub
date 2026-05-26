@@ -2727,6 +2727,27 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+  /web/agent-teams/{id}/runs/{run_id}/state:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetTeamRunState
+      summary: Replay a team run state from TeamEvent and assignment data.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
   /web/agent-teams/{id}/runs/{run_id}/assignments:
     parameters:
       - name: id
@@ -4531,6 +4552,74 @@ components:
         depth: { type: integer }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+
+    TeamRunState:
+      type: object
+      properties:
+        run_id: { type: string, format: uuid }
+        team_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [queued, running, completed, failed, cancelled]
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamMemberState"
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamAssignmentState"
+        route_log:
+          type: array
+          items:
+            $ref: "#/components/schemas/CoordinatorRouteDecision"
+        budget:
+          type: object
+          additionalProperties: true
+        terminal_reason:
+          type: string
+
+    TeamMemberState:
+      type: object
+      properties:
+        member_id: { type: string, format: uuid }
+        agent_profile_id: { type: string, format: uuid }
+        role:
+          type: string
+          enum: [supervisor, executor, reviewer]
+        active_tasks: { type: integer }
+        completed_tasks: { type: integer }
+
+    TeamAssignmentState:
+      type: object
+      properties:
+        assignment_id: { type: string, format: uuid }
+        from_member_id: { type: string, format: uuid }
+        to_member_id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [delegate, review, approve, notify]
+        status:
+          type: string
+          enum: [pending, dispatched, running, done, failed, cancelled]
+        depth: { type: integer }
+        run_id: { type: string, format: uuid }
+
+    CoordinatorRouteDecision:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [delegate, review, approve, finish]
+        next_worker: { type: string }
+        instructions: { type: string }
+        reasoning: { type: string }
+        context: { type: string }
+        approved: { type: boolean }
+        feedback: { type: string }
+        summary: { type: string }
+        blocked_reason: { type: string }
+        correlation_id: { type: string }
 
     CreateAgentProfileRequest:
       type: object

@@ -8,6 +8,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -431,4 +433,146 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	assert.Equal(t, "team-1", run.TeamID)
 	assert.Equal(t, model.TeamRunStatusRunning, run.Status)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAgentTeamService_GetTeamRunStateReplaysEvents(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+
+	team := &model.AgentTeam{OwnerID: "user-1", Name: "State Team"}
+	require.NoError(t, repository.CreateTeam(db, team))
+
+	supervisorProfileID := "profile-supervisor"
+	executorProfileID := "profile-executor"
+	supervisor := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: &supervisorProfileID,
+		Role:           model.TeamMemberRoleSupervisor,
+	}
+	executor := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: &executorProfileID,
+		Role:           model.TeamMemberRoleExecutor,
+	}
+	require.NoError(t, repository.AddTeamMember(db, supervisor))
+	require.NoError(t, repository.AddTeamMember(db, executor))
+
+	run := &model.AgentTeamRun{
+		TeamID:         team.ID,
+		SessionID:      "session-1",
+		TriggerUserID:  "user-1",
+		TriggerMessage: "ship it",
+		Status:         model.TeamRunStatusRunning,
+	}
+	require.NoError(t, repository.CreateTeamRun(db, run))
+
+	assignment := &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor.ID,
+		ToMemberID:   executor.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "Implement replay",
+		Status:       model.AssignmentStatusDone,
+		Result:       "done",
+		Depth:        1,
+		RunID:        stringPtr("edge-run-1"),
+	}
+	require.NoError(t, repository.CreateAssignment(db, assignment))
+
+	require.NoError(t, repository.AppendTeamEvent(db, &model.AgentTeamEvent{
+		TeamRunID: run.ID,
+		Type:      model.TeamEventRunStarted,
+		Payload:   `{"status":"running"}`,
+	}))
+	require.NoError(t, repository.AppendTeamEvent(db, &model.AgentTeamEvent{
+		TeamRunID: run.ID,
+		Type:      model.TeamEventRouteDecided,
+		Payload:   `{"action":"delegate","next_worker":"` + executor.ID + `","instructions":"Implement replay","reasoning":"needs executor"}`,
+	}))
+	require.NoError(t, repository.AppendTeamEvent(db, &model.AgentTeamEvent{
+		TeamRunID: run.ID,
+		Type:      model.TeamEventRunCompleted,
+		Payload:   `{"summary":"done"}`,
+	}))
+
+	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, run.ID, state.RunID)
+	assert.Equal(t, team.ID, state.TeamID)
+	assert.Equal(t, model.TeamRunStatusCompleted, state.Status)
+	assert.Equal(t, "done", state.TerminalReason)
+	require.Len(t, state.Members, 2)
+	assert.Equal(t, 1, state.Members[1].CompletedTasks)
+	require.Len(t, state.Assignments, 1)
+	assert.Equal(t, assignment.ID, state.Assignments[0].AssignmentID)
+	assert.Equal(t, "edge-run-1", state.Assignments[0].RunID)
+	require.Len(t, state.RouteLog, 1)
+	assert.Equal(t, "delegate", state.RouteLog[0].Action)
+	assert.Equal(t, executor.ID, state.RouteLog[0].NextWorker)
+}
+
+func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	tables := []string{
+		`CREATE TABLE agent_teams (
+			id TEXT PRIMARY KEY,
+			owner_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			avatar_url TEXT DEFAULT '',
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_members (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			agent_profile_id TEXT,
+			role TEXT NOT NULL DEFAULT 'executor',
+			position INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_runs (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			session_id TEXT,
+			trigger_user_id TEXT NOT NULL,
+			trigger_message TEXT DEFAULT '',
+			status TEXT NOT NULL DEFAULT 'queued',
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_assignments (
+			id TEXT PRIMARY KEY,
+			team_run_id TEXT NOT NULL,
+			from_member_id TEXT NOT NULL,
+			to_member_id TEXT NOT NULL,
+			type TEXT NOT NULL DEFAULT 'delegate',
+			task_prompt TEXT NOT NULL,
+			context TEXT DEFAULT '',
+			status TEXT NOT NULL DEFAULT 'pending',
+			run_id TEXT,
+			result TEXT DEFAULT '',
+			depth INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_events (
+			id TEXT PRIMARY KEY,
+			team_run_id TEXT NOT NULL,
+			seq INTEGER NOT NULL,
+			type TEXT NOT NULL,
+			payload TEXT NOT NULL DEFAULT '{}',
+			created_at DATETIME
+		)`,
+	}
+	for _, ddl := range tables {
+		require.NoError(t, db.Exec(ddl).Error)
+	}
+	return db
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

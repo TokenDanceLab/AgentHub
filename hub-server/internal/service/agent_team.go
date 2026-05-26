@@ -396,7 +396,6 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		}
 	}
 
-
 	// Trigger the task. This dispatches asynchronously.
 	if _, err := s.agentSvc.TriggerAgentTask(ctx, userID, "", supervisorAIID, "", "", "", ""); err != nil {
 		slog.Error("failed to trigger supervisor agent task for team run", "run_id", run.ID, "team_id", teamID, "error", err)
@@ -436,10 +435,120 @@ func (s *AgentTeamService) ListTeamRuns(ctx context.Context, userID, teamID stri
 	return repository.ListTeamRunsByTeam(s.db, teamID)
 }
 
+// GetTeamRunState returns a replayable projection of a team run.
+func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error) {
+	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+		return nil, err
+	}
+	run, err := repository.GetTeamRunByID(s.db, runID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentTaskNotFound
+		}
+		return nil, err
+	}
+	if run.TeamID != teamID {
+		return nil, errcode.AgentTaskNotFound
+	}
+
+	members, err := repository.ListTeamMembers(s.db, teamID)
+	if err != nil {
+		return nil, err
+	}
+	assignments, err := repository.ListAssignmentsByTeamRun(s.db, runID)
+	if err != nil {
+		return nil, err
+	}
+	events, err := repository.ListTeamEventsByRun(s.db, runID)
+	if err != nil {
+		return nil, err
+	}
+
+	state := &model.TeamRunState{
+		RunID:       run.ID,
+		TeamID:      run.TeamID,
+		Status:      run.Status,
+		Members:     make([]model.TeamMemberState, 0, len(members)),
+		Assignments: make([]model.TeamAssignmentState, 0, len(assignments)),
+		RouteLog:    []model.CoordinatorRouteDecision{},
+	}
+
+	memberIndex := make(map[string]int, len(members))
+	for _, member := range members {
+		agentProfileID := ""
+		if member.AgentProfileID != nil {
+			agentProfileID = *member.AgentProfileID
+		}
+		memberIndex[member.ID] = len(state.Members)
+		state.Members = append(state.Members, model.TeamMemberState{
+			MemberID:       member.ID,
+			AgentProfileID: agentProfileID,
+			Role:           member.Role,
+		})
+	}
+
+	for _, assignment := range assignments {
+		runIDValue := ""
+		if assignment.RunID != nil {
+			runIDValue = *assignment.RunID
+		}
+		state.Assignments = append(state.Assignments, model.TeamAssignmentState{
+			AssignmentID: assignment.ID,
+			FromMemberID: assignment.FromMemberID,
+			ToMemberID:   assignment.ToMemberID,
+			Type:         assignment.Type,
+			Status:       assignment.Status,
+			Depth:        assignment.Depth,
+			RunID:        runIDValue,
+		})
+		if idx, ok := memberIndex[assignment.ToMemberID]; ok {
+			switch assignment.Status {
+			case model.AssignmentStatusPending, model.AssignmentStatusDispatched, model.AssignmentStatusRunning:
+				state.Members[idx].ActiveTasks++
+			case model.AssignmentStatusDone:
+				state.Members[idx].CompletedTasks++
+			}
+		}
+	}
+
+	for _, event := range events {
+		switch event.Type {
+		case model.TeamEventRouteDecided:
+			var decision model.CoordinatorRouteDecision
+			if err := json.Unmarshal([]byte(event.Payload), &decision); err == nil && decision.Action != "" {
+				state.RouteLog = append(state.RouteLog, decision)
+			}
+		case model.TeamEventRunStarted:
+			state.Status = model.TeamRunStatusRunning
+		case model.TeamEventRunCompleted:
+			state.Status = model.TeamRunStatusCompleted
+			state.TerminalReason = payloadString(event.Payload, "summary", "reason")
+		case model.TeamEventRunFailed:
+			state.Status = model.TeamRunStatusFailed
+			state.TerminalReason = payloadString(event.Payload, "reason", "blocked_reason")
+		}
+	}
+
+	return state, nil
+}
+
+func payloadString(payload string, keys ...string) string {
+	var values map[string]string
+	if err := json.Unmarshal([]byte(payload), &values); err != nil {
+		return ""
+	}
+	for _, key := range keys {
+		if value := values[key]; value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 // --- TeamAssignment ---
 
 const (
-	maxAssignmentDepth  = 3
+	maxAssignmentDepth   = 3
 	maxActiveAssignments = 5
 )
 
