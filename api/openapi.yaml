@@ -901,56 +901,6 @@ paths:
         "200":
           description: Public stats.
 
-  /client/auth/register:
-    post:
-      tags: [HubSyncRelay]
-      operationId: hubRegister
-      summary: Register a new user account.
-      x-agenthub-status: implemented
-      x-agenthub-owner: Hub
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [username, password]
-              properties:
-                username: { type: string, minLength: 3 }
-                password: { type: string, minLength: 8 }
-                nickname: { type: string }
-                device_type: { type: string, enum: [desktop, web] }
-                device_id: { type: string }
-      responses:
-        "201":
-          description: Account created.
-
-  /client/auth/login:
-    post:
-      tags: [HubSyncRelay]
-      operationId: hubLogin
-      summary: Login — returns JWT access + refresh tokens.
-      x-agenthub-status: implemented
-      x-agenthub-owner: Hub
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [username, password, device_type, device_id]
-              properties:
-                username: { type: string }
-                password: { type: string }
-                device_type: { type: string, enum: [desktop, web, cli] }
-                device_id:
-                  type: string
-                  format: uuid
-                  description: Stable UUID for this Desktop/Web/CLI device. Web clients must send device_type=web; Desktop/Edge clients must send device_type=desktop.
-      responses:
-        "200":
-          description: JWT tokens.
-
   /client/auth/me:
     get:
       tags: [HubSyncRelay]
@@ -1222,28 +1172,6 @@ paths:
   # ═══════════════════════════════════════════════════════════
 
   # ── Auth ──
-
-  /client/auth/change-password:
-    post:
-      tags: [HubSyncRelay]
-      operationId: hubChangePassword
-      summary: Change account password.
-      x-agenthub-status: implemented
-      x-agenthub-owner: Hub
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [old_password, new_password]
-              properties:
-                old_password: { type: string }
-                new_password: { type: string, minLength: 8 }
-      responses:
-        "200":
-          $ref: "#/components/responses/Ok"
 
   /client/auth/oidc/authorize:
     post:

@@ -37,12 +37,14 @@ func UpdateUser(db *gorm.DB, user *model.User) error {
 	return db.Save(user).Error
 }
 
+// UpdatePassword is deprecated: local password auth has been removed in favor of TokenDance ID OIDC.
+// Deprecated: OIDC users do not have passwords.
 func UpdatePassword(db *gorm.DB, userID string, passwordHash string) error {
 	return db.Model(&model.User{}).Where("id = ?", userID).Update("password_hash", passwordHash).Error
 }
 
-// UpdatePasswordAndRevokeTokens atomically updates the user's password hash and
-// revokes all their refresh tokens within a single transaction.
+// UpdatePasswordAndRevokeTokens is deprecated: local password auth has been removed.
+// Deprecated: OIDC users do not have passwords.
 func UpdatePasswordAndRevokeTokens(db *gorm.DB, userID, passwordHash string) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&model.User{}).Where("id = ?", userID).Update("password_hash", passwordHash).Error; err != nil {

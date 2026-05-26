@@ -400,18 +400,6 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     // ── Auth ──────────────────────────────────────
 
-    register: (data: RegisterRequest) =>
-      request<{ user_id: string }>('/client/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-
-    login: (data: LoginRequest) =>
-      request<AuthResponse>('/client/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-
     refresh: (token: string) =>
       request<AuthResponse>('/client/auth/refresh', {
         method: 'POST',
@@ -426,12 +414,6 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     updateProfile: (data: UpdateProfileRequest) =>
       request<UserProfile>('/client/auth/profile', {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
-
-    changePassword: (data: ChangePasswordRequest) =>
-      request<void>('/client/auth/password', {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
