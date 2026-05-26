@@ -184,6 +184,7 @@ describe('useHubIntegration', () => {
       registerDevice: vi.fn().mockResolvedValue({ id: 'dev-1' }),
       ackTask: vi.fn().mockResolvedValue(undefined),
       streamTask: vi.fn().mockResolvedValue(undefined),
+      streamTaskEvent: vi.fn().mockResolvedValue(undefined),
       doneTask: vi.fn().mockResolvedValue(undefined),
       failTask: vi.fn().mockResolvedValue(undefined),
     } as unknown as HubClient;
@@ -359,7 +360,12 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'Hello' }));
     });
 
-    expect(hubClient.streamTask).toHaveBeenCalledWith('task-1', 'Hello', 'run-1');
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledWith(
+      'task-1',
+      'run.agent.text_delta',
+      { runId: 'run-1', content: 'Hello' },
+      { runId: 'run-1' },
+    );
   });
 
   it('streams stdout run.output.batch to Hub and remembers it for final output', async () => {
@@ -383,10 +389,18 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.finished', { runId: 'run-1', status: 'finished' }));
     });
 
-    expect(hubClient.streamTask).toHaveBeenCalledWith(
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledWith(
       'task-1',
-      'stdout part 1\nstdout part 2\n',
-      'run-1',
+      'run.output.batch',
+      {
+        runId: 'run-1',
+        stream: 'stdout',
+        chunks: [
+          { offset: 0, text: 'stdout part 1\n' },
+          { offset: 14, text: 'stdout part 2\n' },
+        ],
+      },
+      { runId: 'run-1' },
     );
     expect(hubClient.doneTask).toHaveBeenCalledWith(
       'task-1',
@@ -412,7 +426,7 @@ describe('useHubIntegration', () => {
       }));
     });
 
-    expect(hubClient.streamTask).not.toHaveBeenCalled();
+    expect(hubClient.streamTaskEvent).not.toHaveBeenCalled();
   });
 
   it('calls doneTask on successful run.agent.result', async () => {
@@ -428,6 +442,12 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true, content: 'done' }));
     });
 
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledWith(
+      'task-1',
+      'run.agent.result',
+      { runId: 'run-1', success: true, content: 'done' },
+      { runId: 'run-1' },
+    );
     expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'done', 'run-1');
   });
 
@@ -491,7 +511,7 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'unknown-run', content: 'x' }));
     });
 
-    expect(hubClient.streamTask).not.toHaveBeenCalled();
+    expect(hubClient.streamTaskEvent).not.toHaveBeenCalled();
   });
 
   it('does not subscribe to Hub events when hubWS is null', () => {
@@ -621,12 +641,13 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true, content: 'done' }));
     });
     expect(hubClient.doneTask).toHaveBeenCalledTimes(1);
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledTimes(1);
 
     // Second event for the same runId — mapping cleaned up, should be ignored
     act(() => {
       fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'late' }));
     });
-    expect(hubClient.streamTask).not.toHaveBeenCalled();
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledTimes(1);
   });
 
   // ── Edge cases ────────────────────────────────────────
