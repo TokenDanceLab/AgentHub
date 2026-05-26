@@ -113,7 +113,7 @@ AgentHub 建议：
 
 - 采用 `provider:model_id` 作为 API/display boundary，但内部保留 profile、route、capability、policy、quota 字段。
 - Provider secret 不进公开 docs，不作为 renderer persisted state 的权威来源。
-- Relay API key 与 TokenDance ID browser login 保持双 credential plane。
+- TokenDance API key 与 TokenDance ID browser login 保持双 credential plane。
 - Model health check 结果可以给 UI，但不能暴露内部 host 或 operator-only secret path。
 
 ---
