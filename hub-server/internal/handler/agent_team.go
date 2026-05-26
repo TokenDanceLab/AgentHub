@@ -22,6 +22,13 @@ type AgentTeamService interface {
 	StartTeamRun(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error)
 	GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
 	ListTeamRuns(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
+
+	// TeamAssignment
+	CreateAssignment(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error)
+	DispatchAssignment(ctx context.Context, userID, assignmentID string) error
+	CompleteAssignment(ctx context.Context, userID, assignmentID string, result string) error
+	FailAssignment(ctx context.Context, userID, assignmentID string, reason string) error
+	ListAssignments(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error)
 }
 
 type AgentTeamHandler struct {
@@ -235,4 +242,119 @@ func (h *AgentTeamHandler) GetRun(c *gin.Context) {
 		return
 	}
 	OK(c, run)
+}
+
+// --- Assignment Request types ---
+
+type createAssignmentReq struct {
+	FromMemberID string `json:"from_member_id" binding:"required"`
+	ToMemberID   string `json:"to_member_id" binding:"required"`
+	Type         string `json:"type,omitempty"`
+	TaskPrompt   string `json:"task_prompt" binding:"required"`
+	Context      string `json:"context,omitempty"`
+}
+
+type completeAssignmentReq struct {
+	Result string `json:"result" binding:"required"`
+}
+
+type failAssignmentReq struct {
+	Reason string `json:"reason" binding:"required"`
+}
+
+// --- Assignment Handlers ---
+
+// CreateAssignment POST /web/agent-teams/:id/runs/:run_id/assignments
+func (h *AgentTeamHandler) CreateAssignment(c *gin.Context) {
+	var req createAssignmentReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	runID := c.Param("run_id")
+	a, err := h.service.CreateAssignment(c.Request.Context(), userID, runID, req.FromMemberID, req.ToMemberID, req.Type, req.TaskPrompt, req.Context)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, a)
+}
+
+// DispatchAssignment POST /web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/dispatch
+func (h *AgentTeamHandler) DispatchAssignment(c *gin.Context) {
+	userID := c.GetString("user_id")
+	assignmentID := c.Param("assignment_id")
+	if err := h.service.DispatchAssignment(c.Request.Context(), userID, assignmentID); err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, nil)
+}
+
+// CompleteAssignment POST /web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/complete
+func (h *AgentTeamHandler) CompleteAssignment(c *gin.Context) {
+	var req completeAssignmentReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	assignmentID := c.Param("assignment_id")
+	if err := h.service.CompleteAssignment(c.Request.Context(), userID, assignmentID, req.Result); err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, nil)
+}
+
+// FailAssignment POST /web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/fail
+func (h *AgentTeamHandler) FailAssignment(c *gin.Context) {
+	var req failAssignmentReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	assignmentID := c.Param("assignment_id")
+	if err := h.service.FailAssignment(c.Request.Context(), userID, assignmentID, req.Reason); err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, nil)
+}
+
+// ListAssignments GET /web/agent-teams/:id/runs/:run_id/assignments
+func (h *AgentTeamHandler) ListAssignments(c *gin.Context) {
+	userID := c.GetString("user_id")
+	runID := c.Param("run_id")
+	as, err := h.service.ListAssignments(c.Request.Context(), userID, runID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	if as == nil {
+		as = []model.AgentTeamAssignment{}
+	}
+	OK(c, as)
 }
