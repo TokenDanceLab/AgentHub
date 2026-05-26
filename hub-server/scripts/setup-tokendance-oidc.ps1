@@ -81,7 +81,7 @@ if (-not $Secret) {
     try {
         $body = @{
             name          = $ClientName
-            redirect_uris = @("http://127.0.0.1:PORT_IDX/callback", "agenthub://callback")
+            redirect_uris = @("http://127.0.0.1/callback", "http://localhost:5174/auth/tokendance/callback")
             grant_types   = @("authorization_code")
             scopes        = @("openid", "profile", "email")
         } | ConvertTo-Json
@@ -110,6 +110,7 @@ Write-Host ""
 Write-Host "AGENTHUB_TOKENDANCE_ID_ISSUER_URL=$TokenDanceUrl"
 Write-Host "AGENTHUB_TOKENDANCE_ID_CLIENT_ID=$ClientId"
 Write-Host "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=$Secret"
-Write-Host "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=http://127.0.0.1:PORT_IDX/callback"
+Write-Host "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=http://127.0.0.1/callback"
+Write-Host "AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS=http://127.0.0.1/callback,http://localhost:5174/auth/tokendance/callback"
 Write-Host ""
 Write-Host "Done. Keep the client_secret safe — it will never be shown again." -ForegroundColor Yellow
