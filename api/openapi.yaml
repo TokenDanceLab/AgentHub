@@ -3456,13 +3456,15 @@ paths:
     get:
       tags: [HubSyncRelay]
       operationId: hubGetAgentProfile
-      summary: Get an Agent Profile by id.
+      summary: Get an owner-scoped Agent Profile by id.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Error"
     patch:
       tags: [HubSyncRelay]
       operationId: hubUpdateAgentProfile
@@ -3836,7 +3838,7 @@ paths:
     get:
       tags: [HubSyncRelay]
       operationId: hubGetMarketProfile
-      summary: Get a published marketplace profile.
+      summary: Get a published marketplace profile; private profiles return 404.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -3848,6 +3850,8 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "404":
+          $ref: "#/components/responses/Error"
 
   /web/market/profiles/{profileId}:install:
     post:
