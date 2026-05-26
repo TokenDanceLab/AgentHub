@@ -402,13 +402,28 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 	}
 
 	// Trigger the task. This dispatches asynchronously.
-	if _, err := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, supervisorAIID, "", "", "", ""); err != nil {
+	if _, err := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, supervisorAIID, "", "", supervisorRouteModelParams(), ""); err != nil {
 		slog.Error("failed to trigger supervisor agent task for team run", "run_id", run.ID, "team_id", teamID, "error", err)
 		_ = repository.UpdateTeamRunStatus(s.db, run.ID, model.TeamRunStatusFailed)
 		return run, err
 	}
 
 	return run, nil
+}
+
+const supervisorRouteDecisionSchema = `{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["delegate","review","approve","finish"]},"next_worker":{"type":"string","description":"AgentTeamMember id to receive delegate/review/approve work"},"instructions":{"type":"string","description":"Concrete task prompt for the next worker"},"reasoning":{"type":"string","description":"Why this route is appropriate"},"context":{"type":"string","description":"Additional context for the next worker"},"approved":{"type":"boolean"},"feedback":{"type":"string"},"summary":{"type":"string","description":"Final TeamRun summary for action=finish"},"blocked_reason":{"type":"string","description":"Why the TeamRun cannot continue"},"correlation_id":{"type":"string","description":"Optional id linking this route to prior work"}}}`
+
+const supervisorRoutePrompt = "AgentHub TeamRun supervisor mode: decide the next team step with the structured output schema. Use action=delegate/review/approve with next_worker set to an AgentTeamMember id and instructions set to the next task, or action=finish with summary/blocked_reason when the TeamRun is done or blocked. Do not start sub-agents locally; Hub will create TeamAssignment and dispatch them."
+
+func supervisorRouteModelParams() string {
+	data, err := json.Marshal(map[string]string{
+		"structured_output_schema": supervisorRouteDecisionSchema,
+		"append_system_prompt":     supervisorRoutePrompt,
+	})
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 // GetTeamRun returns a single team run, verifying owner access.

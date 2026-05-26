@@ -4219,6 +4219,9 @@ components:
         includePartial:
           type: boolean
           description: Include partial stream_event messages for real-time deltas (Claude Code --include-partial-messages).
+        structuredOutputSchema:
+          type: string
+          description: Optional JSON Schema string passed to runtimes that support structured output, currently Claude Code --json-schema.
         systemPrompt:
           type: string
           description: Runtime system prompt override, usually derived from a Hub CustomAgent/Profile policy.
