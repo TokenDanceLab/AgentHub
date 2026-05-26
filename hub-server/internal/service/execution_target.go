@@ -51,13 +51,16 @@ func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req
 	return req, nil
 }
 
-func (s *ExecutionTargetService) Get(ctx context.Context, id string) (*model.ExecutionTarget, error) {
+func (s *ExecutionTargetService) Get(ctx context.Context, id, ownerID string) (*model.ExecutionTarget, error) {
 	t, err := repository.GetExecutionTargetByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.UserNotFound
 		}
 		return nil, err
+	}
+	if t.OwnerID != ownerID {
+		return nil, errcode.AuthDeviceMismatch
 	}
 	return t, nil
 }
@@ -137,13 +140,16 @@ func (s *ExecutionTargetService) List(ctx context.Context, ownerID, targetType, 
 	return &TargetListResult{Items: targets, HasMore: hasMore, Cursor: nextCursor}, nil
 }
 
-func (s *ExecutionTargetService) Ping(ctx context.Context, id string) error {
+func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) error {
 	t, err := repository.GetExecutionTargetByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.UserNotFound
 		}
 		return err
+	}
+	if t.OwnerID != ownerID {
+		return errcode.AuthDeviceMismatch
 	}
 
 	switch t.TargetType {
