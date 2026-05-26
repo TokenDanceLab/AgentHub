@@ -23,6 +23,7 @@ type AgentTeamService interface {
 	GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
 	GetTeamRunState(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error)
 	ListTeamRuns(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
+	HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
 
 	// TeamAssignment
 	CreateAssignment(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error)
@@ -260,6 +261,28 @@ func (h *AgentTeamHandler) GetRunState(c *gin.Context) {
 		return
 	}
 	OK(c, state)
+}
+
+// HandleRouteDecision POST /web/agent-teams/:id/runs/:run_id/route-decisions
+func (h *AgentTeamHandler) HandleRouteDecision(c *gin.Context) {
+	var req model.CoordinatorRouteDecision
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	teamID := c.Param("id")
+	runID := c.Param("run_id")
+	assignment, err := h.service.HandleRouteDecision(c.Request.Context(), userID, teamID, runID, req)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, assignment)
 }
 
 // --- Assignment Request types ---

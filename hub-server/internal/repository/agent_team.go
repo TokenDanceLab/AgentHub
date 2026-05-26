@@ -94,6 +94,12 @@ func ListAssignmentsByTeamRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamA
 	return as, err
 }
 
+func CountAssignmentsByTeamRun(db *gorm.DB, teamRunID string) (int64, error) {
+	var count int64
+	err := db.Model(&model.AgentTeamAssignment{}).Where("team_run_id = ?", teamRunID).Count(&count).Error
+	return count, err
+}
+
 func UpdateAssignmentStatus(db *gorm.DB, id string, status string, result string) error {
 	updates := map[string]interface{}{
 		"status": status,
