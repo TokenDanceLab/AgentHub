@@ -343,6 +343,18 @@
   line-height: 1.4;
 }
 
+/* ── Home nav ─────────────────────────────── */
+.sidebarHomeNav {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px 2px;
+}
+
+.navIconBtnActive {
+  background: var(--secondary);
+  color: var(--foreground);
+}
+
 /* ── Global search ─────────────────────────── */
 .sidebarSearch {
   margin: 6px 8px;
