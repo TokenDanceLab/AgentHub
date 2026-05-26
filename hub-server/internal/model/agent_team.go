@@ -289,6 +289,8 @@ type TeamRunState struct {
 	Tasks          []TeamTaskState            `json:"tasks"`
 	Dependencies   []TeamTaskDependencyState  `json:"dependencies"`
 	Assignments    []TeamAssignmentState      `json:"assignments"`
+	Approvals      []TeamApprovalState        `json:"approvals"`
+	Artifacts      []TeamArtifactState        `json:"artifacts"`
 	RunEvents      []TeamRunEventState        `json:"run_events"`
 	RouteLog       []CoordinatorRouteDecision `json:"route_log"`
 	Budget         *TeamBudget                `json:"budget,omitempty"`
@@ -324,6 +326,30 @@ type TeamTaskDependencyState struct {
 	TaskID          string `json:"task_id"`
 	DependsOnTaskID string `json:"depends_on_task_id"`
 	Kind            string `json:"kind"`
+}
+
+// TeamApprovalState summarizes approval requests and decisions in a TeamRun.
+type TeamApprovalState struct {
+	AgentTaskID string     `json:"agent_task_id"`
+	EdgeRunID   string     `json:"edge_run_id,omitempty"`
+	RequestID   string     `json:"request_id"`
+	ToolName    string     `json:"tool_name,omitempty"`
+	ToolUseID   string     `json:"tool_use_id,omitempty"`
+	Status      string     `json:"status"`
+	Reason      string     `json:"reason,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	DecidedAt   *time.Time `json:"decided_at,omitempty"`
+}
+
+// TeamArtifactState summarizes file/artifact-producing runtime events.
+type TeamArtifactState struct {
+	AgentTaskID string    `json:"agent_task_id"`
+	EdgeRunID   string    `json:"edge_run_id,omitempty"`
+	Path        string    `json:"path"`
+	Action      string    `json:"action,omitempty"`
+	ToolName    string    `json:"tool_name,omitempty"`
+	Status      string    `json:"status,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // TeamAssignmentState is a resolved assignment with runtime info.
