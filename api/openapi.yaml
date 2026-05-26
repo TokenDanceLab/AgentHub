@@ -1086,6 +1086,10 @@ paths:
                 model_params:
                   type: string
                   description: Optional JSON string with model/provider/reasoning hints copied into the agent.dispatch payload.
+                target_id:
+                  type: string
+                  format: uuid
+                  description: Optional owner-scoped ExecutionTarget id. Hub validates owner and dispatchable target type, persists it on the pending task, and includes it in agent.dispatch; exact remote/cloud target routing is a later slice.
       responses:
         "200":
           description: Task dispatched.

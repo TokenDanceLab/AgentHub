@@ -180,6 +180,7 @@ type dispatchPayload struct {
 	AgentInstanceID  string `json:"agent_instance_id"`
 	AgentType        string `json:"agent_type"`
 	CustomAgentID    string `json:"custom_agent_id,omitempty"`
+	TargetID         string `json:"target_id,omitempty"`
 	SessionID        string `json:"session_id"`
 	TriggerMessageID string `json:"trigger_message_id"`
 	TriggerUserID    string `json:"trigger_user_id"`
@@ -265,7 +266,7 @@ func mergeModelParams(base, override string) string {
 }
 
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.
-func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams string) (*model.PendingAgentTask, error) {
+func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
 	msg, err := repository.GetMessageByID(s.db, triggerMessageID)
 	if err != nil {
 		return nil, errcode.MsgNotFound
@@ -296,10 +297,16 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 		return nil, errcode.SessionNotMember
 	}
 
+	targetID, err = s.validateDispatchTarget(ctx, userID, targetID)
+	if err != nil {
+		return nil, err
+	}
+
 	task := &model.PendingAgentTask{
 		AgentInstanceID:   ai.ID,
 		TriggeredByUserID: userID,
 		TriggerMessageID:  triggerMessageID,
+		TargetID:          targetID,
 		Status:            model.TaskStatusQueued,
 		ExpireAt:          time.Now().Add(config.PendingTaskTTL),
 	}
@@ -312,6 +319,29 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, promptFromMessage(msg), modelParams)
 
 	return task, nil
+}
+
+func (s *AgentService) validateDispatchTarget(ctx context.Context, userID, targetID string) (string, error) {
+	targetID = strings.TrimSpace(targetID)
+	if targetID == "" {
+		return "", nil
+	}
+	target, err := repository.GetExecutionTargetByID(s.db.WithContext(ctx), targetID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", errcode.UserNotFound
+		}
+		return "", err
+	}
+	if target.OwnerID != userID {
+		return "", errcode.AuthDeviceMismatch
+	}
+	switch target.TargetType {
+	case "local_edge", "hub_relay":
+		return target.ID, nil
+	default:
+		return "", errcode.ErrBadRequest.WithMessage("execution target type is not dispatchable yet")
+	}
 }
 
 func promptFromMessage(msg *model.Message) string {
@@ -335,6 +365,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 		TaskID:           task.ID,
 		AgentInstanceID:  ai.ID,
 		AgentType:        normalizeRuntimeAgentType(ai.AgentType),
+		TargetID:         task.TargetID,
 		SessionID:        ai.SessionID,
 		TriggerMessageID: task.TriggerMessageID,
 		TriggerUserID:    task.TriggeredByUserID,
