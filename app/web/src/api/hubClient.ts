@@ -188,6 +188,13 @@ export interface PendingAgentTask {
   expire_at?: string;
 }
 
+export interface TriggerAgentTaskOptions {
+  agent_instance_id?: string;
+  agent_type?: string;
+  custom_agent_id?: string;
+  model_params?: string;
+}
+
 // ── Custom agents ────────────────────────────────
 
 export interface CustomAgentRequest {
@@ -683,10 +690,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
         body: JSON.stringify(data),
       }),
 
-    triggerAgentTask: (triggerMessageId: string) =>
+    triggerAgentTask: (triggerMessageId: string, options: TriggerAgentTaskOptions = {}) =>
       request<PendingAgentTask>('/web/agent-tasks', {
         method: 'POST',
-        body: JSON.stringify({ trigger_message_id: triggerMessageId }),
+        body: JSON.stringify({ trigger_message_id: triggerMessageId, ...options }),
       }),
 
     cancelAgentTask: (taskId: string) =>

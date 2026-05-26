@@ -45,5 +45,5 @@ Early versions used "Runner" to refer to both Agent Runtime adapters and executi
 |---------|------|-----|
 | Connection | `GET /v1/events` | `GET /client/ws` |
 | Envelope | `{version, id, seq, type, scope, traceId, sentAt, payload}` | `{type, seq_id, payload}` |
-| Auth | None (local only) | Bearer JWT first frame |
+| Auth | Optional Local Edge token for `/v1/events` when enabled | Hub-issued access token in query/header/first auth frame |
 | Event naming | `dot.notation.lowercase` | `dot.notation.lowercase` |

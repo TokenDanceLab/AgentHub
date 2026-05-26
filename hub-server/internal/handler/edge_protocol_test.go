@@ -353,7 +353,7 @@ func (m *mockAgentService) AddAgentToSession(ctx context.Context, userID, sessio
 	}
 	return nil
 }
-func (m *mockAgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error) {
+func (m *mockAgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams string) (*model.PendingAgentTask, error) {
 	if m.triggerTaskFn != nil {
 		return m.triggerTaskFn(ctx, userID, triggerMessageID)
 	}

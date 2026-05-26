@@ -120,7 +120,7 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
                     {a.version && <span className={styles.version}>{a.version}</span>}
                     <span className={styles.runtimeMeta}>
                       <MapPin size={10} aria-hidden="true" />
-                      {t('agent.runtime.localEdge')}
+                      {a.runtimeId ?? t('agent.runtime.hubProfile')}
                     </span>
                     <span className={styles.runtimeMeta}>{t('agent.runtime.cliAdapter')}</span>
                   </div>
