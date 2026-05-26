@@ -152,11 +152,82 @@ func TestListTaskRunEventsIsOwnerScoped(t *testing.T) {
 	}).Error)
 
 	svc := &AgentService{db: db}
-	events, err := svc.ListTaskRunEvents(context.Background(), "user-1", "task-1")
+	events, err := svc.ListTaskRunEvents(context.Background(), "user-1", "task-1", model.AgentRunEventFilter{})
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	require.Equal(t, model.RunEventTypeOutputBatch, events[0].EventType)
 
-	_, err = svc.ListTaskRunEvents(context.Background(), "other-user", "task-1")
+	_, err = svc.ListTaskRunEvents(context.Background(), "other-user", "task-1", model.AgentRunEventFilter{})
 	require.ErrorIs(t, err, errcode.AgentTaskNotFound)
+}
+
+func TestListTaskRunEventsSupportsFilters(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	base := time.Date(2026, 5, 27, 1, 0, 0, 0, time.UTC)
+	for _, event := range []model.AgentRunEvent{
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: model.RunEventTypeOutputBatch, Payload: `{"chunks":[{"text":"hello"}]}`, CreatedAt: base},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 2, EventType: "run.agent.tool_call", Payload: `{"toolName":"read_file"}`, CreatedAt: base.Add(time.Second)},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 3, EventType: "run.agent.permission_requested", Payload: `{"requestId":"req-1","status":"pending"}`, CreatedAt: base.Add(2 * time.Second)},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 4, EventType: "run.agent.file_change", Payload: `{"path":"a.txt","action":"modified"}`, CreatedAt: base.Add(3 * time.Second)},
+	} {
+		require.NoError(t, db.Create(&event).Error)
+	}
+
+	svc := &AgentService{db: db}
+	toolEvents, err := svc.ListTaskRunEvents(context.Background(), "user-1", "task-1", model.AgentRunEventFilter{
+		EventType: "run.agent.tool_call",
+		AfterSeq:  1,
+		Limit:     10,
+	})
+	require.NoError(t, err)
+	require.Len(t, toolEvents, 1)
+	require.Equal(t, int64(2), toolEvents[0].EventSeq)
+	require.Equal(t, "run.agent.tool_call", toolEvents[0].EventType)
+
+	limited, err := svc.ListTaskRunEvents(context.Background(), "user-1", "task-1", model.AgentRunEventFilter{
+		AfterSeq: 1,
+		Limit:    2,
+	})
+	require.NoError(t, err)
+	require.Len(t, limited, 2)
+	require.Equal(t, int64(2), limited[0].EventSeq)
+	require.Equal(t, int64(3), limited[1].EventSeq)
+}
+
+func TestGetTaskRunEventSummaryAggregatesRuntimeHistory(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	base := time.Date(2026, 5, 27, 1, 0, 0, 0, time.UTC)
+	finishedAt := base.Add(6 * time.Second)
+	require.NoError(t, db.Exec(`UPDATE pending_agent_tasks SET status = ?, created_at = ?, finished_at = ? WHERE id = ?`,
+		model.TaskStatusDone, base, finishedAt, "task-1").Error)
+	for _, event := range []model.AgentRunEvent{
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 1, EventType: model.RunEventTypeOutputBatch, Payload: `{"chunks":[{"text":"hello\n"}]}`, CreatedAt: base.Add(time.Second)},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 2, EventType: "run.agent.tool_call", Payload: `{"toolName":"read_file"}`, CreatedAt: base.Add(2 * time.Second)},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 3, EventType: "run.agent.permission_requested", Payload: `{"requestId":"req-1","status":"pending"}`, CreatedAt: base.Add(3 * time.Second)},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 4, EventType: "run.agent.permission_decided", Payload: `{"requestId":"req-1","decision":"allow"}`, CreatedAt: base.Add(4 * time.Second)},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 5, EventType: "run.agent.file_change", Payload: `{"path":"a.txt","action":"modified"}`, CreatedAt: base.Add(5 * time.Second)},
+		{TaskID: "task-1", EdgeRunID: "run-1", SessionID: "sess-1", AgentInstanceID: "agent-1", EventSeq: 6, EventType: "run.agent.result", Payload: `{"usage":{"input_tokens":100,"output_tokens":25},"status":"success"}`, CreatedAt: finishedAt},
+	} {
+		require.NoError(t, db.Create(&event).Error)
+	}
+
+	svc := &AgentService{db: db}
+	summary, err := svc.GetTaskRunEventSummary(context.Background(), "user-1", "task-1")
+	require.NoError(t, err)
+	require.Equal(t, "task-1", summary.TaskID)
+	require.Equal(t, "run-1", summary.EdgeRunID)
+	require.Equal(t, model.TaskStatusDone, summary.Status)
+	require.Equal(t, 6, summary.TotalEvents)
+	require.Equal(t, int64(6), summary.LastEventSeq)
+	require.Equal(t, 1, summary.ToolCallCount)
+	require.Equal(t, 1, summary.ArtifactCount)
+	require.Equal(t, 1, summary.ApprovalCount)
+	require.Equal(t, 0, summary.PendingApprovals)
+	require.Equal(t, 1, summary.DecidedApprovals)
+	require.Equal(t, 100, summary.InputTokens)
+	require.Equal(t, 25, summary.OutputTokens)
+	require.Equal(t, 6, summary.OutputBytes)
+	require.Equal(t, int64(6000), summary.ElapsedMs)
+	require.Equal(t, 1, summary.EventTypeCounts[model.RunEventTypeOutputBatch])
+	require.Equal(t, 1, summary.EventTypeCounts["run.agent.result"])
 }
