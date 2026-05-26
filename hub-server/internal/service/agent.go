@@ -850,3 +850,30 @@ func (s *AgentService) authorizeTaskEdgeCallback(task *model.PendingAgentTask, e
 	}
 	return ai, nil
 }
+
+// ── Thin wrappers for repository calls needed by the app layer ──────────
+
+// GetPendingTaskByID returns a pending agent task by ID. Thin wrapper over repository.GetPendingTaskByID.
+func (s *AgentService) GetPendingTaskByID(taskID string) (*model.PendingAgentTask, error) {
+	return repository.GetPendingTaskByID(s.db, taskID)
+}
+
+// ScanExpiredTasks returns all pending tasks whose deadline has passed. Thin wrapper over repository.ScanExpiredTasks.
+func (s *AgentService) ScanExpiredTasks() ([]model.PendingAgentTask, error) {
+	return repository.ScanExpiredTasks(s.db)
+}
+
+// UpdatePendingTaskStatus updates the status of a pending agent task. Thin wrapper over repository.UpdatePendingTaskStatus.
+func (s *AgentService) UpdatePendingTaskStatus(taskID, status, errMsg string) error {
+	return repository.UpdatePendingTaskStatus(s.db, taskID, status, errMsg)
+}
+
+// GetAgentInstanceByID returns an agent instance by ID. Thin wrapper over repository.GetAgentInstanceByID.
+func (s *AgentService) GetAgentInstanceByID(id string) (*model.AgentInstance, error) {
+	return repository.GetAgentInstanceByID(s.db, id)
+}
+
+// UpdatePendingTaskDispatched records the edge device that a task was dispatched to. Thin wrapper over repository.UpdatePendingTaskDispatched.
+func (s *AgentService) UpdatePendingTaskDispatched(taskID, edgeDeviceID string) error {
+	return repository.UpdatePendingTaskDispatched(s.db, taskID, edgeDeviceID)
+}

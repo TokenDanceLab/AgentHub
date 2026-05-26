@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/gin-gonic/gin"
 )
 
@@ -160,7 +159,7 @@ func Timeout(d time.Duration) gin.HandlerFunc {
 			// Restore original writer so handler.Fail writes directly.
 			c.Writer = tw.ResponseWriter
 			c.Abort()
-			handler.Fail(c, errcode.ErrTimeout)
+			fail(c, errcode.ErrTimeout)
 		}
 	}
 }

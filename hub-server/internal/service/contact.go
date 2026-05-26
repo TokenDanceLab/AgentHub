@@ -334,3 +334,8 @@ func (s *ContactService) UpdateRemark(ctx context.Context, currentUserID, friend
 	}
 	return nil
 }
+
+// GetFriendIDs returns the IDs of all accepted friends of the given user. Thin wrapper over repository.GetFriendIDs.
+func (s *ContactService) GetFriendIDs(userID string) ([]string, error) {
+	return repository.GetFriendIDs(s.db, userID)
+}
