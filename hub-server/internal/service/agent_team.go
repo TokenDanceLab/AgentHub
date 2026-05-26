@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -1042,6 +1043,13 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 	if taskCount >= model.MaxTasksPerTeamRun {
 		return nil, s.rejectRouteDecision(runID, decision, "task limit reached")
 	}
+	timedOut, err := s.hasTimedOutActiveAssignment(runID)
+	if err != nil {
+		return nil, err
+	}
+	if timedOut {
+		return nil, s.rejectRouteDecision(runID, decision, "assignment timeout reached")
+	}
 	activeCount, err := repository.CountActiveAssignmentsByTeamRun(s.db, runID)
 	if err != nil {
 		return nil, err
@@ -1055,6 +1063,13 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 	}
 	if repeatCount >= model.MaxRouteRepeats {
 		return nil, s.rejectRouteDecision(runID, decision, "route repeat limit reached")
+	}
+	budgetExceeded, err := s.teamRunBudgetExceeded(runID)
+	if err != nil {
+		return nil, err
+	}
+	if budgetExceeded {
+		return nil, s.rejectRouteDecision(runID, decision, "team run budget exceeded")
 	}
 
 	assignment, err := s.CreateAssignment(ctx, userID, runID, supervisor.ID, worker.ID, routeAssignmentType(decision.Action), decision.Instructions, decision.Context)
@@ -1088,6 +1103,61 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 		return nil, err
 	}
 	return assignment, nil
+}
+
+func (s *AgentTeamService) hasTimedOutActiveAssignment(runID string) (bool, error) {
+	assignments, err := repository.ListAssignmentsByTeamRun(s.db, runID)
+	if err != nil {
+		return false, err
+	}
+	deadline := time.Now().Add(-model.DefaultAssignmentTimeout)
+	for _, assignment := range assignments {
+		if assignment.CreatedAt.IsZero() || !isActiveAssignmentStatus(assignment.Status) {
+			continue
+		}
+		if assignment.CreatedAt.Before(deadline) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (s *AgentTeamService) teamRunBudgetExceeded(runID string) (bool, error) {
+	assignments, err := repository.ListAssignmentsByTeamRun(s.db, runID)
+	if err != nil {
+		return false, err
+	}
+	tasks, err := repository.ListTeamTasksByRun(s.db, runID)
+	if err != nil {
+		return false, err
+	}
+	events, err := repository.ListAgentRunEventsByTaskIDs(s.db, teamAgentTaskIDs(assignments, tasks))
+	if err != nil {
+		return false, err
+	}
+	budget := projectTeamBudget(events, 0)
+	if budget == nil {
+		return false, nil
+	}
+	if budget.TokenLimit > 0 && budget.TotalTokensUsed >= budget.TokenLimit {
+		return true, nil
+	}
+	if budget.TotalTokensUsed >= model.MaxTeamRunBudgetTokens {
+		return true, nil
+	}
+	if budget.UsagePercent >= model.MaxTeamRunBudgetUsagePct {
+		return true, nil
+	}
+	return false, nil
+}
+
+func isActiveAssignmentStatus(status string) bool {
+	switch status {
+	case model.AssignmentStatusPending, model.AssignmentStatusDispatched, model.AssignmentStatusRunning:
+		return true
+	default:
+		return false
+	}
 }
 
 func payloadString(payload string, keys ...string) string {
