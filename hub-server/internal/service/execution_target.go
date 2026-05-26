@@ -187,7 +187,7 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 	case "local_edge":
 		return repository.UpdateTargetOnlineStatus(s.db, id, true)
 	case "remote_ssh", "tailscale", "cloud_edge", "hub_relay":
-		return repository.UpdateTargetOnlineStatus(s.db, id, true)
+		return errcode.TargetNotRoutable.WithMessage("execution target health proof is not available")
 	default:
 		return errcode.ErrBadRequest.WithMessage("unsupported target_type")
 	}

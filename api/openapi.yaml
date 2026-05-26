@@ -2470,6 +2470,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubPingExecutionTarget
       summary: Ping an execution target to test connectivity.
+      description: Current Hub proof only marks local_edge targets healthy. Remote SSH, Tailscale, Cloud Edge, and Hub Relay targets return TARGET_NOT_ROUTABLE until their live health proof paths are implemented, and Hub does not mark them online from this manual ping.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -2481,6 +2482,8 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "409":
+          $ref: "#/components/responses/Error"
 
   # ── Audit Events ──
 
