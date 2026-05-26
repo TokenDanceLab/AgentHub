@@ -297,7 +297,7 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 方向 | 说明 |
 |------|------|------|
-| `agent.dispatch` | Hub→Edge | 分发 agent 任务，payload: `{ task_id, agent_instance_id, session_id, prompt, model, trigger_message_id }` |
+| `agent.dispatch` | Hub→Edge | 分发 agent 任务，payload: `{ task_id, agent_instance_id, agent_type, session_id, prompt, trigger_message_id, trigger_user_id, display_name, model_params? }`；`agent_type` 必须是 Edge Runtime adapter id（如 `claude-code`、`codex`、`opencode`），`prompt` 来自触发消息文本 |
 | `agent.stream` | Edge→Hub | agent 流式输出，payload: `{ task_id, content, content_type }` |
 | `agent.done` | Edge→Hub | agent 任务完成，payload: `{ task_id, result_summary, usage{} }` |
 | `agent.failed` | Edge→Hub | agent 任务失败，payload: `{ task_id, error }` |

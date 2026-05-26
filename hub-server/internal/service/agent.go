@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -182,6 +183,7 @@ type dispatchPayload struct {
 	SessionID        string `json:"session_id"`
 	TriggerMessageID string `json:"trigger_message_id"`
 	TriggerUserID    string `json:"trigger_user_id"`
+	Prompt           string `json:"prompt"`
 	DisplayName      string `json:"display_name"`
 	SystemPrompt     string `json:"system_prompt,omitempty"`
 	ModelParams      string `json:"model_params,omitempty"`
@@ -230,12 +232,28 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 
 	// #100: Use context.WithoutCancel so the dispatch goroutine is not
 	// cancelled when the HTTP handler's request context is cancelled.
-	go s.dispatchTask(context.WithoutCancel(ctx), task, ai)
+	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, promptFromMessage(msg))
 
 	return task, nil
 }
 
-func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance) {
+func promptFromMessage(msg *model.Message) string {
+	if msg == nil {
+		return ""
+	}
+	switch msg.ContentType {
+	case model.ContentTypeText, model.ContentTypeCode, model.ContentTypeDiff:
+		var payload struct {
+			Text string `json:"text"`
+		}
+		if err := json.Unmarshal([]byte(msg.Content), &payload); err == nil && strings.TrimSpace(payload.Text) != "" {
+			return payload.Text
+		}
+	}
+	return msg.Content
+}
+
+func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt string) {
 	dp := dispatchPayload{
 		TaskID:           task.ID,
 		AgentInstanceID:  ai.ID,
@@ -243,6 +261,7 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 		SessionID:        ai.SessionID,
 		TriggerMessageID: task.TriggerMessageID,
 		TriggerUserID:    task.TriggeredByUserID,
+		Prompt:           prompt,
 		DisplayName:      ai.DisplayName,
 	}
 
