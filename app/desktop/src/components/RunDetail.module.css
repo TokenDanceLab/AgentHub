@@ -278,6 +278,27 @@
 }
 .cancelButton:hover { background: rgba(239,68,68,0.08); }
 
+/* ── Diff Review Panel (primary when diffs exist) ── */
+.diffReviewPrimary {
+  flex: 1;
+  min-height: 0;
+  margin: var(--space-xs) 0;
+}
+
+/* Secondary summary when diff review is the primary view */
+.tabContentSecondary {
+  flex: 0 0 auto;
+  max-height: 180px;
+  border-top: 1px solid var(--border);
+  margin-top: var(--space-xs);
+  padding-top: var(--space-xs);
+  opacity: 0.85;
+}
+
+[data-theme='dark'] .tabContentSecondary {
+  border-top-color: rgba(255, 255, 255, 0.045);
+}
+
 /* ── Token usage ───────────────────────────── */
 .usageRow {
   display: flex;
