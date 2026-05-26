@@ -1,25 +1,11 @@
 import { useEffect, useState } from 'react';
+import {
+  createHubClient,
+  type HubCustomAgent,
+} from '@shared/index';
 import { getHubBaseUrl } from './useHubSession';
 
-export type HubCustomAgent = {
-  id: string;
-  owner_user_id?: string;
-  name: string;
-  avatar_url?: string;
-  agent_type: string;
-  system_prompt: string;
-  capability_tags?: string;
-  tool_whitelist?: string;
-  model_params?: string;
-  created_at?: string;
-  updated_at?: string;
-};
-
-type HubResponse<T> = {
-  code?: string;
-  message?: string;
-  data?: T;
-};
+export type { HubCustomAgent };
 
 type CustomAgentsState = {
   agents: HubCustomAgent[];
@@ -27,18 +13,6 @@ type CustomAgentsState = {
   isLoading: boolean;
   source: 'hub' | 'catalog';
 };
-
-function isHubResponse<T>(value: unknown): value is HubResponse<T> {
-  return typeof value === 'object' && value !== null && ('data' in value || 'code' in value);
-}
-
-function unwrapHubResponse<T>(value: unknown): T {
-  if (isHubResponse<T>(value)) {
-    return (value.data ?? []) as T;
-  }
-
-  return value as T;
-}
 
 function formatHubError(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -64,31 +38,18 @@ export function useHubCustomAgents(token: string | null) {
 
     setState((current) => ({ ...current, isLoading: true, error: undefined }));
 
-    fetch(`${getHubBaseUrl()}/web/custom-agents`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          let message = response.statusText;
-          try {
-            const body = await response.json();
-            message = body?.message || body?.error?.message || message;
-          } catch {
-            // Keep the HTTP status text when Hub returns a non-JSON error.
-          }
-          throw new Error(message || `Hub responded with ${response.status}`);
-        }
+    const client = createHubClient({
+      baseUrl: getHubBaseUrl(),
+      fetch: (input, init) => fetch(input, { ...init, signal: controller.signal }),
+      getToken: () => token,
+    });
 
-        return response.json();
-      })
-      .then((body) => {
+    client
+      .listCustomAgents()
+      .then((agents) => {
         if (cancelled) return;
         setState({
-          agents: unwrapHubResponse<HubCustomAgent[]>(body),
+          agents,
           isLoading: false,
           source: 'hub',
         });
