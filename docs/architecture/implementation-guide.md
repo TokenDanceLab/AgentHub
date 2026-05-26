@@ -18,6 +18,8 @@ M1 的 Mock Run 已被真实 CLI adapter 完全取代。Edge 通过统一的 `Ag
 
 - Agent Runtime：Claude Code、Codex、OpenCode 这类 CLI/SDK adapter。
 - Agent Profile：用户选择的业务 Agent，由 Runtime + Model + Configuration + Workspace + Skills/MCP + approval + execution target 组成。
+- AgentTeam：多个 Agent Profile 组成的协作模板，包含成员角色、target 偏好、预算、并发和审批策略。
+- TeamRun / TeamTask：一次团队目标执行及其子任务；TeamRun 必须可审计、可恢复，TeamTask 最终绑定一个或多个具体 Run。
 - Agent Configuration：`AGENTS.md`、Agent memory、上下文、聊天记录、工作目录、skills、MCP、模型参数、审批策略。
 - Execution Target：local、remote SSH/Tailscale、cloud、Hub relay。Target 是 Run 的显式字段，不从 Runtime 名称推断。
 
@@ -48,6 +50,8 @@ M1 的 Mock Run 已被真实 CLI adapter 完全取代。Edge 通过统一的 `Ag
 - Orchestrator 协调多 Agent 的 dispatch 和聚合逻辑。
 - Clone / Init / Worktree 创建。
 - 非默认工作目录隔离。
+
+M3b 的完成口径只覆盖 Edge 本地 runtime 原型：sub-agent spawn、registry、message queue 和 result aggregation。它不是产品级 AgentTeam 完成证据；Hub-visible 的 `AgentTeam`、`TeamRun`、`TeamTask`、`TeamEvent`、可恢复 `TeamRunState`、typed `CoordinatorRouteDecision` 和双真实 Runtime Profile 群组 E2E 仍是 P1 待办。
 
 ### M4 已完成：产物审查与变更管理
 
@@ -114,6 +118,8 @@ api/
 |---|---|---|---|
 | Agent Runtime registry | 暴露 Runtime 可用性和能力，不保存用户配置 | `AgentAdapter` registry 上报 runtime id、版本、能力、健康状态 | Runtime 只在 Profile 详情中展示，不作为主要 Agent 列表 |
 | Agent Profile store | Hub 保存团队/用户 Profile，Edge 缓存本地 Profile | Run start 时解析 Profile 到 `RunProcessContext` | Agent 选择器展示 Profile 名称、模型、Target 和风险标记 |
+| AgentTeam store | Hub 保存 Team、成员角色、策略、模板和 owner boundary | Edge 只接收具体 TeamTask/Run 执行请求，不持有产品 Team SSOT | Settings/Workspace 显示 Team Builder、成员表、readiness summary |
+| TeamRun orchestration | Hub 保存 TeamRun/TeamTask/TeamEvent 并派生 TeamRunState | Edge 执行 TeamTask 绑定的 Run，上报 RunEvent/approval/artifact；Supervisor route 用 typed decision | TeamRun Console 展示 task board、成员状态、route timeline、approval/artifact/conflict |
 | Agent Configuration | 保存 `AGENTS.md` 引用、memory、上下文、聊天记录、工作目录、Skill/MCP、模型参数、审批策略 | Context Builder 合并配置并生成本次 Run 上下文 | 设置页拆成 instructions、memory、context、workspace、skills、MCP、model、approval |
 | Execution Target | Hub 保存设备、Target 权限和 relay 路由 | Edge 支持 local、remote SSH/Tailscale、cloud、Hub relay 的 Target 描述和审计 | 启动 Run 前显示 Target、设备、目录、在线状态和审批策略 |
 | TokenDance ID / 鉴权 | Hub 完成 OIDC code exchange、JWKS 校验、Hub session、device proof | Desktop 存 Hub session，不保存第三方 provider token | 登录页和账号页只面向 TokenDance ID，不直接接 GitHub/Google/飞书 |
@@ -137,6 +143,7 @@ api/
 | M7 | Desktop P0 打磨（已完成） | `app/desktop/` | UI/UX 打磨、性能优化、边界情况 | Desktop 体验达到 P0 交付标准 |
 | M8 | Identity + Profile foundation | `hub-server/`、`edge-server/`、`api/`、`app/` | TokenDance ID OIDC、Hub session、runtime/profile/config/target schema | 用户可登录并创建 Profile，Run 可记录 Profile 和 Target |
 | M9 | Remote/Cloud Target + relay | `hub-server/`、`edge-server/`、`api/`、`app/` | Edge device、Hub relay、remote SSH/Tailscale/cloud target、remote approval | Web/Desktop 可远程查看、审批并代理 Preview |
+| M10a | AgentTeam local TeamRun | `hub-server/`、`edge-server/`、`api/`、`app/` | AgentTeam/Member CRUD、TeamRun/TeamTask/TeamEvent、TeamRunState、typed route decision | 本地两个真实 Runtime Profile 可在同一 TeamRun 下并行/串行执行，UI 可恢复任务树、审批和结果 |
 | M10 | Agent Platform | `hub-server/`、`edge-server/`、`api/`、`app/` | Agent 市场、Skill/MCP catalog、模型映射、cc-switch provider binding、安全审计 | 团队可安装 Profile 模板并审计 Run/工具/远控行为 |
 
 当前集成分支为 `dev/delicious233`。只有互不相干的大任务，才从 `master` 新切短分支。
@@ -196,6 +203,7 @@ api/
 - TokenDance ID OIDC relying party、Hub session、device proof。
 - Contact / Group。
 - Agent Profile / Skill / MCP / 模型映射 catalog。
+- AgentTeam / TeamRun / TeamTask / TeamEvent / TeamRunState。
 - Edge 注册。
 - Edge-Hub sync。
 - Hub relay。
