@@ -7,6 +7,7 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o server-hub ./cmd/server-hub
 
 FROM alpine:3.21
 RUN apk upgrade --no-cache && apk add --no-cache ca-certificates tzdata wget
+RUN echo "hosts: files dns" > /etc/nsswitch.conf
 RUN adduser -D -h /app agenthub
 WORKDIR /app
 COPY --from=builder /app/server-hub .
