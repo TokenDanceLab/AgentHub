@@ -66,6 +66,12 @@ func GetTeamRunByID(db *gorm.DB, runID string) (*model.AgentTeamRun, error) {
 	return &r, err
 }
 
+func GetTeamRunBySessionID(db *gorm.DB, sessionID string) (*model.AgentTeamRun, error) {
+	var r model.AgentTeamRun
+	err := db.Where("session_id = ?", sessionID).Order("created_at DESC").First(&r).Error
+	return &r, err
+}
+
 func ListTeamRunsByTeam(db *gorm.DB, teamID string) ([]model.AgentTeamRun, error) {
 	var runs []model.AgentTeamRun
 	err := db.Where("team_id = ?", teamID).Order("created_at DESC").Find(&runs).Error

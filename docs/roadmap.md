@@ -632,7 +632,7 @@ Hub 调度（远程）:
 	  - `feat/agentteam-core`：✅ Hub 端 AgentTeam/TeamMember/TeamRun 模型、migration、CRUD API 与 StartTeamRun 最小闭环已落地。
 	  - `feat/agentteam-assignment`：✅ TeamAssignment 模型、migration、CRUD、基础委派权限、最大深度/活跃任务/cycle guard 与状态机接口已落地。
 	  - `feat/agentteam-run-state`：✅ TeamEvent model/migration、append/list repository、TeamTask 一等化、TeamRunState replay service 与 `GET /web/agent-teams/{id}/runs/{run_id}/state` 已落地并部署；TeamRun supervisor task 与 Assignment dispatch 已绑定真实 Hub pending task，TeamRunState 已合并 AgentRunEvent runtime 摘要、TeamTask dependencies、runtime budget projection、approval summary 和 artifact/file-change summary。
-	  - `feat/agentteam-delegation-guard`：🔄 typed `CoordinatorRouteDecision` Web 入口、accepted/rejected TeamEvent 审计、`MAX_TASKS_PER_TEAM_RUN`、`MAX_ACTIVE_SUBAGENTS_PER_RUN`、`MAX_ROUTE_REPEATS`、TeamRun budget 和 assignment timeout 拦截已落地；剩余 Edge/Supervisor parser 接入。
+	  - `feat/agentteam-delegation-guard`：✅ typed `CoordinatorRouteDecision` Web 入口、accepted/rejected TeamEvent 审计、`MAX_TASKS_PER_TEAM_RUN`、`MAX_ACTIVE_SUBAGENTS_PER_RUN`、`MAX_ROUTE_REPEATS`、TeamRun budget、assignment timeout、Edge supervisor structured-output parser 与 Desktop auto-binding 已落地。
 	  - `feat/agentteam-orchestrator-refactor`：Edge OrchestratorAdapter 不再自己做子 Agent spawn，改为输出 delegation 指令回 Hub，由 Hub 创建 TeamAssignment 并 dispatch。
 	  - `feat/agentteam-local-smoke`：Hub→Desktop→Edge 完整 TeamRun，两个真实 Runtime Profile（Codex + Claude Code）的委派/聚合/审批 smoke。
 	- [ ] 残留分支：`origin/dev/trump` 不作为可信进度来源；`feat/web-desktop-parity` / `origin/worktree-feat+web-desktop-parity` 与当前 WebAgent 主线大幅分叉，删除或 cherry-pick 前必须人工审 diff。
@@ -675,12 +675,12 @@ Hub 调度（远程）:
   - 验收：Hub/Edge replay 后 UI 可恢复同一个 TeamRun 的任务树和状态，不依赖内存 queue。
   - 2026-05-27 进展：Hub 已新增 `agent_team_tasks` model/migration、owner-scoped `GET /web/agent-teams/{id}/runs/{run_id}/tasks`、`agent_team_events` append/list、TeamRunState replay projection、state endpoint 和 events 读取 API；accepted route decision 会同步创建 TeamAssignment 与 TeamTask 并写 `team.task.created`。TeamRun supervisor task 现在使用真实 trigger message，Assignment dispatch 会创建 assignment prompt message、触发 Hub pending task、绑定 `agent_task_id` / `edge_run_id`，并在 TeamRunState 中从 pending task 同步 dispatched/running/done/fail 状态。TeamRunState 也会按 TeamTask/Assignment 绑定的 Hub task id 合并 `agent_run_events` 摘要，并从 `parent_task_id` 派生 dependencies、从 `run.agent.result` / context usage events 汇总 budget、从 `run.agent.permission_*` 派生 approvals、从 `run.agent.file_change` 派生 artifacts。当前后端 projection 覆盖 members、tasks、dependencies、assignments、route decisions、terminal reason、Hub task binding、Edge run id、runtime event 摘要、budget、approval summary 和 artifact/file-change summary；双真实 Runtime Profile 的 live 群组 E2E 归 AT-4 验收。
 
-- [ ] **AT-3: Structured Supervisor route + delegation guardrails** `[4-5d]` `[P1]`
+- [x] **AT-3: Structured Supervisor route + delegation guardrails** `[4-5d]` `[P1]`
   - 定义 `CoordinatorRouteDecision{next_worker,instructions,reasoning,finish,blocked_reason,correlation_id}`，新增 `team.route.decided` / `team.route.rejected` 事件。
   - 保留旧文本 JSON dispatch 兼容，但新 TeamRun 只消费 typed route。
   - Guardrails：`MAX_DELEGATION_DEPTH`、`MAX_ACTIVE_SUBAGENTS_PER_RUN`、`MAX_ROUTE_REPEATS`、`MAX_TASKS_PER_TEAM_RUN`、budget、timeout、ancestor/cycle reject、context budget、compact/checkpoint。
   - 验收：非法 route 被拒绝且可审计；重复委派、超深度、超预算不会启动 Runtime。
-  - 2026-05-27 进展：Hub 已新增 `POST /web/agent-teams/{id}/runs/{run_id}/route-decisions`，合法 `delegate/review/approve` 会创建 `TeamAssignment` + `TeamTask` 并写 `team.route.decided` + `assignment.created` + `team.task.created`；非法 worker/schema/任务总数超限、同一 TeamRun 活跃 subagent 超限、重复 route 超限、TeamRun budget 超限和 active assignment 超时都会写 `team.route.rejected` 后返回 400。当前仍未接 Edge supervisor 输出 parser 和 RunEvent 自动绑定。
+  - 2026-05-27 进展：Hub 已新增 `POST /web/agent-teams/{id}/runs/{run_id}/route-decisions`，合法 `delegate/review/approve` 会创建 `TeamAssignment` + `TeamTask` 并写 `team.route.decided` + `assignment.created` + `team.task.created`；非法 worker/schema/任务总数超限、同一 TeamRun 活跃 subagent 超限、重复 route 超限、TeamRun budget 超限和 active assignment 超时都会写 `team.route.rejected` 后返回 400。TeamRun supervisor dispatch 现在带 `structured_output_schema` 和 TeamRun context；Edge Claude NDJSON `structured_output` 会提升为 `run.agent.route_decision`，Desktop bridge 会用 `team_id/team_run_id/team_member_role` 自动 POST route decision，同时保留原 `RunEvent` replay。AT-4 仍需两个真实 Runtime Profile 的 live TeamRun smoke。
 
 - [ ] **AT-4: Local TeamRun smoke with two real Runtime Profiles** `[4-6d]` `[P1]`
   - Dispatch：TeamTask 复用现有 Hub `/web/agent-tasks` 和 Desktop bridge，每个 task 绑定 Edge `run_id`。
