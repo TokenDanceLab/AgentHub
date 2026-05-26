@@ -216,3 +216,14 @@ func ListAgentRunEventsByTaskID(db *gorm.DB, taskID string) ([]model.AgentRunEve
 		Find(&events).Error
 	return events, err
 }
+
+func ListAgentRunEventsByTaskIDs(db *gorm.DB, taskIDs []string) ([]model.AgentRunEvent, error) {
+	var events []model.AgentRunEvent
+	if len(taskIDs) == 0 {
+		return events, nil
+	}
+	err := db.Where("task_id IN ?", taskIDs).
+		Order("task_id ASC, event_seq ASC, created_at ASC, id ASC").
+		Find(&events).Error
+	return events, err
+}

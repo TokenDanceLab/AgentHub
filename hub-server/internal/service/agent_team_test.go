@@ -758,6 +758,14 @@ func TestAgentTeamService_DispatchAssignmentBindsTeamTaskToPendingAgentTask(t *t
 	assert.Equal(t, model.TeamEventAssignmentDispatched, events[0].Type)
 
 	require.NoError(t, repository.UpdatePendingTaskStatusWithEdgeRunID(db, pending.ID, model.TaskStatusRunning, "", "edge-run-1"))
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          pending.ID,
+		EdgeRunID:       "edge-run-1",
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-executor",
+		EventType:       model.RunEventTypeOutputBatch,
+		Payload:         `{"content":"runtime output"}`,
+	}))
 	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
 	require.NoError(t, err)
 	require.Len(t, state.Assignments, 1)
@@ -768,6 +776,11 @@ func TestAgentTeamService_DispatchAssignmentBindsTeamTaskToPendingAgentTask(t *t
 	assert.Equal(t, model.TeamTaskStatusRunning, state.Tasks[0].Status)
 	assert.Equal(t, pending.ID, state.Tasks[0].AgentTaskID)
 	assert.Equal(t, "edge-run-1", state.Tasks[0].EdgeRunID)
+	require.Len(t, state.RunEvents, 1)
+	assert.Equal(t, pending.ID, state.RunEvents[0].AgentTaskID)
+	assert.Equal(t, "edge-run-1", state.RunEvents[0].EdgeRunID)
+	assert.Equal(t, model.RunEventTypeOutputBatch, state.RunEvents[0].EventType)
+	assert.JSONEq(t, `{"content":"runtime output"}`, state.RunEvents[0].Payload)
 }
 
 func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
@@ -939,6 +952,17 @@ func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 			created_at DATETIME
 		)`,
 		`CREATE UNIQUE INDEX idx_messages_session_client_msg ON messages (session_id, client_msg_id)`,
+		`CREATE TABLE agent_run_events (
+			id TEXT PRIMARY KEY,
+			task_id TEXT NOT NULL,
+			edge_run_id TEXT,
+			session_id TEXT NOT NULL,
+			agent_instance_id TEXT NOT NULL,
+			event_seq INTEGER NOT NULL,
+			event_type TEXT NOT NULL,
+			payload TEXT NOT NULL,
+			created_at DATETIME
+		)`,
 	}
 	for _, ddl := range tables {
 		require.NoError(t, db.Exec(ddl).Error)

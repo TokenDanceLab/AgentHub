@@ -4666,6 +4666,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TeamAssignmentState"
+        run_events:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamRunEventState"
         route_log:
           type: array
           items:
@@ -4722,6 +4726,16 @@ components:
         run_id: { type: string, format: uuid }
         agent_task_id: { type: string, format: uuid }
         edge_run_id: { type: string }
+
+    TeamRunEventState:
+      type: object
+      properties:
+        agent_task_id: { type: string, format: uuid }
+        edge_run_id: { type: string }
+        event_seq: { type: integer }
+        event_type: { type: string }
+        payload: { type: string }
+        created_at: { type: string, format: date-time }
 
     CoordinatorRouteDecision:
       type: object
