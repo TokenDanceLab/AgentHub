@@ -41,11 +41,9 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		auth := client.Group("/auth")
 		{
-			auth.POST("/register", middleware.RateLimit(cacheClient, config.AuthRegisterRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Register)
-			auth.POST("/login", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Login)
 			auth.POST("/refresh", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Refresh)
 
-			// OIDC (Phase 1)
+			// OIDC (TokenDance ID — the only auth entry point)
 			if oidcHandler != nil {
 				auth.POST("/oidc/authorize", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCAuthorize)
 				auth.POST("/oidc/callback", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCCallback)
@@ -57,15 +55,8 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		authProtected.Use(middleware.RequireHubSession())
 		{
 			authProtected.GET("/me", authHandler.Me)
-		}
-
-		localAuthWrite := client.Group("/auth")
-		localAuthWrite.Use(middleware.AuthMiddleware(cfg))
-		localAuthWrite.Use(middleware.RequireHubSession())
-		{
-			localAuthWrite.POST("/logout", authHandler.Logout)
-			localAuthWrite.PUT("/profile", authHandler.UpdateProfile)
-			localAuthWrite.PUT("/password", authHandler.ChangePassword)
+			authProtected.POST("/logout", authHandler.Logout)
+			authProtected.PUT("/profile", authHandler.UpdateProfile)
 		}
 
 		contacts := client.Group("/contacts")

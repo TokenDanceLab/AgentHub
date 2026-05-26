@@ -8,7 +8,7 @@ describe('createHubClient', () => {
     vi.unstubAllGlobals();
   });
 
-  it('unwraps Hub response envelopes for typed callers', async () => {
+  it('posts refresh_token on refresh', async () => {
     const fetchMock = vi.fn(async () => new Response(
       JSON.stringify({
         code: 'ok',
@@ -23,12 +23,7 @@ describe('createHubClient', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = createHubClient({ baseUrl: 'https://hub.example.test' });
-    const res = await client.login({
-      username: 'alice',
-      password: 'secret',
-      device_type: 'web',
-      device_id: '00000000-0000-0000-0000-00000000a101',
-    });
+    const res = await client.refresh('old-refresh-token');
 
     expect(res).toEqual({
       access_token: 'hub-access',

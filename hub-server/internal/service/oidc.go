@@ -34,6 +34,8 @@ type OIDCService struct {
 	cache  *cache.Client
 }
 
+var validDeviceTypes = []string{"desktop", "web", "cli"}
+
 // NewOIDCService creates a new OIDCService.
 func NewOIDCService(db *gorm.DB, cfg config.TokenDanceIDConfig, jwtCfg config.JWTConfig, cache *cache.Client) *OIDCService {
 	if cfg.JWKSURI != "" {
