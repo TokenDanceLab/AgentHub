@@ -116,8 +116,6 @@ interface ProjectSkill {
 
 const STORAGE_PREFIX = 'agenthub-settings.';
 const DEVICE_ID_KEY = 'agenthub_device_id';
-const TD_CODE_VERIFIER_KEY = 'td_code_verifier';
-const TD_STATE_KEY = 'td_state';
 
 const MODEL_OPTIONS = [
   ['auto', 'Auto'],
@@ -358,8 +356,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
         ? t('settings.hubLocalLogin')
         : t('settings.notConfigured');
   const deviceId = readBrowserStorage('local', DEVICE_ID_KEY);
-  const pkceStateReady =
-    Boolean(readBrowserStorage('session', TD_CODE_VERIFIER_KEY)) && Boolean(readBrowserStorage('session', TD_STATE_KEY));
+  const tokenDanceOidcStatus = tokenSource === 'tokendance' ? t('settings.statusReady') : t('settings.statusInProgress');
   const handleSignOut = () => {
     void hubAuth.logout();
   };
@@ -1527,7 +1524,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title="TokenDance ID OIDC"
                     description={t('settings.tokenDanceOidcDesc')}
-                    status={pkceStateReady ? t('settings.statusInProgress') : t('settings.statusPlanned')}
+                    status={tokenDanceOidcStatus}
                   />
                   <CapabilityCard
                     title={t('settings.authTokenSource')}
