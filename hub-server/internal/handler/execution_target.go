@@ -14,11 +14,11 @@ import (
 // ExecutionTargetService is the subset of *service.ExecutionTargetService used by ExecutionTargetHandler.
 type ExecutionTargetService interface {
 	Create(ctx context.Context, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error)
-	Get(ctx context.Context, id string) (*model.ExecutionTarget, error)
+	Get(ctx context.Context, id, ownerID string) (*model.ExecutionTarget, error)
 	Update(ctx context.Context, id, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error)
 	Delete(ctx context.Context, id, ownerID string) error
 	List(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*service.TargetListResult, error)
-	Ping(ctx context.Context, id string) error
+	Ping(ctx context.Context, id, ownerID string) error
 }
 
 type ExecutionTargetHandler struct {
@@ -73,7 +73,8 @@ func (h *ExecutionTargetHandler) CreateTarget(c *gin.Context) {
 
 func (h *ExecutionTargetHandler) GetTarget(c *gin.Context) {
 	id := c.Param("id")
-	target, err := h.svc.Get(c.Request.Context(), id)
+	userID := c.GetString("user_id")
+	target, err := h.svc.Get(c.Request.Context(), id, userID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -141,8 +142,9 @@ func (h *ExecutionTargetHandler) DeleteTarget(c *gin.Context) {
 
 func (h *ExecutionTargetHandler) PingTarget(c *gin.Context) {
 	id := c.Param("id")
+	userID := c.GetString("user_id")
 
-	if err := h.svc.Ping(c.Request.Context(), id); err != nil {
+	if err := h.svc.Ping(c.Request.Context(), id, userID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return

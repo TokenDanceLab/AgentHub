@@ -125,10 +125,12 @@ Agent Profile -> Execution Target -> Thread -> Run -> RunEvent -> Approval / Art
 |---|---|---|---|
 | P1 | 多 Agent Thread | @Agent、Reviewer、Orchestrator、Thread fork、多 Agent 围绕同一 Artifact 讨论 | 部分完成：Hub group/session、Agent Profile、Orchestrator 和 Web/ Desktop 表面已有落点；仍缺两条以上真实 Runtime Profile 的群组 E2E、聚合 transcript 和冲突处理证据 |
 | P2 | Identity + Edge-Hub Sync | TokenDance ID OIDC 登录、Hub session、Edge 注册、设备状态、消息/事件同步、Web/Mobile 查看状态和远程审批 | 进行中：Hub OIDC code exchange 与 Hub-local session 已在 repo 落地；部署配置、Desktop/Web 回调 UX、logout/reconnect 和授权证据仍需闭环 |
-| P3 | Relay / Remote / Cloud | Hub 中继、本地/远程 SSH/Tailscale/Cloud Execution Target、远程 Preview、Artifact Proxy、远控审批 | 规划中（Q3） |
+| P3 | Relay / Remote / Cloud | Hub 中继、本地/远程 SSH/Tailscale/Cloud Execution Target、远程 Preview、Artifact Proxy、远控审批 | 规划中（Q3）；当前只有 Execution Target 基础模型/接口，远程和云目标还缺注册、路由、workspace allowlist 和远程审批证据 |
 | P4 | 团队 IM + Agent Platform | 用户、联系人、群组、团队空间、团队 Memory、Agent 市场、Skill/MCP 管理、模型配置、模型映射、cc-switch provider binding、安全审计 | 规划中 |
 
 Hub Network、Web/Mobile、团队账号和多人 IM 都是 P1+ 能力，不作为本地 P0 的验收条件。
+
+按完整部署拓扑看，当前不是 8/8：Desktop 本地离线已完成，Desktop 本地在线和 Web 中继到当前 Desktop 处于仓内最小闭环；Desktop/Web 到远程 Desktop 或 Cloud Edge 的四类远程/云执行场景仍未实现为可发布产品链路。
 
 ## 8. 非目标
 
