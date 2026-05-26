@@ -2835,8 +2835,8 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubDecideTeamApproval
-      summary: Record a TeamRun approval decision and return the Edge control payload.
-      description: Validates that the approval is still pending, appends a team.approval.decided TeamEvent, and returns a payload shaped for Edge POST /v1/permissions/decide delivery by the Desktop/Edge bridge.
+      summary: Record a TeamRun approval decision and deliver the Edge control payload.
+      description: Validates that the approval is still pending and tied to an exact Edge device, appends a team.approval.decided TeamEvent, returns the Edge control payload, and pushes or queues an agent.control permission.decide frame for the owning Desktop/Edge device. Hub rejects decisions that cannot be mapped to a recorded edge_device_id so approvals cannot silently fall back to another desktop.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -4842,6 +4842,27 @@ components:
           type: string
           enum: [allow, deny]
         reason: { type: string }
+
+    AgentControlPayload:
+      type: object
+      required: [kind, edge_device_id]
+      properties:
+        kind:
+          type: string
+          enum: [permission.decide]
+        agent_task_id: { type: string, format: uuid }
+        target_id: { type: string, format: uuid }
+        edge_device_id:
+          type: string
+          description: Exact Desktop/Edge device id that owns the local Edge run.
+        team_id: { type: string, format: uuid }
+        team_run_id: { type: string, format: uuid }
+        team_task_id: { type: string, format: uuid }
+        assignment_id: { type: string, format: uuid }
+        member_id: { type: string, format: uuid }
+        approval_id: { type: string }
+        edge_control:
+          $ref: "#/components/schemas/TeamApprovalEdgeControl"
 
     TeamArtifactState:
       type: object
