@@ -677,6 +677,74 @@ func TestAgentTeamService_HandleRouteDecisionRejectsWhenRouteRepeatLimitReached(
 	assert.Contains(t, events[len(events)-1].Payload, "route repeat limit")
 }
 
+func TestAgentTeamService_HandleRouteDecisionRejectsTimedOutAssignment(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, supervisor, executor, run := seedAgentTeamRun(t, db)
+	require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor.ID,
+		ToMemberID:   executor.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "stale task",
+		Status:       model.AssignmentStatusRunning,
+		Depth:        1,
+		CreatedAt:    time.Now().Add(-model.DefaultAssignmentTimeout - time.Minute),
+	}))
+
+	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+		Action:       "delegate",
+		NextWorker:   executor.ID,
+		Instructions: "blocked by timeout",
+	})
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, assignment)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, model.TeamEventRouteRejected, events[0].Type)
+	assert.Contains(t, events[0].Payload, "assignment timeout")
+}
+
+func TestAgentTeamService_HandleRouteDecisionRejectsBudgetExceeded(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, _, executor, run := seedAgentTeamRun(t, db)
+	agentTaskID := "budget-task-1"
+	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: executor.ID,
+		Status:           model.TeamTaskStatusDone,
+		Objective:        "spent budget",
+		RunID:            &agentTaskID,
+	}))
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          agentTaskID,
+		EdgeRunID:       "edge-budget",
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-executor",
+		EventType:       "run.agent.result",
+		Payload:         `{"success":true,"usage":{"input_tokens":600,"output_tokens":400},"tokenLimit":1000}`,
+	}))
+
+	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+		Action:       "delegate",
+		NextWorker:   executor.ID,
+		Instructions: "blocked by budget",
+	})
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, assignment)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, model.TeamEventRouteRejected, events[0].Type)
+	assert.Contains(t, events[0].Payload, "budget exceeded")
+}
+
 func TestAgentTeamService_ListTeamTasksIsOwnerScoped(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
