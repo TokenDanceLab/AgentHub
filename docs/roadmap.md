@@ -692,6 +692,7 @@ Hub 调度（远程）:
 - [ ] **AT-5: Artifact / Approval / Conflict 一等化** `[4-6d]` `[P1-P2]`
   - Artifact index 追溯到 member/task/run/tool；Approval 汇总到 TeamRun header；同文件多 agent 修改标为 conflict。
   - UI：side-by-side artifacts/diffs、result comparison、human decision gate。
+  - 2026-05-27 进展：Hub `TeamRunState` 已将 approval/file-change runtime events 关联到 `team_task_id` / `assignment_id` / `member_id`，并从多个 member/task 对同一路径的 file-change 事件投影 `conflicts[]` 和 artifact `conflict_id`；生产 compose 同步加入 Hub/PostgreSQL/Redis 内存、CPU、pids 与 Redis 连接池护栏。剩余：artifact DB index、审批决策写回 Edge control、冲突解决事件和 Web/Desktop side-by-side 决策 UI。
   - 验收：两个 Agent 同改一文件时 UI 标出冲突并要求人类决策；审批结果进入 Edge control、Hub audit 和 TeamEvent。
 
 ---
