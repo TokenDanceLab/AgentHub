@@ -619,6 +619,9 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	}
 	state.Approvals, state.Artifacts = projectTeamRuntimeSummaries(runEvents, taskRefs)
 	state.Conflicts = projectTeamConflicts(state.Artifacts)
+	if err := s.refreshTeamArtifactIndex(runID, state.Artifacts); err != nil {
+		return nil, err
+	}
 	state.Budget = projectTeamBudget(runEvents, len(agentTaskIDs))
 
 	for _, event := range events {
@@ -730,6 +733,42 @@ func applyConflictResolution(conflicts []model.TeamConflictState, resolution mod
 	}
 }
 
+func (s *AgentTeamService) refreshTeamArtifactIndex(runID string, artifacts []model.TeamArtifactState) error {
+	indexed := make([]model.AgentTeamArtifact, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		path := normalizedArtifactPath(artifact.Path)
+		if path == "" {
+			continue
+		}
+		indexed = append(indexed, model.AgentTeamArtifact{
+			TeamRunID:      runID,
+			TeamTaskID:     stringPtrOrNil(artifact.TeamTaskID),
+			AssignmentID:   stringPtrOrNil(artifact.AssignmentID),
+			MemberID:       stringPtrOrNil(artifact.MemberID),
+			AgentTaskID:    stringPtrOrNil(artifact.AgentTaskID),
+			EdgeRunID:      artifact.EdgeRunID,
+			SourceEventID:  stringPtrOrNil(artifact.SourceEventID),
+			EventSeq:       artifact.EventSeq,
+			Path:           path,
+			NormalizedPath: strings.ToLower(path),
+			Action:         artifact.Action,
+			ToolName:       artifact.ToolName,
+			Status:         artifact.Status,
+			ConflictID:     artifact.ConflictID,
+			CreatedAt:      artifact.CreatedAt,
+		})
+	}
+	return repository.ReplaceTeamArtifactsForRun(s.db, runID, indexed)
+}
+
+func stringPtrOrNil(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
 type teamRuntimeTaskRef struct {
 	TeamTaskID   string
 	AssignmentID string
@@ -815,16 +854,18 @@ func projectTeamRuntimeSummaries(runEvents []model.AgentRunEvent, taskRefs map[s
 			}
 			ref := taskRefs[event.TaskID]
 			artifacts = append(artifacts, model.TeamArtifactState{
-				AgentTaskID:  event.TaskID,
-				TeamTaskID:   ref.TeamTaskID,
-				AssignmentID: ref.AssignmentID,
-				MemberID:     ref.MemberID,
-				EdgeRunID:    event.EdgeRunID,
-				Path:         path,
-				Action:       firstJSONString(payload, "action"),
-				ToolName:     firstJSONString(payload, "toolName", "tool_name"),
-				Status:       firstJSONString(payload, "status"),
-				CreatedAt:    event.CreatedAt,
+				AgentTaskID:   event.TaskID,
+				TeamTaskID:    ref.TeamTaskID,
+				AssignmentID:  ref.AssignmentID,
+				MemberID:      ref.MemberID,
+				EdgeRunID:     event.EdgeRunID,
+				SourceEventID: event.ID,
+				EventSeq:      event.EventSeq,
+				Path:          path,
+				Action:        firstJSONString(payload, "action"),
+				ToolName:      firstJSONString(payload, "toolName", "tool_name"),
+				Status:        firstJSONString(payload, "status"),
+				CreatedAt:     event.CreatedAt,
 			})
 		}
 	}

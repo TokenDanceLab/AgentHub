@@ -4791,6 +4791,8 @@ components:
         assignment_id: { type: string, format: uuid }
         member_id: { type: string, format: uuid }
         edge_run_id: { type: string }
+        source_event_id: { type: string, format: uuid }
+        event_seq: { type: integer, format: int64 }
         path: { type: string }
         action: { type: string }
         tool_name: { type: string }
