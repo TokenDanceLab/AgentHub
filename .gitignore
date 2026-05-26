@@ -141,3 +141,9 @@ docs/review/*
 !/reference/INDEX.md
 /chat-verify/
 test_store.json
+
+# Hub server temp
+hub-server/.tmp/
+
+# Tauri Android generated (source tracked, builds ignored by inner .gitignore)
+# app/desktop/src-tauri/gen/android/ is committed

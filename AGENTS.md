@@ -47,7 +47,10 @@ AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个�
 |---|---|---|
 | 前端 | Web 工作台、IM 交互、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` |
 | 后端 | Hub Server、TokenDance ID 接入、Edge-Hub 通信、账号/群聊/同步/中继、Profile/Skill/MCP/审计 | `hub-server/`、`edge-server/`、`api/` |
-| 客户端 | Desktop、Edge 本地调度、Agent Runtime 进程、workspace、执行目标体验 | `app/desktop/`、`edge-server/` |
+| 客户端（Desktop） | Desktop Tauri、Edge 本地调度、Agent Runtime 进程、workspace、执行目标体验、tray | `app/desktop/`、`edge-server/` |
+| 客户端（Mobile） | Mobile Tauri、移动端 UI、OIDC deep-link | `app/mobile/` |
+
+Desktop 和 Mobile 是**独立 Tauri 项目**，各自拥有独立的 `src-tauri/`，不共享 Rust crate，不互相修改对方的配置。
 
 共享边界：
 
@@ -55,6 +58,38 @@ AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个�
 - Edge Server 同时连接前端和 Hub，改动前先看 `docs/architecture/system-architecture.md`。
 - 跨两个方向的改动先在 PR 描述里写清楚影响面。
 - 开发者必须审查自己 Agent 生成的代码、文档和命令输出；不要把未看懂的 Agent 改动直接合入。
+
+### Desktop / Mobile 端口与资源分配
+
+两个 Tauri 项目独立运行，不得互相占用端口或修改对方配置。
+
+| 资源 | Desktop | Mobile |
+|---|---|---|
+| Tauri 项目 | `app/desktop/src-tauri/` | `app/mobile/src-tauri/` |
+| Vite 开发端口 | **5173** (strict) | **5174** (strict) |
+| Rust crate | `agenthub-desktop` | `agenthub-mobile` |
+| Tauri identifier | `com.agenthub.desktop` | `com.agenthub.mobile` |
+| 前端源码 | `app/desktop/src/` | `app/mobile/src/` |
+| 共享前端 | `app/shared/` (`@agenthub/shared`) | `app/shared/` (`@agenthub/shared`) |
+| Storybook | 6006 | 无（共用 desktop 的 Storybook） |
+
+其他固定端口：
+
+| 服务 | 端口 | 说明 |
+|---|---|---|
+| Hub Server (本地) | 8090 | 开发时 localhost |
+| Edge Server (本地) | 3210 | Desktop 本地 Edge |
+| OIDC callback (Desktop) | 随机 (127.0.0.1:0) | Rust TcpListener 动态分配 |
+| OIDC callback (Mobile) | 深链 `agenthub://` | 不走本地 HTTP server |
+| Web 工作台 | 5175 (预留) | 尚未开发 |
+
+Rust/Tauri 隔离规则：
+
+- **Desktop Agent 只能修改** `app/desktop/src-tauri/`，**Mobile Agent 只能修改** `app/mobile/src-tauri/`。
+- 任何 Agent 不得修改对方的 `tauri.conf.json`、`Cargo.toml`、`lib.rs`。
+- 如需共享 Rust 代码，先提议创建 `app/shared-rust/` crate，两边各自在 `Cargo.toml` 中 `[dependencies]` 引用。
+- Desktop 特有功能（tray、Edge 进程管理、keyring）不往 mobile 移植；Mobile 特有功能（deep link、platform secure store）不往 desktop 移植。
+- 共享的前端代码（类型、hooks、i18n、UI 组件）放 `app/shared/`，两个项目通过 `workspace:*` 引用。
 
 ### AgentHub 产品术语边界
 
