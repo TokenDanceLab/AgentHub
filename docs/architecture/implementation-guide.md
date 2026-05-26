@@ -2,7 +2,7 @@
 
 ## 1. 当前实现状态
 
-当前阶段是 **P0-P3 全部完成，M3b 6/6 完成，M4 8/8 完成，M5 工程基础收敛完成，M6 生产部署完成，M7 Desktop P0 打磨完成**。全部 3 个 Agent Runtime（Claude Code、OpenCode、Codex）端到端测试通过。
+当前阶段是 **P0 本地执行主链路已落地，M3b/M4/M5/M6/M7 的已验收子项已合入主线，P1/P2 多端与身份链路按部分闭环继续推进**。全部 3 个 Agent Runtime（Claude Code、OpenCode、Codex）已有 live smoke 证据；TokenDance ID、Hub session、Web/Desktop 回调、Hub task replay 和真正阻塞式审批仍需部署态或端到端验收。
 
 ### M3a 已完成：真实 Agent CLI 集成
 
