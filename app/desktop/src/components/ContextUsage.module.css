@@ -4,21 +4,29 @@
    ═════════════════════════════════════════════════════════════════════ */
 
 .section {
-  padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid var(--border);
+  padding: 8px 0 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: 7px;
+}
+
+[data-theme='light'] .section {
+  border-bottom-color: rgba(0, 0, 0, 0.055);
 }
 
 /* ── Context Bar ───────────────────────────── */
 
 .bar {
-  height: 8px;
+  height: 4px;
   border-radius: var(--radius-full);
   overflow: hidden;
-  background: var(--surface-base);
+  background: rgba(255, 255, 255, 0.095);
   display: flex;
+}
+
+[data-theme='light'] .bar {
+  background: rgba(0, 0, 0, 0.055);
 }
 
 .barWarning {
@@ -40,7 +48,7 @@
 .usageText {
   font-size: var(--font-size-xs);
   color: var(--foreground);
-  opacity: 0.7;
+  opacity: 0.46;
   font-weight: var(--font-weight-medium);
 }
 
@@ -49,7 +57,7 @@
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-xs);
+  gap: 6px;
 }
 
 .statRow {
@@ -61,9 +69,9 @@
 .statLabel {
   font-size: var(--font-size-2xs);
   color: var(--foreground);
-  opacity: 0.5;
+  opacity: 0.38;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0;
 }
 
 .statValue {
@@ -77,7 +85,7 @@
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-xs) var(--space-sm);
+  gap: 5px 9px;
 }
 
 .legendItem {
@@ -96,7 +104,7 @@
 
 .legendLabel {
   color: var(--foreground);
-  opacity: 0.7;
+  opacity: 0.5;
 }
 
 .legendValue {
@@ -112,8 +120,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: var(--space-xs);
-  border-top: 1px solid var(--border);
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+[data-theme='light'] .costRow {
+  border-top-color: rgba(0, 0, 0, 0.045);
 }
 
 .costLabel {

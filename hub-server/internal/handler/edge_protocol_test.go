@@ -79,9 +79,9 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 			mu.Unlock()
 			return nil
 		},
-		handleStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
+		handleStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 			mu.Lock()
-			streamChunks = append(streamChunks, content)
+			streamChunks = append(streamChunks, stream.Content)
 			mu.Unlock()
 			return nil
 		},
@@ -291,7 +291,7 @@ func TestEdgeHubProtocol_TaskLifecycleStateMachine(t *testing.T) {
 			recordState(model.TaskStatusRunning)
 			return nil
 		},
-		handleStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
+		handleStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 			return nil
 		},
 		handleDoneFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
@@ -334,17 +334,48 @@ func TestEdgeHubProtocol_TaskLifecycleStateMachine(t *testing.T) {
 	}
 }
 
+func TestTriggerTaskPassesTargetID(t *testing.T) {
+	var gotTargetID string
+	agentSvc := &mockAgentService{
+		triggerTaskWithTargetFn: func(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
+			gotTargetID = targetID
+			return &model.PendingAgentTask{
+				ID:                "task-target-001",
+				AgentInstanceID:   "agent-001",
+				TriggeredByUserID: userID,
+				TriggerMessageID:  triggerMessageID,
+				Status:            model.TaskStatusQueued,
+				TargetID:          targetID,
+			}, nil
+		},
+	}
+	h := handler.NewAgentHandler(agentSvc)
+
+	c, w := newGinCtx("POST", "/web/agent-tasks", map[string]string{
+		"trigger_message_id": "msg-001",
+		"target_id":          "target-001",
+	}, "user_id", "u1")
+	h.TriggerTask(c)
+
+	assertStatus(t, w, 200)
+	assertOK(t, w)
+	if gotTargetID != "target-001" {
+		t.Fatalf("target_id was not passed to service: got %q", gotTargetID)
+	}
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────
 
 // mockAgentService satisfies handler.AgentService.
 type mockAgentService struct {
-	triggerTaskFn  func(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error)
-	addAgentFn     func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
-	cancelTaskFn   func(ctx context.Context, userID, taskID string) error
-	handleAckFn    func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
-	handleStreamFn func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error
-	handleDoneFn   func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
-	handleFailFn   func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
+	triggerTaskFn           func(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error)
+	triggerTaskWithTargetFn func(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)
+	addAgentFn              func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
+	cancelTaskFn            func(ctx context.Context, userID, taskID string) error
+	handleAckFn             func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
+	handleStreamFn          func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error
+	handleDoneFn            func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
+	handleFailFn            func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
 }
 
 func (m *mockAgentService) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
@@ -353,7 +384,10 @@ func (m *mockAgentService) AddAgentToSession(ctx context.Context, userID, sessio
 	}
 	return nil
 }
-func (m *mockAgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error) {
+func (m *mockAgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
+	if m.triggerTaskWithTargetFn != nil {
+		return m.triggerTaskWithTargetFn(ctx, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID)
+	}
 	if m.triggerTaskFn != nil {
 		return m.triggerTaskFn(ctx, userID, triggerMessageID)
 	}
@@ -371,9 +405,9 @@ func (m *mockAgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDe
 	}
 	return nil
 }
-func (m *mockAgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content string) error {
+func (m *mockAgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 	if m.handleStreamFn != nil {
-		return m.handleStreamFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, content)
+		return m.handleStreamFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, stream)
 	}
 	return nil
 }
@@ -388,6 +422,9 @@ func (m *mockAgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeD
 		return m.handleFailFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg)
 	}
 	return nil
+}
+func (m *mockAgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string) ([]model.AgentRunEvent, error) {
+	return nil, nil
 }
 
 func assertStatus(t *testing.T, w *httptest.ResponseRecorder, expected int) {

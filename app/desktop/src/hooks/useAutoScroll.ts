@@ -113,7 +113,7 @@ export function useAutoScroll(
         flagTimerRef.current = setTimeout(() => {
           flagRef.current = false;
           flagTimerRef.current = undefined;
-        }, 1500);
+        }, 300);
 
         // Use requestAnimationFrame for coordination with DOM paint
         if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current);
@@ -199,9 +199,7 @@ export function useAutoScroll(
 
     // New message arrived
     if (deps.messages.length > prev) {
-      if (!userScrolledRef.current) {
-        scrollToBottom(false);
-      }
+      scrollToBottom(true);
     }
   }, [deps.messages.length, scrollToBottom]);
 

@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "corepack.cmd pnpm dev",
-    "beforeBuildCommand": "corepack.cmd pnpm build"
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
   },
   "app": {
     "windows": [
@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:3210 ws://127.0.0.1:3210 http://localhost:8080 ws://localhost:8080 http://127.0.0.1:8080 ws://127.0.0.1:8080"
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:3210 ws://127.0.0.1:3210 http://127.0.0.1:* http://localhost:*; style-src 'self' 'unsafe-inline'"
     }
   },
   "plugins": {

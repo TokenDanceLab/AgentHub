@@ -6,10 +6,18 @@ import ThreadPanel from '@/components/ThreadPanel';
 import type { ThreadInfo } from '@shared/types';
 
 // ── Hoisted mocks (available before vi.mock factory runs) ──
-const { mockThreads, mockRenameMutateAsync, mockDeleteMutateAsync } = vi.hoisted(() => ({
+const { mockThreads, mockRenameMutateAsync, mockDeleteMutateAsync, mockCreateMutateAsync } = vi.hoisted(() => ({
   mockThreads: [] as ThreadInfo[],
   mockRenameMutateAsync: vi.fn().mockResolvedValue({}),
   mockDeleteMutateAsync: vi.fn().mockResolvedValue(undefined),
+  mockCreateMutateAsync: vi.fn().mockResolvedValue({
+    threadId: 'new-thread',
+    projectId: 'proj-1',
+    title: 'thread.untitled',
+    status: 'active',
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z',
+  }),
 }));
 
 vi.mock('lucide-react', async (importOriginal) => {
@@ -45,6 +53,7 @@ vi.mock('@/api/threadQueries', () => ({
   useThreads: () => ({ data: { items: mockThreads } }),
   useRenameThread: () => ({ mutateAsync: mockRenameMutateAsync }),
   useDeleteThread: () => ({ mutateAsync: mockDeleteMutateAsync }),
+  useCreateThread: () => ({ mutateAsync: mockCreateMutateAsync, isPending: false }),
 }));
 
 // ── Helpers ──
@@ -87,7 +96,7 @@ describe('ThreadPanel', () => {
 
   it('renders empty state when threads list is empty', () => {
     renderPanel();
-    expect(screen.getByText('thread.emptyTitle')).toBeInTheDocument();
+    expect(screen.getByText('thread.emptyAction')).toBeInTheDocument();
   });
 
   it('renders thread items', () => {
@@ -130,11 +139,14 @@ describe('ThreadPanel', () => {
     expect(onSelect).toHaveBeenCalledWith(thread);
   });
 
-  it('invalidates threads query when + button is clicked', () => {
+  it('creates a thread when + button is clicked', async () => {
     const spy = vi.spyOn(queryClient, 'invalidateQueries');
     renderPanel();
     fireEvent.click(screen.getByTitle('thread.create'));
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['threads'] });
+    await vi.waitFor(() => {
+      expect(mockCreateMutateAsync).toHaveBeenCalledWith({ title: '' });
+      expect(spy).toHaveBeenCalledWith({ queryKey: ['threads'] });
+    });
   });
 
   it('disables create button when offline', () => {
@@ -178,14 +190,15 @@ describe('ThreadPanel', () => {
     expect(screen.getByText('thread.title')).toBeInTheDocument();
   });
 
-  it('shows message count when thread has itemCount', () => {
+  it('hides message count metadata in compact thread rows', () => {
     const thread = makeThread({ threadId: 't1', title: 'Chat' }) as ThreadInfo & {
       itemCount: number;
     };
     thread.itemCount = 5;
     mockThreads.push(thread);
     renderPanel();
-    expect(screen.getByText(/thread\.messages/)).toBeInTheDocument();
+    expect(screen.getByText('Chat')).toBeInTheDocument();
+    expect(screen.queryByText(/thread\.messages/)).not.toBeInTheDocument();
   });
 
   it('does not show message count when zero', () => {
@@ -242,7 +255,7 @@ describe('ThreadPanel', () => {
     renderPanel();
     fireEvent.click(screen.getByTitle('thread.delete'));
     const confirmBtns = screen.getAllByText('thread.delete');
-    fireEvent.click(confirmBtns[confirmBtns.length - 1]);
+    fireEvent.click(confirmBtns[confirmBtns.length - 1]!);
     await vi.waitFor(() => {
       expect(mockDeleteMutateAsync).toHaveBeenCalledWith('t1');
     });

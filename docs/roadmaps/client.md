@@ -20,7 +20,7 @@
 | Stores | 5 个 | runStore, threadStore, connectionStore, uiStore, settingsStore |
 | 测试 | 12/12 通过 | vitest + Testing Library |
 
-### 1.2 已完成（P0-P3 全部完成，M3b 6/6，M4 8/8）
+### 1.2 已完成（Desktop P0 主链路、M3b/M4 已验收子项）
 
 - [x] 设计令牌系统、ChatView 消息气泡、DiffViewer、PromptInput、ThreadPanel
 - [x] StatusBar、SearchDialog、ContextUsage、App.tsx 3 面板布局

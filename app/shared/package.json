@@ -10,16 +10,24 @@
     "./types": "./src/types.ts",
     "./events": "./src/events.ts",
     "./errors": "./src/errors.ts",
+<<<<<<< HEAD
     "./hubEvents": "./src/hubEvents.ts",
     "./hubClient": "./src/hubClient.ts",
+=======
+    "./tree": "./src/tree.ts",
+    "./diff": "./src/diff.ts",
+>>>>>>> origin/dev/delicious233
     "./apiClient": "./src/apiClient.ts",
     "./eventClient": "./src/eventClient.ts",
     "./surfaceMetadata": "./src/surfaceMetadata.ts",
     "./workbenchState": "./src/workbenchState.ts",
     "./mock": "./src/mock.ts",
     "./components": "./src/components/index.ts",
+<<<<<<< HEAD
     "./tree": "./src/tree.ts",
     "./diff": "./src/diff.ts",
+=======
+>>>>>>> origin/dev/delicious233
     "./ui": "./src/ui/index.ts",
     "./ui/*": "./src/ui/*.tsx",
     "./ui/*.css": "./src/ui/*.module.css"
@@ -44,8 +52,13 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "jsdom": "^29.1.1",
+<<<<<<< HEAD
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+=======
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+>>>>>>> origin/dev/delicious233
     "typescript": "~5.8.0",
     "vitest": "^4.1.7"
   }

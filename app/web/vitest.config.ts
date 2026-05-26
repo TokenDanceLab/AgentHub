@@ -9,11 +9,18 @@ export default defineConfig({
     },
   },
   test: {
+<<<<<<< HEAD
     exclude: ['src/**/*.e2e.test.ts', 'src/**/*.e2e.test.tsx', 'e2e/**'],
     environment: 'jsdom',
     globals: true,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     passWithNoTests: true,
+=======
+    globals: true,
+    environment: 'jsdom',
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    exclude: ['src/**/*.e2e.test.ts', 'src/**/*.e2e.test.tsx', 'e2e/**'],
+>>>>>>> origin/dev/delicious233
     setupFiles: [],
   },
 });

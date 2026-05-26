@@ -2,6 +2,7 @@
 
 ## Hub `/client/ws` frame format
 
+<<<<<<< HEAD
 Hub `/client/ws` and Edge `/v1/events` are two different WebSocket protocols.
 Hub frames are IM/task dispatch frames shaped as `{ type, seq_id?, payload? }`.
 Edge events use the `EventEnvelope` documented later in this file. Do not parse
@@ -63,6 +64,11 @@ Task bridge REST contract:
 - There is currently no `listAgentTasks` REST endpoint. Task list UI must be backed by local bridge state, Hub WebSocket events, or a future explicitly documented endpoint.
 
 AgentHub 使用 WebSocket typed events 推送实时状态。REST API 用于发起命令和查询，WebSocket 只负责事件投递。
+=======
+> **Implementation Status (2026-05-24)**: Edge Server events (run.*, runner.*) are
+> the primary event system and are documented in sections 1-6 below. Hub Server
+> WebSocket events are documented in [section 7](#7-hub-websocket-events) (added 2026-05-25).
+>>>>>>> origin/dev/delicious233
 
 ## 1. 连接
 
@@ -131,10 +137,6 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 - 每 50ms 或每 8KB 合并一次。
 - 使用 `run.output.batch` 承载批量 chunk。
 - 每个 chunk 带 `offset`，方便前端去重。
-- Edge raw stdout/stderr 当前由 `ProcessExecutor` 做 per-run 总字节预算；默认 4 MiB，超出后截断持久化输出和 `run.output.batch` 文本。
-- 截断批次会在兼容 payload 上附加 `truncated: true`、`maxBytes`、`bytesWritten` 和 `message`。客户端应保留已收到文本，并用这些字段提示输出被截断。
-- 结构化 `run.agent.*` adapter payload 另有单事件 JSON payload 预算；默认 1 MiB。超出后 Edge 会优先递归截断字符串字段，保留事件类型和 scope，并在 payload 上附加 `truncated: true`、`maxBytes`、`bytesBefore` 和 `message`。
-- 如果 payload 主要由非字符串大对象组成，Edge 可以降级为 metadata-only payload，并附加 `dropped: true`。客户端应把这类事件视为“该事件内容被截断/丢弃”，不要把它当作 run 失败。
 
 单条输出：
 
@@ -166,42 +168,6 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 }
 ```
 
-截断批次：
-
-```json
-{
-  "type": "run.output.batch",
-  "payload": {
-    "runId": "run_1",
-    "stream": "stdout",
-    "chunks": [
-      { "offset": 4194288, "text": "final bytes" }
-    ],
-    "truncated": true,
-    "maxBytes": 4194304,
-    "bytesWritten": 4194304,
-    "message": "run output truncated after 4194304 bytes"
-  }
-}
-```
-
-结构化事件截断示例：
-
-```json
-{
-  "type": "run.agent.tool_result",
-  "payload": {
-    "callId": "toolu_1",
-    "toolName": "shell_command",
-    "output": "first retained bytes...",
-    "truncated": true,
-    "maxBytes": 1048576,
-    "bytesBefore": 2097152,
-    "message": "structured event payload truncated after 1048576 bytes"
-  }
-}
-```
-
 ## 5. 事件总表
 
 ### IM / Project
@@ -220,12 +186,12 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `item.created` | P0 | Thread Item 创建 |
 | `item.updated` | P0 | Thread Item 状态更新 |
 
-### Execution / Runner
+### Execution / Runtime
 
 | type | 阶段 | 说明 |
 |---|---|---|
-| `runner.online` | P0 | Runner 在线 |
-| `runner.offline` | P0 | Runner 离线 |
+| `runner.online` | P0 | Runtime/target compatibility event: legacy Runner 在线 |
+| `runner.offline` | P0 | Runtime/target compatibility event: legacy Runner 离线 |
 | `run.queued` | P0 | AgentRun 已排队 |
 | `run.started` | P0 | AgentRun 已启动 |
 | `run.output` | P0 | 单条 stdout/stderr 输出 |
@@ -294,3 +260,146 @@ WebSocket 事件不是 JSON-RPC：
 - 不用 WebSocket 承载普通查询。
 
 如果未来 Runner 和 sidecar 之间需要 stdio bridge，可以局部使用 JSON-RPC 或 NDJSON，但不作为 AgentHub 主协议。
+
+## 7. Hub WebSocket Events
+
+Hub Server 提供独立的 WebSocket 事件系统，与 Edge Server 的 `EventEnvelope` 格式不同。以下为 Hub WebSocket 事件文档。
+
+### 7.1 连接
+
+```text
+ws://host:8080/client/ws?access_token=<hub-issued-access-token>
+```
+
+连接流程：
+
+1. 客户端使用 Hub-issued HS256 access token 建立 WebSocket 连接。浏览器客户端通过 `access_token` query 参数传递；能设置请求头的原生客户端也可用 `Authorization: Bearer <token>`。
+2. Hub 在 HTTP upgrade 前验证 token；TokenDance ID RS256 bearer token 不能通过 `/client/ws`。
+3. 升级成功后服务端发送 `auth.ok`；验证失败时在升级前返回 401，不建立 WebSocket。
+4. 认证通过后，客户端可发送 `typing` 事件；服务端推送实时事件。
+5. 心跳：服务端定期发送 WebSocket ping，客户端需要回复 pong。连续未回复 pong 将导致断连。
+
+### 7.2 Frame Format (Hub)
+
+Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
+
+| 字段 | 类型 | 必填 | 描述 |
+|-------|------|:---:|------|
+| `type` | string | 是 | 事件类型，使用 dot.notation 格式（如 `message.new`） |
+| `seq_id` | number | 否 | 当前连接内单调递增序号 |
+| `payload` | object | 视事件而定 | 事件载荷，结构由 `type` 决定 |
+
+对比 Edge EventEnvelope：
+
+- Hub: 扁平 `{type, seq_id, payload}` — 无 version / id / scope / traceId / sentAt 包裹
+- Edge: `{version, id, seq, type, scope, traceId, sentAt, payload}` — 完整信封
+
+### 7.3 Hub 事件类型
+
+#### Auth 事件（Client↔Hub）
+
+| type | 方向 | 说明 |
+|------|------|------|
+| `auth` | Client→Hub | 历史帧认证，仅用于未挂 `WSAuthMiddleware` 的测试/兼容入口；主路由 `/client/ws` 使用 upgrade 前 token |
+| `auth.ok` | Hub→Client | 认证成功，payload: `{ user_id, device_id }` 或 `null` |
+| `auth.fail` | Hub→Client | 认证失败，payload: `{ reason }`；主路由通常在 upgrade 前返回 401 |
+
+**auth.ok 示例 — 服务端响应：**
+
+```json
+{"type":"auth.ok","payload":{"user_id":"user_01HX...","device_id":"device_01HX..."}}
+```
+
+**auth.fail 示例 — 服务端响应：**
+
+```json
+{"type":"auth.fail","payload":{"reason":"invalid token"}}
+```
+
+#### Typing 事件（Client→Hub）
+
+| type | 方向 | 说明 |
+|------|------|------|
+| `typing` | Client→Hub | 用户正在输入，payload: `{ session_id }` |
+
+```json
+{"type":"typing","payload":{"session_id":"sess_01HX..."}}
+```
+
+#### Message 事件（Hub→Client）
+
+| type | 说明 |
+|------|------|
+| `message.new` | 新消息，payload: `{ message_id, session_id, sender_id, sender_type, content, content_type, seq_id, reply_to_message_id, created_at }` |
+| `message.recall` | 消息撤回，payload: `{ message_id, session_id, recalled_by }` |
+| `message.pin` | 消息置顶，payload: `{ message_id, session_id, pinned_by }` |
+| `message.unpin` | 取消置顶，payload: `{ message_id, session_id }` |
+| `message.read` | 消息已读回执，payload: `{ message_id, session_id, read_by, last_read_seq }` |
+
+```json
+{"type":"message.new","seq_id":42,"payload":{"message_id":"msg_01HX...","session_id":"sess_01HX...","sender_id":"user_01HX...","sender_type":"user","content":{"text":"Hello"},"content_type":"text","created_at":"2026-05-25T12:00:00Z"}}
+```
+
+#### Session 事件（Hub→Client）
+
+| type | 说明 |
+|------|------|
+| `session.created` | 会话创建，payload: `{ session_id, type, name, owner_id, members[] }` |
+| `session.dissolved` | 群解散，payload: `{ session_id }` |
+| `session.member_joined` | 成员加入，payload: `{ session_id, member_id, member_type }` |
+| `session.member_left` | 成员离开，payload: `{ session_id, member_id }` |
+| `session.info_updated` | 会话信息变更，payload: `{ session_id, changes{} }` |
+
+#### Device 事件（Hub→Client）
+
+| type | 说明 |
+|------|------|
+| `device.online` | 设备上线，payload: `{ user_id, device_id, device_type }` |
+| `device.offline` | 设备下线，payload: `{ user_id, device_id, device_type }` |
+| `device.kicked` | 设备被踢下线，payload: `{ device_id, reason }` |
+
+#### Agent Task 事件（Hub↔Edge）
+
+| type | 方向 | 说明 |
+|------|------|------|
+| `agent.dispatch` | Hub→Edge | 分发 agent 任务，payload: `{ task_id, agent_instance_id, agent_type, session_id, prompt, trigger_message_id, trigger_user_id, display_name, model_params?, target_id? }`；`agent_type` 必须是 Edge Runtime adapter id（如 `claude-code`、`codex`、`opencode`），`prompt` 来自触发消息文本。Web 触发可用 `agent_type` / `agent_instance_id` / `custom_agent_id` 指定 Agent，可用 `target_id` 指定 owner-scoped Execution Target；Hub 会校验 target owner、当前可调度 target type 和绑定 desktop device，把 `target_id` 与 `edge_device_id` 持久化，只向该 device 的 Desktop/Edge WS 下发。目标 device 离线时进入 target/device 专属队列，等待同一 device reconnect replay，禁止 fallback 到其他在线 desktop。该切片仍不代表远程/云 target 已完成；Remote/Cloud 还需要 relay/provisioning、设备证明、workspace allowlist 同步和审批证明。 |
+| `agent.stream` | Edge→Hub/Hub→Client | typed runtime event，payload: `{ id, task_id, edge_run_id, session_id, agent_instance_id, event_seq, event_type, payload, created_at }`；Hub 仍会为当前聊天 UI 同步投影一条 `message.new`。 |
+| `agent.done` | Edge→Hub | agent 任务完成，payload: `{ task_id, result_summary, usage{} }` |
+| `agent.failed` | Edge→Hub | agent 任务失败，payload: `{ task_id, error }` |
+| `agent.cancel` | Hub→Edge | 取消 agent 任务，payload: `{ task_id }` |
+| `agent.timeout` | Hub→Edge | 任务超时，payload: `{ task_id }` |
+
+#### Notification 事件（Hub→Client）
+
+| type | 说明 |
+|------|------|
+| `notification.new` | 新通知，payload: `{ notification_id, type, payload{} }` |
+
+#### Friend 事件（Hub→Client）
+
+| type | 说明 |
+|------|------|
+| `friend.request` | 收到好友请求，payload: `{ request_id, from_user_id, message }` |
+| `friend.accepted` | 好友请求被接受，payload: `{ friendship_id, user_id }` |
+
+### 7.4 代码示例
+
+```json
+// 客户端连接主路由
+"ws://host:8080/client/ws?access_token=eyJhbGciOiJIUzI1NiIs..."
+
+// 服务端响应认证成功
+{"type":"auth.ok","payload":{"user_id":"user_01HX...","device_id":"device_01HX..."}}
+
+// 服务端推送新消息
+{"type":"message.new","seq_id":42,"payload":{"message_id":"msg_01HX...","session_id":"sess_01HX...","sender_id":"user_01HX...","sender_type":"user","content":{"text":"Hello"},"content_type":"text","created_at":"2026-05-25T12:00:00Z"}}
+
+// 服务端推送设备上线
+{"type":"device.online","payload":{"user_id":"user_01HX...","device_id":"device_01HX...","device_type":"desktop"}}
+
+// Edge 上报 agent 任务完成
+{"type":"agent.done","payload":{"task_id":"task_01HX...","result_summary":"Tests passed. 3/3 OK.","usage":{"input_tokens":1234,"output_tokens":567}}}
+
+// Hub 推送 typed runtime event
+{"type":"agent.stream","payload":{"id":"evt_01HX...","task_id":"task_01HX...","edge_run_id":"run_01HX...","session_id":"sess_01HX...","agent_instance_id":"agent_01HX...","event_seq":1,"event_type":"run.agent.tool_call","payload":{"callId":"call_1","toolName":"read_file"},"created_at":"2026-05-25T12:00:00Z"}}
+```

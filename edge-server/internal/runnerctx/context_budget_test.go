@@ -1,6 +1,7 @@
 package runnerctx
 
 import (
+	"strings"
 	"sync"
 	"testing"
 )
@@ -277,21 +278,23 @@ func TestUsagePercentSmallBudget(t *testing.T) {
 
 func TestEstimateTokens(t *testing.T) {
 	tests := []struct {
-		name  string
-		chars int
-		want  int
+		name string
+		text string
+		want int
 	}{
-		{"zero", 0, 0},
-		{"one", 1, 1},
-		{"four", 4, 1},
-		{"five", 5, 2},
-		{"hundred", 100, 25},
+		{"empty string", "", 0},
+		{"one char", "a", 1},
+		{"four chars", "abcd", 1},
+		{"five chars", "abcde", 2},
+		{"eight chars", "abcdefgh", 2},
+		{"twenty chars", "12345678901234567890", 5},
+		{"english sentence", "Hello, world! This is a test.", 8},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := EstimateTokens(tt.chars)
+			got := EstimateTokens(tt.text)
 			if got != tt.want {
-				t.Fatalf("EstimateTokens(%d) = %d, want %d", tt.chars, got, tt.want)
+				t.Fatalf("EstimateTokens(%q) = %d, want %d", tt.text, got, tt.want)
 			}
 		})
 	}
@@ -434,5 +437,289 @@ func TestAllocateChildFullRatio(t *testing.T) {
 	}
 	if child.ReservedTokens != 10000 {
 		t.Fatalf("ReservedTokens = %d, want 10000", child.ReservedTokens)
+	}
+}
+
+// ============================================================================
+// Compaction Tests
+// ============================================================================
+
+// TestCompactHistoryBelowThreshold_NoTrigger verifies that when the message
+// count is below keepRecent, no compaction is triggered.
+func TestCompactHistoryBelowThreshold_NoTrigger(t *testing.T) {
+	messages := []Message{
+		{Role: "user", Content: "Hello"},
+		{Role: "assistant", Content: "Hi there!"},
+		{Role: "user", Content: "What is Go?"},
+	}
+	compacted, result := CompactHistory(messages, 10)
+	if result != nil {
+		t.Fatal("expected nil result when messages <= keepRecent")
+	}
+	if len(compacted) != 3 {
+		t.Fatalf("len(compacted) = %d, want 3", len(compacted))
+	}
+}
+
+// TestCompactHistoryAboveThreshold_Triggered verifies compaction is triggered
+// when message count exceeds keepRecent.
+func TestCompactHistoryAboveThreshold_Triggered(t *testing.T) {
+	messages := make([]Message, 20)
+	for i := range messages {
+		messages[i] = Message{
+			Role:    "user",
+			Content: "Message number " + strings.Repeat("x", 100),
+		}
+	}
+	// Add a decision in the older messages.
+	messages[2] = Message{Role: "assistant", Content: "I decided to use PostgreSQL for the database."}
+
+	compacted, result := CompactHistory(messages, 10)
+	if result == nil {
+		t.Fatal("expected non-nil result when messages > keepRecent")
+	}
+	if result.OriginalCount != 20 {
+		t.Fatalf("OriginalCount = %d, want 20", result.OriginalCount)
+	}
+	// After compaction: 1 system summary + 10 recent = 11 messages.
+	if result.CompactedCount != 11 {
+		t.Fatalf("CompactedCount = %d, want 11", result.CompactedCount)
+	}
+	if len(compacted) != 11 {
+		t.Fatalf("len(compacted) = %d, want 11", len(compacted))
+	}
+	// First message should be a system summary.
+	if compacted[0].Role != "system" {
+		t.Fatalf("compacted[0].Role = %q, want system", compacted[0].Role)
+	}
+	// TokensSaved should be positive.
+	if result.TokensSaved <= 0 {
+		t.Fatalf("TokensSaved = %d, want > 0", result.TokensSaved)
+	}
+}
+
+// TestEstimateTokens_Accuracy verifies token estimation with various inputs.
+func TestEstimateTokens_Accuracy(t *testing.T) {
+	tests := []struct {
+		name     string
+		text     string
+		minWant  int
+		maxWant  int
+	}{
+		{"empty", "", 0, 0},
+		{"single", "a", 1, 1},
+		{"four chars", "abcd", 1, 1},
+		{"eight chars", "abcdefgh", 2, 2},
+		{"long text", strings.Repeat("hello world ", 100), 300, 400},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := EstimateTokens(tt.text)
+			if got < tt.minWant || got > tt.maxWant {
+				t.Fatalf("EstimateTokens = %d, want in [%d, %d]", got, tt.minWant, tt.maxWant)
+			}
+		})
+	}
+}
+
+// TestCompactHistory_SummaryContainsKeyInfo verifies that the generated
+// summary contains information about decisions, errors, and file changes.
+func TestCompactHistory_SummaryContainsKeyInfo(t *testing.T) {
+	messages := []Message{
+		{Role: "user", Content: "Build a REST API."},
+		{Role: "assistant", Content: "I decided to use the Gin framework. I will create a main.go file."},
+		{Role: "user", Content: "It failed."},
+		{Role: "assistant", Content: "The error was a missing import. I fixed it by adding the package."},
+		{Role: "user", Content: "Add tests."},
+		{Role: "assistant", Content: "I created test files and modified the existing ones. The code compiles now."},
+		// Filler messages to push above keepRecent=3.
+		{Role: "user", Content: "Check 1"},
+		{Role: "assistant", Content: "OK 1"},
+		{Role: "user", Content: "Check 2"},
+		{Role: "assistant", Content: "OK 2"},
+		{Role: "user", Content: "Check 3"},
+		{Role: "assistant", Content: "OK 3"},
+		{Role: "user", Content: "Check 4"},
+		{Role: "assistant", Content: "OK 4"},
+		{Role: "user", Content: "Check 5"},
+		{Role: "assistant", Content: "OK 5"},
+		{Role: "user", Content: "Check 6"},
+		{Role: "assistant", Content: "OK 6"},
+		{Role: "user", Content: "Check 7"},
+		{Role: "assistant", Content: "OK 7"},
+	}
+	compacted, result := CompactHistory(messages, 3)
+	if result == nil {
+		t.Fatal("expected non-nil compaction result")
+	}
+	if len(compacted) == 0 {
+		t.Fatal("compacted should not be empty")
+	}
+
+	summary := result.Summary
+	// Summary should mention the decision.
+	if !strings.Contains(summary, "decided") && !strings.Contains(summary, "Decision") {
+		t.Logf("summary: %s", summary)
+		t.Error("summary should contain decision-related content")
+	}
+	// Summary should mention the error.
+	if !strings.Contains(summary, "error") && !strings.Contains(summary, "Error") {
+		t.Logf("summary: %s", summary)
+		t.Error("summary should contain error-related content")
+	}
+	// Summary should mention file changes.
+	if !strings.Contains(summary, "File") && !strings.Contains(summary, "created") {
+		t.Logf("summary: %s", summary)
+		t.Error("summary should contain file-change-related content")
+	}
+}
+
+// TestEvictToBudget_BelowThreshold verifies that eviction reduces the token
+// count below the specified budget.
+func TestEvictToBudget_BelowThreshold(t *testing.T) {
+	// Create messages where each is ~100 estimated tokens (400 chars).
+	messages := make([]Message, 20)
+	for i := range messages {
+		messages[i] = Message{
+			Role:    "user",
+			Content: strings.Repeat("x", 400),
+		}
+	}
+
+	// Each message is ~100 tokens, 20 messages = ~2000 tokens.
+	// Set budget to 800 tokens: should keep ~8 messages.
+	evicted := EvictToBudget(messages, 800)
+
+	// Calculate actual tokens.
+	totalTokens := 0
+	for _, m := range evicted {
+		totalTokens += EstimateTokens(m.Content)
+	}
+	if totalTokens > 800 {
+		t.Fatalf("totalTokens after eviction = %d, want <= 800", totalTokens)
+	}
+	// Should have fewer messages than original.
+	if len(evicted) >= len(messages) {
+		t.Fatalf("len(evicted) = %d, want < %d", len(evicted), len(messages))
+	}
+	// Should have at least 1 message.
+	if len(evicted) == 0 {
+		t.Fatal("evicted should retain at least 1 message")
+	}
+}
+
+// TestCompactHistory_EmptyHistory_NoPanic verifies that compacting an empty
+// history does not panic.
+func TestCompactHistory_EmptyHistory_NoPanic(t *testing.T) {
+	// Empty messages should return empty without panic.
+	compacted, result := CompactHistory(nil, 10)
+	if result != nil {
+		t.Fatal("expected nil result for nil messages")
+	}
+	if compacted != nil {
+		t.Fatalf("expected nil compacted for nil messages, got %d items", len(compacted))
+	}
+
+	// Empty slice should also work.
+	compacted, result = CompactHistory([]Message{}, 10)
+	if result != nil {
+		t.Fatal("expected nil result for empty messages")
+	}
+	if len(compacted) != 0 {
+		t.Fatalf("len(compacted) = %d, want 0", len(compacted))
+	}
+}
+
+// TestEvictToBudget_EmptyHistory_NoPanic verifies eviction on empty history.
+func TestEvictToBudget_EmptyHistory_NoPanic(t *testing.T) {
+	result := EvictToBudget(nil, 100)
+	if result != nil {
+		t.Fatalf("expected nil from EvictToBudget(nil), got %d items", len(result))
+	}
+
+	result = EvictToBudget([]Message{}, 100)
+	if len(result) != 0 {
+		t.Fatalf("len(result) = %d, want 0", len(result))
+	}
+}
+
+// TestCompactHistory_DefaultKeepRecent verifies the default keepRecent of 10.
+func TestCompactHistory_DefaultKeepRecent(t *testing.T) {
+	messages := make([]Message, 25)
+	for i := range messages {
+		messages[i] = Message{Role: "user", Content: "msg " + strings.Repeat("x", 40)}
+	}
+
+	// keepRecent = 0 should default to 10.
+	compacted, result := CompactHistory(messages, 0)
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	// After compaction: 1 system summary + 10 recent = 11 messages.
+	if result.CompactedCount != 11 {
+		t.Fatalf("CompactedCount = %d, want 11", result.CompactedCount)
+	}
+	if len(compacted) != 11 {
+		t.Fatalf("len(compacted) = %d, want 11", len(compacted))
+	}
+}
+
+// TestEvictToBudget_PreservesSystemSummary verifies that the first system
+// message (compaction summary) is preserved during eviction.
+func TestEvictToBudget_PreservesSystemSummary(t *testing.T) {
+	messages := []Message{
+		{Role: "system", Content: "[Compaction summary] Important context from earlier."},
+		{Role: "user", Content: strings.Repeat("a", 400)},
+		{Role: "assistant", Content: strings.Repeat("b", 400)},
+		{Role: "user", Content: strings.Repeat("c", 400)},
+		{Role: "assistant", Content: strings.Repeat("d", 400)},
+	}
+
+	// Set budget to only fit ~2 messages + the summary.
+	evicted := EvictToBudget(messages, 300)
+
+	// The system message should be preserved.
+	if len(evicted) == 0 || evicted[0].Role != "system" {
+		t.Fatal("first system message (compaction summary) should be preserved")
+	}
+}
+
+// TestCompactHistory_KeepRecentNegative verifies negative keepRecent defaults to 10.
+func TestCompactHistory_KeepRecentNegative(t *testing.T) {
+	messages := make([]Message, 15)
+	for i := range messages {
+		messages[i] = Message{Role: "user", Content: "msg"}
+	}
+	compacted, result := CompactHistory(messages, -5)
+	if result == nil {
+		t.Fatal("expected non-nil result with 15 messages and keepRecent=-5 (defaults to 10)")
+	}
+	if result.CompactedCount != 11 {
+		t.Fatalf("CompactedCount = %d, want 11", result.CompactedCount)
+	}
+	if len(compacted) != 11 {
+		t.Fatalf("len(compacted) = %d, want 11", len(compacted))
+	}
+}
+
+// TestEvictToBudget_ZeroBudget_NoChange verifies zero maxTokens is a no-op.
+func TestEvictToBudget_ZeroBudget_NoChange(t *testing.T) {
+	messages := []Message{
+		{Role: "user", Content: "hello world"},
+	}
+	result := EvictToBudget(messages, 0)
+	if len(result) != 1 {
+		t.Fatalf("len(result) = %d, want 1 (no change for zero budget)", len(result))
+	}
+}
+
+// TestEstimateTokens_LongText verifies estimation is proportional for long text.
+func TestEstimateTokens_LongText(t *testing.T) {
+	text := strings.Repeat("The quick brown fox jumps over the lazy dog. ", 1000)
+	got := EstimateTokens(text)
+	// 45 chars per repetition * 1000 = 45000 chars; 45000/4 = 11250 tokens (ceil).
+	expected := 11250
+	if got != expected {
+		t.Fatalf("EstimateTokens(long) = %d, want %d", got, expected)
 	}
 }

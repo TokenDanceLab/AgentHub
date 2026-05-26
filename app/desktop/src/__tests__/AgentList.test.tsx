@@ -54,33 +54,56 @@ describe('AgentList', () => {
   });
 
   it('renders list of agents with names', () => {
-    const agents = [makeAgent({ id: 'a1', name: 'Alpha' }), makeAgent({ id: 'a2', name: 'Beta' })];
+    const agents = [makeAgent({ id: 'a1', name: 'Codex' }), makeAgent({ id: 'a2', name: 'Claude Code' })];
     render(<AgentList agents={agents} online={true} />);
-    expect(screen.getByText('Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Beta')).toBeInTheDocument();
+    expect(screen.getByText('Codex')).toBeInTheDocument();
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
+  });
+
+  it('orders primary runtimes and hides unknown runtimes behind Other by default', () => {
+    const agents = [
+      makeAgent({ id: 'open', name: 'OpenCode' }),
+      makeAgent({ id: 'custom', name: 'Custom Runtime' }),
+      makeAgent({ id: 'claude', name: 'Claude Code' }),
+      makeAgent({ id: 'codex', name: 'Codex' }),
+    ];
+    render(<AgentList agents={agents} online={true} />);
+
+    const runtimeButtons = screen
+      .getAllByRole('button')
+      .map((button) => button.textContent ?? '')
+      .filter((text) => /Codex|Claude Code|OpenCode|Custom Runtime|agent\.runtime\.other/.test(text));
+
+    expect(runtimeButtons[0]).toContain('Codex');
+    expect(runtimeButtons[1]).toContain('Claude Code');
+    expect(runtimeButtons[2]).toContain('OpenCode');
+    expect(screen.queryByText('Custom Runtime')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /agent\.runtime\.other/ }));
+    expect(screen.getByText('Custom Runtime')).toBeInTheDocument();
   });
 
   it('highlights selected agent', () => {
-    const agents = [makeAgent({ id: 'a1', name: 'Alpha' }), makeAgent({ id: 'a2', name: 'Beta' })];
+    const agents = [makeAgent({ id: 'a1', name: 'Codex' }), makeAgent({ id: 'a2', name: 'Claude Code' })];
     render(<AgentList agents={agents} online={true} selectedId="a1" />);
     const buttons = screen.getAllByRole('button');
-    const selectedBtn = buttons.find((btn) => btn.textContent?.includes('Alpha'));
+    const selectedBtn = buttons.find((btn) => btn.textContent?.includes('Codex'));
     expect(selectedBtn?.className).toContain('selected');
     expect(selectedBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('does not highlight non-selected agents', () => {
-    const agents = [makeAgent({ id: 'a1', name: 'Alpha' }), makeAgent({ id: 'a2', name: 'Beta' })];
+    const agents = [makeAgent({ id: 'a1', name: 'Codex' }), makeAgent({ id: 'a2', name: 'Claude Code' })];
     render(<AgentList agents={agents} online={true} selectedId="a1" />);
-    const notSelectedBtn = screen.getByText('Beta').closest('button');
+    const notSelectedBtn = screen.getByText('Claude Code').closest('button');
     expect(notSelectedBtn?.className).not.toContain('selected');
   });
 
-  it('shows runtime metadata instead of basic capability tags', () => {
+  it('keeps runtime rows compact without capability or adapter tags', () => {
     const agents = [
       makeAgent({
         id: 'a1',
-        name: 'CapAgent',
+        name: 'Codex',
         capabilities: {
           streaming: true,
           toolCalls: true,
@@ -94,17 +117,18 @@ describe('AgentList', () => {
       }),
     ];
     render(<AgentList agents={agents} online={true} />);
-    expect(screen.getByText('agent.runtime.localEdge')).toBeInTheDocument();
-    expect(screen.getByText('agent.runtime.cliAdapter')).toBeInTheDocument();
+    expect(screen.getByText('Codex')).toBeInTheDocument();
+    expect(screen.queryByText('agent.runtime.localEdge')).not.toBeInTheDocument();
+    expect(screen.queryByText('agent.runtime.cliAdapter')).not.toBeInTheDocument();
     expect(screen.queryByText('agent.capability.streaming')).not.toBeInTheDocument();
     expect(screen.queryByText('agent.capability.toolCalls')).not.toBeInTheDocument();
   });
 
   it('calls onSelect when an agent is clicked', () => {
     const onSelect = vi.fn();
-    const agent = makeAgent({ id: 'a1', name: 'ClickMe' });
+    const agent = makeAgent({ id: 'a1', name: 'Codex' });
     render(<AgentList agents={[agent]} online={true} onSelect={onSelect} />);
-    fireEvent.click(screen.getByText('ClickMe'));
+    fireEvent.click(screen.getByText('Codex'));
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledWith('a1');
   });

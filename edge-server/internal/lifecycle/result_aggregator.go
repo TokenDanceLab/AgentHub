@@ -115,6 +115,8 @@ func isTerminalStatus(status agents.Status) bool {
 	switch status {
 	case agents.StatusCompleted, agents.StatusError, agents.StatusDisconnected:
 		return true
+	case agents.StatusOnline, agents.StatusBusy, agents.StatusIdle, agents.StatusWaitingInput:
+		return false
 	}
 	return false
 }

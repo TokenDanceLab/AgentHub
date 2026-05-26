@@ -23,6 +23,7 @@ type PendingAgentTask struct {
 	AgentInstanceID   string     `gorm:"type:uuid;not null" json:"agent_instance_id"`
 	TriggeredByUserID string     `gorm:"type:uuid;not null" json:"triggered_by_user_id"`
 	TriggerMessageID  string     `gorm:"type:uuid;not null" json:"trigger_message_id"`
+	TargetID          string     `gorm:"type:uuid;default:null" json:"target_id,omitempty"`
 	Status            string     `gorm:"type:varchar(16);not null" json:"status"`
 	EdgeRunID         string     `gorm:"type:varchar(128)" json:"edge_run_id,omitempty"`
 	EdgeDeviceID      string     `gorm:"type:uuid" json:"edge_device_id,omitempty"`

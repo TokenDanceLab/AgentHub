@@ -17,8 +17,13 @@ import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { useEdgeStatus } from '@/hooks/useEdgeStatus';
 import { useAgentList } from '@/api/agentQueries';
+import { createHubClient } from '@/api/hubClient';
 import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
-import { useThreads } from '@/api/threadQueries';
+import { useThreads, useThreadMessages } from '@/api/threadQueries';
+import { createThread } from '@/api/edgeClient';
+import { getAccessToken, useAuth } from '@/hooks/useAuth';
+import { useHubEventStream } from '@/hooks/useHubEventStream';
+import { useHubIntegration } from '@/hooks/useHubIntegration';
 import type { StartRunRequest } from '@shared/types';
 import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -30,21 +35,20 @@ import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
 import { useHubStore } from '@/stores/hubStore';
-import { getAccessToken, useAuth } from '@/hooks/useAuth';
-import { createHubClient, type HubClient } from '@/api/hubClient';
-import type { HubWSHandle } from '@/api/hubWS';
-import { useHubEventStream } from '@/hooks/useHubEventStream';
-import { useHubIntegration } from '@/hooks/useHubIntegration';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
+import HomeDashboard from '@/components/HomeDashboard';
 import { ToastContainer } from '@/components/Toast';
 import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
 import {
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Circle,
   Copy,
+  Home,
   MessageSquareText,
   LogIn,
   Maximize2,
@@ -78,9 +82,8 @@ interface OptimisticRun {
 }
 
 const LEFT_SIDEBAR_MIN = 248;
-const LEFT_SIDEBAR_MAX = 520;
-const RIGHT_PANEL_MIN = 272;
-const RIGHT_PANEL_MAX = 560;
+const LEFT_SIDEBAR_MAX = 420;
+const RUN_CARD_MIN_WORKSPACE_WIDTH = 1180;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -102,6 +105,29 @@ function isEditableShortcutTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable]'));
 }
 
+function DesktopHubTaskBridge() {
+  const hubAuth = useAuth();
+
+  useEffect(() => {
+    if (!hubAuth.isAuthenticated && !hubAuth.token) {
+      void hubAuth.tryAutoLogin();
+    }
+  }, [hubAuth.isAuthenticated, hubAuth.token, hubAuth.tryAutoLogin]);
+
+  if (!hubAuth.isAuthenticated || !hubAuth.token) {
+    return null;
+  }
+
+  return <DesktopHubTaskBridgeActive />;
+}
+
+function DesktopHubTaskBridgeActive() {
+  const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
+  const hubRealtime = useHubEventStream(getAccessToken);
+  useHubIntegration({ hubWS: hubRealtime.hubWS, hubClient });
+  return null;
+}
+
 type TooltipSide = 'top' | 'right' | 'bottom' | 'left';
 
 interface ShellIconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-label'> {
@@ -121,7 +147,6 @@ function ShellIconButton({
   ...buttonProps
 }: ShellIconButtonProps) {
   const tooltipId = useId();
-
   return (
     <button
       {...buttonProps}
@@ -137,28 +162,6 @@ function ShellIconButton({
   );
 }
 
-function HubTaskBridge({ hubWS, hubClient }: { hubWS: HubWSHandle; hubClient: HubClient }) {
-  useHubIntegration({ hubWS, hubClient });
-  return null;
-}
-
-function HubRealtimeBridge({
-  hubClient,
-  onHubWSChange,
-}: {
-  hubClient: HubClient;
-  onHubWSChange: (hubWS: HubWSHandle | null) => void;
-}) {
-  const { hubWS } = useHubEventStream(getAccessToken);
-
-  useEffect(() => {
-    onHubWSChange(hubWS);
-    return () => onHubWSChange(null);
-  }, [hubWS, onHubWSChange]);
-
-  return hubWS ? <HubTaskBridge hubWS={hubWS} hubClient={hubClient} /> : null;
-}
-
 export default function App() {
   const { online, health } = useHealth();
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online);
@@ -170,21 +173,17 @@ export default function App() {
 
   const { data: threadData } = useThreads();
   const threads = threadData?.items ?? [];
-  const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
 
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
-  const localModeSelected = useHubStore((s) => s.localModeSelected);
-  const hubAuth = useAuth();
   const { setOnline, setConnected, wsLatency } = useConnectionStore(
     useShallow((s) => ({ setOnline: s.setOnline, setConnected: s.setConnected, wsLatency: s.wsLatency })),
   );
-  const { selectedThreadId, selectThread } = useThreadStore(
-    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectThread: s.selectThread })),
+  const { selectedThreadId, selectedAgentId, selectThread, selectAgentThread } = useThreadStore(
+    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectedAgentId: s.selectedAgentId, selectThread: s.selectThread, selectAgentThread: s.selectAgentThread })),
   );
   const { data: agentData } = useAgentList(online);
   const agents = agentData?.items ?? [];
-  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>();
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
   const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
@@ -195,40 +194,31 @@ export default function App() {
     leftSidebarCollapsed,
     rightPanelOpen,
     leftSidebarWidth,
-    rightPanelWidth,
+    leftSidebarView,
     setLeftSidebarCollapsed,
     setRightPanelOpen,
     setLeftSidebarWidth,
-    setRightPanelWidth,
+    setLeftSidebarView,
   } = useUIStore(
     useShallow((s) => ({
       leftSidebarCollapsed: s.leftSidebarCollapsed,
       rightPanelOpen: s.rightPanelOpen,
       leftSidebarWidth: s.sidebarWidth,
-      rightPanelWidth: s.rightPanelWidth,
+      leftSidebarView: s.leftSidebarView,
       setLeftSidebarCollapsed: s.setLeftSidebarCollapsed,
       setRightPanelOpen: s.setRightPanelOpen,
       setLeftSidebarWidth: s.setSidebarWidth,
-      setRightPanelWidth: s.setRightPanelWidth,
+      setLeftSidebarView: s.setLeftSidebarView,
     })),
   );
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [hubWS, setHubWS] = useState<HubWSHandle | null>(null);
+  const [rightPanelMounted, setRightPanelMounted] = useState(rightPanelOpen);
+  const [workspaceWidth, setWorkspaceWidth] = useState(0);
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
 
   // Mobile/tablet overlays
   const [navPanelOpen, setNavPanelOpen] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    hubAuth.tryAutoLogin().finally(() => {
-      if (!cancelled) setAuthChecked(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [hubAuth.tryAutoLogin]);
 
   // Sync health → connection store
   const prevOnlineRef = useRef<boolean | null>(null);
@@ -260,13 +250,17 @@ export default function App() {
   }, [threads, online, addToast, t]);
 
   const selectedThread = threads.find((th) => th.threadId === selectedThreadId);
-  const activeThreadId = selectedThread?.threadId ?? threads[0]?.threadId;
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const displayedRun = currentRun ?? optimisticRun;
   const runIsActive = isRunActiveStatus(displayedRun?.status);
+  const runCardConstrained = workspaceWidth > 0 && workspaceWidth < RUN_CARD_MIN_WORKSPACE_WIDTH;
+  const effectiveRightPanelOpen = rightPanelOpen && !runCardConstrained;
+  const showRunCardSpace = !!displayedRun && effectiveRightPanelOpen && !isMobile && !workspaceExpanded;
   const composerLocked = runStartPending || runIsActive;
   const allMessages = useMemo(() => {
-    const merged = [...userMessages, ...messages];
+    const merged = [...userMessages, ...messages].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    );
     if (!displayedRun) return merged;
 
     const hasVisibleAgentFeedback = messages.some(
@@ -300,18 +294,41 @@ export default function App() {
       },
     ];
   }, [displayedRun, messages, runIsActive, selectedAgent?.name, t, userMessages]);
+  const effectiveLeftSidebarWidth = clamp(leftSidebarWidth, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
   const shellStyle = {
-    '--left-sidebar-width': `${leftSidebarWidth}px`,
-    '--right-panel-width': `${rightPanelWidth}px`,
+    '--left-sidebar-width': `${effectiveLeftSidebarWidth}px`,
   } as CSSProperties;
 
   useEffect(() => {
     if (currentRun) setOptimisticRun(null);
   }, [currentRun]);
 
-  const handleSend = useCallback(async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string }) => {
+  useEffect(() => {
+    if (effectiveRightPanelOpen) {
+      setRightPanelMounted(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setRightPanelMounted(false), 220);
+    return () => window.clearTimeout(timer);
+  }, [effectiveRightPanelOpen]);
+
+  useEffect(() => {
+    const node = workspaceRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+
+    const updateWidth = () => setWorkspaceWidth(node.getBoundingClientRect().width);
+    updateWidth();
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setWorkspaceWidth(entry.contentRect.width);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const handleSend = useCallback(async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string; permissionMode?: string; workDir?: string }) => {
     if (runStartPending || runIsActive) {
-      setRightPanelOpen(true);
       addToast({ type: 'info', message: t('error.activeRunExists') });
       return false;
     }
@@ -332,10 +349,11 @@ export default function App() {
         prompt,
         ...useModelSettingsStore.getState().resolveRunRequestOptions(opts),
       };
+      if (opts?.permissionMode) req.permissionMode = opts.permissionMode;
+      if (opts?.workDir) req.workDir = opts.workDir;
       if (agentId) req.agentId = agentId;
-      if (activeThreadId) req.threadId = activeThreadId;
+      if (selectedThread) req.threadId = selectedThread.threadId;
       setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
-      setRightPanelOpen(true);
       const started = await startRun(req);
       setOptimisticRun({ ...started, outputText: '', toolCalls: [], changedFiles: [] });
       return true;
@@ -344,7 +362,6 @@ export default function App() {
       const activeRunId = getActiveRunConflictId(e);
       if (activeRunId) {
         setOptimisticRun({ runId: activeRunId, status: 'running', outputText: '', toolCalls: [], changedFiles: [] });
-        setRightPanelOpen(true);
         addToast({ type: 'info', message: t('error.activeRunExists') });
         return false;
       }
@@ -355,7 +372,7 @@ export default function App() {
     } finally {
       setRunStartPending(false);
     }
-  }, [activeThreadId, addToast, runIsActive, runStartPending, t]);
+  }, [addToast, runIsActive, runStartPending, selectedThread, t]);
 
   const handleCancel = useCallback(async () => {
     const runId = currentRun?.runId ?? (optimisticRun?.runId.startsWith('starting-') ? undefined : optimisticRun?.runId);
@@ -364,8 +381,27 @@ export default function App() {
     }
   }, [currentRun?.runId, optimisticRun?.runId]);
 
-  const handleSelectThread = useCallback((id: string) => { selectThread(id); setUserMessages([]); }, [selectThread]);
-  const handleSelectAgent = useCallback((id: string) => setSelectedAgentId(id), []);
+  const handleSelectThread = useCallback((id: string) => { selectThread(id); setUserMessages([]); setLeftSidebarView('thread'); }, [selectThread, setLeftSidebarView]);
+  const handleSelectAgent = useCallback(async (agentId: string) => {
+    const store = useThreadStore.getState();
+    const existing = store.agentThreadMap[agentId];
+    if (existing) {
+      store.selectAgentThread(agentId, existing);
+      setUserMessages([]);
+      setLeftSidebarView('thread');
+      return;
+    }
+    const agent = agents.find((a) => a.id === agentId);
+    try {
+      const thread = await createThread(agent?.name ? `${agent.name}` : undefined);
+      store.selectAgentThread(agentId, thread.threadId);
+      setUserMessages([]);
+      setLeftSidebarView('thread');
+    } catch {
+      // still select the agent visually even if thread creation fails
+      store.selectAgentThread(agentId, '');
+    }
+  }, [agents, setLeftSidebarView]);
   const openSettings = useCallback((section: SettingsSectionId = 'general') => {
     setSettingsInitialSection(section);
     setSettingsOpen(true);
@@ -375,26 +411,24 @@ export default function App() {
     event.preventDefault();
     const startX = event.clientX;
     const initialLeft = leftSidebarWidth;
-    const initialRight = rightPanelWidth;
 
     const handleMove = (moveEvent: PointerEvent) => {
       if (side === 'left') {
-        setLeftSidebarWidth(clamp(initialLeft + moveEvent.clientX - startX, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX));
-      } else {
-        setRightPanelWidth(clamp(initialRight + startX - moveEvent.clientX, RIGHT_PANEL_MIN, RIGHT_PANEL_MAX));
+        const nextLeft = clamp(initialLeft + moveEvent.clientX - startX, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
+        setLeftSidebarWidth(nextLeft);
       }
     };
 
     const handleUp = () => {
-      document.body.classList.remove(styles.resizing);
+      document.body.classList.remove(styles.resizing ?? '');
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
     };
 
-    document.body.classList.add(styles.resizing);
+    document.body.classList.add(styles.resizing ?? '');
     window.addEventListener('pointermove', handleMove);
     window.addEventListener('pointerup', handleUp, { once: true });
-  }, [leftSidebarWidth, rightPanelWidth]);
+  }, [leftSidebarWidth, setLeftSidebarWidth]);
 
   const handleResizeKeyDown = useCallback((side: 'left' | 'right') => (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const step = event.shiftKey ? 40 : 16;
@@ -407,33 +441,32 @@ export default function App() {
       if (event.key === 'End') nextWidth = LEFT_SIDEBAR_MAX;
       if (nextWidth != null) {
         event.preventDefault();
-        setLeftSidebarWidth(clamp(nextWidth, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX));
+        const clamped = clamp(nextWidth, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
+        setLeftSidebarWidth(clamped);
       }
       return;
     }
+  }, [leftSidebarWidth, setLeftSidebarWidth]);
 
-    if (event.key === 'ArrowLeft') nextWidth = rightPanelWidth + step;
-    if (event.key === 'ArrowRight') nextWidth = rightPanelWidth - step;
-    if (event.key === 'Home') nextWidth = RIGHT_PANEL_MIN;
-    if (event.key === 'End') nextWidth = RIGHT_PANEL_MAX;
-    if (nextWidth != null) {
-      event.preventDefault();
-      setRightPanelWidth(clamp(nextWidth, RIGHT_PANEL_MIN, RIGHT_PANEL_MAX));
+  const handleDecidePermission = useCallback(async (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
+    const request = permissionRequests.find((item) => item.requestId === requestId);
+    if (!request?.runId) {
+      addToast({ type: 'error', message: t('toast.error') });
+      return;
     }
-  }, [leftSidebarWidth, rightPanelWidth, setLeftSidebarWidth, setRightPanelWidth]);
-
-  const handleDecidePermission = useCallback((requestId: string, decision: 'allow' | 'deny', reason?: string) => {
-    decidePermission(requestId, decision, reason);
-    if (currentRun?.runId) {
-      decidePermissionRest({ runId: currentRun.runId, requestId, decision, reason }).catch(() => {});
+    try {
+      await decidePermissionRest({ runId: request.runId, requestId, decision, reason });
+      decidePermission(requestId, decision, reason);
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
     }
-  }, [decidePermission, currentRun?.runId]);
+  }, [addToast, decidePermission, permissionRequests, t]);
 
   const handleRetry = useCallback((messageId: string) => {
     const msg = allMessages.find((m) => m.id === messageId);
     if (!msg) return;
     const prompt = msg.blocks.find((b) => b.kind === 'text')?.content;
-    if (prompt) handleSend(prompt, selectedAgentId);
+    if (prompt) handleSend(prompt, selectedAgentId ?? undefined);
   }, [allMessages, handleSend, selectedAgentId]);
 
   const handleDelete = useCallback((messageId: string) => {
@@ -503,24 +536,35 @@ export default function App() {
 
   // ── Render ─────────────────────────────────
 
-  const inLocalMode = !hubAuthenticated && localModeSelected;
-  const hubActionLabel = hubAuthenticated
-    ? t('status.hubConnected')
-    : inLocalMode
-      ? t('status.localMode')
-      : t('status.hubClickToLogin');
-  const showStartupAuthChecking = !authChecked && !hubAuthenticated && !localModeSelected;
-  const showStartupAuthGate = authChecked && !hubAuthenticated && !localModeSelected;
-
   return (
     <ErrorBoundary>
     <div className={styles.root}>
-      {hubAuthenticated && (
-        <HubRealtimeBridge hubClient={hubClient} onHubWSChange={setHubWS} />
-      )}
+      <DesktopHubTaskBridge />
       {/* Top status bar — drag region + window controls */}
       <div className={styles.topBar} data-tauri-drag-region onDoubleClick={handleTopBarDoubleClick}>
         <div className={styles.topBarLeft}>
+          {!isMobile && !workspaceExpanded && (
+            <ShellIconButton
+              className={styles.topBarSidebarBtn}
+              onClick={() => setLeftSidebarCollapsed(!leftSidebarCollapsed)}
+              label={leftSidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+              tooltipSide="bottom"
+              aria-expanded={!leftSidebarCollapsed}
+            >
+              {leftSidebarCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+            </ShellIconButton>
+          )}
+          <div className={styles.topBarNavCluster} aria-hidden="true">
+            <span className={styles.topBarNavBtn}><ChevronLeft size={14} /></span>
+            <span className={styles.topBarNavBtn}><ChevronRight size={14} /></span>
+          </div>
+          <nav className={styles.appMenu} aria-label={t('menu.title')}>
+            <button type="button">{t('menu.file')}</button>
+            <button type="button">{t('menu.edit')}</button>
+            <button type="button">{t('menu.view')}</button>
+            <button type="button">{t('menu.window')}</button>
+            <button type="button">{t('menu.help')}</button>
+          </nav>
           <span className={styles.statusBadge}>
             <span className={`${styles.statusBadgeDot} ${online ? styles.statusBadgeDotOnline : styles.statusBadgeDotOffline}`} />
             {online ? `Edge ${health?.version ?? 'v1'}` : t('status.offline')}
@@ -528,21 +572,20 @@ export default function App() {
           {wsLatency != null && <span className={styles.topBarDim} style={{ marginLeft: 6 }}>{wsLatency}ms</span>}
           {isConnected ? <Wifi size={12} className={styles.topBarDim} /> : <WifiOff size={12} className={styles.topBarDim} />}
           {edgeStatus.lastError && <AlertTriangle size={13} className={styles.topBarDim} style={{ marginLeft: 4 }} aria-label={edgeStatus.lastError} />}
-          {inLocalMode && <span className={styles.topBarDim}>{t('status.localMode')}</span>}
         </div>
         <div className={styles.topBarRight}>
           {/* Window controls — no drag region so clicks register */}
           <div className={styles.winControls}>
-            <ShellIconButton className={styles.winBtn} onClick={() => getCurrentWindow().minimize()} label="最小化" tooltipSide="bottom">
+            <ShellIconButton className={styles.winBtn} onClick={() => getCurrentWindow().minimize()} label={t('window.minimize')} tooltipSide="bottom">
               <Minus size={13} />
             </ShellIconButton>
             <ShellIconButton className={styles.winBtn} onClick={async () => {
               const w = getCurrentWindow();
               (await w.isMaximized()) ? w.unmaximize() : w.maximize();
-            }} label="最大化" tooltipSide="bottom">
+            }} label={t('window.maximize')} tooltipSide="bottom">
               <Square size={11} />
             </ShellIconButton>
-            <ShellIconButton className={`${styles.winBtn} ${styles.winBtnClose}`} onClick={() => getCurrentWindow().close()} label="关闭" tooltipSide="bottom">
+            <ShellIconButton className={`${styles.winBtn} ${styles.winBtnClose}`} onClick={() => getCurrentWindow().close()} label={t('window.close')} tooltipSide="bottom">
               <X size={14} />
             </ShellIconButton>
           </div>
@@ -560,17 +603,7 @@ export default function App() {
         </div>
       )}
 
-      {showStartupAuthChecking ? (
-        <div className={styles.startupGate} aria-busy="true" />
-      ) : showStartupAuthGate ? (
-        <div className={styles.startupGate}>
-          <AuthPage
-            startup
-            onLoginSuccess={() => useHubStore.getState().setShowAuthModal(false)}
-            onContinueLocal={hubAuth.continueLocalMode}
-          />
-        </div>
-      ) : settingsOpen ? (
+      {settingsOpen ? (
         <SettingsPage
           initialSection={settingsInitialSection}
           onBack={() => setSettingsOpen(false)}
@@ -589,7 +622,7 @@ export default function App() {
           <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => openSettings('general')} label={t('nav.settings')}>
             <Settings size={17} />
           </ShellIconButton>
-          <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} label={hubActionLabel}>
+          <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
             {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={17} />}
           </ShellIconButton>
           <ShellIconButton className={styles.mobileToolbarBtn} onClick={toggleTheme} label={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-pressed={theme === 'dark'}>
@@ -605,13 +638,11 @@ export default function App() {
           <div className={`${styles.overlayPanel} ${styles.overlayPanelLeft} ${navPanelOpen ? styles.overlayPanelLeftActive : ''}`}>
             <div className={styles.mobileNavPanel}>
               <div className={styles.sidebarSection}>
-                <div className={styles.sidebarSectionLabel}>{t('agent.title')}</div>
                 <div className={styles.sidebarScroll}>
                   <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
                 </div>
               </div>
               <div className={styles.sidebarSection}>
-                <div className={styles.sidebarSectionLabel}>{t('thread.title')}</div>
                 <div className={styles.sidebarScroll}>
                   <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
                 </div>
@@ -623,38 +654,21 @@ export default function App() {
 
       <div className={styles.body} style={shellStyle}>
         {/* Single sidebar — agents + threads grouped */}
-        {!isMobile && !workspaceExpanded && leftSidebarCollapsed && (
-          <div className={styles.leftRail}>
-            <ShellIconButton
-              className={styles.railBtn}
-              onClick={() => setLeftSidebarCollapsed(false)}
-              label={t('nav.expandSidebar')}
-              tooltipSide="right"
-              aria-expanded="false"
-            >
-              <PanelLeftOpen size={17} />
-            </ShellIconButton>
-            <ShellIconButton className={styles.railBtn} onClick={() => openSettings('general')} label={t('nav.settings')} tooltipSide="right">
-              <Settings size={17} />
-            </ShellIconButton>
-            <ShellIconButton
-              className={styles.railBtn}
-              onClick={() => useHubStore.getState().setShowAuthModal(true)}
-              label={hubActionLabel}
-              tooltipSide="right"
-              aria-pressed={hubAuthenticated}
-            >
-              {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={17} />}
-            </ShellIconButton>
-            <ShellIconButton className={styles.railBtn} onClick={toggleTheme} label={theme === 'dark' ? t('theme.light') : t('theme.dark')} tooltipSide="right" aria-pressed={theme === 'dark'}>
-              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-            </ShellIconButton>
-          </div>
-        )}
-
         {!isMobile && !workspaceExpanded && !leftSidebarCollapsed && (
           <>
           <div className={styles.sidebar}>
+            {/* Home nav */}
+            <div className={styles.sidebarHomeNav}>
+              <ShellIconButton
+                className={`${styles.navIconBtn} ${leftSidebarView === 'home' ? styles.navIconBtnActive : ''}`}
+                onClick={() => setLeftSidebarView('home')}
+                label={t('nav.home')}
+                tooltipSide="right"
+              >
+                <Home size={16} />
+              </ShellIconButton>
+            </div>
+
             {/* Global search */}
             <div className={styles.sidebarSearch}>
               <Search size={14} color="#B0B0B5" />
@@ -663,7 +677,6 @@ export default function App() {
 
             {/* Agents section */}
             <div className={styles.sidebarSection}>
-              <div className={styles.sidebarSectionLabel}>{t('agent.title')}</div>
               <div className={styles.sidebarScroll}>
                 <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
               </div>
@@ -671,33 +684,20 @@ export default function App() {
 
             {/* Threads section */}
             <div className={styles.sidebarSection}>
-              <div className={styles.sidebarSectionLabel}>{t('thread.title')}</div>
               <div className={styles.sidebarScroll}>
                 <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
-                {threads.length === 0 && (
-                  <div className={styles.sidebarEmpty}>{t('thread.emptyHint')}</div>
-                )}
               </div>
             </div>
 
             {/* Sidebar footer */}
             <div className={styles.sidebarFooter}>
-              <ShellIconButton
-                className={styles.navIconBtn}
-                onClick={() => setLeftSidebarCollapsed(true)}
-                label={t('nav.collapseSidebar')}
-                tooltipSide="top"
-                aria-expanded="true"
-              >
-                <PanelLeftClose size={16} />
-              </ShellIconButton>
               <ShellIconButton className={styles.navIconBtn} onClick={() => openSettings('general')} label={t('nav.settings')} tooltipSide="top">
                 <Settings size={16} />
               </ShellIconButton>
               <ShellIconButton
                 className={styles.navIconBtn}
                 onClick={() => useHubStore.getState().setShowAuthModal(true)}
-                label={hubActionLabel}
+                label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
                 tooltipSide="top"
                 aria-pressed={hubAuthenticated}
               >
@@ -725,7 +725,10 @@ export default function App() {
 
         {/* Main zone */}
         <div className={`${styles.main} ${workspaceExpanded ? styles.mainExpanded : ''}`}>
-          <div className={styles.workspace}>
+          <div
+            ref={workspaceRef}
+            className={`${styles.workspace} ${showRunCardSpace ? styles.workspaceWithRunCard : ''}`}
+          >
             {/* Workspace header */}
             <div className={styles.workspaceHeader}>
               <div className={`${styles.workspaceHeaderDot} ${online ? styles.workspaceHeaderDotOnline : styles.workspaceHeaderDotOffline}`} />
@@ -765,15 +768,26 @@ export default function App() {
                 >
                   <Route size={15} />
                 </ShellIconButton>
-                {displayedRun && !rightPanelOpen && (
+                {displayedRun && !effectiveRightPanelOpen && (
                   <ShellIconButton
                     className={styles.workspaceHeaderBtn}
                     onClick={() => setRightPanelOpen(true)}
                     label={t('run.open')}
                     tooltipSide="bottom"
-                    aria-expanded="false"
+                    aria-expanded={effectiveRightPanelOpen}
                   >
                     <PanelRightOpen size={15} />
+                  </ShellIconButton>
+                )}
+                {displayedRun && effectiveRightPanelOpen && (
+                  <ShellIconButton
+                    className={styles.workspaceHeaderBtn}
+                    onClick={() => setRightPanelOpen(false)}
+                    label={t('run.close')}
+                    tooltipSide="bottom"
+                    aria-expanded={effectiveRightPanelOpen}
+                  >
+                    <PanelRightClose size={15} />
                   </ShellIconButton>
                 )}
                 <ShellIconButton
@@ -790,105 +804,68 @@ export default function App() {
 
             {/* Chat area */}
             <div className={styles.chatArea}>
-              {viewMode === 'im' ? (
-                <ErrorBoundary>
-                  <Suspense fallback={null}>
-                    <Slot name="im-view" hubClient={hubClient} hubWS={hubWS} />
-                  </Suspense>
-                </ErrorBoundary>
+              {leftSidebarView === 'home' ? (
+                <HomeDashboard
+                  onNewThread={async () => {
+                    try {
+                      const thread = await createThread();
+                      handleSelectThread(thread.threadId);
+                    } catch {
+                      // continue
+                    }
+                  }}
+                  onSelectThread={handleSelectThread}
+                  onQuickStart={async (prompt) => {
+                    try {
+                      const thread = await createThread();
+                      handleSelectThread(thread.threadId);
+                      handleSend(prompt);
+                    } catch {
+                      // continue
+                    }
+                  }}
+                  permissionCount={permissionRequests.length}
+                />
+              ) : viewMode === 'im' ? (
+                <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
               ) : (
                 <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
               )}
             </div>
 
             {/* Input area */}
-            {viewMode === 'agent' && (
+            {leftSidebarView !== 'home' && viewMode === 'agent' && (
               <div className={styles.inputArea}>
-                <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={activeThreadId} />
+                <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId ?? undefined} onSelectAgent={handleSelectAgent} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={selectedThreadId ?? undefined} />
+              </div>
+            )}
+
+            {!isMobile && !workspaceExpanded && displayedRun && rightPanelMounted && (
+              <div
+                className={`${styles.rightPanel} ${effectiveRightPanelOpen ? styles.rightPanelOpen : styles.rightPanelClosing}`}
+                role="dialog"
+                aria-label={t('run.title')}
+                aria-hidden={!effectiveRightPanelOpen}
+              >
+                <div className={styles.rightPanelBody}>
+                  <ErrorBoundary>
+                    <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted-foreground)' }}><SkeletonLine width="60%" height="1em" /><SkeletonLine width="40%" height="1em" /></div>}>
+                      <Slot
+                        name="run-detail"
+                        run={displayedRun ? { runId: displayedRun.runId, projectId: '', threadId: selectedThread?.threadId ?? '', status: displayedRun.status } : null}
+                        outputText={displayedRun?.outputText ?? ''}
+                        toolCalls={displayedRun?.toolCalls ?? []}
+                        changedFiles={displayedRun?.changedFiles ?? []}
+                        onCancel={handleCancel}
+                        chatMessages={allMessages}
+                      />
+                    </Suspense>
+                  </ErrorBoundary>
+                </div>
               </div>
             )}
           </div>
         </div>
-
-        {!isMobile && !workspaceExpanded && displayedRun && rightPanelOpen && (
-          <>
-          <div
-            className={styles.resizeHandle}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label={t('layout.resizeRight')}
-            aria-valuemin={RIGHT_PANEL_MIN}
-            aria-valuemax={RIGHT_PANEL_MAX}
-            aria-valuenow={rightPanelWidth}
-            tabIndex={0}
-            onPointerDown={handleStartResize('right')}
-            onKeyDown={handleResizeKeyDown('right')}
-          />
-          <div className={styles.rightPanel}>
-            <div className={styles.rightPanelHeader}>
-              <div className={styles.rightPanelSegmented}>
-                <button className={`${styles.rightPanelTab} ${styles.rightPanelTabActive}`} type="button" role="tab" aria-selected="true">{t('run.output')}</button>
-                <button className={styles.rightPanelTab} type="button" role="tab" aria-selected="false">{t('run.files')}</button>
-              </div>
-              <ShellIconButton
-                className={styles.rightPanelCollapseBtn}
-                onClick={() => setRightPanelOpen(false)}
-                label={t('run.close')}
-                tooltipSide="left"
-                aria-expanded="true"
-              >
-                <PanelRightClose size={15} />
-              </ShellIconButton>
-            </div>
-            <div className={styles.rightPanelBody}>
-              <ErrorBoundary>
-                <Suspense fallback={<div style={{ padding: 16, color: 'var(--muted-foreground)' }}><SkeletonLine width="60%" height="1em" /><SkeletonLine width="40%" height="1em" /></div>}>
-                  <Slot
-                    name="run-detail"
-                    run={displayedRun ? { runId: displayedRun.runId, projectId: '', threadId: selectedThread?.threadId ?? '', status: displayedRun.status } : null}
-                    outputText={displayedRun?.outputText ?? ''}
-                    toolCalls={displayedRun?.toolCalls ?? []}
-                    changedFiles={displayedRun?.changedFiles ?? []}
-                    onCancel={handleCancel}
-                    chatMessages={allMessages}
-                  />
-                </Suspense>
-              </ErrorBoundary>
-            </div>
-          </div>
-          </>
-        )}
-
-        {!isMobile && !workspaceExpanded && displayedRun && !rightPanelOpen && (
-          <div className={styles.rightRail} aria-label={t('run.collapsedRail')}>
-            <ShellIconButton
-              className={styles.railBtn}
-              onClick={() => setRightPanelOpen(true)}
-              label={t('run.open')}
-              tooltipSide="left"
-              aria-expanded="false"
-            >
-              <PanelRightOpen size={17} />
-            </ShellIconButton>
-            <span className={`${styles.railStatusDot} ${runIsActive ? styles.railStatusDotActive : ''}`} />
-            <ShellIconButton
-              className={styles.railBtn}
-              onClick={() => openSettings('tasks')}
-              label={t('settings.tasks')}
-              tooltipSide="left"
-            >
-              <ClipboardList size={17} />
-            </ShellIconButton>
-            <ShellIconButton
-              className={styles.railBtn}
-              onClick={() => openSettings('agentScheduling')}
-              label={t('settings.agentScheduling')}
-              tooltipSide="left"
-            >
-              <Route size={17} />
-            </ShellIconButton>
-          </div>
-        )}
       </div>
       </>
       )}
@@ -902,13 +879,7 @@ export default function App() {
 
       {showAuthModal && (
         <div className={styles.modalOverlay} onClick={() => useHubStore.getState().setShowAuthModal(false)}>
-          <div
-            className={styles.authModal}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('auth.title')}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className={styles.authModal} onClick={(e) => e.stopPropagation()}>
             <AuthPage
               onLoginSuccess={() => useHubStore.getState().setShowAuthModal(false)}
               onClose={() => useHubStore.getState().setShowAuthModal(false)}

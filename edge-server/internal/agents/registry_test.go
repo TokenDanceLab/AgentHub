@@ -410,3 +410,107 @@ func TestAgentInstance_DefaultStatus(t *testing.T) {
 		t.Fatalf("new AgentInstance AgentPath should be empty, got %s", inst.AgentPath)
 	}
 }
+
+// ── Feature: AgentTree spawn slot enforcement ──
+
+func TestRegistry_CanSpawnSlotFull(t *testing.T) {
+	r := NewRegistry().WithMaxConcurrent(2)
+
+	// Register parent and two active children.
+	_ = r.Register(&AgentInstance{ID: "parent", AdapterID: "orch", ParentID: "", Status: StatusBusy})
+	_ = r.Register(&AgentInstance{ID: "child-1", AdapterID: "worker", ParentID: "parent", Status: StatusBusy})
+	_ = r.Register(&AgentInstance{ID: "child-2", AdapterID: "worker", ParentID: "parent", Status: StatusIdle})
+
+	// Third child should be rejected.
+	err := r.CanSpawn("parent", 1)
+	if err == nil {
+		t.Fatal("CanSpawn should return error when slots are full")
+	}
+	if err != ErrAgentSlotFull {
+		t.Fatalf("CanSpawn error = %v, want ErrAgentSlotFull", err)
+	}
+
+	// Completed children should not count against the limit.
+	r.SetStatus("child-2", StatusCompleted, "")
+	err = r.CanSpawn("parent", 1)
+	if err != nil {
+		t.Fatalf("CanSpawn should succeed after child finishes, got: %v", err)
+	}
+
+	// Parent without children should have all slots available.
+	err = r.CanSpawn("other-parent", 1)
+	if err != nil {
+		t.Fatalf("CanSpawn for new parent should succeed, got: %v", err)
+	}
+}
+
+func TestRegistry_CanSpawnDepthExceeded(t *testing.T) {
+	r := NewRegistry()
+
+	// Depth 0, 1, 2 are allowed.
+	if err := r.CanSpawn("root", 0); err != nil {
+		t.Fatalf("depth 0 should be allowed, got: %v", err)
+	}
+	if err := r.CanSpawn("root", 1); err != nil {
+		t.Fatalf("depth 1 should be allowed, got: %v", err)
+	}
+	if err := r.CanSpawn("root", 2); err != nil {
+		t.Fatalf("depth 2 should be allowed, got: %v", err)
+	}
+
+	// Depth >= 3 must be rejected.
+	err := r.CanSpawn("root", 3)
+	if err == nil {
+		t.Fatal("CanSpawn should reject depth >= 3")
+	}
+	if err != ErrAgentDepthExceeded {
+		t.Fatalf("CanSpawn depth error = %v, want ErrAgentDepthExceeded", err)
+	}
+
+	// Even deeper should also be rejected.
+	err = r.CanSpawn("root", 5)
+	if err != ErrAgentDepthExceeded {
+		t.Fatalf("CanSpawn depth 5 error = %v, want ErrAgentDepthExceeded", err)
+	}
+}
+
+func TestRegistry_ShutdownCascade(t *testing.T) {
+	r := NewRegistry()
+
+	// Build a 3-level tree: root -> child1 -> grandchild1
+	//                              \-> child2
+	_ = r.Register(&AgentInstance{ID: "root", AdapterID: "orch", ParentID: "", Status: StatusBusy})
+	_ = r.Register(&AgentInstance{ID: "child1", AdapterID: "worker", ParentID: "root", Status: StatusBusy})
+	_ = r.Register(&AgentInstance{ID: "child2", AdapterID: "worker", ParentID: "root", Status: StatusIdle})
+	_ = r.Register(&AgentInstance{ID: "grandchild1", AdapterID: "specialist", ParentID: "child1", Status: StatusBusy})
+
+	// Shutdown the root.
+	r.ShutdownCascade("root")
+
+	// All descendants must be disconnected.
+	for _, id := range []string{"root", "child1", "child2", "grandchild1"} {
+		inst, ok := r.Get(id)
+		if !ok {
+			t.Fatalf("agent %q should still exist in registry after cascade", id)
+		}
+		if inst.Status != StatusDisconnected {
+			t.Fatalf("agent %q status = %s, want %s after cascade", id, inst.Status, StatusDisconnected)
+		}
+	}
+
+	// ShutdownCascade on a single leaf should only affect that leaf.
+	r2 := NewRegistry()
+	_ = r2.Register(&AgentInstance{ID: "a", AdapterID: "cc", ParentID: "", Status: StatusIdle})
+	_ = r2.Register(&AgentInstance{ID: "b", AdapterID: "cc", ParentID: "", Status: StatusIdle})
+
+	r2.ShutdownCascade("a")
+
+	instA, _ := r2.Get("a")
+	if instA.Status != StatusDisconnected {
+		t.Fatalf("leaf a should be disconnected, got %s", instA.Status)
+	}
+	instB, _ := r2.Get("b")
+	if instB.Status != StatusIdle {
+		t.Fatalf("unrelated leaf b should be unaffected, got %s", instB.Status)
+	}
+}

@@ -78,7 +78,9 @@ export function flattenActivePath(root: TreeNode, siblingIdx = 0): TreeNode[] {
     const idx = Math.max(0, Math.min(siblingIdx, current.children.length - 1));
     // siblingIdx=0 → last child (newest), matches LibreChat reverse-index
     const childIdx = current.children.length - 1 - idx;
-    current = current.children[Math.max(0, Math.min(childIdx, current.children.length - 1))];
+    const child = current.children[Math.max(0, Math.min(childIdx, current.children.length - 1))];
+    if (!child) break;
+    current = child;
     result.push(current);
   }
 

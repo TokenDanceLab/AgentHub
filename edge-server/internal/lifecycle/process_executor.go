@@ -11,10 +11,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
@@ -41,6 +43,9 @@ type ProcessExecutor struct {
 	adapterReg *adapters.Registry    // per-run adapter resolution; may be nil
 	metrics    *metrics.EdgeMetrics  // Prometheus instrumentation; may be nil
 
+	// Hub callback client for Edge→Hub direct reporting
+	hubCallback *hub.CallbackClient
+
 	maxConcurrentRuns         int // maximum concurrent runs; 0 means use default (5)
 	maxRunOutputBytes         int64
 	maxStructuredPayloadBytes int64
@@ -55,6 +60,8 @@ type ProcessExecutor struct {
 	stdins     map[string]io.Writer                 // runID to stdin (for adapter-aware interrupt)
 	runOutputs map[string]*runnerctx.RunOutputStore // runID to temp log for output persistence and replay
 	runToAgent map[string]string                    // runID to agentInstanceID for result aggregation
+	hubTasks   map[string]string                    // runID to Hub taskID (for Edge→Hub callbacks)
+	hubOutputs map[string]*hubOutputCollector       // runID to bounded final response collector
 }
 
 func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter, adapterReg *adapters.Registry) (*ProcessExecutor, error) {
@@ -90,6 +97,8 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 		stdins:                    make(map[string]io.Writer),
 		runOutputs:                make(map[string]*runnerctx.RunOutputStore),
 		runToAgent:                make(map[string]string),
+		hubTasks:                  make(map[string]string),
+		hubOutputs:                make(map[string]*hubOutputCollector),
 	}, nil
 }
 
@@ -100,7 +109,9 @@ const defaultRunTimeout = 30 * time.Minute
 const (
 	defaultMaxConcurrentRuns = 5
 	defaultReadBufferSize    = 32 * 1024
-	defaultRunOutputMaxBytes = 4 * 1024 * 1024
+	defaultRunOutputMaxBytes = 1 * 1024 * 1024 // 1MB cap on run output before temp log write
+	hubCallbackFinalMaxBytes = 32 * 1024
+	hubCallbackChunkMaxBytes = 16 * 1024
 )
 
 type runOutputLimiter struct {
@@ -172,7 +183,24 @@ func (e *ProcessExecutor) WithResultAggregator(ra *ResultAggregator) *ProcessExe
 	return e
 }
 
+// SetHubCallback configures the Edge→Hub direct callback client.
+// When set, run lifecycle transitions (started, finished, failed, cancelled)
+// are reported to the Hub server. Callbacks are fire-and-forget: errors are
+// logged but never block the run lifecycle.
+func (e *ProcessExecutor) SetHubCallback(c *hub.CallbackClient) {
+	e.hubCallback = c
+}
+
+// WithHubCallback is a fluent variant of SetHubCallback.
+func (e *ProcessExecutor) WithHubCallback(c *hub.CallbackClient) *ProcessExecutor {
+	e.SetHubCallback(c)
+	return e
+}
+
 func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	current, ok := e.store.GetRun(run.ID)
 	if !ok {
 		return store.ErrNotFound
@@ -181,24 +209,20 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 		return ErrRunAlreadyStarted
 	}
 
-	e.mu.Lock()
 	max := e.maxConcurrentRuns
 	if max <= 0 {
 		max = defaultMaxConcurrentRuns
 	}
 	if len(e.running) >= max {
-		e.mu.Unlock()
 		return ErrTooManyConcurrentRuns
 	}
 	if _, ok := e.running[run.ID]; ok {
-		e.mu.Unlock()
 		return ErrRunAlreadyStarted
 	}
 	// Create context and atomically insert cancel into the map while holding
 	// the lock, so a concurrent Cancel can never miss the cancel func.
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRunTimeout)
 	e.running[run.ID] = cancel
-	e.mu.Unlock()
 
 	runCtx.Run = run
 	go e.run(ctx, run, runCtx)
@@ -245,6 +269,14 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProcessContext) {
 	defer e.finish(run.ID)
 
+	// Store Hub task ID for Edge→Hub direct callback reporting
+	if runCtx.HubTaskID != "" {
+		e.mu.Lock()
+		e.hubTasks[run.ID] = runCtx.HubTaskID
+		e.hubOutputs[run.ID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
+		e.mu.Unlock()
+	}
+
 	// Resolve adapter for this run: explicit agentID first, then default
 	adapter := e.adapter
 	if e.adapterReg != nil {
@@ -284,20 +316,26 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if adapter != nil {
 		// Adapter mode: BuildCommand provides full command configuration
 		cmdPath, args, env, workDir = adapter.BuildCommand(adapters.RunProcessContext{
-			Run:               runCtx.Run,
-			Prompt:            runCtx.Prompt,
-			AgentID:           runCtx.AgentID,
-			Model:             runCtx.Model,
-			WorkDir:           runCtx.WorkDir,
-			SessionID:         runCtx.SessionID,
-			ContinueLast:      runCtx.ContinueLast,
-			ForkSession:       runCtx.ForkSession,
-			ReasoningEffort:   runCtx.ReasoningEffort,
-			MaxThinkingTokens: runCtx.MaxThinkingTokens,
-			PermissionMode:    runCtx.PermissionMode,
-			IncludePartial:    runCtx.IncludePartial,
-			AgentName:         runCtx.AgentName,
-			Budget:            runCtx.Budget,
+			Run:                runCtx.Run,
+			Prompt:             runCtx.Prompt,
+			AgentID:            runCtx.AgentID,
+			Model:              runCtx.Model,
+			WorkDir:            runCtx.WorkDir,
+			SessionID:          runCtx.SessionID,
+			ContinueLast:       runCtx.ContinueLast,
+			ForkSession:        runCtx.ForkSession,
+			ReasoningEffort:    runCtx.ReasoningEffort,
+			ThinkingMode:       runCtx.ThinkingMode,
+			MaxThinkingTokens:  runCtx.MaxThinkingTokens,
+			PermissionMode:     runCtx.PermissionMode,
+			IncludePartial:     runCtx.IncludePartial,
+			SystemPrompt:       runCtx.SystemPrompt,
+			AppendSystemPrompt: runCtx.AppendSystemPrompt,
+			AllowedTools:       runCtx.AllowedTools,
+			ConfigOverrides:    runCtx.ConfigOverrides,
+			Ephemeral:          runCtx.Ephemeral,
+			AgentName:          runCtx.AgentName,
+			Budget:             runCtx.Budget,
 		})
 	} else {
 		// Profile mode: use configured command template
@@ -357,6 +395,18 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		return
 	}
 
+	// Close stdin immediately: the prompt is passed via CLI args, not stdin.
+	// An open pipe with no data causes CLI agents (Claude Code) to wait 3s
+	// and warn "no stdin data". Closing the pipe signals EOF immediately.
+	// Interrupt is handled via process signal; permission responses via stdin
+	// will be re-enabled when the full permission bridge is implemented.
+	if stdin != nil {
+		_ = stdin.Close()
+		e.mu.Lock()
+		delete(e.stdins, run.ID)
+		e.mu.Unlock()
+	}
+
 	// Record metrics: run has started successfully
 	if e.metrics != nil {
 		e.metrics.RecordRunStart(adapterLabel)
@@ -366,7 +416,10 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	started, ok := e.store.SetRunStatusIf(run.ID, "started", "queued")
 	if ok {
 		e.bus.Publish("run.started", runScope(started), RunResponse(started))
+		// Fire Hub TaskAck callback (Edge→Hub direct bridge)
+		e.fireHubAck(run.ID)
 	}
+	e.checkPersistError(run.ID)
 
 	// Create temp file for run output persistence and replay
 	outStore, err := runnerctx.NewRunOutputStore(run.ID)
@@ -389,9 +442,10 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		parserCtx = context.WithValue(ctx, adapters.CtxBudgetKey, runCtx.Budget)
 	}
 
+	var parseErr error
 	if adapter != nil {
 		wg.Add(1)
-		go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx)
+		go e.publishStructuredOutput(&wg, run, stdout, stdin, adapter, parserCtx, &parseErr)
 	} else {
 		// Raw capture: stdout goes to run.output.batch events
 		wg.Add(1)
@@ -400,6 +454,29 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 	waitErr := cmd.Wait()
 	wg.Wait()
+
+	// Context budget compaction check: after the stream completes, evaluate
+	// whether the context budget exceeded the auto-compaction threshold.
+	// When triggered, we log the budget state and emit a compaction event
+	// so upstream session managers can compact the actual message history.
+	if runCtx.Budget != nil && runCtx.Budget.ShouldCompact() {
+		usagePct := runCtx.Budget.UsagePercent()
+		tokensUsed := runCtx.Budget.UsedTokens.Load()
+		remaining := runCtx.Budget.Remaining()
+		slog.Info("process: context compaction threshold reached",
+			"runId", run.ID,
+			"usagePercent", usagePct,
+			"tokensUsed", tokensUsed,
+			"tokensRemaining", remaining,
+		)
+		e.bus.Publish(adapters.BusEventContextCompaction, runScope(run), map[string]any{
+			"runId":           run.ID,
+			"usagePercent":    usagePct,
+			"tokensUsed":      tokensUsed,
+			"tokensRemaining": remaining,
+			"threshold":       runnerctx.CompactionThreshold,
+		})
+	}
 
 	if ctx.Err() != nil || e.runStatus(run.ID) == "cancelling" {
 		e.publishCancelled(run)
@@ -411,11 +488,20 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": waitErr.Error()})
 		return
 	}
+	// #179: fail the run when structured output parsing fails critically
+	if parseErr != nil {
+		e.publishFailed(run, fmt.Errorf("structured output parse error: %w", parseErr))
+		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": parseErr.Error()})
+		return
+	}
 	finished, ok := e.store.SetRunStatusIf(run.ID, "finished", "started")
 	if ok {
 		e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
 		e.sendSubAgentResult(run.ID, "finished", RunResponse(finished))
+		// Fire Hub TaskDone callback (Edge→Hub direct bridge)
+		e.fireHubDone(run.ID, RunResponse(finished))
 	}
+	e.checkPersistError(run.ID)
 }
 
 func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outStore *runnerctx.RunOutputStore, limiter *runOutputLimiter, stream string, reader io.Reader) {
@@ -433,6 +519,10 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 					if _, err := outStore.Write(text); err != nil {
 						slog.Warn("process: failed to write output store", "runId", run.ID, "err", err)
 					}
+				}
+				if stream == "stdout" && text != "" {
+					e.recordHubOutput(run.ID, text)
+					e.fireHubStream(run.ID, text)
 				}
 				payload := map[string]any{
 					"runId":  run.ID,
@@ -494,13 +584,38 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 			"status": failed.Status,
 			"error":  classified,
 		})
+		// Fire Hub callback if configured
+		e.fireHubFail(failed.ID, classified.Message)
 	}
+	e.checkPersistError(run.ID)
 }
 
 func (e *ProcessExecutor) publishCancelled(run store.Run) {
 	cancelled, ok := e.store.SetRunStatusIf(run.ID, "cancelled", "queued", "started", "cancelling")
 	if ok {
 		e.bus.Publish("run.cancelled", runScope(cancelled), RunResponse(cancelled))
+		// Fire Hub callback if configured
+		e.fireHubFail(cancelled.ID, "run cancelled")
+	}
+	e.checkPersistError(run.ID)
+}
+
+// checkPersistError logs and emits a persistence_error event when the FileStore
+// has a pending persistence failure after a status transition.
+func (e *ProcessExecutor) checkPersistError(runID string) {
+	type persistChecker interface {
+		LastPersistError() error
+	}
+	pc, ok := e.store.(persistChecker)
+	if !ok {
+		return
+	}
+	if persistErr := pc.LastPersistError(); persistErr != nil {
+		slog.Error("file store persist failed during run status transition", "runId", runID, "err", persistErr)
+		e.bus.Publish("run.persistence_error", map[string]any{"runId": runID}, map[string]any{
+			"runId": runID,
+			"error": persistErr.Error(),
+		})
 	}
 }
 
@@ -513,10 +628,18 @@ func (e *ProcessExecutor) runStatus(runID string) string {
 }
 
 func (e *ProcessExecutor) finish(runID string) {
+	// Cascade: when a parent agent finishes, recursively terminate all
+	// descendant sub-agents (Codex AgentTree shutdown pattern).
+	if e.agentRegistry != nil {
+		e.agentRegistry.ShutdownCascade(runID)
+	}
+
 	e.mu.Lock()
 	delete(e.running, runID)
 	delete(e.stdins, runID)
 	delete(e.runToAgent, runID)
+	delete(e.hubTasks, runID)
+	delete(e.hubOutputs, runID)
 	if s, ok := e.runOutputs[runID]; ok {
 		if err := s.Close(); err != nil {
 			slog.Warn("process: failed to close output store", "runId", runID, "err", err)
@@ -547,10 +670,11 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	}
 
 	msgType := agents.MsgTypeResult
-	if status == "failed" || status == "cancelled" {
+	switch status {
+	case "failed", "cancelled":
 		msgType = agents.MsgTypeError
 		e.agentRegistry.SetStatus(agentID, agents.StatusError, "")
-	} else if status == "finished" {
+	case "finished":
 		e.agentRegistry.SetStatus(agentID, agents.StatusCompleted, "")
 	}
 
@@ -560,6 +684,7 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 		FromAgentID: agentID,
 		ToAgentID:   inst.ParentID,
 		Type:        msgType,
+		TriggerTurn: true, // wake parent orchestrator on sub-agent completion
 		Payload: map[string]any{
 			"runId":     runID,
 			"status":    status,
@@ -573,13 +698,14 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 
 // publishStructuredOutput uses the configured AgentAdapter to parse the CLI's
 // native protocol and emit typed events to the bus.
-func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.Run, stdout io.Reader, stdin io.Writer, adapter adapters.AgentAdapter, ctx context.Context) {
+func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.Run, stdout io.Reader, stdin io.Writer, adapter adapters.AgentAdapter, ctx context.Context, parseErr *error) {
 	defer wg.Done()
 	scope := runScope(run)
 	var emitter adapters.EventEmitter = adapters.NewScopedEventEmitter(
 		adapters.NewPayloadLimitEmitter(adapters.NewBusEventEmitter(e.bus), e.maxStructuredPayloadBytes),
 		scope,
 	)
+	emitter = newHubCallbackEmitter(e, run.ID, emitter)
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
@@ -589,6 +715,7 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
 		slog.Error("structured output parse error", "runId", run.ID, "err", err)
+		*parseErr = err
 	}
 }
 
@@ -596,8 +723,24 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 // It creates a new run for a sub-agent dispatched by the orchestrator, queues it,
 // and starts execution using the resolved agent adapter.
 //
+// Before spawning, it checks the agent registry for slot availability and depth
+// limits (Codex AgentTree pattern parity).
+//
 // Reference: docs/reference/cross-comparison/03-orchestration.md Layer 3 (Supervisor routing).
 func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAgentTask) (agentInstanceID string, runID string, err error) {
+	// Enforce spawn slot and depth limits via the agent registry.
+	if e.agentRegistry != nil {
+		if err := e.agentRegistry.CanSpawn(parentRun.ID, task.Depth); err != nil {
+			slog.Warn("spawn slot rejected",
+				"parentRunId", parentRun.ID,
+				"taskId", task.TaskID,
+				"depth", task.Depth,
+				"err", err,
+			)
+			return "", "", err
+		}
+	}
+
 	runID = "run_" + task.TaskID
 	agentInstanceID = "agent_" + task.TaskID
 
@@ -674,4 +817,266 @@ func childBudget(parent *runnerctx.ContextBudget, depth int) *runnerctx.ContextB
 		alloc = remaining
 	}
 	return runnerctx.NewContextBudget(int(alloc))
+}
+
+// ── Hub callback fire-and-forget helpers ─────────────────────────────────
+
+// hubTaskID returns the Hub task ID for the given run, or empty string if not tracked.
+func (e *ProcessExecutor) hubTaskID(runID string) string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.hubTasks[runID]
+}
+
+// fireHubAck sends a TaskAck callback to Hub. Called when the run starts.
+// Errors are logged but never block the run lifecycle.
+func (e *ProcessExecutor) fireHubAck(runID string) {
+	if e.hubCallback == nil {
+		return
+	}
+	taskID := e.hubTaskID(runID)
+	if taskID == "" {
+		return
+	}
+	go func() {
+		if err := e.hubCallback.TaskAck(context.Background(), taskID, runID); err != nil {
+			slog.Warn("hub callback ack failed", "taskId", taskID, "runId", runID, "err", err)
+		}
+	}()
+}
+
+func (e *ProcessExecutor) recordHubOutput(runID, text string) {
+	if text == "" {
+		return
+	}
+	e.mu.Lock()
+	collector := e.hubOutputs[runID]
+	e.mu.Unlock()
+	if collector == nil {
+		return
+	}
+	collector.Append(text)
+}
+
+func (e *ProcessExecutor) recordHubFinalFallback(runID, text string) {
+	if text == "" {
+		return
+	}
+	e.mu.Lock()
+	collector := e.hubOutputs[runID]
+	e.mu.Unlock()
+	if collector == nil {
+		return
+	}
+	collector.SetFallback(text)
+}
+
+func (e *ProcessExecutor) hubFinalContent(runID string) string {
+	e.mu.Lock()
+	collector := e.hubOutputs[runID]
+	e.mu.Unlock()
+	if collector == nil {
+		return ""
+	}
+	return collector.Final()
+}
+
+// fireHubStream sends a TaskStream callback to Hub for visible runtime output.
+// Errors are logged but never block the run lifecycle.
+func (e *ProcessExecutor) fireHubStream(runID string, content string) {
+	if e.hubCallback == nil || content == "" {
+		return
+	}
+	taskID := e.hubTaskID(runID)
+	if taskID == "" {
+		return
+	}
+	for _, chunk := range splitHubCallbackText(content, hubCallbackChunkMaxBytes) {
+		chunk := chunk
+		go func() {
+			if err := e.hubCallback.TaskStream(context.Background(), taskID, runID, chunk); err != nil {
+				slog.Warn("hub callback stream failed", "taskId", taskID, "runId", runID, "err", err)
+			}
+		}()
+	}
+}
+
+// fireHubDone sends a TaskDone callback to Hub. Called when the run finishes successfully.
+// Errors are logged but never block the run lifecycle.
+func (e *ProcessExecutor) fireHubDone(runID string, runResp map[string]any) {
+	if e.hubCallback == nil {
+		return
+	}
+	taskID := e.hubTaskID(runID)
+	if taskID == "" {
+		return
+	}
+	content := e.hubFinalContent(runID)
+	if content == "" {
+		content = "Run finished"
+	}
+	go func() {
+		result := hub.TaskResult{
+			RunID:        runID,
+			FinalContent: content,
+		}
+		if err := e.hubCallback.TaskDone(context.Background(), taskID, result); err != nil {
+			slog.Warn("hub callback done failed", "taskId", taskID, "runId", runID, "err", err)
+		}
+	}()
+}
+
+type hubCallbackEmitter struct {
+	executor *ProcessExecutor
+	runID    string
+	inner    adapters.EventEmitter
+}
+
+func newHubCallbackEmitter(executor *ProcessExecutor, runID string, inner adapters.EventEmitter) adapters.EventEmitter {
+	if executor == nil || inner == nil {
+		return inner
+	}
+	return &hubCallbackEmitter{executor: executor, runID: runID, inner: inner}
+}
+
+func (e *hubCallbackEmitter) Emit(eventType string, scope map[string]any, payload any) {
+	e.inner.Emit(eventType, scope, payload)
+	switch eventType {
+	case adapters.BusEventTextDelta, adapters.BusEventTextBlock:
+		if text := extractHubCallbackText(payload); text != "" {
+			e.executor.recordHubOutput(e.runID, text)
+			e.executor.fireHubStream(e.runID, text)
+		}
+	case adapters.BusEventResult:
+		if text := extractHubCallbackText(payload); text != "" {
+			e.executor.recordHubFinalFallback(e.runID, text)
+		}
+	}
+}
+
+type hubOutputCollector struct {
+	mu        sync.Mutex
+	builder   strings.Builder
+	fallback  string
+	maxBytes  int
+	truncated bool
+}
+
+func newHubOutputCollector(maxBytes int) *hubOutputCollector {
+	if maxBytes <= 0 {
+		maxBytes = hubCallbackFinalMaxBytes
+	}
+	return &hubOutputCollector{maxBytes: maxBytes}
+}
+
+func (c *hubOutputCollector) Append(text string) {
+	if text == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.builder.Len() >= c.maxBytes {
+		c.truncated = true
+		return
+	}
+	remaining := c.maxBytes - c.builder.Len()
+	if len(text) > remaining {
+		text = strings.ToValidUTF8(text[:remaining], "")
+		c.truncated = true
+	}
+	c.builder.WriteString(text)
+}
+
+func (c *hubOutputCollector) SetFallback(text string) {
+	if text == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.fallback == "" {
+		c.fallback = strings.TrimSpace(text)
+	}
+}
+
+func (c *hubOutputCollector) Final() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	content := strings.TrimSpace(c.builder.String())
+	if content == "" {
+		content = c.fallback
+	}
+	if content == "" {
+		return ""
+	}
+	if c.truncated {
+		return content + "\n[output truncated]"
+	}
+	return content
+}
+
+func extractHubCallbackText(payload any) string {
+	payloadMap, ok := payload.(map[string]any)
+	if !ok {
+		return ""
+	}
+	for _, key := range []string{"content", "text", "delta", "output", "result"} {
+		if value, ok := payloadMap[key].(string); ok && value != "" {
+			return value
+		}
+	}
+	if message, ok := payloadMap["message"].(map[string]any); ok {
+		for _, key := range []string{"content", "text"} {
+			if value, ok := message[key].(string); ok && value != "" {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
+func splitHubCallbackText(text string, maxBytes int) []string {
+	if text == "" {
+		return nil
+	}
+	if maxBytes <= 0 || len(text) <= maxBytes {
+		return []string{text}
+	}
+	chunks := make([]string, 0, len(text)/maxBytes+1)
+	for len(text) > 0 {
+		if len(text) <= maxBytes {
+			chunks = append(chunks, text)
+			break
+		}
+		cut := maxBytes
+		for cut > 0 && !utf8.ValidString(text[:cut]) {
+			cut--
+		}
+		if cut == 0 {
+			_, size := utf8.DecodeRuneInString(text)
+			if size <= 0 {
+				size = 1
+			}
+			cut = size
+		}
+		chunks = append(chunks, text[:cut])
+		text = text[cut:]
+	}
+	return chunks
+}
+
+// fireHubFail sends a TaskFail callback to Hub. Called when the run fails or is cancelled.
+// Errors are logged but never block the run lifecycle.
+func (e *ProcessExecutor) fireHubFail(runID string, reason string) {
+	if e.hubCallback == nil {
+		return
+	}
+	taskID := e.hubTaskID(runID)
+	if taskID == "" {
+		return
+	}
+	go func() {
+		if err := e.hubCallback.TaskFail(context.Background(), taskID, runID, reason); err != nil {
+			slog.Warn("hub callback fail failed", "taskId", taskID, "runId", runID, "err", err)
+		}
+	}()
 }

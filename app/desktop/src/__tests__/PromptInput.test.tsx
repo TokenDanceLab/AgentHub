@@ -28,13 +28,20 @@ vi.mock('@/components/ModelDropdown', () => ({
       disabled={disabled}
       aria-label={ariaLabel}
       onClick={() => {
-        if (placeholder === 'prompt.model') onChange?.('claude-opus-4-7');
-        if (placeholder === 'prompt.reasoning') onChange?.('max');
+        if (ariaLabel === 'prompt.model') onChange?.('claude-opus-4-7');
+        if (ariaLabel === 'prompt.reasoning') onChange?.('max');
       }}
     >
       {placeholder}
     </button>
   ),
+}));
+
+vi.mock('@lobehub/icons', () => ({
+  Claude: ({ size = 18 }: { size?: number }) => <svg data-testid="claude-icon" width={size} height={size} />,
+  ClaudeCode: ({ size = 18 }: { size?: number }) => <svg data-testid="claude-code-icon" width={size} height={size} />,
+  Codex: ({ size = 18 }: { size?: number }) => <svg data-testid="codex-icon" width={size} height={size} />,
+  OpenCode: ({ size = 18 }: { size?: number }) => <svg data-testid="opencode-icon" width={size} height={size} />,
 }));
 
 import { beforeEach, describe, it, expect, vi } from 'vitest';
@@ -429,9 +436,9 @@ describe('PromptInput', () => {
 
     const route = screen.getByLabelText('prompt.routePreview');
     expect(within(route).getByText('anthropic')).toBeInTheDocument();
-    expect(within(route).getByText('claude-sonnet-4-6')).toBeInTheDocument();
-    expect(within(route).getByText('high')).toBeInTheDocument();
-    expect(within(route).getByText('sonnet')).toBeInTheDocument();
+    const picker = screen.getByRole('button', { name: 'prompt.modelReasoning' });
+    expect(picker).toHaveTextContent('Claude 4.6 Sonnet');
+    expect(picker).toHaveTextContent('prompt.reasoning.high');
   });
 
   it('sends the selected Codex profile alias when no model is manually selected', () => {
@@ -455,7 +462,8 @@ describe('PromptInput', () => {
       <PromptInput agents={agents} selectedAgentId="codex" onSelectAgent={vi.fn()} onSend={onSend} />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'prompt.model' }));
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.modelReasoning' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Claude 4.7 Opusanthropic' }));
     const input = screen.getByPlaceholderText(/prompt\.placeholder/);
     typeInPrompt(input, 'Use manual model');
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false });
@@ -510,7 +518,8 @@ describe('PromptInput', () => {
 
     const route = screen.getByLabelText('prompt.routePreview');
     expect(within(route).getByText('openai')).toBeInTheDocument();
-    expect(within(route).getByText('gpt-5.5')).toBeInTheDocument();
-    expect(within(route).getByText('max')).toBeInTheDocument();
+    const picker = screen.getByRole('button', { name: 'prompt.modelReasoning' });
+    expect(picker).toHaveTextContent('gpt-5.5');
+    expect(picker).toHaveTextContent('prompt.reasoning.max');
   });
 });

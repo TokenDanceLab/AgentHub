@@ -24,3 +24,10 @@ jwt:
 upload:
   dir: ./uploads
   max_size: 10485760
+tokendance_id:
+  issuer_url: "https://id.vectorcontrol.tech"
+  jwks_uri: ""
+  client_id: ""
+  client_secret: ""
+  redirect_uri: "http://localhost:8080/client/auth/oidc/callback"
+  allowed_redirect_uris: []

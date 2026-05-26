@@ -57,6 +57,8 @@ export interface ResolvedRunModelSettings {
 }
 
 const DEFAULT_REASONING_EFFORT: ReasoningEffortPreference = 'high';
+const TOKENDANCE_GATEWAY_PROVIDER_ID = 'tokendance-gateway';
+const LEGACY_TOKENDANCE_RELAY_PROVIDER_ID = 'tokendance-relay';
 
 const DEFAULT_ALIASES: ModelAliasMapping[] = [
   {
@@ -76,7 +78,7 @@ const DEFAULT_ALIASES: ModelAliasMapping[] = [
   {
     alias: 'haiku',
     model: 'glm-5.1',
-    provider: 'tokendance-relay',
+    provider: TOKENDANCE_GATEWAY_PROVIDER_ID,
     reasoningEffort: 'medium',
     enabled: true,
   },
@@ -84,11 +86,11 @@ const DEFAULT_ALIASES: ModelAliasMapping[] = [
 
 const DEFAULT_CC_SWITCH_PROVIDERS: CcSwitchProvider[] = [
   {
-    id: 'tokendance-relay',
-    name: 'TokenDance Relay',
+    id: TOKENDANCE_GATEWAY_PROVIDER_ID,
+    name: 'TokenDance Gateway',
     health: 'ready',
     modelCount: 8,
-    notes: 'Primary ecosystem relay for shared routing.',
+    notes: 'Primary ecosystem gateway for shared model routing.',
   },
   {
     id: 'cc-switch-local',
@@ -108,6 +110,34 @@ const DEFAULT_CC_SWITCH_PROVIDERS: CcSwitchProvider[] = [
 
 const cloneAliases = () => DEFAULT_ALIASES.map((item) => ({ ...item }));
 const cloneCcSwitchProviders = () => DEFAULT_CC_SWITCH_PROVIDERS.map((item) => ({ ...item }));
+
+function migrateProviderId(provider: string | undefined): string | undefined {
+  return provider === LEGACY_TOKENDANCE_RELAY_PROVIDER_ID ? TOKENDANCE_GATEWAY_PROVIDER_ID : provider;
+}
+
+function migratePersistedState(persistedState: unknown): unknown {
+  if (!persistedState || typeof persistedState !== 'object') return persistedState;
+  const state = persistedState as Partial<ModelSettingsState>;
+
+  return {
+    ...state,
+    defaultProvider: migrateProviderId(state.defaultProvider),
+    aliases: state.aliases?.map((item) => ({
+      ...item,
+      provider: migrateProviderId(item.provider) ?? item.provider,
+    })),
+    ccSwitchProviders: state.ccSwitchProviders?.map((item) => ({
+      ...item,
+      id: migrateProviderId(item.id) ?? item.id,
+      name: item.id === LEGACY_TOKENDANCE_RELAY_PROVIDER_ID || (item.name.startsWith('TokenDance') && item.name.includes('Relay'))
+        ? 'TokenDance Gateway'
+        : item.name,
+      notes: item.id === LEGACY_TOKENDANCE_RELAY_PROVIDER_ID
+        ? 'Primary ecosystem gateway for shared model routing.'
+        : item.notes,
+    })),
+  };
+}
 
 function resolveRunRequestOptions(state: ModelSettingsState, input: RunModelSettingsInput = {}): ResolvedRunModelSettings {
   const requestedModel = input.model?.trim() ?? '';
@@ -135,7 +165,7 @@ export const useModelSettingsStore = create<ModelSettingsState>()(
     persist(
       (set, get) => ({
         defaultModel: 'auto',
-        defaultProvider: 'tokendance-relay',
+        defaultProvider: TOKENDANCE_GATEWAY_PROVIDER_ID,
         reasoningEffort: DEFAULT_REASONING_EFFORT,
         providerFallbackEnabled: true,
         modelMappingEnabled: true,
@@ -171,7 +201,7 @@ export const useModelSettingsStore = create<ModelSettingsState>()(
         reset: () =>
           set({
             defaultModel: 'auto',
-            defaultProvider: 'tokendance-relay',
+            defaultProvider: TOKENDANCE_GATEWAY_PROVIDER_ID,
             reasoningEffort: DEFAULT_REASONING_EFFORT,
             providerFallbackEnabled: true,
             modelMappingEnabled: true,
@@ -182,7 +212,8 @@ export const useModelSettingsStore = create<ModelSettingsState>()(
       }),
       {
         name: 'agenthub-model-settings',
-        version: 1,
+        version: 2,
+        migrate: migratePersistedState,
       },
     ),
   ),

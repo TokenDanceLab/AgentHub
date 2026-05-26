@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -21,7 +22,9 @@ import (
 // agentCache is the subset of *cache.Client methods used by AgentService.
 type agentCache interface {
 	GetRoute(ctx context.Context, userID, deviceType string) (string, error)
+	GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error)
 	PushPendingTask(ctx context.Context, userID, taskJSON string) error
+	PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error
 	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
 }
 
@@ -179,20 +182,111 @@ type dispatchPayload struct {
 	AgentInstanceID  string `json:"agent_instance_id"`
 	AgentType        string `json:"agent_type"`
 	CustomAgentID    string `json:"custom_agent_id,omitempty"`
+	TargetID         string `json:"target_id,omitempty"`
 	SessionID        string `json:"session_id"`
 	TriggerMessageID string `json:"trigger_message_id"`
 	TriggerUserID    string `json:"trigger_user_id"`
+	Prompt           string `json:"prompt"`
 	DisplayName      string `json:"display_name"`
 	SystemPrompt     string `json:"system_prompt,omitempty"`
 	ModelParams      string `json:"model_params,omitempty"`
 	ToolWhitelist    string `json:"tool_whitelist,omitempty"`
 }
 
+type dispatchTargetSnapshot struct {
+	ID         string
+	TargetType string
+	DeviceID   string
+}
+
+func normalizeRuntimeAgentType(agentType string) string {
+	key := strings.TrimSpace(strings.ToLower(agentType))
+	if key == "" {
+		return ""
+	}
+	if key == "claude" || strings.Contains(key, "claude-code") || strings.Contains(key, "claude") {
+		return "claude-code"
+	}
+	if strings.Contains(key, "opencode") {
+		return "opencode"
+	}
+	if strings.Contains(key, "codex") || strings.Contains(key, "gpt") {
+		return "codex"
+	}
+	return key
+}
+
+func selectAgentInstance(agents []model.AgentInstance, targetAgentInstanceID, targetAgentType, targetCustomAgentID string) (*model.AgentInstance, error) {
+	targetAgentInstanceID = strings.TrimSpace(targetAgentInstanceID)
+	targetAgentType = normalizeRuntimeAgentType(targetAgentType)
+	targetCustomAgentID = strings.TrimSpace(targetCustomAgentID)
+	targetRequested := targetAgentInstanceID != "" || targetAgentType != "" || targetCustomAgentID != ""
+
+	if len(agents) == 0 {
+		return nil, errcode.AgentNotFound
+	}
+	if !targetRequested {
+		return &agents[0], nil
+	}
+
+	for i := range agents {
+		agent := &agents[i]
+		if targetAgentInstanceID != "" && agent.ID != targetAgentInstanceID {
+			continue
+		}
+		if targetAgentType != "" && normalizeRuntimeAgentType(agent.AgentType) != targetAgentType {
+			continue
+		}
+		if targetCustomAgentID != "" && (agent.CustomAgentID == nil || *agent.CustomAgentID != targetCustomAgentID) {
+			continue
+		}
+		return agent, nil
+	}
+	return nil, errcode.AgentNotFound
+}
+
+func mergeModelParams(base, override string) string {
+	base = strings.TrimSpace(base)
+	override = strings.TrimSpace(override)
+	if base == "" {
+		return override
+	}
+	if override == "" {
+		return base
+	}
+
+	var merged map[string]any
+	if err := json.Unmarshal([]byte(base), &merged); err != nil || merged == nil {
+		return override
+	}
+	var incoming map[string]any
+	if err := json.Unmarshal([]byte(override), &incoming); err != nil || incoming == nil {
+		return override
+	}
+	for key, value := range incoming {
+		merged[key] = value
+	}
+	data, err := json.Marshal(merged)
+	if err != nil {
+		return override
+	}
+	return string(data)
+}
+
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.
-func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error) {
+func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
 	msg, err := repository.GetMessageByID(s.db, triggerMessageID)
 	if err != nil {
 		return nil, errcode.MsgNotFound
+	}
+
+	// #116: reject new agent tasks for dissolved sessions
+	session, err := repository.GetSessionByID(s.db, msg.SessionID)
+	if err != nil {
+		return nil, errcode.SessionNotFound
+	}
+	if session.Dissolved {
+		return nil, errcode.SessionDissolved
 	}
 
 	// find agent instances in this session invited by this user
@@ -200,7 +294,10 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 	if err != nil || len(agents) == 0 {
 		return nil, errcode.AgentNotFound
 	}
-	ai := &agents[0]
+	ai, err := selectAgentInstance(agents, targetAgentInstanceID, targetAgentType, targetCustomAgentID)
+	if err != nil {
+		return nil, err
+	}
 
 	// check for active member
 	active, _ := repository.IsMemberActive(s.db, ai.SessionID, model.MemberTypeUser, userID)
@@ -208,30 +305,105 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 		return nil, errcode.SessionNotMember
 	}
 
+	dispatchTarget, err := s.validateDispatchTarget(ctx, userID, targetID)
+	if err != nil {
+		return nil, err
+	}
+	if dispatchTarget != nil {
+		targetID = dispatchTarget.ID
+	} else {
+		targetID = ""
+	}
+
 	task := &model.PendingAgentTask{
 		AgentInstanceID:   ai.ID,
 		TriggeredByUserID: userID,
 		TriggerMessageID:  triggerMessageID,
+		TargetID:          targetID,
 		Status:            model.TaskStatusQueued,
 		ExpireAt:          time.Now().Add(config.PendingTaskTTL),
+	}
+	if dispatchTarget != nil {
+		task.EdgeDeviceID = dispatchTarget.DeviceID
 	}
 	if err := repository.CreatePendingTask(s.db, task); err != nil {
 		return nil, err
 	}
 
-	go s.dispatchTask(ctx, task, ai)
+	// #100: Use context.WithoutCancel so the dispatch goroutine is not
+	// cancelled when the HTTP handler's request context is cancelled.
+	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, promptFromMessage(msg), modelParams)
 
 	return task, nil
 }
 
-func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance) {
+func (s *AgentService) validateDispatchTarget(ctx context.Context, userID, targetID string) (*dispatchTargetSnapshot, error) {
+	targetID = strings.TrimSpace(targetID)
+	if targetID == "" {
+		return nil, nil
+	}
+	target, err := repository.GetExecutionTargetByID(s.db.WithContext(ctx), targetID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.TargetNotFound
+		}
+		return nil, err
+	}
+	if target.OwnerID != userID {
+		return nil, errcode.TargetNotFound
+	}
+	switch target.TargetType {
+	case "local_edge", "hub_relay":
+		if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
+			return nil, errcode.TargetNotRoutable.WithMessage("execution target is not bound to a device")
+		}
+		deviceID := strings.TrimSpace(*target.DeviceID)
+		device, err := repository.GetDeviceByID(s.db.WithContext(ctx), deviceID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
+			}
+			return nil, err
+		}
+		if device.UserID != userID || device.DeviceType != "desktop" {
+			return nil, errcode.TargetNotRoutable.WithMessage("execution target device is not routable")
+		}
+		return &dispatchTargetSnapshot{
+			ID:         target.ID,
+			TargetType: target.TargetType,
+			DeviceID:   deviceID,
+		}, nil
+	default:
+		return nil, errcode.TargetNotRoutable.WithMessage("execution target type is not dispatchable yet")
+	}
+}
+
+func promptFromMessage(msg *model.Message) string {
+	if msg == nil {
+		return ""
+	}
+	switch msg.ContentType {
+	case model.ContentTypeText, model.ContentTypeCode, model.ContentTypeDiff:
+		var payload struct {
+			Text string `json:"text"`
+		}
+		if err := json.Unmarshal([]byte(msg.Content), &payload); err == nil && strings.TrimSpace(payload.Text) != "" {
+			return payload.Text
+		}
+	}
+	return msg.Content
+}
+
+func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams string) {
 	dp := dispatchPayload{
 		TaskID:           task.ID,
 		AgentInstanceID:  ai.ID,
-		AgentType:        ai.AgentType,
+		AgentType:        normalizeRuntimeAgentType(ai.AgentType),
+		TargetID:         task.TargetID,
 		SessionID:        ai.SessionID,
 		TriggerMessageID: task.TriggerMessageID,
 		TriggerUserID:    task.TriggeredByUserID,
+		Prompt:           prompt,
 		DisplayName:      ai.DisplayName,
 	}
 
@@ -244,16 +416,28 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 			dp.ToolWhitelist = ca.ToolWhitelist
 		}
 	}
+	dp.ModelParams = mergeModelParams(dp.ModelParams, modelParams)
 
 	payload, _ := json.Marshal(dp)
 
-	// try to push to inviter's edge (desktop) via WebSocket
 	cacheClient := resolveAgentCache(s.cacheClient)
+	if task.TargetID != "" {
+		if task.EdgeDeviceID == "" {
+			slog.Error("target-bound agent task missing edge device id", "task_id", task.ID, "user_id", ai.InviterUserID, "target_id", task.TargetID)
+			return
+		}
+		s.dispatchTargetBoundTask(ctx, cacheClient, task, ai.InviterUserID, task.EdgeDeviceID, payload)
+		return
+	}
+
+	// try to push to inviter's edge (desktop) via WebSocket
 	connID, err := cacheClient.GetRoute(ctx, ai.InviterUserID, "desktop")
 	if err == nil && connID != "" && s.mgr != nil {
 		conn := s.mgr.FindByConnID(connID)
 		if conn == nil {
-			_ = cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload))
+			if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
+				slog.Error("failed to push agent task to offline queue (conn nil)", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+			}
 			return
 		}
 		frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
@@ -263,7 +447,35 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	}
 
 	// offline: push to Redis pending queue
-	_ = cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload))
+	if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
+		slog.Error("failed to push agent task to offline queue", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+	}
+}
+
+func (s *AgentService) dispatchTargetBoundTask(ctx context.Context, cacheClient agentCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) {
+	queueTargetTask := func(reason string, err error) {
+		if pushErr := cacheClient.PushPendingTargetTask(ctx, userID, task.TargetID, deviceID, string(payload)); pushErr != nil {
+			slog.Error("failed to push target-bound agent task to offline queue", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", pushErr)
+			return
+		}
+		if err != nil {
+			slog.Info("queued target-bound agent task", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "reason", reason, "error", err)
+		}
+	}
+
+	connID, err := cacheClient.GetRouteForDevice(ctx, userID, "desktop", deviceID)
+	if err != nil || connID == "" || s.mgr == nil {
+		queueTargetTask("route unavailable", err)
+		return
+	}
+	conn := s.mgr.FindByConnID(connID)
+	if conn == nil || conn.UserID != userID || conn.DeviceType != "desktop" || conn.DeviceID != deviceID {
+		queueTargetTask("connection mismatch", nil)
+		return
+	}
+	frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
+	s.mgr.PushToConn(connID, frame)
+	_ = repository.UpdatePendingTaskDispatched(s.db, task.ID, deviceID)
 }
 
 // CancelTask cancels a pending task by its ID.
@@ -291,7 +503,13 @@ func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) er
 		return err
 	}
 
-	_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusCancelled, "")
+	rowsAffected, err := repository.UpdatePendingTaskStatusAtomic(s.db, taskID, task.Status, model.TaskStatusCancelled, "")
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return errcode.ErrBadRequest
+	}
 
 	s.bus.Publish(ctx, Event{Type: "agent.cancel", Payload: map[string]string{
 		"task_id":           taskID,
@@ -335,18 +553,27 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDevice
 	}
 	if task.Status == model.TaskStatusRunning {
 		if edgeRunID != "" && task.EdgeRunID == "" {
-			return repository.UpdatePendingTaskStatusWithEdgeRunID(s.db, taskID, model.TaskStatusRunning, "", edgeRunID)
+			return repository.UpdatePendingTaskEdgeRunID(s.db, taskID, edgeRunID)
 		}
 		return nil
 	}
-	if task.Status != model.TaskStatusDispatched {
+	// #99: accept queued tasks for offline-replayed tasks, transitioning to dispatched
+	if task.Status != model.TaskStatusDispatched && task.Status != model.TaskStatusQueued {
 		return errcode.ErrBadRequest
 	}
-	return repository.UpdatePendingTaskStatusWithEdgeRunID(s.db, taskID, model.TaskStatusRunning, "", edgeRunID)
+	rowsAffected, err := repository.UpdatePendingTaskStatusAtomicWithEdgeRunID(s.db, taskID, model.TaskStatusDispatched, model.TaskStatusRunning, "", edgeRunID)
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return errcode.ErrBadRequest
+	}
+	return nil
 }
 
-// HandleTaskStream inserts an agent message into the session (streaming chunk).
-func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, payload string) error {
+// HandleTaskStream records a typed runtime event and keeps the existing
+// message.new projection for current Web/Desktop chat consumers.
+func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -363,9 +590,34 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 		return err
 	}
 
+	eventType, eventPayload, messageContent, err := normalizeRunEventInput(stream)
+	if err != nil {
+		return err
+	}
+
+	// #130: idempotent stream-to-message — skip if a message with this client_msg_id already exists
+	if stream.ClientMsgID != "" {
+		existing, _ := repository.GetMessageByClientMsgID(s.db, ai.SessionID, stream.ClientMsgID)
+		if existing != nil {
+			return nil // already persisted, idempotent
+		}
+	}
+
 	// ensure status is running
 	if task.Status != model.TaskStatusRunning {
 		_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusRunning, "")
+	}
+
+	// #132: bump expire_at to keep running task alive while activity continues
+	_ = repository.BumpRunningTaskExpireAt(s.db, taskID, config.RunningTaskHeartbeatTTL)
+
+	runEvent := &model.AgentRunEvent{
+		TaskID:          taskID,
+		EdgeRunID:       firstNonEmpty(edgeRunID, task.EdgeRunID),
+		SessionID:       ai.SessionID,
+		AgentInstanceID: task.AgentInstanceID,
+		EventType:       eventType,
+		Payload:         eventPayload,
 	}
 
 	msg := &model.Message{
@@ -374,7 +626,11 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 		SenderID:    task.AgentInstanceID,
 		ClientMsgID: uuidv7.Must(),
 		ContentType: model.ContentTypeText,
-		Content:     payload,
+		Content:     messageContent,
+	}
+	// #130: use caller-provided client_msg_id when available for dedup
+	if stream.ClientMsgID != "" {
+		msg.ClientMsgID = stream.ClientMsgID
 	}
 	msg.SessionID = ai.SessionID
 
@@ -385,15 +641,106 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 	msg.SeqID = seq
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if err := repository.CreateAgentRunEventWithNextSeq(tx, runEvent); err != nil {
+			return err
+		}
 		return repository.InsertMessage(tx, msg)
 	})
 	if err != nil {
 		return err
 	}
 
+	// #154: update session last_message_at when agent stream creates a message
+	_ = repository.TouchSessionLastMessage(s.db, ai.SessionID)
+
 	s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
+	s.bus.Publish(ctx, Event{Type: ws.TypeAgentStream, Payload: runEvent})
 
 	return nil
+}
+
+func (s *AgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string) ([]model.AgentRunEvent, error) {
+	task, err := repository.GetPendingTaskByID(s.db, taskID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentTaskNotFound
+		}
+		return nil, err
+	}
+	if task.TriggeredByUserID != userID {
+		return nil, errcode.AgentTaskNotFound
+	}
+	return repository.ListAgentRunEventsByTaskID(s.db, taskID)
+}
+
+func normalizeRunEventInput(stream model.AgentRunEventInput) (eventType, payload, messageContent string, err error) {
+	eventType = strings.TrimSpace(stream.EventType)
+	content := strings.TrimSpace(stream.Content)
+
+	if len(stream.Payload) > 0 {
+		if !json.Valid(stream.Payload) {
+			return "", "", "", errcode.ErrBadRequest
+		}
+		payload = string(stream.Payload)
+	} else if content != "" {
+		if json.Valid([]byte(content)) {
+			payload = content
+		} else {
+			wrapped, marshalErr := json.Marshal(map[string]string{"content": stream.Content})
+			if marshalErr != nil {
+				return "", "", "", marshalErr
+			}
+			payload = string(wrapped)
+		}
+	} else {
+		return "", "", "", errcode.ErrBadRequest
+	}
+
+	if eventType == "" {
+		eventType = inferRunEventType(payload)
+	}
+	if eventType == "" {
+		eventType = model.RunEventTypeOutputBatch
+	}
+
+	messageContent = content
+	if messageContent == "" {
+		messageContent = payload
+	}
+	if !json.Valid([]byte(messageContent)) {
+		wrapped, marshalErr := json.Marshal(map[string]string{"content": messageContent})
+		if marshalErr != nil {
+			return "", "", "", marshalErr
+		}
+		messageContent = string(wrapped)
+	}
+
+	return eventType, payload, messageContent, nil
+}
+
+func inferRunEventType(payload string) string {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(payload), &fields); err != nil {
+		return ""
+	}
+	for _, key := range []string{"event_type", "type"} {
+		if raw, ok := fields[key]; ok {
+			var value string
+			if err := json.Unmarshal(raw, &value); err == nil {
+				return strings.TrimSpace(value)
+			}
+		}
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // HandleTaskDone marks a task as done and inserts the final content as a message.
@@ -405,8 +752,8 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDevic
 		}
 		return err
 	}
-	if task.Status == model.TaskStatusDone || task.Status == model.TaskStatusFailed ||
-		task.Status == model.TaskStatusCancelled || task.Status == model.TaskStatusTimeout {
+	// #109: only accept done callbacks for running or dispatched tasks
+	if task.Status != model.TaskStatusRunning && task.Status != model.TaskStatusDispatched {
 		return errcode.ErrBadRequest
 	}
 
@@ -437,10 +784,12 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDevic
 		if err != nil {
 			return err
 		}
+		// #154: update session last_message_at when agent done creates a message
+		_ = repository.TouchSessionLastMessage(s.db, ai.SessionID)
 		s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
 	}
 
-	_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusDone, "")
+	_, _ = repository.UpdatePendingTaskStatusAtomic(s.db, taskID, task.Status, model.TaskStatusDone, "")
 
 	s.bus.Publish(ctx, Event{Type: "agent.done", Payload: map[string]interface{}{
 		"task_id":           taskID,
@@ -460,8 +809,8 @@ func (s *AgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeDevic
 		}
 		return err
 	}
-	if task.Status == model.TaskStatusDone || task.Status == model.TaskStatusFailed ||
-		task.Status == model.TaskStatusCancelled || task.Status == model.TaskStatusTimeout {
+	// #109: only accept fail callbacks for running or dispatched tasks
+	if task.Status != model.TaskStatusRunning && task.Status != model.TaskStatusDispatched {
 		return errcode.ErrBadRequest
 	}
 
@@ -470,7 +819,7 @@ func (s *AgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeDevic
 		return err
 	}
 
-	_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusFailed, errMsg)
+	_, _ = repository.UpdatePendingTaskStatusAtomic(s.db, taskID, task.Status, model.TaskStatusFailed, errMsg)
 
 	s.bus.Publish(ctx, Event{Type: "agent.failed", Payload: map[string]interface{}{
 		"task_id":           taskID,
@@ -493,11 +842,38 @@ func (s *AgentService) authorizeTaskEdgeCallback(task *model.PendingAgentTask, e
 	if ai.InviterUserID != edgeUserID {
 		return nil, errcode.AgentTaskNotFound
 	}
-	if task.EdgeDeviceID != "" && task.EdgeDeviceID != edgeDeviceID {
+	if task.EdgeDeviceID == "" || task.EdgeDeviceID != edgeDeviceID {
 		return nil, errcode.AgentTaskNotFound
 	}
 	if task.EdgeRunID != "" && task.EdgeRunID != edgeRunID {
 		return nil, errcode.ErrBadRequest
 	}
 	return ai, nil
+}
+
+// ── Thin wrappers for repository calls needed by the app layer ──────────
+
+// GetPendingTaskByID returns a pending agent task by ID. Thin wrapper over repository.GetPendingTaskByID.
+func (s *AgentService) GetPendingTaskByID(taskID string) (*model.PendingAgentTask, error) {
+	return repository.GetPendingTaskByID(s.db, taskID)
+}
+
+// ScanExpiredTasks returns all pending tasks whose deadline has passed. Thin wrapper over repository.ScanExpiredTasks.
+func (s *AgentService) ScanExpiredTasks() ([]model.PendingAgentTask, error) {
+	return repository.ScanExpiredTasks(s.db)
+}
+
+// UpdatePendingTaskStatus updates the status of a pending agent task. Thin wrapper over repository.UpdatePendingTaskStatus.
+func (s *AgentService) UpdatePendingTaskStatus(taskID, status, errMsg string) error {
+	return repository.UpdatePendingTaskStatus(s.db, taskID, status, errMsg)
+}
+
+// GetAgentInstanceByID returns an agent instance by ID. Thin wrapper over repository.GetAgentInstanceByID.
+func (s *AgentService) GetAgentInstanceByID(id string) (*model.AgentInstance, error) {
+	return repository.GetAgentInstanceByID(s.db, id)
+}
+
+// UpdatePendingTaskDispatched records the edge device that a task was dispatched to. Thin wrapper over repository.UpdatePendingTaskDispatched.
+func (s *AgentService) UpdatePendingTaskDispatched(taskID, edgeDeviceID string) error {
+	return repository.UpdatePendingTaskDispatched(s.db, taskID, edgeDeviceID)
 }

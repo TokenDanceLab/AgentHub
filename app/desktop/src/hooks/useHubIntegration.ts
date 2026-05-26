@@ -32,8 +32,8 @@ export { useTaskBridgeStore };
 // ── Options ─────────────────────────────────────────
 
 export interface HubIntegrationOptions {
-  /** Hub WebSocket handle (already connected & authenticated). */
-  hubWS: HubWSHandle;
+  /** Hub WebSocket handle (already connected & authenticated). Null disables the bridge. */
+  hubWS: HubWSHandle | null;
   /** Hub REST client for reporting task progress. */
   hubClient: HubClient;
   /** Edge server base URL (default http://127.0.0.1:3210). */
@@ -55,13 +55,17 @@ export interface HubIntegrationHandle {
 
 // ── Helpers ──────────────────────────────────────────
 
-function tryParseModel(modelParams: unknown): string | undefined {
-  if (typeof modelParams !== 'string') return undefined;
+function parseRecord(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+  if (typeof value !== 'string') return {};
   try {
-    const parsed = JSON.parse(modelParams);
-    return typeof parsed.model === 'string' ? parsed.model : undefined;
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -69,6 +73,111 @@ function tryParseModel(modelParams: unknown): string | undefined {
 function getString(data: Record<string, unknown>, key: string): string {
   const v = data[key];
   return typeof v === 'string' ? v : '';
+}
+
+function getFirstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return undefined;
+}
+
+function getFirstBoolean(...values: unknown[]): boolean | undefined {
+  for (const value of values) {
+    if (typeof value === 'boolean') return value;
+  }
+  return undefined;
+}
+
+function getFirstNumber(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  return undefined;
+}
+
+function parseStringArray(value: unknown): string[] | undefined {
+  let source = value;
+  if (typeof value === 'string') {
+    try {
+      source = JSON.parse(value);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!Array.isArray(source)) return undefined;
+  const values = source.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+  return values.length > 0 ? values : undefined;
+}
+
+function parseStringRecord(value: unknown): Record<string, string> | undefined {
+  const record = parseRecord(value);
+  const entries = Object.entries(record).filter((entry): entry is [string, string] => typeof entry[1] === 'string');
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function normalizeRuntimeAgentId(agentId: string): string {
+  const key = agentId.trim().toLowerCase();
+  if (!key) return '';
+  if (key === 'claude' || key.includes('claude-code') || key.includes('claude')) return 'claude-code';
+  if (key.includes('opencode')) return 'opencode';
+  if (key.includes('codex') || key.includes('gpt')) return 'codex';
+  return key;
+}
+
+function buildEdgeRunBody(data: Record<string, unknown>, threadId: string, prompt: string, agentId: string): Record<string, unknown> {
+  const modelParams = parseRecord(data.model_params);
+  const allowedTools = parseStringArray(data.tool_whitelist)
+    ?? parseStringArray(modelParams.tool_allowlist)
+    ?? parseStringArray(modelParams.allowed_tools)
+    ?? parseStringArray(modelParams.allowedTools);
+
+  return {
+    threadId,
+    prompt: prompt || undefined,
+    agentId: agentId || undefined,
+    model: getFirstString(modelParams.model, data.model),
+    reasoningEffort: getFirstString(modelParams.reasoning_effort, modelParams.reasoningEffort, data.reasoning_effort, data.reasoningEffort),
+    thinkingMode: getFirstString(modelParams.thinking_mode, modelParams.thinkingMode, data.thinking_mode, data.thinkingMode),
+    maxThinkingTokens: getFirstNumber(modelParams.max_thinking_tokens, modelParams.maxThinkingTokens, data.max_thinking_tokens, data.maxThinkingTokens),
+    permissionMode: getFirstString(modelParams.permission_mode, modelParams.permissionMode, data.permission_mode, data.permissionMode),
+    workDir: getFirstString(modelParams.work_dir, modelParams.workDir, data.work_dir, data.workDir),
+    includePartial: getFirstBoolean(modelParams.include_partial, modelParams.includePartial, data.include_partial, data.includePartial),
+    systemPrompt: getFirstString(data.system_prompt, data.systemPrompt, modelParams.system_prompt, modelParams.systemPrompt),
+    appendSystemPrompt: getFirstString(modelParams.append_system_prompt, modelParams.appendSystemPrompt, data.append_system_prompt, data.appendSystemPrompt),
+    allowedTools,
+    configOverrides: parseStringRecord(modelParams.config_overrides) ?? parseStringRecord(modelParams.configOverrides),
+    ephemeral: getFirstBoolean(modelParams.ephemeral, data.ephemeral),
+  };
+}
+
+async function ensureEdgeThread(edgeBaseUrl: string, threadId: string, title: string): Promise<void> {
+  const resp = await fetch(`${edgeBaseUrl}/v1/threads`, {
+    method: 'POST',
+    headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      projectId: 'proj_local',
+      threadId,
+      title,
+    }),
+  });
+  if (!resp.ok) {
+    const errorText = await resp.text().catch(() => 'Unknown error');
+    throw new Error(`Edge POST /v1/threads returned ${resp.status}: ${errorText}`);
+  }
+}
+
+const FINAL_OUTPUT_MAX_CHARS = 32_000;
+
+function extractRunOutputBatch(payload: Record<string, unknown>): string {
+  if (payload.stream !== 'stdout' || !Array.isArray(payload.chunks)) return '';
+  return payload.chunks
+    .map((chunk) => {
+      if (!chunk || typeof chunk !== 'object') return '';
+      const text = (chunk as Record<string, unknown>).text;
+      return typeof text === 'string' ? text : '';
+    })
+    .join('');
 }
 
 // ── Hook ──────────────────────────────────────────────
@@ -79,7 +188,21 @@ export function useHubIntegration(
   const { hubWS, hubClient, edgeBaseUrl = 'http://127.0.0.1:3210', onDispatch } = options;
 
   const streamRef = useRef<StreamHandle | null>(null);
+  const outputByRunRef = useRef<Map<string, string>>(new Map());
   const store = useTaskBridgeStore;
+
+  const rememberOutput = useCallback((runId: string, content: string) => {
+    if (!content) return;
+    const prev = outputByRunRef.current.get(runId) ?? '';
+    outputByRunRef.current.set(
+      runId,
+      (prev + content).slice(-FINAL_OUTPUT_MAX_CHARS),
+    );
+  }, []);
+
+  const forgetOutput = useCallback((runId: string) => {
+    outputByRunRef.current.delete(runId);
+  }, []);
 
   // ── Initialise Edge event stream once ─────────────────
 
@@ -104,7 +227,8 @@ export function useHubIntegration(
         case 'run.agent.text_delta': {
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
-            hubClient.streamTask(taskId, content, runId).catch(() => {});
+            rememberOutput(runId, content);
+            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
           }
           break;
         }
@@ -112,7 +236,17 @@ export function useHubIntegration(
         case 'run.agent.text_block': {
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
-            hubClient.streamTask(taskId, content, runId).catch(() => {});
+            rememberOutput(runId, content);
+            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
+          }
+          break;
+        }
+
+        case 'run.output.batch': {
+          const content = extractRunOutputBatch(payload);
+          if (content) {
+            rememberOutput(runId, content);
+            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
           }
           break;
         }
@@ -120,7 +254,7 @@ export function useHubIntegration(
         case 'run.agent.thinking': {
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
-            hubClient.streamTask(taskId, content, runId).catch(() => {});
+            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
           }
           break;
         }
@@ -128,19 +262,20 @@ export function useHubIntegration(
         case 'run.agent.tool_call':
         case 'run.agent.tool_result':
         case 'run.agent.file_change':
-          // Forward tool metadata for chat visibility
+          // Forward the canonical typed runtime event so Hub can persist and replay it.
           hubClient
-            .streamTask(taskId, JSON.stringify(payload), runId)
+            .streamTaskEvent(taskId, event.type, payload, { runId })
             .catch(() => {});
           break;
 
         case 'run.agent.result': {
+          hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
           const success = payload.success !== false;
           if (success) {
             const output =
               typeof payload.content === 'string'
                 ? payload.content
-                : JSON.stringify(payload);
+                : outputByRunRef.current.get(runId) || JSON.stringify(payload);
             hubClient.doneTask(taskId, output, runId).catch(() => {});
             store.getState().updateTask(taskId, {
               status: 'done',
@@ -158,6 +293,18 @@ export function useHubIntegration(
           }
           // Clean up mapping after terminal event
           store.getState().removeTask(taskId);
+          forgetOutput(runId);
+          break;
+        }
+
+        case 'run.finished': {
+          const output = outputByRunRef.current.get(runId) || 'Run finished';
+          hubClient.doneTask(taskId, output, runId).catch(() => {});
+          store.getState().updateTask(taskId, {
+            status: 'done',
+          });
+          store.getState().removeTask(taskId);
+          forgetOutput(runId);
           break;
         }
 
@@ -187,6 +334,7 @@ export function useHubIntegration(
             error,
           });
           store.getState().removeTask(taskId);
+          forgetOutput(runId);
           break;
         }
 
@@ -197,6 +345,7 @@ export function useHubIntegration(
             error: 'Run cancelled',
           });
           store.getState().removeTask(taskId);
+          forgetOutput(runId);
           break;
         }
       }
@@ -213,6 +362,9 @@ export function useHubIntegration(
   // ── Listen for Hub agent.dispatch and agent.cancel ────
 
   useEffect(() => {
+    if (!hubWS) {
+      return;
+    }
     // ── agent.dispatch: create Edge run ────────────────
     const unsubDispatch = hubWS.on(HUB_EVENTS.AGENT_DISPATCH, async (payload: unknown) => {
       const data = payload as Record<string, unknown> | null;
@@ -222,13 +374,12 @@ export function useHubIntegration(
       }
 
       const taskId = data.task_id;
-      const agentId = getString(data, 'agent_type') || getString(data, 'agent_id');
+      const agentId = normalizeRuntimeAgentId(getString(data, 'agent_type') || getString(data, 'agent_id'));
       const prompt = getString(data, 'prompt') || getString(data, 'content');
       const threadId =
         getString(data, 'thread_id') ||
         getString(data, 'session_id') ||
-        undefined;
-      const model = tryParseModel(data.model_params) || getString(data, 'model') || undefined;
+        'hub-dispatch';
 
       // Build initial task record
       const task: AgentTask = {
@@ -245,15 +396,16 @@ export function useHubIntegration(
 
       // Create Edge run
       try {
+        await ensureEdgeThread(
+          edgeBaseUrl,
+          threadId,
+          getString(data, 'display_name') || 'Hub dispatch',
+        );
+
         const runResp = await fetch(`${edgeBaseUrl}/v1/runs`, {
           method: 'POST',
           headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({
-            threadId: threadId || 'hub-dispatch',
-            prompt: prompt || undefined,
-            agentId: agentId || undefined,
-            model,
-          }),
+          body: JSON.stringify(buildEdgeRunBody(data, threadId, prompt, agentId)),
         });
 
         if (!runResp.ok) {

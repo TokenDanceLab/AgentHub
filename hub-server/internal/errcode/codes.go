@@ -12,6 +12,21 @@ func (e *Error) Error() string {
 	return e.Code + ": " + e.Message
 }
 
+func (e *Error) Is(target error) bool {
+	other, ok := target.(*Error)
+	return ok && e.Code == other.Code
+}
+
+// WithMessage returns a copy of the Error with a custom message,
+// preserving the code and HTTP status.
+func (e *Error) WithMessage(msg string) *Error {
+	return &Error{
+		Code:       e.Code,
+		Message:    msg,
+		HTTPStatus: e.HTTPStatus,
+	}
+}
+
 func New(code, message string, httpStatus int) *Error {
 	return &Error{Code: code, Message: message, HTTPStatus: httpStatus}
 }
@@ -42,6 +57,8 @@ var (
 	AgentTaskNotFound  = &Error{Code: "AGENT_TASK_NOT_FOUND", Message: "agent task not found", HTTPStatus: http.StatusNotFound}
 	AgentTaskCancelled = &Error{Code: "AGENT_TASK_CANCELLED", Message: "task has been cancelled", HTTPStatus: http.StatusGone}
 	AgentTaskTimeout   = &Error{Code: "AGENT_TASK_TIMEOUT", Message: "task has timed out", HTTPStatus: http.StatusGone}
+	TargetNotFound     = &Error{Code: "TARGET_NOT_FOUND", Message: "execution target not found", HTTPStatus: http.StatusNotFound}
+	TargetNotRoutable  = &Error{Code: "TARGET_NOT_ROUTABLE", Message: "execution target is not routable", HTTPStatus: http.StatusConflict}
 
 	GroupNotOwner         = &Error{Code: "GROUP_NOT_OWNER", Message: "only group owner can perform this action", HTTPStatus: http.StatusForbidden}
 	GroupOwnerCannotLeave = &Error{Code: "GROUP_OWNER_CANNOT_LEAVE", Message: "group owner cannot leave, transfer or dissolve first", HTTPStatus: http.StatusBadRequest}
@@ -55,6 +72,10 @@ var (
 	FriendBlocked         = &Error{Code: "FRIEND_BLOCKED", Message: "blocked by user", HTTPStatus: http.StatusForbidden}
 	FriendRequestNotFound = &Error{Code: "FRIEND_REQUEST_NOT_FOUND", Message: "friend request not found", HTTPStatus: http.StatusNotFound}
 
+	FriendRemarkNoRow = &Error{Code: "FRIEND_REMARK_NO_ROW", Message: "remark update affected no rows, friendship may not exist", HTTPStatus: http.StatusNotFound}
+
+	FriendNotFriend = &Error{Code: "FRIEND_NOT_FRIEND", Message: "you are not friends with this user", HTTPStatus: http.StatusForbidden}
+
 	AttachNotFound     = &Error{Code: "ATTACH_NOT_FOUND", Message: "attachment not found", HTTPStatus: http.StatusNotFound}
 	AttachTooLarge     = &Error{Code: "ATTACH_TOO_LARGE", Message: "file exceeds maximum size", HTTPStatus: http.StatusRequestEntityTooLarge}
 	AttachHashMismatch = &Error{Code: "ATTACH_HASH_MISMATCH", Message: "file hash does not match", HTTPStatus: http.StatusBadRequest}
@@ -63,4 +84,12 @@ var (
 
 	WsAuthTimeout = &Error{Code: "WS_AUTH_TIMEOUT", Message: "ws authentication timeout", HTTPStatus: http.StatusUnauthorized}
 	WsAuthFailed  = &Error{Code: "WS_AUTH_FAILED", Message: "ws authentication failed", HTTPStatus: http.StatusUnauthorized}
+
+	ErrNotImplemented = &Error{Code: "NOT_IMPLEMENTED", Message: "endpoint not yet implemented", HTTPStatus: http.StatusNotImplemented}
+
+	// OIDC errors
+	OIDCInvalidState       = &Error{Code: "OIDC_INVALID_STATE", Message: "state is invalid or expired", HTTPStatus: http.StatusBadRequest}
+	OIDCCodeExchangeFailed = &Error{Code: "OIDC_CODE_EXCHANGE_FAILED", Message: "failed to exchange authorization code", HTTPStatus: http.StatusBadRequest}
+	OIDCIDTokenInvalid     = &Error{Code: "OIDC_ID_TOKEN_INVALID", Message: "id token validation failed", HTTPStatus: http.StatusBadRequest}
+	OIDCSubNotFound        = &Error{Code: "OIDC_SUB_NOT_FOUND", Message: "no sub claim in id token", HTTPStatus: http.StatusBadRequest}
 )

@@ -8,3 +8,4 @@ export { ProgressBar } from './ProgressBar';
 export { SearchInput } from './SearchInput';
 export { CollapsibleBlock } from './CollapsibleBlock';
 export { TextShimmer } from './TextShimmer';
+export { Tooltip } from './Tooltip';

@@ -1,0 +1,454 @@
+.root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--app-bg);
+  color: var(--foreground);
+  font-family: var(--font-sans, system-ui, sans-serif);
+}
+
+.root::before {
+  content: none;
+}
+
+[data-theme='dark'] .root {
+  background: var(--app-bg);
+}
+
+.topbar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 48px;
+  padding: 6px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  background: rgba(31, 31, 39, 0.96);
+  box-shadow: none;
+  backdrop-filter: blur(28px) saturate(1.16);
+  -webkit-backdrop-filter: blur(28px) saturate(1.16);
+}
+
+[data-theme='dark'] .topbar {
+  border-bottom-color: rgba(255, 255, 255, 0.045);
+  background: rgba(31, 31, 39, 0.96);
+  box-shadow: none;
+}
+
+.brandCluster,
+.statusCluster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: none;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+[data-theme='dark'] .brandMark {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.brandText {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.brandText strong,
+.brandText span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brandText strong {
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.brandText span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.iconBtn,
+.iconBtnActive,
+.accountBtn,
+.statusPill,
+.statusPillOnline,
+.surfaceTab,
+.surfaceTabActive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: none;
+  color: var(--muted-foreground);
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+[data-theme='dark'] .iconBtn,
+[data-theme='dark'] .iconBtnActive,
+[data-theme='dark'] .accountBtn,
+[data-theme='dark'] .statusPill,
+[data-theme='dark'] .statusPillOnline,
+[data-theme='dark'] .surfaceTab,
+[data-theme='dark'] .surfaceTabActive {
+  border-color: rgba(255, 255, 255, 0.065);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: none;
+}
+
+.iconBtn,
+.iconBtnActive {
+  width: 34px;
+  flex: 0 0 34px;
+}
+
+.iconBtnActive {
+  border-color: oklch(0.62 0.075 250 / 0.46);
+  background: rgba(93, 104, 204, 0.18);
+  color: var(--foreground);
+}
+
+[data-theme='dark'] .iconBtnActive {
+  border-color: oklch(0.72 0.06 250 / 0.26);
+  background: rgba(93, 104, 204, 0.18);
+}
+
+.accountBtn,
+.statusPill,
+.statusPillOnline {
+  gap: 6px;
+  max-width: 180px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.accountBtn span,
+.statusPill span,
+.statusPillOnline span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusPillOnline {
+  color: oklch(0.46 0.13 152);
+}
+
+.iconBtn:hover,
+.iconBtnActive:hover,
+.accountBtn:hover {
+  border-color: oklch(0.74 0.025 245 / 0.82);
+  background: rgba(255, 255, 255, 0.075);
+  color: var(--foreground);
+  transform: translateY(-1px);
+}
+
+[data-theme='dark'] .iconBtn:hover,
+[data-theme='dark'] .iconBtnActive:hover,
+[data-theme='dark'] .accountBtn:hover {
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.surfaceTabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: none;
+}
+
+[data-theme='dark'] .surfaceTabs {
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: none;
+}
+
+.surfaceTab,
+.surfaceTabActive {
+  gap: 6px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.surfaceTab span,
+.surfaceTabActive span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.surfaceTabActive {
+  border-color: rgba(255, 255, 255, 0.075);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+  color: var(--foreground);
+}
+
+[data-theme='dark'] .surfaceTabActive {
+  border-color: rgba(255, 255, 255, 0.075);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+}
+
+.body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 7px;
+  padding: 7px;
+  overflow: hidden;
+}
+
+.sidebar,
+.rightPanel,
+.rightOverlay,
+.workspaceGlass {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 10px;
+  background: rgba(37, 37, 45, 0.9);
+  box-shadow: none;
+  backdrop-filter: blur(18px) saturate(1.02);
+  -webkit-backdrop-filter: blur(18px) saturate(1.02);
+}
+
+[data-theme='dark'] .sidebar,
+[data-theme='dark'] .rightPanel,
+[data-theme='dark'] .rightOverlay,
+[data-theme='dark'] .workspaceGlass {
+  border-color: rgba(255, 255, 255, 0.045);
+  background: rgba(37, 37, 45, 0.9);
+  box-shadow: none;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.sidebarExpanded {
+  width: min(360px, 28vw);
+}
+
+.sidebarRail {
+  width: 54px;
+  align-items: center;
+  padding: 10px;
+}
+
+.sidebarMobile {
+  position: fixed;
+  top: 64px;
+  bottom: 10px;
+  left: 10px;
+  z-index: 110;
+  width: min(330px, calc(100vw - 20px));
+}
+
+.sidebarContent {
+  display: grid;
+  grid-template-rows: minmax(180px, 0.9fr) minmax(220px, 1.1fr);
+  gap: 14px;
+  min-height: 0;
+  padding: 12px 10px;
+}
+
+.sidebarSection {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-theme='dark'] .sidebarSection {
+  border-color: transparent;
+  background: transparent;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 8px;
+  border-bottom: 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+[data-theme='dark'] .sectionHeader {
+  border-bottom-color: transparent;
+}
+
+.sidebarScroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.workspaceGlass {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  isolation: isolate;
+  background: rgba(31, 31, 39, 0.92);
+}
+
+.workspaceGlass::before,
+.workspaceGlass::after {
+  content: none;
+}
+
+.rightPanel {
+  width: min(380px, 30vw);
+  flex: 0 0 auto;
+  overflow-y: auto;
+}
+
+.rightOverlay {
+  position: fixed;
+  top: 64px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 120;
+  width: min(380px, calc(100vw - 20px));
+  overflow-y: auto;
+}
+
+.scrim {
+  position: fixed;
+  inset: 54px 0 0;
+  z-index: 100;
+  border: 0;
+  background: oklch(0.15 0.01 250 / 0.36);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.modalLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: oklch(0.18 0.012 250 / 0.38);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+@media (max-width: 1023px) {
+  .body {
+    padding: 8px;
+  }
+
+  .sidebarExpanded {
+    width: 300px;
+  }
+
+  .rightPanel {
+    width: 340px;
+  }
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    height: 52px;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .brandText span,
+  .statusPill,
+  .statusPillOnline,
+  .surfaceTabs {
+    display: none;
+  }
+
+  .statusCluster {
+    gap: 6px;
+  }
+
+  .accountBtn {
+    max-width: 108px;
+    padding: 0 8px;
+  }
+
+  .body {
+    gap: 0;
+    padding: 8px;
+  }
+
+  .workspaceGlass {
+    border-radius: 8px;
+  }
+
+  .sidebarMobile,
+  .rightOverlay {
+    top: 60px;
+    bottom: 8px;
+  }
+}
