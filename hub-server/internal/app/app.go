@@ -622,7 +622,7 @@ func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string,
 		a.mgr.PushToConn(oldConnID, ws.NewFrame(ws.TypeDeviceKicked, map[string]string{
 			"reason": "logged_in_elsewhere",
 		}))
-		if c := a.mgr.FindByUserDevice(userID, deviceType); c != nil && c.ID == oldConnID {
+		if c := a.mgr.FindByConnID(oldConnID); c != nil {
 			c.Close()
 		}
 	}
@@ -638,7 +638,29 @@ func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string,
 	}
 
 	if deviceType == "desktop" {
+		if deviceID != "" {
+			go a.pushPendingTargetTasks(ctx, userID, deviceID, connID)
+		}
 		go a.pushPendingTasks(ctx, userID, connID)
+	}
+}
+
+func (a *App) pushPendingTargetTasks(ctx context.Context, userID, deviceID, connID string) {
+	tasks, err := a.CacheClient.PopPendingTargetTasksForDevice(ctx, userID, deviceID)
+	if err != nil || len(tasks) == 0 {
+		return
+	}
+	for _, taskJSON := range tasks {
+		var payload json.RawMessage
+		if json.Unmarshal([]byte(taskJSON), &payload) == nil {
+			var meta struct {
+				TaskID string `json:"task_id"`
+			}
+			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
+				_ = repository.UpdatePendingTaskDispatched(a.DB, meta.TaskID, deviceID)
+			}
+			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+		}
 	}
 }
 

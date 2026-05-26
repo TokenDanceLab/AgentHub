@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/ws"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,18 +43,41 @@ func newMockDBAgent(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
 }
 
 type mockAgentCache struct {
-	routeID    string
-	pushedUser string
-	pushed     []string
+	routeID        string
+	deviceRoutes   map[string]string
+	pushedUser     string
+	pushed         []string
+	pushedTarget   []string
+	pushedDeviceID string
+	pushedTargetID string
 }
 
 func (m *mockAgentCache) GetRoute(ctx context.Context, userID, deviceType string) (string, error) {
 	return m.routeID, nil
 }
 
+func (m *mockAgentCache) GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error) {
+	if m.deviceRoutes == nil {
+		return "", gorm.ErrRecordNotFound
+	}
+	connID, ok := m.deviceRoutes[userID+"|"+deviceType+"|"+deviceID]
+	if !ok {
+		return "", gorm.ErrRecordNotFound
+	}
+	return connID, nil
+}
+
 func (m *mockAgentCache) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
 	m.pushedUser = userID
 	m.pushed = append(m.pushed, taskJSON)
+	return nil
+}
+
+func (m *mockAgentCache) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	m.pushedUser = userID
+	m.pushedTargetID = targetID
+	m.pushedDeviceID = deviceID
+	m.pushedTarget = append(m.pushedTarget, taskJSON)
 	return nil
 }
 
@@ -117,6 +142,7 @@ func TestDispatchTaskIncludesTargetID(t *testing.T) {
 		TriggeredByUserID: "user-1",
 		TriggerMessageID:  "msg-1",
 		TargetID:          "target-1",
+		EdgeDeviceID:      "dev-1",
 	}
 	agent := &model.AgentInstance{
 		ID:            "agent-1",
@@ -129,10 +155,143 @@ func TestDispatchTaskIncludesTargetID(t *testing.T) {
 	svc.dispatchTask(context.Background(), task, agent, "Run the selected target", "")
 
 	require.Equal(t, "user-1", cache.pushedUser)
-	require.Len(t, cache.pushed, 1)
+	require.Len(t, cache.pushedTarget, 1)
 	var payload dispatchPayload
-	require.NoError(t, json.Unmarshal([]byte(cache.pushed[0]), &payload))
+	require.NoError(t, json.Unmarshal([]byte(cache.pushedTarget[0]), &payload))
 	require.Equal(t, "target-1", payload.TargetID)
+}
+
+func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	mgr := ws.NewManager()
+	connA := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connA))
+	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
+
+	cache := &mockAgentCache{routeID: connA.ID}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-target-no-device",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		TargetID:          "target-no-device",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run invalid target", "")
+
+	select {
+	case <-connA.Send:
+		t.Fatal("target task without edge device fell back to online desktop")
+	default:
+	}
+	require.Empty(t, cache.pushed)
+	require.Empty(t, cache.pushedTarget)
+}
+
+func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_device_id, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"task-target", "agent-1", "user-1", "msg-1", "target-dev-b", model.TaskStatusQueued, "dev-b", "2030-01-01T00:00:00Z").Error)
+
+	mgr := ws.NewManager()
+	connA := ws.NewConn(nil)
+	connB := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connA))
+	require.NoError(t, mgr.Register(connB))
+	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
+	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+
+	cache := &mockAgentCache{
+		routeID: connA.ID,
+		deviceRoutes: map[string]string{
+			"user-1|desktop|dev-b": connB.ID,
+		},
+	}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-target",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		TargetID:          "target-dev-b",
+		EdgeDeviceID:      "dev-b",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run on B", "")
+
+	select {
+	case data := <-connB.Send:
+		var frame struct {
+			Type    string          `json:"type"`
+			Payload dispatchPayload `json:"payload"`
+		}
+		require.NoError(t, json.Unmarshal(data, &frame))
+		require.Equal(t, ws.TypeAgentDispatch, frame.Type)
+		require.Equal(t, "target-dev-b", frame.Payload.TargetID)
+	default:
+		t.Fatal("target-bound dispatch was not sent to device B")
+	}
+	select {
+	case <-connA.Send:
+		t.Fatal("target-bound dispatch fell back to device A")
+	default:
+	}
+
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", "task-target").First(&stored).Error)
+	require.Equal(t, model.TaskStatusDispatched, stored.Status)
+	require.Equal(t, "dev-b", stored.EdgeDeviceID)
+	require.Empty(t, cache.pushedTarget)
+}
+
+func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	mgr := ws.NewManager()
+	connA := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connA))
+	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
+
+	cache := &mockAgentCache{routeID: connA.ID}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-target-offline",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		TargetID:          "target-dev-b",
+		EdgeDeviceID:      "dev-b",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run on offline B", "")
+
+	select {
+	case <-connA.Send:
+		t.Fatal("target-bound dispatch fell back to online device A")
+	default:
+	}
+	require.Empty(t, cache.pushed)
+	require.Len(t, cache.pushedTarget, 1)
+	require.Equal(t, "target-dev-b", cache.pushedTargetID)
+	require.Equal(t, "dev-b", cache.pushedDeviceID)
 }
 
 func TestMergeModelParamsLetsDispatchOverrideProfileDefaults(t *testing.T) {
@@ -488,7 +647,21 @@ func TestTriggerAgentTaskRejectsTargetOwnedByAnotherUser(t *testing.T) {
 
 	_, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-other")
 
-	require.ErrorIs(t, err, errcode.AuthDeviceMismatch)
+	require.ErrorIs(t, err, errcode.TargetNotFound)
+	var count int64
+	require.NoError(t, db.Table("pending_agent_tasks").Count(&count).Error)
+	require.Equal(t, int64(0), count)
+}
+
+func TestTriggerAgentTaskRejectsTargetWithoutBoundDevice(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, name, target_type, workspace_allowlist, trust_level, health_state, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"target-no-device", "user-1", "Local workstation", "local_edge", `["/workspace"]`, "local", "healthy", "{}", "{}").Error)
+	svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+
+	_, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-no-device")
+
+	require.ErrorIs(t, err, errcode.TargetNotRoutable)
 	var count int64
 	require.NoError(t, db.Table("pending_agent_tasks").Count(&count).Error)
 	require.Equal(t, int64(0), count)
@@ -496,8 +669,10 @@ func TestTriggerAgentTaskRejectsTargetOwnedByAnotherUser(t *testing.T) {
 
 func TestTriggerAgentTaskStoresAndDispatchesOwnedTarget(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
-	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, name, target_type, workspace_allowlist, trust_level, health_state, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		"target-local", "user-1", "Local workstation", "local_edge", `["/workspace"]`, "local", "healthy", "{}", "{}").Error)
+	require.NoError(t, db.Exec(`INSERT INTO devices (id, user_id, device_type, app_version, capabilities, last_active_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"dev-target", "user-1", "desktop", "0.1.0", "[]", "2030-01-01T00:00:00Z", "2030-01-01T00:00:00Z").Error)
+	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, device_id, name, target_type, workspace_allowlist, trust_level, health_state, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"target-local", "user-1", "dev-target", "Local workstation", "local_edge", `["/workspace"]`, "local", "healthy", "{}", "{}").Error)
 	cache := &mockAgentCache{}
 	svc := &AgentService{db: db, cacheClient: cache}
 
@@ -505,13 +680,36 @@ func TestTriggerAgentTaskStoresAndDispatchesOwnedTarget(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "target-local", task.TargetID)
+	require.Equal(t, "dev-target", task.EdgeDeviceID)
 	var stored model.PendingAgentTask
 	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
 	require.Equal(t, "target-local", stored.TargetID)
-	require.Len(t, cache.pushed, 1)
+	require.Equal(t, "dev-target", stored.EdgeDeviceID)
+	require.Eventually(t, func() bool {
+		return len(cache.pushedTarget) == 1
+	}, time.Second, 10*time.Millisecond)
 	var payload dispatchPayload
-	require.NoError(t, json.Unmarshal([]byte(cache.pushed[0]), &payload))
+	require.NoError(t, json.Unmarshal([]byte(cache.pushedTarget[0]), &payload))
 	require.Equal(t, "target-local", payload.TargetID)
+}
+
+func TestTriggerAgentTaskPrebindsOwnedTargetDevice(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO devices (id, user_id, device_type, app_version, capabilities, last_active_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"dev-local", "user-1", "desktop", "0.1.0", "[]", "2030-01-01T00:00:00Z", "2030-01-01T00:00:00Z").Error)
+	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, device_id, name, target_type, workspace_allowlist, trust_level, health_state, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"target-local-device", "user-1", "dev-local", "Local workstation", "local_edge", `["/workspace"]`, "local", "healthy", "{}", "{}").Error)
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+
+	task, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-local-device")
+
+	require.NoError(t, err)
+	require.Equal(t, "target-local-device", task.TargetID)
+	require.Equal(t, "dev-local", task.EdgeDeviceID)
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
+	require.Equal(t, "dev-local", stored.EdgeDeviceID)
 }
 
 func newAgentTaskTargetContractDB(t *testing.T) *gorm.DB {
@@ -565,6 +763,15 @@ func newAgentTaskTargetContractDB(t *testing.T) *gorm.DB {
 			dispatched_at DATETIME,
 			finished_at DATETIME,
 			expire_at DATETIME NOT NULL
+		)`,
+		`CREATE TABLE devices (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			device_type TEXT NOT NULL,
+			app_version TEXT DEFAULT '',
+			capabilities TEXT DEFAULT '[]',
+			last_active_at DATETIME,
+			created_at DATETIME
 		)`,
 		`CREATE TABLE execution_targets (
 			id TEXT PRIMARY KEY,
