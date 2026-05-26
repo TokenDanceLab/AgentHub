@@ -78,8 +78,39 @@ func TestAgentTeamHandler_ListTeamEvents(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "event-1")
 }
 
+func TestAgentTeamHandler_ListTeamTasks(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	called := false
+	svc := &mockAgentTeamService{
+		listTeamTasks: func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error) {
+			called = true
+			assert.Equal(t, "user-1", userID)
+			assert.Equal(t, "team-1", teamID)
+			assert.Equal(t, "run-1", runID)
+			return []model.AgentTeamTask{{ID: "task-1", TeamRunID: runID, Objective: "Build task board"}}, nil
+		},
+	}
+	h := NewAgentTeamHandler(svc)
+
+	r := gin.New()
+	r.GET("/web/agent-teams/:id/runs/:run_id/tasks", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.ListTeamTasks(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/web/agent-teams/team-1/runs/run-1/tasks", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.True(t, called)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "task-1")
+}
+
 type mockAgentTeamService struct {
 	handleRouteDecision func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
+	listTeamTasks       func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
 	listTeamEvents      func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
 }
 
@@ -163,4 +194,11 @@ func (m *mockAgentTeamService) ListTeamEvents(ctx context.Context, userID, teamI
 		return nil, nil
 	}
 	return m.listTeamEvents(ctx, userID, teamID, runID)
+}
+
+func (m *mockAgentTeamService) ListTeamTasks(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error) {
+	if m.listTeamTasks == nil {
+		return nil, nil
+	}
+	return m.listTeamTasks(ctx, userID, teamID, runID)
 }
