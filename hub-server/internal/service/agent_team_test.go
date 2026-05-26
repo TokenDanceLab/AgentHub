@@ -325,6 +325,7 @@ func newMockAgentTeamDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
 // mockAgentTeamAgentSvc implements agentTeamAgentSvc for tests.
 type mockAgentTeamAgentSvc struct {
 	triggerMessageID string
+	modelParams      string
 	returnTaskID     string
 }
 
@@ -334,6 +335,7 @@ func (m *mockAgentTeamAgentSvc) AddAgentToSession(ctx context.Context, userID, s
 
 func (m *mockAgentTeamAgentSvc) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
 	m.triggerMessageID = triggerMessageID
+	m.modelParams = modelParams
 	taskID := m.returnTaskID
 	if taskID == "" {
 		taskID = "task-1"
@@ -442,6 +444,8 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	assert.Equal(t, "team-1", run.TeamID)
 	assert.Equal(t, model.TeamRunStatusRunning, run.Status)
 	assert.NotEmpty(t, agentSvc.triggerMessageID)
+	assert.Contains(t, agentSvc.modelParams, "structured_output_schema")
+	assert.Contains(t, agentSvc.modelParams, "AgentHub TeamRun supervisor mode")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 

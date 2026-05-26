@@ -78,9 +78,9 @@ type AgentCapabilities struct {
 type SubAgentTask struct {
 	TaskID      string `json:"taskId"`
 	Description string `json:"description"`
-	AgentID     string `json:"agentId"`   // target agent adapter ID
-	Prompt      string `json:"prompt"`    // task prompt for the sub-agent
-	Depth       int    `json:"depth"`     // delegation depth (root=0)
+	AgentID     string `json:"agentId"` // target agent adapter ID
+	Prompt      string `json:"prompt"`  // task prompt for the sub-agent
+	Depth       int    `json:"depth"`   // delegation depth (root=0)
 	ParentRunID string `json:"parentRunId"`
 	ThreadID    string `json:"threadId,omitempty"` // inherited from parent run
 	Model       string `json:"model,omitempty"`    // model override propagated from parent context
@@ -108,6 +108,7 @@ const (
 	BusEventToolCall            = "run.agent.tool_call"
 	BusEventToolResult          = "run.agent.tool_result"
 	BusEventFileChange          = "run.agent.file_change"
+	BusEventRouteDecision       = "run.agent.route_decision"
 	BusEventSessionInit         = "run.agent.session_init"
 	BusEventResult              = "run.agent.result"
 	BusEventCompactBoundary     = "run.agent.compact_boundary"

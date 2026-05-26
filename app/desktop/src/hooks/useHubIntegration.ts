@@ -16,7 +16,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import type { HubWSHandle } from '@/api/hubWS';
-import type { HubClient } from '@/api/hubClient';
+import type { CoordinatorRouteDecision, HubClient } from '@/api/hubClient';
 import { createEventStream, type StreamHandle } from '@/api/eventClient';
 import { edgeAuthHeaders } from '@/api/edgeAuth';
 import type { EventEnvelope } from '@shared/events';
@@ -116,6 +116,78 @@ function parseStringRecord(value: unknown): Record<string, string> | undefined {
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
+function boolValue(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function normalizeRouteDecision(value: unknown): CoordinatorRouteDecision | null {
+  const record = parseRecord(value);
+  const nested = parseRecord(record.decision);
+  const source = Object.keys(nested).length > 0 ? nested : record;
+  let action = getFirstString(source.action);
+  if (!action && source.finish === true) {
+    action = 'finish';
+  }
+  action = action?.trim().toLowerCase();
+  if (!action || !['delegate', 'review', 'approve', 'finish'].includes(action)) {
+    return null;
+  }
+
+  return {
+    action,
+    next_worker: getFirstString(source.next_worker, source.nextWorker),
+    instructions: getFirstString(source.instructions),
+    reasoning: getFirstString(source.reasoning),
+    context: getFirstString(source.context),
+    approved: boolValue(source.approved),
+    feedback: getFirstString(source.feedback),
+    summary: getFirstString(source.summary),
+    blocked_reason: getFirstString(source.blocked_reason, source.blockedReason),
+    correlation_id: getFirstString(source.correlation_id, source.correlationId),
+  };
+}
+
+function routeDecisionFromRuntimePayload(payload: Record<string, unknown>): CoordinatorRouteDecision | null {
+  return normalizeRouteDecision(payload.structuredOutput)
+    ?? normalizeRouteDecision(payload.structured_output)
+    ?? normalizeRouteDecision(payload.routeDecision)
+    ?? normalizeRouteDecision(payload.route_decision)
+    ?? normalizeRouteDecision(payload.decision)
+    ?? normalizeRouteDecision(payload);
+}
+
+interface TeamRouteContext {
+  teamId: string;
+  teamRunId: string;
+  teamMemberRole?: string;
+}
+
+function getTeamRouteContext(task: AgentTask): TeamRouteContext | null {
+  const data = task.dispatchPayload ?? {};
+  const modelParams = parseRecord(data.model_params);
+  const nested = parseRecord(modelParams.agenthub_team_context);
+  const teamId = getFirstString(data.team_id, data.teamId, nested.team_id, nested.teamId);
+  const teamRunId = getFirstString(data.team_run_id, data.teamRunId, nested.team_run_id, nested.teamRunId);
+  if (!teamId || !teamRunId) return null;
+  return {
+    teamId,
+    teamRunId,
+    teamMemberRole: getFirstString(data.team_member_role, data.teamMemberRole, nested.team_member_role, nested.teamMemberRole),
+  };
+}
+
+function routeDecisionKey(taskId: string, decision: CoordinatorRouteDecision): string {
+  return [
+    taskId,
+    decision.correlation_id ?? '',
+    decision.action,
+    decision.next_worker ?? '',
+    decision.instructions ?? '',
+    decision.summary ?? '',
+    decision.blocked_reason ?? '',
+  ].join('\u001f');
+}
+
 function normalizeRuntimeAgentId(agentId: string): string {
   const key = agentId.trim().toLowerCase();
   if (!key) return '';
@@ -143,6 +215,7 @@ function buildEdgeRunBody(data: Record<string, unknown>, threadId: string, promp
     permissionMode: getFirstString(modelParams.permission_mode, modelParams.permissionMode, data.permission_mode, data.permissionMode),
     workDir: getFirstString(modelParams.work_dir, modelParams.workDir, data.work_dir, data.workDir),
     includePartial: getFirstBoolean(modelParams.include_partial, modelParams.includePartial, data.include_partial, data.includePartial),
+    structuredOutputSchema: getFirstString(modelParams.structured_output_schema, modelParams.structuredOutputSchema, data.structured_output_schema, data.structuredOutputSchema),
     systemPrompt: getFirstString(data.system_prompt, data.systemPrompt, modelParams.system_prompt, modelParams.systemPrompt),
     appendSystemPrompt: getFirstString(modelParams.append_system_prompt, modelParams.appendSystemPrompt, data.append_system_prompt, data.appendSystemPrompt),
     allowedTools,
@@ -189,6 +262,7 @@ export function useHubIntegration(
 
   const streamRef = useRef<StreamHandle | null>(null);
   const outputByRunRef = useRef<Map<string, string>>(new Map());
+  const postedRouteDecisionsRef = useRef<Set<string>>(new Set());
   const store = useTaskBridgeStore;
 
   const rememberOutput = useCallback((runId: string, content: string) => {
@@ -203,6 +277,20 @@ export function useHubIntegration(
   const forgetOutput = useCallback((runId: string) => {
     outputByRunRef.current.delete(runId);
   }, []);
+
+  const postRouteDecision = useCallback((task: AgentTask, decision: CoordinatorRouteDecision) => {
+    const context = getTeamRouteContext(task);
+    if (!context) return;
+    if (context.teamMemberRole && context.teamMemberRole !== 'supervisor') return;
+
+    const key = routeDecisionKey(task.taskId, decision);
+    if (postedRouteDecisionsRef.current.has(key)) return;
+    postedRouteDecisionsRef.current.add(key);
+
+    hubClient
+      .postTeamRouteDecision(context.teamId, context.teamRunId, decision)
+      .catch(() => {});
+  }, [hubClient]);
 
   // ── Initialise Edge event stream once ─────────────────
 
@@ -268,7 +356,20 @@ export function useHubIntegration(
             .catch(() => {});
           break;
 
+        case 'run.agent.route_decision': {
+          const decision = routeDecisionFromRuntimePayload(payload);
+          if (decision) {
+            postRouteDecision(task, decision);
+          }
+          hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
+          break;
+        }
+
         case 'run.agent.result': {
+          const decision = routeDecisionFromRuntimePayload(payload);
+          if (decision) {
+            postRouteDecision(task, decision);
+          }
           hubClient.streamTaskEvent(taskId, event.type, payload, { runId }).catch(() => {});
           const success = payload.success !== false;
           if (success) {
