@@ -1085,6 +1085,33 @@ paths:
         "200":
           description: Task dispatched.
 
+  /web/agent-tasks/{id}/events:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListTaskRunEvents
+      summary: List typed runtime events persisted for an agent task.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Ordered runtime events for replay.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AgentRunEvent"
+
   /edge/agent-tasks/{id}/ack:
     parameters:
       - name: id
@@ -3248,11 +3275,20 @@ components:
           description: Alias for run_id for explicit Hub persistence.
     HubTaskStreamRequest:
       type: object
-      required: [chunk]
       properties:
+        content:
+          type: string
+          description: 'Legacy stream content. If not valid JSON, Hub wraps it as {"content": "..."} for jsonb storage.'
         chunk:
           type: string
-          description: NDJSON-encoded agent stream event line.
+          description: Legacy alias for content.
+        event_type:
+          type: string
+          description: Typed AgentHub runtime event name, for example run.output.batch or run.agent.tool_call.
+        payload:
+          type: object
+          additionalProperties: true
+          description: Typed runtime payload persisted as jsonb and broadcast as agent.stream.
         client_msg_id:
           type: string
           description: Client-generated message id for idempotent stream dedup.
@@ -3262,6 +3298,30 @@ components:
         edge_run_id:
           type: string
           description: Alias for run_id.
+    AgentRunEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        task_id:
+          type: string
+        edge_run_id:
+          type: string
+        session_id:
+          type: string
+        agent_instance_id:
+          type: string
+        event_seq:
+          type: integer
+          format: int64
+        event_type:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
     HubTaskDoneRequest:
       type: object
       properties:

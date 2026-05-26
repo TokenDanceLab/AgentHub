@@ -79,9 +79,9 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 			mu.Unlock()
 			return nil
 		},
-		handleStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content, clientMsgID string) error {
+		handleStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 			mu.Lock()
-			streamChunks = append(streamChunks, content)
+			streamChunks = append(streamChunks, stream.Content)
 			mu.Unlock()
 			return nil
 		},
@@ -291,7 +291,7 @@ func TestEdgeHubProtocol_TaskLifecycleStateMachine(t *testing.T) {
 			recordState(model.TaskStatusRunning)
 			return nil
 		},
-		handleStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content, clientMsgID string) error {
+		handleStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 			return nil
 		},
 		handleDoneFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
@@ -342,7 +342,7 @@ type mockAgentService struct {
 	addAgentFn     func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
 	cancelTaskFn   func(ctx context.Context, userID, taskID string) error
 	handleAckFn    func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
-	handleStreamFn func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content, clientMsgID string) error
+	handleStreamFn func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error
 	handleDoneFn   func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
 	handleFailFn   func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
 }
@@ -371,9 +371,9 @@ func (m *mockAgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDe
 	}
 	return nil
 }
-func (m *mockAgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content, clientMsgID string) error {
+func (m *mockAgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 	if m.handleStreamFn != nil {
-		return m.handleStreamFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, content, clientMsgID)
+		return m.handleStreamFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, stream)
 	}
 	return nil
 }
@@ -388,6 +388,9 @@ func (m *mockAgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeD
 		return m.handleFailFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg)
 	}
 	return nil
+}
+func (m *mockAgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string) ([]model.AgentRunEvent, error) {
+	return nil, nil
 }
 
 func assertStatus(t *testing.T, w *httptest.ResponseRecorder, expected int) {

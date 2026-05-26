@@ -45,7 +45,7 @@ TokenDance ID -> Hub session/device proof -> Hub IM/task dispatch
 | Desktop 本地文件/进程管理 | 部分完成 | Desktop -> Local Edge -> Runtime adapters 是当前最强实现链路 | Packaged TokenDance ID login/logout/reconnect 与截图证据仍未关闭。 |
 | Mobile 轻量 IM/approval/preview | 规划中 | 部分 Web/mobile 响应式 surface 有测试 | Native/light mobile approval 与 preview flow 尚不是实现产品面。 |
 | TokenDance ID 真实身份 | 部分完成 | Hub OIDC authorize/callback/session gate：`hub-server/internal/service/oidc.go`、`hub-server/internal/middleware/auth.go`；Web/Desktop 登录入口存在 | 需要部署态真实登录 smoke：login -> Hub callback -> Hub session -> WebSocket auth -> logout/reconnect。 |
-| Runtime 事件显示 | 部分完成，本轮增强 | Web 在 `app/web/src/utils/hubAdapters.ts` 解析 runtime payload；RunDetail projection 已消费 text/tool/file blocks | Hub 后端应新增 first-class typed RunEvent 持久化，而不是只把 tool/file 事件存成文本消息。 |
+| Runtime 事件显示 | 部分完成，本轮增强 | Web 在 `app/web/src/utils/hubAdapters.ts` 解析 runtime payload；RunDetail projection 已消费 text/tool/file blocks；Hub 已新增最小 typed RunEvent 持久化和 `GET /web/agent-tasks/{id}/events` | Web/Home 还需要直接消费 `agent.stream` / run event replay，把 token/step/elapsed/approval/artifact 摘要从文本投影提升为一等 UI。 |
 
 ## 竞品方向参考
 
@@ -59,7 +59,7 @@ TokenDance ID -> Hub session/device proof -> Hub IM/task dispatch
 ## 下一批 P0/P1 交付顺序
 
 1. 部署态 TokenDance ID smoke：真实登录 Hub、Hub session、WebSocket auth、logout/reconnect；仓库只保存脱敏证据。
-2. Hub typed RunEvent 持久化：接受 typed task stream callbacks，持久化 `taskId -> edgeRunId -> event`，为 Web/Desktop 暴露 replay/read API。
+2. Web/Home 消费 Hub typed RunEvent：从 `agent.stream` / `GET /web/agent-tasks/{id}/events` 恢复 run history、状态筛选、token/step/elapsed/approval/artifact 摘要。
 3. Runtime UI parity：Web/Desktop RunDetail 和 ChatView 使用同一套 text/tool/file/result/usage/approval projection。
 4. 多 Agent group smoke：一个 Hub group session，两个真实 Runtime Profile，Orchestrator dispatch，可见聚合 transcript。
 5. Artifact lifecycle：diff/file/artifact cards 支持 open preview、apply/discard、version history 和安全路径边界。

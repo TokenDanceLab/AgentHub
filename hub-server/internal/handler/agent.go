@@ -18,9 +18,10 @@ type AgentService interface {
 	TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams string) (*model.PendingAgentTask, error)
 	CancelTask(ctx context.Context, userID, taskID string) error
 	HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
-	HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content, clientMsgID string) error
+	HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error
 	HandleTaskDone(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
 	HandleTaskFail(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
+	ListTaskRunEvents(ctx context.Context, userID, taskID string) ([]model.AgentRunEvent, error)
 }
 
 type AgentHandler struct {
@@ -151,10 +152,13 @@ func (r taskAckReq) normalizedRunID() string {
 }
 
 type taskStreamReq struct {
-	RunID       string `json:"run_id"`
-	EdgeRunID   string `json:"edge_run_id"`
-	Content     string `json:"content" binding:"required"`
-	ClientMsgID string `json:"client_msg_id"`
+	RunID       string          `json:"run_id"`
+	EdgeRunID   string          `json:"edge_run_id"`
+	Content     string          `json:"content"`
+	Chunk       string          `json:"chunk"`
+	EventType   string          `json:"event_type"`
+	Payload     json.RawMessage `json:"payload"`
+	ClientMsgID string          `json:"client_msg_id"`
 }
 
 // TaskStream POST /edge/agent-tasks/:id/stream
@@ -167,7 +171,12 @@ func (h *AgentHandler) TaskStream(c *gin.Context) {
 	taskID := c.Param("id")
 	edgeUserID := c.GetString("user_id")
 	edgeDeviceID := c.GetString("device_id")
-	if err := h.service.HandleTaskStream(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), req.Content, req.ClientMsgID); err != nil {
+	stream := req.normalizedStream()
+	if stream.Content == "" && len(stream.Payload) == 0 {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	if err := h.service.HandleTaskStream(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), stream); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return
@@ -176,6 +185,22 @@ func (h *AgentHandler) TaskStream(c *gin.Context) {
 		return
 	}
 	OK(c, nil)
+}
+
+// TaskEvents GET /web/agent-tasks/:id/events
+func (h *AgentHandler) TaskEvents(c *gin.Context) {
+	userID := c.GetString("user_id")
+	taskID := c.Param("id")
+	events, err := h.service.ListTaskRunEvents(c.Request.Context(), userID, taskID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, events)
 }
 
 type taskDoneReq struct {
@@ -237,6 +262,19 @@ func (r taskStreamReq) normalizedRunID() string {
 		return r.EdgeRunID
 	}
 	return r.RunID
+}
+
+func (r taskStreamReq) normalizedStream() model.AgentRunEventInput {
+	content := r.Content
+	if content == "" {
+		content = r.Chunk
+	}
+	return model.AgentRunEventInput{
+		EventType:   r.EventType,
+		Payload:     r.Payload,
+		Content:     content,
+		ClientMsgID: r.ClientMsgID,
+	}
 }
 
 func (r taskDoneReq) normalizedRunID() string {
