@@ -2804,6 +2804,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubHandleTeamRouteDecision
       summary: Consume a typed supervisor route decision and record accepted or rejected TeamEvent audit entries.
+      description: Applies schema validation plus task-count, active-subagent, and repeated-route guardrails before creating TeamAssignment and TeamTask rows.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
