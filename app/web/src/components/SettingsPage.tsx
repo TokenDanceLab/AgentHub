@@ -38,6 +38,12 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useHubStore } from '@/stores/hubStore';
 import { APP_VERSION, HUB_URL } from '@/config';
 import { useAgentList } from '@/api/agentQueries';
+import {
+  summarizeExecutionTargets,
+  useHubExecutionTargets,
+  usePingHubExecutionTarget,
+  type ExecutionTargetInventoryItem,
+} from '@/api/executionTargetQueries';
 import { useCancelRun, useRuns } from '@/api/runQueries';
 import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
@@ -266,8 +272,16 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const { t } = useTranslation();
   const { themeMode, setThemeMode } = useTheme();
   const hubAuth = useAuth();
+  const [active, setActive] = useState<SectionId>(initialSection);
   const { online: edgeOnline, health } = useHealth();
   const { data: agentData } = useAgentList(edgeOnline);
+  const {
+    data: hubTargetData,
+    isError: hubTargetsError,
+    isFetching: hubTargetsFetching,
+    isLoading: hubTargetsLoading,
+  } = useHubExecutionTargets(active === 'executionTargets' || active === 'agentScheduling');
+  const pingHubTargetMutation = usePingHubExecutionTarget();
   const {
     data: runData,
     isError: runsError,
@@ -279,7 +293,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const bridgedTasks = useTaskBridgeStore((s) => s.tasks);
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const username = useHubStore((s) => s.username);
-  const [active, setActive] = useState<SectionId>(initialSection);
   const [compactMode, setCompactMode] = useStoredBooleanState('compactMode', false);
   const [autoReview, setAutoReview] = useStoredBooleanState('autoReview', true);
   const [fullAccess, setFullAccess] = useStoredBooleanState('fullAccess', false);
@@ -317,6 +330,30 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const updateCcSwitchProvider = useModelSettingsStore((s) => s.updateProvider);
   const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
   const agents = agentData?.items ?? [];
+  const hubTargets = hubTargetData?.items ?? [];
+  const hubTargetSummary = useMemo(() => summarizeExecutionTargets(hubTargets), [hubTargets]);
+  const localTargetCount = hubTargetSummary.byType.local_edge;
+  const hubRelayCount = hubTargetSummary.byType.hub_relay;
+  const remoteTargetCount = hubTargetSummary.byType.remote_ssh + hubTargetSummary.byType.tailscale;
+  const cloudTargetCount = hubTargetSummary.byType.cloud_edge;
+  const localTargetOnline = hubTargets.some((target) => target.target_type === 'local_edge' && target.is_online);
+  const hubRelayOnline = hubTargets.some((target) => target.target_type === 'hub_relay' && target.is_online);
+  const remoteTargetOnline = hubTargets.some(
+    (target) => (target.target_type === 'remote_ssh' || target.target_type === 'tailscale') && target.is_online,
+  );
+  const cloudTargetOnline = hubTargets.some((target) => target.target_type === 'cloud_edge' && target.is_online);
+  const hubTargetInventoryMetric = hubAuthenticated
+    ? t('settings.targetInventoryMetric', { total: hubTargetSummary.total, online: hubTargetSummary.online })
+    : t('settings.targetHubSignInRequired');
+  const hubTargetHealthMetric = hubTargetSummary.total > 0
+    ? t('settings.targetHealthMetric', {
+        healthy: hubTargetSummary.healthy,
+        degraded: hubTargetSummary.degraded,
+        offline: hubTargetSummary.offline,
+        unknown: hubTargetSummary.unknown,
+      })
+    : t('settings.targetHealthUnknown');
+  const hubTargetsErrorMessage = t('settings.targetHubErrorDesc');
   const hubOnlyHealth = health?.status === 'hub-only' || health?.edgeId === 'web-hub-only';
   const localEdgeOnline = edgeOnline && !hubOnlyHealth;
   const localAgentProfiles = useMemo(
@@ -352,13 +389,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const recentBridgeTasks = getRecentTasks(bridgedTasks, 5);
   const schedulerActiveItems = activeRuns + activeHubTasks;
   const schedulerTotalItems = runs.length + bridgedTasks.length;
-  const schedulerTargetReadyCount = [
-    localEdgeOnline,
-    hubAuthenticated,
-    remoteControlEnabled,
-    false,
-  ].filter(Boolean).length;
-  const schedulerLocalMetric = totalRunners > 0 ? runnerSummary : localEdgeOnline ? t('settings.edgeOnline') : t('settings.edgeOffline');
+  const schedulerTargetReadyCount = hubTargetSummary.online;
   const marketPublishReady = agents.filter((agent) => agent.status === 'available').length;
   const marketCapabilityCount = countAgentCapabilities(agents);
   const skillScriptCount = PROJECT_SKILLS.filter((skill) => skill.hasScripts).length;
@@ -722,40 +753,76 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   icon={<Monitor size={18} />}
                   title={t('settings.targetLocalEdge')}
                   description={t('settings.targetLocalEdgeDesc')}
-                  status={localEdgeOnline ? health?.status ?? 'ok' : t('settings.offline')}
-                  metric={runnerSummary}
-                  connected={localEdgeOnline && availableRunners > 0}
+                  status={localTargetCount > 0 ? hubTargetsFetching ? t('settings.loading') : t('settings.enabled') : t('settings.notConfigured')}
+                  metric={hubAuthenticated ? t('settings.targetTypeCount', { count: localTargetCount }) : t('settings.targetHubSignInRequired')}
+                  connected={localTargetOnline}
                 />
                 <ExecutionTargetCard
                   icon={<Globe2 size={18} />}
                   title={t('settings.targetHubRelay')}
                   description={t('settings.targetHubRelayDesc')}
-                  status={hubAuthenticated ? t('settings.enabled') : t('settings.notConfigured')}
-                  metric={hubAuthenticated ? t('settings.targetHubSignedIn') : t('settings.targetHubSignInRequired')}
-                  connected={hubAuthenticated}
+                  status={hubAuthenticated ? hubTargetsFetching ? t('settings.loading') : t('settings.enabled') : t('settings.notConfigured')}
+                  metric={hubAuthenticated ? t('settings.targetTypeCount', { count: hubRelayCount }) : t('settings.targetHubSignInRequired')}
+                  connected={hubRelayOnline}
                 />
                 <ExecutionTargetCard
                   icon={<Server size={18} />}
                   title={t('settings.targetSsh')}
                   description={t('settings.targetSshDesc')}
-                  status={t('settings.statusPlanned')}
-                  metric="SSH / Tailscale"
+                  status={remoteTargetCount > 0 ? t('settings.enabled') : t('settings.statusPlanned')}
+                  metric={t('settings.targetTypeCount', { count: remoteTargetCount })}
+                  connected={remoteTargetOnline}
                 />
                 <ExecutionTargetCard
                   icon={<Computer size={18} />}
                   title={t('settings.targetCloudEdge')}
                   description={t('settings.targetCloudEdgeDesc')}
-                  status={t('settings.statusPlanned')}
-                  metric="Cloud Edge"
+                  status={cloudTargetCount > 0 ? t('settings.enabled') : t('settings.statusPlanned')}
+                  metric={t('settings.targetTypeCount', { count: cloudTargetCount })}
+                  connected={cloudTargetOnline}
                 />
               </div>
-              {runnerItems.length > 0 ? (
-                <div className={styles.runnerList}>
-                  {runnerItems.map((runner) => <RunnerRow key={runner.id} runner={runner} />)}
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.targetHubInventory')}</strong>
+                  <span>{t('settings.targetHubInventoryDesc')}</span>
                 </div>
-              ) : (
-                <Callout title={t('settings.runnerInventory')} body={t('settings.runnerInventoryDesc')} />
-              )}
+                <div className={styles.capabilityGrid}>
+                  <CapabilityCard
+                    title={t('settings.targetHubInventory')}
+                    description={t('settings.targetHubInventoryCardDesc')}
+                    status={hubTargetInventoryMetric}
+                  />
+                  <CapabilityCard
+                    title={t('settings.targetHubHealth')}
+                    description={t('settings.targetHubHealthDesc')}
+                    status={hubTargetHealthMetric}
+                  />
+                </div>
+                {!hubAuthenticated ? (
+                  <EmptyBlock title={t('settings.targetHubSignIn')} description={t('settings.targetHubSignInDesc')} />
+                ) : hubTargetsLoading ? (
+                  <EmptyBlock title={t('settings.targetHubLoading')} description={t('settings.targetHubLoadingDesc')} />
+                ) : hubTargetsError ? (
+                  <EmptyBlock title={t('settings.targetHubError')} description={hubTargetsErrorMessage} />
+                ) : hubTargets.length > 0 ? (
+                  <div className={styles.taskList}>
+                    {hubTargets.map((target) => (
+                      <HubExecutionTargetRow
+                        key={target.id}
+                        target={target}
+                        onPing={(targetId) => pingHubTargetMutation.mutate(targetId)}
+                        pinging={pingHubTargetMutation.isPending && pingHubTargetMutation.variables === target.id}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.targetHubEmpty')} description={t('settings.targetHubEmptyDesc')} />
+                )}
+                {pingHubTargetMutation.isError ? (
+                  <Callout title={t('settings.targetPingError')} body={t('settings.targetPingErrorDesc')} />
+                ) : null}
+              </div>
             </Panel>
           )}
 
@@ -907,8 +974,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <SummaryCard
                   icon={<Server size={18} />}
                   label={t('settings.schedulerTargets')}
-                  value={`${schedulerTargetReadyCount}/4`}
-                  detail={t('settings.schedulerTargetsDesc')}
+                  value={`${schedulerTargetReadyCount}/${hubTargetSummary.total}`}
+                  detail={hubAuthenticated ? t('settings.schedulerTargetsDesc') : t('settings.targetHubSignInRequired')}
                 />
                 <SummaryCard
                   icon={<ShieldCheck size={18} />}
@@ -950,32 +1017,33 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     icon={<Monitor size={18} />}
                     title={t('settings.schedulerRouteLocal')}
                     description={t('settings.schedulerRouteLocalDesc')}
-                    status={localEdgeOnline ? t('settings.enabled') : t('settings.offline')}
-                    metric={schedulerLocalMetric}
-                    connected={localEdgeOnline}
+                    status={localTargetCount > 0 ? t('settings.enabled') : t('settings.notConfigured')}
+                    metric={t('settings.targetTypeCount', { count: localTargetCount })}
+                    connected={localTargetOnline}
                   />
                   <ExecutionTargetCard
                     icon={<Globe2 size={18} />}
                     title={t('settings.schedulerRouteHub')}
                     description={t('settings.schedulerRouteHubDesc')}
-                    status={hubAuthenticated ? t('settings.enabled') : t('settings.notConfigured')}
-                    metric={hubAuthenticated ? t('settings.targetHubSignedIn') : t('settings.targetHubSignInRequired')}
-                    connected={hubAuthenticated}
+                    status={hubRelayCount > 0 ? t('settings.enabled') : t('settings.notConfigured')}
+                    metric={t('settings.targetTypeCount', { count: hubRelayCount })}
+                    connected={hubRelayOnline}
                   />
                   <ExecutionTargetCard
                     icon={<Computer size={18} />}
                     title={t('settings.schedulerRouteRemote')}
                     description={t('settings.schedulerRouteRemoteDesc')}
-                    status={remoteControlEnabled ? t('settings.statusInProgress') : t('settings.statusPlanned')}
-                    metric="SSH / Tailscale"
-                    connected={remoteControlEnabled}
+                    status={remoteTargetCount > 0 ? t('settings.enabled') : t('settings.notConfigured')}
+                    metric={t('settings.targetTypeCount', { count: remoteTargetCount })}
+                    connected={remoteTargetOnline}
                   />
                   <ExecutionTargetCard
                     icon={<Server size={18} />}
                     title={t('settings.schedulerRouteCloud')}
                     description={t('settings.schedulerRouteCloudDesc')}
-                    status={t('settings.statusPlanned')}
-                    metric="Cloud Edge"
+                    status={cloudTargetCount > 0 ? t('settings.enabled') : t('settings.notConfigured')}
+                    metric={t('settings.targetTypeCount', { count: cloudTargetCount })}
+                    connected={cloudTargetOnline}
                   />
                 </div>
               </div>
@@ -1723,6 +1791,55 @@ function HubTaskRow({ task }: { task: AgentTask }) {
       <span className={`${styles.statusPill} ${isActiveBridgeTask(task) ? styles.statusPillOn : ''}`}>
         {t(`settings.taskStatus.${task.status}`, { defaultValue: task.status })}
       </span>
+    </div>
+  );
+}
+
+function HubExecutionTargetRow({
+  target,
+  onPing,
+  pinging,
+}: {
+  target: ExecutionTargetInventoryItem;
+  onPing: (targetId: string) => void;
+  pinging: boolean;
+}) {
+  const { t } = useTranslation();
+  const workspaceLabel = target.workspace_allowlist.length > 0
+    ? t('settings.targetWorkspaceCount', { count: target.workspace_allowlist.length })
+    : t('settings.targetWorkspaceEmpty');
+  const identityLabel = target.device_id
+    ? t('settings.targetDevice', { id: shortId(target.device_id) })
+    : shortId(target.id);
+
+  return (
+    <div className={styles.taskRow}>
+      <div className={styles.connectionIcon}>
+        <Server size={17} />
+      </div>
+      <div className={styles.settingCopy}>
+        <strong>{target.name}</strong>
+        <span>{identityLabel}</span>
+        <div className={styles.taskMeta}>
+          <span>{t(`settings.targetType.${target.target_type}`, { defaultValue: target.target_type })}</span>
+          <span>{t(`settings.targetTrust.${target.trust_level}`, { defaultValue: target.trust_level })}</span>
+          <span>{workspaceLabel}</span>
+        </div>
+      </div>
+      <span className={`${styles.statusPill} ${target.is_online ? styles.statusPillOn : ''}`}>
+        {t(`settings.targetHealth.${target.health_state}`, { defaultValue: target.health_state })}
+      </span>
+      <button
+        type="button"
+        className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
+        onClick={() => onPing(target.id)}
+        disabled={pinging}
+        aria-label={t('settings.targetPing')}
+        title={t('settings.targetPing')}
+      >
+        <RefreshCw size={15} />
+        {pinging ? t('settings.targetPinging') : t('settings.targetPing')}
+      </button>
     </div>
   );
 }
