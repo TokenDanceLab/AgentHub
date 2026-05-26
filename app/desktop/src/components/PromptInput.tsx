@@ -178,7 +178,7 @@ export default function PromptInput({
   const placeholder = selectedAgent
     ? `${t('prompt.placeholder')} @${selectedAgent.name}...`
     : t('prompt.placeholder');
-  const providerLabel = resolvedRoute.provider === 'tokendance-relay'
+  const providerLabel = resolvedRoute.provider === 'tokendance-gateway'
     ? 'TokenDance'
     : (resolvedRoute.provider ?? t('prompt.routeAuto'));
   const permissionLabel = t(`prompt.permission.${permissionMode}`);
