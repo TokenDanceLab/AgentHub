@@ -30,6 +30,13 @@ cd D:\Code\TokenDance\AgentHub
 
 该检查只证明仓库内端点、示例配置、存储策略、Hub WebSocket upgrade 鉴权和治理文档对齐；它不替代部署态 login -> callback -> Hub session -> WebSocket auth -> logout/reconnect 的真实 smoke。
 
+Web 生产入口不得直连 Local Edge。改 Web transport、runtime/profile、run/task 或 preview fallback 时同时运行：
+
+```powershell
+cd D:\Code\TokenDance\AgentHub
+.\scripts\verify-web-hub-boundary.ps1
+```
+
 ## 目录结构
 
 ```text

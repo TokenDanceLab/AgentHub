@@ -93,7 +93,7 @@ func TestDispatchTaskIncludesPrompt(t *testing.T) {
 		DisplayName:   "Claude",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run the real runtime")
+	svc.dispatchTask(context.Background(), task, agent, "Run the real runtime", `{"model":"claude-sonnet-4-6"}`)
 
 	require.Equal(t, "user-1", cache.pushedUser)
 	require.Len(t, cache.pushed, 1)
@@ -101,7 +101,31 @@ func TestDispatchTaskIncludesPrompt(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(cache.pushed[0]), &payload))
 	require.Equal(t, "Run the real runtime", payload.Prompt)
 	require.Equal(t, "claude-code", payload.AgentType)
+	require.Equal(t, `{"model":"claude-sonnet-4-6"}`, payload.ModelParams)
 	require.Equal(t, "sess-1", payload.SessionID)
+}
+
+func TestSelectAgentInstanceHonorsRequestedRuntime(t *testing.T) {
+	agents := []model.AgentInstance{
+		{ID: "agent-claude", AgentType: "claude-code"},
+		{ID: "agent-codex", AgentType: "codex"},
+		{ID: "agent-opencode", AgentType: "opencode"},
+	}
+
+	selected, err := selectAgentInstance(agents, "", "codex", "")
+
+	require.NoError(t, err)
+	require.Equal(t, "agent-codex", selected.ID)
+}
+
+func TestSelectAgentInstanceRejectsMissingRequestedRuntime(t *testing.T) {
+	agents := []model.AgentInstance{
+		{ID: "agent-claude", AgentType: "claude-code"},
+	}
+
+	_, err := selectAgentInstance(agents, "", "opencode", "")
+
+	require.ErrorIs(t, err, errcode.AgentNotFound)
 }
 
 // ==================== CancelTask ====================
@@ -409,7 +433,7 @@ func TestTriggerAgentTask_RejectsDissolvedSession(t *testing.T) {
 			AddRow("session-dissolved", "group", true, "owner-1"))
 
 	svc := &AgentService{db: db}
-	_, err := svc.TriggerAgentTask(context.Background(), "user-1", triggerMsgID)
+	_, err := svc.TriggerAgentTask(context.Background(), "user-1", triggerMsgID, "", "", "", "")
 	require.ErrorIs(t, err, errcode.SessionDissolved)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

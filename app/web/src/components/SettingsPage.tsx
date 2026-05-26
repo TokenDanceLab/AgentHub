@@ -300,6 +300,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const updateCcSwitchProvider = useModelSettingsStore((s) => s.updateProvider);
   const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
   const agents = agentData?.items ?? [];
+  const hubOnlyHealth = health?.status === 'hub-only' || health?.edgeId === 'web-hub-only';
+  const localEdgeOnline = edgeOnline && !hubOnlyHealth;
   const localAgentProfiles = useMemo(
     () => agents.map((agent) => ({
       agent,
@@ -318,11 +320,11 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     ],
   );
   const availableRuntimes = agents.filter((agent) => agent.status === 'available').length;
-  const runnerHealth = health?.checks?.runners;
+  const runnerHealth = hubOnlyHealth ? undefined : health?.checks?.runners;
   const runnerItems = runnerHealth?.items ?? [];
   const availableRunners = runnerHealth?.available ?? runnerItems.filter((item) => item.status === 'online').length;
   const totalRunners = runnerHealth?.total ?? runnerItems.length;
-  const runnerSummary = edgeOnline
+  const runnerSummary = localEdgeOnline
     ? t('settings.runnerSummary', { available: availableRunners, total: totalRunners })
     : t('settings.edgeOffline');
   const runs = runData?.items ?? [];
@@ -334,12 +336,12 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const schedulerActiveItems = activeRuns + activeHubTasks;
   const schedulerTotalItems = runs.length + bridgedTasks.length;
   const schedulerTargetReadyCount = [
-    edgeOnline,
+    localEdgeOnline,
     hubAuthenticated,
     remoteControlEnabled,
     false,
   ].filter(Boolean).length;
-  const schedulerLocalMetric = totalRunners > 0 ? runnerSummary : edgeOnline ? t('settings.edgeOnline') : t('settings.edgeOffline');
+  const schedulerLocalMetric = totalRunners > 0 ? runnerSummary : localEdgeOnline ? t('settings.edgeOnline') : t('settings.edgeOffline');
   const marketPublishReady = agents.filter((agent) => agent.status === 'available').length;
   const marketCapabilityCount = countAgentCapabilities(agents);
   const skillScriptCount = PROJECT_SKILLS.filter((skill) => skill.hasScripts).length;
@@ -625,7 +627,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   icon={<Bot size={18} />}
                   label={t('settings.profileAvailable')}
                   value={`${availableRuntimes}/${agents.length}`}
-                  detail={edgeOnline ? t('settings.runtimeInventoryDesc') : t('settings.edgeOffline')}
+                  detail={localEdgeOnline ? t('settings.runtimeInventoryDesc') : t('settings.edgeOffline')}
                 />
                 <SummaryCard
                   icon={<Cpu size={18} />}
@@ -660,7 +662,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                         agent={profile.agent}
                         alias={profile.alias}
                         route={profile.route}
-                        edgeOnline={edgeOnline}
+                        edgeOnline={localEdgeOnline}
                       />
                     ))}
                   </div>
@@ -686,7 +688,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <CapabilityCard
                     title={t('settings.executionTargets')}
                     description={t('settings.profileExecutionTargetDesc')}
-                    status={edgeOnline ? t('settings.statusReady') : t('settings.notConfigured')}
+                    status={localEdgeOnline ? t('settings.statusReady') : t('settings.notConfigured')}
                   />
                 </div>
               </div>
@@ -702,9 +704,9 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   icon={<Monitor size={18} />}
                   title={t('settings.targetLocalEdge')}
                   description={t('settings.targetLocalEdgeDesc')}
-                  status={edgeOnline ? health?.status ?? 'ok' : t('settings.offline')}
+                  status={localEdgeOnline ? health?.status ?? 'ok' : t('settings.offline')}
                   metric={runnerSummary}
-                  connected={edgeOnline && availableRunners > 0}
+                  connected={localEdgeOnline && availableRunners > 0}
                 />
                 <ExecutionTargetCard
                   icon={<Globe2 size={18} />}
@@ -882,7 +884,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   icon={<Bot size={18} />}
                   label={t('settings.schedulerProfiles')}
                   value={`${availableRuntimes}/${agents.length}`}
-                  detail={edgeOnline ? t('settings.schedulerProfilesDesc') : t('settings.edgeOffline')}
+                  detail={localEdgeOnline ? t('settings.schedulerProfilesDesc') : t('settings.edgeOffline')}
                 />
                 <SummaryCard
                   icon={<Server size={18} />}
@@ -930,9 +932,9 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     icon={<Monitor size={18} />}
                     title={t('settings.schedulerRouteLocal')}
                     description={t('settings.schedulerRouteLocalDesc')}
-                    status={edgeOnline ? t('settings.enabled') : t('settings.offline')}
+                    status={localEdgeOnline ? t('settings.enabled') : t('settings.offline')}
                     metric={schedulerLocalMetric}
-                    connected={edgeOnline}
+                    connected={localEdgeOnline}
                   />
                   <ExecutionTargetCard
                     icon={<Globe2 size={18} />}
@@ -998,7 +1000,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   icon={<Bot size={18} />}
                   label={t('settings.marketLocalProfiles')}
                   value={`${agents.length}`}
-                  detail={edgeOnline ? t('settings.marketLocalProfilesDesc') : t('settings.edgeOffline')}
+                  detail={localEdgeOnline ? t('settings.marketLocalProfilesDesc') : t('settings.edgeOffline')}
                 />
                 <SummaryCard
                   icon={<ShieldCheck size={18} />}
@@ -1090,7 +1092,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   icon={<Plug size={18} />}
                   label={t('settings.mcpRuntimeSupport')}
                   value={`${mcpCapableAgents}/${agents.length}`}
-                  detail={edgeOnline ? t('settings.mcpRuntimeSupportDesc') : t('settings.edgeOffline')}
+                  detail={localEdgeOnline ? t('settings.mcpRuntimeSupportDesc') : t('settings.edgeOffline')}
                 />
                 <SummaryCard
                   icon={<ShieldCheck size={18} />}
@@ -1366,7 +1368,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 description={hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
                 connected={hubAuthenticated}
               />
-              <ConnectionRow name="Edge" description={`${t('settings.edgeLocal')} · ${runnerSummary}`} connected={edgeOnline} />
+              <ConnectionRow name="Edge" description={`${t('settings.edgeLocal')} · ${runnerSummary}`} connected={localEdgeOnline} />
               <ConnectionRow name="WebSocket" description={t('status.wsConnected')} connected={edgeOnline} />
             </Panel>
           )}
@@ -1960,8 +1962,8 @@ function AgentMarketCard({ agent }: { agent: AgentInfo }) {
         </em>
       </div>
       <div className={styles.profileMeta}>
-        <span>{t('settings.profileRuntime')}: {agent.id}</span>
-        <span>{t('settings.marketInstallSource')}: Local Edge</span>
+        <span>{t('settings.profileRuntime')}: {agent.runtimeId ?? agent.id}</span>
+        <span>{t('settings.marketInstallSource')}: TokenDance Hub</span>
         <span>{t('settings.marketPublishStatus')}: {agent.status === 'available' ? t('settings.statusInProgress') : t('settings.statusPlanned')}</span>
       </div>
       <div className={styles.profileMeta}>

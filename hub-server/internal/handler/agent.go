@@ -15,7 +15,7 @@ import (
 // AgentService is the subset of *service.AgentService used by AgentHandler.
 type AgentService interface {
 	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error
-	TriggerAgentTask(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error)
+	TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams string) (*model.PendingAgentTask, error)
 	CancelTask(ctx context.Context, userID, taskID string) error
 	HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error
 	HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, content, clientMsgID string) error
@@ -59,6 +59,10 @@ func (h *AgentHandler) AddAgentToSession(c *gin.Context) {
 
 type triggerTaskReq struct {
 	TriggerMessageID string `json:"trigger_message_id" binding:"required"`
+	AgentInstanceID  string `json:"agent_instance_id,omitempty"`
+	AgentType        string `json:"agent_type,omitempty"`
+	CustomAgentID    string `json:"custom_agent_id,omitempty"`
+	ModelParams      string `json:"model_params,omitempty"`
 }
 
 // TriggerTask POST /web/agent-tasks
@@ -69,7 +73,15 @@ func (h *AgentHandler) TriggerTask(c *gin.Context) {
 		return
 	}
 	userID := c.GetString("user_id")
-	task, err := h.service.TriggerAgentTask(c.Request.Context(), userID, req.TriggerMessageID)
+	task, err := h.service.TriggerAgentTask(
+		c.Request.Context(),
+		userID,
+		req.TriggerMessageID,
+		req.AgentInstanceID,
+		req.AgentType,
+		req.CustomAgentID,
+		req.ModelParams,
+	)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)

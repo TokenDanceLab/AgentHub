@@ -40,8 +40,8 @@ function toAgentInfo(runner: Runner): AgentInfo {
   return {
     id: runner.id,
     name: runner.name,
-    description: `Hub-only web preview for ${runner.name}`,
-    status: runner.status === 'online' ? 'available' : 'unavailable',
+    description: `Preview only; real availability comes from Hub profiles and a signed-in Desktop route.`,
+    status: 'configuring',
     capabilities: {
       streaming: true,
       toolCalls: true,
@@ -61,24 +61,20 @@ export async function fetchHealth(): Promise<HealthResponse> {
     version: 'web-preview',
     edgeId: 'web-hub-only',
     checks: {
-      executor: { status: 'stubbed', detail: 'Web connects through Hub; local Edge is not used.' },
+      executor: { status: 'stubbed', detail: 'Web connects through Hub; browser code does not probe Local Edge.' },
       runners: {
         status: 'stubbed',
-        total: mockRunners.length,
-        available: mockRunners.filter((runner) => runner.status === 'online').length,
-        items: mockRunners.map((runner) => ({
-          id: runner.id,
-          name: runner.name,
-          status: runner.status,
-          capabilities: runner.capabilities?.split(',') ?? [],
-        })),
+        detail: 'Runtime readiness is reported by Desktop/Local Edge during dispatch, not by this web preview.',
+        total: 0,
+        available: 0,
+        items: [],
       },
     },
   };
 }
 
 export async function fetchRunners(): Promise<ListResponse<Runner>> {
-  return page(mockRunners);
+  return page([]);
 }
 
 export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {

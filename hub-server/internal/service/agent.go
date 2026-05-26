@@ -190,8 +190,54 @@ type dispatchPayload struct {
 	ToolWhitelist    string `json:"tool_whitelist,omitempty"`
 }
 
+func normalizeRuntimeAgentType(agentType string) string {
+	key := strings.TrimSpace(strings.ToLower(agentType))
+	if key == "" {
+		return ""
+	}
+	if key == "claude" || strings.Contains(key, "claude-code") || strings.Contains(key, "claude") {
+		return "claude-code"
+	}
+	if strings.Contains(key, "opencode") {
+		return "opencode"
+	}
+	if strings.Contains(key, "codex") || strings.Contains(key, "gpt") {
+		return "codex"
+	}
+	return key
+}
+
+func selectAgentInstance(agents []model.AgentInstance, targetAgentInstanceID, targetAgentType, targetCustomAgentID string) (*model.AgentInstance, error) {
+	targetAgentInstanceID = strings.TrimSpace(targetAgentInstanceID)
+	targetAgentType = normalizeRuntimeAgentType(targetAgentType)
+	targetCustomAgentID = strings.TrimSpace(targetCustomAgentID)
+	targetRequested := targetAgentInstanceID != "" || targetAgentType != "" || targetCustomAgentID != ""
+
+	if len(agents) == 0 {
+		return nil, errcode.AgentNotFound
+	}
+	if !targetRequested {
+		return &agents[0], nil
+	}
+
+	for i := range agents {
+		agent := &agents[i]
+		if targetAgentInstanceID != "" && agent.ID != targetAgentInstanceID {
+			continue
+		}
+		if targetAgentType != "" && normalizeRuntimeAgentType(agent.AgentType) != targetAgentType {
+			continue
+		}
+		if targetCustomAgentID != "" && (agent.CustomAgentID == nil || *agent.CustomAgentID != targetCustomAgentID) {
+			continue
+		}
+		return agent, nil
+	}
+	return nil, errcode.AgentNotFound
+}
+
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.
-func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error) {
+func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams string) (*model.PendingAgentTask, error) {
 	msg, err := repository.GetMessageByID(s.db, triggerMessageID)
 	if err != nil {
 		return nil, errcode.MsgNotFound
@@ -211,7 +257,10 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 	if err != nil || len(agents) == 0 {
 		return nil, errcode.AgentNotFound
 	}
-	ai := &agents[0]
+	ai, err := selectAgentInstance(agents, targetAgentInstanceID, targetAgentType, targetCustomAgentID)
+	if err != nil {
+		return nil, err
+	}
 
 	// check for active member
 	active, _ := repository.IsMemberActive(s.db, ai.SessionID, model.MemberTypeUser, userID)
@@ -232,7 +281,7 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 
 	// #100: Use context.WithoutCancel so the dispatch goroutine is not
 	// cancelled when the HTTP handler's request context is cancelled.
-	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, promptFromMessage(msg))
+	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, promptFromMessage(msg), modelParams)
 
 	return task, nil
 }
@@ -253,11 +302,11 @@ func promptFromMessage(msg *model.Message) string {
 	return msg.Content
 }
 
-func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt string) {
+func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams string) {
 	dp := dispatchPayload{
 		TaskID:           task.ID,
 		AgentInstanceID:  ai.ID,
-		AgentType:        ai.AgentType,
+		AgentType:        normalizeRuntimeAgentType(ai.AgentType),
 		SessionID:        ai.SessionID,
 		TriggerMessageID: task.TriggerMessageID,
 		TriggerUserID:    task.TriggeredByUserID,
@@ -273,6 +322,9 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 			dp.ModelParams = ca.ModelParams
 			dp.ToolWhitelist = ca.ToolWhitelist
 		}
+	}
+	if strings.TrimSpace(modelParams) != "" {
+		dp.ModelParams = modelParams
 	}
 
 	payload, _ := json.Marshal(dp)

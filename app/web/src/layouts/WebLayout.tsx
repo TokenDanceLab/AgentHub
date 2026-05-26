@@ -46,11 +46,22 @@ import styles from './WebLayout.module.css';
 type MainSurface = 'workspace' | 'messages' | 'settings';
 
 function resolveHubAgentType(agent?: AgentInfo): string {
-  const key = `${agent?.id ?? ''} ${agent?.name ?? ''}`.toLowerCase();
+  const key = `${agent?.runtimeId ?? ''} ${agent?.id ?? ''} ${agent?.name ?? ''} ${agent?.description ?? ''}`.toLowerCase();
   if (key.includes('claude')) return 'claude-code';
   if (key.includes('codex') || key.includes('gpt')) return 'codex';
   if (key.includes('opencode')) return 'opencode';
   return 'codex';
+}
+
+function resolveHubModelParams(agent?: AgentInfo, opts?: { model?: string; reasoningEffort?: string }): string | undefined {
+  const params: Record<string, string> = {};
+  const model = agent?.model || opts?.model;
+  const provider = agent?.provider;
+  const reasoningEffort = agent?.reasoningEffort || opts?.reasoningEffort;
+  if (model) params.model = model;
+  if (provider) params.provider = provider;
+  if (reasoningEffort) params.reasoning_effort = reasoningEffort;
+  return Object.keys(params).length > 0 ? JSON.stringify(params) : undefined;
 }
 
 function isAgentMissing(error: unknown): boolean {
@@ -172,7 +183,7 @@ export default function WebLayout() {
   );
 
   const handleSend = useCallback(
-    async (prompt: string, agentId?: string, _opts?: { model?: string; reasoningEffort?: string }) => {
+    async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string }) => {
       if (!prompt.trim() || runStartPending) return false;
       if (!hubAuthenticated || !getAccessToken()) {
         setShowAuthModal(true);
@@ -191,6 +202,12 @@ export default function WebLayout() {
       const now = new Date().toISOString();
       const messageId = newClientMessageId();
       const resolvedAgent = agents.find((agent) => agent.id === (agentId ?? activeAgentId)) ?? selectedAgent;
+      const agentType = resolveHubAgentType(resolvedAgent);
+      const modelParams = resolveHubModelParams(resolvedAgent, opts);
+      const triggerOptions = {
+        agent_type: agentType,
+        ...(modelParams ? { model_params: modelParams } : {}),
+      };
       setRunStartPending(true);
       appendOptimistic({
         id: messageId,
@@ -211,14 +228,14 @@ export default function WebLayout() {
 
         let task;
         try {
-          task = await hubClient.triggerAgentTask(sent.message_id);
+          task = await hubClient.triggerAgentTask(sent.message_id, triggerOptions);
         } catch (error) {
           if (!isAgentMissing(error)) throw error;
           await hubClient.addAgentToSession(targetThread.threadId, {
-            agent_type: resolveHubAgentType(resolvedAgent),
+            agent_type: agentType,
             display_name: resolvedAgent?.name ?? 'Codex',
           });
-          task = await hubClient.triggerAgentTask(sent.message_id);
+          task = await hubClient.triggerAgentTask(sent.message_id, triggerOptions);
         }
 
         setOptimisticRun({

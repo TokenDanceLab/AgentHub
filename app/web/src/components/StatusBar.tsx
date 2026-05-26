@@ -13,7 +13,7 @@ interface Props {
   isConnected: boolean;
   error: string | null;
   projectPath?: string;
-  /** QW-3: WebSocket ping-pong round-trip latency in ms, polled from eventClient. */
+  /** Hub WebSocket ping-pong round-trip latency in ms. */
   wsLatency?: number | null;
   /** Whether authenticated against Hub server. */
   hubAuthenticated?: boolean;
