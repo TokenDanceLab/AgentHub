@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -8,11 +10,15 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/ws"
 	"github.com/glebarez/sqlite"
 )
 
@@ -166,4 +172,55 @@ func TestOIDCSmoke(t *testing.T) {
 			t.Fatal("expected ClientID to be empty, got non-empty")
 		}
 	})
+}
+
+func TestStartEventSubscriptionsPushesAgentStreamToSession(t *testing.T) {
+	mgr := ws.NewManager()
+	mgr.ResolveMembers = func(sessionID string) []string {
+		if sessionID == "sess-1" {
+			return []string{"user-1"}
+		}
+		return nil
+	}
+
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	t.Cleanup(func() {
+		mgr.Unregister(conn.ID)
+	})
+
+	bus := service.NewBus()
+	t.Cleanup(bus.Close)
+
+	a := &App{mgr: mgr, bus: bus}
+	a.startEventSubscriptions(context.Background())
+
+	bus.Publish(context.Background(), service.Event{
+		Type: ws.TypeAgentStream,
+		Payload: &model.AgentRunEvent{
+			ID:              "evt-1",
+			TaskID:          "task-1",
+			EdgeRunID:       "run-1",
+			SessionID:       "sess-1",
+			AgentInstanceID: "agent-1",
+			EventSeq:        1,
+			EventType:       "run.agent.tool_call",
+			Payload:         `{"callId":"call-1","toolName":"Bash"}`,
+		},
+	})
+
+	select {
+	case data := <-conn.Send:
+		var frame struct {
+			Type    string              `json:"type"`
+			Payload model.AgentRunEvent `json:"payload"`
+		}
+		require.NoError(t, json.Unmarshal(data, &frame))
+		require.Equal(t, ws.TypeAgentStream, frame.Type)
+		require.Equal(t, "task-1", frame.Payload.TaskID)
+		require.Equal(t, "run.agent.tool_call", frame.Payload.EventType)
+	case <-time.After(time.Second):
+		t.Fatal("agent.stream frame was not pushed to session")
+	}
 }
