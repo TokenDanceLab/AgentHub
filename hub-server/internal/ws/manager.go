@@ -122,7 +122,7 @@ func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) {
 	}
 	// Find existing connection of same device type (for oldConnID tracking)
 	for _, existingCID := range m.byUser[userID] {
-		if ec, ok := m.conns[existingCID]; ok && ec.DeviceType == deviceType {
+		if ec, ok := m.conns[existingCID]; ok && ec.DeviceType == deviceType && ec.DeviceID == deviceID {
 			oldConnID = existingCID
 			break
 		}
