@@ -432,6 +432,27 @@
   white-space: pre;
 }
 
+.reviewChangesBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 2px 26px;
+  padding: 3px 10px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--primary);
+  font-size: var(--font-size-2xs);
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+
+.reviewChangesBtn:hover {
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+}
+
 /* ── Inline run status ───────────────────── */
 
 .sessionMeta {
