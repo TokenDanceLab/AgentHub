@@ -26,6 +26,9 @@ func newExecutionTargetTestDB(t *testing.T) *gorm.DB {
 			host TEXT DEFAULT '',
 			port INTEGER DEFAULT 0,
 			workspace_root TEXT DEFAULT '',
+			workspace_allowlist TEXT DEFAULT '[]',
+			trust_level TEXT DEFAULT 'local',
+			health_state TEXT DEFAULT 'unknown',
 			auth_method TEXT DEFAULT '',
 			is_online BOOLEAN DEFAULT FALSE,
 			last_seen_at DATETIME,
@@ -42,13 +45,16 @@ func newExecutionTargetTestDB(t *testing.T) *gorm.DB {
 func seedExecutionTarget(t *testing.T, db *gorm.DB, id, ownerID string) {
 	t.Helper()
 	require.NoError(t, db.Create(&model.ExecutionTarget{
-		ID:            id,
-		OwnerID:       ownerID,
-		Name:          "Owner target",
-		TargetType:    "local_edge",
-		WorkspaceRoot: "/workspace",
-		Capabilities:  "{}",
-		Metadata:      "{}",
+		ID:                 id,
+		OwnerID:            ownerID,
+		Name:               "Owner target",
+		TargetType:         "local_edge",
+		WorkspaceRoot:      "/workspace",
+		WorkspaceAllowlist: `["/workspace"]`,
+		TrustLevel:         "local",
+		HealthState:        "unknown",
+		Capabilities:       "{}",
+		Metadata:           "{}",
 	}).Error)
 }
 
@@ -81,4 +87,43 @@ func TestExecutionTargetPingIsOwnerScoped(t *testing.T) {
 	require.NoError(t, db.Where("id = ?", "target-1").First(&target).Error)
 	require.True(t, target.IsOnline)
 	require.NotNil(t, target.LastSeenAt)
+}
+
+func TestExecutionTargetPingRejectsUnsupportedTargetType(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	require.NoError(t, db.Exec(`
+		INSERT INTO execution_targets (id, owner_id, name, target_type, workspace_allowlist, trust_level, health_state, capabilities, metadata)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, "target-unknown", "owner-1", "Unknown target", "unknown", "[]", "local", "unknown", "{}", "{}").Error)
+	svc := NewExecutionTargetService(db)
+
+	err := svc.Ping(context.Background(), "target-unknown", "owner-1")
+	require.Error(t, err)
+
+	var target model.ExecutionTarget
+	require.NoError(t, db.Where("id = ?", "target-unknown").First(&target).Error)
+	require.False(t, target.IsOnline)
+}
+
+func TestExecutionTargetCreateDefaultsPolicyFields(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	svc := NewExecutionTargetService(db)
+
+	target, err := svc.Create(context.Background(), "owner-1", &model.ExecutionTarget{Name: "Local"})
+	require.NoError(t, err)
+	require.Equal(t, "local_edge", target.TargetType)
+	require.Equal(t, "[]", target.WorkspaceAllowlist)
+	require.Equal(t, "local", target.TrustLevel)
+	require.Equal(t, "unknown", target.HealthState)
+}
+
+func TestExecutionTargetRejectsInvalidWorkspaceAllowlist(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	svc := NewExecutionTargetService(db)
+
+	_, err := svc.Create(context.Background(), "owner-1", &model.ExecutionTarget{
+		Name:               "Invalid",
+		WorkspaceAllowlist: `{"path":"/workspace"}`,
+	})
+	require.Error(t, err)
 }

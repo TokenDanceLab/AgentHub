@@ -594,6 +594,9 @@ CREATE TABLE execution_targets (
     host         VARCHAR(256),          -- SSH/Tailscale host
     port         INT,
     workspace_root VARCHAR(512),
+    workspace_allowlist JSONB DEFAULT '[]', -- Target 可执行 workspace root 列表
+    trust_level  VARCHAR(32) DEFAULT 'local', -- local | remote | cloud | relay
+    health_state VARCHAR(32) DEFAULT 'unknown',
     auth_method  VARCHAR(32),           -- ssh_key | password | tailscale_magic | hub_token
     is_online    BOOLEAN DEFAULT FALSE,
     last_seen_at TIMESTAMPTZ,
@@ -620,7 +623,7 @@ CREATE INDEX idx_execution_targets_device ON execution_targets(device_id);
 
 **`DELETE /web/execution-targets/{id}`** — 删除 Target
 
-**`POST /web/execution-targets/{id}:ping`** — 健康检查（Hub 尝试连接 Target）
+**`POST /web/execution-targets/{id}/ping`** — 健康检查（Hub 尝试连接 Target）
 
 #### 3.3.4 与现有 Device 的关系
 
