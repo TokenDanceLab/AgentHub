@@ -54,13 +54,14 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		authProtected := client.Group("/auth")
 		authProtected.Use(middleware.AuthMiddleware(cfg))
+		authProtected.Use(middleware.RequireHubSession())
 		{
 			authProtected.GET("/me", authHandler.Me)
 		}
 
 		localAuthWrite := client.Group("/auth")
 		localAuthWrite.Use(middleware.AuthMiddleware(cfg))
-		localAuthWrite.Use(middleware.RequireLocalAuth())
+		localAuthWrite.Use(middleware.RequireHubSession())
 		{
 			localAuthWrite.POST("/logout", authHandler.Logout)
 			localAuthWrite.PUT("/profile", authHandler.UpdateProfile)
@@ -69,6 +70,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		contacts := client.Group("/contacts")
 		contacts.Use(middleware.AuthMiddleware(cfg))
+		contacts.Use(middleware.RequireHubSession())
 		{
 			contacts.GET("/search", contactHandler.SearchUser)
 			contacts.GET("/friend-requests", contactHandler.ListFriendRequests)
@@ -84,6 +86,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		sessions := client.Group("/sessions")
 		sessions.Use(middleware.AuthMiddleware(cfg))
+		sessions.Use(middleware.RequireHubSession())
 		{
 			sessions.GET("", sessionHandler.List)
 			sessions.POST("/private", sessionHandler.CreatePrivate)
@@ -112,6 +115,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		messages := client.Group("/messages")
 		messages.Use(middleware.AuthMiddleware(cfg))
+		messages.Use(middleware.RequireHubSession())
 		{
 			messages.POST("/:id/recall", messageHandler.RecallMessage)
 			messages.POST("/:id/pin", messageHandler.PinMessage)
@@ -122,6 +126,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		attachments := client.Group("/attachments")
 		attachments.Use(middleware.AuthMiddleware(cfg))
+		attachments.Use(middleware.RequireHubSession())
 		{
 			attachments.POST("/probe", attachmentHandler.Probe)
 			attachments.POST("", middleware.Timeout(config.UploadRequestTimeout), attachmentHandler.Upload)
@@ -130,6 +135,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		notifications := client.Group("/notifications")
 		notifications.Use(middleware.AuthMiddleware(cfg))
+		notifications.Use(middleware.RequireHubSession())
 		{
 			notifications.GET("", notificationHandler.ListNotifications)
 			notifications.POST("/:id/read", notificationHandler.MarkRead)
@@ -139,6 +145,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 	edge := r.Group("/edge")
 	edge.Use(middleware.AuthMiddleware(cfg))
+	edge.Use(middleware.RequireHubSession())
 	edge.Use(middleware.DeviceTypeCheck("desktop"))
 	{
 		edge.POST("/devices/register", deviceHandler.Register)
@@ -150,6 +157,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 	web := r.Group("/web")
 	web.Use(middleware.AuthMiddleware(cfg))
+	web.Use(middleware.RequireHubSession())
 	web.Use(middleware.DeviceTypeCheck("web"))
 	{
 		web.POST("/agent-tasks", agentHandler.TriggerTask)
