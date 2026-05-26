@@ -18,6 +18,7 @@ interface UIState {
   rightPanelWidth: number;
   leftSidebarCollapsed: boolean;
   rightPanelOpen: boolean;
+  leftSidebarView: 'home' | 'thread';
   // Mobile toggles
   mobileSidebarOpen: boolean;
   mobileRightPanelOpen: boolean;
@@ -25,6 +26,7 @@ interface UIState {
   setRightPanelWidth: (w: number) => void;
   setLeftSidebarCollapsed: (v: boolean) => void;
   setRightPanelOpen: (v: boolean) => void;
+  setLeftSidebarView: (v: 'home' | 'thread') => void;
   setMobileSidebarOpen: (v: boolean) => void;
   setMobileRightPanelOpen: (v: boolean) => void;
   toggleLeftSidebar: () => void;
@@ -41,6 +43,7 @@ export const useUIStore = create<UIState>()(
         rightPanelWidth: 360,
         leftSidebarCollapsed: false,
         rightPanelOpen: false,
+        leftSidebarView: 'home',
         mobileSidebarOpen: false,
         mobileRightPanelOpen: false,
 
@@ -48,6 +51,7 @@ export const useUIStore = create<UIState>()(
         setRightPanelWidth: (w) => set({ rightPanelWidth: clamp(w, RIGHT_PANEL_MIN, RIGHT_PANEL_MAX) }),
         setLeftSidebarCollapsed: (v) => set({ leftSidebarCollapsed: v }),
         setRightPanelOpen: (v) => set({ rightPanelOpen: v }),
+        setLeftSidebarView: (v) => set({ leftSidebarView: v }),
         setMobileSidebarOpen: (v) => set({ mobileSidebarOpen: v }),
         setMobileRightPanelOpen: (v) => set({ mobileRightPanelOpen: v }),
         toggleLeftSidebar: () => set((s) => ({ leftSidebarCollapsed: !s.leftSidebarCollapsed })),
@@ -68,6 +72,7 @@ export const useUIStore = create<UIState>()(
             rightPanelWidth: clamp(Number(state?.rightPanelWidth ?? 360), RIGHT_PANEL_MIN, RIGHT_PANEL_MAX),
             leftSidebarCollapsed: Boolean(state?.leftSidebarCollapsed),
             rightPanelOpen: Boolean(state?.rightPanelOpen),
+            leftSidebarView: (state?.leftSidebarView === 'thread' ? 'thread' : 'home') as 'home' | 'thread',
             mobileSidebarOpen: false,
             mobileRightPanelOpen: false,
           };
@@ -77,6 +82,7 @@ export const useUIStore = create<UIState>()(
           rightPanelWidth: clamp(s.rightPanelWidth, RIGHT_PANEL_MIN, RIGHT_PANEL_MAX),
           leftSidebarCollapsed: s.leftSidebarCollapsed,
           rightPanelOpen: s.rightPanelOpen,
+          leftSidebarView: s.leftSidebarView,
         }),
       },
     ),

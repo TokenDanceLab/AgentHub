@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Archive,
@@ -26,6 +26,7 @@ import {
   Plug,
   RefreshCw,
   Route,
+  Search,
   Server,
   ShieldCheck,
   SlidersHorizontal,
@@ -299,6 +300,24 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const username = useHubStore((s) => s.username);
   const [active, setActive] = useState<SectionId>(initialSection);
+  const [navSearch, setNavSearch] = useState('');
+  const navSearchRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcut: `/` focuses the search input
+  const handleSettingsKeyDown = useCallback((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('input, textarea, select, [contenteditable]')) return;
+    if (e.key === '/') {
+      e.preventDefault();
+      navSearchRef.current?.focus();
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleSettingsKeyDown);
+    return () => window.removeEventListener('keydown', handleSettingsKeyDown);
+  }, [handleSettingsKeyDown]);
+
   const [compactMode, setCompactMode] = useStoredBooleanState('compactMode', false);
   const [autoReview, setAutoReview] = useStoredBooleanState('autoReview', true);
   const [fullAccess, setFullAccess] = useStoredBooleanState('fullAccess', false);
@@ -490,6 +509,20 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     [t],
   );
 
+  const filteredNavItems = useMemo(() => {
+    if (!navSearch.trim()) return navItems;
+    const query = navSearch.toLowerCase();
+    return navItems.filter((item) => item.label.toLowerCase().includes(query));
+  }, [navItems, navSearch]);
+
+  const groupedNavItems = useMemo(() => {
+    const groups = ['workspace', 'automation', 'system'] as const;
+    return groups.map((group) => ({
+      group,
+      items: filteredNavItems.filter((item) => item.group === group),
+    }));
+  }, [filteredNavItems]);
+
   const activeLabel = navItems.find((item) => item.id === active)?.label ?? t('settings.title');
   const shortcuts: ShortcutRow[] = [
     { keys: ['Enter'], action: t('shortcut.send') },
@@ -514,13 +547,22 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           <span>{t('settings.back')}</span>
         </button>
 
+        <div className={styles.sidebarSearch}>
+          <Search size={14} />
+          <input
+            ref={navSearchRef}
+            type="text"
+            placeholder={t('settings.searchPlaceholder')}
+            value={navSearch}
+            onChange={(e) => setNavSearch(e.target.value)}
+          />
+        </div>
+
         <nav className={styles.nav} aria-label={t('settings.title')}>
-          {(['workspace', 'automation', 'system'] as const).map((group) => (
+          {groupedNavItems.map(({ group, items }) => (
             <div key={group} className={styles.navGroup}>
-              <div className={styles.navGroupLabel}>{t(`settings.group.${group}`)}</div>
-              {navItems
-                .filter((item) => item.group === group)
-                .map((item) => (
+              {items.length > 0 && <div className={styles.navGroupLabel}>{t(`settings.group.${group}`)}</div>}
+              {items.map((item) => (
                   <button
                     key={item.id}
                     className={`${styles.navItem} ${active === item.id ? styles.navItemActive : ''}`}
