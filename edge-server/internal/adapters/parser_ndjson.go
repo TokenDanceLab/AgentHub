@@ -1,7 +1,6 @@
 package adapters
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"io"
@@ -51,21 +50,12 @@ func (p *NDJSONStreamParser) Parse(ctx context.Context, r io.Reader) error {
 	if budget, ok := ctx.Value(CtxBudgetKey).(*runnerctx.ContextBudget); ok {
 		p.budget = budget
 	}
-	scanner := bufio.NewScanner(r)
-	configureAdapterScanner(scanner)
 
-	for scanner.Scan() {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
+	return ScanLines(ctx, r, func(line []byte) error {
 		p.seq++
 		p.parseLine(line)
-	}
-	return scanner.Err()
+		return nil
+	})
 }
 
 func (p *NDJSONStreamParser) parseLine(line []byte) {

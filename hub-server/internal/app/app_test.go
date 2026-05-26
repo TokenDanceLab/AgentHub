@@ -262,10 +262,11 @@ func TestOnRouteSetReplaysTargetQueueOnlyForConnectedDevice(t *testing.T) {
 	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
 
 	a := &App{
-		DB:          db,
-		CacheClient: cacheClient,
-		mgr:         mgr,
-		coreCtx:     context.Background(),
+		DB:           db,
+		CacheClient:  cacheClient,
+		mgr:          mgr,
+		coreCtx:      context.Background(),
+		AgentService: service.NewAgentService(db, nil, mgr, cacheClient),
 	}
 	require.NoError(t, cacheClient.PushPendingTargetTask(context.Background(), "user-1", "target-dev-b", "dev-b", `{"task_id":"task-dev-b","target_id":"target-dev-b"}`))
 

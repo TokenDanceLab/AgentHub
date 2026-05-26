@@ -572,3 +572,8 @@ func (s *SessionService) SearchSessions(ctx context.Context, userID, q string) (
 	}
 	return result, nil
 }
+
+// ListActiveMembers returns all active (non-left) members of a session. Thin wrapper over repository.ListActiveMembers.
+func (s *SessionService) ListActiveMembers(sessionID string) ([]*model.SessionMember, error) {
+	return repository.ListActiveMembers(s.db, sessionID)
+}
