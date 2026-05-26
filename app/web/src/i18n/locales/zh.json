@@ -599,7 +599,7 @@
   "settings.modelDefault": "默认模型",
   "settings.modelDefaultDesc": "按 Agent、任务类型和可用性自动选择模型。",
   "settings.modelDefaultProvider": "默认 Provider",
-  "settings.modelDefaultProviderDesc": "任务下发前优先使用 TokenDance Relay、直连 Provider 或 cc-switch 本地路由。",
+  "settings.modelDefaultProviderDesc": "任务下发前优先使用 TokenDance Gateway、直连 Provider 或 cc-switch 本地路由。",
   "settings.modelReasoning": "推理强度",
   "settings.modelReasoningDesc": "在 Prompt 输入区和运行请求中保留推理强度控制。",
   "settings.modelProviderFallback": "Provider fallback",
