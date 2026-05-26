@@ -1,6 +1,6 @@
 # 分支治理
 
-最后更新：2026-05-26（Execution Target workspace allowlist 合入后远端分支实态同步）
+最后更新：2026-05-26（Execution Target UI inventory 合入后远端分支实态同步）
 
 ## 合并规则
 
@@ -48,6 +48,7 @@ feat/* -> dev/delicious233 -> master
 | 类别 | 结果 |
 |---|---|
 | WebAgent | `feat/web-agent-closeout-20260526` 已 fast-forward 合入 `dev/delicious233`，本地/远端分支已删除 |
+| Execution Target UI inventory | `feat/execution-target-ui` 已 fast-forward 合入 `dev/delicious233` 并推送；临时 worktree、本地分支和远端分支均已删除 |
 | Execution Target workspace policy | `feat/target-workspace-allowlist` 已 fast-forward 合入 `dev/delicious233`，本地 worktree、本地分支和远端分支均已删除 |
 | TokenDance ID / Web token 收口 | `feat/td-id-runtime-integration` 已 fast-forward 合入 `dev/delicious233` 并推送；临时 worktree、本地分支和远端分支均已删除 |
 | Agent Runtime 架构收口 | `0f1f9c1 docs(architecture): 固化 Agent Runtime 实体模型` 已推送到 `dev/delicious233`，明确 `AgentRuntime -> AgentProfile -> ExecutionTarget -> Thread -> Run -> RunEvent -> Approval/Artifact` 主线 |
