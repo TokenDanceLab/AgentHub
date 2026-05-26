@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-26 UTC+8 | 分支：dev/delicious233
+最后更新：2026-05-26 UTC+8 下午（本轮推进中：target routing 已合入、AgentTeam MVP 已启动、UI 审计/生产验证并行中）| 分支：dev/delicious233
 
 ## 快速上手
 
