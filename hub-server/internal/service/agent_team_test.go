@@ -322,14 +322,22 @@ func newMockAgentTeamDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
 }
 
 // mockAgentTeamAgentSvc implements agentTeamAgentSvc for tests.
-type mockAgentTeamAgentSvc struct{}
+type mockAgentTeamAgentSvc struct {
+	triggerMessageID string
+	returnTaskID     string
+}
 
 func (m *mockAgentTeamAgentSvc) AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) error {
 	return nil
 }
 
 func (m *mockAgentTeamAgentSvc) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
-	return &model.PendingAgentTask{ID: "task-1"}, nil
+	m.triggerMessageID = triggerMessageID
+	taskID := m.returnTaskID
+	if taskID == "" {
+		taskID = "task-1"
+	}
+	return &model.PendingAgentTask{ID: taskID}, nil
 }
 
 // --- StartTeamRun tests ---
@@ -432,6 +440,7 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	assert.NotNil(t, run)
 	assert.Equal(t, "team-1", run.TeamID)
 	assert.Equal(t, model.TeamRunStatusRunning, run.Status)
+	assert.NotEmpty(t, agentSvc.triggerMessageID)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -629,6 +638,75 @@ func TestAgentTeamService_ListTeamTasksIsOwnerScoped(t *testing.T) {
 	assert.Equal(t, errcode.AgentNotFound, err)
 }
 
+func TestAgentTeamService_DispatchAssignmentBindsTeamTaskToPendingAgentTask(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	agentSvc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+	svc := NewAgentTeamService(db, agentSvc, nil)
+	team, supervisor, executor, run := seedAgentTeamRun(t, db)
+	seedTeamRunSession(t, db, run.SessionID, "user-1", executor)
+
+	assignment := &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor.ID,
+		ToMemberID:   executor.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "Implement replay",
+		Context:      "include events",
+		Status:       model.AssignmentStatusPending,
+		Depth:        1,
+	}
+	require.NoError(t, repository.CreateAssignment(db, assignment))
+	assignmentID := assignment.ID
+	teamTask := &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssignmentID:     &assignmentID,
+		AssigneeMemberID: executor.ID,
+		Status:           model.TeamTaskStatusPending,
+		Objective:        assignment.TaskPrompt,
+	}
+	require.NoError(t, repository.CreateTeamTask(db, teamTask))
+
+	require.NoError(t, svc.DispatchAssignment(context.Background(), "user-1", assignment.ID))
+
+	var reloadedAssignment model.AgentTeamAssignment
+	require.NoError(t, db.Where("id = ?", assignment.ID).First(&reloadedAssignment).Error)
+	require.NotNil(t, reloadedAssignment.RunID)
+	assert.Equal(t, model.AssignmentStatusDispatched, reloadedAssignment.Status)
+
+	var reloadedTask model.AgentTeamTask
+	require.NoError(t, db.Where("id = ?", teamTask.ID).First(&reloadedTask).Error)
+	require.NotNil(t, reloadedTask.RunID)
+	assert.Equal(t, *reloadedAssignment.RunID, *reloadedTask.RunID)
+	assert.Equal(t, model.TeamTaskStatusDispatched, reloadedTask.Status)
+
+	var pending model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", *reloadedTask.RunID).First(&pending).Error)
+	assert.Equal(t, "agent-executor", pending.AgentInstanceID)
+	assert.NotEmpty(t, pending.TriggerMessageID)
+
+	var triggerMessage model.Message
+	require.NoError(t, db.Where("id = ?", pending.TriggerMessageID).First(&triggerMessage).Error)
+	assert.Contains(t, triggerMessage.Content, "Implement replay")
+	assert.Contains(t, triggerMessage.Content, "include events")
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, model.TeamEventAssignmentDispatched, events[0].Type)
+
+	require.NoError(t, repository.UpdatePendingTaskStatusWithEdgeRunID(db, pending.ID, model.TaskStatusRunning, "", "edge-run-1"))
+	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
+	require.NoError(t, err)
+	require.Len(t, state.Assignments, 1)
+	assert.Equal(t, model.AssignmentStatusRunning, state.Assignments[0].Status)
+	assert.Equal(t, pending.ID, state.Assignments[0].AgentTaskID)
+	assert.Equal(t, "edge-run-1", state.Assignments[0].EdgeRunID)
+	require.Len(t, state.Tasks, 1)
+	assert.Equal(t, model.TeamTaskStatusRunning, state.Tasks[0].Status)
+	assert.Equal(t, pending.ID, state.Tasks[0].AgentTaskID)
+	assert.Equal(t, "edge-run-1", state.Tasks[0].EdgeRunID)
+}
+
 func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
@@ -653,6 +731,9 @@ func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
 	tables := []string{
 		`CREATE TABLE agent_teams (
 			id TEXT PRIMARY KEY,
@@ -719,6 +800,82 @@ func setupAgentTeamStateSQLite(t *testing.T) *gorm.DB {
 			payload TEXT NOT NULL DEFAULT '{}',
 			created_at DATETIME
 		)`,
+		`CREATE TABLE sessions (
+			id TEXT PRIMARY KEY,
+			type TEXT NOT NULL,
+			name TEXT DEFAULT '',
+			owner_user_id TEXT,
+			next_seq INTEGER NOT NULL DEFAULT 0,
+			last_message_at DATETIME,
+			dissolved BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at DATETIME
+		)`,
+		`CREATE TABLE session_members (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			member_type TEXT NOT NULL,
+			member_id TEXT NOT NULL,
+			role TEXT NOT NULL,
+			pinned BOOLEAN NOT NULL DEFAULT FALSE,
+			archived BOOLEAN NOT NULL DEFAULT FALSE,
+			muted BOOLEAN NOT NULL DEFAULT FALSE,
+			last_read_seq INTEGER NOT NULL DEFAULT 0,
+			joined_at DATETIME,
+			left_at DATETIME
+		)`,
+		`CREATE TABLE agent_instances (
+			id TEXT PRIMARY KEY,
+			agent_type TEXT NOT NULL,
+			custom_agent_id TEXT,
+			session_id TEXT NOT NULL,
+			inviter_user_id TEXT NOT NULL,
+			workspace_id TEXT,
+			display_name TEXT NOT NULL,
+			created_at DATETIME
+		)`,
+		`CREATE TABLE custom_agents (
+			id TEXT PRIMARY KEY,
+			owner_user_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			avatar_url TEXT DEFAULT '',
+			agent_type TEXT NOT NULL,
+			system_prompt TEXT DEFAULT '',
+			capability_tags TEXT DEFAULT '[]',
+			tool_whitelist TEXT DEFAULT '[]',
+			model_params TEXT DEFAULT '{}',
+			deleted_at DATETIME,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE pending_agent_tasks (
+			id TEXT PRIMARY KEY,
+			agent_instance_id TEXT NOT NULL,
+			triggered_by_user_id TEXT NOT NULL,
+			trigger_message_id TEXT NOT NULL,
+			target_id TEXT,
+			status TEXT NOT NULL,
+			edge_run_id TEXT DEFAULT '',
+			edge_device_id TEXT,
+			error_message TEXT,
+			created_at DATETIME,
+			dispatched_at DATETIME,
+			finished_at DATETIME,
+			expire_at DATETIME NOT NULL
+		)`,
+		`CREATE TABLE messages (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			seq_id INTEGER NOT NULL,
+			client_msg_id TEXT NOT NULL,
+			sender_type TEXT NOT NULL,
+			sender_id TEXT NOT NULL,
+			content_type TEXT NOT NULL,
+			content TEXT NOT NULL,
+			reply_to_message_id TEXT,
+			recalled BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at DATETIME
+		)`,
+		`CREATE UNIQUE INDEX idx_messages_session_client_msg ON messages (session_id, client_msg_id)`,
 	}
 	for _, ddl := range tables {
 		require.NoError(t, db.Exec(ddl).Error)
@@ -759,4 +916,29 @@ func seedAgentTeamRun(t *testing.T, db *gorm.DB) (*model.AgentTeam, *model.Agent
 
 func stringPtr(value string) *string {
 	return &value
+}
+
+func seedTeamRunSession(t *testing.T, db *gorm.DB, sessionID, userID string, executor *model.AgentTeamMember) {
+	t.Helper()
+	now := time.Now()
+	require.NoError(t, db.Exec(
+		`INSERT INTO sessions (id, type, name, owner_user_id, next_seq, dissolved, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		sessionID, model.SessionTypeGroup, "Team session", userID, 0, false, now,
+	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO session_members (id, session_id, member_type, member_id, role, joined_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"session-member-user", sessionID, model.MemberTypeUser, userID, model.MemberRoleOwner, now,
+	).Error)
+	customAgentID := ""
+	if executor.AgentProfileID != nil {
+		customAgentID = *executor.AgentProfileID
+	}
+	require.NoError(t, db.Exec(
+		`INSERT INTO agent_instances (id, agent_type, custom_agent_id, session_id, inviter_user_id, display_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"agent-executor", "codex", customAgentID, sessionID, userID, "Executor", now,
+	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO session_members (id, session_id, member_type, member_id, role, joined_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"session-member-agent", sessionID, model.MemberTypeAgent, "agent-executor", model.MemberRoleMember, now,
+	).Error)
 }

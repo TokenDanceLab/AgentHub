@@ -283,6 +283,7 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 	}
 
 	var supervisorAIID string
+	var triggerMessageID string
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		if err := repository.CreateSession(tx, session); err != nil {
@@ -368,6 +369,7 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		if err := repository.InsertMessage(tx, msg); err != nil {
 			return err
 		}
+		triggerMessageID = msg.ID
 
 		// Verify we have a supervisor agent instance.
 		if supervisorAIID == "" {
@@ -398,7 +400,7 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 	}
 
 	// Trigger the task. This dispatches asynchronously.
-	if _, err := s.agentSvc.TriggerAgentTask(ctx, userID, "", supervisorAIID, "", "", "", ""); err != nil {
+	if _, err := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, supervisorAIID, "", "", "", ""); err != nil {
 		slog.Error("failed to trigger supervisor agent task for team run", "run_id", run.ID, "team_id", teamID, "error", err)
 		_ = repository.UpdateTeamRunStatus(s.db, run.ID, model.TeamRunStatusFailed)
 		return run, err
@@ -464,6 +466,10 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	if err != nil {
 		return nil, err
 	}
+	pendingTaskByID, err := s.pendingTaskSnapshotByID(assignments, tasks)
+	if err != nil {
+		return nil, err
+	}
 	events, err := repository.ListTeamEventsByRun(s.db, runID)
 	if err != nil {
 		return nil, err
@@ -498,17 +504,25 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		if assignment.RunID != nil {
 			runIDValue = *assignment.RunID
 		}
+		status := assignment.Status
+		edgeRunID := ""
+		if pending, ok := pendingTaskByID[runIDValue]; ok {
+			status = assignmentStatusFromPending(pending.Status)
+			edgeRunID = pending.EdgeRunID
+		}
 		state.Assignments = append(state.Assignments, model.TeamAssignmentState{
 			AssignmentID: assignment.ID,
 			FromMemberID: assignment.FromMemberID,
 			ToMemberID:   assignment.ToMemberID,
 			Type:         assignment.Type,
-			Status:       assignment.Status,
+			Status:       status,
 			Depth:        assignment.Depth,
 			RunID:        runIDValue,
+			AgentTaskID:  runIDValue,
+			EdgeRunID:    edgeRunID,
 		})
 		if idx, ok := memberIndex[assignment.ToMemberID]; ok {
-			switch assignment.Status {
+			switch status {
 			case model.AssignmentStatusPending, model.AssignmentStatusDispatched, model.AssignmentStatusRunning:
 				state.Members[idx].ActiveTasks++
 			case model.AssignmentStatusDone:
@@ -530,14 +544,22 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		if task.RunID != nil {
 			runIDValue = *task.RunID
 		}
+		status := task.Status
+		edgeRunID := ""
+		if pending, ok := pendingTaskByID[runIDValue]; ok {
+			status = teamTaskStatusFromPending(pending.Status)
+			edgeRunID = pending.EdgeRunID
+		}
 		state.Tasks = append(state.Tasks, model.TeamTaskState{
 			TaskID:           task.ID,
 			AssignmentID:     assignmentID,
 			AssigneeMemberID: task.AssigneeMemberID,
 			ParentTaskID:     parentTaskID,
-			Status:           task.Status,
+			Status:           status,
 			Objective:        task.Objective,
 			RunID:            runIDValue,
+			AgentTaskID:      runIDValue,
+			EdgeRunID:        edgeRunID,
 			Attempt:          task.Attempt,
 			RiskLevel:        task.RiskLevel,
 		})
@@ -562,6 +584,82 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	}
 
 	return state, nil
+}
+
+func (s *AgentTeamService) pendingTaskSnapshotByID(assignments []model.AgentTeamAssignment, tasks []model.AgentTeamTask) (map[string]model.PendingAgentTask, error) {
+	ids := make([]string, 0, len(assignments)+len(tasks))
+	seen := make(map[string]struct{}, len(assignments)+len(tasks))
+	addID := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return
+		}
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	for _, assignment := range assignments {
+		if assignment.RunID != nil {
+			addID(*assignment.RunID)
+		}
+	}
+	for _, task := range tasks {
+		if task.RunID != nil {
+			addID(*task.RunID)
+		}
+	}
+	if len(ids) == 0 {
+		return map[string]model.PendingAgentTask{}, nil
+	}
+	pendingTasks, err := repository.ListPendingTasksByIDs(s.db, ids)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[string]model.PendingAgentTask, len(pendingTasks))
+	for _, pending := range pendingTasks {
+		byID[pending.ID] = pending
+	}
+	return byID, nil
+}
+
+func teamTaskStatusFromPending(status string) string {
+	switch status {
+	case model.TaskStatusQueued:
+		return model.TeamTaskStatusDispatched
+	case model.TaskStatusDispatched:
+		return model.TeamTaskStatusDispatched
+	case model.TaskStatusRunning:
+		return model.TeamTaskStatusRunning
+	case model.TaskStatusDone:
+		return model.TeamTaskStatusDone
+	case model.TaskStatusCancelled:
+		return model.TeamTaskStatusCancelled
+	case model.TaskStatusFailed, model.TaskStatusTimeout:
+		return model.TeamTaskStatusFailed
+	default:
+		return model.TeamTaskStatusPending
+	}
+}
+
+func assignmentStatusFromPending(status string) string {
+	switch status {
+	case model.TaskStatusQueued:
+		return model.AssignmentStatusDispatched
+	case model.TaskStatusDispatched:
+		return model.AssignmentStatusDispatched
+	case model.TaskStatusRunning:
+		return model.AssignmentStatusRunning
+	case model.TaskStatusDone:
+		return model.AssignmentStatusDone
+	case model.TaskStatusCancelled:
+		return model.AssignmentStatusCancelled
+	case model.TaskStatusFailed, model.TaskStatusTimeout:
+		return model.AssignmentStatusFailed
+	default:
+		return model.AssignmentStatusPending
+	}
 }
 
 // ListTeamTasks returns first-class TeamTask rows for a run after owner checks.
@@ -919,13 +1017,11 @@ func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assig
 	if a.Status != model.AssignmentStatusPending && a.Status != model.AssignmentStatusDispatched {
 		return errcode.ErrBadRequest
 	}
-
-	// 2. Update status to dispatched.
-	if err := repository.UpdateAssignmentStatus(s.db, assignmentID, model.AssignmentStatusDispatched, ""); err != nil {
-		return err
+	if a.RunID != nil && strings.TrimSpace(*a.RunID) != "" {
+		return nil
 	}
 
-	// 3. Find the target agent instance in the team run's session.
+	// 2. Find the target agent instance in the team run's session.
 	if run.SessionID == "" {
 		return errcode.AgentNotFound
 	}
@@ -952,15 +1048,107 @@ func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assig
 		return errcode.AgentNotFound
 	}
 
-	// 4. Trigger the agent task. The assignment_id, team_run_id, task_prompt, and context
-	//    are passed so the agent knows its delegation context.
-	_, triggerErr := s.agentSvc.TriggerAgentTask(ctx, userID, "", targetAIID, "", "", "", "")
+	teamTask, err := s.ensureTeamTaskForAssignment(a)
+	if err != nil {
+		return err
+	}
+
+	triggerMessageID, err := s.createAssignmentDispatchMessage(ctx, userID, run.SessionID, a)
+	if err != nil {
+		return err
+	}
+
+	pendingTask, triggerErr := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, targetAIID, "", "", "", "")
 	if triggerErr != nil {
 		slog.Error("failed to trigger dispatch for assignment", "assignment_id", assignmentID, "error", triggerErr)
 		return triggerErr
 	}
+	if pendingTask == nil || pendingTask.ID == "" {
+		return errcode.ErrInternal
+	}
+
+	if err := repository.UpdateAssignmentDispatchBinding(s.db, assignmentID, pendingTask.ID); err != nil {
+		return err
+	}
+	if err := repository.UpdateTeamTaskDispatchBinding(s.db, teamTask.ID, pendingTask.ID); err != nil {
+		return err
+	}
+	if err := s.appendTeamEvent(a.TeamRunID, model.TeamEventAssignmentDispatched, map[string]string{
+		"assignment_id": assignmentID,
+		"team_task_id":  teamTask.ID,
+		"agent_task_id": pendingTask.ID,
+	}); err != nil {
+		return err
+	}
 
 	return nil
+}
+
+func (s *AgentTeamService) ensureTeamTaskForAssignment(a *model.AgentTeamAssignment) (*model.AgentTeamTask, error) {
+	task, err := repository.GetTeamTaskByAssignmentID(s.db, a.ID)
+	if err == nil {
+		return task, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	assignmentID := a.ID
+	task = &model.AgentTeamTask{
+		TeamRunID:        a.TeamRunID,
+		AssignmentID:     &assignmentID,
+		AssigneeMemberID: a.ToMemberID,
+		Status:           model.TeamTaskStatusPending,
+		Objective:        a.TaskPrompt,
+		InputRefs:        "{}",
+		Attempt:          1,
+		RiskLevel:        model.TeamTaskRiskNormal,
+	}
+	if err := repository.CreateTeamTask(s.db, task); err != nil {
+		return nil, err
+	}
+	if err := s.appendTeamEvent(a.TeamRunID, model.TeamEventTaskCreated, task); err != nil {
+		return nil, err
+	}
+	return task, nil
+}
+
+func (s *AgentTeamService) createAssignmentDispatchMessage(ctx context.Context, userID, sessionID string, a *model.AgentTeamAssignment) (string, error) {
+	contentBytes, err := json.Marshal(map[string]string{"text": assignmentDispatchPrompt(a)})
+	if err != nil {
+		return "", err
+	}
+	msgClientID, err := uuidv7.New()
+	if err != nil {
+		return "", err
+	}
+	msg := &model.Message{
+		SessionID:   sessionID,
+		ClientMsgID: msgClientID,
+		SenderType:  model.SenderTypeUser,
+		SenderID:    userID,
+		ContentType: model.ContentTypeText,
+		Content:     string(contentBytes),
+	}
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		seq, seqErr := repository.AllocateSeqID(tx, sessionID)
+		if seqErr != nil {
+			return seqErr
+		}
+		msg.SeqID = seq
+		return repository.InsertMessage(tx, msg)
+	}); err != nil {
+		return "", err
+	}
+	return msg.ID, nil
+}
+
+func assignmentDispatchPrompt(a *model.AgentTeamAssignment) string {
+	prompt := strings.TrimSpace(a.TaskPrompt)
+	contextStr := strings.TrimSpace(a.Context)
+	if contextStr == "" {
+		return prompt
+	}
+	return prompt + "\n\nContext:\n" + contextStr
 }
 
 // CompleteAssignment marks a running assignment as done with the given result.
