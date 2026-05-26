@@ -1793,6 +1793,56 @@ paths:
 
   # ── Custom Agents ──
 
+  /web/agent-profiles:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListAgentProfiles
+      summary: List Hub-owned Agent Profiles for the signed-in user.
+      description: >
+        Returns user-managed Agent Profiles from Hub. Web clients use this
+        endpoint after TokenDance ID -> Hub session exchange; it is not an
+        Edge runtime inventory endpoint and must not be used with raw
+        TokenDance ID bearer tokens.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+        - name: runtime_id
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter profiles by Agent Runtime id, such as codex, claude-code, or opencode.
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+          description: Search profile names/descriptions.
+      responses:
+        "200":
+          description: Hub response envelope containing a paginated Agent Profile list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    required: [items, page]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/AgentProfile"
+                      page:
+                        $ref: "#/components/schemas/PageInfo"
+
   /web/custom-agents:
     get:
       tags: [HubSyncRelay]
@@ -3236,6 +3286,70 @@ components:
           type: object
           additionalProperties: true
           description: Capability flags (streaming, toolCalls, fileChanges, etc.).
+    AgentProfile:
+      type: object
+      required: [id, name, runtime_id]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Hub Agent Profile id.
+        owner_id:
+          type: string
+          format: uuid
+          description: Hub user that owns this profile.
+        name:
+          type: string
+          description: User-visible Agent Profile name.
+        description:
+          type: string
+        runtime_id:
+          type: string
+          description: Agent Runtime id such as codex, claude-code, or opencode.
+        model:
+          type: string
+        provider:
+          type: string
+        reasoning_effort:
+          type: string
+        model_mapping:
+          type: string
+          description: JSON object encoded by current Hub model.
+        skills:
+          type: string
+          description: JSON array encoded by current Hub model.
+        mcp_servers:
+          type: string
+          description: JSON array encoded by current Hub model.
+        tool_allowlist:
+          type: string
+          description: JSON array encoded by current Hub model.
+        approval_policy:
+          type: string
+          description: JSON object encoded by current Hub model.
+        permission_mode:
+          type: string
+        target_preferences:
+          type: string
+          description: JSON object encoded by current Hub model.
+        context_budget_max_tokens:
+          type: integer
+        is_public:
+          type: boolean
+        install_count:
+          type: integer
+        rating_avg:
+          type: number
+        rating_count:
+          type: integer
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     CreateThreadMessageRequest:
       type: object
       required: [content]
