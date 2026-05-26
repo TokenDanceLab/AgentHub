@@ -605,9 +605,14 @@ Hub 调度（远程）:
 - [ ] Eight-scenario follow-up：当前不是 8/8。已完成 1（Desktop 本地离线），2（Desktop 本地在线）和 7（Web 中继当前 Desktop）仍需部署/截图/高信任 Web session 证据；3/4/5/6/8 远程/云执行场景仍未实现，下一批应优先做 registered Edge target、workspace allowlist、target health、Hub relay routing 和远程审批证明。
 - [ ] Cherry/Aion UI reference follow-up：Cherry Studio 调研已补到 `docs/reference/projects/cherry-studio/`，AionUi 继续作为 action-first Home、team composition、runtime auto-detection、scheduling/approval ergonomics 的参考。下一批 UI 只借鉴可证明的交互模式：operational Home、Settings row/group primitives、typed message blocks、tool group waiting state、composer scopes、artifact preview；不复制 Cherry 的 renderer-as-SSOT、provider secret 持久化、Web 直连本地 Runtime 或第三方直接登录。
 - [ ] AgentTeam competitive roadmap follow-up：深度报告见 `docs/reference/cross-comparison/13-agentteam-competitive-roadmap.md`。当前只能说 Hub group/session、Agent Profile、Desktop bridge 和 Edge local sub-agent prototype 已有基础；产品级 `AgentTeam`、`TeamRun`、`TeamTask`、`TeamEvent`、可恢复 `TeamRunState`、typed `CoordinatorRouteDecision`、delegation guardrails、双真实 Runtime Profile 群组 E2E、聚合 transcript 和冲突处理仍未完成。AgentHub 路线应保持 IM-native，不改成 canvas-first；ReactFlow/DAG 只作为 TeamRunState 可视化或模板编辑器。
+- [ ] Product direction competitive roadmap follow-up：综合产品方向报告见 `docs/reference/cross-comparison/14-product-direction-competitive-roadmap.md`。长期定位收敛为 local-first multi-runtime Agent command center + Hub-governed collaboration fabric + Local/Remote/Cloud Target network；四根柱子是 Runtime Workbench、AgentTeam Collaboration、Target Network、Agent Platform。下一批要优先让两个 Home 变成 operational console，而不是继续堆 marketing/preview 卡片。
+- [ ] P2-P4 scenario roadmap follow-up：8 场景缺口不再作为普通 follow-up 管理，按产品主线拆为 P2A identity/session evidence（场景 2/7 部署态证据）、P2B enterprise foundation（org/project/workspace/team membership、resource/action authz、audit schema）、P3A registered Remote Edge（场景 3/4 target 注册/路由/远程审批/proxy）、P3B Cloud Edge lease（场景 5/6/8 workspace provider/lease/quota/session key）和 P4 Team Platform。
 - [ ] 下一批 worktree 建议：
   - `feat/runtime-event-blocks-ui`：`app/web/src/utils/hubAdapters.ts`、Web/desktop RunDetail/ChatView/shared block primitives；验收 Web/Desktop focused Vitest + typecheck + Web-Hub boundary。
   - `feat/operational-home-console`：Web/Desktop Home surfaces、Agent/Profile/Target query composition、TokenDance ID session state；验收 Playwright 桌面/移动截图、无 raw i18n key、无浏览器直连 Local Edge。
+  - `feat/artifact-lifecycle`：Edge event、Hub artifact index、Web/Desktop preview/apply/discard 权限和 provenance；验收 artifact 从 RunEvent 到 UI 可 replay。
+  - `feat/run-config-snapshot`：固化 runtime version、profile/config version、ModelRoute、Skill/MCP version、target、approval policy 和 resolver 结果；验收任意历史 run 可解释当时为什么这样启动。
+  - `feat/platform-profile-market`：Hub Profile store、Team template、Tooling Registry、ModelSpec/ModelRoute、cc-switch ProviderBinding masked metadata；验收安装/启用后 readiness 可解释且不泄露 secret。
   - `feat/agentteam-contract`：`hub-server/`、`api/`、Web/Desktop Hub clients 和 docs；落 AgentTeam/AgentTeamMember CRUD、owner boundary、Team Builder 空壳和 readiness summary。
   - `feat/teamrun-state-router`：`hub-server/`、`edge-server/`、`api/events.md` 和 docs；落 TeamRun/TeamTask/TeamEvent、TeamRunState projection、typed `CoordinatorRouteDecision`、max depth/active subagents/route repeats/budget/timeout guardrails。
   - `feat/teamrun-local-smoke`：Hub dispatch、Desktop bridge、Edge runtime execution、Web/Desktop TeamRun Console；验收 Codex + Claude Code 或 Codex + OpenCode 两个真实 Runtime Profile 的 local TeamRun smoke。
@@ -615,6 +620,11 @@ Hub 调度（远程）:
   - `feat/hub-target-id-dispatch-contract`：`api/openapi.yaml`、`api/events.md`、Hub task model/repository/service/handler 和 ExecutionTarget service；给 `/web/agent-tasks` 增加 `target_id`，校验 owner、target type、deleted state 和 `workspace_allowlist`，把 `target_id` 持久化并进入 `agent.dispatch` payload。
   - `feat/hub-edge-target-routing`：Hub dispatch/app/ws/cache/pending-task 相关代码，必要时只让 Desktop bridge 透传 payload；有 `target_id` 时按 target 绑定 `device_id` route 派发，离线队列按 target/device 隔离，禁止 fallback 到第一个 online desktop。
   - `feat/runtime-typed-control-callbacks`：Edge hub callback、ProcessExecutor、adapter callback tests、Hub stream handler/service/app 和 API docs；把 Codex/Claude Code/OpenCode 的 `run.agent.*`、`run.output.batch`、permission/control event 统一以 `event_type + payload` 上报 Hub，继续持久化到 `agent_run_events` 并保持聊天兼容投影。
+- [ ] Remote/Cloud productization 拆分建议：
+  - `feat/p2-session-evidence-smoke`：真实 TokenDance ID login/logout/reconnect、Hub WS auth、Desktop/Web callback UX、Web 高信任 session 方案和截图证据。
+  - `feat/org-workspace-authz-foundation`：org/project/workspace/team membership、permission key、Profile/Configuration 可见性、audit event schema；只做最小 RBAC，不做复杂策略语言。
+  - `feat/registered-remote-edge-proof`：Remote Edge device proof、target health、workspace allowlist sync、target-bound dispatch、remote approval、preview/artifact proxy。
+  - `feat/cloud-edge-lease-contract`：Cloud workspace provider、WorkspaceSpec、status state machine、startup grace、session key、quota、exposed URL policy。
 - [ ] 残留分支：`origin/dev/trump` 不作为可信进度来源；`feat/web-desktop-parity` / `origin/worktree-feat+web-desktop-parity` 与当前 WebAgent 主线大幅分叉，删除或 cherry-pick 前必须人工审 diff。
 
 ##### 文档架构 sweep `[并行]`
