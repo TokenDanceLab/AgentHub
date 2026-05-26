@@ -4662,6 +4662,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TeamTaskState"
+        dependencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamTaskDependencyState"
         assignments:
           type: array
           items:
@@ -4675,8 +4679,7 @@ components:
           items:
             $ref: "#/components/schemas/CoordinatorRouteDecision"
         budget:
-          type: object
-          additionalProperties: true
+          $ref: "#/components/schemas/TeamBudget"
         terminal_reason:
           type: string
 
@@ -4710,6 +4713,13 @@ components:
           type: string
           enum: [normal, high]
 
+    TeamTaskDependencyState:
+      type: object
+      properties:
+        task_id: { type: string, format: uuid }
+        depends_on_task_id: { type: string, format: uuid }
+        kind: { type: string }
+
     TeamAssignmentState:
       type: object
       properties:
@@ -4736,6 +4746,19 @@ components:
         event_type: { type: string }
         payload: { type: string }
         created_at: { type: string, format: date-time }
+
+    TeamBudget:
+      type: object
+      properties:
+        total_tokens_used: { type: integer }
+        input_tokens: { type: integer }
+        output_tokens: { type: integer }
+        token_limit: { type: integer }
+        remaining_tokens: { type: integer }
+        usage_percent: { type: number, format: double }
+        run_count: { type: integer }
+        context_warnings: { type: integer }
+        compactions: { type: integer }
 
     CoordinatorRouteDecision:
       type: object

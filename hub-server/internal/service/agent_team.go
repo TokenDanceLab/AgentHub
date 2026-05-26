@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strconv"
 	"strings"
 
 	"gorm.io/gorm"
@@ -466,11 +467,12 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	if err != nil {
 		return nil, err
 	}
+	agentTaskIDs := teamAgentTaskIDs(assignments, tasks)
 	pendingTaskByID, err := s.pendingTaskSnapshotByID(assignments, tasks)
 	if err != nil {
 		return nil, err
 	}
-	runEvents, err := repository.ListAgentRunEventsByTaskIDs(s.db, teamAgentTaskIDs(assignments, tasks))
+	runEvents, err := repository.ListAgentRunEventsByTaskIDs(s.db, agentTaskIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -480,14 +482,15 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	}
 
 	state := &model.TeamRunState{
-		RunID:       run.ID,
-		TeamID:      run.TeamID,
-		Status:      run.Status,
-		Members:     make([]model.TeamMemberState, 0, len(members)),
-		Tasks:       make([]model.TeamTaskState, 0, len(tasks)),
-		Assignments: make([]model.TeamAssignmentState, 0, len(assignments)),
-		RunEvents:   make([]model.TeamRunEventState, 0, len(runEvents)),
-		RouteLog:    []model.CoordinatorRouteDecision{},
+		RunID:        run.ID,
+		TeamID:       run.TeamID,
+		Status:       run.Status,
+		Members:      make([]model.TeamMemberState, 0, len(members)),
+		Tasks:        make([]model.TeamTaskState, 0, len(tasks)),
+		Dependencies: make([]model.TeamTaskDependencyState, 0),
+		Assignments:  make([]model.TeamAssignmentState, 0, len(assignments)),
+		RunEvents:    make([]model.TeamRunEventState, 0, len(runEvents)),
+		RouteLog:     []model.CoordinatorRouteDecision{},
 	}
 
 	memberIndex := make(map[string]int, len(members))
@@ -568,6 +571,13 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 			Attempt:          task.Attempt,
 			RiskLevel:        task.RiskLevel,
 		})
+		if parentTaskID != "" {
+			state.Dependencies = append(state.Dependencies, model.TeamTaskDependencyState{
+				TaskID:          task.ID,
+				DependsOnTaskID: parentTaskID,
+				Kind:            "parent_task",
+			})
+		}
 	}
 
 	for _, event := range runEvents {
@@ -580,6 +590,7 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 			CreatedAt:   event.CreatedAt,
 		})
 	}
+	state.Budget = projectTeamBudget(runEvents, len(agentTaskIDs))
 
 	for _, event := range events {
 		switch event.Type {
@@ -600,6 +611,144 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	}
 
 	return state, nil
+}
+
+func projectTeamBudget(runEvents []model.AgentRunEvent, runCount int) *model.TeamBudget {
+	if runCount == 0 && len(runEvents) == 0 {
+		return nil
+	}
+	budget := &model.TeamBudget{RunCount: runCount}
+	observedTokensByTask := map[string]int64{}
+	limitByTask := map[string]int64{}
+	for _, event := range runEvents {
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
+			continue
+		}
+		switch event.EventType {
+		case "run.agent.context_warning":
+			budget.ContextWarnings++
+		case "run.agent.context_compaction":
+			budget.Compactions++
+		}
+
+		input, output, total := teamEventTokenUsage(payload)
+		budget.InputTokens += input
+		budget.OutputTokens += output
+		budget.TotalTokensUsed += total
+
+		if used := firstJSONInt(payload, "tokensUsed", "tokens_used"); used > observedTokensByTask[event.TaskID] {
+			observedTokensByTask[event.TaskID] = used
+		}
+		if limit := firstJSONInt(payload, "tokenLimit", "token_limit", "contextLimit", "context_limit", "maxTokens", "max_tokens"); limit > limitByTask[event.TaskID] {
+			limitByTask[event.TaskID] = limit
+		}
+		if remaining := firstJSONInt(payload, "tokensRemaining", "tokens_remaining", "remainingTokens", "remaining_tokens"); remaining > 0 {
+			if budget.RemainingTokens == 0 || remaining < budget.RemainingTokens {
+				budget.RemainingTokens = remaining
+			}
+		}
+		if usagePercent := firstJSONFloat(payload, "usagePercent", "usage_percent"); usagePercent > budget.UsagePercent {
+			budget.UsagePercent = usagePercent
+		}
+	}
+
+	var observedTotal int64
+	for _, tokens := range observedTokensByTask {
+		observedTotal += tokens
+	}
+	if observedTotal > budget.TotalTokensUsed {
+		budget.TotalTokensUsed = observedTotal
+	}
+	for _, limit := range limitByTask {
+		budget.TokenLimit += limit
+	}
+	return budget
+}
+
+func teamEventTokenUsage(payload map[string]any) (input, output, total int64) {
+	sawNestedUsage := false
+	for _, key := range []string{"tokenUsage", "token_usage", "usage"} {
+		if nested, ok := payload[key].(map[string]any); ok {
+			sawNestedUsage = true
+			nestedInput, nestedOutput, nestedTotal := tokenUsageFields(nested)
+			input += nestedInput
+			output += nestedOutput
+			total += nestedTotal
+		}
+	}
+	if !sawNestedUsage {
+		directInput, directOutput, directTotal := tokenUsageFields(payload)
+		input += directInput
+		output += directOutput
+		total += directTotal
+	}
+	if total == 0 && (input > 0 || output > 0) {
+		total = input + output
+	}
+	return input, output, total
+}
+
+func tokenUsageFields(values map[string]any) (input, output, total int64) {
+	input = firstJSONInt(values, "input", "inputTokens", "input_tokens")
+	output = firstJSONInt(values, "output", "outputTokens", "output_tokens")
+	total = firstJSONInt(values, "total", "totalTokens", "total_tokens")
+	if total == 0 && (input > 0 || output > 0) {
+		total = input + output
+	}
+	return input, output, total
+}
+
+func firstJSONInt(values map[string]any, keys ...string) int64 {
+	for _, key := range keys {
+		value, ok := values[key]
+		if !ok {
+			continue
+		}
+		switch typed := value.(type) {
+		case float64:
+			return int64(typed)
+		case int:
+			return int64(typed)
+		case int64:
+			return typed
+		case json.Number:
+			if parsed, err := typed.Int64(); err == nil {
+				return parsed
+			}
+		case string:
+			if parsed, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64); err == nil {
+				return parsed
+			}
+		}
+	}
+	return 0
+}
+
+func firstJSONFloat(values map[string]any, keys ...string) float64 {
+	for _, key := range keys {
+		value, ok := values[key]
+		if !ok {
+			continue
+		}
+		switch typed := value.(type) {
+		case float64:
+			return typed
+		case int:
+			return float64(typed)
+		case int64:
+			return float64(typed)
+		case json.Number:
+			if parsed, err := typed.Float64(); err == nil {
+				return parsed
+			}
+		case string:
+			if parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64); err == nil {
+				return parsed
+			}
+		}
+	}
+	return 0
 }
 
 func (s *AgentTeamService) pendingTaskSnapshotByID(assignments []model.AgentTeamAssignment, tasks []model.AgentTeamTask) (map[string]model.PendingAgentTask, error) {

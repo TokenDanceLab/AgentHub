@@ -783,6 +783,71 @@ func TestAgentTeamService_DispatchAssignmentBindsTeamTaskToPendingAgentTask(t *t
 	assert.JSONEq(t, `{"content":"runtime output"}`, state.RunEvents[0].Payload)
 }
 
+func TestAgentTeamService_GetTeamRunStateProjectsDependenciesAndBudget(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, _, executor, run := seedAgentTeamRun(t, db)
+	pending := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-executor",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "message-1",
+		Status:            model.TaskStatusRunning,
+		EdgeRunID:         "edge-run-budget",
+		ExpireAt:          time.Now().Add(time.Hour),
+	}
+	require.NoError(t, db.Create(pending).Error)
+
+	root := &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: executor.ID,
+		Status:           model.TeamTaskStatusRunning,
+		Objective:        "Root task",
+		RunID:            &pending.ID,
+	}
+	require.NoError(t, repository.CreateTeamTask(db, root))
+	child := &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: executor.ID,
+		ParentTaskID:     &root.ID,
+		Status:           model.TeamTaskStatusPending,
+		Objective:        "Child task",
+	}
+	require.NoError(t, repository.CreateTeamTask(db, child))
+
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          pending.ID,
+		EdgeRunID:       "edge-run-budget",
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-executor",
+		EventType:       "run.agent.result",
+		Payload:         `{"success":true,"usage":{"input_tokens":1200,"output_tokens":800},"tokenLimit":200000,"tokensRemaining":198000,"usagePercent":1.0}`,
+	}))
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          pending.ID,
+		EdgeRunID:       "edge-run-budget",
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-executor",
+		EventType:       "run.agent.context_warning",
+		Payload:         `{"usagePercent":86.5,"threshold":85}`,
+	}))
+
+	state, err := svc.GetTeamRunState(context.Background(), "user-1", team.ID, run.ID)
+	require.NoError(t, err)
+	require.Len(t, state.Dependencies, 1)
+	assert.Equal(t, child.ID, state.Dependencies[0].TaskID)
+	assert.Equal(t, root.ID, state.Dependencies[0].DependsOnTaskID)
+	assert.Equal(t, "parent_task", state.Dependencies[0].Kind)
+	require.NotNil(t, state.Budget)
+	assert.Equal(t, int64(2000), state.Budget.TotalTokensUsed)
+	assert.Equal(t, int64(1200), state.Budget.InputTokens)
+	assert.Equal(t, int64(800), state.Budget.OutputTokens)
+	assert.Equal(t, int64(200000), state.Budget.TokenLimit)
+	assert.Equal(t, int64(198000), state.Budget.RemainingTokens)
+	assert.Equal(t, 86.5, state.Budget.UsagePercent)
+	assert.Equal(t, 1, state.Budget.RunCount)
+	assert.Equal(t, 1, state.Budget.ContextWarnings)
+}
+
 func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
