@@ -191,6 +191,17 @@ type dispatchPayload struct {
 	SystemPrompt     string `json:"system_prompt,omitempty"`
 	ModelParams      string `json:"model_params,omitempty"`
 	ToolWhitelist    string `json:"tool_whitelist,omitempty"`
+	TeamID           string `json:"team_id,omitempty"`
+	TeamRunID        string `json:"team_run_id,omitempty"`
+	TeamMemberID     string `json:"team_member_id,omitempty"`
+	TeamMemberRole   string `json:"team_member_role,omitempty"`
+}
+
+type dispatchTeamContext struct {
+	TeamID         string
+	TeamRunID      string
+	TeamMemberID   string
+	TeamMemberRole string
 }
 
 type dispatchTargetSnapshot struct {
@@ -417,6 +428,12 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 		}
 	}
 	dp.ModelParams = mergeModelParams(dp.ModelParams, modelParams)
+	if teamContext := s.resolveDispatchTeamContext(ai); teamContext.TeamRunID != "" {
+		dp.TeamID = teamContext.TeamID
+		dp.TeamRunID = teamContext.TeamRunID
+		dp.TeamMemberID = teamContext.TeamMemberID
+		dp.TeamMemberRole = teamContext.TeamMemberRole
+	}
 
 	payload, _ := json.Marshal(dp)
 
@@ -449,6 +466,36 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	// offline: push to Redis pending queue
 	if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); err != nil {
 		slog.Error("failed to push agent task to offline queue", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+	}
+}
+
+func (s *AgentService) resolveDispatchTeamContext(ai *model.AgentInstance) dispatchTeamContext {
+	if s == nil || s.db == nil || ai == nil || ai.CustomAgentID == nil || strings.TrimSpace(*ai.CustomAgentID) == "" {
+		return dispatchTeamContext{}
+	}
+	run, err := repository.GetTeamRunBySessionID(s.db, ai.SessionID)
+	if err != nil || run == nil || run.ID == "" {
+		return dispatchTeamContext{}
+	}
+	members, err := repository.ListTeamMembers(s.db, run.TeamID)
+	if err != nil {
+		return dispatchTeamContext{}
+	}
+	customAgentID := strings.TrimSpace(*ai.CustomAgentID)
+	for _, member := range members {
+		if member.AgentProfileID == nil || strings.TrimSpace(*member.AgentProfileID) != customAgentID {
+			continue
+		}
+		return dispatchTeamContext{
+			TeamID:         run.TeamID,
+			TeamRunID:      run.ID,
+			TeamMemberID:   member.ID,
+			TeamMemberRole: member.Role,
+		}
+	}
+	return dispatchTeamContext{
+		TeamID:    run.TeamID,
+		TeamRunID: run.ID,
 	}
 }
 
