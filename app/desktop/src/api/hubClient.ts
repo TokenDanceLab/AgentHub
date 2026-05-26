@@ -166,6 +166,11 @@ export interface AddAgentToSessionRequest {
   display_name: string;
 }
 
+export interface AgentTaskStreamEventOptions {
+  runId?: string;
+  clientMsgId?: string;
+}
+
 // ── Custom agents ────────────────────────────────
 
 export interface CustomAgentRequest {
@@ -599,6 +604,22 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
         method: 'POST',
         body: JSON.stringify({ content, ...(runId ? { run_id: runId } : {}) }),
+      }),
+
+    streamTaskEvent: (
+      taskId: string,
+      eventType: string,
+      payload: unknown,
+      options: AgentTaskStreamEventOptions = {},
+    ) =>
+      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
+        method: 'POST',
+        body: JSON.stringify({
+          event_type: eventType,
+          payload,
+          ...(options.runId ? { run_id: options.runId } : {}),
+          ...(options.clientMsgId ? { client_msg_id: options.clientMsgId } : {}),
+        }),
       }),
 
     doneTask: (taskId: string, finalContent?: string, runId?: string) =>

@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAgentList } from '@/api/agentQueries';
 import { useThreads } from '@/api/threadQueries';
-import { createHubClient } from '@/api/hubClient';
+import { createHubClient, type AgentRunEvent } from '@/api/hubClient';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useUIStore } from '@/stores/uiStore';
 import { useConnectionStore } from '@/stores/connectionStore';
@@ -34,7 +34,13 @@ import { useHubWSConnection } from '@/hooks/useHubWSConnection';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { AppError } from '@shared/errors';
 import type { AgentInfo, RunInfo } from '@shared/types';
-import { newClientMessageId, projectRunDetail, type HubThreadInfo } from '@/utils/hubAdapters';
+import {
+  mergeAgentRunEvents,
+  newClientMessageId,
+  projectRunDetail,
+  projectRunEvents,
+  type HubThreadInfo,
+} from '@/utils/hubAdapters';
 import { Slot } from '@/views/viewRegistry';
 import AuthPage from '@/components/AuthPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -99,6 +105,7 @@ export default function WebLayout() {
   const { data: agentData } = useAgentList(true);
   const { data: threadData } = useThreads();
   const [optimisticRun, setOptimisticRun] = useState<WebRunInfo | null>(null);
+  const [taskRunEvents, setTaskRunEvents] = useState<AgentRunEvent[]>([]);
   const [runStartPending, setRunStartPending] = useState(false);
   const [mainSurface, setMainSurface] = useState<MainSurface>('workspace');
   const agents = agentData?.items ?? [];
@@ -116,7 +123,9 @@ export default function WebLayout() {
     authenticated: hubAuthenticated,
     hubWS: hubRealtime.hubWS,
   });
-  const runDetail = useMemo(() => projectRunDetail(hubMessages), [hubMessages]);
+  const chatRunDetail = useMemo(() => projectRunDetail(hubMessages), [hubMessages]);
+  const eventRunDetail = useMemo(() => projectRunEvents(taskRunEvents), [taskRunEvents]);
+  const runDetail = taskRunEvents.length > 0 ? eventRunDetail : chatRunDetail;
   const { outputText, toolCalls, changedFiles } = runDetail;
 
   useEffect(() => {
@@ -240,6 +249,7 @@ export default function WebLayout() {
           toolCalls: [],
           changedFiles: [],
         });
+        setTaskRunEvents([]);
         void refreshMessages().catch(() => {});
         addToast({ type: 'success', message: t('webChat.taskQueued') });
         return true;
@@ -268,6 +278,38 @@ export default function WebLayout() {
       t,
     ],
   );
+
+  useEffect(() => {
+    const taskId = optimisticRun?.runId;
+    if (!taskId || !hubAuthenticated || !getAccessToken()) {
+      setTaskRunEvents([]);
+      return;
+    }
+
+    let cancelled = false;
+    void hubClient.listTaskRunEvents(taskId)
+      .then((events) => {
+        if (!cancelled) {
+          setTaskRunEvents((current) => mergeAgentRunEvents(current, events));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hubAuthenticated, hubClient, optimisticRun?.runId]);
+
+  useEffect(() => {
+    const taskId = optimisticRun?.runId;
+    if (!hubRealtime.hubWS || !taskId) return;
+    const unsub = hubRealtime.hubWS.on(HUB_EVENTS.AGENT_STREAM, (payload: unknown) => {
+      const event = payload as AgentRunEvent | null;
+      if (!event || event.task_id !== taskId) return;
+      setTaskRunEvents((current) => mergeAgentRunEvents(current, [event]));
+    });
+    return unsub;
+  }, [hubRealtime.hubWS, optimisticRun?.runId]);
 
   const handleCancel = useCallback(async () => {
     if (!optimisticRun) return;
