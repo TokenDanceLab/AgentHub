@@ -7,6 +7,7 @@ import type { SessionMetrics } from '@shared/context/breakdown';
 import { RunState } from '@/utils/runStateMachine';
 import { RunStateMachine } from '@/utils/runStateMachine';
 import DiffViewer from './DiffViewer';
+import DiffReviewPanel from './DiffReviewPanel';
 import ContextUsage from './ContextUsage';
 import styles from './RunDetail.module.css';
 
@@ -140,6 +141,7 @@ export default function RunDetail({
   const hasFileChanges = changedFiles.length > 0;
 
   const hasAnyContent = hasOutput || hasToolCalls || hasFileChanges;
+  const hasDiffs = diffs && diffs.length > 0;
   const latestFiles = changedFiles.slice(-4).reverse();
   const latestTools = toolCalls.slice(-4).reverse();
 
@@ -169,7 +171,14 @@ export default function RunDetail({
 
       <ContextUsage metrics={metrics} />
 
-      {!hasAnyContent && (
+      {/* ── Diff Review Panel: primary view when diffs exist ── */}
+      {hasDiffs && (
+        <div className={styles.diffReviewPrimary}>
+          <DiffReviewPanel files={diffs} />
+        </div>
+      )}
+
+      {!hasAnyContent && !hasDiffs && (
         <div className={styles.emptyStack}>
           <div className={styles.emptyCard}>
             <TerminalSquare size={16} />
@@ -183,7 +192,7 @@ export default function RunDetail({
       )}
 
       {hasAnyContent && (
-        <div className={styles.tabContent}>
+        <div className={`${styles.tabContent} ${hasDiffs ? styles.tabContentSecondary : ''}`}>
           {hasOutput && (
             <section className={styles.cardSection}>
               <div className={styles.cardHeader}>
@@ -227,7 +236,8 @@ export default function RunDetail({
             </section>
           )}
 
-          {diffs && diffs.length > 0 && (
+          {/* Unified DiffViewer kept as supplementary detailed view when diffs exist */}
+          {hasDiffs && (
             <section className={styles.cardSection}>
               <div className={styles.cardHeader}>
                 <FileText size={14} />
