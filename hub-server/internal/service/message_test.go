@@ -62,6 +62,60 @@ func TestSendMessage_InvalidContentType(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestSendMessage_InvalidContentJSON(t *testing.T) {
+	db, _, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	svc := &MessageService{db: db, cacheClient: &mockMsgCache{seq: 1}}
+
+	// Missing required "text" field for code type
+	_, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
+		ClientMsgID: "msg-1",
+		ContentType: "code",
+		Content:     `{}`,
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	// Missing required "url" field for image type
+	_, err = svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
+		ClientMsgID: "msg-2",
+		ContentType: "image",
+		Content:     `{"width": 100, "height": 200}`,
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	// Missing required "attachment_id" for file type
+	_, err = svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
+		ClientMsgID: "msg-3",
+		ContentType: "file",
+		Content:     `{"name": "test.txt"}`,
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	// Not valid JSON at all
+	_, err = svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
+		ClientMsgID: "msg-4",
+		ContentType: "code",
+		Content:     "not-json",
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	// deploy_card has no required fields — always passes
+	// (but it still gets validated by the caller... wait, we skip deploy_card in validation)
+	// Text content type goes through wrapping, not validation
+	_, err = svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
+		ClientMsgID: "msg-5",
+		ContentType: "deploy_card",
+		Content:     `{"anything": "goes"}`,
+	})
+	// Will fail at member check, not content validation
+	assert.Error(t, err)
+}
+
 func TestSendMessage_NotMember(t *testing.T) {
 	db, mock, sqlDB := newMockDB(t)
 	defer sqlDB.Close()
@@ -97,7 +151,7 @@ func TestSendMessage_SessionDissolved(t *testing.T) {
 	_, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-1",
 		ContentType: "code",
-		Content:     "print('hi')",
+		Content:     `{"text":"print('hi')"}`,
 	})
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -183,6 +237,11 @@ func TestSendMessage_Success(t *testing.T) {
 		WithArgs("sess-1", "msg-1", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
+	// #154: allocateSeq now touches last_message_at after Redis success
+	mock.ExpectExec(sqlmUpdateSession).
+		WithArgs(sqlmock.AnyArg(), "sess-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
 	// db.Transaction wraps InsertMessage + TouchSessionLastMessage
 	mock.ExpectBegin()
 	mock.ExpectExec(sqlmInsertMsg).
@@ -221,6 +280,11 @@ func TestSendMessage_SuccessNonText(t *testing.T) {
 		WithArgs("sess-1", "msg-c", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
+	// #154: allocateSeq now touches last_message_at after Redis success
+	mock.ExpectExec(sqlmUpdateSession).
+		WithArgs(sqlmock.AnyArg(), "sess-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
 	// db.Transaction wraps InsertMessage + TouchSessionLastMessage
 	mock.ExpectBegin()
 	mock.ExpectExec(sqlmInsertMsg).
@@ -234,7 +298,7 @@ func TestSendMessage_SuccessNonText(t *testing.T) {
 	resp, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-c",
 		ContentType: "code",
-		Content:     "console.log('hi')",
+		Content:     `{"text":"console.log('hi')"}`,
 	})
 	require.NoError(t, err)
 	assert.NotEmpty(t, resp.MessageID)
@@ -515,9 +579,15 @@ func TestPinMessage_LimitExceeded(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content", "recalled", "created_at"}).
 			AddRow("msg-1", "sess-1", 1, "c1", "user", "user-2", "text", `{"text":"pinned"}`, false, time.Now()))
 
+	// PinMessageAtomic transaction (FOR UPDATE session + count + rollback on limit)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT id FROM sessions WHERE id =`).
+		WithArgs("sess-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("sess-1"))
 	mock.ExpectQuery(sqlmPin).
 		WithArgs("sess-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(50))
+	mock.ExpectRollback()
 
 	svc := &MessageService{db: db}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-1")
@@ -556,12 +626,17 @@ func TestPinMessage_DuplicatePin(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content", "recalled", "created_at"}).
 			AddRow("msg-1", "sess-1", 1, "c1", "user", "user-2", "text", `{"text":"pinned"}`, false, time.Now()))
 
+	// PinMessageAtomic transaction (FOR UPDATE session + count + insert dup -> rollback)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT id FROM sessions WHERE id =`).
+		WithArgs("sess-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("sess-1"))
 	mock.ExpectQuery(sqlmPin).
 		WithArgs("sess-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
-
 	mock.ExpectExec(sqlmInsertPin).
 		WillReturnError(errors.New("duplicate key value violates unique constraint"))
+	mock.ExpectRollback()
 
 	svc := &MessageService{db: db}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-1")
@@ -582,12 +657,17 @@ func TestPinMessage_Success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content", "recalled", "created_at"}).
 			AddRow("msg-1", "sess-1", 1, "c1", "user", "user-2", "text", `{"text":"pinned"}`, false, time.Now()))
 
+	// PinMessageAtomic transaction (FOR UPDATE session + count + insert + commit)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT id FROM sessions WHERE id =`).
+		WithArgs("sess-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("sess-1"))
 	mock.ExpectQuery(sqlmPin).
 		WithArgs("sess-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
-
 	mock.ExpectExec(sqlmInsertPin).
 		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
 
 	svc := &MessageService{db: db, bus: newTestBus(t)}
 	err := svc.PinMessage(context.Background(), "user-1", "sess-1", "msg-1")
@@ -692,11 +772,40 @@ func TestMarkRead_Success(t *testing.T) {
 		WithArgs("sess-1", "user", "user-1").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
+	// GetActiveMember returns last_read_seq=10, which is less than the new 42
+	mock.ExpectQuery(sqlmSessionMember).
+		WithArgs("sess-1", "user", "user-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role", "last_read_seq"}).
+			AddRow("mem-1", "sess-1", "user", "user-1", "member", 10))
+
 	mock.ExpectExec(sqlmUpdateMember).
 		WithArgs(42, "sess-1", "user", "user-1", 42).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	svc := &MessageService{db: db, bus: newTestBus(t)}
+	err := svc.MarkRead(context.Background(), "user-1", "sess-1", 42)
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// Test that MarkRead rejects seq <= current last_read_seq (no-op + no bus publish).
+func TestMarkRead_SeqNotAdvanced(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(sqlmSessionMember).
+		WithArgs("sess-1", "user", "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	// GetActiveMember returns last_read_seq=50, which is GREATER than 42
+	mock.ExpectQuery(sqlmSessionMember).
+		WithArgs("sess-1", "user", "user-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role", "last_read_seq"}).
+			AddRow("mem-1", "sess-1", "user", "user-1", "member", 50))
+
+	// No UpdateLastReadSeq and no bus publish expected
+
+	svc := &MessageService{db: db}
 	err := svc.MarkRead(context.Background(), "user-1", "sess-1", 42)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())

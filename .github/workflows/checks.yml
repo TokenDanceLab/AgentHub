@@ -8,6 +8,7 @@ on:
 
 env:
   GO_VERSION: "1.25"
+  GOLANGCI_LINT_VERSION: "v2.12.2"
   NODE_VERSION: "22"
   PNPM_VERSION: "10"
 
@@ -31,10 +32,18 @@ jobs:
         run: go build ./...
 
       - name: Lint
+<<<<<<< HEAD
         uses: golangci/golangci-lint-action@v8
         with:
           working-directory: edge-server
           version: v2.12.2
+=======
+        continue-on-error: true
+        uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: edge-server
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+>>>>>>> origin/dev/delicious233
           args: --timeout=5m
         continue-on-error: true
 
@@ -44,7 +53,7 @@ jobs:
       - name: Coverage check (overall >= 70%)
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          THRESHOLD=70
+          THRESHOLD=75
           echo "Overall coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
           if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
             echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
@@ -76,9 +85,8 @@ jobs:
         run: go test ./... -count=1 -short -race
 
       - name: Security scan (gosec)
-        run: go run github.com/securecodewarrior/gosec/v2/cmd/gosec@latest ./...
         continue-on-error: true
-
+        run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
       - name: Vulnerability check (govulncheck)
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
@@ -124,10 +132,18 @@ jobs:
         run: go build ./...
 
       - name: Lint
+<<<<<<< HEAD
         uses: golangci/golangci-lint-action@v8
         with:
           working-directory: hub-server
           version: v2.12.2
+=======
+        continue-on-error: true
+        uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: hub-server
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+>>>>>>> origin/dev/delicious233
           args: --timeout=5m
         continue-on-error: true
 
@@ -148,8 +164,8 @@ jobs:
         run: go test ./... -count=1 -short -race
 
       - name: Security scan (gosec)
-        run: go run github.com/securecodewarrior/gosec/v2/cmd/gosec@latest ./...
         continue-on-error: true
+        run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
 
       - name: Vulnerability check (govulncheck)
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
@@ -254,13 +270,18 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
-      - name: Lint
+      - name: Lint (debt visibility)
+        continue-on-error: true
         run: pnpm lint --max-warnings 10
         continue-on-error: true
 
       - name: Test Desktop
+<<<<<<< HEAD
         run: pnpm test
         continue-on-error: true
+=======
+        run: pnpm test:ci
+>>>>>>> origin/dev/delicious233
 
   # ── Frontend: Web ────────────────────────────
   frontend-web:
@@ -279,7 +300,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-          cache-dependency-path: app/web/pnpm-lock.yaml
+          cache-dependency-path: app/pnpm-lock.yaml
 
       - name: Install
         run: pnpm install --frozen-lockfile

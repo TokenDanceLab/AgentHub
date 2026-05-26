@@ -10,7 +10,6 @@ import type {
   ListResponse,
   RunInfo,
   ThreadInfo,
-  ThreadItemInfo,
   StartRunRequest,
 } from '@shared/types';
 import { parseError } from '@shared/errors';
@@ -21,7 +20,6 @@ import {
   AgentInfoSchema,
   RunInfoSchema,
   ThreadInfoSchema,
-  ThreadItemInfoSchema,
   safeParse,
   listResponseSchema,
 } from './schemas';
@@ -33,7 +31,6 @@ export type {
   ListResponse,
   RunInfo,
   ThreadInfo,
-  ThreadItemInfo,
   StartRunRequest,
 };
 
@@ -95,34 +92,22 @@ export async function fetchThreads(projectId?: string): Promise<ListResponse<Thr
   return safeParse(listResponseSchema(ThreadInfoSchema), await res.json(), 'threads');
 }
 
-export interface CreateThreadRequest {
-  projectId?: string;
-  threadId?: string;
-  title?: string;
-}
-
-export async function createThread(req: CreateThreadRequest = {}): Promise<ThreadInfo> {
+export async function createThread(title?: string, threadId?: string): Promise<ThreadInfo> {
   const res = await fetch(`${BASE}/v1/threads`, {
     method: 'POST',
     headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(req),
+    body: JSON.stringify({ title: title ?? '', threadId: threadId ?? '' }),
   });
   if (!res.ok) throw await parseError(res);
   return safeParse(ThreadInfoSchema, await res.json(), 'createThread');
 }
 
-export async function fetchThreadItems(
-  threadId: string,
-): Promise<ListResponse<ThreadItemInfo>> {
+export async function fetchThreadItems(threadId: string): Promise<ListResponse<{ id: string; role: string; content: string; timestamp: string }>> {
   const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/items`, {
     headers: edgeAuthHeaders(),
   });
   if (!res.ok) throw await parseError(res);
-  return safeParse(
-    listResponseSchema(ThreadItemInfoSchema),
-    await res.json(),
-    'threadItems',
-  );
+  return res.json();
 }
 
 export async function fetchRuns(projectId?: string, threadId?: string): Promise<ListResponse<RunInfo>> {

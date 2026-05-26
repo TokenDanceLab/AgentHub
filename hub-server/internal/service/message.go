@@ -39,6 +39,11 @@ func NewMessageService(db *gorm.DB, bus *Bus, cacheClient *cache.Client) *Messag
 func (s *MessageService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
 	seq, err := resolveMessageCache(s.cacheClient).AllocateSeq(ctx, sessionID)
 	if err == nil {
+		// #154: Redis allocation does not update last_message_at, so touch it here
+		// to ensure the session appears in recent conversations.
+		if touchErr := repository.TouchSessionLastMessage(s.db, sessionID); touchErr != nil {
+			slog.Warn("failed to touch session last_message_at after redis seq alloc", "session_id", sessionID, "error", touchErr)
+		}
 		return seq, nil
 	}
 	slog.Warn("redis seq allocation failed, falling back to DB", "session_id", sessionID, "error", err)
@@ -93,6 +98,54 @@ var validContentTypes = map[string]bool{
 	"file": true, "link_card": true, "deploy_card": true,
 }
 
+// contentRequiredFields maps non-text content types to the fields that must be
+// present (and non-empty strings) in their JSON content payload.
+var contentRequiredFields = map[string][]string{
+	"code":      {"text"},
+	"diff":      {"text"},
+	"image":     {"url"}, // url OR attachment_id
+	"file":      {"attachment_id"},
+	"link_card": {"url"},
+	// deploy_card has no hard requirements — any valid JSON object is accepted.
+}
+
+// validateContentJSON validates that a non-text content JSON string has the
+// required fields for its content type.
+func validateContentJSON(contentType, content string) error {
+	required, ok := contentRequiredFields[contentType]
+	if !ok {
+		// No validation rules defined for this type (e.g., deploy_card).
+		return nil
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal([]byte(content), &payload); err != nil {
+		return fmt.Errorf("invalid JSON for content type %s: %w", contentType, err)
+	}
+
+	for _, field := range required {
+		val, exists := payload[field]
+		if !exists {
+			return fmt.Errorf("missing required field %q for content type %s", field, contentType)
+		}
+		s, ok := val.(string)
+		if !ok || strings.TrimSpace(s) == "" {
+			return fmt.Errorf("required field %q must be a non-empty string for content type %s", field, contentType)
+		}
+	}
+
+	// image type: also accept "attachment_id" as an alternative to "url"
+	if contentType == "image" {
+		if attID, exists := payload["attachment_id"]; exists {
+			if s, ok := attID.(string); ok && strings.TrimSpace(s) != "" {
+				return nil
+			}
+		}
+	}
+
+	return nil
+}
+
 func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserID string, req SendMessageRequest) (*SendMessageResponse, error) {
 	if !validContentTypes[req.ContentType] {
 		return nil, errcode.ErrBadRequest
@@ -111,6 +164,14 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 		return nil, errcode.ErrBadRequest
 	}
 
+	// #173: validate non-text content structure before writing to jsonb.
+	if req.ContentType != "text" && req.ContentType != "deploy_card" {
+		if err := validateContentJSON(req.ContentType, content); err != nil {
+			slog.Warn("invalid message content", "content_type", req.ContentType, "error", err)
+			return nil, errcode.ErrBadRequest
+		}
+	}
+
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, senderUserID)
 	if err != nil {
 		return nil, err
@@ -125,6 +186,12 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 	}
 	if session.Dissolved {
 		return nil, errcode.SessionDissolved
+	}
+
+	if req.ReplyToMsgID != nil && *req.ReplyToMsgID != "" {
+		if _, err := repository.GetMessageBySessionAndID(s.db, sessionID, *req.ReplyToMsgID); err != nil {
+			return nil, errcode.MsgNotFound
+		}
 	}
 
 	if session.Type == model.SessionTypePrivate {
@@ -447,20 +514,15 @@ func (s *MessageService) PinMessage(ctx context.Context, userID, sessionID, msgI
 		return errcode.MsgNotFound
 	}
 
-	count, err := repository.CountPinsBySession(s.db, sessionID)
-	if err != nil {
-		return err
-	}
-	if count >= config.MaxPinsPerSession {
-		return errcode.MsgPinLimitExceeded
-	}
-
 	pin := &model.MessagePin{
 		SessionID:      sessionID,
 		MessageID:      msgID,
 		PinnedByUserID: userID,
 	}
-	if err := repository.InsertPin(s.db, pin); err != nil {
+	if err := repository.PinMessageAtomic(s.db, pin, config.MaxPinsPerSession); err != nil {
+		if errors.Is(err, repository.ErrPinLimitExceeded) {
+			return errcode.MsgPinLimitExceeded
+		}
 		if strings.Contains(err.Error(), "duplicate key") {
 			return nil
 		}
@@ -537,6 +599,9 @@ func (s *MessageService) ListPinnedMessages(ctx context.Context, userID, session
 }
 
 func (s *MessageService) ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error {
+	if len(targetSessionIDs) > config.MaxForwardTargets {
+		return errcode.ErrBadRequest
+	}
 	// Source message access check
 	msg, err := repository.GetMessageByID(s.db, msgID)
 	if err != nil {
@@ -640,6 +705,13 @@ func (s *MessageService) MarkRead(ctx context.Context, userID, sessionID string,
 		return errcode.SessionNotMember
 	}
 
+	member, err := repository.GetActiveMember(s.db, sessionID, model.MemberTypeUser, userID)
+	if err != nil {
+		return err
+	}
+	if lastReadSeq <= member.LastReadSeq {
+		return nil
+	}
 	if err := repository.UpdateLastReadSeq(s.db, sessionID, userID, lastReadSeq); err != nil {
 		return err
 	}
@@ -666,7 +738,7 @@ func (s *MessageService) SearchMessages(ctx context.Context, userID, q, sessionI
 		return s.toMessageResponses(msgs), nil
 	}
 
-	msgs, err := repository.SearchAllMessages(s.db, userID, q)
+	msgs, err := repository.SearchAllMessages(s.db, userID, q, contentType, from, to)
 	if err != nil {
 		return nil, err
 	}

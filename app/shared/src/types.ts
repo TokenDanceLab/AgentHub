@@ -82,6 +82,15 @@ export interface Thread {
   updatedAt?: string;
 }
 
+export interface ThreadInfo {
+  threadId: string;
+  projectId: string;
+  title: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ThreadItemKind = 'message' | 'code' | 'file' | 'diff' | 'approval';
 
 export interface ThreadItem {
@@ -141,6 +150,17 @@ export interface StartRunRequest {
   modelMappingEnabled?: boolean;
   providerFallbackEnabled?: boolean;
 }
+export interface RunInfo {
+  runId: string;
+  projectId: string;
+  threadId: string;
+  status: string;
+  createdAt?: string | undefined;
+  startedAt?: string | undefined;
+  finishedAt?: string | undefined;
+}
+
+// ── Agent types ─────────────────────────────────
 
 // Compatibility aliases for Desktop code that still consumes the original
 // Edge REST shape while the domain model above is being consolidated.
@@ -160,6 +180,14 @@ export interface AgentInfo {
   name: string;
   description?: string;
   version?: string;
+  profileId?: string;
+  runtimeId?: string;
+  model?: string;
+  provider?: string;
+  reasoningEffort?: string;
+  permissionMode?: string;
+  toolAllowlist?: string[];
+  targetPreferences?: Record<string, unknown>;
   status: 'available' | 'unavailable' | 'configuring';
   capabilities: AgentCapabilities;
 }
@@ -194,6 +222,30 @@ export interface ThreadItemInfo {
   content?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface StartRunRequest {
+  projectId?: string;
+  threadId?: string;
+  prompt?: string;
+  agentId?: string;
+  model?: string;
+  provider?: string;
+  modelAlias?: string;
+  modelMappingEnabled?: boolean;
+  providerFallbackEnabled?: boolean;
+  reasoningEffort?: string;
+  thinkingMode?: string;
+  maxThinkingTokens?: number;
+  permissionMode?: string;
+  workDir?: string;
+  includePartial?: boolean;
+  systemPrompt?: string;
+  appendSystemPrompt?: string;
+  allowedTools?: string[];
+  configOverrides?: Record<string, string>;
+  ephemeral?: boolean;
+  hubTaskId?: string;
 }
 
 export interface RunLogs {

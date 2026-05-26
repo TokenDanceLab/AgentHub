@@ -10,6 +10,7 @@ import (
 // DeviceService is the subset of *service.DeviceService used by DeviceHandler.
 type DeviceService interface {
 	Register(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error)
+	ListDevices(userID string) ([]model.Device, error)
 }
 
 type DeviceHandler struct {
@@ -41,6 +42,14 @@ func (h *DeviceHandler) Register(c *gin.Context) {
 
 	userID := c.GetString("user_id")
 	deviceType := c.GetString("device_type")
+	jwtDeviceID := c.GetString("device_id")
+
+	// Cross-validate that the JWT's device_id matches the registration request.
+	// A JWT issued for device X must not be abused to register device Y.
+	if jwtDeviceID != "" && jwtDeviceID != req.DeviceID {
+		FailWithMessage(c, errcode.ErrBadRequest, "device_id does not match JWT claims")
+		return
+	}
 
 	device, err := h.deviceService.Register(req.DeviceID, userID, deviceType, req.AppVersion, req.Capabilities)
 	if err != nil {
@@ -53,4 +62,23 @@ func (h *DeviceHandler) Register(c *gin.Context) {
 	}
 
 	OK(c, device)
+}
+
+// ListDevices returns all devices belonging to the authenticated user,
+// including their capability metadata.
+func (h *DeviceHandler) ListDevices(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	devices, err := h.deviceService.ListDevices(userID)
+	if err != nil {
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+
+	// Always return a non-null array
+	if devices == nil {
+		devices = []model.Device{}
+	}
+
+	OK(c, devices)
 }

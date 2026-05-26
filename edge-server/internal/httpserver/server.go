@@ -15,6 +15,8 @@ import (
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/hub"
+	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runners"
@@ -22,14 +24,35 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
+// ctxKey is a private context key type for injecting auth identity.
+type ctxKey string
+
+const (
+	ctxKeyHubUserID   ctxKey = "hub_user_id"
+	ctxKeyHubDeviceID ctxKey = "hub_device_id"
+)
+
+// HubUserIDFromContext extracts the Hub-authenticated user ID from context.
+// Returns empty string if the request was not authenticated via Hub JWT.
+func HubUserIDFromContext(ctx context.Context) string {
+	if v, ok := ctx.Value(ctxKeyHubUserID).(string); ok {
+		return v
+	}
+	return ""
+}
+
 // Config holds server configuration.
 type Config struct {
-	Addr            string
-	Store           store.Repository
-	ProcessExecutor lifecycle.ProcessExecutorConfig
-	AdapterRegistry *adapters.Registry // agent adapter registry; nil = none registered
-	AgentDefault    string             // default agent adapter ID; empty = raw stdout capture
-	LocalAuthToken  string             // optional local bearer token for non-health Edge APIs
+	Addr               string
+	Store              store.Repository
+	ProcessExecutor    lifecycle.ProcessExecutorConfig
+	AdapterRegistry    *adapters.Registry // agent adapter registry; nil = none registered
+	AgentDefault       string             // default agent adapter ID; empty = raw stdout capture
+	LocalAuthToken     string             // optional local bearer token for non-health Edge APIs
+	HubJWTSecret       string             // shared secret for validating Hub-issued HS256 JWTs
+	HubURL             string             // Hub server base URL for Edge->Hub direct callbacks
+	HubToken           string             // JWT bearer token for Hub callback authentication
+	WorkspaceAllowlist []string           // optional roots allowed for request workDir
 }
 
 const defaultRESTRequestTimeout = 30 * time.Second
@@ -54,7 +77,7 @@ func Run(cfg Config) error {
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken), defaultRESTRequestTimeout)),
+		Handler: corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret), defaultRESTRequestTimeout)),
 		// WriteTimeout=0: WebSocket connections are long-lived and manage their
 		// own deadlines. REST requests are guarded by restTimeoutMiddleware.
 		ReadTimeout:  15 * time.Second,
@@ -127,6 +150,14 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		}
 		processExecutor.SetMetrics(edgeMetrics)
 		processExecutor.WithAgentRegistry(agentReg).WithMessageQueue(msgQueue).WithResultAggregator(resultAgg)
+
+		// Wire Hub callback client for Edge-to-Hub direct bridge
+		if cfg.HubURL != "" {
+			hubClient := hub.NewCallbackClient(cfg.HubURL, cfg.HubToken)
+			processExecutor.WithHubCallback(hubClient)
+			slog.Info("edge-to-hub direct callback enabled", "hubURL", cfg.HubURL)
+		}
+
 		executor = processExecutor
 	}
 	configureLocalRunner(reg, cfg.ProcessExecutor, agentAdapterForRegistry(cfg.AdapterRegistry, cfg.AgentDefault), executor)
@@ -135,14 +166,15 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	wireOrchestrator(cfg.AdapterRegistry, executor, agentReg, msgQueue)
 
 	h := &api.Handler{
-		Bus:             bus,
-		Registry:        reg,
-		Store:           cfg.Store,
-		Executor:        executor,
-		AdapterRegistry: cfg.AdapterRegistry,
-		AgentRegistry:   agentReg,
-		MessageQueue:    msgQueue,
-		Metrics:         edgeMetrics,
+		Bus:                bus,
+		Registry:           reg,
+		Store:              cfg.Store,
+		Executor:           executor,
+		AdapterRegistry:    cfg.AdapterRegistry,
+		AgentRegistry:      agentReg,
+		MessageQueue:       msgQueue,
+		Metrics:            edgeMetrics,
+		WorkspaceAllowlist: append([]string(nil), cfg.WorkspaceAllowlist...),
 	}
 	// Create default project/thread fixtures so POST /v1/runs
 	// with empty projectId/threadId works out of the box.
@@ -262,16 +294,44 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func localAuthMiddleware(next http.Handler, token string) http.Handler {
-	token = strings.TrimSpace(token)
-	if token == "" {
+func localAuthMiddleware(next http.Handler, localAuthToken string, hubJWTSecret string) http.Handler {
+	localAuthToken = strings.TrimSpace(localAuthToken)
+	hubJWTSecret = strings.TrimSpace(hubJWTSecret)
+
+	// Local dev mode: no auth configured.
+	if localAuthToken == "" && hubJWTSecret == "" {
 		return next
 	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isLocalAuthExempt(r) || requestHasLocalAuthToken(r, token) {
+		if isLocalAuthExempt(r) {
 			next.ServeHTTP(w, r)
 			return
 		}
+
+		for _, got := range authTokenCandidates(r) {
+			// Skip TokenDance bearer tokens (td_ prefix) — they are NOT Edge sessions.
+			if strings.HasPrefix(got, "td_") {
+				continue
+			}
+
+			// 1. Try Hub JWT validation (TokenDance ID → Hub → Edge trust chain).
+			if hubJWTSecret != "" {
+				if claims, err := jwtutil.ValidateHubToken(got, []byte(hubJWTSecret)); err == nil {
+					ctx := context.WithValue(r.Context(), ctxKeyHubUserID, claims.UserID)
+					ctx = context.WithValue(ctx, ctxKeyHubDeviceID, claims.DeviceID)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
+
+			// 2. Fallback to pre-shared local auth token.
+			if localAuthToken != "" && constantTimeEqual(got, localAuthToken) {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+
 		w.Header().Set("WWW-Authenticate", `Bearer realm="agenthub-edge"`)
 		http.Error(w, "unauthorized\n", http.StatusUnauthorized)
 	})
@@ -281,7 +341,8 @@ func isLocalAuthExempt(r *http.Request) bool {
 	return r.Method == http.MethodOptions || (r.Method == http.MethodGet && r.URL.Path == "/v1/health")
 }
 
-func requestHasLocalAuthToken(r *http.Request, want string) bool {
+// authTokenCandidates extracts all possible auth tokens from a request.
+func authTokenCandidates(r *http.Request) []string {
 	candidates := []string{
 		bearerToken(r.Header.Get("Authorization")),
 		strings.TrimSpace(r.Header.Get("X-AgentHub-Edge-Token")),
@@ -289,12 +350,7 @@ func requestHasLocalAuthToken(r *http.Request, want string) bool {
 	if isWebSocketUpgrade(r) && r.URL.Path == "/v1/events" {
 		candidates = append(candidates, strings.TrimSpace(r.URL.Query().Get("access_token")))
 	}
-	for _, got := range candidates {
-		if constantTimeEqual(got, want) {
-			return true
-		}
-	}
-	return false
+	return candidates
 }
 
 func bearerToken(header string) string {

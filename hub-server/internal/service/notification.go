@@ -48,7 +48,7 @@ func (s *NotificationService) ListNotifications(ctx context.Context, userID stri
 }
 
 func (s *NotificationService) MarkRead(ctx context.Context, userID, notifID string) error {
-	if err := repository.MarkNotificationRead(s.db, notifID); err != nil {
+	if err := repository.MarkNotificationRead(s.db, userID, notifID); err != nil {
 		return errcode.NotifNotFound
 	}
 	return nil

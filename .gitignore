@@ -10,6 +10,19 @@ coverage/
 playwright-report/
 test-results/
 
+<<<<<<< HEAD
+=======
+# Generated reports and local test artifacts
+app/desktop/stats.html
+**/coverage.out
+**/coverage.html
+**/coverage
+**/.golangci.bck.yml
+edge-server/cov_full
+edge-server/$covPath
+hub-server/tests/uploads/
+
+>>>>>>> origin/dev/delicious233
 # Go
 *.exe
 *.exe~
@@ -101,6 +114,16 @@ docs/review/
 !.agents/skills/env-sandbox/**
 !.agents/skills/ui-screenshot/
 !.agents/skills/ui-screenshot/**
+!.agents/skills/dev-team/
+!.agents/skills/dev-team/**
+# Screenshots and raster images — dev artifacts, not production assets
+screenshots/
+**/screenshots/
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
 .cursor/
 .continue/
 
@@ -120,4 +143,7 @@ docs/review/*
 !/reference/INDEX.md
 /chat-verify/
 test_store.json
+<<<<<<< HEAD
 app/desktop/stats.html
+=======
+>>>>>>> origin/dev/delicious233

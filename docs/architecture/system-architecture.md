@@ -26,6 +26,8 @@ AgentHub 的 UI、API 和文档必须严格区分以下概念，避免把运行�
 |---|---|---|---|
 | Agent Runtime | 能启动和解析某类 Agent CLI/SDK 的执行适配器。它回答“用什么运行”。Runtime 是 adapter 能力，不是用户配置好的 Agent。 | Claude Code、Codex、OpenCode | Edge `AgentAdapter` registry |
 | Agent Profile | 面向用户选择的 Agent 实例。它回答“谁来做事”。 | `Reviewer on Codex/gpt-5.4-high`、`Builder on Claude Code/sonnet` | Hub CustomAgent 或 Edge local profile |
+| AgentTeam | 由多个 Agent Profile 组成的协作模板。它回答“哪些角色一起做事，以及按什么策略委派”。 | `Builder + Reviewer + Tester`、`Research + Implement + Verify` | Hub team store + policy |
+| TeamRun / TeamTask | 一次团队目标执行及其子任务。它回答“这次团队协作如何计划、委派、恢复和收敛”。 | TeamRun 下的 research/build/review/test 子任务 | Hub TeamEvent / TeamRunState + Edge RunEvent |
 | Agent Configuration | Agent Profile 的可编辑配置集合。它回答“按什么规则做事”。 | `AGENTS.md`、Agent memory、上下文、聊天记录、工作目录、Skill、MCP、模型参数、审批策略 | Edge Context Builder + Hub profile store |
 | Execution Target | 一次 Run 实际运行的位置。它回答“在哪里执行”。 | Local Desktop Edge、Remote Edge over SSH/Tailscale、Cloud Edge、Hub Relay target | Edge registration + Hub routing |
 | Run Session | 某次 AgentRun 的运行上下文和生命周期。它回答“这次执行是什么状态”。 | queued/running/streaming/waiting/finished/failed/cancelled | Edge lifecycle + EventStore |
@@ -80,7 +82,7 @@ UI 中的“运行位置”必须显示 Target、设备、工作目录、在线�
 
 ### 2.4 TokenDance ID、鉴权和安全审计
 
-TokenDance ID 是跨端身份入口；Hub 本地 session 是 AgentHub 的产品会话。最终浏览器/桌面登录应由 Hub Server 完成 TokenDance ID OIDC code exchange、验证 issuer/audience、映射 `tokendance_sub` 到 Hub user，再签发 Hub access/refresh session。现有 TokenDance bearer-token middleware 只是身份兼容路径，验证通过后标记为 `tokendance_bearer`，不能替代完整 Hub session，也不能满足 `/edge` 的 `desktop` 设备门禁。
+TokenDance ID 是跨端身份入口；Hub 本地 session 是 AgentHub 的产品会话。Hub Server 已提供 `POST /client/auth/oidc/authorize` 和 `POST /client/auth/oidc/callback` 完成 TokenDance ID OIDC code exchange、issuer/audience/JWKS 校验、`tokendance_sub` 到 Hub user 映射，以及 Hub access/refresh session 与 UUID device proof 签发。现有 TokenDance bearer-token middleware 只是身份兼容路径，验证通过后标记为 `tokendance_bearer`，不能替代完整 Hub session，也不能满足 `/edge` 的 `desktop` 设备门禁；`/client/ws` 只接受 Hub-issued HS256 access token，TokenDance bearer 不能注册为 Hub WebSocket session。
 
 安全审计必须覆盖：
 
@@ -97,6 +99,7 @@ AgentHub 后续平台能力按下表放置，避免散落到前端本地状态�
 |---|---|---|
 | TokenDance ID / OIDC | Hub Server auth + TokenDance ID | TokenDance ID 统一第三方登录和账号主体；Hub 只保存 AgentHub 会话、设备和授权关系。 |
 | 在线 IM / 多端同步 | Hub Server conversation/contact/group/sync | Hub 是云端消息主序列和多端同步中心；Edge 保留本地执行权威。 |
+| AgentTeam / TeamRun 编排 | Hub team/task/event store + Edge runtime execution | Hub 保存 Team、TeamRun、TeamTask、TeamEvent 和 `TeamRunState`；Edge 只执行具体 Run、上报 RunEvent 和可审计结果。 |
 | Agent 市场 | Hub Server profile catalog + Web/Desktop UI | 市场发布和安装 Agent Profile 模板；模板引用 Runtime、模型映射、Skill/MCP 需求和安全声明，不打包真实密钥。 |
 | Skill 管理 | Hub catalog + Edge Context Builder | Hub 管理团队可见性、版本和审计；Edge 负责本机解析、脚本权限和运行时注入。 |
 | MCP 管理 | Hub registry + Edge MCP connector | Hub 存 server 元数据、OAuth 状态和策略；Edge 连接本地或远端 MCP server 并执行工具白名单。 |
@@ -121,9 +124,34 @@ AgentHub 后续平台能力按下表放置，避免散落到前端本地状态�
 
 新增产品文案、schema、事件和 UI 应优先使用 `runtime`、`profile`、`configuration`、`execution_target` / `target` 命名。只有为了兼容既有 Desktop/Edge/API 调用时，才沿用 Runner 词汇，并在说明中标注兼容边界。
 
+### 2.7 推荐数据模型
+
+AgentHub 不应照搬 LangGraph/Dify 的 graph/workflow DSL，也不应把 Claude Code、Codex、OpenCode 当成业务 Agent 本体。当前产品核心是 IM-native collaboration + local/remote Runtime execution。后续 Hub、Edge、Desktop/Web 的表结构、API 和 UI 应向下面这组实体收敛：
+
+| 实体 | 核心字段 | 说明 |
+|---|---|---|
+| `AgentRuntime` | `id`, `kind`, `binary_path`, `version`, `capabilities`, `health` | 真实 CLI/SDK 运行时和 adapter 能力，例如 `codex`、`claude-code`、`opencode`。 |
+| `AgentProfile` | `id`, `owner_org_id`, `runtime_id`, `display_name`, `model_alias`, `config_version`, `visibility` | 用户在 IM/设置/市场里选择的 Agent。 |
+| `AgentTeam` | `id`, `owner_id`, `workspace_id`, `name`, `visibility`, `default_target_policy`, `created_by` | 用户/团队可管理的多 Profile 协作模板。 |
+| `AgentTeamMember` | `team_id`, `profile_id`, `role`, `capability_tags`, `priority`, `max_parallel_tasks`, `budget_share`, `target_preferences` | Team 中的成员角色和策略，不直接绑定 Runtime secret。 |
+| `AgentConfiguration` | `instructions_sources`, `memory_sources`, `skills`, `mcp_servers`, `provider_binding_id`, `approval_policy`, `sandbox_policy`, `worktree_policy` | Profile 的可编辑规则集合，不存真实 provider key。 |
+| `ExecutionTarget` | `id`, `type`, `edge_id`, `device_id`, `workspace_allowlist`, `online`, `trust_level` | 运行位置和信任边界，覆盖 local、remote、cloud、relay。 |
+| `Thread` | `id`, `project_id`, `authority`, `title`, `last_run_id` | IM 会话和项目工作上下文的统一入口。 |
+| `TeamRun` | `id`, `team_id`, `thread_id`, `trigger_message_id`, `status`, `goal`, `budget`, `trace_id`, `created_by` | 一次团队协作执行，聚合多个 TeamTask / Run。 |
+| `TeamTask` | `id`, `team_run_id`, `assignee_member_id`, `parent_task_id`, `status`, `objective`, `input_refs`, `run_id`, `attempt`, `risk_level` | 可并行、可重试、可审批的一项子任务。 |
+| `TeamEvent` / `TeamMessage` | `seq`, `team_run_id`, `task_id`, `type`, `payload`, `visibility`, `created_at` | append-only 团队事件和 Agent 间通信事实源，支持 replay 和审计。 |
+| `TeamRunState` | `team_run_id`, `members`, `tasks`, `dependencies`, `route_decisions`, `approvals`, `budgets`, `terminal_reason` | 从 TeamEvent / RunEvent 派生的可查询 snapshot，不替代事件源。 |
+| `CoordinatorRouteDecision` | `team_run_id`, `task_id`, `next_worker`, `instructions`, `reasoning`, `finish`, `blocked_reason`, `correlation_id` | Supervisor 的 typed route 输出，长期替代从文本中扫描 JSON dispatch。 |
+| `Run` | `id`, `thread_id`, `profile_id`, `target_id`, `runtime_id`, `native_session_id`, `status`, `trace_id`, `budget`, `created_by` | 一次 Runtime 执行。 |
+| `RunEvent` | `seq`, `run_id`, `type`, `scope`, `payload`, `native_item_id`, `visibility`, `created_at` | append-only 事件源。Transcript、Tool timeline、Diff、Artifact、Usage 都从这里派生。 |
+| `Approval` | `run_id`, `event_id`, `action`, `resource`, `requested_by`, `decision`, `decided_by`, `expires_at` | 人类审批闭环，必须可审计、可过期、可拒绝重放。 |
+| `Artifact` / `ToolCall` / `FileChange` / `Usage` / `TraceSpan` / `AuditEvent` | derived indexes | 便于查询和渲染的索引层，不替代 `RunEvent` 事件源。 |
+
+这个模型吸收 LangGraph 的 durable thread/checkpoint、LangSmith 的 trace/run/tag、OpenHands 的 append-only event log、Dify 的 run history、AionUI 的 Team Mode、LibreChat 的 subagent guardrails 和 Flowise 的 Supervisor/Worker 路由思路，但不把 AgentHub 变成低代码 workflow builder。Graph、workflow、chatflow 只能作为未来上层编排能力或 TeamRunState 的可视化投影，不能替代 `Profile -> Target -> Thread -> Run -> RunEvent -> Approval/Artifact` 与 `AgentTeam -> TeamRun -> TeamTask -> Run` 主线。
+
 ## 3. 当前已完成拓扑
 
-P0-P3 已全部完成，M4 8/8 已交付。真实 Agent CLI 集成通过统一 AgentAdapter 接口对接三种 CLI：
+当前仓库已经完成本地执行主链路和 Web 中继到当前 Desktop 的最小链路，但还不是完整 8 个部署场景 8/8。旧里程碑里的 `M4 8/8` 指的是 M4 工程任务清单，不等于远程/云执行拓扑全部完成。真实 Agent CLI 集成通过统一 AgentAdapter 接口对接三种 CLI：
 
 ```text
 Desktop Web UI
@@ -141,10 +169,51 @@ Edge 通过 AgentAdapter 接口直接调用各 CLI 的原生协议：
 | CodexAdapter | `codex exec --json` | JSONL 逐行解析，6 种事件类型 |
 | OpenCodeAdapter | `opencode run --format json` | JSON 逐行解析，7 种事件类型 |
 
+### 3.1 Runtime 最小闭环
+
+真实 Runtime 接入必须从 CLI 输出和 Edge 事件开始，而不是从前端 mock 状态开始：
+
+```text
+UI
+  -> POST /v1/runs 或 Hub /web/agent-tasks
+  -> Edge 校验 project/thread/profile/target/workspace
+  -> Run(status=queued) + RunEvent(run.created)
+  -> ProcessExecutor -> AgentAdapter.BuildCommand()
+  -> Claude Code / Codex / OpenCode 原生结构化输出
+  -> AgentAdapter.ParseStream()
+  -> RunEvent(seq++) append-only
+  -> Edge WebSocket cursor replay
+  -> UI 渲染 Transcript / Tool timeline / Diff / Approval / Usage
+```
+
+Adapter 必须把原生事件归一到稳定事件族：`text_delta`、`thinking`、`tool_call`、`tool_result`、`file_change`、`permission_requested`、`result`、`usage`。前端只依赖 AgentHub 事件，不直接理解某个 CLI 的私有 JSON。
+
+Hub 参与调度时，当前真实链路是：
+
+```text
+Web workspace
+  -> Hub session/message
+  -> POST /web/agent-tasks
+  -> Hub WS agent.dispatch
+  -> Desktop Hub task bridge
+  -> Local Edge POST /v1/runs
+  -> Edge run.output.batch / run.agent.text_delta / run.agent.text_block
+  -> Desktop POST /edge/agent-tasks/{id}/stream
+  -> Desktop POST /edge/agent-tasks/{id}/done|fail
+  -> Hub message/agent task events
+  -> Web workspace transcript
+```
+
+Desktop 只有在恢复或获取 Hub-issued access token 后才打开 Hub WebSocket 并挂载 Hub task bridge。桥接层维护 `taskId <-> runId` 映射，转发 stdout `run.output.batch` 与结构化 `text_delta` / `text_block`，并缓存可见输出作为 `done.final_content`。Edge 直连 Hub callback 模式同样会把 raw stdout 和结构化文本 stream 到 Hub，并用有界输出缓冲生成最终内容；没有可见输出时才退回 `"Run finished"`。
+
+Hub dispatch payload 必须带触发消息提取出的 `prompt`，`agent_type` 使用 Edge Runtime adapter id（`claude-code`、`codex`、`opencode`）。Hub Agent Profile / CustomAgent 的运行配置必须以 secret-free payload 下发：`model_params` 承载 model/provider/reasoning/permission/workdir 等策略提示，CustomAgent 可下发 `system_prompt` 和 `tool_whitelist`，Desktop bridge 再翻译为 Edge `POST /v1/runs` 的 `model`、`reasoningEffort`、`permissionMode`、`workDir`、`systemPrompt`、`allowedTools` 等字段。Edge API 必须把这些字段继续传入 `RunProcessContext`，由 Codex、Claude Code、OpenCode adapter 各自映射到 CLI 参数。Desktop bridge 在启动 Local Edge run 前先用 Hub `session_id`/`thread_id` 确保本地 Edge thread 存在，再调用 `POST /v1/runs`；否则真实 Web→Hub→Desktop 路径会在 Edge `project or thread not found` 或未知 `agentId` 处失败。
+
+审批闭环必须进入 `RunEvent` 和 `Approval`：UI 通过 run-scoped approval API 决策；Edge 验证 pending permission registry、runId、requestId 和 one-shot replay；需要 stdin 控制协议的 Runtime 由 adapter 写回对应控制消息。当前仓库已经完成 REST 决策登记和重复/错 run 拒绝；真正阻塞式 stdin 回写仍是后续实现，不能把 permission event 展示误写成完整 HITL。Hub 参与时，Hub 先做 TokenDance ID -> Hub user -> resource/action 授权，再把任务派到目标 Edge；Hub 同步、审计和中继，不直接启动本地 CLI 进程。
+
 ### 关键实现细节
 
 **Claude Code adapter**：
-- stdin 双向控制协议：支持 `can_use_tool`（权限审批）、`interrupt`（取消）、`set_model`、`set_permission_mode`、`stop_task` 控制消息
+- stdin 双向控制协议结构：支持 `can_use_tool`（权限审批）、`interrupt`（取消）、`set_model`、`set_permission_mode`、`stop_task` 控制消息；`ProcessExecutor` 目前启动后关闭 stdin，阻塞式权限回写待实现
 - 会话管理：`--resume <sessionId>` 指定会话、`--continue` 继续最近会话、`--fork-session` 分叉会话
 - 模型选择：`--model` + `--reasoning-effort` + `--max-thinking-tokens` + `--fast`
 - 14 种新增 BusEvent 常量：`compact_boundary`、`api_retry`、`task_started`/`task_progress`/`task_notification`、`session_state_changed`、`hook_started`/`hook_progress`/`hook_response`、`tool_use_summary`、`auth_status`、`rate_limit`、`status_change`
@@ -170,7 +239,7 @@ Edge 通过 AgentAdapter 接口直接调用各 CLI 的原生协议：
 
 adapter 包包含 32 个单元测试（覆盖 24 种 NDJSON 消息类型解析、控制协议、边界情况）和 14 个集成测试（覆盖 Claude Code 和 OpenCode 的端到端执行、工具调用、取消、stdin 控制、命令行参数构建）。
 
-当前本地拓扑（P0-P3 已全部完成）：
+当前本地拓扑（本地执行闭环已完成）：
 
 ```text
 Desktop App
@@ -186,11 +255,26 @@ Desktop App
 
 当前架构边界：
 
-- Hub Server 已完整实现（三层架构，21 migrations，Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。
+- Hub Server 已完整实现（三层架构，28 migrations，Gin + GORM + Redis + PostgreSQL），但本地执行不依赖 Hub。
 - Web/Mobile 可通过 Hub 远程查看和审批。
 - Desktop UI 默认只连接本机 Local Edge。
 - Edge 才能启动 Agent CLI 进程，UI 不直接启动 Agent CLI。
 - Agent CLI 只能在授权 workspace 或 worktree 内执行。
+
+### 3.2 八个部署场景现状
+
+| 场景 | 状态 | 当前证据 / 缺口 |
+|---|---|---|
+| 1. Desktop 本地离线 | ✅ 已实现 | Desktop -> Local Edge -> Claude Code / Codex / OpenCode 本地运行闭环成立，不依赖 Hub。 |
+| 2. Desktop 本地在线 | 🟡 基本实现 | Hub OIDC exchange、Hub-local session、WS auth 和设备注册链路已在仓内落地；部署态 login/logout/reconnect 与截图证据仍需补齐。 |
+| 3. Desktop 直连远程 Desktop | ❌ 未实现 | Local Edge 已有 `/v1/runs` workspace allowlist 护栏；Remote Edge over SSH/Tailscale 仍缺目标注册、路由、授权、远程 allowlist 同步和远程审批证明。 |
+| 4. Desktop 中继到远程 Desktop | ❌ 未实现 | Hub Relay 到任意远程 Desktop Edge 还不是通用产品链路。 |
+| 5. Desktop 直连云 | ❌ 未实现 | Cloud Edge / hosted target 仍是架构目标。 |
+| 6. Desktop 中继到云 | ❌ 未实现 | Hub -> Cloud Edge 调度、租户隔离、凭据隔离和资源限额未落地。 |
+| 7. Web 中继到 Desktop | 🟡 最小闭环 | Web -> Hub task -> Desktop bridge -> Local Edge -> typed stream / replay -> Web 已在仓内打通；仍需部署态 smoke、Web session 姿态和 live E2E 截图。 |
+| 8. Web 中继到云 | ❌ 未实现 | 依赖 Cloud Edge 注册、Hub relay routing、云端 workspace policy 和审计闭环。 |
+
+因此当前可对外表达为：本地执行闭环已完成，Web 控制当前 Desktop 的仓内最小闭环已完成；远程和云相关能力仍在 P3/P4，不应写成 8/8。
 
 ## 4. 组件职责
 
@@ -217,7 +301,7 @@ REST JSON API + WebSocket typed events
 | Edge -> UI | WebSocket typed events | 消息增量、run output、artifact、preview、审批请求 |
 | Edge lifecycle -> AgentAdapter | Go interface + process context | 启动执行、取消执行、读取产物、解析 CLI 输出 |
 | AgentAdapter -> Edge | typed events | 日志、状态、Diff、Artifact、Preview |
-| Edge -> Hub | REST sync + reverse WebSocket | 同步、注册、中继、远程控制 |
+| Edge/Desktop bridge -> Hub | REST callbacks + Hub WebSocket dispatch | 设备注册、Web task dispatch、run stream/done/fail 回传、同步和中继 |
 | Web/Mobile -> Hub | REST JSON + WebSocket | 云端会话、远程查看、远程审批 |
 | Hub -> TokenDance ID | OIDC Authorization Code + PKCE / JWKS | 登录、token 验证、账号映射 |
 | Edge -> MCP / Skill runtime | local process / HTTP / stdio | 工具发现、工具执行、脚本权限控制 |
@@ -249,10 +333,10 @@ UI -> Hub -> Edge -> AgentAdapter -> Agent CLI
 
 ```text
 Agent CLI -> Edge EventStore -> Edge WebSocket Bus -> UI
-Edge EventStore -> Hub Sync -> Web/Mobile
+Edge EventStore -> Desktop bridge -> Hub callbacks -> Web/Mobile
 ```
 
-`edge-server/internal/events/bus.go` 是内存投递组件，负责 seq、短历史 replay 和 WebSocket fanout。EventStore 已完整落地到 Edge 本地存储。
+`edge-server/internal/events/bus.go` 是内存投递组件，负责 seq、短历史 replay 和 WebSocket fanout。EventStore 已完整落地到 Edge 本地存储。Hub task bridge 只同步可见输出和任务终态，不把 stderr diagnostics、secret-bearing local logs 或本地临时产物直接写入 Hub。
 
 ### 同步线
 
@@ -262,7 +346,7 @@ Edge EventStore -> Hub Sync -> Web/Mobile
 Edge EventStore -> Hub Sync -> other devices
 ```
 
-本地 EventStore 语义已完整实现。Hub Server 也已完整实现（三层架构，17 migrations，Gin + GORM + Redis + PostgreSQL），提供账号、IM、多端同步和中继能力。
+本地 EventStore 语义已完整实现。Hub Server 也已完整实现（三层架构，28 migrations，Gin + GORM + Redis + PostgreSQL），提供账号、IM、多端同步和中继能力。
 
 ## 7. EventStore 和恢复语义
 
@@ -353,9 +437,9 @@ REST snapshot 至少应能按 Project、Thread、Run、Item、Artifact 重建 UI
 | M3b | 多 Agent 协调、Orchestrator、sub-agent spawn | ✅ |
 | M4 | Hub Server、响应式布局、环境隔离、E2E、权限门控、Hub auth | ✅ |
 | P0 | Desktop UI -> Local Edge -> AgentAdapter -> Agent CLI (完整闭环) | ✅ |
-| P1 | Local Edge + 多 Agent Thread | 已完成 |
-| P2 | Edge <-> Hub 同步，TokenDance ID 登录，Web/Mobile 查看和审批 | 规划中（Q3） |
-| P3 | Hub Relay -> Local/Remote/Cloud Edge -> AgentAdapter，远程控制和预览代理 | 规划中（Q3） |
+| P1 | Local Edge + 多 Agent Thread / AgentTeam | 部分完成：Edge 本地 Orchestrator/sub-agent 原型、Hub group/session、Agent Profile 和 Web/Desktop 表面已有；仍缺产品级 AgentTeam、TeamRun/TeamTask/TeamEvent、TeamRunState、typed route decision、双真实 Runtime Profile 的群组 E2E 和冲突处理证据 |
+| P2 | Edge <-> Hub 同步，TokenDance ID 登录，Web/Mobile 查看和审批 | 进行中：Hub OIDC code exchange 与 Hub-local session 已在 repo 落地；部署配置、Desktop/Web 回调 UX、logout/reconnect 和授权证据仍需闭环 |
+| P3 | Hub Relay -> Local/Remote/Cloud Edge -> AgentAdapter，远程控制和预览代理 | 规划中（Q3）；Execution Target 基础 CRUD、policy 字段和 Local Edge workspace allowlist 护栏已有，但远程/云 target 注册、allowlist 同步、relay routing 和远程审批未完成 |
 | P4 | 完整团队 IM、Agent 市场、Skill/MCP 管理、模型配置和安全审计 | 规划中 |
 
 ## 11. 文档分层

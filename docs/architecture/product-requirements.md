@@ -12,13 +12,13 @@ AgentHub 是一个 IM 形态的多 Agent 协作平台。
 AgentHub = 本地 Agent 工作台 + IM 式多 Agent 协作 + Hub 网络同步与中继
 ```
 
-当前仓库已完成 P0-P3 全部任务，M3b 与 M4 均已交付。全链路已跑通：
+当前仓库的最强证据集中在 P0 本地执行主链路：Desktop/Edge 能启动真实 Agent Runtime，并把结构化事件回到 UI。P1/P2 的 Hub IM、TokenDance ID、多端同步和 Web 查看已经有代码落点，但仍按“部分闭环”管理，不能把仓内 wiring、结构检查或历史分支记录当成部署态完成证明。
 
 ```text
 Desktop UI -> Local Edge -> Edge lifecycle -> Agent Runtime Adapter (Claude Code / OpenCode / Codex) -> WebSocket events -> UI
 ```
 
-P0 完整闭环已实现：本地项目、Thread、真实 Agent Runtime adapter、Diff、Apply / Discard、Approval 和 Preview。旧文档中的 Runner 指 Edge lifecycle + AgentAdapter，不再是独立产品组件。
+P0 本地执行主链路已实现：本地项目、Thread、真实 Agent Runtime adapter、WebSocket 事件、基础 Diff/输出展示和 Preview 入口可用。Approval 当前具备事件展示与 run-scoped REST 决策登记；真正阻塞式 stdin 回写和远程 Edge 决策证明仍是后续安全闭环。旧文档中的 Runner 指 Edge lifecycle + AgentAdapter，不再是独立产品组件。TokenDance ID 接入当前以 Hub OIDC code exchange、Hub-local session、Web/Desktop 登录入口和 Hub WebSocket session gate 为仓内证据；部署态 login/callback/logout/reconnect smoke 仍是 P0 后续验收。
 
 ## 2. 目标用户和场景
 
@@ -26,7 +26,7 @@ P0 完整闭环已实现：本地项目、Thread、真实 Agent Runtime adapter�
 |---|---|---|
 | 学生/开发者 | 在本地项目里让 Agent 写代码、审查 Diff、启动预览 | 能选择本地项目，创建 Thread，启动一次 AgentRun，并看到日志、Diff 和 Preview |
 | 小团队 | 像群聊一样组织多个 Agent Profile 协作完成任务 | 能在同一个 Thread 中 @Agent Profile，查看不同 Agent 的进度、产物和审查意见 |
-| 比赛评审 | 快速看懂产品定位、技术路线、可演示流程和 AI 协作记录 | 能启动 Local Edge/Desktop，创建 AgentRun，看到 WebSocket 事件和 UI 实时更新，并理解 P0-P3 全部完成的状态 |
+| 比赛评审 | 快速看懂产品定位、技术路线、可演示流程和 AI 协作记录 | 能启动 Local Edge/Desktop，创建 AgentRun，看到 WebSocket 事件和 UI 实时更新，并理解 P0 本地主链路已落地、P1/P2 多端与身份链路仍需真实 smoke 的边界 |
 | 后续 Agent | 根据文档继续拆任务、补接口、写实现 | 能从 README、本文、系统架构、实现指南定位当前阶段和下一步任务 |
 
 ## 3. 核心体验
@@ -41,6 +41,8 @@ P0/P1 的第一屏不是普通聊天软件，而是 Agent 工作台：
 ```
 
 用户直接选择和管理的是 Agent Profile。Profile 由 Agent Runtime、模型、Agent Configuration、Workspace、Skill/MCP、审批策略和 Execution Target 组成。Agent Configuration 包含 `AGENTS.md`、Agent memory、上下文、聊天记录、工作目录、skills、MCP、模型参数和审批策略。Execution Target 必须能区分本地、远程 SSH/Tailscale、云端和 Hub relay。
+
+多 Agent 协作需要在 Profile 之上新增产品级 AgentTeam，而不是继续把 Edge 进程内 sub-agent registry 当成团队模型。AgentTeam 是可管理、可审计、可恢复的团队模板；TeamRun 是一次团队目标执行；TeamTask 是团队成员实际承担的子任务。当前 Hub group/session 和 Edge Orchestrator 只能证明“可放多个 Agent / 可本地派生子任务”，还不能证明 AgentTeam 闭环。
 
 ### 当前可演示流
 
@@ -74,6 +76,31 @@ P0/P1 的第一屏不是普通聊天软件，而是 Agent 工作台：
 
 P1 之后都是增强能力，不阻塞 P0 本地离线闭环。P0 必须做到不依赖 Hub 也能在本机完成 Agent 工作台体验。
 
+### 4.1 产品方向约束
+
+AgentHub 的产品方向是“IM-native Agent collaboration + real Runtime execution”，不是 LangGraph/Dify 式低代码 workflow canvas。可以借鉴竞品的 durable thread、trace、run history、append-only event log 和审批恢复，但用户第一对象仍是：
+
+```text
+Agent Profile -> Execution Target -> Thread -> Run -> RunEvent -> Approval / Artifact
+```
+
+P1 多 Agent 目标需要把这条单 Agent 主线扩展为：
+
+```text
+AgentProfile -> AgentTeam -> TeamRun -> TeamTask -> Run -> RunEvent
+                                 -> TeamEvent / TeamMessage / Approval / Artifact
+```
+
+AgentTeam 的首版验收不要求远程/云执行完成，但必须具备 Hub-visible 的 `AgentTeam`、`TeamRun`、`TeamTask`、`TeamEvent` 或等价事件源，并能从事件恢复 `TeamRunState`。Supervisor 委派应收敛为 typed `CoordinatorRouteDecision`，不能长期依赖从模型文本里扫描 JSON。
+
+因此下一阶段产品验收应优先看真实 Runtime 闭环：
+
+- Codex、Claude Code、OpenCode 是否通过 Edge adapter 产生结构化 `RunEvent`；
+- Web/Desktop 是否用同一事件模型渲染 transcript、tool timeline、diff、approval、usage；
+- Hub 是否只做身份、授权、同步、中继和审计，不绕过 Edge 直接启动 CLI；
+- TokenDance ID 是否只做身份 SSOT，Hub 是否签发自己的 session/device proof；
+- 公开文案是否把 Codex/Claude Code/OpenCode 写作 Agent Runtime，而不是可管理的业务 Agent 本体。
+
 ## 5. P0 功能验收
 
 | 能力 | 怎样算完成 |
@@ -87,7 +114,7 @@ P1 之后都是增强能力，不阻塞 P0 本地离线闭环。P0 必须做到�
 | changed files | run 结束后能检测文件变更列表 |
 | Diff 查看 | UI 能展示文本 Diff，并关联到对应 run/artifact |
 | Apply / Discard | 用户能把变更应用回主工作区，或丢弃本次 run |
-| Approval 卡片 | 危险命令、文件写入或部署动作会生成审批请求，用户可接受或拒绝 |
+| Approval 卡片 | 危险命令、文件写入或部署动作会生成审批请求，用户可接受或拒绝；当前完成 run-scoped REST 决策登记，阻塞式 Runtime 回写另行验收 |
 | Preview 面板 | Agent Runtime 或 Edge 能启动预览，并通过 UI 打开 |
 | `.agenthub/` 规则读取 | Edge Context Builder 能读取项目规则、Agent 说明和基础记忆 |
 
@@ -107,12 +134,14 @@ P1 之后都是增强能力，不阻塞 P0 本地离线闭环。P0 必须做到�
 
 | 阶段 | 目标 | 能力 | 状态 |
 |---|---|---|---|
-| P1 | 多 Agent Thread | @Agent、Reviewer、Orchestrator、Thread fork、多 Agent 围绕同一 Artifact 讨论 | 已完成 |
-| P2 | Identity + Edge-Hub Sync | TokenDance ID OIDC 登录、Hub session、Edge 注册、设备状态、消息/事件同步、Web/Mobile 查看状态和远程审批 | 规划中（Q3） |
-| P3 | Relay / Remote / Cloud | Hub 中继、本地/远程 SSH/Tailscale/Cloud Execution Target、远程 Preview、Artifact Proxy、远控审批 | 规划中（Q3） |
+| P1 | AgentTeam / 多 Agent Thread | @Agent、Reviewer、Orchestrator、Thread fork、AgentTeam、TeamRun、TeamTask、多 Agent 围绕同一 Artifact 讨论 | 部分完成：Hub group/session、Agent Profile、Orchestrator 和 Web/Desktop 表面已有落点；仍缺产品级 `AgentTeam`、`TeamRun`、`TeamTask`、`TeamEvent`、可恢复 `TeamRunState`、typed route decision、两条以上真实 Runtime Profile 的群组 E2E、聚合 transcript 和冲突处理证据 |
+| P2 | Identity + Edge-Hub Sync | TokenDance ID OIDC 登录、Hub session、Edge 注册、设备状态、消息/事件同步、Web/Mobile 查看状态和远程审批 | 进行中：Hub OIDC code exchange 与 Hub-local session 已在 repo 落地；部署配置、Desktop/Web 回调 UX、logout/reconnect 和授权证据仍需闭环 |
+| P3 | Relay / Remote / Cloud | Hub 中继、本地/远程 SSH/Tailscale/Cloud Execution Target、远程 Preview、Artifact Proxy、远控审批 | 规划中（Q3）；当前只有 Execution Target 基础模型/接口，远程和云目标还缺注册、路由、workspace allowlist 和远程审批证据 |
 | P4 | 团队 IM + Agent Platform | 用户、联系人、群组、团队空间、团队 Memory、Agent 市场、Skill/MCP 管理、模型配置、模型映射、cc-switch provider binding、安全审计 | 规划中 |
 
 Hub Network、Web/Mobile、团队账号和多人 IM 都是 P1+ 能力，不作为本地 P0 的验收条件。
+
+按完整部署拓扑看，当前不是 8/8：Desktop 本地离线已完成，Desktop 本地在线和 Web 中继到当前 Desktop 处于仓内最小闭环；Desktop/Web 到远程 Desktop 或 Cloud Edge 的四类远程/云执行场景仍未实现为可发布产品链路。
 
 ## 8. 非目标
 

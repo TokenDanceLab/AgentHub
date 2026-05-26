@@ -38,6 +38,9 @@ const DefaultServerReadTimeout = 30 * time.Second
 // DefaultServerIdleTimeout is the IdleTimeout applied to the main HTTP server.
 const DefaultServerIdleTimeout = 120 * time.Second
 
+// DefaultMaxUploadSize is the fallback max upload size when not configured.
+const DefaultMaxUploadSize int64 = 50 << 20 // 50 MB
+
 // DefaultMaxHeaderBytes caps incoming HTTP request headers.
 const DefaultMaxHeaderBytes = 1 << 20
 
@@ -61,6 +64,12 @@ const SessionMemberCacheTTL = 5 * time.Minute
 // PendingTaskTTL is the time-to-live for a queued pending agent task. Expired
 // tasks are scanned by the background scheduler and published as timeout events.
 const PendingTaskTTL = 24 * time.Hour
+
+// RunningTaskHeartbeatTTL is the expiration extension applied to running tasks
+// each time the Hub receives a stream callback. If no callback arrives within
+// this window, the background scheduler will mark the task as timed out.
+// #132: ensures long-running agent tasks are eventually expired on inactivity.
+const RunningTaskHeartbeatTTL = 10 * time.Minute
 
 // PendingTaskScanInterval controls how often expired pending tasks are scanned.
 const PendingTaskScanInterval = time.Minute
@@ -97,6 +106,9 @@ const MaxPinsPerSession int64 = 50
 
 // ForwardMessageConcurrency limits concurrent writes during message forwarding.
 const ForwardMessageConcurrency = 8
+
+// MaxForwardTargets limits the number of target sessions for message forwarding.
+const MaxForwardTargets = 50
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 

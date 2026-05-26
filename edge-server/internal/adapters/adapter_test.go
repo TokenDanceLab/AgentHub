@@ -255,7 +255,7 @@ func TestSandboxForPermissionMode(t *testing.T) {
 		want string
 	}{
 		{"plan", "read-only"},
-		{"default", "default"},
+		{"default", ""}, // Codex has no "default" sandbox — let it decide
 		{"acceptEdits", "workspace-write"},
 		{"dontAsk", "workspace-write"},
 		{"bypassPermissions", "danger-full-access"},

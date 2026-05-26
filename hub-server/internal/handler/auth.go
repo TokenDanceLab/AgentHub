@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"log"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
@@ -12,13 +11,10 @@ import (
 
 // AuthService is the subset of *service.AuthService used by AuthHandler.
 type AuthService interface {
-	Register(ctx context.Context, username, password, nickname string) (*model.User, error)
-	Login(ctx context.Context, username, password, deviceType, deviceID string) (*service.LoginResponse, error)
 	RefreshToken(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error)
-	Logout(ctx context.Context, userID, deviceID string) error
+	Logout(ctx context.Context, userID, deviceID, deviceType string) error
 	GetMe(ctx context.Context, userID string) (*model.User, error)
 	UpdateProfile(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error)
-	ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error
 }
 
 type AuthHandler struct {
@@ -27,64 +23,6 @@ type AuthHandler struct {
 
 func NewAuthHandler(s AuthService) *AuthHandler {
 	return &AuthHandler{service: s}
-}
-
-type registerReq struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-	Nickname string `json:"nickname" binding:"required"`
-}
-
-func (h *AuthHandler) Register(c *gin.Context) {
-	var req registerReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		Fail(c, errcode.ErrBadRequest)
-		return
-	}
-	user, err := h.service.Register(c.Request.Context(), req.Username, req.Password, req.Nickname)
-	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
-			Fail(c, e)
-			return
-		}
-		Fail(c, errcode.ErrInternal)
-		return
-	}
-	OK(c, gin.H{"user_id": user.ID})
-}
-
-type loginReq struct {
-	Username   string `json:"username" binding:"required"`
-	Password   string `json:"password" binding:"required"`
-	DeviceType string `json:"device_type" binding:"required"`
-	DeviceID   string `json:"device_id" binding:"required"`
-}
-
-func (h *AuthHandler) Login(c *gin.Context) {
-	var req loginReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		Fail(c, errcode.ErrBadRequest)
-		return
-	}
-	deviceID, ok := normalizeUUID(req.DeviceID)
-	if !ok {
-		FailWithMessage(c, errcode.ErrBadRequest, "device_id must be a UUID")
-		return
-	}
-	req.DeviceID = deviceID
-
-	resp, err := h.service.Login(c.Request.Context(), req.Username, req.Password, req.DeviceType, req.DeviceID)
-	if err != nil {
-		if e, ok := err.(*errcode.Error); ok {
-			Fail(c, e)
-			return
-		}
-		c.Error(err)
-		log.Printf("[LOGIN ERROR] username=%s device_type=%s err=%v", req.Username, req.DeviceType, err)
-		Fail(c, errcode.ErrInternal)
-		return
-	}
-	OK(c, resp)
 }
 
 type refreshReq struct {
@@ -112,7 +50,9 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	userID := c.GetString("user_id")
 	deviceID := c.GetString("device_id")
-	if err := h.service.Logout(c.Request.Context(), userID, deviceID); err != nil {
+	// Scope revocation by device_type if provided as a query parameter (#149).
+	deviceType := c.Query("device_type")
+	if err := h.service.Logout(c.Request.Context(), userID, deviceID, deviceType); err != nil {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
@@ -155,27 +95,4 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 	OK(c, user)
-}
-
-type changePasswordReq struct {
-	OldPassword string `json:"old_password" binding:"required"`
-	NewPassword string `json:"new_password" binding:"required"`
-}
-
-func (h *AuthHandler) ChangePassword(c *gin.Context) {
-	var req changePasswordReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		Fail(c, errcode.ErrBadRequest)
-		return
-	}
-	userID := c.GetString("user_id")
-	if err := h.service.ChangePassword(c.Request.Context(), userID, req.OldPassword, req.NewPassword); err != nil {
-		if e, ok := err.(*errcode.Error); ok {
-			Fail(c, e)
-			return
-		}
-		Fail(c, errcode.ErrInternal)
-		return
-	}
-	OK(c, nil)
 }

@@ -1,8 +1,8 @@
 // Custom model/agent dropdown — Portal-rendered, high-density two-line items.
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Check } from 'lucide-react';
-import { ModelIcon, ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
+import { ChevronDown, Check, Bot } from 'lucide-react';
+import { Claude, ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
 import styles from './ModelDropdown.module.css';
 
 interface Option {
@@ -36,20 +36,31 @@ function cleanModelName(name: string): string {
 
 function AgentDot({ name }: { name: string }) {
   const n = name.toLowerCase();
-  if (n.includes('claude')) return <ClaudeCode size={18} />;
+  const compact = n.replace(/[\s_-]+/g, '');
+  if (compact === 'claudecode') return <ClaudeCode size={18} />;
   if (n.includes('codex')) return <Codex size={18} />;
   if (n.includes('opencode')) return <OpenCode size={18} />;
-  return <ModelIcon model={name} size={18} />;
+  return <Bot size={16} />;
+}
+
+function ModelDot() {
+  return <Bot size={15} strokeWidth={1.9} />;
+}
+
+function ModelIcon({ name }: { name: string }) {
+  const n = name.toLowerCase();
+  if (n.includes('claude')) return <Claude size={18} />;
+  return <ModelDot />;
 }
 
 export default function ModelDropdown({ options, value, onChange, placeholder, disabled, ariaLabel, alignRight, variant = 'default' }: Props) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0, up: false, rightEdge: 0 });
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0, up: false });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selected = options.find((o) => o.value === value);
-  const showPlaceholder = !selected && variant !== 'text';
+  const showPlaceholder = !selected;
   const displayLabel = selected ? cleanModelName(selected.label) : (showPlaceholder ? (placeholder || 'Select...') : '');
 
   const grouped: Record<string, Option[]> = useMemo(() => {
@@ -62,26 +73,32 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
     return g;
   }, [options]);
 
-  const openDropdown = useCallback(() => {
-    if (disabled) return;
+  const updatePosition = useCallback(() => {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      const w = Math.max(rect.width, 280);
-      const dropdownH = 320; // estimated max height
+      const margin = 12;
+      const preferredWidth = options.some((o) => o.isAgent) ? 440 : 280;
+      const w = Math.min(Math.max(rect.width, preferredWidth), window.innerWidth - margin * 2);
+      const dropdownH = 320;
       const spaceBelow = window.innerHeight - rect.bottom;
       const spaceAbove = rect.top;
-      // Open upward if not enough space below
       const openUp = spaceBelow < dropdownH && spaceAbove > spaceBelow;
+      const rawLeft = alignRight ? rect.right - w : rect.left;
+      const left = Math.min(Math.max(rawLeft, margin), window.innerWidth - w - margin);
       setPos({
         top: openUp ? rect.top - 4 : rect.bottom + 4,
-        left: alignRight ? rect.right - w : rect.left,
-        rightEdge: rect.right,
+        left,
         width: w,
         up: openUp,
       });
     }
+  }, [alignRight, options]);
+
+  const openDropdown = useCallback(() => {
+    if (disabled) return;
+    updatePosition();
     setOpen(true);
-  }, [disabled, alignRight]);
+  }, [disabled, updatePosition]);
 
   useEffect(() => {
     if (!open) return;
@@ -105,20 +122,12 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
   useEffect(() => {
     if (!open) return;
     const handler = () => {
-      if (triggerRef.current) {
-        const rect = triggerRef.current.getBoundingClientRect();
-        const w = Math.max(rect.width, 280);
-        const dropdownH = 320;
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const spaceAbove = rect.top;
-        const openUp = spaceBelow < dropdownH && spaceAbove > spaceBelow;
-        setPos({ top: openUp ? rect.top - 4 : rect.bottom + 4, left: alignRight ? rect.right - w : rect.left, rightEdge: rect.right, width: w, up: openUp });
-      }
+      updatePosition();
     };
     window.addEventListener('scroll', handler, true);
     window.addEventListener('resize', handler);
     return () => { window.removeEventListener('scroll', handler, true); window.removeEventListener('resize', handler); };
-  }, [open, alignRight]);
+  }, [open, updatePosition]);
 
   const handleSelect = useCallback((optValue: string) => {
     onChange(optValue);
@@ -132,10 +141,9 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
         position: 'fixed', zIndex: 9999,
         top: pos.up ? 'auto' : pos.top,
         bottom: pos.up ? `${window.innerHeight - pos.top}px` : 'auto',
-        ...(alignRight
-          ? { right: `${window.innerWidth - pos.rightEdge}px`, left: 'auto' }
-          : { left: pos.left, right: 'auto' }),
-        minWidth: pos.width,
+        left: pos.left,
+        right: 'auto',
+        width: pos.width,
       }}>
       {Object.entries(grouped).map(([group, opts], gi) => (
         <div key={group}>
@@ -148,7 +156,7 @@ export default function ModelDropdown({ options, value, onChange, placeholder, d
               className={`${styles.item} ${compact ? styles.itemCompact : ''} ${opt.value === value ? styles.itemActive : ''}`}
               onClick={() => handleSelect(opt.value)}>
               <span className={styles.itemIcon}>
-                {opt.isAgent ? <AgentDot name={opt.label} /> : <ModelIcon model={opt.value} size={16} />}
+                {opt.isAgent ? <AgentDot name={opt.label} /> : <ModelIcon name={opt.label} />}
               </span>
               <span className={styles.itemBody}>
                 <span className={styles.itemName}>{cleanModelName(opt.label)}</span>

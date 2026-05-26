@@ -301,14 +301,11 @@ func (s *ContactService) BlockContact(ctx context.Context, currentUserID, target
 		return errcode.UserNotFound
 	}
 
-	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("(user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)",
-			currentUserID, targetUserID, targetUserID, currentUserID).Delete(&model.Friendship{}).Error; err != nil {
-			return err
-		}
-		return repository.CreateFriendship(tx, &model.Friendship{
-			UserID: currentUserID, FriendID: targetUserID, Status: model.StatusBlocked,
-		})
+	// #183: Only upsert the caller→target direction to blocked.
+	// Do not delete the reverse direction — that would wipe a target→caller
+	// blocked row (cross-user data loss).
+	if err := repository.UpsertFriendship(s.db, &model.Friendship{
+		UserID: currentUserID, FriendID: targetUserID, Status: model.StatusBlocked,
 	}); err != nil {
 		return err
 	}
@@ -329,5 +326,16 @@ func (s *ContactService) UnblockContact(ctx context.Context, currentUserID, targ
 }
 
 func (s *ContactService) UpdateRemark(ctx context.Context, currentUserID, friendUserID, remark string) error {
-	return repository.UpdateFriendshipRemark(s.db, currentUserID, friendUserID, remark)
+	if err := repository.UpdateFriendshipRemark(s.db, currentUserID, friendUserID, remark); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errcode.FriendRemarkNoRow
+		}
+		return err
+	}
+	return nil
+}
+
+// GetFriendIDs returns the IDs of all accepted friends of the given user. Thin wrapper over repository.GetFriendIDs.
+func (s *ContactService) GetFriendIDs(userID string) ([]string, error) {
+	return repository.GetFriendIDs(s.db, userID)
 }

@@ -1,11 +1,12 @@
 package adapters
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
+	"os/exec"
+	"strings"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -16,11 +17,13 @@ import (
 // Phase 2: opencode run "prompt" --format json — structured JSON events.
 type OpenCodeAdapter struct {
 	binaryPath string
+	available  bool // #177: true if the CLI binary exists and is executable
 }
 
 // NewOpenCodeAdapter creates an OpenCode adapter.
 func NewOpenCodeAdapter(binaryPath string) *OpenCodeAdapter {
-	return &OpenCodeAdapter{binaryPath: binaryPath}
+	_, err := exec.LookPath(binaryPath)
+	return &OpenCodeAdapter{binaryPath: binaryPath, available: err == nil}
 }
 
 func (a *OpenCodeAdapter) Metadata() AdapterMetadata {
@@ -87,6 +90,25 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		args = append(args, "--dangerously-skip-permissions")
 	}
 
+	// Attach files via --file (supports comma-separated list via ConfigOverrides)
+	if files, ok := ctx.ConfigOverrides["files"]; ok && files != "" {
+		for _, f := range splitComma(files) {
+			if f != "" {
+				args = append(args, "--file", f)
+			}
+		}
+	}
+
+	// Working directory as --dir (supplemental to process workDir)
+	if ctx.WorkDir != "" {
+		args = append(args, "--dir", ctx.WorkDir)
+	}
+
+	// Slash command via --command (e.g., /compact)
+	if cmd, ok := ctx.ConfigOverrides["command"]; ok && cmd != "" {
+		args = append(args, "--command", cmd)
+	}
+
 	args = append(args, prompt)
 
 	workDir := ctx.WorkDir
@@ -106,30 +128,24 @@ func (a *OpenCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, std
 		"runId":     run.ID,
 	}
 
-	scanner := bufio.NewScanner(stdout)
-	configureAdapterScanner(scanner)
-
-	for scanner.Scan() {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
+	return ScanLines(ctx, stdout, func(line []byte) error {
 		var evt opencodeEvent
 		if err := json.Unmarshal(line, &evt); err != nil {
 			slog.Debug("opencode: skipping unparseable line", "err", err)
-			continue
+			return nil
 		}
 		a.dispatch(scope, emitter, &evt)
-	}
-	return scanner.Err()
+		return nil
+	})
 }
 
 // NeedsStdin returns false — OpenCode runs in batch mode with the prompt
 // passed as a CLI argument, so it does NOT read stdin.
 func (a *OpenCodeAdapter) NeedsStdin() bool { return false }
+
+// Available reports whether the opencode CLI binary was found at startup.
+// #177: check binary at startup, report unavailable if missing.
+func (a *OpenCodeAdapter) Available() bool { return a.available }
 
 func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
 	// Forward sessionID to scope if present
@@ -152,44 +168,36 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 			})
 		}
 	case "tool_use":
-		if evt.Part != nil {
+		if evt.Part != nil && evt.Part.State != nil {
+			toolName := evt.Part.Tool
+			state := evt.Part.State
+			// Emit tool call event (start notification)
 			emitter.Emit(BusEventToolCall, scope, map[string]any{
 				"callId":   evt.Part.CallID,
-				"toolName": evt.Part.ToolName,
-				"input":    evt.Part.Input,
-				"status":   evt.Part.State,
+				"toolName": toolName,
+				"input":    state.Input,
+				"status":   state.Status,
 			})
-		}
-	case "tool_result":
-		if evt.Part != nil {
-			emitter.Emit(BusEventToolResult, scope, map[string]any{
+			// Emit tool result event (completion/error)
+			resultPayload := map[string]any{
 				"callId":   evt.Part.CallID,
-				"toolName": evt.Part.ToolName,
-				"output":   evt.Part.Output,
-				"status":   evt.Part.Status,
-			})
-			if isFileModifyingTool(evt.Part.ToolName) {
+				"toolName": toolName,
+				"status":   state.Status,
+			}
+			if state.Status == "error" {
+				resultPayload["error"] = state.Error
+			} else {
+				resultPayload["output"] = state.Output
+			}
+			emitter.Emit(BusEventToolResult, scope, resultPayload)
+			// Emit file change event for file-modifying tools
+			if isFileModifyingTool(toolName) {
 				emitter.Emit(BusEventFileChange, scope, map[string]any{
 					"callId":   evt.Part.CallID,
-					"toolName": evt.Part.ToolName,
-					"content":  evt.Part.Output,
+					"toolName": toolName,
+					"content":  state.Output,
 				})
 			}
-		}
-	case "permission":
-		if evt.Part != nil {
-			emitter.Emit(BusEventStatusChange, scope, map[string]any{
-				"permissionMode":  "ask",
-				"permissionTool":  evt.Part.ToolName,
-				"permissionInput": evt.Part.ToolInput,
-			})
-		}
-	case "file":
-		if evt.Part != nil {
-			emitter.Emit(BusEventFileChange, scope, map[string]any{
-				"path":      evt.Part.Path,
-				"operation": evt.Part.Operation,
-			})
 		}
 	case "reasoning":
 		if evt.Part != nil {
@@ -220,38 +228,6 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 		emitter.Emit(BusEventSessionStateChanged, scope, map[string]any{
 			"state": "idle",
 		})
-	case "session.init":
-		emitter.Emit(BusEventSessionInit, scope, map[string]any{
-			"sessionId": evt.SessionID,
-			"model":     evt.Model,
-			"provider":  evt.Provider,
-			"tools":     evt.Tools,
-		})
-	case "session.error":
-		emitter.Emit(BusEventResult, scope, map[string]any{
-			"success": false,
-			"error":   evt.ErrorMessage,
-		})
-	case "task_start":
-		emitter.Emit(BusEventTaskStarted, scope, map[string]any{
-			"taskId":      evt.TaskID,
-			"description": evt.TaskDescription,
-			"taskType":    evt.TaskType,
-		})
-	case "task_progress":
-		emitter.Emit(BusEventTaskProgress, scope, map[string]any{
-			"taskId":       evt.TaskID,
-			"description":  evt.TaskDescription,
-			"lastToolName": evt.LastToolName,
-			"usage":        evt.TaskUsage,
-		})
-	case "task_complete":
-		emitter.Emit(BusEventTaskNotification, scope, map[string]any{
-			"taskId":  evt.TaskID,
-			"status":  "completed",
-			"summary": evt.TaskSummary,
-			"usage":   evt.TaskUsage,
-		})
 	case "error":
 		emitter.Emit(BusEventResult, scope, map[string]any{
 			"success": false,
@@ -265,37 +241,51 @@ func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, e
 // --- OpenCode JSON event schemas ---
 
 type opencodeEvent struct {
-	Type            string        `json:"type"`
-	SessionID       string        `json:"sessionID,omitempty"`
-	Part            *opencodePart `json:"part,omitempty"`
-	ErrorMessage    string        `json:"error,omitempty"`
-	Model           string        `json:"model,omitempty"`
-	Provider        string        `json:"provider,omitempty"`
-	Tools           []string      `json:"tools,omitempty"`
-	TaskID          string        `json:"taskId,omitempty"`
-	TaskDescription string        `json:"taskDescription,omitempty"`
-	TaskType        string        `json:"taskType,omitempty"`
-	TaskSummary     string        `json:"taskSummary,omitempty"`
-	TaskUsage       any           `json:"taskUsage,omitempty"`
-	LastToolName    string        `json:"lastToolName,omitempty"`
+	Type         string        `json:"type"`
+	Timestamp    float64       `json:"timestamp,omitempty"`
+	SessionID    string        `json:"sessionID,omitempty"`
+	Part         *opencodePart `json:"part,omitempty"`
+	ErrorMessage string        `json:"error,omitempty"`
+	Model        string        `json:"model,omitempty"`
+	Provider     string        `json:"provider,omitempty"`
+	Tools        []string      `json:"tools,omitempty"`
 }
 
 type opencodePart struct {
-	ID        string          `json:"id,omitempty"`
-	Text      string          `json:"text,omitempty"`
-	CallID    string          `json:"callId,omitempty"`
-	ToolName  string          `json:"toolName,omitempty"`
-	Input     any             `json:"input,omitempty"`
-	State     string          `json:"state,omitempty"`
-	Reason    string          `json:"reason,omitempty"`
-	Type      string          `json:"type,omitempty"`
-	Tokens    *opencodeTokens `json:"tokens,omitempty"`
-	Cost      float64         `json:"cost,omitempty"`
-	Output    string          `json:"output,omitempty"`
-	Status    string          `json:"status,omitempty"`
-	ToolInput any             `json:"toolInput,omitempty"`
-	Path      string          `json:"path,omitempty"`
-	Operation string          `json:"operation,omitempty"`
+	ID        string `json:"id,omitempty"`
+	SessionID string `json:"sessionID,omitempty"`
+	MessageID string `json:"messageID,omitempty"`
+	Type      string `json:"type,omitempty"`
+
+	// StepStartPart fields
+	Snapshot string `json:"snapshot,omitempty"`
+
+	// TextPart / ReasoningPart fields
+	Text string        `json:"text,omitempty"`
+	Time *opencodeTime `json:"time,omitempty"`
+
+	// ToolPart fields
+	CallID string             `json:"callID,omitempty"`
+	Tool   string             `json:"tool,omitempty"`
+	State  *opencodeToolState `json:"state,omitempty"`
+
+	// StepFinishPart fields
+	Reason string          `json:"reason,omitempty"`
+	Tokens *opencodeTokens `json:"tokens,omitempty"`
+	Cost   float64         `json:"cost,omitempty"`
+}
+
+type opencodeToolState struct {
+	Status string `json:"status"`
+	Input  any    `json:"input,omitempty"`
+	Output string `json:"output,omitempty"`
+	Title  string `json:"title,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+type opencodeTime struct {
+	Start float64 `json:"start"`
+	End   float64 `json:"end"`
 }
 
 type opencodeTokens struct {
@@ -309,4 +299,17 @@ type opencodeTokens struct {
 type opencodeCache struct {
 	Write int `json:"write"`
 	Read  int `json:"read"`
+}
+
+// splitComma splits a comma-separated string into trimmed, non-empty tokens.
+func splitComma(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
