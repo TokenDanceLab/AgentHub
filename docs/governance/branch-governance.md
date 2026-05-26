@@ -1,6 +1,6 @@
 # 分支治理
 
-最后更新：2026-05-26（Runtime live smoke / Web typed runtime payload 合入，旧远端保存分支清理）
+最后更新：2026-05-26（Settings OIDC 状态修正后远端分支实态同步）
 
 ## 合并规则
 
@@ -37,11 +37,11 @@ feat/* -> dev/maintainer -> master
 
 | 远端分支 | 处理建议 |
 |---|---|
-| `origin/dev/contributor-b` | contributor-b 独立开发线；用户明确要求不信其进度。当前仍在持续新增 pass 分支，不能作为稳定进度来源；只允许逐提交 cherry-pick 并重新验证 |
-| `origin/feat/contributor-b-desktop-button-*` / `origin/feat/contributor-b-desktop-right-panel-tabs` / `origin/feat/contributor-b-desktop-settings-button-pass2` | contributor-b button/UI pass 分支仍在远端增长（截至本轮已看到 pass1、pass3-pass9 等）；不直合、不按其状态更新 roadmap，只能按单 patch 审查后重做或 cherry-pick |
-| `origin/feat/team-contributor-a-merge` | contributor-a 聚合 merge；merge-base `7600452`，相对当前 dev 为 `96/1` 分叉，包含 migrations/API/process-executor-test 等冲突；只单独审，不直合 |
+| `origin/dev/contributor-b` | contributor-b 独立开发线；用户明确要求不信其进度。当前相对 `origin/dev/maintainer` 为 `115/51` 分叉，不能作为稳定进度来源；只允许逐提交 cherry-pick 并重新验证 |
+| `origin/dev/contributor-a` | contributor-a 开发线；当前相对 `origin/dev/maintainer` 为 `122/2` 分叉，仍有 `9cf5c95` 与 `58239fc` 等独有内容；只单独审，不直合 |
+| `origin/feat/team-contributor-a-merge` | contributor-a 聚合 merge；当前相对 `origin/dev/maintainer` 为 `122/1` 分叉，包含大 diff 与冲突风险；只单独审，不直合 |
 
-`origin/dev/contributor-a` 已合入主线但受 GitHub 分支保护，删除被拒绝；保留为受保护历史分支。
+当前 `origin` 仅保留 `dev/maintainer`、`master`、`dev/contributor-b`、`dev/contributor-a`、`feat/team-contributor-a-merge` 五个 heads。旧 `origin/worktree-feat+web-desktop-parity` 与 `origin/chore/oidc-handoff-save-20260526` 已删除；不要继续在 AGENTS/roadmap 中引用它们作为活跃远端。
 
 ## 2026-05-26 已清理
 
