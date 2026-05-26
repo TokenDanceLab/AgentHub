@@ -96,6 +96,11 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 	// Structured JSON output
 	args = append(args, "--json")
 
+	// Skills prompt: prepend to the prompt text since Codex has no --append-system-prompt.
+	if ctx.SkillsPrompt != "" {
+		prompt = ctx.SkillsPrompt + "\n\n---\n\n" + prompt
+	}
+
 	args = append(args, prompt)
 
 	workDir := ctx.WorkDir
