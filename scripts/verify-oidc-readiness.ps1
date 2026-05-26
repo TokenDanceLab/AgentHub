@@ -88,6 +88,12 @@ Assert-Contains "hub-server/internal/config/config.go" "tokendance_id\.redirect_
 Assert-Contains "hub-server/internal/service/oidc.go" "ParseTokenDanceJWT" "Hub validates TokenDance ID token"
 Assert-Contains "hub-server/internal/service/oidc.go" "FindOrCreateByTokenDanceSub" "Hub maps tokendance_sub to Hub user"
 Assert-Contains "hub-server/internal/service/oidc.go" "UpsertRefreshToken" "Hub issues Hub-local refresh session"
+Assert-Contains "hub-server/internal/middleware/auth.go" "func RequireHubSession" "Hub has explicit Hub-session-only middleware"
+Assert-Contains "hub-server/internal/router/router.go" "contacts\.Use\(middleware\.RequireHubSession\(\)\)" "client contacts require Hub-issued session"
+Assert-Contains "hub-server/internal/router/router.go" "sessions\.Use\(middleware\.RequireHubSession\(\)\)" "client sessions require Hub-issued session"
+Assert-Contains "hub-server/internal/router/router.go" "messages\.Use\(middleware\.RequireHubSession\(\)\)" "client messages require Hub-issued session"
+Assert-Contains "hub-server/internal/router/router.go" "web\.Use\(middleware\.RequireHubSession\(\)\)" "web routes require Hub-issued session"
+Assert-Contains "hub-server/internal/router/router.go" "edge\.Use\(middleware\.RequireHubSession\(\)\)" "edge routes require Hub-issued session"
 
 Step "Secret-free deployment examples"
 Assert-Contains ".env.example" "AGENTHUB_TOKENDANCE_ID_ISSUER_URL" ".env.example documents TokenDance ID issuer"
@@ -108,6 +114,7 @@ Assert-NotContains "app/web/src/api/hubTokenStorage.ts" "localStorage\.setItem" 
 Assert-Contains "app/desktop/src/api/hubWS.ts" "access_token" "Desktop Hub WebSocket sends Hub access token during upgrade"
 Assert-Contains "app/web/src/api/hubWS.ts" "access_token" "Web Hub WebSocket sends Hub access token during upgrade"
 Assert-Contains "hub-server/internal/handler/ws_test.go" "TestWebSocketRouteAcceptsHubLocalQueryTokenBeforeUpgrade" "Hub tests accept Hub-issued query token before WebSocket upgrade"
+Assert-Contains "hub-server/internal/middleware/auth_test.go" "TestRequireHubSessionBlocksTokenDanceAuth" "Hub session middleware tests reject TokenDance bearer source"
 Assert-Contains "app/web/README.md" "BFF/HttpOnly cookie" "Web README keeps high-trust session caveat"
 
 if (-not $SkipWorkspaceDocs) {
