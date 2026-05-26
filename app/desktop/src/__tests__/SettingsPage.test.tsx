@@ -5,10 +5,28 @@ import SettingsPage from '@/components/SettingsPage';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import type { AgentInfo, RunInfo } from '@shared/types';
 import type { AgentTask } from '@/stores/taskBridgeStore';
+import type { ExecutionTarget } from '@/api/hubClient';
 
-const { mockAgents, mockCancelRun, mockRefetchRuns, mockRuns, mockTasks } = vi.hoisted(() => ({
+const {
+  mockAgents,
+  mockCancelRun,
+  mockHubTargets,
+  mockHubTargetsState,
+  mockPingHubTarget,
+  mockRefetchRuns,
+  mockRuns,
+  mockTasks,
+} = vi.hoisted(() => ({
   mockAgents: [] as AgentInfo[],
   mockCancelRun: vi.fn(),
+  mockHubTargets: [] as ExecutionTarget[],
+  mockHubTargetsState: {
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+    error: null as Error | null,
+  },
+  mockPingHubTarget: vi.fn(),
   mockRefetchRuns: vi.fn(),
   mockRuns: [] as RunInfo[],
   mockTasks: [] as AgentTask[],
@@ -54,6 +72,18 @@ vi.mock('@/api/agentQueries', () => ({
   useAgentList: () => ({ data: { items: mockAgents } }),
 }));
 
+vi.mock('@/api/executionTargetQueries', () => ({
+  useHubExecutionTargets: () => ({
+    data: { items: mockHubTargets, page: { hasMore: false, nextCursor: '' } },
+    ...mockHubTargetsState,
+  }),
+  usePingHubExecutionTarget: () => ({
+    mutate: mockPingHubTarget,
+    isPending: false,
+    variables: undefined,
+  }),
+}));
+
 vi.mock('@/api/runQueries', () => ({
   useRuns: () => ({
     data: { items: mockRuns, page: { hasMore: false } },
@@ -95,9 +125,15 @@ vi.mock('@/hooks/useAuth', () => ({
 describe('SettingsPage tasks', () => {
   beforeEach(() => {
     mockAgents.splice(0, mockAgents.length);
+    mockHubTargets.splice(0, mockHubTargets.length);
+    mockHubTargetsState.isLoading = false;
+    mockHubTargetsState.isFetching = false;
+    mockHubTargetsState.isError = false;
+    mockHubTargetsState.error = null;
     mockRuns.splice(0, mockRuns.length);
     mockTasks.splice(0, mockTasks.length);
     mockCancelRun.mockReset();
+    mockPingHubTarget.mockReset();
     mockRefetchRuns.mockReset();
     localStorage.clear();
     sessionStorage.clear();
@@ -237,6 +273,64 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('settings.profileModel')).toBeInTheDocument();
     expect(screen.getByText('settings.profileConfig')).toBeInTheDocument();
     expect(screen.getAllByText('settings.executionTargets').length).toBeGreaterThan(0);
+  });
+
+  it('renders Hub execution target inventory and can ping a target', () => {
+    mockHubTargets.splice(
+      0,
+      mockHubTargets.length,
+      {
+        id: 'target-relay-1',
+        owner_id: 'user_1',
+        name: 'Hub relay alpha',
+        target_type: 'hub_relay',
+        trust_level: 'relay',
+        health_state: 'healthy',
+        is_online: true,
+      },
+      {
+        id: 'target-ssh-1',
+        owner_id: 'user_1',
+        name: 'SSH workstation',
+        target_type: 'remote_ssh',
+        trust_level: 'remote',
+        health_state: 'degraded',
+        is_online: false,
+      },
+    );
+
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="executionTargets" />);
+
+    expect(screen.getAllByText('settings.targetHubInventory').length).toBeGreaterThan(0);
+    expect(screen.getByText('settings.targetHubHealth')).toBeInTheDocument();
+    expect(screen.getByText('Hub relay alpha')).toBeInTheDocument();
+    expect(screen.getByText('SSH workstation')).toBeInTheDocument();
+    expect(screen.getAllByText('settings.targetHealth.healthy').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('settings.targetHealth.degraded').length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'settings.targetPing' })[0]);
+
+    expect(mockPingHubTarget).toHaveBeenCalledWith('target-relay-1');
+  });
+
+  it('renders Hub execution target loading, empty, and error copy', () => {
+    mockHubTargetsState.isLoading = true;
+    const { rerender } = render(
+      <SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="executionTargets" />,
+    );
+
+    expect(screen.getAllByText('settings.targetHubLoading').length).toBeGreaterThan(0);
+
+    mockHubTargetsState.isLoading = false;
+    rerender(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="executionTargets" />);
+    expect(screen.getAllByText('settings.targetHubEmpty').length).toBeGreaterThan(0);
+    expect(screen.getByText('settings.targetHubEmptyDesc')).toBeInTheDocument();
+
+    mockHubTargetsState.isError = true;
+    mockHubTargetsState.error = new Error('Hub unavailable');
+    rerender(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="executionTargets" />);
+    expect(screen.getAllByText('settings.targetHubError').length).toBeGreaterThan(0);
+    expect(screen.getByText('Hub unavailable')).toBeInTheDocument();
   });
 
   it('renders agent market readiness from local profiles and capabilities', () => {
