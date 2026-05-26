@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createHubClient, HubError } from '../api/hubClient';
 import type { AuthResponse, UserProfile } from '../api/hubClient';
 import { createHubAuth } from '../api/hubAuth';
-import { clearStoredHubRefreshToken, saveStoredHubRefreshToken } from '../api/hubTokenStorage';
+import {
+  clearStoredHubAccessToken,
+  clearStoredHubRefreshToken,
+  saveStoredHubAccessToken,
+  saveStoredHubRefreshToken,
+} from '../api/hubTokenStorage';
 
 const mockUser: UserProfile = {
   id: 'user_1',
@@ -20,24 +25,24 @@ const mockAuthResponse: AuthResponse = {
 // ── Helpers ──────────────────────────────────────
 
 function mockFetch(status: number, data: unknown) {
-  return vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: status === 401 ? 'Unauthorized' : status === 200 ? 'OK' : 'Error',
-    json: () => Promise.resolve(data),
-    headers: new Headers(),
-  } as Response);
+  return vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+    new Response(JSON.stringify(data), {
+      status,
+      statusText: status === 401 ? 'Unauthorized' : status === 200 ? 'OK' : 'Error',
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  );
 }
 
 function mockFetchSequence(responses: Array<{ status: number; data: unknown }>) {
   for (const r of responses) {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
-      ok: r.status >= 200 && r.status < 300,
-      status: r.status,
-      statusText: r.status === 200 ? 'OK' : 'Error',
-      json: () => Promise.resolve(r.data),
-      headers: new Headers(),
-    } as Response);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(r.data), {
+        status: r.status,
+        statusText: r.status === 200 ? 'OK' : 'Error',
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
   }
 }
 
@@ -47,6 +52,8 @@ describe('hubClient', () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
+    await clearStoredHubAccessToken();
     await clearStoredHubRefreshToken();
   });
 
@@ -74,6 +81,20 @@ describe('hubClient', () => {
       expect(body.password).toBe('secret');
       expect(body.device_type).toBe('desktop');
       expect(body.device_id).toBe('dev_001');
+    });
+
+    it('unwraps Hub response envelopes', async () => {
+      mockFetch(200, { code: 'ok', data: mockAuthResponse });
+
+      const res = await client.login({
+        username: 'alice',
+        password: 'secret',
+        device_type: 'desktop',
+        device_id: 'dev_001',
+      });
+
+      expect(res.access_token).toBe('jwt_access_123');
+      expect(res.refresh_token).toBe('jwt_refresh_456');
     });
 
     it('sends register with nickname', async () => {
@@ -104,6 +125,19 @@ describe('hubClient', () => {
       ).rejects.toThrow('Invalid credentials');
     });
 
+    it('converts Hub error envelopes into AppError', async () => {
+      mockFetch(401, { code: 'unauthorized', message: 'bad token' });
+
+      await expect(
+        client.login({
+          username: 'bad',
+          password: 'wrong',
+          device_type: 'desktop',
+          device_id: 'd',
+        }),
+      ).rejects.toMatchObject({ code: 'unauthorized', message: 'bad token', status: 401 });
+    });
+
     it('throws on 500 server error', async () => {
       mockFetch(500, { error: { code: 'internal_error', message: 'database down' } });
 
@@ -122,6 +156,7 @@ describe('hubClient', () => {
         ok: false,
         status: 503,
         statusText: 'Service Unavailable',
+        text: () => Promise.resolve(JSON.stringify({})),
         json: () => Promise.resolve({}),
         headers: new Headers(),
       } as Response);
@@ -258,6 +293,8 @@ describe('hubAuth', () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
+    await clearStoredHubAccessToken();
     await clearStoredHubRefreshToken();
   });
 
@@ -279,7 +316,8 @@ describe('hubAuth', () => {
       expect(state.refreshToken).toBe('jwt_refresh_456');
       expect(state.isAuthenticated).toBe(true);
       expect(state.user?.username).toBe('testuser');
-      expect(localStorage.getItem('agenthub_hub_token')).toBe('jwt_access_123');
+      expect(sessionStorage.getItem('agenthub_hub_token')).toBe('jwt_access_123');
+      expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
       expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
     });
 
@@ -383,7 +421,7 @@ describe('hubAuth', () => {
     });
 
     it('returns true and fetches user when token is valid', async () => {
-      localStorage.setItem('agenthub_hub_token', 'stored_token');
+      await saveStoredHubAccessToken('stored_token');
       const auth = newAuth();
 
       mockFetch(200, mockUser);
@@ -395,7 +433,7 @@ describe('hubAuth', () => {
     });
 
     it('refreshes token when stored token is expired', async () => {
-      localStorage.setItem('agenthub_hub_token', 'expired_token');
+      await saveStoredHubAccessToken('expired_token');
       await saveStoredHubRefreshToken('valid_refresh');
       const auth = newAuth();
 
@@ -411,12 +449,13 @@ describe('hubAuth', () => {
       expect(auth.getState().token).toBe('new_token');
       expect(auth.getState().refreshToken).toBe('new_refresh');
       expect(auth.getState().isAuthenticated).toBe(true);
-      expect(localStorage.getItem('agenthub_hub_token')).toBe('new_token');
+      expect(sessionStorage.getItem('agenthub_hub_token')).toBe('new_token');
+      expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
       expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
     });
 
     it('returns false and clears state when both token and refresh fail', async () => {
-      localStorage.setItem('agenthub_hub_token', 'bad_token');
+      await saveStoredHubAccessToken('bad_token');
       await saveStoredHubRefreshToken('bad_refresh');
       const auth = newAuth();
 
@@ -432,11 +471,12 @@ describe('hubAuth', () => {
       expect(auth.getState().refreshToken).toBeNull();
       expect(auth.getState().isAuthenticated).toBe(false);
       expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
+      expect(sessionStorage.getItem('agenthub_hub_token')).toBeNull();
       expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
     });
 
     it('returns false and clears state when token fails and no refresh token exists', async () => {
-      localStorage.setItem('agenthub_hub_token', 'bad_token');
+      await saveStoredHubAccessToken('bad_token');
       // No refresh token
       const auth = newAuth();
 
@@ -447,6 +487,7 @@ describe('hubAuth', () => {
       expect(result).toBe(false);
       expect(auth.getState().isAuthenticated).toBe(false);
       expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
+      expect(sessionStorage.getItem('agenthub_hub_token')).toBeNull();
     });
   });
 

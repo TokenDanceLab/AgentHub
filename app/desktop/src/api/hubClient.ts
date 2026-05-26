@@ -5,7 +5,7 @@
 // Uses the same error convention as edgeClient.ts: AppError from @shared/errors.
 
 import { HUB_URL } from '@/config';
-import { AppError, parseError } from '@shared/errors';
+import { AppError } from '@shared/errors';
 
 // ── Types ─────────────────────────────────────────
 
@@ -221,6 +221,12 @@ export interface ChangePasswordRequest {
   new_password: string;
 }
 
+interface HubEnvelope<T> {
+  code: string;
+  message?: string;
+  data?: T;
+}
+
 // ── Error ────────────────────────────────────────
 
 export class HubError extends Error {
@@ -246,6 +252,28 @@ export interface HubClientOptions {
 export function createHubClient(opts: HubClientOptions = {}) {
   const base = (opts.baseUrl || HUB_URL).replace(/\/+$/, '');
 
+  function isHubEnvelope<T>(body: unknown): body is HubEnvelope<T> {
+    return !!body && typeof body === 'object' && typeof (body as { code?: unknown }).code === 'string';
+  }
+
+  function isSharedErrorBody(body: unknown): body is { error: { code: string; message: string } } {
+    if (!body || typeof body !== 'object') return false;
+    const error = (body as { error?: unknown }).error;
+    if (!error || typeof error !== 'object') return false;
+    const record = error as { code?: unknown; message?: unknown };
+    return typeof record.code === 'string' && typeof record.message === 'string';
+  }
+
+  async function readJsonBody(res: Response): Promise<unknown> {
+    const text = await res.text();
+    if (!text) return undefined;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return undefined;
+    }
+  }
+
   async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = opts.getToken?.();
     const headers: Record<string, string> = {
@@ -255,30 +283,40 @@ export function createHubClient(opts: HubClientOptions = {}) {
     };
 
     const res = await fetch(`${base}${path}`, { ...options, headers });
+    const body = res.status === 204 ? undefined : await readJsonBody(res);
+
     if (!res.ok) {
-      // Try Hub's structured error first, then fall back to generic parseError
-      try {
-        const body = await res.json();
-        if (body?.error?.message) {
-          throw new AppError(
-            { error: { code: body.error.code || 'hub_error', message: body.error.message } },
-            res.status,
-          );
-        }
-      } catch (e) {
-        if (e instanceof AppError) throw e;
+      if (isSharedErrorBody(body)) {
+        throw new AppError({ error: body.error }, res.status, body);
       }
-      // Fallback to shared parseError
-      throw await parseError(
-        new Response(
-          JSON.stringify({ error: { code: 'internal_error', message: res.statusText } }),
-          { status: res.status },
-        ),
+      if (isHubEnvelope(body)) {
+        throw new AppError(
+          {
+            error: {
+              code: body.code || 'hub_error',
+              message: body.message || res.statusText || 'Hub request failed',
+            },
+          },
+          res.status,
+          body,
+        );
+      }
+      throw new AppError(
+        {
+          error: {
+            code: res.status >= 500 ? 'internal_error' : 'bad_request',
+            message: `HTTP ${res.status}: ${res.statusText}`,
+          },
+        },
+        res.status,
+        body,
       );
     }
+
     // 204 No Content for void endpoints
     if (res.status === 204) return undefined as T;
-    return res.json();
+    if (isHubEnvelope<T>(body)) return body.data as T;
+    return body as T;
   }
 
   // ── Helpers ────────────────────────────────────
