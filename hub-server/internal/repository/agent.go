@@ -71,6 +71,15 @@ func GetPendingTaskByID(db *gorm.DB, id string) (*model.PendingAgentTask, error)
 	return &task, err
 }
 
+func ListPendingTasksByIDs(db *gorm.DB, ids []string) ([]model.PendingAgentTask, error) {
+	var tasks []model.PendingAgentTask
+	if len(ids) == 0 {
+		return tasks, nil
+	}
+	err := db.Where("id IN ?", ids).Find(&tasks).Error
+	return tasks, err
+}
+
 func UpdatePendingTaskStatus(db *gorm.DB, id, status, errMsg string) error {
 	return UpdatePendingTaskStatusWithEdgeRunID(db, id, status, errMsg, "")
 }

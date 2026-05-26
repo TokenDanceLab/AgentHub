@@ -2887,7 +2887,7 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubDispatchTeamAssignment
-      summary: Dispatch a pending assignment to the target agent.
+      summary: Dispatch a pending assignment through Hub agent task routing and bind TeamTask state.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -4698,6 +4698,8 @@ components:
           enum: [pending, dispatched, running, done, failed, cancelled]
         objective: { type: string }
         run_id: { type: string }
+        agent_task_id: { type: string, format: uuid }
+        edge_run_id: { type: string }
         attempt: { type: integer }
         risk_level:
           type: string
@@ -4717,6 +4719,8 @@ components:
           enum: [pending, dispatched, running, done, failed, cancelled]
         depth: { type: integer }
         run_id: { type: string, format: uuid }
+        agent_task_id: { type: string, format: uuid }
+        edge_run_id: { type: string }
 
     CoordinatorRouteDecision:
       type: object
