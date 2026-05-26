@@ -279,6 +279,7 @@ const (
 	TeamEventRunCompleted         = "team.run.completed"
 	TeamEventRunFailed            = "team.run.failed"
 	TeamEventAgentMessage         = "agent.message"
+	TeamEventConflictResolved     = "team.conflict.resolved"
 )
 
 // TeamRunState is the materialized view of a team run derived by replaying
@@ -365,17 +366,45 @@ type TeamArtifactState struct {
 // TeamConflictState summarizes a file-level conflict detected from multiple
 // task/member file-change events in one TeamRun.
 type TeamConflictState struct {
-	ConflictID    string    `json:"conflict_id"`
-	Path          string    `json:"path"`
-	Status        string    `json:"status"`
-	AgentTaskIDs  []string  `json:"agent_task_ids"`
-	TeamTaskIDs   []string  `json:"team_task_ids,omitempty"`
-	AssignmentIDs []string  `json:"assignment_ids,omitempty"`
-	MemberIDs     []string  `json:"member_ids,omitempty"`
-	EdgeRunIDs    []string  `json:"edge_run_ids,omitempty"`
-	Actions       []string  `json:"actions,omitempty"`
-	FirstSeenAt   time.Time `json:"first_seen_at"`
-	LastSeenAt    time.Time `json:"last_seen_at"`
+	ConflictID    string     `json:"conflict_id"`
+	Path          string     `json:"path"`
+	Status        string     `json:"status"`
+	AgentTaskIDs  []string   `json:"agent_task_ids"`
+	TeamTaskIDs   []string   `json:"team_task_ids,omitempty"`
+	AssignmentIDs []string   `json:"assignment_ids,omitempty"`
+	MemberIDs     []string   `json:"member_ids,omitempty"`
+	EdgeRunIDs    []string   `json:"edge_run_ids,omitempty"`
+	Actions       []string   `json:"actions,omitempty"`
+	FirstSeenAt   time.Time  `json:"first_seen_at"`
+	LastSeenAt    time.Time  `json:"last_seen_at"`
+	Resolution    string     `json:"resolution,omitempty"`
+	ResolvedBy    string     `json:"resolved_by,omitempty"`
+	ResolvedAt    *time.Time `json:"resolved_at,omitempty"`
+	Reason        string     `json:"reason,omitempty"`
+	SelectedTask  string     `json:"selected_agent_task_id,omitempty"`
+}
+
+const (
+	TeamConflictStatusPending  = "pending"
+	TeamConflictStatusResolved = "resolved"
+)
+
+const (
+	TeamConflictResolutionAcceptAgentTask = "accept_agent_task"
+	TeamConflictResolutionManualMerge     = "manual_merge"
+	TeamConflictResolutionKeepAll         = "keep_all"
+	TeamConflictResolutionDiscardAll      = "discard_all"
+	TeamConflictResolutionBlocked         = "blocked"
+)
+
+type TeamConflictResolution struct {
+	ConflictID          string    `json:"conflict_id"`
+	Path                string    `json:"path,omitempty"`
+	Resolution          string    `json:"resolution"`
+	SelectedAgentTaskID string    `json:"selected_agent_task_id,omitempty"`
+	Reason              string    `json:"reason,omitempty"`
+	ResolvedBy          string    `json:"resolved_by,omitempty"`
+	ResolvedAt          time.Time `json:"resolved_at,omitempty"`
 }
 
 // TeamAssignmentState is a resolved assignment with runtime info.
