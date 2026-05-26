@@ -42,6 +42,8 @@ P0/P1 的第一屏不是普通聊天软件，而是 Agent 工作台：
 
 用户直接选择和管理的是 Agent Profile。Profile 由 Agent Runtime、模型、Agent Configuration、Workspace、Skill/MCP、审批策略和 Execution Target 组成。Agent Configuration 包含 `AGENTS.md`、Agent memory、上下文、聊天记录、工作目录、skills、MCP、模型参数和审批策略。Execution Target 必须能区分本地、远程 SSH/Tailscale、云端和 Hub relay。
 
+多 Agent 协作需要在 Profile 之上新增产品级 AgentTeam，而不是继续把 Edge 进程内 sub-agent registry 当成团队模型。AgentTeam 是可管理、可审计、可恢复的团队模板；TeamRun 是一次团队目标执行；TeamTask 是团队成员实际承担的子任务。当前 Hub group/session 和 Edge Orchestrator 只能证明“可放多个 Agent / 可本地派生子任务”，还不能证明 AgentTeam 闭环。
+
 ### 当前可演示流
 
 1. 启动 Local Edge。
@@ -81,6 +83,15 @@ AgentHub 的产品方向是“IM-native Agent collaboration + real Runtime execu
 ```text
 Agent Profile -> Execution Target -> Thread -> Run -> RunEvent -> Approval / Artifact
 ```
+
+P1 多 Agent 目标需要把这条单 Agent 主线扩展为：
+
+```text
+AgentProfile -> AgentTeam -> TeamRun -> TeamTask -> Run -> RunEvent
+                                 -> TeamEvent / TeamMessage / Approval / Artifact
+```
+
+AgentTeam 的首版验收不要求远程/云执行完成，但必须具备 Hub-visible 的 `AgentTeam`、`TeamRun`、`TeamTask`、`TeamEvent` 或等价事件源，并能从事件恢复 `TeamRunState`。Supervisor 委派应收敛为 typed `CoordinatorRouteDecision`，不能长期依赖从模型文本里扫描 JSON。
 
 因此下一阶段产品验收应优先看真实 Runtime 闭环：
 
@@ -123,7 +134,7 @@ Agent Profile -> Execution Target -> Thread -> Run -> RunEvent -> Approval / Art
 
 | 阶段 | 目标 | 能力 | 状态 |
 |---|---|---|---|
-| P1 | 多 Agent Thread | @Agent、Reviewer、Orchestrator、Thread fork、多 Agent 围绕同一 Artifact 讨论 | 部分完成：Hub group/session、Agent Profile、Orchestrator 和 Web/ Desktop 表面已有落点；仍缺两条以上真实 Runtime Profile 的群组 E2E、聚合 transcript 和冲突处理证据 |
+| P1 | AgentTeam / 多 Agent Thread | @Agent、Reviewer、Orchestrator、Thread fork、AgentTeam、TeamRun、TeamTask、多 Agent 围绕同一 Artifact 讨论 | 部分完成：Hub group/session、Agent Profile、Orchestrator 和 Web/Desktop 表面已有落点；仍缺产品级 `AgentTeam`、`TeamRun`、`TeamTask`、`TeamEvent`、可恢复 `TeamRunState`、typed route decision、两条以上真实 Runtime Profile 的群组 E2E、聚合 transcript 和冲突处理证据 |
 | P2 | Identity + Edge-Hub Sync | TokenDance ID OIDC 登录、Hub session、Edge 注册、设备状态、消息/事件同步、Web/Mobile 查看状态和远程审批 | 进行中：Hub OIDC code exchange 与 Hub-local session 已在 repo 落地；部署配置、Desktop/Web 回调 UX、logout/reconnect 和授权证据仍需闭环 |
 | P3 | Relay / Remote / Cloud | Hub 中继、本地/远程 SSH/Tailscale/Cloud Execution Target、远程 Preview、Artifact Proxy、远控审批 | 规划中（Q3）；当前只有 Execution Target 基础模型/接口，远程和云目标还缺注册、路由、workspace allowlist 和远程审批证据 |
 | P4 | 团队 IM + Agent Platform | 用户、联系人、群组、团队空间、团队 Memory、Agent 市场、Skill/MCP 管理、模型配置、模型映射、cc-switch provider binding、安全审计 | 规划中 |
