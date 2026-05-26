@@ -507,6 +507,7 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		Assignments:  make([]model.TeamAssignmentState, 0, len(assignments)),
 		Approvals:    []model.TeamApprovalState{},
 		Artifacts:    []model.TeamArtifactState{},
+		Conflicts:    []model.TeamConflictState{},
 		RunEvents:    make([]model.TeamRunEventState, 0, len(runEvents)),
 		RouteLog:     []model.CoordinatorRouteDecision{},
 	}
@@ -557,6 +558,7 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		}
 	}
 
+	taskRefs := make(map[string]teamRuntimeTaskRef, len(tasks))
 	for _, task := range tasks {
 		assignmentID := ""
 		if task.AssignmentID != nil {
@@ -589,6 +591,13 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 			Attempt:          task.Attempt,
 			RiskLevel:        task.RiskLevel,
 		})
+		if runIDValue != "" {
+			taskRefs[runIDValue] = teamRuntimeTaskRef{
+				TeamTaskID:   task.ID,
+				AssignmentID: assignmentID,
+				MemberID:     task.AssigneeMemberID,
+			}
+		}
 		if parentTaskID != "" {
 			state.Dependencies = append(state.Dependencies, model.TeamTaskDependencyState{
 				TaskID:          task.ID,
@@ -608,7 +617,8 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 			CreatedAt:   event.CreatedAt,
 		})
 	}
-	state.Approvals, state.Artifacts = projectTeamRuntimeSummaries(runEvents)
+	state.Approvals, state.Artifacts = projectTeamRuntimeSummaries(runEvents, taskRefs)
+	state.Conflicts = projectTeamConflicts(state.Artifacts)
 	state.Budget = projectTeamBudget(runEvents, len(agentTaskIDs))
 
 	for _, event := range events {
@@ -632,7 +642,13 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	return state, nil
 }
 
-func projectTeamRuntimeSummaries(runEvents []model.AgentRunEvent) ([]model.TeamApprovalState, []model.TeamArtifactState) {
+type teamRuntimeTaskRef struct {
+	TeamTaskID   string
+	AssignmentID string
+	MemberID     string
+}
+
+func projectTeamRuntimeSummaries(runEvents []model.AgentRunEvent, taskRefs map[string]teamRuntimeTaskRef) ([]model.TeamApprovalState, []model.TeamArtifactState) {
 	approvals := []model.TeamApprovalState{}
 	artifacts := []model.TeamArtifactState{}
 	approvalIndex := map[string]int{}
@@ -649,16 +665,20 @@ func projectTeamRuntimeSummaries(runEvents []model.AgentRunEvent) ([]model.TeamA
 			if key == "" {
 				continue
 			}
+			ref := taskRefs[event.TaskID]
 			status := firstNonEmptyString(firstJSONString(payload, "status"), "pending")
 			approvalIndex[key] = len(approvals)
 			approvals = append(approvals, model.TeamApprovalState{
-				AgentTaskID: event.TaskID,
-				EdgeRunID:   event.EdgeRunID,
-				RequestID:   requestID,
-				ToolName:    firstJSONString(payload, "toolName", "tool_name"),
-				ToolUseID:   toolUseID,
-				Status:      status,
-				CreatedAt:   event.CreatedAt,
+				AgentTaskID:  event.TaskID,
+				TeamTaskID:   ref.TeamTaskID,
+				AssignmentID: ref.AssignmentID,
+				MemberID:     ref.MemberID,
+				EdgeRunID:    event.EdgeRunID,
+				RequestID:    requestID,
+				ToolName:     firstJSONString(payload, "toolName", "tool_name"),
+				ToolUseID:    toolUseID,
+				Status:       status,
+				CreatedAt:    event.CreatedAt,
 			})
 		case "run.agent.permission_decided":
 			requestID := firstJSONString(payload, "requestId", "request_id")
@@ -685,34 +705,153 @@ func projectTeamRuntimeSummaries(runEvents []model.AgentRunEvent) ([]model.TeamA
 				continue
 			}
 			approvalIndex[key] = len(approvals)
+			ref := taskRefs[event.TaskID]
 			approvals = append(approvals, model.TeamApprovalState{
-				AgentTaskID: event.TaskID,
-				EdgeRunID:   event.EdgeRunID,
-				RequestID:   requestID,
-				ToolName:    firstJSONString(payload, "toolName", "tool_name"),
-				ToolUseID:   toolUseID,
-				Status:      decision,
-				Reason:      firstJSONString(payload, "reason"),
-				CreatedAt:   event.CreatedAt,
-				DecidedAt:   &decidedAt,
+				AgentTaskID:  event.TaskID,
+				TeamTaskID:   ref.TeamTaskID,
+				AssignmentID: ref.AssignmentID,
+				MemberID:     ref.MemberID,
+				EdgeRunID:    event.EdgeRunID,
+				RequestID:    requestID,
+				ToolName:     firstJSONString(payload, "toolName", "tool_name"),
+				ToolUseID:    toolUseID,
+				Status:       decision,
+				Reason:       firstJSONString(payload, "reason"),
+				CreatedAt:    event.CreatedAt,
+				DecidedAt:    &decidedAt,
 			})
 		case "run.agent.file_change":
 			path := firstJSONString(payload, "path", "filePath", "file_path")
 			if path == "" {
 				continue
 			}
+			ref := taskRefs[event.TaskID]
 			artifacts = append(artifacts, model.TeamArtifactState{
-				AgentTaskID: event.TaskID,
-				EdgeRunID:   event.EdgeRunID,
-				Path:        path,
-				Action:      firstJSONString(payload, "action"),
-				ToolName:    firstJSONString(payload, "toolName", "tool_name"),
-				Status:      firstJSONString(payload, "status"),
-				CreatedAt:   event.CreatedAt,
+				AgentTaskID:  event.TaskID,
+				TeamTaskID:   ref.TeamTaskID,
+				AssignmentID: ref.AssignmentID,
+				MemberID:     ref.MemberID,
+				EdgeRunID:    event.EdgeRunID,
+				Path:         path,
+				Action:       firstJSONString(payload, "action"),
+				ToolName:     firstJSONString(payload, "toolName", "tool_name"),
+				Status:       firstJSONString(payload, "status"),
+				CreatedAt:    event.CreatedAt,
 			})
 		}
 	}
 	return approvals, artifacts
+}
+
+func projectTeamConflicts(artifacts []model.TeamArtifactState) []model.TeamConflictState {
+	type conflictBucket struct {
+		conflict model.TeamConflictState
+		sources  map[string]bool
+	}
+	buckets := map[string]*conflictBucket{}
+	order := []string{}
+	for _, artifact := range artifacts {
+		if !artifactCanConflict(artifact) {
+			continue
+		}
+		path := normalizedArtifactPath(artifact.Path)
+		if path == "" {
+			continue
+		}
+		key := strings.ToLower(path)
+		source := firstNonEmptyString(artifact.MemberID, artifact.AgentTaskID, artifact.EdgeRunID)
+		if source == "" {
+			continue
+		}
+		bucket, ok := buckets[key]
+		if !ok {
+			bucket = &conflictBucket{
+				conflict: model.TeamConflictState{
+					ConflictID:  conflictIDForPath(path),
+					Path:        path,
+					Status:      "pending",
+					FirstSeenAt: artifact.CreatedAt,
+					LastSeenAt:  artifact.CreatedAt,
+				},
+				sources: map[string]bool{},
+			}
+			buckets[key] = bucket
+			order = append(order, key)
+		}
+		bucket.sources[source] = true
+		bucket.conflict.AgentTaskIDs = appendUniqueString(bucket.conflict.AgentTaskIDs, artifact.AgentTaskID)
+		bucket.conflict.TeamTaskIDs = appendUniqueString(bucket.conflict.TeamTaskIDs, artifact.TeamTaskID)
+		bucket.conflict.AssignmentIDs = appendUniqueString(bucket.conflict.AssignmentIDs, artifact.AssignmentID)
+		bucket.conflict.MemberIDs = appendUniqueString(bucket.conflict.MemberIDs, artifact.MemberID)
+		bucket.conflict.EdgeRunIDs = appendUniqueString(bucket.conflict.EdgeRunIDs, artifact.EdgeRunID)
+		bucket.conflict.Actions = appendUniqueString(bucket.conflict.Actions, artifact.Action)
+		if bucket.conflict.FirstSeenAt.IsZero() || artifact.CreatedAt.Before(bucket.conflict.FirstSeenAt) {
+			bucket.conflict.FirstSeenAt = artifact.CreatedAt
+		}
+		if artifact.CreatedAt.After(bucket.conflict.LastSeenAt) {
+			bucket.conflict.LastSeenAt = artifact.CreatedAt
+		}
+	}
+
+	conflicts := []model.TeamConflictState{}
+	for _, key := range order {
+		bucket := buckets[key]
+		if len(bucket.sources) < 2 {
+			continue
+		}
+		conflictID := bucket.conflict.ConflictID
+		for i := range artifacts {
+			if strings.EqualFold(normalizedArtifactPath(artifacts[i].Path), bucket.conflict.Path) {
+				artifacts[i].ConflictID = conflictID
+			}
+		}
+		conflicts = append(conflicts, bucket.conflict)
+	}
+	return conflicts
+}
+
+func artifactCanConflict(artifact model.TeamArtifactState) bool {
+	status := strings.ToLower(strings.TrimSpace(artifact.Status))
+	switch status {
+	case "failed", "cancelled", "canceled", "discarded", "skipped":
+		return false
+	}
+	action := strings.ToLower(strings.TrimSpace(artifact.Action))
+	switch action {
+	case "", "create", "created", "add", "added", "write", "written", "modify", "modified", "edit", "edited", "update", "updated", "delete", "deleted", "remove", "removed", "rename", "renamed":
+		return true
+	case "read", "view", "open", "inspect":
+		return false
+	default:
+		return true
+	}
+}
+
+func normalizedArtifactPath(path string) string {
+	path = strings.TrimSpace(strings.ReplaceAll(path, "\\", "/"))
+	for strings.HasPrefix(path, "./") {
+		path = strings.TrimPrefix(path, "./")
+	}
+	return path
+}
+
+func conflictIDForPath(path string) string {
+	path = strings.ReplaceAll(path, " ", "_")
+	path = strings.ReplaceAll(path, "/", ":")
+	return "file:" + path
+}
+
+func appendUniqueString(values []string, value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return values
+	}
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	return append(values, value)
 }
 
 func projectTeamBudget(runEvents []model.AgentRunEvent, runCount int) *model.TeamBudget {
