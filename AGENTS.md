@@ -244,10 +244,10 @@ feat/* → dev/delicious233 → master
 | **dev/delicious233** | 主开发分支，唯一事实源 | ✅ 活跃 |
 | master | PR-only 稳定快照，Q2 里程碑后同步 | 滞后（勿直接 clone 使用） |
 | origin/dev/trump | Trump 独立分支，不作为可信进度来源 | 保留，不自动合并 |
+| origin/dev/johnny | Johnny 开发线，仍有少量独有提交 | 单独审，不直合 |
 | origin/feat/team-johnny-merge | Johnny 聚合 merge，冲突大 | 单独审，不直合 |
-| feat/web-desktop-parity / origin/worktree-feat+web-desktop-parity | 早期 Web parity 残留，和当前 WebAgent 主线分叉 | 保留待人工决策 |
-| origin/chore/oidc-handoff-save-20260526 | OIDC handoff 保存点 | 远端保留，本地 worktree 已清理 |
-| ~~dev/johnny~~ | 已合入但远端受保护 | 本地已清理 |
+| ~~feat/web-desktop-parity / origin/worktree-feat+web-desktop-parity~~ | 早期 Web parity 残留已导出 patch 并删除远端 | ✅ 已归档 |
+| ~~origin/chore/oidc-handoff-save-20260526~~ | OIDC handoff 保存点已被 STATE/roadmap 覆盖 | ✅ 已删除 |
 | ~~codex/johnny-fork~~ | Codex 实验分支 | ✅ 已清理 |
 | ~~codex/trump-ui-fork~~ | Codex UI fork | ✅ 已清理 |
 | ~~feat/agent-runtime-expansion~~ | Runtime 扩展 | ✅ 已清理 |
