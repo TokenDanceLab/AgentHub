@@ -7,9 +7,27 @@
 package agents
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
+)
+
+// Sentinel errors for spawn slot enforcement (Codex AgentTree parity).
+var (
+	ErrAgentSlotFull     = errors.New("agent slot full: max concurrent sub-agents reached for parent")
+	ErrAgentDepthExceeded = errors.New("agent depth exceeded: max delegation depth reached")
+	ErrAgentNotFound      = errors.New("agent instance not found")
+)
+
+const (
+	// DefaultMaxConcurrent is the default maximum number of concurrent sub-agents
+	// per parent, matching Codex's default spawn limit.
+	DefaultMaxConcurrent = 6
+	// MaxAgentDepth is the hard limit on delegation depth. Depth 0 = root,
+	// depth 1 = direct child, depth 2 = grandchild. Depth >= MaxAgentDepth
+	// is rejected to prevent runaway recursion.
+	MaxAgentDepth = 3
 )
 
 // Status represents the runtime status of an agent instance.
@@ -47,14 +65,16 @@ type AgentInstance struct {
 // It is the runtime counterpart to adapters.Registry (which holds adapter
 // definitions, not instances).
 type Registry struct {
-	mu       sync.RWMutex
-	agents   map[string]*AgentInstance
+	mu            sync.RWMutex
+	agents        map[string]*AgentInstance
+	maxConcurrent int // max sub-agents per parent; 0 means use DefaultMaxConcurrent
 }
 
 // NewRegistry creates an empty agent registry.
 func NewRegistry() *Registry {
 	return &Registry{
-		agents: make(map[string]*AgentInstance),
+		agents:        make(map[string]*AgentInstance),
+		maxConcurrent: DefaultMaxConcurrent,
 	}
 }
 
@@ -300,4 +320,112 @@ func (r *Registry) GetByRunID(runID string) *AgentInstance {
 		}
 	}
 	return nil
+}
+
+// WithMaxConcurrent sets the maximum concurrent sub-agents per parent and
+// returns the registry for fluent chaining. Values <= 0 are ignored.
+func (r *Registry) WithMaxConcurrent(n int) *Registry {
+	if n > 0 {
+		r.mu.Lock()
+		r.maxConcurrent = n
+		r.mu.Unlock()
+	}
+	return r
+}
+
+// MaxConcurrent returns the configured max concurrent sub-agents per parent.
+func (r *Registry) MaxConcurrent() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.maxConcurrent <= 0 {
+		return DefaultMaxConcurrent
+	}
+	return r.maxConcurrent
+}
+
+// CountActiveByParent returns the number of non-terminal agents whose ParentID
+// matches the given parent. Terminal states (completed, error, disconnected)
+// are excluded from the count because they no longer consume a spawn slot.
+func (r *Registry) CountActiveByParent(parentID string) int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	count := 0
+	for _, inst := range r.agents {
+		if inst.ParentID != parentID {
+			continue
+		}
+		switch inst.Status {
+		case StatusCompleted, StatusError, StatusDisconnected:
+			continue
+		default:
+			count++
+		}
+	}
+	return count
+}
+
+// CanSpawn checks whether a new child can be spawned under the given parent.
+// It enforces both the concurrent slot limit (maxConcurrent) and the maximum
+// delegation depth (MaxAgentDepth).
+func (r *Registry) CanSpawn(parentID string, childDepth int) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	maxConc := r.maxConcurrent
+	if maxConc <= 0 {
+		maxConc = DefaultMaxConcurrent
+	}
+
+	active := 0
+	for _, inst := range r.agents {
+		if inst.ParentID != parentID {
+			continue
+		}
+		switch inst.Status {
+		case StatusCompleted, StatusError, StatusDisconnected:
+			continue
+		default:
+			active++
+		}
+	}
+	if active >= maxConc {
+		return ErrAgentSlotFull
+	}
+
+	if childDepth >= MaxAgentDepth {
+		return ErrAgentDepthExceeded
+	}
+
+	return nil
+}
+
+// ShutdownCascade recursively marks the given agent and all its descendants as
+// StatusDisconnected. This implements the Codex AgentTree pattern where closing
+// a parent agent terminates the entire subtree.
+func (r *Registry) ShutdownCascade(rootID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.shutdownTree(rootID)
+}
+
+// shutdownTree is the recursive worker for ShutdownCascade. Caller must hold
+// r.mu write lock.
+func (r *Registry) shutdownTree(id string) {
+	inst, ok := r.agents[id]
+	if !ok {
+		return
+	}
+	inst.Status = StatusDisconnected
+	inst.LastSeen = time.Now()
+
+	// Collect child IDs first to avoid modifying the map while iterating.
+	var children []string
+	for childID, child := range r.agents {
+		if child.ParentID == id {
+			children = append(children, childID)
+		}
+	}
+	for _, childID := range children {
+		r.shutdownTree(childID)
+	}
 }

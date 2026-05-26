@@ -606,6 +606,12 @@ func (e *ProcessExecutor) runStatus(runID string) string {
 }
 
 func (e *ProcessExecutor) finish(runID string) {
+	// Cascade: when a parent agent finishes, recursively terminate all
+	// descendant sub-agents (Codex AgentTree shutdown pattern).
+	if e.agentRegistry != nil {
+		e.agentRegistry.ShutdownCascade(runID)
+	}
+
 	e.mu.Lock()
 	delete(e.running, runID)
 	delete(e.stdins, runID)
@@ -656,6 +662,7 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 		FromAgentID: agentID,
 		ToAgentID:   inst.ParentID,
 		Type:        msgType,
+		TriggerTurn: true, // wake parent orchestrator on sub-agent completion
 		Payload: map[string]any{
 			"runId":     runID,
 			"status":    status,
@@ -694,8 +701,24 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 // It creates a new run for a sub-agent dispatched by the orchestrator, queues it,
 // and starts execution using the resolved agent adapter.
 //
+// Before spawning, it checks the agent registry for slot availability and depth
+// limits (Codex AgentTree pattern parity).
+//
 // Reference: docs/reference/cross-comparison/03-orchestration.md Layer 3 (Supervisor routing).
 func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAgentTask) (agentInstanceID string, runID string, err error) {
+	// Enforce spawn slot and depth limits via the agent registry.
+	if e.agentRegistry != nil {
+		if err := e.agentRegistry.CanSpawn(parentRun.ID, task.Depth); err != nil {
+			slog.Warn("spawn slot rejected",
+				"parentRunId", parentRun.ID,
+				"taskId", task.TaskID,
+				"depth", task.Depth,
+				"err", err,
+			)
+			return "", "", err
+		}
+	}
+
 	runID = "run_" + task.TaskID
 	agentInstanceID = "agent_" + task.TaskID
 
