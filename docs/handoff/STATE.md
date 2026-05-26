@@ -1,6 +1,94 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-26 UTC+8 下午（本轮推进中：target routing 已合入、AgentTeam MVP 已启动、UI 审计/生产验证并行中）| 分支：dev/delicious233
+最后更新：2026-05-26 UTC+8 深夜 | 分支：dev/delicious233 | 状态：Mobile APK 可构建，emulator 就绪，待 UI 打磨与 OIDC 深链实现
+
+## 本次会话完成（2026-05-26 晚间）
+
+### Desktop/Mobile Tauri 拆分
+- **问题**：Mobile Agent 修改了 Desktop 的 `tauri.conf.json`，把 devUrl 改成 5174、frontendDist 改成 `../../mobile/dist`，并在 `lib.rs` 中混入 `#[cfg(target_os = "android")]` 条件编译——两个 Tauri 项目不该共享。
+- **修复**：恢复 Desktop `tauri.conf.json`（5173、`../dist`、`pnpm dev`），恢复 `lib.rs` 移除 cfg 守卫。
+- **Mobile 脚手架**：创建 `app/mobile/src-tauri/` 独立 Tauri 项目（`com.agenthub.mobile`、5174、无 tray/edge/挂 keyring），含 oidc/secure_store/notifications stub。
+- **规则落地**：`AGENTS.md` 新增端口分配表（5173/5174/8090/3210）和 Rust 隔离规则。Desktop Agent 只能改 `app/desktop/src-tauri/`，Mobile Agent 只能改 `app/mobile/src-tauri/`。需要共享 Rust 代码时先提议创建 `app/shared-rust/`。
+
+### Mobile Android 构建与 Emulator（2026-05-26 深夜）
+- **APK 构建**：`app/mobile` 独立 Tauri 项目已成功构建 debug APK（`app/mobile/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`）。
+- **APK 大小**：~480 MB，几乎全来自 4 个 CPU 架构的 Rust debug `.so`（108-125 MB/arch）。Release build（`--release`）或单 ABI（x86_64 emulator only）可大幅缩小。
+- **Emulator**：AVD `agenthub-emu` 已创建（API 35, x86_64, google_apis），emulator 可成功启动并通过 `adb` 连接。
+- **Gradle 代理**：`app/mobile/src-tauri/gen/android/gradle.properties` 已配 127.0.0.1:7897 代理（Clash Verge Rev），Java 需用 Android Studio JBR（`C:\Program Files\Android\Android Studio\jbr`）。
+- **`tauri android dev` 未验证**：`beforeDevCommand` 启动 Vite 时端口 5174 被占用；尚未完成完整 dev 循环验证。
+
+### Mobile 前端骨架（app/mobile/src/）
+- **路由**：4-tab BottomNav（Threads / Chat / Runs / Settings），glass 风格，48dp touch target。
+- **视图**：ThreadListView（listThreads + StatusBadge）、ChatView（ChatBubble + ChatInput）、RunStatusView（getRun + getRunLogs）、SettingsView（占位）。
+- **Hooks**：`useHubSocket.ts` — WebSocket hook，generation counter 模式，exponential backoff + jitter。
+- **样式**：`global.css` — 完整 `--td-*` 设计 token + 暗色模式 + Tailwind-like utility 子集（无 Tailwind 构建依赖）。
+- **共享**：消费 `@agenthub/shared`（types, apiClient, eventClient, UI 组件）。
+
+### Mobile Rust 骨架（app/mobile/src-tauri/src/）
+| 模块 | 状态 | 说明 |
+|------|:--:|------|
+| `lib.rs` | ✅ | Tauri builder + `#[tauri::mobile_entry_point]`，plugin shell + notification |
+| `notifications.rs` | ✅ | `notify_run_completed` / `notify_run_failed`（已完整实现） |
+| `oidc.rs` | ⚠️ stub | `start_oidc_login` 返回 "not yet implemented"（需适配系统浏览器 + 深链 `agenthub://`） |
+| `secure_store.rs` | ⚠️ stub | store/read/clear 均返回 "not yet implemented"（需平台安全存储，不能用 desktop keyring-rs） |
+
+### Mobile 待办（下一轮）
+1. **OIDC 深链**：实现 `agenthub://` custom URI scheme，PKCE + 系统浏览器 → TokenDance ID → 回调 app。
+2. **Secure Store**：选型 Android Keystore / Tauri plugin，替换当前 stub。
+3. **APK 体积**：切 release build 或单 ABI（x86_64 for emulator），预估可降到 ~50 MB。
+4. **UI 打磨**：当前视图是功能骨架，需按 TokenDance 设计语言（glass nav、dense lists、code blocks、diff views）细化。
+5. **`tauri android dev` 闭环**：解决端口冲突，验证 emulator 热重载流程。
+6. **前端通知权限**：Android 13+ 运行时通知权限请求（`POST_NOTIFICATIONS`）。
+
+### Worktree 清理（3 进 3 出）
+- `feat/openapi-docs`：22 endpoints + 13 schemas → 提交 → 合并 → 删分支
+- `feat/skillmd`：SKILL.md discovery + 3 adapter injection + 测试 → 提交 → 合并 → 删分支
+- `feat/settings-split`：settingsShared.tsx 930 行提取 → 提交 → 合并 → 删分支
+- 共 4 个新 commit 已 push 到 `dev/delicious233`
+
+### AgentTeam 底层状态确认
+- **AT-1 已完成**：模型（AgentTeam/AgentTeamMember/AgentTeamRun/AgentTeamAssignment）、迁移（0033/0034）、仓库（15 func）、服务（18 method）、处理器（15 endpoint）、路由（15 条 under `/web/agent-teams`）全部就绪，测试 7/7 通过。
+- **AT-2 部分完成**：StartTeamRun 会创建 Hub session → agent instances → trigger supervisor → dispatch。缺失：① Supervisor 输出解析自动创建 TeamAssignment ② TeamEvent append-only log ③ TeamRunState replay projection。
+- **AT-3 待实现**：CoordinatorRouteDecision 结构化委派 + guardrails（MAX_DEPTH=3, MAX_ACTIVE=5, cycle detection, timeout=30min, budget inheritance）。
+- **模型已新增**：CoordinatorRouteDecision、AgentTeamEvent、TeamRunState、TeamBudget 类型写入 `model/agent_team.go`。
+- **迁移已创建**：0036 `agent_team_events` 表（up + down SQL）。
+- **仓库/服务/处理器**：尚未补全。
+
+### 5 个待修后端 Issue
+- `0374d91` 已修复 #145 #142 #138 #105。仅 #173 状态待确认。
+
+## 下一步（按角色分工，2026-05-26 深夜）
+
+### Desktop Agent（客户端）
+- [ ] 修复 UI popover 裁剪 bug（top-right 图标 hover，`.root { overflow: hidden }` 截断 run card）
+- [ ] Desktop Settings 接入 AgentTeam 管理界面（CRUD team/member，消费 `/web/agent-teams` API）
+- [ ] Desktop TeamRun Console：task board、member status、subagent activity
+
+### Mobile Agent（移动端）
+- [ ] OIDC 深链（`agenthub://`）+ PKCE + 系统浏览器
+- [ ] Platform secure store（Android Keystore）
+- [ ] `tauri android dev` 端口冲突解决 + 热重载闭环
+- [ ] **禁止修改** `app/desktop/src-tauri/` 下任何文件
+
+### 后端（我负责）
+- [ ] AT-3：Supervisor 路由决策解析 + guardrails（model/migration 已有，待 service/handler/repo）
+- [ ] AT-2 补全：TeamEvent 持久化 + TeamRunState replay（migration 0036 已有）
+- [ ] #173 状态确认
+- [ ] hk2 部署验证（注意：不在服务器编译，磁盘敏感）
+
+### 共享端口与资源
+| 资源 | Desktop | Mobile |
+|------|---------|--------|
+| Tauri 项目 | `app/desktop/src-tauri/` | `app/mobile/src-tauri/` |
+| Vite 端口 | **5173** | **5174** |
+| Rust crate | `agenthub-desktop` | `agenthub-mobile` |
+| 前端共享 | `app/shared/` (`@agenthub/shared`) | 同左 |
+
+### 分支与质量
+- 分支：`dev/delicious233`（唯一事实源）
+- Hub: 13/13 ✓ | Edge: 16/16 ✓（含新增 skills 包）
+- `feat/* → dev/delicious233 → master`
+- 小步 commit + push，跨方向改 API 先开 draft PR
 
 ## 快速上手
 
