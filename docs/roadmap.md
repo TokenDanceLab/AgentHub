@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-26（M8 审计批次 — Web/team 合入后 CI 收敛）
+最后更新：2026-05-27（Hub lifecycle reliability hardening）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -617,6 +617,7 @@ Hub 调度（远程）:
 - [x] 2026-05-27 Edge TaskAck queued offline replay CAS fix：`HandleTaskAck` 对 queued offline-replayed task 现在用任务当前状态作为 atomic oldStatus，真实数据库中 queued/dispatched 都能 CAS 到 running 并写入 `edge_run_id`；避免此前 sqlmock rows=1 掩盖真实 queued→running rows=0、ack 被误拒的问题。验证通过 SQLite 红绿测试 `go test ./internal/service -run TestHandleTaskAck_QueuedOfflineReplayTransitionsToRunning -count=1` 和 ack focused test `go test ./internal/service -run "TestHandleTaskAck" -count=1`。
 - [x] 2026-05-27 Edge dispatch state persistence fail-closed：在线 direct dispatch、target-bound dispatch 和 reconnect queue replay 现在先持久化 `pending_agent_tasks` 的 `dispatched` 状态/`edge_device_id`，成功后才推送 `agent.dispatch`；`UpdatePendingTaskDispatched` rows=0 会返回错误，避免 DB 未落 dispatched/device 绑定时 Edge 已收到任务、后续 ack 被拒或重复投递。验证通过 service/app/repository 红绿测试 `go test ./internal/service -run "TestDispatchTask(DoesNotPush.*DispatchedStateMissing|RoutesTargetBoundTaskToBoundDevice)" -count=1`、`go test ./internal/app -run "TestOnRouteSet(DoesNotReplayTargetQueueWhenDispatchStateMissing|ReplaysTargetQueueOnlyForConnectedDevice)" -count=1`、`go test ./internal/repository -run TestPendingTaskRepo_CRUD -count=1`。
 - [x] 2026-05-27 Edge dispatch terminal-state guard：`UpdatePendingTaskDispatched` 只允许 queued/dispatched task 写入 dispatched/device 绑定；cancelled/done/failed/timeout 等终态 rows=0 并返回错误，上层 direct/target dispatch 因而不会把已取消或已终态任务重新推给 Edge。验证通过 service/repository/app 红绿测试 `go test ./internal/service -run "TestDispatchTask(DoesNotPushTerminal|DoesNotPush.*DispatchedStateMissing|RoutesTargetBoundTaskToBoundDevice)" -count=1`、`go test ./internal/repository -run TestPendingTaskRepo_CRUD -count=1`、`go test ./internal/app -run "TestOnRouteSet(DoesNotReplayTargetQueueWhenDispatchStateMissing|ReplaysTargetQueueOnlyForConnectedDevice)" -count=1`。
+- [x] 2026-05-27 Edge task timeout CAS hardening：`startTaskScheduler` 不再用无条件 status update 把扫描到的 expired task 写成 `timeout`；现在使用扫描时的旧状态做 atomic CAS，CAS 失败时跳过 `agent.timeout` 广播，避免 done/failed/cancelled 等并发终态被超时扫描覆盖。验证通过 service/app 红绿测试 `go test ./internal/service -run "TestTimeoutExpiredTask" -count=1`、`go test ./internal/app -run TestPublishExpiredTaskTimeoutSkipsStaleTerminalTask -count=1`。
 - [x] **2026-05-26：`feat/web-agent-closeout-20260526` 已合入并删除本地/远端分支。** WebAgent 产出已成为 `dev/delicious233` 主线的一部分。
 - [x] **2026-05-26：PR #197 已关闭。** 其中安全可独立验证的 `team-hub-authz`、`team-hub-reliability`、`team-adapter-compat` 已直接合入主线；Johnny 聚合分支因 migrations/API/process-executor-test 冲突保留单独审。
 - [x] 2026-05-26 Web Hub-only boundary slice：删除 `app/web/src/api/eventClient.ts`、`edgeAuth.ts`、`hooks/useHubIntegration.ts`、旧 `useChatMessages.ts`、Local Edge status/event/runners hooks，权限弹窗类型迁到 `app/web/src/types/permissions.ts`；新增 `scripts/verify-web-hub-boundary.ps1` 并接入 runtime readiness，阻断浏览器端重新引入 Local Edge loopback、`/v1/runs` 或 `/v1/events`。Web `edgeClient.ts` 只保留显式 Hub-only/stubbed 兼容面。
