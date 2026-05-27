@@ -103,7 +103,7 @@ Write-Host "Repo: $RepoRoot"
 try {
     # Start all services
     Start-ServiceProcess -Name 'edge-server' -WorkingDir "$RepoRoot\edge-server" -Exe 'go' -Args @('run', './cmd/agenthub-edge', '--addr', '127.0.0.1:3210')
-    Start-ServiceProcess -Name 'hub-server'  -WorkingDir "$RepoRoot\hub-server"  -Exe 'go' -Args @('run', './cmd/agenthub-hub',  '--addr', '127.0.0.1:4210')
+    Start-ServiceProcess -Name 'hub-server'  -WorkingDir "$RepoRoot\hub-server"  -Exe 'go' -Args @('run', './cmd/server-hub',  '--addr', '127.0.0.1:4210')
     Start-ServiceProcess -Name 'desktop'     -WorkingDir "$RepoRoot\app\desktop"  -Exe 'pnpm' -Args @('dev', '--port', '5199')
 
     # Wait for health checks
