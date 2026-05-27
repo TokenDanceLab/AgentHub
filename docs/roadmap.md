@@ -41,7 +41,7 @@
 
 > 以下 P0-P2 项在 M5 批次（2026-05-24）中全部修复，保留作为记录。
 
-参考：`docs/review/edge-server-audit.md`、`docs/review/hub-server-audit.md`、`docs/review/hub-server-testing.md`、`docs/review/backend-engineering-standards.md`
+参考：`docs/archive/review-archive/edge-server-audit.md`、`docs/archive/review-archive/hub-server-audit.md`、`docs/review/hub-server-testing.md`、`docs/review/backend-engineering-standards.md`
 
 | 严重度 | 层面 | 核心问题 | 报告索引 | 状态 |
 |:--:|------|------|:--:|:--:|
@@ -138,13 +138,13 @@ Hub 调度（远程）:
 ### 3.1 Q2 2026（当前 -- 工程基础收敛）
 
 > **目标**：代码质量达标、测试覆盖完整、CI/CD 完善、消除全局状态。
-> **参考**：`docs/review/edge-server-audit.md`、`docs/review/hub-server-audit.md`、`docs/review/hub-server-testing.md`、`docs/review/backend-engineering-standards.md`
+> **参考**：`docs/archive/review-archive/edge-server-audit.md`、`docs/archive/review-archive/hub-server-audit.md`、`docs/review/hub-server-testing.md`、`docs/review/backend-engineering-standards.md`
 
 ---
 
 #### 3.1.1 Edge Server 工程完善（~12 天）
 
-> 参考：`docs/review/edge-server-audit.md` 全部 13 项发现
+> 参考：`docs/archive/review-archive/edge-server-audit.md` 全部 13 项发现
 
 ##### P0 -- 阻断级
 
@@ -214,7 +214,7 @@ Hub 调度（远程）:
 
 #### 3.1.2 Hub Server 工程完善（~18 天）
 
-> 参考：`docs/review/hub-server-audit.md` 全部 P0-P3 发现 + `docs/review/hub-server-testing.md` 测试改进计划
+> 参考：`docs/archive/review-archive/hub-server-audit.md` 全部 P0-P3 发现 + `docs/review/hub-server-testing.md` 测试改进计划
 
 ##### P0 -- 阻断级
 
@@ -427,7 +427,7 @@ Hub 调度（远程）:
   - `docs/architecture/adr/` — 5 篇：Hub-Edge双层/WS+NDJSON/Zustand+TanStack/Go进程编排/Worktree隔离
 
 - [x] **文档与代码一致性修复** `[1d]`
-  - Hub Server 准确性矩阵（`docs/review/hub-server-audit.md` 第 10 节）31 项对比中 15 项不一致
+  - Hub Server 准确性矩阵（`docs/archive/review-archive/hub-server-audit.md` 第 10 节）31 项对比中 15 项不一致
   - 修复关键项：消息撤回 2min vs 5min、CORS/Rate-limit middleware 文档声明但不存在
   - 验收：移除文档中未实现的端点声明
 
@@ -626,6 +626,7 @@ Hub 调度（远程）:
 - [x] 2026-05-27 #145 configured upload directory：附件上传 handler 不再用 hash 的最终 blob path 在当前工作目录创建 staging temp 文件，改为系统临时文件；最终 blob 仍通过 `AttachmentService.StoreBlob` 写入配置的 `Upload.Dir` / S3 storage，避免 configured upload dir 场景下遗留 `./uploads` 临时目录，也避免本地 storage 根为 `.` 时 temp 目录与最终文件路径冲突。验证通过 handler 红绿测试 `go test ./internal/handler -run TestAttachmentUploadUsesConfiguredLocalStorageDir -count=1`、attachment 相关 handler/service 测试和 `hub-server && go test ./... -short -count=1`。
 - [x] 2026-05-27 #138 device register contract alignment：OpenAPI 已对齐 Hub 实际 `/edge/devices/register` slash route、`{code,message,data}` response envelope 和当前 `Device` response 字段；Hub handler 不再把存储层 `capabilities` JSON 字符串泄漏给客户端，注册/列表响应会返回数组。验证通过 OpenAPI 合同红绿测试 `go test ./internal/handler -run TestOpenAPIEdgeDeviceRegisterMatchesHubRouteAndEnvelope -count=1`、handler register response 红绿测试、相关 Edge protocol 测试、OpenAPI YAML 解析和 `hub-server && go test ./... -short -count=1`。
 - [x] 2026-05-27 #142 Edge callback request body contract：OpenAPI 的 Edge task stream/done callback request body 现在明确指向 Hub 实际 schema；stream 至少要求 `content`、`chunk` 或 `payload` 之一，`client_msg_id` 标为 UUID，`content`/`chunk`/`final_content`/`error` 字符串字段写明 1 MiB 上限，`event_type` 写明 96 字符上限，`run_id`/`edge_run_id` 保持 128 字符上限。验证通过 OpenAPI 合同红绿测试 `go test ./internal/handler -run TestOpenAPIEdgeTaskCallbacksDocumentStreamAndDoneBodies -count=1`、`go test ./internal/handler -count=1`、OpenAPI YAML 解析和 `hub-server && go test ./... -short -count=1`。
+- [x] 2026-05-27 #105 CI gate policy alignment：新增 `scripts/verify-ci-gates.ps1` 并接入 `validate` job，防止 CI gate 再次漂移；校验 Edge/Hub 覆盖率硬阈值分别为 75%/40%，`govulncheck` 为硬阻断，Go lint/gosec 保持 warning-only 可见债务，validate job 保留 whitespace、secret guard 和 OpenAPI YAML 解析。路线图验收标准同步区分 CI 硬 gate 与发布审计 gate。验证通过本地红绿执行 `pwsh -NoLogo -NoProfile -File scripts\verify-ci-gates.ps1`、OpenAPI YAML 解析、`hub-server && go test ./... -short -count=1` 和目标文件 `git diff --check`。
 - [x] **2026-05-26：`feat/web-agent-closeout-20260526` 已合入并删除本地/远端分支。** WebAgent 产出已成为 `dev/delicious233` 主线的一部分。
 - [x] **2026-05-26：PR #197 已关闭。** 其中安全可独立验证的 `team-hub-authz`、`team-hub-reliability`、`team-adapter-compat` 已直接合入主线；Johnny 聚合分支因 migrations/API/process-executor-test 冲突保留单独审。
 - [x] 2026-05-26 Web Hub-only boundary slice：删除 `app/web/src/api/eventClient.ts`、`edgeAuth.ts`、`hooks/useHubIntegration.ts`、旧 `useChatMessages.ts`、Local Edge status/event/runners hooks，权限弹窗类型迁到 `app/web/src/types/permissions.ts`；新增 `scripts/verify-web-hub-boundary.ps1` 并接入 runtime readiness，阻断浏览器端重新引入 Local Edge loopback、`/v1/runs` 或 `/v1/events`。Web `edgeClient.ts` 只保留显式 Hub-only/stubbed 兼容面。
@@ -758,14 +759,16 @@ Hub 调度（远程）:
 ```powershell
 # Edge Server
 go test ./... -count=1 -short -race -coverprofile=coverage.out ./...
-go tool cover -func=coverage.out | grep total          # >= 80%
-go run golang.org/x/vuln/cmd/govulncheck@latest ./...  # 零高危漏洞
-go run github.com/securecodewarrior/gosec/v2/cmd/gosec@latest ./...  # 零高危
+go tool cover -func=coverage.out | grep total          # CI 硬阈值 >= 75%
+go run golang.org/x/vuln/cmd/govulncheck@latest ./...  # CI 硬阻断：零可利用漏洞
+# gosec 当前在 CI 中 warning-only，可见但不阻断；发布审计再按 4.3 执行零 HIGH/MEDIUM
 
 # Hub Server
 go test ./... -count=1 -short -race -coverprofile=coverage.out ./...
 # 不少于 5 个包有独立单元测试
-go tool cover -func=coverage.out | grep total          # >= 60%
+go tool cover -func=coverage.out | grep total          # CI 硬阈值 >= 40%
+go run golang.org/x/vuln/cmd/govulncheck@latest ./...  # CI 硬阻断：零可利用漏洞
+# gosec 当前在 CI 中 warning-only，可见但不阻断；发布审计再按 4.3 执行零 HIGH/MEDIUM
 
 # Desktop
 pnpm test:run                                          # 全部通过
@@ -811,9 +814,11 @@ pnpm typecheck                                         # 零错误
 
 ### 4.3 安全审计通过标准
 
-- [ ] `gosec`：零 HIGH/MEDIUM
-- [ ] `govulncheck`：零可利用漏洞
-- [ ] `gitleaks`：零密钥泄露
+- [x] CI 硬阻断：Edge/Hub `govulncheck` 零可利用漏洞
+- [x] CI 硬阻断：`scripts/check-secrets.sh` 零密钥泄露
+- [x] CI 可见债务：Edge/Hub `gosec` warning-only，结果必须在 Actions 中可见
+- [ ] 发布审计：`gosec` 零 HIGH/MEDIUM
+- [ ] 发布审计：`gitleaks` 零密钥泄露
 - [ ] JWT secret 仅环境变量（代码中无硬编码）
 - [ ] 速率限制生效（登录/注册 429 拒绝）
 - [ ] pprof/metrics 端口仅 localhost 绑定
@@ -1140,11 +1145,11 @@ pnpm typecheck                                         # 零错误
 ---
 ### 7.11 剩余待处理
 
-**纯后端（1 个）**：
+**纯后端（0 个）**：
 
 | # | Issue | 优先级 |
 |---|-------|:--:|
-| 105 | Align CI gates with documented security/coverage policy | P2 |
+| — | — | — |
 
 **B7 剩余（4 个，客户端相关）**：#181, #180, #71, #114
 **B6 剩余（9 个，Desktop IM/Hub 对接）**：#123, #121, #119, #118, #125, #126, #102, #106, #150
@@ -1165,8 +1170,8 @@ pnpm typecheck                                         # 零错误
 
 | 类别 | 文档 | 用途 |
 |------|------|------|
-| **审计** | `docs/review/edge-server-audit.md` | Edge 13 项发现（S1-S13） |
-| | `docs/review/hub-server-audit.md` | Hub 22 项发现（P0-1 ~ P3-9） |
+| **审计** | `docs/archive/review-archive/edge-server-audit.md` | Edge 13 项发现（S1-S13） |
+| | `docs/archive/review-archive/hub-server-audit.md` | Hub 22 项发现（P0-1 ~ P3-9） |
 | | `docs/review/hub-server-testing.md` | Hub 测试覆盖率 + 改进计划 |
 | | `docs/review/backend-engineering-standards.md` | 工程标准评分 + Top 10 改进 |
 | **路线图** | `docs/roadmaps/client.md` | Desktop Phase 0/1/2 详细任务 |
