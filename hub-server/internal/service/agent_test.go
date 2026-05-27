@@ -313,6 +313,43 @@ func TestDispatchTaskDoesNotPushWhenDispatchedStateMissing(t *testing.T) {
 	}
 }
 
+func TestDispatchTaskDoesNotPushTerminalTask(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, edge_device_id, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"task-cancelled-dispatch", "agent-1", "user-1", "msg-1", model.TaskStatusCancelled, "dev-a", "2030-01-01T00:00:00Z").Error)
+
+	mgr := ws.NewManager()
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-a")
+
+	cache := &mockAgentCache{routeID: conn.ID}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-cancelled-dispatch",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run cancelled task", "")
+
+	select {
+	case <-conn.Send:
+		t.Fatal("terminal task was pushed after cancellation")
+	case <-time.After(100 * time.Millisecond):
+	}
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
+	require.Equal(t, model.TaskStatusCancelled, stored.Status)
+}
+
 func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
 	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_device_id, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -410,6 +447,49 @@ func TestDispatchTaskDoesNotPushTargetWhenDispatchedStateMissing(t *testing.T) {
 		t.Fatal("target dispatch was pushed before task dispatch state was persisted")
 	case <-time.After(100 * time.Millisecond):
 	}
+}
+
+func TestDispatchTaskDoesNotPushTerminalTargetTask(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_device_id, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"task-cancelled-target", "agent-1", "user-1", "msg-1", "target-dev-b", model.TaskStatusCancelled, "dev-b", "2030-01-01T00:00:00Z").Error)
+
+	mgr := ws.NewManager()
+	connB := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connB))
+	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+
+	cache := &mockAgentCache{
+		deviceRoutes: map[string]string{
+			"user-1|desktop|dev-b": connB.ID,
+		},
+	}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-cancelled-target",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		TargetID:          "target-dev-b",
+		EdgeDeviceID:      "dev-b",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run cancelled target", "")
+
+	select {
+	case <-connB.Send:
+		t.Fatal("terminal target task was pushed after cancellation")
+	case <-time.After(100 * time.Millisecond):
+	}
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
+	require.Equal(t, model.TaskStatusCancelled, stored.Status)
 }
 
 func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
