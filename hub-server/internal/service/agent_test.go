@@ -539,6 +539,66 @@ func TestHandleTaskAck_EdgeRunIDBackfill(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestHandleTaskAck_EdgeRunIDBackfillConflictAcceptsSameRunID(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	svc := &AgentService{db: db}
+
+	taskID := "task-backfill-same-conflict"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", ""))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "claude", "sess-1", "user-1"))
+
+	mock.ExpectExec(`UPDATE "pending_agent_tasks" SET "edge_run_id"`).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", "run-002"))
+
+	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", taskID, "run-002")
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskAck_EdgeRunIDBackfillConflictRejectsMismatch(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	svc := &AgentService{db: db}
+
+	taskID := "task-backfill-mismatch-conflict"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", ""))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "claude", "sess-1", "user-1"))
+
+	mock.ExpectExec(`UPDATE "pending_agent_tasks" SET "edge_run_id"`).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", "run-other"))
+
+	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", taskID, "run-002")
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestHandleTaskAckRejectsOversizedEdgeRunID(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()

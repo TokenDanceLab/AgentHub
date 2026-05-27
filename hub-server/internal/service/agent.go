@@ -604,7 +604,24 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDevice
 	}
 	if task.Status == model.TaskStatusRunning {
 		if edgeRunID != "" && task.EdgeRunID == "" {
-			return repository.UpdatePendingTaskEdgeRunID(s.db, taskID, edgeRunID)
+			rowsAffected, err := repository.UpdatePendingTaskEdgeRunID(s.db, taskID, edgeRunID)
+			if err != nil {
+				return err
+			}
+			if rowsAffected > 0 {
+				return nil
+			}
+			latestTask, err := repository.GetPendingTaskByID(s.db, taskID)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return errcode.AgentTaskNotFound
+				}
+				return err
+			}
+			if latestTask.EdgeRunID == edgeRunID {
+				return nil
+			}
+			return errcode.ErrBadRequest
 		}
 		return nil
 	}
