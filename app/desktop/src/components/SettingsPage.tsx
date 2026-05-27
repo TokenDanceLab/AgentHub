@@ -53,6 +53,7 @@ import {
 import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
 import type { ExecutionTarget, ExecutionTargetHealthState, ExecutionTargetType } from '@/api/hubClient';
 import styles from './SettingsPage.module.css';
+import { Select } from '@shared/ui';
 
 export type SectionId =
   | 'general'
@@ -301,6 +302,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [active, setActive] = useState<SectionId>(initialSection);
   const [navSearch, setNavSearch] = useState('');
   const navSearchRef = useRef<HTMLInputElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
 
   // Keyboard shortcut: `/` focuses the search input
   const handleSettingsKeyDown = useCallback((e: KeyboardEvent) => {
@@ -316,6 +318,10 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     window.addEventListener('keydown', handleSettingsKeyDown);
     return () => window.removeEventListener('keydown', handleSettingsKeyDown);
   }, [handleSettingsKeyDown]);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [active]);
 
   const [compactMode, setCompactMode] = useStoredBooleanState('compactMode', false);
   const [autoReview, setAutoReview] = useStoredBooleanState('autoReview', true);
@@ -584,7 +590,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
         </div>
       </aside>
 
-      <main className={styles.main}>
+      <main className={styles.main} ref={mainRef}>
         <div className={styles.content}>
           <div className={styles.header}>
             <span>{t('settings.title')}</span>
@@ -2353,15 +2359,7 @@ function SelectControl({
   options: Array<[SettingsSelectValue, string]>;
   onChange: (value: string) => void;
 }) {
-  return (
-    <select className={styles.select} value={value} onChange={(event) => onChange(event.target.value)}>
-      {options.map(([optionValue, label]) => (
-        <option key={optionValue} value={optionValue}>
-          {label}
-        </option>
-      ))}
-    </select>
-  );
+  return <Select value={value} options={options} onChange={onChange} />;
 }
 
 function Callout({ title, body }: { title: string; body: string }) {
