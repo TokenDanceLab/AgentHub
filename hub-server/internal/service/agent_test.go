@@ -282,6 +282,37 @@ func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
 	require.Empty(t, cache.pushedTarget)
 }
 
+func TestDispatchTaskDoesNotPushWhenDispatchedStateMissing(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	mgr := ws.NewManager()
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-a")
+
+	cache := &mockAgentCache{routeID: conn.ID}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "missing-dispatch-task",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run missing task", "")
+
+	select {
+	case <-conn.Send:
+		t.Fatal("dispatch was pushed before task dispatch state was persisted")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
 func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
 	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_device_id, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -342,6 +373,43 @@ func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 	require.Equal(t, model.TaskStatusDispatched, stored.Status)
 	require.Equal(t, "dev-b", stored.EdgeDeviceID)
 	require.Empty(t, cache.pushedTarget)
+}
+
+func TestDispatchTaskDoesNotPushTargetWhenDispatchedStateMissing(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	mgr := ws.NewManager()
+	connB := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connB))
+	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+
+	cache := &mockAgentCache{
+		deviceRoutes: map[string]string{
+			"user-1|desktop|dev-b": connB.ID,
+		},
+	}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "missing-target-dispatch-task",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		TargetID:          "target-dev-b",
+		EdgeDeviceID:      "dev-b",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run missing target task", "")
+
+	select {
+	case <-connB.Send:
+		t.Fatal("target dispatch was pushed before task dispatch state was persisted")
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
