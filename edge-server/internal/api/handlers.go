@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -23,19 +24,22 @@ import (
 	"github.com/agenthub/edge-server/internal/metrics"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
+	"github.com/agenthub/edge-server/internal/skills"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
 // Handler holds dependencies for HTTP and WebSocket handlers.
 type Handler struct {
-	Bus             *events.Bus
-	Registry        *runners.Registry
-	Store           store.Repository
-	Executor        lifecycle.RunExecutor
-	AdapterRegistry *adapters.Registry // nil if no agent adapters configured
-	AgentRegistry   *agents.Registry   // runtime agent instance registry
-	MessageQueue    *agents.Queue      // inter-agent message queue
-	Metrics         *metrics.EdgeMetrics
+	Bus                *events.Bus
+	Registry           *runners.Registry
+	Store              store.Repository
+	Executor           lifecycle.RunExecutor
+	AdapterRegistry    *adapters.Registry     // nil if no agent adapters configured
+	AgentRegistry      *agents.Registry       // runtime agent instance registry
+	MessageQueue       *agents.Queue          // inter-agent message queue
+	Metrics            *metrics.EdgeMetrics
+	WorkspaceAllowlist []string               // optional absolute/relative roots allowed for request workDir
+	SkillRegistry      *skills.SkillRegistry  // optional SKILL.md registry; nil = no skills injection
 
 	PermissionRegistry *PermissionRegistry
 
@@ -76,6 +80,50 @@ func errorResponse(code, message string) map[string]any {
 			"traceId": genID("trace_"),
 		},
 	}
+}
+
+func normalizedRealPath(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	realPath, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Clean(realPath), nil
+}
+
+func isPathWithin(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel))
+}
+
+func (h *Handler) validateWorkDirAllowed(workDir string) error {
+	if workDir == "" || len(h.WorkspaceAllowlist) == 0 {
+		return nil
+	}
+	candidate, err := normalizedRealPath(workDir)
+	if err != nil {
+		return err
+	}
+	for _, root := range h.WorkspaceAllowlist {
+		root = strings.TrimSpace(root)
+		if root == "" {
+			continue
+		}
+		allowedRoot, err := normalizedRealPath(root)
+		if err != nil {
+			continue
+		}
+		if isPathWithin(allowedRoot, candidate) {
+			return nil
+		}
+	}
+	return fmt.Errorf("workDir is outside the Edge workspace allowlist")
 }
 
 func ensureStore(h *Handler) store.Repository {
@@ -423,12 +471,18 @@ func (h *Handler) GetAgents(w http.ResponseWriter, r *http.Request) {
 	metadataList := h.AdapterRegistry.List()
 	agents := make([]map[string]any, 0, len(metadataList))
 	for _, m := range metadataList {
+		status := "available"
+		if a, ok := h.AdapterRegistry.Get(m.ID); ok {
+			if !a.Available() {
+				status = "unavailable"
+			}
+		}
 		info := map[string]any{
 			"id":          m.ID,
 			"name":        m.Name,
 			"description": m.Description,
 			"version":     m.Version,
-			"status":      "available",
+			"status":      status,
 		}
 		if a, ok := h.AdapterRegistry.Get(m.ID); ok {
 			info["capabilities"] = a.Capabilities()
@@ -458,19 +512,27 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		ProjectID         string `json:"projectId"`
-		ThreadID          string `json:"threadId"`
-		Prompt            string `json:"prompt"`
-		AgentID           string `json:"agentId"`
-		Model             string `json:"model"`
-		SessionID         string `json:"sessionId"`
-		Continue          bool   `json:"continue"`
-		Fork              bool   `json:"fork"`
-		ReasoningEffort   string `json:"reasoningEffort"`
-		MaxThinkingTokens int    `json:"maxThinkingTokens"`
-		PermissionMode    string `json:"permissionMode"`
-		IncludePartial    bool   `json:"includePartial"`
-		HubTaskID         string `json:"hubTaskId"` // Edge-to-Hub direct callback task ID
+		ProjectID              string            `json:"projectId"`
+		ThreadID               string            `json:"threadId"`
+		Prompt                 string            `json:"prompt"`
+		AgentID                string            `json:"agentId"`
+		Model                  string            `json:"model"`
+		SessionID              string            `json:"sessionId"`
+		Continue               bool              `json:"continue"`
+		Fork                   bool              `json:"fork"`
+		ReasoningEffort        string            `json:"reasoningEffort"`
+		ThinkingMode           string            `json:"thinkingMode"`
+		MaxThinkingTokens      int               `json:"maxThinkingTokens"`
+		PermissionMode         string            `json:"permissionMode"`
+		WorkDir                string            `json:"workDir"`
+		IncludePartial         bool              `json:"includePartial"`
+		StructuredOutputSchema string            `json:"structuredOutputSchema"`
+		SystemPrompt           string            `json:"systemPrompt"`
+		AppendSystemPrompt     string            `json:"appendSystemPrompt"`
+		AllowedTools           []string          `json:"allowedTools"`
+		ConfigOverrides        map[string]string `json:"configOverrides"`
+		Ephemeral              bool              `json:"ephemeral"`
+		HubTaskID              string            `json:"hubTaskId"` // Edge-to-Hub direct callback task ID
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
@@ -495,6 +557,11 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	if _, ok := repository.GetProject(req.ProjectID); !ok {
 		h.runCreateMu.Unlock()
 		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "project or thread not found"))
+		return
+	}
+	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
+		h.runCreateMu.Unlock()
+		writeJSON(w, http.StatusForbidden, errorResponse("workspace_not_allowed", err.Error()))
 		return
 	}
 	if active, ok := activeRunForThread(repository.ListRuns(req.ThreadID)); ok {
@@ -546,18 +613,31 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.Executor != nil {
 		runCtx := lifecycle.RunProcessContext{
-			Run:               run,
-			Prompt:            req.Prompt,
-			AgentID:           req.AgentID,
-			Model:             req.Model,
-			SessionID:         req.SessionID,
-			ContinueLast:      req.Continue,
-			ForkSession:       req.Fork,
-			ReasoningEffort:   req.ReasoningEffort,
-			MaxThinkingTokens: req.MaxThinkingTokens,
-			PermissionMode:    req.PermissionMode,
-			IncludePartial:    req.IncludePartial,
-			HubTaskID:         req.HubTaskID,
+			Run:                    run,
+			Prompt:                 req.Prompt,
+			AgentID:                req.AgentID,
+			Model:                  req.Model,
+			SessionID:              req.SessionID,
+			ContinueLast:           req.Continue,
+			ForkSession:            req.Fork,
+			ReasoningEffort:        req.ReasoningEffort,
+			ThinkingMode:           req.ThinkingMode,
+			MaxThinkingTokens:      req.MaxThinkingTokens,
+			PermissionMode:         req.PermissionMode,
+			WorkDir:                req.WorkDir,
+			IncludePartial:         req.IncludePartial,
+			StructuredOutputSchema: req.StructuredOutputSchema,
+			SystemPrompt:           req.SystemPrompt,
+			AppendSystemPrompt:     req.AppendSystemPrompt,
+			AllowedTools:           req.AllowedTools,
+			ConfigOverrides:        req.ConfigOverrides,
+			Ephemeral:              req.Ephemeral,
+			HubTaskID:              req.HubTaskID,
+		}
+		// Inject Skills directory context (SKILL.md discovery) into the system prompt.
+		// The SkillRegistry is shared across runs and lazily lists name+description.
+		if h.SkillRegistry != nil {
+			runCtx.SkillsPrompt = h.SkillRegistry.SystemPromptContext()
 		}
 		if err := h.Executor.Start(run, runCtx); err != nil {
 			if failed, ok := repository.SetRunStatusIf(run.ID, "failed", "queued"); ok {
@@ -595,6 +675,15 @@ func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 	if h.Executor != nil {
 		result := h.Executor.Cancel(runID)
 		if result.Found {
+			// #108: align cancel response with OpenAPI spec
+			// Terminal runs (finished/failed/cancelled) are already done; return OK with current status
+			if isTerminalRunStatus(result.Status) {
+				writeJSON(w, http.StatusOK, acceptedResponse(map[string]any{
+					"runId":  runID,
+					"status": result.Status,
+				}))
+				return
+			}
 			writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
 				"runId":  runID,
 				"status": result.Status,
@@ -602,19 +691,26 @@ func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// #108: check store as fallback; return 404 for missing run instead of silently accepting
 	if repository := ensureStore(h); repository != nil {
 		if run, ok := repository.GetRun(runID); ok {
-			writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
+			writeJSON(w, http.StatusOK, acceptedResponse(map[string]any{
 				"runId":  runID,
 				"status": run.Status,
 			}))
 			return
 		}
 	}
-	writeJSON(w, http.StatusAccepted, acceptedResponse(map[string]any{
-		"runId":  runID,
-		"status": "cancelling",
-	}))
+	writeJSON(w, http.StatusNotFound, errorResponse("not_found", "run not found"))
+}
+
+func isTerminalRunStatus(status string) bool {
+	switch status {
+	case "finished", "failed", "cancelled":
+		return true
+	default:
+		return false
+	}
 }
 
 // ---------------------------------------------------------------------------

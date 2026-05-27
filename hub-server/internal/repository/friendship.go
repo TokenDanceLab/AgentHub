@@ -38,9 +38,16 @@ func UpdateFriendshipByID(db *gorm.DB, id, status string) error {
 }
 
 func UpdateFriendshipRemark(db *gorm.DB, userID, friendID, remark string) error {
-	return db.Model(&model.Friendship{}).
+	result := db.Model(&model.Friendship{}).
 		Where("user_id = ? AND friend_id = ? AND status = ?", userID, friendID, model.StatusAccepted).
-		Update("remark", remark).Error
+		Update("remark", remark)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func DeleteFriendshipPair(db *gorm.DB, userID1, userID2 string) error {

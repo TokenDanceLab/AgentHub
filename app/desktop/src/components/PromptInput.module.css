@@ -5,31 +5,65 @@
 .root {
   position: relative;
   flex-shrink: 0;
-  padding: 10px 18px 18px;
+  pointer-events: none;
+  --composer-column-width: 760px;
+  --composer-side-pad: max(30px, calc((100% - var(--run-card-space, 0px) - var(--composer-column-width)) / 2));
+  padding:
+    10px
+    calc(var(--composer-side-pad) + var(--run-card-space, 0px))
+    22px
+    var(--composer-side-pad);
+  transition: padding 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 /* ── Floating glass capsule ────────────────── */
 .capsule {
-  background: color-mix(in oklch, var(--input-panel-bg) 88%, var(--surface-raised));
-  border: 1px solid color-mix(in oklch, var(--input-panel-border) 82%, transparent);
+  pointer-events: auto;
+  width: 100%;
+  max-width: var(--composer-column-width);
+  margin: 0 auto;
+  background: rgba(47, 47, 57, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 14px;
   padding: 10px 14px 9px;
   display: flex;
   flex-direction: column;
   gap: 7px;
-  backdrop-filter: blur(18px) saturate(1.08);
-  -webkit-backdrop-filter: blur(18px) saturate(1.08);
-  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(24px) saturate(1.06);
+  -webkit-backdrop-filter: blur(24px) saturate(1.06);
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.028) inset;
   transition: background var(--duration-fast), border-color var(--duration-fast),
     box-shadow var(--duration-fast);
 }
 
 .capsule:focus-within {
-  background: color-mix(in oklch, var(--input-panel-bg) 80%, var(--surface-raised));
-  border-color: var(--ring);
+  background: rgba(50, 50, 61, 0.88);
+  border-color: rgba(255, 255, 255, 0.105);
   box-shadow:
-    0 -4px 20px rgba(0, 0, 0, 0.18),
-    0 0 0 1px color-mix(in oklch, var(--ring) 28%, transparent);
+    0 10px 24px rgba(0, 0, 0, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.032) inset;
+}
+
+[data-theme='light'] .capsule {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.56)),
+    rgba(244, 245, 248, 0.82);
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 10px 26px rgba(15, 23, 42, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.72) inset;
+}
+
+[data-theme='light'] .capsule:focus-within {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.78), rgba(255,255,255,0.62)),
+    rgba(246, 247, 250, 0.88);
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow:
+    0 12px 28px rgba(15, 23, 42, 0.12),
+    0 0 0 1px rgba(15, 23, 42, 0.045);
 }
 
 /* ── Agent badge ───────────────────────────── */
@@ -41,8 +75,8 @@
   max-width: 100%;
   padding: 3px 9px;
   border-radius: 999px;
-  background: color-mix(in oklch, var(--primary) 15%, transparent);
-  color: var(--primary);
+  background: var(--input-ghost-btn-hover);
+  color: var(--muted-foreground);
   font-size: 12px;
   font-weight: 560;
   overflow: hidden;
@@ -57,8 +91,8 @@
   outline: none !important;
   background: transparent !important;
   resize: none;
-  font-size: 15px;
-  line-height: 1.45;
+  font-size: 17px;
+  line-height: 1.52;
   color: var(--foreground);
   font-family: var(--font-sans);
   padding: 2px 0 1px;
@@ -81,9 +115,9 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
-  max-width: min(48vw, 520px);
+  max-width: 230px;
   overflow-x: auto;
   padding: 0;
   scrollbar-width: none;
@@ -110,13 +144,13 @@
 .providerPill {
   display: inline-flex;
   align-items: center;
-  max-width: 110px;
-  height: 28px;
-  padding: 0 10px;
+  max-width: 176px;
+  height: 26px;
+  padding: 0 9px;
   border-radius: 8px;
   background: var(--input-ghost-btn-hover);
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 560;
   line-height: 1;
   overflow: hidden;
@@ -125,13 +159,13 @@
 }
 
 .contextGlyph {
-  width: 17px;
-  height: 17px;
-  border: 3px solid var(--muted-foreground);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--muted-foreground);
   border-right-color: transparent;
   border-radius: 50%;
   flex-shrink: 0;
-  opacity: 0.72;
+  opacity: 0.58;
 }
 
 /* Hide label text — only show the value. Provider/model/reasoning are
@@ -172,7 +206,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 9px;
   min-width: 0;
 }
 
@@ -180,7 +214,7 @@
 .attachBtn {
   width: 30px;
   height: 30px;
-  border-radius: 50%;
+  border-radius: 8px;
   border: none;
   display: flex;
   align-items: center;
@@ -197,6 +231,11 @@
   color: var(--foreground);
 }
 
+.attachBtnActive {
+  background: var(--input-ghost-btn-hover);
+  color: var(--foreground);
+}
+
 .attachBtn:active {
   transform: scale(0.94);
 }
@@ -206,23 +245,52 @@
   cursor: not-allowed;
 }
 
+.workDirPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 160px;
+  min-height: 30px;
+  padding: 0 9px;
+  border-radius: 9px;
+  background: rgba(255,255,255,0.055);
+  color: var(--muted-foreground);
+  font-size: 13px;
+  font-weight: 560;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-theme='light'] .permissionPill,
+[data-theme='light'] .workDirPill {
+  background: rgba(0,0,0,0.035);
+}
+
+.workDirPill {
+  max-width: 190px;
+}
+
+
 /* ── Model / reasoning ghost pills ──────────── */
 .metaChain {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
+  flex-shrink: 1;
 }
 
 .metaBtn {
-  height: 26px;
-  padding: 0 8px;
+  height: 28px;
+  padding: 0 9px;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--muted-foreground);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 540;
   cursor: pointer;
   white-space: nowrap;
   transition: background var(--duration-fast), color var(--duration-fast);
@@ -244,7 +312,7 @@
 .stopBtn {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: 999px;
   border: none;
   display: flex;
   align-items: center;

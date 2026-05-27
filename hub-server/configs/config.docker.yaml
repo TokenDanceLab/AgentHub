@@ -18,7 +18,7 @@ redis:
   min_idle_conns: 10
 jwt:
   # AGENTHUB_JWT_SECRET env var takes precedence over this value.
-  secret: dev-secret-change-in-production
+  secret: ""
   access_ttl: 15m
   refresh_ttl: 720h
 upload:

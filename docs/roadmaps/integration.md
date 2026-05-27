@@ -2,6 +2,9 @@
 
 > 生成于 2026-05-24，基于对全部三个代码库的完整源码审查。
 > 分支：`dev/delicious233`
+> 状态：历史集成分析 / 兼容参考。当前权威架构见 `docs/architecture/system-architecture.md`、`docs/handoff/STATE.md` 和 `docs/roadmap.md`；早期 Runner Registry 语境已收敛为 Edge Server 内的 Agent Runtime adapter / Agent Profile / Execution Target，token storage 描述以当前安全风险登记为准。
+
+> 2026-05-26 补充：后续集成主线按 `AgentRuntime -> AgentProfile -> ExecutionTarget -> Thread -> Run -> RunEvent -> Approval/Artifact` 收敛。Hub 负责 TokenDance ID 映射、Hub-local session、授权、同步、中继和审计；Edge 负责 Runtime 进程、append-only event、workspace/worktree 和审批控制协议。不要把本文件旧表里的 `AgentInstance` / `Runner` 词汇扩展成新的产品模型。
 
 ---
 
@@ -37,7 +40,7 @@
 │  │  @shared/    │  gorilla/websocket   │   Edge Server        │    │
 │  │  events.ts   │  EventEnvelope       │  (net/http, :3210)   │    │
 │  │  types.ts    │  cursor replay        │                      │    │
-│  └──────────────┘                      │  Runner Registry     │    │
+│  └──────────────┘                      │ Runtime Adapter Reg. │    │
 │                                        │  Agent Adapters      │    │
 │  ┌──────────────┐                      │  Process Executor    │    │
 │  │  CLI Tools   │  local exec          │  EventBus (seq)      │    │
@@ -279,7 +282,7 @@ Desktop 认证流程：
 - 修改 `app/desktop/src/config.ts` — 添加 `HUB_URL`
 
 **任务**：
-1. 实现 `hubAuth.ts`：登录、令牌存储（localStorage）、刷新定时器
+1. 实现 `hubAuth.ts`：登录、Hub-issued session 存储、刷新定时器。当前安全边界：Desktop packaged mode 走 Tauri/OS credential store，Web Hub tokens 仅用 sessionStorage 降低持久化风险；公开 Web 发布前仍需 BFF/HttpOnly cookie 或等价 server-owned session 方案。
 2. 实现 `hubClient.ts`：认证端点（login、refresh、me）
 3. 在 StatusBar 中添加 Hub 连接状态
 

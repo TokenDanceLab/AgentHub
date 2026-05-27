@@ -1,7 +1,10 @@
 package repository
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/model"
@@ -34,12 +37,14 @@ func UpdateUser(db *gorm.DB, user *model.User) error {
 	return db.Save(user).Error
 }
 
+// UpdatePassword is deprecated: local password auth has been removed in favor of TokenDance ID OIDC.
+// Deprecated: OIDC users do not have passwords.
 func UpdatePassword(db *gorm.DB, userID string, passwordHash string) error {
 	return db.Model(&model.User{}).Where("id = ?", userID).Update("password_hash", passwordHash).Error
 }
 
-// UpdatePasswordAndRevokeTokens atomically updates the user's password hash and
-// revokes all their refresh tokens within a single transaction.
+// UpdatePasswordAndRevokeTokens is deprecated: local password auth has been removed.
+// Deprecated: OIDC users do not have passwords.
 func UpdatePasswordAndRevokeTokens(db *gorm.DB, userID, passwordHash string) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&model.User{}).Where("id = ?", userID).Update("password_hash", passwordHash).Error; err != nil {
@@ -88,15 +93,13 @@ func FindOrCreateByTokenDanceSub(db *gorm.DB, sub string) (*model.User, error) {
 	}
 
 	// First login — auto-create a Hub user linked to this TokenDance ID sub.
-	// Username is derived from the sub prefix; password is empty (user must use OIDC login).
-	username := "td_" + sub
-	if len(username) > 32 {
-		username = username[:32]
-	}
+	// Username is derived from a readable prefix plus a hash suffix so long
+	// TokenDance subjects cannot collide after truncation.
+	username := tokenDanceUsername(sub)
 	now := time.Now()
 	user = &model.User{
 		Username:              username,
-		Nickname:              sub, // can be changed later
+		Nickname:              tokenDanceNickname(sub), // can be changed later
 		TokenDanceSub:         &sub,
 		TokenDanceSubLinkedAt: &now,
 	}
@@ -104,4 +107,57 @@ func FindOrCreateByTokenDanceSub(db *gorm.DB, sub string) (*model.User, error) {
 		return nil, err
 	}
 	return user, nil
+}
+
+func tokenDanceUsername(sub string) string {
+	hash := sha256.Sum256([]byte(sub))
+	suffix := hex.EncodeToString(hash[:])[:10]
+
+	const (
+		prefix       = "td_"
+		maxUsername  = 32
+		separatorLen = 1
+	)
+	maxBaseLen := maxUsername - len(prefix) - separatorLen - len(suffix)
+	base := sanitizeUsernamePart(sub)
+	if len(base) > maxBaseLen {
+		base = base[:maxBaseLen]
+	}
+	base = strings.Trim(base, "_")
+	if base == "" {
+		base = "user"
+	}
+	return prefix + base + "_" + suffix
+}
+
+func sanitizeUsernamePart(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	var b strings.Builder
+	b.Grow(len(value))
+	lastUnderscore := false
+	for _, r := range value {
+		allowed := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		if allowed {
+			b.WriteRune(r)
+			lastUnderscore = false
+			continue
+		}
+		if !lastUnderscore {
+			b.WriteByte('_')
+			lastUnderscore = true
+		}
+	}
+	return b.String()
+}
+
+func tokenDanceNickname(sub string) string {
+	value := strings.TrimSpace(sub)
+	if value == "" {
+		return "TokenDance User"
+	}
+	runes := []rune(value)
+	if len(runes) <= 64 {
+		return value
+	}
+	return string(runes[:64])
 }

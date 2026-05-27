@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -31,6 +32,10 @@ func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req
 	if req.Name == "" {
 		return nil, errcode.ErrBadRequest
 	}
+	if healthState := strings.TrimSpace(req.HealthState); healthState != "" && healthState != "unknown" {
+		return nil, errcode.ErrBadRequest.WithMessage("health_state is system-managed")
+	}
+	normalizeExecutionTargetDefaults(req)
 	if err := req.Validate(); err != nil {
 		return nil, errcode.ErrBadRequest.WithMessage(err.Error())
 	}
@@ -51,13 +56,16 @@ func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req
 	return req, nil
 }
 
-func (s *ExecutionTargetService) Get(ctx context.Context, id string) (*model.ExecutionTarget, error) {
+func (s *ExecutionTargetService) Get(ctx context.Context, id, ownerID string) (*model.ExecutionTarget, error) {
 	t, err := repository.GetExecutionTargetByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.UserNotFound
 		}
 		return nil, err
+	}
+	if t.OwnerID != ownerID {
+		return nil, errcode.AuthDeviceMismatch
 	}
 	return t, nil
 }
@@ -89,6 +97,15 @@ func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string,
 	if req.WorkspaceRoot != "" {
 		t.WorkspaceRoot = req.WorkspaceRoot
 	}
+	if req.WorkspaceAllowlist != "" {
+		t.WorkspaceAllowlist = req.WorkspaceAllowlist
+	}
+	if req.TrustLevel != "" {
+		t.TrustLevel = req.TrustLevel
+	}
+	if strings.TrimSpace(req.HealthState) != "" {
+		return nil, errcode.ErrBadRequest.WithMessage("health_state is system-managed")
+	}
 	if req.AuthMethod != "" {
 		t.AuthMethod = req.AuthMethod
 	}
@@ -109,6 +126,27 @@ func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string,
 		return nil, err
 	}
 	return t, nil
+}
+
+func normalizeExecutionTargetDefaults(t *model.ExecutionTarget) {
+	if t.TargetType == "" {
+		t.TargetType = "local_edge"
+	}
+	if t.WorkspaceAllowlist == "" {
+		t.WorkspaceAllowlist = "[]"
+	}
+	if t.TrustLevel == "" {
+		t.TrustLevel = "local"
+	}
+	if t.HealthState == "" {
+		t.HealthState = "unknown"
+	}
+	if t.Capabilities == "" {
+		t.Capabilities = "{}"
+	}
+	if t.Metadata == "" {
+		t.Metadata = "{}"
+	}
 }
 
 func (s *ExecutionTargetService) Delete(ctx context.Context, id, ownerID string) error {
@@ -137,7 +175,7 @@ func (s *ExecutionTargetService) List(ctx context.Context, ownerID, targetType, 
 	return &TargetListResult{Items: targets, HasMore: hasMore, Cursor: nextCursor}, nil
 }
 
-func (s *ExecutionTargetService) Ping(ctx context.Context, id string) error {
+func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) error {
 	t, err := repository.GetExecutionTargetByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -145,13 +183,16 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id string) error {
 		}
 		return err
 	}
+	if t.OwnerID != ownerID {
+		return errcode.AuthDeviceMismatch
+	}
 
 	switch t.TargetType {
 	case "local_edge":
 		return repository.UpdateTargetOnlineStatus(s.db, id, true)
 	case "remote_ssh", "tailscale", "cloud_edge", "hub_relay":
-		return repository.UpdateTargetOnlineStatus(s.db, id, true)
+		return errcode.TargetNotRoutable.WithMessage("execution target health proof is not available")
 	default:
-		return repository.UpdateTargetOnlineStatus(s.db, id, true)
+		return errcode.ErrBadRequest.WithMessage("unsupported target_type")
 	}
 }

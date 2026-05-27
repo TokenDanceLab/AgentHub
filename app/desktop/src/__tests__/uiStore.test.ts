@@ -9,6 +9,7 @@ describe('uiStore shell layout state', () => {
       rightPanelWidth: 360,
       leftSidebarCollapsed: false,
       rightPanelOpen: false,
+      leftSidebarView: 'home',
       mobileSidebarOpen: false,
       mobileRightPanelOpen: false,
     });
@@ -26,7 +27,7 @@ describe('uiStore shell layout state', () => {
       leftSidebarCollapsed: true,
       rightPanelOpen: true,
       sidebarWidth: 420,
-      rightPanelWidth: 448,
+      rightPanelWidth: 360,
     });
   });
 
@@ -44,6 +45,7 @@ describe('uiStore shell layout state', () => {
       rightPanelWidth: 360,
       leftSidebarCollapsed: true,
       rightPanelOpen: true,
+      leftSidebarView: 'home',
     });
   });
 });

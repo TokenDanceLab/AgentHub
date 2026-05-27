@@ -128,7 +128,8 @@ function parseMentionAtCursor(
   if (atIndex === -1) return null;
 
   // @ must be at start or preceded by whitespace
-  if (atIndex > 0 && !/\s/.test(textBefore[atIndex - 1])) return null;
+  const previousChar = atIndex > 0 ? textBefore[atIndex - 1] : undefined;
+  if (previousChar && !/\s/.test(previousChar)) return null;
 
   const query = textBefore.substring(atIndex + 1);
 

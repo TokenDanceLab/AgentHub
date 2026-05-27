@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -35,14 +37,16 @@ func (r *recordingRepository) CreateProject(id, name string) (store.Project, err
 }
 
 type fakeRunExecutor struct {
-	started []store.Run
-	cancel  lifecycle.CancelResult
-	cancels []string
-	err     error
+	started  []store.Run
+	contexts []lifecycle.RunProcessContext
+	cancel   lifecycle.CancelResult
+	cancels  []string
+	err      error
 }
 
-func (f *fakeRunExecutor) Start(run store.Run, _ lifecycle.RunProcessContext) error {
+func (f *fakeRunExecutor) Start(run store.Run, ctx lifecycle.RunProcessContext) error {
 	f.started = append(f.started, run)
+	f.contexts = append(f.contexts, ctx)
 	return f.err
 }
 
@@ -375,6 +379,196 @@ func TestPostRunsBindsProjectAndThread(t *testing.T) {
 	}
 	if executor.started[0].ID != runID {
 		t.Fatalf("executor started run = %#v, want run %q", executor.started[0], runID)
+	}
+}
+
+func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+
+	body := `{
+		"projectId":"proj_local",
+		"threadId":"thread_local",
+		"prompt":"review this patch",
+		"agentId":"codex",
+		"model":"gpt-5.5",
+		"reasoningEffort":"high",
+		"thinkingMode":"adaptive",
+		"permissionMode":"plan",
+		"workDir":"D:\\Code\\TokenDance\\AgentHub",
+		"includePartial":true,
+		"structuredOutputSchema":"{\"type\":\"object\"}",
+		"systemPrompt":"You are a careful reviewer.",
+		"appendSystemPrompt":"Keep output concise.",
+		"allowedTools":["Read","Grep"],
+		"configOverrides":{"reasoning_summary":"auto"},
+		"ephemeral":true
+	}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(executor.contexts) != 1 {
+		t.Fatalf("executor contexts = %d, want 1", len(executor.contexts))
+	}
+	ctx := executor.contexts[0]
+	if ctx.Prompt != "review this patch" || ctx.AgentID != "codex" || ctx.Model != "gpt-5.5" {
+		t.Fatalf("basic run context = %#v", ctx)
+	}
+	if ctx.ReasoningEffort != "high" || ctx.ThinkingMode != "adaptive" || ctx.PermissionMode != "plan" {
+		t.Fatalf("runtime policy context = %#v", ctx)
+	}
+	if ctx.WorkDir != `D:\Code\TokenDance\AgentHub` || !ctx.IncludePartial || !ctx.Ephemeral {
+		t.Fatalf("execution context = %#v", ctx)
+	}
+	if ctx.StructuredOutputSchema != `{"type":"object"}` {
+		t.Fatalf("structured output schema = %#v", ctx.StructuredOutputSchema)
+	}
+	if ctx.SystemPrompt != "You are a careful reviewer." || ctx.AppendSystemPrompt != "Keep output concise." {
+		t.Fatalf("system prompt context = %#v", ctx)
+	}
+	if len(ctx.AllowedTools) != 2 || ctx.AllowedTools[0] != "Read" || ctx.AllowedTools[1] != "Grep" {
+		t.Fatalf("allowed tools = %#v", ctx.AllowedTools)
+	}
+	if ctx.ConfigOverrides["reasoning_summary"] != "auto" {
+		t.Fatalf("config overrides = %#v", ctx.ConfigOverrides)
+	}
+}
+
+func TestPostRunsAllowsWorkDirWithinWorkspaceAllowlist(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+
+	allowedRoot := filepath.Join(t.TempDir(), "workspace")
+	workDir := filepath.Join(allowedRoot, "project-a")
+	if err := os.MkdirAll(workDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	h.WorkspaceAllowlist = []string{allowedRoot}
+
+	body, err := json.Marshal(map[string]any{
+		"projectId": "proj_local",
+		"threadId":  "thread_local",
+		"workDir":   workDir,
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(string(body)))
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 1 {
+		t.Fatalf("executor starts = %d, want 1", len(executor.started))
+	}
+	if executor.contexts[0].WorkDir != workDir {
+		t.Fatalf("executor workDir = %q, want %q", executor.contexts[0].WorkDir, workDir)
+	}
+}
+
+func TestPostRunsRejectsWorkDirOutsideWorkspaceAllowlist(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+
+	parent := t.TempDir()
+	allowedRoot := filepath.Join(parent, "allowed")
+	escapedWorkDir := filepath.Join(allowedRoot, "..", "outside")
+	if err := os.MkdirAll(allowedRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll allowed root returned error: %v", err)
+	}
+	if err := os.MkdirAll(escapedWorkDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	h.WorkspaceAllowlist = []string{allowedRoot}
+
+	body, err := json.Marshal(map[string]any{
+		"projectId": "proj_local",
+		"threadId":  "thread_local",
+		"workDir":   escapedWorkDir,
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(string(body)))
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	errObj, ok := resp["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("error body = %#v, want error object", resp)
+	}
+	if errObj["code"] != "workspace_not_allowed" {
+		t.Fatalf("error code = %#v, want workspace_not_allowed", errObj["code"])
+	}
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+	if runs := h.Store.ListRuns("thread_local"); len(runs) != 0 {
+		t.Fatalf("stored runs = %d, want 0", len(runs))
+	}
+}
+
+func TestPostRunsRejectsSymlinkEscapeFromWorkspaceAllowlist(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+
+	parent := t.TempDir()
+	allowedRoot := filepath.Join(parent, "allowed")
+	outsideRoot := filepath.Join(parent, "outside")
+	if err := os.MkdirAll(allowedRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll allowed root returned error: %v", err)
+	}
+	if err := os.MkdirAll(outsideRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll outside root returned error: %v", err)
+	}
+	linkPath := filepath.Join(allowedRoot, "linked-outside")
+	if err := os.Symlink(outsideRoot, linkPath); err != nil {
+		t.Skipf("symlink creation unavailable in this environment: %v", err)
+	}
+	h.WorkspaceAllowlist = []string{allowedRoot}
+
+	body, err := json.Marshal(map[string]any{
+		"projectId": "proj_local",
+		"threadId":  "thread_local",
+		"workDir":   linkPath,
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(string(body)))
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(executor.started) != 0 {
+		t.Fatalf("executor starts = %d, want 0", len(executor.started))
 	}
 }
 
@@ -778,13 +972,18 @@ func TestPostRunsMethodNotAllowed(t *testing.T) {
 
 func TestPostCancelRun(t *testing.T) {
 	h := newTestHandler()
+	// Create project and thread first (required for CreateRun).
+	_, _ = h.Store.CreateProject("proj_local", "Local")
+	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Thread")
+	_, _ = h.Store.CreateRun("run_test123", "proj_local", "thread_local")
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_test123:cancel", nil)
 	rec := httptest.NewRecorder()
 
 	h.PostCancelRun(rec, req)
 
-	if rec.Code != http.StatusAccepted {
-		t.Fatalf("expected status 202, got %d", rec.Code)
+	// #108: existing run returns 200 via store fallback
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
 	var body map[string]any
@@ -794,6 +993,19 @@ func TestPostCancelRun(t *testing.T) {
 
 	if body["runId"] != "run_test123" {
 		t.Errorf("expected runId=run_test123, got %v", body["runId"])
+	}
+}
+
+func TestPostCancelRunMissingRunReturns404(t *testing.T) {
+	h := newTestHandler()
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_nonexistent:cancel", nil)
+	rec := httptest.NewRecorder()
+
+	h.PostCancelRun(rec, req)
+
+	// #108: missing run returns 404
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404 for missing run, got %d", rec.Code)
 	}
 }
 
@@ -840,8 +1052,9 @@ func TestPostCancelRunReturnsStoredStatusWhenExecutorCannotCancel(t *testing.T) 
 	rec := httptest.NewRecorder()
 	h.PostCancelRun(rec, req)
 
-	if rec.Code != http.StatusAccepted {
-		t.Fatalf("expected status 202, got %d", rec.Code)
+	// #108: store fallback for terminal runs returns 200
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200 (terminal run fallback), got %d", rec.Code)
 	}
 	var body map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
@@ -1123,6 +1336,10 @@ func TestMuxGetRunsRoute(t *testing.T) {
 
 func TestMuxCancelRunRoute(t *testing.T) {
 	h := newTestHandler()
+	// Create project, thread, and run so the cancel route can find it.
+	_, _ = h.Store.CreateProject("proj_local", "Local")
+	_, _ = h.Store.CreateThread("thread_local", "proj_local", "Thread")
+	_, _ = h.Store.CreateRun("run_abc", "proj_local", "thread_local")
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
@@ -1130,8 +1347,23 @@ func TestMuxCancelRunRoute(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestMuxCancelRunMissingRunRoute(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_missing:cancel", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	// #108: missing run returns 404
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
 	}
 }
 

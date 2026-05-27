@@ -72,6 +72,12 @@ func TestCreatePrivateSession_Existing(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
 			AddRow("target-1", "target", "hash", "Target"))
 
+	// #122: friendship check — both users must be accepted friends.
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "friendships" WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $3 AND friend_id = $4) ORDER BY "friendships"."id" LIMIT $5`)).
+		WithArgs("user-1", "target-1", "target-1", "user-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
+			AddRow("f1", "user-1", "target-1", "accepted"))
+
 	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members sm1`).
 		WithArgs("user-1", "target-1", "private").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "type"}).
@@ -94,6 +100,12 @@ func TestCreatePrivateSession_Success(t *testing.T) {
 		WithArgs("target-1", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
 			AddRow("target-1", "target", "hash", "Target"))
+
+	// #122: friendship check — both users must be accepted friends.
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "friendships" WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $3 AND friend_id = $4) ORDER BY "friendships"."id" LIMIT $5`)).
+		WithArgs("user-1", "target-1", "target-1", "user-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
+			AddRow("f1", "user-1", "target-1", "accepted"))
 
 	// FindPrivateSessionBetween returns empty (no existing session)
 	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members sm1`).
@@ -129,6 +141,12 @@ func TestCreatePrivateSession_NilCacheDoesNotPanic(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
 			AddRow("target-1", "target", "hash", "Target"))
 
+	// #122: friendship check — both users must be accepted friends.
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "friendships" WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $3 AND friend_id = $4) ORDER BY "friendships"."id" LIMIT $5`)).
+		WithArgs("user-1", "target-1", "target-1", "user-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
+			AddRow("f1", "user-1", "target-1", "accepted"))
+
 	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members sm1`).
 		WithArgs("user-1", "target-1", "private").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
@@ -145,6 +163,26 @@ func TestCreatePrivateSession_NilCacheDoesNotPanic(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, resp.Created)
 	assert.Equal(t, "private", resp.Type)
+	assert.NotEmpty(t, resp.SessionID)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCreateGroupSession_AllowsOwnerOnlyWorkspace(t *testing.T) {
+	db, mock, sqlDB := newMockDBSession(t)
+	defer sqlDB.Close()
+
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "sessions"`)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "session_members"`)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	svc := NewSessionService(db, testSessionCache(t))
+	resp, err := svc.CreateGroupSession(context.Background(), "owner-1", "Workspace", []string{})
+	require.NoError(t, err)
+	assert.True(t, resp.Created)
+	assert.Equal(t, "group", resp.Type)
 	assert.NotEmpty(t, resp.SessionID)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -297,6 +335,11 @@ func TestAddGroupMembers_FailClosedOnIsMemberActiveError(t *testing.T) {
 		WithArgs("sess-1", "user", "owner-1", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
 			AddRow("mem-1", "sess-1", "user", "owner-1", "owner"))
+
+	// GetFriendIDs: owner-1 is friends with u2 (#86 friend-boundary check)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT "friend_id" FROM "friendships" WHERE user_id = $1 AND status = $2`)).
+		WithArgs("owner-1", "accepted").
+		WillReturnRows(sqlmock.NewRows([]string{"friend_id"}).AddRow("u2"))
 
 	// IsMemberActive returns DB error — must NOT silently pass
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE`)).
@@ -590,8 +633,8 @@ func TestAddGroupMembers_DeduplicateIDs(t *testing.T) {
 	// getSession: SELECT * FROM "sessions" WHERE id = $1 ORDER BY "sessions"."id" LIMIT $2
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "sessions" WHERE id = $1 ORDER BY "sessions"."id" LIMIT $2`)).
 		WithArgs("sess-1", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved"}).
-			AddRow("sess-1", "group", false))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved", "owner_user_id"}).
+			AddRow("sess-1", "group", false, "user-1"))
 
 	// requireMember: IsMemberActive for user-1
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL`)).
@@ -602,7 +645,12 @@ func TestAddGroupMembers_DeduplicateIDs(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "session_members" WHERE session_id = $1 AND member_type = $2 AND member_id = $3 AND left_at IS NULL ORDER BY "session_members"."id" LIMIT $4`)).
 		WithArgs("sess-1", "user", "user-1", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
-			AddRow("mem-1", "sess-1", "user", "user-1", "member"))
+			AddRow("mem-1", "sess-1", "user", "user-1", "owner"))
+
+	// GetFriendIDs: user-1 is friends with user-2 and user-3 (#86 friend-boundary check)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT "friend_id" FROM "friendships" WHERE user_id = $1 AND status = $2`)).
+		WithArgs("user-1", "accepted").
+		WillReturnRows(sqlmock.NewRows([]string{"friend_id"}).AddRow("user-2").AddRow("user-3"))
 
 	// Input has [user-2, user-2, user-3] - deduplicated to [user-2, user-3].
 	// After dedup, only 2 IsMemberActive + 2 IsMemberSoftDeleted checks (not 3+3).

@@ -164,7 +164,7 @@ func (h *ContactHandler) UnblockContact(c *gin.Context) {
 }
 
 type updateRemarkReq struct {
-	Remark string `json:"remark" binding:"required"`
+	Remark string `json:"remark"`
 }
 
 func (h *ContactHandler) UpdateRemark(c *gin.Context) {

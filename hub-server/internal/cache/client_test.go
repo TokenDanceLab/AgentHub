@@ -3,10 +3,12 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
@@ -311,6 +313,21 @@ func TestSetRoute_Overwrites(t *testing.T) {
 	assert.Equal(t, "conn-new", conn)
 }
 
+func TestGetRouteForDeviceDoesNotFallbackToOtherDesktop(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	require.NoError(t, c.SetRoute(ctx, "user-target", "desktop:dev-a", "conn-a"))
+	require.NoError(t, c.SetRoute(ctx, "user-target", "desktop:dev-b", "conn-b"))
+
+	conn, err := c.GetRouteForDevice(ctx, "user-target", "desktop", "dev-b")
+	require.NoError(t, err)
+	assert.Equal(t, "conn-b", conn)
+
+	_, err = c.GetRouteForDevice(ctx, "user-target", "desktop", "dev-c")
+	assert.ErrorIs(t, err, redis.Nil)
+}
+
 // ==================== Online Status & Kick ====================
 
 func TestIsOnline(t *testing.T) {
@@ -481,6 +498,126 @@ func TestPendingTaskCount_MultipleUsers(t *testing.T) {
 	c3, err := c.PendingTaskCount(ctx, "u3")
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), c3)
+}
+
+func TestPendingTasksExpire(t *testing.T) {
+	c, mr := testClient(t)
+	ctx := context.Background()
+
+	require.NoError(t, c.PushPendingTask(ctx, "user-ttl", `{"task_id":"task-ttl"}`))
+
+	ttl, err := c.rdb.TTL(ctx, pendingTaskKey("user-ttl")).Result()
+	require.NoError(t, err)
+	require.Greater(t, ttl, time.Duration(0))
+	require.LessOrEqual(t, ttl, config.PendingTaskTTL)
+
+	mr.FastForward(config.PendingTaskTTL + time.Second)
+	count, err := c.PendingTaskCount(ctx, "user-ttl")
+	require.NoError(t, err)
+	require.Equal(t, int64(0), count)
+}
+
+func TestPendingTargetTasksAreIsolatedByDeviceAndTarget(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-a", "dev-a", `{"task_id":"a1"}`))
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-b", "dev-a", `{"task_id":"b1"}`))
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-a", "dev-b", `{"task_id":"a2"}`))
+
+	devATasks, err := c.PopPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{`{"task_id":"a1"}`, `{"task_id":"b1"}`}, devATasks)
+
+	devASecondPop, err := c.PopPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	assert.Empty(t, devASecondPop)
+
+	devBTasks, err := c.PopPendingTargetTasksForDevice(ctx, "user-target", "dev-b")
+	require.NoError(t, err)
+	require.Equal(t, []string{`{"task_id":"a2"}`}, devBTasks)
+}
+
+func TestPendingTargetTasksExpireWithIndex(t *testing.T) {
+	c, mr := testClient(t)
+	ctx := context.Background()
+
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-ttl", "dev-a", `{"task_id":"target-ttl"}`))
+
+	taskTTL, err := c.rdb.TTL(ctx, pendingTargetTaskKey("user-target", "target-ttl", "dev-a")).Result()
+	require.NoError(t, err)
+	require.Greater(t, taskTTL, time.Duration(0))
+	require.LessOrEqual(t, taskTTL, config.PendingTaskTTL)
+
+	indexTTL, err := c.rdb.TTL(ctx, pendingTargetTaskIndexKey("user-target", "dev-a")).Result()
+	require.NoError(t, err)
+	require.Greater(t, indexTTL, time.Duration(0))
+	require.LessOrEqual(t, indexTTL, config.PendingTaskTTL)
+
+	mr.FastForward(config.PendingTaskTTL + time.Second)
+	tasks, err := c.PopPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	require.Empty(t, tasks)
+}
+
+func TestPendingAgentControlsAreIsolatedByDevice(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-a", `{"kind":"permission.decide","approval_id":"approval-a"}`))
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-b", `{"kind":"permission.decide","approval_id":"approval-b"}`))
+
+	devAControls, err := c.PopPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Len(t, devAControls, 1)
+	require.JSONEq(t, `{"kind":"permission.decide","approval_id":"approval-a"}`, devAControls[0])
+
+	devASecondPop, err := c.PopPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Empty(t, devASecondPop)
+
+	devBControls, err := c.PopPendingAgentControlsForDevice(ctx, "user-control", "dev-b")
+	require.NoError(t, err)
+	require.Len(t, devBControls, 1)
+	require.JSONEq(t, `{"kind":"permission.decide","approval_id":"approval-b"}`, devBControls[0])
+}
+
+func TestPendingAgentControlsDeduplicateExactPayloadForDevice(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+	control := `{"kind":"permission.decide","approval_id":"approval-dedupe","edge_control":{"runId":"run-dedupe","requestId":"approval-dedupe","decision":"allow"}}`
+
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-a", control))
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-a", control))
+
+	controls, err := c.PopPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Len(t, controls, 1)
+	require.JSONEq(t, control, controls[0])
+}
+
+func TestPendingAgentControlsAreCappedAndExpire(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	totalControls := config.PendingAgentControlQueueMaxLen + 2
+	for i := 0; i < totalControls; i++ {
+		control := fmt.Sprintf(`{"kind":"permission.decide","approval_id":"approval-%03d"}`, i)
+		require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-a", control))
+	}
+
+	ttl, err := c.rdb.TTL(ctx, pendingAgentControlKey("user-control", "dev-a")).Result()
+	require.NoError(t, err)
+	require.Greater(t, ttl, time.Duration(0))
+	require.LessOrEqual(t, ttl, config.PendingAgentControlQueueTTL)
+
+	controls, err := c.PopPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Len(t, controls, config.PendingAgentControlQueueMaxLen)
+	for i, control := range controls {
+		expectedID := totalControls - 1 - i
+		require.JSONEq(t, fmt.Sprintf(`{"kind":"permission.decide","approval_id":"approval-%03d"}`, expectedID), control)
+	}
 }
 
 // ==================== Sequence Allocation ====================
