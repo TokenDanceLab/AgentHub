@@ -193,7 +193,7 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 
 ## 3. 技术主线
 
-- Hub Server 和 Edge Server 使用 Go。早期独立 `runner/` 目录已废弃；当前执行生命周期在 `edge-server/internal/lifecycle/`，Agent Runtime 协议适配在 `edge-server/internal/adapters/`。
+- Hub Server 和 Edge Server 使用 Go。早期独立 `runner/` 目录已废弃；当前执行生命周期在 `edge-server/internal/lifecycle/`，Agent Runtime 协议适配在 `edge-server/internal/adapters/`。`edge-server/internal/runners/` 仍保留为内部兼容包，通过 `/v1/runners` 提供 Runtime/Target health 摘要；但 root-level `runner/` 目录（原独立服务）已不再存在。
 - UI 使用 React + TypeScript，Desktop 使用 Tauri。
 - 主协议是 REST JSON API + WebSocket typed events。
 - REST endpoint 入口是 `api/openapi.yaml`。
