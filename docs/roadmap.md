@@ -622,6 +622,7 @@ Hub 调度（远程）:
 - [x] 2026-05-27 Agent control offline queue dedupe：离线 `agent.control` 队列现在对同一 user/device 的完全相同 control payload 先 `LREM` 再 `LPUSH`，避免 approval 幂等重投在 Desktop 离线期间把 Redis list 重复堆积，仍保持 device 级隔离。验证通过 cache/service 红绿测试 `go test ./internal/cache -run TestPendingAgentControlsDeduplicateExactPayloadForDevice -count=1`、`go test ./internal/service -run TestAgentControlServiceQueuesDuplicateOfflineControlOnce -count=1`。
 - [x] 2026-05-27 Agent control offline queue resource cap：离线 `agent.control` 队列现在在 exact-payload 去重后追加 `LTRIM` 和 `EXPIRE`，每个 user/device 最多保留 256 条最新 control，24 小时未重连自动过期，避免 Desktop 长时间离线时 Redis list 无界增长。验证通过 cache 红绿测试 `go test ./internal/cache -run TestPendingAgentControlsAreCappedAndExpire -count=1`、cache/service/app 相关测试和 `hub-server && go test ./... -short -count=1`。
 - [x] 2026-05-27 Pending task Redis queue TTL：普通离线 `pending_tasks` 和 target/device 专属 `pending_tasks:*:device:*:target:*` Redis list 现在写入后设置 24 小时 TTL，target index set 同步设置 TTL；与 DB `pending_agent_tasks.expire_at` 对齐，避免 stale offline task queue key 永久驻留。验证通过 cache 红绿测试 `go test ./internal/cache -run "TestPending(TasksExpire|TargetTasksExpireWithIndex)" -count=1`、cache/service/app 相关测试和 `hub-server && go test ./... -short -count=1`。
+- [x] 2026-05-27 #173 non-text message content normalization：`SendMessage` 写入 jsonb 前统一 normalize content；text 仍包装为 `{"text": ...}`，非 text 必须是 JSON object 并按类型校验必需字段后 compact marshal，`deploy_card` 不再跳过 JSON 校验，避免 raw client JSON 或 invalid JSON 进入持久层。验证通过 service 红绿测试 `go test ./internal/service -run "TestSendMessage_(NormalizesNonTextContentBeforeJsonbWrite|RejectsInvalidDeployCardJSONBeforeDBLookup)" -count=1`、`go test ./internal/service -run TestSendMessage -count=1` 和 `hub-server && go test ./... -short -count=1`。
 - [x] **2026-05-26：`feat/web-agent-closeout-20260526` 已合入并删除本地/远端分支。** WebAgent 产出已成为 `dev/delicious233` 主线的一部分。
 - [x] **2026-05-26：PR #197 已关闭。** 其中安全可独立验证的 `team-hub-authz`、`team-hub-reliability`、`team-adapter-compat` 已直接合入主线；Johnny 聚合分支因 migrations/API/process-executor-test 冲突保留单独审。
 - [x] 2026-05-26 Web Hub-only boundary slice：删除 `app/web/src/api/eventClient.ts`、`edgeAuth.ts`、`hooks/useHubIntegration.ts`、旧 `useChatMessages.ts`、Local Edge status/event/runners hooks，权限弹窗类型迁到 `app/web/src/types/permissions.ts`；新增 `scripts/verify-web-hub-boundary.ps1` 并接入 runtime readiness，阻断浏览器端重新引入 Local Edge loopback、`/v1/runs` 或 `/v1/events`。Web `edgeClient.ts` 只保留显式 Hub-only/stubbed 兼容面。
@@ -1136,14 +1137,13 @@ pnpm typecheck                                         # 零错误
 ---
 ### 7.11 剩余待处理
 
-**纯后端（5 个）**：
+**纯后端（4 个）**：
 
 | # | Issue | 优先级 |
 |---|-------|:--:|
 | 145 | Honor configured upload directory for attachment storage | P2 |
 | 142 | Document request bodies for Edge task stream/done callbacks | P2 |
 | 138 | Align register request/response between OpenAPI and Hub | P2 |
-| 173 | Normalize non-text message content before jsonb writes | P2 |
 | 105 | Align CI gates with documented security/coverage policy | P2 |
 
 **B7 剩余（4 个，客户端相关）**：#181, #180, #71, #114
