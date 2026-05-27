@@ -210,6 +210,19 @@ func TestHandleTaskDoneRejectsOversizedFinalContent(t *testing.T) {
 	require.Equal(t, model.TaskStatusRunning, task.Status)
 }
 
+func TestHandleTaskFailRejectsOversizedError(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+
+	err := svc.HandleTaskFail(context.Background(), "user-1", "dev-1", "task-1", "run-1", strings.Repeat("x", model.RunEventPayloadMaxBytes+1))
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	var task model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", "task-1").First(&task).Error)
+	require.Equal(t, model.TaskStatusRunning, task.Status)
+	require.Empty(t, task.ErrorMessage)
+}
+
 func TestListTaskRunEventsIsOwnerScoped(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
 	require.NoError(t, db.Create(&model.AgentRunEvent{
