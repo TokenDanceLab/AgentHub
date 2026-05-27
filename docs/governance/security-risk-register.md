@@ -175,3 +175,12 @@ rg -n 'PostForm\("hash"\)|PathFromHash|Content-Disposition|Content-Type' hub-ser
 - Keep this file focused on active risks and verification decisions.
 - When a finding becomes a design decision, link the ADR or architecture section and mark it `Accepted`.
 - When a code fix lands, include the test command and commit/PR in the status note.
+
+## 2026-05-27 — Dependabot 上游漏洞（等待上游修复）
+
+| ID | 包 | 严重度 | 说明 | 状态 |
+|:--|:--|:--|:--|:--:|
+| — | `github.com/jackc/pgx/v5` v5.9.2 | **critical** | Memory-safety vulnerability | 等待 pgx 发新版（当前 v5.9.2 是最新） |
+| — | `github.com/jackc/pgx/v5` v5.9.2 | low | SQL injection via dollar-quoted string literals | 同上 |
+| — | `github.com/google/uuid` v1.6.0 | medium | Buffer bounds check missing | 等待 uuid 发新版（当前 v1.6.0 是最新） |
+| — | `glib` (Rust/Tauri) | medium | Iterator unsoundness | Tauri 上游依赖，等待更新 |
