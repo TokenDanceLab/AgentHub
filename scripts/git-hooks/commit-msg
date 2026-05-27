@@ -30,7 +30,7 @@ if ! echo "$SUBJECT" | grep -qE "$PATTERN"; then
     echo "  Examples:"
     echo "    docs: 中文化项目入口和文档规范"
     echo "    feat(edge): 实现 WebSocket Hub"
-    echo "    fix(runner): 处理子进程超时"
+    echo "    fix(edge): 处理子进程超时"
     echo "    refactor: 重组 reference 文档结构"
     echo ""
     exit 1
