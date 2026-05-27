@@ -1700,14 +1700,30 @@ func TestPendingTaskRepo_AtomicWithEdgeRunID(t *testing.T) {
 	assert.Equal(t, model.TaskStatusRunning, fetched.Status)
 	assert.Equal(t, "run-001", fetched.EdgeRunID)
 
-	// Non-atomic edgeRunID update on an already empty edgeRunID
-	// (after clearing it for test, we verify that duplicating calls is a no-op)
-	err = UpdatePendingTaskEdgeRunID(db, task.ID, "run-002")
+	// Edge run id backfill on an already populated edgeRunID is a no-op.
+	rows, err = UpdatePendingTaskEdgeRunID(db, task.ID, "run-002")
 	// edge_run_id is already "run-001" so WHERE edge_run_id = '' matches 0 rows
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rows)
 	fetched, err = GetPendingTaskByID(db, task.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "run-001", fetched.EdgeRunID, "edgeRunID should not be overwritten")
+
+	backfillTask := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-edge",
+		TriggeredByUserID: "user-t",
+		TriggerMessageID:  "msg-2",
+		Status:            model.TaskStatusRunning,
+		ExpireAt:          expireAt,
+	}
+	require.NoError(t, CreatePendingTask(db, backfillTask))
+
+	rows, err = UpdatePendingTaskEdgeRunID(db, backfillTask.ID, "run-002")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+	fetched, err = GetPendingTaskByID(db, backfillTask.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "run-002", fetched.EdgeRunID)
 }
 
 func TestPendingTaskRepo_AtomicFailClosed(t *testing.T) {
