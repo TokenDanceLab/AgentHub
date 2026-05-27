@@ -265,7 +265,7 @@ go test ./... -short -count=1
 | `AGENTHUB_DB_PASSWORD` | 数据库密码 | dev_password |
 | `AGENTHUB_DB_NAME` | 数据库名 | agenthub |
 | `AGENTHUB_REDIS_HOST` | Redis 地址 | localhost |
-| `AGENTHUB_REDIS_PORT` | Redis 端口 | 6380 |
+| `AGENTHUB_REDIS_PORT` | Redis 端口 | 6379 |
 | `AGENTHUB_REDIS_POOL_SIZE` | Redis 连接池大小 | 100 |
 | `AGENTHUB_REDIS_MIN_IDLE_CONNS` | Redis 最小空闲连接 | 10 |
 | `AGENTHUB_JWT_SECRET` | Hub JWT 密钥 | 必须由环境注入 |
