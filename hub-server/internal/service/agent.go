@@ -1208,6 +1208,16 @@ func (s *AgentService) ScanExpiredTasks() ([]model.PendingAgentTask, error) {
 	return repository.ScanExpiredTasks(s.db)
 }
 
+// TimeoutExpiredTask marks a scanned expired task as timeout only if its status
+// still matches the status returned by the scan.
+func (s *AgentService) TimeoutExpiredTask(taskID, scannedStatus string) (bool, error) {
+	rowsAffected, err := repository.UpdatePendingTaskStatusAtomic(s.db, taskID, scannedStatus, model.TaskStatusTimeout, "")
+	if err != nil {
+		return false, err
+	}
+	return rowsAffected > 0, nil
+}
+
 // UpdatePendingTaskStatus updates the status of a pending agent task. Thin wrapper over repository.UpdatePendingTaskStatus.
 func (s *AgentService) UpdatePendingTaskStatus(taskID, status, errMsg string) error {
 	return repository.UpdatePendingTaskStatus(s.db, taskID, status, errMsg)
