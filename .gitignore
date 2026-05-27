@@ -84,6 +84,9 @@ hub-server/deployments/.env
 hub-server/deployments/backups/
 backups/
 
+# Local temp files
+.tmp/
+
 # Local machine and agent state
 .worktrees/
 docs/review/
