@@ -98,3 +98,29 @@ func TestAgentControlServiceQueuesWhenExactDeviceRouteMissing(t *testing.T) {
 	require.Len(t, queued, 1)
 	require.JSONEq(t, `{"kind":"permission.decide","edge_device_id":"dev-b","approval_id":"approval-b","edge_control":{"runId":"edge-run-b","requestId":"approval-b","decision":"allow"}}`, queued[0])
 }
+
+func TestAgentControlServiceQueuesDuplicateOfflineControlOnce(t *testing.T) {
+	ctx := context.Background()
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	cacheClient := cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+
+	svc := NewAgentControlService(cacheClient, ws.NewManager())
+	payload := model.AgentControlPayload{
+		Kind:       model.AgentControlKindPermissionDecide,
+		ApprovalID: "approval-dedupe",
+		EdgeControl: &model.TeamApprovalEdgeControl{
+			RunID:     "edge-run-dedupe",
+			RequestID: "approval-dedupe",
+			Decision:  "allow",
+		},
+	}
+	require.NoError(t, svc.DeliverToDesktopDevice(ctx, "user-1", "dev-b", payload))
+	require.NoError(t, svc.DeliverToDesktopDevice(ctx, "user-1", "dev-b", payload))
+
+	queued, err := cacheClient.PopPendingAgentControlsForDevice(ctx, "user-1", "dev-b")
+	require.NoError(t, err)
+	require.Len(t, queued, 1)
+	require.JSONEq(t, `{"kind":"permission.decide","edge_device_id":"dev-b","approval_id":"approval-dedupe","edge_control":{"runId":"edge-run-dedupe","requestId":"approval-dedupe","decision":"allow"}}`, queued[0])
+}
