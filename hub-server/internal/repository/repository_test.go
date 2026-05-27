@@ -1215,6 +1215,13 @@ func TestPendingTaskRepo_CRUD(t *testing.T) {
 	assert.Equal(t, model.TaskStatusDone, fetched.Status)
 	assert.NotNil(t, fetched.FinishedAt)
 
+	err = UpdatePendingTaskDispatched(db, task.ID, "device-after-done")
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	fetched, err = GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusDone, fetched.Status, "terminal task should not be moved back to dispatched")
+	assert.Equal(t, "device-edge-1", fetched.EdgeDeviceID)
+
 	// Update with error
 	task2 := &model.PendingAgentTask{
 		AgentInstanceID:   "agent-inst-2",
