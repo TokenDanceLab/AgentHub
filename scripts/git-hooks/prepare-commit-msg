@@ -41,6 +41,6 @@ cat > "$MSG_FILE" << 'TEMPLATE'
 # Examples:
 #   docs: 中文化项目入口和文档规范
 #   feat(edge): 实现 WebSocket Hub
-#   fix(runner): 处理 Windows 子进程超时
+#   fix(edge): 处理 Windows 子进程超时
 
 TEMPLATE
