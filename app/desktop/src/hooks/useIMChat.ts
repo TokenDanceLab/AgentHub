@@ -43,7 +43,7 @@ function readTextContent(content: string): string {
   try {
     const parsed = JSON.parse(content) as unknown;
     if (parsed && typeof parsed === 'object' && typeof (parsed as Record<string, unknown>).text === 'string') {
-      return (parsed as Record<string, string>).text;
+      return (parsed as Record<string, string>).text ?? content;
     }
   } catch {
     // Plain text or non-JSON rich payloads should pass through unchanged.
@@ -287,7 +287,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       contactsByUserIdRef.current = contactsByUserId;
       setHubContacts(contactSnapshot);
       setFriendRequests(friendRequestSnapshot);
-      setNotifications(notificationSnapshot);
+      setNotifications(notificationSnapshot as HubNotification[]);
       setContacts(sessionSnapshot.map((session) => sessionToContact(session, contactsByUserId)));
       setStatus('ready');
     } catch (err) {
