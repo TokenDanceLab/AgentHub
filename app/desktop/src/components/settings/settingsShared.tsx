@@ -34,6 +34,7 @@ import type {
   ResolvedRunModelSettings,
 } from '@/stores/modelSettingsStore';
 import styles from '../SettingsPage.module.css';
+import { Select } from '@shared/ui';
 
 // ============================================================
 // Types
@@ -896,15 +897,7 @@ export function SelectControl({
   options: Array<[SettingsSelectValue, string]>;
   onChange: (value: string) => void;
 }) {
-  return (
-    <select className={styles.select} value={value} onChange={(event) => onChange(event.target.value)}>
-      {options.map(([optionValue, label]) => (
-        <option key={optionValue} value={optionValue}>
-          {label}
-        </option>
-      ))}
-    </select>
-  );
+  return <Select value={value} options={options} onChange={onChange} />;
 }
 
 export function Callout({ title, body }: { title: string; body: string }) {
