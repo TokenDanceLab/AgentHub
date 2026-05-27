@@ -162,6 +162,23 @@ AgentHub 后续调用模型 API 网关时，产品名写 TokenDance Gateway / �
 - subagent 提示必须包含：目标、允许修改的路径、必须阅读的文档、必须运行的检查、隐私红线。
 - subagent 不自行扩大范围；发现范围不够，停下交回主 Agent。
 
+### subagent 质量红线
+
+以下情况视为交付不合格，主 Agent 必须退回重做：
+
+1. **冲突标记未清理**：提交包含 `<<<<<<<`、`=======`、`>>>>>>>` 等未解决的合并冲突标记。
+2. **CI 降级规避**：不得通过降低覆盖率阈值、放宽 lint 规则、跳过检查步骤来让 CI 变绿。
+3. **不完整功能**：提交标记为 `feat` 但实际只有脚手架或占位符。不完整功能用 `wip:` 前缀或留在本地分支。
+4. **未验证的提交**：提交前未运行对应模块的测试和 typecheck。前端至少跑 `pnpm typecheck && pnpm test`，后端至少跑 `go test ./... -short -count=1`。
+5. **大规模无关联改动**：一个 PR 包含不相关的文件变更（如同时改 desktop UI 和 CI workflow 且不在 PR 描述中说明关联）。
+6. **伪造验收证据**：声称"已完成"但截图是 mock 数据、空壳页面或无法交互的静态 UI。
+
+subagent 完成后、提交前，自检：
+```powershell
+git diff --check                  # 无冲突标记、无行尾空格
+git status --short --branch       # 确认只改了允许的路径
+```
+
 ### 模型分配策略
 
 > 实际后端模型映射，AgentHub 项目专用。dev-loop skill 同步更新。
