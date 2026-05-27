@@ -146,3 +146,30 @@ export {
   playRunLifecycle,
   playMessageStream,
 } from './mock';
+
+// Workbench state management (shared across Desktop and Web)
+export {
+  workbenchReducer,
+  type WorkbenchState,
+  type WorkbenchAction,
+  type WorkbenchSnapshot,
+} from './workbenchState';
+
+// Workbench data mode classifier
+export {
+  getWorkbenchDataMode,
+  getWorkbenchCatalogState,
+  getWorkbenchSectionSource,
+  type WorkbenchDataMode,
+  type WorkbenchCatalogState,
+} from './workbenchDataMode';
+
+// Hub REST client (shared across Desktop and Web)
+export {
+  createHubClient,
+  type HubClient,
+  type HubEnvelope,
+  type HubSession,
+  type HubMessage,
+  type HubContactInfo,
+} from './hubClient';
