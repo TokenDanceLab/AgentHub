@@ -4245,15 +4245,22 @@ components:
           description: Alias for run_id for explicit Hub persistence.
     HubTaskStreamRequest:
       type: object
+      anyOf:
+        - required: [content]
+        - required: [chunk]
+        - required: [payload]
       properties:
         content:
           type: string
+          maxLength: 1048576
           description: 'Legacy stream content. If not valid JSON, Hub wraps it as {"content": "..."} for jsonb storage. Normalized payload/message content must stay within the 1 MiB per-event budget.'
         chunk:
           type: string
+          maxLength: 1048576
           description: Legacy alias for content. Normalized payload/message content must stay within the 1 MiB per-event budget.
         event_type:
           type: string
+          maxLength: 96
           description: Typed AgentHub runtime event name, for example run.output.batch or run.agent.tool_call.
         payload:
           type: object
@@ -4261,6 +4268,7 @@ components:
           description: Typed runtime payload persisted as jsonb and broadcast as agent.stream. The encoded JSON payload must stay within the 1 MiB per-event budget.
         client_msg_id:
           type: string
+          format: uuid
           description: Client-generated message id for idempotent stream dedup.
         run_id:
           type: string
@@ -4356,6 +4364,7 @@ components:
           description: Alias for run_id.
         final_content:
           type: string
+          maxLength: 1048576
           description: Optional final agent output or summary inserted as the final chat projection. Hub rejects values above the 1 MiB callback payload budget.
     HubTaskFailRequest:
       type: object
@@ -4371,6 +4380,7 @@ components:
           description: Alias for run_id.
         error:
           type: string
+          maxLength: 1048576
           description: Failure reason persisted on the task and broadcast as agent.failed. Hub rejects values above the 1 MiB callback payload budget.
     StartRunRequest:
       type: object
