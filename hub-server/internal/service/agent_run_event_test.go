@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -137,6 +138,22 @@ func TestHandleTaskStreamPersistsTypedRunEventAndProjection(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("agent.stream event was not published")
 	}
+}
+
+func TestHandleTaskStreamRejectsOversizedInferredEventType(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	tooLongEventType := "run.agent." + strings.Repeat("x", 96)
+	payload := json.RawMessage(`{"type":"` + tooLongEventType + `","content":"oversized event type"}`)
+
+	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
+		Payload: payload,
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	var count int64
+	require.NoError(t, db.Model(&model.AgentRunEvent{}).Count(&count).Error)
+	require.Zero(t, count)
 }
 
 func TestListTaskRunEventsIsOwnerScoped(t *testing.T) {
