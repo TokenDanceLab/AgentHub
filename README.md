@@ -90,6 +90,17 @@ Desktop UI -> Local Edge Server -> Agent Runtime Adapter -> Claude Code / Codex 
 
 ## 快速开始
 
+### 直接使用
+
+[下载最新 Release](https://github.com/TokenDanceLab/AgentHub/releases)：
+
+| 文件 | 说明 |
+|:--|:--|
+| `AgentHub_x.x.x_x64-setup.exe` | Windows 安装版（推荐） |
+| `AgentHub_x.x.x_x64-portable.zip` | Windows 便携版，解压即用 |
+
+### 从源码构建
+
 首次克隆后先做本地开发初始化：
 
 ```powershell
