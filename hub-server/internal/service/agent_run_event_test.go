@@ -194,6 +194,24 @@ func TestHandleTaskStreamRejectsOversizedProjectedContent(t *testing.T) {
 	require.Zero(t, messageCount)
 }
 
+func TestHandleTaskStreamRejectsOversizedEdgeRunID(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+
+	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", strings.Repeat("x", 129), model.AgentRunEventInput{
+		Payload: json.RawMessage(`{"type":"run.output.batch","content":"hello"}`),
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	var eventCount int64
+	require.NoError(t, db.Model(&model.AgentRunEvent{}).Count(&eventCount).Error)
+	require.Zero(t, eventCount)
+
+	var messageCount int64
+	require.NoError(t, db.Model(&model.Message{}).Count(&messageCount).Error)
+	require.Zero(t, messageCount)
+}
+
 func TestHandleTaskDoneRejectsOversizedFinalContent(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
 	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
@@ -210,11 +228,40 @@ func TestHandleTaskDoneRejectsOversizedFinalContent(t *testing.T) {
 	require.Equal(t, model.TaskStatusRunning, task.Status)
 }
 
+func TestHandleTaskDoneRejectsOversizedEdgeRunID(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+
+	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", "task-1", strings.Repeat("x", 129), "final")
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	var messageCount int64
+	require.NoError(t, db.Model(&model.Message{}).Count(&messageCount).Error)
+	require.Zero(t, messageCount)
+
+	var task model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", "task-1").First(&task).Error)
+	require.Equal(t, model.TaskStatusRunning, task.Status)
+}
+
 func TestHandleTaskFailRejectsOversizedError(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
 	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskFail(context.Background(), "user-1", "dev-1", "task-1", "run-1", strings.Repeat("x", model.RunEventPayloadMaxBytes+1))
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	var task model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", "task-1").First(&task).Error)
+	require.Equal(t, model.TaskStatusRunning, task.Status)
+	require.Empty(t, task.ErrorMessage)
+}
+
+func TestHandleTaskFailRejectsOversizedEdgeRunID(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+
+	err := svc.HandleTaskFail(context.Background(), "user-1", "dev-1", "task-1", strings.Repeat("x", 129), "model error")
 	require.ErrorIs(t, err, errcode.ErrBadRequest)
 
 	var task model.PendingAgentTask
