@@ -4341,9 +4341,9 @@ components:
         edge_run_id:
           type: string
           description: Alias for run_id.
-        result:
+        final_content:
           type: string
-          description: Optional final agent output or summary.
+          description: Optional final agent output or summary inserted as the final chat projection. Hub rejects values above the 1 MiB callback payload budget.
     StartRunRequest:
       type: object
       properties:
