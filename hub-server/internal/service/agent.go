@@ -914,7 +914,7 @@ func normalizeRunEventInput(stream model.AgentRunEventInput) (eventType, payload
 	} else {
 		return "", "", "", errcode.ErrBadRequest
 	}
-	if err := validateRunEventPayloadSize(payload); err != nil {
+	if err := validateAgentCallbackPayloadSize(payload); err != nil {
 		return "", "", "", err
 	}
 
@@ -939,16 +939,16 @@ func normalizeRunEventInput(stream model.AgentRunEventInput) (eventType, payload
 		}
 		messageContent = string(wrapped)
 	}
-	if err := validateRunEventPayloadSize(messageContent); err != nil {
+	if err := validateAgentCallbackPayloadSize(messageContent); err != nil {
 		return "", "", "", err
 	}
 
 	return eventType, payload, messageContent, nil
 }
 
-func validateRunEventPayloadSize(value string) error {
+func validateAgentCallbackPayloadSize(value string) error {
 	if len(value) > model.RunEventPayloadMaxBytes {
-		return errcode.ErrBadRequest.WithMessage("run event payload exceeds maximum size")
+		return errcode.ErrBadRequest.WithMessage("agent callback payload exceeds maximum size")
 	}
 	return nil
 }
@@ -1016,6 +1016,9 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDevic
 
 	// insert final message if content is provided
 	if finalContent != "" {
+		if err := validateAgentCallbackPayloadSize(finalContent); err != nil {
+			return err
+		}
 		msg := &model.Message{
 			SessionID:   ai.SessionID,
 			SenderType:  model.SenderTypeAgent,
