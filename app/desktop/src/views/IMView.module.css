@@ -18,9 +18,9 @@
   min-width: 0;
 }
 
-.chatHeader {
+.actionPanel {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
@@ -28,10 +28,140 @@
   flex-shrink: 0;
 }
 
+.actionPanelHeader,
+.actionPanelFooter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.actionPanelFooter {
+  justify-content: flex-end;
+}
+
+.actionQueues {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.queueItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.queueText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.queueText strong,
+.queueText span,
+.queueText em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queueText span {
+  color: var(--muted);
+}
+
+.queueText em,
+.inlineError {
+  color: var(--destructive);
+  font-style: normal;
+}
+
+.queueActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.iconAction,
+.textAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.iconAction {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.textAction {
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.iconAction:hover:not(:disabled),
+.textAction:hover:not(:disabled) {
+  background: var(--surface-raised);
+}
+
+.iconAction:disabled,
+.textAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.interfaceGap {
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.chatHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+  flex-shrink: 0;
+}
+
+.chatHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .chatTitle {
   font-weight: 600;
   font-size: 14px;
   color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chatType {
