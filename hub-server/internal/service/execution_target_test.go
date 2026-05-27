@@ -87,6 +87,7 @@ func TestExecutionTargetPingIsOwnerScoped(t *testing.T) {
 	require.NoError(t, db.Where("id = ?", "target-1").First(&target).Error)
 	require.True(t, target.IsOnline)
 	require.NotNil(t, target.LastSeenAt)
+	require.Equal(t, "healthy", target.HealthState)
 }
 
 func TestExecutionTargetPingRejectsUnsupportedTargetType(t *testing.T) {
@@ -105,6 +106,46 @@ func TestExecutionTargetPingRejectsUnsupportedTargetType(t *testing.T) {
 	require.False(t, target.IsOnline)
 }
 
+func TestExecutionTargetPingRequiresLiveProofForRemoteTargets(t *testing.T) {
+	tests := []struct {
+		targetType string
+		trustLevel string
+	}{
+		{targetType: "remote_ssh", trustLevel: "remote"},
+		{targetType: "tailscale", trustLevel: "remote"},
+		{targetType: "cloud_edge", trustLevel: "cloud"},
+		{targetType: "hub_relay", trustLevel: "relay"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.targetType, func(t *testing.T) {
+			db := newExecutionTargetTestDB(t)
+			require.NoError(t, db.Create(&model.ExecutionTarget{
+				ID:                 "target-" + tt.targetType,
+				OwnerID:            "owner-1",
+				Name:               "Remote target",
+				TargetType:         tt.targetType,
+				WorkspaceRoot:      "/workspace",
+				WorkspaceAllowlist: `["/workspace"]`,
+				TrustLevel:         tt.trustLevel,
+				HealthState:        "unknown",
+				Capabilities:       "{}",
+				Metadata:           "{}",
+			}).Error)
+			svc := NewExecutionTargetService(db)
+
+			err := svc.Ping(context.Background(), "target-"+tt.targetType, "owner-1")
+			require.ErrorIs(t, err, errcode.TargetNotRoutable)
+
+			var target model.ExecutionTarget
+			require.NoError(t, db.Where("id = ?", "target-"+tt.targetType).First(&target).Error)
+			require.False(t, target.IsOnline)
+			require.Nil(t, target.LastSeenAt)
+			require.Equal(t, "unknown", target.HealthState)
+		})
+	}
+}
+
 func TestExecutionTargetCreateDefaultsPolicyFields(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	svc := NewExecutionTargetService(db)
@@ -114,6 +155,38 @@ func TestExecutionTargetCreateDefaultsPolicyFields(t *testing.T) {
 	require.Equal(t, "local_edge", target.TargetType)
 	require.Equal(t, "[]", target.WorkspaceAllowlist)
 	require.Equal(t, "local", target.TrustLevel)
+	require.Equal(t, "unknown", target.HealthState)
+}
+
+func TestExecutionTargetCreateRejectsClientManagedHealthState(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	svc := NewExecutionTargetService(db)
+
+	_, err := svc.Create(context.Background(), "owner-1", &model.ExecutionTarget{
+		Name:        "Forged healthy target",
+		HealthState: "healthy",
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	var count int64
+	require.NoError(t, db.Model(&model.ExecutionTarget{}).Count(&count).Error)
+	require.Zero(t, count)
+}
+
+func TestExecutionTargetUpdateRejectsClientManagedHealthState(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	seedExecutionTarget(t, db, "target-1", "owner-1")
+	svc := NewExecutionTargetService(db)
+
+	_, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTarget{
+		Name:        "Forged healthy target",
+		HealthState: "healthy",
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	var target model.ExecutionTarget
+	require.NoError(t, db.Where("id = ?", "target-1").First(&target).Error)
+	require.Equal(t, "Owner target", target.Name)
 	require.Equal(t, "unknown", target.HealthState)
 }
 

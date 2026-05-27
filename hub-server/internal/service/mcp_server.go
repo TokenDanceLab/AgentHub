@@ -55,14 +55,17 @@ func (s *MCPService) Create(ctx context.Context, ownerID string, m *model.MCPSer
 	return m, nil
 }
 
-// Get retrieves a single MCP server by ID.
-func (s *MCPService) Get(ctx context.Context, id string) (*model.MCPServer, error) {
+// Get retrieves a single MCP server by ID; owner must match.
+func (s *MCPService) Get(ctx context.Context, id, ownerID string) (*model.MCPServer, error) {
 	m, err := repository.GetMCPServerByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.UserNotFound
 		}
 		return nil, err
+	}
+	if m.OwnerID != ownerID {
+		return nil, errcode.AuthDeviceMismatch
 	}
 	return m, nil
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -30,6 +31,9 @@ func NewExecutionTargetService(db *gorm.DB) *ExecutionTargetService {
 func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error) {
 	if req.Name == "" {
 		return nil, errcode.ErrBadRequest
+	}
+	if healthState := strings.TrimSpace(req.HealthState); healthState != "" && healthState != "unknown" {
+		return nil, errcode.ErrBadRequest.WithMessage("health_state is system-managed")
 	}
 	normalizeExecutionTargetDefaults(req)
 	if err := req.Validate(); err != nil {
@@ -99,8 +103,8 @@ func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string,
 	if req.TrustLevel != "" {
 		t.TrustLevel = req.TrustLevel
 	}
-	if req.HealthState != "" {
-		t.HealthState = req.HealthState
+	if strings.TrimSpace(req.HealthState) != "" {
+		return nil, errcode.ErrBadRequest.WithMessage("health_state is system-managed")
 	}
 	if req.AuthMethod != "" {
 		t.AuthMethod = req.AuthMethod
@@ -187,7 +191,7 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 	case "local_edge":
 		return repository.UpdateTargetOnlineStatus(s.db, id, true)
 	case "remote_ssh", "tailscale", "cloud_edge", "hub_relay":
-		return repository.UpdateTargetOnlineStatus(s.db, id, true)
+		return errcode.TargetNotRoutable.WithMessage("execution target health proof is not available")
 	default:
 		return errcode.ErrBadRequest.WithMessage("unsupported target_type")
 	}

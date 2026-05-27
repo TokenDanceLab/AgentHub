@@ -188,6 +188,7 @@ describe('useHubIntegration', () => {
       streamTask: vi.fn().mockResolvedValue(undefined),
       doneTask: vi.fn().mockResolvedValue(undefined),
       failTask: vi.fn().mockResolvedValue(undefined),
+      postTeamRouteDecision: vi.fn().mockResolvedValue({ id: 'assignment-1' }),
     } as unknown as HubClient;
 
     // Mock fetch for Edge REST calls
@@ -302,6 +303,120 @@ describe('useHubIntegration', () => {
     });
 
     expect(hubClient.streamTask).toHaveBeenCalledWith('task-1', 'Hello', 'run-1');
+  });
+
+  it('posts supervisor route decisions from typed Edge events to Hub TeamRun', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
+        team_id: 'team-1',
+        team_run_id: 'team-run-1',
+        team_member_id: 'member-supervisor',
+        team_member_role: 'supervisor',
+      }));
+    });
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.agent.route_decision', {
+        runId: 'run-1',
+        action: 'delegate',
+        next_worker: 'member-executor',
+        instructions: 'Implement the repository change.',
+        reasoning: 'Backend work is needed.',
+        correlation_id: 'route-1',
+      }));
+    });
+
+    expect(hubClient.postTeamRouteDecision).toHaveBeenCalledWith(
+      'team-1',
+      'team-run-1',
+      {
+        action: 'delegate',
+        next_worker: 'member-executor',
+        instructions: 'Implement the repository change.',
+        reasoning: 'Backend work is needed.',
+        context: undefined,
+        approved: undefined,
+        feedback: undefined,
+        summary: undefined,
+        blocked_reason: undefined,
+        correlation_id: 'route-1',
+      },
+    );
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledWith(
+      'task-1',
+      'run.agent.route_decision',
+      {
+        runId: 'run-1',
+        action: 'delegate',
+        next_worker: 'member-executor',
+        instructions: 'Implement the repository change.',
+        reasoning: 'Backend work is needed.',
+        correlation_id: 'route-1',
+      },
+      { runId: 'run-1' },
+    );
+  });
+
+  it('posts structuredOutput route decisions from result only once', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
+        team_id: 'team-1',
+        team_run_id: 'team-run-1',
+        team_member_role: 'supervisor',
+      }));
+    });
+
+    const structuredOutput = {
+      action: 'delegate',
+      next_worker: 'member-executor',
+      instructions: 'Write focused tests.',
+      correlation_id: 'route-1',
+    };
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.agent.route_decision', { runId: 'run-1', ...structuredOutput }));
+      fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true, structuredOutput }));
+    });
+
+    expect(hubClient.postTeamRouteDecision).toHaveBeenCalledTimes(1);
+    expect(hubClient.doneTask).toHaveBeenCalledWith(
+      'task-1',
+      JSON.stringify({ runId: 'run-1', success: true, structuredOutput }),
+      'run-1',
+    );
+  });
+
+  it('does not post route decisions for non-supervisor team members', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
+        team_id: 'team-1',
+        team_run_id: 'team-run-1',
+        team_member_role: 'executor',
+      }));
+    });
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.agent.route_decision', {
+        runId: 'run-1',
+        action: 'delegate',
+        next_worker: 'member-reviewer',
+        instructions: 'Review it.',
+      }));
+    });
+
+    expect(hubClient.postTeamRouteDecision).not.toHaveBeenCalled();
   });
 
   it('calls doneTask on successful run.agent.result', async () => {
