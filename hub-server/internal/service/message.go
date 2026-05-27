@@ -98,52 +98,67 @@ var validContentTypes = map[string]bool{
 	"file": true, "link_card": true, "deploy_card": true,
 }
 
-// contentRequiredFields maps non-text content types to the fields that must be
-// present (and non-empty strings) in their JSON content payload.
-var contentRequiredFields = map[string][]string{
-	"code":      {"text"},
-	"diff":      {"text"},
-	"image":     {"url"}, // url OR attachment_id
-	"file":      {"attachment_id"},
-	"link_card": {"url"},
-	// deploy_card has no hard requirements — any valid JSON object is accepted.
-}
-
-// validateContentJSON validates that a non-text content JSON string has the
-// required fields for its content type.
-func validateContentJSON(contentType, content string) error {
-	required, ok := contentRequiredFields[contentType]
-	if !ok {
-		// No validation rules defined for this type (e.g., deploy_card).
-		return nil
+// normalizeMessageContent returns the JSONB string persisted for a message.
+// #173: every content type is normalized before DB write so PostgreSQL jsonb
+// never sees raw, unvalidated client strings.
+func normalizeMessageContent(contentType, content string) (string, error) {
+	if contentType == model.ContentTypeText {
+		contentBytes, err := json.Marshal(map[string]string{"text": content})
+		if err != nil {
+			return "", err
+		}
+		return string(contentBytes), nil
 	}
 
 	var payload map[string]interface{}
 	if err := json.Unmarshal([]byte(content), &payload); err != nil {
-		return fmt.Errorf("invalid JSON for content type %s: %w", contentType, err)
+		return "", fmt.Errorf("invalid JSON for content type %s: %w", contentType, err)
+	}
+	if payload == nil {
+		return "", fmt.Errorf("content type %s must be a JSON object", contentType)
 	}
 
-	for _, field := range required {
-		val, exists := payload[field]
-		if !exists {
-			return fmt.Errorf("missing required field %q for content type %s", field, contentType)
-		}
-		s, ok := val.(string)
-		if !ok || strings.TrimSpace(s) == "" {
-			return fmt.Errorf("required field %q must be a non-empty string for content type %s", field, contentType)
-		}
+	if err := validateContentPayload(contentType, payload); err != nil {
+		return "", err
 	}
 
-	// image type: also accept "attachment_id" as an alternative to "url"
-	if contentType == "image" {
-		if attID, exists := payload["attachment_id"]; exists {
-			if s, ok := attID.(string); ok && strings.TrimSpace(s) != "" {
-				return nil
-			}
-		}
+	normalized, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
 	}
+	return string(normalized), nil
+}
 
+func validateContentPayload(contentType string, payload map[string]interface{}) error {
+	switch contentType {
+	case model.ContentTypeCode, model.ContentTypeDiff:
+		return requireContentString(payload, "text", contentType)
+	case model.ContentTypeFile:
+		return requireContentString(payload, "attachment_id", contentType)
+	case model.ContentTypeLinkCard:
+		return requireContentString(payload, "url", contentType)
+	case model.ContentTypeImage:
+		return requireContentString(payload, "url", contentType)
+	case model.ContentTypeDeployCard:
+		return nil
+	}
 	return nil
+}
+
+func requireContentString(payload map[string]interface{}, field, contentType string) error {
+	if hasContentString(payload, field) {
+		return nil
+	}
+	return fmt.Errorf("required field %q must be a non-empty string for content type %s", field, contentType)
+}
+
+func hasContentString(payload map[string]interface{}, field string) bool {
+	value, exists := payload[field]
+	if !exists {
+		return false
+	}
+	s, ok := value.(string)
+	return ok && strings.TrimSpace(s) != ""
 }
 
 func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserID string, req SendMessageRequest) (*SendMessageResponse, error) {
@@ -151,25 +166,14 @@ func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserI
 		return nil, errcode.ErrBadRequest
 	}
 
-	content := req.Content
-	if req.ContentType == "text" {
-		contentBytes, err := json.Marshal(map[string]string{"text": req.Content})
-		if err != nil {
-			return nil, errcode.ErrInternal
-		}
-		content = string(contentBytes)
+	content, err := normalizeMessageContent(req.ContentType, req.Content)
+	if err != nil {
+		slog.Warn("invalid message content", "content_type", req.ContentType, "error", err)
+		return nil, errcode.ErrBadRequest
 	}
 	attachmentIDs, ok := attachmentIDsFromContent(req.ContentType, content)
 	if !ok {
 		return nil, errcode.ErrBadRequest
-	}
-
-	// #173: validate non-text content structure before writing to jsonb.
-	if req.ContentType != "text" && req.ContentType != "deploy_card" {
-		if err := validateContentJSON(req.ContentType, content); err != nil {
-			slog.Warn("invalid message content", "content_type", req.ContentType, "error", err)
-			return nil, errcode.ErrBadRequest
-		}
 	}
 
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, senderUserID)

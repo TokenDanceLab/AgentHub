@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -21,7 +22,8 @@ type AgentService interface {
 	HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error
 	HandleTaskDone(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error
 	HandleTaskFail(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error
-	ListTaskRunEvents(ctx context.Context, userID, taskID string) ([]model.AgentRunEvent, error)
+	ListTaskRunEvents(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error)
+	GetTaskRunEventSummary(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error)
 }
 
 type AgentHandler struct {
@@ -178,6 +180,14 @@ func (h *AgentHandler) TaskStream(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
+	if req.ClientMsgID != "" {
+		normalized, ok := normalizeUUID(req.ClientMsgID)
+		if !ok {
+			Fail(c, errcode.ErrBadRequest)
+			return
+		}
+		stream.ClientMsgID = normalized
+	}
 	if err := h.service.HandleTaskStream(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), stream); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -193,7 +203,12 @@ func (h *AgentHandler) TaskStream(c *gin.Context) {
 func (h *AgentHandler) TaskEvents(c *gin.Context) {
 	userID := c.GetString("user_id")
 	taskID := c.Param("id")
-	events, err := h.service.ListTaskRunEvents(c.Request.Context(), userID, taskID)
+	filter, parseErr := runEventFilterFromQuery(c)
+	if parseErr != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	events, err := h.service.ListTaskRunEvents(c.Request.Context(), userID, taskID, filter)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -203,6 +218,43 @@ func (h *AgentHandler) TaskEvents(c *gin.Context) {
 		return
 	}
 	OK(c, events)
+}
+
+// TaskEventSummary GET /web/agent-tasks/:id/events/summary
+func (h *AgentHandler) TaskEventSummary(c *gin.Context) {
+	userID := c.GetString("user_id")
+	taskID := c.Param("id")
+	summary, err := h.service.GetTaskRunEventSummary(c.Request.Context(), userID, taskID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, summary)
+}
+
+func runEventFilterFromQuery(c *gin.Context) (model.AgentRunEventFilter, error) {
+	filter := model.AgentRunEventFilter{
+		EventType: c.Query("event_type"),
+	}
+	if raw := c.Query("after_seq"); raw != "" {
+		seq, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || seq < 0 {
+			return filter, errcode.ErrBadRequest
+		}
+		filter.AfterSeq = seq
+	}
+	if raw := c.Query("limit"); raw != "" {
+		limit, err := strconv.Atoi(raw)
+		if err != nil || limit < 0 {
+			return filter, errcode.ErrBadRequest
+		}
+		filter.Limit = limit
+	}
+	return filter, nil
 }
 
 type taskDoneReq struct {

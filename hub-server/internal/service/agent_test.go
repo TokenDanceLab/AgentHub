@@ -161,6 +161,93 @@ func TestDispatchTaskIncludesTargetID(t *testing.T) {
 	require.Equal(t, "target-1", payload.TargetID)
 }
 
+func TestDispatchTaskIncludesTeamRunContext(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	for _, ddl := range []string{
+		`CREATE TABLE custom_agents (
+			id TEXT PRIMARY KEY,
+			owner_user_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			avatar_url TEXT DEFAULT '',
+			agent_type TEXT NOT NULL,
+			system_prompt TEXT NOT NULL,
+			capability_tags TEXT DEFAULT '[]',
+			tool_whitelist TEXT DEFAULT '[]',
+			model_params TEXT DEFAULT '{}',
+			deleted_at DATETIME,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE agent_teams (
+			id TEXT PRIMARY KEY,
+			owner_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			avatar_url TEXT DEFAULT '',
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_members (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			agent_profile_id TEXT,
+			role TEXT NOT NULL,
+			position INTEGER DEFAULT 0,
+			created_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_runs (
+			id TEXT PRIMARY KEY,
+			team_id TEXT NOT NULL,
+			session_id TEXT NOT NULL,
+			trigger_user_id TEXT NOT NULL,
+			trigger_message TEXT DEFAULT '',
+			status TEXT NOT NULL,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+	} {
+		require.NoError(t, db.Exec(ddl).Error)
+	}
+	now := time.Now()
+	require.NoError(t, db.Exec(`INSERT INTO custom_agents (id, owner_user_id, name, agent_type, system_prompt, capability_tags, tool_whitelist, model_params, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"profile-supervisor", "user-1", "Supervisor", "claude-code", "Coordinate the team", "[]", "[]", `{"model":"claude-sonnet-4-6"}`, now, now).Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_teams (id, owner_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		"team-1", "user-1", "Backend Team", now, now).Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_team_members (id, team_id, agent_profile_id, role, position, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"member-supervisor", "team-1", "profile-supervisor", model.TeamMemberRoleSupervisor, 0, now).Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_team_runs (id, team_id, session_id, trigger_user_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"run-team-1", "team-1", "sess-1", "user-1", model.TeamRunStatusRunning, now, now).Error)
+
+	profileID := "profile-supervisor"
+	cache := &mockAgentCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "claude-code",
+		CustomAgentID: &profileID,
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Supervisor",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Route this team run", "")
+
+	require.Len(t, cache.pushed, 1)
+	var payload dispatchPayload
+	require.NoError(t, json.Unmarshal([]byte(cache.pushed[0]), &payload))
+	require.Equal(t, "team-1", payload.TeamID)
+	require.Equal(t, "run-team-1", payload.TeamRunID)
+	require.Equal(t, "member-supervisor", payload.TeamMemberID)
+	require.Equal(t, model.TeamMemberRoleSupervisor, payload.TeamMemberRole)
+	require.Equal(t, "profile-supervisor", payload.CustomAgentID)
+	require.JSONEq(t, `{"model":"claude-sonnet-4-6"}`, payload.ModelParams)
+}
+
 func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
 	mgr := ws.NewManager()
@@ -193,6 +280,74 @@ func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
 	}
 	require.Empty(t, cache.pushed)
 	require.Empty(t, cache.pushedTarget)
+}
+
+func TestDispatchTaskDoesNotPushWhenDispatchedStateMissing(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	mgr := ws.NewManager()
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-a")
+
+	cache := &mockAgentCache{routeID: conn.ID}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "missing-dispatch-task",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run missing task", "")
+
+	select {
+	case <-conn.Send:
+		t.Fatal("dispatch was pushed before task dispatch state was persisted")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestDispatchTaskDoesNotPushTerminalTask(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, edge_device_id, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"task-cancelled-dispatch", "agent-1", "user-1", "msg-1", model.TaskStatusCancelled, "dev-a", "2030-01-01T00:00:00Z").Error)
+
+	mgr := ws.NewManager()
+	conn := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(conn))
+	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-a")
+
+	cache := &mockAgentCache{routeID: conn.ID}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-cancelled-dispatch",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run cancelled task", "")
+
+	select {
+	case <-conn.Send:
+		t.Fatal("terminal task was pushed after cancellation")
+	case <-time.After(100 * time.Millisecond):
+	}
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
+	require.Equal(t, model.TaskStatusCancelled, stored.Status)
 }
 
 func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
@@ -255,6 +410,86 @@ func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 	require.Equal(t, model.TaskStatusDispatched, stored.Status)
 	require.Equal(t, "dev-b", stored.EdgeDeviceID)
 	require.Empty(t, cache.pushedTarget)
+}
+
+func TestDispatchTaskDoesNotPushTargetWhenDispatchedStateMissing(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	mgr := ws.NewManager()
+	connB := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connB))
+	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+
+	cache := &mockAgentCache{
+		deviceRoutes: map[string]string{
+			"user-1|desktop|dev-b": connB.ID,
+		},
+	}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "missing-target-dispatch-task",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		TargetID:          "target-dev-b",
+		EdgeDeviceID:      "dev-b",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run missing target task", "")
+
+	select {
+	case <-connB.Send:
+		t.Fatal("target dispatch was pushed before task dispatch state was persisted")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestDispatchTaskDoesNotPushTerminalTargetTask(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_device_id, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"task-cancelled-target", "agent-1", "user-1", "msg-1", "target-dev-b", model.TaskStatusCancelled, "dev-b", "2030-01-01T00:00:00Z").Error)
+
+	mgr := ws.NewManager()
+	connB := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connB))
+	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+
+	cache := &mockAgentCache{
+		deviceRoutes: map[string]string{
+			"user-1|desktop|dev-b": connB.ID,
+		},
+	}
+	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	task := &model.PendingAgentTask{
+		ID:                "task-cancelled-target",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		TargetID:          "target-dev-b",
+		EdgeDeviceID:      "dev-b",
+	}
+	agent := &model.AgentInstance{
+		ID:            "agent-1",
+		AgentType:     "codex",
+		SessionID:     "sess-1",
+		InviterUserID: "user-1",
+		DisplayName:   "Codex",
+	}
+
+	svc.dispatchTask(context.Background(), task, agent, "Run cancelled target", "")
+
+	select {
+	case <-connB.Send:
+		t.Fatal("terminal target task was pushed after cancellation")
+	case <-time.After(100 * time.Millisecond):
+	}
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
+	require.Equal(t, model.TaskStatusCancelled, stored.Status)
 }
 
 func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
@@ -452,6 +687,119 @@ func TestHandleTaskAck_EdgeRunIDBackfill(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestHandleTaskAck_EdgeRunIDBackfillConflictAcceptsSameRunID(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	svc := &AgentService{db: db}
+
+	taskID := "task-backfill-same-conflict"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", ""))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "claude", "sess-1", "user-1"))
+
+	mock.ExpectExec(`UPDATE "pending_agent_tasks" SET "edge_run_id"`).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", "run-002"))
+
+	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", taskID, "run-002")
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskAck_EdgeRunIDBackfillConflictRejectsMismatch(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	svc := &AgentService{db: db}
+
+	taskID := "task-backfill-mismatch-conflict"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", ""))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "claude", "sess-1", "user-1"))
+
+	mock.ExpectExec(`UPDATE "pending_agent_tasks" SET "edge_run_id"`).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", "run-other"))
+
+	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", taskID, "run-002")
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskAckRejectsOversizedEdgeRunID(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	svc := &AgentService{db: db}
+
+	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", "task-ack", strings.Repeat("x", 129))
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskStream_DispatchedTransitionConflictDoesNotPersist(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	bus := newTestBus(t)
+	streamEvents := make(chan Event, 1)
+	bus.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event Event) {
+		streamEvents <- event
+	})
+	svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
+
+	taskID := "task-stream-conflict"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusDispatched, "dev-1", "run-001"))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "codex", "sess-1", "user-1"))
+
+	mock.ExpectExec(sqlmUpdateTask).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusDone, "dev-1", "run-001"))
+
+	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", taskID, "run-001", model.AgentRunEventInput{
+		Payload: json.RawMessage(`{"type":"run.output.batch","content":"hello"}`),
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+	select {
+	case <-streamEvents:
+		t.Fatal("agent.stream was published after dispatched transition conflict")
+	case <-time.After(50 * time.Millisecond):
+	}
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ==================== HandleTaskDone ====================
 
 func TestHandleTaskDone_AtomicTransition(t *testing.T) {
@@ -472,12 +820,51 @@ func TestHandleTaskDone_AtomicTransition(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
 			AddRow("agent-1", "claude", "sess-1", "user-1"))
 
+	mock.ExpectBegin()
 	mock.ExpectExec(sqlmUpdateTask).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", taskID, "run-001", "")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskDone_AtomicConflictDoesNotPublish(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	bus := newTestBus(t)
+	doneEvents := make(chan Event, 1)
+	bus.Subscribe("agent.done", func(ctx context.Context, event Event) {
+		doneEvents <- event
+	})
+	svc := &AgentService{db: db, bus: bus}
+
+	taskID := "task-done-conflict"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", "run-001"))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "claude", "sess-1", "user-1"))
+
+	mock.ExpectBegin()
+	mock.ExpectExec(sqlmUpdateTask).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectRollback()
+
+	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", taskID, "run-001", "")
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+	select {
+	case <-doneEvents:
+		t.Fatal("agent.done was published after atomic update conflict")
+	case <-time.After(50 * time.Millisecond):
+	}
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 // ==================== HandleTaskFail ====================
@@ -506,6 +893,41 @@ func TestHandleTaskFail_AtomicTransition(t *testing.T) {
 	err := svc.HandleTaskFail(context.Background(), "user-1", "dev-1", taskID, "run-001", "model error")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskFail_AtomicConflictDoesNotPublish(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	bus := newTestBus(t)
+	failedEvents := make(chan Event, 1)
+	bus.Subscribe("agent.failed", func(ctx context.Context, event Event) {
+		failedEvents <- event
+	})
+	svc := &AgentService{db: db, bus: bus}
+
+	taskID := "task-fail-conflict"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", "run-001"))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "claude", "sess-1", "user-1"))
+
+	mock.ExpectExec(sqlmUpdateTask).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	err := svc.HandleTaskFail(context.Background(), "user-1", "dev-1", taskID, "run-001", "model error")
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+	select {
+	case <-failedEvents:
+		t.Fatal("agent.failed was published after atomic update conflict")
+	case <-time.After(50 * time.Millisecond):
+	}
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestHandleTaskFail_AlreadyTerminal(t *testing.T) {
@@ -579,8 +1001,10 @@ func TestHandleTaskDone_AcceptsDispatchedTask(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
 			AddRow("agent-1", "claude", "sess-1", "user-1"))
 
+	mock.ExpectBegin()
 	mock.ExpectExec(sqlmUpdateTask).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", taskID, "run-001", "")
 	assert.NoError(t, err)
@@ -589,7 +1013,7 @@ func TestHandleTaskDone_AcceptsDispatchedTask(t *testing.T) {
 
 // ==================== #99: offline-replayed tasks ====================
 
-func TestHandleTaskAck_QueuedToDispatched(t *testing.T) {
+func TestHandleTaskAck_QueuedToRunning(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
@@ -606,13 +1030,90 @@ func TestHandleTaskAck_QueuedToDispatched(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
 			AddRow("agent-1", "claude", "sess-1", "user-1"))
 
-	// queued → dispatched (offline-replayed task)
+	// queued → running (offline-replayed task)
 	mock.ExpectExec(sqlmUpdateTask).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", taskID, "run-001")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskAck_QueuedOfflineReplayTransitionsToRunning(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	task := &model.PendingAgentTask{
+		ID:                "task-queued-ack-real",
+		AgentInstanceID:   "agent-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusQueued,
+		EdgeDeviceID:      "dev-1",
+		ExpireAt:          time.Now().Add(time.Hour),
+	}
+	require.NoError(t, db.Create(task).Error)
+	svc := &AgentService{db: db}
+
+	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", task.ID, "run-queued")
+
+	require.NoError(t, err)
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
+	require.Equal(t, model.TaskStatusRunning, stored.Status)
+	require.Equal(t, "run-queued", stored.EdgeRunID)
+}
+
+func TestTimeoutExpiredTaskMarksScannedStatus(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	task := &model.PendingAgentTask{
+		ID:                "task-timeout-running",
+		AgentInstanceID:   "agent-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusRunning,
+		EdgeDeviceID:      "dev-1",
+		EdgeRunID:         "run-1",
+		ExpireAt:          time.Now().Add(-time.Hour),
+	}
+	require.NoError(t, db.Create(task).Error)
+	svc := &AgentService{db: db}
+
+	timedOut, err := svc.TimeoutExpiredTask(task.ID, model.TaskStatusRunning)
+
+	require.NoError(t, err)
+	require.True(t, timedOut)
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
+	require.Equal(t, model.TaskStatusTimeout, stored.Status)
+	require.NotNil(t, stored.FinishedAt)
+}
+
+func TestTimeoutExpiredTaskDoesNotOverwriteTerminalRace(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	task := &model.PendingAgentTask{
+		ID:                "task-timeout-race",
+		AgentInstanceID:   "agent-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusRunning,
+		EdgeDeviceID:      "dev-1",
+		EdgeRunID:         "run-1",
+		ExpireAt:          time.Now().Add(-time.Hour),
+	}
+	require.NoError(t, db.Create(task).Error)
+	finishedAt := time.Now()
+	require.NoError(t, db.Model(&model.PendingAgentTask{}).
+		Where("id = ?", task.ID).
+		Updates(map[string]interface{}{"status": model.TaskStatusDone, "finished_at": &finishedAt}).Error)
+	svc := &AgentService{db: db}
+
+	timedOut, err := svc.TimeoutExpiredTask(task.ID, model.TaskStatusRunning)
+
+	require.NoError(t, err)
+	require.False(t, timedOut)
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
+	require.Equal(t, model.TaskStatusDone, stored.Status)
+	require.NotNil(t, stored.FinishedAt)
 }
 
 // ==================== B5: #116 reject agent tasks for dissolved sessions ====================

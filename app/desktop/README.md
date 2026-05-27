@@ -44,17 +44,20 @@ app/desktop/
 
 ## 本地运行
 
+> 以下命令从仓库根目录运行。
+
 终端 1：启动 Local Edge。
 
 ```powershell
-cd D:\Code\TokenDance\AgentHub\edge-server
+cd edge-server
 go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --agent-default claude-code
 ```
 
 终端 2：启动 Desktop Web UI。
 
 ```powershell
-cd D:\Code\TokenDance\AgentHub\app\desktop
+# from repo root
+cd app/desktop
 pnpm install
 pnpm dev --port 5199
 ```
@@ -77,7 +80,8 @@ Desktop 默认连接：
 ## Tauri 开发
 
 ```powershell
-cd D:\Code\TokenDance\AgentHub\app\desktop
+# from repo root
+cd app/desktop
 pnpm build
 pnpm tauri dev
 ```
@@ -87,7 +91,8 @@ pnpm tauri dev
 ## 验证
 
 ```powershell
-cd D:\Code\TokenDance\AgentHub\app\desktop
+# from repo root
+cd app/desktop
 pnpm typecheck
 pnpm test:ci
 pnpm build
@@ -123,7 +128,7 @@ pnpm storybook
 TokenDance ID / Hub OIDC 结构检查：
 
 ```powershell
-cd D:\Code\TokenDance\AgentHub
+# from repo root
 .\scripts\verify-oidc-readiness.ps1
 ```
 
