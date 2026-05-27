@@ -550,6 +550,48 @@ func TestHandleTaskAckRejectsOversizedEdgeRunID(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestHandleTaskStream_DispatchedTransitionConflictDoesNotPersist(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	bus := newTestBus(t)
+	streamEvents := make(chan Event, 1)
+	bus.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event Event) {
+		streamEvents <- event
+	})
+	svc := &AgentService{db: db, bus: bus, cacheClient: &mockAgentCache{}}
+
+	taskID := "task-stream-conflict"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusDispatched, "dev-1", "run-001"))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "codex", "sess-1", "user-1"))
+
+	mock.ExpectExec(sqlmUpdateTask).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusDone, "dev-1", "run-001"))
+
+	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", taskID, "run-001", model.AgentRunEventInput{
+		Payload: json.RawMessage(`{"type":"run.output.batch","content":"hello"}`),
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+	select {
+	case <-streamEvents:
+		t.Fatal("agent.stream was published after dispatched transition conflict")
+	case <-time.After(50 * time.Millisecond):
+	}
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ==================== HandleTaskDone ====================
 
 func TestHandleTaskDone_AtomicTransition(t *testing.T) {
