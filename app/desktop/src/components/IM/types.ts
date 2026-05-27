@@ -1,4 +1,5 @@
 // IM (Instant Messaging) shared types for Hub WS message integration.
+// Extended with Trump's IM enhancements (PR #220): recall, read receipts, friend/notification types.
 
 export type AuthorityType = 'hub' | 'edge' | 'hybrid';
 
@@ -15,9 +16,15 @@ export interface IMMessage {
   replyToId?: string;
   recalled?: boolean;
   read?: boolean;
-  readBy?: string;
+  readBy?: string | string[];
   readAt?: string;
+  readSeq?: number;
   actionError?: string;
+}
+
+export interface IMMessageWithHubState extends IMMessage {
+  hubSent?: boolean;
+  hubError?: string;
 }
 
 export interface IMContact {
