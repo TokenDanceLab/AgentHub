@@ -865,7 +865,7 @@ func TestHandleTaskDone_AcceptsDispatchedTask(t *testing.T) {
 
 // ==================== #99: offline-replayed tasks ====================
 
-func TestHandleTaskAck_QueuedToDispatched(t *testing.T) {
+func TestHandleTaskAck_QueuedToRunning(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
@@ -882,13 +882,36 @@ func TestHandleTaskAck_QueuedToDispatched(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
 			AddRow("agent-1", "claude", "sess-1", "user-1"))
 
-	// queued → dispatched (offline-replayed task)
+	// queued → running (offline-replayed task)
 	mock.ExpectExec(sqlmUpdateTask).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", taskID, "run-001")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskAck_QueuedOfflineReplayTransitionsToRunning(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	task := &model.PendingAgentTask{
+		ID:                "task-queued-ack-real",
+		AgentInstanceID:   "agent-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusQueued,
+		EdgeDeviceID:      "dev-1",
+		ExpireAt:          time.Now().Add(time.Hour),
+	}
+	require.NoError(t, db.Create(task).Error)
+	svc := &AgentService{db: db}
+
+	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", task.ID, "run-queued")
+
+	require.NoError(t, err)
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
+	require.Equal(t, model.TaskStatusRunning, stored.Status)
+	require.Equal(t, "run-queued", stored.EdgeRunID)
 }
 
 // ==================== B5: #116 reject agent tasks for dissolved sessions ====================
