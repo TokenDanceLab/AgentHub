@@ -5,7 +5,7 @@ import styles from './IMMessageInput.module.css';
 const MAX_CHARS = 2000;
 
 interface IMMessageInputProps {
-  onSend: (content: string) => void;
+  onSend: (content: string) => boolean | void | Promise<boolean | void>;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -18,10 +18,11 @@ const IMMessageInput = memo(function IMMessageInput({
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
-    onSend(trimmed);
+    const accepted = await onSend(trimmed);
+    if (accepted === false) return;
     setValue('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
