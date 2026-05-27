@@ -13,11 +13,11 @@ interface IMContactListProps {
 function avatarClass(type: string): string {
   switch (type) {
     case 'agent':
-      return styles.itemAvatarAgent;
+      return styles.itemAvatarAgent ?? '';
     case 'group':
-      return styles.itemAvatarGroup;
+      return styles.itemAvatarGroup ?? '';
     default:
-      return styles.itemAvatarUser;
+      return styles.itemAvatarUser ?? '';
   }
 }
 

@@ -21,7 +21,9 @@
 | `ADR-004-go-process-orchestration.md` | 已采纳，当前执行边界权威。 | Go `os/exec` + AgentAdapter 是当前独立 Runner 替代方案。它应与 `docs/architecture/system-architecture.md` 的 Agent Runtime/Profile/Execution Target 术语一起阅读。 |
 | `ADR-005-worktree-subagent-isolation.md` | 已采纳。 | Worktree 隔离和 subagent 协作原则仍成立；具体任务分发规则以 `AGENTS.md` 和当前 roadmap 为准。 |
 
-## 需要新增 ADR 的候选主题
+| `ADR-006-agent-communication-model.md` | 已采纳（2026-05-26）。 | Agent 间通信走结构化委派（TeamAssignment），不走自由聊天（IM message）。Hub 是 Agent 通信的单一事实源。IM 消息只作为可选投影。 |
+	
+	## 需要新增 ADR 的候选主题
 
 这些主题已有主文档方向，但尚未形成独立 ADR：
 

@@ -14,7 +14,7 @@ import (
 // AgentProfileService is the subset of *service.AgentProfileService used by AgentProfileHandler.
 type AgentProfileService interface {
 	Create(ctx context.Context, ownerID string, req *model.AgentProfile) (*model.AgentProfile, error)
-	Get(ctx context.Context, id string) (*model.AgentProfile, error)
+	Get(ctx context.Context, id, ownerID string) (*model.AgentProfile, error)
 	Update(ctx context.Context, id, ownerID string, updates map[string]interface{}) (*model.AgentProfile, error)
 	Delete(ctx context.Context, id, ownerID string) error
 	List(ctx context.Context, ownerID, runtimeID, q, cursor string, pageSize int) (*service.ListResult, error)
@@ -94,7 +94,8 @@ func (h *AgentProfileHandler) CreateProfile(c *gin.Context) {
 
 func (h *AgentProfileHandler) GetProfile(c *gin.Context) {
 	id := c.Param("id")
-	profile, err := h.svc.Get(c.Request.Context(), id)
+	userID := c.GetString("user_id")
+	profile, err := h.svc.Get(c.Request.Context(), id, userID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)

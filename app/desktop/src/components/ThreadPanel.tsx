@@ -3,9 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Plus, MessageSquare, Pencil, Trash2, Check, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ThreadInfo } from '@shared/types';
-import { useThreads, useRenameThread, useDeleteThread } from '@/api/threadQueries';
+import { useThreads, useRenameThread, useDeleteThread, useCreateThread } from '@/api/threadQueries';
 import { useToastStore } from '@/stores/toastStore';
-import EmptyState from './EmptyState';
 import styles from './ThreadPanel.module.css';
 
 /** ThreadInfo with optional count metadata the Edge may return. */
@@ -26,22 +25,6 @@ function getDisplayTitle(th: ThreadInfo, t: (k: string) => string): string {
   return t('thread.untitled');
 }
 
-/** Relative time display (e.g. "3m ago", "2h ago"). Uses i18n for locale. */
-function relativeTime(
-  dateStr: string,
-  t: (k: string, v?: Record<string, unknown>) => string,
-): string {
-  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (seconds < 60) return t('time.justNow');
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return t('time.minutesAgo', { count: minutes });
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return t('time.hoursAgo', { count: hours });
-  const days = Math.floor(hours / 24);
-  if (days < 30) return t('time.daysAgo', { count: days });
-  return new Date(dateStr).toLocaleDateString();
-}
-
 export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props) {
   const { t } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
@@ -52,6 +35,7 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
   const threads = data?.items ?? [];
   const renameMutation = useRenameThread();
   const deleteMutation = useDeleteThread();
+  const createMutation = useCreateThread();
 
   const [query, setQuery] = useState('');
 
@@ -140,19 +124,19 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
 
   // ── create handler ─────────────────────────
 
-  const handleCreate = () => {
-    // Invalidate queries so Edge-synced threads refresh
-    queryClient.invalidateQueries({ queryKey: ['threads'] });
-  };
-
-  // ── helpers ────────────────────────────────
-
-  const formatCount = (th: ThreadInfoExt): string | null => {
-    const runs = th.runCount;
-    const msgs = th.itemCount;
-    const count = msgs ?? runs;
-    if (count != null && count > 0) return t('thread.messages', { count });
-    return null;
+  const handleCreate = async () => {
+    try {
+      const thread = await createMutation.mutateAsync({ title: '' });
+      onSelect(thread);
+      setActionError(null);
+      addToast({ type: 'success', message: t('toast.threadCreated') });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setActionError(msg);
+      addToast({ type: 'error', message: msg });
+    } finally {
+      queryClient.invalidateQueries({ queryKey: ['threads'] });
+    }
   };
 
   // ── render ─────────────────────────────────
@@ -164,8 +148,9 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
         <button
           className={styles.createBtn}
           onClick={handleCreate}
-          disabled={!online}
+          disabled={!online || createMutation.isPending}
           title={t('thread.create')}
+          aria-label={t('thread.create')}
         >
           <Plus size={16} />
         </button>
@@ -182,11 +167,10 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
 
       {filtered.length === 0 ? (
         threads.length === 0 ? (
-          <EmptyState
-            title={t('thread.emptyTitle')}
-            description={t('thread.emptyDescription')}
-            action={{ label: t('thread.emptyAction'), onClick: handleCreate }}
-          />
+          <button className={styles.emptyCreate} type="button" onClick={handleCreate} disabled={!online || createMutation.isPending}>
+            <MessageSquare size={14} />
+            <span>{t('thread.emptyAction')}</span>
+          </button>
         ) : (
           <div className={styles.empty}>{t('thread.empty')}</div>
         )
@@ -194,8 +178,6 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
         <ul className={styles.list}>
           {filtered.map((th) => {
             const ext = th as ThreadInfoExt;
-            const count = formatCount(ext);
-
             if (th.threadId === editingId) {
               // ── inline editing row ──────────
               return (
@@ -270,10 +252,6 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
                   <MessageSquare size={14} />
                   <div className={styles.itemInfo}>
                     <div className={styles.name} title={displayTitle}>{displayTitle}</div>
-                    <div className={styles.meta}>
-                      {relativeTime(th.updatedAt, t)}
-                      {count && <span className={styles.count}>{` · ${count}`}</span>}
-                    </div>
                   </div>
                 </button>
                 <div className={styles.actions}>

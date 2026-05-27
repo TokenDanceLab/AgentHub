@@ -8,22 +8,23 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/gin-gonic/gin"
 )
 
-// AuthMiddleware returns a Gin middleware that validates JWT bearer tokens.
-// It supports dual-mode authentication:
-// 1. TokenDance ID RS256 JWT (if configured) — primary, validated via JWKS
-// 2. Local HS256 JWT — fallback for legacy Hub-issued tokens
+// AuthMiddleware returns a Gin middleware that validates JWT bearer tokens and
+// classifies the auth source.
+// It supports dual-mode identity parsing:
+// 1. TokenDance ID RS256 JWT (if configured) — identity compatibility only
+// 2. Local HS256 JWT — Hub-issued product session
 //
 // User identity (user_id, device_type, device_id) is injected into the Gin context.
+// Product APIs must add RequireHubSession after this middleware.
 func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" || !strings.HasPrefix(header, "Bearer ") {
-			handler.Fail(c, errcode.AuthInvalidToken)
+			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
 		}
@@ -46,11 +47,25 @@ func WSAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			tokenStr = c.Query("access_token")
 		}
 		if tokenStr == "" {
-			handler.Fail(c, errcode.AuthInvalidToken)
+			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
 		}
-		validateToken(c, cfg, tokenStr)
+
+		// WebSocket sessions must be Hub-issued sessions. TokenDance ID bearer
+		// tokens prove identity only and must not bypass the Hub session/device
+		// handshake by authenticating at the upgrade middleware layer.
+		claims, err := jwtutil.ParseToken(tokenStr, cfg.JWT.Secret)
+		if err != nil {
+			fail(c, errcode.AuthInvalidToken)
+			c.Abort()
+			return
+		}
+		c.Set("user_id", claims.UserID)
+		c.Set("device_type", claims.DeviceType)
+		c.Set("device_id", claims.DeviceID)
+		c.Set("auth_source", "hub_local")
+		c.Next()
 	}
 }
 
@@ -72,7 +87,7 @@ func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
 	// Fallback to local HS256 JWT.
 	claims, err := jwtutil.ParseToken(tokenStr, cfg.JWT.Secret)
 	if err != nil {
-		handler.Fail(c, errcode.AuthInvalidToken)
+		fail(c, errcode.AuthInvalidToken)
 		c.Abort()
 		return
 	}
@@ -83,17 +98,15 @@ func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
 	c.Next()
 }
 
-// RequireLocalAuth is a middleware that blocks requests authenticated via
-// TokenDance ID bearer tokens from mutating Hub-local user resources.
-// TokenDance ID tokens are read-only for local user data (profile, password, etc.).
-// Apply this middleware after AuthMiddleware on write endpoints that modify
-// user-local resources.
-func RequireLocalAuth() gin.HandlerFunc {
+// RequireHubSession is a middleware that requires a Hub-issued local session.
+// TokenDance ID bearer tokens prove identity only; they must not authorize Hub
+// product APIs, device routing, Web task dispatch, or user-local resources.
+func RequireHubSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.GetString("auth_source") == "tokendance_id" {
-			handler.Fail(c, &errcode.Error{
+		if c.GetString("auth_source") != "hub_local" {
+			fail(c, &errcode.Error{
 				Code:       "FORBIDDEN",
-				Message:    "TokenDance bearer sessions cannot modify Hub-local user resources",
+				Message:    "Hub-issued session is required for this API",
 				HTTPStatus: http.StatusForbidden,
 			})
 			c.Abort()
@@ -101,6 +114,12 @@ func RequireLocalAuth() gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+// RequireLocalAuth is kept for existing call sites. Local Hub auth and Hub
+// session are the same boundary after TokenDance ID OIDC exchange.
+func RequireLocalAuth() gin.HandlerFunc {
+	return RequireHubSession()
 }
 
 // RequireAdmin is a middleware that restricts access to admin users.
@@ -115,12 +134,12 @@ func RequireAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetString("user_id")
 		if userID == "" {
-			handler.Fail(c, errcode.AuthInvalidToken)
+			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
 		}
 		if len(adminUsers) == 0 {
-			handler.Fail(c, &errcode.Error{
+			fail(c, &errcode.Error{
 				Code:       "FORBIDDEN",
 				Message:    "admin access not configured — set AGENTHUB_ADMIN_USERS",
 				HTTPStatus: http.StatusForbidden,
@@ -134,7 +153,7 @@ func RequireAdmin() gin.HandlerFunc {
 				return
 			}
 		}
-		handler.Fail(c, &errcode.Error{
+		fail(c, &errcode.Error{
 			Code:       "FORBIDDEN",
 			Message:    "admin access required",
 			HTTPStatus: http.StatusForbidden,

@@ -16,6 +16,12 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('@lobehub/icons', () => ({
+  ClaudeCode: ({ size }: { size?: number }) => <span data-testid="claude-icon" style={{ width: size, height: size }} />,
+  Codex: ({ size }: { size?: number }) => <span data-testid="codex-icon" style={{ width: size, height: size }} />,
+  OpenCode: ({ size }: { size?: number }) => <span data-testid="opencode-icon" style={{ width: size, height: size }} />,
+}));
+
 vi.mock('@/stores/toastStore', () => ({
   useToastStore: (selector: (s: { toasts: unknown[]; addToast: ReturnType<typeof vi.fn>; removeToast: ReturnType<typeof vi.fn> }) => unknown) => {
     const store = {
@@ -41,6 +47,7 @@ vi.mock('@tanstack/react-virtual', () => ({
     return {
       getVirtualItems: () => items,
       getTotalSize: () => 0,
+      measure: () => {},
       measureElement: () => {},
       scrollToIndex: () => {},
     };
@@ -120,9 +127,8 @@ describe('ChatView', () => {
       timestamp: new Date().toISOString(),
       blocks: [{ kind: 'thinking', content: 'Let me think about this...' }],
     };
-    render(<ChatView messages={[msg]} />);
-    // The toggle button should show "Thinking"
-    expect(screen.getByText('Thinking')).toBeInTheDocument();
+    render(<ChatView messages={[msg]} isStreaming={true} />);
+    expect(screen.getAllByText('chat.thinkingLabel').length).toBeGreaterThan(0);
     // Content is conditionally rendered (NOT in DOM when collapsed)
     expect(screen.queryByText('Let me think about this...')).not.toBeInTheDocument();
   });
@@ -145,10 +151,10 @@ describe('ChatView', () => {
     render(<ChatView messages={[msg]} />);
     // The toggle button should show tool name and status
     expect(screen.getByText('read_file')).toBeInTheDocument();
-    expect(screen.getByText('completed')).toBeInTheDocument();
+    expect(screen.getByText(/chat\.toolStatus\.completed/)).toBeInTheDocument();
   });
 
-  it('renders file_change blocks with color coding', () => {
+  it('renders file_change blocks with summary metadata', () => {
     const msg: ChatMessage = {
       id: 'msg-file-1',
       role: 'agent',
@@ -163,14 +169,12 @@ describe('ChatView', () => {
       ],
     };
     render(<ChatView messages={[msg]} />);
-    // The action should be in the summary
     expect(screen.getByText(/created/)).toBeInTheDocument();
-    // The "added" class on the <details> element for created action
-    const details = screen.getByText(/created/).closest('details');
-    expect(details?.className).toContain('added');
+    expect(screen.getByText('test.ts')).toBeInTheDocument();
+    expect(screen.getByText('+1')).toBeInTheDocument();
   });
 
-  it('renders modified file_change with different color', () => {
+  it('renders modified file_change summary', () => {
     const msg: ChatMessage = {
       id: 'msg-file-2',
       role: 'agent',
@@ -184,11 +188,11 @@ describe('ChatView', () => {
       ],
     };
     render(<ChatView messages={[msg]} />);
-    const details = screen.getByText(/modified/).closest('details');
-    expect(details?.className).toContain('modified');
+    expect(screen.getByText(/modified/)).toBeInTheDocument();
+    expect(screen.getByText('update.ts')).toBeInTheDocument();
   });
 
-  it('renders deleted file_change with different color', () => {
+  it('renders deleted file_change summary', () => {
     const msg: ChatMessage = {
       id: 'msg-file-3',
       role: 'agent',
@@ -202,8 +206,8 @@ describe('ChatView', () => {
       ],
     };
     render(<ChatView messages={[msg]} />);
-    const details = screen.getByText(/deleted/).closest('details');
-    expect(details?.className).toContain('removed');
+    expect(screen.getByText(/deleted/)).toBeInTheDocument();
+    expect(screen.getByText('remove.ts')).toBeInTheDocument();
   });
 
   it('shows stream progress bar when isStreaming=true', () => {

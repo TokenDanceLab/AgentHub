@@ -40,15 +40,22 @@ type ObjectStorage interface {
 // ── LocalStorage ────────────────────────────────────────────────────────────
 
 // LocalStorage stores attachment blobs on the local filesystem under the
-// current working directory, matching the existing Upload.Dir-relative layout.
-type LocalStorage struct{}
+// configured upload directory (cfg.Upload.Dir), falling back to ".".
+type LocalStorage struct {
+	baseDir string
+}
 
-func NewLocalStorage() *LocalStorage {
-	return &LocalStorage{}
+// NewLocalStorage returns a local filesystem storage rooted at baseDir.
+// When baseDir is empty, "." (current working directory) is used as fallback.
+func NewLocalStorage(baseDir string) *LocalStorage {
+	if baseDir == "" {
+		baseDir = "."
+	}
+	return &LocalStorage{baseDir: baseDir}
 }
 
 func (s *LocalStorage) Put(ctx context.Context, key string, body io.Reader, contentType string) (bool, error) {
-	absPath := filepath.Join(".", key)
+	absPath := filepath.Join(s.baseDir, key)
 	dir := filepath.Dir(absPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return false, err
@@ -82,12 +89,12 @@ func (s *LocalStorage) Put(ctx context.Context, key string, body io.Reader, cont
 }
 
 func (s *LocalStorage) Get(ctx context.Context, key string) (io.ReadCloser, error) {
-	absPath := filepath.Join(".", key)
+	absPath := filepath.Join(s.baseDir, key)
 	return os.Open(absPath)
 }
 
 func (s *LocalStorage) Delete(ctx context.Context, key string) error {
-	absPath := filepath.Join(".", key)
+	absPath := filepath.Join(s.baseDir, key)
 	if err := os.Remove(absPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -95,7 +102,7 @@ func (s *LocalStorage) Delete(ctx context.Context, key string) error {
 }
 
 func (s *LocalStorage) LocalPath(key string) string {
-	return filepath.Join(".", key)
+	return filepath.Join(s.baseDir, key)
 }
 
 // ── S3Storage ───────────────────────────────────────────────────────────────
@@ -245,10 +252,10 @@ func (s *AttachmentService) GetAttachmentByID(ctx context.Context, userID, id st
 		}
 		return nil, err
 	}
-	if a.UploaderUserID == userID {
-		return a, nil
-	}
-
+	// #81: Always verify active session membership — do not allow
+	// uploader ownership alone to bypass the session member check.
+	// This prevents users who are no longer active session members
+	// from accessing attachments.
 	allowed, err := repository.CanUserAccessReferencedAttachment(s.db, userID, id)
 	if err != nil {
 		return nil, err

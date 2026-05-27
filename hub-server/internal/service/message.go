@@ -39,6 +39,11 @@ func NewMessageService(db *gorm.DB, bus *Bus, cacheClient *cache.Client) *Messag
 func (s *MessageService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
 	seq, err := resolveMessageCache(s.cacheClient).AllocateSeq(ctx, sessionID)
 	if err == nil {
+		// #154: Redis allocation does not update last_message_at, so touch it here
+		// to ensure the session appears in recent conversations.
+		if touchErr := repository.TouchSessionLastMessage(s.db, sessionID); touchErr != nil {
+			slog.Warn("failed to touch session last_message_at after redis seq alloc", "session_id", sessionID, "error", touchErr)
+		}
 		return seq, nil
 	}
 	slog.Warn("redis seq allocation failed, falling back to DB", "session_id", sessionID, "error", err)
@@ -93,18 +98,78 @@ var validContentTypes = map[string]bool{
 	"file": true, "link_card": true, "deploy_card": true,
 }
 
+// normalizeMessageContent returns the JSONB string persisted for a message.
+// #173: every content type is normalized before DB write so PostgreSQL jsonb
+// never sees raw, unvalidated client strings.
+func normalizeMessageContent(contentType, content string) (string, error) {
+	if contentType == model.ContentTypeText {
+		contentBytes, err := json.Marshal(map[string]string{"text": content})
+		if err != nil {
+			return "", err
+		}
+		return string(contentBytes), nil
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal([]byte(content), &payload); err != nil {
+		return "", fmt.Errorf("invalid JSON for content type %s: %w", contentType, err)
+	}
+	if payload == nil {
+		return "", fmt.Errorf("content type %s must be a JSON object", contentType)
+	}
+
+	if err := validateContentPayload(contentType, payload); err != nil {
+		return "", err
+	}
+
+	normalized, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	return string(normalized), nil
+}
+
+func validateContentPayload(contentType string, payload map[string]interface{}) error {
+	switch contentType {
+	case model.ContentTypeCode, model.ContentTypeDiff:
+		return requireContentString(payload, "text", contentType)
+	case model.ContentTypeFile:
+		return requireContentString(payload, "attachment_id", contentType)
+	case model.ContentTypeLinkCard:
+		return requireContentString(payload, "url", contentType)
+	case model.ContentTypeImage:
+		return requireContentString(payload, "url", contentType)
+	case model.ContentTypeDeployCard:
+		return nil
+	}
+	return nil
+}
+
+func requireContentString(payload map[string]interface{}, field, contentType string) error {
+	if hasContentString(payload, field) {
+		return nil
+	}
+	return fmt.Errorf("required field %q must be a non-empty string for content type %s", field, contentType)
+}
+
+func hasContentString(payload map[string]interface{}, field string) bool {
+	value, exists := payload[field]
+	if !exists {
+		return false
+	}
+	s, ok := value.(string)
+	return ok && strings.TrimSpace(s) != ""
+}
+
 func (s *MessageService) SendMessage(ctx context.Context, sessionID, senderUserID string, req SendMessageRequest) (*SendMessageResponse, error) {
 	if !validContentTypes[req.ContentType] {
 		return nil, errcode.ErrBadRequest
 	}
 
-	content := req.Content
-	if req.ContentType == "text" {
-		contentBytes, err := json.Marshal(map[string]string{"text": req.Content})
-		if err != nil {
-			return nil, errcode.ErrInternal
-		}
-		content = string(contentBytes)
+	content, err := normalizeMessageContent(req.ContentType, req.Content)
+	if err != nil {
+		slog.Warn("invalid message content", "content_type", req.ContentType, "error", err)
+		return nil, errcode.ErrBadRequest
 	}
 	attachmentIDs, ok := attachmentIDsFromContent(req.ContentType, content)
 	if !ok {
@@ -644,6 +709,13 @@ func (s *MessageService) MarkRead(ctx context.Context, userID, sessionID string,
 		return errcode.SessionNotMember
 	}
 
+	member, err := repository.GetActiveMember(s.db, sessionID, model.MemberTypeUser, userID)
+	if err != nil {
+		return err
+	}
+	if lastReadSeq <= member.LastReadSeq {
+		return nil
+	}
 	if err := repository.UpdateLastReadSeq(s.db, sessionID, userID, lastReadSeq); err != nil {
 		return err
 	}
@@ -670,7 +742,7 @@ func (s *MessageService) SearchMessages(ctx context.Context, userID, q, sessionI
 		return s.toMessageResponses(msgs), nil
 	}
 
-	msgs, err := repository.SearchAllMessages(s.db, userID, q)
+	msgs, err := repository.SearchAllMessages(s.db, userID, q, contentType, from, to)
 	if err != nil {
 		return nil, err
 	}

@@ -17,10 +17,10 @@
 | Agent 任务调度 | 80% | dispatch→ack→stream→done/fail，taskId↔edgeRunId |
 | WebSocket | 85% | per-user 路由、心跳、丢帧告警、panic recovery |
 | 中间件链 | 90% | CORS/APIVersion/BodyLimit/RateLimit/RequestID/AccessLog/Timeout |
-| 数据库 | 90% | 18 migrations, GORM+PG, Upsert/jsonb校验/seq分配 |
+| 数据库 | 90% | 28 migrations, GORM+PG, Upsert/jsonb校验/seq分配 |
 | 缓存 | 85% | Redis singleflight/seq/路由/离线任务队列 |
 | EventBus | 85% | ants pool 1024/panic recovery/metrics |
-| 生产部署 | 80% | Docker Compose on hk2, nginx 反代 |
+| 生产部署 | 80% | Docker Compose, nginx 反代 |
 
 ### 1.2 待完成能力栈（按优先级）
 
@@ -57,12 +57,12 @@ Priority 3 — 高级：远程/中继/多端增强
 
 #### 2.1.1 现状
 
-当前 `AuthMiddleware` 支持 TokenDance ID RS256/JWKS bearer token 作为兼容路径，但不能替代完整 Hub session。Desktop AuthPage 保留了 PKCE state 写入占位，但 OIDC callback 捕获和 Hub token exchange 未实现。
+当前 `AuthMiddleware` 支持 TokenDance ID RS256/JWKS bearer token 作为兼容路径，但不能替代完整 Hub session。Hub Server 已落地 Hub-owned OIDC authorize/callback：客户端生成 S256 PKCE challenge，Hub 生成 state 并保存到 Redis，callback 阶段用 code + verifier 向 TokenDance ID 换取 ID token，完成 issuer/audience/JWKS 校验、`tokendance_sub` 到 Hub user 映射，并签发 Hub access/refresh session 与 device proof。
 
-实际缺失链路：
+已落地后端链路：
 
 ```text
-Desktop 打开系统浏览器 → TokenDance ID /oidc/auth?...&code_challenge=...&code_challenge_method=S256
+Desktop 打开系统浏览器 → TokenDance ID /oidc/authorize?...&code_challenge=...&code_challenge_method=S256
   → 用户登录 TokenDance ID
   → TokenDance ID redirect 回 Hub callback
   → Hub POST /client/auth/oidc/callback 接收 code + code_verifier
@@ -73,38 +73,24 @@ Desktop 打开系统浏览器 → TokenDance ID /oidc/auth?...&code_challenge=..
   → Hub 返回 Hub tokens 给客户端
 ```
 
-#### 2.1.2 新增 API
+剩余工作不在 Hub code exchange 本身，而在客户端和部署验证：Desktop/Web 捕获 redirect 后把 code/state/verifier 交给 Hub callback、持久化 Hub session、用 Hub access token 建立 REST/WS 会话、实现 logout/refresh UX，并用真实 TokenDance ID 环境跑一次端到端 smoke。
 
-**`GET /client/auth/oidc/authorize`** — 生成 PKCE 参数并返回 redirect URL
+#### 2.1.2 已落地 API
 
-```
-Query:  device_type=desktop|web, device_id=..., redirect_uri=...
-Response 200:
-{
-  "authorization_url": "https://id.vectorcontrol.tech/oidc/auth?...&code_challenge=...",
-  "state": "临时state，服务端保存用于验证callback",
-  "code_verifier": "本地生成的PKCE verifier"  
-}
-```
-
-> 注意：`code_verifier` 需要返回给 Desktop 保存，因为 callback 时 Desktop 需要提供它。实际方案：Hub 不返回 code_verifier；Desktop 自己生成 PKCE pair，把 challenge 传给 Hub 的 authorize endpoint，Hub 只构造 URL。
-
-**修订方案**：
-
-**`POST /client/auth/oidc/authorize`** — 接收客户端生成的 PKCE challenge，返回 redirect URL
+**`POST /client/auth/oidc/authorize`** — 接收客户端生成的 S256 PKCE challenge，返回 TokenDance ID redirect URL
 
 ```
 Request:
 {
   "code_challenge": "客户端 S256 challenge (base64url)",
   "code_challenge_method": "S256",
-  "device_type": "desktop|web",
+  "device_type": "desktop|web|cli",
   "device_id": "..."
 }
 Response 200:
 {
   "state": "Hub 生成的随机 state (TTL 10min, Redis)",
-  "authorization_url": "https://id.vectorcontrol.tech/oidc/auth?response_type=code&client_id=...&redirect_uri=...&code_challenge=...&code_challenge_method=S256&state=..."
+  "authorization_url": "https://id.vectorcontrol.tech/oidc/authorize?response_type=code&client_id=...&redirect_uri=...&code_challenge=...&code_challenge_method=S256&state=..."
 }
 ```
 
@@ -116,7 +102,7 @@ Request:
   "code": "TokenDance ID 返回的 authorization code",
   "state": "authorize 步骤返回的 state",
   "code_verifier": "客户端保存的 PKCE verifier",
-  "device_type": "desktop|web",
+  "device_type": "desktop|web|cli",
   "device_id": "..."
 }
 Response 200:
@@ -144,7 +130,7 @@ OIDCService 依赖:
   - GenerateAuthorizationURL(codeChallenge, deviceType, deviceID) → (state, url, error)
     1. 生成 crypto/rand 32-byte state
     2. state → Redis SETEX state:{state} = {codeChallenge, deviceType, deviceID, createdAt} TTL 10min
-    3. 构造 TokenDance ID /oidc/auth URL
+    3. 构造 TokenDance ID /oidc/authorize URL
     4. 返回
 
   - HandleCallback(code, state, codeVerifier, deviceType, deviceID) → (accessToken, refreshToken, user, error)
@@ -175,12 +161,12 @@ UserRepository 新增:
 **Migration 0019: `users` 表新增字段**
 
 ```sql
--- 0019_token_dance_sub.up.sql
+-- 0020_token_dance_sub.up.sql
 ALTER TABLE users ADD COLUMN tokendance_sub VARCHAR(255);
 CREATE UNIQUE INDEX idx_users_tokendance_sub ON users(tokendance_sub) WHERE tokendance_sub IS NOT NULL AND tokendance_sub != '';
 ALTER TABLE users ADD COLUMN tokendance_sub_linked_at TIMESTAMPTZ;
 
--- 0019_token_dance_sub.down.sql
+-- 0020_token_dance_sub.down.sql
 DROP INDEX IF EXISTS idx_users_tokendance_sub;
 ALTER TABLE users DROP COLUMN IF EXISTS tokendance_sub_linked_at;
 ALTER TABLE users DROP COLUMN IF EXISTS tokendance_sub;
@@ -608,6 +594,9 @@ CREATE TABLE execution_targets (
     host         VARCHAR(256),          -- SSH/Tailscale host
     port         INT,
     workspace_root VARCHAR(512),
+    workspace_allowlist JSONB DEFAULT '[]', -- Target 可执行 workspace root 列表
+    trust_level  VARCHAR(32) DEFAULT 'local', -- local | remote | cloud | relay
+    health_state VARCHAR(32) DEFAULT 'unknown',
     auth_method  VARCHAR(32),           -- ssh_key | password | tailscale_magic | hub_token
     is_online    BOOLEAN DEFAULT FALSE,
     last_seen_at TIMESTAMPTZ,
@@ -634,7 +623,7 @@ CREATE INDEX idx_execution_targets_device ON execution_targets(device_id);
 
 **`DELETE /web/execution-targets/{id}`** — 删除 Target
 
-**`POST /web/execution-targets/{id}:ping`** — 健康检查（Hub 尝试连接 Target）
+**`POST /web/execution-targets/{id}/ping`** — 健康检查（Hub 尝试连接 Target）
 
 #### 3.3.4 与现有 Device 的关系
 

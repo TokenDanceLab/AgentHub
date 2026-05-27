@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/service"
 )
@@ -100,6 +101,22 @@ func TestSessionHandler_CreatePrivate_BadRequest(t *testing.T) {
 	}
 }
 
+func TestSessionHandler_CreatePrivate_NotFriend(t *testing.T) {
+	svc := &mockSessionService{
+		createPrivateFn: func(ctx context.Context, currentUserID, targetUserID string) (*service.CreateSessionResponse, error) {
+			return nil, errcode.FriendNotFriend
+		},
+	}
+	h := handler.NewSessionHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/sessions/private", map[string]string{"target_user_id": "u2"}, "user_id", "u1")
+	h.CreatePrivate(c)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 // ── CreateGroup ─────────────────────────────────────────────────────
 
 func TestSessionHandler_CreateGroup_Success(t *testing.T) {
@@ -113,6 +130,28 @@ func TestSessionHandler_CreateGroup_Success(t *testing.T) {
 	c, w := newGinCtx("POST", "/client/sessions/group", map[string]any{
 		"name":       "Test Group",
 		"member_ids": []string{"u2", "u3"},
+	}, "user_id", "u1")
+	h.CreateGroup(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSessionHandler_CreateGroup_EmptyMembersAllowed(t *testing.T) {
+	svc := &mockSessionService{
+		createGroupFn: func(ctx context.Context, ownerUserID, name string, memberIDs []string) (*service.CreateSessionResponse, error) {
+			if len(memberIDs) != 0 {
+				t.Fatalf("expected empty memberIDs, got %v", memberIDs)
+			}
+			return &service.CreateSessionResponse{SessionID: "g1", Type: "group", Created: true}, nil
+		},
+	}
+	h := handler.NewSessionHandler(svc)
+
+	c, w := newGinCtx("POST", "/client/sessions/group", map[string]any{
+		"name":       "Workspace",
+		"member_ids": []string{},
 	}, "user_id", "u1")
 	h.CreateGroup(c)
 

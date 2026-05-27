@@ -54,13 +54,16 @@ func (s *SkillService) Create(ctx context.Context, ownerID string, req *model.Sk
 	return req, nil
 }
 
-func (s *SkillService) Get(ctx context.Context, id string) (*model.Skill, error) {
+func (s *SkillService) Get(ctx context.Context, id, ownerID string) (*model.Skill, error) {
 	sk, err := repository.GetSkillByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.UserNotFound
 		}
 		return nil, err
+	}
+	if sk.OwnerID != ownerID {
+		return nil, errcode.AuthDeviceMismatch
 	}
 	return sk, nil
 }

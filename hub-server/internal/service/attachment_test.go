@@ -13,7 +13,7 @@ import (
 
 func TestLocalStorage_PutAndGet(t *testing.T) {
 	t.Chdir(t.TempDir())
-	store := service.NewLocalStorage()
+	store := service.NewLocalStorage(".")
 
 	key := "uploads/ab/cd/testhash1234"
 	body := strings.NewReader("hello world")
@@ -103,7 +103,7 @@ func TestSaveAttachment_StorageInjection(t *testing.T) {
 	// writes to disk.
 	t.Chdir(t.TempDir())
 
-	store := service.NewLocalStorage()
+	store := service.NewLocalStorage(".")
 	// Verify that the local store works through the AttachmentService
 	// public API contract (the methods exist and don't panic).
 	_ = store
