@@ -25,7 +25,13 @@ func (m *mockDeviceService) ListDevices(userID string) ([]model.Device, error) {
 func TestDeviceHandler_Register_Success(t *testing.T) {
 	svc := &mockDeviceService{
 		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
-			return &model.Device{ID: deviceID, UserID: userID, DeviceType: deviceType, AppVersion: appVersion}, nil
+			return &model.Device{
+				ID:           deviceID,
+				UserID:       userID,
+				DeviceType:   deviceType,
+				AppVersion:   appVersion,
+				Capabilities: `["chat","agent"]`,
+			}, nil
 		},
 	}
 	h := handler.NewDeviceHandler(svc)
@@ -44,6 +50,21 @@ func TestDeviceHandler_Register_Success(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp.Code != "OK" {
 		t.Fatalf("expected OK, got %s", resp.Code)
+	}
+	data, err := json.Marshal(resp.Data)
+	if err != nil {
+		t.Fatalf("marshal response data: %v", err)
+	}
+	var device map[string]any
+	if err := json.Unmarshal(data, &device); err != nil {
+		t.Fatalf("unmarshal response data: %v", err)
+	}
+	capabilities, ok := device["capabilities"].([]any)
+	if !ok {
+		t.Fatalf("capabilities has type %T, want array", device["capabilities"])
+	}
+	if len(capabilities) != 2 || capabilities[0] != "chat" || capabilities[1] != "agent" {
+		t.Fatalf("capabilities = %v, want [chat agent]", capabilities)
 	}
 }
 

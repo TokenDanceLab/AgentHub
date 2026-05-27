@@ -91,7 +91,7 @@ func TestAllFrameTypes(t *testing.T) {
 		TypeMessageRead, TypeSessionCreated, TypeSessionDissolved,
 		TypeSessionMemberJoined, TypeSessionMemberLeft, TypeSessionInfoUpdated,
 		TypeDeviceOnline, TypeDeviceOffline, TypeDeviceKicked,
-		TypeAgentDispatch, TypeAgentStream, TypeAgentDone, TypeAgentFailed, TypeAgentCancel,
+		TypeAgentDispatch, TypeAgentStream, TypeAgentDone, TypeAgentFailed, TypeAgentCancel, TypeAgentControl,
 		TypeNotificationNew, TypeFriendRequest, TypeFriendAccepted,
 	}
 	for _, typ := range types {

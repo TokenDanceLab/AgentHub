@@ -172,21 +172,52 @@ func TestNewError(t *testing.T) {
 
 func TestAllErrorsHaveNonEmptyCode(t *testing.T) {
 	all := []*Error{
-		OK, ErrInternal, ErrBadRequest,
+		OK, ErrInternal, ErrBadRequest, ErrTimeout,
 		AuthInvalidToken, AuthInvalidCredentials, AuthTokenExpired, AuthDeviceMismatch, AuthRefreshInvalid,
 		MsgNotFound, MsgRecallTimeout, MsgPinLimitExceeded, MsgBlockedByReceiver,
 		SessionNotFound, SessionDissolved, SessionNotMember,
 		AgentNotFound, AgentOffline, AgentTaskNotFound, AgentTaskCancelled, AgentTaskTimeout, TargetNotFound, TargetNotRoutable,
 		GroupNotOwner, GroupOwnerCannotLeave, GroupAlreadyMember,
 		UserNotFound, UserUsernameTaken, UserInvalidParam,
-		FriendAlready, FriendBlocked, FriendRequestNotFound,
+		FriendAlready, FriendBlocked, FriendRequestNotFound, FriendRemarkNoRow, FriendNotFriend,
 		AttachNotFound, AttachTooLarge, AttachHashMismatch,
 		NotifNotFound,
 		WsAuthTimeout, WsAuthFailed,
+		OIDCInvalidState, OIDCCodeExchangeFailed, OIDCIDTokenInvalid, OIDCSubNotFound,
+		ErrNotImplemented,
 	}
 	for _, e := range all {
 		if e.Code == "" {
 			t.Errorf("error with message %q has empty Code", e.Message)
 		}
+	}
+}
+
+func TestErrorIs(t *testing.T) {
+	e := New("TEST", "msg", 400)
+	if !e.Is(e) {
+		t.Error("same error should match itself")
+	}
+	if e.Is(New("OTHER", "msg", 400)) {
+		t.Error("different code should not match")
+	}
+	if ErrInternal.Is(ErrBadRequest) {
+		t.Error("different sentinel errors should not match")
+	}
+}
+
+func TestWithMessage(t *testing.T) {
+	e := ErrBadRequest.WithMessage("custom")
+	if e.Code != ErrBadRequest.Code {
+		t.Errorf("Code = %q, want %q", e.Code, ErrBadRequest.Code)
+	}
+	if e.Message != "custom" {
+		t.Errorf("Message = %q, want custom", e.Message)
+	}
+	if e.HTTPStatus != ErrBadRequest.HTTPStatus {
+		t.Errorf("HTTPStatus = %d, want %d", e.HTTPStatus, ErrBadRequest.HTTPStatus)
+	}
+	if ErrBadRequest.Message != "invalid request" {
+		t.Error("original error message was mutated")
 	}
 }

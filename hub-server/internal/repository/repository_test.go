@@ -224,6 +224,29 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			created_at DATETIME,
 			updated_at DATETIME
 		)`,
+		`CREATE TABLE agent_team_tasks (
+			id TEXT PRIMARY KEY,
+			team_run_id TEXT NOT NULL,
+			assignment_id TEXT,
+			assignee_member_id TEXT NOT NULL,
+			parent_task_id TEXT,
+			status TEXT NOT NULL DEFAULT 'pending',
+			objective TEXT NOT NULL,
+			input_refs TEXT NOT NULL DEFAULT '{}',
+			run_id TEXT,
+			attempt INTEGER NOT NULL DEFAULT 1,
+			risk_level TEXT NOT NULL DEFAULT 'normal',
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE agent_team_events (
+			id TEXT PRIMARY KEY,
+			team_run_id TEXT NOT NULL,
+			seq INTEGER NOT NULL,
+			type TEXT NOT NULL,
+			payload TEXT NOT NULL DEFAULT '{}',
+			created_at DATETIME
+		)`,
 	}
 	for _, ddl := range tables {
 		require.NoError(t, db.Exec(ddl).Error, "DDL: %s", ddl[:60])
@@ -1192,6 +1215,13 @@ func TestPendingTaskRepo_CRUD(t *testing.T) {
 	assert.Equal(t, model.TaskStatusDone, fetched.Status)
 	assert.NotNil(t, fetched.FinishedAt)
 
+	err = UpdatePendingTaskDispatched(db, task.ID, "device-after-done")
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	fetched, err = GetPendingTaskByID(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TaskStatusDone, fetched.Status, "terminal task should not be moved back to dispatched")
+	assert.Equal(t, "device-edge-1", fetched.EdgeDeviceID)
+
 	// Update with error
 	task2 := &model.PendingAgentTask{
 		AgentInstanceID:   "agent-inst-2",
@@ -1677,14 +1707,30 @@ func TestPendingTaskRepo_AtomicWithEdgeRunID(t *testing.T) {
 	assert.Equal(t, model.TaskStatusRunning, fetched.Status)
 	assert.Equal(t, "run-001", fetched.EdgeRunID)
 
-	// Non-atomic edgeRunID update on an already empty edgeRunID
-	// (after clearing it for test, we verify that duplicating calls is a no-op)
-	err = UpdatePendingTaskEdgeRunID(db, task.ID, "run-002")
+	// Edge run id backfill on an already populated edgeRunID is a no-op.
+	rows, err = UpdatePendingTaskEdgeRunID(db, task.ID, "run-002")
 	// edge_run_id is already "run-001" so WHERE edge_run_id = '' matches 0 rows
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rows)
 	fetched, err = GetPendingTaskByID(db, task.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "run-001", fetched.EdgeRunID, "edgeRunID should not be overwritten")
+
+	backfillTask := &model.PendingAgentTask{
+		AgentInstanceID:   "agent-edge",
+		TriggeredByUserID: "user-t",
+		TriggerMessageID:  "msg-2",
+		Status:            model.TaskStatusRunning,
+		ExpireAt:          expireAt,
+	}
+	require.NoError(t, CreatePendingTask(db, backfillTask))
+
+	rows, err = UpdatePendingTaskEdgeRunID(db, backfillTask.ID, "run-002")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rows)
+	fetched, err = GetPendingTaskByID(db, backfillTask.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "run-002", fetched.EdgeRunID)
 }
 
 func TestPendingTaskRepo_AtomicFailClosed(t *testing.T) {

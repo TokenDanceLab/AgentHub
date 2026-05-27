@@ -66,6 +66,12 @@ func GetTeamRunByID(db *gorm.DB, runID string) (*model.AgentTeamRun, error) {
 	return &r, err
 }
 
+func GetTeamRunBySessionID(db *gorm.DB, sessionID string) (*model.AgentTeamRun, error) {
+	var r model.AgentTeamRun
+	err := db.Where("session_id = ?", sessionID).Order("created_at DESC").First(&r).Error
+	return &r, err
+}
+
 func ListTeamRunsByTeam(db *gorm.DB, teamID string) ([]model.AgentTeamRun, error) {
 	var runs []model.AgentTeamRun
 	err := db.Where("team_id = ?", teamID).Order("created_at DESC").Find(&runs).Error
@@ -94,6 +100,12 @@ func ListAssignmentsByTeamRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamA
 	return as, err
 }
 
+func CountAssignmentsByTeamRun(db *gorm.DB, teamRunID string) (int64, error) {
+	var count int64
+	err := db.Model(&model.AgentTeamAssignment{}).Where("team_run_id = ?", teamRunID).Count(&count).Error
+	return count, err
+}
+
 func UpdateAssignmentStatus(db *gorm.DB, id string, status string, result string) error {
 	updates := map[string]interface{}{
 		"status": status,
@@ -102,10 +114,28 @@ func UpdateAssignmentStatus(db *gorm.DB, id string, status string, result string
 	return db.Model(&model.AgentTeamAssignment{}).Where("id = ?", id).Updates(updates).Error
 }
 
+func UpdateAssignmentDispatchBinding(db *gorm.DB, id, pendingTaskID string) error {
+	return db.Model(&model.AgentTeamAssignment{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"status": model.AssignmentStatusDispatched,
+		"run_id": pendingTaskID,
+	}).Error
+}
+
 func CountActiveAssignmentsByMember(db *gorm.DB, memberID string) (int64, error) {
 	var count int64
 	err := db.Model(&model.AgentTeamAssignment{}).
 		Where("from_member_id = ? AND status IN (?, ?, ?)", memberID,
+			model.AssignmentStatusPending,
+			model.AssignmentStatusDispatched,
+			model.AssignmentStatusRunning).
+		Count(&count).Error
+	return count, err
+}
+
+func CountActiveAssignmentsByTeamRun(db *gorm.DB, teamRunID string) (int64, error) {
+	var count int64
+	err := db.Model(&model.AgentTeamAssignment{}).
+		Where("team_run_id = ? AND status IN (?, ?, ?)", teamRunID,
 			model.AssignmentStatusPending,
 			model.AssignmentStatusDispatched,
 			model.AssignmentStatusRunning).
@@ -120,4 +150,86 @@ func GetAssignmentByToMember(db *gorm.DB, teamRunID, toMemberID string) (*model.
 	err := db.Where("team_run_id = ? AND to_member_id = ?", teamRunID, toMemberID).
 		Order("depth DESC").First(&a).Error
 	return &a, err
+}
+
+// AgentTeamTask
+
+func CreateTeamTask(db *gorm.DB, task *model.AgentTeamTask) error {
+	if task.InputRefs == "" {
+		task.InputRefs = "{}"
+	}
+	if task.Attempt == 0 {
+		task.Attempt = 1
+	}
+	if task.RiskLevel == "" {
+		task.RiskLevel = model.TeamTaskRiskNormal
+	}
+	if task.Status == "" {
+		task.Status = model.TeamTaskStatusPending
+	}
+	return db.Create(task).Error
+}
+
+func ListTeamTasksByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamTask, error) {
+	var tasks []model.AgentTeamTask
+	err := db.Where("team_run_id = ?", teamRunID).Order("created_at ASC").Find(&tasks).Error
+	return tasks, err
+}
+
+func GetTeamTaskByAssignmentID(db *gorm.DB, assignmentID string) (*model.AgentTeamTask, error) {
+	var task model.AgentTeamTask
+	err := db.Where("assignment_id = ?", assignmentID).First(&task).Error
+	return &task, err
+}
+
+func UpdateTeamTaskDispatchBinding(db *gorm.DB, id, pendingTaskID string) error {
+	return db.Model(&model.AgentTeamTask{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"status": model.TeamTaskStatusDispatched,
+		"run_id": pendingTaskID,
+	}).Error
+}
+
+// AgentTeamArtifact
+
+func ReplaceTeamArtifactsForRun(db *gorm.DB, teamRunID string, artifacts []model.AgentTeamArtifact) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("team_run_id = ?", teamRunID).Delete(&model.AgentTeamArtifact{}).Error; err != nil {
+			return err
+		}
+		if len(artifacts) == 0 {
+			return nil
+		}
+		return tx.Create(&artifacts).Error
+	})
+}
+
+func ListTeamArtifactsByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamArtifact, error) {
+	var artifacts []model.AgentTeamArtifact
+	err := db.Where("team_run_id = ?", teamRunID).Order("created_at ASC, id ASC").Find(&artifacts).Error
+	return artifacts, err
+}
+
+// AgentTeamEvent
+
+func AppendTeamEvent(db *gorm.DB, event *model.AgentTeamEvent) error {
+	if event.Payload == "" {
+		event.Payload = "{}"
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		var maxSeq int
+		if err := tx.Model(&model.AgentTeamEvent{}).
+			Where("team_run_id = ?", event.TeamRunID).
+			Select("COALESCE(MAX(seq), 0)").
+			Scan(&maxSeq).Error; err != nil {
+			return err
+		}
+		event.Seq = maxSeq + 1
+		return tx.Create(event).Error
+	})
+}
+
+func ListTeamEventsByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamEvent, error) {
+	var events []model.AgentTeamEvent
+	err := db.Where("team_run_id = ?", teamRunID).Order("seq ASC, created_at ASC").Find(&events).Error
+	return events, err
 }

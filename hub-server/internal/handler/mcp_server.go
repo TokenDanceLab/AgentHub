@@ -14,7 +14,7 @@ import (
 // MCPService is the subset of *service.MCPService used by MCPServerHandler.
 type MCPService interface {
 	Create(ctx context.Context, ownerID string, req *model.MCPServer) (*model.MCPServer, error)
-	Get(ctx context.Context, id string) (*model.MCPServer, error)
+	Get(ctx context.Context, id, ownerID string) (*model.MCPServer, error)
 	Update(ctx context.Context, id, ownerID string, req *model.MCPServer) (*model.MCPServer, error)
 	Delete(ctx context.Context, id, ownerID string) error
 	List(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*service.MCPListResult, error)
@@ -77,7 +77,8 @@ func (h *MCPServerHandler) CreateMCPServer(c *gin.Context) {
 
 func (h *MCPServerHandler) GetMCPServer(c *gin.Context) {
 	id := c.Param("id")
-	srv, err := h.svc.Get(c.Request.Context(), id)
+	userID := c.GetString("user_id")
+	srv, err := h.svc.Get(c.Request.Context(), id, userID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)

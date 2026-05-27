@@ -399,6 +399,7 @@ func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
 		"permissionMode":"plan",
 		"workDir":"<REPO_ROOT>",
 		"includePartial":true,
+		"structuredOutputSchema":"{\"type\":\"object\"}",
 		"systemPrompt":"You are a careful reviewer.",
 		"appendSystemPrompt":"Keep output concise.",
 		"allowedTools":["Read","Grep"],
@@ -425,6 +426,9 @@ func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
 	}
 	if ctx.WorkDir != `<REPO_ROOT>` || !ctx.IncludePartial || !ctx.Ephemeral {
 		t.Fatalf("execution context = %#v", ctx)
+	}
+	if ctx.StructuredOutputSchema != `{"type":"object"}` {
+		t.Fatalf("structured output schema = %#v", ctx.StructuredOutputSchema)
 	}
 	if ctx.SystemPrompt != "You are a careful reviewer." || ctx.AppendSystemPrompt != "Keep output concise." {
 		t.Fatalf("system prompt context = %#v", ctx)

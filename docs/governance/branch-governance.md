@@ -1,6 +1,6 @@
 # 分支治理
 
-最后更新：2026-05-26（Execution Target UI inventory 合入后远端分支实态同步）
+最后更新：2026-05-27（fork 远端清理，文档治理）
 
 ## 合并规则
 
@@ -42,6 +42,13 @@ feat/* -> dev/maintainer -> master
 | `origin/feat/team-contributor-a-merge` | contributor-a 聚合 merge；当前相对 `origin/dev/maintainer` 为 `122/1` 分叉，包含大 diff 与冲突风险；只单独审，不直合 |
 
 当前 `origin` 仅保留 `dev/maintainer`、`master`、`dev/contributor-b`、`dev/contributor-a`、`feat/team-contributor-a-merge` 五个 heads。旧 `origin/worktree-feat+web-desktop-parity` 与 `origin/chore/oidc-handoff-save-20260526` 已删除；不要继续在 AGENTS/roadmap 中引用它们作为活跃远端。
+
+## 2026-05-27 已清理
+
+| 类别 | 结果 |
+|---|---|
+| Fork 远端分支清理 | `fork/codex/contributor-a-fork`、`fork/codex/contributor-b-ui-fork`、`fork/feat/web-validation-foundation`、`fork/dev/contributor-b`、`fork/dev/contributor-a`、`fork/dependabot/go_modules/hub-server/github.com/jackc/pgx/v5-5.9.2`、`fork/feat/team-contributor-a-desktop` 共 7 个已从 fork 远端删除。`fork` 当前仅保留 `dev/maintainer` 和 `master` |
+| 文档治理 | 根级重复文档（`docs/branch-governance.md`、`docs/governance-execution.md`、`docs/security-risk-register.md`）已删除，权威版本统一在 `docs/governance/`；收件箱移交文档已归档；README 公开路径已修正 |
 
 ## 2026-05-26 已清理
 

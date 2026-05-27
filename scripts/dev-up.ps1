@@ -47,12 +47,6 @@ try {
     }
     Write-Host "  Redis is ready." -ForegroundColor Green
 
-    Write-Host "`n=== Running database migrations ===" -ForegroundColor Magenta
-    go run ./hub-server/cmd/server-hub migrate 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "  (migrate command not available; if the schema is already current, this is fine)" -ForegroundColor DarkGray
-    }
-
     Write-Host "`n=== Starting Hub Server ===" -ForegroundColor Magenta
     Write-Host "  API:    http://localhost:8080" -ForegroundColor Cyan
     Write-Host "  Admin:  http://localhost:6060/debug/pprof/" -ForegroundColor Cyan

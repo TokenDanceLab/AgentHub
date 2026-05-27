@@ -306,6 +306,40 @@ func TestSendMessage_SuccessNonText(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestSendMessage_NormalizesNonTextContentBeforeJsonbWrite(t *testing.T) {
+	db := newMessageAttachmentTestDB(t)
+	seedMessageSessionMember(t, db, "sess-code", "user-1")
+
+	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 5}}
+	resp, err := svc.SendMessage(context.Background(), "sess-code", "user-1", SendMessageRequest{
+		ClientMsgID: "11111111-1111-4111-8111-111111111111",
+		ContentType: "code",
+		Content: `{
+			"text": "console.log('hi')",
+			"language": "javascript"
+		}`,
+	})
+	require.NoError(t, err)
+
+	var stored string
+	require.NoError(t, db.Table("messages").Select("content").Where("id = ?", resp.MessageID).Scan(&stored).Error)
+	require.Equal(t, `{"language":"javascript","text":"console.log('hi')"}`, stored)
+}
+
+func TestSendMessage_RejectsInvalidDeployCardJSONBeforeDBLookup(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	svc := &MessageService{db: db, cacheClient: &mockMsgCache{seq: 1}}
+	_, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
+		ClientMsgID: "msg-deploy-card",
+		ContentType: "deploy_card",
+		Content:     `not-json`,
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestSendMessage_FileContentRecordsAttachmentReference(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)
 	svc := &MessageService{db: db, bus: newTestBus(t), cacheClient: &mockMsgCache{seq: 7}}
@@ -961,4 +995,14 @@ func newMessageAttachmentTestDB(t *testing.T) *gorm.DB {
 		}
 	}
 	return db
+}
+
+func seedMessageSessionMember(t *testing.T, db *gorm.DB, sessionID, userID string) {
+	t.Helper()
+	if err := db.Exec(`INSERT INTO sessions (id, type, next_seq, dissolved) VALUES (?, 'group', 0, 0)`, sessionID).Error; err != nil {
+		t.Fatalf("insert session: %v", err)
+	}
+	if err := db.Exec(`INSERT INTO session_members (id, session_id, member_type, member_id, role) VALUES (?, ?, 'user', ?, 'member')`, "mem-"+sessionID, sessionID, userID).Error; err != nil {
+		t.Fatalf("insert member: %v", err)
+	}
 }

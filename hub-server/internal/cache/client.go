@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
 )
@@ -185,9 +186,18 @@ func pendingTargetTaskIndexKey(userID, deviceID string) string {
 	return "pending_tasks:" + userID + ":device:" + deviceID + ":targets"
 }
 
+func pendingAgentControlKey(userID, deviceID string) string {
+	return "pending_controls:" + userID + ":device:" + deviceID
+}
+
 // PushPendingTask pushes a task JSON to the user's offline pending queue.
 func (c *Client) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
-	return c.rdb.LPush(ctx, pendingTaskKey(userID), taskJSON).Err()
+	key := pendingTaskKey(userID)
+	pipe := c.rdb.TxPipeline()
+	pipe.LPush(ctx, key, taskJSON)
+	pipe.Expire(ctx, key, config.PendingTaskTTL)
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // PopPendingTasks pops all pending tasks for a user and clears the queue.
@@ -218,9 +228,13 @@ func (c *Client) PendingTaskCount(ctx context.Context, userID string) (int64, er
 // PushPendingTargetTask pushes a task JSON to a target/device-specific offline
 // queue so target-bound dispatch cannot be replayed to a different desktop.
 func (c *Client) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
+	taskKey := pendingTargetTaskKey(userID, targetID, deviceID)
 	pipe := c.rdb.TxPipeline()
-	pipe.SAdd(ctx, pendingTargetTaskIndexKey(userID, deviceID), targetID)
-	pipe.LPush(ctx, pendingTargetTaskKey(userID, targetID, deviceID), taskJSON)
+	pipe.SAdd(ctx, indexKey, targetID)
+	pipe.Expire(ctx, indexKey, config.PendingTaskTTL)
+	pipe.LPush(ctx, taskKey, taskJSON)
+	pipe.Expire(ctx, taskKey, config.PendingTaskTTL)
 	_, err := pipe.Exec(ctx)
 	return err
 }
@@ -253,6 +267,40 @@ func (c *Client) PopPendingTargetTasksForDevice(ctx context.Context, userID, dev
 	}
 	if len(targetIDs) == 0 {
 		c.rdb.Del(ctx, indexKey)
+	}
+	return result, nil
+}
+
+// PushPendingAgentControl pushes a control JSON to a device-specific offline
+// queue so approval decisions are never replayed to a different desktop.
+func (c *Client) PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
+	key := pendingAgentControlKey(userID, deviceID)
+	pipe := c.rdb.TxPipeline()
+	pipe.LRem(ctx, key, 0, controlJSON)
+	pipe.LPush(ctx, key, controlJSON)
+	pipe.LTrim(ctx, key, 0, int64(config.PendingAgentControlQueueMaxLen-1))
+	pipe.Expire(ctx, key, config.PendingAgentControlQueueTTL)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// PopPendingAgentControlsForDevice pops all queued controls for one device and
+// clears only that device's control queue.
+func (c *Client) PopPendingAgentControlsForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
+	key := pendingAgentControlKey(userID, deviceID)
+	controls, err := c.rdb.LRange(ctx, key, 0, -1).Result()
+	if err != nil {
+		return nil, err
+	}
+	if len(controls) > 0 {
+		c.rdb.Del(ctx, key)
+	}
+	result := make([]string, 0, len(controls))
+	for _, control := range controls {
+		var raw json.RawMessage
+		if json.Unmarshal([]byte(control), &raw) == nil {
+			result = append(result, control)
+		}
 	}
 	return result, nil
 }
@@ -342,6 +390,12 @@ func (NoOpCache) PushPendingTargetTask(ctx context.Context, userID, targetID, de
 	return ErrCacheUnavailable
 }
 func (NoOpCache) PopPendingTargetTasksForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
+	return nil, ErrCacheUnavailable
+}
+func (NoOpCache) PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
+	return ErrCacheUnavailable
+}
+func (NoOpCache) PopPendingAgentControlsForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
 	return nil, ErrCacheUnavailable
 }
 func (NoOpCache) BlacklistRefreshToken(ctx context.Context, tokenHash string, ttl time.Duration) error {
