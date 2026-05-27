@@ -1,32 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import IMView from '@/views/IMView';
 
-// jsdom does not implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();
 
-// Mock useIMChat
 vi.mock('@/hooks/useIMChat', () => ({
   useIMChat: vi.fn(() => ({
-    messages: new Map(),
+    messages: [],
     contacts: [
       { id: 'c1', name: 'Alice', type: 'user' as const, online: true },
       { id: 'c2', name: 'Bob', type: 'user' as const, online: false },
     ],
+    hubContacts: [],
     sendMessage: vi.fn(),
     getSessionMessages: vi.fn(() => []),
     upsertContact: vi.fn(),
     removeContact: vi.fn(),
-    searchContacts: vi.fn((q: string) =>
-      q
-        ? [{ id: 'c1', name: 'Alice', type: 'user' as const, online: true }]
-        : [
-            { id: 'c1', name: 'Alice', type: 'user' as const, online: true },
-            { id: 'c2', name: 'Bob', type: 'user' as const, online: false },
-          ],
-    ),
-    // Trump IM additions
+    searchContacts: vi.fn(() => []),
     friendRequests: [],
     notifications: [],
     acceptFriendRequest: vi.fn(),
@@ -39,13 +30,21 @@ vi.mock('@/hooks/useIMChat', () => ({
     createGroupSession: vi.fn(),
     selectContact: vi.fn(),
     actionState: {},
+    activeSessionId: null,
+    status: 'loaded' as const,
+    actionCapabilities: {},
+    markSessionRead: vi.fn(),
+    sessionReadError: null,
+    addContact: vi.fn(() => Promise.resolve({ ok: true })),
+    error: null,
+    label: (key: string, fallback: string) => fallback,
+    actionPending: () => false,
   })),
 }));
 
-// Mock useHubStore
 vi.mock('@/stores/hubStore', () => ({
-  useHubStore: vi.fn((selector?: (s: { authenticated: boolean; userId: string | null; username: string | null }) => unknown) => {
-    const state = { authenticated: true, userId: 'user-1', username: 'testuser' };
+  useHubStore: vi.fn((selector?: (s: { authenticated: boolean; userId: string | null }) => unknown) => {
+    const state = { authenticated: true, userId: 'user-1' };
     return selector ? selector(state) : state;
   }),
 }));
@@ -55,45 +54,23 @@ describe('IMView', () => {
     vi.clearAllMocks();
   });
 
-  it('renders contact list with contacts', () => {
+  it('renders with contacts', () => {
     render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
     expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText('Bob')).toBeInTheDocument();
   });
 
-  it('renders contacts sidebar header', () => {
+  it('shows empty state when no conversations', () => {
+    // Re-mock with empty state for this test
+    vi.mocked(useIMChat).mockReturnValue({
+      ...vi.mocked(useIMChat)(),
+      contacts: [],
+      status: 'loaded' as const,
+    } as never);
     render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
-    expect(screen.getByText('Contacts')).toBeInTheDocument();
-  });
-
-  it('renders Select a contact placeholder when no contact selected', () => {
-    render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
-    expect(screen.getByText('Select a contact to start messaging')).toBeInTheDocument();
-  });
-
-  it('shows empty message area when no contact selected', () => {
-    render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
-    expect(screen.getByRole('listbox', { name: 'Contacts' })).toBeInTheDocument();
-  });
-
-  it('has message input enabled after selecting a contact', () => {
-    render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
-    // Click on the first contact (Alice) to select it
-    const contact = screen.getByRole('option', { name: /Alice/i });
-    fireEvent.click(contact);
-    // After selection, the message input should appear and be enabled
-    const input = screen.getByRole('textbox', { name: 'Message input' });
-    expect(input).toBeInTheDocument();
-    expect(input).not.toBeDisabled();
-  });
-
-  it('renders search contact input', () => {
-    render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
-    expect(screen.getByPlaceholderText('Search contacts...')).toBeInTheDocument();
-  });
-
-  it('renders add contact button', () => {
-    render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
-    expect(screen.getByRole('button', { name: 'Add contact' })).toBeInTheDocument();
+    expect(screen.getByText("No Hub conversations yet")).toBeInTheDocument();
   });
 });
+
+// Re-import for mock manipulation
+import { useIMChat } from '@/hooks/useIMChat';

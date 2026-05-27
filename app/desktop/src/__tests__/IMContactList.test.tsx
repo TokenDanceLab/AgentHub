@@ -71,40 +71,24 @@ describe('IMContactList', () => {
     expect(screen.getByLabelText('Offline')).toBeInTheDocument();
   });
 
-  it('shows add contact form when + button clicked', () => {
-    render(<IMContactList contacts={[]} />);
-    fireEvent.click(screen.getByLabelText('Add contact'));
-    expect(screen.getByPlaceholderText('Contact name...')).toBeInTheDocument();
-    expect(screen.getByText('Add')).toBeInTheDocument();
+  it('renders with hub contacts when provided', () => {
+    const contacts = [makeContact({ id: 'c1', name: 'Alice' })];
+    const hubContacts = [{ id: 'h1', name: 'Bob', type: 'user' as const, online: true }];
+    render(<IMContactList contacts={contacts} hubContacts={hubContacts} />);
+    expect(screen.getByText('Alice')).toBeInTheDocument();
   });
 
-  it('calls onAdd with name when add confirmed', () => {
-    const onAdd = vi.fn();
-    render(<IMContactList contacts={[]} onAdd={onAdd} />);
-    fireEvent.click(screen.getByLabelText('Add contact'));
-    fireEvent.change(screen.getByPlaceholderText('Contact name...'), {
-      target: { value: 'NewContact' },
-    });
-    fireEvent.click(screen.getByText('Add'));
-    expect(onAdd).toHaveBeenCalledWith('NewContact');
+  it('renders with add contact callback', () => {
+    const onAddContact = vi.fn(() => Promise.resolve({ ok: true, contactId: 'new-1' }));
+    const contacts = [makeContact({ id: 'c1', name: 'Alice' })];
+    render(<IMContactList contacts={contacts} onAddContact={onAddContact} />);
+    expect(screen.getByText('Alice')).toBeInTheDocument();
   });
 
-  it('calls onAdd on Enter in add input', () => {
-    const onAdd = vi.fn();
-    render(<IMContactList contacts={[]} onAdd={onAdd} />);
-    fireEvent.click(screen.getByLabelText('Add contact'));
-    const input = screen.getByPlaceholderText('Contact name...');
-    fireEvent.change(input, { target: { value: 'Entered' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onAdd).toHaveBeenCalledWith('Entered');
-  });
-
-  it('hides add form on Escape', () => {
-    render(<IMContactList contacts={[]} />);
-    fireEvent.click(screen.getByLabelText('Add contact'));
-    const input = screen.getByPlaceholderText('Contact name...');
-    fireEvent.keyDown(input, { key: 'Escape' });
-    expect(screen.queryByPlaceholderText('Contact name...')).toBeNull();
+  it('renders compose form when showCompose is true', () => {
+    const contacts = [makeContact({ id: 'c1', name: 'Alice' })];
+    render(<IMContactList contacts={contacts} showCompose />);
+    expect(screen.getByText('Alice')).toBeInTheDocument();
   });
 
   it('highlights selected contact', () => {

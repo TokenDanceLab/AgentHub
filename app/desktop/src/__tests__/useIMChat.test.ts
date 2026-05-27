@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useIMChat } from '@/hooks/useIMChat';
+import type { HubClient } from '@/api/hubClient';
 import type { HubWSHandle } from '@/api/hubWS';
 import type { HubEventType } from '@shared/hubEvents';
 import { HUB_EVENTS } from '@shared/hubEvents';
@@ -254,16 +255,17 @@ describe('useIMChat', () => {
     expect(result.current.searchContacts('ali')[0].name).toBe('Alice');
   });
 
-  it('sendMessage sends through Hub WS', () => {
-    const ws = createMockHubWS();
-    const { result } = renderHook(() => useIMChat({ hubWS: ws }));
+  it('sendMessage sends through Hub REST client', async () => {
+    const mockClient = { sendMessage: vi.fn(() => Promise.resolve({ message_id: 'msg-1' })) } as never;
+    const { result } = renderHook(() => useIMChat({ hubClient: mockClient as HubClient }));
 
-    act(() => {
-      result.current.sendMessage('sess-1', 'Hello!');
+    await act(async () => {
+      await result.current.sendMessage('sess-1', 'Hello!');
     });
 
-    expect(ws.send).toHaveBeenCalledWith('message.send', {
-      session_id: 'sess-1',
+    expect(mockClient.sendMessage).toHaveBeenCalledWith('sess-1', {
+      client_msg_id: expect.any(String),
+      content_type: 'text',
       content: 'Hello!',
     });
   });
