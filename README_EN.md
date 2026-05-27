@@ -8,7 +8,7 @@ Chat with AI Agents like teammates. @mention them, create group chats, and keep 
 
 [中文文档](README.md) &nbsp;·&nbsp; [Product Requirements](docs/architecture/product-requirements.md) &nbsp;·&nbsp; [System Architecture](docs/architecture/system-architecture.md) &nbsp;·&nbsp; [API](api/) &nbsp;·&nbsp; [Website](https://hub.vectorcontrol.tech)
 
-<img src="https://img.shields.io/badge/status-P0--M7_complete-blue?style=flat-square" alt="status">
+<img src="https://img.shields.io/badge/status-P0_Complete-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go" alt="go">
 <img src="https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react" alt="react">
 <img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square" alt="license">
@@ -19,11 +19,13 @@ Chat with AI Agents like teammates. @mention them, create group chats, and keep 
 
 ## What is AgentHub
 
-AgentHub turns AI coding agents into IM contacts. You can @mention Claude Code for implementation, Codex for review, or a Reviewer profile for feedback, while plans, tool output, diffs, approvals, and previews stay in the same thread.
+AgentHub turns AI coding agents into IM contacts. @mention Claude Code for implementation, Codex for review, or a Reviewer profile for feedback. Plans, execution, diffs, approvals, and previews all stay in the same conversation thread without switching between tools.
 
-**vs. existing tools**: most Claude Code GUIs are single-player chat shells. AgentHub is built around multi-agent collaboration and multi-device control: Desktop provides the local command center, Edge Server connects real agent CLIs, and Hub Server owns accounts, IM, sync, and relay.
+Unlike single-player chat shells, AgentHub is built for multi-agent collaboration and multi-device control: Desktop is your local command center, Edge Server runs real agent CLIs on your machine, and Hub Server owns accounts, IM, multi-device sync, and remote relay.
 
-Current implementation includes three Edge Agent Runtime adapters (Claude Code, Codex, OpenCode), a Tauri Desktop IM workspace, a Gin/GORM/Redis/PostgreSQL Hub Server with 17 migrations, and an Edge-Hub deployment path. Current project state lives in [docs/handoff/STATE.md](docs/handoff/STATE.md) and [docs/roadmap.md](docs/roadmap.md).
+Create a group, add Builder, Reviewer, and Tester profiles. Builder writes code, Reviewer inspects diffs, Tester runs tests. All output and decisions stay visible in the group chat. Approval cards, progress updates, and artifact previews are native IM collaboration experiences.
+
+AgentHub supports Claude Code, Codex, and OpenCode runtimes out of the box. Agent Profiles combine runtime, model, skills, MCP tools, and approval policies into reusable configurations that sync across your devices.
 
 <br>
 
@@ -46,8 +48,6 @@ Desktop UI -> Local Edge Server -> Agent Runtime Adapter -> Claude Code / Codex 
 | **Web App** | `app/web/` | Browser workspace and page-preview entry for remote viewing, approvals, and collaboration flows |
 | **Shared App** | `app/shared/` | Shared frontend types, API/event clients, tree/diff helpers, and `@shared/ui` components |
 | **API Contract** | `api/` | REST JSON API and WebSocket typed event contracts |
-
-Earlier drafts had a standalone `runner/` directory. The current execution lifecycle lives in `edge-server/internal/lifecycle/`, and runtime protocol adapters live in `edge-server/internal/adapters/`. Docs and UI must distinguish **Agent Runtime**, **Agent Profile**, **Agent Configuration**, and **Execution Target** instead of calling a raw runtime a configured agent.
 
 <br>
 
@@ -102,11 +102,7 @@ macOS/Linux:
 ./scripts/setup.sh
 ```
 
-### Recommended Local Loop
-
-The current reliable local path is to start Edge and Desktop manually. `scripts/dev-start.ps1` / `scripts/dev-start.sh` still reference an old Hub command and should not be treated as the recommended entry until fixed.
-
-Terminal 1: Edge Server.
+### Start Edge Server
 
 ```powershell
 cd edge-server
@@ -121,7 +117,7 @@ go run ./cmd/agenthub-edge --agent-default codex
 go run ./cmd/agenthub-edge --agent-default opencode
 ```
 
-Terminal 2: Desktop Web UI.
+### Start Desktop
 
 ```powershell
 cd app/desktop
@@ -142,58 +138,15 @@ go run ./cmd/server-hub
 
 Defaults come from `hub-server/configs/config.yaml`: Hub HTTP `localhost:8080`, admin/pprof/metrics `localhost:6060`, Redis `localhost:6380`.
 
-### Desktop Build and Checks
+### Desktop Build
 
 ```powershell
 cd app/desktop
 pnpm build
 pnpm tauri dev
-pnpm test:e2e
 ```
 
-`pnpm build` only builds the frontend and does not need Rust. `pnpm tauri dev` needs Rust and Tauri system dependencies. Playwright uses `http://localhost:5199`.
-
-`scripts/client-smoke.ps1` now matches the current Edge Runtime architecture. It no longer builds the removed standalone `runner/` directory, uses the Edge built-in `agenthub-runner-mock` compatibility profile, and supports `-EdgeAddr` for isolated smoke runs.
-
-### Verification
-
-Docs/API changes:
-
-```powershell
-git diff --check
-python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
-```
-
-Runtime / AgentAdapter / Edge API / Settings display boundary changes should also run:
-
-```powershell
-.\scripts\verify-runtime-readiness.ps1
-```
-
-Backend changes:
-
-```powershell
-cd edge-server
-go test ./... -short -count=1
-
-cd ..\hub-server
-go test ./... -short -count=1
-```
-
-Frontend changes:
-
-```powershell
-cd app/desktop
-pnpm test
-pnpm build
-pnpm typecheck
-
-cd ..\web
-pnpm typecheck
-pnpm build
-```
-
-Known limitation: `app/shared/src/ui` React type resolution and pnpm cross-package virtual store behavior can affect some shared-ui tests/typecheck. Separate newly introduced failures from this known limitation in handoff notes.
+`pnpm build` only builds the frontend and does not need Rust. `pnpm tauri dev` needs Rust and Tauri system dependencies.
 
 <br>
 
@@ -219,8 +172,6 @@ AgentHub/
 └── scripts/                # local setup, git hooks and integration scripts
 ```
 
-Docker and deployment files live with the module that needs them. Root compose is only for cross-module local orchestration.
-
 <br>
 
 ## Documentation
@@ -235,29 +186,11 @@ Docker and deployment files live with the module that needs them. Root compose i
 | [Research Index](docs/reference/) | Cross-repo research and engineering specifications |
 | [Archive](docs/archive/) | Previous detailed docs for architecture, protocol, memory, workspace and planning |
 
-When working inside the `D:\Code\TokenDance` workspace, read root `../AGENTS.md` and `../docs/` for TokenDance-level governance first. Root `../docs/architecture/system-architecture.md`, `../docs/identity-auth.md`, and `../docs/design-system.md` define cross-product architecture, identity/auth, and design boundaries; this repository's `docs/` folder owns AgentHub implementation details.
-
 <br>
 
-## TokenDance ID Auth Boundary
+## Auth
 
-TokenDance ID is the cross-product identity entry. Hub session is AgentHub's own product session. Hub Server now provides the TokenDance ID relying-party flow: OIDC Authorization Code + PKCE authorize/callback, issuer/audience/JWKS ID token validation, `tokendance_sub` to Hub user mapping, and Hub-local access/refresh session issuance. Release readiness still depends on deployed client registration, Desktop/Web callback UX, logout/reconnect flows, and screenshot/smoke evidence.
-
-| Item | Boundary |
-|---|---|
-| TokenDance ID | Owns unified third-party login and account identity; products do not integrate GitHub/Google/Feishu directly |
-| Hub Server | Owns Hub callback, code exchange, Hub user mapping, Hub access/refresh sessions, and device proof |
-| Desktop/Web | Opens browser/Web login and stores Hub session; does not store third-party provider tokens |
-| Compatibility bearer path | `hub-server/internal/middleware/auth.go` can verify TokenDance ID RS256/JWKS bearer tokens, but this is identity-only compatibility; it does not replace Hub session and does not satisfy desktop device proof |
-| Local execution | Local Edge + Desktop execution does not require Hub login; Hub session is required for cloud IM, sync, remote control, or relay |
-
-OIDC structural check:
-
-```powershell
-.\scripts\verify-oidc-readiness.ps1
-```
-
-This check only proves public repository wiring for Hub OIDC endpoints, example configuration, Desktop/Web Hub session storage policy, and the root governance matrix. It does not connect to production TokenDance ID, does not need a real `client_secret`, and does not replace deployed login/callback/logout/reconnect evidence.
+AgentHub uses TokenDance ID for unified login. Hub Server manages its own session layer. Local execution works without login; Hub connectivity is required for cloud IM, multi-device sync, and remote control.
 
 <br>
 
@@ -265,7 +198,7 @@ This check only proves public repository wiring for Hub OIDC endpoints, example 
 
 - [Claude Code Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview)
 - [OpenAI Codex CLI](https://github.com/openai/codex)
-- [OpenCode](https://github.com/anomalyco/opencode)
+- [OpenCode](https://github.com/sst/opencode)
 - [Multica](https://github.com/multica-ai/multica)
 - [LibreChat](https://github.com/danny-avila/LibreChat)
 - [Kanna](https://github.com/jakemor/kanna)
