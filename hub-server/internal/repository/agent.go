@@ -93,7 +93,9 @@ func UpdatePendingTaskDispatched(db *gorm.DB, id, edgeDeviceID string) error {
 	if edgeDeviceID != "" {
 		updates["edge_device_id"] = edgeDeviceID
 	}
-	result := db.Model(&model.PendingAgentTask{}).Where("id = ?", id).Updates(updates)
+	result := db.Model(&model.PendingAgentTask{}).
+		Where("id = ? AND status IN ?", id, []string{model.TaskStatusQueued, model.TaskStatusDispatched}).
+		Updates(updates)
 	if result.Error != nil {
 		return result.Error
 	}
