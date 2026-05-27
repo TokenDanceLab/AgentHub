@@ -12,8 +12,8 @@ import (
 const (
 	RunEventTypeOutputBatch = "run.output.batch"
 	RunEventTypeMaxLength   = 96
-	// RunEventPayloadMaxBytes is the per-callback budget for runtime events
-	// and done.final_content before Hub persists them into message/event rows.
+	// RunEventPayloadMaxBytes is the per-callback budget for runtime events,
+	// done.final_content, and fail.error before Hub persists or broadcasts them.
 	RunEventPayloadMaxBytes = 1 * 1024 * 1024
 )
 
