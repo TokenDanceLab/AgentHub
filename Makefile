@@ -4,7 +4,8 @@
 #        make lint        (golangci-lint)
 #        make coverage    (HTML coverage report)
 
-.PHONY: test test-all test-edge test-hub lint coverage clean
+#        make release VER=v0.1.1  (build + upload release binaries)
+.PHONY: test test-all test-edge test-hub lint coverage sec release clean
 
 # ── Unit tests (no external deps) ────────────────────
 
@@ -55,6 +56,12 @@ sec:
 # ── All checks (CI pipeline) ─────────────────────
 
 ci: test lint sec
+
+# ── Release ─────────────────────────────────────
+
+release:
+	@if [ -z "$(VER)" ]; then echo "Usage: make release VER=v0.1.1"; exit 1; fi
+	powershell -File scripts/release.ps1 $(VER)
 
 # ── Clean ────────────────────────────────────────
 
