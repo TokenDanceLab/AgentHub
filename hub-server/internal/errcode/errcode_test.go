@@ -172,17 +172,19 @@ func TestNewError(t *testing.T) {
 
 func TestAllErrorsHaveNonEmptyCode(t *testing.T) {
 	all := []*Error{
-		OK, ErrInternal, ErrBadRequest,
+		OK, ErrInternal, ErrBadRequest, ErrTimeout,
 		AuthInvalidToken, AuthInvalidCredentials, AuthTokenExpired, AuthDeviceMismatch, AuthRefreshInvalid,
 		MsgNotFound, MsgRecallTimeout, MsgPinLimitExceeded, MsgBlockedByReceiver,
 		SessionNotFound, SessionDissolved, SessionNotMember,
 		AgentNotFound, AgentOffline, AgentTaskNotFound, AgentTaskCancelled, AgentTaskTimeout, TargetNotFound, TargetNotRoutable,
 		GroupNotOwner, GroupOwnerCannotLeave, GroupAlreadyMember,
 		UserNotFound, UserUsernameTaken, UserInvalidParam,
-		FriendAlready, FriendBlocked, FriendRequestNotFound,
+		FriendAlready, FriendBlocked, FriendRequestNotFound, FriendRemarkNoRow, FriendNotFriend,
 		AttachNotFound, AttachTooLarge, AttachHashMismatch,
 		NotifNotFound,
 		WsAuthTimeout, WsAuthFailed,
+		OIDCInvalidState, OIDCCodeExchangeFailed, OIDCIDTokenInvalid, OIDCSubNotFound,
+		ErrNotImplemented,
 	}
 	for _, e := range all {
 		if e.Code == "" {
