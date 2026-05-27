@@ -1,79 +1,15 @@
 # WebSocket Events
 
-## Hub `/client/ws` frame format
-
-<<<<<<< HEAD
-Hub `/client/ws` and Edge `/v1/events` are two different WebSocket protocols.
-Hub frames are IM/task dispatch frames shaped as `{ type, seq_id?, payload? }`.
-Edge events use the `EventEnvelope` documented later in this file. Do not parse
-Hub frames as Edge `EventEnvelope`, and do not use Edge cursors for Hub `seq_id`.
-
-Hub WebSocket frames are not `EventEnvelope`. They use the Hub-local frame:
-
-```json
-{
-  "type": "message.new",
-  "seq_id": 42,
-  "payload": {}
-}
-```
-
-Desktop authenticates by sending the first frame after connect:
-
-```json
-{
-  "type": "auth",
-  "payload": {
-    "access_token": "<Hub access token>"
-  }
-}
-```
-
-The server replies with `auth.ok` or `auth.fail`. Desktop ignores application events until `auth.ok` is received.
-
-Current Hub `/client/ws` event types:
-
-| type | payload | Desktop behavior |
-|---|---|---|
-| `message.new` | Hub message object with `id`, `session_id`, `seq_id`, `sender_type`, `sender_id`, `content_type`, `content`, `recalled`, `created_at` | Append or confirm the message in the matching IM session, deduplicated by message id. |
-| `message.recall` | Message id/session payload | Mark the matching message as recalled instead of deleting local history. |
-| `message.pin` / `message.unpin` | Message id/session payload | Refresh pinned message state when a UI surface shows pins. |
-| `message.read` | `session_id`, `user_id`, `last_read_seq` | Update read metadata when a UI surface needs it; safe to ignore for v1 rendering. |
-| `session.created` | Hub session object or `session_id` payload | Add or refresh the IM session list. |
-| `session.info_updated` | `session_id` plus changed metadata | Update the session row title/avatar/announcement. |
-| `session.dissolved` | `session_id` | Remove the session from active send targets or mark it unavailable. |
-| `session.member_joined` / `session.member_left` | `session_id`, member metadata | Refresh session membership when shown. |
-| `device.online` / `device.offline` | `user_id`, `device_type`, `device_id` | Update device presence if shown; REST snapshots remain authoritative after reconnect. |
-| `device.kicked` | Device/session metadata | Treat the current Hub device session as invalid and require re-authentication if it matches the local device. |
-| `agent.dispatch` | Hub agent task payload with `task_id`, `session_id`, prompt/content and agent metadata | Desktop starts a Local Edge run and reports ack/stream/done/fail through Hub REST callbacks. |
-| `agent.stream` | `task_id`, streamed content metadata | Append remote agent output if a Hub-only task surface is active; Desktop Local Edge streaming normally comes through Edge events. |
-| `agent.done` | `task_id`, final content/status metadata | Mark the Hub task as complete in task bridge state. |
-| `agent.failed` | `task_id`, `error`/`error_message` metadata | Mark the Hub task as failed and surface the error. |
-| `agent.cancel` | `task_id` | Desktop cancels the mapped Local Edge run if it is still active. |
-| `notification.new` | Hub notification object with `id`, `user_id`, `type`, `payload`, `read`, `created_at` | Add or refresh the notification list item. |
-| `friend.request` / `friend.accepted` | Friend/user metadata | Refresh contacts and friend request snapshots when shown. |
-
-Hub REST remains the snapshot source for `/client/contacts`, `/client/sessions`, and `/client/sessions/{id}/messages`. `/client/ws` is used for live updates and must not be the only source of IM state after refresh or reconnect.
-
-Shared frontend contract note: Hub REST responses use `{ "code": "OK", "data": ... }`; Hub WebSocket frames use `{ "type": "...", "seq_id": 42, "payload": ... }` and are intentionally separate from Edge `EventEnvelope`.
-
-Task bridge REST contract:
-
-- Web/Web-like clients can trigger and cancel Hub agent tasks through `POST /web/agent-tasks` and `POST /web/agent-tasks/{id}/cancel`.
-- Desktop/Edge reports task lifecycle through `POST /edge/agent-tasks/{id}/ack`, `/stream`, `/done`, and `/fail`.
-- There is currently no `listAgentTasks` REST endpoint. Task list UI must be backed by local bridge state, Hub WebSocket events, or a future explicitly documented endpoint.
-
 AgentHub 使用 WebSocket typed events 推送实时状态。REST API 用于发起命令和查询，WebSocket 只负责事件投递。
-=======
+
 > **Implementation Status (2026-05-24)**: Edge Server events (run.*, runner.*) are
 > the primary event system and are documented in sections 1-6 below. Hub Server
 > WebSocket events are documented in [section 7](#7-hub-websocket-events) (added 2026-05-25).
->>>>>>> origin/dev/delicious233
 
 ## 1. 连接
 
 ```text
-GET /v1/events?cursor=42
+GET /v1/events?cursor=evt_cursor
 ```
 
 用途：
@@ -123,10 +59,9 @@ P0 只需要 `UI -> Edge` 事件流。
 ## 3. 序号和重连
 
 - `seq` 在同一 event stream 内单调递增。
-- `cursor` 是 Edge event stream 的数字 `seq`，不是事件 `id`。
-- 客户端保存最后处理的 `seq` 作为 cursor。
-- 断线后用 `GET /v1/events?cursor=...` 恢复，Edge replay `seq > cursor` 的事件。
-- 如果 Edge 无法 replay，客户端应重新拉取 REST snapshot。
+- 客户端保存最后处理的 `id` 或 cursor。
+- 断线后用 `GET /v1/events?cursor=...` 恢复。
+- 服务端无法回放时，发送 `error` 事件并要求客户端重新拉取 REST snapshot。
 
 ## 4. 输出流
 
@@ -207,7 +142,7 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `preview.stopped` | P1 | 预览停止 (planned) |
 | `run.finished` | P0 | AgentRun 正常结束 |
 | `run.failed` | P0 | AgentRun 失败 |
-| `run.cancelled` | P1 | AgentRun 已取消；payload 至少包含 `runId`，可带 `finishedAt` 和 `reason` |
+| `run.cancelled` | P1 | AgentRun 已取消（已实现，补文档） |
 | `run.agent.text_delta` | P0 | Agent 流式文本增量（CLI-agnostic） |
 | `run.agent.text_block` | P0 | Agent 完整文本块 |
 | `run.agent.thinking` | P0 | Agent 思考/推理内容（可折叠显示） |
