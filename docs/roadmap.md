@@ -1188,7 +1188,7 @@ pnpm typecheck                                         # 零错误
 | 测试覆盖 | hub 整体 48.2%（CI 门槛 40%）、edge 整体 75.7%（CI 门槛 75%）——均通过 | ✅ CI 合规 |
 | 文档收尾 | hub README 迁移数/Redis端口修正、desktop README 绝对路径清除、PR 模板 runner→desktop/hub、errcode 40→100% | ✅ 完成 |
 | Trump PR #221 | Web 页面——Workbench/AgentSquare/Chat/Group/Project 真实 API + i18n——已合并 | ✅ 完成 |
-| Trump PR #222 | 玻璃态 Select 组件 + 设置滚动——85 文件，审查中 | ⏳ 审查中 |
+| Trump PR #222 | 玻璃态 Select 组件——已审查，3 个阻塞项待修（rebase + 测试 + tokens） | ⏳ 待修改 |
 | 全量健康 | 36 commits、Desktop 697/712、Web typecheck ✅、Mobile 2 tests | ✅ 通过 |
 
 ### 后续方向
