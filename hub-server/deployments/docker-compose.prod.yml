@@ -1,10 +1,10 @@
 # ──────────────────────────────────────────────
-# AgentHub Hub Server — 生产部署配置 (hk2)
+# AgentHub Hub Server — 生产部署配置 (production)
 # ──────────────────────────────────────────────
 # 与 AIhub 完全隔离：独立的 PostgreSQL + Redis 容器。
 # DB/Redis 端口不对外暴露，仅 Docker 内部网络访问。
 #
-# 部署步骤（在 hk2 上执行）：
+# 部署步骤（在生产服务器上执行）：
 #   1. 在开发机/CI 构建镜像并传输到服务器，服务器只执行 docker load
 #   2. 配置环境变量（必须设置 AGENTHUB_JWT_SECRET）
 #   3. docker compose up -d --no-build

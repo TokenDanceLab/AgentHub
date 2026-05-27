@@ -110,34 +110,36 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | type | 阶段 | 说明 |
 |---|---|---|
 | `project.created` | P0 | 项目创建或注册 |
-| `project.updated` | P0 | 项目元数据更新 |
-| `conversation.created` | P1 | 会话创建 |
-| `conversation.member.added` | P1 | 会话成员加入 |
+| `project.updated` | P0 | 项目元数据更新 (planned) |
+| `conversation.created` | P1 | 会话创建 (planned) |
+| `conversation.member.added` | P1 | 会话成员加入 (planned) |
 | `thread.created` | P0 | Thread 创建 |
 | `thread.updated` | P0 | Thread 状态或标题更新 |
-| `thread.forked` | P1 | Thread 分支创建 |
+| `thread.deleted` | P0 | Thread 删除 |
+| `thread.forked` | P1 | Thread 分支创建 (planned) |
 | `message.created` | P0 | 消息创建 |
 | `message.delta` | P0 | Agent 消息流式增量 |
 | `item.created` | P0 | Thread Item 创建 |
-| `item.updated` | P0 | Thread Item 状态更新 |
+| `item.updated` | P0 | Thread Item 状态更新 (planned) |
 
 ### Execution / Runtime
 
 | type | 阶段 | 说明 |
 |---|---|---|
-| `runner.online` | P0 | Runtime/target compatibility event: legacy Runner 在线 |
-| `runner.offline` | P0 | Runtime/target compatibility event: legacy Runner 离线 |
+| `runner.online` | P0 | Runtime/target compatibility event: legacy Runner 在线 (planned) |
+| `runner.offline` | P0 | Runtime/target compatibility event: legacy Runner 离线 (planned) |
 | `run.queued` | P0 | AgentRun 已排队 |
 | `run.started` | P0 | AgentRun 已启动 |
-| `run.output` | P0 | 单条 stdout/stderr 输出 |
+| `run.output` | P0 | 单条 stdout/stderr 输出 (planned — 当前仅 `run.output.batch` 已实现) |
 | `run.output.batch` | P0 | 批量 stdout/stderr 输出 |
-| `run.status.changed` | P0 | AgentRun 状态变化 |
-| `approval.requested` | P0 | 请求用户审批 |
-| `approval.decided` | P0 | 用户已审批 |
-| `artifact.created` | P0 | 产物创建 |
-| `artifact.updated` | P1 | 产物元数据更新 |
-| `preview.ready` | P0 | 预览可用 |
-| `preview.stopped` | P1 | 预览停止 |
+| `run.status.changed` | P0 | AgentRun 状态变化 (planned) |
+| `run.persistence_error` | P0 | 持久化错误，payload: `{ runId, error }` |
+| `approval.requested` | P0 | 请求用户审批 (planned) |
+| `approval.decided` | P0 | 用户已审批 (planned) |
+| `artifact.created` | P0 | 产物创建 (planned) |
+| `artifact.updated` | P1 | 产物元数据更新 (planned) |
+| `preview.ready` | P0 | 预览可用 (planned) |
+| `preview.stopped` | P1 | 预览停止 (planned) |
 | `run.finished` | P0 | AgentRun 正常结束 |
 | `run.failed` | P0 | AgentRun 失败 |
 | `run.cancelled` | P1 | AgentRun 已取消（已实现，补文档） |
@@ -153,9 +155,16 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.compact_boundary` | P1 | 上下文压缩边界 |
 | `run.agent.api_retry` | P1 | API 重试通知 |
 | `run.agent.task_started` | P1 | 子代理任务启动 |
+| `run.agent.task_dispatched` | P1 | 子代理任务已派发 |
 | `run.agent.task_progress` | P1 | 子代理任务进度 |
 | `run.agent.task_notification` | P1 | 子代理任务完成/失败 |
+| `run.agent.sub_agents_complete` | P1 | 所有子代理执行完毕，payload: `{ parentId, childCount, allComplete }` |
 | `run.agent.session_state_changed` | P1 | 会话状态变更（idle/running/requires_action） |
+| `run.agent.status_change` | P1 | Agent 适配器状态变更 |
+| `run.agent.session_metrics` | P1 | 会话度量信息 |
+| `run.agent.context_usage` | P1 | 上下文使用量报告 |
+| `run.agent.context_warning` | P1 | 上下文容量警告 |
+| `run.agent.context_compaction` | P1 | 上下文压缩通知 |
 | `run.agent.hook_started` | P1 | Hook 执行开始 |
 | `run.agent.hook_progress` | P1 | Hook 执行输出 |
 | `run.agent.hook_response` | P1 | Hook 执行完成 |
@@ -294,11 +303,11 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 说明 |
 |------|------|
-| `session.created` | 会话创建，payload: `{ session_id, type, name, owner_id, members[] }` |
-| `session.dissolved` | 群解散，payload: `{ session_id }` |
-| `session.member_joined` | 成员加入，payload: `{ session_id, member_id, member_type }` |
-| `session.member_left` | 成员离开，payload: `{ session_id, member_id }` |
-| `session.info_updated` | 会话信息变更，payload: `{ session_id, changes{} }` |
+| `session.created` | 会话创建 (defined, not yet emitted)，payload: `{ session_id, type, name, owner_id, members[] }` |
+| `session.dissolved` | 群解散 (defined, not yet emitted)，payload: `{ session_id }` |
+| `session.member_joined` | 成员加入 (defined, not yet emitted)，payload: `{ session_id, member_id, member_type }` |
+| `session.member_left` | 成员离开 (defined, not yet emitted)，payload: `{ session_id, member_id }` |
+| `session.info_updated` | 会话信息变更 (defined, not yet emitted)，payload: `{ session_id, changes{} }` |
 
 #### Device 事件（Hub→Client）
 

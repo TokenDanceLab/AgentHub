@@ -1,6 +1,8 @@
 # reference 仓库索引
 
 > `reference/` 存放 clone 下来的第三方仓库，只用于调研。除本索引外，目录内源码和文档默认不翻译、不改写。
+>
+> **注意：本索引的"对应报告"章节反映了旧的 docs 布局（01-learn/02-decide/03-build），当前参考文档结构以 `docs/reference/README.md` 为准。**
 
 ## 阅读入口
 
