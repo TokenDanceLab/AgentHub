@@ -32,20 +32,12 @@ jobs:
         run: go build ./...
 
       - name: Lint
-<<<<<<< HEAD
-        uses: golangci/golangci-lint-action@v8
-        with:
-          working-directory: edge-server
-          version: v2.12.2
-=======
         continue-on-error: true
         uses: golangci/golangci-lint-action@v9
         with:
           working-directory: edge-server
           version: ${{ env.GOLANGCI_LINT_VERSION }}
->>>>>>> origin/dev/delicious233
           args: --timeout=5m
-        continue-on-error: true
 
       - name: Test (unit only, skip integration)
         run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
@@ -132,28 +124,20 @@ jobs:
         run: go build ./...
 
       - name: Lint
-<<<<<<< HEAD
-        uses: golangci/golangci-lint-action@v8
-        with:
-          working-directory: hub-server
-          version: v2.12.2
-=======
         continue-on-error: true
         uses: golangci/golangci-lint-action@v9
         with:
           working-directory: hub-server
           version: ${{ env.GOLANGCI_LINT_VERSION }}
->>>>>>> origin/dev/delicious233
           args: --timeout=5m
-        continue-on-error: true
 
       - name: Test (unit only, skip integration)
         run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic
 
-      - name: Coverage check (overall >= 37%)
+      - name: Coverage check (overall >= 40%)
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          THRESHOLD=37
+          THRESHOLD=40
           echo "Overall coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
           if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
             echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
@@ -273,15 +257,9 @@ jobs:
       - name: Lint (debt visibility)
         continue-on-error: true
         run: pnpm lint --max-warnings 10
-        continue-on-error: true
 
       - name: Test Desktop
-<<<<<<< HEAD
-        run: pnpm test
-        continue-on-error: true
-=======
         run: pnpm test:ci
->>>>>>> origin/dev/delicious233
 
   # ── Frontend: Web ────────────────────────────
   frontend-web:
