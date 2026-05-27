@@ -55,6 +55,10 @@
 | `client-handoff.md` | 历史交接 | 2026-05-22 历史快照，引用已废弃的 `runner/` 目录、旧分支名 `feat/client-dev`、旧 PR #26。当前客户端接手入口为 `docs/handoff/STATE.md`。 |
 | `desktop-shell-layout-progress-2026-05-25.md` | 进度记录 | Desktop shell 布局进度快照。已完成项已合入 `docs/roadmap.md` batch B，8 项后续 TODO 已提取到群聊评论。 |
 | `PLAN-adapt-trump-ui.md` | 历史计划 | 旧 `worktree-adapt-trump-ui` 工作计划。涉及从 Trump 5 页面 UI 提取共享组件、工程规范、测试框架和 WebUI 集成。相关代号已过期，当前以主文档、roadmap 和 handoff 状态为准。 |
+| `RESEARCH-SUMMARY-2026-05-24.md` | 研究交付 | 研究交付封面备忘录，汇总调研成果和参考来源。 |
+| `desktop-frontend-handoff.md` | 历史交接 | React 渲染循环修复交接文档，记录无限重渲染根因和修复方案。 |
+| `branches/` | 历史归档 | 历史分支归档（14 个文件），包含已合入或废弃的功能分支快照。 |
+| `review-archive/` | 审计归档 | 已归档的代码审查报告。 |
 
 ### 可参考原则 - 需要按新术语重解释
 

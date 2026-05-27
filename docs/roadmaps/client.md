@@ -293,4 +293,4 @@ npm run build
 
 - 实施详情：`docs/architecture/design/client-p0-architecture.md`
 - 参考模式：`docs/architecture/design/client-reference-patterns.md`
-- 相关路线图：`docs/roadmaps/integration.md`、`docs/roadmaps/backend.md`
+- 相关路线图：`docs/roadmaps/integration.md`

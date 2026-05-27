@@ -30,7 +30,7 @@ servers:
   - url: http://localhost:8080
     description: Local Hub Server
   - url: http://api.hub.vectorcontrol.tech
-    description: Production Hub Server (hk2)
+    description: Production Hub Server
 tags:
   - name: Foundation
     description: Health, capability and event stream handshake.
@@ -42,6 +42,44 @@ tags:
     description: Auth, user, contact, group, device, edge, sync, relay and cloud APIs.
 
 paths:
+  # ═══════════════════════════════════════════════════════════
+  # Edge Server — Implementation Status
+  #
+  # IMPLEMENTED: /v1/health, /v1/events, /v1/projects (GET/POST),
+  #   /v1/projects/{projectId} (GET only), /v1/threads (GET/POST),
+  #   /v1/threads/{threadId} (GET/PATCH/DELETE), /v1/threads/{threadId}/items,
+  #   /v1/threads/{threadId}/messages, /v1/items/{itemId},
+  #   /v1/runners (GET only), /v1/agents, /v1/runs (GET/POST),
+  #   /v1/runs/{runId} (GET), /v1/runs/{runId}:cancel,
+  #   /v1/metrics, /v1/agent-instances (GET only),
+  #   /v1/permissions/decide
+  #
+  # PLANNED (documented but not yet implemented):
+  #   PATCH/DELETE /v1/projects/{projectId},
+  #   GET/PATCH /v1/projects/{projectId}/memory,
+  #   GET/POST /v1/conversations,
+  #   GET/PATCH /v1/conversations/{conversationId},
+  #   POST /v1/conversations/{conversationId}:archive,
+  #   GET/POST /v1/conversations/{conversationId}/members,
+  #   DELETE /v1/conversations/{conversationId}/members/{memberId},
+  #   POST /v1/threads/{threadId}:archive,
+  #   POST /v1/threads/{threadId}:fork,
+  #   GET /v1/runners/{runnerId},
+  #   POST /v1/runners/{runnerId}:ping,
+  #   POST /v1/runners/{runnerId}:drain,
+  #   POST /v1/runs/{runId}:interrupt,
+  #   POST /v1/runs/{runId}:resume,
+  #   POST /v1/runs/{runId}:retry,
+  #   GET /v1/runs/{runId}/items,
+  #   GET /v1/runs/{runId}/logs,
+  #   GET /v1/runs/{runId}/diff,
+  #   GET/POST /v1/approvals and nested,
+  #   GET/POST /v1/artifacts and nested,
+  #   GET/POST /v1/previews and nested,
+  #   GET /v1/workspaces/{workspaceId} and nested,
+  #   POST /v1/agent-instances
+  # ═══════════════════════════════════════════════════════════
+
   /v1/health:
     get:
       tags: [Foundation]
@@ -1319,7 +1357,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /client/contacts/{userId}/remark:
-    patch:
+    put:
       tags: [HubSyncRelay]
       operationId: hubUpdateRemark
       summary: Update contact remark.
@@ -1594,6 +1632,8 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubRecallMessage
       summary: Recall (delete) a message.
+      x-deprecated: true
+      description: Deprecated session-scoped path. Use `POST /client/messages/{id}:recall` instead.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1612,6 +1652,8 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubPinMessage
       summary: Pin a message.
+      x-deprecated: true
+      description: Deprecated session-scoped path. Use `POST /client/messages/{id}:pin` instead.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1630,6 +1672,8 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubUnpinMessage
       summary: Unpin a message.
+      x-deprecated: true
+      description: Deprecated session-scoped path. Use `DELETE /client/messages/{id}/pin` instead.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1648,6 +1692,8 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubMarkMessageRead
       summary: Mark a message as read.
+      x-deprecated: true
+      description: Deprecated. No corresponding route exists in Hub router.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1950,7 +1996,7 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
-    patch:
+    put:
       tags: [HubSyncRelay]
       operationId: hubUpdateCustomAgent
       summary: Update a custom agent.
@@ -4143,8 +4189,7 @@ components:
         device_id:
           type: string
           format: uuid
-          description: Bound Hub desktop device id. Current target-bound dispatch requires an owner-owned desktop device; remote/cloud routing remains future work.
-          description: Stable Hub device UUID; must match the callback request.
+          description: Stable Hub device UUID; must match the callback request. Current target-bound dispatch requires an owner-owned desktop device; remote/cloud routing remains future work.
         redirect_uri:
           type: string
           format: uri

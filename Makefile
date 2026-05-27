@@ -30,7 +30,7 @@ test-hub-full:
 
 bench:
 	cd edge-server && go test -bench=. -benchmem ./internal/events/
-	cd hub-server && go test -bench=. -benchmem ./internal/middleware/
+	cd hub-server && go test -bench=. -benchmem ./internal/service/
 
 # ── Lint ─────────────────────────────────────────
 
@@ -49,8 +49,8 @@ coverage:
 sec:
 	cd edge-server && gosec ./...
 	cd hub-server && gosec ./...
-	govulncheck ./edge-server/...
-	govulncheck ./hub-server/...
+	cd edge-server && govulncheck ./...
+	cd hub-server && govulncheck ./...
 
 # ── All checks (CI pipeline) ─────────────────────
 
