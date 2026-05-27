@@ -232,6 +232,30 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 	})
 }
 
+func TestAgentHandlerTaskStreamRejectsInvalidClientMsgID(t *testing.T) {
+	called := false
+	agentSvc := &mockAgentService{
+		handleStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
+			called = true
+			return nil
+		},
+	}
+	agentHandler := handler.NewAgentHandler(agentSvc)
+
+	c, w := newGinCtx("POST", "/edge/agent-tasks/task-001/stream", map[string]string{
+		"content":       "hello",
+		"client_msg_id": "not-a-uuid",
+	}, "user_id", "u1", "device_id", "dev-1")
+	c.Params = []gin.Param{{Key: "id", Value: "task-001"}}
+
+	agentHandler.TaskStream(c)
+
+	assertStatus(t, w, http.StatusBadRequest)
+	if called {
+		t.Fatal("HandleTaskStream should not run for invalid client_msg_id")
+	}
+}
+
 // TestEdgeHubProtocol_RegisterRequired verifies that the Hub requires device
 // registration before accepting agent task callbacks (authorization check).
 func TestEdgeHubProtocol_RegisterRequired(t *testing.T) {

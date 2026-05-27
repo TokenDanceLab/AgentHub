@@ -180,6 +180,14 @@ func (h *AgentHandler) TaskStream(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
+	if req.ClientMsgID != "" {
+		normalized, ok := normalizeUUID(req.ClientMsgID)
+		if !ok {
+			Fail(c, errcode.ErrBadRequest)
+			return
+		}
+		stream.ClientMsgID = normalized
+	}
 	if err := h.service.HandleTaskStream(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), stream); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
