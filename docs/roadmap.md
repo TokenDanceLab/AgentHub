@@ -1181,7 +1181,7 @@ pnpm typecheck                                         # 零错误
 | 架构审计 | 迁移数修正、Hub 完整实现措辞、runners 包澄清 | ✅ 完成 |
 | 竞品研究 | Teamily AI/Dust/SageOx 新入局、AgentTeam 加速建议 | ✅ 完成 |
 | 部署修复 | restore-db.sh 格式匹配、rollback 文档 | ✅ 完成 |
-| 测试覆盖 | hub handler 39%（低于 CI 门槛 40%）、edge lifecycle 63%（低于 75%） | ⚠️ 记录 |
+| 测试覆盖 | hub 整体 48.2%（CI 门槛 40%）、edge 整体 75.7%（CI 门槛 75%）——均通过 | ✅ CI 合规 |
 
 ### 后续方向
 
