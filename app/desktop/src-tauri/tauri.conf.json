@@ -35,7 +35,11 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["English", "SimpChinese"]
+        "languages": ["English", "SimpChinese"],
+        "displayLanguageSelector": true,
+        "headerImage": "icons/installer-header.bmp",
+        "sidebarImage": "icons/installer-sidebar.bmp",
+        "installerIcon": "icons/icon.ico"
       }
     }
   },
