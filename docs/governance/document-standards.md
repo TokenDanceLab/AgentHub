@@ -13,7 +13,7 @@
 | **客户端** | `docs/roadmaps/client.md` | Desktop 路线图 | 前端 | Delicious233 |
 | **集成** | `docs/roadmaps/integration.md` | Hub↔Edge 对接方案 | 后端 | 三人协商 |
 | **设计规格** | `docs/architecture/design/` | 架构细节/参考模式（长文） | 开发者 | 任何人 |
-| **参考研究** | `docs/reference/` | 21 项目竞品分析，按问题检索 | 按需查阅 | 任何人 |
+| **参考研究** | `docs/reference/` | 25 项目竞品分析，按问题检索 | 按需查阅 | 任何人 |
 | **审计报告** | `docs/review/` | 代码/测试/工程审计 | 开发者 | 任何人 |
 | **收件箱** | `docs/inbox/` | Agent 间通信，本地不提交 | Agent | Agent |
 

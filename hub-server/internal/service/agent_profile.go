@@ -59,13 +59,30 @@ func (s *AgentProfileService) Create(ctx context.Context, ownerID string, req *m
 	return req, nil
 }
 
-func (s *AgentProfileService) Get(ctx context.Context, id string) (*model.AgentProfile, error) {
+func (s *AgentProfileService) Get(ctx context.Context, id, ownerID string) (*model.AgentProfile, error) {
 	p, err := repository.GetAgentProfileByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.UserNotFound
 		}
 		return nil, err
+	}
+	if p.OwnerID != ownerID {
+		return nil, errcode.AuthDeviceMismatch
+	}
+	return p, nil
+}
+
+func (s *AgentProfileService) GetPublic(ctx context.Context, id string) (*model.AgentProfile, error) {
+	p, err := repository.GetAgentProfileByID(s.db, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentNotFound
+		}
+		return nil, err
+	}
+	if !p.IsPublic {
+		return nil, errcode.AgentNotFound.WithMessage("profile is not public")
 	}
 	return p, nil
 }

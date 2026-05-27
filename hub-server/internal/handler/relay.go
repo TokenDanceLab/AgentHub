@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -28,9 +29,27 @@ func NewRelayHandler(svc RelayService) *RelayHandler {
 }
 
 type createRelayReq struct {
-	TargetEdgeID string          `json:"target_edge_id" binding:"required"`
-	CommandType  string          `json:"command_type" binding:"required"`
+	TargetEdgeID string          `json:"target_edge_id"`
+	TargetID     string          `json:"target_id"`
+	CommandType  string          `json:"command_type"`
 	Payload      json.RawMessage `json:"payload"`
+}
+
+func (r createRelayReq) targetEdgeID() (string, bool) {
+	targetEdgeID := strings.TrimSpace(r.TargetEdgeID)
+	targetID := strings.TrimSpace(r.TargetID)
+	if targetEdgeID != "" && targetID != "" && targetEdgeID != targetID {
+		return "", false
+	}
+	if targetEdgeID != "" {
+		return targetEdgeID, true
+	}
+	return targetID, targetID != ""
+}
+
+func (r createRelayReq) validPayload() bool {
+	payload := strings.TrimSpace(string(r.Payload))
+	return payload != "" && payload != "null"
 }
 
 // CreateCommand handles POST /web/relay/commands — creates and pushes a relay command.
@@ -40,8 +59,13 @@ func (h *RelayHandler) CreateCommand(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
+	targetEdgeID, ok := req.targetEdgeID()
+	if !ok || strings.TrimSpace(req.CommandType) == "" || !req.validPayload() {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
 	userID := c.GetString("user_id")
-	cmd, err := h.svc.CreateCommand(c.Request.Context(), req.TargetEdgeID, req.CommandType, req.Payload, userID)
+	cmd, err := h.svc.CreateCommand(c.Request.Context(), targetEdgeID, strings.TrimSpace(req.CommandType), req.Payload, userID)
 	if err != nil {
 		Fail(c, errcode.ErrInternal)
 		return

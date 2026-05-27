@@ -4,7 +4,7 @@
 
 | 组件 | 最低版本 | 说明 |
 |------|---------|------|
-| Go | 1.25 | 构建所需 |
+| Go | 1.25 | 开发机/CI 构建所需；生产服务器不编译 |
 | PostgreSQL | 16 | 主数据库 |
 | Redis | 7 | 缓存 / 会话 / WebSocket 路由 |
 
@@ -27,9 +27,12 @@ Hub Server 通过 `AGENTHUB_` 前缀的环境变量覆盖配置文件中的值�
 | `AGENTHUB_REDIS_PORT` | Redis 端口 | `6379` |
 | `AGENTHUB_REDIS_PASSWORD` | Redis 密码 | `` |
 | `AGENTHUB_REDIS_DB` | Redis 数据库编号 | `0` |
-| `AGENTHUB_REDIS_POOL_SIZE` | Redis 连接池大小 | `100` |
-| `AGENTHUB_REDIS_MIN_IDLE_CONNS` | Redis 最小空闲连接 | `10` |
-| `AGENTHUB_JWT_SECRET` | JWT 签名密钥（**必填，最少 16 字符**） | — |
+| `AGENTHUB_REDIS_POOL_SIZE` | Redis 连接池大小 | `20` |
+| `AGENTHUB_REDIS_MIN_IDLE_CONNS` | Redis 最小空闲连接 | `2` |
+| `AGENTHUB_POSTGRES_MEM_LIMIT` / `AGENTHUB_POSTGRES_CPUS` / `AGENTHUB_POSTGRES_PIDS_LIMIT` | 生产 PostgreSQL 容器资源上限 | `512m` / `1.0` / `256` |
+| `AGENTHUB_REDIS_CONTAINER_MEM_LIMIT` / `AGENTHUB_REDIS_CPUS` / `AGENTHUB_REDIS_PIDS_LIMIT` | 生产 Redis 容器资源上限；Redis 内部仍有 `--maxmemory 256mb` | `384m` / `0.5` / `128` |
+| `AGENTHUB_HUB_MEM_LIMIT` / `AGENTHUB_HUB_CPUS` / `AGENTHUB_HUB_PIDS_LIMIT` | 生产 Hub Server 容器资源上限 | `256m` / `1.0` / `256` |
+| `AGENTHUB_JWT_SECRET` | JWT 签名密钥（**必填，最少 32 字符**） | — |
 | `AGENTHUB_JWT_ACCESS_TTL` | Access Token 有效期 | `15m` |
 | `AGENTHUB_JWT_REFRESH_TTL` | Refresh Token 有效期 | `720h` |
 | `AGENTHUB_TOKENDANCE_ID_ISSUER_URL` | TokenDance ID issuer，用于 RS256 bearer-token 兼容路径 | `https://id.vectorcontrol.tech` |
@@ -58,7 +61,7 @@ copy .env.example .env
 docker compose up -d
 ```
 
-生产部署参考 `deployments/docker-compose.prod.yml`，镜像构建入口为 `deployments/Dockerfile`。
+生产部署参考 `deployments/docker-compose.prod.yml`。生产服务器只加载开发机/CI 构建好的镜像并执行 `docker compose up -d --no-build`；不得在服务器上运行 `docker compose build`。镜像构建入口为 `deployments/Dockerfile`。生产 compose 默认给 Hub/PostgreSQL/Redis 设置内存、CPU、pids 和日志轮转护栏，防止低流量实例被异常请求或日志放大拖垮宿主机。
 
 ## 生产部署
 
@@ -110,7 +113,7 @@ systemctl enable --now hub-server
 ### 方案 B：Docker 单容器
 
 ```powershell
-# 构建镜像
+# 在开发机/CI 构建镜像
 docker build -f deployments/Dockerfile -t hub-server:latest .
 
 # 运行

@@ -52,6 +52,7 @@ type App struct {
 	SessionService      *service.SessionService
 	MessageService      *service.MessageService
 	AgentService        *service.AgentService
+	AgentControlService *service.AgentControlService
 	AttachmentService   *service.AttachmentService
 	NotificationService *service.NotificationService
 	DeviceService       *service.DeviceService
@@ -168,6 +169,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.SessionService = service.NewSessionService(a.DB, a.CacheClient)
 	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)
 	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient)
+	a.AgentControlService = service.NewAgentControlService(a.CacheClient, a.mgr)
 	a.DeviceService = service.NewDeviceService(a.DB)
 
 	// Agent Profile service
@@ -197,6 +199,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// AgentTeam service
 	a.AgentTeamService = service.NewAgentTeamService(a.DB, a.AgentService, a.CacheClient)
+	a.AgentTeamService.SetControlService(a.AgentControlService)
 	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
 
 	// Relay service
@@ -534,23 +537,36 @@ func (a *App) startTaskScheduler(ctx context.Context) {
 				continue
 			}
 			for _, task := range tasks {
-				_ = a.AgentService.UpdatePendingTaskStatus(task.ID, model.TaskStatusTimeout, "")
-				ai, _ := a.AgentService.GetAgentInstanceByID(task.AgentInstanceID)
-				sessionID := ""
-				if ai != nil {
-					sessionID = ai.SessionID
-				}
-				a.bus.Publish(a.coreCtx, service.Event{
-					Type: "agent.timeout",
-					Payload: map[string]interface{}{
-						"task_id":           task.ID,
-						"agent_instance_id": task.AgentInstanceID,
-						"session_id":        sessionID,
-					},
-				})
+				a.publishExpiredTaskTimeout(ctx, task)
 			}
 		}
 	}()
+}
+
+func (a *App) publishExpiredTaskTimeout(ctx context.Context, task model.PendingAgentTask) {
+	timedOut, err := a.AgentService.TimeoutExpiredTask(task.ID, task.Status)
+	if err != nil {
+		slog.Warn("failed to mark expired agent task timeout", "task_id", task.ID, "status", task.Status, "error", err)
+		return
+	}
+	if !timedOut {
+		slog.Info("skip stale expired agent task timeout", "task_id", task.ID, "scanned_status", task.Status)
+		return
+	}
+
+	ai, _ := a.AgentService.GetAgentInstanceByID(task.AgentInstanceID)
+	sessionID := ""
+	if ai != nil {
+		sessionID = ai.SessionID
+	}
+	a.bus.Publish(ctx, service.Event{
+		Type: "agent.timeout",
+		Payload: map[string]interface{}{
+			"task_id":           task.ID,
+			"agent_instance_id": task.AgentInstanceID,
+			"session_id":        sessionID,
+		},
+	})
 }
 
 // startWebSocketCleanup starts heartbeat-based stale connection cleanup.
@@ -648,6 +664,7 @@ func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string,
 	if deviceType == "desktop" {
 		if deviceID != "" {
 			go a.pushPendingTargetTasks(ctx, userID, deviceID, connID)
+			go a.pushPendingAgentControls(ctx, userID, deviceID, connID)
 		}
 		go a.pushPendingTasks(ctx, userID, connID)
 	}
@@ -665,9 +682,25 @@ func (a *App) pushPendingTargetTasks(ctx context.Context, userID, deviceID, conn
 				TaskID string `json:"task_id"`
 			}
 			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
-				_ = a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, deviceID)
+				if err := a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, deviceID); err != nil {
+					slog.Error("failed to mark target-bound queued task dispatched", "task_id", meta.TaskID, "user_id", userID, "device_id", deviceID, "error", err)
+					continue
+				}
 			}
 			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+		}
+	}
+}
+
+func (a *App) pushPendingAgentControls(ctx context.Context, userID, deviceID, connID string) {
+	controls, err := a.CacheClient.PopPendingAgentControlsForDevice(ctx, userID, deviceID)
+	if err != nil || len(controls) == 0 {
+		return
+	}
+	for _, controlJSON := range controls {
+		var payload json.RawMessage
+		if json.Unmarshal([]byte(controlJSON), &payload) == nil {
+			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentControl, payload))
 		}
 	}
 }
@@ -689,7 +722,10 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 				TaskID string `json:"task_id"`
 			}
 			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
-				_ = a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, edgeDeviceID)
+				if err := a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, edgeDeviceID); err != nil {
+					slog.Error("failed to mark queued task dispatched", "task_id", meta.TaskID, "user_id", userID, "device_id", edgeDeviceID, "error", err)
+					continue
+				}
 			}
 			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
 		}

@@ -33,6 +33,7 @@ const (
 	TypeAgentDone           = "agent.done"
 	TypeAgentFailed         = "agent.failed"
 	TypeAgentCancel         = "agent.cancel"
+	TypeAgentControl        = "agent.control"
 	TypeNotificationNew     = "notification.new"
 	TypeFriendRequest       = "friend.request"
 	TypeFriendAccepted      = "friend.accepted"

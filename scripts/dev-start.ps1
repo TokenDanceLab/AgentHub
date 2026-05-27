@@ -4,7 +4,7 @@
 .DESCRIPTION
     Starts edge-server (go run), hub-server (go run), and Desktop dev server (pnpm dev).
     Each service runs in the background; press Ctrl+C to stop all.
-    URLs: Edge=http://127.0.0.1:3210, Hub=http://127.0.0.1:4210, Desktop=http://localhost:5199
+    URLs: Edge=http://127.0.0.1:3210, Hub=http://127.0.0.1:8080, Desktop=http://localhost:5199
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -103,19 +103,19 @@ Write-Host "Repo: $RepoRoot"
 try {
     # Start all services
     Start-ServiceProcess -Name 'edge-server' -WorkingDir "$RepoRoot\edge-server" -Exe 'go' -Args @('run', './cmd/agenthub-edge', '--addr', '127.0.0.1:3210')
-    Start-ServiceProcess -Name 'hub-server'  -WorkingDir "$RepoRoot\hub-server"  -Exe 'go' -Args @('run', './cmd/agenthub-hub',  '--addr', '127.0.0.1:4210')
+    Start-ServiceProcess -Name 'hub-server'  -WorkingDir "$RepoRoot\hub-server"  -Exe 'go' -Args @('run', './cmd/server-hub')
     Start-ServiceProcess -Name 'desktop'     -WorkingDir "$RepoRoot\app\desktop"  -Exe 'pnpm' -Args @('dev', '--port', '5199')
 
     # Wait for health checks
     Write-Host "`nWaiting for services to be ready...`n"
     $allReady = $true
     $allReady = (Wait-ForPort -Name 'Edge'    -Port 3210) -and $allReady
-    $allReady = (Wait-ForPort -Name 'Hub'     -Port 4210) -and $allReady
+    $allReady = (Wait-ForPort -Name 'Hub'     -Port 8080) -and $allReady
     $allReady = (Wait-ForPort -Name 'Desktop' -Port 5199 -HostAddr 'localhost') -and $allReady
 
     Write-Banner "All services started"
     Write-Host "  Edge:    http://127.0.0.1:3210" -ForegroundColor Cyan
-    Write-Host "  Hub:     http://127.0.0.1:4210" -ForegroundColor Cyan
+    Write-Host "  Hub:     http://127.0.0.1:8080" -ForegroundColor Cyan
     Write-Host "  Desktop: http://localhost:5199" -ForegroundColor Cyan
     Write-Host "`nPress Ctrl+C to stop all services.`n" -ForegroundColor Yellow
 

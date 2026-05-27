@@ -20,7 +20,7 @@
 | 数据库 | 90% | 28 migrations, GORM+PG, Upsert/jsonb校验/seq分配 |
 | 缓存 | 85% | Redis singleflight/seq/路由/离线任务队列 |
 | EventBus | 85% | ants pool 1024/panic recovery/metrics |
-| 生产部署 | 80% | Docker Compose on hk2, nginx 反代 |
+| 生产部署 | 80% | Docker Compose, nginx 反代 |
 
 ### 1.2 待完成能力栈（按优先级）
 

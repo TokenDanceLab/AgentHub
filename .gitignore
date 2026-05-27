@@ -6,12 +6,11 @@ node_modules/
 dist/
 build/
 .next/
+.vite/
 coverage/
 playwright-report/
 test-results/
 
-<<<<<<< HEAD
-=======
 # Generated reports and local test artifacts
 app/desktop/stats.html
 **/coverage.out
@@ -22,7 +21,6 @@ edge-server/cov_full
 edge-server/$covPath
 hub-server/tests/uploads/
 
->>>>>>> origin/dev/delicious233
 # Go
 *.exe
 *.exe~
@@ -80,11 +78,14 @@ yarn-error.log*
 *.backup
 *.sql.gz
 
-# AgentHub deployment state (hk2 production)
+# AgentHub deployment state (production)
 hub-server/deployments/.env.production
 hub-server/deployments/.env
 hub-server/deployments/backups/
 backups/
+
+# Local temp files
+.tmp/
 
 # Local machine and agent state
 .worktrees/
@@ -143,7 +144,9 @@ docs/review/*
 !/reference/INDEX.md
 /chat-verify/
 test_store.json
-<<<<<<< HEAD
-app/desktop/stats.html
-=======
->>>>>>> origin/dev/delicious233
+
+# Hub server temp
+hub-server/.tmp/
+
+# Tauri Android generated (source tracked, builds ignored by inner .gitignore)
+# app/desktop/src-tauri/gen/android/ is committed

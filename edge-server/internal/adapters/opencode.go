@@ -109,6 +109,11 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		args = append(args, "--command", cmd)
 	}
 
+	// Skills prompt: prepend to the prompt since OpenCode has no --append-system-prompt.
+	if ctx.SkillsPrompt != "" {
+		prompt = ctx.SkillsPrompt + "\n\n---\n\n" + prompt
+	}
+
 	args = append(args, prompt)
 
 	workDir := ctx.WorkDir

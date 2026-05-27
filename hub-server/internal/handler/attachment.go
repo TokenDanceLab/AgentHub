@@ -93,14 +93,7 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	relPath := service.PathFromHash(hash)
-	absDir := filepath.Join(".", relPath)
-	if err := os.MkdirAll(absDir, 0755); err != nil {
-		Fail(c, errcode.ErrInternal)
-		return
-	}
-
-	tmpFile, err := os.CreateTemp(absDir, "."+hash+".*.tmp")
+	tmpFile, err := os.CreateTemp("", "."+hash+".*.tmp")
 	if err != nil {
 		Fail(c, errcode.ErrInternal)
 		return

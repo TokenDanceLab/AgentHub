@@ -18,7 +18,10 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
@@ -254,6 +257,74 @@ func TestAttachmentUploadSniffsMimeTypeInsteadOfTrustingMultipartHeader(t *testi
 	}
 	if svc.saveMimeType != "application/pdf" {
 		t.Fatalf("saved MIME type = %q, want application/pdf", svc.saveMimeType)
+	}
+}
+
+func TestAttachmentUploadUsesConfiguredLocalStorageDir(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	workDir := t.TempDir()
+	t.Chdir(workDir)
+	uploadDir := filepath.Join(t.TempDir(), "configured-uploads")
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&model.Attachment{}); err != nil {
+		t.Fatalf("migrate attachments: %v", err)
+	}
+
+	content := []byte("configured upload directory content")
+	sum := sha256.Sum256(content)
+	hash := hex.EncodeToString(sum[:])
+
+	svc := service.NewAttachmentService(
+		db,
+		config.UploadConfig{Dir: uploadDir, MaxSize: 1024},
+		service.NewLocalStorage(uploadDir),
+	)
+	h := handler.NewAttachmentHandler(svc)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("hash", hash); err != nil {
+		t.Fatalf("WriteField hash returned error: %v", err)
+	}
+	if err := writer.WriteField("original_name", "configured.txt"); err != nil {
+		t.Fatalf("WriteField original_name returned error: %v", err)
+	}
+	part, err := writer.CreateFormFile("file", "configured.txt")
+	if err != nil {
+		t.Fatalf("CreateFormFile returned error: %v", err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("part.Write returned error: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer.Close returned error: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("user_id", "user-1")
+	c.Request = httptest.NewRequest(http.MethodPost, "/client/attachments", &body)
+	c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+	h.Upload(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+	storedPath := filepath.Join(uploadDir, service.PathFromHash(hash))
+	got, err := os.ReadFile(storedPath)
+	if err != nil {
+		t.Fatalf("configured upload blob should be readable at %s: %v", storedPath, err)
+	}
+	if string(got) != string(content) {
+		t.Fatalf("stored upload content = %q, want %q", got, content)
+	}
+	if _, err := os.Stat(filepath.Join(workDir, "uploads")); !os.IsNotExist(err) {
+		t.Fatalf("upload handler created cwd uploads directory despite configured upload dir: %v", err)
 	}
 }
 

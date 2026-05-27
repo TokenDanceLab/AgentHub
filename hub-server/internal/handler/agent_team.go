@@ -21,7 +21,13 @@ type AgentTeamService interface {
 	RemoveTeamMember(ctx context.Context, userID, teamID, memberID string) error
 	StartTeamRun(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error)
 	GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
+	GetTeamRunState(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error)
 	ListTeamRuns(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
+	ListTeamTasks(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
+	ListTeamEvents(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
+	HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
+	DecideApproval(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
+	ResolveConflict(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
 
 	// TeamAssignment
 	CreateAssignment(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error)
@@ -244,6 +250,79 @@ func (h *AgentTeamHandler) GetRun(c *gin.Context) {
 	OK(c, run)
 }
 
+// GetRunState GET /web/agent-teams/:id/runs/:run_id/state
+func (h *AgentTeamHandler) GetRunState(c *gin.Context) {
+	userID := c.GetString("user_id")
+	teamID := c.Param("id")
+	runID := c.Param("run_id")
+	state, err := h.service.GetTeamRunState(c.Request.Context(), userID, teamID, runID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, state)
+}
+
+// ListTeamTasks GET /web/agent-teams/:id/runs/:run_id/tasks
+func (h *AgentTeamHandler) ListTeamTasks(c *gin.Context) {
+	userID := c.GetString("user_id")
+	teamID := c.Param("id")
+	runID := c.Param("run_id")
+	tasks, err := h.service.ListTeamTasks(c.Request.Context(), userID, teamID, runID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, tasks)
+}
+
+// ListTeamEvents GET /web/agent-teams/:id/runs/:run_id/events
+func (h *AgentTeamHandler) ListTeamEvents(c *gin.Context) {
+	userID := c.GetString("user_id")
+	teamID := c.Param("id")
+	runID := c.Param("run_id")
+	events, err := h.service.ListTeamEvents(c.Request.Context(), userID, teamID, runID)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, events)
+}
+
+// HandleRouteDecision POST /web/agent-teams/:id/runs/:run_id/route-decisions
+func (h *AgentTeamHandler) HandleRouteDecision(c *gin.Context) {
+	var req model.CoordinatorRouteDecision
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	teamID := c.Param("id")
+	runID := c.Param("run_id")
+	assignment, err := h.service.HandleRouteDecision(c.Request.Context(), userID, teamID, runID, req)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, assignment)
+}
+
 // --- Assignment Request types ---
 
 type createAssignmentReq struct {
@@ -260,6 +339,18 @@ type completeAssignmentReq struct {
 
 type failAssignmentReq struct {
 	Reason string `json:"reason" binding:"required"`
+}
+
+type resolveConflictReq struct {
+	Path                string `json:"path,omitempty"`
+	Resolution          string `json:"resolution" binding:"required"`
+	SelectedAgentTaskID string `json:"selected_agent_task_id,omitempty"`
+	Reason              string `json:"reason,omitempty"`
+}
+
+type decideApprovalReq struct {
+	Decision string `json:"decision" binding:"required"`
+	Reason   string `json:"reason,omitempty"`
 }
 
 // --- Assignment Handlers ---
@@ -357,4 +448,57 @@ func (h *AgentTeamHandler) ListAssignments(c *gin.Context) {
 		as = []model.AgentTeamAssignment{}
 	}
 	OK(c, as)
+}
+
+// ResolveConflict POST /web/agent-teams/:id/runs/:run_id/conflicts/:conflict_id/resolve
+func (h *AgentTeamHandler) ResolveConflict(c *gin.Context) {
+	var req resolveConflictReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	teamID := c.Param("id")
+	runID := c.Param("run_id")
+	conflict, err := h.service.ResolveConflict(c.Request.Context(), userID, teamID, runID, model.TeamConflictResolution{
+		ConflictID:          c.Param("conflict_id"),
+		Path:                req.Path,
+		Resolution:          req.Resolution,
+		SelectedAgentTaskID: req.SelectedAgentTaskID,
+		Reason:              req.Reason,
+	})
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, conflict)
+}
+
+// DecideApproval POST /web/agent-teams/:id/runs/:run_id/approvals/:approval_id/decide
+func (h *AgentTeamHandler) DecideApproval(c *gin.Context) {
+	var req decideApprovalReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	userID := c.GetString("user_id")
+	teamID := c.Param("id")
+	runID := c.Param("run_id")
+	approval, err := h.service.DecideApproval(c.Request.Context(), userID, teamID, runID, c.Param("approval_id"), model.TeamApprovalDecision{
+		Decision: req.Decision,
+		Reason:   req.Reason,
+	})
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, approval)
 }

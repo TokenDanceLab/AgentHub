@@ -4,7 +4,8 @@
 #        make lint        (golangci-lint)
 #        make coverage    (HTML coverage report)
 
-.PHONY: test test-all test-edge test-hub lint coverage clean
+#        make release VER=v0.1.1  (build + upload release binaries)
+.PHONY: test test-all test-edge test-hub lint coverage sec release clean
 
 # ── Unit tests (no external deps) ────────────────────
 
@@ -30,7 +31,7 @@ test-hub-full:
 
 bench:
 	cd edge-server && go test -bench=. -benchmem ./internal/events/
-	cd hub-server && go test -bench=. -benchmem ./internal/middleware/
+	cd hub-server && go test -bench=. -benchmem ./internal/service/
 
 # ── Lint ─────────────────────────────────────────
 
@@ -49,12 +50,18 @@ coverage:
 sec:
 	cd edge-server && gosec ./...
 	cd hub-server && gosec ./...
-	govulncheck ./edge-server/...
-	govulncheck ./hub-server/...
+	cd edge-server && govulncheck ./...
+	cd hub-server && govulncheck ./...
 
 # ── All checks (CI pipeline) ─────────────────────
 
 ci: test lint sec
+
+# ── Release ─────────────────────────────────────
+
+release:
+	@if [ -z "$(VER)" ]; then echo "Usage: make release VER=v0.1.1"; exit 1; fi
+	powershell -File scripts/release.ps1 $(VER)
 
 # ── Clean ────────────────────────────────────────
 

@@ -1,14 +1,14 @@
 # ──────────────────────────────────────────────
-# AgentHub Hub Server — 生产部署配置 (hk2)
+# AgentHub Hub Server — 生产部署配置 (production)
 # ──────────────────────────────────────────────
 # 与 AIhub 完全隔离：独立的 PostgreSQL + Redis 容器。
 # DB/Redis 端口不对外暴露，仅 Docker 内部网络访问。
 #
-# 部署步骤（在 hk2 上执行）：
-#   1. 拉取代码：git clone 或 scp 整个 hub-server/ 目录
+# 部署步骤（在生产服务器上执行）：
+#   1. 在开发机/CI 构建镜像并传输到服务器，服务器只执行 docker load
 #   2. 配置环境变量（必须设置 AGENTHUB_JWT_SECRET）
-#   3. docker compose up -d
-#   4. 配置 Caddy/nginx 反代：api.hub.vectorcontrol.tech → localhost:8080
+#   3. docker compose up -d --no-build
+#   4. 配置 nginx 反代：api.hub.vectorcontrol.tech → 127.0.0.1:8090
 # ──────────────────────────────────────────────
 
 services:
@@ -17,6 +17,9 @@ services:
     image: postgres:16-alpine
     container_name: agenthub-postgres
     restart: unless-stopped
+    mem_limit: ${AGENTHUB_POSTGRES_MEM_LIMIT:-512m}
+    cpus: ${AGENTHUB_POSTGRES_CPUS:-1.0}
+    pids_limit: ${AGENTHUB_POSTGRES_PIDS_LIMIT:-256}
     environment:
       POSTGRES_DB: ${AGENTHUB_DB_NAME:-agenthub}
       POSTGRES_USER: ${AGENTHUB_DB_USER:-agenthub}
@@ -45,6 +48,9 @@ services:
     image: redis:7-alpine
     container_name: agenthub-redis
     restart: unless-stopped
+    mem_limit: ${AGENTHUB_REDIS_CONTAINER_MEM_LIMIT:-384m}
+    cpus: ${AGENTHUB_REDIS_CPUS:-0.5}
+    pids_limit: ${AGENTHUB_REDIS_PIDS_LIMIT:-128}
     command: >
       redis-server
       --appendonly yes
@@ -75,16 +81,19 @@ services:
 
   # ── Hub Server ─────────────────────────────
   hub-server:
-    build:
-      context: ..
-      dockerfile: ./deployments/Dockerfile
+    image: ${AGENTHUB_HUB_IMAGE:-ghcr.io/tokendancelab/agenthub-hub:latest}
+    pull_policy: never
     container_name: agenthub-hub
     restart: unless-stopped
+    mem_limit: ${AGENTHUB_HUB_MEM_LIMIT:-256m}
+    cpus: ${AGENTHUB_HUB_CPUS:-1.0}
+    pids_limit: ${AGENTHUB_HUB_PIDS_LIMIT:-256}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    dns: 127.0.0.11
     environment:
       # 数据库（连接 Docker 网络内的独立 PG）
       AGENTHUB_DB_HOST: postgres
@@ -97,8 +106,8 @@ services:
       AGENTHUB_REDIS_PORT: "6379"
       AGENTHUB_REDIS_PASSWORD: ${AGENTHUB_REDIS_PASSWORD}
       AGENTHUB_REDIS_DB: "0"
-      AGENTHUB_REDIS_POOL_SIZE: "100"
-      AGENTHUB_REDIS_MIN_IDLE_CONNS: "10"
+      AGENTHUB_REDIS_POOL_SIZE: ${AGENTHUB_REDIS_POOL_SIZE:-20}
+      AGENTHUB_REDIS_MIN_IDLE_CONNS: ${AGENTHUB_REDIS_MIN_IDLE_CONNS:-2}
       # JWT（生产环境必须设置强密钥）
       AGENTHUB_JWT_SECRET: ${AGENTHUB_JWT_SECRET:?必须设置 AGENTHUB_JWT_SECRET（至少32字符）}
       AGENTHUB_JWT_ACCESS_TTL: ${AGENTHUB_JWT_ACCESS_TTL:-15m}
@@ -123,7 +132,7 @@ services:
       AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub.vectorcontrol.tech/client/auth/oidc/callback}
       AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-}
     ports:
-      - "127.0.0.1:8080:8080"   # 仅本地回环，由 Caddy/nginx 反代
+      - "127.0.0.1:8090:8080"   # 仅本地回环，由 nginx 反代
       - "127.0.0.1:6060:6060"   # pprof/metrics 仅本地访问
     volumes:
       - agenthub_uploads:/app/uploads
