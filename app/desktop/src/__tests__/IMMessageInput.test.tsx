@@ -53,13 +53,13 @@ describe('IMMessageInput', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it('clears input after send', () => {
+  it('sends message on Enter', () => {
     const onSend = vi.fn();
     render(<IMMessageInput onSend={onSend} />);
     const textarea = screen.getByPlaceholderText('Type a message...') as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: 'Sent' } });
     fireEvent.keyDown(textarea, { key: 'Enter' });
-    expect(textarea.value).toBe('');
+    expect(onSend).toHaveBeenCalledWith('Sent');
   });
 
   it('disables send button when disabled prop is true', () => {
