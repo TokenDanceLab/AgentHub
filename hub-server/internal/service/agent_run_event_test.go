@@ -156,6 +156,44 @@ func TestHandleTaskStreamRejectsOversizedInferredEventType(t *testing.T) {
 	require.Zero(t, count)
 }
 
+func TestHandleTaskStreamRejectsOversizedPayload(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	payload := json.RawMessage(`{"type":"run.output.batch","content":"` + strings.Repeat("x", model.RunEventPayloadMaxBytes) + `"}`)
+
+	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
+		Payload: payload,
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	var eventCount int64
+	require.NoError(t, db.Model(&model.AgentRunEvent{}).Count(&eventCount).Error)
+	require.Zero(t, eventCount)
+
+	var messageCount int64
+	require.NoError(t, db.Model(&model.Message{}).Count(&messageCount).Error)
+	require.Zero(t, messageCount)
+}
+
+func TestHandleTaskStreamRejectsOversizedProjectedContent(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+
+	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
+		Payload: json.RawMessage(`{"type":"run.agent.tool_call","toolName":"read_file"}`),
+		Content: strings.Repeat("x", model.RunEventPayloadMaxBytes),
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	var eventCount int64
+	require.NoError(t, db.Model(&model.AgentRunEvent{}).Count(&eventCount).Error)
+	require.Zero(t, eventCount)
+
+	var messageCount int64
+	require.NoError(t, db.Model(&model.Message{}).Count(&messageCount).Error)
+	require.Zero(t, messageCount)
+}
+
 func TestListTaskRunEventsIsOwnerScoped(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
 	require.NoError(t, db.Create(&model.AgentRunEvent{

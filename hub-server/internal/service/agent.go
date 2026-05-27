@@ -914,6 +914,9 @@ func normalizeRunEventInput(stream model.AgentRunEventInput) (eventType, payload
 	} else {
 		return "", "", "", errcode.ErrBadRequest
 	}
+	if err := validateRunEventPayloadSize(payload); err != nil {
+		return "", "", "", err
+	}
 
 	if eventType == "" {
 		eventType = inferRunEventType(payload)
@@ -936,8 +939,18 @@ func normalizeRunEventInput(stream model.AgentRunEventInput) (eventType, payload
 		}
 		messageContent = string(wrapped)
 	}
+	if err := validateRunEventPayloadSize(messageContent); err != nil {
+		return "", "", "", err
+	}
 
 	return eventType, payload, messageContent, nil
+}
+
+func validateRunEventPayloadSize(value string) error {
+	if len(value) > model.RunEventPayloadMaxBytes {
+		return errcode.ErrBadRequest.WithMessage("run event payload exceeds maximum size")
+	}
+	return nil
 }
 
 func validateRunEventType(eventType string) error {

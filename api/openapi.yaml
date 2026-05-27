@@ -1140,6 +1140,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubTaskStream
       summary: Edge reports agent output stream chunk to Hub.
+      description: Hub normalizes content/chunk or event_type + payload into an AgentRunEvent and chat projection. The persisted runtime payload and projected message content are each capped at 1 MiB after normalization.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -4240,17 +4241,17 @@ components:
       properties:
         content:
           type: string
-          description: 'Legacy stream content. If not valid JSON, Hub wraps it as {"content": "..."} for jsonb storage.'
+          description: 'Legacy stream content. If not valid JSON, Hub wraps it as {"content": "..."} for jsonb storage. Normalized payload/message content must stay within the 1 MiB per-event budget.'
         chunk:
           type: string
-          description: Legacy alias for content.
+          description: Legacy alias for content. Normalized payload/message content must stay within the 1 MiB per-event budget.
         event_type:
           type: string
           description: Typed AgentHub runtime event name, for example run.output.batch or run.agent.tool_call.
         payload:
           type: object
           additionalProperties: true
-          description: Typed runtime payload persisted as jsonb and broadcast as agent.stream.
+          description: Typed runtime payload persisted as jsonb and broadcast as agent.stream. The encoded JSON payload must stay within the 1 MiB per-event budget.
         client_msg_id:
           type: string
           description: Client-generated message id for idempotent stream dedup.
@@ -4281,6 +4282,7 @@ components:
         payload:
           type: object
           additionalProperties: true
+          description: Runtime payload persisted by Hub. Encoded JSON is capped at 1 MiB on stream ingest.
         created_at:
           type: string
           format: date-time
