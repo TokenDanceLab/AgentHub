@@ -49,7 +49,10 @@ func (m *mockEdgeAgentService) HandleTaskDone(ctx context.Context, edgeUserID, e
 func (m *mockEdgeAgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {
 	return m.handleTaskFailFn(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg)
 }
-func (m *mockEdgeAgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string) ([]model.AgentRunEvent, error) {
+func (m *mockEdgeAgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error) {
+	return nil, nil
+}
+func (m *mockEdgeAgentService) GetTaskRunEventSummary(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error) {
 	return nil, nil
 }
 

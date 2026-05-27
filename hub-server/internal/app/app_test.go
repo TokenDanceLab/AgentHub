@@ -294,3 +294,162 @@ func TestOnRouteSetReplaysTargetQueueOnlyForConnectedDevice(t *testing.T) {
 	require.Equal(t, model.TaskStatusDispatched, stored.Status)
 	require.Equal(t, "dev-b", stored.EdgeDeviceID)
 }
+
+func TestOnRouteSetDoesNotReplayTargetQueueWhenDispatchStateMissing(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Exec(`CREATE TABLE pending_agent_tasks (
+		id TEXT PRIMARY KEY,
+		agent_instance_id TEXT NOT NULL,
+		triggered_by_user_id TEXT NOT NULL,
+		trigger_message_id TEXT NOT NULL,
+		target_id TEXT,
+		status TEXT NOT NULL,
+		edge_run_id TEXT DEFAULT '',
+		edge_device_id TEXT DEFAULT '',
+		error_message TEXT DEFAULT '',
+		created_at DATETIME,
+		dispatched_at DATETIME,
+		finished_at DATETIME,
+		expire_at DATETIME NOT NULL
+	)`).Error)
+
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	cacheClient := cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+
+	mgr := ws.NewManager()
+	connB := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connB))
+	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+
+	a := &App{
+		DB:           db,
+		CacheClient:  cacheClient,
+		mgr:          mgr,
+		coreCtx:      context.Background(),
+		AgentService: service.NewAgentService(db, nil, mgr, cacheClient),
+	}
+	require.NoError(t, cacheClient.PushPendingTargetTask(context.Background(), "user-1", "target-dev-b", "dev-b", `{"task_id":"missing-task","target_id":"target-dev-b"}`))
+
+	a.onRouteSet("user-1", "desktop", "dev-b", connB.ID, "", false)
+	select {
+	case <-connB.Send:
+		t.Fatal("target queue was replayed before task dispatch state was persisted")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestPublishExpiredTaskTimeoutSkipsStaleTerminalTask(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Exec(`CREATE TABLE agent_instances (
+		id TEXT PRIMARY KEY,
+		agent_type TEXT NOT NULL,
+		session_id TEXT NOT NULL,
+		inviter_user_id TEXT NOT NULL,
+		display_name TEXT NOT NULL
+	)`).Error)
+	require.NoError(t, db.Exec(`CREATE TABLE pending_agent_tasks (
+		id TEXT PRIMARY KEY,
+		agent_instance_id TEXT NOT NULL,
+		triggered_by_user_id TEXT NOT NULL,
+		trigger_message_id TEXT NOT NULL,
+		status TEXT NOT NULL,
+		edge_run_id TEXT DEFAULT '',
+		edge_device_id TEXT DEFAULT '',
+		error_message TEXT DEFAULT '',
+		created_at DATETIME,
+		dispatched_at DATETIME,
+		finished_at DATETIME,
+		expire_at DATETIME NOT NULL
+	)`).Error)
+	finishedAt := time.Now()
+	require.NoError(t, db.Exec(`INSERT INTO agent_instances (id, agent_type, session_id, inviter_user_id, display_name) VALUES (?, ?, ?, ?, ?)`,
+		"agent-1", "codex", "sess-1", "user-1", "Codex").Error)
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, edge_run_id, edge_device_id, finished_at, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"task-timeout-race", "agent-1", "user-1", "msg-1", model.TaskStatusDone, "run-1", "dev-1", finishedAt, time.Now().Add(-time.Hour)).Error)
+
+	bus := service.NewBus()
+	t.Cleanup(bus.Close)
+	timeoutEvents := make(chan service.Event, 1)
+	bus.Subscribe("agent.timeout", func(ctx context.Context, event service.Event) {
+		timeoutEvents <- event
+	})
+
+	a := &App{
+		DB:           db,
+		bus:          bus,
+		coreCtx:      context.Background(),
+		AgentService: service.NewAgentService(db, bus, nil, nil),
+	}
+	staleScannedTask := model.PendingAgentTask{
+		ID:              "task-timeout-race",
+		AgentInstanceID: "agent-1",
+		Status:          model.TaskStatusRunning,
+	}
+
+	a.publishExpiredTaskTimeout(context.Background(), staleScannedTask)
+
+	select {
+	case event := <-timeoutEvents:
+		t.Fatalf("stale terminal task published timeout event: %#v", event)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", "task-timeout-race").First(&stored).Error)
+	require.Equal(t, model.TaskStatusDone, stored.Status)
+}
+
+func TestOnRouteSetReplaysPendingAgentControlsToExactDevice(t *testing.T) {
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	cacheClient := cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+
+	mgr := ws.NewManager()
+	connA := ws.NewConn(nil)
+	connB := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connA))
+	require.NoError(t, mgr.Register(connB))
+	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
+	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+
+	a := &App{
+		CacheClient: cacheClient,
+		mgr:         mgr,
+		coreCtx:     context.Background(),
+	}
+	require.NoError(t, cacheClient.PushPendingAgentControl(context.Background(), "user-1", "dev-b", `{"kind":"permission.decide","approval_id":"approval-b"}`))
+
+	a.onRouteSet("user-1", "desktop", "dev-a", connA.ID, "", false)
+	select {
+	case <-connA.Send:
+		t.Fatal("device A consumed device B control queue")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	a.onRouteSet("user-1", "desktop", "dev-b", connB.ID, "", false)
+	select {
+	case data := <-connB.Send:
+		var frame struct {
+			Type    string `json:"type"`
+			Payload struct {
+				Kind       string `json:"kind"`
+				ApprovalID string `json:"approval_id"`
+			} `json:"payload"`
+		}
+		require.NoError(t, json.Unmarshal(data, &frame))
+		require.Equal(t, ws.TypeAgentControl, frame.Type)
+		require.Equal(t, "permission.decide", frame.Payload.Kind)
+		require.Equal(t, "approval-b", frame.Payload.ApprovalID)
+	case <-time.After(time.Second):
+		t.Fatal("device B did not replay its control queue")
+	}
+}

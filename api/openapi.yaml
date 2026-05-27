@@ -32,7 +32,7 @@ servers:
   - url: http://localhost:8080
     description: Local Hub Server
   - url: http://api.hub.vectorcontrol.tech
-    description: Production Hub Server (hk2)
+    description: Production Hub Server
 tags:
   - name: Foundation
     description: Health, capability and event stream handshake.
@@ -44,6 +44,44 @@ tags:
     description: Auth, user, contact, group, device, edge, sync, relay and cloud APIs.
 
 paths:
+  # ═══════════════════════════════════════════════════════════
+  # Edge Server — Implementation Status
+  #
+  # IMPLEMENTED: /v1/health, /v1/events, /v1/projects (GET/POST),
+  #   /v1/projects/{projectId} (GET only), /v1/threads (GET/POST),
+  #   /v1/threads/{threadId} (GET/PATCH/DELETE), /v1/threads/{threadId}/items,
+  #   /v1/threads/{threadId}/messages, /v1/items/{itemId},
+  #   /v1/runners (GET only), /v1/agents, /v1/runs (GET/POST),
+  #   /v1/runs/{runId} (GET), /v1/runs/{runId}:cancel,
+  #   /v1/metrics, /v1/agent-instances (GET only),
+  #   /v1/permissions/decide
+  #
+  # PLANNED (documented but not yet implemented):
+  #   PATCH/DELETE /v1/projects/{projectId},
+  #   GET/PATCH /v1/projects/{projectId}/memory,
+  #   GET/POST /v1/conversations,
+  #   GET/PATCH /v1/conversations/{conversationId},
+  #   POST /v1/conversations/{conversationId}:archive,
+  #   GET/POST /v1/conversations/{conversationId}/members,
+  #   DELETE /v1/conversations/{conversationId}/members/{memberId},
+  #   POST /v1/threads/{threadId}:archive,
+  #   POST /v1/threads/{threadId}:fork,
+  #   GET /v1/runners/{runnerId},
+  #   POST /v1/runners/{runnerId}:ping,
+  #   POST /v1/runners/{runnerId}:drain,
+  #   POST /v1/runs/{runId}:interrupt,
+  #   POST /v1/runs/{runId}:resume,
+  #   POST /v1/runs/{runId}:retry,
+  #   GET /v1/runs/{runId}/items,
+  #   GET /v1/runs/{runId}/logs,
+  #   GET /v1/runs/{runId}/diff,
+  #   GET/POST /v1/approvals and nested,
+  #   GET/POST /v1/artifacts and nested,
+  #   GET/POST /v1/previews and nested,
+  #   GET /v1/workspaces/{workspaceId} and nested,
+  #   POST /v1/agent-instances
+  # ═══════════════════════════════════════════════════════════
+
   /v1/health:
     get:
       tags: [Foundation]
@@ -1149,6 +1187,21 @@ paths:
           in: path
           required: true
           schema: { type: string }
+        - name: event_type
+          in: query
+          required: false
+          schema: { type: string }
+          description: Optional exact runtime event type filter.
+        - name: after_seq
+          in: query
+          required: false
+          schema: { type: integer, format: int64, minimum: 0 }
+          description: Return only events with event_seq greater than this value.
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, maximum: 500 }
+          description: Optional maximum number of events. Values above 500 are clamped by Hub.
       responses:
         "200":
           description: Ordered runtime events for replay.
@@ -1163,6 +1216,32 @@ paths:
                     items:
                       $ref: "#/components/schemas/AgentRunEvent"
 
+  /web/agent-tasks/{id}/events/summary:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetTaskRunEventSummary
+      summary: Summarize typed runtime event history for an agent task.
+      description: Owner-scoped runtime history summary with task status, event counts, tokens, elapsed time, approval, artifact, output and tool-call aggregates.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Runtime event summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  data:
+                    $ref: "#/components/schemas/AgentRunEventSummary"
+
   /edge/agent-tasks/{id}/ack:
     parameters:
       - name: id
@@ -1173,6 +1252,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubTaskAck
       summary: Edge acknowledges an agent task and may attach the Edge run id.
+      description: Optional run_id/edge_run_id is capped at 128 characters before Hub persists it.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1191,6 +1271,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubTaskStream
       summary: Edge reports agent output stream chunk to Hub.
+      description: Hub normalizes content/chunk or event_type + payload into an AgentRunEvent and chat projection. The persisted runtime payload and projected message content are each capped at 1 MiB after normalization. Optional run_id/edge_run_id is capped at 128 characters before Hub persists or matches it.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1214,6 +1295,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubTaskDone
       summary: Edge reports agent task completed.
+      description: Optional run_id/edge_run_id is capped at 128 characters; final_content is capped at the 1 MiB callback payload budget.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1237,6 +1319,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubTaskFail
       summary: Edge reports agent task failure.
+      description: Optional run_id/edge_run_id is capped at 128 characters; error is capped at the 1 MiB callback payload budget.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1250,11 +1333,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [error]
-              properties:
-                error:
-                  type: string
+              $ref: "#/components/schemas/HubTaskFailRequest"
       responses:
         "200":
           description: Task marked failed.
@@ -1370,7 +1449,7 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /client/contacts/{userId}/remark:
-    patch:
+    put:
       tags: [HubSyncRelay]
       operationId: hubUpdateRemark
       summary: Update contact remark.
@@ -1645,6 +1724,8 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubRecallMessage
       summary: Recall (delete) a message.
+      x-deprecated: true
+      description: Deprecated session-scoped path. Use `POST /client/messages/{id}:recall` instead.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1663,6 +1744,8 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubPinMessage
       summary: Pin a message.
+      x-deprecated: true
+      description: Deprecated session-scoped path. Use `POST /client/messages/{id}:pin` instead.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1681,6 +1764,8 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubUnpinMessage
       summary: Unpin a message.
+      x-deprecated: true
+      description: Deprecated session-scoped path. Use `DELETE /client/messages/{id}/pin` instead.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1699,6 +1784,8 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubMarkMessageRead
       summary: Mark a message as read.
+      x-deprecated: true
+      description: Deprecated. No corresponding route exists in Hub router.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1925,6 +2012,22 @@ paths:
                           $ref: "#/components/schemas/AgentProfile"
                       page:
                         $ref: "#/components/schemas/PageInfo"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateAgentProfile
+      summary: Create a new Agent Profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgentProfileRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
 
   /web/custom-agents:
     get:
@@ -1985,7 +2088,7 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
-    patch:
+    put:
       tags: [HubSyncRelay]
       operationId: hubUpdateCustomAgent
       summary: Update a custom agent.
@@ -2038,7 +2141,7 @@ paths:
 
   # ── Edge / Web ──
 
-  /edge/devices:register:
+  /edge/devices/register:
     post:
       tags: [HubSyncRelay]
       operationId: hubRegisterDevice
@@ -2071,7 +2174,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Device"
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  data:
+                    $ref: "#/components/schemas/Device"
         "400":
           $ref: "#/components/responses/BadRequest"
 
@@ -2505,6 +2614,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubPingExecutionTarget
       summary: Ping an execution target to test connectivity.
+      description: Current Hub proof only marks local_edge targets healthy. Remote SSH, Tailscale, Cloud Edge, and Hub Relay targets return TARGET_NOT_ROUTABLE until their live health proof paths are implemented, and Hub does not mark them online from this manual ping.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -2516,6 +2626,8 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "409":
+          $ref: "#/components/responses/Error"
 
   # ── Audit Events ──
 
@@ -2550,13 +2662,24 @@ paths:
           application/json:
             schema:
               type: object
-              required: [target_id, payload]
+              required: [command_type, payload]
+              description: Provide target_edge_id. The legacy target_id alias is accepted for clients generated from the earlier web relay schema.
               properties:
-                target_id: { type: string }
-                payload: { type: object }
+                target_edge_id:
+                  type: string
+                  description: Target Edge connection/user id that should receive the relay command.
+                target_id:
+                  type: string
+                  deprecated: true
+                  description: Backward-compatible alias for target_edge_id.
+                command_type:
+                  type: string
+                  description: Relay command type, for example run.cancel.
+                payload:
+                  type: object
       responses:
-        "202":
-          $ref: "#/components/responses/Accepted"
+        "200":
+          $ref: "#/components/responses/Ok"
 
   /web/relay/commands/{id}:
     get:
@@ -2575,7 +2698,7 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /web/relay/commands/{id}:ack:
+  /web/relay/commands/{id}/ack:
     post:
       tags: [HubSyncRelay]
       operationId: hubAckWebRelayCommand
@@ -2803,6 +2926,161 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+  /web/agent-teams/{id}/runs/{run_id}/state:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetTeamRunState
+      summary: Replay a team run state from TeamEvent and assignment data.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/agent-teams/{id}/runs/{run_id}/events:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListTeamEvents
+      summary: List append-only TeamEvent entries for a team run.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /web/agent-teams/{id}/runs/{run_id}/tasks:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListTeamTasks
+      summary: List first-class TeamTask rows for a team run.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /web/agent-teams/{id}/runs/{run_id}/route-decisions:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubHandleTeamRouteDecision
+      summary: Consume a typed supervisor route decision and record accepted or rejected TeamEvent audit entries.
+      description: Applies schema validation plus task-count, active-subagent, and repeated-route guardrails before creating TeamAssignment and TeamTask rows.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CoordinatorRouteDecision"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/agent-teams/{id}/runs/{run_id}/approvals/{approval_id}/decide:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: approval_id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubDecideTeamApproval
+      summary: Record a TeamRun approval decision and deliver the Edge control payload.
+      description: Validates that the approval is still pending and tied to an exact Edge device, appends a team.approval.decided TeamEvent, returns the Edge control payload, and pushes or queues an agent.control permission.decide frame for the owning Desktop/Edge device. Hub rejects decisions that cannot be mapped to a recorded edge_device_id so approvals cannot silently fall back to another desktop.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamApprovalDecisionRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/agent-teams/{id}/runs/{run_id}/conflicts/{conflict_id}/resolve:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: run_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: conflict_id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubResolveTeamConflict
+      summary: Resolve a projected TeamRun file conflict and append an auditable TeamEvent.
+      description: Validates that the conflict still exists in the replayed TeamRunState, records the human decision as team.conflict.resolved, and marks the conflict resolved on subsequent state replay.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamConflictResolveRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
   /web/agent-teams/{id}/runs/{run_id}/assignments:
     parameters:
       - name: id
@@ -2873,7 +3151,7 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubDispatchTeamAssignment
-      summary: Dispatch a pending assignment to the target agent.
+      summary: Dispatch a pending assignment through Hub agent task routing and bind TeamTask state.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -3321,6 +3599,468 @@ paths:
         "202":
           $ref: "#/components/responses/Accepted"
 
+  # ═══════════════════════════════════════════════════════════
+  # Hub Server — additional /web routes (Phase 2–6)
+  # ═══════════════════════════════════════════════════════════
+
+  # ── Agent Profiles (CRUD beyond GET list) ──
+
+  /web/agent-profiles/{profileId}:
+    parameters:
+      - name: profileId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetAgentProfile
+      summary: Get an owner-scoped Agent Profile by id.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateAgentProfile
+      summary: Update an Agent Profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentProfileRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteAgentProfile
+      summary: Delete an Agent Profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Deleted.
+
+  /web/agent-profiles/{profileId}:publish:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPublishAgentProfile
+      summary: Publish an Agent Profile to the marketplace (admin only).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/agent-profiles/{profileId}:install:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubInstallAgentProfile
+      summary: Install an Agent Profile from the marketplace.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Skills ──
+
+  /web/skills:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListSkills
+      summary: List skills owned by the current user.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateSkill
+      summary: Create a skill.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSkillRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /web/skills/{skillId}:
+    parameters:
+      - name: skillId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetSkill
+      summary: Get an owner-scoped skill.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Error"
+    put:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateSkill
+      summary: Update a skill.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSkillRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteSkill
+      summary: Delete a skill.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Deleted.
+
+  /web/skills/{skillId}:publish:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPublishSkill
+      summary: Publish a skill to the marketplace (admin only).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/skills/{skillId}:unpublish:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubUnpublishSkill
+      summary: Unpublish a skill from the marketplace (admin only).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── MCP Servers ──
+
+  /web/mcp-servers:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListMCPServers
+      summary: List MCP servers owned by the current user.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateMCPServer
+      summary: Create an MCP server.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMCPServerRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /web/mcp-servers/{serverId}:
+    parameters:
+      - name: serverId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetMCPServer
+      summary: Get an owner-scoped MCP server.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/Error"
+    put:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateMCPServer
+      summary: Update an MCP server.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMCPServerRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteMCPServer
+      summary: Delete an MCP server.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Deleted.
+
+  /web/mcp-servers/{serverId}:publish:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPublishMCPServer
+      summary: Publish an MCP server to the marketplace (admin only).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/mcp-servers/{serverId}:unpublish:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubUnpublishMCPServer
+      summary: Unpublish an MCP server from the marketplace (admin only).
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  # ── Provider Bindings ──
+
+  /web/provider-bindings:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListProviderBindings
+      summary: List provider bindings.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubCreateProviderBinding
+      summary: Create a provider binding.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProviderBindingRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+
+  /web/provider-bindings/{bindingId}:
+    parameters:
+      - name: bindingId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      tags: [HubSyncRelay]
+      operationId: hubUpdateProviderBinding
+      summary: Update a provider binding.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProviderBindingRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    delete:
+      tags: [HubSyncRelay]
+      operationId: hubDeleteProviderBinding
+      summary: Delete a provider binding.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204":
+          description: Deleted.
+
+  # ── Market ──
+
+  /web/market/profiles:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubSearchMarketProfiles
+      summary: Search published Agent Profiles in the marketplace.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+          description: Search keyword for profile name or description.
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
+
+  /web/market/profiles/{profileId}:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubGetMarketProfile
+      summary: Get a published marketplace profile; private profiles return 404.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /web/market/profiles/{profileId}:install:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubInstallMarketProfile
+      summary: Install a marketplace profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /web/market/profiles/{profileId}:rate:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRateMarketProfile
+      summary: Rate a marketplace profile.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3564,8 +4304,7 @@ components:
         device_id:
           type: string
           format: uuid
-          description: Bound Hub desktop device id. Current target-bound dispatch requires an owner-owned desktop device; remote/cloud routing remains future work.
-          description: Stable Hub device UUID; must match the callback request.
+          description: Stable Hub device UUID; must match the callback request. Current target-bound dispatch requires an owner-owned desktop device; remote/cloud routing remains future work.
         redirect_uri:
           type: string
           format: uri
@@ -3659,34 +4398,46 @@ components:
       properties:
         run_id:
           type: string
+          maxLength: 128
           description: Edge run id returned by POST /v1/runs.
         edge_run_id:
           type: string
+          maxLength: 128
           description: Alias for run_id for explicit Hub persistence.
     HubTaskStreamRequest:
       type: object
+      anyOf:
+        - required: [content]
+        - required: [chunk]
+        - required: [payload]
       properties:
         content:
           type: string
-          description: 'Legacy stream content. If not valid JSON, Hub wraps it as {"content": "..."} for jsonb storage.'
+          maxLength: 1048576
+          description: 'Legacy stream content. If not valid JSON, Hub wraps it as {"content": "..."} for jsonb storage. Normalized payload/message content must stay within the 1 MiB per-event budget.'
         chunk:
           type: string
-          description: Legacy alias for content.
+          maxLength: 1048576
+          description: Legacy alias for content. Normalized payload/message content must stay within the 1 MiB per-event budget.
         event_type:
           type: string
+          maxLength: 96
           description: Typed AgentHub runtime event name, for example run.output.batch or run.agent.tool_call.
         payload:
           type: object
           additionalProperties: true
-          description: Typed runtime payload persisted as jsonb and broadcast as agent.stream.
+          description: Typed runtime payload persisted as jsonb and broadcast as agent.stream. The encoded JSON payload must stay within the 1 MiB per-event budget.
         client_msg_id:
           type: string
+          format: uuid
           description: Client-generated message id for idempotent stream dedup.
         run_id:
           type: string
+          maxLength: 128
           description: Edge run id.
         edge_run_id:
           type: string
+          maxLength: 128
           description: Alias for run_id.
     AgentRunEvent:
       type: object
@@ -3697,6 +4448,7 @@ components:
           type: string
         edge_run_id:
           type: string
+          maxLength: 128
         session_id:
           type: string
         agent_instance_id:
@@ -3709,21 +4461,88 @@ components:
         payload:
           type: object
           additionalProperties: true
+          description: Runtime payload persisted by Hub. Encoded JSON is capped at 1 MiB on stream ingest.
         created_at:
           type: string
           format: date-time
+    AgentRunEventSummary:
+      type: object
+      properties:
+        task_id:
+          type: string
+        edge_run_id:
+          type: string
+          maxLength: 128
+        status:
+          type: string
+          description: Current Hub pending task status.
+        total_events:
+          type: integer
+        last_event_seq:
+          type: integer
+          format: int64
+        event_type_counts:
+          type: object
+          additionalProperties:
+            type: integer
+        tool_call_count:
+          type: integer
+        step_count:
+          type: integer
+        artifact_count:
+          type: integer
+        approval_count:
+          type: integer
+        pending_approvals:
+          type: integer
+        decided_approvals:
+          type: integer
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        output_bytes:
+          type: integer
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        elapsed_ms:
+          type: integer
+          format: int64
     HubTaskDoneRequest:
       type: object
       properties:
         run_id:
           type: string
+          maxLength: 128
           description: Edge run id.
         edge_run_id:
           type: string
+          maxLength: 128
           description: Alias for run_id.
-        result:
+        final_content:
           type: string
-          description: Optional final agent output or summary.
+          maxLength: 1048576
+          description: Optional final agent output or summary inserted as the final chat projection. Hub rejects values above the 1 MiB callback payload budget.
+    HubTaskFailRequest:
+      type: object
+      required: [error]
+      properties:
+        run_id:
+          type: string
+          maxLength: 128
+          description: Edge run id.
+        edge_run_id:
+          type: string
+          maxLength: 128
+          description: Alias for run_id.
+        error:
+          type: string
+          maxLength: 1048576
+          description: Failure reason persisted on the task and broadcast as agent.failed. Hub rejects values above the 1 MiB callback payload budget.
     StartRunRequest:
       type: object
       properties:
@@ -3774,6 +4593,9 @@ components:
         includePartial:
           type: boolean
           description: Include partial stream_event messages for real-time deltas (Claude Code --include-partial-messages).
+        structuredOutputSchema:
+          type: string
+          description: Optional JSON Schema string passed to runtimes that support structured output, currently Claude Code --json-schema.
         systemPrompt:
           type: string
           description: Runtime system prompt override, usually derived from a Hub CustomAgent/Profile policy.
@@ -3876,6 +4698,8 @@ components:
         health_state:
           type: string
           enum: [unknown, healthy, degraded, offline]
+          readOnly: true
+          description: System-managed health proof state. Clients cannot set this through create/update requests.
         auth_method:
           type: string
         is_online:
@@ -3953,9 +4777,6 @@ components:
         trust_level:
           type: string
           enum: [local, remote, cloud, relay]
-        health_state:
-          type: string
-          enum: [unknown, healthy, degraded, offline]
         auth_method:
           type: string
         device_id:
@@ -4177,6 +4998,582 @@ components:
         depth: { type: integer }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+
+    AgentTeamTask:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        team_run_id: { type: string, format: uuid }
+        assignment_id: { type: string, format: uuid }
+        assignee_member_id: { type: string, format: uuid }
+        parent_task_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [pending, dispatched, running, done, failed, cancelled]
+        objective: { type: string }
+        input_refs:
+          type: object
+          additionalProperties: true
+        run_id: { type: string }
+        attempt: { type: integer }
+        risk_level:
+          type: string
+          enum: [normal, high]
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    TeamRunState:
+      type: object
+      properties:
+        run_id: { type: string, format: uuid }
+        team_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [queued, running, completed, failed, cancelled]
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamMemberState"
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamTaskState"
+        dependencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamTaskDependencyState"
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamAssignmentState"
+        approvals:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamApprovalState"
+        artifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamArtifactState"
+        conflicts:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamConflictState"
+        run_events:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamRunEventState"
+        route_log:
+          type: array
+          items:
+            $ref: "#/components/schemas/CoordinatorRouteDecision"
+        budget:
+          $ref: "#/components/schemas/TeamBudget"
+        terminal_reason:
+          type: string
+
+    TeamMemberState:
+      type: object
+      properties:
+        member_id: { type: string, format: uuid }
+        agent_profile_id: { type: string, format: uuid }
+        role:
+          type: string
+          enum: [supervisor, executor, reviewer]
+        active_tasks: { type: integer }
+        completed_tasks: { type: integer }
+
+    TeamTaskState:
+      type: object
+      properties:
+        task_id: { type: string, format: uuid }
+        assignment_id: { type: string, format: uuid }
+        assignee_member_id: { type: string, format: uuid }
+        parent_task_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [pending, dispatched, running, done, failed, cancelled]
+        objective: { type: string }
+        run_id: { type: string }
+        agent_task_id: { type: string, format: uuid }
+        edge_run_id: { type: string }
+        attempt: { type: integer }
+        risk_level:
+          type: string
+          enum: [normal, high]
+
+    TeamTaskDependencyState:
+      type: object
+      properties:
+        task_id: { type: string, format: uuid }
+        depends_on_task_id: { type: string, format: uuid }
+        kind: { type: string }
+
+    TeamApprovalState:
+      type: object
+      properties:
+        approval_id: { type: string }
+        agent_task_id: { type: string, format: uuid }
+        team_task_id: { type: string, format: uuid }
+        assignment_id: { type: string, format: uuid }
+        member_id: { type: string, format: uuid }
+        edge_run_id: { type: string }
+        request_id: { type: string }
+        tool_name: { type: string }
+        tool_use_id: { type: string }
+        status: { type: string }
+        reason: { type: string }
+        decided_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time }
+        edge_control:
+          $ref: "#/components/schemas/TeamApprovalEdgeControl"
+
+    TeamApprovalDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [allow, deny]
+        reason: { type: string }
+
+    TeamApprovalEdgeControl:
+      type: object
+      required: [runId, requestId, decision]
+      properties:
+        runId:
+          type: string
+          description: Local Edge run id to send to Edge /v1/permissions/decide.
+        requestId:
+          type: string
+          description: Edge permission request id.
+        decision:
+          type: string
+          enum: [allow, deny]
+        reason: { type: string }
+
+    AgentControlPayload:
+      type: object
+      required: [kind, edge_device_id]
+      properties:
+        kind:
+          type: string
+          enum: [permission.decide]
+        agent_task_id: { type: string, format: uuid }
+        target_id: { type: string, format: uuid }
+        edge_device_id:
+          type: string
+          description: Exact Desktop/Edge device id that owns the local Edge run.
+        team_id: { type: string, format: uuid }
+        team_run_id: { type: string, format: uuid }
+        team_task_id: { type: string, format: uuid }
+        assignment_id: { type: string, format: uuid }
+        member_id: { type: string, format: uuid }
+        approval_id: { type: string }
+        edge_control:
+          $ref: "#/components/schemas/TeamApprovalEdgeControl"
+
+    TeamArtifactState:
+      type: object
+      properties:
+        agent_task_id: { type: string, format: uuid }
+        team_task_id: { type: string, format: uuid }
+        assignment_id: { type: string, format: uuid }
+        member_id: { type: string, format: uuid }
+        edge_run_id: { type: string }
+        source_event_id: { type: string, format: uuid }
+        event_seq: { type: integer, format: int64 }
+        path: { type: string }
+        action: { type: string }
+        tool_name: { type: string }
+        status: { type: string }
+        conflict_id: { type: string }
+        created_at: { type: string, format: date-time }
+
+    TeamConflictState:
+      type: object
+      properties:
+        conflict_id: { type: string }
+        path: { type: string }
+        status:
+          type: string
+          enum: [pending, resolved]
+        agent_task_ids:
+          type: array
+          items: { type: string, format: uuid }
+        team_task_ids:
+          type: array
+          items: { type: string, format: uuid }
+        assignment_ids:
+          type: array
+          items: { type: string, format: uuid }
+        member_ids:
+          type: array
+          items: { type: string, format: uuid }
+        edge_run_ids:
+          type: array
+          items: { type: string }
+        actions:
+          type: array
+          items: { type: string }
+        first_seen_at: { type: string, format: date-time }
+        last_seen_at: { type: string, format: date-time }
+        resolution:
+          type: string
+          enum: [accept_agent_task, manual_merge, keep_all, discard_all, blocked]
+        resolved_by: { type: string, format: uuid }
+        resolved_at: { type: string, format: date-time }
+        reason: { type: string }
+        selected_agent_task_id: { type: string, format: uuid }
+
+    TeamConflictResolveRequest:
+      type: object
+      required: [resolution]
+      properties:
+        path: { type: string }
+        resolution:
+          type: string
+          enum: [accept_agent_task, manual_merge, keep_all, discard_all, blocked]
+        selected_agent_task_id:
+          type: string
+          format: uuid
+          description: Required when resolution is accept_agent_task.
+        reason: { type: string }
+
+    TeamAssignmentState:
+      type: object
+      properties:
+        assignment_id: { type: string, format: uuid }
+        from_member_id: { type: string, format: uuid }
+        to_member_id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [delegate, review, approve, notify]
+        status:
+          type: string
+          enum: [pending, dispatched, running, done, failed, cancelled]
+        depth: { type: integer }
+        run_id: { type: string, format: uuid }
+        agent_task_id: { type: string, format: uuid }
+        edge_run_id: { type: string }
+
+    TeamRunEventState:
+      type: object
+      properties:
+        agent_task_id: { type: string, format: uuid }
+        edge_run_id: { type: string }
+        event_seq: { type: integer }
+        event_type: { type: string }
+        payload: { type: string }
+        created_at: { type: string, format: date-time }
+
+    TeamBudget:
+      type: object
+      properties:
+        total_tokens_used: { type: integer }
+        input_tokens: { type: integer }
+        output_tokens: { type: integer }
+        token_limit: { type: integer }
+        remaining_tokens: { type: integer }
+        usage_percent: { type: number, format: double }
+        run_count: { type: integer }
+        context_warnings: { type: integer }
+        compactions: { type: integer }
+
+    CoordinatorRouteDecision:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [delegate, review, approve, finish]
+        next_worker: { type: string }
+        instructions: { type: string }
+        reasoning: { type: string }
+        context: { type: string }
+        approved: { type: boolean }
+        feedback: { type: string }
+        summary: { type: string }
+        blocked_reason: { type: string }
+        correlation_id: { type: string }
+
+    CreateAgentProfileRequest:
+      type: object
+      required: [name, runtime_id]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        runtime_id:
+          type: string
+          description: Agent Runtime id such as codex, claude-code, or opencode.
+        model:
+          type: string
+        provider:
+          type: string
+        reasoning_effort:
+          type: string
+        permission_mode:
+          type: string
+        model_mapping:
+          type: object
+          additionalProperties: true
+        skills:
+          type: array
+          items:
+            type: string
+            format: uuid
+        mcp_servers:
+          type: array
+          items:
+            type: string
+            format: uuid
+        tool_allowlist:
+          type: array
+          items:
+            type: string
+        approval_policy:
+          type: object
+          additionalProperties: true
+        target_preferences:
+          type: object
+          additionalProperties: true
+        context_budget_max_tokens:
+          type: integer
+        is_public:
+          type: boolean
+
+    UpdateAgentProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        runtime_id:
+          type: string
+        model:
+          type: string
+        provider:
+          type: string
+        reasoning_effort:
+          type: string
+        permission_mode:
+          type: string
+        model_mapping:
+          type: object
+          additionalProperties: true
+        skills:
+          type: array
+          items:
+            type: string
+            format: uuid
+        mcp_servers:
+          type: array
+          items:
+            type: string
+            format: uuid
+        tool_allowlist:
+          type: array
+          items:
+            type: string
+        approval_policy:
+          type: object
+          additionalProperties: true
+        target_preferences:
+          type: object
+          additionalProperties: true
+        context_budget_max_tokens:
+          type: integer
+        is_public:
+          type: boolean
+
+    Skill:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        owner_id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        skill_type: { type: string }
+        config: { type: object, additionalProperties: true }
+        is_public: { type: boolean }
+        install_count: { type: integer }
+        version: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateSkillRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        skill_type:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+        is_public:
+          type: boolean
+
+    UpdateSkillRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        skill_type:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+        is_public:
+          type: boolean
+
+    MCPServer:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        owner_id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        transport: { type: string }
+        command: { type: string }
+        args: { type: string }
+        env: { type: string }
+        url: { type: string }
+        headers: { type: string }
+        is_public: { type: boolean }
+        install_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateMCPServerRequest:
+      type: object
+      required: [name, transport]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        transport:
+          type: string
+          enum: [stdio, sse, streamable]
+        command:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        url:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        is_public:
+          type: boolean
+
+    UpdateMCPServerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        transport:
+          type: string
+          enum: [stdio, sse, streamable]
+        command:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        url:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        is_public:
+          type: boolean
+
+    ProviderBinding:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        owner_id: { type: string, format: uuid }
+        provider: { type: string }
+        api_base: { type: string }
+        api_key: { type: string }
+        models: { type: string }
+        is_default: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateProviderBindingRequest:
+      type: object
+      required: [provider]
+      properties:
+        provider:
+          type: string
+        api_base:
+          type: string
+        api_key:
+          type: string
+        models:
+          type: array
+          items:
+            type: string
+        is_default:
+          type: boolean
+
+    UpdateProviderBindingRequest:
+      type: object
+      properties:
+        provider:
+          type: string
+        api_base:
+          type: string
+        api_key:
+          type: string
+        models:
+          type: array
+          items:
+            type: string
+        is_default:
+          type: boolean
+
+    Device:
+      type: object
+      required: [id, user_id, device_type, capabilities, last_active_at, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        device_type: { type: string }
+        app_version: { type: string }
+        capabilities:
+          type: array
+          items: { type: string }
+        last_active_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
 
   responses:
     Ok:

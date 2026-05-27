@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -39,6 +40,7 @@ type createTargetReq struct {
 	WorkspaceRoot      string   `json:"workspace_root"`
 	WorkspaceAllowlist []string `json:"workspace_allowlist"`
 	TrustLevel         string   `json:"trust_level"`
+	HealthState        string   `json:"health_state"`
 	AuthMethod         string   `json:"auth_method"`
 	DeviceID           string   `json:"device_id"`
 	Capabilities       string   `json:"capabilities"`
@@ -78,6 +80,11 @@ func (h *ExecutionTargetHandler) CreateTarget(c *gin.Context) {
 		return
 	}
 	userID := c.GetString("user_id")
+
+	if strings.TrimSpace(req.HealthState) != "" {
+		Fail(c, errcode.ErrBadRequest.WithMessage("health_state is system-managed"))
+		return
+	}
 
 	workspaceAllowlist, err := marshalStringArray(req.WorkspaceAllowlist)
 	if err != nil {

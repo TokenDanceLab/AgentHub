@@ -59,6 +59,15 @@ const UploadRequestTimeout = 30 * time.Second
 // resolving WebSocket push targets.
 const SessionMemberCacheTTL = 5 * time.Minute
 
+// PendingAgentControlQueueMaxLen bounds the per-user/device offline control
+// list so approval/control redelivery cannot grow Redis without limit while a
+// desktop stays offline.
+const PendingAgentControlQueueMaxLen = 256
+
+// PendingAgentControlQueueTTL expires stale offline control queues when a
+// desktop does not reconnect within the task lifetime window.
+const PendingAgentControlQueueTTL = 24 * time.Hour
+
 // ── Agent task ────────────────────────────────────────────────────────────────
 
 // PendingTaskTTL is the time-to-live for a queued pending agent task. Expired

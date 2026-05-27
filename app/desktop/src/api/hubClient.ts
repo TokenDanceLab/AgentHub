@@ -195,6 +195,19 @@ export interface AgentTaskStreamEventOptions {
   clientMsgId?: string;
 }
 
+export interface CoordinatorRouteDecision {
+  action: string;
+  next_worker?: string;
+  instructions?: string;
+  reasoning?: string;
+  context?: string;
+  approved?: boolean;
+  feedback?: string;
+  summary?: string;
+  blocked_reason?: string;
+  correlation_id?: string;
+}
+
 // ── Custom agents ────────────────────────────────
 
 export interface CustomAgentRequest {
@@ -695,6 +708,15 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     cancelAgentTask: (taskId: string) =>
       request<void>(`/web/agent-tasks/${encodeURIComponent(taskId)}/cancel`, { method: 'POST' }),
+
+    postTeamRouteDecision: (teamId: string, runId: string, decision: CoordinatorRouteDecision) =>
+      request<Record<string, unknown>>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/route-decisions`,
+        {
+          method: 'POST',
+          body: JSON.stringify(decision),
+        },
+      ),
 
     // ── Custom agents ─────────────────────────────
 

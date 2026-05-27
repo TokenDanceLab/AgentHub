@@ -62,7 +62,7 @@ func GetMessageByClientMsgID(db *gorm.DB, sessionID, clientMsgID string) (*model
 func AllocateSeqID(tx *gorm.DB, sessionID string) (int64, error) {
 	var seq int64
 	err := tx.Raw(
-		"UPDATE sessions SET next_seq = next_seq + 1, last_message_at = NOW() WHERE id = ? RETURNING next_seq",
+		"UPDATE sessions SET next_seq = next_seq + 1, last_message_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING next_seq",
 		sessionID,
 	).Scan(&seq).Error
 	return seq, err
