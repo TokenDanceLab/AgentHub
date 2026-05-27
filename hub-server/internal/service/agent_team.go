@@ -681,7 +681,7 @@ func (s *AgentTeamService) DecideApproval(ctx context.Context, userID, teamID, r
 		return nil, errcode.ErrBadRequest
 	}
 	if !pendingApprovalStatus(approval.Status) {
-		return nil, errcode.ErrBadRequest
+		return s.redeliverDecidedApproval(ctx, userID, teamID, runID, approval, decision)
 	}
 	if strings.TrimSpace(approval.RequestID) == "" || strings.TrimSpace(approval.EdgeRunID) == "" {
 		return nil, errcode.ErrBadRequest
@@ -690,18 +690,10 @@ func (s *AgentTeamService) DecideApproval(ctx context.Context, userID, teamID, r
 	edgeDeviceID := ""
 	targetID := ""
 	if s.controlSvc != nil {
-		if strings.TrimSpace(approval.AgentTaskID) == "" {
-			return nil, errcode.ErrBadRequest
-		}
-		pendingTask, err := repository.GetPendingTaskByID(s.db, approval.AgentTaskID)
+		edgeDeviceID, targetID, err = s.approvalControlTarget(userID, approval.AgentTaskID)
 		if err != nil {
-			return nil, errcode.ErrBadRequest
+			return nil, err
 		}
-		if pendingTask.TriggeredByUserID != userID || strings.TrimSpace(pendingTask.EdgeDeviceID) == "" {
-			return nil, errcode.ErrBadRequest
-		}
-		edgeDeviceID = strings.TrimSpace(pendingTask.EdgeDeviceID)
-		targetID = strings.TrimSpace(pendingTask.TargetID)
 	}
 
 	now := time.Now().UTC()
@@ -756,6 +748,54 @@ func (s *AgentTeamService) DecideApproval(ctx context.Context, userID, teamID, r
 	decided.DecidedAt = &now
 	decided.EdgeControl = edgeControl
 	return &decided, nil
+}
+
+func (s *AgentTeamService) redeliverDecidedApproval(ctx context.Context, userID, teamID, runID string, approval *model.TeamApprovalState, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error) {
+	if strings.ToLower(strings.TrimSpace(approval.Status)) != decision.Decision {
+		return nil, errcode.ErrBadRequest
+	}
+	if s.controlSvc != nil {
+		if approval.EdgeControl == nil || strings.TrimSpace(approval.EdgeControl.RunID) == "" || strings.TrimSpace(approval.EdgeControl.RequestID) == "" {
+			return nil, errcode.ErrBadRequest
+		}
+		edgeDeviceID, targetID, err := s.approvalControlTarget(userID, approval.AgentTaskID)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.controlSvc.DeliverToDesktopDevice(ctx, userID, edgeDeviceID, model.AgentControlPayload{
+			Kind:         model.AgentControlKindPermissionDecide,
+			AgentTaskID:  approval.AgentTaskID,
+			TargetID:     targetID,
+			EdgeDeviceID: edgeDeviceID,
+			TeamID:       teamID,
+			TeamRunID:    runID,
+			TeamTaskID:   approval.TeamTaskID,
+			AssignmentID: approval.AssignmentID,
+			MemberID:     approval.MemberID,
+			ApprovalID:   firstNonEmptyString(approval.ApprovalID, approvalIDFor(approval.RequestID, approval.ToolUseID)),
+			EdgeControl:  approval.EdgeControl,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	decided := *approval
+	return &decided, nil
+}
+
+func (s *AgentTeamService) approvalControlTarget(userID, agentTaskID string) (string, string, error) {
+	agentTaskID = strings.TrimSpace(agentTaskID)
+	if agentTaskID == "" {
+		return "", "", errcode.ErrBadRequest
+	}
+	pendingTask, err := repository.GetPendingTaskByID(s.db, agentTaskID)
+	if err != nil {
+		return "", "", errcode.ErrBadRequest
+	}
+	edgeDeviceID := strings.TrimSpace(pendingTask.EdgeDeviceID)
+	if pendingTask.TriggeredByUserID != userID || edgeDeviceID == "" {
+		return "", "", errcode.ErrBadRequest
+	}
+	return edgeDeviceID, strings.TrimSpace(pendingTask.TargetID), nil
 }
 
 func (s *AgentTeamService) ResolveConflict(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error) {
