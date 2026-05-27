@@ -4497,6 +4497,8 @@ components:
         health_state:
           type: string
           enum: [unknown, healthy, degraded, offline]
+          readOnly: true
+          description: System-managed health proof state. Clients cannot set this through create/update requests.
         auth_method:
           type: string
         is_online:
@@ -4574,9 +4576,6 @@ components:
         trust_level:
           type: string
           enum: [local, remote, cloud, relay]
-        health_state:
-          type: string
-          enum: [unknown, healthy, degraded, offline]
         auth_method:
           type: string
         device_id:
