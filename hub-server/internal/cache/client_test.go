@@ -3,10 +3,12 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
@@ -553,6 +555,30 @@ func TestPendingAgentControlsDeduplicateExactPayloadForDevice(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, controls, 1)
 	require.JSONEq(t, control, controls[0])
+}
+
+func TestPendingAgentControlsAreCappedAndExpire(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	totalControls := config.PendingAgentControlQueueMaxLen + 2
+	for i := 0; i < totalControls; i++ {
+		control := fmt.Sprintf(`{"kind":"permission.decide","approval_id":"approval-%03d"}`, i)
+		require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-a", control))
+	}
+
+	ttl, err := c.rdb.TTL(ctx, pendingAgentControlKey("user-control", "dev-a")).Result()
+	require.NoError(t, err)
+	require.Greater(t, ttl, time.Duration(0))
+	require.LessOrEqual(t, ttl, config.PendingAgentControlQueueTTL)
+
+	controls, err := c.PopPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Len(t, controls, config.PendingAgentControlQueueMaxLen)
+	for i, control := range controls {
+		expectedID := totalControls - 1 - i
+		require.JSONEq(t, fmt.Sprintf(`{"kind":"permission.decide","approval_id":"approval-%03d"}`, expectedID), control)
+	}
 }
 
 // ==================== Sequence Allocation ====================

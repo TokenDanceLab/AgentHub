@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
 )
@@ -268,6 +269,8 @@ func (c *Client) PushPendingAgentControl(ctx context.Context, userID, deviceID, 
 	pipe := c.rdb.TxPipeline()
 	pipe.LRem(ctx, key, 0, controlJSON)
 	pipe.LPush(ctx, key, controlJSON)
+	pipe.LTrim(ctx, key, 0, int64(config.PendingAgentControlQueueMaxLen-1))
+	pipe.Expire(ctx, key, config.PendingAgentControlQueueTTL)
 	_, err := pipe.Exec(ctx)
 	return err
 }
