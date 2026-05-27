@@ -12,6 +12,7 @@ import (
 const (
 	RunEventTypeOutputBatch = "run.output.batch"
 	RunEventTypeMaxLength   = 96
+	RunEventPayloadMaxBytes = 1 * 1024 * 1024
 )
 
 type AgentRunEvent struct {
