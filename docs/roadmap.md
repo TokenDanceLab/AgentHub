@@ -1177,6 +1177,20 @@ pnpm typecheck                                         # 零错误
 | Batch 2 | HIGH——服务器别名替换、配置修正、脚本修复 | ✅ 完成 |
 | Batch 3 | API 契约——OpenAPI 幽灵端点、events.md 补齐 | ✅ 完成 |
 | Batch 4 | 文档——死链修复、术语更新、孤儿文件 | ✅ 完成 |
+| 发版 | Release pipeline（scripts/release.ps1 + CI workflow） | ✅ 完成 |
+| 架构审计 | 迁移数修正、Hub 完整实现措辞、runners 包澄清 | ✅ 完成 |
+| 竞品研究 | Teamily AI/Dust/SageOx 新入局、AgentTeam 加速建议 | ✅ 完成 |
+| 部署修复 | restore-db.sh 格式匹配、rollback 文档 | ✅ 完成 |
+| 测试覆盖 | hub handler 39%（低于 CI 门槛 40%）、edge lifecycle 63%（低于 75%） | ⚠️ 记录 |
+
+### 后续方向
+
+| 方向 | 建议 | 优先级 |
+|------|------|:--:|
+| AgentTeam 加速 | 竞品压力（AionUI 团战、Claude Teams）——从 P1 提到 P0.5 | High |
+| 测试覆盖 | hub handler +1% 过 CI 门槛、edge lifecycle +12% | High |
+| 远程 Edge PoC | 演示 Hub 中继到第二台 Desktop——证明架构不是空文档 | Medium |
+| 跨会话记忆 | Codex Memory 预览已上线——AgentHub 需要 profile 级记忆 | Medium |
 
 ---
 
