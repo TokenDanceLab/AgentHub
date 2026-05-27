@@ -61,8 +61,6 @@
   --authority-edge: #69c967;
   --authority-hybrid: #fbbf24;
 
-<<<<<<< HEAD
-=======
   /* Chat surface */
   --chat-agent-bg: transparent;
   --chat-user-bg: rgba(255, 255, 255, 0.045);
@@ -102,7 +100,6 @@
   --td-radius-control: var(--radius-md);
   --td-radius-panel: var(--radius-xl);
 
->>>>>>> origin/dev/delicious233
   /* Typography */
   --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI",
     "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -127,14 +124,6 @@
   --space-lg: 1rem;
   --space-xl: 1.5rem;
   --space-2xl: 2rem;
-<<<<<<< HEAD
-
-  /* Border Radius */
-  --radius-sm:  0.25rem;
-  --radius-md:  0.375rem;
-  --radius-lg:  0.5rem;
-  --radius-xl:  0.75rem;
-=======
   --space-3xl: 3rem;
 
   /* Border Radius */
@@ -142,15 +131,11 @@
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
->>>>>>> origin/dev/delicious233
   --radius-2xl: 1rem;
   --radius-full: 9999px;
 
   /* Layout */
   --sidebar-width: 280px;
-<<<<<<< HEAD
-  --detail-width:  300px;
-=======
   --detail-width: 300px;
 
   /* Shadows */
@@ -167,7 +152,6 @@
 
 [data-theme='dark'] {
   color-scheme: dark;
->>>>>>> origin/dev/delicious233
 }
 
 *, *::before, *::after {

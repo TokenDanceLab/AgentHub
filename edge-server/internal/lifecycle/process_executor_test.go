@@ -128,10 +128,8 @@ func TestProcessExecutorPublishesOutputAndFinished(t *testing.T) {
 				if !ok || len(chunks) == 0 {
 					t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
 				}
-				for _, chunk := range chunks {
-					text, _ := chunk["text"].(string)
-					stdoutText += text
-				}
+				text, _ := chunks[0]["text"].(string)
+				stdoutText += text
 			}
 		case "run.finished":
 			if !seenOutput["stdout"] || !seenOutput["stderr"] {
@@ -626,8 +624,6 @@ func TestProcessExecutorCancelMissingRun(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
-=======
 // TestProcessExecutorStartCancelRace verifies that concurrent Start and Cancel
 // calls do not suffer from a TOCTOU race where Start reads the store as "queued"
 // but Cancel modifies it before Start enters the running map. Run with -race.
@@ -660,7 +656,6 @@ func TestProcessExecutorStartCancelRace(t *testing.T) {
 	wg.Wait()
 }
 
->>>>>>> origin/dev/delicious233
 func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleStore, mode string) *ProcessExecutor {
 	t.Helper()
 
@@ -783,8 +778,6 @@ func hasArg(args []string, want string) bool {
 	return false
 }
 
-<<<<<<< HEAD
-=======
 func TestSplitHubCallbackTextPreservesUTF8(t *testing.T) {
 	text := "ab你好cd"
 
@@ -802,7 +795,6 @@ func TestSplitHubCallbackTextPreservesUTF8(t *testing.T) {
 	}
 }
 
->>>>>>> origin/dev/delicious233
 // ── Result aggregation tests ───────────────────────────────────────────────
 
 func TestSendSubAgentResult_Completed(t *testing.T) {

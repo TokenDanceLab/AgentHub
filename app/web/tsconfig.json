@@ -15,16 +15,10 @@
     "isolatedModules": true,
     "noEmit": true,
     "lib": ["ES2021", "DOM", "DOM.Iterable"],
-<<<<<<< HEAD
-    "paths": {
-      "@/*": ["./src/*"],
-      "@shared/*": ["./../shared/src/*"]
-=======
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
       "@shared/*": ["../shared/src/*"]
->>>>>>> origin/dev/delicious233
     }
   },
   "include": ["src"]
