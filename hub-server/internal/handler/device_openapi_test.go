@@ -55,6 +55,50 @@ func TestOpenAPIEdgeDeviceRegisterMatchesHubRouteAndEnvelope(t *testing.T) {
 	}
 }
 
+func TestOpenAPIEdgeTaskCallbacksDocumentStreamAndDoneBodies(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
+
+	streamPost := yamlMapField(t, yamlMapField(t, paths, "/edge/agent-tasks/{id}/stream", "paths.stream"), "post", "paths.stream.post")
+	streamSchema := requestBodySchema(t, streamPost, "stream")
+	if got := yamlScalarField(t, streamSchema, "$ref", "stream requestBody schema.$ref"); got != "#/components/schemas/HubTaskStreamRequest" {
+		t.Fatalf("stream request body ref = %v, want HubTaskStreamRequest", got)
+	}
+	streamRequest := yamlMapField(t, schemas, "HubTaskStreamRequest", "components.schemas.HubTaskStreamRequest")
+	streamAnyOf := yamlSequenceField(t, streamRequest, "anyOf", "HubTaskStreamRequest.anyOf")
+	if !sequenceRequires(streamAnyOf, "content") || !sequenceRequires(streamAnyOf, "chunk") || !sequenceRequires(streamAnyOf, "payload") {
+		t.Fatalf("HubTaskStreamRequest.anyOf must require content, chunk, or payload")
+	}
+	streamProps := yamlMapField(t, streamRequest, "properties", "HubTaskStreamRequest.properties")
+	requireMaxLength(t, yamlMapField(t, streamProps, "content", "HubTaskStreamRequest.properties.content"), "1048576", "stream content")
+	requireMaxLength(t, yamlMapField(t, streamProps, "chunk", "HubTaskStreamRequest.properties.chunk"), "1048576", "stream chunk")
+	requireMaxLength(t, yamlMapField(t, streamProps, "run_id", "HubTaskStreamRequest.properties.run_id"), "128", "stream run_id")
+	requireMaxLength(t, yamlMapField(t, streamProps, "edge_run_id", "HubTaskStreamRequest.properties.edge_run_id"), "128", "stream edge_run_id")
+	clientMsgID := yamlMapField(t, streamProps, "client_msg_id", "HubTaskStreamRequest.properties.client_msg_id")
+	if got := yamlScalarField(t, clientMsgID, "format", "stream client_msg_id format"); got != "uuid" {
+		t.Fatalf("stream client_msg_id format = %v, want uuid", got)
+	}
+
+	donePost := yamlMapField(t, yamlMapField(t, paths, "/edge/agent-tasks/{id}/done", "paths.done"), "post", "paths.done.post")
+	doneSchema := requestBodySchema(t, donePost, "done")
+	if got := yamlScalarField(t, doneSchema, "$ref", "done requestBody schema.$ref"); got != "#/components/schemas/HubTaskDoneRequest" {
+		t.Fatalf("done request body ref = %v, want HubTaskDoneRequest", got)
+	}
+	doneProps := yamlMapField(t, yamlMapField(t, schemas, "HubTaskDoneRequest", "components.schemas.HubTaskDoneRequest"), "properties", "HubTaskDoneRequest.properties")
+	requireMaxLength(t, yamlMapField(t, doneProps, "run_id", "HubTaskDoneRequest.properties.run_id"), "128", "done run_id")
+	requireMaxLength(t, yamlMapField(t, doneProps, "edge_run_id", "HubTaskDoneRequest.properties.edge_run_id"), "128", "done edge_run_id")
+	requireMaxLength(t, yamlMapField(t, doneProps, "final_content", "HubTaskDoneRequest.properties.final_content"), "1048576", "done final_content")
+}
+
+func requestBodySchema(t *testing.T, post *yaml.Node, name string) *yaml.Node {
+	t.Helper()
+	body := yamlMapField(t, post, "requestBody", name+" requestBody")
+	content := yamlMapField(t, body, "content", name+" requestBody.content")
+	jsonBody := yamlMapField(t, content, "application/json", name+" requestBody.application/json")
+	return yamlMapField(t, jsonBody, "schema", name+" requestBody.schema")
+}
+
 func loadOpenAPISpec(t *testing.T) *yaml.Node {
 	t.Helper()
 	raw, err := os.ReadFile("../../../api/openapi.yaml")
@@ -113,6 +157,15 @@ func yamlScalarField(t *testing.T, node *yaml.Node, key string, path string) str
 	return value.Value
 }
 
+func yamlSequenceField(t *testing.T, node *yaml.Node, key string, path string) []*yaml.Node {
+	t.Helper()
+	value := yamlField(t, node, key, path)
+	if value.Kind != yaml.SequenceNode {
+		t.Fatalf("%s has kind %v, want sequence", path, value.Kind)
+	}
+	return value.Content
+}
+
 func yamlStringSlice(t *testing.T, node *yaml.Node, path string) []string {
 	t.Helper()
 	if node.Kind != yaml.SequenceNode {
@@ -126,6 +179,28 @@ func yamlStringSlice(t *testing.T, node *yaml.Node, path string) []string {
 		items = append(items, item.Value)
 	}
 	return items
+}
+
+func sequenceRequires(items []*yaml.Node, requiredField string) bool {
+	for _, item := range items {
+		required := yamlOptionalMapField(item, "required")
+		if required == nil || required.Kind != yaml.SequenceNode {
+			continue
+		}
+		for _, field := range required.Content {
+			if field.Kind == yaml.ScalarNode && field.Value == requiredField {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func requireMaxLength(t *testing.T, node *yaml.Node, want string, field string) {
+	t.Helper()
+	if got := yamlScalarField(t, node, "maxLength", field+" maxLength"); got != want {
+		t.Fatalf("%s maxLength = %v, want %s", field, got, want)
+	}
 }
 
 func containsString(items []string, target string) bool {
