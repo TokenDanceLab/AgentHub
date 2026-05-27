@@ -158,6 +158,38 @@ func TestExecutionTargetCreateDefaultsPolicyFields(t *testing.T) {
 	require.Equal(t, "unknown", target.HealthState)
 }
 
+func TestExecutionTargetCreateRejectsClientManagedHealthState(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	svc := NewExecutionTargetService(db)
+
+	_, err := svc.Create(context.Background(), "owner-1", &model.ExecutionTarget{
+		Name:        "Forged healthy target",
+		HealthState: "healthy",
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	var count int64
+	require.NoError(t, db.Model(&model.ExecutionTarget{}).Count(&count).Error)
+	require.Zero(t, count)
+}
+
+func TestExecutionTargetUpdateRejectsClientManagedHealthState(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	seedExecutionTarget(t, db, "target-1", "owner-1")
+	svc := NewExecutionTargetService(db)
+
+	_, err := svc.Update(context.Background(), "target-1", "owner-1", &model.ExecutionTarget{
+		Name:        "Forged healthy target",
+		HealthState: "healthy",
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	var target model.ExecutionTarget
+	require.NoError(t, db.Where("id = ?", "target-1").First(&target).Error)
+	require.Equal(t, "Owner target", target.Name)
+	require.Equal(t, "unknown", target.HealthState)
+}
+
 func TestExecutionTargetRejectsInvalidWorkspaceAllowlist(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	svc := NewExecutionTargetService(db)
