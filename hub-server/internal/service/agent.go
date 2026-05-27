@@ -1031,11 +1031,12 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDevic
 	}
 
 	// insert final message if content is provided
+	var msg *model.Message
 	if finalContent != "" {
 		if err := validateAgentCallbackPayloadSize(finalContent); err != nil {
 			return err
 		}
-		msg := &model.Message{
+		msg = &model.Message{
 			SessionID:   ai.SessionID,
 			SenderType:  model.SenderTypeAgent,
 			SenderID:    task.AgentInstanceID,
@@ -1048,19 +1049,32 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDevic
 			return err
 		}
 		msg.SeqID = seq
+	}
 
-		err = s.db.Transaction(func(tx *gorm.DB) error {
-			return repository.InsertMessage(tx, msg)
-		})
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if msg != nil {
+			if err := repository.InsertMessage(tx, msg); err != nil {
+				return err
+			}
+		}
+		rowsAffected, err := repository.UpdatePendingTaskStatusAtomic(tx, taskID, task.Status, model.TaskStatusDone, "")
 		if err != nil {
 			return err
 		}
+		if rowsAffected == 0 {
+			return errcode.ErrBadRequest
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if msg != nil {
 		// #154: update session last_message_at when agent done creates a message
 		_ = repository.TouchSessionLastMessage(s.db, ai.SessionID)
 		s.bus.Publish(ctx, Event{Type: "message.new", Payload: msg})
 	}
-
-	_, _ = repository.UpdatePendingTaskStatusAtomic(s.db, taskID, task.Status, model.TaskStatusDone, "")
 
 	s.bus.Publish(ctx, Event{Type: "agent.done", Payload: map[string]interface{}{
 		"task_id":           taskID,
@@ -1098,7 +1112,13 @@ func (s *AgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeDevic
 		}
 	}
 
-	_, _ = repository.UpdatePendingTaskStatusAtomic(s.db, taskID, task.Status, model.TaskStatusFailed, errMsg)
+	rowsAffected, err := repository.UpdatePendingTaskStatusAtomic(s.db, taskID, task.Status, model.TaskStatusFailed, errMsg)
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return errcode.ErrBadRequest
+	}
 
 	s.bus.Publish(ctx, Event{Type: "agent.failed", Payload: map[string]interface{}{
 		"task_id":           taskID,
