@@ -58,7 +58,7 @@ LobeHub 的 Hub Server 设计和 AgentHub 的理念如出一辙。对照如下�
 | 模块 | LobeHub | AgentHub | 借鉴 |
 |------|------|------|------|
 | **数据库** | PostgreSQL + Drizzle ORM | PostgreSQL（contributor-a 已建 15 migration） | LobeHub 的 schema 设计作为参考 |
-| **认证** | better-auth + OIDC | JWT + Casdoor OIDC（host-redacted 已部署） | 架构一致 |
+| **认证** | better-auth + OIDC | JWT + Casdoor OIDC（已部署） | 架构一致 |
 | **用户模型** | `packages/database/src/models/user/` | contributor-a 的 `internal/model/user.go` | 字段对齐 |
 | **会话模型** | `packages/database/src/models/session/` | contributor-a 的 `internal/model/session.go` | 消息树结构参考 |
 | **Agent 模型** | `packages/database/src/models/agent/` | contributor-a 的 `internal/model/agent_instance.go` | Agent 元数据扩展 |
