@@ -1,8 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createHubClient, HubError } from '../api/hubClient';
 import type { AuthResponse, UserProfile } from '../api/hubClient';
 import { createHubAuth } from '../api/hubAuth';
-import { clearStoredHubRefreshToken, saveStoredHubRefreshToken } from '../api/hubTokenStorage';
+import {
+  clearStoredHubAccessToken,
+  clearStoredHubRefreshToken,
+  saveStoredHubAccessToken,
+  saveStoredHubRefreshToken,
+} from '../api/hubTokenStorage';
 
 const mockUser: UserProfile = {
   id: 'user_1',
@@ -20,24 +25,24 @@ const mockAuthResponse: AuthResponse = {
 // ── Helpers ──────────────────────────────────────
 
 function mockFetch(status: number, data: unknown) {
-  return vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: status === 401 ? 'Unauthorized' : status === 200 ? 'OK' : 'Error',
-    json: () => Promise.resolve(data),
-    headers: new Headers(),
-  } as Response);
+  return vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+    new Response(JSON.stringify(data), {
+      status,
+      statusText: status === 401 ? 'Unauthorized' : status === 200 ? 'OK' : 'Error',
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  );
 }
 
 function mockFetchSequence(responses: Array<{ status: number; data: unknown }>) {
   for (const r of responses) {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
-      ok: r.status >= 200 && r.status < 300,
-      status: r.status,
-      statusText: r.status === 200 ? 'OK' : 'Error',
-      json: () => Promise.resolve(r.data),
-      headers: new Headers(),
-    } as Response);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(r.data), {
+        status: r.status,
+        statusText: r.status === 200 ? 'OK' : 'Error',
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
   }
 }
 
@@ -47,89 +52,13 @@ describe('hubClient', () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
+    await clearStoredHubAccessToken();
     await clearStoredHubRefreshToken();
   });
 
   describe('createHubClient (unauthenticated)', () => {
     const client = createHubClient({ baseUrl: 'http://test.local' });
-
-    it('sends POST login with correct body', async () => {
-      const fetchSpy = mockFetch(200, mockAuthResponse);
-
-      const res = await client.login({
-        username: 'alice',
-        password: 'secret',
-        device_type: 'desktop',
-        device_id: 'dev_001',
-      });
-
-      expect(res.access_token).toBe('jwt_access_123');
-      expect(res.refresh_token).toBe('jwt_refresh_456');
-
-      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-      expect(url).toBe('http://test.local/client/auth/login');
-      expect(init.method).toBe('POST');
-      const body = JSON.parse(init.body as string);
-      expect(body.username).toBe('alice');
-      expect(body.password).toBe('secret');
-      expect(body.device_type).toBe('desktop');
-      expect(body.device_id).toBe('dev_001');
-    });
-
-    it('sends register with nickname', async () => {
-      const fetchSpy = mockFetch(200, { user_id: 'user_new' });
-
-      const res = await client.register({
-        username: 'newuser',
-        password: 'pass123',
-        nickname: 'New Guy',
-      });
-
-      expect(res.user_id).toBe('user_new');
-      const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-      const body = JSON.parse(init.body as string);
-      expect(body.nickname).toBe('New Guy');
-    });
-
-    it('throws HubError on 401 invalid credentials', async () => {
-      mockFetch(401, { error: { code: 'auth_failed', message: 'Invalid credentials' } });
-
-      await expect(
-        client.login({
-          username: 'bad',
-          password: 'wrong',
-          device_type: 'desktop',
-          device_id: 'd',
-        }),
-      ).rejects.toThrow('Invalid credentials');
-    });
-
-    it('throws on 500 server error', async () => {
-      mockFetch(500, { error: { code: 'internal_error', message: 'database down' } });
-
-      await expect(
-        client.login({
-          username: 'x',
-          password: 'y',
-          device_type: 'desktop',
-          device_id: 'z',
-        }),
-      ).rejects.toThrow('database down');
-    });
-
-    it('falls back to statusText when error body has no message', async () => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
-        ok: false,
-        status: 503,
-        statusText: 'Service Unavailable',
-        json: () => Promise.resolve({}),
-        headers: new Headers(),
-      } as Response);
-
-      await expect(
-        client.login({ username: 'x', password: 'y', device_type: 'd', device_id: 'z' }),
-      ).rejects.toThrow();
-    });
 
     it('refresh POSTs refresh_token', async () => {
       const fetchSpy = mockFetch(200, mockAuthResponse);
@@ -164,8 +93,8 @@ describe('hubClient', () => {
         getToken: () => null,
       });
 
-      const fetchSpy = mockFetch(200, { user_id: 'x' });
-      await client.register({ username: 'x', password: 'y', nickname: 'z' });
+      const fetchSpy = mockFetch(200, mockUser);
+      await client.me();
 
       const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
       expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
@@ -241,6 +170,72 @@ describe('hubClient', () => {
     });
   });
 
+  describe('execution targets', () => {
+    const client = createHubClient({ baseUrl: 'http://test.local', getToken: () => 'tok' });
+
+    it('lists Hub execution targets from the web inventory endpoint', async () => {
+      const fetchSpy = mockFetch(200, {
+        code: 'ok',
+        data: {
+          items: [
+            {
+              id: 'target-relay-1',
+              owner_id: 'user_1',
+              name: 'Hub relay alpha',
+              target_type: 'hub_relay',
+              health_state: 'healthy',
+              is_online: true,
+            },
+          ],
+          page: { hasMore: false, nextCursor: '' },
+        },
+      });
+
+      const res = await client.listExecutionTargets();
+
+      expect(res.items[0].name).toBe('Hub relay alpha');
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('http://test.local/web/execution-targets');
+      expect(init.method).toBeUndefined();
+      expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
+    });
+
+    it('pings a Hub execution target through the web endpoint', async () => {
+      const fetchSpy = mockFetch(200, { code: 'ok', data: null });
+
+      await client.pingExecutionTarget('target-relay-1');
+
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('http://test.local/web/execution-targets/target-relay-1/ping');
+      expect(init.method).toBe('POST');
+    });
+
+    it('passes target_id when triggering a Hub agent task', async () => {
+      const fetchSpy = mockFetch(200, {
+        code: 'ok',
+        data: {
+          id: 'task-1',
+          agent_instance_id: 'agent-1',
+          triggered_by_user_id: 'user_1',
+          trigger_message_id: 'msg-1',
+          target_id: 'target-relay-1',
+          status: 'queued',
+        },
+      });
+
+      const res = await client.triggerAgentTask('msg-1', { target_id: 'target-relay-1' });
+
+      expect(res.target_id).toBe('target-relay-1');
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('http://test.local/web/agent-tasks');
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(init.body as string)).toEqual({
+        trigger_message_id: 'msg-1',
+        target_id: 'target-relay-1',
+      });
+    });
+  });
+
   describe('baseUrl handling', () => {
     it('strips trailing slash from baseUrl', async () => {
       const client = createHubClient({ baseUrl: 'http://test.local/' });
@@ -258,94 +253,26 @@ describe('hubAuth', () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
+    await clearStoredHubAccessToken();
     await clearStoredHubRefreshToken();
   });
 
   const newAuth = () => createHubAuth(createHubClient({ baseUrl: 'http://test.local' }));
 
-  describe('login flow', () => {
-    it('stores token and fetches user on successful login', async () => {
-      const auth = newAuth();
-
-      mockFetchSequence([
-        { status: 200, data: mockAuthResponse }, // login
-        { status: 200, data: mockUser },          // me
-      ]);
-
-      await auth.login('alice', 'hunter2');
-
-      const state = auth.getState();
-      expect(state.token).toBe('jwt_access_123');
-      expect(state.refreshToken).toBe('jwt_refresh_456');
-      expect(state.isAuthenticated).toBe(true);
-      expect(state.user?.username).toBe('testuser');
-      expect(localStorage.getItem('agenthub_hub_token')).toBe('jwt_access_123');
-      expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
-    });
-
-    it('uses the stable desktop device id for legacy login', async () => {
-      localStorage.setItem('agenthub_device_id', '00000000-0000-0000-0000-00000000a001');
-      const auth = newAuth();
-
-      mockFetchSequence([
-        { status: 200, data: mockAuthResponse },
-        { status: 200, data: mockUser },
-      ]);
-
-      await auth.login('alice', 'hunter2');
-
-      const [, init] = vi.mocked(globalThis.fetch).mock.calls[0] as [string, RequestInit];
-      const body = JSON.parse(init.body as string);
-      expect(body.device_id).toBe('00000000-0000-0000-0000-00000000a001');
-    });
-
-    it('notifies subscribers on login', async () => {
-      const auth = newAuth();
-      const states: { isAuthenticated: boolean }[] = [];
-
-      auth.subscribe((s) => states.push({ isAuthenticated: s.isAuthenticated }));
-
-      mockFetchSequence([
-        { status: 200, data: mockAuthResponse },
-        { status: 200, data: mockUser },
-      ]);
-
-      await auth.login('alice', 'hunter2');
-      // Should have been notified at least once with isAuthenticated=true
-      expect(states.some((s) => s.isAuthenticated)).toBe(true);
-    });
-
-    it('unsubscribe stops receiving notifications', async () => {
-      const auth = newAuth();
-      const calls: boolean[] = [];
-      const unsub = auth.subscribe((s) => calls.push(s.isAuthenticated));
-
-      // Unsubscribe immediately
-      unsub();
-
-      mockFetchSequence([
-        { status: 200, data: mockAuthResponse },
-        { status: 200, data: mockUser },
-      ]);
-      await auth.login('alice', 'hunter2');
-      // Still called once for initial subscription, then unsubscribed
-      // The unsubscribe should prevent additional calls during login
-      expect(calls.length).toBeLessThanOrEqual(1);
-    });
-  });
+  // Helper: seed authenticated state via a stored token that tryAutoLogin reads.
+  async function seedAuthenticated(auth: ReturnType<typeof createHubAuth>) {
+    await saveStoredHubAccessToken('jwt_access_123');
+    mockFetch(200, mockUser);
+    const ok = await auth.tryAutoLogin();
+    if (!ok) throw new Error('seedAuthenticated failed');
+  }
 
   describe('logout flow', () => {
-    it('clears state and localStorage on logout', async () => {
+    it('clears state and sessionStorage on logout', async () => {
       const auth = newAuth();
+      await seedAuthenticated(auth);
 
-      // First login
-      mockFetchSequence([
-        { status: 200, data: mockAuthResponse },
-        { status: 200, data: mockUser },
-      ]);
-      await auth.login('alice', 'hunter2');
-
-      // Then logout
       mockFetch(200, {});
       await auth.logout();
 
@@ -360,12 +287,7 @@ describe('hubAuth', () => {
 
     it('logout handles server errors gracefully', async () => {
       const auth = newAuth();
-
-      mockFetchSequence([
-        { status: 200, data: mockAuthResponse },
-        { status: 200, data: mockUser },
-      ]);
-      await auth.login('alice', 'hunter2');
+      await seedAuthenticated(auth);
 
       // Server errors during logout should not throw
       vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('network error'));
@@ -383,7 +305,7 @@ describe('hubAuth', () => {
     });
 
     it('returns true and fetches user when token is valid', async () => {
-      localStorage.setItem('agenthub_hub_token', 'stored_token');
+      await saveStoredHubAccessToken('stored_token');
       const auth = newAuth();
 
       mockFetch(200, mockUser);
@@ -395,7 +317,7 @@ describe('hubAuth', () => {
     });
 
     it('refreshes token when stored token is expired', async () => {
-      localStorage.setItem('agenthub_hub_token', 'expired_token');
+      await saveStoredHubAccessToken('expired_token');
       await saveStoredHubRefreshToken('valid_refresh');
       const auth = newAuth();
 
@@ -411,12 +333,13 @@ describe('hubAuth', () => {
       expect(auth.getState().token).toBe('new_token');
       expect(auth.getState().refreshToken).toBe('new_refresh');
       expect(auth.getState().isAuthenticated).toBe(true);
-      expect(localStorage.getItem('agenthub_hub_token')).toBe('new_token');
+      expect(sessionStorage.getItem('agenthub_hub_token')).toBe('new_token');
+      expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
       expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
     });
 
     it('returns false and clears state when both token and refresh fail', async () => {
-      localStorage.setItem('agenthub_hub_token', 'bad_token');
+      await saveStoredHubAccessToken('bad_token');
       await saveStoredHubRefreshToken('bad_refresh');
       const auth = newAuth();
 
@@ -432,11 +355,12 @@ describe('hubAuth', () => {
       expect(auth.getState().refreshToken).toBeNull();
       expect(auth.getState().isAuthenticated).toBe(false);
       expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
+      expect(sessionStorage.getItem('agenthub_hub_token')).toBeNull();
       expect(localStorage.getItem('agenthub_hub_refresh')).toBeNull();
     });
 
     it('returns false and clears state when token fails and no refresh token exists', async () => {
-      localStorage.setItem('agenthub_hub_token', 'bad_token');
+      await saveStoredHubAccessToken('bad_token');
       // No refresh token
       const auth = newAuth();
 
@@ -447,22 +371,21 @@ describe('hubAuth', () => {
       expect(result).toBe(false);
       expect(auth.getState().isAuthenticated).toBe(false);
       expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
+      expect(sessionStorage.getItem('agenthub_hub_token')).toBeNull();
     });
   });
 
   describe('getState snapshot stability', () => {
-    it('returns a stable frozen snapshot until auth state changes', async () => {
+    it('returns a stable frozen snapshot after auto-login', async () => {
       const auth = newAuth();
 
       const initialSnapshot = auth.getState();
       expect(auth.getState()).toBe(initialSnapshot);
       expect(Object.isFrozen(initialSnapshot)).toBe(true);
 
-      mockFetchSequence([
-        { status: 200, data: mockAuthResponse },
-        { status: 200, data: mockUser },
-      ]);
-      await auth.login('alice', 'hunter2');
+      await saveStoredHubAccessToken('stored_token');
+      mockFetch(200, mockUser);
+      await auth.tryAutoLogin();
 
       const snapshot = auth.getState();
       expect(snapshot).not.toBe(initialSnapshot);

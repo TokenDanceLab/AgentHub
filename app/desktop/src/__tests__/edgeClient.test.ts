@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchHealth, fetchRunners, startRun, cancelRun } from '../api/edgeClient';
+import { fetchHealth, fetchRunners, startRun, cancelRun, decidePermission } from '../api/edgeClient';
 
 describe('edgeClient', () => {
   beforeEach(() => {
@@ -140,6 +140,35 @@ describe('edgeClient', () => {
       expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringMatching(/\/v1\/runs\/run_x:cancel$/),
         expect.anything(),
+      );
+    });
+  });
+
+  describe('decidePermission', () => {
+    it('posts a run-scoped permission decision to Edge', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ status: 'ok' }),
+      } as Response);
+
+      await decidePermission({
+        runId: 'run_abc123',
+        requestId: 'perm_1',
+        decision: 'deny',
+        reason: 'test denial',
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/permissions\/decide$/),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            runId: 'run_abc123',
+            requestId: 'perm_1',
+            decision: 'deny',
+            reason: 'test denial',
+          }),
+        }),
       );
     });
   });

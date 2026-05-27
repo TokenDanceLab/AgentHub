@@ -1,11 +1,11 @@
 package adapters
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
+	"os/exec"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -17,11 +17,13 @@ import (
 type CodexAdapter struct {
 	binaryPath string
 	model      string
+	available  bool // #177: true if the CLI binary exists and is executable
 }
 
 // NewCodexAdapter creates a Codex adapter.
 func NewCodexAdapter(binaryPath, model string) *CodexAdapter {
-	return &CodexAdapter{binaryPath: binaryPath, model: model}
+	_, err := exec.LookPath(binaryPath)
+	return &CodexAdapter{binaryPath: binaryPath, model: model, available: err == nil}
 }
 
 func (a *CodexAdapter) Metadata() AdapterMetadata {
@@ -81,8 +83,23 @@ func (a *CodexAdapter) BuildCommand(ctx RunProcessContext) (string, []string, []
 		args = append(args, "--ephemeral")
 	}
 
+	// Image input (--image / -i)
+	if image, ok := ctx.ConfigOverrides["image"]; ok && image != "" {
+		args = append(args, "--image", image)
+	}
+
+	// Add working directory for tool access (mirrors Claude Code --add-dir)
+	if ctx.WorkDir != "" {
+		args = append(args, "--add-dir", ctx.WorkDir)
+	}
+
 	// Structured JSON output
 	args = append(args, "--json")
+
+	// Skills prompt: prepend to the prompt text since Codex has no --append-system-prompt.
+	if ctx.SkillsPrompt != "" {
+		prompt = ctx.SkillsPrompt + "\n\n---\n\n" + prompt
+	}
 
 	args = append(args, prompt)
 
@@ -119,21 +136,10 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 		"runId":     run.ID,
 	}
 
-	scanner := bufio.NewScanner(stdout)
-	configureAdapterScanner(scanner)
-
 	jsonlMode := false
 	offset := 0
 
-	for scanner.Scan() {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
-
+	return ScanLines(ctx, stdout, func(line []byte) error {
 		if !jsonlMode {
 			var probe json.RawMessage
 			if json.Unmarshal(line, &probe) == nil {
@@ -150,7 +156,7 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 					"offset":  offset,
 				})
 				offset += len(line)
-				continue
+				return nil
 			}
 			a.dispatchCodexEvent(scope, emitter, &evt)
 		} else {
@@ -161,13 +167,17 @@ func (a *CodexAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin 
 			})
 			offset += len(line)
 		}
-	}
-	return scanner.Err()
+		return nil
+	})
 }
 
 // NeedsStdin returns false — Codex uses JSONL output via --json flag
 // and does NOT require bidirectional stdin communication.
 func (a *CodexAdapter) NeedsStdin() bool { return false }
+
+// Available reports whether the codex CLI binary was found at startup.
+// #177: check binary at startup, report unavailable if missing.
+func (a *CodexAdapter) Available() bool { return a.available }
 
 // --- Event types ---
 
@@ -326,6 +336,8 @@ func (a *CodexAdapter) dispatchItemUpdated(scope map[string]any, emitter EventEm
 	case "command_execution":
 		a.emitToolProgress(raw, scope, emitter)
 	case "mcp_tool_call":
+		a.emitToolProgress(raw, scope, emitter)
+	case "web_search":
 		a.emitToolProgress(raw, scope, emitter)
 	case "collab_tool_call":
 		a.emitTaskNotification(raw, scope, emitter)
@@ -540,6 +552,17 @@ func (a *CodexAdapter) emitToolProgress(raw json.RawMessage, scope map[string]an
 			slog.Debug("codex: emitToolProgress mcp_tool_call unmarshal failed", "err", err)
 		}
 		payload["toolName"] = "mcp__" + item.Server + "__" + item.Tool
+	case "web_search":
+		var item struct {
+			Query  string `json:"query"`
+			Action string `json:"action"`
+		}
+		if err := json.Unmarshal(raw, &item); err != nil {
+			slog.Debug("codex: emitToolProgress web_search unmarshal failed", "err", err)
+		}
+		payload["toolName"] = "web_search"
+		payload["kind"] = "web_search"
+		payload["input"] = map[string]any{"query": item.Query, "action": item.Action}
 	}
 	emitter.Emit(BusEventToolCall, scope, payload)
 }

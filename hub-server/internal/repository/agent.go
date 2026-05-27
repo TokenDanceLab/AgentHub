@@ -71,6 +71,15 @@ func GetPendingTaskByID(db *gorm.DB, id string) (*model.PendingAgentTask, error)
 	return &task, err
 }
 
+func ListPendingTasksByIDs(db *gorm.DB, ids []string) ([]model.PendingAgentTask, error) {
+	var tasks []model.PendingAgentTask
+	if len(ids) == 0 {
+		return tasks, nil
+	}
+	err := db.Where("id IN ?", ids).Find(&tasks).Error
+	return tasks, err
+}
+
 func UpdatePendingTaskStatus(db *gorm.DB, id, status, errMsg string) error {
 	return UpdatePendingTaskStatusWithEdgeRunID(db, id, status, errMsg, "")
 }
@@ -84,7 +93,16 @@ func UpdatePendingTaskDispatched(db *gorm.DB, id, edgeDeviceID string) error {
 	if edgeDeviceID != "" {
 		updates["edge_device_id"] = edgeDeviceID
 	}
-	return db.Model(&model.PendingAgentTask{}).Where("id = ?", id).Updates(updates).Error
+	result := db.Model(&model.PendingAgentTask{}).
+		Where("id = ? AND status IN ?", id, []string{model.TaskStatusQueued, model.TaskStatusDispatched}).
+		Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func UpdatePendingTaskStatusWithEdgeRunID(db *gorm.DB, id, status, errMsg, edgeRunID string) error {
@@ -154,18 +172,18 @@ func UpdatePendingTaskStatusAtomicWithEdgeRunID(db *gorm.DB, id, oldStatus, newS
 	return result.RowsAffected, result.Error
 }
 
-// UpdatePendingTaskEdgeRunID sets the edge_run_id on a task that has an empty
-// edge_run_id. Used when the task is already running and only the edge run id
-// needs backfilling (idempotent).
-func UpdatePendingTaskEdgeRunID(db *gorm.DB, id, edgeRunID string) error {
-	return db.Model(&model.PendingAgentTask{}).
-		Where("id = ? AND edge_run_id = ?", id, "").
-		Update("edge_run_id", edgeRunID).Error
+// UpdatePendingTaskEdgeRunID sets the edge_run_id on a running task that has an
+// empty edge_run_id. RowsAffected is 0 when a concurrent callback won the race.
+func UpdatePendingTaskEdgeRunID(db *gorm.DB, id, edgeRunID string) (int64, error) {
+	result := db.Model(&model.PendingAgentTask{}).
+		Where("id = ? AND status = ? AND edge_run_id = ?", id, model.TaskStatusRunning, "").
+		Update("edge_run_id", edgeRunID)
+	return result.RowsAffected, result.Error
 }
 
 func ScanExpiredTasks(db *gorm.DB) ([]model.PendingAgentTask, error) {
 	var tasks []model.PendingAgentTask
-	err := db.Where("expire_at < NOW() AND status IN ?", []string{model.TaskStatusQueued, model.TaskStatusDispatched}).Find(&tasks).Error
+	err := db.Where("expire_at < ? AND status IN ?", time.Now(), []string{model.TaskStatusQueued, model.TaskStatusDispatched, model.TaskStatusRunning}).Find(&tasks).Error
 	return tasks, err
 }
 
@@ -174,4 +192,59 @@ func CancelTasksByAgentInstance(db *gorm.DB, agentInstanceID string) error {
 	return db.Model(&model.PendingAgentTask{}).
 		Where("agent_instance_id = ? AND status IN ?", agentInstanceID, []string{model.TaskStatusQueued, model.TaskStatusDispatched, model.TaskStatusRunning}).
 		Updates(map[string]interface{}{"status": model.TaskStatusCancelled, "finished_at": &now}).Error
+}
+
+// BumpRunningTaskExpireAt extends the expire_at timestamp for a running task,
+// keeping it alive while activity (stream callbacks) continues.
+// #132: running tasks that stop receiving activity will be expired by the scheduler.
+func BumpRunningTaskExpireAt(db *gorm.DB, id string, ttl time.Duration) error {
+	newExpire := time.Now().Add(ttl)
+	return db.Model(&model.PendingAgentTask{}).
+		Where("id = ? AND status = ?", id, model.TaskStatusRunning).
+		Update("expire_at", newExpire).Error
+}
+
+func CreateAgentRunEventWithNextSeq(db *gorm.DB, event *model.AgentRunEvent) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		var maxSeq int64
+		if err := tx.Model(&model.AgentRunEvent{}).
+			Where("task_id = ?", event.TaskID).
+			Select("COALESCE(MAX(event_seq), 0)").
+			Scan(&maxSeq).Error; err != nil {
+			return err
+		}
+		event.EventSeq = maxSeq + 1
+		return tx.Create(event).Error
+	})
+}
+
+func ListAgentRunEventsByTaskID(db *gorm.DB, taskID string) ([]model.AgentRunEvent, error) {
+	return ListAgentRunEventsByTaskIDFiltered(db, taskID, model.AgentRunEventFilter{})
+}
+
+func ListAgentRunEventsByTaskIDFiltered(db *gorm.DB, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error) {
+	var events []model.AgentRunEvent
+	query := db.Where("task_id = ?", taskID)
+	if filter.EventType != "" {
+		query = query.Where("event_type = ?", filter.EventType)
+	}
+	if filter.AfterSeq > 0 {
+		query = query.Where("event_seq > ?", filter.AfterSeq)
+	}
+	if filter.Limit > 0 {
+		query = query.Limit(filter.Limit)
+	}
+	err := query.Order("event_seq ASC, created_at ASC, id ASC").Find(&events).Error
+	return events, err
+}
+
+func ListAgentRunEventsByTaskIDs(db *gorm.DB, taskIDs []string) ([]model.AgentRunEvent, error) {
+	var events []model.AgentRunEvent
+	if len(taskIDs) == 0 {
+		return events, nil
+	}
+	err := db.Where("task_id IN ?", taskIDs).
+		Order("task_id ASC, event_seq ASC, created_at ASC, id ASC").
+		Find(&events).Error
+	return events, err
 }

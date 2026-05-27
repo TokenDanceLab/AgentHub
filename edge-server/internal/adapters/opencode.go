@@ -1,11 +1,12 @@
 package adapters
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
+	"os/exec"
+	"strings"
 
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -16,11 +17,13 @@ import (
 // Phase 2: opencode run "prompt" --format json — structured JSON events.
 type OpenCodeAdapter struct {
 	binaryPath string
+	available  bool // #177: true if the CLI binary exists and is executable
 }
 
 // NewOpenCodeAdapter creates an OpenCode adapter.
 func NewOpenCodeAdapter(binaryPath string) *OpenCodeAdapter {
-	return &OpenCodeAdapter{binaryPath: binaryPath}
+	_, err := exec.LookPath(binaryPath)
+	return &OpenCodeAdapter{binaryPath: binaryPath, available: err == nil}
 }
 
 func (a *OpenCodeAdapter) Metadata() AdapterMetadata {
@@ -87,6 +90,30 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 		args = append(args, "--dangerously-skip-permissions")
 	}
 
+	// Attach files via --file (supports comma-separated list via ConfigOverrides)
+	if files, ok := ctx.ConfigOverrides["files"]; ok && files != "" {
+		for _, f := range splitComma(files) {
+			if f != "" {
+				args = append(args, "--file", f)
+			}
+		}
+	}
+
+	// Working directory as --dir (supplemental to process workDir)
+	if ctx.WorkDir != "" {
+		args = append(args, "--dir", ctx.WorkDir)
+	}
+
+	// Slash command via --command (e.g., /compact)
+	if cmd, ok := ctx.ConfigOverrides["command"]; ok && cmd != "" {
+		args = append(args, "--command", cmd)
+	}
+
+	// Skills prompt: prepend to the prompt since OpenCode has no --append-system-prompt.
+	if ctx.SkillsPrompt != "" {
+		prompt = ctx.SkillsPrompt + "\n\n---\n\n" + prompt
+	}
+
 	args = append(args, prompt)
 
 	workDir := ctx.WorkDir
@@ -106,30 +133,24 @@ func (a *OpenCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, std
 		"runId":     run.ID,
 	}
 
-	scanner := bufio.NewScanner(stdout)
-	configureAdapterScanner(scanner)
-
-	for scanner.Scan() {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
+	return ScanLines(ctx, stdout, func(line []byte) error {
 		var evt opencodeEvent
 		if err := json.Unmarshal(line, &evt); err != nil {
 			slog.Debug("opencode: skipping unparseable line", "err", err)
-			continue
+			return nil
 		}
 		a.dispatch(scope, emitter, &evt)
-	}
-	return scanner.Err()
+		return nil
+	})
 }
 
 // NeedsStdin returns false — OpenCode runs in batch mode with the prompt
 // passed as a CLI argument, so it does NOT read stdin.
 func (a *OpenCodeAdapter) NeedsStdin() bool { return false }
+
+// Available reports whether the opencode CLI binary was found at startup.
+// #177: check binary at startup, report unavailable if missing.
+func (a *OpenCodeAdapter) Available() bool { return a.available }
 
 func (a *OpenCodeAdapter) dispatch(scope map[string]any, emitter EventEmitter, evt *opencodeEvent) {
 	// Forward sessionID to scope if present
@@ -283,4 +304,17 @@ type opencodeTokens struct {
 type opencodeCache struct {
 	Write int `json:"write"`
 	Read  int `json:"read"`
+}
+
+// splitComma splits a comma-separated string into trimmed, non-empty tokens.
+func splitComma(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

@@ -5,47 +5,37 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-<<<<<<< HEAD
     "build": "tsc && vite build",
-=======
-    "build": "tsgo && vite build",
->>>>>>> origin/dev/trump
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-<<<<<<< HEAD
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@lobehub/icons": "^5.8.0",
+    "@tanstack/react-query": "^5.100.14",
+    "@tanstack/react-virtual": "^3.13.25",
     "i18next": "^26.2.0",
+    "lucide-react": "^1.16.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-i18next": "^17.0.8",
-=======
-    "typecheck": "tsgo -p tsconfig.json --noEmit"
-  },
-  "dependencies": {
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
->>>>>>> origin/dev/trump
-    "react-router-dom": "^7"
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7",
+    "react-syntax-highlighter": "^16.1.1",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-<<<<<<< HEAD
-=======
-    "@typescript/native-preview": "beta",
->>>>>>> origin/dev/trump
+    "@types/node": "^25.9.1",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.4.0",
     "jsdom": "^29.1.1",
-<<<<<<< HEAD
     "typescript": "~5.8.0",
-=======
->>>>>>> origin/dev/trump
     "vite": "^6.3.0",
     "vitest": "^4.1.7"
   }

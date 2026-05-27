@@ -40,6 +40,12 @@ type AgentAdapter interface {
 	// When false, the process executor will NOT open stdin, avoiding deadlocks
 	// with CLIs that block on stdin read when a pipe is attached.
 	NeedsStdin() bool
+
+	// Available reports whether the adapter's CLI binary is executable.
+	// When the binary does not exist or is not runnable, this returns false
+	// and the adapter should be reported as unavailable in health/agent listings.
+	// #177: check binary at startup, report unavailable if missing.
+	Available() bool
 }
 
 // EventEmitter abstracts the event bus so adapters don't couple to it directly.
@@ -72,9 +78,9 @@ type AgentCapabilities struct {
 type SubAgentTask struct {
 	TaskID      string `json:"taskId"`
 	Description string `json:"description"`
-	AgentID     string `json:"agentId"`   // target agent adapter ID
-	Prompt      string `json:"prompt"`    // task prompt for the sub-agent
-	Depth       int    `json:"depth"`     // delegation depth (root=0)
+	AgentID     string `json:"agentId"` // target agent adapter ID
+	Prompt      string `json:"prompt"`  // task prompt for the sub-agent
+	Depth       int    `json:"depth"`   // delegation depth (root=0)
 	ParentRunID string `json:"parentRunId"`
 	ThreadID    string `json:"threadId,omitempty"` // inherited from parent run
 	Model       string `json:"model,omitempty"`    // model override propagated from parent context
@@ -102,6 +108,7 @@ const (
 	BusEventToolCall            = "run.agent.tool_call"
 	BusEventToolResult          = "run.agent.tool_result"
 	BusEventFileChange          = "run.agent.file_change"
+	BusEventRouteDecision       = "run.agent.route_decision"
 	BusEventSessionInit         = "run.agent.session_init"
 	BusEventResult              = "run.agent.result"
 	BusEventCompactBoundary     = "run.agent.compact_boundary"
@@ -125,6 +132,7 @@ const (
 	BusEventSessionMetrics      = "run.agent.session_metrics"
 	BusEventContextUsage        = "run.agent.context_usage"
 	BusEventContextWarning      = "run.agent.context_warning"
+	BusEventContextCompaction   = "run.agent.context_compaction"
 )
 
 // Context keys for adapter-level context propagation.

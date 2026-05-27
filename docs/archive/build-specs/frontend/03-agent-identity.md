@@ -289,7 +289,7 @@ agents:
 ```
 ┌─────────────────────────────────┐
 │ 🔍 Search sessions...           │
-│ [All] [Hub] [Edge:us1] [+ New] │
+│ [All] [Hub] [Edge:edge-01] [+ New] │
 ├─────────────────────────────────┤
 │ 📂 project-search               │  ← ProjectTree（现有）
 │   ├─ auth-refactor              │
@@ -371,7 +371,7 @@ agents:
 **MessageHeader**（来自 `design-desktop-ux.md` 的现有组件，增强后）：
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ 🐍 Senior Backend Developer · [Edge:us1] · 2 min ago       │
+│ 🐍 Senior Backend Developer · [Edge:edge-01] · 2 min ago       │
 │ executor · Claude Sonnet 4.5 · Run #3                       │
 ├─────────────────────────────────────────────────────────────┤
 │ I've analyzed the auth module and found three issues:       │

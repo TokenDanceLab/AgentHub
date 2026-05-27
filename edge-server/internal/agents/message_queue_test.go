@@ -355,4 +355,119 @@ func TestMessage_ZeroValue(t *testing.T) {
 	if !msg.Timestamp.IsZero() {
 		t.Fatal("zero-value Message.Timestamp should be zero")
 	}
+	if msg.TriggerTurn {
+		t.Fatal("zero-value Message.TriggerTurn should be false")
+	}
+}
+
+// ── Feature: Mailbox trigger_turn auto-wake ──
+
+func TestQueue_TriggerTurnWakeSignal(t *testing.T) {
+	q := NewQueue()
+	msgCh := q.EnsureAgent("agent-1", 64)
+	wakeCh := q.WakeChan("agent-1")
+	if wakeCh == nil {
+		t.Fatal("WakeChan should return non-nil after EnsureAgent")
+	}
+
+	// Send a message with TriggerTurn = true.
+	msg := Message{
+		ID:          "msg-1",
+		FromAgentID: "child",
+		ToAgentID:   "agent-1",
+		Type:        MsgTypeResult,
+		TriggerTurn: true,
+	}
+	if !q.Send(msg) {
+		t.Fatal("Send with TriggerTurn should succeed")
+	}
+
+	// The message should be on the message channel.
+	select {
+	case received := <-msgCh:
+		if received.ID != "msg-1" {
+			t.Fatalf("received wrong message ID: %s", received.ID)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for message")
+	}
+
+	// The wake channel should have a signal.
+	select {
+	case <-wakeCh:
+		// wake signal received
+	default:
+		t.Fatal("wake channel should have a signal when TriggerTurn is true")
+	}
+
+	// Second wake signal should not block (channel buffered size 1).
+	msg2 := Message{
+		ID:          "msg-2",
+		FromAgentID: "child",
+		ToAgentID:   "agent-1",
+		Type:        MsgTypeProgress,
+		TriggerTurn: true,
+	}
+	if !q.Send(msg2) {
+		t.Fatal("second Send with TriggerTurn should succeed")
+	}
+	// After draining the first wake, the second should be available.
+	// But the channel buffer is 1, so after consuming the first, we may
+	// have gotten the second wake. Let's just verify it didn't panic.
+}
+
+func TestQueue_PostMessage(t *testing.T) {
+	q := NewQueue()
+	msgCh := q.EnsureAgent("agent-1", 64)
+	wakeCh := q.WakeChan("agent-1")
+
+	// PostMessage always sets TriggerTurn.
+	ok := q.PostMessage(Message{
+		ID:          "msg-1",
+		FromAgentID: "child",
+		ToAgentID:   "agent-1",
+		Type:        MsgTypeResult,
+	})
+	if !ok {
+		t.Fatal("PostMessage should return true")
+	}
+
+	// Message delivered.
+	select {
+	case received := <-msgCh:
+		if !received.TriggerTurn {
+			t.Fatal("PostMessage should set TriggerTurn to true on the delivered message")
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for message")
+	}
+
+	// Wake signal delivered.
+	select {
+	case <-wakeCh:
+	default:
+		t.Fatal("PostMessage should deliver wake signal")
+	}
+}
+
+func TestQueue_WakeChanNilBeforeEnsure(t *testing.T) {
+	q := NewQueue()
+
+	// WakeChan should return nil before EnsureAgent.
+	if ch := q.WakeChan("nonexistent"); ch != nil {
+		t.Fatal("WakeChan should return nil for unregistered agent")
+	}
+
+	// After EnsureAgent, it should return a valid channel.
+	_ = q.EnsureAgent("agent-1", 64)
+	wc := q.WakeChan("agent-1")
+	if wc == nil {
+		t.Fatal("WakeChan should return non-nil after EnsureAgent")
+	}
+
+	// After Close, it should return nil again.
+	q.Close("agent-1")
+	if ch := q.WakeChan("agent-1"); ch != nil {
+		t.Fatal("WakeChan should return nil after Close")
+	}
 }

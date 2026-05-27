@@ -79,7 +79,7 @@ hub-server/**
 - [ ] 把 Desktop Settings 中 IM 群聊、MCP、模型映射、cc-switch、远控/审计继续接到真实 Hub/Edge/API 或本机配置源。
 - [ ] 补 runStore / TanStack Query active run 列表同步链，减少只靠 optimistic run 的状态差异。
 - [ ] 决定 `/v1/runners`、`runner.*` 是否长期作为 deprecated compatibility，并规划 Runtime/Target 命名迁移。
-- [ ] Web UI 移植继续保持独立分支开发，合并前处理落后主分支和产品入口确认。
+- [x] WebAgent closeout 已合入 `dev/delicious233`；旧 Trump/Web parity 分支只作为单独审查输入，不再作为默认开发线。
 
 ## 6. 验证命令
 

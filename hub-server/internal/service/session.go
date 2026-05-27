@@ -65,6 +65,15 @@ func (s *SessionService) CreatePrivateSession(ctx context.Context, currentUserID
 		return nil, err
 	}
 
+	// #122: verify both users are friends before creating a private session.
+	f, err := repository.FindFriendshipBetween(s.db, currentUserID, targetUserID)
+	if err != nil {
+		return nil, err
+	}
+	if f == nil || f.Status != model.StatusAccepted {
+		return nil, errcode.FriendNotFriend
+	}
+
 	existing, err := repository.FindPrivateSessionBetween(s.db, currentUserID, targetUserID)
 	if err != nil {
 		return nil, err
@@ -99,26 +108,25 @@ func (s *SessionService) CreateGroupSession(ctx context.Context, ownerUserID, na
 	if len(name) == 0 || len(name) > config.MaxGroupNameLength {
 		return nil, errcode.ErrBadRequest
 	}
-	if len(memberIDs) == 0 {
-		return nil, errcode.ErrBadRequest
-	}
 
-	friendIDs, err := repository.GetFriendIDs(s.db, ownerUserID)
-	if err != nil {
-		return nil, err
-	}
-	friendSet := make(map[string]bool)
-	for _, id := range friendIDs {
-		friendSet[id] = true
-	}
-	for _, mid := range memberIDs {
-		if !friendSet[mid] {
-			return nil, errcode.ErrBadRequest
+	if len(memberIDs) > 0 {
+		friendIDs, err := repository.GetFriendIDs(s.db, ownerUserID)
+		if err != nil {
+			return nil, err
+		}
+		friendSet := make(map[string]bool)
+		for _, id := range friendIDs {
+			friendSet[id] = true
+		}
+		for _, mid := range memberIDs {
+			if !friendSet[mid] {
+				return nil, errcode.ErrBadRequest
+			}
 		}
 	}
 
 	session := &model.Session{Type: model.SessionTypeGroup, Name: name, OwnerUserID: &ownerUserID}
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := repository.CreateSession(tx, session); err != nil {
 			return err
 		}
@@ -212,9 +220,28 @@ func (s *SessionService) AddGroupMembers(ctx context.Context, currentUserID, ses
 		return errcode.ErrBadRequest
 	}
 
-	_, err = s.requireMember(ctx, sessionID, currentUserID)
+	// #86: Only the group owner can add members, and members must be friends.
+	member, err := s.requireMember(ctx, sessionID, currentUserID)
 	if err != nil {
 		return err
+	}
+	if member.Role != model.MemberRoleOwner {
+		return errcode.GroupNotOwner
+	}
+
+	// Re-apply friend-boundary check: owner can only invite friends into the group.
+	friendIDs, err := repository.GetFriendIDs(s.db, currentUserID)
+	if err != nil {
+		return err
+	}
+	friendSet := make(map[string]bool)
+	for _, id := range friendIDs {
+		friendSet[id] = true
+	}
+	for _, mid := range memberIDs {
+		if !friendSet[mid] {
+			return errcode.ErrBadRequest
+		}
 	}
 
 	// Deduplicate member IDs to prevent duplicate key violations
@@ -505,7 +532,11 @@ func (s *SessionService) DeleteForMe(ctx context.Context, currentUserID, session
 		}
 	}
 
-	return repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID)
+	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID); err != nil {
+		return err
+	}
+	resolveSessionCache(s.cacheClient).Invalidate(ctx, "session:members:"+sessionID)
+	return nil
 }
 
 func (s *SessionService) SearchSessions(ctx context.Context, userID, q string) ([]SessionListItem, error) {
@@ -540,4 +571,9 @@ func (s *SessionService) SearchSessions(ctx context.Context, userID, q string) (
 		}
 	}
 	return result, nil
+}
+
+// ListActiveMembers returns all active (non-left) members of a session. Thin wrapper over repository.ListActiveMembers.
+func (s *SessionService) ListActiveMembers(sessionID string) ([]*model.SessionMember, error) {
+	return repository.ListActiveMembers(s.db, sessionID)
 }

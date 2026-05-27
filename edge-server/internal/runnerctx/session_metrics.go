@@ -2,8 +2,6 @@
 // between the API handler, lifecycle executor, and agent adapters.
 package runnerctx
 
-import "math"
-
 // SessionMetrics holds aggregate context and cost metrics for a session,
 // mirroring OpenCode's session usage tracking model.
 type SessionMetrics struct {
@@ -33,11 +31,4 @@ type CostMetrics struct {
 	TotalCostUSD  float64 `json:"totalCostUsd"`
 	ModelLabel    string  `json:"modelLabel"`
 	ProviderLabel string  `json:"providerLabel"`
-}
-
-// EstimateTokens implements OpenCode's char/4 formula for estimating token count
-// from raw character length. This is a rough heuristic used when actual token
-// counts are unavailable from the API.
-func EstimateTokens(chars int) int {
-	return int(math.Ceil(float64(chars) / 4))
 }
