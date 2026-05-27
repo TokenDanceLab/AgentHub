@@ -190,3 +190,32 @@ func TestAllErrorsHaveNonEmptyCode(t *testing.T) {
 		}
 	}
 }
+
+func TestErrorIs(t *testing.T) {
+	e := New("TEST", "msg", 400)
+	if !e.Is(e) {
+		t.Error("same error should match itself")
+	}
+	if e.Is(New("OTHER", "msg", 400)) {
+		t.Error("different code should not match")
+	}
+	if ErrInternal.Is(ErrBadRequest) {
+		t.Error("different sentinel errors should not match")
+	}
+}
+
+func TestWithMessage(t *testing.T) {
+	e := ErrBadRequest.WithMessage("custom")
+	if e.Code != ErrBadRequest.Code {
+		t.Errorf("Code = %q, want %q", e.Code, ErrBadRequest.Code)
+	}
+	if e.Message != "custom" {
+		t.Errorf("Message = %q, want custom", e.Message)
+	}
+	if e.HTTPStatus != ErrBadRequest.HTTPStatus {
+		t.Errorf("HTTPStatus = %d, want %d", e.HTTPStatus, ErrBadRequest.HTTPStatus)
+	}
+	if ErrBadRequest.Message != "invalid request" {
+		t.Error("original error message was mutated")
+	}
+}
