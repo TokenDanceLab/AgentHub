@@ -1187,7 +1187,8 @@ pnpm typecheck                                         # 零错误
 | 类型修复 | IM types/HubNotification/Session 字段补齐——Desktop typecheck 通过 | ✅ 完成 |
 | 测试覆盖 | hub 整体 48.2%（CI 门槛 40%）、edge 整体 75.7%（CI 门槛 75%）——均通过 | ✅ CI 合规 |
 | 文档收尾 | hub README 迁移数/Redis端口修正、desktop README 绝对路径清除、PR 模板 runner→desktop/hub、errcode 40→100% | ✅ 完成 |
-| 全量健康 | 21 commits、Desktop 725/Web 31/Mobile 0 测试、go vet 零警告 | ✅ 通过 |
+| Trump PR #221 | Web 页面（未合）——Workbench/AgentSquare/Chat/Group/Project 真实 API + i18n | ⏳ PR 已开 |
+| 全量健康 | 36 commits、Desktop 697/712、Web typecheck ✅、Mobile 2 tests | ✅ 通过 |
 
 ### 后续方向
 
