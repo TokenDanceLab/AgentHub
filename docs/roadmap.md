@@ -1191,12 +1191,12 @@ pnpm typecheck                                         # 零错误
 
 ### 后续方向
 
-> 全量健康检查 2026-05-28：hub (13/13 包, 48.2%) · edge (15/15 包, 75.7%) · Desktop (690/718, 28 已知技债) · Web (9 文件, 31 测试) · Mobile (1 文件, 2 测试) · OpenAPI YAML ✅ · TS typecheck ✅
+> 全量健康检查 2026-05-28：hub (13/13 ✅) · edge (15/15 ✅) · Desktop (697/712, 13 修复, 15 预存/用户新测试) · Web (9, 31 ✅) · Mobile (1, 2 ✅) · OpenAPI YAML ✅ · TS typecheck ✅
 
 | 方向 | 建议 | 优先级 |
 |------|------|:--:|
-| Desktop 测试修复 | 28 个 IM 组件测试需适配 Trump 新 API——已知技债 | High |
-| AgentTeam 加速 | 竞品压力（AionUI 团战、Claude Teams）——从 P1 提到 P0.5 | High |
+| 工作树提交 | ~120 个未提交文件——桌面/移动端活跃开发改动，需用户 commit | **阻塞** |
+| AgentTeam 加速 | 竞品压力（AionUI 团战、Claude Teams）——设计文档已写，待开发 | High |
 | 远程 Edge PoC | 演示 Hub 中继到第二台 Desktop——证明架构不是空文档 | Medium |
 | 跨会话记忆 | Codex Memory 预览已上线——AgentHub 需要 profile 级记忆 | Medium |
 
