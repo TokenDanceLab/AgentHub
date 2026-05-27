@@ -921,6 +921,9 @@ func normalizeRunEventInput(stream model.AgentRunEventInput) (eventType, payload
 	if eventType == "" {
 		eventType = model.RunEventTypeOutputBatch
 	}
+	if err := validateRunEventType(eventType); err != nil {
+		return "", "", "", err
+	}
 
 	messageContent = content
 	if messageContent == "" {
@@ -935,6 +938,23 @@ func normalizeRunEventInput(stream model.AgentRunEventInput) (eventType, payload
 	}
 
 	return eventType, payload, messageContent, nil
+}
+
+func validateRunEventType(eventType string) error {
+	if eventType == "" || len(eventType) > model.RunEventTypeMaxLength {
+		return errcode.ErrBadRequest
+	}
+	for _, r := range eventType {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '.', r == '_', r == '-':
+		default:
+			return errcode.ErrBadRequest
+		}
+	}
+	return nil
 }
 
 func inferRunEventType(payload string) string {
