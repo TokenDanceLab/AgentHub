@@ -45,9 +45,9 @@
 
 每个项目目录包含该项目的 overview、架构分析、可采纳模式等。
 
-### cross-comparison/ -- 跨项目对比研究（15 篇）
+### cross-comparison/ -- 跨项目对比研究（16 篇）
 
-`00-synthesis.md`（总报告） · `01-adapters.md` · `02-im-ux.md` · `03-orchestration.md` · `04-sandbox-tools.md` · `05-undo-rollback.md` · `06-realtime-sync.md` · `07-permission-models.md` · `08-ui-beautify-plan.md` · `09-prompt-engineering.md` · `10-best-practices-playbook.md` · `11-bytedance-feature-map.md` · `12-awesome-architecture-study.md` · `13-agentteam-competitive-roadmap.md` · `14-product-direction-competitive-roadmap.md`
+`00-synthesis.md`（总报告） · `01-adapters.md` · `02-im-ux.md` · `03-orchestration.md` · `04-sandbox-tools.md` · `05-undo-rollback.md` · `06-realtime-sync.md` · `07-permission-models.md` · `08-ui-beautify-plan.md` · `09-prompt-engineering.md` · `10-best-practices-playbook.md` · `11-bytedance-feature-map.md` · `12-awesome-architecture-study.md` · `13-agentteam-competitive-roadmap.md` · `14-product-direction-competitive-roadmap.md` · `15-competitive-update-2026-05-27.md`
 
 ### web-research/ -- 生态调研
 
