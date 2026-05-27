@@ -459,8 +459,11 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 			return
 		}
 		frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
+		if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, conn.DeviceID); err != nil {
+			slog.Error("failed to mark agent task dispatched", "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "error", err)
+			return
+		}
 		s.mgr.PushToConn(connID, frame)
-		_ = repository.UpdatePendingTaskDispatched(s.db, task.ID, conn.DeviceID)
 		return
 	}
 
@@ -522,8 +525,11 @@ func (s *AgentService) dispatchTargetBoundTask(ctx context.Context, cacheClient 
 		return
 	}
 	frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
+	if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, deviceID); err != nil {
+		slog.Error("failed to mark target-bound agent task dispatched", "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "error", err)
+		return
+	}
 	s.mgr.PushToConn(connID, frame)
-	_ = repository.UpdatePendingTaskDispatched(s.db, task.ID, deviceID)
 }
 
 // CancelTask cancels a pending task by its ID.
