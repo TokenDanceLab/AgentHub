@@ -85,9 +85,13 @@ cleanup() {
     docker image prune -f --filter "until=24h"
 }
 
-# Rollback
+# Rollback — requires manual image swap first:
+#   1. docker load < rollback-image.tar  (load the previous working image)
+#   2. docker tag <old-image-id> ghcr.io/tokendancelab/agenthub-hub:rollback
+#   3. AGENTHUB_HUB_IMAGE=ghcr.io/tokendancelab/agenthub-hub:rollback ./deploy.sh rollback
+# The compose file uses pull_policy: never, so it will use the locally-loaded tag.
 rollback() {
-    log "Rolling back to previous version..."
+    log "Rolling back to $HUB_IMAGE..."
     cd "$PROJECT_DIR"
     AGENTHUB_HUB_IMAGE="$HUB_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down
     AGENTHUB_HUB_IMAGE="$HUB_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build --no-deps --remove-orphans hub-server
