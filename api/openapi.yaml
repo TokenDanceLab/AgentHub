@@ -1122,6 +1122,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubTaskAck
       summary: Edge acknowledges an agent task and may attach the Edge run id.
+      description: Optional run_id/edge_run_id is capped at 128 characters before Hub persists it.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1140,7 +1141,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubTaskStream
       summary: Edge reports agent output stream chunk to Hub.
-      description: Hub normalizes content/chunk or event_type + payload into an AgentRunEvent and chat projection. The persisted runtime payload and projected message content are each capped at 1 MiB after normalization.
+      description: Hub normalizes content/chunk or event_type + payload into an AgentRunEvent and chat projection. The persisted runtime payload and projected message content are each capped at 1 MiB after normalization. Optional run_id/edge_run_id is capped at 128 characters before Hub persists or matches it.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1164,6 +1165,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubTaskDone
       summary: Edge reports agent task completed.
+      description: Optional run_id/edge_run_id is capped at 128 characters; final_content is capped at the 1 MiB callback payload budget.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1187,6 +1189,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubTaskFail
       summary: Edge reports agent task failure.
+      description: Optional run_id/edge_run_id is capped at 128 characters; error is capped at the 1 MiB callback payload budget.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1200,12 +1203,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [error]
-              properties:
-                error:
-                  type: string
-                  description: Failure reason persisted on the task and broadcast as agent.failed. Hub rejects values above the 1 MiB callback payload budget.
+              $ref: "#/components/schemas/HubTaskFailRequest"
       responses:
         "200":
           description: Task marked failed.
@@ -4233,9 +4231,11 @@ components:
       properties:
         run_id:
           type: string
+          maxLength: 128
           description: Edge run id returned by POST /v1/runs.
         edge_run_id:
           type: string
+          maxLength: 128
           description: Alias for run_id for explicit Hub persistence.
     HubTaskStreamRequest:
       type: object
@@ -4258,9 +4258,11 @@ components:
           description: Client-generated message id for idempotent stream dedup.
         run_id:
           type: string
+          maxLength: 128
           description: Edge run id.
         edge_run_id:
           type: string
+          maxLength: 128
           description: Alias for run_id.
     AgentRunEvent:
       type: object
@@ -4271,6 +4273,7 @@ components:
           type: string
         edge_run_id:
           type: string
+          maxLength: 128
         session_id:
           type: string
         agent_instance_id:
@@ -4294,6 +4297,7 @@ components:
           type: string
         edge_run_id:
           type: string
+          maxLength: 128
         status:
           type: string
           description: Current Hub pending task status.
@@ -4338,13 +4342,30 @@ components:
       properties:
         run_id:
           type: string
+          maxLength: 128
           description: Edge run id.
         edge_run_id:
           type: string
+          maxLength: 128
           description: Alias for run_id.
         final_content:
           type: string
           description: Optional final agent output or summary inserted as the final chat projection. Hub rejects values above the 1 MiB callback payload budget.
+    HubTaskFailRequest:
+      type: object
+      required: [error]
+      properties:
+        run_id:
+          type: string
+          maxLength: 128
+          description: Edge run id.
+        edge_run_id:
+          type: string
+          maxLength: 128
+          description: Alias for run_id.
+        error:
+          type: string
+          description: Failure reason persisted on the task and broadcast as agent.failed. Hub rejects values above the 1 MiB callback payload budget.
     StartRunRequest:
       type: object
       properties:
