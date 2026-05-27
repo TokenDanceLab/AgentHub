@@ -368,7 +368,7 @@ python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml')
 git status --short --branch
 ```
 
-运行命令以真实入口为准：Edge 是 `edge-server/cmd/agenthub-edge`，Hub 是 `hub-server/cmd/server-hub`。`scripts/dev-start.ps1` / `scripts/dev-start.sh` 仍引用旧 Hub 命令，`scripts/client-smoke.ps1` 仍包含已删除 `runner/` 的历史检查；修复脚本前不要把这些脚本作为验收依据。
+运行命令以真实入口为准：Edge 是 `edge-server/cmd/agenthub-edge`，Hub 是 `hub-server/cmd/server-hub`。`scripts/dev-start.ps1` / `scripts/dev-start.sh` 已修复 Hub 入口路径。`scripts/client-smoke.ps1` 仍包含已删除 `runner/` 的历史检查；修复脚本前不要把这些脚本作为验收依据。
 
 有 Go 代码后追加：
 

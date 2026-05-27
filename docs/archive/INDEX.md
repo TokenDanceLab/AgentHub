@@ -54,6 +54,7 @@
 | `frontend.md` | 历史路线图 | 自声明 superseded（2026-05-23），前端路线图已合并到 `docs/roadmap.md`。所有待办项实际已完成。 |
 | `client-handoff.md` | 历史交接 | 2026-05-22 历史快照，引用已废弃的 `runner/` 目录、旧分支名 `feat/client-dev`、旧 PR #26。当前客户端接手入口为 `docs/handoff/STATE.md`。 |
 | `desktop-shell-layout-progress-2026-05-25.md` | 进度记录 | Desktop shell 布局进度快照。已完成项已合入 `docs/roadmap.md` batch B，8 项后续 TODO 已提取到群聊评论。 |
+| `PLAN-adapt-trump-ui.md` | 历史计划 | 旧 `worktree-adapt-trump-ui` 工作计划。涉及从 Trump 5 页面 UI 提取共享组件、工程规范、测试框架和 WebUI 集成。相关代号已过期，当前以主文档、roadmap 和 handoff 状态为准。 |
 
 ### 可参考原则 - 需要按新术语重解释
 

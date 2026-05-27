@@ -98,7 +98,7 @@ starting 'edge-server'
 PIDS+=($!)
 
 starting 'hub-server'
-(cd "$REPO_ROOT/hub-server" && go run ./cmd/agenthub-hub --addr 127.0.0.1:4210) &
+(cd "$REPO_ROOT/hub-server" && go run ./cmd/server-hub --addr 127.0.0.1:4210) &
 PIDS+=($!)
 
 starting 'desktop'
