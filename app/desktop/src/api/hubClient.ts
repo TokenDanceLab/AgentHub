@@ -80,11 +80,17 @@ export interface Contact {
 
 export interface Session {
   id: string;
+  session_id?: string;
   type: string;
   name?: string;
   owner_user_id: string;
   last_message?: Record<string, unknown>;
   members?: SessionMember[];
+  unread_count?: number;
+  last_read_seq?: number;
+  last_message_at?: string;
+  archived?: boolean;
+  member_count?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -221,6 +227,16 @@ export interface CustomAgentRequest {
 }
 
 // ── Execution targets ───────────────────────────
+
+export interface HubNotification {
+  id: string;
+  user_id: string;
+  type: string;
+  payload: string;
+  read: boolean;
+  created_at: string;
+  [key: string]: unknown;
+}
 
 export type ExecutionTargetType = 'local_edge' | 'hub_relay' | 'remote_ssh' | 'tailscale' | 'cloud_edge';
 export type ExecutionTargetTrustLevel = 'local' | 'remote' | 'cloud' | 'relay';
