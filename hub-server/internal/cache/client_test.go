@@ -500,6 +500,23 @@ func TestPendingTaskCount_MultipleUsers(t *testing.T) {
 	assert.Equal(t, int64(0), c3)
 }
 
+func TestPendingTasksExpire(t *testing.T) {
+	c, mr := testClient(t)
+	ctx := context.Background()
+
+	require.NoError(t, c.PushPendingTask(ctx, "user-ttl", `{"task_id":"task-ttl"}`))
+
+	ttl, err := c.rdb.TTL(ctx, pendingTaskKey("user-ttl")).Result()
+	require.NoError(t, err)
+	require.Greater(t, ttl, time.Duration(0))
+	require.LessOrEqual(t, ttl, config.PendingTaskTTL)
+
+	mr.FastForward(config.PendingTaskTTL + time.Second)
+	count, err := c.PendingTaskCount(ctx, "user-ttl")
+	require.NoError(t, err)
+	require.Equal(t, int64(0), count)
+}
+
 func TestPendingTargetTasksAreIsolatedByDeviceAndTarget(t *testing.T) {
 	c, _ := testClient(t)
 	ctx := context.Background()
@@ -519,6 +536,28 @@ func TestPendingTargetTasksAreIsolatedByDeviceAndTarget(t *testing.T) {
 	devBTasks, err := c.PopPendingTargetTasksForDevice(ctx, "user-target", "dev-b")
 	require.NoError(t, err)
 	require.Equal(t, []string{`{"task_id":"a2"}`}, devBTasks)
+}
+
+func TestPendingTargetTasksExpireWithIndex(t *testing.T) {
+	c, mr := testClient(t)
+	ctx := context.Background()
+
+	require.NoError(t, c.PushPendingTargetTask(ctx, "user-target", "target-ttl", "dev-a", `{"task_id":"target-ttl"}`))
+
+	taskTTL, err := c.rdb.TTL(ctx, pendingTargetTaskKey("user-target", "target-ttl", "dev-a")).Result()
+	require.NoError(t, err)
+	require.Greater(t, taskTTL, time.Duration(0))
+	require.LessOrEqual(t, taskTTL, config.PendingTaskTTL)
+
+	indexTTL, err := c.rdb.TTL(ctx, pendingTargetTaskIndexKey("user-target", "dev-a")).Result()
+	require.NoError(t, err)
+	require.Greater(t, indexTTL, time.Duration(0))
+	require.LessOrEqual(t, indexTTL, config.PendingTaskTTL)
+
+	mr.FastForward(config.PendingTaskTTL + time.Second)
+	tasks, err := c.PopPendingTargetTasksForDevice(ctx, "user-target", "dev-a")
+	require.NoError(t, err)
+	require.Empty(t, tasks)
 }
 
 func TestPendingAgentControlsAreIsolatedByDevice(t *testing.T) {
