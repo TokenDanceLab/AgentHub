@@ -669,7 +669,10 @@ func (a *App) pushPendingTargetTasks(ctx context.Context, userID, deviceID, conn
 				TaskID string `json:"task_id"`
 			}
 			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
-				_ = a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, deviceID)
+				if err := a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, deviceID); err != nil {
+					slog.Error("failed to mark target-bound queued task dispatched", "task_id", meta.TaskID, "user_id", userID, "device_id", deviceID, "error", err)
+					continue
+				}
 			}
 			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
 		}
@@ -706,7 +709,10 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 				TaskID string `json:"task_id"`
 			}
 			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
-				_ = a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, edgeDeviceID)
+				if err := a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, edgeDeviceID); err != nil {
+					slog.Error("failed to mark queued task dispatched", "task_id", meta.TaskID, "user_id", userID, "device_id", edgeDeviceID, "error", err)
+					continue
+				}
 			}
 			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
 		}

@@ -295,6 +295,54 @@ func TestOnRouteSetReplaysTargetQueueOnlyForConnectedDevice(t *testing.T) {
 	require.Equal(t, "dev-b", stored.EdgeDeviceID)
 }
 
+func TestOnRouteSetDoesNotReplayTargetQueueWhenDispatchStateMissing(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Exec(`CREATE TABLE pending_agent_tasks (
+		id TEXT PRIMARY KEY,
+		agent_instance_id TEXT NOT NULL,
+		triggered_by_user_id TEXT NOT NULL,
+		trigger_message_id TEXT NOT NULL,
+		target_id TEXT,
+		status TEXT NOT NULL,
+		edge_run_id TEXT DEFAULT '',
+		edge_device_id TEXT DEFAULT '',
+		error_message TEXT DEFAULT '',
+		created_at DATETIME,
+		dispatched_at DATETIME,
+		finished_at DATETIME,
+		expire_at DATETIME NOT NULL
+	)`).Error)
+
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	cacheClient := cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+
+	mgr := ws.NewManager()
+	connB := ws.NewConn(nil)
+	require.NoError(t, mgr.Register(connB))
+	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+
+	a := &App{
+		DB:           db,
+		CacheClient:  cacheClient,
+		mgr:          mgr,
+		coreCtx:      context.Background(),
+		AgentService: service.NewAgentService(db, nil, mgr, cacheClient),
+	}
+	require.NoError(t, cacheClient.PushPendingTargetTask(context.Background(), "user-1", "target-dev-b", "dev-b", `{"task_id":"missing-task","target_id":"target-dev-b"}`))
+
+	a.onRouteSet("user-1", "desktop", "dev-b", connB.ID, "", false)
+	select {
+	case <-connB.Send:
+		t.Fatal("target queue was replayed before task dispatch state was persisted")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
 func TestOnRouteSetReplaysPendingAgentControlsToExactDevice(t *testing.T) {
 	mr, err := miniredis.Run()
 	require.NoError(t, err)
