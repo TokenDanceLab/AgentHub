@@ -570,12 +570,51 @@ func TestHandleTaskDone_AtomicTransition(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
 			AddRow("agent-1", "claude", "sess-1", "user-1"))
 
+	mock.ExpectBegin()
 	mock.ExpectExec(sqlmUpdateTask).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", taskID, "run-001", "")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskDone_AtomicConflictDoesNotPublish(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	bus := newTestBus(t)
+	doneEvents := make(chan Event, 1)
+	bus.Subscribe("agent.done", func(ctx context.Context, event Event) {
+		doneEvents <- event
+	})
+	svc := &AgentService{db: db, bus: bus}
+
+	taskID := "task-done-conflict"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", "run-001"))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "claude", "sess-1", "user-1"))
+
+	mock.ExpectBegin()
+	mock.ExpectExec(sqlmUpdateTask).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectRollback()
+
+	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", taskID, "run-001", "")
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+	select {
+	case <-doneEvents:
+		t.Fatal("agent.done was published after atomic update conflict")
+	case <-time.After(50 * time.Millisecond):
+	}
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 // ==================== HandleTaskFail ====================
@@ -604,6 +643,41 @@ func TestHandleTaskFail_AtomicTransition(t *testing.T) {
 	err := svc.HandleTaskFail(context.Background(), "user-1", "dev-1", taskID, "run-001", "model error")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskFail_AtomicConflictDoesNotPublish(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	bus := newTestBus(t)
+	failedEvents := make(chan Event, 1)
+	bus.Subscribe("agent.failed", func(ctx context.Context, event Event) {
+		failedEvents <- event
+	})
+	svc := &AgentService{db: db, bus: bus}
+
+	taskID := "task-fail-conflict"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusRunning, "dev-1", "run-001"))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "claude", "sess-1", "user-1"))
+
+	mock.ExpectExec(sqlmUpdateTask).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	err := svc.HandleTaskFail(context.Background(), "user-1", "dev-1", taskID, "run-001", "model error")
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+	select {
+	case <-failedEvents:
+		t.Fatal("agent.failed was published after atomic update conflict")
+	case <-time.After(50 * time.Millisecond):
+	}
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestHandleTaskFail_AlreadyTerminal(t *testing.T) {
@@ -677,8 +751,10 @@ func TestHandleTaskDone_AcceptsDispatchedTask(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
 			AddRow("agent-1", "claude", "sess-1", "user-1"))
 
+	mock.ExpectBegin()
 	mock.ExpectExec(sqlmUpdateTask).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", taskID, "run-001", "")
 	assert.NoError(t, err)
