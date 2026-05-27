@@ -589,6 +589,9 @@ func (s *AgentService) allocateSeq(ctx context.Context, sessionID string) (int64
 // HandleTaskAck marks a task as running and optionally records the Edge run id
 // that is executing it.
 func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
+	if err := validateAgentCallbackEdgeRunID(edgeRunID); err != nil {
+		return err
+	}
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -622,6 +625,9 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDevice
 // HandleTaskStream records a typed runtime event and keeps the existing
 // message.new projection for current Web/Desktop chat consumers.
 func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
+	if err := validateAgentCallbackEdgeRunID(edgeRunID); err != nil {
+		return err
+	}
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -953,6 +959,13 @@ func validateAgentCallbackPayloadSize(value string) error {
 	return nil
 }
 
+func validateAgentCallbackEdgeRunID(edgeRunID string) error {
+	if len(edgeRunID) > model.AgentCallbackEdgeRunIDMaxLength {
+		return errcode.ErrBadRequest.WithMessage("agent callback run id exceeds maximum length")
+	}
+	return nil
+}
+
 func validateRunEventType(eventType string) error {
 	if eventType == "" || len(eventType) > model.RunEventTypeMaxLength {
 		return errcode.ErrBadRequest
@@ -997,6 +1010,9 @@ func firstNonEmpty(values ...string) string {
 
 // HandleTaskDone marks a task as done and inserts the final content as a message.
 func (s *AgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
+	if err := validateAgentCallbackEdgeRunID(edgeRunID); err != nil {
+		return err
+	}
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -1057,6 +1073,9 @@ func (s *AgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDevic
 
 // HandleTaskFail marks a task as failed.
 func (s *AgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {
+	if err := validateAgentCallbackEdgeRunID(edgeRunID); err != nil {
+		return err
+	}
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

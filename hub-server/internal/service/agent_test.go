@@ -539,6 +539,17 @@ func TestHandleTaskAck_EdgeRunIDBackfill(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestHandleTaskAckRejectsOversizedEdgeRunID(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	svc := &AgentService{db: db}
+
+	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", "task-ack", strings.Repeat("x", 129))
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ==================== HandleTaskDone ====================
 
 func TestHandleTaskDone_AtomicTransition(t *testing.T) {
