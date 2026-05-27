@@ -314,6 +314,10 @@ jobs:
             bash scripts/check-secrets.sh --worktree
           fi
 
+      - name: Verify CI gate policy
+        shell: pwsh
+        run: ./scripts/verify-ci-gates.ps1
+
       - name: Validate OpenAPI YAML
         run: |
           python -m pip install --quiet PyYAML
