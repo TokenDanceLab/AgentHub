@@ -658,8 +658,10 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 	}
 
 	// ensure status is running
-	if task.Status != model.TaskStatusRunning {
-		_ = repository.UpdatePendingTaskStatus(s.db, taskID, model.TaskStatusRunning, "")
+	if task.Status == model.TaskStatusDispatched {
+		if err := s.transitionDispatchedTaskToRunning(taskID); err != nil {
+			return err
+		}
 	}
 
 	// #132: bump expire_at to keep running task alive while activity continues
@@ -711,6 +713,27 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 	s.bus.Publish(ctx, Event{Type: ws.TypeAgentStream, Payload: runEvent})
 
 	return nil
+}
+
+func (s *AgentService) transitionDispatchedTaskToRunning(taskID string) error {
+	rowsAffected, err := repository.UpdatePendingTaskStatusAtomic(s.db, taskID, model.TaskStatusDispatched, model.TaskStatusRunning, "")
+	if err != nil {
+		return err
+	}
+	if rowsAffected > 0 {
+		return nil
+	}
+	current, err := repository.GetPendingTaskByID(s.db, taskID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errcode.AgentTaskNotFound
+		}
+		return err
+	}
+	if current.Status == model.TaskStatusRunning {
+		return nil
+	}
+	return errcode.ErrBadRequest
 }
 
 func (s *AgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error) {
