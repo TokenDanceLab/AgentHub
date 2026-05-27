@@ -192,7 +192,12 @@ func pendingAgentControlKey(userID, deviceID string) string {
 
 // PushPendingTask pushes a task JSON to the user's offline pending queue.
 func (c *Client) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
-	return c.rdb.LPush(ctx, pendingTaskKey(userID), taskJSON).Err()
+	key := pendingTaskKey(userID)
+	pipe := c.rdb.TxPipeline()
+	pipe.LPush(ctx, key, taskJSON)
+	pipe.Expire(ctx, key, config.PendingTaskTTL)
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // PopPendingTasks pops all pending tasks for a user and clears the queue.
@@ -223,9 +228,13 @@ func (c *Client) PendingTaskCount(ctx context.Context, userID string) (int64, er
 // PushPendingTargetTask pushes a task JSON to a target/device-specific offline
 // queue so target-bound dispatch cannot be replayed to a different desktop.
 func (c *Client) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
+	taskKey := pendingTargetTaskKey(userID, targetID, deviceID)
 	pipe := c.rdb.TxPipeline()
-	pipe.SAdd(ctx, pendingTargetTaskIndexKey(userID, deviceID), targetID)
-	pipe.LPush(ctx, pendingTargetTaskKey(userID, targetID, deviceID), taskJSON)
+	pipe.SAdd(ctx, indexKey, targetID)
+	pipe.Expire(ctx, indexKey, config.PendingTaskTTL)
+	pipe.LPush(ctx, taskKey, taskJSON)
+	pipe.Expire(ctx, taskKey, config.PendingTaskTTL)
 	_, err := pipe.Exec(ctx)
 	return err
 }
