@@ -1,6 +1,6 @@
 # Open Design -- Design System Schema Reference
 
-> **Parent:** [01-overview-and-architecture.md](./01-overview-and-architecture.md)
+> **Parent:** [01-daemon-architecture.md](./01-daemon-architecture.md)
 > **Sources:** `design-systems/_schema/`, 10 DESIGN.md files, AgentHub `tokens.css` / `themes.css`
 > **Updated:** 2026-05-24
 

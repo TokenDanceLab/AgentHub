@@ -1146,8 +1146,8 @@ export default defineConfig({
   1. 打开有 @ClaudeCode 和 @Codex 的群聊 Conversation
   2. 发送："Both of you: review this function"
   3. 验证：两个 Agent 都回复
-  4. 验证：Claude 的回复带有 Authority 标签 [Edge:us1]
-  5. 验证：Codex 的回复带有 Authority 标签 [Edge:us1]
+  4. 验证：Claude 的回复带有 Authority 标签 [Edge:edge-01]
+  5. 验证：Codex 的回复带有 Authority 标签 [Edge:edge-01]
 ```
 
 ### 4.3 Mobile 768px 断点测试

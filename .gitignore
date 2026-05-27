@@ -78,7 +78,7 @@ yarn-error.log*
 *.backup
 *.sql.gz
 
-# AgentHub deployment state (hk2 production)
+# AgentHub deployment state (production)
 hub-server/deployments/.env.production
 hub-server/deployments/.env
 hub-server/deployments/backups/

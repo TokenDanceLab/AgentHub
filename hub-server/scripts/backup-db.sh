@@ -1,5 +1,5 @@
 #!/bin/bash
-# AgentHub Hub Server — DB backup script (hk2 production)
+# AgentHub Hub Server — DB backup script (production)
 # Cron: 0 2 * * * /opt/agenthub-hub/hub-server/scripts/backup-db.sh
 set -euo pipefail
 BACKUP_DIR="${BACKUP_DIR:-/opt/agenthub-backups}"

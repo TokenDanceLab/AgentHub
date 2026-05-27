@@ -3,7 +3,7 @@
 #
 # Starts edge-server (go run), hub-server (go run), and Desktop dev server (pnpm dev).
 # Each service runs in the background; press Ctrl+C to stop all.
-# URLs: Edge=http://127.0.0.1:3210, Hub=http://127.0.0.1:4210, Desktop=http://localhost:5199
+# URLs: Edge=http://127.0.0.1:3210, Hub=http://127.0.0.1:8080, Desktop=http://localhost:5199
 #
 # Usage: ./scripts/dev-start.sh
 set -euo pipefail
@@ -98,7 +98,7 @@ starting 'edge-server'
 PIDS+=($!)
 
 starting 'hub-server'
-(cd "$REPO_ROOT/hub-server" && go run ./cmd/server-hub --addr 127.0.0.1:4210) &
+(cd "$REPO_ROOT/hub-server" && go run ./cmd/server-hub) &
 PIDS+=($!)
 
 starting 'desktop'
@@ -109,12 +109,12 @@ PIDS+=($!)
 printf '\nWaiting for services to be ready...\n\n'
 ALL_READY=0
 wait_for_port 'Edge'    3210 || ALL_READY=1
-wait_for_port 'Hub'     4210 || ALL_READY=1
+wait_for_port 'Hub'     8080 || ALL_READY=1
 wait_for_port 'Desktop' 5199 'localhost' || ALL_READY=1
 
 banner 'All services started'
 printf '  Edge:    http://127.0.0.1:3210\n'
-printf '  Hub:     http://127.0.0.1:4210\n'
+printf '  Hub:     http://127.0.0.1:8080\n'
 printf '  Desktop: http://localhost:5199\n'
 printf '\nPress Ctrl+C to stop all services.\n\n'
 
