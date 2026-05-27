@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
+	"time"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -25,6 +28,16 @@ type registerDeviceReq struct {
 	DeviceID     string   `json:"device_id" binding:"required"`
 	AppVersion   string   `json:"app_version"`
 	Capabilities []string `json:"capabilities"`
+}
+
+type deviceResponse struct {
+	ID           string    `json:"id"`
+	UserID       string    `json:"user_id"`
+	DeviceType   string    `json:"device_type"`
+	AppVersion   string    `json:"app_version"`
+	Capabilities []string  `json:"capabilities"`
+	LastActiveAt time.Time `json:"last_active_at"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 func (h *DeviceHandler) Register(c *gin.Context) {
@@ -61,7 +74,7 @@ func (h *DeviceHandler) Register(c *gin.Context) {
 		return
 	}
 
-	OK(c, device)
+	OK(c, newDeviceResponse(device))
 }
 
 // ListDevices returns all devices belonging to the authenticated user,
@@ -80,5 +93,25 @@ func (h *DeviceHandler) ListDevices(c *gin.Context) {
 		devices = []model.Device{}
 	}
 
-	OK(c, devices)
+	resp := make([]deviceResponse, 0, len(devices))
+	for i := range devices {
+		resp = append(resp, newDeviceResponse(&devices[i]))
+	}
+	OK(c, resp)
+}
+
+func newDeviceResponse(device *model.Device) deviceResponse {
+	capabilities := []string{}
+	if device.Capabilities != "" {
+		_ = json.Unmarshal([]byte(device.Capabilities), &capabilities)
+	}
+	return deviceResponse{
+		ID:           device.ID,
+		UserID:       device.UserID,
+		DeviceType:   device.DeviceType,
+		AppVersion:   device.AppVersion,
+		Capabilities: capabilities,
+		LastActiveAt: device.LastActiveAt,
+		CreatedAt:    device.CreatedAt,
+	}
 }
