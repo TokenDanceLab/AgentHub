@@ -1184,7 +1184,11 @@ pnpm typecheck                                         # 零错误
 | 发版 | Release pipeline（scripts/release.ps1 + CI workflow） | ✅ 完成 |
 | 架构审计 | 迁移数修正、Hub 完整实现措辞、runners 包澄清 | ✅ 完成 |
 | 竞品研究 | Teamily AI/Dust/SageOx 新入局、AgentTeam 加速建议 | ✅ 完成 |
-| 部署修复 | restore-db.sh 格式匹配、rollback 文档 | ✅ 完成 |
+| 部署修复 | restore-db.sh 格式匹配、rollback 文档、.dockerignore | ✅ 完成 |
+| Trump PR #219 | 共享模块（workbenchState/dataMode/hubClient）+ SettingsPage 拆分——已合并 | ✅ 完成 |
+| Trump PR #220 | Desktop IM 系统（useIMChat/IMView/IMContactList +10 功能）——已合入 | ✅ 完成 |
+| PR #217 | Trump dev/trump→dev/delicious233——已关闭（冲突 33，拆分为 #219 #220） | ✅ 已处理 |
+| 类型修复 | IM types/HubNotification/Session 字段补齐——Desktop typecheck 通过 | ✅ 完成 |
 | 测试覆盖 | hub 整体 48.2%（CI 门槛 40%）、edge 整体 75.7%（CI 门槛 75%）——均通过 | ✅ CI 合规 |
 | 文档收尾 | hub README 迁移数/Redis端口修正、desktop README 绝对路径清除、PR 模板 runner→desktop/hub、errcode 40→100% | ✅ 完成 |
 | 全量健康 | 21 commits、Desktop 725/Web 31/Mobile 0 测试、go vet 零警告 | ✅ 通过 |
