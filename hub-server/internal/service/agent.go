@@ -1073,6 +1073,11 @@ func (s *AgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeDevic
 	if err != nil {
 		return err
 	}
+	if errMsg != "" {
+		if err := validateAgentCallbackPayloadSize(errMsg); err != nil {
+			return err
+		}
+	}
 
 	_, _ = repository.UpdatePendingTaskStatusAtomic(s.db, taskID, task.Status, model.TaskStatusFailed, errMsg)
 
