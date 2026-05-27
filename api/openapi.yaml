@@ -2003,7 +2003,7 @@ paths:
 
   # ── Edge / Web ──
 
-  /edge/devices:register:
+  /edge/devices/register:
     post:
       tags: [HubSyncRelay]
       operationId: hubRegisterDevice
@@ -2036,7 +2036,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Device"
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+                  data:
+                    $ref: "#/components/schemas/Device"
         "400":
           $ref: "#/components/responses/BadRequest"
 
@@ -5386,17 +5392,17 @@ components:
 
     Device:
       type: object
+      required: [id, user_id, device_type, capabilities, last_active_at, created_at]
       properties:
         id: { type: string, format: uuid }
-        owner_id: { type: string, format: uuid }
-        device_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
         device_type: { type: string }
-        device_name: { type: string }
         app_version: { type: string }
-        is_online: { type: boolean }
-        last_seen_at: { type: string, format: date-time }
+        capabilities:
+          type: array
+          items: { type: string }
+        last_active_at: { type: string, format: date-time }
         created_at: { type: string, format: date-time }
-        updated_at: { type: string, format: date-time }
 
   responses:
     Ok:
