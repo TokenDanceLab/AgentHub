@@ -625,11 +625,11 @@ func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDevice
 		}
 		return nil
 	}
-	// #99: accept queued tasks for offline-replayed tasks, transitioning to dispatched
+	// #99: accept queued tasks for offline-replayed tasks, transitioning to running.
 	if task.Status != model.TaskStatusDispatched && task.Status != model.TaskStatusQueued {
 		return errcode.ErrBadRequest
 	}
-	rowsAffected, err := repository.UpdatePendingTaskStatusAtomicWithEdgeRunID(s.db, taskID, model.TaskStatusDispatched, model.TaskStatusRunning, "", edgeRunID)
+	rowsAffected, err := repository.UpdatePendingTaskStatusAtomicWithEdgeRunID(s.db, taskID, task.Status, model.TaskStatusRunning, "", edgeRunID)
 	if err != nil {
 		return err
 	}
