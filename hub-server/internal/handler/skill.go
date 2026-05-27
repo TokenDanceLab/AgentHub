@@ -14,7 +14,7 @@ import (
 // SkillService is the subset of *service.SkillService used by SkillHandler.
 type SkillService interface {
 	Create(ctx context.Context, ownerID string, req *model.Skill) (*model.Skill, error)
-	Get(ctx context.Context, id string) (*model.Skill, error)
+	Get(ctx context.Context, id, ownerID string) (*model.Skill, error)
 	Update(ctx context.Context, id, ownerID string, req *model.Skill) (*model.Skill, error)
 	Delete(ctx context.Context, id, ownerID string) error
 	List(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error)
@@ -71,7 +71,8 @@ func (h *SkillHandler) CreateSkill(c *gin.Context) {
 
 func (h *SkillHandler) GetSkill(c *gin.Context) {
 	id := c.Param("id")
-	skill, err := h.svc.Get(c.Request.Context(), id)
+	userID := c.GetString("user_id")
+	skill, err := h.svc.Get(c.Request.Context(), id, userID)
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)

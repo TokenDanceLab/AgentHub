@@ -24,7 +24,6 @@ import (
 	"github.com/agenthub/hub-server/internal/log"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/router"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -53,6 +52,7 @@ type App struct {
 	SessionService      *service.SessionService
 	MessageService      *service.MessageService
 	AgentService        *service.AgentService
+	AgentControlService *service.AgentControlService
 	AttachmentService   *service.AttachmentService
 	NotificationService *service.NotificationService
 	DeviceService       *service.DeviceService
@@ -62,25 +62,29 @@ type App struct {
 	OIDCHandler *handler.OIDCHandler
 
 	// Handler layer
-	AuthHandler          *handler.AuthHandler
-	WebSocketHandler     *handler.WebSocketHandler
-	DeviceHandler        *handler.DeviceHandler
-	ContactHandler       *handler.ContactHandler
-	SessionHandler       *handler.SessionHandler
-	MessageHandler       *handler.MessageHandler
-	AgentHandler         *handler.AgentHandler
-	CustomAgentHandler   *handler.CustomAgentHandler
-	AttachmentHandler    *handler.AttachmentHandler
-	NotificationHandler  *handler.NotificationHandler
-	HealthHandler        *handler.HealthHandler
-	PublicHandler        *handler.PublicHandler
-	AgentProfileHandler  *handler.AgentProfileHandler
-	SkillHandler         *handler.SkillHandler
-	MCPServerHandler     *handler.MCPServerHandler
-	MarketHandler        *handler.MarketHandler
+	AuthHandler            *handler.AuthHandler
+	WebSocketHandler       *handler.WebSocketHandler
+	DeviceHandler          *handler.DeviceHandler
+	ContactHandler         *handler.ContactHandler
+	SessionHandler         *handler.SessionHandler
+	MessageHandler         *handler.MessageHandler
+	AgentHandler           *handler.AgentHandler
+	CustomAgentHandler     *handler.CustomAgentHandler
+	AttachmentHandler      *handler.AttachmentHandler
+	NotificationHandler    *handler.NotificationHandler
+	HealthHandler          *handler.HealthHandler
+	PublicHandler          *handler.PublicHandler
+	AgentProfileHandler    *handler.AgentProfileHandler
+	SkillHandler           *handler.SkillHandler
+	MCPServerHandler       *handler.MCPServerHandler
+	MarketHandler          *handler.MarketHandler
 	ProviderBindingHandler *handler.ProviderBindingHandler
 	ExecutionTargetHandler *handler.ExecutionTargetHandler
 	AuditHandler           *handler.AuditHandler
+	AgentTeamHandler       *handler.AgentTeamHandler
+
+	// AgentTeam
+	AgentTeamService *service.AgentTeamService
 
 	// Relay
 	RelayService *service.RelayService
@@ -152,19 +156,20 @@ func (a *App) Run(ctx context.Context) error {
 		s3Store, err := service.NewS3StorageFromConfig(ctx, a.Config.S3)
 		if err != nil {
 			slog.Error("failed to init S3 storage, falling back to local", "error", err)
-			attachmentStorage = service.NewLocalStorage()
+			attachmentStorage = service.NewLocalStorage(a.Config.Upload.Dir)
 		} else {
 			attachmentStorage = s3Store
 			slog.Info("S3 attachment storage configured", "bucket", a.Config.S3.Bucket, "endpoint", a.Config.S3.Endpoint)
 		}
 	} else {
-		attachmentStorage = service.NewLocalStorage()
+		attachmentStorage = service.NewLocalStorage(a.Config.Upload.Dir)
 	}
 	a.AttachmentService = service.NewAttachmentService(a.DB, a.Config.Upload, attachmentStorage)
 	a.ContactService = service.NewContactService(a.DB, a.bus, a.CacheClient)
 	a.SessionService = service.NewSessionService(a.DB, a.CacheClient)
 	a.MessageService = service.NewMessageService(a.DB, a.bus, a.CacheClient)
 	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient)
+	a.AgentControlService = service.NewAgentControlService(a.CacheClient, a.mgr)
 	a.DeviceService = service.NewDeviceService(a.DB)
 
 	// Agent Profile service
@@ -180,21 +185,26 @@ func (a *App) Run(ctx context.Context) error {
 	// Market handler (reuses AgentProfileService)
 	a.MarketHandler = handler.NewMarketHandler(agentProfileSvc)
 
-		// Provider Binding service
-		pbSvc := service.NewProviderBindingService(a.DB)
-		a.ProviderBindingHandler = handler.NewProviderBindingHandler(pbSvc)
+	// Provider Binding service
+	pbSvc := service.NewProviderBindingService(a.DB)
+	a.ProviderBindingHandler = handler.NewProviderBindingHandler(pbSvc)
 
-		// Execution Target service
-		targetSvc := service.NewExecutionTargetService(a.DB)
-		a.ExecutionTargetHandler = handler.NewExecutionTargetHandler(targetSvc)
+	// Execution Target service
+	targetSvc := service.NewExecutionTargetService(a.DB)
+	a.ExecutionTargetHandler = handler.NewExecutionTargetHandler(targetSvc)
 
-		// Audit service
-		auditSvc := service.NewAuditService(a.DB)
-		a.AuditHandler = handler.NewAuditHandler(auditSvc)
+	// Audit service
+	auditSvc := service.NewAuditService(a.DB)
+	a.AuditHandler = handler.NewAuditHandler(auditSvc)
 
-		// Relay service
-		a.RelayService = service.NewRelayService(a.CacheClient, a.mgr)
-		a.RelayHandler = handler.NewRelayHandler(a.RelayService)
+	// AgentTeam service
+	a.AgentTeamService = service.NewAgentTeamService(a.DB, a.AgentService, a.CacheClient)
+	a.AgentTeamService.SetControlService(a.AgentControlService)
+	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
+
+	// Relay service
+	a.RelayService = service.NewRelayService(a.CacheClient, a.mgr)
+	a.RelayHandler = handler.NewRelayHandler(a.RelayService)
 
 	// OIDC Service (optional — only when TokenDance ID client is configured)
 	if a.Config.TokenDanceID.ClientID != "" {
@@ -333,6 +343,7 @@ func (a *App) setupRouter() *gin.Engine {
 		a.ExecutionTargetHandler,
 		a.AuditHandler,
 		a.RelayHandler,
+		a.AgentTeamHandler,
 	)
 	return r
 }
@@ -345,7 +356,7 @@ func (a *App) setupWSManager() {
 	a.mgr.ResolveMembers = func(sessionID string) []string {
 		ctx := a.coreCtx
 		ids, err := cache.GetOrLoad(a.CacheClient, ctx, "session:members:"+sessionID, config.SessionMemberCacheTTL, func(ctx context.Context) ([]string, error) {
-			members, err := repository.ListActiveMembers(a.DB, sessionID)
+			members, err := a.SessionService.ListActiveMembers(sessionID)
 			if err != nil {
 				return nil, err
 			}
@@ -368,8 +379,18 @@ func (a *App) setupWSManager() {
 			"user_id":    userID,
 			"session_id": sessionID,
 		})
-		members, err := repository.ListActiveMembers(a.DB, sessionID)
+		members, err := a.SessionService.ListActiveMembers(sessionID)
 		if err != nil {
+			return
+		}
+		senderIsMember := false
+		for _, member := range members {
+			if member.MemberID == userID {
+				senderIsMember = true
+				break
+			}
+		}
+		if !senderIsMember {
 			return
 		}
 		for _, member := range members {
@@ -431,6 +452,15 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 		a.mgr.PushToSession(sessionID, frame)
 	})
 
+	a.bus.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event service.Event) {
+		runEvent, ok := event.Payload.(*model.AgentRunEvent)
+		if !ok {
+			return
+		}
+		frame := ws.NewFrame(ws.TypeAgentStream, runEvent)
+		a.mgr.PushToSession(runEvent.SessionID, frame)
+	})
+
 	a.bus.Subscribe("agent.done", func(ctx context.Context, event service.Event) {
 		payload, ok := event.Payload.(map[string]interface{})
 		if !ok {
@@ -442,7 +472,7 @@ func (a *App) startEventSubscriptions(ctx context.Context) {
 
 		taskID, _ := payload["task_id"].(string)
 		if taskID != "" {
-			task, err := repository.GetPendingTaskByID(a.DB, taskID)
+			task, err := a.AgentService.GetPendingTaskByID(taskID)
 			if err == nil && task != nil {
 				a.NotificationService.Notify(ctx, task.TriggeredByUserID, model.TypeAgentDone, map[string]interface{}{
 					"task_id":           payload["task_id"],
@@ -501,29 +531,42 @@ func (a *App) startTaskScheduler(ctx context.Context) {
 		ticker := time.NewTicker(config.PendingTaskScanInterval)
 		defer ticker.Stop()
 		for range ticker.C {
-			tasks, err := repository.ScanExpiredTasks(a.DB)
+			tasks, err := a.AgentService.ScanExpiredTasks()
 			if err != nil {
 				slog.Warn("failed to scan expired agent tasks", "error", err)
 				continue
 			}
 			for _, task := range tasks {
-				_ = repository.UpdatePendingTaskStatus(a.DB, task.ID, model.TaskStatusTimeout, "")
-				ai, _ := repository.GetAgentInstanceByID(a.DB, task.AgentInstanceID)
-				sessionID := ""
-				if ai != nil {
-					sessionID = ai.SessionID
-				}
-				a.bus.Publish(a.coreCtx, service.Event{
-					Type: "agent.timeout",
-					Payload: map[string]interface{}{
-						"task_id":           task.ID,
-						"agent_instance_id": task.AgentInstanceID,
-						"session_id":        sessionID,
-					},
-				})
+				a.publishExpiredTaskTimeout(ctx, task)
 			}
 		}
 	}()
+}
+
+func (a *App) publishExpiredTaskTimeout(ctx context.Context, task model.PendingAgentTask) {
+	timedOut, err := a.AgentService.TimeoutExpiredTask(task.ID, task.Status)
+	if err != nil {
+		slog.Warn("failed to mark expired agent task timeout", "task_id", task.ID, "status", task.Status, "error", err)
+		return
+	}
+	if !timedOut {
+		slog.Info("skip stale expired agent task timeout", "task_id", task.ID, "scanned_status", task.Status)
+		return
+	}
+
+	ai, _ := a.AgentService.GetAgentInstanceByID(task.AgentInstanceID)
+	sessionID := ""
+	if ai != nil {
+		sessionID = ai.SessionID
+	}
+	a.bus.Publish(ctx, service.Event{
+		Type: "agent.timeout",
+		Payload: map[string]interface{}{
+			"task_id":           task.ID,
+			"agent_instance_id": task.AgentInstanceID,
+			"session_id":        sessionID,
+		},
+	})
 }
 
 // startWebSocketCleanup starts heartbeat-based stale connection cleanup.
@@ -595,7 +638,7 @@ func (a *App) syncLegacySeqs() {
 
 // ── WebSocket route callbacks ──────────────────────────────────────────────
 
-func (a *App) onRouteSet(userID, deviceType, connID, oldConnID string, wasOffline bool) {
+func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string, wasOffline bool) {
 	ctx := a.coreCtx
 
 	if oldConnID != "" && oldConnID != connID {
@@ -603,19 +646,62 @@ func (a *App) onRouteSet(userID, deviceType, connID, oldConnID string, wasOfflin
 		a.mgr.PushToConn(oldConnID, ws.NewFrame(ws.TypeDeviceKicked, map[string]string{
 			"reason": "logged_in_elsewhere",
 		}))
-		if c := a.mgr.FindByUserDevice(userID, deviceType); c != nil && c.ID == oldConnID {
+		if c := a.mgr.FindByConnID(oldConnID); c != nil {
 			c.Close()
 		}
 	}
 
-	a.CacheClient.SetRoute(ctx, userID, deviceType, connID)
+	routeField := deviceType
+	if deviceID != "" {
+		routeField = deviceType + ":" + deviceID
+	}
+	a.CacheClient.SetRoute(ctx, userID, routeField, connID)
 
 	if wasOffline {
 		go a.broadcastOnlineStatus(ctx, userID, true)
 	}
 
 	if deviceType == "desktop" {
+		if deviceID != "" {
+			go a.pushPendingTargetTasks(ctx, userID, deviceID, connID)
+			go a.pushPendingAgentControls(ctx, userID, deviceID, connID)
+		}
 		go a.pushPendingTasks(ctx, userID, connID)
+	}
+}
+
+func (a *App) pushPendingTargetTasks(ctx context.Context, userID, deviceID, connID string) {
+	tasks, err := a.CacheClient.PopPendingTargetTasksForDevice(ctx, userID, deviceID)
+	if err != nil || len(tasks) == 0 {
+		return
+	}
+	for _, taskJSON := range tasks {
+		var payload json.RawMessage
+		if json.Unmarshal([]byte(taskJSON), &payload) == nil {
+			var meta struct {
+				TaskID string `json:"task_id"`
+			}
+			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
+				if err := a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, deviceID); err != nil {
+					slog.Error("failed to mark target-bound queued task dispatched", "task_id", meta.TaskID, "user_id", userID, "device_id", deviceID, "error", err)
+					continue
+				}
+			}
+			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
+		}
+	}
+}
+
+func (a *App) pushPendingAgentControls(ctx context.Context, userID, deviceID, connID string) {
+	controls, err := a.CacheClient.PopPendingAgentControlsForDevice(ctx, userID, deviceID)
+	if err != nil || len(controls) == 0 {
+		return
+	}
+	for _, controlJSON := range controls {
+		var payload json.RawMessage
+		if json.Unmarshal([]byte(controlJSON), &payload) == nil {
+			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentControl, payload))
+		}
 	}
 }
 
@@ -636,19 +722,26 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 				TaskID string `json:"task_id"`
 			}
 			if json.Unmarshal([]byte(taskJSON), &meta) == nil && meta.TaskID != "" {
-				_ = repository.UpdatePendingTaskDispatched(a.DB, meta.TaskID, edgeDeviceID)
+				if err := a.AgentService.UpdatePendingTaskDispatched(meta.TaskID, edgeDeviceID); err != nil {
+					slog.Error("failed to mark queued task dispatched", "task_id", meta.TaskID, "user_id", userID, "device_id", edgeDeviceID, "error", err)
+					continue
+				}
 			}
 			a.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, payload))
 		}
 	}
 }
 
-func (a *App) onRouteDel(userID, deviceType, connID string) {
+func (a *App) onRouteDel(userID, deviceType, deviceID, connID string) {
 	ctx := a.coreCtx
 
 	kicked, _ := a.CacheClient.IsKicked(ctx, connID)
 	if !kicked {
-		a.CacheClient.DeleteRoute(ctx, userID, deviceType)
+		routeField := deviceType
+		if deviceID != "" {
+			routeField = deviceType + ":" + deviceID
+		}
+		a.CacheClient.DeleteRoute(ctx, userID, routeField)
 		online, _ := a.CacheClient.IsOnline(ctx, userID)
 		if !online {
 			go a.broadcastOnlineStatus(ctx, userID, false)
@@ -657,7 +750,7 @@ func (a *App) onRouteDel(userID, deviceType, connID string) {
 }
 
 func (a *App) broadcastOnlineStatus(ctx context.Context, userID string, online bool) {
-	friendIDs, err := repository.GetFriendIDs(a.DB, userID)
+	friendIDs, err := a.ContactService.GetFriendIDs(userID)
 	if err != nil || len(friendIDs) == 0 {
 		return
 	}

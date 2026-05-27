@@ -41,6 +41,7 @@ type RunProcessContext struct {
 	// System prompt customization
 	SystemPrompt       string // Override system prompt (--system-prompt)
 	AppendSystemPrompt string // Append to default system prompt (--append-system-prompt)
+	SkillsPrompt       string // Skills directory context (injected by SkillRegistry.SystemPromptContext)
 
 	// Custom agents (--agents JSON)
 	AgentDefinitions map[string]AgentDefinition // agent name → definition

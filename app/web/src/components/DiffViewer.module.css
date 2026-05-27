@@ -1,0 +1,425 @@
+/* ═══════════════════════════════════════════════════════════════════
+   DiffViewer — GitHub-style unified diff with file tree sidebar
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+.root {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 0;
+  min-height: 200px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .root {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+}
+
+.diffPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.empty {
+  padding: var(--space-xl) var(--space-md);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+/* ── File Tree Sidebar ──────────────────────────────────────────── */
+.fileTree {
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fileTreeHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.fileTreeTitle {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--foreground);
+}
+
+.fileTreeStats {
+  display: flex;
+  gap: var(--space-xs);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+  font-family: var(--font-mono);
+}
+
+.fileTreeActions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.miniBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+.miniBtn:hover {
+  background: var(--hover-overlay);
+  color: var(--foreground);
+}
+
+.fileTreeList {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-xs) 0;
+}
+
+.fileTreeItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: 4px var(--space-md);
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+  text-align: left;
+}
+.fileTreeItem:hover {
+  background: var(--hover-overlay);
+}
+.fileTreeItemActive {
+  background: color-mix(in oklch, var(--primary) 8%, transparent);
+  border-left: 2px solid var(--primary);
+  padding-left: calc(var(--space-md) - 2px);
+}
+
+.fileTreeIcon {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+.fileTreePath {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Status badges ────────────────────────────────────────────────── */
+.statusBadge {
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.statusAdded {
+  background: var(--diff-added-bg);
+  color: var(--diff-added-border);
+}
+.statusDeleted {
+  background: var(--diff-removed-bg);
+  color: var(--diff-removed-border);
+}
+.statusModified {
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+
+/* ── File Section ─────────────────────────────────────────────────── */
+.fileSection {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.fileHeader {
+  display: flex;
+  align-items: center;
+  background: var(--card);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+
+.fileHeaderBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-xs) var(--space-md);
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+.fileHeaderBtn:hover {
+  background: var(--hover-overlay);
+}
+
+.filePath {
+  font-weight: var(--font-weight-medium);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileChangeStats {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.addedCount {
+  color: var(--diff-added-border);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-2xs);
+}
+.deletedCount {
+  color: var(--diff-removed-border);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-2xs);
+}
+
+.chevron {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.chevronDown {
+  transform: rotate(90deg);
+}
+
+/* ── File body ────────────────────────────────────────────────────── */
+.fileBody {
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  tab-size: 4;
+}
+
+/* ── Hunk ─────────────────────────────────────────────────────────── */
+.hunk {
+  border-bottom: 1px solid var(--border);
+}
+.hunk:last-child {
+  border-bottom: none;
+}
+
+.hunkHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-xs) var(--space-md);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklch, var(--primary) 6%, transparent);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-2xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+.hunkHeader:hover {
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
+}
+
+.hunkChevron {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  transition: transform var(--duration-fast);
+}
+.hunkChevronDown {
+  transform: rotate(90deg);
+}
+
+.hunkHeaderText {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Diff rows ────────────────────────────────────────────────────── */
+.lineAdded,
+.lineDeleted,
+.lineContext {
+  display: flex;
+  min-height: 20px;
+}
+
+.lineAdded {
+  background: var(--diff-added-bg);
+}
+.lineDeleted {
+  background: var(--diff-removed-bg);
+}
+
+/* GitHub-style left accent bar */
+.lineAdded::before,
+.lineDeleted::before {
+  content: '';
+  width: 4px;
+  flex-shrink: 0;
+}
+.lineAdded::before {
+  background: var(--diff-added-border);
+}
+.lineDeleted::before {
+  background: var(--diff-removed-border);
+}
+
+.lineAdded:hover {
+  background: color-mix(in oklch, var(--diff-added-bg) 80%, var(--hover-overlay));
+}
+.lineDeleted:hover {
+  background: color-mix(in oklch, var(--diff-removed-bg) 80%, var(--hover-overlay));
+}
+.lineContext:hover {
+  background: var(--hover-overlay);
+}
+
+/* ── Line number gutters ──────────────────────────────────────────── */
+.lineNumOld,
+.lineNumNew {
+  width: 48px;
+  min-width: 48px;
+  padding: 0 var(--space-sm);
+  text-align: right;
+  color: var(--muted-foreground);
+  opacity: 0.45;
+  user-select: none;
+  flex-shrink: 0;
+}
+.lineNumNew {
+  border-right: 1px solid var(--border);
+}
+
+.lineAdded .lineNumOld,
+.lineAdded .lineNumNew,
+.lineDeleted .lineNumOld,
+.lineDeleted .lineNumNew {
+  opacity: 0.65;
+}
+
+/* ── Line sign (+, -) ─────────────────────────────────────────────── */
+.lineSign {
+  width: 20px;
+  min-width: 20px;
+  text-align: center;
+  color: var(--muted-foreground);
+  opacity: 0.5;
+  user-select: none;
+  flex-shrink: 0;
+}
+.lineAdded .lineSign {
+  color: var(--diff-added-border);
+  opacity: 0.85;
+}
+.lineDeleted .lineSign {
+  color: var(--diff-removed-border);
+  opacity: 0.85;
+}
+
+/* ── Line content ─────────────────────────────────────────────────── */
+.lineContent {
+  flex: 1;
+  white-space: pre;
+  overflow-x: auto;
+  padding: 0 var(--space-md);
+}
+
+/* ── Accept/Reject actions ────────────────────────────────────────── */
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin-right: var(--space-xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    border-color var(--duration-fast),
+    color var(--duration-fast);
+  flex-shrink: 0;
+}
+
+.acceptBtn {
+  color: var(--diff-added-border);
+}
+.acceptBtn:hover {
+  background: var(--diff-added-bg);
+  border-color: var(--diff-added-border);
+}
+.acceptBtnActive {
+  background: var(--diff-added-bg);
+  border-color: var(--diff-added-border);
+}
+
+.rejectBtn {
+  color: var(--diff-removed-border);
+}
+.rejectBtn:hover {
+  background: var(--diff-removed-bg);
+  border-color: var(--diff-removed-border);
+}
+.rejectBtnActive {
+  background: var(--diff-removed-bg);
+  border-color: var(--diff-removed-border);
+}
+
+/* ── File-level accept/reject states ──────────────────────────────── */
+.fileAccepted {
+  opacity: 0.6;
+}
+
+.fileRejected {
+  opacity: 0.4;
+}
+.fileRejected .filePath {
+  text-decoration: line-through;
+}

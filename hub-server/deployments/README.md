@@ -4,7 +4,7 @@
 
 | 组件 | 最低版本 | 说明 |
 |------|---------|------|
-| Go | 1.25 | 构建所需 |
+| Go | 1.25 | 开发机/CI 构建所需；生产服务器不编译 |
 | PostgreSQL | 16 | 主数据库 |
 | Redis | 7 | 缓存 / 会话 / WebSocket 路由 |
 
@@ -27,15 +27,19 @@ Hub Server 通过 `AGENTHUB_` 前缀的环境变量覆盖配置文件中的值�
 | `AGENTHUB_REDIS_PORT` | Redis 端口 | `6379` |
 | `AGENTHUB_REDIS_PASSWORD` | Redis 密码 | `` |
 | `AGENTHUB_REDIS_DB` | Redis 数据库编号 | `0` |
-| `AGENTHUB_REDIS_POOL_SIZE` | Redis 连接池大小 | `100` |
-| `AGENTHUB_REDIS_MIN_IDLE_CONNS` | Redis 最小空闲连接 | `10` |
-| `AGENTHUB_JWT_SECRET` | JWT 签名密钥（**必填，最少 16 字符**） | — |
+| `AGENTHUB_REDIS_POOL_SIZE` | Redis 连接池大小 | `20` |
+| `AGENTHUB_REDIS_MIN_IDLE_CONNS` | Redis 最小空闲连接 | `2` |
+| `AGENTHUB_POSTGRES_MEM_LIMIT` / `AGENTHUB_POSTGRES_CPUS` / `AGENTHUB_POSTGRES_PIDS_LIMIT` | 生产 PostgreSQL 容器资源上限 | `512m` / `1.0` / `256` |
+| `AGENTHUB_REDIS_CONTAINER_MEM_LIMIT` / `AGENTHUB_REDIS_CPUS` / `AGENTHUB_REDIS_PIDS_LIMIT` | 生产 Redis 容器资源上限；Redis 内部仍有 `--maxmemory 256mb` | `384m` / `0.5` / `128` |
+| `AGENTHUB_HUB_MEM_LIMIT` / `AGENTHUB_HUB_CPUS` / `AGENTHUB_HUB_PIDS_LIMIT` | 生产 Hub Server 容器资源上限 | `256m` / `1.0` / `256` |
+| `AGENTHUB_JWT_SECRET` | JWT 签名密钥（**必填，最少 32 字符**） | — |
 | `AGENTHUB_JWT_ACCESS_TTL` | Access Token 有效期 | `15m` |
 | `AGENTHUB_JWT_REFRESH_TTL` | Refresh Token 有效期 | `720h` |
 | `AGENTHUB_TOKENDANCE_ID_ISSUER_URL` | TokenDance ID issuer，用于 RS256 bearer-token 兼容路径 | `https://id.vectorcontrol.tech` |
 | `AGENTHUB_TOKENDANCE_ID_JWKS_URI` | TokenDance ID JWKS；为空时由 issuer 拼出 `/oidc/jwks` | `https://id.vectorcontrol.tech/oidc/jwks` |
-| `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | Hub OIDC client id；启用 TokenDance bearer 兼容路径时必填，用于强制 `aud` 校验 | — |
-| `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | 预留给未来 confidential-client flow；只从 secret store 注入 | — |
+| `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | Hub OIDC client id；用于 Hub code exchange 和 TokenDance bearer 兼容路径的 `aud` 校验 | — |
+| `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | Hub confidential-client secret；只从 secret store 注入，不得写入仓库 | — |
+| `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI` | Hub OIDC callback/exchange redirect URI，必须与 TokenDance ID client 注册值一致 | — |
 | `AGENTHUB_UPLOAD_DIR` | 上传文件存储目录 | `./uploads` |
 | `AGENTHUB_UPLOAD_MAX_SIZE` | 上传文件最大字节数 | `10485760` |
 | `AGENTHUB_PPROF_USER` | 管理端点 HTTP Basic 用户名 | **必填** |
@@ -43,7 +47,9 @@ Hub Server 通过 `AGENTHUB_` 前缀的环境变量覆盖配置文件中的值�
 
 `AGENTHUB_JWT_SECRET` 必须通过环境变量设置；配置文件中的硬编码默认值会被拒绝。参见 `.env.example`。
 
-TokenDance ID 相关变量只启用 Hub Server 对 TokenDance ID RS256 bearer token 的兼容校验路径。启用该路径时必须配置 issuer、JWKS 和 Hub client id；Hub 会校验 RS256 签名、`exp`、`iss` 和 `aud`。当前 Hub Server 还没有最终定稿的 TokenDance ID 浏览器登录 callback，也不会为 TokenDance ID bearer token 自动创建 Hub refresh session；完整边界见 `../README.md` 的 TokenDance ID 兼容鉴权章节。
+TokenDance ID 相关变量启用 Hub Server 的 TokenDance ID OIDC Authorization Code + PKCE 登录交换，同时保留 RS256 bearer token 兼容校验路径。Hub OIDC callback/exchange 路由为 `POST /client/auth/oidc/callback`：服务端用 `client_secret` 交换 code、校验 ID token 的 RS256/JWKS、`exp`、`iss`、`aud`，再签发 Hub 本地 access/refresh session 和 device proof。TokenDance ID bearer token 兼容路径仍只作为身份校验，不会自动创建 Hub refresh session，也不能作为 Edge `desktop` device proof。完整边界见 `../README.md` 的 TokenDance ID 鉴权章节。
+
+`AGENTHUB_TOKENDANCE_*` 旧变量名仍被配置加载器兼容；生产和新文档统一使用 `AGENTHUB_TOKENDANCE_ID_*`。
 
 ## 快速启动（Docker Compose）
 
@@ -55,7 +61,7 @@ copy .env.example .env
 docker compose up -d
 ```
 
-生产部署参考 `deployments/docker-compose.prod.yml`，镜像构建入口为 `deployments/Dockerfile`。
+生产部署参考 `deployments/docker-compose.prod.yml`。生产服务器只加载开发机/CI 构建好的镜像并执行 `docker compose up -d --no-build`；不得在服务器上运行 `docker compose build`。镜像构建入口为 `deployments/Dockerfile`。生产 compose 默认给 Hub/PostgreSQL/Redis 设置内存、CPU、pids 和日志轮转护栏，防止低流量实例被异常请求或日志放大拖垮宿主机。
 
 ## 生产部署
 
@@ -107,7 +113,7 @@ systemctl enable --now hub-server
 ### 方案 B：Docker 单容器
 
 ```powershell
-# 构建镜像
+# 在开发机/CI 构建镜像
 docker build -f deployments/Dockerfile -t hub-server:latest .
 
 # 运行

@@ -7,8 +7,10 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
 )
@@ -21,12 +23,24 @@ type Client struct {
 }
 
 // NewClient creates a new cache client backed by the given Redis connection.
+// Passing nil will produce a non-functional client whose methods return
+// errors rather than panicking; always pass a valid *redis.Client.
 func NewClient(rdb *redis.Client) *Client {
 	return &Client{rdb: rdb}
 }
 
+// isReady reports whether the underlying Redis connection is available.
+func (c *Client) isReady() bool {
+	return c != nil && c.rdb != nil
+}
+
 // GetRDB returns the underlying Redis client for advanced operations (e.g., rate limiting).
+// Returns nil if called on a nil *Client (defensive guard against wiring errors).
 func (c *Client) GetRDB() *redis.Client {
+	if c == nil || c.rdb == nil {
+		slog.Error("cache.Client.GetRDB called on nil or uninitialized client")
+		return nil
+	}
 	return c.rdb
 }
 
@@ -85,6 +99,13 @@ func (c *Client) Invalidate(ctx context.Context, keys ...string) error {
 
 func routeKey(userID string) string { return "device_route:" + userID }
 
+func routeField(deviceType, deviceID string) string {
+	if deviceID == "" {
+		return deviceType
+	}
+	return deviceType + ":" + deviceID
+}
+
 // SetRoute records the WebSocket connection for a user device.
 func (c *Client) SetRoute(ctx context.Context, userID, deviceType, connID string) error {
 	return c.rdb.HSet(ctx, routeKey(userID), deviceType, connID).Err()
@@ -97,7 +118,32 @@ func (c *Client) DeleteRoute(ctx context.Context, userID, deviceType string) err
 
 // GetRoute returns the connection ID for a user device.
 func (c *Client) GetRoute(ctx context.Context, userID, deviceType string) (string, error) {
-	return c.rdb.HGet(ctx, routeKey(userID), deviceType).Result()
+	// Try exact match first (backward compatible)
+	connID, err := c.rdb.HGet(ctx, routeKey(userID), deviceType).Result()
+	if err == nil {
+		return connID, nil
+	}
+	// Scan for compound keys (deviceType:deviceID)
+	all, scanErr := c.rdb.HGetAll(ctx, routeKey(userID)).Result()
+	if scanErr != nil {
+		return "", scanErr
+	}
+	prefix := deviceType + ":"
+	for field, val := range all {
+		if strings.HasPrefix(field, prefix) {
+			return val, nil
+		}
+	}
+	return "", redis.Nil
+}
+
+// GetRouteForDevice returns the exact connection route for a device. It does
+// not fall back to another device of the same type.
+func (c *Client) GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error) {
+	if deviceID == "" {
+		return "", redis.Nil
+	}
+	return c.rdb.HGet(ctx, routeKey(userID), routeField(deviceType, deviceID)).Result()
 }
 
 // IsOnline reports whether the user has at least one active device route.
@@ -132,9 +178,26 @@ func (c *Client) IsKicked(ctx context.Context, connID string) (bool, error) {
 
 func pendingTaskKey(userID string) string { return "pending_tasks:" + userID }
 
+func pendingTargetTaskKey(userID, targetID, deviceID string) string {
+	return "pending_tasks:" + userID + ":device:" + deviceID + ":target:" + targetID
+}
+
+func pendingTargetTaskIndexKey(userID, deviceID string) string {
+	return "pending_tasks:" + userID + ":device:" + deviceID + ":targets"
+}
+
+func pendingAgentControlKey(userID, deviceID string) string {
+	return "pending_controls:" + userID + ":device:" + deviceID
+}
+
 // PushPendingTask pushes a task JSON to the user's offline pending queue.
 func (c *Client) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
-	return c.rdb.LPush(ctx, pendingTaskKey(userID), taskJSON).Err()
+	key := pendingTaskKey(userID)
+	pipe := c.rdb.TxPipeline()
+	pipe.LPush(ctx, key, taskJSON)
+	pipe.Expire(ctx, key, config.PendingTaskTTL)
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // PopPendingTasks pops all pending tasks for a user and clears the queue.
@@ -160,6 +223,86 @@ func (c *Client) PopPendingTasks(ctx context.Context, userID string) ([]string, 
 // PendingTaskCount returns the number of pending tasks for a user.
 func (c *Client) PendingTaskCount(ctx context.Context, userID string) (int64, error) {
 	return c.rdb.LLen(ctx, pendingTaskKey(userID)).Result()
+}
+
+// PushPendingTargetTask pushes a task JSON to a target/device-specific offline
+// queue so target-bound dispatch cannot be replayed to a different desktop.
+func (c *Client) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
+	taskKey := pendingTargetTaskKey(userID, targetID, deviceID)
+	pipe := c.rdb.TxPipeline()
+	pipe.SAdd(ctx, indexKey, targetID)
+	pipe.Expire(ctx, indexKey, config.PendingTaskTTL)
+	pipe.LPush(ctx, taskKey, taskJSON)
+	pipe.Expire(ctx, taskKey, config.PendingTaskTTL)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// PopPendingTargetTasksForDevice pops all target-bound pending tasks for one
+// device and clears only that device's target queues.
+func (c *Client) PopPendingTargetTasksForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
+	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
+	targetIDs, err := c.rdb.SMembers(ctx, indexKey).Result()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]string, 0)
+	for _, targetID := range targetIDs {
+		key := pendingTargetTaskKey(userID, targetID, deviceID)
+		tasks, err := c.rdb.LRange(ctx, key, 0, -1).Result()
+		if err != nil {
+			return nil, err
+		}
+		if len(tasks) > 0 {
+			c.rdb.Del(ctx, key)
+		}
+		c.rdb.SRem(ctx, indexKey, targetID)
+		for _, t := range tasks {
+			var raw json.RawMessage
+			if json.Unmarshal([]byte(t), &raw) == nil {
+				result = append(result, t)
+			}
+		}
+	}
+	if len(targetIDs) == 0 {
+		c.rdb.Del(ctx, indexKey)
+	}
+	return result, nil
+}
+
+// PushPendingAgentControl pushes a control JSON to a device-specific offline
+// queue so approval decisions are never replayed to a different desktop.
+func (c *Client) PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
+	key := pendingAgentControlKey(userID, deviceID)
+	pipe := c.rdb.TxPipeline()
+	pipe.LRem(ctx, key, 0, controlJSON)
+	pipe.LPush(ctx, key, controlJSON)
+	pipe.LTrim(ctx, key, 0, int64(config.PendingAgentControlQueueMaxLen-1))
+	pipe.Expire(ctx, key, config.PendingAgentControlQueueTTL)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// PopPendingAgentControlsForDevice pops all queued controls for one device and
+// clears only that device's control queue.
+func (c *Client) PopPendingAgentControlsForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
+	key := pendingAgentControlKey(userID, deviceID)
+	controls, err := c.rdb.LRange(ctx, key, 0, -1).Result()
+	if err != nil {
+		return nil, err
+	}
+	if len(controls) > 0 {
+		c.rdb.Del(ctx, key)
+	}
+	result := make([]string, 0, len(controls))
+	for _, control := range controls {
+		var raw json.RawMessage
+		if json.Unmarshal([]byte(control), &raw) == nil {
+			result = append(result, control)
+		}
+	}
+	return result, nil
 }
 
 // ── Sequence numbers (from seq.go) ────────────────────────────────────
@@ -220,3 +363,45 @@ func (c *Client) CheckRateLimit(ctx context.Context, key string, limit int64) (c
 	exceeded = count > limit
 	return
 }
+
+// ── NoOpCache ───────────────────────────────────────────────────────────
+
+// NoOpCache is a safe no-op implementation of all cache interfaces used by
+// services. Tests and offline paths can use this explicitly. Production
+// constructors MUST receive a real *Client — passing nil will panic.
+type NoOpCache struct{}
+
+func (NoOpCache) Invalidate(ctx context.Context, keys ...string) error                   { return nil }
+func (NoOpCache) IsOnline(ctx context.Context, userID string) (bool, error)              { return false, nil }
+func (NoOpCache) InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error { return nil }
+func (NoOpCache) AllocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	return 0, ErrCacheUnavailable
+}
+func (NoOpCache) GetRoute(ctx context.Context, userID, deviceType string) (string, error) {
+	return "", ErrCacheUnavailable
+}
+func (NoOpCache) GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error) {
+	return "", ErrCacheUnavailable
+}
+func (NoOpCache) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
+	return ErrCacheUnavailable
+}
+func (NoOpCache) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	return ErrCacheUnavailable
+}
+func (NoOpCache) PopPendingTargetTasksForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
+	return nil, ErrCacheUnavailable
+}
+func (NoOpCache) PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
+	return ErrCacheUnavailable
+}
+func (NoOpCache) PopPendingAgentControlsForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
+	return nil, ErrCacheUnavailable
+}
+func (NoOpCache) BlacklistRefreshToken(ctx context.Context, tokenHash string, ttl time.Duration) error {
+	return nil
+}
+
+// ErrCacheUnavailable is returned by NoOpCache methods that cannot operate
+// without a real Redis connection (e.g. AllocateSeq, GetRoute).
+var ErrCacheUnavailable = errors.New("cache unavailable")

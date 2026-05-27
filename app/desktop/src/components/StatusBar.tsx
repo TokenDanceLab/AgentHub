@@ -1,10 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
-<<<<<<< HEAD
 import { Circle, Wifi, WifiOff, Sun, Moon, LogIn } from 'lucide-react';
-=======
-import { Wifi, WifiOff, Sun, Moon } from 'lucide-react';
->>>>>>> origin/dev/trump
 import type { HealthResponse } from '@shared/types';
 import { StatusBadge } from '@shared/components';
 import { useTheme } from '@/contexts/ThemeContext';

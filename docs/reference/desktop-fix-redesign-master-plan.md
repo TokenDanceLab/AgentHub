@@ -522,7 +522,7 @@ interface AgentProfile {
 **Goal:** Complete the TokenDance ID login flow.
 
 **Changes:**
-- Implement OIDC callback capture (currently stored as PKCE state but not exchanged)
+- Wire Desktop/Web redirect capture to the implemented Hub OIDC callback and store the Hub-issued session
 - Add token refresh flow
 - Add device registration with TokenDance ID
 - Add session audit trail

@@ -59,11 +59,26 @@ const UploadRequestTimeout = 30 * time.Second
 // resolving WebSocket push targets.
 const SessionMemberCacheTTL = 5 * time.Minute
 
+// PendingAgentControlQueueMaxLen bounds the per-user/device offline control
+// list so approval/control redelivery cannot grow Redis without limit while a
+// desktop stays offline.
+const PendingAgentControlQueueMaxLen = 256
+
+// PendingAgentControlQueueTTL expires stale offline control queues when a
+// desktop does not reconnect within the task lifetime window.
+const PendingAgentControlQueueTTL = 24 * time.Hour
+
 // ── Agent task ────────────────────────────────────────────────────────────────
 
 // PendingTaskTTL is the time-to-live for a queued pending agent task. Expired
 // tasks are scanned by the background scheduler and published as timeout events.
 const PendingTaskTTL = 24 * time.Hour
+
+// RunningTaskHeartbeatTTL is the expiration extension applied to running tasks
+// each time the Hub receives a stream callback. If no callback arrives within
+// this window, the background scheduler will mark the task as timed out.
+// #132: ensures long-running agent tasks are eventually expired on inactivity.
+const RunningTaskHeartbeatTTL = 10 * time.Minute
 
 // PendingTaskScanInterval controls how often expired pending tasks are scanned.
 const PendingTaskScanInterval = time.Minute

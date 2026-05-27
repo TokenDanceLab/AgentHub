@@ -27,7 +27,7 @@ INSERT OR IGNORE INTO oauth_clients (
   'agenthub-desktop',
   '$2a$10$kHt48nZd9zTvhrnYGkHLqeOgtWatj0oM2dPOYjV9lngjMC2mf.vmu',  -- bcrypt of: agenthub-dev-secret-change-me
   'AgentHub Desktop',
-  '["http://127.0.0.1:PORT_IDX/callback","agenthub://callback"]',
+  '["http://127.0.0.1/callback","http://localhost:5174/auth/tokendance/callback"]',
   '["authorization_code"]',
   '["openid","profile","email"]',
   '144650a1-f72b-4d98-b34a-399507a1f32a',  -- alice@test.com (existing user from seed-admin-data.sql)

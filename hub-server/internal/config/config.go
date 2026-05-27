@@ -34,6 +34,8 @@ type TokenDanceIDConfig struct {
 	ClientSecret string `mapstructure:"client_secret"`
 	// RedirectURI is the Hub-owned OIDC callback URL.
 	RedirectURI string `mapstructure:"redirect_uri"`
+	// AllowedRedirectURIs lists additional browser/native callbacks accepted for one OIDC round trip.
+	AllowedRedirectURIs []string `mapstructure:"allowed_redirect_uris"`
 }
 
 // LogValue implements slog.LogValuer to redact secrets when config is logged.
@@ -44,6 +46,7 @@ func (t TokenDanceIDConfig) LogValue() slog.Value {
 		slog.String("client_id", t.ClientID),
 		slog.String("client_secret", "[REDACTED]"),
 		slog.String("redirect_uri", t.RedirectURI),
+		slog.Any("allowed_redirect_uris", t.AllowedRedirectURIs),
 	)
 }
 
@@ -177,20 +180,23 @@ func Load(configPath string) (*Config, error) {
 	// Viper AutomaticEnv handles nesting with underscores but these
 	// belt-and-suspenders overrides guarantee the env vars take precedence
 	// regardless of config file content.
-	if envIssuer := os.Getenv("AGENTHUB_TOKENDANCE_ISSUER_URL"); envIssuer != "" {
+	if envIssuer := firstEnv("AGENTHUB_TOKENDANCE_ID_ISSUER_URL", "AGENTHUB_TOKENDANCE_ISSUER_URL"); envIssuer != "" {
 		cfg.TokenDanceID.IssuerURL = envIssuer
 	}
-	if envJWKS := os.Getenv("AGENTHUB_TOKENDANCE_JWKS_URI"); envJWKS != "" {
+	if envJWKS := firstEnv("AGENTHUB_TOKENDANCE_ID_JWKS_URI", "AGENTHUB_TOKENDANCE_JWKS_URI"); envJWKS != "" {
 		cfg.TokenDanceID.JWKSURI = envJWKS
 	}
-	if envClientID := os.Getenv("AGENTHUB_TOKENDANCE_CLIENT_ID"); envClientID != "" {
+	if envClientID := firstEnv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "AGENTHUB_TOKENDANCE_CLIENT_ID"); envClientID != "" {
 		cfg.TokenDanceID.ClientID = envClientID
 	}
-	if envClientSecret := os.Getenv("AGENTHUB_TOKENDANCE_CLIENT_SECRET"); envClientSecret != "" {
+	if envClientSecret := firstEnv("AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "AGENTHUB_TOKENDANCE_CLIENT_SECRET"); envClientSecret != "" {
 		cfg.TokenDanceID.ClientSecret = envClientSecret
 	}
-	if envRedirectURI := os.Getenv("AGENTHUB_TOKENDANCE_REDIRECT_URI"); envRedirectURI != "" {
+	if envRedirectURI := firstEnv("AGENTHUB_TOKENDANCE_ID_REDIRECT_URI", "AGENTHUB_TOKENDANCE_REDIRECT_URI"); envRedirectURI != "" {
 		cfg.TokenDanceID.RedirectURI = envRedirectURI
+	}
+	if envAllowedRedirectURIs := firstEnv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "AGENTHUB_TOKENDANCE_ALLOWED_REDIRECT_URIS"); envAllowedRedirectURIs != "" {
+		cfg.TokenDanceID.AllowedRedirectURIs = splitEnvList(envAllowedRedirectURIs)
 	}
 
 	// Auto-derive JWKS URI from issuer URL when not explicitly set.
@@ -199,6 +205,26 @@ func Load(configPath string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func firstEnv(names ...string) string {
+	for _, name := range names {
+		if value := os.Getenv(name); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func splitEnvList(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
 
 // Validate checks that the loaded configuration is usable at startup.
@@ -264,6 +290,9 @@ func (c *Config) Validate() error {
 		}
 		if c.TokenDanceID.ClientSecret == "" {
 			return fmt.Errorf("tokendance_id.client_secret is required when tokendance_id.client_id is set")
+		}
+		if c.TokenDanceID.RedirectURI == "" {
+			return fmt.Errorf("tokendance_id.redirect_uri is required when tokendance_id.client_id is set")
 		}
 	}
 

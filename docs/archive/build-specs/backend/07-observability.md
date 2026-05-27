@@ -70,7 +70,7 @@ func NewLogger(format string, level slog.Level, attrs ...slog.Attr) *slog.Logger
 
 **生产 JSON**：
 ```json
-{"time":"2026-05-21T10:00:00.000Z","level":"INFO","msg":"run started","run_id":"abc123","agent":"claude-code","model":"claude-sonnet-4-6","service":"runner","edge_id":"us1"}
+{"time":"2026-05-21T10:00:00.000Z","level":"INFO","msg":"run started","run_id":"abc123","agent":"claude-code","model":"claude-sonnet-4-6","service":"runner","edge_id":"edge-01"}
 ```
 
 **本地 Text**：

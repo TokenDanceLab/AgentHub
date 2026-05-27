@@ -192,7 +192,7 @@ type ToastType = "success" | "error" | "warning" | "info" | "loading"
 // 5. "loading" toast 持续到被 success/error 替换
 
 // 示例：
-// - "已连接到 Edge: us1-desktop"（success, 3s）
+// - "已连接到 Edge: edge-01-desktop"（success, 3s）
 // - "消息发送失败 — 点击重试"（error, 持续到操作）
 // - "压缩完成：释放 12k tokens"（info, 4s）
 // - "安全检查：检测到大括号扩展混淆"（warning, 6s）
@@ -203,7 +203,7 @@ type ToastType = "success" | "error" | "warning" | "info" | "loading"
 LeftSidebar 中的持久底部元素：
 
 ```
-绿色圆点 + "us1-desktop" + "12ms" → 正常
+绿色圆点 + "edge-01-desktop" + "12ms" → 正常
 黄色圆点 + "Connecting..."       → 瞬时（重连尝试 N）
 红色圆点 + "Disconnected"         → 离线，带 [Reconnect] 按钮
 红色横幅（全宽）                  → "Edge 不可达 — 离线模式"（达到最大重试后）
@@ -219,7 +219,7 @@ LeftSidebar 中的持久底部元素：
 |------|------|---------|
 | `queued` | 灰色 pill | "Queued..." |
 | `starting` | 蓝色脉冲 | "Starting..." |
-| `running` | 绿色脉冲 | "Edge: us1-desktop / Runner #3" |
+| `running` | 绿色脉冲 | "Edge: edge-01-desktop / Runner #3" |
 | `awaiting_approval` | 黄色脉冲 | "Waiting for approval..." |
 | `completed` | 绿色对勾（2s）然后消失 | -- |
 | `failed` | 红色叉号 + 错误摘要 | "Failed: rate limit exceeded" |

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"strings"
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/service"
@@ -10,8 +11,8 @@ import (
 
 // OIDCService is the subset of *service.OIDCService used by OIDCHandler.
 type OIDCService interface {
-	GenerateAuthorizationURL(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID string) (*service.AuthorizationResult, error)
-	HandleCallback(ctx context.Context, code, state, codeVerifier, deviceType, deviceID string) (*service.CallbackResult, error)
+	GenerateAuthorizationURL(ctx context.Context, codeChallenge, codeChallengeMethod, deviceType, deviceID, redirectURI string) (*service.AuthorizationResult, error)
+	HandleCallback(ctx context.Context, code, state, codeVerifier, deviceType, deviceID, redirectURI string) (*service.CallbackResult, error)
 }
 
 type OIDCHandler struct {
@@ -27,6 +28,7 @@ type oidcAuthorizeReq struct {
 	CodeChallengeMethod string `json:"code_challenge_method"`
 	DeviceType          string `json:"device_type" binding:"required"`
 	DeviceID            string `json:"device_id" binding:"required"`
+	RedirectURI         string `json:"redirect_uri"`
 }
 
 func (h *OIDCHandler) PostOIDCAuthorize(c *gin.Context) {
@@ -35,8 +37,18 @@ func (h *OIDCHandler) PostOIDCAuthorize(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
+	deviceType, ok := normalizeOIDCDeviceType(req.DeviceType)
+	if !ok {
+		FailWithMessage(c, errcode.ErrBadRequest, "device_type must be one of desktop, web, cli")
+		return
+	}
+	deviceID, ok := normalizeUUID(req.DeviceID)
+	if !ok {
+		FailWithMessage(c, errcode.ErrBadRequest, "device_id must be a UUID")
+		return
+	}
 	result, err := h.svc.GenerateAuthorizationURL(c.Request.Context(),
-		req.CodeChallenge, req.CodeChallengeMethod, req.DeviceType, req.DeviceID)
+		req.CodeChallenge, req.CodeChallengeMethod, deviceType, deviceID, strings.TrimSpace(req.RedirectURI))
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -54,6 +66,7 @@ type oidcCallbackReq struct {
 	CodeVerifier string `json:"code_verifier" binding:"required"`
 	DeviceType   string `json:"device_type" binding:"required"`
 	DeviceID     string `json:"device_id" binding:"required"`
+	RedirectURI  string `json:"redirect_uri"`
 }
 
 func (h *OIDCHandler) PostOIDCCallback(c *gin.Context) {
@@ -62,8 +75,18 @@ func (h *OIDCHandler) PostOIDCCallback(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
+	deviceType, ok := normalizeOIDCDeviceType(req.DeviceType)
+	if !ok {
+		FailWithMessage(c, errcode.ErrBadRequest, "device_type must be one of desktop, web, cli")
+		return
+	}
+	deviceID, ok := normalizeUUID(req.DeviceID)
+	if !ok {
+		FailWithMessage(c, errcode.ErrBadRequest, "device_id must be a UUID")
+		return
+	}
 	result, err := h.svc.HandleCallback(c.Request.Context(),
-		req.Code, req.State, req.CodeVerifier, req.DeviceType, req.DeviceID)
+		req.Code, req.State, req.CodeVerifier, deviceType, deviceID, strings.TrimSpace(req.RedirectURI))
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
@@ -73,4 +96,13 @@ func (h *OIDCHandler) PostOIDCCallback(c *gin.Context) {
 		return
 	}
 	OK(c, result)
+}
+
+func normalizeOIDCDeviceType(value string) (string, bool) {
+	switch strings.TrimSpace(value) {
+	case "desktop", "web", "cli":
+		return strings.TrimSpace(value), true
+	default:
+		return "", false
+	}
 }

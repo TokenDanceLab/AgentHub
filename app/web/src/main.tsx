@@ -1,9 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-<<<<<<< HEAD
 import '@/styles/tokens.css';
-=======
->>>>>>> origin/dev/trump
+import '@/i18n';
 import App from '@/App';
 
 createRoot(document.getElementById('root')!).render(

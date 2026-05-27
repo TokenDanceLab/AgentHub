@@ -7,6 +7,7 @@ interface MockTransport extends Transport {
   _setStatus(s: TransportStatus): void;
   _deliverMessage(data: unknown): void;
   _sent: unknown[];
+  _urls: Array<string | undefined>;
   _closed: boolean;
 }
 
@@ -14,20 +15,29 @@ function mockTransport(): MockTransport {
   const statusListeners = new Set<(s: TransportStatus) => void>();
   const msgListeners = new Set<(data: unknown) => void>();
   const sent: unknown[] = [];
+  const urls: Array<string | undefined> = [];
   let closed = false;
   let status: TransportStatus = "disconnected";
 
   const t: MockTransport = {
     _sent: sent,
+    _urls: urls,
     get _closed() { return closed; },
     set _closed(v) { closed = v; },
 
-    connect() {
+    connect(url?: string) {
+      urls.push(url);
       sent.length = 0;
+      closed = false;
       status = "connecting";
       for (const h of statusListeners) h("connecting");
       status = "connected";
       for (const h of statusListeners) h("connected");
+    },
+
+    reconnect(url?: string) {
+      closed = false;
+      this.connect(url);
     },
 
     send(data: unknown) { sent.push(data); },
@@ -76,21 +86,18 @@ describe("createHubWS", () => {
     h.connect();
   }
 
-  it("sends auth frame on connect with valid token", () => {
+  it("connects with the Hub access token in the WebSocket URL", () => {
     init();
-    const auth = t._sent.find(
-      (m) => (m as Record<string, unknown>).type === HUB_EVENTS.AUTH,
-    );
-    expect(auth).toBeDefined();
-    expect((auth as Record<string, unknown>).payload).toEqual({ access_token: "test-token" });
-  });
-
-  it("skips auth when token is null", () => {
-    init(false);
+    expect(String(t._urls[0])).toContain("access_token=test-token");
     const authFrames = t._sent.filter(
       (m) => (m as Record<string, unknown>).type === HUB_EVENTS.AUTH,
     );
     expect(authFrames.length).toBe(0);
+  });
+
+  it("connects without an access_token query param when token is null", () => {
+    init(false);
+    expect(String(t._urls[0])).not.toContain("access_token=");
   });
 
   it("calls onAuthSuccess on auth.ok", () => {
@@ -184,12 +191,18 @@ describe("createHubWS", () => {
     expect(t._closed).toBe(true);
   });
 
-  it("reconnect sends new auth", () => {
-    init();
+  it("reconnect refreshes the WebSocket URL with the latest token", () => {
+    let currentToken = "first-token";
+    t = mockTransport();
+    h = createHubWS({
+      transport: t as unknown as Transport,
+      getToken: () => currentToken,
+    });
+    h.connect();
     t._deliverMessage({ type: HUB_EVENTS.AUTH_OK });
+    currentToken = "second-token";
     h.reconnect();
-    const last = t._sent[t._sent.length - 1];
-    expect((last as Record<string, unknown>).type).toBe(HUB_EVENTS.AUTH);
+    expect(String(t._urls[t._urls.length - 1])).toContain("access_token=second-token");
   });
 
   it("on() unsub stops delivery", () => {
@@ -226,18 +239,12 @@ describe("createHubWS", () => {
     expect(called).toBe(false);
   });
 
-  it("sends auth on transport reconnect", () => {
+  it("connect URL still contains the token on transport reconnect", () => {
     init();
     t._deliverMessage({ type: HUB_EVENTS.AUTH_OK });
     t._setStatus("disconnected");
-    const before = t._sent.filter(
-      (m) => (m as Record<string, unknown>).type === HUB_EVENTS.AUTH,
-    ).length;
     t._setStatus("connected");
-    const after = t._sent.filter(
-      (m) => (m as Record<string, unknown>).type === HUB_EVENTS.AUTH,
-    ).length;
-    expect(after).toBeGreaterThan(before);
+    expect(String(t._urls[0])).toContain("access_token=test-token");
   });
 
   it("onStatus forwards transport status", () => {

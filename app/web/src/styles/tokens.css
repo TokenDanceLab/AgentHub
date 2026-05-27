@@ -4,70 +4,118 @@
    ============================================================ */
 
 :root {
+  color-scheme: dark;
+
+  /* Codex App target: dark desktop workbench, calm glass layers. */
+  --app-bg: #1f1f27;
+
   /* Semantic Colors */
-  --background:          oklch(0.985 0.002 260);
-  --foreground:          oklch(0.14 0.005 260);
-  --card:                oklch(1 0 0);
-  --card-foreground:     oklch(0.14 0.005 260);
-  --popover:             oklch(1 0 0);
-  --popover-foreground:  oklch(0.14 0.005 260);
-  --primary:             oklch(0.21 0.006 286);
-  --primary-foreground:  oklch(0.985 0 0);
-  --secondary:           oklch(0.965 0.003 260);
-  --secondary-foreground:oklch(0.21 0.006 286);
-  --muted:               oklch(0.965 0.003 260);
-  --muted-foreground:    oklch(0.55 0.012 260);
-  --accent:              oklch(0.965 0.003 260);
-  --accent-foreground:   oklch(0.21 0.006 286);
-  --destructive:         oklch(0.58 0.24 27);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border:              oklch(0.90 0.005 260);
-  --input:               oklch(0.90 0.005 260);
-  --ring:                oklch(0.62 0.015 260);
+  --background: #1f1f27;
+  --foreground: #e3e4e6;
+  --card: rgba(37, 37, 45, 0.82);
+  --card-foreground: #e3e4e6;
+  --popover: rgba(48, 48, 58, 0.88);
+  --popover-foreground: #e3e4e6;
+  --primary: #5d68cc;
+  --primary-foreground: #f4f5ff;
+  --secondary: rgba(255, 255, 255, 0.055);
+  --secondary-foreground: #e3e4e6;
+  --muted: rgba(255, 255, 255, 0.045);
+  --muted-foreground: #a0a1aa;
+  --accent: #5d68cc;
+  --accent-foreground: #f4f5ff;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.075);
+  --input: rgba(255, 255, 255, 0.06);
+  --ring: rgba(93, 104, 204, 0.42);
+
+  /* Legacy aliases used by copied desktop components. */
+  --text: var(--foreground);
+  --text-muted: var(--muted-foreground);
+  --text-weaker: #a0a1aa;
+  --text-weakest: #6e7079;
+  --surface: var(--card);
+  --surface-base: #1f1f27;
+  --surface-raised: rgba(37, 37, 45, 0.82);
+  --surface-raised-hover: rgba(55, 55, 66, 0.86);
+  --surface-overlay: rgba(60, 60, 72, 0.9);
+  --hover: var(--secondary);
+  --hover-overlay: rgba(255, 255, 255, 0.04);
+  --color-border: rgba(255, 255, 255, 0.06);
+  --color-danger: var(--destructive);
 
   /* Extended Semantic */
-  --success:             oklch(0.58 0.18 150);
-  --success-foreground:  oklch(0.985 0 0);
-  --warning:             oklch(0.70 0.18 85);
-  --warning-foreground:  oklch(0.14 0.005 260);
-  --info:                oklch(0.60 0.12 230);
-  --info-foreground:     oklch(0.985 0 0);
+  --success: #69c967;
+  --success-foreground: #0f172a;
+  --warning: #fbbf24;
+  --warning-foreground: #0f172a;
+  --info: #60a5fa;
+  --info-foreground: #0f172a;
+  --color-success: var(--success);
 
   /* AgentHub-specific */
-  --brand:               oklch(0.55 0.16 255);
+  --brand: #5d68cc;
+  --skill: #c2a1ff;
+  --authority-hub: #5d68cc;
+  --authority-edge: #69c967;
+  --authority-hybrid: #fbbf24;
 
-<<<<<<< HEAD
-  /* TokenDance cross-app aliases */
-  --td-canvas:           var(--background);
-  --td-surface:          var(--card);
-  --td-tint:             var(--secondary);
-  --td-ink:              var(--foreground);
-  --td-ink-muted:        var(--muted-foreground);
-  --td-line:             var(--border);
-  --td-plum:             var(--brand);
-  --td-moss:             var(--success);
-  --td-danger:           var(--destructive);
-  --td-focus:            var(--ring);
-  --td-radius-control:   var(--radius-md);
-  --td-radius-panel:     var(--radius-xl);
+  /* Chat surface */
+  --chat-agent-bg: transparent;
+  --chat-user-bg: rgba(255, 255, 255, 0.045);
+  --chat-code-bg: rgba(255, 255, 255, 0.055);
+  --chat-thinking-bg: rgba(255, 255, 255, 0.02);
+  --chat-thinking-border: rgba(255, 255, 255, 0.055);
 
-=======
->>>>>>> origin/dev/trump
+  /* Floating input panel */
+  --input-panel-bg: rgba(50, 50, 60, 0.78);
+  --input-panel-border: rgba(255, 255, 255, 0.09);
+  --input-panel-shadow: 0 -10px 34px rgba(0, 0, 0, 0.24);
+  --input-ghost-btn: rgba(255, 255, 255, 0.045);
+  --input-ghost-btn-hover: rgba(255, 255, 255, 0.075);
+
+  /* Sidebar inventory */
+  --sidebar-bg: rgba(31, 31, 39, 0.86);
+  --agent-card-bg: transparent;
+  --agent-card-hover: rgba(255, 255, 255, 0.03);
+  --agent-card-active: rgba(255, 255, 255, 0.06);
+  --agent-dot-online: #69c967;
+  --agent-dot-online-glow: 0 0 6px rgba(105, 201, 103, 0.3);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
+  --scrollbar-track: transparent;
+
+  --td-canvas: var(--app-bg);
+  --td-surface: var(--surface-raised);
+  --td-tint: var(--secondary);
+  --td-ink: var(--foreground);
+  --td-ink-muted: var(--muted-foreground);
+  --td-line: var(--border);
+  --td-plum: var(--brand);
+  --td-moss: var(--success);
+  --td-danger: var(--destructive);
+  --td-focus: var(--ring);
+  --td-radius-control: var(--radius-md);
+  --td-radius-panel: var(--radius-xl);
+
   /* Typography */
-  --font-sans:  "Inter Variable", "Inter", system-ui, -apple-system,
-                "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-mono:  "Geist Mono", "SF Mono", "Cascadia Code", "Fira Code",
-                "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI",
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Geist Mono", "SF Mono", "Cascadia Code", "Fira Code",
+    "JetBrains Mono", ui-monospace, monospace;
 
-  --font-size-xs:   0.75rem;
-  --font-size-sm:   0.875rem;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
   --font-size-base: 1rem;
 
   --font-weight-normal: 400;
   --font-weight-medium: 500;
 
-  --line-height-tight:   1.25;
-  --line-height-normal:  1.5;
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
 
   /* Spacing */
   --space-xs: 0.25rem;
@@ -76,8 +124,19 @@
   --space-lg: 1rem;
   --space-xl: 1.5rem;
   --space-2xl: 2rem;
-<<<<<<< HEAD
   --space-3xl: 3rem;
+
+  /* Border Radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Layout */
+  --sidebar-width: 280px;
+  --detail-width: 300px;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
@@ -89,23 +148,10 @@
   --duration-slow: 500ms;
   --ease-standard: ease;
   --ease-out: ease-out;
+}
 
-  /* Line Height */
-  --line-height-relaxed: 1.625;
-=======
->>>>>>> origin/dev/trump
-
-  /* Border Radius */
-  --radius-sm:  0.25rem;
-  --radius-md:  0.375rem;
-  --radius-lg:  0.5rem;
-  --radius-xl:  0.75rem;
-  --radius-2xl: 1rem;
-  --radius-full: 9999px;
-
-  /* Layout */
-  --sidebar-width: 280px;
-  --detail-width:  300px;
+[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 *, *::before, *::after {
@@ -130,7 +176,32 @@ button, input, textarea, select {
   color: inherit;
 }
 
-button { cursor: pointer; }
+button {
+  cursor: pointer;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--scrollbar-thumb);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
 
 *:focus-visible {
   outline: 2px solid var(--ring);
@@ -139,6 +210,6 @@ button { cursor: pointer; }
 }
 
 ::selection {
-  background: oklch(0.70 0.15 260 / 0.3);
+  background: oklch(0.7 0.15 260 / 0.3);
   color: inherit;
 }

@@ -15,6 +15,8 @@ test-results/
 app/desktop/stats.html
 **/coverage.out
 **/coverage.html
+**/coverage
+**/.golangci.bck.yml
 edge-server/cov_full
 edge-server/$covPath
 hub-server/tests/uploads/
@@ -76,11 +78,14 @@ yarn-error.log*
 *.backup
 *.sql.gz
 
-# AgentHub deployment state (hk2 production)
+# AgentHub deployment state (production)
 hub-server/deployments/.env.production
 hub-server/deployments/.env
 hub-server/deployments/backups/
 backups/
+
+# Local temp files
+.tmp/
 
 # Local machine and agent state
 .worktrees/
@@ -98,7 +103,6 @@ docs/review/
 .agents/skills/*
 !.agents/skills/dev-loop/
 !.agents/skills/dev-loop/**
-<<<<<<< HEAD
 !.agents/skills/test-coverage/
 !.agents/skills/test-coverage/**
 !.agents/skills/pre-push/
@@ -135,17 +139,14 @@ docs/inbox/*
 docs/review/*
 !docs/review/README.md
 
-=======
-.cursor/
-.continue/
-
->>>>>>> origin/dev/trump
 # Cloned reference repos (at repo root only)
 /reference/*
 !/reference/INDEX.md
 /chat-verify/
 test_store.json
-<<<<<<< HEAD
-=======
-app/desktop/stats.html
->>>>>>> origin/dev/trump
+
+# Hub server temp
+hub-server/.tmp/
+
+# Tauri Android generated (source tracked, builds ignored by inner .gitignore)
+# app/desktop/src-tauri/gen/android/ is committed

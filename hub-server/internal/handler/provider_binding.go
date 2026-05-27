@@ -14,7 +14,7 @@ import (
 // ProviderBindingService is the subset of *service.ProviderBindingService used by ProviderBindingHandler.
 type ProviderBindingService interface {
 	Create(ctx context.Context, ownerID string, req *model.ProviderBinding) (*model.ProviderBinding, error)
-	Get(ctx context.Context, id string) (*model.ProviderBinding, error)
+	Get(ctx context.Context, id, ownerID string) (*model.ProviderBinding, error)
 	Update(ctx context.Context, id, ownerID string, req *model.ProviderBinding) (*model.ProviderBinding, error)
 	Delete(ctx context.Context, id, ownerID string) error
 	List(ctx context.Context, ownerID, cursor string, pageSize int) (*service.PBListResult, error)

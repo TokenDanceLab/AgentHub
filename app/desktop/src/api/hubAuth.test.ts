@@ -9,7 +9,7 @@ import type { HubAuth } from './hubAuth';
 // We test the login flow in isolation by importing the module with mocked deps.
 // The actual E2E flow requires Tauri context, so these tests focus on:
 // 1. PKCE helper correctness
-// 2. exchangeCodeForToken API contract (mocked fetch)
+// 2. Hub OIDC API contract (mocked fetch)
 // 3. State validation in the callback flow
 
 // ── Mock localStorage and sessionStorage ──────────
@@ -63,21 +63,6 @@ async function computeCodeChallenge(verifier: string): Promise<string> {
   return base64UrlEncode(new Uint8Array(digest));
 }
 
-// ── redirect_uri patching ─────────────────────────
-
-function patchRedirectUri(authUrl: string, redirectUri: string): string {
-  try {
-    const url = new URL(authUrl);
-    url.searchParams.set('redirect_uri', redirectUri);
-    return url.toString();
-  } catch {
-    return authUrl.replace(
-      /redirect_uri=[^&]*/,
-      `redirect_uri=${encodeURIComponent(redirectUri)}`,
-    );
-  }
-}
-
 // ── Tests ─────────────────────────────────────────
 
 describe('PKCE helpers', () => {
@@ -106,32 +91,6 @@ describe('PKCE helpers', () => {
     const c1 = await computeCodeChallenge(verifier);
     const c2 = await computeCodeChallenge(verifier);
     expect(c1).toBe(c2);
-  });
-});
-
-describe('patchRedirectUri', () => {
-  it('replaces redirect_uri in a well-formed URL', () => {
-    const url = 'https://id.vectorcontrol.tech/oidc/auth?response_type=code&client_id=test&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fcallback&state=abc';
-    const result = patchRedirectUri(url, 'http://127.0.0.1:18080/callback');
-    expect(result).toContain('redirect_uri=http%3A%2F%2F127.0.0.1%3A18080%2Fcallback');
-  });
-
-  it('preserves other query parameters', () => {
-    const url = 'https://id.vectorcontrol.tech/oidc/auth?response_type=code&client_id=test&redirect_uri=old&scope=openid&state=abc';
-    const result = patchRedirectUri(url, 'http://127.0.0.1:9999/cb');
-    expect(result).toContain('response_type=code');
-    expect(result).toContain('client_id=test');
-    expect(result).toContain('scope=openid');
-    expect(result).toContain('state=abc');
-    expect(result).toContain('redirect_uri=http%3A%2F%2F127.0.0.1%3A9999%2Fcb');
-  });
-
-  it('handles URLs without redirect_uri gracefully', () => {
-    const url = 'https://id.vectorcontrol.tech/oidc/auth?response_type=code&client_id=test';
-    const result = patchRedirectUri(url, 'http://localhost/cb');
-    // Adds the redirect_uri
-    const parsed = new URL(result);
-    expect(parsed.searchParams.get('redirect_uri')).toBe('http://localhost/cb');
   });
 });
 
@@ -176,7 +135,8 @@ describe('Hub OIDC API contract (mocked)', () => {
       code_challenge: 'test-challenge',
       code_challenge_method: 'S256',
       device_type: 'desktop',
-      device_id: 'test-device-id',
+      device_id: '00000000-0000-0000-0000-00000000a201',
+      redirect_uri: 'http://127.0.0.1:49152/callback',
     };
 
     const res = await fetch('http://localhost:8080/client/auth/oidc/authorize', {
@@ -190,6 +150,9 @@ describe('Hub OIDC API contract (mocked)', () => {
     const data = await res.json();
     expect(data.state).toBe('hub-generated-state');
     expect(data.authorization_url).toContain('id.vectorcontrol.tech');
+    const [, authorizeInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const sent = JSON.parse(authorizeInit.body as string);
+    expect(sent.redirect_uri).toBe('http://127.0.0.1:49152/callback');
   });
 
   it('oidcCallback sends code + state + verifier to Hub', async () => {
@@ -217,7 +180,8 @@ describe('Hub OIDC API contract (mocked)', () => {
       state: 'server-state',
       code_verifier: 'verifier-456',
       device_type: 'desktop',
-      device_id: 'test-device-id',
+      device_id: '00000000-0000-0000-0000-00000000a202',
+      redirect_uri: 'http://127.0.0.1:49152/callback',
     };
 
     const res = await fetch('http://localhost:8080/client/auth/oidc/callback', {
@@ -233,6 +197,9 @@ describe('Hub OIDC API contract (mocked)', () => {
     expect(data.refresh_token).toBe('hub-refresh-token');
     expect(data.user.id).toBe('user-1');
     expect(data.user.username).toBe('testuser');
+    const [, callbackInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const sent = JSON.parse(callbackInit.body as string);
+    expect(sent.redirect_uri).toBe('http://127.0.0.1:49152/callback');
   });
 
   it('oidcCallback handles Hub error response', async () => {
@@ -251,7 +218,7 @@ describe('Hub OIDC API contract (mocked)', () => {
         state: 'bad-state',
         code_verifier: 'verifier',
         device_type: 'desktop',
-        device_id: 'dev-1',
+        device_id: '00000000-0000-0000-0000-00000000a203',
       }),
     });
 

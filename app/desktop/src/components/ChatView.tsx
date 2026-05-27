@@ -1,8 +1,9 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench } from 'lucide-react';
+import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, ChevronRight } from 'lucide-react';
+import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
@@ -10,7 +11,6 @@ import EmptyState from './EmptyState';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
-import { TextShimmer } from '@shared/ui';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -41,6 +41,24 @@ function resolveToolIcon(toolName: string) {
   return <Icon size={14} />;
 }
 
+function AgentAvatarIcon({ name }: { name: string }) {
+  const normalized = name.toLowerCase();
+  if (
+    normalized.includes('claude-opus') ||
+    normalized.includes('claude-sonnet') ||
+    normalized.includes('claude-haiku') ||
+    normalized.includes('gpt') ||
+    normalized.includes('glm') ||
+    normalized.includes('qwen')
+  ) {
+    return <Bot size={16} />;
+  }
+  if (normalized.includes('claude code') || normalized === 'claude') return <ClaudeCode size={18} />;
+  if (normalized.includes('codex')) return <Codex size={18} />;
+  if (normalized.includes('opencode')) return <OpenCode size={18} />;
+  return <Bot size={15} />;
+}
+
 function summarizeInput(input: Record<string, unknown>): string {
   const parts: string[] = [];
   if (typeof input.file_path === 'string') parts.push(input.file_path);
@@ -51,56 +69,84 @@ function summarizeInput(input: Record<string, unknown>): string {
   return str.length > 40 ? str.slice(0, 40) + '...' : str;
 }
 
-// ── Relative time formatter ──────────────────
-function relativeTime(timestamp: string): { relative: string; exact: string } {
-  const now = Date.now();
-  const then = new Date(timestamp).getTime();
-  const diff = now - then;
+// ── Concrete message time formatter ─────────
+function formatMessageTime(timestamp: string, language: string): { short: string; exact: string } {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return { short: '', exact: '' };
 
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
+  const locale = language.startsWith('zh') ? 'zh-CN' : 'en-US';
+  const now = new Date();
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  const sameYear = date.getFullYear() === now.getFullYear();
 
-  const exact = new Date(timestamp).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  const shortOptions: Intl.DateTimeFormatOptions = sameDay
+    ? { hour: 'numeric', minute: '2-digit', hour12: language.startsWith('zh') }
+    : sameYear
+      ? { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: language.startsWith('zh') }
+      : { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: language.startsWith('zh') };
 
-  if (minutes < 1) return { relative: 'Just now', exact };
-  if (minutes < 60) return { relative: `${minutes} min ago`, exact };
-  if (hours < 24) return { relative: `${hours}h ago`, exact };
-  if (days === 1) return { relative: 'Yesterday', exact };
-  if (days < 7) return { relative: `${days}d ago`, exact };
+  return {
+    short: new Intl.DateTimeFormat(locale, shortOptions).format(date),
+    exact: new Intl.DateTimeFormat(locale, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: language.startsWith('zh'),
+    }).format(date),
+  };
+}
 
-  const shortDate = new Date(timestamp).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-  return { relative: shortDate, exact };
+function basename(path: string): string {
+  const normalized = path.replace(/\\/g, '/');
+  return normalized.split('/').filter(Boolean).pop() ?? path;
+}
+
+function summarizeRawDiff(diff?: string): { additions: number; deletions: number; preview: string[] } {
+  if (!diff) return { additions: 0, deletions: 0, preview: [] };
+  const lines = diff.split(/\r?\n/);
+  let additions = 0;
+  let deletions = 0;
+  const preview: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith('+++') || line.startsWith('---')) continue;
+    if (line.startsWith('+')) additions += 1;
+    if (line.startsWith('-')) deletions += 1;
+    if (preview.length < 18 && (/^[-+ ]/.test(line) || line.startsWith('@@'))) {
+      preview.push(line);
+    }
+  }
+
+  return { additions, deletions, preview };
 }
 
 // ── Status badge class resolver ──────────────
 function toolStatusClass(status: string): string {
   switch (status) {
     case 'pending':
-      return styles.toolStatusPending;
+      return styles.toolStatusPending ?? '';
     case 'running':
-      return styles.toolStatusRunning;
+      return styles.toolStatusRunning ?? '';
     case 'completed':
-      return styles.toolStatusDone;
+      return styles.toolStatusDone ?? '';
     case 'failed':
-      return styles.toolStatusFailed;
+      return styles.toolStatusFailed ?? '';
     default:
       return '';
   }
 }
 
 // ── ThinkingBlock ───────────────────────────
-function ThinkingBlock({ content }: { content: string }) {
+function ThinkingBlock({ content, active }: { content: string; active?: boolean }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  if (!active) return null;
   return (
     <div className={styles.thinking}>
       <button
@@ -109,8 +155,7 @@ function ThinkingBlock({ content }: { content: string }) {
         aria-expanded={expanded}
       >
         <span className={styles.chevron + (expanded ? ' ' + styles.chevronDown : '')}>▸</span>
-        <span>Thinking</span>
-        <span className={styles.thinkingLen}>({content.length} chars)</span>
+        <span className={active ? styles.runningText : styles.settledText}>{t('chat.thinkingLabel')}</span>
       </button>
       {expanded && <div className={styles.thinkingContent}>{content}</div>}
     </div>
@@ -123,8 +168,17 @@ function StreamingTextBlock({ content, isStreaming }: { content: string; isStrea
   return <MarkdownRenderer content={displayed} />;
 }
 
+function PendingThinking({ label }: { label: string }) {
+  return (
+    <div className={styles.pendingThinking}>
+      <span className={styles.pendingThinkingLabel}>{label}</span>
+    </div>
+  );
+}
+
 // ── ToolUseBlock ────────────────────────────
 function ToolUseBlock({ block }: { block: Extract<MessageBlock, { kind: 'tool_use' }> }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [showParams, setShowParams] = useState(false);
   const iconEl = resolveToolIcon(block.toolName);
@@ -142,7 +196,7 @@ function ToolUseBlock({ block }: { block: Extract<MessageBlock, { kind: 'tool_us
         <span
           className={`${styles.toolStatus} ${toolStatusClass(block.status)}`}
         >
-          {block.status}
+          {t(`chat.toolStatus.${block.status}`, { defaultValue: block.status })}
         </span>
         <span className={styles.chevron + (expanded ? ' ' + styles.chevronDown : '')}>▸</span>
       </button>
@@ -150,7 +204,7 @@ function ToolUseBlock({ block }: { block: Extract<MessageBlock, { kind: 'tool_us
       {expanded && (
         <div className={styles.toolUseBody}>
           <button className={styles.showParamsBtn} onClick={() => setShowParams((v) => !v)}>
-            {showParams ? 'Hide parameters' : 'Show parameters'}
+            {showParams ? t('chat.hideParameters') : t('chat.showParameters')}
           </button>
           {showParams && (
             <pre className={styles.toolInput}>{JSON.stringify(block.input, null, 2)}</pre>
@@ -165,6 +219,8 @@ function ToolUseBlock({ block }: { block: Extract<MessageBlock, { kind: 'tool_us
 }
 
 function ToolResultRenderer({ result }: { result: ToolResultBlock }) {
+  const { t } = useTranslation();
+
   switch (result.kind) {
     case 'read_result':
       return (
@@ -188,7 +244,7 @@ function ToolResultRenderer({ result }: { result: ToolResultBlock }) {
               {result.stderr.slice(0, 2000)}
             </pre>
           )}
-          <span className={styles.exitCode}>Exit: {result.exitCode}</span>
+          <span className={styles.exitCode}>{t('chat.exitCode', { code: result.exitCode })}</span>
         </div>
       );
     case 'generic_result':
@@ -278,19 +334,58 @@ function DiffCard({ diff }: { diff: FileDiff }) {
 
 // ── FileChangeBlock ─────────────────────────
 function FileChangeBlock({ block }: { block: Extract<MessageBlock, { kind: 'file_change' }> }) {
-  const actionClass =
-    block.action === 'created'
-      ? styles.added
-      : block.action === 'deleted'
-        ? styles.removed
-        : styles.modified;
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const diff = summarizeRawDiff(block.diff);
+  const actionLabel = t(`chat.fileAction.${block.action}`, { defaultValue: block.action });
+  const hasDiff = diff.preview.length > 0;
+
+  const handleReviewChanges = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.dispatchEvent(
+      new CustomEvent('agenthub:review-changes', {
+        detail: { path: block.path, action: block.action, diff: block.diff },
+      }),
+    );
+  };
+
   return (
-    <details className={`${styles.fileCard} ${actionClass}`}>
-      <summary>
-        {block.action} — <code>{block.path}</code>
-      </summary>
-      {block.diff && <pre className={styles.diff}>{block.diff.slice(0, 5000)}</pre>}
-    </details>
+    <div className={styles.fileChange}>
+      <button
+        className={styles.fileChangeHeader}
+        type="button"
+        onClick={() => hasDiff && setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-label={t('chat.fileChangeToggle', { path: block.path })}
+      >
+        <Pencil size={15} className={styles.fileChangeIcon} />
+        <span className={styles.fileChangeAction}>{actionLabel}</span>
+        <code className={styles.fileChangePath} title={block.path}>{basename(block.path)}</code>
+        {diff.additions > 0 && <span className={styles.fileChangeAdd}>+{diff.additions}</span>}
+        {diff.deletions > 0 && <span className={styles.fileChangeDel}>-{diff.deletions}</span>}
+        {hasDiff && (
+          <ChevronRight
+            size={15}
+            className={styles.fileChangeChevron + (expanded ? ' ' + styles.fileChangeChevronOpen : '')}
+          />
+        )}
+      </button>
+      {hasDiff && (
+        <button
+          className={styles.reviewChangesBtn}
+          type="button"
+          onClick={handleReviewChanges}
+        >
+          {t('chat.reviewChanges')}
+        </button>
+      )}
+      {expanded && hasDiff && (
+        <pre className={styles.fileChangeDiff}>
+          {diff.preview.join('\n')}
+          {block.diff && block.diff.split(/\r?\n/).length > diff.preview.length ? '\n...' : ''}
+        </pre>
+      )}
+    </div>
   );
 }
 
@@ -298,9 +393,11 @@ function FileChangeBlock({ block }: { block: Extract<MessageBlock, { kind: 'file
 function BlockRenderer({
   block,
   t,
+  active,
 }: {
   block: MessageBlock;
   t: (key: string, vars?: Record<string, unknown>) => string;
+  active?: boolean;
 }) {
   switch (block.kind) {
     case 'text':
@@ -310,7 +407,7 @@ function BlockRenderer({
       return <CodeBlock content={block.content} language={block.language} />;
 
     case 'thinking':
-      return <ThinkingBlock content={block.content} />;
+      return <ThinkingBlock content={block.content} active={active} />;
 
     case 'tool_use':
       return <ToolUseBlock block={block} />;
@@ -319,41 +416,11 @@ function BlockRenderer({
       return <FileChangeBlock block={block} />;
 
     case 'session_init':
-      return (
-        <StatusRow
-          label={t('chat.sessionInit', { model: block.model ?? 'unknown' })}
-          meta={block.permissionMode ?? undefined}
-        >
-          {block.tools && block.tools.length > 0 && (
-            <div className={styles.sessionMeta}>
-              <span className={styles.sessionMetaLabel}>Tools:</span>
-              {block.tools.map((tool: string) => (
-                <span key={tool} className={styles.inlinePill}>{tool}</span>
-              ))}
-            </div>
-          )}
-        </StatusRow>
-      );
+      return null;
 
     case 'result':
-      return (
-        <StatusRow
-          label={block.success
-            ? t('chat.result.success', {
-                input: String(block.tokenUsage?.input ?? '?'),
-                output: String(block.tokenUsage?.output ?? '?'),
-              })
-            : t('chat.result.failed', { error: block.error ?? 'unknown error' })}
-          meta={block.success ? undefined : 'failed'}
-        >
-          {block.tokenUsage && (
-            <div className={styles.tokenUsage}>
-              <span>↑ {block.tokenUsage.input.toLocaleString()} tokens in</span>
-              <span>↓ {block.tokenUsage.output.toLocaleString()} tokens out</span>
-            </div>
-          )}
-        </StatusRow>
-      );
+      if (block.success) return null;
+      return <StatusRow label={t('chat.result.failed', { error: block.error ?? 'unknown error' })} meta="failed" />;
 
     default:
       return null;
@@ -391,9 +458,10 @@ function extractMessageText(msg: ChatMessage): string {
 
 // ── ChatView ────────────────────────────────
 export default function ChatView({ messages, isStreaming, onRetry, onDelete }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastMessageIdRef = useRef<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   // ── Virtualizer ──────────────────────────────
@@ -408,7 +476,7 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
       return 160;
     },
     overscan: 5,
-    getItemKey: (index: number) => messages[index].id,
+    getItemKey: (index: number) => messages[index]?.id ?? index,
   });
 
   // Stable refs so the callback closure always sees latest values
@@ -430,6 +498,79 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
     },
   );
 
+  const lastMsg = messages[messages.length - 1];
+  const lastMessageId = lastMsg?.id ?? null;
+  const lastMessageSignature = lastMsg
+    ? `${lastMsg.id}:${lastMsg.blocks.map((block) => {
+        if ('content' in block && typeof block.content === 'string') return block.content.length;
+        if (block.kind === 'tool_use') return `${block.status}:${block.children?.length ?? 0}`;
+        if (block.kind === 'result') return block.success ? 'success' : block.error ?? 'failed';
+        return block.kind;
+      }).join('|')}`
+    : '';
+
+  useEffect(() => {
+    if (!lastMessageId || lastMessageIdRef.current === lastMessageId) return;
+    lastMessageIdRef.current = lastMessageId;
+
+    const frame = requestAnimationFrame(() => {
+      scrollToBottom(true);
+      requestAnimationFrame(() => scrollToBottom(true));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [lastMessageId, scrollToBottom]);
+
+  useEffect(() => {
+    if (!lastMessageSignature) return;
+    const timers = [
+      window.setTimeout(() => scrollToBottom(true), 0),
+      window.setTimeout(() => scrollToBottom(true), 80),
+      window.setTimeout(() => scrollToBottom(true), 220),
+    ];
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [lastMessageSignature, scrollToBottom]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    let frame: number | null = null;
+    const scheduleBottom = () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        scrollToBottom(true);
+        requestAnimationFrame(() => scrollToBottom(true));
+      });
+    };
+
+    scheduleBottom();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', scheduleBottom);
+      return () => {
+        if (frame !== null) cancelAnimationFrame(frame);
+        window.removeEventListener('resize', scheduleBottom);
+      };
+    }
+
+    const observer = new ResizeObserver(scheduleBottom);
+    observer.observe(el);
+    window.addEventListener('resize', scheduleBottom);
+    return () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener('resize', scheduleBottom);
+    };
+  }, [scrollToBottom]);
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+    virtualizer.measure();
+    const frame = requestAnimationFrame(() => scrollToBottom(true));
+    return () => cancelAnimationFrame(frame);
+  }, [messages.length, scrollToBottom, virtualizer]);
+
   const showScrollIndicator = isStreaming && !isNearBottom;
 
   const handleCopy = useCallback(async (msg: ChatMessage) => {
@@ -444,13 +585,12 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
     }
   }, [addToast, t]);
 
-  const lastMsg = messages[messages.length - 1];
   const lastMsgHasText =
     lastMsg?.role === 'agent' && lastMsg.blocks.some((b) => b.kind === 'text');
 
   const renderMessage = useCallback(
     (msg: ChatMessage) => {
-      const rt = relativeTime(msg.timestamp);
+      const messageTime = formatMessageTime(msg.timestamp, i18n.language);
       return (
         <div
           className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
@@ -458,7 +598,7 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
           {msg.role === 'agent' && msg.agentName && (
             <div className={styles.agentAvatar}>
               <div className={styles.avatarCircle}>
-                {msg.agentName.charAt(0).toUpperCase()}
+                <AgentAvatarIcon name={msg.agentName} />
               </div>
               <span className={styles.agentNameLabel}>{msg.agentName}</span>
             </div>
@@ -468,52 +608,64 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
             if (block.kind === 'text' && isStreaming && msg.id === lastMsg?.id) {
               return <StreamingTextBlock key={i} content={block.content} isStreaming={true} />;
             }
-            return <BlockRenderer key={i} block={block} t={t} />;
+            return (
+              <BlockRenderer
+                key={i}
+                block={block}
+                t={t}
+                active={Boolean(isStreaming && msg.id === lastMsg?.id)}
+              />
+            );
           })}
 
-          <div className={styles.messageFooter}>
-            <span
-              className={styles.timestamp}
-              title={rt.exact}
-              aria-label={rt.exact}
-            >
-              {rt.relative}
-            </span>
-            <div className={styles.actionBar}>
-              <button
-                className={styles.actionBtn}
-                title="Copy"
-                onClick={() => handleCopy(msg)}
+          {msg.role !== 'user' && (
+            <div className={styles.messageFooter}>
+              <div className={styles.actionBar}>
+                <button
+                  className={styles.actionBtn}
+                  title={t('chat.copy')}
+                  aria-label={t('chat.copy')}
+                  onClick={() => handleCopy(msg)}
+                >
+                  <Copy size={14} />
+                </button>
+                {onRetry && (
+                  <button
+                    className={styles.actionBtn}
+                    title={t('chat.retry')}
+                    aria-label={t('chat.retry')}
+                    onClick={() => onRetry(msg.id)}
+                  >
+                    <RefreshCw size={14} />
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    className={styles.actionBtn}
+                    title={t('chat.delete')}
+                    aria-label={t('chat.delete')}
+                    onClick={() => onDelete(msg.id)}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+              <span
+                className={styles.timestamp}
+                title={messageTime.exact}
+                aria-label={messageTime.exact}
               >
-                <Copy size={14} />
-              </button>
-              {onRetry && (
-                <button
-                  className={styles.actionBtn}
-                  title="Retry"
-                  onClick={() => onRetry(msg.id)}
-                >
-                  <RefreshCw size={14} />
-                </button>
-              )}
-              {onDelete && (
-                <button
-                  className={styles.actionBtn}
-                  title="Delete"
-                  onClick={() => onDelete(msg.id)}
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
+                {messageTime.short}
+              </span>
             </div>
-          </div>
+          )}
           {copiedMessageId === msg.id && (
-            <span className={styles.copyToast}>Copied!</span>
+            <span className={styles.copyToast}>{t('chat.copied')}</span>
           )}
         </div>
       );
     },
-    [t, isStreaming, lastMsg?.id, copiedMessageId, handleCopy, onRetry, onDelete],
+    [t, i18n.language, isStreaming, lastMsg?.id, copiedMessageId, handleCopy, onRetry, onDelete],
   );
 
   const handleScrollToBottom = useCallback(() => {
@@ -539,16 +691,17 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
             ]}
           />
         ) : (
-          <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative', flexShrink: 0 }}>
+          <div className={styles.virtualContent} style={{ height: virtualizer.getTotalSize() }}>
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const msg = messages[virtualRow.index];
+              if (!msg) return null;
               const isLast = virtualRow.index === messages.length - 1;
               return (
                 <div
                   key={virtualRow.key}
                   data-index={virtualRow.index}
                   ref={virtualizer.measureElement}
-                  className={styles.virtualItem}
+                  className={`${styles.virtualItem} ${msg.role === 'user' ? styles.virtualItemUser : ''}`}
                   style={{
                     transform: `translateY(${virtualRow.start}px)`,
                     paddingBottom: isLast ? 0 : undefined,
@@ -564,7 +717,7 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
           (lastMsgHasText ? (
             <div className={styles.streamProgress} />
           ) : (
-            <TextShimmer label={t('chat.thinking')} bars={3} />
+            <PendingThinking label={t('chat.thinkingLabel')} />
           ))}
       </div>
 

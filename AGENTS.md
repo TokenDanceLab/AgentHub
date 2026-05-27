@@ -30,8 +30,8 @@ Agent 不要一次性扫全仓库。按下面顺序加载，够用就停：
 4. 如果用户要求持续推进、自我迭代、长程开发、worktree/subagent 分发或交叉 review，必须先加载 `.agents/skills/dev-loop/SKILL.md`，再按其中 `references/` 执行。短任务（单文件修复、小改动）不需要。
 5. 只读相关主文档章节：产品不清读 `docs/architecture/product-requirements.md`；边界不清读 `docs/architecture/system-architecture.md`；实现顺序不清读 `docs/architecture/implementation-guide.md`。
 6. 改接口时读 `api/README.md`、`api/openapi.yaml`、`api/events.md`。
-7. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Relay 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity-auth.md`、`../docs/authorization-model.md`、`../docs/security-risk-governance.md`、`../docs/unified-login.md`、`../docs/feishu-agenthub-integration.md`、`../docs/product-matrix.md`、`../docs/relay-productization.md`、`../docs/ecosystem-execution-queue.md`、`../docs/agent-seo-i18n-packaging.md`、`../docs/i18n-parity-matrix.md`、`../docs/design-system.md`、`../docs/design-implementation-playbook.md` 或 `../docs/visual-qa-matrix.md` 中相关文档。
-8. 做统一登录、Feishu/Lark、Relay、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem-product-backlog.md`、`../docs/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
+7. 改 TokenDance ID 登录、OIDC、跨产品鉴权、Feishu/Lark 集成、Gateway 调用、安全风险、公开包装、i18n 或共享设计 token 时，同步读 `../docs/identity-auth.md`、`../docs/authorization-model.md`、`../docs/security-risk-governance.md`、`../docs/unified-login.md`、`../docs/feishu-agenthub-integration.md`、`../docs/product-matrix.md`、`../docs/relay-productization.md`、`../docs/ecosystem-execution-queue.md`、`../docs/agent-seo-i18n-packaging.md`、`../docs/i18n-parity-matrix.md`、`../docs/design-system.md`、`../docs/design-implementation-playbook.md` 或 `../docs/visual-qa-matrix.md` 中相关文档。
+8. 做统一登录、Feishu/Lark、Gateway、SEO/i18n、开源包装等生态级产品需求时，先读 `../docs/ecosystem-product-backlog.md`、`../docs/ecosystem-execution-queue.md` 和 `docs/governance/governance-execution.md`，再把其中属于 AgentHub 的项拆到本仓库 issue/roadmap。
 9. 把跨系统治理工作拆成 issue 时，优先使用 `.github/ISSUE_TEMPLATE/tokendance-governance.md`，并对照 `../docs/governance-scorecard.md`、`../docs/governance-evidence-ledger.md`、`../docs/issue-templates.md` 和对应 `TD-P0-*` / `TD-P1-*` 队列 ID 写验收标准。
 10. 持续开发和任务拆解读 `docs/roadmap.md`、`docs/roadmaps/<方向>.md` 和当前分支路线图。
 11. 客户端 M1 任务读 `docs/operations/client-roadmap.md`。
@@ -47,7 +47,10 @@ AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个�
 |---|---|---|
 | 前端 | Web 工作台、IM 交互、Diff/Preview/Approval 面板、前端状态 | `app/web/`、`app/shared/` |
 | 后端 | Hub Server、TokenDance ID 接入、Edge-Hub 通信、账号/群聊/同步/中继、Profile/Skill/MCP/审计 | `hub-server/`、`edge-server/`、`api/` |
-| 客户端 | Desktop、Edge 本地调度、Agent Runtime 进程、workspace、执行目标体验 | `app/desktop/`、`edge-server/` |
+| 客户端（Desktop） | Desktop Tauri、Edge 本地调度、Agent Runtime 进程、workspace、执行目标体验、tray | `app/desktop/`、`edge-server/` |
+| 客户端（Mobile） | Mobile Tauri、移动端 UI、OIDC deep-link | `app/mobile/` |
+
+Desktop 和 Mobile 是**独立 Tauri 项目**，各自拥有独立的 `src-tauri/`，不共享 Rust crate，不互相修改对方的配置。
 
 共享边界：
 
@@ -55,6 +58,38 @@ AgentHub 的开发工作流是"三个开发者，每个开发者可以带一个�
 - Edge Server 同时连接前端和 Hub，改动前先看 `docs/architecture/system-architecture.md`。
 - 跨两个方向的改动先在 PR 描述里写清楚影响面。
 - 开发者必须审查自己 Agent 生成的代码、文档和命令输出；不要把未看懂的 Agent 改动直接合入。
+
+### Desktop / Mobile 端口与资源分配
+
+两个 Tauri 项目独立运行，不得互相占用端口或修改对方配置。
+
+| 资源 | Desktop | Mobile |
+|---|---|---|
+| Tauri 项目 | `app/desktop/src-tauri/` | `app/mobile/src-tauri/` |
+| Vite 开发端口 | **5173** (strict) | **5174** (strict) |
+| Rust crate | `agenthub-desktop` | `agenthub-mobile` |
+| Tauri identifier | `com.agenthub.desktop` | `com.agenthub.mobile` |
+| 前端源码 | `app/desktop/src/` | `app/mobile/src/` |
+| 共享前端 | `app/shared/` (`@agenthub/shared`) | `app/shared/` (`@agenthub/shared`) |
+| Storybook | 6006 | 无（共用 desktop 的 Storybook） |
+
+其他固定端口：
+
+| 服务 | 端口 | 说明 |
+|---|---|---|
+| Hub Server (本地) | 8090 | 开发时 localhost |
+| Edge Server (本地) | 3210 | Desktop 本地 Edge |
+| OIDC callback (Desktop) | 随机 (127.0.0.1:0) | Rust TcpListener 动态分配 |
+| OIDC callback (Mobile) | 深链 `agenthub://` | 不走本地 HTTP server |
+| Web 工作台 | 5175 (预留) | 尚未开发 |
+
+Rust/Tauri 隔离规则：
+
+- **Desktop Agent 只能修改** `app/desktop/src-tauri/`，**Mobile Agent 只能修改** `app/mobile/src-tauri/`。
+- 任何 Agent 不得修改对方的 `tauri.conf.json`、`Cargo.toml`、`lib.rs`。
+- 如需共享 Rust 代码，先提议创建 `app/shared-rust/` crate，两边各自在 `Cargo.toml` 中 `[dependencies]` 引用。
+- Desktop 特有功能（tray、Edge 进程管理、keyring）不往 mobile 移植；Mobile 特有功能（deep link、platform secure store）不往 desktop 移植。
+- 共享的前端代码（类型、hooks、i18n、UI 组件）放 `app/shared/`，两个项目通过 `workspace:*` 引用。
 
 ### AgentHub 产品术语边界
 
@@ -95,7 +130,7 @@ AgentHub 角色、组织、项目、Thread、Run、Approval、Agent Profile、In
 
 AgentHub 的 `docs/governance/security-risk-register.md` 是本仓库风险事实源；跨仓库分级、状态词、发布门禁和 accepted-risk 规则见 `../docs/security-risk-governance.md`。
 
-- 涉及 Hub 登录/session、Edge 远程执行、Desktop/Web token storage、Feishu/Lark action、Relay API key、integration secret、公开 stats 或 generated artifact 的风险变更，必须同步更新本仓库风险表。
+- 涉及 Hub 登录/session、Edge 远程执行、Desktop/Web token storage、Feishu/Lark action、TokenDance API key、integration secret、公开 stats 或 generated artifact 的风险变更，必须同步更新本仓库风险表。
 - Critical/High 风险在未修复、未验证或未显式 accepted 之前阻断公开发布；accepted risk 必须写 owner、日期、原因、补偿控制和复查触发条件。
 - 需要生产 endpoint、host、日志、备份或 secret 证明的结论只在 `C:\Users\Ding\server` 或私有运维文档记录；AgentHub 公开文档只写证据指针和无密结论。
 - 发布前从 workspace 根运行 `..\scripts\verify-security-risks.ps1 -StrictReleaseGate`；默认治理 pass 里的 security warning 不是可忽略噪声，而是未关闭 release blocker。
@@ -112,11 +147,11 @@ AgentHub 飞书/Lark应用规划见 `../docs/feishu-agenthub-integration.md`。F
 
 ### i18n 与公开文案边界
 
-AgentHub Desktop/Web 的 zh/en 字典、登录入口、错误/空状态、Agent Runtime/Profile/Configuration/Execution Target 术语、Feishu/Lark 协作入口和 Relay 调用文案变更时，先查 `../docs/i18n-parity-matrix.md`。新增用户可见字符串必须保证中英文语义一致，尤其不能把第三方 provider 写成 AgentHub 直连登录，也不能把 Relay API key 写成 TokenDance ID token。
+AgentHub Desktop/Web 的 zh/en 字典、登录入口、错误/空状态、Agent Runtime/Profile/Configuration/Execution Target 术语、Feishu/Lark 协作入口和 Gateway 调用文案变更时，先查 `../docs/i18n-parity-matrix.md`。新增用户可见字符串必须保证中英文语义一致，尤其不能把第三方 provider 写成 AgentHub 直连登录，也不能把 TokenDance API key 写成 TokenDance ID token。
 
-### TokenDance Relay 调用边界
+### TokenDance Gateway 调用边界
 
-AgentHub 后续调用模型中转站时，产品名写 TokenDance Relay / 词元跳动中转站，设计边界见 `../docs/relay-productization.md`。Relay API key 只能由 Hub Server、Edge Server 或受信后端/本地运行面持有，不得暴露给浏览器 UI、飞书卡片 value、公开日志或第三方 OAuth session。TokenDance ID access token 只用于登录/身份，不是 `api.vectorcontrol.tech/v1` 的模型 API bearer token。
+AgentHub 后续调用模型 API 网关时，产品名写 TokenDance Gateway / 词元跳动 API 网关，设计边界见 `../docs/relay-productization.md`。TokenDance API key 只能由 Hub Server、Edge Server 或受信后端/本地运行面持有，不得暴露给浏览器 UI、飞书卡片 value、公开日志或第三方 OAuth session。TokenDance ID access token 只用于登录/身份，不是 `api.vectorcontrol.tech/v1` 的模型 API bearer token。
 
 任务分发：
 
@@ -127,7 +162,6 @@ AgentHub 后续调用模型中转站时，产品名写 TokenDance Relay / 词元
 - subagent 提示必须包含：目标、允许修改的路径、必须阅读的文档、必须运行的检查、隐私红线。
 - subagent 不自行扩大范围；发现范围不够，停下交回主 Agent。
 
-<<<<<<< HEAD
 ### 模型分配策略
 
 > 实际后端模型映射，AgentHub 项目专用。dev-loop skill 同步更新。
@@ -151,11 +185,6 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 ### 仓库级 Skill
 
 - 仓库只提交白名单 skill：`.agents/skills/dev-loop/`、`.agents/skills/test-coverage/`、`.agents/skills/pre-push/`、`.agents/skills/integration-test/`、`.agents/skills/adapter-dev/`、`.agents/skills/env-sandbox/`、`.agents/skills/ui-screenshot/`、`.agents/skills/dev-team/`。
-=======
-### 仓库级 Skill
-
-- 仓库只提交白名单 skill：`.agents/skills/dev-loop/`。
->>>>>>> origin/dev/trump
 - 长程多步骤任务（跨文件重构、多步骤功能、需要审查的变更）必须先读 `.agents/skills/dev-loop/SKILL.md`。
 - 短任务（单文件修复、typo、小改动）不需要 dev-loop——直接做。
 - `.agents/skills/dev-loop/references/` 已内嵌模型分配策略、审查清单、worktree 指南；不要假设外部同名 skill 一定可用。
@@ -242,46 +271,35 @@ fix/short-topic
 当前分支状态和合并规则详见 `docs/governance/branch-governance.md`。摘要：
 
 ```
-<<<<<<< HEAD
 feat/* → dev/delicious233 → master
-=======
-Remote (6):
-  origin/master                            ← 稳定（skill 基础设施已上线）
-  origin/dev/delicious233                  ← 主 dev: P1 交互体验推进中
-  origin/dev/trump                         ← Trump dev
-  origin/feat/trump-webui                  ← Web 工作区
-  origin/docs/dev-loop-skill-master        ← 已合并删除
-  origin/feat/backend-foundation           ← 后台预留 (dormant)
-
-本地 worktree: dev/delicious233
->>>>>>> origin/dev/trump
 ```
 
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
 | **dev/delicious233** | 主开发分支，唯一事实源 | ✅ 活跃 |
 | master | PR-only 稳定快照，Q2 里程碑后同步 | 滞后（勿直接 clone 使用） |
-| **dev/trump** | Trump 的 Web 前端，不合并 | 独立开发 |
-| ~~dev/johnny~~ | 已过期 | ✅ 已清理 |
+| origin/dev/trump | Trump 独立分支，不作为可信进度来源 | 保留，不自动合并 |
+| origin/dev/johnny | Johnny 开发线，仍有少量独有提交 | 单独审，不直合 |
+| origin/feat/team-johnny-merge | Johnny 聚合 merge，冲突大 | 单独审，不直合 |
+| ~~feat/web-desktop-parity / origin/worktree-feat+web-desktop-parity~~ | 早期 Web parity 残留已导出 patch 并删除远端 | ✅ 已归档 |
+| ~~origin/chore/oidc-handoff-save-20260526~~ | OIDC handoff 保存点已被 STATE/roadmap 覆盖 | ✅ 已删除 |
 | ~~codex/johnny-fork~~ | Codex 实验分支 | ✅ 已清理 |
 | ~~codex/trump-ui-fork~~ | Codex UI fork | ✅ 已清理 |
 | ~~feat/agent-runtime-expansion~~ | Runtime 扩展 | ✅ 已清理 |
+| ~~feat/web-agent-closeout-20260526~~ | WebAgent 收尾 | ✅ 已合入并删除 |
+| ~~feat/team-hub-authz / team-hub-reliability / team-adapter-compat~~ | 授权、可靠性、adapter 修复 | ✅ 已合入并删除 |
 
 规则：
 - `master` 禁止直接 push，必须通过 PR。
 - `master` 目前滞后于 `dev/delicious233` 300+ commits，始终从 `dev/delicious233` 开始工作。
-- `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + `pnpm build`。
+- `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + 对应前端真实构建入口。Web 优先用 `corepack.cmd pnpm typecheck` + `corepack.cmd pnpm exec vite build`，避免把 Windows wrapper/lifecycle 债误判为 Vite 构建失败。
 - `feat/*` 合并前需要 rebase 到最新 `dev/delicious233`，解决冲突后再开 PR。
 - 删除已合并的 `feat/*` 分支和对应的 worktree。
-- `dev/trump` 不合并到 `dev/delicious233`，最终由 Trump 自行决定是否 PR。
+- Trump、Johnny 聚合和旧 Web parity 残留分支不合并到 `dev/delicious233`，除非先单独审查并拆成可验证的小 patch。
 
-<<<<<<< HEAD
 开发引擎：`.agents/skills/dev-loop/` — 模型分配（opus/sonnet/haiku）+ 标准循环 + 交叉审查。
 
-P0-P3、M3b、M4、M5、M6、M7 全部完成。详细进度见 `docs/roadmap.md`。
-=======
-当前 P1 进度：P0 级 3/3 ✅ | P1 级 2/4（ThreadPanel/DiffViewer ✅, ChatView/AgentList ❌）
->>>>>>> origin/dev/trump
+P0 本地执行主链路、M3b/M4/M5/M6/M7 的已验收子项已合入主线；P1/P2 的 TokenDance ID、多端、Hub replay 和远程审批仍按 `docs/roadmap.md` 的部分闭环继续推进。
 
 进度同步：
 
@@ -350,7 +368,7 @@ python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml')
 git status --short --branch
 ```
 
-运行命令以真实入口为准：Edge 是 `edge-server/cmd/agenthub-edge`，Hub 是 `hub-server/cmd/server-hub`。`scripts/dev-start.ps1` / `scripts/dev-start.sh` 仍引用旧 Hub 命令，`scripts/client-smoke.ps1` 仍包含已删除 `runner/` 的历史检查；修复脚本前不要把这些脚本作为验收依据。
+运行命令以真实入口为准：Edge 是 `edge-server/cmd/agenthub-edge`，Hub 是 `hub-server/cmd/server-hub`。`scripts/dev-start.ps1` / `scripts/dev-start.sh` 已修复 Hub 入口路径。`scripts/client-smoke.ps1` 仍包含已删除 `runner/` 的历史检查；修复脚本前不要把这些脚本作为验收依据。
 
 有 Go 代码后追加：
 
@@ -377,8 +395,8 @@ pnpm build
 pnpm typecheck
 
 cd ..\web
-pnpm typecheck
-pnpm build
+corepack.cmd pnpm typecheck
+corepack.cmd pnpm exec vite build
 ```
 
 前端和客户端测试要求：
@@ -411,25 +429,6 @@ pnpm build
 | PR 到 `master` / `dev/*` | 全量 |
 | push 到 `feat/*` | **不触发**（仅在开 PR 后触发） |
 
-<<<<<<< HEAD
-=======
-### 分支治理
-
-```
-master                    ← 稳定发布。CI 必须全绿才能合入。
-dev/delicious233          ← 主开发。所有 feat/* 的合入目标。
-dev/trump                 ← Web 前端合并中继。
-feat/*                    ← 功能分支。开 PR 到 dev 时触发 CI。
-```
-
-规则：
-- `master` 禁止直接 push，必须通过 PR。
-- `dev/*` 合并前本地验证：`go test ./...` + `pnpm test` + `pnpm build`。
-- `feat/*` 合并前需要 rebase 到最新 `dev`，解决冲突后再开 PR。
-- 删除已合并的 `feat/*` 分支和对应的 worktree。
-- worktree 放在 `.worktrees/`，已在 `.gitignore`，严禁提交。
-
->>>>>>> origin/dev/trump
 ### 提交纪律
 
 - **小步提交**：每个逻辑改动完成后立即 commit，不要攒到一天结束。

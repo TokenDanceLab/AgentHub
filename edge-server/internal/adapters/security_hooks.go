@@ -52,6 +52,8 @@ func (h *SecurityHook) PermissionRequest(_ context.Context, toolName string, ris
 		return PermDeny
 	case RiskHigh:
 		return PermAllowOnce
+	case RiskLow, RiskMedium:
+		return PermAllow
 	default:
 		return PermAllow
 	}
@@ -159,30 +161,30 @@ var dangerousPatternsRE = regexp.MustCompile(
 		`--force\s+(?:--recursive\s+)?` + // long form reversed
 		`)\s*` +
 		`(?:/|\$\{?\w*ROOT\}?|~\w*)(?:\s|$|\*|\.\.)` + `|` +
-	// curl/wget piped to any shell interpreter (bash, sh, dash, zsh, ash, fish)
-	`(?:curl|wget)\b[^|&;]*\|[^|&;]*(?:ba)?sh\b` + `|` +
-	`(?:curl|wget)\b[^|&;]*\|[^|&;]*(?:da)?sh\b` + `|` +
-	`(?:curl|wget)\b[^|&;]*\|[^|&;]*zsh\b` + `|` +
-	`(?:curl|wget)\b[^|&;]*\|[^|&;]*fish\b` + `|` +
-	// curl/wget redirect-then-execute (no pipe, uses && or ; then shell)
-	`(?:curl|wget)\b[^|]*(?:-o\s+\S+\s*|-O\s*\S*\s*|>\s*\S+\s*)&&\s*(?:ba)?sh\b` + `|` +
-	`(?:curl|wget)\b[^|]*(?:-o\s+\S+\s*|-O\s*\S*\s*|>\s*\S+\s*);\s*(?:ba)?sh\b` + `|` +
-	// sudo with shell interpreters: sudo bash, sudo -E bash, sudo /bin/bash, etc.
-	`\bsudo\s+(?:-[a-zA-Z]*\s+)*(?:bash|/bin/bash|/usr/bin/bash|zsh|/bin/zsh|dash|/bin/dash)(?:\s|$)` + `|` +
-	// sudo with no subcommand (interactive root shell)
-	`^\s*sudo\s*$` + `|` +
-	// sudo -i or sudo -s (shell escalation)
-	`\bsudo\s+(?:-[a-z]*[is][a-z]*\s*)+$` + `|` +
-	// sudo su (user-switch escalation)
-	`\bsudo\s+su\b` + `|` +
-	// chmod 777 / 0777 / a+rwx / a=rwx (world-writable)
-	`chmod\s+(?:-R\s+)?(?:0?777|a\+rwx|a=rwx)\b` + `|` +
-	// block-device overwrite: > /dev/sd*, dd of=/dev/*, NVMe/xen/virtio
-	`>\s*/dev/(?:sd[a-z]|nvme\w+|hd[a-z]|xvda|vda)\b` + `|` +
-	`\bdd\b[^|&;]*of=/dev/(?:sd[a-z]|nvme\w+|hd[a-z]|xvda|vda)\b` + `|` +
-	// cp/mv/tee to raw block device
-	`(?:cp|mv)\s+\S+\s+/dev/(?:sd[a-z]|nvme\w+|hd[a-z]|xvda|vda)\b` + `|` +
-	`\btee\b[^|&;]*/dev/(?:sd[a-z]|nvme\w+|hd[a-z]|xvda|vda)\b`,
+		// curl/wget piped to any shell interpreter (bash, sh, dash, zsh, ash, fish)
+		`(?:curl|wget)\b[^|&;]*\|[^|&;]*(?:ba)?sh\b` + `|` +
+		`(?:curl|wget)\b[^|&;]*\|[^|&;]*(?:da)?sh\b` + `|` +
+		`(?:curl|wget)\b[^|&;]*\|[^|&;]*zsh\b` + `|` +
+		`(?:curl|wget)\b[^|&;]*\|[^|&;]*fish\b` + `|` +
+		// curl/wget redirect-then-execute (no pipe, uses && or ; then shell)
+		`(?:curl|wget)\b[^|]*(?:-o\s+\S+\s*|-O\s*\S*\s*|>\s*\S+\s*)&&\s*(?:ba)?sh\b` + `|` +
+		`(?:curl|wget)\b[^|]*(?:-o\s+\S+\s*|-O\s*\S*\s*|>\s*\S+\s*);\s*(?:ba)?sh\b` + `|` +
+		// sudo with shell interpreters: sudo bash, sudo -E bash, sudo /bin/bash, etc.
+		`\bsudo\s+(?:-[a-zA-Z]*\s+)*(?:bash|/bin/bash|/usr/bin/bash|zsh|/bin/zsh|dash|/bin/dash)(?:\s|$)` + `|` +
+		// sudo with no subcommand (interactive root shell)
+		`^\s*sudo\s*$` + `|` +
+		// sudo -i or sudo -s (shell escalation)
+		`\bsudo\s+(?:-[a-z]*[is][a-z]*\s*)+$` + `|` +
+		// sudo su (user-switch escalation)
+		`\bsudo\s+su\b` + `|` +
+		// chmod 777 / 0777 / a+rwx / a=rwx (world-writable)
+		`chmod\s+(?:-R\s+)?(?:0?777|a\+rwx|a=rwx)\b` + `|` +
+		// block-device overwrite: > /dev/sd*, dd of=/dev/*, NVMe/xen/virtio
+		`>\s*/dev/(?:sd[a-z]|nvme\w+|hd[a-z]|xvda|vda)\b` + `|` +
+		`\bdd\b[^|&;]*of=/dev/(?:sd[a-z]|nvme\w+|hd[a-z]|xvda|vda)\b` + `|` +
+		// cp/mv/tee to raw block device
+		`(?:cp|mv)\s+\S+\s+/dev/(?:sd[a-z]|nvme\w+|hd[a-z]|xvda|vda)\b` + `|` +
+		`\btee\b[^|&;]*/dev/(?:sd[a-z]|nvme\w+|hd[a-z]|xvda|vda)\b`,
 )
 
 // init validates the regex compiles at package load time (mustCompile

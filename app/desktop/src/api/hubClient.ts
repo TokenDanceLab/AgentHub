@@ -5,7 +5,7 @@
 // Uses the same error convention as edgeClient.ts: AppError from @shared/errors.
 
 import { HUB_URL } from '@/config';
-import { AppError, parseError } from '@shared/errors';
+import { AppError } from '@shared/errors';
 
 // ── Types ─────────────────────────────────────────
 
@@ -166,6 +166,48 @@ export interface AddAgentToSessionRequest {
   display_name: string;
 }
 
+export interface PendingAgentTask {
+  id: string;
+  agent_instance_id: string;
+  triggered_by_user_id: string;
+  trigger_message_id: string;
+  target_id?: string;
+  status: string;
+  edge_run_id?: string;
+  edge_device_id?: string;
+  error_message?: string;
+  created_at?: string;
+  dispatched_at?: string;
+  finished_at?: string;
+  expire_at?: string;
+}
+
+export interface TriggerAgentTaskOptions {
+  agent_instance_id?: string;
+  agent_type?: string;
+  custom_agent_id?: string;
+  model_params?: string;
+  target_id?: string;
+}
+
+export interface AgentTaskStreamEventOptions {
+  runId?: string;
+  clientMsgId?: string;
+}
+
+export interface CoordinatorRouteDecision {
+  action: string;
+  next_worker?: string;
+  instructions?: string;
+  reasoning?: string;
+  context?: string;
+  approved?: boolean;
+  feedback?: string;
+  summary?: string;
+  blocked_reason?: string;
+  correlation_id?: string;
+}
+
 // ── Custom agents ────────────────────────────────
 
 export interface CustomAgentRequest {
@@ -178,6 +220,41 @@ export interface CustomAgentRequest {
   model_params?: string;
 }
 
+// ── Execution targets ───────────────────────────
+
+export type ExecutionTargetType = 'local_edge' | 'hub_relay' | 'remote_ssh' | 'tailscale' | 'cloud_edge';
+export type ExecutionTargetTrustLevel = 'local' | 'remote' | 'cloud' | 'relay';
+export type ExecutionTargetHealthState = 'unknown' | 'healthy' | 'degraded' | 'offline';
+
+export interface ExecutionTarget {
+  id: string;
+  owner_id?: string;
+  device_id?: string;
+  name: string;
+  target_type: ExecutionTargetType;
+  endpoint?: string;
+  host?: string;
+  port?: number | string;
+  workspace_root?: string;
+  capabilities?: string;
+  metadata?: string;
+  workspace_allowlist?: string[] | string;
+  trust_level?: ExecutionTargetTrustLevel;
+  health_state?: ExecutionTargetHealthState;
+  is_online?: boolean;
+  last_seen_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ExecutionTargetListResponse {
+  items: ExecutionTarget[];
+  page: {
+    nextCursor?: string;
+    hasMore: boolean;
+  };
+}
+
 // ── Auth ─────────────────────────────────────────
 
 export interface OIDCAuthorizeRequest {
@@ -185,6 +262,7 @@ export interface OIDCAuthorizeRequest {
   code_challenge_method?: string;
   device_type: string;
   device_id: string;
+  redirect_uri?: string;
 }
 
 export interface OIDCAuthorizeResponse {
@@ -198,6 +276,7 @@ export interface OIDCCallbackRequest {
   code_verifier: string;
   device_type: string;
   device_id: string;
+  redirect_uri?: string;
 }
 
 export interface OIDCCallbackResponse {
@@ -217,6 +296,12 @@ export interface UpdateProfileRequest {
 export interface ChangePasswordRequest {
   old_password: string;
   new_password: string;
+}
+
+interface HubEnvelope<T> {
+  code: string;
+  message?: string;
+  data?: T;
 }
 
 // ── Error ────────────────────────────────────────
@@ -244,6 +329,28 @@ export interface HubClientOptions {
 export function createHubClient(opts: HubClientOptions = {}) {
   const base = (opts.baseUrl || HUB_URL).replace(/\/+$/, '');
 
+  function isHubEnvelope<T>(body: unknown): body is HubEnvelope<T> {
+    return !!body && typeof body === 'object' && typeof (body as { code?: unknown }).code === 'string';
+  }
+
+  function isSharedErrorBody(body: unknown): body is { error: { code: string; message: string } } {
+    if (!body || typeof body !== 'object') return false;
+    const error = (body as { error?: unknown }).error;
+    if (!error || typeof error !== 'object') return false;
+    const record = error as { code?: unknown; message?: unknown };
+    return typeof record.code === 'string' && typeof record.message === 'string';
+  }
+
+  async function readJsonBody(res: Response): Promise<unknown> {
+    const text = await res.text();
+    if (!text) return undefined;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return undefined;
+    }
+  }
+
   async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = opts.getToken?.();
     const headers: Record<string, string> = {
@@ -253,30 +360,40 @@ export function createHubClient(opts: HubClientOptions = {}) {
     };
 
     const res = await fetch(`${base}${path}`, { ...options, headers });
+    const body = res.status === 204 ? undefined : await readJsonBody(res);
+
     if (!res.ok) {
-      // Try Hub's structured error first, then fall back to generic parseError
-      try {
-        const body = await res.json();
-        if (body?.error?.message) {
-          throw new AppError(
-            { error: { code: body.error.code || 'hub_error', message: body.error.message } },
-            res.status,
-          );
-        }
-      } catch (e) {
-        if (e instanceof AppError) throw e;
+      if (isSharedErrorBody(body)) {
+        throw new AppError({ error: body.error }, res.status, body);
       }
-      // Fallback to shared parseError
-      throw await parseError(
-        new Response(
-          JSON.stringify({ error: { code: 'internal_error', message: res.statusText } }),
-          { status: res.status },
-        ),
+      if (isHubEnvelope(body)) {
+        throw new AppError(
+          {
+            error: {
+              code: body.code || 'hub_error',
+              message: body.message || res.statusText || 'Hub request failed',
+            },
+          },
+          res.status,
+          body,
+        );
+      }
+      throw new AppError(
+        {
+          error: {
+            code: res.status >= 500 ? 'internal_error' : 'bad_request',
+            message: `HTTP ${res.status}: ${res.statusText}`,
+          },
+        },
+        res.status,
+        body,
       );
     }
+
     // 204 No Content for void endpoints
     if (res.status === 204) return undefined as T;
-    return res.json();
+    if (isHubEnvelope<T>(body)) return body.data as T;
+    return body as T;
   }
 
   // ── Helpers ────────────────────────────────────
@@ -296,18 +413,6 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     // ── Auth ──────────────────────────────────────
 
-    register: (data: RegisterRequest) =>
-      request<{ user_id: string }>('/client/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-
-    login: (data: LoginRequest) =>
-      request<AuthResponse>('/client/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-
     refresh: (token: string) =>
       request<AuthResponse>('/client/auth/refresh', {
         method: 'POST',
@@ -322,12 +427,6 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     updateProfile: (data: UpdateProfileRequest) =>
       request<UserProfile>('/client/auth/profile', {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
-
-    changePassword: (data: ChangePasswordRequest) =>
-      request<void>('/client/auth/password', {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
@@ -561,6 +660,22 @@ export function createHubClient(opts: HubClientOptions = {}) {
         body: JSON.stringify({ content, ...(runId ? { run_id: runId } : {}) }),
       }),
 
+    streamTaskEvent: (
+      taskId: string,
+      eventType: string,
+      payload: unknown,
+      options: AgentTaskStreamEventOptions = {},
+    ) =>
+      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
+        method: 'POST',
+        body: JSON.stringify({
+          event_type: eventType,
+          payload,
+          ...(options.runId ? { run_id: options.runId } : {}),
+          ...(options.clientMsgId ? { client_msg_id: options.clientMsgId } : {}),
+        }),
+      }),
+
     doneTask: (taskId: string, finalContent?: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/done`, {
         method: 'POST',
@@ -585,14 +700,23 @@ export function createHubClient(opts: HubClientOptions = {}) {
         body: JSON.stringify(data),
       }),
 
-    triggerAgentTask: (triggerMessageId: string) =>
-      request<Record<string, unknown>>('/web/agent-tasks', {
+    triggerAgentTask: (triggerMessageId: string, options: TriggerAgentTaskOptions = {}) =>
+      request<PendingAgentTask>('/web/agent-tasks', {
         method: 'POST',
-        body: JSON.stringify({ trigger_message_id: triggerMessageId }),
+        body: JSON.stringify({ trigger_message_id: triggerMessageId, ...options }),
       }),
 
     cancelAgentTask: (taskId: string) =>
       request<void>(`/web/agent-tasks/${encodeURIComponent(taskId)}/cancel`, { method: 'POST' }),
+
+    postTeamRouteDecision: (teamId: string, runId: string, decision: CoordinatorRouteDecision) =>
+      request<Record<string, unknown>>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/route-decisions`,
+        {
+          method: 'POST',
+          body: JSON.stringify(decision),
+        },
+      ),
 
     // ── Custom agents ─────────────────────────────
 
@@ -613,6 +737,18 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     deleteCustomAgent: (id: string) =>
       request<void>(`/web/custom-agents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    // ── Execution targets ────────────────────────
+
+    listExecutionTargets: (params?: {
+      target_type?: ExecutionTargetType | string;
+      pageCursor?: string;
+      pageSize?: number;
+    }) =>
+      request<ExecutionTargetListResponse>(`/web/execution-targets${qs(params ?? {})}`),
+
+    pingExecutionTarget: (id: string) =>
+      request<void>(`/web/execution-targets/${encodeURIComponent(id)}/ping`, { method: 'POST' }),
   };
 }
 

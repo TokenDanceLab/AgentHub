@@ -98,6 +98,12 @@ func TestAgentErrors(t *testing.T) {
 	if AgentTaskNotFound.HTTPStatus != http.StatusNotFound {
 		t.Errorf("AgentTaskNotFound.HTTPStatus = %d", AgentTaskNotFound.HTTPStatus)
 	}
+	if TargetNotFound.HTTPStatus != http.StatusNotFound {
+		t.Errorf("TargetNotFound.HTTPStatus = %d", TargetNotFound.HTTPStatus)
+	}
+	if TargetNotRoutable.HTTPStatus != http.StatusConflict {
+		t.Errorf("TargetNotRoutable.HTTPStatus = %d", TargetNotRoutable.HTTPStatus)
+	}
 }
 
 func TestGroupErrors(t *testing.T) {
@@ -170,7 +176,7 @@ func TestAllErrorsHaveNonEmptyCode(t *testing.T) {
 		AuthInvalidToken, AuthInvalidCredentials, AuthTokenExpired, AuthDeviceMismatch, AuthRefreshInvalid,
 		MsgNotFound, MsgRecallTimeout, MsgPinLimitExceeded, MsgBlockedByReceiver,
 		SessionNotFound, SessionDissolved, SessionNotMember,
-		AgentNotFound, AgentOffline, AgentTaskNotFound, AgentTaskCancelled, AgentTaskTimeout,
+		AgentNotFound, AgentOffline, AgentTaskNotFound, AgentTaskCancelled, AgentTaskTimeout, TargetNotFound, TargetNotRoutable,
 		GroupNotOwner, GroupOwnerCannotLeave, GroupAlreadyMember,
 		UserNotFound, UserUsernameTaken, UserInvalidParam,
 		FriendAlready, FriendBlocked, FriendRequestNotFound,
