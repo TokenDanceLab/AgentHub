@@ -26,6 +26,19 @@ vi.mock('@/hooks/useIMChat', () => ({
             { id: 'c2', name: 'Bob', type: 'user' as const, online: false },
           ],
     ),
+    // Trump IM additions
+    friendRequests: [],
+    notifications: [],
+    acceptFriendRequest: vi.fn(),
+    rejectFriendRequest: vi.fn(),
+    markNotificationRead: vi.fn(),
+    markAllNotificationsRead: vi.fn(),
+    recallMessage: vi.fn(),
+    loadSessionMessages: vi.fn(),
+    createPrivateSession: vi.fn(),
+    createGroupSession: vi.fn(),
+    selectContact: vi.fn(),
+    actionState: {},
   })),
 }));
 
