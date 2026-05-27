@@ -277,8 +277,8 @@ feat/* → dev/delicious233 → master
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
 | **dev/delicious233** | 主开发分支，唯一事实源 | ✅ 活跃 |
-| master | PR-only 稳定快照，Q2 里程碑后同步 | 滞后（勿直接 clone 使用） |
-| origin/dev/trump | Trump 独立分支，不作为可信进度来源 | 保留，不自动合并 |
+| master | PR-only 稳定快照，v0.1.0 已同步 | ✅ 当前 |
+| origin/dev/trump | Trump 独立分支，55 ahead/89 behind，代码已过期不建议合入 | 保留，不自动合并 |
 | origin/dev/johnny | Johnny 开发线，仍有少量独有提交 | 单独审，不直合 |
 | origin/feat/team-johnny-merge | Johnny 聚合 merge，冲突大 | 单独审，不直合 |
 | ~~feat/web-desktop-parity / origin/worktree-feat+web-desktop-parity~~ | 早期 Web parity 残留已导出 patch 并删除远端 | ✅ 已归档 |
