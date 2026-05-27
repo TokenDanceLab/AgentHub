@@ -69,10 +69,12 @@ func FindTargetByOwnerAndName(db *gorm.DB, ownerID, name string) (*model.Executi
 func UpdateTargetOnlineStatus(db *gorm.DB, id string, isOnline bool) error {
 	updates := map[string]interface{}{
 		"is_online":    isOnline,
+		"health_state": "healthy",
 		"last_seen_at": time.Now(),
 	}
 	if !isOnline {
 		delete(updates, "last_seen_at")
+		updates["health_state"] = "offline"
 	}
 	return db.Model(&model.ExecutionTarget{}).
 		Where("id = ? AND deleted_at IS NULL", id).

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/agenthub/edge-server/internal/adapters"
@@ -15,15 +16,16 @@ import (
 )
 
 type config struct {
-	Addr           string
-	StoreFile      string
-	RunnerProfile  string
-	RunnerCommand  string
-	RunnerArgs     repeatedString
-	RunnerEnv      repeatedString
-	RunnerWorkDir  string
-	LocalAuthToken string
-	HubJWTSecret   string // shared secret for validating Hub-issued HS256 JWTs
+	Addr               string
+	StoreFile          string
+	RunnerProfile      string
+	RunnerCommand      string
+	RunnerArgs         repeatedString
+	RunnerEnv          repeatedString
+	RunnerWorkDir      string
+	WorkspaceAllowlist repeatedString
+	LocalAuthToken     string
+	HubJWTSecret       string // shared secret for validating Hub-issued HS256 JWTs
 
 	// Hub callback configuration (Edge→Hub direct bridge)
 	HubURL   string // Hub server base URL for Edge callback reporting
@@ -35,6 +37,9 @@ type config struct {
 	CodexPath      string // path to codex binary
 	OpenCodePath   string // path to opencode binary
 	AgentModel     string // model override for the default agent
+
+	// SKILL.md discovery
+	SkillsDirs repeatedString // additional dirs to search for SKILL.md files
 }
 
 type repeatedString []string
@@ -75,14 +80,15 @@ func main() {
 	adapterReg := buildAdapterRegistry(cfg)
 
 	serverConfig := httpserver.Config{
-		Addr:            cfg.Addr,
-		Store:           repository,
-		AdapterRegistry: adapterReg,
-		AgentDefault:    cfg.AgentDefault,
-		LocalAuthToken:  cfg.LocalAuthToken,
-		HubJWTSecret:    cfg.HubJWTSecret,
-		HubURL:          cfg.HubURL,
-		HubToken:        cfg.HubToken,
+		Addr:               cfg.Addr,
+		Store:              repository,
+		AdapterRegistry:    adapterReg,
+		AgentDefault:       cfg.AgentDefault,
+		LocalAuthToken:     cfg.LocalAuthToken,
+		HubJWTSecret:       cfg.HubJWTSecret,
+		HubURL:             cfg.HubURL,
+		HubToken:           cfg.HubToken,
+		WorkspaceAllowlist: append([]string(nil), cfg.WorkspaceAllowlist...),
 	}
 	if cfg.RunnerCommand != "" {
 		serverConfig.ProcessExecutor = lifecycle.ProcessExecutorConfig{
@@ -106,6 +112,18 @@ func getEnv(key, defaultVal string) string {
 	return defaultVal
 }
 
+func splitPathList(value string) []string {
+	parts := filepath.SplitList(value)
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
 func buildConfig(args []string) (config, error) {
 	fs := flag.NewFlagSet("agenthub-edge", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
@@ -116,6 +134,8 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.RunnerProfile, "runner-profile", getEnv("AGENTHUB_RUNNER_PROFILE", ""), "runner profile preset; supported: agenthub-runner-mock, claude-code, codex, opencode")
 	fs.StringVar(&cfg.RunnerCommand, "runner-command", getEnv("AGENTHUB_RUNNER_COMMAND", ""), "local process executable to run for each run; empty uses the built-in mock executor")
 	fs.StringVar(&cfg.RunnerWorkDir, "runner-workdir", getEnv("AGENTHUB_RUNNER_WORKDIR", ""), "working directory for --runner-command; empty inherits the edge process working directory")
+	cfg.WorkspaceAllowlist = append(cfg.WorkspaceAllowlist, splitPathList(getEnv("AGENTHUB_WORKSPACE_ALLOWLIST", ""))...)
+	fs.Var(&cfg.WorkspaceAllowlist, "workspace-allowlist", "workspace root allowed for request workDir; may be repeated; env AGENTHUB_WORKSPACE_ALLOWLIST uses OS path-list separators")
 	fs.StringVar(&cfg.LocalAuthToken, "local-auth-token", getEnv("AGENTHUB_EDGE_AUTH_TOKEN", ""), "optional local bearer token required for Edge APIs other than /v1/health")
 	fs.StringVar(&cfg.HubJWTSecret, "hub-jwt-secret", getEnv("AGENTHUB_HUB_JWT_SECRET", ""), "shared secret for validating Hub-issued HS256 JWTs (enables TokenDance trust chain)")
 	fs.StringVar(&cfg.HubURL, "hub-url", getEnv("AGENTHUB_HUB_URL", ""), "Hub server base URL for Edge→Hub direct callback reporting (e.g. https://hub.example.com)")
@@ -128,6 +148,9 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.CodexPath, "codex-path", getEnv("AGENTHUB_CODEX_PATH", "codex"), "path to codex binary")
 	fs.StringVar(&cfg.OpenCodePath, "opencode-path", getEnv("AGENTHUB_OPENCODE_PATH", "opencode"), "path to opencode binary")
 	fs.StringVar(&cfg.AgentModel, "agent-model", getEnv("AGENTHUB_AGENT_MODEL", ""), "model override for the default agent (e.g. claude-sonnet-4-6)")
+
+	cfg.SkillsDirs = append(cfg.SkillsDirs, splitPathList(getEnv("AGENTHUB_SKILLS_DIRS", ""))...)
+	fs.Var(&cfg.SkillsDirs, "skills-dir", "directory containing SKILL.md subdirectories; may be repeated; defaults to .agents/skills and .codex/skills")
 
 	if err := fs.Parse(args); err != nil {
 		return config{}, err

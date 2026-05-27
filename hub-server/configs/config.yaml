@@ -11,7 +11,7 @@ db:
   name: agenthub
 redis:
   host: localhost
-  port: 6380
+  port: 6379
   password: ""
   db: 0
   pool_size: 100
@@ -30,3 +30,4 @@ tokendance_id:
   client_id: ""
   client_secret: ""
   redirect_uri: "http://localhost:8080/client/auth/oidc/callback"
+  allowed_redirect_uris: []

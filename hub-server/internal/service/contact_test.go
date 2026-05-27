@@ -488,14 +488,9 @@ func TestBlockContact_Success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname", "avatar_url"}).
 			AddRow("target-1", "target", "hash", "Target", ""))
 
-	// Explicit transaction: DELETE + INSERT
-	mock.ExpectBegin()
-	mock.ExpectExec(sqlcDeleteFriend).
-		WithArgs("user-1", "target-1", "target-1", "user-1").
-		WillReturnResult(sqlmock.NewResult(0, 0))
+	// #183: UpsertFriendship sets currentUserID -> targetUserID = blocked
 	mock.ExpectExec(sqlcInsertFriend).
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
 
 	svc := NewContactService(db, nil, testCacheClient(t))
 	err := svc.BlockContact(context.Background(), "user-1", "target-1")

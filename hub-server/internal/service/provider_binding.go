@@ -45,13 +45,16 @@ func (s *ProviderBindingService) Create(ctx context.Context, ownerID string, req
 	return req, nil
 }
 
-func (s *ProviderBindingService) Get(ctx context.Context, id string) (*model.ProviderBinding, error) {
+func (s *ProviderBindingService) Get(ctx context.Context, id, ownerID string) (*model.ProviderBinding, error) {
 	pb, err := repository.GetProviderBindingByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.UserNotFound
 		}
 		return nil, err
+	}
+	if pb.OwnerID != ownerID {
+		return nil, errcode.AuthDeviceMismatch
 	}
 	return pb, nil
 }

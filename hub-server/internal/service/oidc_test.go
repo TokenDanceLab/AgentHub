@@ -2,11 +2,20 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
+	"math/big"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,6 +25,7 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/glebarez/sqlite"
 )
 
@@ -108,7 +118,7 @@ func TestGenerateAuthorizationURL_Success(t *testing.T) {
 	svc, _, _ := setupOIDCTest(t)
 	ctx := context.Background()
 
-	result, err := svc.GenerateAuthorizationURL(ctx, "test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256", "desktop", "device-123")
+	result, err := svc.GenerateAuthorizationURL(ctx, "test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256", "desktop", "11111111-1111-4111-8111-111111111111", "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.State)
 	assert.Contains(t, result.AuthorizationURL, "https://id.example.com/oidc/authorize")
@@ -116,13 +126,67 @@ func TestGenerateAuthorizationURL_Success(t *testing.T) {
 	assert.Contains(t, result.AuthorizationURL, "code_challenge=test-challenge")
 	assert.Contains(t, result.AuthorizationURL, "code_challenge_method=S256")
 	assert.Contains(t, result.AuthorizationURL, "state="+result.State)
+	assert.Contains(t, result.AuthorizationURL, "redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fclient%2Fauth%2Foidc%2Fcallback")
+}
+
+func TestGenerateAuthorizationURL_AllowsConfiguredBrowserRedirectURI(t *testing.T) {
+	svc, _, _ := setupOIDCTest(t)
+	svc.cfg.AllowedRedirectURIs = []string{"https://hub.example/auth/tokendance/callback"}
+
+	result, err := svc.GenerateAuthorizationURL(context.Background(),
+		"test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256",
+		"web", "11111111-1111-4111-8111-111111111111",
+		"https://hub.example/auth/tokendance/callback")
+	require.NoError(t, err)
+
+	authURL, err := url.Parse(result.AuthorizationURL)
+	require.NoError(t, err)
+	assert.Equal(t, "https://hub.example/auth/tokendance/callback", authURL.Query().Get("redirect_uri"))
+}
+
+func TestGenerateAuthorizationURL_AllowsDesktopLoopbackDynamicPortWhenRegistered(t *testing.T) {
+	svc, _, _ := setupOIDCTest(t)
+	svc.cfg.AllowedRedirectURIs = []string{"http://127.0.0.1/callback"}
+
+	result, err := svc.GenerateAuthorizationURL(context.Background(),
+		"test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256",
+		"desktop", "11111111-1111-4111-8111-111111111111",
+		"http://127.0.0.1:49152/callback")
+	require.NoError(t, err)
+
+	authURL, err := url.Parse(result.AuthorizationURL)
+	require.NoError(t, err)
+	assert.Equal(t, "http://127.0.0.1:49152/callback", authURL.Query().Get("redirect_uri"))
+}
+
+func TestGenerateAuthorizationURL_RejectsUnlistedRedirectURI(t *testing.T) {
+	svc, _, _ := setupOIDCTest(t)
+
+	_, err := svc.GenerateAuthorizationURL(context.Background(),
+		"test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256",
+		"web", "11111111-1111-4111-8111-111111111111",
+		"https://evil.example/callback")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "redirect_uri is not allowed")
+}
+
+func TestGenerateAuthorizationURL_RejectsWebLoopbackDynamicPort(t *testing.T) {
+	svc, _, _ := setupOIDCTest(t)
+	svc.cfg.AllowedRedirectURIs = []string{"http://127.0.0.1/callback"}
+
+	_, err := svc.GenerateAuthorizationURL(context.Background(),
+		"test-challenge-abcdefghijklmnopqrstuvwxyz==", "S256",
+		"web", "11111111-1111-4111-8111-111111111111",
+		"http://127.0.0.1:49152/callback")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "redirect_uri is not allowed")
 }
 
 func TestHandleCallback_InvalidState(t *testing.T) {
 	svc, _, _ := setupOIDCTest(t)
 	ctx := context.Background()
 
-	_, err := svc.HandleCallback(ctx, "test-code", "invalid-state", "verifier", "desktop", "device-123")
+	_, err := svc.HandleCallback(ctx, "test-code", "invalid-state", "verifier", "desktop", "11111111-1111-4111-8111-111111111111", "")
 	require.Error(t, err)
 }
 
@@ -135,13 +199,136 @@ func TestHandleCallback_StateExpired(t *testing.T) {
 		CodeChallenge:       "challenge",
 		CodeChallengeMethod: "S256",
 		DeviceType:          "desktop",
-		DeviceID:            "device-123",
+		DeviceID:            "11111111-1111-4111-8111-111111111111",
+		RedirectURI:         "http://localhost:8080/client/auth/oidc/callback",
 	}
 	entryJSON, _ := json.Marshal(entry)
 	mr.Set("oidc:state:expired-state", string(entryJSON))
 	// Fast-forward past TTL
 	mr.FastForward(11 * time.Minute)
 
-	_, err := svc.HandleCallback(ctx, "test-code", "expired-state", "verifier", "desktop", "device-123")
+	_, err := svc.HandleCallback(ctx, "test-code", "expired-state", "verifier", "desktop", "11111111-1111-4111-8111-111111111111", "")
 	assert.Error(t, err)
+}
+
+func TestGenerateAuthorizationURL_InvalidDeviceType(t *testing.T) {
+	svc, _, _ := setupOIDCTest(t)
+	ctx := context.Background()
+
+	_, err := svc.GenerateAuthorizationURL(ctx, "test-challenge", "S256", "tokendance_bearer", "11111111-1111-4111-8111-111111111111", "")
+	require.Error(t, err)
+}
+
+func TestGenerateAuthorizationURL_RejectsNonS256PKCEMethod(t *testing.T) {
+	svc, _, _ := setupOIDCTest(t)
+	ctx := context.Background()
+
+	_, err := svc.GenerateAuthorizationURL(ctx, "test-challenge", "plain", "desktop", "11111111-1111-4111-8111-111111111111", "")
+	require.Error(t, err)
+}
+
+func TestHandleCallback_SuccessUsesConfiguredJWKSAndIssuesHubSession(t *testing.T) {
+	db := setupOIDCDB(t)
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	cacheClient := cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
+
+	privateKey, jwks, kid := oidcTestKey(t)
+	issuer := ""
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/oidc/jwks":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(jwks))
+		case "/oidc/token":
+			require.NoError(t, r.ParseForm())
+			assert.Equal(t, "authorization_code", r.PostForm.Get("grant_type"))
+			assert.Equal(t, "auth-code-1", r.PostForm.Get("code"))
+			assert.Equal(t, "http://127.0.0.1:8181/client/auth/oidc/callback", r.PostForm.Get("redirect_uri"))
+			assert.Equal(t, "agenthub-client", r.PostForm.Get("client_id"))
+			assert.Equal(t, "agenthub-secret", r.PostForm.Get("client_secret"))
+			assert.Equal(t, "verifier-1", r.PostForm.Get("code_verifier"))
+			idToken := signOIDCTestIDToken(t, privateKey, kid, issuer, "agenthub-client", "td-sub-1")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"td-access","token_type":"Bearer","expires_in":900,"id_token":"` + idToken + `"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	issuer = server.URL
+
+	jwtutil.SetJWKSURI("")
+	jwtutil.ResetJWKSCache()
+	svc := NewOIDCService(db, config.TokenDanceIDConfig{
+		IssuerURL:    server.URL,
+		JWKSURI:      server.URL + "/oidc/jwks",
+		ClientID:     "agenthub-client",
+		ClientSecret: "agenthub-secret",
+		RedirectURI:  "http://127.0.0.1:8181/client/auth/oidc/callback",
+	}, config.JWTConfig{
+		Secret:     "hub-local-secret-minimum-32-chars",
+		AccessTTL:  15 * time.Minute,
+		RefreshTTL: time.Hour,
+	}, cacheClient)
+
+	deviceID := "11111111-1111-4111-8111-111111111111"
+	authz, err := svc.GenerateAuthorizationURL(context.Background(), "challenge-1", "S256", "desktop", deviceID, "")
+	require.NoError(t, err)
+
+	result, err := svc.HandleCallback(context.Background(), "auth-code-1", authz.State, "verifier-1", "desktop", deviceID, "")
+	require.NoError(t, err)
+	require.NotEmpty(t, result.AccessToken)
+	require.NotEmpty(t, result.RefreshToken)
+	require.NotEmpty(t, result.User.ID)
+	require.NotNil(t, result.User.TokenDanceSub)
+	assert.Equal(t, "td-sub-1", *result.User.TokenDanceSub)
+
+	claims, err := jwtutil.ParseToken(result.AccessToken, "hub-local-secret-minimum-32-chars")
+	require.NoError(t, err)
+	assert.Equal(t, result.User.ID, claims.UserID)
+	assert.Equal(t, "desktop", claims.DeviceType)
+	assert.Equal(t, deviceID, claims.DeviceID)
+
+	_, err = repository.FindRefreshTokenByHash(db, jwtutil.HashRefreshToken(result.RefreshToken))
+	require.NoError(t, err)
+}
+
+func oidcTestKey(t *testing.T) (*rsa.PrivateKey, string, string) {
+	t.Helper()
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	kid := oidcTestKID(&privateKey.PublicKey)
+	n := base64.RawURLEncoding.EncodeToString(privateKey.PublicKey.N.Bytes())
+	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privateKey.PublicKey.E)).Bytes())
+	jwks := `{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"` + kid + `","n":"` + n + `","e":"` + e + `"}]}`
+	return privateKey, jwks, kid
+}
+
+func oidcTestKID(pub *rsa.PublicKey) string {
+	hash := sha256.Sum256(pub.N.Bytes())
+	return base64.RawURLEncoding.EncodeToString(hash[:16])
+}
+
+func signOIDCTestIDToken(t *testing.T, privateKey *rsa.PrivateKey, kid, issuer, audience, subject string) string {
+	t.Helper()
+	now := time.Now()
+	claims := jwtutil.TokenDanceClaims{
+		Email:         "user@example.com",
+		EmailVerified: true,
+		Name:          "Test User",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    issuer,
+			Subject:   subject,
+			Audience:  jwt.ClaimStrings{audience},
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = kid
+	signed, err := token.SignedString(privateKey)
+	require.NoError(t, err)
+	return signed
 }

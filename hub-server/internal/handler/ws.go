@@ -41,6 +41,16 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 		return
 	}
 
+	// #82: If middleware already authenticated the upgrade request,
+	// use the Gin context values directly and skip in-protocol auth frame.
+	if userID := c.GetString("user_id"); userID != "" {
+		h.manager.SetAuth(conn.ID, userID, c.GetString("device_type"), c.GetString("device_id"))
+		h.sendFrame(conn, ws.NewFrame(ws.TypeAuthOK, nil))
+		go h.writeLoop(conn)
+		go h.messageLoop(conn)
+		return
+	}
+
 	go h.writeLoop(conn)
 	go h.readLoop(conn)
 }
@@ -146,6 +156,50 @@ func (h *WebSocketHandler) readLoop(conn *ws.Conn) {
 		}
 	}
 }
+
+// messageLoop reads messages from an already-authenticated WebSocket connection.
+// It is used when the upgrade request was already authenticated by middleware,
+// so no in-protocol auth frame exchange is needed.
+func (h *WebSocketHandler) messageLoop(conn *ws.Conn) {
+	defer h.manager.Unregister(conn.ID)
+
+	for {
+		_, data, err := conn.W.Read(context.Background())
+		if err != nil {
+			slog.Info("ws read error", "user_id", conn.UserID, "err", err)
+			return
+		}
+
+		frame, err := ws.ParseFrame(data)
+		if err != nil {
+			continue
+		}
+
+		switch frame.Type {
+		case ws.TypeTyping:
+			slog.Debug("ws typing", "user_id", conn.UserID)
+			if h.onTyping != nil {
+				sessionID := ""
+				if m, ok := frame.Payload.(map[string]interface{}); ok {
+					if sid, ok := m["session_id"].(string); ok {
+						sessionID = sid
+					}
+				}
+				if sessionID == "" {
+					if s, ok := frame.Payload.(string); ok {
+						sessionID = s
+					}
+				}
+				if sessionID != "" {
+					h.onTyping(conn.UserID, sessionID)
+				}
+			}
+		default:
+			slog.Debug("ws unknown frame type", "type", frame.Type)
+		}
+	}
+}
+
 
 func (h *WebSocketHandler) sendFrame(conn *ws.Conn, frame ws.Frame) {
 	data, err := frame.Marshal()

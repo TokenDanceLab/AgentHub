@@ -9,7 +9,7 @@ import (
 	"github.com/agenthub/hub-server/internal/middleware"
 )
 
-func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler) {
+func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler, agentTeamHandler *handler.AgentTeamHandler) {
 	r.Use(middleware.CORS())
 	r.Use(middleware.APIVersion())
 	r.Use(middleware.BodyLimit(config.DefaultRequestBodyLimit))
@@ -41,11 +41,9 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		auth := client.Group("/auth")
 		{
-			auth.POST("/register", middleware.RateLimit(cacheClient, config.AuthRegisterRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Register)
-			auth.POST("/login", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Login)
 			auth.POST("/refresh", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Refresh)
 
-			// OIDC (Phase 1)
+			// OIDC (TokenDance ID — the only auth entry point)
 			if oidcHandler != nil {
 				auth.POST("/oidc/authorize", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCAuthorize)
 				auth.POST("/oidc/callback", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCCallback)
@@ -54,21 +52,16 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		authProtected := client.Group("/auth")
 		authProtected.Use(middleware.AuthMiddleware(cfg))
+		authProtected.Use(middleware.RequireHubSession())
 		{
 			authProtected.GET("/me", authHandler.Me)
-		}
-
-		localAuthWrite := client.Group("/auth")
-		localAuthWrite.Use(middleware.AuthMiddleware(cfg))
-		localAuthWrite.Use(middleware.RequireLocalAuth())
-		{
-			localAuthWrite.POST("/logout", authHandler.Logout)
-			localAuthWrite.PUT("/profile", authHandler.UpdateProfile)
-			localAuthWrite.PUT("/password", authHandler.ChangePassword)
+			authProtected.POST("/logout", authHandler.Logout)
+			authProtected.PUT("/profile", authHandler.UpdateProfile)
 		}
 
 		contacts := client.Group("/contacts")
 		contacts.Use(middleware.AuthMiddleware(cfg))
+		contacts.Use(middleware.RequireHubSession())
 		{
 			contacts.GET("/search", contactHandler.SearchUser)
 			contacts.GET("/friend-requests", contactHandler.ListFriendRequests)
@@ -84,6 +77,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		sessions := client.Group("/sessions")
 		sessions.Use(middleware.AuthMiddleware(cfg))
+		sessions.Use(middleware.RequireHubSession())
 		{
 			sessions.GET("", sessionHandler.List)
 			sessions.POST("/private", sessionHandler.CreatePrivate)
@@ -112,6 +106,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		messages := client.Group("/messages")
 		messages.Use(middleware.AuthMiddleware(cfg))
+		messages.Use(middleware.RequireHubSession())
 		{
 			messages.POST("/:id/recall", messageHandler.RecallMessage)
 			messages.POST("/:id/pin", messageHandler.PinMessage)
@@ -122,6 +117,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		attachments := client.Group("/attachments")
 		attachments.Use(middleware.AuthMiddleware(cfg))
+		attachments.Use(middleware.RequireHubSession())
 		{
 			attachments.POST("/probe", attachmentHandler.Probe)
 			attachments.POST("", middleware.Timeout(config.UploadRequestTimeout), attachmentHandler.Upload)
@@ -130,6 +126,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		notifications := client.Group("/notifications")
 		notifications.Use(middleware.AuthMiddleware(cfg))
+		notifications.Use(middleware.RequireHubSession())
 		{
 			notifications.GET("", notificationHandler.ListNotifications)
 			notifications.POST("/:id/read", notificationHandler.MarkRead)
@@ -139,6 +136,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 	edge := r.Group("/edge")
 	edge.Use(middleware.AuthMiddleware(cfg))
+	edge.Use(middleware.RequireHubSession())
 	edge.Use(middleware.DeviceTypeCheck("desktop"))
 	{
 		edge.POST("/devices/register", deviceHandler.Register)
@@ -150,10 +148,13 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 	web := r.Group("/web")
 	web.Use(middleware.AuthMiddleware(cfg))
+	web.Use(middleware.RequireHubSession())
 	web.Use(middleware.DeviceTypeCheck("web"))
 	{
 		web.POST("/agent-tasks", agentHandler.TriggerTask)
 		web.POST("/agent-tasks/:id/cancel", agentHandler.CancelTask)
+		web.GET("/agent-tasks/:id/events/summary", agentHandler.TaskEventSummary)
+		web.GET("/agent-tasks/:id/events", agentHandler.TaskEvents)
 		web.GET("/custom-agents", customAgentHandler.List)
 		web.POST("/custom-agents", customAgentHandler.Create)
 		web.PUT("/custom-agents/:id", customAgentHandler.Update)
@@ -232,5 +233,30 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 
 		// Devices
 		web.GET("/devices", deviceHandler.ListDevices)
+
+		// Agent Teams
+		if agentTeamHandler != nil {
+			web.POST("/agent-teams", agentTeamHandler.CreateTeam)
+			web.GET("/agent-teams", agentTeamHandler.ListTeams)
+			web.GET("/agent-teams/:id", agentTeamHandler.GetTeam)
+			web.PUT("/agent-teams/:id", agentTeamHandler.UpdateTeam)
+			web.DELETE("/agent-teams/:id", agentTeamHandler.DeleteTeam)
+			web.POST("/agent-teams/:id/members", agentTeamHandler.AddMember)
+			web.DELETE("/agent-teams/:id/members/:member_id", agentTeamHandler.RemoveMember)
+			web.POST("/agent-teams/:id/runs", agentTeamHandler.StartRun)
+			web.GET("/agent-teams/:id/runs", agentTeamHandler.ListRuns)
+			web.GET("/agent-teams/:id/runs/:run_id", agentTeamHandler.GetRun)
+			web.GET("/agent-teams/:id/runs/:run_id/state", agentTeamHandler.GetRunState)
+			web.GET("/agent-teams/:id/runs/:run_id/tasks", agentTeamHandler.ListTeamTasks)
+			web.GET("/agent-teams/:id/runs/:run_id/events", agentTeamHandler.ListTeamEvents)
+			web.POST("/agent-teams/:id/runs/:run_id/route-decisions", agentTeamHandler.HandleRouteDecision)
+			web.POST("/agent-teams/:id/runs/:run_id/approvals/:approval_id/decide", agentTeamHandler.DecideApproval)
+			web.POST("/agent-teams/:id/runs/:run_id/conflicts/:conflict_id/resolve", agentTeamHandler.ResolveConflict)
+			web.POST("/agent-teams/:id/runs/:run_id/assignments", agentTeamHandler.CreateAssignment)
+			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/dispatch", agentTeamHandler.DispatchAssignment)
+			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/complete", agentTeamHandler.CompleteAssignment)
+			web.POST("/agent-teams/:id/runs/:run_id/assignments/:assignment_id/fail", agentTeamHandler.FailAssignment)
+			web.GET("/agent-teams/:id/runs/:run_id/assignments", agentTeamHandler.ListAssignments)
+		}
 	}
 }

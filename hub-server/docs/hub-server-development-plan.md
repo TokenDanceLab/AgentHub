@@ -272,8 +272,8 @@ docs(api): 补全 Hub Server 37 条路由 OpenAPI 声明与 WebSocket 事件契�
 #### 任务 1.1：Migration 0019 — users 表新增 tokendance_sub
 
 **新建文件**：
-- `migrations/0019_token_dance_sub.up.sql`
-- `migrations/0019_token_dance_sub.down.sql`
+- `migrations/0020_token_dance_sub.up.sql`
+- `migrations/0020_token_dance_sub.down.sql`
 
 ```sql
 -- up
@@ -354,7 +354,7 @@ type OIDCService struct {
 1. `GenerateAuthorizationURL(ctx, codeChallenge, codeChallengeMethod, deviceType, deviceID) (state, url, error)`
    - 生成 32 字节随机 state
    - 保存到 Redis：`state:{state}` → `{codeChallenge, deviceType, deviceID, createdAt}`，TTL 10min
-   - 构造 TokenDance ID `/oidc/auth` URL
+   - 构造 TokenDance ID `/oidc/authorize` URL
    - 返回 state 和完整 authorization_url
 
 2. `HandleCallback(ctx, code, state, codeVerifier, deviceType, deviceID) (accessToken, refreshToken, user, error)`
@@ -491,8 +491,8 @@ feat(hub): 注册 OIDC handler 路由并完成 app 装配
 #### 任务 2.1：Migration 0020 — agent_profiles 表
 
 **新建文件**：
-- `migrations/0020_agent_profiles.up.sql`
-- `migrations/0020_agent_profiles.down.sql`
+- `migrations/0022_agent_profiles.up.sql`
+- `migrations/0022_agent_profiles.down.sql`
 
 DDL 见需求文档 3.1.2。
 
@@ -814,7 +814,7 @@ web.POST("/execution-targets", targetHandler.Create)
 web.GET("/execution-targets/:id", targetHandler.Get)
 web.PATCH("/execution-targets/:id", targetHandler.Update)
 web.DELETE("/execution-targets/:id", targetHandler.Delete)
-web.POST("/execution-targets/:id:ping", targetHandler.Ping)
+web.POST("/execution-targets/:id/ping", targetHandler.Ping)
 ```
 
 `Ping` 逻辑：

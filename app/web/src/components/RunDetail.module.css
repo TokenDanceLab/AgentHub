@@ -1,0 +1,287 @@
+/* RunDetail — inline content within App's right panel (no outer panel) */
+
+/* ── Panel ─────────────────────────────────── */
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.title {
+  display: none; /* App rightPanelHeader handles section label */
+}
+
+.empty {
+  padding: var(--space-lg);
+  color: var(--text-weakest);
+  font-size: 12px;
+  text-align: center;
+}
+
+.section {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+[data-theme='light'] .section {
+  border-bottom-color: rgba(0, 0, 0, 0.04);
+}
+
+.tabContent {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  animation: tabFadeIn 0.2s ease-out;
+}
+
+@keyframes tabFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Status tags — transparent bg + bright text ─ */
+.status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.statusDone    { background: rgba(52, 211, 153, 0.12); color: #4ade80; }
+.statusFailed  { background: rgba(239, 68, 68, 0.12); color: var(--destructive); }
+.statusRunning { background: rgba(99, 102, 241, 0.12); color: var(--primary); }
+.statusPending { background: var(--muted); color: var(--muted-foreground); }
+
+.runId {
+  margin-left: 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  opacity: 0.4;
+}
+
+/* ── Console output ─────────────────────────── */
+.output {
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 2px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0 6px 6px 0;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  line-height: 1.6;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--muted-foreground);
+}
+
+.outputWarning {
+  border-left-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.03);
+}
+
+.outputError {
+  border-left-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.03);
+}
+
+[data-theme='light'] .output {
+  background: var(--muted);
+  border-left-color: rgba(0, 0, 0, 0.08);
+}
+
+.emptyStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.emptyCard,
+.cardSection {
+  border: 1px solid rgba(0,0,0,0.04);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.35);
+}
+
+[data-theme='dark'] .emptyCard,
+[data-theme='dark'] .cardSection {
+  background: rgba(255,255,255,0.035);
+  border-color: rgba(255,255,255,0.06);
+}
+
+.emptyCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 14px;
+  color: #8E8E93;
+  font-size: 12px;
+}
+
+.cardSection {
+  overflow: hidden;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .cardHeader {
+  border-bottom-color: rgba(255,255,255,0.06);
+}
+
+.cardCount {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.04);
+  color: #8E8E93;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .cardCount {
+  background: rgba(255,255,255,0.07);
+}
+
+.list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 10px 8px;
+}
+
+.sourceList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+}
+
+.sourceItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.025);
+}
+
+[data-theme='dark'] .sourceItem {
+  background: rgba(255,255,255,0.04);
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+  font-size: 11px;
+}
+
+/* ── Tool call items ───────────────────────── */
+.toolCallItem { border-bottom: 1px solid rgba(0,0,0,0.04); }
+.toolCallItem:last-child { border-bottom: none; }
+
+.toolCallHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  text-align: left;
+  font-family: var(--font-sans);
+}
+
+.toolCallOutput {
+  margin: 2px 0 8px;
+  padding: 8px;
+  background: rgba(0,0,0,0.02);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  max-height: 140px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+[data-theme='light'] .toolCallOutput { background: #F1F3F5; }
+
+.chevron {
+  display: inline-block;
+  font-size: 9px;
+  transition: transform 0.15s ease;
+  opacity: 0.4;
+  margin-left: auto;
+}
+.chevronDown { transform: rotate(90deg); }
+
+.success { color: var(--success); }
+.pending { color: var(--foreground); opacity: 0.5; }
+
+.itemTs { font-size: 10px; opacity: 0.35; }
+
+.filePath {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action {
+  color: #8E8E93;
+  font-size: 10px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.cancelButton {
+  width: 100%;
+  padding: 6px 12px;
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 8px;
+  background: rgba(239,68,68,0.04);
+  color: var(--destructive);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cancelButton:hover { background: rgba(239,68,68,0.08); }
+
+/* ── Token usage ───────────────────────────── */
+.usageRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+.usageLabel { font-size: 11px; color: #8E8E93; }
+.usageValue { font-size: 11px; font-family: var(--font-mono); }

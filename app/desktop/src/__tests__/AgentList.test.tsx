@@ -99,7 +99,7 @@ describe('AgentList', () => {
     expect(notSelectedBtn?.className).not.toContain('selected');
   });
 
-  it('shows runtime metadata instead of basic capability tags', () => {
+  it('keeps runtime rows compact without capability or adapter tags', () => {
     const agents = [
       makeAgent({
         id: 'a1',
@@ -117,8 +117,9 @@ describe('AgentList', () => {
       }),
     ];
     render(<AgentList agents={agents} online={true} />);
-    expect(screen.getByText('agent.runtime.localEdge')).toBeInTheDocument();
-    expect(screen.getByText('agent.runtime.cliAdapter')).toBeInTheDocument();
+    expect(screen.getByText('Codex')).toBeInTheDocument();
+    expect(screen.queryByText('agent.runtime.localEdge')).not.toBeInTheDocument();
+    expect(screen.queryByText('agent.runtime.cliAdapter')).not.toBeInTheDocument();
     expect(screen.queryByText('agent.capability.streaming')).not.toBeInTheDocument();
     expect(screen.queryByText('agent.capability.toolCalls')).not.toBeInTheDocument();
   });

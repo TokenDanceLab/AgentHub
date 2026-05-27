@@ -219,6 +219,27 @@ func TestResultSuccess(t *testing.T) {
 	}
 }
 
+func TestResultStructuredOutputEmitsRouteDecision(t *testing.T) {
+	input := `{"type":"result","subtype":"success","structured_output":{"action":"delegate","next_worker":"member-2","instructions":"Implement tests","reasoning":"needs executor","correlation_id":"route-1"},"session_id":"ses_abc"}`
+	emitter := parseLines(t, input)
+
+	routeEvents := emitter.eventsOfType(BusEventRouteDecision)
+	if len(routeEvents) != 1 {
+		t.Fatalf("expected 1 route_decision, got %d", len(routeEvents))
+	}
+	if routeEvents[0].Payload["action"] != "delegate" || routeEvents[0].Payload["next_worker"] != "member-2" {
+		t.Fatalf("route decision payload = %#v", routeEvents[0].Payload)
+	}
+
+	resultEvents := emitter.eventsOfType(BusEventResult)
+	if len(resultEvents) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(resultEvents))
+	}
+	if resultEvents[0].Payload["structuredOutput"] == nil {
+		t.Fatalf("result did not retain structuredOutput: %#v", resultEvents[0].Payload)
+	}
+}
+
 func TestResultError(t *testing.T) {
 	input := `{"type":"result","subtype":"error_during_execution","is_error":true,"duration_ms":2000,"errors":["Permission denied"],"session_id":"ses_abc"}`
 	emitter := parseLines(t, input)

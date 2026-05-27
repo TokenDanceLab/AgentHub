@@ -110,34 +110,36 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | type | 阶段 | 说明 |
 |---|---|---|
 | `project.created` | P0 | 项目创建或注册 |
-| `project.updated` | P0 | 项目元数据更新 |
-| `conversation.created` | P1 | 会话创建 |
-| `conversation.member.added` | P1 | 会话成员加入 |
+| `project.updated` | P0 | 项目元数据更新 (planned) |
+| `conversation.created` | P1 | 会话创建 (planned) |
+| `conversation.member.added` | P1 | 会话成员加入 (planned) |
 | `thread.created` | P0 | Thread 创建 |
 | `thread.updated` | P0 | Thread 状态或标题更新 |
-| `thread.forked` | P1 | Thread 分支创建 |
+| `thread.deleted` | P0 | Thread 删除 |
+| `thread.forked` | P1 | Thread 分支创建 (planned) |
 | `message.created` | P0 | 消息创建 |
 | `message.delta` | P0 | Agent 消息流式增量 |
 | `item.created` | P0 | Thread Item 创建 |
-| `item.updated` | P0 | Thread Item 状态更新 |
+| `item.updated` | P0 | Thread Item 状态更新 (planned) |
 
-### Execution / Runner
+### Execution / Runtime
 
 | type | 阶段 | 说明 |
 |---|---|---|
-| `runner.online` | P0 | Runner 在线 |
-| `runner.offline` | P0 | Runner 离线 |
+| `runner.online` | P0 | Runtime/target compatibility event: legacy Runner 在线 (planned) |
+| `runner.offline` | P0 | Runtime/target compatibility event: legacy Runner 离线 (planned) |
 | `run.queued` | P0 | AgentRun 已排队 |
 | `run.started` | P0 | AgentRun 已启动 |
-| `run.output` | P0 | 单条 stdout/stderr 输出 |
+| `run.output` | P0 | 单条 stdout/stderr 输出 (planned — 当前仅 `run.output.batch` 已实现) |
 | `run.output.batch` | P0 | 批量 stdout/stderr 输出 |
-| `run.status.changed` | P0 | AgentRun 状态变化 |
-| `approval.requested` | P0 | 请求用户审批 |
-| `approval.decided` | P0 | 用户已审批 |
-| `artifact.created` | P0 | 产物创建 |
-| `artifact.updated` | P1 | 产物元数据更新 |
-| `preview.ready` | P0 | 预览可用 |
-| `preview.stopped` | P1 | 预览停止 |
+| `run.status.changed` | P0 | AgentRun 状态变化 (planned) |
+| `run.persistence_error` | P0 | 持久化错误，payload: `{ runId, error }` |
+| `approval.requested` | P0 | 请求用户审批 (planned) |
+| `approval.decided` | P0 | 用户已审批 (planned) |
+| `artifact.created` | P0 | 产物创建 (planned) |
+| `artifact.updated` | P1 | 产物元数据更新 (planned) |
+| `preview.ready` | P0 | 预览可用 (planned) |
+| `preview.stopped` | P1 | 预览停止 (planned) |
 | `run.finished` | P0 | AgentRun 正常结束 |
 | `run.failed` | P0 | AgentRun 失败 |
 | `run.cancelled` | P1 | AgentRun 已取消（已实现，补文档） |
@@ -147,14 +149,22 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.tool_call` | P0 | Agent 请求工具调用 |
 | `run.agent.tool_result` | P0 | 工具调用执行结果 |
 | `run.agent.file_change` | P0 | 文件变更，payload: `{ path, kind: "created"\|"modified"\|"deleted", diff? }` |
+| `run.agent.route_decision` | P1 | Runtime structured output 中解析出的 `CoordinatorRouteDecision`；Desktop bridge 会用 dispatch payload 中的 TeamRun context 自动 POST 到 Hub route decision endpoint |
 | `run.agent.session_init` | P0 | Agent 会话初始化（模型、工具列表、权限模式） |
 | `run.agent.result` | P0 | Agent 执行结束（成功/失败、token 用量） |
 | `run.agent.compact_boundary` | P1 | 上下文压缩边界 |
 | `run.agent.api_retry` | P1 | API 重试通知 |
 | `run.agent.task_started` | P1 | 子代理任务启动 |
+| `run.agent.task_dispatched` | P1 | 子代理任务已派发 |
 | `run.agent.task_progress` | P1 | 子代理任务进度 |
 | `run.agent.task_notification` | P1 | 子代理任务完成/失败 |
+| `run.agent.sub_agents_complete` | P1 | 所有子代理执行完毕，payload: `{ parentId, childCount, allComplete }` |
 | `run.agent.session_state_changed` | P1 | 会话状态变更（idle/running/requires_action） |
+| `run.agent.status_change` | P1 | Agent 适配器状态变更 |
+| `run.agent.session_metrics` | P1 | 会话度量信息 |
+| `run.agent.context_usage` | P1 | 上下文使用量报告 |
+| `run.agent.context_warning` | P1 | 上下文容量警告 |
+| `run.agent.context_compaction` | P1 | 上下文压缩通知 |
 | `run.agent.hook_started` | P1 | Hook 执行开始 |
 | `run.agent.hook_progress` | P1 | Hook 执行输出 |
 | `run.agent.hook_response` | P1 | Hook 执行完成 |
@@ -163,6 +173,20 @@ Runner stdout/stderr 不要一行一帧直接刷给 UI。
 | `run.agent.rate_limit` | P1 | 速率限制通知 |
 | `run.agent.permission_requested` | P1 | Agent 请求权限审批 |
 | `run.agent.permission_decided` | P1 | 权限审批结果 |
+
+### AgentTeam / TeamRun
+
+| type | 阶段 | 说明 |
+|---|---|---|
+| `team.route.decided` | P1 | Supervisor typed route decision 已接受，payload 为 `CoordinatorRouteDecision` |
+| `team.route.rejected` | P1 | Supervisor route decision 被 schema、任务数、活跃 subagent 或重复 route guardrail 拒绝，payload 包含 `decision` 和 `reason` |
+| `team.task.created` | P1 | TeamTask 已从 accepted route decision 创建 |
+| `team.approval.decided` | P1 | TeamRun approval 人工决策已记录，payload 包含 `approval_id`、`agent_task_id`、`edge_run_id`、`decision`、`decided_by`、`edge_control` |
+| `assignment.created` | P1 | TeamAssignment 已创建 |
+| `assignment.dispatched` | P1 | TeamAssignment 已派发到目标 Agent，payload 包含 `assignment_id`、`team_task_id` 和 Hub `agent_task_id` |
+| `assignment.completed` | P1 | TeamAssignment 完成 |
+| `assignment.failed` | P1 | TeamAssignment 失败 |
+| `assignment.cancelled` | P1 | TeamAssignment 取消 |
 
 ### Hub / Sync / Relay
 
@@ -203,14 +227,14 @@ Hub Server 提供独立的 WebSocket 事件系统，与 Edge Server 的 `EventEn
 ### 7.1 连接
 
 ```text
-ws://host:8080/client/ws
+ws://host:8080/client/ws?access_token=<hub-issued-access-token>
 ```
 
 连接流程：
 
-1. 建立 WebSocket 连接。
-2. 客户端必须在第一帧发送 `auth` 事件。
-3. 服务端验证 token 后返回 `auth.ok` 或 `auth.fail`。
+1. 客户端使用 Hub-issued HS256 access token 建立 WebSocket 连接。浏览器客户端通过 `access_token` query 参数传递；能设置请求头的原生客户端也可用 `Authorization: Bearer <token>`。
+2. Hub 在 HTTP upgrade 前验证 token；TokenDance ID RS256 bearer token 不能通过 `/client/ws`。
+3. 升级成功后服务端发送 `auth.ok`；验证失败时在升级前返回 401，不建立 WebSocket。
 4. 认证通过后，客户端可发送 `typing` 事件；服务端推送实时事件。
 5. 心跳：服务端定期发送 WebSocket ping，客户端需要回复 pong。连续未回复 pong 将导致断连。
 
@@ -235,15 +259,9 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 方向 | 说明 |
 |------|------|------|
-| `auth` | Client→Hub | 认证请求，payload: `{ access_token }` |
-| `auth.ok` | Hub→Client | 认证成功，payload: `{ user_id, device_id }` |
-| `auth.fail` | Hub→Client | 认证失败，payload: `{ reason }` |
-
-**auth 示例 — 客户端发送：**
-
-```json
-{"type":"auth","payload":{"access_token":"eyJhbGciOiJIUzI1NiIs..."}}
-```
+| `auth` | Client→Hub | 历史帧认证，仅用于未挂 `WSAuthMiddleware` 的测试/兼容入口；主路由 `/client/ws` 使用 upgrade 前 token |
+| `auth.ok` | Hub→Client | 认证成功，payload: `{ user_id, device_id }` 或 `null` |
+| `auth.fail` | Hub→Client | 认证失败，payload: `{ reason }`；主路由通常在 upgrade 前返回 401 |
 
 **auth.ok 示例 — 服务端响应：**
 
@@ -285,11 +303,11 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 说明 |
 |------|------|
-| `session.created` | 会话创建，payload: `{ session_id, type, name, owner_id, members[] }` |
-| `session.dissolved` | 群解散，payload: `{ session_id }` |
-| `session.member_joined` | 成员加入，payload: `{ session_id, member_id, member_type }` |
-| `session.member_left` | 成员离开，payload: `{ session_id, member_id }` |
-| `session.info_updated` | 会话信息变更，payload: `{ session_id, changes{} }` |
+| `session.created` | 会话创建 (defined, not yet emitted)，payload: `{ session_id, type, name, owner_id, members[] }` |
+| `session.dissolved` | 群解散 (defined, not yet emitted)，payload: `{ session_id }` |
+| `session.member_joined` | 成员加入 (defined, not yet emitted)，payload: `{ session_id, member_id, member_type }` |
+| `session.member_left` | 成员离开 (defined, not yet emitted)，payload: `{ session_id, member_id }` |
+| `session.info_updated` | 会话信息变更 (defined, not yet emitted)，payload: `{ session_id, changes{} }` |
 
 #### Device 事件（Hub→Client）
 
@@ -303,11 +321,12 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 | type | 方向 | 说明 |
 |------|------|------|
-| `agent.dispatch` | Hub→Edge | 分发 agent 任务，payload: `{ task_id, agent_instance_id, session_id, prompt, model, trigger_message_id }` |
-| `agent.stream` | Edge→Hub | agent 流式输出，payload: `{ task_id, content, content_type }` |
+| `agent.dispatch` | Hub→Edge | 分发 agent 任务，payload: `{ task_id, agent_instance_id, agent_type, session_id, prompt, trigger_message_id, trigger_user_id, display_name, model_params?, target_id?, team_id?, team_run_id?, team_member_id?, team_member_role? }`；`agent_type` 必须是 Edge Runtime adapter id（如 `claude-code`、`codex`、`opencode`），`prompt` 来自触发消息文本。Web 触发可用 `agent_type` / `agent_instance_id` / `custom_agent_id` 指定 Agent，可用 `target_id` 指定 owner-scoped Execution Target；Hub 会校验 target owner、当前可调度 target type 和绑定 desktop device，把 `target_id` 与 `edge_device_id` 持久化，只向该 device 的 Desktop/Edge WS 下发。TeamRun supervisor dispatch 会携带 team context，Desktop bridge 用它把 `run.agent.route_decision` / result `structuredOutput` 自动绑定到 Hub route decision endpoint。目标 device 离线时进入 target/device 专属队列，等待同一 device reconnect replay，禁止 fallback 到其他在线 desktop。该切片仍不代表远程/云 target 已完成；Remote/Cloud 还需要 relay/provisioning、设备证明、workspace allowlist 同步和审批证明。 |
+| `agent.stream` | Edge→Hub/Hub→Client | typed runtime event，payload: `{ id, task_id, edge_run_id, session_id, agent_instance_id, event_seq, event_type, payload, created_at }`；Hub 仍会为当前聊天 UI 同步投影一条 `message.new`。 |
 | `agent.done` | Edge→Hub | agent 任务完成，payload: `{ task_id, result_summary, usage{} }` |
 | `agent.failed` | Edge→Hub | agent 任务失败，payload: `{ task_id, error }` |
 | `agent.cancel` | Hub→Edge | 取消 agent 任务，payload: `{ task_id }` |
+| `agent.control` | Hub→Edge | 设备级控制命令，payload: `{ kind, agent_task_id?, target_id?, edge_device_id, team_id?, team_run_id?, team_task_id?, assignment_id?, member_id?, approval_id?, edge_control? }`。当前 `kind=permission.decide` 用于把 TeamRun approval decision 投递给拥有该 Edge run 的 exact Desktop/Edge；`edge_control` 可直接转为 Edge `POST /v1/permissions/decide` body。目标 device 离线时进入 user/device 专属控制队列，reconnect 只 replay 同一 device，禁止 fallback 到其它 Desktop。 |
 | `agent.timeout` | Hub→Edge | 任务超时，payload: `{ task_id }` |
 
 #### Notification 事件（Hub→Client）
@@ -326,8 +345,8 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 ### 7.4 代码示例
 
 ```json
-// 客户端发送认证
-{"type":"auth","payload":{"access_token":"eyJhbGciOiJIUzI1NiIs..."}}
+// 客户端连接主路由
+"ws://host:8080/client/ws?access_token=eyJhbGciOiJIUzI1NiIs..."
 
 // 服务端响应认证成功
 {"type":"auth.ok","payload":{"user_id":"user_01HX...","device_id":"device_01HX..."}}
@@ -340,4 +359,10 @@ Hub 使用扁平帧格式（与 Edge 的 EventEnvelope 不同）：
 
 // Edge 上报 agent 任务完成
 {"type":"agent.done","payload":{"task_id":"task_01HX...","result_summary":"Tests passed. 3/3 OK.","usage":{"input_tokens":1234,"output_tokens":567}}}
+
+// Hub 推送 typed runtime event
+{"type":"agent.stream","payload":{"id":"evt_01HX...","task_id":"task_01HX...","edge_run_id":"run_01HX...","session_id":"sess_01HX...","agent_instance_id":"agent_01HX...","event_seq":1,"event_type":"run.agent.tool_call","payload":{"callId":"call_1","toolName":"read_file"},"created_at":"2026-05-25T12:00:00Z"}}
+
+// Hub 推送 exact-device permission decision control
+{"type":"agent.control","payload":{"kind":"permission.decide","agent_task_id":"task_01HX...","edge_device_id":"device_01HX...","team_id":"team_01HX...","team_run_id":"run_team_01HX...","approval_id":"req_01HX...","edge_control":{"runId":"edge_run_01HX...","requestId":"req_01HX...","decision":"allow","reason":"Known safe command"}}}
 ```

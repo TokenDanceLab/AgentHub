@@ -424,3 +424,50 @@ func TestMessageHandler_SearchSessionMessages_EmptyQuery(t *testing.T) {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
 }
+
+func TestMessageHandler_SearchMessages_WithFilters(t *testing.T) {
+	svc := &mockMessageService{
+		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error) {
+			if contentType != "image" {
+				t.Errorf("expected content_type=image, got %s", contentType)
+			}
+			if from != "2026-01-01" {
+				t.Errorf("expected from=2026-01-01, got %s", from)
+			}
+			if to != "2026-06-01" {
+				t.Errorf("expected to=2026-06-01, got %s", to)
+			}
+			return []service.MessageResponse{}, nil
+		},
+	}
+	h := handler.NewMessageHandler(svc)
+
+	c, w := newGinCtx("GET", "/client/messages/search?q=hello&content_type=image&from=2026-01-01&to=2026-06-01", nil, "user_id", "u1")
+	c.Request.URL.RawQuery = "q=hello&content_type=image&from=2026-01-01&to=2026-06-01"
+	h.SearchMessages(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMessageHandler_SearchSessionMessages_WithFilters(t *testing.T) {
+	svc := &mockMessageService{
+		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]service.MessageResponse, error) {
+			if sessionID != "s1" {
+				t.Errorf("expected sessionID=s1, got %s", sessionID)
+			}
+			return []service.MessageResponse{}, nil
+		},
+	}
+	h := handler.NewMessageHandler(svc)
+
+	c, w := newGinCtx("GET", "/client/sessions/s1/messages/search?q=hello&content_type=text", nil, "user_id", "u1")
+	c.Params = gin.Params{{Key: "id", Value: "s1"}}
+	c.Request.URL.RawQuery = "q=hello&content_type=text"
+	h.SearchSessionMessages(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}

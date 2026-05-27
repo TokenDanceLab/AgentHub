@@ -85,6 +85,7 @@ go run ./cmd/agenthub-edge --runner-profile opencode
 | `--store-file` / `AGENTHUB_STORE_FILE` | JSON file store 快照路径；为空使用内存 store |
 | `--agent-default` / `AGENTHUB_AGENT_DEFAULT` | 默认 Runtime adapter ID：`claude-code`、`codex`、`opencode` |
 | `--runner-profile` / `AGENTHUB_RUNNER_PROFILE` | 兼容旧名称的 Runtime preset：`agenthub-runner-mock`、`claude-code`、`codex`、`opencode` |
+| `--workspace-allowlist` / `AGENTHUB_WORKSPACE_ALLOWLIST` | 限制 `/v1/runs` 请求里的 `workDir` 必须位于允许的 workspace root 内；flag 可重复，环境变量使用系统 path-list 分隔符 |
 | `--local-auth-token` / `AGENTHUB_EDGE_AUTH_TOKEN` | 可选本地 Edge token；为空保持本地开发兼容，非空时除 `/v1/health` 和 CORS preflight 外的 Edge API 都需要 token |
 | `--claude-code-path` / `AGENTHUB_CLAUDE_CODE_PATH` | Claude Code CLI 路径，默认 `claude` |
 | `--codex-path` / `AGENTHUB_CODEX_PATH` | Codex CLI 路径，默认 `codex` |
@@ -92,6 +93,8 @@ go run ./cmd/agenthub-edge --runner-profile opencode
 | `--agent-model` / `AGENTHUB_AGENT_MODEL` | 默认 Runtime 的模型覆盖 |
 
 本地 Edge token 启用后，REST 请求使用 `Authorization: Bearer <token>` 或 `X-AgentHub-Edge-Token: <token>`。浏览器 WebSocket 无法设置自定义 header，所以 `/v1/events` 使用 `?access_token=<token>`。这只覆盖本地回环 Edge 的进程调用边界；Remote/Cloud/Hub relay Target 仍需要 Hub session、device proof、Target 权限和审计。
+
+`--workspace-allowlist` 是 Execution Target 的本地执行护栏：配置后，带 `workDir` 的 `/v1/runs` 请求必须落在至少一个 allowlist root 内，否则 Edge 返回 `workspace_not_allowed` 且不会创建 run 或启动 Runtime。未配置时保持本地开发兼容；Remote/Cloud Target 仍需要 Hub 侧 target 注册、路由授权、设备证明和远程审批闭环。
 
 ## 当前结构
 

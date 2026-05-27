@@ -27,22 +27,22 @@ function formatTime(timestamp: string): string {
 function authorityClass(authority: string): string {
   switch (authority) {
     case 'edge':
-      return styles.authorityEdge;
+      return styles.authorityEdge ?? '';
     case 'hybrid':
-      return styles.authorityHybrid;
+      return styles.authorityHybrid ?? '';
     default:
-      return styles.authorityHub;
+      return styles.authorityHub ?? '';
   }
 }
 
 function authorityBadgeClass(authority: string): string {
   switch (authority) {
     case 'edge':
-      return styles.authorityBadgeEdge;
+      return styles.authorityBadgeEdge ?? '';
     case 'hybrid':
-      return styles.authorityBadgeHybrid;
+      return styles.authorityBadgeHybrid ?? '';
     default:
-      return styles.authorityBadgeHub;
+      return styles.authorityBadgeHub ?? '';
   }
 }
 

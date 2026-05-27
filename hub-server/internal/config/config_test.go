@@ -350,6 +350,148 @@ func TestEnvOverrideUploadConfig(t *testing.T) {
 	}
 }
 
+func TestEnvOverrideTokenDanceIDCanonicalNames(t *testing.T) {
+	path := writeTempConfig(t, validJWTYAML+`
+tokendance_id:
+  issuer_url: ""
+  jwks_uri: ""
+  client_id: ""
+  client_secret: ""
+  redirect_uri: ""
+`)
+	t.Setenv("AGENTHUB_JWT_SECRET", "tokendance-env-secret")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ISSUER_URL", "https://id.example")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_JWKS_URI", "https://id.example/oidc/jwks")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "agenthub-client")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "agenthub-secret")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_REDIRECT_URI", "https://hub.example/client/auth/oidc/callback")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "https://hub.example/auth/tokendance/callback, http://127.0.0.1/callback")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.TokenDanceID.IssuerURL != "https://id.example" {
+		t.Errorf("IssuerURL = %q", cfg.TokenDanceID.IssuerURL)
+	}
+	if cfg.TokenDanceID.JWKSURI != "https://id.example/oidc/jwks" {
+		t.Errorf("JWKSURI = %q", cfg.TokenDanceID.JWKSURI)
+	}
+	if cfg.TokenDanceID.ClientID != "agenthub-client" {
+		t.Errorf("ClientID = %q", cfg.TokenDanceID.ClientID)
+	}
+	if cfg.TokenDanceID.ClientSecret != "agenthub-secret" {
+		t.Errorf("ClientSecret = %q", cfg.TokenDanceID.ClientSecret)
+	}
+	if cfg.TokenDanceID.RedirectURI != "https://hub.example/client/auth/oidc/callback" {
+		t.Errorf("RedirectURI = %q", cfg.TokenDanceID.RedirectURI)
+	}
+	if len(cfg.TokenDanceID.AllowedRedirectURIs) != 2 {
+		t.Fatalf("AllowedRedirectURIs len = %d, want 2", len(cfg.TokenDanceID.AllowedRedirectURIs))
+	}
+	if cfg.TokenDanceID.AllowedRedirectURIs[0] != "https://hub.example/auth/tokendance/callback" {
+		t.Errorf("AllowedRedirectURIs[0] = %q", cfg.TokenDanceID.AllowedRedirectURIs[0])
+	}
+	if cfg.TokenDanceID.AllowedRedirectURIs[1] != "http://127.0.0.1/callback" {
+		t.Errorf("AllowedRedirectURIs[1] = %q", cfg.TokenDanceID.AllowedRedirectURIs[1])
+	}
+}
+
+func TestEnvOverrideTokenDanceIDCanonicalNamesWithoutYAMLSection(t *testing.T) {
+	path := writeTempConfig(t, validJWTYAML)
+	t.Setenv("AGENTHUB_JWT_SECRET", "tokendance-env-secret")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ISSUER_URL", "https://id.example")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "agenthub-client")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "agenthub-secret")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_REDIRECT_URI", "https://hub.example/client/auth/oidc/callback")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.TokenDanceID.IssuerURL != "https://id.example" {
+		t.Errorf("IssuerURL = %q", cfg.TokenDanceID.IssuerURL)
+	}
+	if cfg.TokenDanceID.JWKSURI != "https://id.example/oidc/jwks" {
+		t.Errorf("JWKSURI = %q", cfg.TokenDanceID.JWKSURI)
+	}
+	if cfg.TokenDanceID.ClientID != "agenthub-client" {
+		t.Errorf("ClientID = %q", cfg.TokenDanceID.ClientID)
+	}
+	if cfg.TokenDanceID.ClientSecret != "agenthub-secret" {
+		t.Errorf("ClientSecret = %q", cfg.TokenDanceID.ClientSecret)
+	}
+	if cfg.TokenDanceID.RedirectURI != "https://hub.example/client/auth/oidc/callback" {
+		t.Errorf("RedirectURI = %q", cfg.TokenDanceID.RedirectURI)
+	}
+}
+
+func TestEnvOverrideTokenDanceIDLegacyNamesStillWork(t *testing.T) {
+	path := writeTempConfig(t, validJWTYAML+`
+tokendance_id:
+  issuer_url: ""
+  client_id: ""
+  client_secret: ""
+  redirect_uri: ""
+`)
+	t.Setenv("AGENTHUB_JWT_SECRET", "tokendance-legacy-secret")
+	t.Setenv("AGENTHUB_TOKENDANCE_ISSUER_URL", "https://legacy-id.example")
+	t.Setenv("AGENTHUB_TOKENDANCE_CLIENT_ID", "legacy-client")
+	t.Setenv("AGENTHUB_TOKENDANCE_CLIENT_SECRET", "legacy-secret")
+	t.Setenv("AGENTHUB_TOKENDANCE_REDIRECT_URI", "https://legacy.example/callback")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.TokenDanceID.IssuerURL != "https://legacy-id.example" {
+		t.Errorf("IssuerURL = %q", cfg.TokenDanceID.IssuerURL)
+	}
+	if cfg.TokenDanceID.JWKSURI != "https://legacy-id.example/oidc/jwks" {
+		t.Errorf("JWKSURI = %q", cfg.TokenDanceID.JWKSURI)
+	}
+	if cfg.TokenDanceID.ClientID != "legacy-client" {
+		t.Errorf("ClientID = %q", cfg.TokenDanceID.ClientID)
+	}
+	if cfg.TokenDanceID.ClientSecret != "legacy-secret" {
+		t.Errorf("ClientSecret = %q", cfg.TokenDanceID.ClientSecret)
+	}
+	if cfg.TokenDanceID.RedirectURI != "https://legacy.example/callback" {
+		t.Errorf("RedirectURI = %q", cfg.TokenDanceID.RedirectURI)
+	}
+}
+
+func TestValidateTokenDanceIDRequiresRedirectURI(t *testing.T) {
+	cfg := &Config{
+		DB: DBConfig{
+			Host: "localhost",
+			Port: 5432,
+			User: "agenthub",
+			Name: "agenthub",
+		},
+		Redis: RedisConfig{
+			Host: "localhost",
+			Port: 6379,
+		},
+		JWT: JWTConfig{
+			Secret: "strong-agenthub-secret",
+		},
+		TokenDanceID: TokenDanceIDConfig{
+			IssuerURL:    "https://id.example",
+			ClientID:     "agenthub-client",
+			ClientSecret: "agenthub-secret",
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected missing TokenDance ID redirect URI to be rejected")
+	}
+	if !strings.Contains(err.Error(), "tokendance_id.redirect_uri") {
+		t.Fatalf("Validate() error = %q, want tokendance_id.redirect_uri", err.Error())
+	}
+}
+
 // --- DSN / Addr edge cases ---
 
 func TestDBConfigDSNZeroValues(t *testing.T) {
@@ -446,7 +588,6 @@ func TestLoadYAMLEnvVarNotSetForNonSecretField(t *testing.T) {
 	}
 }
 
-
 // #101: Reject known hardcoded JWT secrets in production.
 func TestJWTSecretKnownHardcodedRejected(t *testing.T) {
 	knownHardcoded := []string{
@@ -480,8 +621,6 @@ jwt:
 		})
 	}
 }
-
-
 
 // #101: Known hardcoded secret overridden by env var should pass.
 func TestJWTSecretHardcodedOverriddenByEnv(t *testing.T) {
