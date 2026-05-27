@@ -537,23 +537,36 @@ func (a *App) startTaskScheduler(ctx context.Context) {
 				continue
 			}
 			for _, task := range tasks {
-				_ = a.AgentService.UpdatePendingTaskStatus(task.ID, model.TaskStatusTimeout, "")
-				ai, _ := a.AgentService.GetAgentInstanceByID(task.AgentInstanceID)
-				sessionID := ""
-				if ai != nil {
-					sessionID = ai.SessionID
-				}
-				a.bus.Publish(a.coreCtx, service.Event{
-					Type: "agent.timeout",
-					Payload: map[string]interface{}{
-						"task_id":           task.ID,
-						"agent_instance_id": task.AgentInstanceID,
-						"session_id":        sessionID,
-					},
-				})
+				a.publishExpiredTaskTimeout(ctx, task)
 			}
 		}
 	}()
+}
+
+func (a *App) publishExpiredTaskTimeout(ctx context.Context, task model.PendingAgentTask) {
+	timedOut, err := a.AgentService.TimeoutExpiredTask(task.ID, task.Status)
+	if err != nil {
+		slog.Warn("failed to mark expired agent task timeout", "task_id", task.ID, "status", task.Status, "error", err)
+		return
+	}
+	if !timedOut {
+		slog.Info("skip stale expired agent task timeout", "task_id", task.ID, "scanned_status", task.Status)
+		return
+	}
+
+	ai, _ := a.AgentService.GetAgentInstanceByID(task.AgentInstanceID)
+	sessionID := ""
+	if ai != nil {
+		sessionID = ai.SessionID
+	}
+	a.bus.Publish(ctx, service.Event{
+		Type: "agent.timeout",
+		Payload: map[string]interface{}{
+			"task_id":           task.ID,
+			"agent_instance_id": task.AgentInstanceID,
+			"session_id":        sessionID,
+		},
+	})
 }
 
 // startWebSocketCleanup starts heartbeat-based stale connection cleanup.

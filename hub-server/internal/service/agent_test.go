@@ -1062,6 +1062,60 @@ func TestHandleTaskAck_QueuedOfflineReplayTransitionsToRunning(t *testing.T) {
 	require.Equal(t, "run-queued", stored.EdgeRunID)
 }
 
+func TestTimeoutExpiredTaskMarksScannedStatus(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	task := &model.PendingAgentTask{
+		ID:                "task-timeout-running",
+		AgentInstanceID:   "agent-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusRunning,
+		EdgeDeviceID:      "dev-1",
+		EdgeRunID:         "run-1",
+		ExpireAt:          time.Now().Add(-time.Hour),
+	}
+	require.NoError(t, db.Create(task).Error)
+	svc := &AgentService{db: db}
+
+	timedOut, err := svc.TimeoutExpiredTask(task.ID, model.TaskStatusRunning)
+
+	require.NoError(t, err)
+	require.True(t, timedOut)
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
+	require.Equal(t, model.TaskStatusTimeout, stored.Status)
+	require.NotNil(t, stored.FinishedAt)
+}
+
+func TestTimeoutExpiredTaskDoesNotOverwriteTerminalRace(t *testing.T) {
+	db := newAgentTaskTargetContractDB(t)
+	task := &model.PendingAgentTask{
+		ID:                "task-timeout-race",
+		AgentInstanceID:   "agent-1",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-1",
+		Status:            model.TaskStatusRunning,
+		EdgeDeviceID:      "dev-1",
+		EdgeRunID:         "run-1",
+		ExpireAt:          time.Now().Add(-time.Hour),
+	}
+	require.NoError(t, db.Create(task).Error)
+	finishedAt := time.Now()
+	require.NoError(t, db.Model(&model.PendingAgentTask{}).
+		Where("id = ?", task.ID).
+		Updates(map[string]interface{}{"status": model.TaskStatusDone, "finished_at": &finishedAt}).Error)
+	svc := &AgentService{db: db}
+
+	timedOut, err := svc.TimeoutExpiredTask(task.ID, model.TaskStatusRunning)
+
+	require.NoError(t, err)
+	require.False(t, timedOut)
+	var stored model.PendingAgentTask
+	require.NoError(t, db.Where("id = ?", task.ID).First(&stored).Error)
+	require.Equal(t, model.TaskStatusDone, stored.Status)
+	require.NotNil(t, stored.FinishedAt)
+}
+
 // ==================== B5: #116 reject agent tasks for dissolved sessions ====================
 
 func TestTriggerAgentTask_RejectsDissolvedSession(t *testing.T) {
