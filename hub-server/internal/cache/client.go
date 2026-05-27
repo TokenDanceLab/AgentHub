@@ -264,7 +264,12 @@ func (c *Client) PopPendingTargetTasksForDevice(ctx context.Context, userID, dev
 // PushPendingAgentControl pushes a control JSON to a device-specific offline
 // queue so approval decisions are never replayed to a different desktop.
 func (c *Client) PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
-	return c.rdb.LPush(ctx, pendingAgentControlKey(userID, deviceID), controlJSON).Err()
+	key := pendingAgentControlKey(userID, deviceID)
+	pipe := c.rdb.TxPipeline()
+	pipe.LRem(ctx, key, 0, controlJSON)
+	pipe.LPush(ctx, key, controlJSON)
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // PopPendingAgentControlsForDevice pops all queued controls for one device and

@@ -541,6 +541,20 @@ func TestPendingAgentControlsAreIsolatedByDevice(t *testing.T) {
 	require.JSONEq(t, `{"kind":"permission.decide","approval_id":"approval-b"}`, devBControls[0])
 }
 
+func TestPendingAgentControlsDeduplicateExactPayloadForDevice(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+	control := `{"kind":"permission.decide","approval_id":"approval-dedupe","edge_control":{"runId":"run-dedupe","requestId":"approval-dedupe","decision":"allow"}}`
+
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-a", control))
+	require.NoError(t, c.PushPendingAgentControl(ctx, "user-control", "dev-a", control))
+
+	controls, err := c.PopPendingAgentControlsForDevice(ctx, "user-control", "dev-a")
+	require.NoError(t, err)
+	require.Len(t, controls, 1)
+	require.JSONEq(t, control, controls[0])
+}
+
 // ==================== Sequence Allocation ====================
 
 func TestInitSeqIfAbsent_PeekSeq_AllocateSeq(t *testing.T) {
