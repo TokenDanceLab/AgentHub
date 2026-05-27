@@ -1185,10 +1185,12 @@ pnpm typecheck                                         # 零错误
 
 ### 后续方向
 
+> 全量健康检查 2026-05-27：hub (13/13 包, 48.2%) · edge (15/15 包, 75.7%) · Desktop (59 文件, 725 测试) · Web (9 文件, 31 测试) · Mobile (0 测试, 早期) · OpenAPI YAML ✅ · TS typecheck ✅
+
 | 方向 | 建议 | 优先级 |
 |------|------|:--:|
 | AgentTeam 加速 | 竞品压力（AionUI 团战、Claude Teams）——从 P1 提到 P0.5 | High |
-| 测试覆盖 | hub handler +1% 过 CI 门槛、edge lifecycle +12% | High |
+| Mobile 测试 | 0 测试文件，需要至少冒烟覆盖 | Medium |
 | 远程 Edge PoC | 演示 Hub 中继到第二台 Desktop——证明架构不是空文档 | Medium |
 | 跨会话记忆 | Codex Memory 预览已上线——AgentHub 需要 profile 级记忆 | Medium |
 
