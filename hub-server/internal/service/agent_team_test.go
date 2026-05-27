@@ -1286,6 +1286,91 @@ func TestAgentTeamService_DecideApprovalDeliversControlToExactEdgeDevice(t *test
 	assert.Equal(t, "allow", call.payload.EdgeControl.Decision)
 }
 
+func TestAgentTeamService_DecideApprovalRedeliversSameDecisionWithoutDuplicateEvent(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	controlSvc := &mockAgentTeamControlSvc{}
+	svc := NewAgentTeamService(db, nil, nil)
+	svc.SetControlService(controlSvc)
+	team, _, executor, run := seedAgentTeamRun(t, db)
+	pending := &model.PendingAgentTask{
+		ID:                "agent-task-redeliver-control",
+		AgentInstanceID:   "agent-executor",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-redeliver-control",
+		TargetID:          "target-local",
+		Status:            model.TaskStatusRunning,
+		EdgeRunID:         "edge-run-redeliver-control",
+		EdgeDeviceID:      "edge-device-redeliver-control",
+		ExpireAt:          time.Now().Add(time.Hour),
+	}
+	require.NoError(t, db.Create(pending).Error)
+	teamTask := &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: executor.ID,
+		Status:           model.TeamTaskStatusRunning,
+		Objective:        "Run gated command",
+		RunID:            &pending.ID,
+	}
+	require.NoError(t, repository.CreateTeamTask(db, teamTask))
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          pending.ID,
+		EdgeRunID:       pending.EdgeRunID,
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-executor",
+		EventType:       "run.agent.permission_requested",
+		Payload:         `{"requestId":"req-redeliver","toolUseId":"tool-redeliver","toolName":"Bash","status":"pending"}`,
+	}))
+	decidedAt := time.Now().UTC()
+	record := model.TeamApprovalDecision{
+		ApprovalID:  "req-redeliver",
+		AgentTaskID: pending.ID,
+		TeamTaskID:  teamTask.ID,
+		MemberID:    executor.ID,
+		EdgeRunID:   pending.EdgeRunID,
+		RequestID:   "req-redeliver",
+		ToolName:    "Bash",
+		ToolUseID:   "tool-redeliver",
+		Decision:    "allow",
+		Reason:      "Known safe command",
+		DecidedBy:   "user-1",
+		DecidedAt:   decidedAt,
+		EdgeControl: &model.TeamApprovalEdgeControl{
+			RunID:     pending.EdgeRunID,
+			RequestID: "req-redeliver",
+			Decision:  "allow",
+			Reason:    "Known safe command",
+		},
+	}
+	payload, err := json.Marshal(record)
+	require.NoError(t, err)
+	require.NoError(t, repository.AppendTeamEvent(db, &model.AgentTeamEvent{
+		TeamRunID: run.ID,
+		Type:      model.TeamEventApprovalDecided,
+		Payload:   string(payload),
+	}))
+
+	decided, err := svc.DecideApproval(context.Background(), "user-1", team.ID, run.ID, "req-redeliver", model.TeamApprovalDecision{
+		Decision: "allow",
+		Reason:   "Known safe command",
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, decided)
+	assert.Equal(t, "allow", decided.Status)
+	require.Len(t, controlSvc.calls, 1)
+	call := controlSvc.calls[0]
+	assert.Equal(t, "user-1", call.userID)
+	assert.Equal(t, pending.EdgeDeviceID, call.deviceID)
+	assert.Equal(t, pending.ID, call.payload.AgentTaskID)
+	assert.Equal(t, "req-redeliver", call.payload.ApprovalID)
+	require.NotNil(t, call.payload.EdgeControl)
+	assert.Equal(t, pending.EdgeRunID, call.payload.EdgeControl.RunID)
+	assert.Equal(t, "allow", call.payload.EdgeControl.Decision)
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+}
+
 func TestAgentTeamService_DecideApprovalRejectsMissingEdgeDeviceForControl(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	controlSvc := &mockAgentTeamControlSvc{}
