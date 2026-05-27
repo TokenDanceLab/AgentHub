@@ -1173,10 +1173,10 @@ pnpm typecheck                                         # 零错误
 
 | 批次 | 范围 | 状态 |
 |------|------|:--:|
-| Batch 1 | CRITICAL 安全——生产 IP + OIDC client ID 脱敏 | 进行中 |
-| Batch 2 | HIGH——服务器别名替换、配置修正、脚本修复 | 待开始 |
-| Batch 3 | API 契约——OpenAPI 幽灵端点、events.md 补齐 | 待开始 |
-| Batch 4 | 文档——死链修复、术语更新、孤儿文件 | 待开始 |
+| Batch 1 | CRITICAL 安全——生产 IP + OIDC client ID 脱敏 | ✅ 完成 |
+| Batch 2 | HIGH——服务器别名替换、配置修正、脚本修复 | ✅ 完成 |
+| Batch 3 | API 契约——OpenAPI 幽灵端点、events.md 补齐 | ✅ 完成 |
+| Batch 4 | 文档——死链修复、术语更新、孤儿文件 | ✅ 完成 |
 
 ---
 
