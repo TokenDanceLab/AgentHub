@@ -341,6 +341,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [auditTrail, setAuditTrail] = useStoredBooleanState('auditTrail', true);
   const [detailLevel, setDetailLevel] = useStoredValueState<SelectValue>('detailLevel', 'detailed');
   const [approvalMode, setApprovalMode] = useStoredValueState<SelectValue>('approvalMode', 'ask');
+  const [defaultAgent, setDefaultAgent] = useStoredValueState<string>('defaultAgent', 'auto');
+  const [routing, setRouting] = useStoredValueState<string>('routing', 'auto');
   const defaultModel = useModelSettingsStore((s) => s.defaultModel);
   const defaultProvider = useModelSettingsStore((s) => s.defaultProvider);
   const modelReasoningEffort = useModelSettingsStore((s) => s.reasoningEffort);
@@ -377,6 +379,14 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
       resolveRunRequestOptions,
     ],
   );
+  const defaultAgentOptions = useMemo<Array<[string, string]>>(() => {
+    const opts: Array<[string, string]> = [['auto', t('settings.defaultAgent.auto')]];
+    for (const agent of agents) {
+      if (agent.status === 'available') opts.push([agent.id, agent.name]);
+    }
+    return opts;
+  }, [agents, t]);
+
   const availableRuntimes = agents.filter((agent) => agent.status === 'available').length;
   const runnerHealth = health?.checks?.runners;
   const runnerItems = runnerHealth?.items ?? [];
@@ -387,6 +397,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     : t('settings.edgeOffline');
   const hubTargets = hubTargetsQuery.data?.items ?? [];
   const hubOnlineTargets = hubTargets.filter(isHubTargetConnected).length;
+  const routingOptions = useMemo<Array<[string, string]>>(() => {
+    const opts: Array<[string, string]> = [['auto', t('settings.defaultAgent.auto')]];
+    for (const target of hubTargets) {
+      if (isHubTargetConnected(target)) opts.push([target.id, target.name]);
+    }
+    return opts;
+  }, [hubTargets, t]);
   const hubHealthyTargets = countTargetsByHealth(hubTargets, 'healthy');
   const hubDegradedTargets = countTargetsByHealth(hubTargets, 'degraded');
   const hubOfflineTargets = countTargetsByHealth(hubTargets, 'offline');
@@ -682,11 +699,33 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'configuration' && (
             <Panel title={t('settings.configuration')} description={t('settings.configurationDesc')}>
-              <SettingRow title={t('settings.defaultAgent')} description="Claude Code / Codex / OpenCode" value="Auto" />
+              <SettingRow
+                title={t('settings.defaultAgent')}
+                description={t('settings.defaultAgentDesc')}
+                control={
+                  <SelectControl
+                    value={defaultAgent}
+                    onChange={(value) => {
+                      setDefaultAgent(value);
+                      writeStoredValue('defaultAgent', value);
+                    }}
+                    options={defaultAgentOptions}
+                  />
+                }
+              />
               <SettingRow
                 title={t('settings.routing')}
                 description={t('settings.routingDesc')}
-                value={t('settings.routingAuto')}
+                control={
+                  <SelectControl
+                    value={routing}
+                    onChange={(value) => {
+                      setRouting(value);
+                      writeStoredValue('routing', value);
+                    }}
+                    options={routingOptions}
+                  />
+                }
               />
               <SettingRow
                 title={t('settings.approvalMode')}

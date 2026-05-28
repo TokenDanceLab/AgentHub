@@ -177,6 +177,8 @@
   "settings.approvalMode.ask": "Ask when needed",
   "settings.approvalMode.auto": "Auto-handle low risk",
   "settings.approvalMode.manual": "Always manual",
+  "settings.defaultAgentDesc": "Select the default agent runtime.",
+  "settings.defaultAgent.auto": "Auto select",
   "settings.permissionsDesc": "Control approval boundaries for file writes, shell commands, networking, remote control, and computer use.",
   "settings.personalizationDesc": "Manage display identity, default instructions, and local work preferences.",
   "settings.displayName": "Display name",
