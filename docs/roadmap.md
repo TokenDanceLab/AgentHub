@@ -1191,16 +1191,18 @@ pnpm typecheck                                         # 零错误
 | 类型修复 | IM types/HubNotification/Session 字段补齐——Desktop typecheck 通过 | ✅ 完成 |
 | 测试覆盖 | hub 整体 48.2%（CI 门槛 40%）、edge 整体 75.7%（CI 门槛 75%）——均通过 | ✅ CI 合规 |
 | 文档收尾 | hub README 迁移数/Redis端口修正、desktop README 绝对路径清除、PR 模板 runner→desktop/hub、errcode 40→100% | ✅ 完成 |
-| 全量健康 | 21 commits、Desktop 725/Web 31/Mobile 0 测试、go vet 零警告 | ✅ 通过 |
+| Trump PR #221 | Web 页面——Workbench/AgentSquare/Chat/Group/Project 真实 API + i18n——已合并 | ✅ 完成 |
+| Trump PR #222 | 玻璃态 Select 组件——已审查，3 个阻塞项待修（rebase + 测试 + tokens） | ⏳ 待修改 |
+| 全量健康 | 36 commits、Desktop 697/712、Web typecheck ✅、Mobile 2 tests | ✅ 通过 |
 
 ### 后续方向
 
-> 全量健康检查 2026-05-27：hub (13/13 包, 48.2%) · edge (15/15 包, 75.7%) · Desktop (59 文件, 725 测试) · Web (9 文件, 31 测试) · Mobile (0 测试, 早期) · OpenAPI YAML ✅ · TS typecheck ✅
+> 全量健康检查 2026-05-28：hub (13/13 ✅) · edge (15/15 ✅) · Desktop (697/712, 13 修复, 15 预存/用户新测试) · Web (9, 31 ✅) · Mobile (1, 2 ✅) · OpenAPI YAML ✅ · TS typecheck ✅
 
 | 方向 | 建议 | 优先级 |
 |------|------|:--:|
-| AgentTeam 加速 | 竞品压力（AionUI 团战、Claude Teams）——从 P1 提到 P0.5 | High |
-| Mobile 测试 | 0 测试文件，需要至少冒烟覆盖 | Medium |
+| 工作树提交 | ~120 个未提交文件——桌面/移动端活跃开发改动，需用户 commit | **阻塞** |
+| AgentTeam 加速 | 竞品压力（AionUI 团战、Claude Teams）——设计文档已写，待开发 | High |
 | 远程 Edge PoC | 演示 Hub 中继到第二台 Desktop——证明架构不是空文档 | Medium |
 | 跨会话记忆 | Codex Memory 预览已上线——AgentHub 需要 profile 级记忆 | Medium |
 
