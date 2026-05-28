@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import IMView from '@/views/IMView';
 
-// jsdom does not implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();
 
 const {
@@ -28,10 +27,9 @@ const {
   mockRecallMessage: vi.fn(async () => ({ ok: true })),
 }));
 
-// Mock useIMChat
 vi.mock('@/hooks/useIMChat', () => ({
   useIMChat: vi.fn(() => ({
-    messages: new Map(),
+    messages: [],
     contacts: [
       { id: 'c1', name: 'Alice', type: 'user' as const, online: true },
       { id: 'c2', name: 'Bob', type: 'user' as const, online: false },
@@ -84,26 +82,17 @@ vi.mock('@/hooks/useIMChat', () => ({
             { id: 'c2', name: 'Bob', type: 'user' as const, online: false },
           ],
     ),
-    // Trump IM additions
-    friendRequests: [],
-    notifications: [],
-    acceptFriendRequest: vi.fn(),
-    rejectFriendRequest: vi.fn(),
-    markNotificationRead: vi.fn(),
-    markAllNotificationsRead: vi.fn(),
-    recallMessage: vi.fn(),
-    loadSessionMessages: vi.fn(),
-    createPrivateSession: vi.fn(),
-    createGroupSession: vi.fn(),
     selectContact: vi.fn(),
-    actionState: {},
+    activeSessionId: null,
+    sessionReadError: null,
+    label: (key: string, fallback: string) => fallback,
+    actionPending: () => false,
   })),
 }));
 
-// Mock useHubStore
 vi.mock('@/stores/hubStore', () => ({
-  useHubStore: vi.fn((selector?: (s: { authenticated: boolean; userId: string | null; username: string | null }) => unknown) => {
-    const state = { authenticated: true, userId: 'user-1', username: 'testuser' };
+  useHubStore: vi.fn((selector?: (s: { authenticated: boolean; userId: string | null }) => unknown) => {
+    const state = { authenticated: true, userId: 'user-1' };
     return selector ? selector(state) : state;
   }),
 }));
@@ -113,13 +102,19 @@ describe('IMView', () => {
     vi.clearAllMocks();
   });
 
-  it('renders contact list with contacts', () => {
+  it('renders with contacts', () => {
     render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
     expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText('Bob')).toBeInTheDocument();
   });
 
-  it('renders contacts sidebar header', () => {
+  it('shows empty state when no conversations', () => {
+    const { useIMChat } = require('@/hooks/useIMChat');
+    vi.mocked(useIMChat).mockReturnValue({
+      ...vi.mocked(useIMChat)(),
+      contacts: [],
+      status: 'loaded' as const,
+    } as never);
     render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
     expect(screen.getByText('Contacts')).toBeInTheDocument();
   });
@@ -160,10 +155,8 @@ describe('IMView', () => {
 
   it('has message input enabled after selecting a contact', () => {
     render(<IMView online={false} isConnected={false} isStreaming={false} isMobile={false} isTablet={false} />);
-    // Click on the first contact (Alice) to select it
     const contact = screen.getByRole('option', { name: /Alice/i });
     fireEvent.click(contact);
-    // After selection, the message input should appear and be enabled
     const input = screen.getByRole('textbox', { name: 'Message input' });
     expect(input).toBeInTheDocument();
     expect(input).not.toBeDisabled();

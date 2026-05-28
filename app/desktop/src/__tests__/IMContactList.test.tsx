@@ -153,7 +153,6 @@ describe('IMContactList', () => {
     await waitFor(() =>
       expect(onCreateGroupSession).toHaveBeenCalledWith('Build Room', ['friend-1', 'friend-2']),
     );
-  });
 
   it('highlights selected contact', () => {
     const contacts = [makeContact({ id: 'c1', name: 'Alice' })];
