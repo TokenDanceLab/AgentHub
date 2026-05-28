@@ -1,21 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BINDING_IDS, getBinding } from '@/stores/keybindingStore';
 import styles from './ShortcutHelp.module.css';
-
-interface Shortcut {
-  keys: string[];
-  description: string;
-}
-
-const SHORTCUTS: Shortcut[] = [
-  { keys: ['Ctrl', 'K'], description: 'shortcut.search' },
-  { keys: ['⌘/Ctrl', 'B'], description: 'shortcut.toggleSidebar' },
-  { keys: ['⌘/Ctrl', 'J'], description: 'shortcut.toggleRunPanel' },
-  { keys: ['Enter'], description: 'shortcut.send' },
-  { keys: ['Shift', 'Enter'], description: 'shortcut.newline' },
-  { keys: ['Escape'], description: 'shortcut.close' },
-  { keys: ['?'], description: 'shortcut.help' },
-];
 
 interface Props {
   open: boolean;
@@ -93,21 +79,24 @@ export default function ShortcutHelp({ open, onClose }: Props) {
 
         <table className={styles.table}>
           <tbody>
-            {SHORTCUTS.map((sc) => (
-              <tr key={sc.description} className={styles.row}>
-                <td className={styles.keys}>
-                  {sc.keys.map((key, i) => (
-                    <span key={key}>
-                      <kbd className={styles.kbd}>{key}</kbd>
-                      {i < sc.keys.length - 1 && (
-                        <span className={styles.plus}>+</span>
-                      )}
-                    </span>
-                  ))}
-                </td>
-                <td className={styles.desc}>{t(sc.description)}</td>
-              </tr>
-            ))}
+            {BINDING_IDS.map((id) => {
+              const keys = getBinding(id);
+              return (
+                <tr key={id} className={styles.row}>
+                  <td className={styles.keys}>
+                    {keys.map((key, i) => (
+                      <span key={key}>
+                        <kbd className={styles.kbd}>{key}</kbd>
+                        {i < keys.length - 1 && (
+                          <span className={styles.plus}>+</span>
+                        )}
+                      </span>
+                    ))}
+                  </td>
+                  <td className={styles.desc}>{t(`shortcut.${id}`)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
