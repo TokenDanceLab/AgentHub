@@ -1329,3 +1329,57 @@
     text-align: left;
   }
 }
+
+.shortcutRowRecording {
+  background: rgba(59, 130, 246, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+[data-theme='dark'] .shortcutRowRecording {
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.25);
+}
+
+.recordingHint {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.restoreButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.48);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.restoreButton:hover {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+[data-theme='dark'] .restoreButton {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+[data-theme='dark'] .restoreButton:hover {
+  background: rgba(255, 255, 255, 0.085);
+  border-color: rgba(255, 255, 255, 0.14);
+}
