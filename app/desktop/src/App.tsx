@@ -35,6 +35,8 @@ import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
 import { useHubStore } from '@/stores/hubStore';
+import { getBinding } from '@/stores/keybindingStore';
+import { matchesBinding } from '@/utils/keybinding';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
@@ -496,17 +498,16 @@ export default function App() {
       }
       if (isEditableShortcutTarget(e.target)) return;
 
-      const shellModifier = e.ctrlKey || e.metaKey;
-      if (shortcutHelpOpen && !(e.key === '?' && !shellModifier)) return;
-      if (e.key === '?' && !shellModifier) {
+      if (shortcutHelpOpen && !matchesBinding(e, getBinding('help'))) return;
+      if (matchesBinding(e, getBinding('help'))) {
         e.preventDefault();
         setShortcutHelpOpen((v) => !v);
       }
-      if (shellModifier && e.key.toLowerCase() === 'b' && !workspaceExpanded && !isMobile) {
+      if (matchesBinding(e, getBinding('toggleSidebar')) && !workspaceExpanded && !isMobile) {
         e.preventDefault();
         setLeftSidebarCollapsed(!leftSidebarCollapsed);
       }
-      if (shellModifier && e.key.toLowerCase() === 'j' && displayedRun && !workspaceExpanded && !isMobile) {
+      if (matchesBinding(e, getBinding('toggleRunPanel')) && displayedRun && !workspaceExpanded && !isMobile) {
         e.preventDefault();
         setRightPanelOpen(!rightPanelOpen);
       }
