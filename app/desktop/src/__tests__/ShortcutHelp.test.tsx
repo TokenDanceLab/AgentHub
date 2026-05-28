@@ -15,7 +15,9 @@ describe('ShortcutHelp', () => {
 
     expect(screen.getByText('shortcut.toggleSidebar')).toBeInTheDocument();
     expect(screen.getByText('shortcut.toggleRunPanel')).toBeInTheDocument();
-    expect(screen.getAllByText('⌘/Ctrl')).toHaveLength(2);
+    expect(screen.getAllByText('Ctrl')).toHaveLength(3);
+    expect(screen.getByText('B')).toBeInTheDocument();
+    expect(screen.getByText('J')).toBeInTheDocument();
   });
 
   it('closes on Escape', () => {

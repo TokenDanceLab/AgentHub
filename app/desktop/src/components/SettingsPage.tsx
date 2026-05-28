@@ -54,6 +54,9 @@ import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
 import type { ExecutionTarget, ExecutionTargetHealthState, ExecutionTargetType } from '@/api/hubClient';
 import styles from './SettingsPage.module.css';
 import { Select } from '@shared/ui';
+import { useKeybindingStore, BINDING_IDS, getBinding, type BindingId } from '@/stores/keybindingStore';
+import { keysFromEvent } from '@/utils/keybinding';
+import { useToastStore } from '@/stores/toastStore';
 
 export type SectionId =
   | 'general'
@@ -101,11 +104,6 @@ interface NavItem {
   label: string;
   icon: ReactNode;
   group: 'workspace' | 'automation' | 'system';
-}
-
-interface ShortcutRow {
-  keys: string[];
-  action: string;
 }
 
 interface ProjectSkill {
@@ -299,6 +297,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const bridgedTasks = useTaskBridgeStore((s) => s.tasks);
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const username = useHubStore((s) => s.username);
+  const addToast = useToastStore((s) => s.addToast);
   const [active, setActive] = useState<SectionId>(initialSection);
   const [navSearch, setNavSearch] = useState('');
   const navSearchRef = useRef<HTMLInputElement>(null);
@@ -322,6 +321,36 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   useEffect(() => {
     mainRef.current?.scrollTo(0, 0);
   }, [active]);
+
+  const [recordingBinding, setRecordingBinding] = useState<BindingId | null>(null);
+
+  // Keybinding recording: capture keydown when a binding row is clicked
+  useEffect(() => {
+    if (!recordingBinding) return;
+    const handler = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const keys = keysFromEvent(e);
+      if (keys.length > 0 && keys.some((k) => !['Ctrl', '⌘', 'Shift', 'Alt'].includes(k))) {
+        useKeybindingStore.getState().setBinding(recordingBinding, keys);
+        setRecordingBinding(null);
+      }
+    };
+    const cancel = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setRecordingBinding(null);
+    };
+    window.addEventListener('keydown', handler, true);
+    window.addEventListener('keydown', cancel);
+    return () => {
+      window.removeEventListener('keydown', handler, true);
+      window.removeEventListener('keydown', cancel);
+    };
+  }, [recordingBinding]);
+
+  const handleRestoreDefaults = useCallback(() => {
+    useKeybindingStore.getState().resetAll();
+    addToast({ type: 'success', message: t('settings.keyboard.restored') });
+  }, [addToast, t]);
 
   const [compactMode, setCompactMode] = useStoredBooleanState('compactMode', false);
   const [autoReview, setAutoReview] = useStoredBooleanState('autoReview', true);
@@ -546,15 +575,15 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   }, [filteredNavItems]);
 
   const activeLabel = navItems.find((item) => item.id === active)?.label ?? t('settings.title');
-  const shortcuts: ShortcutRow[] = [
-    { keys: ['Enter'], action: t('shortcut.send') },
-    { keys: ['Shift', 'Enter'], action: t('shortcut.newline') },
-    { keys: ['Ctrl', 'K'], action: t('shortcut.search') },
-    { keys: ['⌘/Ctrl', 'B'], action: t('shortcut.toggleSidebar') },
-    { keys: ['⌘/Ctrl', 'J'], action: t('shortcut.toggleRunPanel') },
-    { keys: ['Esc'], action: t('shortcut.close') },
-    { keys: ['?'], action: t('shortcut.help') },
-  ];
+  const ACTION_LABELS: Record<BindingId, string> = {
+    send: t('shortcut.send'),
+    newline: t('shortcut.newline'),
+    search: t('shortcut.search'),
+    toggleSidebar: t('shortcut.toggleSidebar'),
+    toggleRunPanel: t('shortcut.toggleRunPanel'),
+    close: t('shortcut.close'),
+    help: t('shortcut.help'),
+  };
 
   const setBooleanSetting = (key: string, setter: (value: boolean) => void) => (value: boolean) => {
     setter(value);
@@ -1274,17 +1303,38 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           {active === 'keyboard' && (
             <Panel title={t('settings.keyboard')} description={t('settings.keyboardDesc')}>
               <div className={styles.shortcutTable}>
-                {shortcuts.map((shortcut) => (
-                  <div key={`${shortcut.keys.join('+')}-${shortcut.action}`} className={styles.shortcutRow}>
-                    <span>{shortcut.action}</span>
-                    <div>
-                      {shortcut.keys.map((key) => (
-                        <kbd key={key}>{key}</kbd>
-                      ))}
+                {BINDING_IDS.map((id) => {
+                  const keys = getBinding(id);
+                  const isRecording = recordingBinding === id;
+                  return (
+                    <div
+                      key={id}
+                      className={`${styles.shortcutRow} ${isRecording ? styles.shortcutRowRecording : ''}`}
+                      onClick={() => setRecordingBinding(isRecording ? null : id)}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={t('settings.keyboard.clickToRebind')}
+                      title={t('settings.keyboard.clickToRebind')}
+                    >
+                      <span>{ACTION_LABELS[id]}</span>
+                      <div>
+                        {isRecording ? (
+                          <span className={styles.recordingHint}>{t('settings.keyboard.recording')}</span>
+                        ) : (
+                          keys.map((key) => <kbd key={key}>{key}</kbd>)
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+              <button
+                type="button"
+                className={styles.restoreButton}
+                onClick={handleRestoreDefaults}
+              >
+                {t('settings.keyboard.restoreDefaults')}
+              </button>
             </Panel>
           )}
 
