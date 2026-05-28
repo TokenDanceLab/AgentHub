@@ -9,3 +9,5 @@ export { SearchInput } from './SearchInput';
 export { CollapsibleBlock } from './CollapsibleBlock';
 export { TextShimmer } from './TextShimmer';
 export { Tooltip } from './Tooltip';
+export { Select } from './Select';
+export type { SelectProps } from './Select';
