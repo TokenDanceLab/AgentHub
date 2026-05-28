@@ -325,6 +325,8 @@
   "settings.approvalMode.ask": "需要时询问",
   "settings.approvalMode.auto": "自动处理低风险项",
   "settings.approvalMode.manual": "始终手动",
+  "settings.defaultAgentDesc": "选择默认的 Agent 运行时。",
+  "settings.defaultAgent.auto": "自动选择",
   "settings.permissionsDesc": "控制文件写入、命令执行、联网、远控和电脑操控的审批边界。",
   "settings.personalizationDesc": "管理显示身份、默认指令和个人工作习惯。",
   "settings.displayName": "显示名称",
