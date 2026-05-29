@@ -392,6 +392,17 @@ async function collectMetrics(page, { mobile = false } = {}) {
     const nestedThreadActionButtons = threadButtons
       .map((button) => button.querySelectorAll("button").length)
       .reduce((sum, count) => sum + count, 0);
+    const searchDialog = Array.from(document.querySelectorAll("[class*='dialog']")).find((el) => {
+      const text = el.textContent || "";
+      return text.includes("Search messages") || text.includes("Desktop glass shell");
+    });
+    const searchDialogRect = searchDialog?.getBoundingClientRect();
+    const searchResultButtons = Array.from(document.querySelectorAll("button[aria-label*='Desktop glass shell'], button[aria-label*='Visual QA covers']"));
+    const visibleSearchResultButtons = searchResultButtons.filter((button) => {
+      const rect = button.getBoundingClientRect();
+      const style = window.getComputedStyle(button);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
 
     return {
       title: document.title,
@@ -415,6 +426,13 @@ async function collectMetrics(page, { mobile = false } = {}) {
       threadRowButtonCount: threadButtons.length,
       visibleThreadRowButtonCount: visibleThreadButtons.length,
       nestedThreadActionButtons,
+      searchDialog: searchDialogRect
+        ? {
+            width: Math.round(searchDialogRect.width),
+            height: Math.round(searchDialogRect.height),
+          }
+        : null,
+      visibleSearchResultButtonCount: visibleSearchResultButtons.length,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -509,6 +527,19 @@ async function visitAndCapture(page, scene) {
     await page.getByRole("button", { name: /Bash completed/i }).click();
     await page.getByText("Web visual QA passed (10 scenes)").waitFor({ state: "visible", timeout: 5000 });
   }
+  if (scene.openSearch) {
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+KeyK" : "Control+KeyK");
+    await page.getByPlaceholder("Search messages...").waitFor({ state: "visible", timeout: 5000 });
+    await page.getByPlaceholder("Search messages...").fill("Desktop glass");
+    await page.waitForFunction(() => {
+      const buttons = Array.from(document.querySelectorAll("button[aria-label*='Desktop glass shell'], button[aria-label*='Visual QA covers']"));
+      return buttons.some((button) => {
+        const rect = button.getBoundingClientRect();
+        const style = window.getComputedStyle(button);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      });
+    }, undefined, { timeout: 5000 });
+  }
   if (scene.emptyAgents) {
     await page.getByText("No runtimes available").waitFor({ state: "visible", timeout: 5000 });
   }
@@ -527,6 +558,10 @@ async function visitAndCapture(page, scene) {
   if (scene.verifyThreadRows) {
     assert(metrics.visibleThreadRowButtonCount === 2, `${scene.name}: shared thread rows should expose two visible selectable buttons`, metrics);
     assert(metrics.nestedThreadActionButtons === 0, `${scene.name}: thread row actions must not nest buttons inside the selectable row`, metrics);
+  }
+  if (scene.openSearch) {
+    assert(metrics.searchDialog, `${scene.name}: search dialog should be visible`, metrics);
+    assert(metrics.visibleSearchResultButtonCount >= 1, `${scene.name}: search results should render as selectable rows`, metrics);
   }
 
   return { screenshotPath, metrics };
@@ -585,6 +620,15 @@ async function main() {
       language: "en",
       theme: "dark",
       verifyThreadRows: true,
+    },
+    {
+      name: "web-design-search-dialog-desktop-1440x920",
+      path: "/",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openSearch: true,
     },
     {
       name: "web-design-run-detail-tool-call-desktop-1440x920",
