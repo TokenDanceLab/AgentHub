@@ -194,6 +194,15 @@ export default function WebLayout() {
   const eventRunDetail = useMemo(() => projectRunEvents(taskRunEvents), [taskRunEvents]);
   const runDetail = taskRunEvents.length > 0 ? eventRunDetail : chatRunDetail;
   const { outputText, toolCalls, changedFiles } = runDetail;
+  const hasProjectedRunDetail = outputText.length > 0 || toolCalls.length > 0 || changedFiles.length > 0;
+  const projectedRun = hasProjectedRunDetail
+    ? {
+        runId: selectedThreadId ?? 'hub-thread',
+        projectId: selectedThread?.projectId ?? 'hub',
+        threadId: selectedThreadId ?? selectedThread?.threadId ?? 'hub-thread',
+        status: 'finished',
+      }
+    : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -476,10 +485,11 @@ export default function WebLayout() {
       allMessages: hubMessages,
       threadsCount: threads.length,
       requests: [],
-      run: optimisticRun,
-      toolCalls: optimisticRun ? toolCalls : [],
-      changedFiles: optimisticRun ? changedFiles : [],
+      run: optimisticRun ?? projectedRun,
+      toolCalls,
+      changedFiles,
       outputText,
+      chatMessages: hubMessages,
       onSelectAgent: handleSelectAgent,
       onSelect: handleSelectThread,
       onRetry: () => {
@@ -509,6 +519,7 @@ export default function WebLayout() {
       hubRealtime.status,
       online,
       optimisticRun,
+      projectedRun,
       outputText,
       toolCalls,
       changedFiles,

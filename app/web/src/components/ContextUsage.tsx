@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   breakdownContext,
   toSegments,
@@ -6,6 +7,7 @@ import {
   formatCost,
   type SessionMetrics,
 } from '@shared/context/breakdown';
+import { MetricGrid } from '@shared/ui';
 import styles from './ContextUsage.module.css';
 
 const SEGMENT_COLORS: Record<string, string> = {
@@ -16,20 +18,13 @@ const SEGMENT_COLORS: Record<string, string> = {
   other: 'var(--muted-foreground)',
 };
 
-const SEGMENT_LABELS: Record<string, string> = {
-  system: 'System',
-  user: 'User',
-  assistant: 'Assistant',
-  tool: 'Tool',
-  other: 'Other',
-};
-
 interface Props {
   metrics: SessionMetrics | null;
   compact?: boolean;
 }
 
 export default function ContextUsage({ metrics, compact = false }: Props) {
+  const { t } = useTranslation();
   const breakdown = useMemo(() => {
     if (!metrics || !metrics.inputTokens) return null;
     return breakdownContext(metrics.messages ?? [], metrics.inputTokens);
@@ -84,6 +79,12 @@ export default function ContextUsage({ metrics, compact = false }: Props) {
     );
   }
 
+  const metricItems = [
+    { id: 'input', value: formatTokens(metrics.inputTokens), label: t('run.context.input') },
+    { id: 'output', value: formatTokens(metrics.outputTokens), label: t('run.context.output') },
+    { id: 'total', value: formatTokens(metrics.totalTokens), label: t('run.context.total') },
+  ];
+
   return (
     <div className={containerClass}>
       {/* Context bar */}
@@ -103,25 +104,20 @@ export default function ContextUsage({ metrics, compact = false }: Props) {
       {/* Percentage display */}
       {usagePercent != null && (
         <div className={styles.usageText}>
-          {usagePercent}% of {formatTokens(metrics.contextLimit ?? 200000)} context used
+          {t('run.context.usage', {
+            percent: usagePercent,
+            limit: formatTokens(metrics.contextLimit ?? 200000),
+          })}
         </div>
       )}
 
-      {/* Token counts */}
-      <div className={styles.statsGrid}>
-        <div className={styles.statRow}>
-          <span className={styles.statLabel}>Input</span>
-          <span className={styles.statValue}>{formatTokens(metrics.inputTokens)}</span>
-        </div>
-        <div className={styles.statRow}>
-          <span className={styles.statLabel}>Output</span>
-          <span className={styles.statValue}>{formatTokens(metrics.outputTokens)}</span>
-        </div>
-        <div className={styles.statRow}>
-          <span className={styles.statLabel}>Total</span>
-          <span className={styles.statValue}>{formatTokens(metrics.totalTokens)}</span>
-        </div>
-      </div>
+      <MetricGrid
+        className={styles.statsGrid ?? ''}
+        itemClassName={styles.statRow ?? ''}
+        valueClassName={styles.statValue ?? ''}
+        labelClassName={styles.statLabel ?? ''}
+        items={metricItems}
+      />
 
       {/* Role breakdown legend */}
       {segments.length > 0 && (
@@ -132,7 +128,7 @@ export default function ContextUsage({ metrics, compact = false }: Props) {
                 className={styles.legendDot}
                 style={{ backgroundColor: SEGMENT_COLORS[seg.key] }}
               />
-              <span className={styles.legendLabel}>{SEGMENT_LABELS[seg.key]}</span>
+              <span className={styles.legendLabel}>{t(`run.context.segment.${seg.key}`)}</span>
               <span className={styles.legendValue}>
                 {formatTokens(seg.tokens)} ({seg.percent}%)
               </span>
@@ -145,7 +141,7 @@ export default function ContextUsage({ metrics, compact = false }: Props) {
       {metrics.totalCost != null && (
         <div className={styles.costRow}>
           <span className={styles.costLabel}>
-            {[metrics.provider, metrics.model].filter(Boolean).join(' / ') || 'Cost'}
+            {[metrics.provider, metrics.model].filter(Boolean).join(' / ') || t('run.context.cost')}
           </span>
           <span className={styles.costValue}>{formatCost(metrics.totalCost)}</span>
         </div>
