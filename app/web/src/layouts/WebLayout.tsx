@@ -34,6 +34,7 @@ import { useHubMainChat } from '@/hooks/useHubMainChat';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { useHealth } from '@/hooks/useHealth';
 import { useHubWSConnection } from '@/hooks/useHubWSConnection';
+import { TokenDanceMark } from '@shared/ui';
 import { getSurfaceByWebRoute, getSurfaceMetadata, getSurfaceStatusMetadata, type SurfaceMetadata } from '@shared/surfaceMetadata';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { AppError } from '@shared/errors';
@@ -50,7 +51,6 @@ import AuthPage from '@/components/AuthPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import SettingsPage from '@/components/SettingsPage';
 import { ToastContainer } from '@/components/Toast';
-import tokenDanceLogo from '@shared/assets/tokendance-icon-rounded.svg';
 import styles from './WebLayout.module.css';
 
 type MainSurface = 'workspace' | 'messages' | 'settings';
@@ -535,7 +535,7 @@ export default function WebLayout() {
               </button>
             )}
 
-            <img className={styles.brandMark} src={tokenDanceLogo} alt="" aria-hidden="true" />
+            <TokenDanceMark className={styles.brandMark} alt="" aria-hidden="true" />
             <div className={styles.brandText}>
               <strong>AgentHub</strong>
               <span>{t('webShell.brand.subtitle')}</span>
