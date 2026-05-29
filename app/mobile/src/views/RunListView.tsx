@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listRuns } from "@agenthub/shared";
 import type { Run, RunStatus } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
+import { EmptyState } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, ArrowRight, CheckCircle2, Clock3, GitPullRequestArrow, Play, Radio, RefreshCw, ShieldAlert, TerminalSquare, UserRound } from "lucide-react";
@@ -281,23 +282,25 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
         )}
 
         {!runs.isLoading && !runs.isError && items.length === 0 && (
-          <div className="mobileCenterState">
-            <Play size={32} />
-            <strong>{t("queue.runs.emptyTitle")}</strong>
-            <p>{t("queue.runs.emptyDescription")}</p>
-          </div>
+          <EmptyState
+            icon={<Play size={24} />}
+            title={t("queue.runs.emptyTitle")}
+            description={t("queue.runs.emptyDescription")}
+            className="mobileCenterState"
+            iconClassName="mobileEmptyIcon"
+          />
         )}
 
         {!runs.isLoading && !runs.isError && items.length > 0 && visibleItems.length === 0 && (
-          <div className="mobileCenterState">
-            <TerminalSquare size={32} />
-            <strong>{t("queue.runs.emptyFilterTitle", { filter: t(`queue.common.${filter}`) })}</strong>
-            <p>{t("queue.runs.emptyFilterDescription")}</p>
-            <button className="mobileActionButton" type="button" onClick={() => setFilter("all")}>
-              <Play size={16} />
-              <span>{t("queue.common.showAll")}</span>
-            </button>
-          </div>
+          <EmptyState
+            icon={<TerminalSquare size={24} />}
+            title={t("queue.runs.emptyFilterTitle", { filter: t(`queue.common.${filter}`) })}
+            description={t("queue.runs.emptyFilterDescription")}
+            className="mobileCenterState"
+            iconClassName="mobileEmptyIcon"
+            actionClassName="mobileActionButton"
+            action={{ label: t("queue.common.showAll"), icon: <Play size={16} />, onClick: () => setFilter("all") }}
+          />
         )}
 
         {!runs.isError && (

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listThreads } from "@agenthub/shared";
 import type { Thread } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
+import { EmptyState } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, UserRound, ArrowRight } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
@@ -216,23 +217,25 @@ export function ThreadListView({ onThreadSelect, onOpenAccount }: ThreadListView
         )}
 
         {!threads.isLoading && !threads.isError && items.length === 0 && (
-          <div className="mobileCenterState">
-            <MessageSquare size={32} />
-            <strong>{t("queue.threads.emptyTitle")}</strong>
-            <p>{t("queue.threads.emptyDescription")}</p>
-          </div>
+          <EmptyState
+            icon={<MessageSquare size={24} />}
+            title={t("queue.threads.emptyTitle")}
+            description={t("queue.threads.emptyDescription")}
+            className="mobileCenterState"
+            iconClassName="mobileEmptyIcon"
+          />
         )}
 
         {!threads.isLoading && !threads.isError && items.length > 0 && visibleItems.length === 0 && (
-          <div className="mobileCenterState">
-            <Archive size={32} />
-            <strong>{t("queue.threads.emptyFilterTitle", { filter: t(`queue.common.${filter}`) })}</strong>
-            <p>{t("queue.threads.emptyFilterDescription")}</p>
-            <button className="mobileActionButton" type="button" onClick={() => setFilter("all")}>
-              <Play size={16} />
-              <span>{t("queue.common.showAll")}</span>
-            </button>
-          </div>
+          <EmptyState
+            icon={<Archive size={24} />}
+            title={t("queue.threads.emptyFilterTitle", { filter: t(`queue.common.${filter}`) })}
+            description={t("queue.threads.emptyFilterDescription")}
+            className="mobileCenterState"
+            iconClassName="mobileEmptyIcon"
+            actionClassName="mobileActionButton"
+            action={{ label: t("queue.common.showAll"), icon: <Play size={16} />, onClick: () => setFilter("all") }}
+          />
         )}
 
         {!threads.isError && (
