@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -209,6 +210,40 @@ func TestHandleTaskStreamRejectsOversizedEdgeRunID(t *testing.T) {
 
 	var messageCount int64
 	require.NoError(t, db.Model(&model.Message{}).Count(&messageCount).Error)
+	require.Zero(t, messageCount)
+}
+
+func TestHandleTaskStreamRejectsRunEventWhenTaskEventCapReached(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	maxRunEventsPerTask := config.MaxRunEventsPerTask
+
+	events := make([]model.AgentRunEvent, 0, maxRunEventsPerTask)
+	for seq := int64(1); seq <= maxRunEventsPerTask; seq++ {
+		events = append(events, model.AgentRunEvent{
+			TaskID:          "task-1",
+			EdgeRunID:       "run-1",
+			SessionID:       "sess-1",
+			AgentInstanceID: "agent-1",
+			EventSeq:        seq,
+			EventType:       model.RunEventTypeOutputBatch,
+			Payload:         `{"content":"previous"}`,
+		})
+	}
+	require.NoError(t, db.CreateInBatches(events, 256).Error)
+
+	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
+		Payload:     json.RawMessage(`{"type":"run.output.batch","content":"overflow"}`),
+		ClientMsgID: "22222222-2222-4222-8222-222222222222",
+	})
+	require.ErrorIs(t, err, errcode.ErrBadRequest)
+
+	var eventCount int64
+	require.NoError(t, db.Model(&model.AgentRunEvent{}).Where("task_id = ?", "task-1").Count(&eventCount).Error)
+	require.Equal(t, maxRunEventsPerTask, eventCount)
+
+	var messageCount int64
+	require.NoError(t, db.Model(&model.Message{}).Where("session_id = ?", "sess-1").Count(&messageCount).Error)
 	require.Zero(t, messageCount)
 }
 
