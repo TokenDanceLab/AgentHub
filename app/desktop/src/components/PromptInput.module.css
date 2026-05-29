@@ -762,6 +762,38 @@
   padding: 8px 0 0;
 }
 
+.workTargetGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 24px;
+}
+
+.workTargetGroupHeader > span {
+  min-width: 0;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 520;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workTargetGroupHeader button {
+  border: 0;
+  background: transparent;
+  color: var(--composer-control-text);
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 2px 0;
+}
+
+.workTargetGroupHeader button:hover {
+  color: var(--foreground);
+}
+
 .workTargetEmpty {
   padding: 8px 9px;
 }
