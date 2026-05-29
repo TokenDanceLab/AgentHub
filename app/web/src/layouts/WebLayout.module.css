@@ -399,7 +399,7 @@
   text-transform: uppercase;
 }
 
-.routeContextHeader h1 {
+.routeContextTitle {
   margin: 0;
   color: var(--foreground);
   font-size: 15px;
@@ -431,21 +431,21 @@
   background: rgba(255, 255, 255, 0.025);
 }
 
-.routeMetric strong,
-.routeMetric span {
+.routeMetricValue,
+.routeMetricLabel {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.routeMetric strong {
+.routeMetricValue {
   color: var(--foreground);
   font-size: 14px;
   font-weight: 650;
   line-height: 1.25;
 }
 
-.routeMetric span {
+.routeMetricLabel {
   color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 620;
