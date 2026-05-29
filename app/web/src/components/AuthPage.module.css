@@ -1,52 +1,73 @@
-/* ═══════════════════════════════════════════════════════
-   AuthPage + LoginForm + RegisterForm
-   macOS-style modal — soft glass backdrop, unified inputs
-   ═══════════════════════════════════════════════════════ */
-
-/* ── AuthPage shell ───────────────────────── */
 .page {
   display: flex;
   flex-direction: column;
-  padding: 28px;
   min-width: 360px;
   max-width: 420px;
+  padding: 26px;
   position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 14px;
+  background: rgba(37, 37, 45, 0.92);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  color: var(--foreground);
+  backdrop-filter: blur(28px) saturate(1.12);
+  -webkit-backdrop-filter: blur(28px) saturate(1.12);
 }
 
 .closeBtn {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: #8E8E93;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted-foreground);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.closeBtn:hover { background: rgba(0,0,0,0.05); }
+.closeBtn:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--foreground);
+}
 
-/* ── Header ───────────────────────────────── */
-.header { text-align: center; margin-bottom: 20px; }
-.logo {
-  width: 40px; height: 40px;
-  border-radius: 10px;
-  background: var(--primary);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 16px;
-  margin-bottom: 10px;
+.header {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  margin-bottom: 18px;
+  padding-inline: 34px;
+  text-align: center;
 }
-.appName { font-size: 18px; font-weight: 600; margin: 0; }
-.tagline { font-size: 12px; color: #8E8E93; margin: 4px 0 0; }
+.logo {
+  display: block;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 12px 28px rgba(0, 113, 188, 0.18);
+}
+.appName {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 620;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+.tagline {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.4;
+}
 
 /* ── Segmented tab switch ─────────────────── */
 .tabs {
@@ -90,15 +111,15 @@
 .label {
   font-size: 12px;
   font-weight: 500;
-  color: #8E8E93;
+  color: var(--muted-foreground);
 }
 
 /* ── Input — unified borderless style ─────── */
 .input {
   padding: 10px 14px;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.065);
   border-radius: 10px;
-  background: rgba(0,0,0,0.04);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--foreground);
   font-size: 14px;
   font-family: var(--font-sans);
@@ -110,8 +131,8 @@
 }
 .input::placeholder { color: #B0B0B5; }
 .input:focus {
-  background: rgba(0,0,0,0.02);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.10);
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: 0 0 0 3px rgba(93, 104, 204, 0.18);
 }
 .input:disabled { opacity: 0.5; }
 .inputError { box-shadow: 0 0 0 1px rgba(239,68,68,0.3); }
@@ -128,7 +149,7 @@
   right: 10px;
   border: none;
   background: transparent;
-  color: #B0B0B5;
+  color: var(--muted-foreground);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -140,10 +161,12 @@
   color: #DC2626;
 }
 .errorBanner {
-  padding: 8px 12px;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.18);
   border-radius: 8px;
-  background: rgba(239,68,68,0.06);
-  color: #DC2626;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--foreground);
   font-size: 12px;
   display: flex;
   align-items: center;
@@ -153,17 +176,17 @@
 .submitButton {
   margin-top: 4px;
   padding: 10px 0;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
-  background: #111827;
-  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--foreground);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, transform 0.1s;
   width: 100%;
 }
-.submitButton:hover { background: #1F2937; }
+.submitButton:hover { background: rgba(255, 255, 255, 0.1); }
 .submitButton:active { transform: scale(0.98); }
 .submitButton:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -173,13 +196,13 @@
   align-items: center;
   gap: 10px;
   margin: 2px 0;
-  color: #8E8E93;
+  color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 500;
 }
 .identityDivider span {
   height: 1px;
-  background: rgba(0,0,0,0.08);
+  background: rgba(255, 255, 255, 0.08);
 }
 .identityDivider strong {
   font: inherit;
@@ -188,13 +211,11 @@
 
 .identityButton {
   min-height: 44px;
-  border: 1px solid rgba(255,255,255,0.64);
-  border-radius: 12px;
-  background: rgba(255,255,255,0.78);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.95),
-    0 10px 28px rgba(15,23,42,0.08);
-  color: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: none;
+  color: var(--foreground);
   font-size: 14px;
   font-weight: 650;
   cursor: pointer;
@@ -202,30 +223,32 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
   width: 100%;
 }
 .identityButton:hover {
-  border-color: rgba(0,122,255,0.28);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.95),
-    0 12px 32px rgba(0,122,255,0.12);
+  border-color: rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.085);
 }
 .identityButton:focus-visible {
   outline: none;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.95),
-    0 0 0 3px rgba(0,122,255,0.16),
-    0 12px 32px rgba(0,122,255,0.12);
+  box-shadow: 0 0 0 3px rgba(93, 104, 204, 0.2);
 }
 .identityButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
+.identityIcon {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  flex: 0 0 auto;
+}
+
 .identityHint {
   margin: -2px 0 0;
-  color: #6B7280;
+  color: var(--muted-foreground);
   font-size: 11px;
   line-height: 1.45;
   text-align: center;
@@ -233,10 +256,10 @@
 
 .identityNotice {
   padding: 9px 11px;
-  border: 1px solid rgba(0,122,255,0.16);
+  border: 1px solid rgba(93, 104, 204, 0.22);
   border-radius: 10px;
-  background: rgba(0,122,255,0.07);
-  color: #1D4ED8;
+  background: rgba(93, 104, 204, 0.12);
+  color: var(--foreground);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -277,7 +300,7 @@
   padding: 6px 0;
   border: none;
   background: transparent;
-  color: #8E8E93;
+  color: var(--muted-foreground);
   font-size: 12px;
   cursor: pointer;
   width: 100%;
@@ -297,9 +320,9 @@
 .hubInput {
   width: 100%;
   padding: 8px 12px;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.065);
   border-radius: 8px;
-  background: rgba(0,0,0,0.04);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--foreground);
   font-size: 13px;
   font-family: var(--font-mono);
@@ -307,7 +330,7 @@
   box-sizing: border-box;
 }
 .hubInput:focus {
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.10);
+  box-shadow: 0 0 0 3px rgba(93, 104, 204, 0.18);
 }
 .hubStatus {
   display: flex;
@@ -315,7 +338,7 @@
   gap: 6px;
   margin-top: 6px;
   font-size: 11px;
-  color: #8E8E93;
+  color: var(--muted-foreground);
 }
 
 .hubStatusDot {
@@ -372,17 +395,16 @@
   .header {
     margin-bottom: 16px;
     padding-right: 50px;
+    padding-left: 0;
     text-align: left;
+    justify-items: start;
   }
 
   .logo {
     width: 36px;
     height: 36px;
     margin-bottom: 8px;
-    border: 1px solid rgba(255,255,255,0.08);
     border-radius: 9px;
-    background: rgba(255,255,255,0.055);
-    color: var(--foreground);
   }
 
   .appName {

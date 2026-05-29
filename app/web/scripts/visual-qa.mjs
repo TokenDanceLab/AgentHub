@@ -312,6 +312,8 @@ async function collectMetrics(page, { mobile = false } = {}) {
     const authSheet = modal?.querySelector("[class*='page']");
     const authRect = authSheet?.getBoundingClientRect();
     const authStyle = authSheet ? window.getComputedStyle(authSheet) : null;
+    const authBrandLogo = authSheet?.querySelector("img[alt='TokenDance']");
+    const identityIcon = authSheet?.querySelector("button img[aria-hidden='true']");
 
     return {
       title: document.title,
@@ -337,6 +339,8 @@ async function collectMetrics(page, { mobile = false } = {}) {
             topRadius: authStyle.borderTopLeftRadius,
             background: authStyle.backgroundColor,
             backdropFilter: authStyle.backdropFilter || authStyle.webkitBackdropFilter,
+            brandLogo: !!authBrandLogo,
+            identityIcon: !!identityIcon,
           }
         : null,
     };
@@ -360,6 +364,8 @@ function assertMetrics(name, metrics, { mobile = false, accountSheet = false } =
     assert(metrics.authSheet.width === metrics.innerWidth, `${name}: account sheet should fill mobile width`, metrics.authSheet);
     assert(metrics.authSheet.bottom === 0, `${name}: account sheet should dock to the bottom`, metrics.authSheet);
     assert(metrics.authSheet.backdropFilter !== "none", `${name}: account sheet should keep glass blur`, metrics.authSheet);
+    assert(metrics.authSheet.brandLogo === true, `${name}: TokenDance brand logo should render`, metrics.authSheet);
+    assert(metrics.authSheet.identityIcon === true, `${name}: identity action should render TokenDance icon`, metrics.authSheet);
   }
 }
 
