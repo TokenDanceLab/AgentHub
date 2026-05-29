@@ -171,6 +171,10 @@ interface EdgePermissionDecisionControl {
 
 const HUB_AGENT_CONTROL_EVENT = 'agent.control';
 
+function isTerminalBridgeTask(task: AgentTask): boolean {
+  return task.status === 'done' || task.status === 'failed';
+}
+
 function getTeamRouteContext(task: AgentTask): TeamRouteContext | null {
   const data = task.dispatchPayload ?? {};
   const modelParams = parseRecord(data.model_params);
@@ -322,12 +326,6 @@ export function useHubIntegration(
   const postedRouteDecisionsRef = useRef<Set<string>>(new Set());
   const deliveredAgentControlsRef = useRef<Set<string>>(new Set());
   const inFlightAgentControlsRef = useRef<Set<string>>(new Set());
-<<<<<<< HEAD
-  /** RunIds whose terminal result has already been reported to Hub (prevents
-   *  double doneTask / failTask across run.agent.result and run.finished/failed). */
-  const reportedRunIdsRef = useRef<Set<string>>(new Set());
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const store = useTaskBridgeStore;
 
   const rememberOutput = useCallback((runId: string, content: string) => {
@@ -373,6 +371,7 @@ export function useHubIntegration(
 
       const task = store.getState().getTaskByRunId(runId);
       if (!task) return; // not one of our bridged tasks
+      if (isTerminalBridgeTask(task)) return;
 
       const taskId = task.taskId;
 
@@ -431,9 +430,6 @@ export function useHubIntegration(
         }
 
         case 'run.agent.result': {
-          // Idempotency guard — if we already reported this run, skip
-          if (reportedRunIdsRef.current.has(runId)) break;
-
           const decision = routeDecisionFromRuntimePayload(payload);
           if (decision) {
             postRouteDecision(task, decision);
@@ -446,62 +442,54 @@ export function useHubIntegration(
                 ? payload.content
                 : outputByRunRef.current.get(runId) || JSON.stringify(payload);
             hubClient.doneTask(taskId, output, runId).catch(() => {});
+            store.getState().updateTask(taskId, {
+              status: 'done',
+            });
           } else {
             const error =
               typeof payload.error === 'string'
                 ? payload.error
                 : 'Agent reported failure';
             hubClient.failTask(taskId, error, runId).catch(() => {});
+            store.getState().updateTask(taskId, {
+              status: 'failed',
+              error,
+            });
           }
-          // Record that we have reported this run's terminal state to Hub —
-          // prevents a second doneTask / failTask when run.finished/failed/cancelled
-          // arrives later.
-          reportedRunIdsRef.current.add(runId);
-          store.getState().removeTask(taskId);
           forgetOutput(runId);
           break;
         }
 
         case 'run.finished': {
-          const output =
-            typeof payload.content === 'string'
-              ? payload.content
-              : typeof payload.output === 'string'
-                ? payload.output
-                : outputByRunRef.current.get(runId) || 'Run finished';
+          const output = outputByRunRef.current.get(runId) || 'Run finished';
           hubClient.doneTask(taskId, output, runId).catch(() => {});
-          reportedRunIdsRef.current.add(runId);
-          store.getState().removeTask(taskId);
+          store.getState().updateTask(taskId, {
+            status: 'done',
+          });
           forgetOutput(runId);
           break;
         }
 
         case 'run.failed': {
-          if (reportedRunIdsRef.current.has(runId)) {
-            store.getState().removeTask(taskId);
-            forgetOutput(runId);
-            break;
-          }
           const error =
             typeof payload.error === 'string'
               ? payload.error
               : 'Run lifecycle failure';
           hubClient.failTask(taskId, error, runId).catch(() => {});
-          reportedRunIdsRef.current.add(runId);
-          store.getState().removeTask(taskId);
+          store.getState().updateTask(taskId, {
+            status: 'failed',
+            error,
+          });
           forgetOutput(runId);
           break;
         }
 
         case 'run.cancelled': {
-          if (reportedRunIdsRef.current.has(runId)) {
-            store.getState().removeTask(taskId);
-            forgetOutput(runId);
-            break;
-          }
           hubClient.failTask(taskId, 'Run cancelled', runId).catch(() => {});
-          reportedRunIdsRef.current.add(runId);
-          store.getState().removeTask(taskId);
+          store.getState().updateTask(taskId, {
+            status: 'failed',
+            error: 'Run cancelled',
+          });
           forgetOutput(runId);
           break;
         }
@@ -513,7 +501,8 @@ export function useHubIntegration(
       stream.close();
       streamRef.current = null;
     };
-  }, [edgeBaseUrl, hubClient, postRouteDecision, rememberOutput, forgetOutput, store]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [edgeBaseUrl]);
 
   // ── Listen for Hub agent.dispatch and agent.cancel ────
 
@@ -536,7 +525,6 @@ export function useHubIntegration(
         getString(data, 'thread_id') ||
         getString(data, 'session_id') ||
         'hub-dispatch';
-      const targetId = getString(data, 'target_id');
 
       // Build initial task record
       const task: AgentTask = {
@@ -544,7 +532,6 @@ export function useHubIntegration(
         agentId,
         prompt,
         threadId,
-        targetId: targetId || undefined,
         status: 'queued',
         dispatchPayload: data,
         createdAt: new Date().toISOString(),
@@ -613,7 +600,10 @@ export function useHubIntegration(
           method: 'POST',
           headers: edgeAuthHeaders(),
         });
-        store.getState().removeTask(taskId);
+        store.getState().updateTask(taskId, {
+          status: 'failed',
+          error: 'Cancelled by Hub',
+        });
       } catch {
         // Best-effort cancel — Edge may already be stopped
       }
@@ -652,18 +642,18 @@ export function useHubIntegration(
       unsubCancel();
       unsubControl();
     };
-  }, [hubWS, hubClient, edgeBaseUrl, onDispatch, store]);
+  }, [hubWS, hubClient, edgeBaseUrl, onDispatch]);
 
   // ── Return stable handle ──────────────────────────────
 
   const getTaskByRunId = useCallback(
     (runId: string) => store.getState().getTaskByRunId(runId),
-    [store],
+    [],
   );
 
   const getRunByTaskId = useCallback(
     (taskId: string) => store.getState().getRunByTaskId(taskId),
-    [store],
+    [],
   );
 
   // Read tasks reactively from the store
