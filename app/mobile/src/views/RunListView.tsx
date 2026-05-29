@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listRuns } from "@agenthub/shared";
 import type { Run, RunStatus } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { EmptyState, SegmentedControl } from "@agenthub/shared/ui";
+import { EmptyState, MetricGrid, SegmentedControl } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, ArrowRight, CheckCircle2, Clock3, GitPullRequestArrow, Play, Radio, RefreshCw, ShieldAlert, TerminalSquare, UserRound } from "lucide-react";
@@ -175,20 +175,15 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
               <RefreshCw size={18} className={isRefreshing ? "mobileSpin" : undefined} />
             </button>
           </div>
-          <div className="mobileMetricGrid">
-            <div className="mobileMetricTile">
-              <strong>{activeRuns}</strong>
-              <span>{t("queue.runs.metricActive")}</span>
-            </div>
-            <div className="mobileMetricTile">
-              <strong>{reviewRuns}</strong>
-              <span>{t("queue.runs.metricReview")}</span>
-            </div>
-            <div className="mobileMetricTile">
-              <strong>{items.length}</strong>
-              <span>{t("queue.common.total")}</span>
-            </div>
-          </div>
+          <MetricGrid
+            className="mobileMetricGrid"
+            itemClassName="mobileMetricTile"
+            items={[
+              { id: "active", value: activeRuns, label: t("queue.runs.metricActive") },
+              { id: "review", value: reviewRuns, label: t("queue.runs.metricReview") },
+              { id: "total", value: items.length, label: t("queue.common.total") },
+            ]}
+          />
           <div className="mobileSignalRow">
             <Radio size={14} />
             <span>

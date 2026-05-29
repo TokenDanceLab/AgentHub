@@ -15,7 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { StatusBadge } from "@agenthub/shared/components";
-import { BottomSheet, SegmentedControl } from "@agenthub/shared/ui";
+import { BottomSheet, MetricGrid, SegmentedControl } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import type { Artifact, Preview, Run, RunStatus, ThreadItem } from "@agenthub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -211,20 +211,32 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
         <section className="mobileOverviewPanel">
           <p className="mobileEyebrow">{t("runDetail.context.eyebrow")}</p>
           <h2>{run.projectId}</h2>
-          <div className="mobileMetricGrid">
-            <button className="mobileMetricTile mobileSummaryShortcut" type="button" onClick={() => jumpTo("review")}>
-              <strong>{decisionStatus === "approved" ? "Approved" : decisionStatus === "rejected" ? "Rejected" : "Review"}</strong>
-              <span>{t("runDetail.summary.review")}</span>
-            </button>
-            <button className="mobileMetricTile mobileSummaryShortcut" type="button" onClick={() => jumpTo("blocks")} aria-label={`Blocks summary: ${blocks.length} items`}>
-              <strong>{blocks.length}</strong>
-              <span>{t("runDetail.summary.blocks")}</span>
-            </button>
-            <button className="mobileMetricTile mobileSummaryShortcut" type="button" onClick={() => jumpTo("outputs")}>
-              <strong>{resources.length}</strong>
-              <span>{t("runDetail.summary.outputs")}</span>
-            </button>
-          </div>
+          <MetricGrid
+            className="mobileMetricGrid"
+            itemClassName="mobileMetricTile"
+            interactiveItemClassName="mobileSummaryShortcut"
+            items={[
+              {
+                id: "review",
+                value: decisionStatus === "approved" ? "Approved" : decisionStatus === "rejected" ? "Rejected" : "Review",
+                label: t("runDetail.summary.review"),
+                onClick: () => jumpTo("review"),
+              },
+              {
+                id: "blocks",
+                value: blocks.length,
+                label: t("runDetail.summary.blocks"),
+                ariaLabel: `Blocks summary: ${blocks.length} items`,
+                onClick: () => jumpTo("blocks"),
+              },
+              {
+                id: "outputs",
+                value: resources.length,
+                label: t("runDetail.summary.outputs"),
+                onClick: () => jumpTo("outputs"),
+              },
+            ]}
+          />
         </section>
 
         <SegmentedControl
