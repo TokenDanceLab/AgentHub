@@ -2,11 +2,11 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listRuns } from "@agenthub/shared";
 import type { Run, RunStatus } from "@agenthub/shared";
+import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, ArrowRight, CheckCircle2, Clock3, GitPullRequestArrow, Play, Radio, RefreshCw, ShieldAlert, TerminalSquare, UserRound } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
-import { MobileStatusBadge } from "../components/MobileStatusBadge";
 import { getMobileHubHealth } from "../native/hubHealth";
 
 interface RunListViewProps {
@@ -325,9 +325,10 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
                     </span>
                   </span>
                 </span>
-                <MobileStatusBadge
+                <StatusBadge
                   status={runStatusToVariant(run.status)}
                   label={t(runStatusLabelKey(run.status))}
+                  className={`mobileQueueStatusBadge mobileQueueStatusBadge-${getStatusVariantClassName(runStatusToVariant(run.status))}`}
                 />
               </button>
             ))}

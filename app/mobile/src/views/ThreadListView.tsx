@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listThreads } from "@agenthub/shared";
 import type { Thread } from "@agenthub/shared";
+import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, UserRound, ArrowRight } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
-import { MobileStatusBadge } from "../components/MobileStatusBadge";
 import { getMobileHubHealth } from "../native/hubHealth";
 import { useTranslation } from "react-i18next";
 
@@ -257,9 +257,10 @@ export function ThreadListView({ onThreadSelect, onOpenAccount }: ThreadListView
                     </span>
                   </span>
                 </span>
-                <MobileStatusBadge
+                <StatusBadge
                   status={threadStatusToVariant(thread.status)}
                   label={t(threadStatusLabelKey(thread.status))}
+                  className={`mobileQueueStatusBadge mobileQueueStatusBadge-${getStatusVariantClassName(threadStatusToVariant(thread.status))}`}
                 />
               </button>
             ))}
