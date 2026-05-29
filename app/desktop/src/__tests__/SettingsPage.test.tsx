@@ -152,6 +152,16 @@ function renderSettings(initialSection: ComponentProps<typeof SettingsPage>['ini
   );
 }
 
+function changeSelect(currentLabel: string, nextLabel: string, occurrence = 0) {
+  const trigger = screen
+    .getAllByText(currentLabel)
+    .map((element) => element.closest('button'))
+    .filter((button): button is HTMLButtonElement => Boolean(button))[occurrence];
+  expect(trigger).toBeTruthy();
+  fireEvent.click(trigger);
+  fireEvent.click(screen.getByRole('option', { name: nextLabel }));
+}
+
 describe('SettingsPage tasks', () => {
   beforeEach(() => {
     mockAgents.splice(0, mockAgents.length);
@@ -648,9 +658,9 @@ describe('SettingsPage tasks', () => {
   it('persists model defaults from the model configuration panel', () => {
     renderSettings('models');
 
-    fireEvent.change(screen.getByDisplayValue('Auto'), { target: { value: 'gpt-5.5' } });
-    fireEvent.change(screen.getByDisplayValue('TokenDance Relay'), { target: { value: 'openai' } });
-    fireEvent.change(screen.getByDisplayValue('High'), { target: { value: 'max' } });
+    changeSelect('Auto', 'gpt-5.5');
+    changeSelect('TokenDance Relay', 'OpenAI');
+    changeSelect('High', 'Max');
 
     expect(useModelSettingsStore.getState()).toMatchObject({
       defaultModel: 'gpt-5.5',
@@ -666,9 +676,7 @@ describe('SettingsPage tasks', () => {
     renderSettings('modelMapping');
 
     expect(screen.getByText('opus')).toBeInTheDocument();
-    fireEvent.change(screen.getAllByDisplayValue('claude-opus-4-7')[0], {
-      target: { value: 'gpt-5.5' },
-    });
+    changeSelect('claude-opus-4-7', 'gpt-5.5');
     fireEvent.click(screen.getAllByRole('switch')[1]);
 
     const opus = useModelSettingsStore.getState().aliases.find((item) => item.alias === 'opus');
@@ -682,9 +690,7 @@ describe('SettingsPage tasks', () => {
     renderSettings('ccSwitch');
 
     fireEvent.click(screen.getAllByRole('switch')[0]);
-    fireEvent.change(screen.getAllByDisplayValue('Degraded')[0], {
-      target: { value: 'ready' },
-    });
+    changeSelect('Degraded', 'Ready');
     fireEvent.change(screen.getByDisplayValue('Local provider bridge; health should be refreshed by cc-switch integration.'), {
       target: { value: 'healthy after manual check' },
     });

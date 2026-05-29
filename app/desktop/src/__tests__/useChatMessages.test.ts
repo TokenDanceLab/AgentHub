@@ -696,7 +696,7 @@ describe('useChatMessages', () => {
 
       const addToastFn = vi.mocked(useToastStore.getState)().addToast;
       // Only 1 warning (at 3rd) + 1 error (at 5th)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const calls = (addToastFn as any).mock.calls as any[];
       const warningCalls = calls.filter(
         (c: any[]) => c[0].type === 'warning',

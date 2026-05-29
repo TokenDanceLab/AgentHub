@@ -124,7 +124,8 @@ describe('IMContactList', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Hub compose' }));
     fireEvent.click(screen.getByRole('button', { name: 'Create direct chat' }));
-    fireEvent.change(screen.getByLabelText('Hub contact'), { target: { value: 'friend-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a Hub contact...' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Alice' }));
     fireEvent.click(screen.getByText('Create'));
 
     await waitFor(() => expect(onCreatePrivateSession).toHaveBeenCalledWith('friend-1'));

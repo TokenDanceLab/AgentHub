@@ -28,18 +28,18 @@ export function useDeviceRegistration(
 
   useEffect(() => {
     if (!hubClient) {
-      setState((prev) => ({ ...prev, status: 'idle', error: null }));
+      queueMicrotask(() => setState((prev) => ({ ...prev, status: 'idle', error: null })));
       return;
     }
 
     const deviceId = getOrCreateDeviceId();
     if (registeredRef.current) {
-      setState({ deviceId, status: 'registered', error: null });
+      queueMicrotask(() => setState({ deviceId, status: 'registered', error: null }));
       return;
     }
 
     let cancelled = false;
-    setState({ deviceId, status: 'registering', error: null });
+    queueMicrotask(() => setState({ deviceId, status: 'registering', error: null }));
     hubClient
       .registerDevice({
         device_id: deviceId,

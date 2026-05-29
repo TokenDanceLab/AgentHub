@@ -23,6 +23,12 @@ type IMMessageWithHubState = IMMessage & {
 type IMActionStatus = 'pending' | 'error';
 type IMActionState = Record<string, { status: IMActionStatus; error?: string }>;
 
+function omitActionState(state: IMActionState, key: string): IMActionState {
+  return Object.fromEntries(
+    Object.entries(state).filter(([candidate]) => candidate !== key),
+  );
+}
+
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
@@ -224,24 +230,22 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   const clearAction = useCallback((key: string) => {
     setActionState((prev) => {
       if (!prev[key]) return prev;
-      const next = { ...prev };
-      delete next[key];
-      return next;
+      return omitActionState(prev, key);
     });
   }, []);
 
   useEffect(() => {
     if (hubWS || !authenticated || !getAccessToken()) {
-      setOwnedHubWS(null);
+      queueMicrotask(() => setOwnedHubWS(null));
       return;
     }
 
     const handle = createHubWS({ getToken: getAccessToken });
-    setOwnedHubWS(handle);
+    queueMicrotask(() => setOwnedHubWS(handle));
     handle.connect();
     return () => {
       handle.close();
-      setOwnedHubWS(null);
+      queueMicrotask(() => setOwnedHubWS(null));
     };
   }, [hubWS, authenticated]);
 
@@ -303,7 +307,9 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   }, [addToast, authenticated, client]);
 
   useEffect(() => {
-    void refreshSessions();
+    queueMicrotask(() => {
+      void refreshSessions();
+    });
   }, [refreshSessions]);
 
   const loadSessionMessages = useCallback(

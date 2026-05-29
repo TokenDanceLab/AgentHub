@@ -19,7 +19,7 @@ import { useEdgeStatus } from '@/hooks/useEdgeStatus';
 import { useAgentList } from '@/api/agentQueries';
 import { createHubClient } from '@/api/hubClient';
 import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
-import { useThreads, useThreadMessages } from '@/api/threadQueries';
+import { useThreads } from '@/api/threadQueries';
 import { createThread } from '@/api/edgeClient';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useHubEventStream } from '@/hooks/useHubEventStream';
@@ -109,15 +109,15 @@ function isEditableShortcutTarget(target: EventTarget | null): boolean {
 }
 
 function DesktopHubTaskBridge() {
-  const hubAuth = useAuth();
+  const { isAuthenticated, token, tryAutoLogin } = useAuth();
 
   useEffect(() => {
-    if (!hubAuth.isAuthenticated && !hubAuth.token) {
-      void hubAuth.tryAutoLogin();
+    if (!isAuthenticated && !token) {
+      void tryAutoLogin();
     }
-  }, [hubAuth.isAuthenticated, hubAuth.token, hubAuth.tryAutoLogin]);
+  }, [isAuthenticated, token, tryAutoLogin]);
 
-  if (!hubAuth.isAuthenticated || !hubAuth.token) {
+  if (!isAuthenticated || !token) {
     return null;
   }
 
@@ -175,18 +175,18 @@ export default function App() {
   const { theme, toggleTheme } = useTheme();
 
   const { data: threadData } = useThreads();
-  const threads = threadData?.items ?? [];
+  const threads = useMemo(() => threadData?.items ?? [], [threadData?.items]);
 
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
   const { setOnline, setConnected, wsLatency } = useConnectionStore(
     useShallow((s) => ({ setOnline: s.setOnline, setConnected: s.setConnected, wsLatency: s.wsLatency })),
   );
-  const { selectedThreadId, selectedAgentId, selectThread, selectAgentThread } = useThreadStore(
-    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectedAgentId: s.selectedAgentId, selectThread: s.selectThread, selectAgentThread: s.selectAgentThread })),
+  const { selectedThreadId, selectedAgentId, selectThread } = useThreadStore(
+    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectedAgentId: s.selectedAgentId, selectThread: s.selectThread })),
   );
   const { data: agentData } = useAgentList(online);
-  const agents = agentData?.items ?? [];
+  const agents = useMemo(() => agentData?.items ?? [], [agentData?.items]);
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
   const [viewMode, setViewMode] = useState<'agent' | 'im' | 'teamrun'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
@@ -216,7 +216,6 @@ export default function App() {
   );
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
-  const [rightPanelMounted, setRightPanelMounted] = useState(rightPanelOpen);
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
 
@@ -225,13 +224,11 @@ export default function App() {
 
   // Sync health → connection store
   const prevOnlineRef = useRef<boolean | null>(null);
-  const healthRef = useRef(health);
-  healthRef.current = health;
   useEffect(() => {
     if (prevOnlineRef.current === online) return;
     prevOnlineRef.current = online;
-    setOnline(online, healthRef.current);
-  }, [online, setOnline]);
+    setOnline(online, health);
+  }, [health, online, setOnline]);
 
   // Sync isConnected → connection store
   useEffect(() => {
@@ -303,17 +300,10 @@ export default function App() {
   } as CSSProperties;
 
   useEffect(() => {
-    if (currentRun) setOptimisticRun(null);
-  }, [currentRun]);
-
-  useEffect(() => {
-    if (effectiveRightPanelOpen) {
-      setRightPanelMounted(true);
-      return;
+    if (currentRun) {
+      queueMicrotask(() => setOptimisticRun(null));
     }
-    const timer = window.setTimeout(() => setRightPanelMounted(false), 220);
-    return () => window.clearTimeout(timer);
-  }, [effectiveRightPanelOpen]);
+  }, [currentRun]);
 
   useEffect(() => {
     const node = workspaceRef.current;
@@ -380,7 +370,11 @@ export default function App() {
   const handleCancel = useCallback(async () => {
     const runId = currentRun?.runId ?? (optimisticRun?.runId.startsWith('starting-') ? undefined : optimisticRun?.runId);
     if (runId) {
-      try { await cancelRun(runId); } catch {}
+      try {
+        await cancelRun(runId);
+      } catch (error) {
+        console.warn('Failed to cancel run:', error);
+      }
     }
   }, [currentRun?.runId, optimisticRun?.runId]);
 
@@ -537,8 +531,14 @@ export default function App() {
     if (target.closest('button, input, select, a')) return;
     try {
       const w = getCurrentWindow();
-      (await w.isMaximized()) ? w.unmaximize() : w.maximize();
-    } catch {}
+      if (await w.isMaximized()) {
+        void w.unmaximize();
+      } else {
+        void w.maximize();
+      }
+    } catch (error) {
+      console.warn('Failed to toggle window maximize:', error);
+    }
   }, []);
 
   // ── Render ─────────────────────────────────
@@ -588,7 +588,11 @@ export default function App() {
             </ShellIconButton>
             <ShellIconButton className={styles.winBtn} onClick={async () => {
               const w = getCurrentWindow();
-              (await w.isMaximized()) ? w.unmaximize() : w.maximize();
+              if (await w.isMaximized()) {
+                void w.unmaximize();
+              } else {
+                void w.maximize();
+              }
             }} label={t('window.maximize')} tooltipSide="bottom">
               <Square size={11} />
             </ShellIconButton>
@@ -859,7 +863,7 @@ export default function App() {
               </div>
             )}
 
-            {!isMobile && !workspaceExpanded && displayedRun && rightPanelMounted && (
+            {!isMobile && !workspaceExpanded && displayedRun && (
               <div
                 className={`${styles.rightPanel} ${effectiveRightPanelOpen ? styles.rightPanelOpen : styles.rightPanelClosing}`}
                 role="dialog"

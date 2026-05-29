@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { Globe2 } from 'lucide-react';
 import Panel from '../primitives/Panel';
 import ConnectionRow from '../primitives/ConnectionRow';
 
