@@ -10,12 +10,16 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('ShortcutHelp', () => {
-  it('renders shell navigation shortcuts', () => {
+  it('renders grouped shortcuts from the shared shortcut map', () => {
     render(<ShortcutHelp open onClose={vi.fn()} />);
 
+    expect(screen.getByText('shortcut.group.conversation')).toBeInTheDocument();
+    expect(screen.getByText('shortcut.group.composer')).toBeInTheDocument();
     expect(screen.getByText('shortcut.toggleSidebar')).toBeInTheDocument();
     expect(screen.getByText('shortcut.toggleRunPanel')).toBeInTheDocument();
-    expect(screen.getAllByText('⌘/Ctrl')).toHaveLength(2);
+    expect(screen.getByText('shortcut.newThread')).toBeInTheDocument();
+    expect(screen.getByText('shortcut.slashCommands')).toBeInTheDocument();
+    expect(screen.getAllByText('Ctrl/⌘').length).toBeGreaterThan(4);
   });
 
   it('closes on Escape', () => {

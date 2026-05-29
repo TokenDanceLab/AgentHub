@@ -1,13 +1,15 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
-import type { ReactNode } from 'react';
+import { useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, ChevronRight } from 'lucide-react';
+import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, ChevronRight, Route, GitFork, Gauge } from 'lucide-react';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
+import { formatTokens, formatCost } from '@shared/context/breakdown';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
 import EmptyState from './EmptyState';
+import TaskList from './TaskList';
+import ToolTimeline from './ToolTimeline';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
@@ -19,8 +21,14 @@ interface Props {
   messages: ChatMessage[];
   isStreaming?: boolean;
   onRetry?: (messageId: string) => void;
+  onFork?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
 }
+
+const LONG_AGENT_TEXT_MAX_LINES = 24;
+const LONG_AGENT_TEXT_PREVIEW_LINES = 18;
+const LONG_AGENT_TEXT_MAX_CHARS = 2200;
+const LONG_AGENT_TEXT_PREVIEW_CHARS = 1800;
 
 // ── Tool icons ───────────────────────────────
 const TOOL_ICON_MAP: Record<string, typeof FileText> = {
@@ -41,22 +49,57 @@ function resolveToolIcon(toolName: string) {
   return <Icon size={14} />;
 }
 
+function DecorativeAgentIcon({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    ref.current?.querySelectorAll('title').forEach((node) => node.remove());
+  });
+
+  return (
+    <span ref={ref} className={styles.decorativeAgentIcon} aria-hidden="true">
+      {children}
+    </span>
+  );
+}
+
 function AgentAvatarIcon({ name }: { name: string }) {
   const normalized = name.toLowerCase();
   if (
+    normalized.includes('claude code') ||
+    normalized === 'claude' ||
     normalized.includes('claude-opus') ||
     normalized.includes('claude-sonnet') ||
-    normalized.includes('claude-haiku') ||
+    normalized.includes('claude-haiku')
+  ) {
+    return <DecorativeAgentIcon><ClaudeCode size={18} /></DecorativeAgentIcon>;
+  }
+  if (normalized.includes('codex')) return <DecorativeAgentIcon><Codex size={18} /></DecorativeAgentIcon>;
+  if (normalized.includes('opencode') || normalized.includes('open-code')) return <DecorativeAgentIcon><OpenCode size={18} /></DecorativeAgentIcon>;
+  if (
     normalized.includes('gpt') ||
     normalized.includes('glm') ||
     normalized.includes('qwen')
   ) {
-    return <Bot size={16} />;
+    return <DecorativeAgentIcon><Bot size={16} /></DecorativeAgentIcon>;
   }
-  if (normalized.includes('claude code') || normalized === 'claude') return <ClaudeCode size={18} />;
-  if (normalized.includes('codex')) return <Codex size={18} />;
-  if (normalized.includes('opencode')) return <OpenCode size={18} />;
-  return <Bot size={15} />;
+  return <DecorativeAgentIcon><Bot size={15} /></DecorativeAgentIcon>;
+}
+
+function agentDisplayName(name: string): string {
+  const normalized = name.toLowerCase();
+  if (
+    normalized.includes('claude code') ||
+    normalized === 'claude' ||
+    normalized.includes('claude-opus') ||
+    normalized.includes('claude-sonnet') ||
+    normalized.includes('claude-haiku')
+  ) {
+    return 'Claude Code';
+  }
+  if (normalized.includes('codex')) return 'Codex';
+  if (normalized.includes('opencode') || normalized.includes('open-code')) return 'OpenCode';
+  if (normalized.includes('tokendance')) return 'TokenDance';
+  return name;
 }
 
 function summarizeInput(input: Record<string, unknown>): string {
@@ -146,7 +189,6 @@ function toolStatusClass(status: string): string {
 function ThinkingBlock({ content, active }: { content: string; active?: boolean }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
-  if (!active) return null;
   return (
     <div className={styles.thinking}>
       <button
@@ -155,17 +197,13 @@ function ThinkingBlock({ content, active }: { content: string; active?: boolean 
         aria-expanded={expanded}
       >
         <span className={styles.chevron + (expanded ? ' ' + styles.chevronDown : '')}>▸</span>
-        <span className={active ? styles.runningText : styles.settledText}>{t('chat.thinkingLabel')}</span>
+        <span className={active ? styles.runningText : styles.settledText}>
+          {active ? t('chat.thinkingLabel') : t('chat.thinkingSettledLabel')}
+        </span>
       </button>
       {expanded && <div className={styles.thinkingContent}>{content}</div>}
     </div>
   );
-}
-
-// ── StreamingTextBlock ───────────────────────
-function StreamingTextBlock({ content, isStreaming }: { content: string; isStreaming: boolean }) {
-  const displayed = useStreamingText(content, isStreaming);
-  return <MarkdownRenderer content={displayed} />;
 }
 
 function PendingThinking({ label }: { label: string }) {
@@ -173,6 +211,142 @@ function PendingThinking({ label }: { label: string }) {
     <div className={styles.pendingThinking}>
       <span className={styles.pendingThinkingLabel}>{label}</span>
     </div>
+  );
+}
+
+function previewAgentText(content: string): { preview: string; hiddenLines: number; hiddenChars: number } | null {
+  const lines = content.split(/\r?\n/);
+  const tooManyLines = lines.length > LONG_AGENT_TEXT_MAX_LINES;
+  const tooManyChars = content.length > LONG_AGENT_TEXT_MAX_CHARS;
+  if (!tooManyLines && !tooManyChars) return null;
+
+  let preview = tooManyLines
+    ? lines.slice(0, LONG_AGENT_TEXT_PREVIEW_LINES).join('\n')
+    : content.slice(0, LONG_AGENT_TEXT_PREVIEW_CHARS);
+  if (preview.length > LONG_AGENT_TEXT_PREVIEW_CHARS) {
+    preview = preview.slice(0, LONG_AGENT_TEXT_PREVIEW_CHARS);
+  }
+  preview = preview.trimEnd();
+
+  const hiddenLines = Math.max(0, lines.length - preview.split(/\r?\n/).length);
+  const hiddenChars = Math.max(0, content.length - preview.length);
+  return { preview, hiddenLines, hiddenChars };
+}
+
+function previewInlineText(content: string, maxLength: number): string {
+  const normalized = content.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+}
+
+function AgentTextBlock({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
+  const { t } = useTranslation();
+  const displayed = useStreamingText(content, Boolean(isStreaming));
+  const [expanded, setExpanded] = useState(false);
+  const collapsed = previewAgentText(displayed);
+
+  if (!collapsed || expanded) {
+    return (
+      <div className={styles.longTextBlock}>
+        <MarkdownRenderer content={displayed} />
+        {collapsed && (
+          <button
+            type="button"
+            className={styles.longTextToggle}
+            onClick={() => setExpanded(false)}
+            aria-label={t('chat.collapseOutput')}
+          >
+            {t('chat.collapseOutput')}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.longTextBlock}>
+      <MarkdownRenderer content={collapsed.preview} />
+      <button
+        type="button"
+        className={styles.longTextToggle}
+        onClick={() => setExpanded(true)}
+        aria-label={t('chat.showFullOutput')}
+      >
+        {t('chat.showFullOutput', {
+          lines: collapsed.hiddenLines,
+          chars: collapsed.hiddenChars,
+        })}
+      </button>
+    </div>
+  );
+}
+
+interface ParsedAttachmentSummary {
+  name: string;
+  source?: string;
+  size?: string;
+}
+
+function parseUserAttachmentContext(content: string): { text: string; attachments: ParsedAttachmentSummary[] } | null {
+  const match = content.match(/\n\s*Attached files:\s*/i);
+  if (!match || match.index == null) return null;
+
+  const text = content.slice(0, match.index).trim();
+  const context = content.slice(match.index + match[0].length);
+  const attachments: ParsedAttachmentSummary[] = [];
+  let current: ParsedAttachmentSummary | null = null;
+
+  for (const rawLine of context.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const itemMatch = line.match(/^\d+\.\s+(.+)$/);
+    if (itemMatch) {
+      const name = itemMatch[1]?.trim();
+      if (!name) continue;
+      current = { name };
+      attachments.push(current);
+      continue;
+    }
+
+    if (!current) continue;
+    const fieldMatch = line.match(/^(Source|Size):\s*(.+)$/i);
+    if (!fieldMatch) continue;
+    const key = fieldMatch[1]?.toLowerCase();
+    const value = fieldMatch[2]?.trim();
+    if (!key || !value) continue;
+    if (key === 'source') current.source = value;
+    if (key === 'size') current.size = value;
+  }
+
+  return attachments.length > 0 ? { text, attachments } : null;
+}
+
+function UserTextBlock({ content }: { content: string }) {
+  const { t } = useTranslation();
+  const parsed = parseUserAttachmentContext(content);
+  if (!parsed) return <MarkdownRenderer content={content} />;
+
+  return (
+    <>
+      {parsed.text && <MarkdownRenderer content={parsed.text} />}
+      <div
+        className={styles.userAttachmentList}
+        aria-label={t('chat.attachmentsLabel', { count: parsed.attachments.length })}
+      >
+        {parsed.attachments.map((attachment, index) => (
+          <div key={`${attachment.name}-${index}`} className={styles.userAttachmentChip}>
+            <FileText size={13} />
+            <span className={styles.userAttachmentName}>{attachment.name}</span>
+            {(attachment.source || attachment.size) && (
+              <span className={styles.userAttachmentMeta}>
+                {[attachment.source, attachment.size].filter(Boolean).join(' · ')}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -276,6 +450,118 @@ function StatusRow({
         {meta && <span className={styles.statusRowMeta}>{meta}</span>}
       </button>
       {expanded && children && <div className={styles.statusRowBody}>{children}</div>}
+    </div>
+  );
+}
+
+type ContextUsageBlockType = Extract<MessageBlock, { kind: 'context_usage' }>;
+
+function isDetailedContextUsage(block: ContextUsageBlockType): boolean {
+  return block.variant === 'warning' || block.variant === 'compaction';
+}
+
+function usagePercentFrom(block: ContextUsageBlockType): number | undefined {
+  if (block.usagePercent != null) return block.usagePercent;
+  if (block.contextLimit && block.total != null && block.contextLimit > 0) {
+    return Math.max(0, Math.min(100, (block.total / block.contextLimit) * 100));
+  }
+  return undefined;
+}
+
+function formatTokenUsageFooter(
+  msg: ChatMessage,
+  t: (key: string, vars?: Record<string, unknown>) => string,
+): string | null {
+  let stats: { input?: number; output?: number; total?: number } | null = null;
+
+  for (const block of msg.blocks) {
+    if (block.kind === 'result' && block.success && block.tokenUsage) {
+      stats = {
+        input: block.tokenUsage.input,
+        output: block.tokenUsage.output,
+        total: block.tokenUsage.input + block.tokenUsage.output,
+      };
+    }
+    if (block.kind === 'context_usage' && !isDetailedContextUsage(block)) {
+      const total = block.total ?? (
+        block.input != null || block.output != null ? (block.input ?? 0) + (block.output ?? 0) : undefined
+      );
+      stats = {
+        input: block.input,
+        output: block.output,
+        total,
+      };
+    }
+  }
+
+  if (!stats) return null;
+  const parts: string[] = [];
+  if (stats.input != null) parts.push(`${t('chat.tokenUsageInput')} ${formatTokens(stats.input)}`);
+  if (stats.output != null) parts.push(`${t('chat.tokenUsageOutput')} ${formatTokens(stats.output)}`);
+  if (stats.total != null) parts.push(`${t('chat.tokenUsageTotal')} ${formatTokens(stats.total)}`);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+function ContextUsageInline({ block }: { block: ContextUsageBlockType }) {
+  const { t } = useTranslation();
+  const usagePercent = usagePercentFrom(block);
+  const total = block.total ?? (
+    block.input != null || block.output != null ? (block.input ?? 0) + (block.output ?? 0) : undefined
+  );
+  const title = block.variant === 'warning'
+      ? t('chat.contextWarning')
+      : block.variant === 'compaction'
+        ? t('chat.contextCompaction')
+        : t('chat.contextUsage');
+  const modelLabel = [block.provider, block.model].filter(Boolean).join(' / ');
+  const usageStyle = usagePercent != null
+    ? { '--usage-percent': `${Math.max(0, Math.min(100, usagePercent))}%` } as CSSProperties
+    : undefined;
+
+  const stats: Array<[string, string]> = [];
+  if (block.input != null) stats.push([t('chat.tokenUsageInput'), formatTokens(block.input)]);
+  if (block.output != null) stats.push([t('chat.tokenUsageOutput'), formatTokens(block.output)]);
+  if (total != null) stats.push([t('chat.tokenUsageTotal'), formatTokens(total)]);
+  if (block.remaining != null) stats.push([t('chat.contextRemaining'), formatTokens(block.remaining)]);
+  if (block.contextLimit != null) stats.push([t('chat.contextLimit'), formatTokens(block.contextLimit)]);
+  if (block.totalCost != null) stats.push([t('chat.tokenUsageCost'), formatCost(block.totalCost)]);
+  const summary = stats.map(([label, value]) => `${label} ${value}`).join(' · ');
+
+  const rootClass = [
+    styles.contextUsageStrip,
+    styles.contextUsageDetailed,
+    block.variant === 'warning' ? styles.contextUsageWarning : '',
+    block.variant === 'compaction' ? styles.contextUsageCompaction : '',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <div className={rootClass} data-testid="context-usage-strip" title={[summary, modelLabel].filter(Boolean).join(' · ') || undefined}>
+      <div className={styles.contextUsageHeader}>
+        <span className={styles.contextUsageIcon} aria-hidden="true"><Gauge size={14} /></span>
+        <span className={styles.contextUsageTitle}>{title}</span>
+        {usagePercent != null ? (
+          <span className={styles.contextUsagePercent}>{Math.round(usagePercent)}%</span>
+        ) : null}
+        {block.threshold != null ? (
+          <span className={styles.contextUsageThreshold}>
+            {t('chat.contextThreshold', { percent: Math.round(block.threshold) })}
+          </span>
+        ) : null}
+      </div>
+      {usagePercent != null ? (
+        <div className={styles.contextUsageBar} style={usageStyle} aria-hidden="true" />
+      ) : null}
+      {stats.length > 0 ? (
+        <div className={styles.contextUsageStats}>
+          {stats.map(([label, value]) => (
+            <span key={label} className={styles.contextUsageStat}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {modelLabel ? <div className={styles.contextUsageModel}>{modelLabel}</div> : null}
     </div>
   );
 }
@@ -389,18 +675,98 @@ function FileChangeBlock({ block }: { block: Extract<MessageBlock, { kind: 'file
   );
 }
 
+function AgentTaskBlock({ block }: { block: Extract<MessageBlock, { kind: 'agent_task' }> }) {
+  const { t } = useTranslation();
+  const title = block.title.trim() || block.taskId;
+  return (
+    <div className={styles.agentTaskBlock} data-testid="subagent-task-card">
+      <div className={styles.agentTaskHeader}>
+        <span className={styles.agentTaskIcon} aria-hidden="true"><Bot size={14} /></span>
+        <span className={styles.agentTaskKind}>{t('chat.subagentTask')}</span>
+        <strong>{title}</strong>
+        <span className={`${styles.toolStatus} ${toolStatusClass(block.status)}`}>
+          {t(`chat.taskStatus.${block.status}`, { defaultValue: block.status })}
+        </span>
+      </div>
+      {block.summary ? <p className={styles.agentTaskSummary}>{block.summary}</p> : null}
+      <div className={styles.agentTaskMeta}>
+        <code>{block.taskId}</code>
+        {block.worker ? <span>{t('chat.subagentWorker')}: {block.worker}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function formatDurationMs(durationMs?: number): string | null {
+  if (durationMs == null || !Number.isFinite(durationMs)) return null;
+  if (durationMs < 1000) return `${Math.round(durationMs)}ms`;
+  return `${(durationMs / 1000).toFixed(durationMs < 10_000 ? 1 : 0)}s`;
+}
+
+function ChildAgentBlock({ block }: { block: Extract<MessageBlock, { kind: 'child_agent' }> }) {
+  const { t } = useTranslation();
+  const title = block.title.trim() || block.childId;
+  const detail = block.error || block.result;
+  const duration = formatDurationMs(block.durationMs);
+
+  return (
+    <div className={styles.childAgentBlock} data-testid="child-agent-card">
+      <div className={styles.childAgentHeader}>
+        <span className={styles.childAgentIcon} aria-hidden="true"><GitFork size={14} /></span>
+        <span className={styles.childAgentKind}>{t('chat.childAgent')}</span>
+        {block.agentName ? <span className={styles.childAgentName}>{block.agentName}</span> : null}
+        <strong>{title}</strong>
+        <span className={`${styles.toolStatus} ${toolStatusClass(block.status)}`}>
+          {t(`chat.taskStatus.${block.status}`, { defaultValue: block.status })}
+        </span>
+      </div>
+      {detail ? <p className={styles.childAgentSummary}>{detail}</p> : null}
+      <div className={styles.childAgentMeta}>
+        <code>{block.childId}</code>
+        {block.childRunId ? <span>{t('chat.childAgentRun')}: {block.childRunId}</span> : null}
+        {block.parentRunId ? <span>{t('chat.childAgentParent')}: {block.parentRunId}</span> : null}
+        {duration ? <span>{duration}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function RouteDecisionBlock({ block }: { block: Extract<MessageBlock, { kind: 'route_decision' }> }) {
+  const { t } = useTranslation();
+  const headline = block.instructions || block.summary || block.blockedReason || block.reasoning || block.action;
+  return (
+    <div className={styles.routeDecisionBlock} data-testid="route-decision-card">
+      <div className={styles.routeDecisionHeader}>
+        <span className={styles.routeDecisionIcon} aria-hidden="true"><Route size={14} /></span>
+        <span className={styles.routeDecisionKind}>{t('chat.routeDecision')}</span>
+        <em>{block.action}</em>
+      </div>
+      <p>{headline}</p>
+      <div className={styles.routeDecisionMeta}>
+        {block.nextWorker ? <span>{t('chat.routeNextWorker')}: {block.nextWorker}</span> : null}
+        {block.blockedReason ? <span>{t('chat.routeBlocked')}: {block.blockedReason}</span> : null}
+        {block.reasoning ? <span>{t('chat.routeReasoning')}: {previewInlineText(block.reasoning, 90)}</span> : null}
+      </div>
+    </div>
+  );
+}
+
 // ── Main BlockRenderer ──────────────────────
 function BlockRenderer({
   block,
   t,
+  role,
   active,
 }: {
   block: MessageBlock;
   t: (key: string, vars?: Record<string, unknown>) => string;
+  role?: ChatMessage['role'];
   active?: boolean;
 }) {
   switch (block.kind) {
     case 'text':
+      if (role === 'user') return <UserTextBlock content={block.content} />;
+      if (role === 'agent') return <AgentTextBlock content={block.content} isStreaming={active} />;
       return <MarkdownRenderer content={block.content} />;
 
     case 'code':
@@ -415,12 +781,24 @@ function BlockRenderer({
     case 'file_change':
       return <FileChangeBlock block={block} />;
 
+    case 'agent_task':
+      return <AgentTaskBlock block={block} />;
+
+    case 'child_agent':
+      return <ChildAgentBlock block={block} />;
+
+    case 'route_decision':
+      return <RouteDecisionBlock block={block} />;
+
     case 'session_init':
       return null;
 
     case 'result':
       if (block.success) return null;
       return <StatusRow label={t('chat.result.failed', { error: block.error ?? 'unknown error' })} meta="failed" />;
+
+    case 'context_usage':
+      return isDetailedContextUsage(block) ? <ContextUsageInline block={block} /> : null;
 
     default:
       return null;
@@ -442,12 +820,20 @@ function extractMessageText(msg: ChatMessage): string {
           return `[${block.toolName}] ${summarizeInput(block.input)}`;
         case 'file_change':
           return `[${block.action}] ${block.path}`;
+        case 'agent_task':
+          return `[subagent:${block.status}] ${block.title || block.taskId}${block.summary ? ` — ${block.summary}` : ''}`;
+        case 'child_agent':
+          return `[child:${block.status}] ${block.agentName ?? block.childId} ${block.title || block.childId}${block.result ? ` — ${block.result}` : ''}${block.error ? ` — ${block.error}` : ''}`;
+        case 'route_decision':
+          return `[route:${block.action}] ${block.instructions ?? block.summary ?? block.blockedReason ?? ''}`;
         case 'session_init':
           return `Session: ${block.model ?? 'unknown'}`;
         case 'result':
           return block.success
             ? `Result: success (tokens in=${block.tokenUsage?.input ?? '?'} out=${block.tokenUsage?.output ?? '?'})`
             : `Result: failed — ${block.error ?? 'unknown error'}`;
+        case 'context_usage':
+          return `Context usage: total=${block.total ?? '?'} input=${block.input ?? '?'} output=${block.output ?? '?'} percent=${block.usagePercent ?? '?'}`;
         default:
           return '';
       }
@@ -456,55 +842,63 @@ function extractMessageText(msg: ChatMessage): string {
     .join('\n');
 }
 
+function hasVisibleBlock(block: MessageBlock): boolean {
+  switch (block.kind) {
+    case 'session_init':
+      return false;
+    case 'result':
+      return !block.success;
+    case 'context_usage':
+      return isDetailedContextUsage(block);
+    case 'text':
+    case 'code':
+    case 'thinking':
+      return block.content.trim().length > 0;
+    case 'tool_use':
+    case 'file_change':
+    case 'agent_task':
+    case 'child_agent':
+    case 'route_decision':
+      return true;
+    default:
+      return false;
+  }
+}
+
+function hasVisibleMessage(message: ChatMessage): boolean {
+  return message.blocks.some(hasVisibleBlock);
+}
+
 // ── ChatView ────────────────────────────────
-export default function ChatView({ messages, isStreaming, onRetry, onDelete }: Props) {
+export default function ChatView({
+  messages,
+  isStreaming,
+  onRetry,
+  onFork,
+  onDelete,
+}: Props) {
   const { t, i18n } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastMessageIdRef = useRef<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-
-  // ── Virtualizer ──────────────────────────────
-  const virtualizer = useVirtualizer({
-    count: messages.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: (index: number) => {
-      const msg = messages[index];
-      if (!msg) return 200;
-      if (msg.role === 'system') return 80;
-      if (msg.blocks.some((b) => b.kind === 'tool_use')) return 300;
-      return 160;
-    },
-    overscan: 5,
-    getItemKey: (index: number) => messages[index]?.id ?? index,
-  });
-
-  // Stable refs so the callback closure always sees latest values
-  const messagesRef = useRef(messages);
-  messagesRef.current = messages;
-  const virtualizerRef = useRef(virtualizer);
-  virtualizerRef.current = virtualizer;
+  const visibleMessages = messages.filter(hasVisibleMessage);
 
   const { scrollToBottom, isNearBottom } = useAutoScroll(
     scrollRef,
-    { messages, isStreaming: isStreaming ?? false },
-    {
-      scrollToBottomFn: () => {
-        const len = messagesRef.current.length;
-        if (len > 0) {
-          virtualizerRef.current.scrollToIndex(len - 1, { align: 'end' });
-        }
-      },
-    },
+    { messages: visibleMessages, isStreaming: isStreaming ?? false },
   );
 
-  const lastMsg = messages[messages.length - 1];
+  const lastMsg = visibleMessages[visibleMessages.length - 1];
   const lastMessageId = lastMsg?.id ?? null;
   const lastMessageSignature = lastMsg
     ? `${lastMsg.id}:${lastMsg.blocks.map((block) => {
         if ('content' in block && typeof block.content === 'string') return block.content.length;
         if (block.kind === 'tool_use') return `${block.status}:${block.children?.length ?? 0}`;
+        if (block.kind === 'agent_task') return `${block.status}:${block.summary?.length ?? 0}`;
+        if (block.kind === 'child_agent') return `${block.status}:${block.result?.length ?? 0}:${block.error?.length ?? 0}`;
         if (block.kind === 'result') return block.success ? 'success' : block.error ?? 'failed';
+        if (block.kind === 'context_usage') return `${block.variant ?? 'usage'}:${block.total ?? ''}:${block.usagePercent ?? ''}`;
         return block.kind;
       }).join('|')}`
     : '';
@@ -564,13 +958,6 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
     };
   }, [scrollToBottom]);
 
-  useEffect(() => {
-    if (messages.length === 0) return;
-    virtualizer.measure();
-    const frame = requestAnimationFrame(() => scrollToBottom(true));
-    return () => cancelAnimationFrame(frame);
-  }, [messages.length, scrollToBottom, virtualizer]);
-
   const showScrollIndicator = isStreaming && !isNearBottom;
 
   const handleCopy = useCallback(async (msg: ChatMessage) => {
@@ -591,28 +978,30 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
   const renderMessage = useCallback(
     (msg: ChatMessage) => {
       const messageTime = formatMessageTime(msg.timestamp, i18n.language);
+      const tokenUsageFooter = formatTokenUsageFooter(msg, t);
       return (
         <div
           className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
         >
           {msg.role === 'agent' && msg.agentName && (
-            <div className={styles.agentAvatar}>
+            <div className={styles.agentAvatar} title={msg.agentName}>
               <div className={styles.avatarCircle}>
                 <AgentAvatarIcon name={msg.agentName} />
               </div>
-              <span className={styles.agentNameLabel}>{msg.agentName}</span>
+              <span className={styles.agentNameLabel}>{agentDisplayName(msg.agentName)}</span>
             </div>
           )}
 
+          {msg.role === 'agent' ? <TaskList blocks={msg.blocks} /> : null}
+          {msg.role === 'agent' ? <ToolTimeline blocks={msg.blocks} /> : null}
+
           {msg.blocks.map((block, i) => {
-            if (block.kind === 'text' && isStreaming && msg.id === lastMsg?.id) {
-              return <StreamingTextBlock key={i} content={block.content} isStreaming={true} />;
-            }
             return (
               <BlockRenderer
                 key={i}
                 block={block}
                 t={t}
+                role={msg.role}
                 active={Boolean(isStreaming && msg.id === lastMsg?.id)}
               />
             );
@@ -639,6 +1028,16 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
                     <RefreshCw size={14} />
                   </button>
                 )}
+                {onFork && (
+                  <button
+                    className={styles.actionBtn}
+                    title={t('chat.fork')}
+                    aria-label={t('chat.fork')}
+                    onClick={() => onFork(msg.id)}
+                  >
+                    <GitFork size={14} />
+                  </button>
+                )}
                 {onDelete && (
                   <button
                     className={styles.actionBtn}
@@ -657,6 +1056,15 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
               >
                 {messageTime.short}
               </span>
+              {tokenUsageFooter ? (
+                <span
+                  className={styles.messageTokenUsage}
+                  title={tokenUsageFooter}
+                  aria-label={tokenUsageFooter}
+                >
+                  · {tokenUsageFooter}
+                </span>
+              ) : null}
             </div>
           )}
           {copiedMessageId === msg.id && (
@@ -665,7 +1073,7 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
         </div>
       );
     },
-    [t, i18n.language, isStreaming, lastMsg?.id, copiedMessageId, handleCopy, onRetry, onDelete],
+    [t, i18n.language, isStreaming, lastMsg?.id, copiedMessageId, handleCopy, onRetry, onFork, onDelete],
   );
 
   const handleScrollToBottom = useCallback(() => {
@@ -680,45 +1088,25 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
         role="log"
         aria-live="polite"
       >
-        {messages.length === 0 ? (
+        {visibleMessages.length === 0 ? (
           <EmptyState
             title={t('chat.emptyTitle')}
             description={t('chat.emptyDescription')}
-            suggestions={[
-              { label: t('chat.suggestion.newTask'), onClick: () => {} },
-              { label: t('chat.suggestion.explainCode'), onClick: () => {} },
-              { label: t('chat.suggestion.fixBugs'), onClick: () => {} },
-            ]}
           />
         ) : (
-          <div className={styles.virtualContent} style={{ height: virtualizer.getTotalSize() }}>
-            {virtualizer.getVirtualItems().map((virtualRow) => {
-              const msg = messages[virtualRow.index];
-              if (!msg) return null;
-              const isLast = virtualRow.index === messages.length - 1;
-              return (
-                <div
-                  key={virtualRow.key}
-                  data-index={virtualRow.index}
-                  ref={virtualizer.measureElement}
-                  className={`${styles.virtualItem} ${msg.role === 'user' ? styles.virtualItemUser : ''}`}
-                  style={{
-                    transform: `translateY(${virtualRow.start}px)`,
-                    paddingBottom: isLast ? 0 : undefined,
-                  }}
-                >
-                  {renderMessage(msg)}
-                </div>
-              );
-            })}
+          <div className={styles.messageList}>
+            {visibleMessages.map((msg) => (
+              <div
+                key={msg.id}
+                data-message-id={msg.id}
+                className={`${styles.messageRow} ${msg.role === 'user' ? styles.messageRowUser : ''}`}
+              >
+                {renderMessage(msg)}
+              </div>
+            ))}
           </div>
         )}
-        {isStreaming &&
-          (lastMsgHasText ? (
-            <div className={styles.streamProgress} />
-          ) : (
-            <PendingThinking label={t('chat.thinkingLabel')} />
-          ))}
+        {isStreaming && !lastMsgHasText ? <PendingThinking label={t('chat.thinkingLabel')} /> : null}
       </div>
 
       {showScrollIndicator && (

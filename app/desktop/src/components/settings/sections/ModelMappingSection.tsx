@@ -22,7 +22,7 @@ export default function ModelMappingSection({
   const { t } = useTranslation();
   return (
     <Panel title={t('settings.modelMapping')} description={t('settings.modelMappingDesc')}>
-      <SettingRow title={t('settings.modelMappingSource')} description={t('settings.modelMappingSourceDesc')} value={t('settings.status.localSource')} />
+      <SettingRow title={t('settings.modelMappingSource')} description={t('settings.modelMappingSourceDesc')} value={t('settings.statusLocalSource')} />
       <SettingRow title={t('settings.enableModelMapping')} description={t('settings.enableModelMappingDesc')} control={<Switch checked={modelMappingEnabled} onChange={setModelMappingEnabled} />} />
       <div className={styles.taskSection}>
         <div className={styles.taskSectionHeader}><strong>{t('settings.modelAlias')}</strong><span>{t('settings.modelAliasDesc')}</span></div>

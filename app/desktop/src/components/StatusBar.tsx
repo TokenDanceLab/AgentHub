@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { Circle, Wifi, WifiOff, Sun, Moon, LogIn } from 'lucide-react';
+import { Circle, Wifi, WifiOff, Sun, Moon, UserCircle } from 'lucide-react';
 import type { HealthResponse } from '@shared/types';
 import { StatusBadge } from '@shared/components';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -122,7 +122,7 @@ export default memo(function StatusBar({ online, health, isConnected, error, pro
             <span className={styles.wsStatus}>
               {hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
             </span>
-            {!hubAuthenticated && <LogIn size={12} />}
+            {!hubAuthenticated && <UserCircle size={12} />}
           </button>
         </>
       )}

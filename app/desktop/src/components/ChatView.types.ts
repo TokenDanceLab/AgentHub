@@ -28,12 +28,56 @@ export type MessageBlock =
       children?: ToolResultBlock[];
     }
   | { kind: 'file_change'; path: string; action: 'created' | 'modified' | 'deleted'; diff?: string }
+  | {
+      kind: 'agent_task';
+      taskId: string;
+      title: string;
+      status: 'pending' | 'running' | 'completed' | 'failed';
+      summary?: string;
+      worker?: string;
+    }
+  | {
+      kind: 'child_agent';
+      childId: string;
+      title: string;
+      status: 'pending' | 'running' | 'completed' | 'failed';
+      agentName?: string;
+      parentRunId?: string;
+      childRunId?: string;
+      result?: string;
+      error?: string;
+      durationMs?: number;
+    }
+  | {
+      kind: 'route_decision';
+      action: string;
+      instructions?: string;
+      summary?: string;
+      reasoning?: string;
+      nextWorker?: string;
+      blockedReason?: string;
+    }
   | { kind: 'session_init'; model?: string; tools?: string[]; permissionMode?: string }
   | {
       kind: 'result';
       success: boolean;
       error?: string;
       tokenUsage?: { input: number; output: number };
+    }
+  | {
+      kind: 'context_usage';
+      runId?: string;
+      input?: number;
+      output?: number;
+      total?: number;
+      contextLimit?: number;
+      usagePercent?: number;
+      remaining?: number;
+      threshold?: number;
+      totalCost?: number;
+      model?: string;
+      provider?: string;
+      variant?: 'usage' | 'warning' | 'compaction';
     };
 
 // Tool result subtypes (nested under tool_use, 参考: Cline DiffEditRow 双格式)

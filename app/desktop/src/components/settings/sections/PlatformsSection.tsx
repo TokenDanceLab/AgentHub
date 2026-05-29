@@ -23,8 +23,8 @@ export default function PlatformsSection({ hubSessionActive }: PlatformsSectionP
         value={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')}
       />
       <div className={styles.capabilityGrid}>
-        <CapabilityCard title="macOS" description={t('settings.platformMacosDesc')} status={t('settings.status.localSource')} />
-        <CapabilityCard title="Windows" description={t('settings.platformWindowsDesc')} status={t('settings.status.localSource')} />
+        <CapabilityCard title="macOS" description={t('settings.platformMacosDesc')} status={t('settings.statusLocalSource')} />
+        <CapabilityCard title="Windows" description={t('settings.platformWindowsDesc')} status={t('settings.statusLocalSource')} />
         <CapabilityCard title="Android" description={t('settings.platformAndroidDesc')} status={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')} />
         <CapabilityCard title="Web" description={t('settings.platformWebDesc')} status={hubSessionActive ? t('settings.status.interfaceGap') : t('settings.status.loginLocked')} />
       </div>

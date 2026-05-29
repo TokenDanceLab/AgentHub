@@ -6,8 +6,8 @@ import App from '@/App';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import '@/i18n';
-import '@/styles/themes.css';
 import '@/styles/tokens.css';
+import '@/styles/themes.css';
 
 function AppShell() {
   return <App />;

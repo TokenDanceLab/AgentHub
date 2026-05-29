@@ -84,7 +84,7 @@
     linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.003)),
     var(--input-panel-bg);
   color: color-mix(in oklch, var(--foreground) 74%, var(--muted-foreground) 26%);
-  border: 1px solid rgba(0, 0, 0, 0.065);
+  border: 1px solid rgba(0, 0, 0, 0.04);
   border-radius: 18px;
   padding: 9px 13px 10px;
   box-shadow:
@@ -96,7 +96,7 @@
   background:
     linear-gradient(180deg, rgba(255,255,255,0.64), rgba(255,255,255,0.52)),
     var(--input-panel-bg);
-  border-color: rgba(15, 23, 42, 0.035);
+  border-color: rgba(15, 23, 42, 0.02);
 }
 
 .userAttachmentList {

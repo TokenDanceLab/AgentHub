@@ -44,6 +44,8 @@ interface ModelSettingsState {
 
 export interface RunModelSettingsInput {
   model?: string;
+  provider?: string;
+  modelAlias?: string;
   reasoningEffort?: string;
 }
 
@@ -63,15 +65,15 @@ const LEGACY_TOKENDANCE_RELAY_PROVIDER_ID = 'tokendance-relay';
 const DEFAULT_ALIASES: ModelAliasMapping[] = [
   {
     alias: 'opus',
-    model: 'claude-opus-4-7',
-    provider: 'anthropic',
+    model: 'deepseek-v4-pro',
+    provider: TOKENDANCE_GATEWAY_PROVIDER_ID,
     reasoningEffort: 'max',
     enabled: true,
   },
   {
     alias: 'sonnet',
-    model: 'claude-sonnet-4-6',
-    provider: 'anthropic',
+    model: 'deepseek-v4-flash',
+    provider: TOKENDANCE_GATEWAY_PROVIDER_ID,
     reasoningEffort: 'high',
     enabled: true,
   },
@@ -122,10 +124,16 @@ function migratePersistedState(persistedState: unknown): unknown {
   return {
     ...state,
     defaultProvider: migrateProviderId(state.defaultProvider),
-    aliases: state.aliases?.map((item) => ({
-      ...item,
-      provider: migrateProviderId(item.provider) ?? item.provider,
-    })),
+    aliases: state.aliases?.map((item) => {
+      const provider = migrateProviderId(item.provider) ?? item.provider;
+      if (item.alias === 'opus' && item.model === 'claude-opus-4-7') {
+        return { ...item, model: 'deepseek-v4-pro', provider: TOKENDANCE_GATEWAY_PROVIDER_ID };
+      }
+      if (item.alias === 'sonnet' && item.model === 'claude-sonnet-4-6') {
+        return { ...item, model: 'deepseek-v4-flash', provider: TOKENDANCE_GATEWAY_PROVIDER_ID };
+      }
+      return { ...item, provider };
+    }),
     ccSwitchProviders: state.ccSwitchProviders?.map((item) => ({
       ...item,
       id: migrateProviderId(item.id) ?? item.id,
@@ -147,14 +155,15 @@ function resolveRunRequestOptions(state: ModelSettingsState, input: RunModelSett
     ? state.aliases.find((item) => item.enabled && item.alias === candidateModel)
     : undefined;
   const model = alias?.model ?? candidateModel;
-  const provider = alias?.provider ?? (state.defaultProvider.trim() || undefined);
+  const provider = input.provider?.trim() || alias?.provider || (state.defaultProvider.trim() || undefined);
   const reasoningEffort = input.reasoningEffort?.trim() || alias?.reasoningEffort || state.reasoningEffort;
+  const modelAlias = input.modelAlias?.trim() || alias?.alias;
 
   return {
     ...(model ? { model } : {}),
     ...(provider ? { provider } : {}),
     ...(reasoningEffort ? { reasoningEffort } : {}),
-    ...(alias ? { modelAlias: alias.alias } : {}),
+    ...(modelAlias ? { modelAlias } : {}),
     modelMappingEnabled: state.modelMappingEnabled,
     providerFallbackEnabled: state.providerFallbackEnabled,
   };
@@ -212,7 +221,7 @@ export const useModelSettingsStore = create<ModelSettingsState>()(
       }),
       {
         name: 'agenthub-model-settings',
-        version: 2,
+        version: 3,
         migrate: migratePersistedState,
       },
     ),

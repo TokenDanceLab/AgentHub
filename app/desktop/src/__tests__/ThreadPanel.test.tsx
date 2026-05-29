@@ -3,10 +3,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ThreadPanel from '@/components/ThreadPanel';
-import type { ThreadInfo } from '@shared/types';
+import type { RunInfo, ThreadInfo } from '@shared/types';
 
 // ── Hoisted mocks (available before vi.mock factory runs) ──
-const { mockThreads, mockRenameMutateAsync, mockDeleteMutateAsync, mockCreateMutateAsync } = vi.hoisted(() => ({
+const { mockThreads, mockRenameMutateAsync, mockDeleteMutateAsync, mockCreateMutateAsync, mockArchiveMutateAsync, mockRestoreMutateAsync } = vi.hoisted(() => ({
   mockThreads: [] as ThreadInfo[],
   mockRenameMutateAsync: vi.fn().mockResolvedValue({}),
   mockDeleteMutateAsync: vi.fn().mockResolvedValue(undefined),
@@ -18,6 +18,8 @@ const { mockThreads, mockRenameMutateAsync, mockDeleteMutateAsync, mockCreateMut
     createdAt: '2025-01-01T00:00:00Z',
     updatedAt: '2025-01-01T00:00:00Z',
   }),
+  mockArchiveMutateAsync: vi.fn().mockResolvedValue({}),
+  mockRestoreMutateAsync: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock('lucide-react', async (importOriginal) => {
@@ -54,6 +56,8 @@ vi.mock('@/api/threadQueries', () => ({
   useRenameThread: () => ({ mutateAsync: mockRenameMutateAsync }),
   useDeleteThread: () => ({ mutateAsync: mockDeleteMutateAsync }),
   useCreateThread: () => ({ mutateAsync: mockCreateMutateAsync, isPending: false }),
+  useArchiveThread: () => ({ mutateAsync: mockArchiveMutateAsync, isPending: false }),
+  useRestoreThread: () => ({ mutateAsync: mockRestoreMutateAsync, isPending: false }),
 }));
 
 // ── Helpers ──
@@ -66,6 +70,18 @@ function makeThread(overrides: Partial<ThreadInfo> = {}): ThreadInfo {
     status: 'active',
     createdAt: '2025-01-01T00:00:00Z',
     updatedAt: '2025-01-02T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function makeRun(overrides: Partial<RunInfo> = {}): RunInfo {
+  return {
+    runId: 'run-default-1',
+    projectId: 'proj-1',
+    threadId: 'thread-default-1',
+    status: 'running',
+    createdAt: '2025-01-02T00:00:00Z',
+    startedAt: '2025-01-02T00:00:01Z',
     ...overrides,
   };
 }
@@ -109,6 +125,17 @@ describe('ThreadPanel', () => {
     expect(screen.getByText('Second Thread')).toBeInTheDocument();
   });
 
+  it('adds project labels to date groups when multiple projects are visible', () => {
+    mockThreads.push(
+      makeThread({ threadId: 't1', projectId: 'proj-a', title: 'Project A Thread' }),
+      makeThread({ threadId: 't2', projectId: 'proj-b', title: 'Project B Thread' }),
+    );
+    renderPanel();
+
+    expect(screen.getByText('proj-a · thread.groupEarlier')).toBeInTheDocument();
+    expect(screen.getByText('proj-b · thread.groupEarlier')).toBeInTheDocument();
+  });
+
   it('shows fallback title when thread title is empty', () => {
     mockThreads.push(
       makeThread({ threadId: 'thread-with-very-long-id-12345', title: '' }),
@@ -146,6 +173,84 @@ describe('ThreadPanel', () => {
     await vi.waitFor(() => {
       expect(mockCreateMutateAsync).toHaveBeenCalledWith({ title: '' });
       expect(spy).toHaveBeenCalledWith({ queryKey: ['threads'] });
+    });
+  });
+
+  it('separates archived threads behind a real status tab', () => {
+    mockThreads.push(
+      makeThread({ threadId: 't1', title: 'Active Thread', status: 'active' }),
+      makeThread({ threadId: 't2', title: 'Archived Thread', status: 'archived' }),
+    );
+    renderPanel();
+
+    expect(screen.getByText('Active Thread')).toBeInTheDocument();
+    expect(screen.queryByText('Archived Thread')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /thread\.archived/ }));
+
+    expect(screen.queryByText('Active Thread')).not.toBeInTheDocument();
+    expect(screen.getByText('Archived Thread')).toBeInTheDocument();
+  });
+
+  it('shows running status from real run records', () => {
+    mockThreads.push(makeThread({ threadId: 't1', title: 'Running Thread' }));
+
+    renderPanel({
+      runs: [makeRun({ runId: 'run-running', threadId: 't1', status: 'running' })],
+    });
+
+    expect(screen.getByText('Running Thread')).toBeInTheDocument();
+    expect(screen.getByText('thread.status.running')).toBeInTheDocument();
+  });
+
+  it('prioritizes waiting approval over running for the same thread', () => {
+    mockThreads.push(makeThread({ threadId: 't1', title: 'Approval Thread' }));
+
+    renderPanel({
+      runs: [
+        makeRun({ runId: 'run-running', threadId: 't1', status: 'running', startedAt: '2025-01-02T00:00:01Z' }),
+        makeRun({ runId: 'run-approval', threadId: 't1', status: 'waiting_approval', startedAt: '2025-01-02T00:00:02Z' }),
+      ],
+    });
+
+    expect(screen.getByText('thread.status.waitingApproval')).toBeInTheDocument();
+    expect(screen.queryByText('thread.status.running')).not.toBeInTheDocument();
+  });
+
+  it('shows failed only when the latest terminal run failed', () => {
+    mockThreads.push(makeThread({ threadId: 't1', title: 'Failed Thread' }));
+
+    renderPanel({
+      runs: [
+        makeRun({ runId: 'run-old', threadId: 't1', status: 'completed', finishedAt: '2025-01-02T00:00:01Z' }),
+        makeRun({ runId: 'run-failed', threadId: 't1', status: 'failed', finishedAt: '2025-01-02T00:00:03Z' }),
+      ],
+    });
+
+    expect(screen.getByText('thread.status.failed')).toBeInTheDocument();
+  });
+
+  it('does not show an activity dot for the selected active run thread', () => {
+    mockThreads.push(makeThread({ threadId: 't1', title: 'Selected Running Thread' }));
+
+    const { container } = renderPanel({
+      selectedId: 't1',
+      runs: [makeRun({ runId: 'run-running', threadId: 't1', status: 'running' })],
+    });
+
+    expect(screen.getByText('thread.status.running')).toBeInTheDocument();
+    expect(container.querySelector('[class*="unreadDot"]')).toBeNull();
+  });
+
+  it('delegates creation to the shell when provided so runtime binding is preserved', async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+    renderPanel({ onCreate });
+
+    fireEvent.click(screen.getByTitle('thread.create'));
+
+    await vi.waitFor(() => {
+      expect(onCreate).toHaveBeenCalledTimes(1);
+      expect(mockCreateMutateAsync).not.toHaveBeenCalled();
     });
   });
 
@@ -247,17 +352,36 @@ describe('ThreadPanel', () => {
     mockThreads.push(makeThread({ threadId: 't1', title: 'To Delete' }));
     renderPanel();
     fireEvent.click(screen.getByTitle('thread.delete'));
-    expect(screen.getByText('thread.confirmDelete')).toBeInTheDocument();
+    expect(screen.getByText('thread.confirmDeleteShort')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'thread.confirmDeleteAction' })).toBeInTheDocument();
   });
 
   it('confirms delete and removes thread', async () => {
     mockThreads.push(makeThread({ threadId: 't1', title: 'To Delete' }));
     renderPanel();
     fireEvent.click(screen.getByTitle('thread.delete'));
-    const confirmBtns = screen.getAllByText('thread.delete');
-    fireEvent.click(confirmBtns[confirmBtns.length - 1]!);
+    fireEvent.click(screen.getByRole('button', { name: 'thread.confirmDeleteAction' }));
     await vi.waitFor(() => {
       expect(mockDeleteMutateAsync).toHaveBeenCalledWith('t1');
+    });
+  });
+
+  it('archives active threads through the Edge archive mutation', async () => {
+    mockThreads.push(makeThread({ threadId: 't1', title: 'Archive Me' }));
+    renderPanel();
+    fireEvent.click(screen.getByTitle('thread.archive'));
+    await vi.waitFor(() => {
+      expect(mockArchiveMutateAsync).toHaveBeenCalledWith('t1');
+    });
+  });
+
+  it('restores archived threads through the Edge status mutation', async () => {
+    mockThreads.push(makeThread({ threadId: 't1', title: 'Restore Me', status: 'archived' }));
+    renderPanel();
+    fireEvent.click(screen.getByRole('tab', { name: /thread\.archived/ }));
+    fireEvent.click(screen.getByTitle('thread.restore'));
+    await vi.waitFor(() => {
+      expect(mockRestoreMutateAsync).toHaveBeenCalledWith('t1');
     });
   });
 
@@ -267,15 +391,17 @@ describe('ThreadPanel', () => {
     fireEvent.click(screen.getByTitle('thread.delete'));
     fireEvent.click(screen.getByTitle('thread.cancel'));
     expect(screen.getByText('To Delete')).toBeInTheDocument();
-    expect(screen.queryByText('thread.confirmDelete')).not.toBeInTheDocument();
+    expect(screen.queryByText('thread.confirmDeleteShort')).not.toBeInTheDocument();
   });
 
   it('disables rename and delete buttons when offline', () => {
     mockThreads.push(makeThread({ threadId: 't1', title: 'Offline Thread' }));
     renderPanel({ online: false });
     const renameBtn = screen.getByTitle('thread.rename');
+    const archiveBtn = screen.getByTitle('thread.archive');
     const deleteBtn = screen.getByTitle('thread.delete');
     expect(renameBtn).toBeDisabled();
+    expect(archiveBtn).toBeDisabled();
     expect(deleteBtn).toBeDisabled();
   });
 });

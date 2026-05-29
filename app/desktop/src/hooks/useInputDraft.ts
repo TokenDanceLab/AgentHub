@@ -65,6 +65,7 @@ export function useInputDraft(threadId: string | undefined): UseInputDraftReturn
   }, []);
 
   const clear = useCallback(() => {
+    clearTimeout(timerRef.current);
     const tid = threadIdRef.current;
     if (!tid) return;
     localStorage.removeItem(getKey(tid));

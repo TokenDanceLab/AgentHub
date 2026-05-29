@@ -5,16 +5,20 @@
   display: flex;
   justify-content: center;
   padding-top: 15vh;
-  background: oklch(0 0 0 / 0.4);
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .dialog {
-  width: 560px;
-  max-height: 60vh;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(62vh, 520px);
+  background: rgba(31, 32, 39, 0.96);
+  border: 1px solid rgba(0, 0, 0, 0.34);
+  border-radius: 14px;
+  box-shadow:
+    0 22px 56px rgba(0, 0, 0, 0.36),
+    0 4px 16px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -23,9 +27,9 @@
 .inputRow {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-md);
-  border-bottom: 1px solid var(--border);
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
 }
 
 .searchIcon {
@@ -37,39 +41,45 @@
   flex: 1;
   border: none;
   background: transparent;
-  color: var(--foreground);
-  font-size: var(--font-size-base);
+  color: color-mix(in oklch, var(--foreground) 90%, var(--muted-foreground) 10%);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 22px;
   font-family: var(--font-sans);
   outline: none;
 }
 
 .kbd {
-  padding: 2px 6px;
-  border: 1px solid var(--border);
-  border-radius: 3px;
+  padding: 2px 6px 3px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
+  font-weight: 560;
   color: var(--muted-foreground);
-  background: var(--background);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .results {
   overflow-y: auto;
-  padding: var(--space-xs);
+  padding: 6px;
 }
 
 .item {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
+  gap: 10px;
+  min-height: 42px;
+  padding: 6px 9px;
+  border-radius: 9px;
+  color: var(--muted-foreground);
   cursor: pointer;
-  transition: background var(--duration-fast);
+  transition: background var(--duration-fast), color var(--duration-fast);
 }
 .item:hover,
 .selected {
-  background: var(--accent);
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--foreground);
 }
 
 .itemIcon {
@@ -85,15 +95,18 @@
 }
 
 .itemTitle {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  color: color-mix(in oklch, var(--foreground) 82%, var(--muted-foreground) 18%);
+  font-size: 13px;
+  font-weight: 470;
+  line-height: 1.45;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .itemSnippet {
-  font-size: var(--font-size-xs);
+  font-size: 12px;
+  line-height: 1.4;
   color: var(--muted-foreground);
   white-space: nowrap;
   overflow: hidden;
@@ -110,15 +123,38 @@
 }
 
 .timestamp {
-  font-size: var(--font-size-xs);
+  font-size: 11px;
+  line-height: 1.4;
   color: var(--muted-foreground);
   flex-shrink: 0;
   white-space: nowrap;
 }
 
 .empty {
-  padding: var(--space-xl);
+  padding: 24px;
   text-align: center;
   color: var(--muted-foreground);
-  font-size: var(--font-size-sm);
+  font-size: 13px;
+}
+
+[data-theme='light'] .dialog {
+  background: rgba(250, 250, 252, 0.97);
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 22px 56px rgba(15, 23, 42, 0.14),
+    0 4px 16px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme='light'] .inputRow {
+  border-bottom-color: rgba(15, 23, 42, 0.075);
+}
+
+[data-theme='light'] .kbd {
+  border-color: rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.045);
+}
+
+[data-theme='light'] .item:hover,
+[data-theme='light'] .selected {
+  background: rgba(15, 23, 42, 0.055);
 }

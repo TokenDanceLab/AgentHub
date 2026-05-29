@@ -44,6 +44,7 @@ describe('LoginForm', () => {
   it('renders the TokenDance ID login button', () => {
     renderForm();
     expect(screen.getByText('auth.tokenDanceLogin')).toBeInTheDocument();
+    expect(screen.getByText('auth.tokenDanceLogin').closest('button')?.querySelector('img')).toBeInTheDocument();
   });
 
   it('renders the primary auth hint', () => {
