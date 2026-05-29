@@ -397,6 +397,7 @@ export default function App() {
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
+  const [pendingComposerDraft, setPendingComposerDraft] = useState('');
   const [openTopMenu, setOpenTopMenu] = useState<TopMenuId | null>(null);
   const [hoverOpenedTopMenu, setHoverOpenedTopMenu] = useState<TopMenuId | null>(null);
   const {
@@ -749,6 +750,12 @@ export default function App() {
     }
   }, [addThreadToCache, agents, queryClient, setLeftSidebarView]);
 
+  const handleStartLocalOrchestration = useCallback(async (agentId: string, draft: string) => {
+    await handleSelectAgent(agentId);
+    setViewMode('agent');
+    setPendingComposerDraft(draft);
+  }, [handleSelectAgent]);
+
   const handleCreateThread = useCallback(async () => {
     try {
       const thread = await createThread(selectedAgent?.name ? `${selectedAgent.name}` : undefined);
@@ -966,8 +973,7 @@ export default function App() {
         messages: allMessages,
         messageId,
       });
-      window.setTimeout(() => setComposerDraft(draft), 120);
-      focusComposer();
+      setPendingComposerDraft(draft);
       addToast({ type: 'success', message: t('toast.forkCreated') });
     } catch {
       addToast({ type: 'error', message: t('toast.error') });
@@ -991,6 +997,27 @@ export default function App() {
   const handleDelete = useCallback((messageId: string) => {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
   }, []);
+
+  useEffect(() => {
+    if (!pendingComposerDraft || leftSidebarView === 'home' || viewMode !== 'agent') return undefined;
+    let attempts = 0;
+    let timer: number | undefined;
+    const tryApplyDraft = () => {
+      const textarea = document.querySelector<HTMLTextAreaElement>('textarea[aria-label], textarea[placeholder]');
+      if (!textarea) {
+        attempts += 1;
+        if (attempts < 12) timer = window.setTimeout(tryApplyDraft, 50);
+        return;
+      }
+      setComposerDraft(pendingComposerDraft);
+      focusComposer();
+      setPendingComposerDraft('');
+    };
+    timer = window.setTimeout(tryApplyDraft, 0);
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [leftSidebarView, pendingComposerDraft, viewMode]);
 
   const handleShareWorkspace = useCallback(async () => {
     const title = selectedThread?.title ?? selectedAgent?.name ?? 'AgentHub';
@@ -1685,6 +1712,7 @@ export default function App() {
                   agents={agents}
                   selectedAgentId={selectedAgentId ?? undefined}
                   onSelectAgent={handleSelectAgent}
+                  onStartLocalOrchestration={handleStartLocalOrchestration}
                 />
               ) : viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>

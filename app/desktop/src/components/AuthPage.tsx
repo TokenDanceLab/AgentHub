@@ -4,6 +4,7 @@ import { X, ChevronDown } from 'lucide-react';
 import type { UserProfile } from '@/api/hubClient';
 import { HUB_URL } from '@/config';
 import LoginForm from '@/components/LoginForm';
+import tokenDanceLogo from '@/assets/tokendance-icon-rounded.svg';
 import styles from './AuthPage.module.css';
 
 type HubStatus = 'connected' | 'disconnected' | 'checking';
@@ -84,9 +85,7 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
 
       {/* Clean header — no dark background */}
       <div className={styles.header}>
-        <div className={styles.logo} aria-hidden="true">
-          AH
-        </div>
+        <img className={styles.logo} src={tokenDanceLogo} alt="TokenDance" />
         <h1 className={styles.appName}>{t('auth.title')}</h1>
         <p className={styles.tagline}>{t('auth.tagline')}</p>
       </div>

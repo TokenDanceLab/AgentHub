@@ -20,6 +20,7 @@ interface Props {
   selectedAgentId?: string;
   onSelectAgent?: (agentId: string) => void;
   onRetry: (messageId: string) => void;
+  onFork?: (messageId: string) => void;
   onDelete: (messageId: string) => void;
   onSendMessage: (message: string, agentId?: string, opts?: { model?: string }) => void;
 }
@@ -32,8 +33,8 @@ export function resolveViewMode(
   isStreaming: boolean,
   isConnected: boolean,
 ): ViewMode {
-  if (messages.length === 0 && isStreaming) return 'loading';
   const hasUserMessage = allMessages.some((message) => message.role === 'user');
+  if (messages.length === 0 && isStreaming && !hasUserMessage) return 'loading';
   if (threadsCount === 0 && isConnected && !hasUserMessage) return 'welcome';
   return 'chat';
 }
@@ -48,13 +49,13 @@ export default function MainView({
   selectedAgentId,
   onSelectAgent,
   onRetry,
+  onFork,
   onDelete,
   onSendMessage,
 }: Props) {
   const { t } = useTranslation();
 
   const viewMode = resolveViewMode(allMessages, messages, threadsCount, isStreaming, isConnected);
-
   const handleCreateThread = useCallback(() => {
     const textarea = document.querySelector<HTMLTextAreaElement>(
       'textarea[aria-label], textarea[placeholder]',
@@ -65,6 +66,18 @@ export default function MainView({
     }
   }, []);
 
+  const handleWelcomeSend = useCallback(
+    (message: string, agentId?: string, opts?: { model?: string }) => {
+      const resolvedAgentId = agentId ?? selectedAgentId;
+      if (opts) {
+        onSendMessage(message, resolvedAgentId, opts);
+      } else {
+        onSendMessage(message, resolvedAgentId);
+      }
+    },
+    [onSendMessage, selectedAgentId],
+  );
+
   if (viewMode === 'welcome') {
     return (
       <WelcomeScreen
@@ -73,7 +86,7 @@ export default function MainView({
         selectedAgentId={selectedAgentId}
         onSelectAgent={onSelectAgent}
         onCreateThread={handleCreateThread}
-        onSendMessage={onSendMessage}
+        onSendMessage={handleWelcomeSend}
       />
     );
   }
@@ -107,6 +120,7 @@ export default function MainView({
           messages={allMessages}
           isStreaming={isStreaming}
           onRetry={onRetry}
+          onFork={onFork}
           onDelete={onDelete}
         />
       </Suspense>

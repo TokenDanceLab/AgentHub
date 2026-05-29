@@ -18,7 +18,7 @@
   --composer-control-text-active: var(--text-strong);
   --composer-control-icon: var(--text-weaker);
   --composer-control-icon-active: var(--text-primary);
-  --composer-panel-edge: rgba(0, 0, 0, 0.065);
+  --composer-panel-edge: rgba(0, 0, 0, 0.04);
   --composer-panel-shadow: 0 14px 34px rgba(0, 0, 0, 0.16), 0 1px 4px rgba(0, 0, 0, 0.1);
   --composer-side-pad: max(30px, calc((100% - var(--run-card-space, 0px) - var(--composer-column-width)) / 2));
   padding:
@@ -54,7 +54,7 @@
 
 .capsule:focus-within {
   background: rgba(49, 49, 59, 0.88);
-  border-color: rgba(0, 0, 0, 0.095);
+  border-color: rgba(0, 0, 0, 0.06);
   box-shadow:
     0 14px 34px rgba(0, 0, 0, 0.17),
     0 1px 5px rgba(0, 0, 0, 0.1);
@@ -64,7 +64,7 @@
   background:
     linear-gradient(180deg, rgba(255,255,255,0.64), rgba(255,255,255,0.52)),
     rgba(244, 245, 248, 0.82);
-  border-color: rgba(15, 23, 42, 0.035);
+  border-color: rgba(15, 23, 42, 0.02);
   box-shadow:
     0 12px 30px rgba(15, 23, 42, 0.075);
 }
@@ -73,7 +73,7 @@
   background:
     linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.58)),
     rgba(246, 247, 250, 0.88);
-  border-color: rgba(15, 23, 42, 0.08);
+  border-color: rgba(15, 23, 42, 0.045);
   box-shadow:
     0 14px 32px rgba(15, 23, 42, 0.09);
 }

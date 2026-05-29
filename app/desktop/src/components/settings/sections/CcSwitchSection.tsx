@@ -18,7 +18,7 @@ export default function CcSwitchSection({ ccSwitchBridge, setCcSwitchBridge, ccS
   const { t } = useTranslation();
   return (
     <Panel title={t('settings.ccSwitch')} description={t('settings.ccSwitchDesc')}>
-      <SettingRow title={t('settings.ccSwitchSource')} description={t('settings.ccSwitchSourceDesc')} value={t('settings.status.localSource')} />
+      <SettingRow title={t('settings.ccSwitchSource')} description={t('settings.ccSwitchSourceDesc')} value={t('settings.statusLocalSource')} />
       <SettingRow title={t('settings.ccSwitchBridge')} description={t('settings.ccSwitchBridgeDesc')} control={<Switch checked={ccSwitchBridge} onChange={setCcSwitchBridge} />} />
       <div className={styles.taskSection}>
         <div className={styles.taskSectionHeader}><strong>{t('settings.ccSwitchProviders')}</strong><span>{t('settings.ccSwitchProvidersDesc')}</span></div>

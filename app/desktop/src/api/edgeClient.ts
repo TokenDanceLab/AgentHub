@@ -13,6 +13,7 @@ import type {
   StartRunRequest,
 } from '@shared/types';
 import { parseError } from '@shared/errors';
+import type { AppError } from '@shared/errors';
 import { edgeAuthHeaders } from './edgeAuth';
 import {
   HealthResponseSchema,
@@ -20,6 +21,7 @@ import {
   AgentInfoSchema,
   RunInfoSchema,
   ThreadInfoSchema,
+  ModelCatalogResponseSchema,
   safeParse,
   listResponseSchema,
 } from './schemas';
@@ -33,6 +35,34 @@ export type {
   ThreadInfo,
   StartRunRequest,
 };
+
+export interface ModelCatalogItem {
+  id: string;
+  value: string;
+  label: string;
+  provider?: string;
+  runtimeId?: string;
+  resolvedModel?: string;
+  sourceId: string;
+  sourceLabel: string;
+  status: string;
+  description?: string;
+  tags?: string[];
+  reasoningEfforts?: string[];
+  default?: boolean;
+}
+
+export interface ModelCatalogSource {
+  id: string;
+  label: string;
+  status: string;
+  detail?: string;
+}
+
+export interface ModelCatalogResponse {
+  items: ModelCatalogItem[];
+  sources: ModelCatalogSource[];
+}
 
 const BASE = EDGE_URL.replace(/\/+$/, '');
 
@@ -54,6 +84,12 @@ export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {
   const raw = await res.json();
   const normalized = normalizeAgentList(raw);
   return safeParse(listResponseSchema(AgentInfoSchema), normalized, 'agents');
+}
+
+export async function fetchModelCatalog(): Promise<ModelCatalogResponse> {
+  const res = await fetch(`${BASE}/v1/model-catalog`, { headers: edgeAuthHeaders() });
+  if (!res.ok) throw await parseError(res);
+  return safeParse(ModelCatalogResponseSchema, await res.json(), 'modelCatalog');
 }
 
 function normalizeAgentList(raw: unknown): unknown {
@@ -149,12 +185,42 @@ export async function renameThread(threadId: string, title: string): Promise<Thr
   return safeParse(ThreadInfoSchema, await res.json(), 'renameThread');
 }
 
-export async function deleteThread(threadId: string): Promise<void> {
+export async function updateThreadStatus(threadId: string, status: 'active' | 'archived'): Promise<ThreadInfo> {
+  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
+    method: 'PATCH',
+    headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw await parseError(res);
+  return safeParse(ThreadInfoSchema, await res.json(), 'updateThreadStatus');
+}
+
+export async function archiveThread(threadId: string): Promise<ThreadInfo> {
+  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}:archive`, {
+    method: 'POST',
+    headers: edgeAuthHeaders(),
+  });
+  if (!res.ok) throw await parseError(res);
+  return safeParse(ThreadInfoSchema, await res.json(), 'archiveThread');
+}
+
+export async function deleteThread(threadId: string): Promise<'deleted' | 'archived'> {
   const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
     method: 'DELETE',
     headers: edgeAuthHeaders(),
   });
-  if (!res.ok) throw await parseError(res);
+  if (res.ok) return 'deleted';
+
+  const error = await parseError(res);
+  if (isMethodNotAllowed(error)) {
+    await archiveThread(threadId);
+    return 'archived';
+  }
+  throw error;
+}
+
+function isMethodNotAllowed(error: AppError): boolean {
+  return error.status === 405 || error.code === 'method_not_allowed';
 }
 
 // ── Permission gating ────────────────────────

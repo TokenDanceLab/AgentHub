@@ -20,6 +20,8 @@ const MAX_OUTPUT_TEXT = 20000;
 
 const LOOP_WARN_AT = 3;
 const LOOP_CANCEL_AT = 5;
+const LIVE_TAIL_CURSOR = String(Number.MAX_SAFE_INTEGER);
+const THREAD_REPLAY_CURSOR = '0';
 
 interface LoopEntry {
   count: number;
@@ -96,8 +98,14 @@ function mergeBlock(blocks: MessageBlock[], block: MessageBlock): MessageBlock[]
   return [...blocks, block];
 }
 
-function newAgentMessage(id: string, timestamp: string, agentName?: string): ChatMessage {
-  return { id, role: 'agent', timestamp, blocks: [], agentName };
+function newAgentMessage(id: string, timestamp: string, agentName?: string, parentId?: string | null): ChatMessage {
+  return { id, role: 'agent', timestamp, blocks: [], agentName, ...(parentId ? { parentId } : {}) };
+}
+
+function canAppendToAgentMessage(message: ChatMessage | undefined, runId: string | null): message is ChatMessage {
+  if (!message || message.role !== 'agent') return false;
+  if (!runId || !message.parentId) return true;
+  return message.parentId === runId;
 }
 
 function capMessages(messages: ChatMessage[]): ChatMessage[] {
@@ -112,6 +120,39 @@ function capOutputText(text: string): string {
     return text.slice(text.length - MAX_OUTPUT_TEXT);
   }
   return text;
+}
+
+function stringField(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function numberField(value: unknown): string | null {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : null;
+}
+
+function firstString(...values: unknown[]): string | null {
+  for (const value of values) {
+    const stringValue = stringField(value) ?? numberField(value);
+    if (stringValue) return stringValue;
+  }
+  return null;
+}
+
+function eventThreadId(event: EventEnvelope): string | null {
+  return stringField(event.scope?.threadId) ?? stringField(event.payload.threadId);
+}
+
+function eventRunId(event: EventEnvelope): string | null {
+  return stringField(event.scope?.runId) ?? stringField(event.payload.runId);
+}
+
+function isThreadScopedEvent(event: EventEnvelope): boolean {
+  return event.type.startsWith('run.') || event.type.startsWith('message.') || event.type.startsWith('item.');
+}
+
+function eventMatchesSelectedThread(event: EventEnvelope, selectedThreadId: string | null | undefined): boolean {
+  if (!selectedThreadId || !isThreadScopedEvent(event)) return true;
+  return eventThreadId(event) === selectedThreadId;
 }
 
 function extractPathFromContent(
@@ -146,6 +187,261 @@ function mapUsageToTokenUsage(
   const output = (usage.outputTokens ?? usage.output_tokens ?? usage.output) as number | undefined;
   if (input == null && output == null) return undefined;
   return { input: Number(input ?? 0), output: Number(output ?? 0) };
+}
+
+function taskStatus(value: unknown, fallback: Extract<MessageBlock, { kind: 'agent_task' }>['status']): Extract<MessageBlock, { kind: 'agent_task' }>['status'] {
+  const normalized = stringField(value)?.toLowerCase();
+  switch (normalized) {
+    case 'pending':
+    case 'queued':
+      return 'pending';
+    case 'running':
+    case 'in_progress':
+    case 'dispatching':
+      return 'running';
+    case 'done':
+    case 'completed':
+    case 'success':
+    case 'succeeded':
+      return 'completed';
+    case 'failed':
+    case 'error':
+    case 'cancelled':
+      return 'failed';
+    default:
+      return fallback;
+  }
+}
+
+function numberValue(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return value;
+}
+
+function numericValue(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function recordValue(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function percentValue(value: unknown): number | undefined {
+  const numeric = numericValue(value);
+  if (numeric == null) return undefined;
+  const pct = numeric > 0 && numeric <= 1 ? numeric * 100 : numeric;
+  return Math.max(0, Math.min(100, pct));
+}
+
+function parseContextUsageBlock(
+  event: EventEnvelope,
+  variant: Extract<MessageBlock, { kind: 'context_usage' }>['variant'],
+): Extract<MessageBlock, { kind: 'context_usage' }> | null {
+  const payload = event.payload;
+  const context = recordValue(payload.context) ?? payload;
+  const cost = recordValue(payload.cost);
+
+  const input = numericValue(context.inputTokens)
+    ?? numericValue(context.input_tokens)
+    ?? numericValue(context.input);
+  const output = numericValue(context.outputTokens)
+    ?? numericValue(context.output_tokens)
+    ?? numericValue(context.output);
+  const total = numericValue(context.totalTokens)
+    ?? numericValue(context.total_tokens)
+    ?? numericValue(context.total)
+    ?? numericValue(payload.tokensUsed)
+    ?? numericValue(payload.tokens_used)
+    ?? (input != null || output != null ? (input ?? 0) + (output ?? 0) : undefined);
+  const contextLimit = numericValue(context.contextLimit)
+    ?? numericValue(context.context_limit)
+    ?? numericValue(context.limit)
+    ?? numericValue(context.maxTokens)
+    ?? numericValue(context.max_tokens);
+  const usagePercent = percentValue(context.usagePercent)
+    ?? percentValue(context.usage_percent)
+    ?? percentValue(context.usage)
+    ?? percentValue(payload.usagePercent)
+    ?? percentValue(payload.usage_percent);
+  const remaining = numericValue(context.remaining)
+    ?? numericValue(context.tokensRemaining)
+    ?? numericValue(context.tokens_remaining)
+    ?? numericValue(payload.tokensRemaining)
+    ?? numericValue(payload.tokens_remaining);
+  const threshold = percentValue(context.threshold) ?? percentValue(payload.threshold);
+  const totalCost = numericValue(cost?.totalCostUsd)
+    ?? numericValue(cost?.total_cost_usd)
+    ?? numericValue(payload.totalCostUsd)
+    ?? numericValue(payload.total_cost_usd);
+
+  if (
+    input == null &&
+    output == null &&
+    total == null &&
+    contextLimit == null &&
+    usagePercent == null &&
+    remaining == null
+  ) {
+    return null;
+  }
+
+  return {
+    kind: 'context_usage',
+    runId: eventRunId(event) ?? undefined,
+    input,
+    output,
+    total,
+    contextLimit,
+    usagePercent,
+    remaining,
+    threshold,
+    totalCost,
+    model: firstString(cost?.modelLabel, cost?.model_label, payload.model, payload.modelLabel) ?? undefined,
+    provider: firstString(cost?.providerLabel, cost?.provider_label, payload.provider, payload.providerLabel) ?? undefined,
+    variant,
+  };
+}
+
+function upsertAgentTaskBlock(blocks: MessageBlock[], block: Extract<MessageBlock, { kind: 'agent_task' }>): MessageBlock[] {
+  const index = blocks.findIndex((item) => item.kind === 'agent_task' && item.taskId === block.taskId);
+  if (index < 0) return [...blocks, block];
+
+  const current = blocks[index] as Extract<MessageBlock, { kind: 'agent_task' }>;
+  const next = {
+    ...current,
+    ...block,
+    title: block.title || current.title,
+    summary: block.summary || current.summary,
+    worker: block.worker || current.worker,
+  };
+  return [...blocks.slice(0, index), next, ...blocks.slice(index + 1)];
+}
+
+function upsertChildAgentBlock(blocks: MessageBlock[], block: Extract<MessageBlock, { kind: 'child_agent' }>): MessageBlock[] {
+  const index = blocks.findIndex((item) => (
+    item.kind === 'child_agent' &&
+    (item.childId === block.childId || Boolean(block.childRunId && item.childRunId === block.childRunId))
+  ));
+  if (index < 0) return [...blocks, block];
+
+  const current = blocks[index] as Extract<MessageBlock, { kind: 'child_agent' }>;
+  const next = {
+    ...current,
+    ...block,
+    title: block.title || current.title,
+    agentName: block.agentName || current.agentName,
+    parentRunId: block.parentRunId || current.parentRunId,
+    childRunId: block.childRunId || current.childRunId,
+    result: block.result || current.result,
+    error: block.error || current.error,
+    durationMs: block.durationMs ?? current.durationMs,
+  };
+  return [...blocks.slice(0, index), next, ...blocks.slice(index + 1)];
+}
+
+function upsertContextUsageBlock(blocks: MessageBlock[], block: Extract<MessageBlock, { kind: 'context_usage' }>): MessageBlock[] {
+  const index = blocks.findIndex((item) => (
+    item.kind === 'context_usage' &&
+    (block.runId == null || item.runId == null || item.runId === block.runId)
+  ));
+  if (index < 0) return [...blocks, block];
+
+  const current = blocks[index] as Extract<MessageBlock, { kind: 'context_usage' }>;
+  const next = {
+    ...current,
+    ...block,
+    input: block.input ?? current.input,
+    output: block.output ?? current.output,
+    total: block.total ?? current.total,
+    contextLimit: block.contextLimit ?? current.contextLimit,
+    usagePercent: block.usagePercent ?? current.usagePercent,
+    remaining: block.remaining ?? current.remaining,
+    threshold: block.threshold ?? current.threshold,
+    totalCost: block.totalCost ?? current.totalCost,
+    model: block.model || current.model,
+    provider: block.provider || current.provider,
+    variant: block.variant ?? current.variant,
+  };
+  return [...blocks.slice(0, index), next, ...blocks.slice(index + 1)];
+}
+
+function appendOrUpdateAgentBlock(
+  messages: ChatMessage[],
+  event: EventEnvelope,
+  agentName: string | undefined,
+  block: MessageBlock,
+  parentRunIdOverride?: string | null,
+): ChatMessage[] {
+  const runId = parentRunIdOverride ?? eventRunId(event);
+  const last = messages[messages.length - 1];
+  const upsert = (blocks: MessageBlock[]) => {
+    if (block.kind === 'agent_task') return upsertAgentTaskBlock(blocks, block);
+    if (block.kind === 'child_agent') return upsertChildAgentBlock(blocks, block);
+    if (block.kind === 'context_usage') return upsertContextUsageBlock(blocks, block);
+    return [...blocks, block];
+  };
+
+  if (canAppendToAgentMessage(last, runId)) {
+    return [...messages.slice(0, -1), { ...last, blocks: upsert(last.blocks) }];
+  }
+
+  const msg = newAgentMessage(event.id, event.sentAt, agentName, runId);
+  msg.blocks = [block];
+  return [...messages, msg];
+}
+
+function routeDecisionPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const nested = payload.decision ?? payload.route_decision ?? payload.routeDecision ?? payload.structuredOutput;
+  return nested && typeof nested === 'object'
+    ? { ...payload, ...(nested as Record<string, unknown>) }
+    : payload;
+}
+
+function childAgentIdentity(payload: Record<string, unknown>, event: EventEnvelope): string {
+  return firstString(
+    payload.childId,
+    payload.child_id,
+    payload.subAgentId,
+    payload.sub_agent_id,
+    payload.agentInstanceId,
+    payload.agent_instance_id,
+    payload.agentId,
+    payload.agent_id,
+    payload.taskId,
+    payload.task_id,
+  ) ?? event.id;
+}
+
+function childAgentParentRunId(payload: Record<string, unknown>, event: EventEnvelope): string | null {
+  return firstString(
+    payload.parentRunId,
+    payload.parent_run_id,
+    payload.parentId,
+    payload.parent_id,
+    event.scope?.parentRunId,
+    event.scope?.parent_id,
+    event.scope?.runId,
+  ) ?? eventRunId(event);
+}
+
+function childAgentRunId(payload: Record<string, unknown>, parentRunId: string | null): string | undefined {
+  const explicit = firstString(
+    payload.childRunId,
+    payload.child_run_id,
+    payload.subAgentRunId,
+    payload.sub_agent_run_id,
+  );
+  if (explicit) return explicit;
+
+  const payloadRunId = firstString(payload.runId, payload.run_id);
+  return payloadRunId && payloadRunId !== parentRunId ? payloadRunId : undefined;
 }
 
 function processEvent(state: State, event: EventEnvelope): State {
@@ -195,15 +491,16 @@ function processEvent(state: State, event: EventEnvelope): State {
 
     case 'run.agent.text_delta': {
       const content = event.payload.content as string;
+      const runId = eventRunId(event);
       const block: MessageBlock = {
         kind: 'text',
         content,
       };
       const last = messages[messages.length - 1];
-      if (last && last.role === 'agent') {
+      if (canAppendToAgentMessage(last, runId)) {
         messages = [...messages.slice(0, -1), { ...last, blocks: mergeBlock(last.blocks, block) }];
       } else {
-        const msg = newAgentMessage(event.id, ts, agentName);
+        const msg = newAgentMessage(event.id, ts, agentName, runId);
         msg.blocks = [block];
         messages = [...messages, msg];
       }
@@ -219,16 +516,17 @@ function processEvent(state: State, event: EventEnvelope): State {
     }
 
     case 'run.agent.text_block': {
+      const runId = eventRunId(event);
       const block: MessageBlock = {
         kind: (event.payload.contentType as MessageBlock['kind']) === 'code' ? 'code' : 'text',
         content: event.payload.content as string,
         language: event.payload.language as string | undefined,
       };
       const last = messages[messages.length - 1];
-      if (last && last.role === 'agent') {
+      if (canAppendToAgentMessage(last, runId)) {
         messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
       } else {
-        const msg = newAgentMessage(event.id, ts, agentName);
+        const msg = newAgentMessage(event.id, ts, agentName, runId);
         msg.blocks = [block];
         messages = [...messages, msg];
       }
@@ -236,15 +534,16 @@ function processEvent(state: State, event: EventEnvelope): State {
     }
 
     case 'run.agent.thinking': {
+      const runId = eventRunId(event);
       const block: MessageBlock = {
         kind: 'thinking',
         content: event.payload.content as string,
       };
       const last = messages[messages.length - 1];
-      if (last && last.role === 'agent') {
+      if (canAppendToAgentMessage(last, runId)) {
         messages = [...messages.slice(0, -1), { ...last, blocks: mergeBlock(last.blocks, block) }];
       } else {
-        const msg = newAgentMessage(event.id, ts, agentName);
+        const msg = newAgentMessage(event.id, ts, agentName, runId);
         msg.blocks = [block];
         messages = [...messages, msg];
       }
@@ -260,6 +559,7 @@ function processEvent(state: State, event: EventEnvelope): State {
         | 'running'
         | 'completed'
         | 'failed';
+      const runId = eventRunId(event);
       const block: MessageBlock = {
         kind: 'tool_use',
         callId,
@@ -268,7 +568,6 @@ function processEvent(state: State, event: EventEnvelope): State {
         status,
         children: [],
       };
-      const runId = event.payload.runId as string;
       if (runId && currentRun && currentRun.runId === runId) {
         currentRun = {
           ...currentRun,
@@ -276,10 +575,10 @@ function processEvent(state: State, event: EventEnvelope): State {
         };
       }
       const last = messages[messages.length - 1];
-      if (last && last.role === 'agent') {
+      if (canAppendToAgentMessage(last, runId)) {
         messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
       } else {
-        const msg = newAgentMessage(event.id, ts, agentName);
+        const msg = newAgentMessage(event.id, ts, agentName, runId);
         msg.blocks = [block];
         messages = [...messages, msg];
       }
@@ -317,6 +616,7 @@ function processEvent(state: State, event: EventEnvelope): State {
     case 'run.agent.file_change': {
       // Canonical shape: {path, action, diff?} per events.md
       // NDJSON fallback: {callId, toolName, content, isError}
+      const runId = eventRunId(event);
       const content = event.payload.content as string | undefined;
       const toolName = event.payload.toolName as string | undefined;
       const filePath = (event.payload.path as string) ?? extractPathFromContent(content, toolName);
@@ -330,7 +630,6 @@ function processEvent(state: State, event: EventEnvelope): State {
         action,
         diff: event.payload.diff as string | undefined,
       };
-      const runId = event.payload.runId as string;
       if (runId && currentRun && currentRun.runId === runId) {
         currentRun = {
           ...currentRun,
@@ -338,10 +637,10 @@ function processEvent(state: State, event: EventEnvelope): State {
         };
       }
       const last = messages[messages.length - 1];
-      if (last && last.role === 'agent') {
+      if (canAppendToAgentMessage(last, runId)) {
         messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
       } else {
-        const msg = newAgentMessage(event.id, ts, agentName);
+        const msg = newAgentMessage(event.id, ts, agentName, runId);
         msg.blocks = [block];
         messages = [...messages, msg];
       }
@@ -349,28 +648,57 @@ function processEvent(state: State, event: EventEnvelope): State {
     }
 
     case 'run.agent.result': {
+      const runId = eventRunId(event);
       const rawTokenUsage =
         event.payload.tokenUsage ??
         mapUsageToTokenUsage(event.payload.usage as Record<string, unknown> | undefined);
+      const success = event.payload.success as boolean;
       const block: MessageBlock = {
         kind: 'result',
-        success: event.payload.success as boolean,
+        success,
         error: event.payload.error as string | undefined,
         tokenUsage: rawTokenUsage as { input: number; output: number } | undefined,
       };
       const last = messages[messages.length - 1];
-      if (last && last.role === 'agent') {
+      if (canAppendToAgentMessage(last, runId)) {
         messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, block] }];
-      } else {
-        const msg = newAgentMessage(event.id, ts, agentName);
+      } else if (!success) {
+        const msg = newAgentMessage(event.id, ts, agentName, runId);
         msg.blocks = [block];
         messages = [...messages, msg];
       }
       break;
     }
 
+    case 'run.agent.route_decision': {
+      const payload = routeDecisionPayload(event.payload);
+      const action = firstString(payload.action) ?? 'route';
+      const block: MessageBlock = {
+        kind: 'route_decision',
+        action,
+        instructions: firstString(payload.instructions) ?? undefined,
+        summary: firstString(payload.summary) ?? undefined,
+        reasoning: firstString(payload.reasoning) ?? undefined,
+        nextWorker: firstString(payload.next_worker, payload.nextWorker, payload.worker, payload.member_id) ?? undefined,
+        blockedReason: firstString(payload.blocked_reason, payload.blockedReason) ?? undefined,
+      };
+      messages = appendOrUpdateAgentBlock(messages, event, agentName, block);
+      break;
+    }
+
     case 'run.agent.task_started': {
-      const tid = event.payload.taskId as string;
+      const tid = firstString(
+        event.payload.taskId,
+        event.payload.task_id,
+        event.payload.agent_task_id,
+        event.payload.team_task_id,
+      ) ?? event.id;
+      const description = firstString(
+        event.payload.description,
+        event.payload.objective,
+        event.payload.prompt,
+        event.payload.task_prompt,
+      ) ?? tid;
       if (currentRun) {
         currentRun = {
           ...currentRun,
@@ -378,17 +706,71 @@ function processEvent(state: State, event: EventEnvelope): State {
             ...currentRun.tasks,
             {
               taskId: tid,
-              description: (event.payload.description as string) || '',
+              description,
               status: 'running',
             },
           ],
         };
       }
+      messages = appendOrUpdateAgentBlock(messages, event, agentName, {
+        kind: 'agent_task',
+        taskId: tid,
+        title: description,
+        status: 'running',
+        worker: firstString(event.payload.worker, event.payload.agent, event.payload.member_id, event.payload.assignee_member_id) ?? undefined,
+      });
+      break;
+    }
+
+    case 'run.agent.task_dispatched':
+    case 'run.agent.child_spawn':
+    case 'run.agent.child_started':
+    case 'child_spawn': {
+      const payload = event.payload;
+      const parentRunId = childAgentParentRunId(payload, event);
+      const childId = childAgentIdentity(payload, event);
+      const childRunId = childAgentRunId(payload, parentRunId);
+      const title = firstString(
+        payload.title,
+        payload.task,
+        payload.description,
+        payload.objective,
+        payload.prompt,
+        payload.message,
+      ) ?? childId;
+      const block: MessageBlock = {
+        kind: 'child_agent',
+        childId,
+        parentRunId: parentRunId ?? undefined,
+        childRunId,
+        agentName: firstString(
+          payload.agentName,
+          payload.agent_name,
+          payload.agent,
+          payload.worker,
+          payload.taskType,
+          payload.task_type,
+          payload.role,
+        ) ?? undefined,
+        title,
+        status: taskStatus(payload.status, 'running'),
+      };
+      messages = appendOrUpdateAgentBlock(messages, event, agentName, block, parentRunId);
       break;
     }
 
     case 'run.agent.task_progress': {
-      const tid = event.payload.taskId as string;
+      const tid = firstString(
+        event.payload.taskId,
+        event.payload.task_id,
+        event.payload.agent_task_id,
+        event.payload.team_task_id,
+      ) ?? event.id;
+      const description = firstString(
+        event.payload.description,
+        event.payload.objective,
+        event.payload.title,
+      );
       if (currentRun) {
         currentRun = {
           ...currentRun,
@@ -396,18 +778,76 @@ function processEvent(state: State, event: EventEnvelope): State {
             t.taskId === tid
               ? {
                   ...t,
-                  description: (event.payload.description as string) || t.description,
+                  description: description || t.description,
                   status: 'running',
                 }
               : t,
           ),
         };
       }
+      messages = appendOrUpdateAgentBlock(messages, event, agentName, {
+        kind: 'agent_task',
+        taskId: tid,
+        title: description ?? '',
+        status: 'running',
+        summary: firstString(event.payload.summary, event.payload.message, event.payload.progress) ?? undefined,
+        worker: firstString(event.payload.worker, event.payload.agent, event.payload.member_id, event.payload.assignee_member_id) ?? undefined,
+      });
+      break;
+    }
+
+    case 'run.agent.child_result':
+    case 'run.agent.child_completed':
+    case 'run.agent.child_failed':
+    case 'child_result': {
+      const payload = event.payload;
+      const parentRunId = childAgentParentRunId(payload, event);
+      const childId = childAgentIdentity(payload, event);
+      const childRunId = childAgentRunId(payload, parentRunId);
+      const explicitStatus = event.type === 'run.agent.child_failed'
+        ? 'failed'
+        : payload.success === false
+          ? 'failed'
+          : 'completed';
+      const block: MessageBlock = {
+        kind: 'child_agent',
+        childId,
+        parentRunId: parentRunId ?? undefined,
+        childRunId,
+        agentName: firstString(
+          payload.agentName,
+          payload.agent_name,
+          payload.agent,
+          payload.worker,
+          payload.taskType,
+          payload.task_type,
+          payload.role,
+        ) ?? undefined,
+        title: firstString(
+          payload.title,
+          payload.task,
+          payload.description,
+          payload.objective,
+          payload.prompt,
+        ) ?? '',
+        status: taskStatus(payload.status, explicitStatus),
+        result: firstString(payload.result, payload.summary, payload.output, payload.message) ?? undefined,
+        error: firstString(payload.error, payload.errorMessage, payload.error_message) ?? undefined,
+        durationMs: numberValue(payload.durationMs) ?? numberValue(payload.duration_ms),
+      };
+      messages = appendOrUpdateAgentBlock(messages, event, agentName, block, parentRunId);
       break;
     }
 
     case 'run.agent.task_notification': {
-      const tid = event.payload.taskId as string;
+      const tid = firstString(
+        event.payload.taskId,
+        event.payload.task_id,
+        event.payload.agent_task_id,
+        event.payload.team_task_id,
+      ) ?? event.id;
+      const status = taskStatus(event.payload.status, 'completed');
+      const summary = firstString(event.payload.summary, event.payload.message, event.payload.result);
       if (currentRun) {
         currentRun = {
           ...currentRun,
@@ -415,12 +855,37 @@ function processEvent(state: State, event: EventEnvelope): State {
             t.taskId === tid
               ? {
                   ...t,
-                  status: (event.payload.status as string) || 'completed',
-                  summary: (event.payload.summary as string) || '',
+                  status,
+                  summary: summary ?? '',
                 }
               : t,
           ),
         };
+      }
+      messages = appendOrUpdateAgentBlock(messages, event, agentName, {
+        kind: 'agent_task',
+        taskId: tid,
+        title: firstString(event.payload.description, event.payload.objective, event.payload.title) ?? '',
+        status,
+        summary: summary ?? undefined,
+        worker: firstString(event.payload.worker, event.payload.agent, event.payload.member_id, event.payload.assignee_member_id) ?? undefined,
+      });
+      break;
+    }
+
+    case 'run.agent.session_metrics':
+    case 'run.agent.context_usage':
+    case 'run.agent.context_warning':
+    case 'run.agent.context_compaction': {
+      const variant =
+        event.type === 'run.agent.context_warning'
+          ? 'warning'
+          : event.type === 'run.agent.context_compaction'
+            ? 'compaction'
+            : 'usage';
+      const block = parseContextUsageBlock(event, variant);
+      if (block) {
+        messages = appendOrUpdateAgentBlock(messages, event, agentName, block);
       }
       break;
     }
@@ -561,7 +1026,7 @@ const initialState: State = {
   agentName: '',
 };
 
-export function useChatMessages(online: boolean): ChatState {
+export function useChatMessages(online: boolean, selectedThreadId?: string | null): ChatState {
   const [state, dispatch] = useReducer(reducer, initialState);
   const mountedRef = useRef(true);
   const streamRef = useRef<StreamHandle | null>(null);
@@ -588,7 +1053,12 @@ export function useChatMessages(online: boolean): ChatState {
       return;
     }
 
-    const stream = createEventStream();
+    dispatch({ type: 'CLEAR_MESSAGES' });
+    currentRunIdRef.current = null;
+    loopDetectorRef.current.clear();
+
+    const streamCursor = selectedThreadId ? THREAD_REPLAY_CURSOR : LIVE_TAIL_CURSOR;
+    const stream = createEventStream(streamCursor);
     streamRef.current = stream;
 
     stream.onStatusChange((connected) => {
@@ -598,6 +1068,7 @@ export function useChatMessages(online: boolean): ChatState {
 
     stream.subscribe((event: EventEnvelope) => {
       if (!mountedRef.current) return;
+      if (!eventMatchesSelectedThread(event, selectedThreadId)) return;
 
       // ── Tool call loop detection ──
       if (event.type === 'run.agent.tool_call') {
@@ -642,12 +1113,18 @@ export function useChatMessages(online: boolean): ChatState {
       } else if (event.type === 'run.finished') {
         useRunStore.getState().setRunState(RunState.COMPLETED);
         queryClient.invalidateQueries({ queryKey: ['runs'] });
+        const threadId = eventThreadId(event);
+        if (threadId) queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
       } else if (event.type === 'run.failed') {
         useRunStore.getState().setRunState(RunState.FAILED);
         queryClient.invalidateQueries({ queryKey: ['runs'] });
+        const threadId = eventThreadId(event);
+        if (threadId) queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
       } else if (event.type === 'run.cancelled') {
         useRunStore.getState().setRunState(RunState.CANCELLED);
         queryClient.invalidateQueries({ queryKey: ['runs'] });
+        const threadId = eventThreadId(event);
+        if (threadId) queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
       }
 
       dispatch({ type: 'EVENT_RECEIVED', event });
@@ -666,7 +1143,7 @@ export function useChatMessages(online: boolean): ChatState {
       clearInterval(latencyTimer);
       stream.close();
     };
-  }, [online]);
+  }, [online, selectedThreadId]);
 
   return { ...state, clearMessages, decidePermission };
 }

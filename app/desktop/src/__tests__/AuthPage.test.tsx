@@ -42,7 +42,8 @@ describe('AuthPage', () => {
     renderAuthPage();
     expect(screen.getByText('auth.title')).toBeInTheDocument();
     expect(screen.getByText('auth.tagline')).toBeInTheDocument();
-    expect(screen.getByText('AH')).toBeInTheDocument();
+    expect(screen.getByAltText('TokenDance')).toBeInTheDocument();
+    expect(screen.queryByText('AH')).not.toBeInTheDocument();
   });
 
   it('renders the TokenDance ID login button', () => {

@@ -66,6 +66,7 @@
   --z-sticky: 20;
   --z-overlay: 30;
   --z-modal: 40;
+  --z-popover: 45;
   --z-toast: 50;
   --z-tooltip: 60;
 
@@ -160,6 +161,11 @@ button {
   border-radius: var(--radius-md);
 }
 
+html[data-focus-source='pointer'] *:focus-visible {
+  outline: none !important;
+  outline-offset: 0;
+}
+
 /* ── Reduced Motion (WCAG 2.2 AA 2.3.1) ───────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -199,7 +205,7 @@ button {
 }
 
 /* ── Mobile Input (iOS 16px 防缩放) ───────────────────────────────── */
-@media (max-width: 767px), (pointer: coarse) {
+@media (pointer: coarse) {
   input:not([type='button']):not([type='checkbox']):not([type='color']):not([type='file']):not(
       [type='hidden']
     ):not([type='image']):not([type='radio']):not([type='range']):not([type='reset']):not(
