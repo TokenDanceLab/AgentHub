@@ -746,9 +746,13 @@ func TestProcessExecutorHelper(t *testing.T) {
 	case "args":
 		fmt.Fprintf(os.Stdout, "args=%s\n", strings.Join(os.Args, "\n"))
 	case "env":
-		fmt.Fprintf(os.Stdout, "profileRun=%s\n", os.Getenv("PROFILE_RUN"))
-		fmt.Fprintf(os.Stdout, "profileProject=%s\n", os.Getenv("PROFILE_PROJECT"))
-		fmt.Fprintf(os.Stdout, "profileThread=%s\n", os.Getenv("PROFILE_THREAD"))
+		fmt.Fprintf(
+			os.Stdout,
+			"profileRun=%s\nprofileProject=%s\nprofileThread=%s\n",
+			os.Getenv("PROFILE_RUN"),
+			os.Getenv("PROFILE_PROJECT"),
+			os.Getenv("PROFILE_THREAD"),
+		)
 	case "inherited-env":
 		fmt.Fprintf(os.Stdout, "inherited=%s\n", os.Getenv("AGENTHUB_INHERITED_ENV_FOR_TEST"))
 	case "sanitized-env":
