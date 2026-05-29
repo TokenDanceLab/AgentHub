@@ -34,6 +34,7 @@ The current UI is a native Mobile adaptation of the Desktop information architec
 - `Account surface registry`: Account now renders Threads / Chat / Runs / Account from `@agenthub/shared` `surfaceMetadata`, so Mobile follows the same Desktop/Web information architecture registry while still adapting identity to a native bottom-tab pattern.
 - `i18n`: Mobile now initializes `i18next`/`react-i18next`, defaults to the device language, persists manual overrides in local storage, syncs `<html lang>`, and exposes an English / 简体中文 language switch in Account. The translated surface now covers the global shell, bottom navigation, Chat empty state, shared recovery actions, Account readiness/account/notification/about cards, native action statuses, retry actions, clear-session confirmation sheet, Threads/Runs queue shell, filters, recovery states, refresh feedback, and queue status badges; remaining feature copy should migrate incrementally as each screen is touched.
 - `BottomNav`: 4-tab mobile navigation is now Threads / Chat / Runs / Account, driven by shared Mobile surface metadata with 48dp touch targets, TokenDance glass/tint styling, compact task badges for active Threads plus pending review Runs, explicit active styling that stays legible during browser hover QA, and a minimum Android gesture-area bottom buffer for WebViews where `env(safe-area-inset-bottom)` reports `0`; approval decisions invalidate the Runs cache so the pending badge clears after the checkpoint is resolved.
+- `Queue status badges`: Threads and Runs queue rows now consume shared `@agenthub/shared/components` `StatusBadge` with localized Mobile labels and Mobile glass status classes. Mobile no longer maintains a separate `MobileStatusBadge` wrapper.
 - `Glassmorphism`: Mobile now follows the Desktop glass direction instead of the earlier gradient-heavy treatment. Core list rows, overview panels, run detail panels, recovery cards, approval/diff/log surfaces, and Account cards use shared `--td-*` rgba/backdrop tokens mapped to `@agenthub/shared` `designTokens`; status color is limited to badges, borders, icons, and chips so the UI reads closer to the Desktop command center.
 
 This pass removed the broken Tailwind-style dependency assumption. Mobile now uses local semantic CSS classes in `src/styles/global.css` instead of relying on a Tailwind build pipeline that does not exist in this package.
@@ -51,7 +52,6 @@ src/
     BottomNav.tsx                 # 4-tab mobile navigation
     MobileEmptyState.tsx          # Shared Mobile empty state
     MobileRecoveryPanel.tsx       # Shared Mobile Hub/API recovery state
-    MobileStatusBadge.tsx         # Localized Mobile queue status badge
   hooks/
     useHubSocket.ts               # Hub WebSocket hook with reconnect/backoff
   native/
