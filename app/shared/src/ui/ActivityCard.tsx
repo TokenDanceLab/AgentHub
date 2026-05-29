@@ -6,7 +6,7 @@ export interface ActivityCardProps {
   icon?: ReactNode;
   label: ReactNode;
   meta?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   actions?: ReactNode;
   className?: string | undefined;
   leadingClassName?: string | undefined;
@@ -52,7 +52,7 @@ export function ActivityCard({
           <strong className={cx(styles.label, labelClassName)}>{label}</strong>
           {meta ? <span>{meta}</span> : null}
         </span>
-        <span className={cx(styles.content, contentClassName)}>{children}</span>
+        {children ? <span className={cx(styles.content, contentClassName)}>{children}</span> : null}
       </span>
       {actions ? <span className={cx(styles.actions, actionsClassName)}>{actions}</span> : null}
     </article>
