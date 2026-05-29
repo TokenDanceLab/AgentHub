@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listThreads } from "@agenthub/shared";
 import type { Thread } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { ActionList, EmptyState, MetricGrid, SegmentedControl, StatusNotice, SurfaceHeader } from "@agenthub/shared/ui";
+import { ActionList, EmptyState, MetricGrid, SegmentedControl, StatusNotice, SurfaceHeader, TriageCard } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, UserRound, ArrowRight } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
@@ -135,27 +135,24 @@ export function ThreadListView({ onThreadSelect, onOpenAccount }: ThreadListView
         </section>
 
         {nextActiveThread && filter !== "archived" && (
-          <button
+          <TriageCard
             className="mobileRunTriageCard"
-            type="button"
-            aria-label={t("queue.threads.continueAria", { title: nextActiveThread.title || nextActiveThread.id })}
+            ariaLabel={t("queue.threads.continueAria", { title: nextActiveThread.title || nextActiveThread.id })}
             onClick={() => onThreadSelect(nextActiveThread)}
-          >
-            <span className="mobileRunTriageIcon">
-              <MessageSquare size={18} />
-            </span>
-            <div className="mobileRunTriageBody">
-              <p>{t("queue.threads.continueHandoff")}</p>
-              <h2>{nextActiveThread.title || nextActiveThread.id}</h2>
-              <span>
+            iconClassName="mobileRunTriageIcon"
+            bodyClassName="mobileRunTriageBody"
+            actionClassName="mobileRunTriageAction"
+            eyebrow={t("queue.threads.continueHandoff")}
+            title={nextActiveThread.title || nextActiveThread.id}
+            icon={<MessageSquare size={18} />}
+            meta={(
+              <>
                 <Clock3 size={12} />
                 {formatThreadTime(nextActiveThread)}
-              </span>
-            </div>
-            <span className="mobileRunTriageAction" aria-hidden="true">
-              <ArrowRight size={17} />
-            </span>
-          </button>
+              </>
+            )}
+            actionIcon={<ArrowRight size={17} />}
+          />
         )}
 
         <SegmentedControl

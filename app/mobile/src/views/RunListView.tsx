@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listRuns } from "@agenthub/shared";
 import type { Run, RunStatus } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { ActionList, EmptyState, MetricGrid, SegmentedControl, StatusNotice, SurfaceHeader } from "@agenthub/shared/ui";
+import { ActionList, EmptyState, MetricGrid, SegmentedControl, StatusNotice, SurfaceHeader, TriageCard } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, ArrowRight, CheckCircle2, Clock3, GitPullRequestArrow, Play, Radio, RefreshCw, ShieldAlert, TerminalSquare, UserRound } from "lucide-react";
@@ -194,27 +194,24 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
         </section>
 
         {nextReviewRun && (filter === "all" || filter === "review") && (
-          <button
+          <TriageCard
             className="mobileRunTriageCard"
-            type="button"
-            aria-label={t("queue.runs.nextReviewAria", { runId: nextReviewRun.runId })}
+            ariaLabel={t("queue.runs.nextReviewAria", { runId: nextReviewRun.runId })}
             onClick={() => onRunSelect(nextReviewRun)}
-          >
-            <span className="mobileRunTriageIcon">
-              <ShieldAlert size={18} />
-            </span>
-            <div className="mobileRunTriageBody">
-              <p>{t("queue.runs.nextReview")}</p>
-              <h2>{t("queue.runs.runLabel", { runId: nextReviewRun.runId.slice(0, 8) })}</h2>
-              <span>
+            iconClassName="mobileRunTriageIcon"
+            bodyClassName="mobileRunTriageBody"
+            actionClassName="mobileRunTriageAction"
+            eyebrow={t("queue.runs.nextReview")}
+            title={t("queue.runs.runLabel", { runId: nextReviewRun.runId.slice(0, 8) })}
+            icon={<ShieldAlert size={18} />}
+            meta={(
+              <>
                 <Clock3 size={12} />
                 {formatRunTime(nextReviewRun)}
-              </span>
-            </div>
-            <span className="mobileRunTriageAction" aria-hidden="true">
-              <ArrowRight size={17} />
-            </span>
-          </button>
+              </>
+            )}
+            actionIcon={<ArrowRight size={17} />}
+          />
         )}
 
         <SegmentedControl
