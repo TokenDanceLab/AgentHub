@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileText, TerminalSquare, Wrench } from 'lucide-react';
+import { ActivityCard } from '@shared/ui';
 import type { RunInfo } from '@shared/types';
 import type { FileDiff, ChatMessage } from './ChatView.types';
 import type { SessionMetrics } from '@shared/context/breakdown';
@@ -117,18 +118,27 @@ export default function RunDetail({
       <aside className={styles.panel} aria-label={t('run.title')}>
         <div className={styles.title}>{t('run.title')}</div>
         <div className={styles.emptyStack}>
-          <div className={styles.emptyCard}>
-            <TerminalSquare size={16} />
-            <span>{t('run.empty')}</span>
-          </div>
-          <div className={styles.emptyCard}>
-            <FileText size={16} />
-            <span>{t('run.emptyOutput')}</span>
-          </div>
-          <div className={styles.emptyCard}>
-            <Wrench size={16} />
-            <span>{t('run.emptySources')}</span>
-          </div>
+          <ActivityCard
+            className={styles.emptyCard}
+            icon={<TerminalSquare size={16} />}
+            iconClassName={styles.emptyIcon}
+            bodyClassName={styles.emptyBody}
+            label={t('run.empty')}
+          />
+          <ActivityCard
+            className={styles.emptyCard}
+            icon={<FileText size={16} />}
+            iconClassName={styles.emptyIcon}
+            bodyClassName={styles.emptyBody}
+            label={t('run.emptyOutput')}
+          />
+          <ActivityCard
+            className={styles.emptyCard}
+            icon={<Wrench size={16} />}
+            iconClassName={styles.emptyIcon}
+            bodyClassName={styles.emptyBody}
+            label={t('run.emptySources')}
+          />
         </div>
       </aside>
     );
@@ -184,14 +194,20 @@ export default function RunDetail({
 
       {!hasAnyContent && (
         <div className={styles.emptyStack}>
-          <div className={styles.emptyCard}>
-            <TerminalSquare size={16} />
-            <span>{t('run.emptyOutput')}</span>
-          </div>
-          <div className={styles.emptyCard}>
-            <FileText size={16} />
-            <span>{t('run.emptySources')}</span>
-          </div>
+          <ActivityCard
+            className={styles.emptyCard}
+            icon={<TerminalSquare size={16} />}
+            iconClassName={styles.emptyIcon}
+            bodyClassName={styles.emptyBody}
+            label={t('run.emptyOutput')}
+          />
+          <ActivityCard
+            className={styles.emptyCard}
+            icon={<FileText size={16} />}
+            iconClassName={styles.emptyIcon}
+            bodyClassName={styles.emptyBody}
+            label={t('run.emptySources')}
+          />
         </div>
       )}
 
@@ -231,10 +247,15 @@ export default function RunDetail({
               </div>
               <div className={styles.sourceList}>
                 {latestFiles.map((f) => (
-                  <div key={`${f.path}-${f.timestamp}`} className={styles.sourceItem}>
-                    <code className={styles.filePath}>{f.path}</code>
-                    <span className={styles.action}>{f.action}</span>
-                  </div>
+                  <ActivityCard
+                    key={`${f.path}-${f.timestamp}`}
+                    className={styles.sourceItem}
+                    bodyClassName={styles.sourceBody}
+                    labelClassName={styles.filePath}
+                    actionsClassName={styles.sourceAction}
+                    label={f.path}
+                    actions={<span className={styles.action}>{f.action}</span>}
+                  />
                 ))}
               </div>
             </section>

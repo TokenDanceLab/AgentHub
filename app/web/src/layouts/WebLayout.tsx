@@ -1,5 +1,6 @@
 import {
   Bot,
+  FileText,
   FolderKanban,
   LogIn,
   Menu,
@@ -11,10 +12,12 @@ import {
   PanelRightOpen,
   Settings,
   Sun,
+  TerminalSquare,
   Users,
   User,
   Wifi,
   WifiOff,
+  Wrench,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -34,7 +37,7 @@ import { useHubMainChat } from '@/hooks/useHubMainChat';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { useHealth } from '@/hooks/useHealth';
 import { useHubWSConnection } from '@/hooks/useHubWSConnection';
-import { ContextSummary, TokenDanceMark } from '@shared/ui';
+import { ActivityCard, ContextSummary, TokenDanceMark } from '@shared/ui';
 import { getSurfaceByWebRoute, getSurfaceMetadata, getSurfaceStatusMetadata, type SurfaceMetadata } from '@shared/surfaceMetadata';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { AppError } from '@shared/errors';
@@ -491,6 +494,35 @@ export default function WebLayout() {
     ],
   );
 
+  const runDetailFallback = (
+    <div className={styles.runDetailFallback} role="region" aria-label={t('run.title')}>
+      <div className={styles.runDetailFallbackTitle}>{t('run.title')}</div>
+      <div className={styles.runDetailFallbackStack}>
+        <ActivityCard
+          className={styles.runDetailFallbackCard}
+          icon={<TerminalSquare size={16} />}
+          iconClassName={styles.runDetailFallbackIcon}
+          bodyClassName={styles.runDetailFallbackBody}
+          label={t('run.empty')}
+        />
+        <ActivityCard
+          className={styles.runDetailFallbackCard}
+          icon={<FileText size={16} />}
+          iconClassName={styles.runDetailFallbackIcon}
+          bodyClassName={styles.runDetailFallbackBody}
+          label={t('run.emptyOutput')}
+        />
+        <ActivityCard
+          className={styles.runDetailFallbackCard}
+          icon={<Wrench size={16} />}
+          iconClassName={styles.runDetailFallbackIcon}
+          bodyClassName={styles.runDetailFallbackBody}
+          label={t('run.emptySources')}
+        />
+      </div>
+    </div>
+  );
+
   const sidebarOpen = isMobile ? mobileSidebarOpen : true;
   const detailOpen = isMobile ? mobileRightPanelOpen : rightPanelOpen;
   const showDesktopDetail = !isMobile && rightPanelOpen;
@@ -738,7 +770,7 @@ export default function WebLayout() {
 
           {showDesktopDetail && (
             <aside className={isTablet ? styles.rightOverlay : styles.rightPanel}>
-              <Slot name="run-detail" {...shellProps} />
+              <Slot name="run-detail" fallback={runDetailFallback} {...shellProps} />
             </aside>
           )}
 
@@ -751,7 +783,7 @@ export default function WebLayout() {
                 type="button"
               />
               <aside className={styles.rightOverlay}>
-                <Slot name="run-detail" {...shellProps} />
+                <Slot name="run-detail" fallback={runDetailFallback} {...shellProps} />
               </aside>
             </>
           )}
