@@ -37,7 +37,7 @@ import { useHubMainChat } from '@/hooks/useHubMainChat';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { useHealth } from '@/hooks/useHealth';
 import { useHubWSConnection } from '@/hooks/useHubWSConnection';
-import { ActivityCard, ContextSummary, TokenDanceMark } from '@shared/ui';
+import { ActivityCard, ContextSummary, SectionHeader, TokenDanceMark } from '@shared/ui';
 import { getSurfaceByWebRoute, getSurfaceMetadata, getSurfaceStatusMetadata, type SurfaceMetadata } from '@shared/surfaceMetadata';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { AppError } from '@shared/errors';
@@ -689,17 +689,21 @@ export default function WebLayout() {
               ) : (
                 <div className={styles.sidebarContent}>
                   <section className={styles.sidebarSection}>
-                    <div className={styles.sectionHeader}>
-                      <span>{t('webShell.sidebar.agents')}</span>
-                    </div>
+                    <SectionHeader
+                      className={styles.sectionHeader ?? ''}
+                      titleClassName={styles.sectionHeaderTitle ?? ''}
+                      title={t('webShell.sidebar.agents')}
+                    />
                     <div className={styles.sidebarScroll}>
                       <Slot name="agent-list" {...shellProps} />
                     </div>
                   </section>
                   <section className={styles.sidebarSection}>
-                    <div className={styles.sectionHeader}>
-                      <span>{t('webShell.sidebar.threads')}</span>
-                    </div>
+                    <SectionHeader
+                      className={styles.sectionHeader ?? ''}
+                      titleClassName={styles.sectionHeaderTitle ?? ''}
+                      title={t('webShell.sidebar.threads')}
+                    />
                     <div className={styles.sidebarScroll}>
                       <Slot name="thread-panel" {...shellProps} />
                     </div>
