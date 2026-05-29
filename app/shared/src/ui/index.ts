@@ -13,3 +13,5 @@ export { TokenDanceMark } from './TokenDanceMark';
 export type { TokenDanceMarkProps } from './TokenDanceMark';
 export { EmptyState } from './EmptyState';
 export type { EmptyStateAction, EmptyStateProps, EmptyStateSuggestion } from './EmptyState';
+export { RecoveryPanel } from './RecoveryPanel';
+export type { RecoveryPanelAction, RecoveryPanelProps } from './RecoveryPanel';
