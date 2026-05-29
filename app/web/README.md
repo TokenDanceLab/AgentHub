@@ -81,6 +81,14 @@ Web follows the Desktop command-center layout and token direction. Workbench, Pr
 Latest in-app browser evidence:
 
 ```text
+app/web/screenshots/web-design-workspace-desktop-1440x920.png
+app/web/screenshots/web-design-workspace-mobile-390x844.png
+app/web/screenshots/web-design-messages-mobile-390x844.png
+app/web/screenshots/web-design-settings-mobile-zh-390x844.png
+app/web/screenshots/web-design-run-overlay-mobile-390x844.png
+app/web/screenshots/web-design-account-sheet-mobile-390x844.png
+app/web/screenshots/web-design-agent-square-mobile-390x844.png
+app/web/screenshots/web-design-project-mobile-light-390x844.png
 app/web/screenshots/web-glass-workbench-i18n-iab-1440x920.png
 app/web/screenshots/web-glass-workbench-i18n-iab-390x844.png
 app/web/screenshots/web-glass-final-typechecked-workbench-iab-1440x920.png
@@ -122,7 +130,7 @@ app/web/screenshots/web-mobile-account-sheet-pw-390x844.png
 app/web/screenshots/web-mobile-account-sheet-pw-390x844.probe.json
 ```
 
-The latest 390x844 probes confirmed `scrollWidth=390`, `gradientCount=0`, `leftOnlyBorderCount=0`, `coloredLeftRailCount=0`, `leftInsetShadowCount=0`, `smallTargetCount=0`, and no raw `agent.*` / `welcome.*` / `prompt.*` / `webShell.*` i18n keys on Workbench, Messages, Settings, and Run detail shell states. The shared-glass Settings shell probe also confirms `smallTargets=[]` and no raw i18n keys on `/settings`. The mobile Web shell now keeps a bottom surface nav for Workspace / Messages / Run / Account. Account is the rightmost phone-first identity entry and uses the shared `surface.mobile.account.*` metadata; the topbar account button is hidden on 390px screens so sign-in is not duplicated. The current Account nav probe confirms `navLabels=[Workspace,Messages,Run,Account]`, Account aria from shared metadata, `topbarAccountButtonCount=0`, `smallTargets=[]`, no overflow, no gradients, and no left rails. The Account sign-in surface is a mobile bottom sheet rather than a Desktop-centered modal on 390px screens; the sheet probe confirms `width=390`, `bottom=0`, top radius `14px`, 44px+ Continue/Close/Advanced controls, no raw i18n keys, and no hardcoded Chinese copy in the English view. Shared/Web source scanning also returns no `linear-gradient`, `radial-gradient`, `conic-gradient`, `border-left:`, particle canvas references, or `inset Npx 0 0` left-rail selected states under `app/web/src`, `app/mobile/src`, and `app/shared/src`.
+`corepack.cmd pnpm --filter agenthub-web visual:qa` is the current repeatable Web visual gate. It starts from `WEB_QA_URL` (default `http://127.0.0.1:5175/`), mocks Hub REST data, captures 8 Desktop/Web/Mobile scenes, and writes matching `.probe.json` files beside the screenshots. The latest probes confirmed `scrollWidth=390`, `gradientCount=0`, `leftOnlyBorderCount=0`, `leftInsetShadowCount=0`, `smallTargets=[]`, and no raw `agent.*` / `welcome.*` / `prompt.*` / `webShell.*` / `settings.*` / `auth.*` i18n keys on Workbench, Messages, Settings zh, Run overlay, Account sheet, Agent Square bridge, and Project bridge states. The mobile Web shell keeps a bottom surface nav for Workspace / Messages / Run / Account. Account is the rightmost phone-first identity entry and uses the shared `surface.mobile.account.*` metadata; the topbar account button is hidden on 390px screens so sign-in is not duplicated. The Account sign-in surface is a mobile bottom sheet rather than a Desktop-centered modal on 390px screens; the sheet probe confirms `width=390`, `bottom=0`, top radius `14px`, 44px+ controls, glass blur, no raw i18n keys, and no hardcoded Chinese copy in the English view. Shared/Web source scanning also returns no `linear-gradient`, `radial-gradient`, `conic-gradient`, `border-left:`, particle canvas references, or `inset Npx 0 0` left-rail selected states under `app/web/src`, `app/mobile/src`, and `app/shared/src`.
 
 Messages-specific 390x844 evidence now covers both anonymous and authenticated visual states. `IMView` fills the Hub-locked state with session/surface/realtime cards, and the authenticated no-selection state with sessions/messages/agent-handoff cards. `IMContactList` user-visible strings are localized through `im.contact.*`; mobile add/search/contact controls are at least 44px, with the latest probe recording `addButton=44x44`, `searchInput=348x44`, `smallTargets=[]`, `gradientCount=0`, `leftOnlyBorderCount=0`, `leftInsetShadowCount=0`, and `rawI18nKeys=[]`.
 
@@ -150,6 +158,13 @@ Web Settings also consumes the shared Desktop section registry. The Settings nav
 cd D:\Code\TokenDance\AgentHub\app\web
 corepack.cmd pnpm typecheck
 corepack.cmd pnpm build
+```
+
+视觉验收（需要 5175 Web preview 已启动）：
+
+```powershell
+cd D:\Code\TokenDance\AgentHub\app
+corepack.cmd pnpm --filter agenthub-web visual:qa
 ```
 
 仓库提交前在根目录补充：
