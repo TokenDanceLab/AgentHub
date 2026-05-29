@@ -15,6 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { StatusBadge } from "@agenthub/shared/components";
+import { SegmentedControl } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import type { Artifact, Preview, Run, RunStatus, ThreadItem } from "@agenthub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -226,18 +227,19 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
           </div>
         </section>
 
-        <nav className="mobileRunSectionNav" aria-label={t("runDetail.sections.aria")}>
-          {(["review", "diff", "blocks", "outputs", "logs"] as RunSection[]).map((section) => (
-            <button
-              key={section}
-              className={`mobileSegmentButton${activeSection === section ? " mobileSegmentButtonActive" : ""}`}
-              type="button"
-              onClick={() => jumpTo(section)}
-            >
-              {t(`runDetail.sections.${section}`)}
-            </button>
-          ))}
-        </nav>
+        <SegmentedControl
+          as="nav"
+          ariaLabel={t("runDetail.sections.aria")}
+          value={activeSection}
+          onChange={jumpTo}
+          className="mobileRunSectionNav"
+          optionClassName="mobileSegmentButton"
+          activeOptionClassName="mobileSegmentButtonActive"
+          options={(["review", "diff", "blocks", "outputs", "logs"] as RunSection[]).map((section) => ({
+            value: section,
+            label: t(`runDetail.sections.${section}`),
+          }))}
+        />
 
         <section className="mobileApprovalPanel" ref={reviewRef}>
           <p className="mobileEyebrow">{t("runDetail.sections.review")}</p>
@@ -321,18 +323,18 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
         <section className="mobileLogPanel" ref={logsRef}>
           <p className="mobileEyebrow">{t("runDetail.sections.logs")}</p>
           <h2>{t("runDetail.logs.title")}</h2>
-          <div className="mobileLogFilterBar">
-            {["All", "Review", "Diff", "Mobile", "Error"].map((filter) => (
-              <button
-                className={`mobileLogFilterChip${logFilter === filter ? " mobileLogFilterChipActive" : ""}`}
-                key={filter}
-                type="button"
-                onClick={() => setLogFilter(filter)}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            ariaLabel={t("runDetail.logs.title")}
+            value={logFilter}
+            onChange={setLogFilter}
+            className="mobileLogFilterBar"
+            optionClassName="mobileLogFilterChip"
+            activeOptionClassName="mobileLogFilterChipActive"
+            options={["All", "Review", "Diff", "Mobile", "Error"].map((filter) => ({
+              value: filter,
+              label: filter,
+            }))}
+          />
           <div className="mobileLogFrame">
             {filteredLogRows.map((row, index) => (
               <div className="mobileLogLine" key={`${row.source}-${index}`}>

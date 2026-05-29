@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listRuns } from "@agenthub/shared";
 import type { Run, RunStatus } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { EmptyState } from "@agenthub/shared/ui";
+import { EmptyState, SegmentedControl } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, ArrowRight, CheckCircle2, Clock3, GitPullRequestArrow, Play, Radio, RefreshCw, ShieldAlert, TerminalSquare, UserRound } from "lucide-react";
@@ -123,15 +123,15 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
   );
 
   const filterOptions: Array<{
-    id: RunFilter;
+    value: RunFilter;
     label: string;
     count: number;
     icon: typeof Play;
   }> = [
-    { id: "all", label: t("queue.common.all"), count: items.length, icon: Play },
-    { id: "review", label: t("queue.common.review"), count: reviewRuns, icon: ShieldAlert },
-    { id: "active", label: t("queue.common.active"), count: activeRuns, icon: TerminalSquare },
-    { id: "closed", label: t("queue.common.closed"), count: closedRuns, icon: CheckCircle2 },
+    { value: "all", label: t("queue.common.all"), count: items.length, icon: Play },
+    { value: "review", label: t("queue.common.review"), count: reviewRuns, icon: ShieldAlert },
+    { value: "active", label: t("queue.common.active"), count: activeRuns, icon: TerminalSquare },
+    { value: "closed", label: t("queue.common.closed"), count: closedRuns, icon: CheckCircle2 },
   ];
 
   return (
@@ -231,25 +231,23 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
           </button>
         )}
 
-        <div className="mobileSegmentedToolbar mobileRunFilterToolbar" aria-label={t("queue.runs.filters")}>
-          {filterOptions.map((option) => {
+        <SegmentedControl
+          ariaLabel={t("queue.runs.filters")}
+          value={filter}
+          onChange={setFilter}
+          className="mobileSegmentedToolbar mobileRunFilterToolbar"
+          optionClassName="mobileSegmentButton"
+          activeOptionClassName="mobileSegmentButtonActive"
+          options={filterOptions.map((option) => {
             const Icon = option.icon;
-            const isActive = option.id === filter;
-            return (
-              <button
-                key={option.id}
-                className={`mobileSegmentButton${isActive ? " mobileSegmentButtonActive" : ""}`}
-                type="button"
-                aria-pressed={isActive}
-                onClick={() => setFilter(option.id)}
-              >
-                <Icon size={14} />
-                <span>{option.label}</span>
-                <strong>{option.count}</strong>
-              </button>
-            );
+            return {
+              value: option.value,
+              label: option.label,
+              meta: option.count,
+              icon: <Icon size={14} />,
+            };
           })}
-        </div>
+        />
 
         {runs.isLoading && (
           <div className="mobileCenterState">
