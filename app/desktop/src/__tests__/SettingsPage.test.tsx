@@ -13,6 +13,7 @@ import type {
   ExecutionTarget,
   TeamApprovalState,
   TeamArtifactState,
+  TeamAssignmentState,
   TeamBudget,
   TeamConflictState,
   TeamMemberState,
@@ -24,6 +25,7 @@ const {
   mockAgents,
   mockAgentTeamApprovals,
   mockAgentTeamArtifacts,
+  mockAgentTeamAssignments,
   mockAgentTeamBudget,
   mockAgentTeamConflicts,
   mockAgentTeamEvents,
@@ -52,6 +54,7 @@ const {
   mockAgents: [] as AgentInfo[],
   mockAgentTeamApprovals: [] as TeamApprovalState[],
   mockAgentTeamArtifacts: [] as TeamArtifactState[],
+  mockAgentTeamAssignments: [] as TeamAssignmentState[],
   mockAgentTeamBudget: { value: undefined as TeamBudget | undefined },
   mockAgentTeamConflicts: [] as TeamConflictState[],
   mockAgentTeamEvents: [] as TeamRunEventState[],
@@ -175,6 +178,7 @@ vi.mock('@/api/agentTeamQueries', () => ({
               status: selectedRun.status,
               members: mockAgentTeamMembers,
               tasks: mockAgentTeamTasks,
+              assignments: mockAgentTeamAssignments,
               approvals: mockAgentTeamApprovals,
               conflicts: mockAgentTeamConflicts,
               artifacts: mockAgentTeamArtifacts,
@@ -255,6 +259,7 @@ describe('SettingsPage tasks', () => {
     mockAgents.splice(0, mockAgents.length);
     mockAgentTeamApprovals.splice(0, mockAgentTeamApprovals.length);
     mockAgentTeamArtifacts.splice(0, mockAgentTeamArtifacts.length);
+    mockAgentTeamAssignments.splice(0, mockAgentTeamAssignments.length);
     mockAgentTeamBudget.value = undefined;
     mockAgentTeamConflicts.splice(0, mockAgentTeamConflicts.length);
     mockAgentTeamEvents.splice(0, mockAgentTeamEvents.length);
@@ -487,9 +492,19 @@ describe('SettingsPage tasks', () => {
       assignee_member_id: 'member_builder',
       status: 'running',
       objective: 'Build TeamRun task board',
+      agent_task_id: 'task_a',
       run_id: 'edge_run_1',
+      edge_run_id: 'edge_run_1',
       attempt: 1,
       risk_level: 'normal',
+    });
+    mockAgentTeamAssignments.splice(0, mockAgentTeamAssignments.length, {
+      assignment_id: 'assignment_1',
+      from_member_id: 'member_supervisor',
+      to_member_id: 'member_builder',
+      type: 'delegate',
+      status: 'running',
+      edge_run_id: 'edge_run_1',
     });
     mockAgentTeamRouteLog.splice(0, mockAgentTeamRouteLog.length, {
       action: 'delegate',
@@ -556,7 +571,16 @@ describe('SettingsPage tasks', () => {
     expect(screen.getAllByText('Builder Review Team').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Build TeamRun task board').length).toBeGreaterThan(0);
     expect(screen.getByText('shell')).toBeInTheDocument();
-    expect(screen.getByText('agent.message')).toBeInTheDocument();
+    expect(screen.getAllByText('agent.message').length).toBeGreaterThan(0);
+    const graph = screen.getByTestId('agent-team-communication-graph');
+    expect(within(graph).getByText('settings.agentTeamCommunicationGraph')).toBeInTheDocument();
+    expect(within(graph).getAllByText('supervisor').length).toBeGreaterThan(0);
+    expect(within(graph).getAllByText('executor').length).toBeGreaterThan(0);
+    expect(within(graph).getAllByText('delegate').length).toBeGreaterThan(0);
+    expect(within(graph).getByText('owns')).toBeInTheDocument();
+    expect(within(graph).getByText('runs')).toBeInTheDocument();
+    expect(within(graph).getAllByText('modify').length).toBeGreaterThan(0);
+    expect(within(graph).getAllByText('conflict').length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: 'settings.acceptAgentTask' })).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'settings.keepAllArtifacts' })).toBeInTheDocument();
 
@@ -697,7 +721,7 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('Supervisor finished after reviewer approved all artifacts.')).toBeInTheDocument();
     expect(screen.getAllByText('Release notes are ready for reviewer handoff.').length).toBeGreaterThan(0);
     expect(screen.getByText('settings.agentTeamArtifacts')).toBeInTheDocument();
-    expect(screen.getByText('reports/teamrun-summary.md')).toBeInTheDocument();
+    expect(screen.getAllByText('reports/teamrun-summary.md').length).toBeGreaterThan(0);
     expect(screen.getAllByText('filesystem').length).toBeGreaterThan(0);
     expect(screen.getByText('settings.agentTeamBudget')).toBeInTheDocument();
     expect(screen.getByText('1,280 / 4,000')).toBeInTheDocument();
