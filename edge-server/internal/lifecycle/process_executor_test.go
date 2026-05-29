@@ -128,8 +128,7 @@ func TestProcessExecutorPublishesOutputAndFinished(t *testing.T) {
 				if !ok || len(chunks) == 0 {
 					t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
 				}
-				text, _ := chunks[0]["text"].(string)
-				stdoutText += text
+				stdoutText += outputChunksText(chunks)
 			}
 		case "run.finished":
 			if !seenOutput["stdout"] || !seenOutput["stderr"] {
@@ -204,8 +203,7 @@ func TestProcessExecutorRunsCommandWithInjectedContext(t *testing.T) {
 				t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
 			}
 			sawStdoutBatch = true
-			text, _ := chunks[0]["text"].(string)
-			stdoutText += text
+			stdoutText += outputChunksText(chunks)
 		case "run.finished":
 			if !sawStarted {
 				t.Fatal("run.finished arrived before run.started")
@@ -273,8 +271,7 @@ func TestProcessExecutorRunsCommandInConfiguredWorkDir(t *testing.T) {
 			if !ok || len(chunks) == 0 {
 				t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
 			}
-			text, _ := chunks[0]["text"].(string)
-			stdoutText += text
+			stdoutText += outputChunksText(chunks)
 		case "run.finished":
 			want := "cwd=" + filepath.Clean(workDir)
 			if !strings.Contains(stdoutText, want) {
@@ -668,6 +665,16 @@ func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleS
 		t.Fatalf("NewProcessExecutor returned error: %v", err)
 	}
 	return executor
+}
+
+func outputChunksText(chunks []map[string]any) string {
+	var text strings.Builder
+	for _, chunk := range chunks {
+		if value, ok := chunk["text"].(string); ok {
+			text.WriteString(value)
+		}
+	}
+	return text.String()
 }
 
 func TestProcessExecutorHelperRunsFromModeArgument(t *testing.T) {

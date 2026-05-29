@@ -156,7 +156,7 @@ export function normalize(diff: ReviewDiff): ViewDiff {
         patch: diff.patch,
         additions: diff.additions,
         deletions: diff.deletions,
-        status: diff.status,
+        ...(diff.status ? { status: diff.status } : {}),
         hunks: parsed.hunks,
       };
     }
@@ -166,7 +166,7 @@ export function normalize(diff: ReviewDiff): ViewDiff {
       patch: diff.patch,
       additions: diff.additions,
       deletions: diff.deletions,
-      status: diff.status,
+      ...(diff.status ? { status: diff.status } : {}),
       hunks: [],
     };
   }
@@ -181,7 +181,7 @@ export function normalize(diff: ReviewDiff): ViewDiff {
       patch: '',
       additions: diff.additions,
       deletions: diff.deletions,
-      status: diff.status,
+      ...(diff.status ? { status: diff.status } : {}),
       hunks: [],
     };
   }
@@ -196,7 +196,7 @@ export function normalize(diff: ReviewDiff): ViewDiff {
     patch: builtPatch,
     additions: diff.additions,
     deletions: diff.deletions,
-    status: diff.status,
+    ...(diff.status ? { status: diff.status } : {}),
   });
 }
 
@@ -268,12 +268,12 @@ export function parseUnifiedDiff(
           return {
             type,
             content: line.slice(1),
-            oldLineNumber: type !== 'added'
-              ? (h.oldStart ?? 0) + i
-              : undefined,
-            newLineNumber: type !== 'deleted'
-              ? (h.newStart ?? 0) + i
-              : undefined,
+            ...(type !== 'added'
+              ? { oldLineNumber: (h.oldStart ?? 0) + i }
+              : {}),
+            ...(type !== 'deleted'
+              ? { newLineNumber: (h.newStart ?? 0) + i }
+              : {}),
           };
         });
         return { header, lines };
