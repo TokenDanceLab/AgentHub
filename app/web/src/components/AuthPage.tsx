@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, ChevronDown } from 'lucide-react';
+import { TokenDanceMark } from '@shared/ui';
 import type { UserProfile } from '@/api/hubClient';
 import { HUB_URL } from '@/config';
 import LoginForm from '@/components/LoginForm';
-import tokenDanceLogo from '@shared/assets/tokendance-icon-rounded.svg';
 import styles from './AuthPage.module.css';
 
 type HubStatus = 'connected' | 'disconnected' | 'checking';
@@ -84,7 +84,7 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
       )}
 
       <div className={styles.header}>
-        <img className={styles.logo} src={tokenDanceLogo} alt="TokenDance" />
+        <TokenDanceMark className={styles.logo} />
         <h1 className={styles.appName}>{t('auth.title')}</h1>
         <p className={styles.tagline}>{t('auth.tagline')}</p>
       </div>
