@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useRef, useState, useCallback, useEffect, useLayoutEffect, Fragment, memo, useMemo, createContext } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +17,20 @@ import LinkCard from './LinkCard';
 import ArtifactPreview from './ArtifactPreview';
 import type { ArtifactType } from './ArtifactPreview';
 import { ToolTimeline } from '@shared/ui/ToolTimeline';
+=======
+import { useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, ChevronRight, Route, GitFork, Gauge } from 'lucide-react';
+import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
+import { formatTokens, formatCost } from '@shared/context/breakdown';
+import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
+import MarkdownRenderer from './MarkdownRenderer';
+import CodeBlock from './CodeBlock';
+import EmptyState from './EmptyState';
+import TaskList from './TaskList';
+import ToolTimeline from './ToolTimeline';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
@@ -59,6 +74,7 @@ function resolveToolIcon(toolName: string) {
   return <Icon size={14} />;
 }
 
+<<<<<<< HEAD
 // ── Tool call grouping (Kanna-style: collapse consecutive tool_use blocks) ──
 
 const TOOL_CATEGORY_LABELS: Record<string, { singular: string; plural: string }> = {
@@ -155,6 +171,8 @@ function blockMemoEqual(prev: Record<string, unknown>, next: Record<string, unkn
   return true;
 }
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function DecorativeAgentIcon({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
@@ -323,7 +341,11 @@ const ThinkingBlock = memo(function ThinkingBlock({ content, active }: { content
   );
 });
 
+<<<<<<< HEAD
 const PendingThinking = memo(function PendingThinking({ label }: { label: string }) {
+=======
+function PendingThinking({ label }: { label: string }) {
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   return (
     <div className={styles.pendingThinking}>
       <span className={styles.pendingThinkingLabel}>{label}</span>
@@ -350,13 +372,39 @@ function previewAgentText(content: string): { preview: string; hiddenLines: numb
   return { preview, hiddenLines, hiddenChars };
 }
 
+<<<<<<< HEAD
+=======
+function previewAgentText(content: string): { preview: string; hiddenLines: number; hiddenChars: number } | null {
+  const lines = content.split(/\r?\n/);
+  const tooManyLines = lines.length > LONG_AGENT_TEXT_MAX_LINES;
+  const tooManyChars = content.length > LONG_AGENT_TEXT_MAX_CHARS;
+  if (!tooManyLines && !tooManyChars) return null;
+
+  let preview = tooManyLines
+    ? lines.slice(0, LONG_AGENT_TEXT_PREVIEW_LINES).join('\n')
+    : content.slice(0, LONG_AGENT_TEXT_PREVIEW_CHARS);
+  if (preview.length > LONG_AGENT_TEXT_PREVIEW_CHARS) {
+    preview = preview.slice(0, LONG_AGENT_TEXT_PREVIEW_CHARS);
+  }
+  preview = preview.trimEnd();
+
+  const hiddenLines = Math.max(0, lines.length - preview.split(/\r?\n/).length);
+  const hiddenChars = Math.max(0, content.length - preview.length);
+  return { preview, hiddenLines, hiddenChars };
+}
+
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function previewInlineText(content: string, maxLength: number): string {
   const normalized = content.replace(/\s+/g, ' ').trim();
   if (normalized.length <= maxLength) return normalized;
   return `${normalized.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
 }
 
+<<<<<<< HEAD
 const AgentTextBlock = memo(function AgentTextBlock({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
+=======
+function AgentTextBlock({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const { t } = useTranslation();
   const displayed = useStreamingText(content, Boolean(isStreaming));
   const [expanded, setExpanded] = useState(false);
@@ -396,7 +444,11 @@ const AgentTextBlock = memo(function AgentTextBlock({ content, isStreaming }: { 
       </button>
     </div>
   );
+<<<<<<< HEAD
 });
+=======
+}
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 interface ParsedAttachmentSummary {
   name: string;
@@ -439,7 +491,11 @@ function parseUserAttachmentContext(content: string): { text: string; attachment
   return attachments.length > 0 ? { text, attachments } : null;
 }
 
+<<<<<<< HEAD
 const UserTextBlock = memo(function UserTextBlock({ content }: { content: string }) {
+=======
+function UserTextBlock({ content }: { content: string }) {
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const { t } = useTranslation();
   const parsed = parseUserAttachmentContext(content);
   if (!parsed) return <MarkdownRenderer content={content} />;
@@ -465,7 +521,11 @@ const UserTextBlock = memo(function UserTextBlock({ content }: { content: string
       </div>
     </>
   );
+<<<<<<< HEAD
 });
+=======
+}
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 // ── ToolUseBlock ────────────────────────────
 
@@ -652,6 +712,15 @@ function isDetailedContextUsage(block: ContextUsageBlockType): boolean {
   return block.variant === 'warning' || block.variant === 'compaction';
 }
 
+<<<<<<< HEAD
+=======
+type ContextUsageBlockType = Extract<MessageBlock, { kind: 'context_usage' }>;
+
+function isDetailedContextUsage(block: ContextUsageBlockType): boolean {
+  return block.variant === 'warning' || block.variant === 'compaction';
+}
+
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function usagePercentFrom(block: ContextUsageBlockType): number | undefined {
   if (block.usagePercent != null) return block.usagePercent;
   if (block.contextLimit && block.total != null && block.contextLimit > 0) {
@@ -694,7 +763,76 @@ function formatTokenUsageFooter(
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+<<<<<<< HEAD
 const ContextUsageInline = memo(function ContextUsageInline({ block }: { block: ContextUsageBlockType }) {
+=======
+function ContextUsageInline({ block }: { block: ContextUsageBlockType }) {
+  const { t } = useTranslation();
+  const usagePercent = usagePercentFrom(block);
+  const total = block.total ?? (
+    block.input != null || block.output != null ? (block.input ?? 0) + (block.output ?? 0) : undefined
+  );
+  const title = block.variant === 'warning'
+      ? t('chat.contextWarning')
+      : block.variant === 'compaction'
+        ? t('chat.contextCompaction')
+        : t('chat.contextUsage');
+  const modelLabel = [block.provider, block.model].filter(Boolean).join(' / ');
+  const usageStyle = usagePercent != null
+    ? { '--usage-percent': `${Math.max(0, Math.min(100, usagePercent))}%` } as CSSProperties
+    : undefined;
+
+  const stats: Array<[string, string]> = [];
+  if (block.input != null) stats.push([t('chat.tokenUsageInput'), formatTokens(block.input)]);
+  if (block.output != null) stats.push([t('chat.tokenUsageOutput'), formatTokens(block.output)]);
+  if (total != null) stats.push([t('chat.tokenUsageTotal'), formatTokens(total)]);
+  if (block.remaining != null) stats.push([t('chat.contextRemaining'), formatTokens(block.remaining)]);
+  if (block.contextLimit != null) stats.push([t('chat.contextLimit'), formatTokens(block.contextLimit)]);
+  if (block.totalCost != null) stats.push([t('chat.tokenUsageCost'), formatCost(block.totalCost)]);
+  const summary = stats.map(([label, value]) => `${label} ${value}`).join(' · ');
+
+  const rootClass = [
+    styles.contextUsageStrip,
+    styles.contextUsageDetailed,
+    block.variant === 'warning' ? styles.contextUsageWarning : '',
+    block.variant === 'compaction' ? styles.contextUsageCompaction : '',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <div className={rootClass} data-testid="context-usage-strip" title={[summary, modelLabel].filter(Boolean).join(' · ') || undefined}>
+      <div className={styles.contextUsageHeader}>
+        <span className={styles.contextUsageIcon} aria-hidden="true"><Gauge size={14} /></span>
+        <span className={styles.contextUsageTitle}>{title}</span>
+        {usagePercent != null ? (
+          <span className={styles.contextUsagePercent}>{Math.round(usagePercent)}%</span>
+        ) : null}
+        {block.threshold != null ? (
+          <span className={styles.contextUsageThreshold}>
+            {t('chat.contextThreshold', { percent: Math.round(block.threshold) })}
+          </span>
+        ) : null}
+      </div>
+      {usagePercent != null ? (
+        <div className={styles.contextUsageBar} style={usageStyle} aria-hidden="true" />
+      ) : null}
+      {stats.length > 0 ? (
+        <div className={styles.contextUsageStats}>
+          {stats.map(([label, value]) => (
+            <span key={label} className={styles.contextUsageStat}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {modelLabel ? <div className={styles.contextUsageModel}>{modelLabel}</div> : null}
+    </div>
+  );
+}
+
+// ── DiffCard ──────────────────────────────── (参考: Cline DiffEditRow + CCViewer DiffViewer)
+function DiffCard({ diff }: { diff: FileDiff }) {
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const { t } = useTranslation();
   const usagePercent = usagePercentFrom(block);
   const total = block.total ?? (
@@ -1173,7 +1311,39 @@ function formatDurationMs(durationMs?: number): string | null {
   return `${(durationMs / 1000).toFixed(durationMs < 10_000 ? 1 : 0)}s`;
 }
 
+<<<<<<< HEAD
 const ChildAgentBlock = memo(function ChildAgentBlock({ block }: { block: Extract<MessageBlock, { kind: 'child_agent' }> }) {
+=======
+function AgentTaskBlock({ block }: { block: Extract<MessageBlock, { kind: 'agent_task' }> }) {
+  const { t } = useTranslation();
+  const title = block.title.trim() || block.taskId;
+  return (
+    <div className={styles.agentTaskBlock} data-testid="subagent-task-card">
+      <div className={styles.agentTaskHeader}>
+        <span className={styles.agentTaskIcon} aria-hidden="true"><Bot size={14} /></span>
+        <span className={styles.agentTaskKind}>{t('chat.subagentTask')}</span>
+        <strong>{title}</strong>
+        <span className={`${styles.toolStatus} ${toolStatusClass(block.status)}`}>
+          {t(`chat.taskStatus.${block.status}`, { defaultValue: block.status })}
+        </span>
+      </div>
+      {block.summary ? <p className={styles.agentTaskSummary}>{block.summary}</p> : null}
+      <div className={styles.agentTaskMeta}>
+        <code>{block.taskId}</code>
+        {block.worker ? <span>{t('chat.subagentWorker')}: {block.worker}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function formatDurationMs(durationMs?: number): string | null {
+  if (durationMs == null || !Number.isFinite(durationMs)) return null;
+  if (durationMs < 1000) return `${Math.round(durationMs)}ms`;
+  return `${(durationMs / 1000).toFixed(durationMs < 10_000 ? 1 : 0)}s`;
+}
+
+function ChildAgentBlock({ block }: { block: Extract<MessageBlock, { kind: 'child_agent' }> }) {
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const { t } = useTranslation();
   const title = block.title.trim() || block.childId;
   const detail = block.error || block.result;
@@ -1199,9 +1369,15 @@ const ChildAgentBlock = memo(function ChildAgentBlock({ block }: { block: Extrac
       </div>
     </div>
   );
+<<<<<<< HEAD
 });
 
 const RouteDecisionBlock = memo(function RouteDecisionBlock({ block }: { block: Extract<MessageBlock, { kind: 'route_decision' }> }) {
+=======
+}
+
+function RouteDecisionBlock({ block }: { block: Extract<MessageBlock, { kind: 'route_decision' }> }) {
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const { t } = useTranslation();
   const headline = block.instructions || block.summary || block.blockedReason || block.reasoning || block.action;
   return (
@@ -1219,6 +1395,7 @@ const RouteDecisionBlock = memo(function RouteDecisionBlock({ block }: { block: 
       </div>
     </div>
   );
+<<<<<<< HEAD
 });
 
 // ── ErrorBlock ──────────────────────────────
@@ -1447,6 +1624,10 @@ const CompactBlock = memo(function CompactBlock({ block }: { block: Extract<Mess
   );
 });
 
+=======
+}
+
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 // ── Main BlockRenderer ──────────────────────
 function blockRendererPropsEqual(
   prev: { block: MessageBlock; t: (key: string, vars?: Record<string, unknown>) => string; role?: ChatMessage['role']; active?: boolean },
@@ -1503,6 +1684,7 @@ const BlockRenderer = memo(function BlockRenderer({
     case 'context_usage':
       return isDetailedContextUsage(block) ? <ContextUsageInline block={block} /> : null;
 
+<<<<<<< HEAD
     case 'error':
       return <ErrorBlock block={block} />;
 
@@ -1559,6 +1741,8 @@ const BlockRenderer = memo(function BlockRenderer({
     case 'link_card':
       return <LinkCard block={block} />;
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     default:
       return null;
   }
@@ -1593,6 +1777,7 @@ function extractMessageText(msg: ChatMessage): string {
             : `Result: failed — ${block.error ?? 'unknown error'}`;
         case 'context_usage':
           return `Context usage: total=${block.total ?? '?'} input=${block.input ?? '?'} output=${block.output ?? '?'} percent=${block.usagePercent ?? '?'}`;
+<<<<<<< HEAD
         case 'error':
           return `[error] ${block.message || block.error || 'unknown error'}`;
         case 'citation':
@@ -1601,6 +1786,8 @@ function extractMessageText(msg: ChatMessage): string {
           return `[compact] ${block.summary}`;
         case 'tool_group':
           return block.items.map((item) => `[${item.toolName}] ${summarizeInput(item.input)}`).join('\n');
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
         default:
           return '';
       }
@@ -1626,6 +1813,7 @@ function hasVisibleBlock(block: MessageBlock): boolean {
     case 'agent_task':
     case 'child_agent':
     case 'route_decision':
+<<<<<<< HEAD
     case 'error':
     case 'citation':
     case 'compact':
@@ -1635,6 +1823,8 @@ function hasVisibleBlock(block: MessageBlock): boolean {
     case 'artifact':
     case 'deploy_card':
     case 'link_card':
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       return true;
     default:
       return false;
@@ -1645,6 +1835,7 @@ function hasVisibleMessage(message: ChatMessage): boolean {
   return message.blocks.some(hasVisibleBlock);
 }
 
+<<<<<<< HEAD
 // ── MessageCard (memo'd per-message renderer) ─
 interface MessageCardProps {
   msg: ChatMessage;
@@ -1812,13 +2003,19 @@ const MessageCard = memo(function MessageCard({
   );
 });
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 // ── ChatView ────────────────────────────────
 export default function ChatView({
   messages,
   isStreaming,
   onRetry,
   onFork,
+<<<<<<< HEAD
   onDelete, onReply, onRegenerate, replyTo, onCancelReply,
+=======
+  onDelete,
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }: Props) {
   const { t, i18n } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
@@ -1826,6 +2023,7 @@ export default function ChatView({
   const lastMessageIdRef = useRef<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const visibleMessages = messages.filter(hasVisibleMessage);
+<<<<<<< HEAD
 
   // ── Keyboard navigation & accessibility ─────
   const [focusedMessageIndex, setFocusedMessageIndex] = useState<number>(-1);
@@ -1857,6 +2055,8 @@ export default function ChatView({
   messagesRef.current = visibleMessages;
   const virtualizerRef = useRef(virtualizer);
   virtualizerRef.current = virtualizer;
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   // ── Keyboard navigation callbacks (after virtualizer is available) ──
   const focusMessageByIndex = useCallback((index: number) => {
@@ -1920,6 +2120,7 @@ export default function ChatView({
   const { scrollToBottom, isNearBottom } = useAutoScroll(
     scrollRef,
     { messages: visibleMessages, isStreaming: isStreaming ?? false },
+<<<<<<< HEAD
     virtualEnabled
       ? {
           scrollToBottomFn: () => {
@@ -1930,10 +2131,13 @@ export default function ChatView({
           },
         }
       : undefined,
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   );
 
   const lastMsg = visibleMessages[visibleMessages.length - 1];
   const lastMessageId = lastMsg?.id ?? null;
+<<<<<<< HEAD
 
   // Announce new streaming content to screen readers
   useEffect(() => {
@@ -1959,6 +2163,19 @@ export default function ChatView({
       }
     };
   }, [isStreaming, lastMsg]);
+=======
+  const lastMessageSignature = lastMsg
+    ? `${lastMsg.id}:${lastMsg.blocks.map((block) => {
+        if ('content' in block && typeof block.content === 'string') return block.content.length;
+        if (block.kind === 'tool_use') return `${block.status}:${block.children?.length ?? 0}`;
+        if (block.kind === 'agent_task') return `${block.status}:${block.summary?.length ?? 0}`;
+        if (block.kind === 'child_agent') return `${block.status}:${block.result?.length ?? 0}:${block.error?.length ?? 0}`;
+        if (block.kind === 'result') return block.success ? 'success' : block.error ?? 'failed';
+        if (block.kind === 'context_usage') return `${block.variant ?? 'usage'}:${block.total ?? ''}:${block.usagePercent ?? ''}`;
+        return block.kind;
+      }).join('|')}`
+    : '';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   useEffect(() => {
     if (!lastMessageId || lastMessageIdRef.current === lastMessageId) return;
@@ -2022,6 +2239,110 @@ export default function ChatView({
   const lastMsgHasText =
     lastMsg?.role === 'agent' && lastMsg.blocks.some((b) => b.kind === 'text');
 
+<<<<<<< HEAD
+=======
+  const renderMessage = useCallback(
+    (msg: ChatMessage) => {
+      const messageTime = formatMessageTime(msg.timestamp, i18n.language);
+      const tokenUsageFooter = formatTokenUsageFooter(msg, t);
+      return (
+        <div
+          className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
+        >
+          {msg.role === 'agent' && msg.agentName && (
+            <div className={styles.agentAvatar} title={msg.agentName}>
+              <div className={styles.avatarCircle}>
+                <AgentAvatarIcon name={msg.agentName} />
+              </div>
+              <span className={styles.agentNameLabel}>{agentDisplayName(msg.agentName)}</span>
+            </div>
+          )}
+
+          {msg.role === 'agent' ? <TaskList blocks={msg.blocks} /> : null}
+          {msg.role === 'agent' ? <ToolTimeline blocks={msg.blocks} /> : null}
+
+          {msg.blocks.map((block, i) => {
+            return (
+              <BlockRenderer
+                key={i}
+                block={block}
+                t={t}
+                role={msg.role}
+                active={Boolean(isStreaming && msg.id === lastMsg?.id)}
+              />
+            );
+          })}
+
+          {msg.role !== 'user' && (
+            <div className={styles.messageFooter}>
+              <div className={styles.actionBar}>
+                <button
+                  className={styles.actionBtn}
+                  title={t('chat.copy')}
+                  aria-label={t('chat.copy')}
+                  onClick={() => handleCopy(msg)}
+                >
+                  <Copy size={14} />
+                </button>
+                {onRetry && (
+                  <button
+                    className={styles.actionBtn}
+                    title={t('chat.retry')}
+                    aria-label={t('chat.retry')}
+                    onClick={() => onRetry(msg.id)}
+                  >
+                    <RefreshCw size={14} />
+                  </button>
+                )}
+                {onFork && (
+                  <button
+                    className={styles.actionBtn}
+                    title={t('chat.fork')}
+                    aria-label={t('chat.fork')}
+                    onClick={() => onFork(msg.id)}
+                  >
+                    <GitFork size={14} />
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    className={styles.actionBtn}
+                    title={t('chat.delete')}
+                    aria-label={t('chat.delete')}
+                    onClick={() => onDelete(msg.id)}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+              <span
+                className={styles.timestamp}
+                title={messageTime.exact}
+                aria-label={messageTime.exact}
+              >
+                {messageTime.short}
+              </span>
+              {tokenUsageFooter ? (
+                <span
+                  className={styles.messageTokenUsage}
+                  title={tokenUsageFooter}
+                  aria-label={tokenUsageFooter}
+                >
+                  · {tokenUsageFooter}
+                </span>
+              ) : null}
+            </div>
+          )}
+          {copiedMessageId === msg.id && (
+            <span className={styles.copyToast}>{t('chat.copied')}</span>
+          )}
+        </div>
+      );
+    },
+    [t, i18n.language, isStreaming, lastMsg?.id, copiedMessageId, handleCopy, onRetry, onFork, onDelete],
+  );
+
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const handleScrollToBottom = useCallback(() => {
     scrollToBottom(true);
   }, [scrollToBottom]);
@@ -2039,6 +2360,7 @@ export default function ChatView({
             title={t('chat.emptyTitle')}
             description={t('chat.emptyDescription')}
           />
+<<<<<<< HEAD
         ) : (<Fragment>
           {virtualEnabled ? (
               <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative', flexShrink: 0 }}>
@@ -2134,6 +2456,22 @@ export default function ChatView({
         >
           {streamAnnouncement}
         </span>
+=======
+        ) : (
+          <div className={styles.messageList}>
+            {visibleMessages.map((msg) => (
+              <div
+                key={msg.id}
+                data-message-id={msg.id}
+                className={`${styles.messageRow} ${msg.role === 'user' ? styles.messageRowUser : ''}`}
+              >
+                {renderMessage(msg)}
+              </div>
+            ))}
+          </div>
+        )}
+        {isStreaming && !lastMsgHasText ? <PendingThinking label={t('chat.thinkingLabel')} /> : null}
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       </div>
 
       {showScrollIndicator && (

@@ -28,7 +28,11 @@ import {
   ArtifactSchema,
   PreviewSchema,
   ThreadInfoSchema,
+<<<<<<< HEAD
   ThreadItemInfoSchema,
+=======
+  ModelCatalogResponseSchema,
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   safeParse,
   listResponseSchema,
 } from './schemas';
@@ -75,9 +79,13 @@ export interface ModelCatalogResponse {
   sources: ModelCatalogSource[];
 }
 
+<<<<<<< HEAD
 function baseUrl(): string {
   return getEdgeBaseUrl().replace(/\/+$/, '');
 }
+=======
+const BASE = EDGE_URL.replace(/\/+$/, '');
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 export async function fetchHealth(): Promise<HealthResponse> {
   const res = await fetch(`${baseUrl()}/v1/health`);
@@ -100,7 +108,11 @@ export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {
 }
 
 export async function fetchModelCatalog(): Promise<ModelCatalogResponse> {
+<<<<<<< HEAD
   const res = await fetch(`${baseUrl()}/v1/model-catalog`, { headers: edgeAuthHeaders() });
+=======
+  const res = await fetch(`${BASE}/v1/model-catalog`, { headers: edgeAuthHeaders() });
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   if (!res.ok) throw await parseError(res);
   return safeParse(ModelCatalogResponseSchema, await res.json(), 'modelCatalog');
 }
@@ -232,7 +244,11 @@ export async function renameThread(threadId: string, title: string): Promise<Thr
 }
 
 export async function updateThreadStatus(threadId: string, status: 'active' | 'archived'): Promise<ThreadInfo> {
+<<<<<<< HEAD
   const res = await fetch(`${baseUrl()}/v1/threads/${encodeURIComponent(threadId)}`, {
+=======
+  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     method: 'PATCH',
     headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ status }),
@@ -242,6 +258,7 @@ export async function updateThreadStatus(threadId: string, status: 'active' | 'a
 }
 
 export async function archiveThread(threadId: string): Promise<ThreadInfo> {
+<<<<<<< HEAD
   const res = await fetch(`${baseUrl()}/v1/threads/${encodeURIComponent(threadId)}:archive`, {
     method: 'POST',
     headers: edgeAuthHeaders(),
@@ -255,6 +272,21 @@ export async function deleteThread(threadId: string): Promise<'deleted' | 'archi
     method: 'DELETE',
     headers: edgeAuthHeaders(),
   });
+=======
+  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}:archive`, {
+    method: 'POST',
+    headers: edgeAuthHeaders(),
+  });
+  if (!res.ok) throw await parseError(res);
+  return safeParse(ThreadInfoSchema, await res.json(), 'archiveThread');
+}
+
+export async function deleteThread(threadId: string): Promise<'deleted' | 'archived'> {
+  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
+    method: 'DELETE',
+    headers: edgeAuthHeaders(),
+  });
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   if (res.ok) return 'deleted';
 
   const error = await parseError(res);

@@ -12,7 +12,11 @@
     "core:window:allow-close",
     "core:window:allow-start-dragging",
     "dialog:allow-open",
+<<<<<<< HEAD
     "shell:allow-open",
     "notification:default"
+=======
+    "shell:allow-open"
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   ]
 }

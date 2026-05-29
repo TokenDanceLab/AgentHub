@@ -237,8 +237,11 @@ export interface CoordinatorRouteDecision {
   correlation_id?: string;
 }
 
+<<<<<<< HEAD
 // 鈹€鈹€ Agent teams / TeamRuns 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 export interface AgentTeam {
   id: string;
   owner_id?: string;
@@ -247,25 +250,75 @@ export interface AgentTeam {
   avatar_url?: string;
   created_at?: string;
   updated_at?: string;
+<<<<<<< HEAD
   members?: AgentTeamMember[];
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 export interface AgentTeamMember {
   id: string;
   team_id: string;
   agent_profile_id?: string;
+<<<<<<< HEAD
   role: string;
+=======
+  role: 'supervisor' | 'executor' | 'reviewer' | string;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   position?: number;
   created_at?: string;
 }
 
+<<<<<<< HEAD
+=======
+export interface AgentTeamDetail extends AgentTeam {
+  members?: AgentTeamMember[];
+}
+
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 export interface AgentTeamRun {
   id: string;
   team_id: string;
   session_id?: string;
   trigger_user_id?: string;
   trigger_message?: string;
+<<<<<<< HEAD
   status: string;
+=======
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AgentTeamAssignment {
+  id: string;
+  team_run_id: string;
+  from_member_id?: string;
+  to_member_id?: string;
+  type?: string;
+  task_prompt?: string;
+  context?: string;
+  status?: string;
+  run_id?: string;
+  result?: string;
+  depth?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AgentTeamTask {
+  id: string;
+  team_run_id: string;
+  assignment_id?: string;
+  assignee_member_id?: string;
+  parent_task_id?: string;
+  status: 'pending' | 'dispatched' | 'running' | 'done' | 'failed' | 'cancelled' | string;
+  objective?: string;
+  input_refs?: Record<string, unknown>;
+  run_id?: string;
+  attempt?: number;
+  risk_level?: 'normal' | 'high' | string;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   created_at?: string;
   updated_at?: string;
 }
@@ -275,7 +328,11 @@ export interface AgentTeamEvent {
   team_run_id: string;
   seq: number;
   type: string;
+<<<<<<< HEAD
   payload: string;
+=======
+  payload?: string | Record<string, unknown>;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   created_at?: string;
 }
 
@@ -283,13 +340,19 @@ export interface TeamMemberState {
   member_id: string;
   agent_profile_id?: string;
   role: string;
+<<<<<<< HEAD
   active_tasks: number;
   completed_tasks: number;
+=======
+  active_tasks?: number;
+  completed_tasks?: number;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 export interface TeamTaskState {
   task_id: string;
   assignment_id?: string;
+<<<<<<< HEAD
   assignee_member_id: string;
   parent_task_id?: string;
   status: string;
@@ -305,20 +368,40 @@ export interface TeamTaskDependencyState {
   task_id: string;
   depends_on_task_id: string;
   kind: string;
+=======
+  assignee_member_id?: string;
+  parent_task_id?: string;
+  status: string;
+  objective?: string;
+  run_id?: string;
+  agent_task_id?: string;
+  edge_run_id?: string;
+  attempt?: number;
+  risk_level?: string;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 export interface TeamAssignmentState {
   assignment_id: string;
+<<<<<<< HEAD
   from_member_id: string;
   to_member_id: string;
   type: string;
   status: string;
   depth: number;
+=======
+  from_member_id?: string;
+  to_member_id?: string;
+  type?: string;
+  status?: string;
+  depth?: number;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   run_id?: string;
   agent_task_id?: string;
   edge_run_id?: string;
 }
 
+<<<<<<< HEAD
 export interface TeamApprovalEdgeControl {
   runId: string;
   requestId: string;
@@ -329,11 +412,20 @@ export interface TeamApprovalEdgeControl {
 export interface TeamApprovalState {
   approval_id: string;
   agent_task_id: string;
+=======
+export interface TeamApprovalState {
+  approval_id: string;
+  agent_task_id?: string;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   team_task_id?: string;
   assignment_id?: string;
   member_id?: string;
   edge_run_id?: string;
+<<<<<<< HEAD
   request_id: string;
+=======
+  request_id?: string;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   tool_name?: string;
   tool_use_id?: string;
   status: string;
@@ -341,11 +433,19 @@ export interface TeamApprovalState {
   decided_by?: string;
   created_at?: string;
   decided_at?: string;
+<<<<<<< HEAD
   edge_control?: TeamApprovalEdgeControl;
 }
 
 export interface TeamArtifactState {
   agent_task_id: string;
+=======
+  edge_control?: Record<string, unknown>;
+}
+
+export interface TeamArtifactState {
+  agent_task_id?: string;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   team_task_id?: string;
   assignment_id?: string;
   member_id?: string;
@@ -364,7 +464,11 @@ export interface TeamConflictState {
   conflict_id: string;
   path: string;
   status: string;
+<<<<<<< HEAD
   agent_task_ids: string[];
+=======
+  agent_task_ids?: string[];
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   team_task_ids?: string[];
   assignment_ids?: string[];
   member_ids?: string[];
@@ -384,11 +488,16 @@ export interface TeamRunEventState {
   edge_run_id?: string;
   event_seq: number;
   event_type: string;
+<<<<<<< HEAD
   payload: string;
+=======
+  payload?: string;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   created_at?: string;
 }
 
 export interface TeamBudget {
+<<<<<<< HEAD
   total_tokens_used: number;
   input_tokens?: number;
   output_tokens?: number;
@@ -396,6 +505,15 @@ export interface TeamBudget {
   remaining_tokens?: number;
   usage_percent?: number;
   run_count: number;
+=======
+  total_tokens_used?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  token_limit?: number;
+  remaining_tokens?: number;
+  usage_percent?: number;
+  run_count?: number;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   context_warnings?: number;
   compactions?: number;
 }
@@ -404,6 +522,7 @@ export interface TeamRunState {
   run_id: string;
   team_id: string;
   status: string;
+<<<<<<< HEAD
   members: TeamMemberState[];
   tasks: TeamTaskState[];
   dependencies: TeamTaskDependencyState[];
@@ -413,13 +532,59 @@ export interface TeamRunState {
   conflicts: TeamConflictState[];
   run_events: TeamRunEventState[];
   route_log: CoordinatorRouteDecision[];
+=======
+  members?: TeamMemberState[];
+  tasks?: TeamTaskState[];
+  dependencies?: Array<Record<string, unknown>>;
+  assignments?: TeamAssignmentState[];
+  approvals?: TeamApprovalState[];
+  artifacts?: TeamArtifactState[];
+  conflicts?: TeamConflictState[];
+  run_events?: TeamRunEventState[];
+  route_log?: CoordinatorRouteDecision[];
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   budget?: TeamBudget;
   terminal_reason?: string;
 }
 
+<<<<<<< HEAD
 export type HubListResponse<T> = T[] | { items: T[] };
 
 // 鈹€鈹€ Custom agents 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+=======
+export interface TeamApprovalDecisionRequest {
+  decision: 'allow' | 'deny';
+  reason?: string;
+}
+
+export interface TeamConflictResolutionRequest {
+  resolution: string;
+  path?: string;
+  selected_agent_task_id?: string;
+  reason?: string;
+}
+
+export interface CreateAgentTeamRequest {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateAgentTeamRequest {
+  name: string;
+  description?: string;
+}
+
+export interface AddAgentTeamMemberRequest {
+  agent_profile_id: string;
+  role: 'supervisor' | 'executor' | 'reviewer' | string;
+}
+
+export interface StartAgentTeamRunRequest {
+  trigger_message: string;
+}
+
+// ── Custom agents ────────────────────────────────
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 export interface CustomAgentRequest {
   name: string;
@@ -431,7 +596,25 @@ export interface CustomAgentRequest {
   model_params?: string;
 }
 
+<<<<<<< HEAD
 // 鈹€鈹€ Execution targets 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+=======
+export interface CustomAgent {
+  id: string;
+  owner_user_id?: string;
+  name: string;
+  avatar_url?: string;
+  agent_type: string;
+  system_prompt?: string;
+  capability_tags?: string;
+  tool_whitelist?: string;
+  model_params?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// ── Execution targets ───────────────────────────
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 export interface HubNotification {
   id: string;
@@ -999,6 +1182,70 @@ export function createHubClient(opts: HubClientOptions = {}) {
         `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/tasks`,
       ),
 
+    // ── Agent teams / TeamRun console ─────────────
+
+    createAgentTeam: (data: CreateAgentTeamRequest) =>
+      request<AgentTeam>('/web/agent-teams', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    listAgentTeams: () =>
+      request<AgentTeam[]>('/web/agent-teams'),
+
+    getAgentTeam: (teamId: string) =>
+      request<AgentTeamDetail>(`/web/agent-teams/${encodeURIComponent(teamId)}`),
+
+    updateAgentTeam: (teamId: string, data: UpdateAgentTeamRequest) =>
+      request<void>(`/web/agent-teams/${encodeURIComponent(teamId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    deleteAgentTeam: (teamId: string) =>
+      request<void>(`/web/agent-teams/${encodeURIComponent(teamId)}`, { method: 'DELETE' }),
+
+    addAgentTeamMember: (teamId: string, data: AddAgentTeamMemberRequest) =>
+      request<void>(`/web/agent-teams/${encodeURIComponent(teamId)}/members`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    removeAgentTeamMember: (teamId: string, memberId: string) =>
+      request<void>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
+        { method: 'DELETE' },
+      ),
+
+    startTeamRun: (teamId: string, data: StartAgentTeamRunRequest) =>
+      request<AgentTeamRun>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    listTeamRuns: (teamId: string) =>
+      request<AgentTeamRun[]>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs`),
+
+    getTeamRun: (teamId: string, runId: string) =>
+      request<AgentTeamRun>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}`,
+      ),
+
+    getTeamRunState: (teamId: string, runId: string) =>
+      request<TeamRunState>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/state`,
+      ),
+
+    listTeamEvents: (teamId: string, runId: string) =>
+      request<AgentTeamEvent[]>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/events`,
+      ),
+
+    listTeamTasks: (teamId: string, runId: string) =>
+      request<AgentTeamTask[]>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/tasks`,
+      ),
+
     postTeamRouteDecision: (teamId: string, runId: string, decision: CoordinatorRouteDecision) =>
       request<Record<string, unknown>>(
         `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/route-decisions`,
@@ -1008,6 +1255,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
         },
       ),
 
+<<<<<<< HEAD
     listAgentTeams: () =>
       request<HubListResponse<AgentTeam>>('/web/agent-teams'),
 
@@ -1027,6 +1275,37 @@ export function createHubClient(opts: HubClientOptions = {}) {
       ),
 
     // 鈹€鈹€ Custom agents 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+=======
+    decideTeamApproval: (
+      teamId: string,
+      runId: string,
+      approvalId: string,
+      decision: TeamApprovalDecisionRequest,
+    ) =>
+      request<TeamApprovalState>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}/decide`,
+        {
+          method: 'POST',
+          body: JSON.stringify(decision),
+        },
+      ),
+
+    resolveTeamConflict: (
+      teamId: string,
+      runId: string,
+      conflictId: string,
+      resolution: TeamConflictResolutionRequest,
+    ) =>
+      request<TeamConflictState>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/conflicts/${encodeURIComponent(conflictId)}/resolve`,
+        {
+          method: 'POST',
+          body: JSON.stringify(resolution),
+        },
+      ),
+
+    // ── Custom agents ─────────────────────────────
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
     listCustomAgents: () =>
       request<CustomAgent[]>('/web/custom-agents'),
