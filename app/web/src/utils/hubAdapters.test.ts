@@ -69,6 +69,32 @@ describe('hubMessageToChatMessage runtime payloads', () => {
     expect(message.blocks).toEqual([{ kind: 'text', content: 'plain answer from agent' }]);
   });
 
+  it('renders Hub-delivered run event envelopes as runtime status blocks', () => {
+    const message = hubMessageToChatMessage({
+      id: 'msg-session-init',
+      session_id: 'sess-1',
+      sender_type: 'agent',
+      content_type: 'json',
+      content: JSON.stringify({
+        event_type: 'run.agent.session_init',
+        payload: {
+          model: 'gpt-5',
+          tools: ['Read', 'Edit', 'Bash'],
+          permissionMode: 'approval',
+        },
+      }),
+    });
+
+    expect(message.blocks).toEqual([
+      {
+        kind: 'session_init',
+        model: 'gpt-5',
+        tools: ['Read', 'Edit', 'Bash'],
+        permissionMode: 'approval',
+      },
+    ]);
+  });
+
   it('does not treat generic JSON id fields as tool call ids', () => {
     const message = hubMessageToChatMessage({
       id: 'msg-json',

@@ -32,7 +32,7 @@ import { useConnectionStore } from '@/stores/connectionStore';
 import { useHubStore } from '@/stores/hubStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useThreadStore } from '@/stores/threadStore';
-import { getAccessToken } from '@/hooks/useAuth';
+import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useHubMainChat } from '@/hooks/useHubMainChat';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { useHealth } from '@/hooks/useHealth';
@@ -137,6 +137,7 @@ function isAgentMissing(error: unknown): boolean {
 
 export default function WebLayout() {
   const { t } = useTranslation();
+  const { tryAutoLogin } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
@@ -195,8 +196,33 @@ export default function WebLayout() {
   const { outputText, toolCalls, changedFiles } = runDetail;
 
   useEffect(() => {
+    let cancelled = false;
+    void tryAutoLogin()
+      .then((authenticated) => {
+        if (authenticated && !cancelled) {
+          void queryClient.refetchQueries({ queryKey: ['threads'] });
+          void queryClient.refetchQueries({ queryKey: ['agents'] });
+        }
+      })
+      .catch(() => {
+        /* Auth surfaces handle explicit login errors. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [queryClient, tryAutoLogin]);
+
+  useEffect(() => {
     setOnline(online, health);
   }, [health, online, setOnline]);
+
+  useEffect(() => {
+    if (selectedThreadId || threads.length === 0) return;
+    const firstThread = threads[0];
+    if (firstThread?.threadId) {
+      selectThread(firstThread.threadId);
+    }
+  }, [selectThread, selectedThreadId, threads]);
 
   useEffect(() => {
     const syncSurfaceFromPath = () => {

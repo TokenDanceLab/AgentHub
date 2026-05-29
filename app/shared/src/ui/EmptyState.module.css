@@ -154,8 +154,8 @@
   }
 
   .suggestionChip {
-    min-height: 32px;
-    padding: 0 10px;
+    min-height: var(--touch-target-min, 44px);
+    padding: 0 13px;
     font-size: 12px;
   }
 }

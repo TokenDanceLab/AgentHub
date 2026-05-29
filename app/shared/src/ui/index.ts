@@ -35,3 +35,5 @@ export { ContextSummary } from './ContextSummary';
 export type { ContextSummaryItem, ContextSummaryProps } from './ContextSummary';
 export { ActivityCard } from './ActivityCard';
 export type { ActivityCardProps } from './ActivityCard';
+export { DisclosureRow } from './DisclosureRow';
+export type { DisclosureRowProps } from './DisclosureRow';

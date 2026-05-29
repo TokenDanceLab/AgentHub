@@ -98,6 +98,36 @@ const messages = [
     seq_id: 2,
     created_at: "2026-05-30T01:21:00Z",
   },
+  {
+    id: "msg_session_init",
+    session_id: "session_web_design",
+    sender_id: "profile_codex",
+    sender_type: "agent",
+    content_type: "json",
+    content: JSON.stringify({
+      event_type: "run.agent.session_init",
+      payload: {
+        model: "gpt-5",
+        tools: ["Read", "Edit", "Bash"],
+        permissionMode: "approval",
+      },
+    }),
+    seq_id: 3,
+    created_at: "2026-05-30T01:22:00Z",
+  },
+  {
+    id: "msg_result",
+    session_id: "session_web_design",
+    sender_id: "profile_codex",
+    sender_type: "agent",
+    content_type: "json",
+    content: JSON.stringify({
+      success: true,
+      tokenUsage: { input: 1420, output: 318 },
+    }),
+    seq_id: 4,
+    created_at: "2026-05-30T01:23:00Z",
+  },
 ];
 
 function hubEnvelope(data) {
@@ -405,6 +435,14 @@ async function visitAndCapture(page, scene) {
     await page.getByRole("button", { name: /Account|Sign in/ }).click();
     await page.waitForTimeout(250);
   }
+  if (scene.selectThread) {
+    const targetThread = page.getByRole("button", { name: /Web design convergence/i });
+    if ((await targetThread.count()) > 0) {
+      await targetThread.first().click();
+    }
+    await page.getByText("Session initialized — gpt-5").waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("Completed — 1420 in / 318 out tokens").waitFor({ state: "visible", timeout: 5000 });
+  }
 
   const screenshotPath = path.join(outDir, `${scene.name}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -456,6 +494,15 @@ async function main() {
       authenticated: true,
       language: "en",
       theme: "dark",
+    },
+    {
+      name: "web-design-workspace-desktop-status-1440x920",
+      path: "/",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      selectThread: true,
     },
     {
       name: "web-design-settings-mobile-zh-390x844",

@@ -801,8 +801,13 @@
   }
 
   .actionBtn {
-    width: 32px;
-    height: 32px;
+    width: var(--touch-target-min, 44px);
+    height: var(--touch-target-min, 44px);
+  }
+
+  .statusRowHeader {
+    min-height: var(--touch-target-min, 44px);
+    padding: 8px 10px;
   }
 
   .toolUseHeader {
