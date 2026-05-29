@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, KeyRound } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserProfile } from '@/api/hubClient';
+import tokenDanceLogo from '@/assets/tokendance-icon-rounded.svg';
 import styles from './AuthPage.module.css';
 
 interface LoginFormProps {
@@ -57,7 +58,10 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
         {identityLoading ? (
           <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
         ) : (
-          <KeyRound size={16} aria-hidden="true" />
+          <>
+            <img className={styles.identityIcon} src={tokenDanceLogo} alt="" aria-hidden="true" />
+            <KeyRound size={15} aria-hidden="true" />
+          </>
         )}
         <span>{t('auth.tokenDanceLogin')}</span>
       </button>
