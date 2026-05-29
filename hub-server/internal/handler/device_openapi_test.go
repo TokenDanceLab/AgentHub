@@ -55,6 +55,22 @@ func TestOpenAPIEdgeDeviceRegisterMatchesHubRouteAndEnvelope(t *testing.T) {
 	}
 }
 
+func TestOpenAPIDoesNotContainDuplicateMappingKeys(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	duplicatePath, ok := firstDuplicateMappingKey(spec, "$")
+	if ok {
+		t.Fatalf("OpenAPI contains duplicate mapping key at %s", duplicatePath)
+	}
+}
+
+func TestOpenAPIHubAuthDeviceIDsUseUUIDContract(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	schemas := yamlMapField(t, yamlMapField(t, spec, "components", "components"), "schemas", "components.schemas")
+
+	assertSchemaRequiresUUIDDeviceID(t, schemas, "HubOIDCAuthorizeRequest")
+	assertSchemaRequiresUUIDDeviceID(t, schemas, "HubOIDCCallbackRequest")
+}
+
 func TestOpenAPIEdgeTaskCallbacksDocumentStreamAndDoneBodies(t *testing.T) {
 	spec := loadOpenAPISpec(t)
 	paths := yamlMapField(t, spec, "paths", "paths")
@@ -91,6 +107,20 @@ func TestOpenAPIEdgeTaskCallbacksDocumentStreamAndDoneBodies(t *testing.T) {
 	requireMaxLength(t, yamlMapField(t, doneProps, "final_content", "HubTaskDoneRequest.properties.final_content"), "1048576", "done final_content")
 }
 
+func assertSchemaRequiresUUIDDeviceID(t *testing.T, schemas *yaml.Node, schemaName string) {
+	t.Helper()
+	schema := yamlMapField(t, schemas, schemaName, "components.schemas."+schemaName)
+	required := yamlStringSlice(t, yamlField(t, schema, "required", schemaName+".required"), schemaName+".required")
+	if !containsString(required, "device_type") || !containsString(required, "device_id") {
+		t.Fatalf("%s.required = %v, want device_type and device_id", schemaName, required)
+	}
+	properties := yamlMapField(t, schema, "properties", schemaName+".properties")
+	deviceID := yamlMapField(t, properties, "device_id", schemaName+".properties.device_id")
+	if got := yamlScalarField(t, deviceID, "format", schemaName+".properties.device_id.format"); got != "uuid" {
+		t.Fatalf("%s device_id format = %v, want uuid", schemaName, got)
+	}
+}
+
 func requestBodySchema(t *testing.T, post *yaml.Node, name string) *yaml.Node {
 	t.Helper()
 	body := yamlMapField(t, post, "requestBody", name+" requestBody")
@@ -113,6 +143,43 @@ func loadOpenAPISpec(t *testing.T) *yaml.Node {
 		return spec.Content[0]
 	}
 	return &spec
+}
+
+func firstDuplicateMappingKey(node *yaml.Node, path string) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	if node.Kind == yaml.DocumentNode {
+		for _, child := range node.Content {
+			if duplicatePath, ok := firstDuplicateMappingKey(child, path); ok {
+				return duplicatePath, true
+			}
+		}
+		return "", false
+	}
+	if node.Kind == yaml.MappingNode {
+		seen := map[string]struct{}{}
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			key := node.Content[i].Value
+			childPath := path + "." + key
+			if _, exists := seen[key]; exists {
+				return childPath, true
+			}
+			seen[key] = struct{}{}
+			if duplicatePath, ok := firstDuplicateMappingKey(node.Content[i+1], childPath); ok {
+				return duplicatePath, true
+			}
+		}
+		return "", false
+	}
+	if node.Kind == yaml.SequenceNode {
+		for _, child := range node.Content {
+			if duplicatePath, ok := firstDuplicateMappingKey(child, path+"[]"); ok {
+				return duplicatePath, true
+			}
+		}
+	}
+	return "", false
 }
 
 func yamlMapField(t *testing.T, node *yaml.Node, key string, path string) *yaml.Node {
