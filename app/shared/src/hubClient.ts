@@ -7,6 +7,8 @@ export interface HubResponseEnvelope<T = unknown> {
   data?: T;
 }
 
+export type HubEnvelope<T = unknown> = HubResponseEnvelope<T>;
+
 export interface HubClientOptions {
   baseUrl?: string;
   getToken?: () => string | null | undefined;
@@ -950,7 +952,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     ackTask: (taskId: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/ack`, {
         method: 'POST',
-        body: runId ? JSON.stringify({ run_id: runId }) : undefined,
+        ...(runId ? { body: JSON.stringify({ run_id: runId }) } : {}),
       }),
     streamTask: (taskId: string, content: string, runId?: string) =>
       request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {

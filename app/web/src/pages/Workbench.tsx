@@ -1,1 +1,1 @@
-export { default } from '@/pages/workbench/WorkbenchPage';
+export { default } from '@/App';

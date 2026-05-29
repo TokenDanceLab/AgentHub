@@ -10,12 +10,12 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--brand, oklch(0.55 0.16 255)), oklch(0.60 0.14 210));
+  background: var(--brand, oklch(0.55 0.16 255));
   transition: width var(--duration-slow, 0.5s) ease-out;
 }
 
 .paused .fill {
-  background: linear-gradient(90deg, var(--warning, oklch(0.70 0.18 85)), oklch(0.55 0.22 300));
+  background: var(--warning, oklch(0.70 0.18 85));
 }
 
 .label {

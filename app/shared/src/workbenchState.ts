@@ -78,7 +78,7 @@ export function createWorkbenchState(
 ): WorkbenchState {
   return workbenchReducer(initialWorkbenchState, {
     type: 'snapshot.loaded',
-    snapshot,
+    ...(snapshot !== undefined ? { snapshot } : {}),
   });
 }
 
@@ -129,7 +129,10 @@ export function workbenchReducer(
     case 'connection.disconnected':
       return {
         ...state,
-        connection: { status: 'disconnected', error: action.error },
+        connection: {
+          status: 'disconnected',
+          ...(action.error !== undefined ? { error: action.error } : {}),
+        },
       };
     case 'connection.error':
       return {
@@ -166,7 +169,9 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
         projects: upsertBy(state.projects, projectId, (current) => ({
           id: projectId,
           name: text(payload.name) ?? current?.name ?? projectId,
-          description: text(payload.description) ?? current?.description,
+          ...(text(payload.description) ?? current?.description
+            ? { description: text(payload.description) ?? current?.description }
+            : {}),
           createdAt: text(payload.createdAt) ?? current?.createdAt ?? sentAt,
           updatedAt: text(payload.updatedAt) ?? sentAt,
         })),
@@ -187,9 +192,12 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
             text(envelope.scope?.projectId) ??
             current?.projectId ??
             '',
-          conversationId:
-            text(payload.conversationId) ?? current?.conversationId,
-          title: text(payload.title) ?? current?.title,
+          ...(text(payload.conversationId) ?? current?.conversationId
+            ? { conversationId: text(payload.conversationId) ?? current?.conversationId }
+            : {}),
+          ...(text(payload.title) ?? current?.title
+            ? { title: text(payload.title) ?? current?.title }
+            : {}),
           status: threadStatus(payload.status) ?? current?.status ?? 'active',
           createdAt: text(payload.createdAt) ?? current?.createdAt ?? sentAt,
           updatedAt: text(payload.updatedAt) ?? sentAt,
@@ -256,7 +264,9 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
           id: runnerId,
           name: text(payload.name) ?? current?.name ?? runnerId,
           status: event.type === 'runner.online' ? 'online' : 'offline',
-          capabilities: text(payload.capabilities) ?? current?.capabilities,
+          ...(text(payload.capabilities) ?? current?.capabilities
+            ? { capabilities: text(payload.capabilities) ?? current?.capabilities }
+            : {}),
         })),
       };
     }
@@ -286,8 +296,12 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
             '',
           status: runStatus(event.type, payload.status) ?? current?.status ?? 'queued',
           createdAt: text(payload.createdAt) ?? current?.createdAt ?? sentAt,
-          startedAt: text(payload.startedAt) ?? current?.startedAt,
-          finishedAt: text(payload.finishedAt) ?? current?.finishedAt,
+          ...(text(payload.startedAt) ?? current?.startedAt
+            ? { startedAt: text(payload.startedAt) ?? current?.startedAt }
+            : {}),
+          ...(text(payload.finishedAt) ?? current?.finishedAt
+            ? { finishedAt: text(payload.finishedAt) ?? current?.finishedAt }
+            : {}),
         })),
       };
     }
@@ -304,10 +318,10 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
       const chunks =
         event.type === 'run.output.batch'
           ? chunkTexts(payload.chunks, text(payload.stream))
-          : [{ stream: text(payload.stream), text: text(payload.text) ?? '' }];
+          : [logChunk(text(payload.text) ?? '', text(payload.stream))];
       const notice = truncationNotice(payload);
       if (notice) {
-        chunks.push({ stream: text(payload.stream), text: notice });
+        chunks.push(logChunk(notice, text(payload.stream)));
       }
       const nextLog = chunks.reduce<RunLogs>((acc, chunk) => {
         if (chunk.stream === 'stderr') {
@@ -340,7 +354,7 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
           summary: text(payload.summary) ?? current?.summary ?? 'Approval required',
           status: 'pending',
           createdAt: text(payload.createdAt) ?? current?.createdAt ?? sentAt,
-          decidedAt: current?.decidedAt,
+          ...(current?.decidedAt ? { decidedAt: current.decidedAt } : {}),
         })),
       };
     }
@@ -395,7 +409,9 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
           id: previewId,
           runId,
           threadId: text(payload.threadId) ?? current?.threadId ?? run?.threadId ?? '',
-          url: text(payload.url) ?? current?.url,
+          ...(text(payload.url) ?? current?.url
+            ? { url: text(payload.url) ?? current?.url }
+            : {}),
           status: 'ready',
           createdAt: text(payload.createdAt) ?? current?.createdAt ?? sentAt,
         })),
@@ -535,9 +551,19 @@ function setRunStatus(runs: Run[], runId: string, status: Run['status']): Run[] 
     threadId: current?.threadId ?? '',
     status,
     createdAt: current?.createdAt ?? EPOCH,
-    startedAt: current?.startedAt,
-    finishedAt: current?.finishedAt,
+    ...(current?.startedAt ? { startedAt: current.startedAt } : {}),
+    ...(current?.finishedAt ? { finishedAt: current.finishedAt } : {}),
   }));
+}
+
+function logChunk(
+  chunkText: string,
+  stream?: string,
+): { stream?: string; text: string } {
+  return {
+    text: chunkText,
+    ...(stream !== undefined ? { stream } : {}),
+  };
 }
 
 function chunkTexts(
@@ -548,12 +574,9 @@ function chunkTexts(
   return value.map((chunk) => {
     if (chunk && typeof chunk === 'object') {
       const record = chunk as Record<string, unknown>;
-      return {
-        stream: text(record.stream) ?? fallbackStream,
-        text: text(record.text) ?? '',
-      };
+      return logChunk(text(record.text) ?? '', text(record.stream) ?? fallbackStream);
     }
-    return { stream: fallbackStream, text: '' };
+    return logChunk('', fallbackStream);
   });
 }
 

@@ -5,10 +5,16 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  padding: 12px;
 }
 
 .title {
-  display: none; /* App rightPanelHeader handles section label */
+  display: block;
+  margin: 0 0 10px;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .empty {
@@ -70,8 +76,8 @@
   margin: 0;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.02);
-  border-left: 2px solid rgba(255, 255, 255, 0.06);
-  border-radius: 0 6px 6px 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
   font-size: 11px;
   font-family: var(--font-mono);
   line-height: 1.6;
@@ -83,18 +89,18 @@
 }
 
 .outputWarning {
-  border-left-color: rgba(251, 191, 36, 0.4);
+  border-color: rgba(251, 191, 36, 0.22);
   background: rgba(251, 191, 36, 0.03);
 }
 
 .outputError {
-  border-left-color: rgba(239, 68, 68, 0.4);
+  border-color: rgba(239, 68, 68, 0.22);
   background: rgba(239, 68, 68, 0.03);
 }
 
 [data-theme='light'] .output {
   background: var(--muted);
-  border-left-color: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 .emptyStack {

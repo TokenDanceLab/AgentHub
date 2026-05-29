@@ -78,12 +78,10 @@
 }
 
 .selected {
-  border-color: transparent;
+  border-color: color-mix(in oklch, var(--primary) 34%, transparent);
   background: var(--agent-card-active);
   color: var(--foreground);
-  box-shadow:
-    inset 2px 0 0 color-mix(in oklch, var(--primary) 74%, var(--foreground)),
-    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035);
 }
 
 .selected:hover {
@@ -99,11 +97,9 @@
 }
 
 [data-theme='dark'] .selected {
-  border-color: transparent;
+  border-color: color-mix(in oklch, var(--primary) 38%, transparent);
   background: var(--agent-card-active);
-  box-shadow:
-    inset 2px 0 0 color-mix(in oklch, var(--primary) 74%, var(--foreground)),
-    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035);
 }
 
 [data-theme='dark'] .selected:hover {

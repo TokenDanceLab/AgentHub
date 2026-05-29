@@ -24,17 +24,13 @@
 .bar {
   height: 12px;
   border-radius: var(--radius-sm, 0.25rem);
-  background: linear-gradient(
-    90deg,
-    oklch(0 0 0 / 0.06) 0%,
-    oklch(0 0 0 / 0.12) 50%,
-    oklch(0 0 0 / 0.06) 100%
-  );
-  background-size: 200% 100%;
+  background: oklch(0 0 0 / 0.08);
+  opacity: 0.72;
   animation: shimmer 1.8s ease-in-out infinite;
 }
 
 @keyframes shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% { opacity: 0.48; }
+  50% { opacity: 0.86; }
+  100% { opacity: 0.48; }
 }
