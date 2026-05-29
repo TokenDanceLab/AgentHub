@@ -1,21 +1,29 @@
 .card {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 10px;
   min-width: 0;
   min-height: 64px;
 }
 
-.card[data-has-leading='true'] {
+.card[data-has-icon='true'] {
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.card[data-has-leading='true'][data-has-icon='true'] {
   grid-template-columns: auto 34px minmax(0, 1fr);
 }
 
 .card[data-has-actions='true'] {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.card[data-has-icon='true'][data-has-actions='true'] {
   grid-template-columns: 34px minmax(0, 1fr) auto;
 }
 
-.card[data-has-leading='true'][data-has-actions='true'] {
+.card[data-has-leading='true'][data-has-icon='true'][data-has-actions='true'] {
   grid-template-columns: auto 34px minmax(0, 1fr) auto;
 }
 
