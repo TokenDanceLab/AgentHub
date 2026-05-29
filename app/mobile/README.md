@@ -40,7 +40,7 @@ This pass removed the broken Tailwind-style dependency assumption. Mobile now us
 
 The latest Desktop-aligned glass pass also restored Mobile i18n initialization in `src/main.tsx`, reworked tab roots so Runs and Chat do not open to blank content, and rewired Chat send through `createThreadMessage`.
 
-Account readiness now uses a filled Desktop-style identity panel plus dense rows for TokenDance ID deep link, native Hub session storage, and notification permission checks instead of sparse placeholder metric tiles. This keeps the Mobile native adaptation visible without adding gradient cards or colored left rails.
+Account readiness now uses a filled Desktop-style identity panel plus dense rows for TokenDance ID deep link, native Hub session storage, and notification permission checks instead of sparse placeholder metric tiles. The Account identity panel imports the shared TokenDance mark from `app/shared/src/assets/tokendance-icon-rounded.svg`, matching Web without maintaining a second Mobile-only SVG copy. This keeps the Mobile native adaptation visible without adding gradient cards or colored left rails.
 
 ## Source Layout
 
