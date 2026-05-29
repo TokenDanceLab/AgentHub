@@ -383,6 +383,15 @@ async function collectMetrics(page, { mobile = false } = {}) {
     const shellBrandFallbackText = Array.from(document.querySelectorAll("header [class*='brandMark']"))
       .map((el) => el.textContent?.trim())
       .filter(Boolean);
+    const threadButtons = Array.from(document.querySelectorAll("button[aria-label='Web design convergence'], button[aria-label='Mobile handoff evidence']"));
+    const visibleThreadButtons = threadButtons.filter((button) => {
+      const rect = button.getBoundingClientRect();
+      const style = window.getComputedStyle(button);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const nestedThreadActionButtons = threadButtons
+      .map((button) => button.querySelectorAll("button").length)
+      .reduce((sum, count) => sum + count, 0);
 
     return {
       title: document.title,
@@ -403,6 +412,9 @@ async function collectMetrics(page, { mobile = false } = {}) {
       mobileAccountNavIndex,
       shellBrandLogo: !!shellBrandLogo,
       shellBrandFallbackText,
+      threadRowButtonCount: threadButtons.length,
+      visibleThreadRowButtonCount: visibleThreadButtons.length,
+      nestedThreadActionButtons,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -478,6 +490,16 @@ async function visitAndCapture(page, scene) {
     await page.getByText("Session initialized — gpt-5").waitFor({ state: "visible", timeout: 5000 });
     await page.getByText("Completed — 1420 in / 318 out tokens").waitFor({ state: "visible", timeout: 5000 });
   }
+  if (scene.verifyThreadRows) {
+    await page.waitForFunction(() => {
+      const buttons = Array.from(document.querySelectorAll("button[aria-label='Web design convergence'], button[aria-label='Mobile handoff evidence']"));
+      return buttons.filter((button) => {
+        const rect = button.getBoundingClientRect();
+        const style = window.getComputedStyle(button);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      }).length === 2;
+    }, undefined, { timeout: 5000 });
+  }
   if (scene.openRunWithToolCall) {
     const targetThread = page.getByRole("button", { name: /Web design convergence/i });
     if ((await targetThread.count()) > 0) {
@@ -502,6 +524,10 @@ async function visitAndCapture(page, scene) {
     mobile: scene.mobile,
     accountSheet: scene.openAccount,
   });
+  if (scene.verifyThreadRows) {
+    assert(metrics.visibleThreadRowButtonCount === 2, `${scene.name}: shared thread rows should expose two visible selectable buttons`, metrics);
+    assert(metrics.nestedThreadActionButtons === 0, `${scene.name}: thread row actions must not nest buttons inside the selectable row`, metrics);
+  }
 
   return { screenshotPath, metrics };
 }
@@ -550,6 +576,15 @@ async function main() {
       language: "en",
       theme: "dark",
       selectThread: true,
+    },
+    {
+      name: "web-design-thread-sidebar-desktop-1440x920",
+      path: "/",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      verifyThreadRows: true,
     },
     {
       name: "web-design-run-detail-tool-call-desktop-1440x920",
