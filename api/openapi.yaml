@@ -7,17 +7,19 @@ info:
     message deltas, approvals and artifact notifications are delivered through
     WebSocket typed events documented in api/events.md.
 
-    ## Implementation Status (2026-05-26)
+    ## Implementation Status (2026-05-29)
 
     **Edge Server**: Core endpoints (health/runs/threads/projects/agents/events/permissions)
     are implemented. `/v1/runners` remains a compatibility surface for runtime/
     target health; new architecture language should use Agent Runtime, Agent
     Profile, and Execution Target.
 
-    **Hub Server**: All documented `/client/auth`, `/client/contacts`, `/client/sessions`,
-    `/client/messages`, `/edge/*`, `/web/*` endpoints are implemented. Additional routes
-    exist in code but are not yet documented here (~36 routes for session members,
-    message pins, attachments, notifications, custom agents, contacts search/block).
+    **Hub Server**: Hub entries marked `x-agenthub-status: implemented` mirror
+    the current Gin router paths in `hub-server/internal/router/router.go`,
+    including `/client/auth`, `/client/contacts`, `/client/sessions`,
+    `/client/messages`, `/client/attachments`, `/client/notifications`,
+    `/edge/*`, and `/web/*`. Deprecated or legacy Hub shapes are retained only
+    when marked `planned`; they are not callable routes.
     The legacy `/v1/auth`, `/v1/users`, `/v1/contacts` paths are planned for future
     migration and not currently implemented.
 
@@ -1385,7 +1387,7 @@ paths:
         "204":
           description: Removed.
 
-  /client/contacts/{userId}:block:
+  /client/contacts/{userId}/block:
     post:
       tags: [HubSyncRelay]
       operationId: hubBlockContact
@@ -1399,7 +1401,7 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /client/contacts/{userId}:unblock:
+  /client/contacts/{userId}/unblock:
     post:
       tags: [HubSyncRelay]
       operationId: hubUnblockContact
@@ -1442,8 +1444,10 @@ paths:
     get:
       tags: [HubSyncRelay]
       operationId: hubListFriendRequests
-      summary: List received friend requests.
-      x-agenthub-status: implemented
+      summary: Legacy friend-request listing shape.
+      x-deprecated: true
+      description: No corresponding Hub router path exists. Use `GET /client/contacts/friend-requests`.
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       responses:
@@ -1454,8 +1458,10 @@ paths:
     get:
       tags: [HubSyncRelay]
       operationId: hubListSentFriendRequests
-      summary: List sent friend requests.
-      x-agenthub-status: implemented
+      summary: Legacy sent friend-request listing shape.
+      x-deprecated: true
+      description: No corresponding Hub router path exists.
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       responses:
@@ -1469,7 +1475,9 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubListSessionMembers
       summary: List session members.
-      x-agenthub-status: implemented
+      x-deprecated: true
+      description: No corresponding Hub router path exists.
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
@@ -1508,7 +1516,7 @@ paths:
         "201":
           $ref: "#/components/responses/Created"
 
-  /client/sessions/{id}/members/{memberId}:
+  /client/sessions/{id}/members/{user_id}:
     delete:
       tags: [HubSyncRelay]
       operationId: hubRemoveSessionMember
@@ -1521,12 +1529,15 @@ paths:
           in: path
           required: true
           schema: { type: string }
-        - $ref: "#/components/parameters/MemberId"
+        - name: user_id
+          in: path
+          required: true
+          schema: { type: string }
       responses:
         "204":
           description: Removed.
 
-  /client/sessions/{id}:leave:
+  /client/sessions/{id}/leave:
     post:
       tags: [HubSyncRelay]
       operationId: hubLeaveSession
@@ -1545,7 +1556,7 @@ paths:
 
   # ── Session Management ──
 
-  /client/sessions/{id}:dissolve:
+  /client/sessions/{id}/dissolve:
     post:
       tags: [HubSyncRelay]
       operationId: hubDissolveGroup
@@ -1562,7 +1573,7 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /client/sessions/{id}:transfer-owner:
+  /client/sessions/{id}/transfer-owner:
     post:
       tags: [HubSyncRelay]
       operationId: hubTransferOwner
@@ -1589,10 +1600,10 @@ paths:
           $ref: "#/components/responses/Ok"
 
   /client/sessions/{id}/settings:
-    patch:
+    put:
       tags: [HubSyncRelay]
-      operationId: hubUpdateSessionSettings
-      summary: Update session settings.
+      operationId: hubUpdateMemberSettings
+      summary: Update the current user's session settings.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -1608,9 +1619,9 @@ paths:
             schema:
               type: object
               properties:
-                name: { type: string }
-                avatar_url: { type: string }
-                announcement: { type: string }
+                pinned: { type: boolean }
+                muted: { type: boolean }
+                archived: { type: boolean }
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -1618,9 +1629,11 @@ paths:
   /client/sessions/{id}/member-settings:
     patch:
       tags: [HubSyncRelay]
-      operationId: hubUpdateMemberSettings
-      summary: Update member's own session settings.
-      x-agenthub-status: implemented
+      operationId: hubUpdateMemberSettingsLegacy
+      summary: Legacy member settings shape.
+      x-deprecated: true
+      description: No corresponding Hub router path exists. Use `PUT /client/sessions/{id}/settings`.
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
@@ -1690,8 +1703,8 @@ paths:
       operationId: hubRecallMessage
       summary: Recall (delete) a message.
       x-deprecated: true
-      description: Deprecated session-scoped path. Use `POST /client/messages/{id}:recall` instead.
-      x-agenthub-status: implemented
+      description: Deprecated session-scoped path. Use `POST /client/messages/{id}/recall` instead.
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
@@ -1710,8 +1723,8 @@ paths:
       operationId: hubPinMessage
       summary: Pin a message.
       x-deprecated: true
-      description: Deprecated session-scoped path. Use `POST /client/messages/{id}:pin` instead.
-      x-agenthub-status: implemented
+      description: Deprecated session-scoped path. Use `POST /client/messages/{id}/pin` instead.
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
@@ -1731,7 +1744,7 @@ paths:
       summary: Unpin a message.
       x-deprecated: true
       description: Deprecated session-scoped path. Use `DELETE /client/messages/{id}/pin` instead.
-      x-agenthub-status: implemented
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
@@ -1751,7 +1764,7 @@ paths:
       summary: Mark a message as read.
       x-deprecated: true
       description: Deprecated. No corresponding route exists in Hub router.
-      x-agenthub-status: implemented
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
@@ -1785,8 +1798,10 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubForwardMessages
-      summary: Forward messages to another session.
-      x-agenthub-status: implemented
+      summary: Legacy batch-forward shape.
+      x-deprecated: true
+      description: No corresponding Hub router path exists. Use `POST /client/messages/{id}/forward`.
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -1808,7 +1823,7 @@ paths:
 
   # ── Attachments ──
 
-  /client/attachments:probe:
+  /client/attachments/probe:
     post:
       tags: [HubSyncRelay]
       operationId: hubProbeAttachment
@@ -1829,7 +1844,7 @@ paths:
         "200":
           description: Attachment metadata if present; null if absent.
 
-  /client/attachments:upload:
+  /client/attachments:
     post:
       tags: [HubSyncRelay]
       operationId: hubUploadAttachment
@@ -1897,7 +1912,7 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
-  /client/notifications/{id}:read:
+  /client/notifications/{id}/read:
     post:
       tags: [HubSyncRelay]
       operationId: hubMarkNotificationRead
@@ -1914,7 +1929,7 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /client/notifications:read-all:
+  /client/notifications/read-all:
     post:
       tags: [HubSyncRelay]
       operationId: hubReadAllNotifications
@@ -2041,8 +2056,10 @@ paths:
     get:
       tags: [HubSyncRelay]
       operationId: hubGetCustomAgent
-      summary: Get a custom agent.
-      x-agenthub-status: implemented
+      summary: Legacy custom-agent detail shape.
+      x-deprecated: true
+      description: No corresponding Hub router path exists.
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
@@ -2149,7 +2166,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
 
-  /web/agent-tasks/{id}:cancel:
+  /web/agent-tasks/{id}/cancel:
     post:
       tags: [HubSyncRelay]
       operationId: hubCancelTask
@@ -2241,6 +2258,16 @@ paths:
           $ref: "#/components/responses/List"
 
   /client/contacts/friend-requests:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubListContactFriendRequests
+      summary: List received friend requests.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          $ref: "#/components/responses/List"
     post:
       tags: [HubSyncRelay]
       operationId: hubSendFriendRequest
@@ -2254,14 +2281,15 @@ paths:
           application/json:
             schema:
               type: object
-              required: [user_id]
+              required: [friend_id]
               properties:
-                user_id: { type: string }
+                friend_id: { type: string }
+                message: { type: string }
       responses:
         "201":
           $ref: "#/components/responses/Created"
 
-  /client/contacts/friend-requests/{id}:accept:
+  /client/contacts/friend-requests/{id}/accept:
     post:
       tags: [HubSyncRelay]
       operationId: hubAcceptFriendRequest
@@ -2278,7 +2306,7 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /client/contacts/friend-requests/{id}:reject:
+  /client/contacts/friend-requests/{id}/reject:
     post:
       tags: [HubSyncRelay]
       operationId: hubRejectFriendRequest
@@ -2366,7 +2394,7 @@ paths:
         "200":
           description: Incremental message batch.
 
-  /client/sessions/{id}:read:
+  /client/sessions/{id}/read:
     post:
       tags: [HubSyncRelay]
       operationId: hubMarkSessionRead
@@ -2428,7 +2456,7 @@ paths:
 
   # ── Messages (individual operations — code paths) ──
 
-  /client/messages/{id}:recall:
+  /client/messages/{id}/recall:
     post:
       tags: [HubSyncRelay]
       operationId: hubRecallMessageDirect
@@ -2437,12 +2465,15 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - $ref: "#/components/parameters/MsgId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
       responses:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /client/messages/{id}:pin:
+  /client/messages/{id}/pin:
     post:
       tags: [HubSyncRelay]
       operationId: hubPinMessageDirect
@@ -2451,7 +2482,10 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - $ref: "#/components/parameters/MsgId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -2463,12 +2497,15 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - $ref: "#/components/parameters/MsgId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
       responses:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /client/messages/{id}:forward:
+  /client/messages/{id}/forward:
     post:
       tags: [HubSyncRelay]
       operationId: hubForwardSingleMessage
@@ -2477,7 +2514,10 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - $ref: "#/components/parameters/MsgId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
       requestBody:
         required: true
         content:
@@ -3570,9 +3610,9 @@ paths:
 
   # ── Agent Profiles (CRUD beyond GET list) ──
 
-  /web/agent-profiles/{profileId}:
+  /web/agent-profiles/{id}:
     parameters:
-      - name: profileId
+      - name: id
         in: path
         required: true
         schema: { type: string, format: uuid }
@@ -3615,7 +3655,7 @@ paths:
         "204":
           description: Deleted.
 
-  /web/agent-profiles/{profileId}:publish:
+  /web/agent-profiles/{id}/publish:
     post:
       tags: [HubSyncRelay]
       operationId: hubPublishAgentProfile
@@ -3624,7 +3664,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - name: profileId
+        - name: id
           in: path
           required: true
           schema: { type: string, format: uuid }
@@ -3632,7 +3672,7 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /web/agent-profiles/{profileId}:install:
+  /web/agent-profiles/{id}/install:
     post:
       tags: [HubSyncRelay]
       operationId: hubInstallAgentProfile
@@ -3641,7 +3681,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - name: profileId
+        - name: id
           in: path
           required: true
           schema: { type: string, format: uuid }
@@ -3682,9 +3722,9 @@ paths:
         "201":
           $ref: "#/components/responses/Created"
 
-  /web/skills/{skillId}:
+  /web/skills/{id}:
     parameters:
-      - name: skillId
+      - name: id
         in: path
         required: true
         schema: { type: string, format: uuid }
@@ -3727,7 +3767,7 @@ paths:
         "204":
           description: Deleted.
 
-  /web/skills/{skillId}:publish:
+  /web/skills/{id}/publish:
     post:
       tags: [HubSyncRelay]
       operationId: hubPublishSkill
@@ -3736,7 +3776,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - name: skillId
+        - name: id
           in: path
           required: true
           schema: { type: string, format: uuid }
@@ -3744,7 +3784,7 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /web/skills/{skillId}:unpublish:
+  /web/skills/{id}/unpublish:
     post:
       tags: [HubSyncRelay]
       operationId: hubUnpublishSkill
@@ -3753,7 +3793,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - name: skillId
+        - name: id
           in: path
           required: true
           schema: { type: string, format: uuid }
@@ -3794,9 +3834,9 @@ paths:
         "201":
           $ref: "#/components/responses/Created"
 
-  /web/mcp-servers/{serverId}:
+  /web/mcp-servers/{id}:
     parameters:
-      - name: serverId
+      - name: id
         in: path
         required: true
         schema: { type: string, format: uuid }
@@ -3839,7 +3879,7 @@ paths:
         "204":
           description: Deleted.
 
-  /web/mcp-servers/{serverId}:publish:
+  /web/mcp-servers/{id}/publish:
     post:
       tags: [HubSyncRelay]
       operationId: hubPublishMCPServer
@@ -3848,7 +3888,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - name: serverId
+        - name: id
           in: path
           required: true
           schema: { type: string, format: uuid }
@@ -3856,7 +3896,7 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /web/mcp-servers/{serverId}:unpublish:
+  /web/mcp-servers/{id}/unpublish:
     post:
       tags: [HubSyncRelay]
       operationId: hubUnpublishMCPServer
@@ -3865,7 +3905,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - name: serverId
+        - name: id
           in: path
           required: true
           schema: { type: string, format: uuid }
@@ -3906,9 +3946,9 @@ paths:
         "201":
           $ref: "#/components/responses/Created"
 
-  /web/provider-bindings/{bindingId}:
+  /web/provider-bindings/{id}:
     parameters:
-      - name: bindingId
+      - name: id
         in: path
         required: true
         schema: { type: string, format: uuid }
@@ -3961,7 +4001,7 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
-  /web/market/profiles/{profileId}:
+  /web/market/profiles/{id}:
     get:
       tags: [HubSyncRelay]
       operationId: hubGetMarketProfile
@@ -3970,7 +4010,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - name: profileId
+        - name: id
           in: path
           required: true
           schema: { type: string, format: uuid }
@@ -3980,7 +4020,7 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
 
-  /web/market/profiles/{profileId}:install:
+  /web/market/profiles/{id}/install:
     post:
       tags: [HubSyncRelay]
       operationId: hubInstallMarketProfile
@@ -3989,7 +4029,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - name: profileId
+        - name: id
           in: path
           required: true
           schema: { type: string, format: uuid }
@@ -3997,7 +4037,7 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /web/market/profiles/{profileId}:rate:
+  /web/market/profiles/{id}/rate:
     post:
       tags: [HubSyncRelay]
       operationId: hubRateMarketProfile
@@ -4006,7 +4046,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - name: profileId
+        - name: id
           in: path
           required: true
           schema: { type: string, format: uuid }
