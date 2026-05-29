@@ -48,23 +48,21 @@
 }
 
 .brandMark {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 28px;
   height: 28px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: none;
-  color: var(--foreground);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 10px 24px rgba(0, 113, 188, 0.14);
+  object-fit: cover;
 }
 
 [data-theme='dark'] .brandMark {
   border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .brandText {
