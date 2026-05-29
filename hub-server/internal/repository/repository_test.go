@@ -990,6 +990,21 @@ func TestNotificationRepo_CreateAndList(t *testing.T) {
 	assert.Equal(t, n2.ID, result[0].ID)
 }
 
+func TestNotificationRepo_MarkReadRequiresOwningUser(t *testing.T) {
+	db := setupSQLite(t)
+
+	n := &model.Notification{UserID: "user-owner", Type: model.TypeMention, Payload: `{}`}
+	require.NoError(t, CreateNotification(db, n))
+
+	err := MarkNotificationRead(db, "user-other", n.ID)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	unread, err := ListNotifications(db, "user-owner", true, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, unread, 1)
+	assert.Equal(t, n.ID, unread[0].ID)
+}
+
 func TestNotificationRepo_MarkAllRead(t *testing.T) {
 	db := setupSQLite(t)
 
