@@ -1,4 +1,4 @@
-export type SurfacePlatform = 'desktop' | 'web';
+export type SurfacePlatform = 'desktop' | 'web' | 'mobile';
 
 export type SurfaceCategory =
   | 'command-center'
@@ -307,6 +307,38 @@ export const SURFACE_METADATA = [
     webRoutePattern: '/project/:id',
     defaultStatus: 'demoFallback',
   },
+  {
+    id: 'mobile.threads',
+    platform: 'mobile',
+    category: 'communication',
+    labelKey: 'surface.mobile.threads.label',
+    descriptionKey: 'surface.mobile.threads.description',
+    defaultStatus: 'realSnapshot',
+  },
+  {
+    id: 'mobile.chat',
+    platform: 'mobile',
+    category: 'communication',
+    labelKey: 'surface.mobile.chat.label',
+    descriptionKey: 'surface.mobile.chat.description',
+    defaultStatus: 'realSnapshot',
+  },
+  {
+    id: 'mobile.runs',
+    platform: 'mobile',
+    category: 'automation',
+    labelKey: 'surface.mobile.runs.label',
+    descriptionKey: 'surface.mobile.runs.description',
+    defaultStatus: 'realSnapshot',
+  },
+  {
+    id: 'mobile.account',
+    platform: 'mobile',
+    category: 'system',
+    labelKey: 'surface.mobile.account.label',
+    descriptionKey: 'surface.mobile.account.description',
+    defaultStatus: 'localSource',
+  },
 ] as const satisfies readonly SurfaceMetadata[];
 
 export type SurfaceId = (typeof SURFACE_METADATA)[number]['id'];
@@ -329,6 +361,10 @@ export function getSurfaceMetadata(id: SurfaceId): SurfaceMetadata {
 
 export function getSurfacesByCategory(category: SurfaceCategory): SurfaceMetadata[] {
   return SURFACE_METADATA.filter((surface) => surface.category === category);
+}
+
+export function getSurfacesByPlatform(platform: SurfacePlatform): SurfaceMetadata[] {
+  return SURFACE_METADATA.filter((surface) => surface.platform === platform);
 }
 
 export function getSurfaceByDesktopSectionId(sectionId: string): SurfaceMetadata | undefined {

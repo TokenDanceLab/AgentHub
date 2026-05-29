@@ -81,12 +81,34 @@
 
 /* ── Color schemes ─────────────── */
 
-.schemeDefault { border-left: 3px solid var(--border); }
-.schemeBlue    { border-left: 3px solid oklch(0.60 0.18 240); }
-.schemeGreen   { border-left: 3px solid var(--success, oklch(0.58 0.18 150)); }
-.schemeAmber   { border-left: 3px solid var(--warning, oklch(0.70 0.18 85)); }
-.schemePurple  { border-left: 3px solid oklch(0.55 0.22 300); }
-.schemeRed     { border-left: 3px solid var(--destructive, oklch(0.58 0.24 27)); }
+.schemeDefault {
+  border-color: var(--border);
+}
+
+.schemeBlue {
+  border-color: color-mix(in oklch, var(--brand, oklch(0.60 0.18 240)) 48%, var(--border));
+  background: color-mix(in oklch, var(--brand, oklch(0.60 0.18 240)) 8%, transparent);
+}
+
+.schemeGreen {
+  border-color: color-mix(in oklch, var(--success, oklch(0.58 0.18 150)) 48%, var(--border));
+  background: color-mix(in oklch, var(--success, oklch(0.58 0.18 150)) 8%, transparent);
+}
+
+.schemeAmber {
+  border-color: color-mix(in oklch, var(--warning, oklch(0.70 0.18 85)) 48%, var(--border));
+  background: color-mix(in oklch, var(--warning, oklch(0.70 0.18 85)) 8%, transparent);
+}
+
+.schemePurple {
+  border-color: color-mix(in oklch, var(--skill, oklch(0.55 0.22 300)) 48%, var(--border));
+  background: color-mix(in oklch, var(--skill, oklch(0.55 0.22 300)) 8%, transparent);
+}
+
+.schemeRed {
+  border-color: color-mix(in oklch, var(--destructive, oklch(0.58 0.24 27)) 48%, var(--border));
+  background: color-mix(in oklch, var(--destructive, oklch(0.58 0.24 27)) 8%, transparent);
+}
 
 .expanded {
   border-color: oklch(0 0 0 / 0.15);

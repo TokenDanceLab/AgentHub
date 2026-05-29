@@ -5,12 +5,13 @@
   place-items: center;
   flex-shrink: 0;
   border-radius: 10px;
-  color: #fff;
+  color: var(--primary);
   font-family: var(--font-sans);
   font-weight: 900;
   font-size: 14px;
   line-height: 1;
-  background: linear-gradient(135deg, var(--primary), oklch(0.55 0.22 300));
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+  border: 1px solid color-mix(in oklch, var(--primary) 28%, transparent);
 }
 
 .sm { width: 28px; height: 28px; font-size: 11px; border-radius: 8px; }
@@ -18,6 +19,7 @@
 .lg { width: 42px; height: 42px; font-size: 16px; border-radius: 12px; }
 
 .brand {
-  background: linear-gradient(135deg, var(--brand, oklch(0.55 0.16 255)), oklch(0.60 0.14 210) 58%, oklch(0.55 0.22 300));
-  box-shadow: 0 12px 24px oklch(0.55 0.16 255 / 0.22);
+  background: color-mix(in oklch, var(--brand, oklch(0.55 0.16 255)) 14%, transparent);
+  color: var(--brand, oklch(0.55 0.16 255));
+  box-shadow: none;
 }

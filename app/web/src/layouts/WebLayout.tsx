@@ -1,4 +1,6 @@
 import {
+  Bot,
+  FolderKanban,
   LogIn,
   Menu,
   MessageSquare,
@@ -9,6 +11,7 @@ import {
   PanelRightOpen,
   Settings,
   Sun,
+  Users,
   User,
   Wifi,
   WifiOff,
@@ -31,6 +34,7 @@ import { useHubMainChat } from '@/hooks/useHubMainChat';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { useHealth } from '@/hooks/useHealth';
 import { useHubWSConnection } from '@/hooks/useHubWSConnection';
+import { getSurfaceByWebRoute, getSurfaceMetadata, getSurfaceStatusMetadata, type SurfaceMetadata } from '@shared/surfaceMetadata';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { AppError } from '@shared/errors';
 import type { AgentInfo, RunInfo } from '@shared/types';
@@ -50,6 +54,46 @@ import styles from './WebLayout.module.css';
 
 type MainSurface = 'workspace' | 'messages' | 'settings';
 type WebRunInfo = RunInfo & ReturnType<typeof projectRunDetail>;
+
+interface RouteContext {
+  surface: SurfaceMetadata;
+  id?: string;
+}
+
+const SURFACE_PATHS: Record<MainSurface, string> = {
+  workspace: '/',
+  messages: '/chats',
+  settings: '/settings',
+};
+
+function surfaceFromPath(pathname: string): MainSurface {
+  if (pathname === '/chats' || pathname.startsWith('/chats/')) return 'messages';
+  if (pathname === '/settings' || pathname.startsWith('/settings/')) return 'settings';
+  return 'workspace';
+}
+
+function routeContextFromPath(pathname: string): RouteContext | null {
+  const surface = getSurfaceByWebRoute(pathname);
+  if (!surface || surface.id === 'web.workbench' || surface.id === 'web.privateChats') return null;
+
+  const groupMatch = pathname.match(/^\/group\/([^/]+)$/);
+  const projectMatch = pathname.match(/^\/project\/([^/]+)$/);
+  const routeId = groupMatch?.[1] ?? projectMatch?.[1];
+
+  return routeId
+    ? {
+        surface,
+        id: decodeURIComponent(routeId),
+      }
+    : { surface };
+}
+
+function routeSourceLabelKey(surface: SurfaceMetadata): string {
+  if (surface.id === 'web.agentSquare') return 'webShell.route.sources.catalog';
+  if (surface.id === 'web.groupWorkspace') return 'webShell.route.sources.group';
+  if (surface.id === 'web.projectPreview') return 'webShell.route.sources.project';
+  return 'webShell.route.metrics.shell';
+}
 
 function resolveHubAgentType(agent?: AgentInfo): string {
   const key = `${agent?.runtimeId ?? ''} ${agent?.id ?? ''} ${agent?.name ?? ''} ${agent?.description ?? ''}`.toLowerCase();
@@ -120,7 +164,12 @@ export default function WebLayout() {
   const [optimisticRun, setOptimisticRun] = useState<WebRunInfo | null>(null);
   const [taskRunEvents, setTaskRunEvents] = useState<AgentRunEvent[]>([]);
   const [runStartPending, setRunStartPending] = useState(false);
-  const [mainSurface, setMainSurface] = useState<MainSurface>('workspace');
+  const [mainSurface, setMainSurface] = useState<MainSurface>(() =>
+    typeof window === 'undefined' ? 'workspace' : surfaceFromPath(window.location.pathname),
+  );
+  const [routeContext, setRouteContext] = useState<RouteContext | null>(() =>
+    typeof window === 'undefined' ? null : routeContextFromPath(window.location.pathname),
+  );
   const agents = agentData?.items ?? [];
   const threads = threadData?.items ?? [];
   const activeAgentId = selectedAgentId ?? agents[0]?.id;
@@ -144,6 +193,26 @@ export default function WebLayout() {
   useEffect(() => {
     setOnline(online, health);
   }, [health, online, setOnline]);
+
+  useEffect(() => {
+    const syncSurfaceFromPath = () => {
+      setMainSurface(surfaceFromPath(window.location.pathname));
+      setRouteContext(routeContextFromPath(window.location.pathname));
+    };
+    window.addEventListener('popstate', syncSurfaceFromPath);
+    return () => window.removeEventListener('popstate', syncSurfaceFromPath);
+  }, []);
+
+  const selectMainSurface = useCallback((surface: MainSurface) => {
+    setMainSurface(surface);
+    setRouteContext(null);
+
+    if (typeof window === 'undefined') return;
+    const nextPath = SURFACE_PATHS[surface];
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState(null, '', nextPath);
+    }
+  }, []);
 
   const createWorkspaceThread = useCallback(async (): Promise<HubThreadInfo> => {
     const title = t('thread.defaultTitle');
@@ -268,7 +337,7 @@ export default function WebLayout() {
         return true;
       } catch (error) {
         if (!messagePersisted) removeMessage(messageId);
-        addToast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to start run' });
+        addToast({ type: 'error', message: error instanceof Error ? error.message : t('webChat.startFailed') });
         return false;
       } finally {
         setRunStartPending(false);
@@ -425,10 +494,20 @@ export default function WebLayout() {
   const detailOpen = isMobile ? mobileRightPanelOpen : rightPanelOpen;
   const showDesktopDetail = !isMobile && rightPanelOpen;
   const realtimeLabel = !hubAuthenticated
-    ? 'Sign in for realtime'
+    ? t('webShell.status.realtimeSignIn')
     : hubRealtime.authenticated
-      ? 'Hub WS live'
-      : `Hub WS ${hubRealtime.status}`;
+      ? t('webShell.status.realtimeLive')
+      : t('webShell.status.realtimeState', { state: hubRealtime.status });
+  const routeContextIcon =
+    routeContext?.surface.id === 'web.agentSquare'
+      ? <Bot size={16} />
+      : routeContext?.surface.id === 'web.groupWorkspace'
+        ? <Users size={16} />
+        : <FolderKanban size={16} />;
+  const routeContextStatus = routeContext ? getSurfaceStatusMetadata(routeContext.surface.defaultStatus) : null;
+  const mobileAccountSurface = getSurfaceMetadata('mobile.account');
+  const mobileAccountLabel = t(mobileAccountSurface.labelKey);
+  const mobileAccountDescription = t(mobileAccountSurface.descriptionKey);
 
   return (
     <ErrorBoundary>
@@ -439,7 +518,7 @@ export default function WebLayout() {
               <button
                 className={styles.iconBtn}
                 onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-                aria-label={mobileSidebarOpen ? 'Close navigation' : 'Open navigation'}
+                aria-label={mobileSidebarOpen ? t('webShell.nav.close') : t('webShell.nav.open')}
                 type="button"
               >
                 {mobileSidebarOpen ? <X size={18} /> : <Menu size={18} />}
@@ -448,7 +527,7 @@ export default function WebLayout() {
               <button
                 className={styles.iconBtn}
                 onClick={() => setLeftSidebarCollapsed(!sidebarCollapsed)}
-                aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-label={sidebarCollapsed ? t('webShell.nav.expand') : t('webShell.nav.collapse')}
                 type="button"
               >
                 {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
@@ -460,38 +539,42 @@ export default function WebLayout() {
             </div>
             <div className={styles.brandText}>
               <strong>AgentHub</strong>
-              <span>Web workspace</span>
+              <span>{t('webShell.brand.subtitle')}</span>
             </div>
           </div>
 
           <div className={styles.statusCluster}>
-            <div className={styles.surfaceTabs} role="tablist" aria-label="Main surface">
+            <div className={styles.surfaceTabs} role="tablist" aria-label={t('webShell.surface.aria')}>
               <button
                 className={mainSurface === 'workspace' ? styles.surfaceTabActive : styles.surfaceTab}
-                onClick={() => setMainSurface('workspace')}
-                aria-label="Workspace"
+                onClick={() => selectMainSurface('workspace')}
+                aria-label={t('webShell.surface.workspace')}
                 aria-selected={mainSurface === 'workspace'}
                 role="tab"
                 type="button"
               >
                 <PanelLeftOpen size={15} />
-                <span>Workspace</span>
+                <span>{t('webShell.surface.workspace')}</span>
               </button>
               <button
                 className={mainSurface === 'messages' ? styles.surfaceTabActive : styles.surfaceTab}
-                onClick={() => setMainSurface('messages')}
-                aria-label="Messages"
+                onClick={() => selectMainSurface('messages')}
+                aria-label={t('webShell.surface.messages')}
                 aria-selected={mainSurface === 'messages'}
                 role="tab"
                 type="button"
               >
                 <MessageSquare size={15} />
-                <span>Messages</span>
+                <span>{t('webShell.surface.messages')}</span>
               </button>
             </div>
             <span className={online ? styles.statusPillOnline : styles.statusPill}>
               {online ? <Wifi size={14} /> : <WifiOff size={14} />}
-              <span>{online ? `Hub REST ${health?.version ?? 'ready'}` : 'Hub path idle'}</span>
+              <span>
+                {online
+                  ? t('webShell.status.restReady', { version: health?.version ?? t('webShell.status.ready') })
+                  : t('webShell.status.restIdle')}
+              </span>
             </span>
             <span className={hubRealtime.authenticated ? styles.statusPillOnline : styles.statusPill}>
               {hubRealtime.authenticated ? <Wifi size={14} /> : <WifiOff size={14} />}
@@ -503,12 +586,12 @@ export default function WebLayout() {
               type="button"
             >
               {hubAuthenticated ? <User size={15} /> : <LogIn size={15} />}
-              <span>{hubAuthenticated ? username || 'Account' : 'Sign in'}</span>
+              <span>{hubAuthenticated ? username || t('webShell.account.account') : t('webShell.account.signIn')}</span>
             </button>
             <button
               className={styles.iconBtn}
               onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              aria-label={theme === 'dark' ? t('theme.switchToLight') : t('theme.switchToDark')}
               type="button"
             >
               {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
@@ -517,7 +600,7 @@ export default function WebLayout() {
               <button
                 className={styles.iconBtn}
                 onClick={() => setRightPanelOpen(!rightPanelOpen)}
-                aria-label={rightPanelOpen ? 'Close run detail' : 'Open run detail'}
+                aria-label={rightPanelOpen ? t('webShell.runDetail.close') : t('webShell.runDetail.open')}
                 type="button"
               >
                 {rightPanelOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
@@ -525,8 +608,8 @@ export default function WebLayout() {
             )}
             <button
               className={mainSurface === 'settings' ? styles.iconBtnActive : styles.iconBtn}
-              onClick={() => setMainSurface((surface) => (surface === 'settings' ? 'workspace' : 'settings'))}
-              aria-label="Settings"
+              onClick={() => selectMainSurface(mainSurface === 'settings' ? 'workspace' : 'settings')}
+              aria-label={t('settings.open')}
               type="button"
             >
               <Settings size={17} />
@@ -535,7 +618,7 @@ export default function WebLayout() {
               <button
                 className={styles.iconBtn}
                 onClick={() => setMobileRightPanelOpen(!mobileRightPanelOpen)}
-                aria-label={mobileRightPanelOpen ? 'Close run detail' : 'Open run detail'}
+                aria-label={mobileRightPanelOpen ? t('webShell.runDetail.close') : t('webShell.runDetail.open')}
                 type="button"
               >
                 {mobileRightPanelOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
@@ -549,7 +632,7 @@ export default function WebLayout() {
             <button
               className={styles.scrim}
               onClick={() => setMobileSidebarOpen(false)}
-              aria-label="Close navigation overlay"
+              aria-label={t('webShell.nav.closeOverlay')}
               type="button"
             />
           )}
@@ -566,7 +649,7 @@ export default function WebLayout() {
                   <button
                     className={styles.iconBtn}
                     onClick={() => setLeftSidebarCollapsed(false)}
-                    aria-label="Expand sidebar"
+                    aria-label={t('webShell.nav.expand')}
                     type="button"
                   >
                     <PanelLeftOpen size={18} />
@@ -576,7 +659,7 @@ export default function WebLayout() {
                 <div className={styles.sidebarContent}>
                   <section className={styles.sidebarSection}>
                     <div className={styles.sectionHeader}>
-                      <span>Agents</span>
+                      <span>{t('webShell.sidebar.agents')}</span>
                     </div>
                     <div className={styles.sidebarScroll}>
                       <Slot name="agent-list" {...shellProps} />
@@ -584,7 +667,7 @@ export default function WebLayout() {
                   </section>
                   <section className={styles.sidebarSection}>
                     <div className={styles.sectionHeader}>
-                      <span>Threads</span>
+                      <span>{t('webShell.sidebar.threads')}</span>
                     </div>
                     <div className={styles.sidebarScroll}>
                       <Slot name="thread-panel" {...shellProps} />
@@ -599,13 +682,59 @@ export default function WebLayout() {
             <div className={styles.workspaceGlass}>
               {mainSurface === 'settings' ? (
                 <SettingsPage
-                  onBack={() => setMainSurface('workspace')}
+                  onBack={() => selectMainSurface('workspace')}
                   onOpenAuth={() => setShowAuthModal(true)}
                 />
               ) : mainSurface === 'messages' ? (
                 <Slot name="im-view" {...shellProps} />
               ) : (
                 <>
+                  {routeContext && (
+                    <section className={styles.routeContextPanel} aria-label={t('webShell.route.aria', { surface: t(routeContext.surface.labelKey) })}>
+                      <div className={styles.routeContextHeader}>
+                        <span className={styles.routeContextIcon}>{routeContextIcon}</span>
+                        <div>
+                          <p className={styles.routeEyebrow}>{t('webShell.route.eyebrow')}</p>
+                          <h1>{t(routeContext.surface.labelKey)}</h1>
+                        </div>
+                      </div>
+                      <p className={styles.routeContextCopy}>{t(routeContext.surface.descriptionKey)}</p>
+                      <div className={styles.routeContextGrid}>
+                        <div className={styles.routeMetric}>
+                          <strong>{agents.length}</strong>
+                          <span>{t('webShell.route.metrics.agents')}</span>
+                        </div>
+                        <div className={styles.routeMetric}>
+                          <strong>{threads.length}</strong>
+                          <span>{t('webShell.route.metrics.threads')}</span>
+                        </div>
+                        <div className={styles.routeMetric}>
+                          <strong>{routeContext.id ?? t('webShell.route.metrics.shell')}</strong>
+                          <span>{t(routeSourceLabelKey(routeContext.surface))}</span>
+                        </div>
+                        {routeContextStatus && (
+                          <div className={styles.routeMetric}>
+                            <strong>{t(routeContextStatus.labelKey)}</strong>
+                            <span>{t('webShell.route.sources.status')}</span>
+                          </div>
+                        )}
+                        <div className={styles.routeMetric}>
+                          <strong>{routeContext.surface.platform}</strong>
+                          <span>{t('webShell.route.sources.registry')}</span>
+                        </div>
+                      </div>
+                      <div className={styles.routeActionRow}>
+                        <button className={styles.routeAction} type="button" onClick={() => selectMainSurface('messages')}>
+                          <MessageSquare size={16} />
+                          <span>{t('webShell.route.actions.messages')}</span>
+                        </button>
+                        <button className={styles.routeAction} type="button" onClick={() => selectMainSurface('settings')}>
+                          <Settings size={16} />
+                          <span>{t('webShell.route.actions.settings')}</span>
+                        </button>
+                      </div>
+                    </section>
+                  )}
                   <Slot name="main-view" {...shellProps} />
                   <Slot name="prompt-input" {...shellProps} />
                 </>
@@ -624,7 +753,7 @@ export default function WebLayout() {
               <button
                 className={styles.scrim}
                 onClick={() => setMobileRightPanelOpen(false)}
-                aria-label="Close run detail overlay"
+                aria-label={t('webShell.runDetail.closeOverlay')}
                 type="button"
               />
               <aside className={styles.rightOverlay}>
@@ -633,6 +762,63 @@ export default function WebLayout() {
             </>
           )}
         </div>
+
+        {isMobile && (
+          <nav className={styles.mobileSurfaceNav} aria-label={t('webShell.surface.aria')}>
+            <button
+              className={mainSurface === 'workspace' ? styles.mobileSurfaceNavItemActive : styles.mobileSurfaceNavItem}
+              type="button"
+              aria-current={mainSurface === 'workspace' ? 'page' : undefined}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setMobileRightPanelOpen(false);
+                selectMainSurface('workspace');
+              }}
+            >
+              <PanelLeftOpen size={20} />
+              <span>{t('webShell.surface.workspace')}</span>
+            </button>
+            <button
+              className={mainSurface === 'messages' ? styles.mobileSurfaceNavItemActive : styles.mobileSurfaceNavItem}
+              type="button"
+              aria-current={mainSurface === 'messages' ? 'page' : undefined}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setMobileRightPanelOpen(false);
+                selectMainSurface('messages');
+              }}
+            >
+              <MessageSquare size={20} />
+              <span>{t('webShell.surface.messages')}</span>
+            </button>
+            <button
+              className={detailOpen ? styles.mobileSurfaceNavItemActive : styles.mobileSurfaceNavItem}
+              type="button"
+              aria-pressed={detailOpen}
+              aria-label={detailOpen ? t('webShell.runDetail.close') : t('webShell.runDetail.open')}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setMobileRightPanelOpen(!mobileRightPanelOpen);
+              }}
+            >
+              <PanelRightOpen size={20} />
+              <span>{t('webShell.surface.runDetail')}</span>
+            </button>
+            <button
+              className={styles.mobileSurfaceNavItem}
+              type="button"
+              aria-label={`${hubAuthenticated ? username || mobileAccountLabel : mobileAccountLabel}. ${mobileAccountDescription}`}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setMobileRightPanelOpen(false);
+                setShowAuthModal(true);
+              }}
+            >
+              {hubAuthenticated ? <User size={20} /> : <LogIn size={20} />}
+              <span>{hubAuthenticated ? username || mobileAccountLabel : mobileAccountLabel}</span>
+            </button>
+          </nav>
+        )}
 
         <Slot name="permission-dialog" {...shellProps} />
         <Slot name="shortcut-help" />

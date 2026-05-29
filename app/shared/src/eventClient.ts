@@ -1,6 +1,11 @@
 import type { EventEnvelope, AnyEvent } from './events';
 
 export type EventListener = (event: AnyEvent) => void;
+export type EventConnectionStatus = 'connected' | 'disconnected' | 'error';
+export type EventConnectionListener = (
+  status: EventConnectionStatus,
+  error?: string,
+) => void;
 
 export interface EventClientOptions {
   baseUrl?: string;
@@ -15,6 +20,7 @@ export class EventClient {
   private ws: WebSocket | null = null;
   private listeners = new Set<EventListener>();
   private typeListeners = new Map<string, Set<EventListener>>();
+  private connectionListeners = new Set<EventConnectionListener>();
   private baseUrl: string;
   private cursor: string | undefined;
   private reconnectDelayMs: number;
@@ -60,6 +66,7 @@ export class EventClient {
 
     this.ws.onopen = () => {
       this.currentDelayMs = this.reconnectDelayMs;
+      this.dispatchConnection('connected');
     };
 
     this.ws.onmessage = (msg: MessageEvent<string>) => {
@@ -80,12 +87,14 @@ export class EventClient {
 
     this.ws.onclose = () => {
       this.ws = null;
+      this.dispatchConnection('disconnected');
       if (!this.destroyed) {
         this.scheduleReconnect();
       }
     };
 
     this.ws.onerror = () => {
+      this.dispatchConnection('error', 'Edge event stream error');
       this.ws?.close();
     };
   }
@@ -118,6 +127,21 @@ export class EventClient {
     }
     set.add(listener);
     return () => set?.delete(listener);
+  }
+
+  onConnection(listener: EventConnectionListener): () => void {
+    this.connectionListeners.add(listener);
+    return () => this.connectionListeners.delete(listener);
+  }
+
+  private dispatchConnection(status: EventConnectionStatus, error?: string): void {
+    for (const fn of this.connectionListeners) {
+      try {
+        fn(status, error);
+      } catch {
+        // Keep connection notifications isolated.
+      }
+    }
   }
 
   private dispatch(event: AnyEvent): void {
