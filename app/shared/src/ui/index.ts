@@ -17,3 +17,5 @@ export { RecoveryPanel } from './RecoveryPanel';
 export type { RecoveryPanelAction, RecoveryPanelProps } from './RecoveryPanel';
 export { SegmentedControl } from './SegmentedControl';
 export type { SegmentedControlOption, SegmentedControlProps } from './SegmentedControl';
+export { BottomSheet } from './BottomSheet';
+export type { BottomSheetProps } from './BottomSheet';
