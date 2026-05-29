@@ -17,20 +17,33 @@ import { useChatMessages } from '@/hooks/useChatMessages';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { useEdgeStatus } from '@/hooks/useEdgeStatus';
 import { useAgentList } from '@/api/agentQueries';
+import { useHubAgentTeams, type AgentTeamOverview } from '@/api/agentTeamQueries';
+import { useModelCatalog } from '@/api/modelCatalogQueries';
+import { useModelsDevDisplayNames } from '@/api/modelsDevCatalog';
 import { createHubClient } from '@/api/hubClient';
-import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
+import {
+  startRun,
+  cancelRun,
+  createThread,
+  renameThread,
+  decidePermission as decidePermissionRest,
+} from '@/api/edgeClient';
 import { useThreads, useThreadMessages } from '@/api/threadQueries';
-import { createThread } from '@/api/edgeClient';
+import { useRuns } from '@/api/runQueries';
+import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useHubEventStream } from '@/hooks/useHubEventStream';
 import { useHubIntegration } from '@/hooks/useHubIntegration';
-import type { StartRunRequest } from '@shared/types';
+import type { ListResponse, StartRunRequest, ThreadInfo } from '@shared/types';
 import { AppError } from '@shared/errors';
 import type { ChatMessage } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useThreadStore } from '@/stores/threadStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
+import { useSearchStore } from '@/stores/searchStore';
+import { readCustomInstructions } from '@/utils/customInstructions';
+import { buildForkDraft, findRetryPrompt } from '@/utils/messageActions';
 import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
@@ -50,7 +63,6 @@ import {
   Copy,
   Home,
   MessageSquareText,
-  LogIn,
   Maximize2,
   Menu,
   Minimize2,
@@ -65,11 +77,23 @@ import {
   Settings,
   Square,
   Sun,
+  UserCircle,
   Wifi,
   WifiOff,
   X,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/contexts/ThemeContext';
+import {
+  applyRuntimeAgentLabel,
+  buildChatMessagesFromThreadItems,
+  buildDisplayedRunOutputMessage,
+  buildRunReplayFallbackMessages,
+  mergeChatMessages,
+} from '@/utils/chatMessages';
+import { resolveThreadSelectionId, type ThreadSelectionInput } from '@/utils/threadSelection';
+import { resolveTopMenuClickState, type TopMenuId } from '@/utils/topMenuState';
+import { buildAutomaticThreadTitle, canAutoRenameThreadTitle, getAutomaticThreadTitle } from '@/utils/threadTitle';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '@/App.module.css';
 
@@ -81,9 +105,35 @@ interface OptimisticRun {
   changedFiles: [];
 }
 
+interface SendRunOptions {
+  model?: string;
+  provider?: string;
+  modelAlias?: string;
+  reasoningEffort?: string;
+  permissionMode?: string;
+  workDir?: string;
+  threadId?: string;
+  threadInfo?: ThreadInfo;
+  createdEmptyThread?: boolean;
+}
+
+interface TopMenuItem {
+  id: string;
+  label: string;
+  detail?: string;
+  shortcut?: string;
+  disabled?: boolean;
+  danger?: boolean;
+  separatorBefore?: boolean;
+  action: () => void | Promise<void>;
+}
+
+type TopMenuDefinition = Record<TopMenuId, { label: string; items: TopMenuItem[] }>;
+
 const LEFT_SIDEBAR_MIN = 248;
 const LEFT_SIDEBAR_MAX = 420;
 const RUN_CARD_MIN_WORKSPACE_WIDTH = 1180;
+const TOP_MENU_ORDER: TopMenuId[] = ['file', 'edit', 'view', 'window', 'help'];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -103,6 +153,99 @@ function getActiveRunConflictId(error: unknown): string | undefined {
 
 function isEditableShortcutTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && Boolean(target.closest('input,textarea,select,[contenteditable]'));
+}
+
+function focusComposer() {
+  const textarea = document.querySelector<HTMLTextAreaElement>('textarea[aria-label], textarea[placeholder]');
+  if (!textarea) return;
+  textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  window.setTimeout(() => textarea.focus(), 120);
+}
+
+function setComposerDraft(text: string) {
+  window.dispatchEvent(new CustomEvent('agenthub:set-composer-draft', { detail: { text } }));
+}
+
+function shortRunId(value: string): string {
+  return value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
+}
+
+function isTeamRunActiveStatus(status: string | undefined): boolean {
+  if (!status) return false;
+  return [
+    'queued',
+    'planning',
+    'dispatching',
+    'running',
+    'waiting_for_approval',
+    'merging',
+  ].includes(status);
+}
+
+function isPendingTeamApprovalStatus(status: string | undefined): boolean {
+  if (!status) return false;
+  return ['pending', 'requested', 'waiting', 'waiting_for_approval'].includes(status.toLowerCase());
+}
+
+function summarizeAgentTeamOverview(overview?: AgentTeamOverview) {
+  const runs = overview?.bundles.flatMap((bundle) => bundle.runs) ?? [];
+  const activeRuns = runs.filter((run) => isTeamRunActiveStatus(run.status)).length;
+  const pendingApprovals = (overview?.state?.approvals ?? []).filter((approval) => (
+    isPendingTeamApprovalStatus(approval.status)
+  )).length;
+  const pendingConflicts = (overview?.state?.conflicts ?? []).filter((conflict) => (
+    conflict.status !== 'resolved'
+  )).length;
+  return {
+    activeRuns,
+    pendingApprovals,
+    pendingConflicts,
+    blockingCount: pendingApprovals + pendingConflicts,
+  };
+}
+
+function isTauriRuntime(): boolean {
+  return typeof window !== 'undefined' && Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
+}
+
+const FOCUS_NAVIGATION_KEYS = new Set([
+  'Tab',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+]);
+
+function useFocusSourceTracking() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const setPointerSource = () => {
+      root.dataset.focusSource = 'pointer';
+    };
+    const setKeyboardSource = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (FOCUS_NAVIGATION_KEYS.has(event.key)) {
+        root.dataset.focusSource = 'keyboard';
+      }
+    };
+
+    root.dataset.focusSource ||= 'keyboard';
+    window.addEventListener('pointerdown', setPointerSource, true);
+    window.addEventListener('mousedown', setPointerSource, true);
+    window.addEventListener('touchstart', setPointerSource, true);
+    window.addEventListener('keydown', setKeyboardSource, true);
+
+    return () => {
+      window.removeEventListener('pointerdown', setPointerSource, true);
+      window.removeEventListener('mousedown', setPointerSource, true);
+      window.removeEventListener('touchstart', setPointerSource, true);
+      window.removeEventListener('keydown', setKeyboardSource, true);
+    };
+  }, []);
 }
 
 function DesktopHubTaskBridge() {
@@ -163,33 +306,99 @@ function ShellIconButton({
 }
 
 export default function App() {
+  useFocusSourceTracking();
+
   const { online, health } = useHealth();
-  const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online);
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const edgeStatus = useEdgeStatus(online);
   const addToast = useToastStore((s) => s.addToast);
   const { theme, toggleTheme } = useTheme();
+  const queryClient = useQueryClient();
+  const hubAuth = useAuth();
 
   const { data: threadData } = useThreads();
   const threads = threadData?.items ?? [];
+  const pendingCreatedThreadIdsRef = useRef<Set<string>>(new Set());
+  const emptyCreatedThreadIdsRef = useRef<Set<string>>(new Set());
+  const manuallyNamedThreadIdsRef = useRef<Set<string>>(new Set());
+  const silentCreatedThreadToastIdsRef = useRef<Set<string>>(new Set());
+  const addThreadToCache = useCallback((thread: ThreadInfo, opts?: { suppressCreatedToast?: boolean; empty?: boolean }) => {
+    pendingCreatedThreadIdsRef.current.add(thread.threadId);
+    if (opts?.empty) {
+      emptyCreatedThreadIdsRef.current.add(thread.threadId);
+    }
+    if (opts?.suppressCreatedToast) {
+      silentCreatedThreadToastIdsRef.current.add(thread.threadId);
+    }
+    queryClient.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
+      if (!current) return current;
+      if (current.items.some((item) => item.threadId === thread.threadId)) return current;
+      return { ...current, items: [thread, ...current.items] };
+    });
+  }, [queryClient]);
+  const updateThreadInCache = useCallback((thread: ThreadInfo) => {
+    queryClient.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
+      if (!current) return current;
+      let found = false;
+      const items = current.items.map((item) => {
+        if (item.threadId !== thread.threadId) return item;
+        found = true;
+        return { ...item, ...thread };
+      });
+      return { ...current, items: found ? items : [thread, ...items] };
+    });
+  }, [queryClient]);
+  const setThreadTitleInCache = useCallback((threadId: string, title: string) => {
+    queryClient.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        items: current.items.map((thread) =>
+          thread.threadId === threadId ? { ...thread, title } : thread,
+        ),
+      };
+    });
+  }, [queryClient]);
 
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
+  const executionTargetsQuery = useHubExecutionTargets(true);
+  const hubInventoryEnabled = hubAuth.isAuthenticated && Boolean(hubAuth.token);
+  const agentTeamsQuery = useHubAgentTeams({
+    enabled: hubInventoryEnabled,
+    getToken: () => hubAuth.token,
+  });
   const { setOnline, setConnected, wsLatency } = useConnectionStore(
     useShallow((s) => ({ setOnline: s.setOnline, setConnected: s.setConnected, wsLatency: s.wsLatency })),
   );
   const { selectedThreadId, selectedAgentId, selectThread, selectAgentThread } = useThreadStore(
     useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectedAgentId: s.selectedAgentId, selectThread: s.selectThread, selectAgentThread: s.selectAgentThread })),
   );
+  const activeThreadId = resolveThreadSelectionId(selectedThreadId as ThreadSelectionInput);
+  const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online, activeThreadId);
   const { data: agentData } = useAgentList(online);
   const agents = agentData?.items ?? [];
+  const modelCatalogQuery = useModelCatalog(online);
+  const modelsDevDisplayNamesQuery = useModelsDevDisplayNames(true);
+  const agentTeamSummary = useMemo(
+    () => summarizeAgentTeamOverview(agentTeamsQuery.data),
+    [agentTeamsQuery.data],
+  );
+  const teamRunBadgeCount = agentTeamSummary.blockingCount || agentTeamSummary.activeRuns;
+  const teamRunButtonLabel = agentTeamSummary.blockingCount > 0
+    ? t('workspace.teamRunsWithBlocks', { count: agentTeamSummary.blockingCount })
+    : agentTeamSummary.activeRuns > 0
+      ? t('workspace.teamRunsActive', { count: agentTeamSummary.activeRuns })
+      : t('settings.agentScheduling');
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
   const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
+  const [openTopMenu, setOpenTopMenu] = useState<TopMenuId | null>(null);
+  const [hoverOpenedTopMenu, setHoverOpenedTopMenu] = useState<TopMenuId | null>(null);
   const {
     leftSidebarCollapsed,
     rightPanelOpen,
@@ -216,6 +425,8 @@ export default function App() {
   const [rightPanelMounted, setRightPanelMounted] = useState(rightPanelOpen);
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const topMenuRef = useRef<HTMLElement | null>(null);
+  const hoverOpenedTopMenuRef = useRef<TopMenuId | null>(null);
 
   // Mobile/tablet overlays
   const [navPanelOpen, setNavPanelOpen] = useState(false);
@@ -243,13 +454,32 @@ export default function App() {
     const wasInitial = prevThreadIdsRef.current.size === 0;
     if (!wasInitial) {
       for (const th of threads) {
-        if (!prevThreadIdsRef.current.has(th.threadId)) addToast({ type: 'success', message: t('toast.threadCreated') });
+        if (!prevThreadIdsRef.current.has(th.threadId)) {
+          if (silentCreatedThreadToastIdsRef.current.delete(th.threadId)) continue;
+          addToast({ type: 'success', message: t('toast.threadCreated') });
+        }
       }
     }
     prevThreadIdsRef.current = currentIds;
   }, [threads, online, addToast, t]);
 
-  const selectedThread = threads.find((th) => th.threadId === selectedThreadId);
+  useEffect(() => {
+    if (!threadData?.items) return;
+    const liveThreadIds = new Set(threads.map((thread) => thread.threadId));
+    const knownThreadIds = new Set(liveThreadIds);
+    for (const threadId of pendingCreatedThreadIdsRef.current) {
+      knownThreadIds.add(threadId);
+      if (liveThreadIds.has(threadId)) pendingCreatedThreadIdsRef.current.delete(threadId);
+    }
+    useThreadStore.getState().pruneMissingThreads([...knownThreadIds]);
+  }, [threadData?.items, threads]);
+
+  const selectedThread = threads.find((th) => th.threadId === activeThreadId);
+  const { data: threadItemData } = useThreadMessages(activeThreadId);
+  const { data: allRunsData } = useRuns(undefined, undefined, { enabled: online });
+  const { data: selectedThreadRunsData } = useRuns(undefined, activeThreadId ?? undefined, {
+    enabled: Boolean(activeThreadId),
+  });
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const displayedRun = currentRun ?? optimisticRun;
   const runIsActive = isRunActiveStatus(displayedRun?.status);
@@ -257,43 +487,47 @@ export default function App() {
   const effectiveRightPanelOpen = rightPanelOpen && !runCardConstrained;
   const showRunCardSpace = !!displayedRun && effectiveRightPanelOpen && !isMobile && !workspaceExpanded;
   const composerLocked = runStartPending || runIsActive;
+  const persistedMessages = useMemo(
+    () => buildChatMessagesFromThreadItems(threadItemData?.items ?? []),
+    [threadItemData?.items],
+  );
+  const runReplayFallbackMessages = useMemo(
+    () => buildRunReplayFallbackMessages(threadItemData?.items ?? [], selectedThreadRunsData?.items ?? [], {
+      agentName: selectedAgent?.name,
+      statusLabel: (status) => t(`run.status.${status}`, { defaultValue: status }),
+      content: ({ runId, statusLabel }) => t('chat.runStatus.noReplayOutput', {
+        runId: shortRunId(runId),
+        status: statusLabel,
+      }),
+    }),
+    [selectedAgent?.name, selectedThreadRunsData?.items, t, threadItemData?.items],
+  );
+  const replayMessages = useMemo(
+    () => [...persistedMessages, ...runReplayFallbackMessages],
+    [persistedMessages, runReplayFallbackMessages],
+  );
   const allMessages = useMemo(() => {
-    const merged = [...userMessages, ...messages].sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-    );
-    if (!displayedRun) return merged;
+    const merged = mergeChatMessages({
+      persisted: replayMessages,
+      optimistic: userMessages,
+      live: messages,
+    });
+    const labeled = applyRuntimeAgentLabel(merged, selectedAgent?.name);
+    if (!displayedRun) return labeled;
 
     const hasVisibleAgentFeedback = messages.some(
       (msg) => msg.role === 'agent' && msg.blocks.some((block) => block.kind !== 'session_init'),
     );
-    if (hasVisibleAgentFeedback) return merged;
+    if (hasVisibleAgentFeedback) return labeled;
 
-    const statusKey = `run.status.${displayedRun.status}`;
-    const statusLabel = t(statusKey, { defaultValue: displayedRun.status });
-    const output = displayedRun.outputText.trim();
-    const content = output.length > 0
-      ? output
-      : runIsActive
-        ? t('chat.runStatus.running', {
-            status: statusLabel,
-            agent: selectedAgent?.name ?? t('chat.runStatus.agentFallback'),
-          })
-        : t('chat.runStatus.completed', {
-            status: statusLabel,
-            agent: selectedAgent?.name ?? t('chat.runStatus.agentFallback'),
-          });
+    const runOutputMessage = buildDisplayedRunOutputMessage(displayedRun, selectedAgent?.name);
+    if (!runOutputMessage) return labeled;
 
     return [
-      ...merged,
-      {
-        id: `run-status-${displayedRun.runId}-${displayedRun.status}`,
-        role: 'agent' as const,
-        timestamp: new Date().toISOString(),
-        agentName: selectedAgent?.name,
-        blocks: [{ kind: 'text' as const, content }],
-      },
+      ...labeled,
+      runOutputMessage,
     ];
-  }, [displayedRun, messages, runIsActive, selectedAgent?.name, t, userMessages]);
+  }, [displayedRun, messages, replayMessages, selectedAgent?.name, userMessages]);
   const effectiveLeftSidebarWidth = clamp(leftSidebarWidth, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
   const shellStyle = {
     '--left-sidebar-width': `${effectiveLeftSidebarWidth}px`,
@@ -313,6 +547,31 @@ export default function App() {
   }, [effectiveRightPanelOpen]);
 
   useEffect(() => {
+    if (!openTopMenu) return undefined;
+
+    const closeOnPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && topMenuRef.current?.contains(target)) return;
+      setOpenTopMenu(null);
+      setHoverOpenedTopMenu(null);
+      hoverOpenedTopMenuRef.current = null;
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpenTopMenu(null);
+      setHoverOpenedTopMenu(null);
+      hoverOpenedTopMenuRef.current = null;
+    };
+
+    window.addEventListener('pointerdown', closeOnPointerDown, true);
+    window.addEventListener('keydown', closeOnEscape, true);
+    return () => {
+      window.removeEventListener('pointerdown', closeOnPointerDown, true);
+      window.removeEventListener('keydown', closeOnEscape, true);
+    };
+  }, [openTopMenu]);
+
+  useEffect(() => {
     const node = workspaceRef.current;
     if (!node || typeof ResizeObserver === 'undefined') return;
 
@@ -327,7 +586,7 @@ export default function App() {
     return () => observer.disconnect();
   }, []);
 
-  const handleSend = useCallback(async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string; permissionMode?: string; workDir?: string }) => {
+  const handleSend = useCallback(async (prompt: string, agentId?: string, opts?: SendRunOptions) => {
     if (runStartPending || runIsActive) {
       addToast({ type: 'info', message: t('error.activeRunExists') });
       return false;
@@ -345,17 +604,79 @@ export default function App() {
       },
     ]);
     try {
+      let requestThreadId = opts?.threadId ?? activeThreadId;
+      let requestThread = opts?.threadInfo ?? (requestThreadId ? threads.find((thread) => thread.threadId === requestThreadId) : undefined);
+      let createdThreadForPrompt = Boolean(opts?.createdEmptyThread);
+      if (!requestThreadId) {
+        const agent = agentId ? agents.find((item) => item.id === agentId) : undefined;
+        const initialTitle = buildAutomaticThreadTitle(prompt) ?? (agent?.name ? `${agent.name}` : undefined);
+        const thread = await createThread(initialTitle);
+        addThreadToCache(thread);
+        requestThread = thread;
+        requestThreadId = thread.threadId;
+        createdThreadForPrompt = true;
+        if (agentId) {
+          useThreadStore.getState().selectAgentThread(agentId, thread.threadId);
+        } else {
+          selectThread(thread.threadId);
+        }
+        queryClient.invalidateQueries({ queryKey: ['threads'] });
+      }
       const req: StartRunRequest = {
         prompt,
-        ...useModelSettingsStore.getState().resolveRunRequestOptions(opts),
+        ...useModelSettingsStore.getState().resolveRunRequestOptions({
+          model: opts?.model,
+          provider: opts?.provider,
+          modelAlias: opts?.modelAlias,
+          reasoningEffort: opts?.reasoningEffort,
+        }),
       };
+      const customInstructions = readCustomInstructions();
+      if (customInstructions) req.appendSystemPrompt = customInstructions;
       if (opts?.permissionMode) req.permissionMode = opts.permissionMode;
       if (opts?.workDir) req.workDir = opts.workDir;
       if (agentId) req.agentId = agentId;
-      if (selectedThread) req.threadId = selectedThread.threadId;
+      if (requestThreadId) {
+        req.threadId = requestThreadId;
+        req.sessionId = requestThreadId;
+      }
       setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
       const started = await startRun(req);
       setOptimisticRun({ ...started, outputText: '', toolCalls: [], changedFiles: [] });
+      if (started.threadId && started.threadId !== requestThreadId) {
+        selectThread(started.threadId);
+      }
+      const renameThreadId = started.threadId || requestThreadId;
+      const runtimeNames = agents.map((item) => item.name);
+      const currentThreadItemCount = threadItemData?.items?.length;
+      const wasLocallyCreatedEmptyThread = Boolean(renameThreadId && emptyCreatedThreadIdsRef.current.has(renameThreadId));
+      const wasManuallyNamedThread = Boolean(renameThreadId && manuallyNamedThreadIdsRef.current.has(renameThreadId));
+      const canAutoRenameThread = canAutoRenameThreadTitle({
+        createdThreadForPrompt,
+        currentThreadItemCount,
+        manuallyNamedThread: wasManuallyNamedThread,
+        locallyCreatedEmptyThread: wasLocallyCreatedEmptyThread,
+      });
+      const autoTitle = canAutoRenameThread
+        ? getAutomaticThreadTitle({
+          currentTitle: requestThread?.title,
+          prompt,
+          runtimeNames,
+        })
+        : null;
+      if (renameThreadId && autoTitle) {
+        setThreadTitleInCache(renameThreadId, autoTitle);
+        try {
+          const renamedThread = await renameThread(renameThreadId, autoTitle);
+          updateThreadInCache(renamedThread);
+        } catch (renameError) {
+          queryClient.invalidateQueries({ queryKey: ['threads'] });
+          console.error('Failed to auto-rename thread:', renameError);
+        }
+      }
+      if (renameThreadId) emptyCreatedThreadIdsRef.current.delete(renameThreadId);
+      queryClient.invalidateQueries({ queryKey: ['threads'] });
+      queryClient.invalidateQueries({ queryKey: ['threadItems', started.threadId] });
       return true;
     } catch (e) {
       setUserMessages((prev) => prev.filter((msg) => msg.id !== tempUserMessageId));
@@ -372,7 +693,7 @@ export default function App() {
     } finally {
       setRunStartPending(false);
     }
-  }, [addToast, runIsActive, runStartPending, selectedThread, t]);
+  }, [activeThreadId, addThreadToCache, addToast, agents, queryClient, runIsActive, runStartPending, selectThread, setThreadTitleInCache, threadItemData?.items?.length, threads, t, updateThreadInCache]);
 
   const handleCancel = useCallback(async () => {
     const runId = currentRun?.runId ?? (optimisticRun?.runId.startsWith('starting-') ? undefined : optimisticRun?.runId);
@@ -381,7 +702,30 @@ export default function App() {
     }
   }, [currentRun?.runId, optimisticRun?.runId]);
 
-  const handleSelectThread = useCallback((id: string) => { selectThread(id); setUserMessages([]); setLeftSidebarView('thread'); }, [selectThread, setLeftSidebarView]);
+  const handleSelectThread = useCallback((selection: ThreadSelectionInput) => {
+    const id = resolveThreadSelectionId(selection);
+    if (!id) return;
+    selectThread(id);
+    setUserMessages([]);
+    setLeftSidebarView('thread');
+  }, [selectThread, setLeftSidebarView]);
+  const handleThreadTitleEdited = useCallback((threadId: string) => {
+    emptyCreatedThreadIdsRef.current.delete(threadId);
+    manuallyNamedThreadIdsRef.current.add(threadId);
+  }, []);
+  const openGlobalSearch = useCallback((initialQuery = '') => {
+    useSearchStore.getState().openDialog(initialQuery);
+  }, []);
+  const handleSearchMessageSelect = useCallback((messageId: string) => {
+    setLeftSidebarView('thread');
+    window.requestAnimationFrame(() => {
+      const selector = `[data-message-id="${CSS.escape(messageId)}"]`;
+      document.querySelector<HTMLElement>(selector)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+  }, [setLeftSidebarView]);
+  const handleSearchThreadSelect = useCallback((thread: ThreadInfo) => {
+    handleSelectThread(thread.threadId);
+  }, [handleSelectThread]);
   const handleSelectAgent = useCallback(async (agentId: string) => {
     const store = useThreadStore.getState();
     const existing = store.agentThreadMap[agentId];
@@ -394,18 +738,149 @@ export default function App() {
     const agent = agents.find((a) => a.id === agentId);
     try {
       const thread = await createThread(agent?.name ? `${agent.name}` : undefined);
-      store.selectAgentThread(agentId, thread.threadId);
-      setUserMessages([]);
-      setLeftSidebarView('thread');
+        addThreadToCache(thread, { empty: true });
+        store.selectAgentThread(agentId, thread.threadId);
+        setUserMessages([]);
+        setLeftSidebarView('thread');
+      queryClient.invalidateQueries({ queryKey: ['threads'] });
     } catch {
       // still select the agent visually even if thread creation fails
       store.selectAgentThread(agentId, '');
     }
-  }, [agents, setLeftSidebarView]);
+  }, [addThreadToCache, agents, queryClient, setLeftSidebarView]);
+
+  const handleCreateThread = useCallback(async () => {
+    try {
+      const thread = await createThread(selectedAgent?.name ? `${selectedAgent.name}` : undefined);
+      addThreadToCache(thread, { empty: true });
+      if (selectedAgent?.id) {
+        selectAgentThread(selectedAgent.id, thread.threadId);
+        setUserMessages([]);
+        setLeftSidebarView('thread');
+      } else {
+        handleSelectThread(thread.threadId);
+      }
+      queryClient.invalidateQueries({ queryKey: ['threads'] });
+      focusComposer();
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addThreadToCache, addToast, handleSelectThread, queryClient, selectAgentThread, selectedAgent?.id, selectedAgent?.name, setLeftSidebarView, t]);
+
+  const handleQuickChat = useCallback(async () => {
+    await handleCreateThread();
+    focusComposer();
+  }, [handleCreateThread]);
+
   const openSettings = useCallback((section: SettingsSectionId = 'general') => {
     setSettingsInitialSection(section);
     setSettingsOpen(true);
   }, []);
+
+  const handleOpenAuth = useCallback(() => {
+    useHubStore.getState().setShowAuthModal(true);
+  }, []);
+
+  const handleOpenHubAccount = useCallback(() => {
+    if (hubAuthenticated) {
+      openSettings('account');
+      return;
+    }
+    handleOpenAuth();
+  }, [handleOpenAuth, hubAuthenticated, openSettings]);
+
+  const desktopWindowAvailable = isTauriRuntime();
+  const handleWindowCommand = useCallback(async (command: 'minimize' | 'toggleMaximize' | 'close') => {
+    if (!desktopWindowAvailable) {
+      addToast({ type: 'info', message: t('menu.nativeWindowUnavailable') });
+      return;
+    }
+    try {
+      const windowHandle = getCurrentWindow();
+      if (command === 'minimize') {
+        await windowHandle.minimize();
+        return;
+      }
+      if (command === 'close') {
+        await windowHandle.close();
+        return;
+      }
+      (await windowHandle.isMaximized()) ? await windowHandle.unmaximize() : await windowHandle.maximize();
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addToast, desktopWindowAvailable, t]);
+
+  const handleOpenFolder = useCallback(async () => {
+    if (!desktopWindowAvailable) {
+      addToast({ type: 'info', message: t('prompt.browseWorkDirUnavailable') });
+      return;
+    }
+    try {
+      const selected = await (await import('@tauri-apps/plugin-dialog')).open({ directory: true, multiple: false });
+      const workDir = Array.isArray(selected) ? selected[0] : selected;
+      if (typeof workDir !== 'string' || !workDir.trim()) return;
+      window.localStorage.setItem('agenthub.prompt.workDir', workDir);
+      window.dispatchEvent(new CustomEvent('agenthub:workdir-selected', { detail: { workDir } }));
+      addToast({ type: 'success', message: t('toast.workDirSelected') });
+      focusComposer();
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addToast, desktopWindowAvailable, t]);
+
+  const handleEditCommand = useCallback((command: 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'selectAll') => {
+    const active = document.activeElement;
+    if (command === 'selectAll' && active instanceof HTMLInputElement) {
+      active.select();
+      return;
+    }
+    if (command === 'selectAll' && active instanceof HTMLTextAreaElement) {
+      active.select();
+      return;
+    }
+    const commandMap = {
+      undo: 'undo',
+      redo: 'redo',
+      cut: 'cut',
+      copy: 'copy',
+      paste: 'paste',
+      delete: 'delete',
+      selectAll: 'selectAll',
+    } as const;
+    try {
+      document.execCommand(commandMap[command]);
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addToast, t]);
+
+  const handleCopyDiagnostics = useCallback(async () => {
+    const diagnostic = [
+      'AgentHub Desktop diagnostics',
+      `Edge: ${online ? `online ${health?.version ?? 'v1'}` : 'offline'}`,
+      `WebSocket: ${isConnected ? 'connected' : 'disconnected'}`,
+      wsLatency != null ? `Latency: ${wsLatency}ms` : null,
+      selectedAgent ? `Agent: ${selectedAgent.name} (${selectedAgent.id})` : null,
+      selectedThread ? `Thread: ${selectedThread.threadId}` : null,
+      displayedRun ? `Run: ${displayedRun.runId} (${displayedRun.status})` : null,
+    ].filter(Boolean).join('\n');
+    try {
+      await navigator.clipboard.writeText(diagnostic);
+      addToast({ type: 'success', message: t('toast.copied') });
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addToast, displayedRun, health?.version, isConnected, online, selectedAgent, selectedThread, t, wsLatency]);
+
+  const handleReviewApprovalsFromHome = useCallback(() => {
+    if (permissionRequests.length === 0) {
+      openSettings('permissions');
+      return;
+    }
+    setLeftSidebarView('thread');
+    if (displayedRun) setRightPanelOpen(true);
+  }, [displayedRun, openSettings, permissionRequests.length, setLeftSidebarView, setRightPanelOpen]);
 
   const handleStartResize = useCallback((side: 'left' | 'right') => (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -462,12 +937,56 @@ export default function App() {
     }
   }, [addToast, decidePermission, permissionRequests, t]);
 
-  const handleRetry = useCallback((messageId: string) => {
-    const msg = allMessages.find((m) => m.id === messageId);
-    if (!msg) return;
-    const prompt = msg.blocks.find((b) => b.kind === 'text')?.content;
-    if (prompt) handleSend(prompt, selectedAgentId ?? undefined);
-  }, [allMessages, handleSend, selectedAgentId]);
+  const handleRetry = useCallback(async (messageId?: string) => {
+    const retry = findRetryPrompt(allMessages, messageId);
+    if (!retry) {
+      addToast({ type: 'info', message: t('toast.retryNoPrompt') });
+      return;
+    }
+    await handleSend(retry.prompt, selectedAgentId ?? undefined);
+  }, [addToast, allMessages, handleSend, selectedAgentId, t]);
+
+  const handleForkThread = useCallback(async (messageId?: string) => {
+    try {
+      const sourceTitle = selectedThread?.title ?? selectedAgent?.name ?? 'AgentHub';
+      const forkTitle = `Fork: ${sourceTitle}`.slice(0, 96);
+      const thread = await createThread(forkTitle);
+      addThreadToCache(thread, { suppressCreatedToast: true });
+      if (selectedAgent?.id) {
+        selectAgentThread(selectedAgent.id, thread.threadId);
+        setUserMessages([]);
+        setLeftSidebarView('thread');
+      } else {
+        handleSelectThread(thread.threadId);
+      }
+      queryClient.invalidateQueries({ queryKey: ['threads'] });
+      const draft = buildForkDraft({
+        sourceTitle,
+        sourceThreadId: selectedThread?.threadId ?? activeThreadId ?? undefined,
+        messages: allMessages,
+        messageId,
+      });
+      window.setTimeout(() => setComposerDraft(draft), 120);
+      focusComposer();
+      addToast({ type: 'success', message: t('toast.forkCreated') });
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [
+    activeThreadId,
+    addThreadToCache,
+    addToast,
+    allMessages,
+    handleSelectThread,
+    queryClient,
+    selectAgentThread,
+    selectedAgent?.id,
+    selectedAgent?.name,
+    selectedThread?.threadId,
+    selectedThread?.title,
+    setLeftSidebarView,
+    t,
+  ]);
 
   const handleDelete = useCallback((messageId: string) => {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
@@ -488,6 +1007,228 @@ export default function App() {
     }
   }, [addToast, selectedAgent, selectedThread, t]);
 
+  const topMenus = useMemo<TopMenuDefinition>(() => ({
+    file: {
+      label: t('menu.file'),
+      items: [
+        {
+          id: 'close',
+          label: t('window.close'),
+          shortcut: 'Ctrl+W',
+          detail: desktopWindowAvailable ? undefined : t('menu.desktopOnly'),
+          disabled: !desktopWindowAvailable,
+          action: () => handleWindowCommand('close'),
+        },
+        {
+          id: 'new-thread',
+          label: t('menu.file.newThread'),
+          shortcut: 'Ctrl+N',
+          detail: online ? undefined : t('menu.requiresEdge'),
+          disabled: !online,
+          action: handleCreateThread,
+        },
+        {
+          id: 'quick-chat',
+          label: t('menu.file.quickChat'),
+          shortcut: 'Alt+Ctrl+N',
+          detail: online ? undefined : t('menu.requiresEdge'),
+          disabled: !online,
+          action: handleQuickChat,
+        },
+        {
+          id: 'open-folder',
+          label: t('menu.file.openFolder'),
+          shortcut: 'Ctrl+O',
+          detail: desktopWindowAvailable ? undefined : t('menu.desktopOnly'),
+          disabled: !desktopWindowAvailable,
+          action: handleOpenFolder,
+        },
+        {
+          id: 'settings',
+          label: t('menu.file.settings'),
+          shortcut: 'Ctrl+,',
+          separatorBefore: true,
+          action: () => openSettings('general'),
+        },
+        {
+          id: 'account',
+          label: t('menu.file.account'),
+          action: handleOpenHubAccount,
+        },
+        {
+          id: 'about',
+          label: t('menu.help.about'),
+          separatorBefore: true,
+          action: () => openSettings('general'),
+        },
+      ],
+    },
+    edit: {
+      label: t('menu.edit'),
+      items: [
+        {
+          id: 'undo',
+          label: t('menu.edit.undo'),
+          shortcut: 'Ctrl+Z',
+          action: () => handleEditCommand('undo'),
+        },
+        {
+          id: 'redo',
+          label: t('menu.edit.redo'),
+          shortcut: 'Ctrl+Y',
+          action: () => handleEditCommand('redo'),
+        },
+        {
+          id: 'cut',
+          label: t('menu.edit.cut'),
+          shortcut: 'Ctrl+X',
+          separatorBefore: true,
+          action: () => handleEditCommand('cut'),
+        },
+        {
+          id: 'copy',
+          label: t('menu.edit.copy'),
+          shortcut: 'Ctrl+C',
+          action: () => handleEditCommand('copy'),
+        },
+        {
+          id: 'paste',
+          label: t('menu.edit.paste'),
+          shortcut: 'Ctrl+V',
+          action: () => handleEditCommand('paste'),
+        },
+        {
+          id: 'delete',
+          label: t('menu.edit.delete'),
+          action: () => handleEditCommand('delete'),
+        },
+        {
+          id: 'select-all',
+          label: t('menu.edit.selectAll'),
+          shortcut: 'Ctrl+A',
+          separatorBefore: true,
+          action: () => handleEditCommand('selectAll'),
+        },
+      ],
+    },
+    view: {
+      label: t('menu.view'),
+      items: [
+        {
+          id: 'toggle-sidebar',
+          label: leftSidebarCollapsed ? t('menu.view.showSidebar') : t('menu.view.hideSidebar'),
+          shortcut: 'Ctrl+B',
+          action: () => setLeftSidebarCollapsed(!leftSidebarCollapsed),
+        },
+        {
+          id: 'toggle-run-detail',
+          label: rightPanelOpen ? t('menu.view.hideRunDetail') : t('menu.view.showRunDetail'),
+          detail: displayedRun ? undefined : t('menu.requiresRun'),
+          shortcut: 'Ctrl+J',
+          disabled: !displayedRun,
+          action: () => setRightPanelOpen(!rightPanelOpen),
+        },
+        {
+          id: 'toggle-workspace',
+          label: workspaceExpanded ? t('menu.view.restoreWorkspace') : t('menu.view.expandWorkspace'),
+          action: () => setWorkspaceExpanded((value) => !value),
+        },
+        {
+          id: 'tasks',
+          label: t('menu.view.tasks'),
+          separatorBefore: true,
+          action: () => openSettings('tasks'),
+        },
+        {
+          id: 'team-runs',
+          label: t('menu.view.teamRuns'),
+          action: () => openSettings('agentScheduling'),
+        },
+        {
+          id: 'theme',
+          label: theme === 'dark' ? t('theme.light') : t('theme.dark'),
+          separatorBefore: true,
+          action: toggleTheme,
+        },
+      ],
+    },
+    window: {
+      label: t('menu.window'),
+      items: [
+        {
+          id: 'minimize',
+          label: t('window.minimize'),
+          detail: desktopWindowAvailable ? undefined : t('menu.desktopOnly'),
+          disabled: !desktopWindowAvailable,
+          action: () => handleWindowCommand('minimize'),
+        },
+        {
+          id: 'toggle-maximize',
+          label: t('window.maximize'),
+          detail: desktopWindowAvailable ? undefined : t('menu.desktopOnly'),
+          disabled: !desktopWindowAvailable,
+          action: () => handleWindowCommand('toggleMaximize'),
+        },
+        {
+          id: 'close',
+          label: t('window.close'),
+          detail: desktopWindowAvailable ? undefined : t('menu.desktopOnly'),
+          disabled: !desktopWindowAvailable,
+          separatorBefore: true,
+          danger: true,
+          action: () => handleWindowCommand('close'),
+        },
+      ],
+    },
+    help: {
+      label: t('menu.help'),
+      items: [
+        {
+          id: 'shortcuts',
+          label: t('menu.help.shortcuts'),
+          shortcut: '?',
+          action: () => setShortcutHelpOpen(true),
+        },
+        {
+          id: 'diagnostics',
+          label: t('menu.help.copyDiagnostics'),
+          separatorBefore: true,
+          action: handleCopyDiagnostics,
+        },
+        {
+          id: 'desktop-settings',
+          label: t('menu.help.desktopSettings'),
+          action: () => openSettings('general'),
+        },
+        {
+          id: 'about',
+          label: t('menu.help.about'),
+          action: () => openSettings('general'),
+        },
+      ],
+    },
+  }), [
+    desktopWindowAvailable,
+    displayedRun,
+    handleCopyDiagnostics,
+    handleCreateThread,
+    handleEditCommand,
+    handleOpenHubAccount,
+    handleOpenFolder,
+    handleQuickChat,
+    handleWindowCommand,
+    leftSidebarCollapsed,
+    online,
+    openSettings,
+    rightPanelOpen,
+    setLeftSidebarCollapsed,
+    setRightPanelOpen,
+    t,
+    theme,
+    toggleTheme,
+    workspaceExpanded,
+  ]);
+
   // Global shell shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -502,6 +1243,22 @@ export default function App() {
         e.preventDefault();
         setShortcutHelpOpen((v) => !v);
       }
+      if (shellModifier && e.altKey && e.key.toLowerCase() === 'n' && online) {
+        e.preventDefault();
+        void handleQuickChat();
+      } else if (shellModifier && e.key.toLowerCase() === 'n' && online) {
+        e.preventDefault();
+        void handleCreateThread();
+      } else if (shellModifier && e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        void handleOpenFolder();
+      } else if (shellModifier && e.key === ',') {
+        e.preventDefault();
+        openSettings('general');
+      } else if (shellModifier && e.key.toLowerCase() === 'w') {
+        e.preventDefault();
+        void handleWindowCommand('close');
+      }
       if (shellModifier && e.key.toLowerCase() === 'b' && !workspaceExpanded && !isMobile) {
         e.preventDefault();
         setLeftSidebarCollapsed(!leftSidebarCollapsed);
@@ -515,8 +1272,14 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     displayedRun,
+    handleCreateThread,
+    handleOpenFolder,
+    handleQuickChat,
+    handleWindowCommand,
     isMobile,
     leftSidebarCollapsed,
+    online,
+    openSettings,
     rightPanelOpen,
     setLeftSidebarCollapsed,
     setRightPanelOpen,
@@ -558,12 +1321,74 @@ export default function App() {
             <span className={styles.topBarNavBtn}><ChevronLeft size={14} /></span>
             <span className={styles.topBarNavBtn}><ChevronRight size={14} /></span>
           </div>
-          <nav className={styles.appMenu} aria-label={t('menu.title')}>
-            <button type="button">{t('menu.file')}</button>
-            <button type="button">{t('menu.edit')}</button>
-            <button type="button">{t('menu.view')}</button>
-            <button type="button">{t('menu.window')}</button>
-            <button type="button">{t('menu.help')}</button>
+          <nav className={styles.appMenu} aria-label={t('menu.title')} ref={topMenuRef}>
+            {TOP_MENU_ORDER.map((menuId) => {
+              const menu = topMenus[menuId];
+              const expanded = openTopMenu === menuId;
+              const panelId = `top-menu-${menuId}`;
+              return (
+                <div
+                  key={menuId}
+                  className={styles.topMenuGroup}
+                  onMouseEnter={() => {
+                    if (!openTopMenu) return;
+                    setHoverOpenedTopMenu(menuId);
+                    hoverOpenedTopMenuRef.current = menuId;
+                  }}
+                >
+                  <button
+                    type="button"
+                    className={`${styles.topMenuTrigger} ${expanded ? styles.topMenuTriggerActive : ''}`}
+                    aria-haspopup="menu"
+                    aria-expanded={expanded}
+                    aria-controls={expanded ? panelId : undefined}
+                    onClick={() => {
+                      setOpenTopMenu((current) => resolveTopMenuClickState(current, menuId, hoverOpenedTopMenuRef.current ?? hoverOpenedTopMenu));
+                      setHoverOpenedTopMenu(null);
+                      hoverOpenedTopMenuRef.current = null;
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        setOpenTopMenu(menuId);
+                        setHoverOpenedTopMenu(null);
+                        hoverOpenedTopMenuRef.current = null;
+                      }
+                    }}
+                  >
+                    {menu.label}
+                  </button>
+                  {expanded && (
+                    <div id={panelId} className={styles.topMenuPanel} role="menu" aria-label={menu.label}>
+                      {menu.items.map((item) => (
+                        <div key={item.id} className={styles.topMenuItemWrap}>
+                          {item.separatorBefore && <div className={styles.topMenuSeparator} role="separator" />}
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className={`${styles.topMenuItem} ${item.danger ? styles.topMenuItemDanger : ''}`}
+                            disabled={item.disabled}
+                            aria-disabled={item.disabled ? true : undefined}
+                            title={item.disabled && item.detail ? item.detail : undefined}
+                            onClick={() => {
+                              if (item.disabled) return;
+                              const result = item.action();
+                              setOpenTopMenu(null);
+                              setHoverOpenedTopMenu(null);
+                              hoverOpenedTopMenuRef.current = null;
+                              if (result instanceof Promise) void result;
+                            }}
+                          >
+                            <span className={styles.topMenuItemLabel}>{item.label}</span>
+                            {item.shortcut && <kbd>{item.shortcut}</kbd>}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </nav>
           <span className={styles.statusBadge}>
             <span className={`${styles.statusBadgeDot} ${online ? styles.statusBadgeDotOnline : styles.statusBadgeDotOffline}`} />
@@ -606,8 +1431,10 @@ export default function App() {
       {settingsOpen ? (
         <SettingsPage
           initialSection={settingsInitialSection}
+          modelCatalog={modelCatalogQuery.data}
+          modelDisplayNames={modelsDevDisplayNamesQuery.data}
           onBack={() => setSettingsOpen(false)}
-          onOpenAuth={() => useHubStore.getState().setShowAuthModal(true)}
+          onOpenAuth={handleOpenAuth}
         />
       ) : (
       <>
@@ -618,12 +1445,15 @@ export default function App() {
           <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => setNavPanelOpen(true)} label={t('nav.openMenu')} aria-expanded={navPanelOpen}>
             <Menu size={17} />
           </ShellIconButton>
+          <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => openGlobalSearch()} label={t('search.openGlobal')}>
+            <Search size={17} />
+          </ShellIconButton>
           <span className={styles.mobileToolbarTitle}>{selectedAgent?.name ?? 'AgentHub'}</span>
           <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => openSettings('general')} label={t('nav.settings')}>
             <Settings size={17} />
           </ShellIconButton>
-          <ShellIconButton className={styles.mobileToolbarBtn} onClick={() => useHubStore.getState().setShowAuthModal(true)} label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
-            {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={17} />}
+          <ShellIconButton className={styles.mobileToolbarBtn} onClick={handleOpenHubAccount} label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}>
+            {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <UserCircle size={17} />}
           </ShellIconButton>
           <ShellIconButton className={styles.mobileToolbarBtn} onClick={toggleTheme} label={theme === 'dark' ? t('theme.light') : t('theme.dark')} aria-pressed={theme === 'dark'}>
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
@@ -642,9 +1472,9 @@ export default function App() {
                   <Slot name="agent-list" agents={agents} online={online} selectedId={selectedAgentId} onSelect={handleSelectAgent} />
                 </div>
               </div>
-              <div className={styles.sidebarSection}>
+              <div className={`${styles.sidebarSection} ${styles.threadSection}`}>
                 <div className={styles.sidebarScroll}>
-                  <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
+                  <Slot name="thread-panel" online={online} selectedId={activeThreadId ?? undefined} onSelect={handleSelectThread} onCreate={handleCreateThread} onThreadTitleEdited={handleThreadTitleEdited} runs={allRunsData?.items ?? []} />
                 </div>
               </div>
             </div>
@@ -670,10 +1500,15 @@ export default function App() {
             </div>
 
             {/* Global search */}
-            <div className={styles.sidebarSearch}>
-              <Search size={14} color="#B0B0B5" />
-              <input type="text" placeholder={t('im.contact.search')} />
-            </div>
+            <button
+              type="button"
+              className={styles.sidebarSearch}
+              aria-label={t('search.openGlobal')}
+              onClick={() => openGlobalSearch()}
+            >
+              <Search size={14} />
+              <span>{t('search.sidebarPlaceholder')}</span>
+            </button>
 
             {/* Agents section */}
             <div className={styles.sidebarSection}>
@@ -683,9 +1518,9 @@ export default function App() {
             </div>
 
             {/* Threads section */}
-            <div className={styles.sidebarSection}>
+            <div className={`${styles.sidebarSection} ${styles.threadSection}`}>
               <div className={styles.sidebarScroll}>
-                <Slot name="thread-panel" online={online} selectedId={selectedThreadId ?? undefined} onSelect={handleSelectThread} />
+                <Slot name="thread-panel" online={online} selectedId={activeThreadId ?? undefined} onSelect={handleSelectThread} onCreate={handleCreateThread} onThreadTitleEdited={handleThreadTitleEdited} runs={allRunsData?.items ?? []} />
               </div>
             </div>
 
@@ -696,12 +1531,12 @@ export default function App() {
               </ShellIconButton>
               <ShellIconButton
                 className={styles.navIconBtn}
-                onClick={() => useHubStore.getState().setShowAuthModal(true)}
+                onClick={handleOpenHubAccount}
                 label={hubAuthenticated ? t('status.hubConnected') : t('status.hubClickToLogin')}
                 tooltipSide="top"
                 aria-pressed={hubAuthenticated}
               >
-                {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <LogIn size={16} />}
+                {hubAuthenticated ? <Circle size={10} fill="var(--color-success)" color="var(--color-success)" /> : <UserCircle size={16} />}
               </ShellIconButton>
               <ShellIconButton className={styles.navIconBtn} onClick={toggleTheme} label={theme === 'dark' ? t('theme.light') : t('theme.dark')} tooltipSide="top" aria-pressed={theme === 'dark'}>
                 {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
@@ -733,7 +1568,7 @@ export default function App() {
             <div className={styles.workspaceHeader}>
               <div className={`${styles.workspaceHeaderDot} ${online ? styles.workspaceHeaderDotOnline : styles.workspaceHeaderDotOffline}`} />
               <h2>{selectedAgent ? selectedAgent.name : 'AgentHub'}</h2>
-              {selectedThread && <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--muted-foreground)' }}>{selectedThread.title}</span>}
+              {selectedThread && <span className={styles.workspaceThreadTitle}>{selectedThread.title}</span>}
               <div className={styles.workspaceHeaderActions}>
                 <ShellIconButton
                   className={styles.workspaceHeaderBtn}
@@ -763,10 +1598,17 @@ export default function App() {
                 <ShellIconButton
                   className={styles.workspaceHeaderBtn}
                   onClick={() => openSettings('agentScheduling')}
-                  label={t('settings.agentScheduling')}
+                  label={teamRunButtonLabel}
                   tooltipSide="bottom"
                 >
-                  <Route size={15} />
+                  <span className={styles.iconBadgeHostInline}>
+                    <Route size={15} />
+                    {teamRunBadgeCount > 0 ? (
+                      <span className={styles.iconBadge} aria-label={teamRunButtonLabel}>
+                        {teamRunBadgeCount > 9 ? '9+' : teamRunBadgeCount}
+                      </span>
+                    ) : null}
+                  </span>
                 </ShellIconButton>
                 {displayedRun && !effectiveRightPanelOpen && (
                   <ShellIconButton
@@ -809,6 +1651,7 @@ export default function App() {
                   onNewThread={async () => {
                     try {
                       const thread = await createThread();
+                      addThreadToCache(thread, { empty: true });
                       handleSelectThread(thread.threadId);
                     } catch {
                       // continue
@@ -816,27 +1659,44 @@ export default function App() {
                   }}
                   onSelectThread={handleSelectThread}
                   onQuickStart={async (prompt) => {
+                    const title = buildAutomaticThreadTitle(prompt);
                     try {
-                      const thread = await createThread();
+                      const thread = await createThread(title ?? undefined);
+                      addThreadToCache(thread);
                       handleSelectThread(thread.threadId);
-                      handleSend(prompt);
+                      await handleSend(prompt, selectedAgentId ?? undefined, {
+                        threadId: thread.threadId,
+                        threadInfo: thread,
+                        createdEmptyThread: true,
+                      });
                     } catch {
-                      // continue
+                      addToast({ type: 'error', message: t('toast.error') });
                     }
                   }}
+                  onViewRuns={() => openSettings('tasks')}
+                  onReviewApprovals={handleReviewApprovalsFromHome}
+                  onViewAllThreads={() => setLeftSidebarView('thread')}
+                  onOpenTeamRuns={() => openSettings('agentScheduling')}
+                  onOpenHubAccount={handleOpenHubAccount}
                   permissionCount={permissionRequests.length}
+                  agentTeamOverview={agentTeamsQuery.data}
+                  agentTeamsLoading={agentTeamsQuery.isLoading || agentTeamsQuery.isFetching}
+                  agentTeamsSignedIn={hubInventoryEnabled}
+                  agents={agents}
+                  selectedAgentId={selectedAgentId ?? undefined}
+                  onSelectAgent={handleSelectAgent}
                 />
               ) : viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
               ) : (
-                <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
+                <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onFork={handleForkThread} onDelete={handleDelete} onSendMessage={handleSend} />
               )}
             </div>
 
             {/* Input area */}
             {leftSidebarView !== 'home' && viewMode === 'agent' && (
               <div className={styles.inputArea}>
-                <Slot name="prompt-input" agents={agents} selectedAgentId={selectedAgentId ?? undefined} onSelectAgent={handleSelectAgent} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={selectedThreadId ?? undefined} />
+                <Slot name="prompt-input" agents={agents} threads={threads} executionTargets={executionTargetsQuery.data?.items ?? []} modelCatalog={modelCatalogQuery.data} modelDisplayNames={modelsDevDisplayNamesQuery.data} selectedAgentId={selectedAgentId ?? undefined} onSelectAgent={handleSelectAgent} onSend={handleSend} isStreaming={runIsActive} isStarting={runStartPending} onCancel={handleCancel} disabled={!online} threadId={activeThreadId ?? undefined} onRetryLast={handleRetry} onForkThread={handleForkThread} />
               </div>
             )}
 
@@ -872,7 +1732,7 @@ export default function App() {
 
       {/* Modals */}
       <Suspense fallback={null}>
-        <Slot name="search-dialog" messages={allMessages} onSelect={() => {}} />
+        <Slot name="search-dialog" messages={allMessages} threads={threads} onSelect={handleSearchMessageSelect} onSelectThread={handleSearchThreadSelect} />
       </Suspense>
       <Slot name="permission-dialog" requests={permissionRequests} onDecide={handleDecidePermission} />
       <Slot name="shortcut-help" open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
