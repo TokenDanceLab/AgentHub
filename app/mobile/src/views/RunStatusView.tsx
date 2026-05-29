@@ -15,7 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { StatusBadge } from "@agenthub/shared/components";
-import { ActivityCard, BottomSheet, MetricGrid, SegmentedControl, StatusNotice } from "@agenthub/shared/ui";
+import { ActivityCard, BottomSheet, CodePreviewCard, MetricGrid, SegmentedControl, StatusNotice } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import type { Artifact, Preview, Run, RunStatus, ThreadItem } from "@agenthub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -283,10 +283,15 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
           <p className="mobileEyebrow">{t("runDetail.sections.diff")}</p>
           <h2>{t("runDetail.diff.title", { count: diffFiles.length })}</h2>
           {diffFiles.map((file) => (
-            <article className="mobileDiffFile" key={diffFilePath(file)}>
-              <strong>{diffFilePath(file)}</strong>
-              <pre className="mobileDiffCode">{diffFileText(file)}</pre>
-            </article>
+            <CodePreviewCard
+              key={diffFilePath(file)}
+              className="mobileDiffFile"
+              titleClassName="mobileDiffFileTitle"
+              bodyClassName="mobileDiffCode"
+              title={diffFilePath(file)}
+              meta={`+${file.additions ?? 0} -${file.deletions ?? 0}`}
+              code={diffFileText(file)}
+            />
           ))}
         </section>
 

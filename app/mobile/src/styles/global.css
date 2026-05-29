@@ -1318,16 +1318,16 @@ button:disabled {
   padding: 10px;
 }
 
-.mobileDiffFile strong {
+.mobileDiffFileTitle {
   overflow: hidden;
   color: var(--td-ink);
   font-size: 12px;
+  line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .mobileDiffCode {
-  overflow-x: auto;
   margin: 0;
   color: var(--td-ink-70);
   font-size: 11px;

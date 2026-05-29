@@ -41,3 +41,5 @@ export { SelectableRow } from './SelectableRow';
 export type { SelectableRowProps } from './SelectableRow';
 export { MessageBubble } from './MessageBubble';
 export type { MessageBubbleProps } from './MessageBubble';
+export { CodePreviewCard } from './CodePreviewCard';
+export type { CodePreviewCardProps } from './CodePreviewCard';
