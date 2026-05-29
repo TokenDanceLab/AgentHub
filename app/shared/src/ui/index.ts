@@ -37,3 +37,5 @@ export { ActivityCard } from './ActivityCard';
 export type { ActivityCardProps } from './ActivityCard';
 export { DisclosureRow } from './DisclosureRow';
 export type { DisclosureRowProps } from './DisclosureRow';
+export { SelectableRow } from './SelectableRow';
+export type { SelectableRowProps } from './SelectableRow';

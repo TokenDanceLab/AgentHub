@@ -1,7 +1,17 @@
 /* ThreadPanel — inline items within sidebar (no outer panel) */
 
 /* ── Hidden: App sidebar provides search + header ─ */
-.sidebar, .header, .title, .createBtn, .search, .actionError { display: none; }
+.sidebar {
+  display: block;
+}
+
+.header,
+.title,
+.createBtn,
+.search,
+.actionError {
+  display: none;
+}
 
 /* ── List ──────────────────────────────────── */
 .list {
@@ -44,6 +54,10 @@
 
 .itemRow .item { flex: 1; min-width: 0; }
 
+.itemIcon {
+  color: currentColor;
+}
+
 /* ── Info ──────────────────────────────────── */
 .itemInfo {
   display: flex;
@@ -73,6 +87,10 @@
   border-radius: 50%;
   background: var(--primary);
   flex-shrink: 0;
+}
+
+.unreadDotWrap {
+  width: 5px;
 }
 
 /* ── Actions ───────────────────────────────── */
