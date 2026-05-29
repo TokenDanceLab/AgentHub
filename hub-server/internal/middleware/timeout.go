@@ -158,6 +158,7 @@ func Timeout(d time.Duration) gin.HandlerFunc {
 			// Deadline fired — discard handler output and write 504.
 			tw.markTimedOut()
 			writeTimeout(tw.ResponseWriter)
+			<-done
 		}
 	}
 }

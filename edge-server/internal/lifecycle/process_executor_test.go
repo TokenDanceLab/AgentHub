@@ -723,10 +723,13 @@ func TestProcessExecutorHelper(t *testing.T) {
 	}
 	switch mode {
 	case "success":
-		fmt.Fprint(os.Stdout, "stdout chunk\n")
-		fmt.Fprintf(os.Stdout, "run=%s\n", os.Getenv("AGENTHUB_RUN_ID"))
-		fmt.Fprintf(os.Stdout, "project=%s\n", os.Getenv("AGENTHUB_PROJECT_ID"))
-		fmt.Fprintf(os.Stdout, "thread=%s\n", os.Getenv("AGENTHUB_THREAD_ID"))
+		fmt.Fprintf(
+			os.Stdout,
+			"stdout chunk\nrun=%s\nproject=%s\nthread=%s\n",
+			os.Getenv("AGENTHUB_RUN_ID"),
+			os.Getenv("AGENTHUB_PROJECT_ID"),
+			os.Getenv("AGENTHUB_THREAD_ID"),
+		)
 		fmt.Fprint(os.Stderr, "stderr chunk\n")
 	case "fail":
 		fmt.Fprint(os.Stderr, "failure chunk\n")
