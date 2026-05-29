@@ -4,6 +4,7 @@ import {
   applyRuntimeAgentLabel,
   buildChatMessagesFromThreadItems,
   buildRunReplayFallbackMessages,
+  filterOptimisticMessagesForThread,
   mergeChatMessages,
 } from '@/utils/chatMessages';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -33,6 +34,7 @@ describe('chat message projection', () => {
         id: 'thread-item-item_1',
         role: 'user',
         timestamp: '2026-05-28T10:05:54Z',
+        threadId: 'thread_local',
         blocks: [{ kind: 'text', content: '用户输入去哪了' }],
       },
     ]);
@@ -86,6 +88,78 @@ describe('chat message projection', () => {
 
     expect(mergeChatMessages({ persisted, optimistic })).toHaveLength(1);
     expect(mergeChatMessages({ persisted, optimistic })[0].id).toBe('thread-item-item_user');
+  });
+
+  it('keeps optimistic user bubbles scoped to the active thread', () => {
+    const optimistic: ChatMessage[] = [
+      {
+        id: 'optimistic-thread-a',
+        role: 'user',
+        threadId: 'thread-A',
+        timestamp: '2026-05-28T10:05:54Z',
+        blocks: [{ kind: 'text', content: 'thread A prompt' }],
+      },
+      {
+        id: 'optimistic-thread-b',
+        role: 'user',
+        threadId: 'thread-B',
+        timestamp: '2026-05-28T10:05:55Z',
+        blocks: [{ kind: 'text', content: 'thread B prompt' }],
+      },
+      {
+        id: 'optimistic-threadless',
+        role: 'user',
+        timestamp: '2026-05-28T10:05:56Z',
+        blocks: [{ kind: 'text', content: 'threadless draft prompt' }],
+      },
+    ];
+
+    expect(filterOptimisticMessagesForThread(optimistic, 'thread-A').map((msg) => msg.id)).toEqual([
+      'optimistic-thread-a',
+    ]);
+    expect(filterOptimisticMessagesForThread(optimistic, 'thread-B').map((msg) => msg.id)).toEqual([
+      'optimistic-thread-b',
+    ]);
+    expect(filterOptimisticMessagesForThread(optimistic, null).map((msg) => msg.id)).toEqual([
+      'optimistic-threadless',
+    ]);
+  });
+
+  it('keeps same-timestamp messages in merge order', () => {
+    const timestamp = '2026-05-28T10:05:54Z';
+    const persisted: ChatMessage[] = [
+      {
+        id: 'persisted-user',
+        role: 'user',
+        threadId: 'thread-A',
+        timestamp,
+        blocks: [{ kind: 'text', content: 'persisted prompt' }],
+      },
+    ];
+    const optimistic: ChatMessage[] = [
+      {
+        id: 'optimistic-user',
+        role: 'user',
+        threadId: 'thread-A',
+        timestamp,
+        blocks: [{ kind: 'text', content: 'new prompt' }],
+      },
+    ];
+    const live: ChatMessage[] = [
+      {
+        id: 'live-agent',
+        role: 'agent',
+        parentId: 'run-1',
+        timestamp,
+        blocks: [{ kind: 'text', content: 'live answer' }],
+      },
+    ];
+
+    expect(mergeChatMessages({ persisted, optimistic, live }).map((msg) => msg.id)).toEqual([
+      'persisted-user',
+      'optimistic-user',
+      'live-agent',
+    ]);
   });
 
   it('prefers live agent rendering over persisted transcript for the same run', () => {

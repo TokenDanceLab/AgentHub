@@ -828,6 +828,87 @@ describe('PromptInput', () => {
 >>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   });
 
+  it('persists and reuses recent local workspaces without sending a target id', () => {
+    const onSend = vi.fn();
+    render(
+      <PromptInput
+        agents={[]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={onSend}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.workTarget' }));
+    fireEvent.change(screen.getByLabelText('prompt.targetFolder'), {
+      target: { value: 'D:\\Code\\TokenDance\\AgentHub' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.applyWorkDir' }));
+
+    expect(JSON.parse(localStorage.getItem('agenthub.prompt.recentWorkDirs') ?? '[]')).toEqual([
+      'D:\\Code\\TokenDance\\AgentHub',
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.workTarget' }));
+    expect(screen.getByText('prompt.targetRecentWorkspaces')).toBeInTheDocument();
+    expect(screen.getByText('prompt.targetRecentRunWorkDir')).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Run from recent workspace');
+    fireEvent.click(screen.getByRole('button', { name: 'action.startRun' }));
+
+    expect(onSend).toHaveBeenCalledWith(
+      'Run from recent workspace',
+      undefined,
+      { workDir: 'D:\\Code\\TokenDance\\AgentHub' },
+    );
+    expect(onSend.mock.calls[0]?.[2]).not.toHaveProperty('targetId');
+  });
+
+  it('shows remote and cloud execution targets as disabled inventory only', () => {
+    const onSend = vi.fn();
+    render(
+      <PromptInput
+        agents={[]}
+        executionTargets={[{
+          id: 'target-ssh',
+          name: 'Remote SSH lab',
+          target_type: 'remote_ssh',
+          workspace_root: '/srv/project',
+          workspace_allowlist: ['/srv'],
+          trust_level: 'remote',
+          health_state: 'healthy',
+          is_online: true,
+        }, {
+          id: 'target-cloud',
+          name: 'Cloud runner',
+          target_type: 'cloud_edge',
+          workspace_allowlist: [],
+          trust_level: 'cloud',
+          health_state: 'unknown',
+          is_online: false,
+        }]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={onSend}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.workTarget' }));
+
+    expect(screen.getByText('prompt.targetRemoteInventory')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Remote SSH lab/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Cloud runner/ })).toBeDisabled();
+    expect(screen.getByText('prompt.targetRemoteDisabled(type=remote_ssh)')).toBeInTheDocument();
+    expect(screen.getByText('prompt.targetNoWorkspace')).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Remote targets should not be selected');
+    fireEvent.click(screen.getByRole('button', { name: 'action.startRun' }));
+
+    expect(onSend).toHaveBeenCalledWith('Remote targets should not be selected', undefined, undefined);
+  });
+
   it('lets a manually selected model override the selected agent profile alias', () => {
     const onSend = vi.fn();
     const agents = [makeAgent({ id: 'codex', name: 'Codex Runtime' })];
@@ -1040,6 +1121,53 @@ describe('PromptInput', () => {
       modelAlias: 'opus[1m]',
       provider: 'claude-code',
     });
+  });
+
+  it('shows active run settings from slash commands and lets users clear them before sending', () => {
+    const onSend = vi.fn();
+    const modelCatalog = makeModelCatalog([{
+      id: 'claude-settings:ANTHROPIC_DEFAULT_OPUS_MODEL',
+      value: 'opus[1m]',
+      label: 'deepseek-v4-pro',
+      provider: 'Claude Code',
+      runtimeId: 'claude-code',
+      resolvedModel: 'claude-opus-4-7[1M]',
+      sourceId: 'claude-settings',
+      sourceLabel: 'Claude Code settings',
+      status: 'configured',
+    }]);
+    render(
+      <PromptInput agents={[]} modelCatalog={modelCatalog} selectedAgentId={undefined} onSelectAgent={vi.fn()} onSend={onSend} />,
+    );
+
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/) as HTMLTextAreaElement;
+    input.focus();
+    input.value = '/deep';
+    input.selectionStart = 5;
+    input.selectionEnd = 5;
+    fireEvent.input(input);
+    fireEvent.click(screen.getByTestId('slash-command-model-claude-settings-ANTHROPIC_DEFAULT_OPUS_MODEL'));
+
+    input.value = '/bypass';
+    input.selectionStart = 7;
+    input.selectionEnd = 7;
+    fireEvent.input(input);
+    fireEvent.click(screen.getByTestId('slash-command-permission-bypassPermissions'));
+
+    const strip = screen.getByTestId('prompt-active-run-settings');
+    expect(within(strip).getByText('prompt.activeSetting.model')).toBeInTheDocument();
+    expect(within(strip).getByText('deepseek-v4-pro')).toBeInTheDocument();
+    expect(within(strip).getByText('prompt.activeSetting.permission')).toBeInTheDocument();
+    expect(within(strip).getByText('prompt.permission.bypassPermissions')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.clearModelRoute' }));
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.clearPermissionMode' }));
+    expect(screen.queryByTestId('prompt-active-run-settings')).not.toBeInTheDocument();
+
+    typeInPrompt(input, 'Run with defaults');
+    fireEvent.click(screen.getByRole('button', { name: 'action.startRun' }));
+
+    expect(onSend).toHaveBeenCalledWith('Run with defaults', undefined, undefined);
   });
 
   it('uses slash commands to set reasoning and open the workspace selector', () => {
