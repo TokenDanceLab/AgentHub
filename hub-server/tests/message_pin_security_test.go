@@ -80,7 +80,7 @@ func seedPinSecurityUser(t *testing.T, username, nickname string) testUser {
 	user := &model.User{
 		Username:     username,
 		Nickname:     nickname,
-		PasswordHash: "seeded-test-user",
+		PasswordHash: stringPtr("seeded-test-user"),
 	}
 	if err := db.Create(user).Error; err != nil {
 		t.Fatalf("seed user %s: %v", username, err)
