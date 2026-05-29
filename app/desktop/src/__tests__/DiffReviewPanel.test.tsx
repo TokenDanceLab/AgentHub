@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import DiffReviewPanel from '@/components/DiffReviewPanel';
 import type { DiffReviewFile } from '@/components/DiffReviewPanel';
@@ -78,8 +78,8 @@ describe('DiffReviewPanel', () => {
     const files = [makeFile()];
     render(<DiffReviewPanel files={files} />);
 
-    const acceptAllBtn = screen.getByRole('button', { name: /accept all/i });
-    const rejectAllBtn = screen.getByRole('button', { name: /reject all/i });
+    const acceptAllBtn = screen.getByRole('button', { name: 'diffReview.acceptAll' });
+    const rejectAllBtn = screen.getByRole('button', { name: 'diffReview.rejectAll' });
 
     expect(acceptAllBtn).toBeInTheDocument();
     expect(rejectAllBtn).toBeInTheDocument();
@@ -91,7 +91,7 @@ describe('DiffReviewPanel', () => {
     const files = [makeFile()];
     render(<DiffReviewPanel files={files} onAcceptAll={onAcceptAll} />);
 
-    const acceptAllBtn = screen.getByRole('button', { name: /accept all/i });
+    const acceptAllBtn = screen.getByRole('button', { name: 'diffReview.acceptAll' });
     fireEvent.click(acceptAllBtn);
 
     expect(onAcceptAll).toHaveBeenCalledTimes(1);
@@ -103,7 +103,7 @@ describe('DiffReviewPanel', () => {
     const files = [makeFile()];
     render(<DiffReviewPanel files={files} onRejectAll={onRejectAll} />);
 
-    const rejectAllBtn = screen.getByRole('button', { name: /reject all/i });
+    const rejectAllBtn = screen.getByRole('button', { name: 'diffReview.rejectAll' });
     fireEvent.click(rejectAllBtn);
 
     expect(onRejectAll).toHaveBeenCalledTimes(1);
@@ -114,8 +114,8 @@ describe('DiffReviewPanel', () => {
     const files = [makeFile()];
     render(<DiffReviewPanel files={files} />);
 
-    const acceptButtons = screen.getAllByRole('button', { name: /accept line/i });
-    const rejectButtons = screen.getAllByRole('button', { name: /reject line/i });
+    const acceptButtons = screen.getAllByRole('button', { name: 'diffReview.acceptLine' });
+    const rejectButtons = screen.getAllByRole('button', { name: 'diffReview.rejectLine' });
 
     // Should have accept/reject buttons on both left and right sides for the modified pair
     expect(acceptButtons.length).toBeGreaterThanOrEqual(1);
@@ -169,7 +169,7 @@ describe('DiffReviewPanel', () => {
     const files = [makeFile()];
     render(<DiffReviewPanel files={files} />);
 
-    const acceptButtons = screen.getAllByRole('button', { name: /accept line/i });
+    const acceptButtons = screen.getAllByRole('button', { name: 'diffReview.acceptLine' });
     const firstAccept = acceptButtons[0];
     expect(firstAccept).toBeDefined();
 
@@ -185,7 +185,7 @@ describe('DiffReviewPanel', () => {
     const files = [makeFile()];
     render(<DiffReviewPanel files={files} />);
 
-    const rejectButtons = screen.getAllByRole('button', { name: /reject line/i });
+    const rejectButtons = screen.getAllByRole('button', { name: 'diffReview.rejectLine' });
     const firstReject = rejectButtons[0];
     expect(firstReject).toBeDefined();
 
@@ -211,7 +211,7 @@ describe('DiffReviewPanel', () => {
     render(<DiffReviewPanel files={files} />);
 
     // Only have accept/reject for the added line, not the context line
-    const acceptButtons = screen.getAllByRole('button', { name: /accept line/i });
+    const acceptButtons = screen.getAllByRole('button', { name: 'diffReview.acceptLine' });
     // Should be 2: one on left (empty) and one on right (new line)
     expect(acceptButtons.length).toBe(2);
   });

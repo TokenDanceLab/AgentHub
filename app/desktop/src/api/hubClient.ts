@@ -1,4 +1,4 @@
-// Typed REST client for Hub Server.
+﻿// Typed REST client for Hub Server.
 // Handles JWT auth header injection, error parsing, and typed endpoints.
 // Covers all routes defined in hub-server/internal/router/router.go.
 //
@@ -7,7 +7,9 @@
 import { HUB_URL } from '@/config';
 import { AppError } from '@shared/errors';
 
-// ── Types ─────────────────────────────────────────
+// 鈹€鈹€ Types 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+type EmptyHubResponse = undefined;
 
 export interface RegisterRequest {
   username: string;
@@ -36,7 +38,7 @@ export interface UserProfile {
   created_at?: string;
 }
 
-// ── Contacts ─────────────────────────────────────
+// 鈹€鈹€ Contacts 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface SearchResult {
   user_id: string;
@@ -76,7 +78,7 @@ export interface Contact {
   created_at?: string;
 }
 
-// ── Sessions ─────────────────────────────────────
+// 鈹€鈹€ Sessions 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface Session {
   id: string;
@@ -112,7 +114,7 @@ export interface CreateGroupSessionRequest {
   member_ids: string[];
 }
 
-// ── Messages ─────────────────────────────────────
+// 鈹€鈹€ Messages 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface SendMessageRequest {
   client_msg_id: string;
@@ -148,7 +150,7 @@ export interface MessageResponse {
   created_at?: string;
 }
 
-// ── Devices ──────────────────────────────────────
+// 鈹€鈹€ Devices 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface RegisterDeviceRequest {
   device_id: string;
@@ -164,7 +166,7 @@ export interface Device {
   capabilities: Record<string, unknown>;
 }
 
-// ── Agents ───────────────────────────────────────
+// 鈹€鈹€ Agents 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface AddAgentToSessionRequest {
   agent_type: string;
@@ -214,7 +216,7 @@ export interface CoordinatorRouteDecision {
   correlation_id?: string;
 }
 
-// ── Agent teams / TeamRuns ───────────────────────
+// 鈹€鈹€ Agent teams / TeamRuns 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface AgentTeam {
   id: string;
@@ -396,7 +398,7 @@ export interface TeamRunState {
 
 export type HubListResponse<T> = T[] | { items: T[] };
 
-// ── Custom agents ────────────────────────────────
+// 鈹€鈹€ Custom agents 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface CustomAgentRequest {
   name: string;
@@ -408,7 +410,7 @@ export interface CustomAgentRequest {
   model_params?: string;
 }
 
-// ── Execution targets ───────────────────────────
+// 鈹€鈹€ Execution targets 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface HubNotification {
   id: string;
@@ -453,7 +455,7 @@ export interface ExecutionTargetListResponse {
   };
 }
 
-// ── Auth ─────────────────────────────────────────
+// 鈹€鈹€ Auth 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface OIDCAuthorizeRequest {
   code_challenge: string;
@@ -502,7 +504,7 @@ interface HubEnvelope<T> {
   data?: T;
 }
 
-// ── Error ────────────────────────────────────────
+// 鈹€鈹€ Error 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export class HubError extends Error {
   status: number;
@@ -516,7 +518,7 @@ export class HubError extends Error {
   }
 }
 
-// ── Client factory ────────────────────────────────
+// 鈹€鈹€ Client factory 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface HubClientOptions {
   baseUrl?: string;
@@ -594,7 +596,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     return body as T;
   }
 
-  // ── Helpers ────────────────────────────────────
+  // 鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   function qs(params: Record<string, string | number | boolean | undefined | null>): string {
     const p = new URLSearchParams();
@@ -609,7 +611,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
     /** Raw request for one-off calls. */
     request,
 
-    // ── Auth ──────────────────────────────────────
+    // 鈹€鈹€ Auth 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     refresh: (token: string) =>
       request<AuthResponse>('/client/auth/refresh', {
@@ -618,7 +620,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       }),
 
     logout: () =>
-      request<void>('/client/auth/logout', { method: 'POST' }),
+      request<EmptyHubResponse>('/client/auth/logout', { method: 'POST' }),
 
     me: () =>
       request<UserProfile>('/client/auth/me'),
@@ -629,7 +631,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
         body: JSON.stringify(data),
       }),
 
-    // ── OIDC PKCE ─────────────────────────────────
+    // 鈹€鈹€ OIDC PKCE 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     oidcAuthorize: (data: OIDCAuthorizeRequest) =>
       request<OIDCAuthorizeResponse>('/client/auth/oidc/authorize', {
@@ -643,7 +645,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
         body: JSON.stringify(data),
       }),
 
-    // ── Contacts ──────────────────────────────────
+    // 鈹€鈹€ Contacts 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     /** Search for a user by their user_id (UUID). Returns relationship status. */
     searchUser: (targetUserId: string) =>
@@ -653,7 +655,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<ContactInfo[]>('/client/contacts'),
 
     sendFriendRequest: (friendId: string, message?: string) =>
-      request<void>('/client/contacts/friend-requests', {
+      request<EmptyHubResponse>('/client/contacts/friend-requests', {
         method: 'POST',
         body: JSON.stringify({ friend_id: friendId, message }),
       }),
@@ -662,35 +664,35 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<FriendRequestInfo[]>('/client/contacts/friend-requests'),
 
     acceptFriendRequest: (requestId: string) =>
-      request<void>(`/client/contacts/friend-requests/${encodeURIComponent(requestId)}/accept`, {
+      request<EmptyHubResponse>(`/client/contacts/friend-requests/${encodeURIComponent(requestId)}/accept`, {
         method: 'POST',
       }),
 
     rejectFriendRequest: (requestId: string) =>
-      request<void>(`/client/contacts/friend-requests/${encodeURIComponent(requestId)}/reject`, {
+      request<EmptyHubResponse>(`/client/contacts/friend-requests/${encodeURIComponent(requestId)}/reject`, {
         method: 'POST',
       }),
 
     removeContact: (friendUserId: string) =>
-      request<void>(`/client/contacts/${encodeURIComponent(friendUserId)}`, { method: 'DELETE' }),
+      request<EmptyHubResponse>(`/client/contacts/${encodeURIComponent(friendUserId)}`, { method: 'DELETE' }),
 
     blockContact: (targetUserId: string) =>
-      request<void>(`/client/contacts/${encodeURIComponent(targetUserId)}/block`, {
+      request<EmptyHubResponse>(`/client/contacts/${encodeURIComponent(targetUserId)}/block`, {
         method: 'POST',
       }),
 
     unblockContact: (targetUserId: string) =>
-      request<void>(`/client/contacts/${encodeURIComponent(targetUserId)}/unblock`, {
+      request<EmptyHubResponse>(`/client/contacts/${encodeURIComponent(targetUserId)}/unblock`, {
         method: 'POST',
       }),
 
     updateContactRemark: (friendUserId: string, remark: string) =>
-      request<void>(`/client/contacts/${encodeURIComponent(friendUserId)}/remark`, {
+      request<EmptyHubResponse>(`/client/contacts/${encodeURIComponent(friendUserId)}/remark`, {
         method: 'PUT',
         body: JSON.stringify({ remark }),
       }),
 
-    // ── Sessions ──────────────────────────────────
+    // 鈹€鈹€ Sessions 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     listSessions: () =>
       request<Session[]>('/client/sessions'),
@@ -711,31 +713,31 @@ export function createHubClient(opts: HubClientOptions = {}) {
       }),
 
     addSessionMembers: (sessionId: string, memberIds: string[]) =>
-      request<void>(`/client/sessions/${sessionId}/members`, {
+      request<EmptyHubResponse>(`/client/sessions/${sessionId}/members`, {
         method: 'POST',
         body: JSON.stringify({ member_ids: memberIds }),
       }),
 
     removeSessionMember: (sessionId: string, userId: string) =>
-      request<void>(`/client/sessions/${sessionId}/members/${userId}`, { method: 'DELETE' }),
+      request<EmptyHubResponse>(`/client/sessions/${sessionId}/members/${userId}`, { method: 'DELETE' }),
 
     leaveSession: (sessionId: string) =>
-      request<void>(`/client/sessions/${sessionId}/leave`, { method: 'POST' }),
+      request<EmptyHubResponse>(`/client/sessions/${sessionId}/leave`, { method: 'POST' }),
 
     transferSessionOwnership: (sessionId: string, newOwnerId: string) =>
-      request<void>(`/client/sessions/${sessionId}/transfer-owner`, {
+      request<EmptyHubResponse>(`/client/sessions/${sessionId}/transfer-owner`, {
         method: 'POST',
         body: JSON.stringify({ new_owner_id: newOwnerId }),
       }),
 
     dissolveSession: (sessionId: string) =>
-      request<void>(`/client/sessions/${sessionId}/dissolve`, { method: 'POST' }),
+      request<EmptyHubResponse>(`/client/sessions/${sessionId}/dissolve`, { method: 'POST' }),
 
     updateSessionInfo: (
       sessionId: string,
       data: { name?: string; avatar_url?: string; announcement?: string },
     ) =>
-      request<void>(`/client/sessions/${sessionId}/info`, {
+      request<EmptyHubResponse>(`/client/sessions/${sessionId}/info`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
@@ -744,15 +746,15 @@ export function createHubClient(opts: HubClientOptions = {}) {
       sessionId: string,
       data: { pinned?: boolean; archived?: boolean; muted?: boolean },
     ) =>
-      request<void>(`/client/sessions/${sessionId}/settings`, {
+      request<EmptyHubResponse>(`/client/sessions/${sessionId}/settings`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
 
     deleteSession: (sessionId: string) =>
-      request<void>(`/client/sessions/${sessionId}`, { method: 'DELETE' }),
+      request<EmptyHubResponse>(`/client/sessions/${sessionId}`, { method: 'DELETE' }),
 
-    // ── Messages ──────────────────────────────────
+    // 鈹€鈹€ Messages 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     sendMessage: (sessionId: string, body: SendMessageRequest) =>
       request<SendMessageResponse>(
@@ -777,30 +779,30 @@ export function createHubClient(opts: HubClientOptions = {}) {
       ),
 
     markRead: (sessionId: string, lastReadSeq: number) =>
-      request<void>(`/client/sessions/${sessionId}/read`, {
+      request<EmptyHubResponse>(`/client/sessions/${sessionId}/read`, {
         method: 'POST',
         body: JSON.stringify({ last_read_seq: lastReadSeq }),
       }),
 
     recallMessage: (messageId: string) =>
-      request<void>(`/client/messages/${encodeURIComponent(messageId)}/recall`, {
+      request<EmptyHubResponse>(`/client/messages/${encodeURIComponent(messageId)}/recall`, {
         method: 'POST',
       }),
 
     pinMessage: (messageId: string, sessionId: string) =>
-      request<void>(`/client/messages/${encodeURIComponent(messageId)}/pin`, {
+      request<EmptyHubResponse>(`/client/messages/${encodeURIComponent(messageId)}/pin`, {
         method: 'POST',
         body: JSON.stringify({ session_id: sessionId }),
       }),
 
     unpinMessage: (messageId: string, sessionId: string) =>
-      request<void>(`/client/messages/${encodeURIComponent(messageId)}/pin`, {
+      request<EmptyHubResponse>(`/client/messages/${encodeURIComponent(messageId)}/pin`, {
         method: 'DELETE',
         body: JSON.stringify({ session_id: sessionId }),
       }),
 
     forwardMessage: (messageId: string, targetSessionIds: string[]) =>
-      request<void>(`/client/messages/${encodeURIComponent(messageId)}/forward`, {
+      request<EmptyHubResponse>(`/client/messages/${encodeURIComponent(messageId)}/forward`, {
         method: 'POST',
         body: JSON.stringify({ target_session_ids: targetSessionIds }),
       }),
@@ -825,18 +827,18 @@ export function createHubClient(opts: HubClientOptions = {}) {
         `/client/sessions/${sessionId}/messages/search${qs(params)}`,
       ),
 
-    // ── Notifications ─────────────────────────────
+    // 鈹€鈹€ Notifications 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     listNotifications: (params?: { unread_only?: boolean; limit?: number; offset?: number }) =>
       request<Record<string, unknown>[]>(`/client/notifications${qs(params ?? {})}`),
 
     markNotificationRead: (id: string) =>
-      request<void>(`/client/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' }),
+      request<EmptyHubResponse>(`/client/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' }),
 
     readAllNotifications: () =>
-      request<void>('/client/notifications/read-all', { method: 'POST' }),
+      request<EmptyHubResponse>('/client/notifications/read-all', { method: 'POST' }),
 
-    // ── Edge (desktop device operations) ──────────
+    // 鈹€鈹€ Edge (desktop device operations) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     registerDevice: (data: RegisterDeviceRequest) =>
       request<Device>('/edge/devices/register', {
@@ -844,16 +846,16 @@ export function createHubClient(opts: HubClientOptions = {}) {
         body: JSON.stringify(data),
       }),
 
-    // ── Edge callbacks (desktop → hub task lifecycle) ──
+    // 鈹€鈹€ Edge callbacks (desktop 鈫?hub task lifecycle) 鈹€鈹€
 
     ackTask: (taskId: string, runId?: string) =>
-      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/ack`, {
+      request<EmptyHubResponse>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/ack`, {
         method: 'POST',
         ...(runId ? { body: JSON.stringify({ run_id: runId }) } : {}),
       }),
 
     streamTask: (taskId: string, content: string, runId?: string) =>
-      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
+      request<EmptyHubResponse>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
         method: 'POST',
         body: JSON.stringify({ content, ...(runId ? { run_id: runId } : {}) }),
       }),
@@ -864,7 +866,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       payload: unknown,
       options: AgentTaskStreamEventOptions = {},
     ) =>
-      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
+      request<EmptyHubResponse>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/stream`, {
         method: 'POST',
         body: JSON.stringify({
           event_type: eventType,
@@ -875,7 +877,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       }),
 
     doneTask: (taskId: string, finalContent?: string, runId?: string) =>
-      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/done`, {
+      request<EmptyHubResponse>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/done`, {
         method: 'POST',
         body: JSON.stringify({
           final_content: finalContent ?? '',
@@ -884,16 +886,16 @@ export function createHubClient(opts: HubClientOptions = {}) {
       }),
 
     failTask: (taskId: string, error: string, runId?: string) =>
-      request<void>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/fail`, {
+      request<EmptyHubResponse>(`/edge/agent-tasks/${encodeURIComponent(taskId)}/fail`, {
         method: 'POST',
         body: JSON.stringify({ error, ...(runId ? { run_id: runId } : {}) }),
       }),
 
-    // ── Agent tasks ───────────────────────────────
+    // 鈹€鈹€ Agent tasks 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     /** Add an agent to a session (becomes triggerable by @mentions). */
     addAgentToSession: (sessionId: string, data: AddAgentToSessionRequest) =>
-      request<void>(`/client/sessions/${sessionId}/agents`, {
+      request<EmptyHubResponse>(`/client/sessions/${sessionId}/agents`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -905,7 +907,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       }),
 
     cancelAgentTask: (taskId: string) =>
-      request<void>(`/web/agent-tasks/${encodeURIComponent(taskId)}/cancel`, { method: 'POST' }),
+      request<EmptyHubResponse>(`/web/agent-tasks/${encodeURIComponent(taskId)}/cancel`, { method: 'POST' }),
 
     postTeamRouteDecision: (teamId: string, runId: string, decision: CoordinatorRouteDecision) =>
       request<Record<string, unknown>>(
@@ -934,7 +936,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
         `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/events`,
       ),
 
-    // ── Custom agents ─────────────────────────────
+    // 鈹€鈹€ Custom agents 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     listCustomAgents: () =>
       request<Record<string, unknown>[]>('/web/custom-agents'),
@@ -952,9 +954,9 @@ export function createHubClient(opts: HubClientOptions = {}) {
       }),
 
     deleteCustomAgent: (id: string) =>
-      request<void>(`/web/custom-agents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+      request<EmptyHubResponse>(`/web/custom-agents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
-    // ── Execution targets ────────────────────────
+    // 鈹€鈹€ Execution targets 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     listExecutionTargets: (params?: {
       target_type?: ExecutionTargetType | string;
@@ -964,7 +966,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       request<ExecutionTargetListResponse>(`/web/execution-targets${qs(params ?? {})}`),
 
     pingExecutionTarget: (id: string) =>
-      request<void>(`/web/execution-targets/${encodeURIComponent(id)}/ping`, { method: 'POST' }),
+      request<EmptyHubResponse>(`/web/execution-targets/${encodeURIComponent(id)}/ping`, { method: 'POST' }),
   };
 }
 

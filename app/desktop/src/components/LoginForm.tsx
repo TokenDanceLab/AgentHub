@@ -20,8 +20,6 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
     if (user) onSuccess(user);
   }, [onSuccess, user]);
 
-  if (user) return null;
-
   const handleTokenDanceLogin = useCallback(async () => {
     setServerError(null);
     setIdentityNotice(null);
@@ -36,6 +34,8 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       setIdentityLoading(false);
     }
   }, [loginWithTokenDance, t]);
+
+  if (user) return null;
 
   return (
     <div className={styles.body}>
