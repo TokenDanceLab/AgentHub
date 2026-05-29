@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import type { Run, Thread } from "@agenthub/shared";
+import { useQuery } from "@tanstack/react-query";
+import { listRuns, listThreads, type Run, type Thread } from "@agenthub/shared";
 import { BottomNav } from "./components/BottomNav";
 import { ThreadListView } from "./views/ThreadListView";
 import { ChatView } from "./views/ChatView";
@@ -17,6 +18,21 @@ export function App() {
   const [activeView, setActiveView] = useState<MobileView>("threads");
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
   const [selectedRun, setSelectedRun] = useState<Run | null>(null);
+  const threadsBadge = useQuery({
+    queryKey: ["threads"],
+    queryFn: () => listThreads({ pageSize: 50 }),
+    retry: false,
+  });
+  const runsBadge = useQuery({
+    queryKey: ["runs"],
+    queryFn: () => listRuns({ pageSize: 30 }),
+    retry: false,
+    refetchInterval: 5000,
+  });
+  const cachedThreads = threadsBadge.data?.items ?? [];
+  const cachedRuns = runsBadge.data?.items ?? [];
+  const activeThreadCount = cachedThreads.filter((thread) => thread.status === "active").length;
+  const pendingReviewCount = cachedRuns.filter((run) => run.status === "waiting_approval").length;
 
   const handleThreadSelect = useCallback((thread: Thread) => {
     setSelectedThread(thread);
@@ -82,7 +98,12 @@ export function App() {
         {activeView === "account" && <AccountView />}
       </main>
 
-      <BottomNav activeView={activeView} onNavigate={handleNavigate} />
+      <BottomNav
+        activeView={activeView}
+        onNavigate={handleNavigate}
+        activeThreadCount={activeThreadCount}
+        pendingReviewCount={pendingReviewCount}
+      />
     </div>
   );
 }

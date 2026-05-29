@@ -9,7 +9,7 @@ AgentHub Mobile is the secondary client surface for the AgentHub product line. D
 - Android package: `com.agenthub.mobile`
 - Frontend stack: React 19, TypeScript, TanStack Query, `@agenthub/shared`
 - Runtime model: Mobile talks to Hub APIs. It does not start Local Edge or own Desktop runtime orchestration.
-- Hub API host: `http://api.hub.vectorcontrol.tech` for REST and `ws://api.hub.vectorcontrol.tech/ws` for WebSocket. The shared client appends `/v1`.
+- Hub API host: `https://hub.vectorcontrol.tech` for REST and `wss://hub.vectorcontrol.tech/ws` for WebSocket. The shared client appends `/v1`; `visual:qa` mocks both the current host and the older `api.hub.vectorcontrol.tech` host to keep local browser QA off production CORS.
 
 ## UI Status
 
@@ -76,8 +76,10 @@ Commands used for the latest UI/native bridge pass:
 ```powershell
 cd app/mobile
 corepack.cmd pnpm typecheck
-corepack.cmd pnpm visual:qa
 corepack.cmd pnpm build
+node --check scripts/visual-qa.mjs
+$env:MOBILE_QA_URL='http://127.0.0.1:5184/'
+corepack.cmd pnpm visual:qa
 git diff --check -- app/mobile/src app/mobile/scripts app/mobile/README.md docs/handoff/STATE.md
 $env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'
 corepack.cmd pnpm tauri android build --debug
