@@ -1,0 +1,71 @@
+.card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--td-line, var(--border));
+  border-radius: var(--td-radius-control, 10px);
+  padding: 10px;
+  background: color-mix(in oklch, var(--td-surface, var(--card)) 74%, transparent);
+  box-shadow: var(--td-shadow-hairline, none);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.card[data-has-actions='true'] .header {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--td-ink, var(--foreground));
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  color: var(--td-ink-muted, var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  color: var(--td-ink-muted, var(--muted-foreground));
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.line {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.more {
+  color: var(--td-ink, var(--foreground));
+  font-weight: 700;
+}
