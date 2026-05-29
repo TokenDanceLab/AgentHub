@@ -1091,19 +1091,19 @@ pnpm typecheck                                         # 零错误
 
 ---
 
-### 7.9 B9: S3 对象存储接入（1-2d，🟢 中）
+### 7.9 B9: S3 对象存储接入（2026-05-29，✅ 完成）
 
 **目标**：附件存储支持 S3 兼容对象存储（中国科技云 / 自部署 MinIO）。
 
 | 子任务 | 文件 | 方案 |
 |--------|------|------|
-| S3 config | `hub-server/internal/config/config.go` | 新增 `S3Config{Endpoint, AccessKey, SecretKey, Bucket, Region, UseSSL}` |
-| Storage 分层 | `hub-server/internal/service/attachment.go` | `Upload()` 分流：`Upload.Dir` 本地 vs S3 `PutObject` |
-| go.mod | `hub-server/go.mod` | 加 `github.com/aws/aws-sdk-go-v2/service/s3` |
-| 部署配置 | `hub-server/deployments/.env.production.example` | 加 `S3_ENDPOINT`、`S3_BUCKET` 等环境变量 |
-| 回退兼容 | — | 无 S3 配置时回退本地 `Upload.Dir`，不破坏现有部署 |
+| S3 config | `hub-server/internal/config/config.go` | `S3Config{Endpoint, AccessKey, SecretKey, Bucket, Region, UseSSL}` 已接 `AGENTHUB_S3_*` 环境变量；配置不完整时 startup validation fail fast |
+| Storage 分层 | `hub-server/internal/service/attachment.go` / `s3_client.go` | `Upload()` 通过 `ObjectStorage` 分流：未配置 S3 时使用本地 `Upload.Dir`，配置后使用 S3-compatible `PutObject` |
+| go.mod | `hub-server/go.mod` | 已加入 AWS SDK v2 S3 依赖 |
+| 部署配置 | `hub-server/deployments/.env.production.example` / `docker-compose.prod.yml` | 生产 env 模板与 compose 已传入 `AGENTHUB_S3_ENDPOINT`、`AGENTHUB_S3_BUCKET`、`AGENTHUB_S3_ACCESS_KEY`、`AGENTHUB_S3_SECRET_KEY`、`AGENTHUB_S3_REGION`、`AGENTHUB_S3_USE_SSL` |
+| 回退兼容 | — | 无 S3 配置时继续使用本地 `Upload.Dir`；配置 S3 后不要求本地 upload dir 存在，避免大附件继续压 hk2 根盘 |
 
-**验收**：`S3_ENDPOINT` 未设置时行为不变，设置后附件写入 S3。
+**验收**：未配置 S3 时行为不变；配置 S3 后附件写入 S3-compatible object store；hash object 写入使用 `If-None-Match: *`，已存在对象不覆盖；S3 初始化失败不再静默回退本地盘。验证通过 `go test ./internal/config -run "Test(EnvOverrideS3Config|S3Config_IsConfigured|S3Config_IsEmpty|ValidateS3ConfigRequiresCompleteCredentials|ValidateS3ConfigDoesNotRequireLocalUploadDir)$" -count=1 -v`、`go test ./internal/service -run "Test(LocalStorage_PutAndGet|S3Storage_LocalPathReturnsEmpty|S3Storage_PutReturnsTrue|S3Storage_PutReturnsFalseWhenBlobAlreadyExists|SaveAttachment_StorageInjection)$" -count=1 -v`、`go test ./internal/config ./internal/service ./internal/app -count=1`、`go test ./... -short -count=1`、`docker compose -f deployments/docker-compose.prod.yml --env-file deployments/.env.production.example config --quiet` 和 `git diff --check`。
 
 ---
 

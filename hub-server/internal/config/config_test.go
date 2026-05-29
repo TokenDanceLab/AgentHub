@@ -785,5 +785,96 @@ func TestS3Config_IsEmpty(t *testing.T) {
 }
 
 func TestEnvOverrideS3Config(t *testing.T) {
-	t.Skip("TODO: S3 env vars need explicit viper.BindEnv for nested struct — will fix in follow-up")
+	path := writeTempConfig(t, validJWTYAML)
+	t.Setenv("AGENTHUB_JWT_SECRET", "s3-env-secret!!")
+	t.Setenv("AGENTHUB_S3_ENDPOINT", "https://r2.example.com")
+	t.Setenv("AGENTHUB_S3_ACCESS_KEY", "access-key")
+	t.Setenv("AGENTHUB_S3_SECRET_KEY", "secret-key")
+	t.Setenv("AGENTHUB_S3_BUCKET", "agenthub-attachments")
+	t.Setenv("AGENTHUB_S3_REGION", "auto")
+	t.Setenv("AGENTHUB_S3_USE_SSL", "true")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.S3.Endpoint != "https://r2.example.com" {
+		t.Errorf("S3.Endpoint = %q", cfg.S3.Endpoint)
+	}
+	if cfg.S3.AccessKey != "access-key" {
+		t.Errorf("S3.AccessKey = %q", cfg.S3.AccessKey)
+	}
+	if cfg.S3.SecretKey != "secret-key" {
+		t.Errorf("S3.SecretKey = %q", cfg.S3.SecretKey)
+	}
+	if cfg.S3.Bucket != "agenthub-attachments" {
+		t.Errorf("S3.Bucket = %q", cfg.S3.Bucket)
+	}
+	if cfg.S3.Region != "auto" {
+		t.Errorf("S3.Region = %q", cfg.S3.Region)
+	}
+	if !cfg.S3.UseSSL {
+		t.Error("S3.UseSSL = false, want true")
+	}
+}
+
+func TestValidateS3ConfigRequiresCompleteCredentials(t *testing.T) {
+	cfg := &Config{
+		DB: DBConfig{
+			Host: "localhost",
+			Port: 5432,
+			User: "agenthub",
+			Name: "agenthub",
+		},
+		Redis: RedisConfig{
+			Host: "localhost",
+			Port: 6379,
+		},
+		JWT: JWTConfig{
+			Secret: "strong-s3-secret!!",
+		},
+		S3: S3Config{
+			Endpoint: "https://r2.example.com",
+			Bucket:   "agenthub-attachments",
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected incomplete S3 credentials to be rejected")
+	}
+	if !strings.Contains(err.Error(), "s3.access_key") {
+		t.Fatalf("Validate() error = %q, want s3.access_key", err.Error())
+	}
+}
+
+func TestValidateS3ConfigDoesNotRequireLocalUploadDir(t *testing.T) {
+	cfg := &Config{
+		DB: DBConfig{
+			Host: "localhost",
+			Port: 5432,
+			User: "agenthub",
+			Name: "agenthub",
+		},
+		Redis: RedisConfig{
+			Host: "localhost",
+			Port: 6379,
+		},
+		JWT: JWTConfig{
+			Secret: "strong-s3-secret!!",
+		},
+		Upload: UploadConfig{
+			Dir: filepath.Join(t.TempDir(), "missing"),
+		},
+		S3: S3Config{
+			Endpoint:  "https://r2.example.com",
+			AccessKey: "access-key",
+			SecretKey: "secret-key",
+			Bucket:    "agenthub-attachments",
+		},
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want nil when S3 is configured", err)
+	}
 }

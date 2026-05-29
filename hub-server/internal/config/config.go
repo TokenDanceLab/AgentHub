@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -227,7 +228,39 @@ type S3Config struct {
 // IsConfigured returns true when enough S3 settings are present to attempt
 // S3-backed attachment storage.
 func (s S3Config) IsConfigured() bool {
-	return s.Endpoint != "" && s.Bucket != ""
+	return strings.TrimSpace(s.Endpoint) != "" && strings.TrimSpace(s.Bucket) != ""
+}
+
+func (s S3Config) hasAnySetting() bool {
+	return strings.TrimSpace(s.Endpoint) != "" ||
+		strings.TrimSpace(s.AccessKey) != "" ||
+		strings.TrimSpace(s.SecretKey) != "" ||
+		strings.TrimSpace(s.Bucket) != "" ||
+		strings.TrimSpace(s.Region) != ""
+}
+
+func (s S3Config) Validate() error {
+	if !s.hasAnySetting() {
+		return nil
+	}
+	if strings.TrimSpace(s.Endpoint) == "" {
+		return fmt.Errorf("s3.endpoint is required when S3 attachment storage is configured")
+	}
+	if strings.TrimSpace(s.Bucket) == "" {
+		return fmt.Errorf("s3.bucket is required when S3 attachment storage is configured")
+	}
+	if strings.TrimSpace(s.AccessKey) == "" {
+		return fmt.Errorf("s3.access_key is required when S3 attachment storage is configured")
+	}
+	if strings.TrimSpace(s.SecretKey) == "" {
+		return fmt.Errorf("s3.secret_key is required when S3 attachment storage is configured")
+	}
+	if strings.Contains(s.Endpoint, "://") &&
+		!strings.HasPrefix(s.Endpoint, "http://") &&
+		!strings.HasPrefix(s.Endpoint, "https://") {
+		return fmt.Errorf("s3.endpoint must use http or https when a scheme is provided")
+	}
+	return nil
 }
 
 // LogValue implements slog.LogValuer to redact secrets when config is logged.
@@ -285,6 +318,30 @@ func Load(configPath string) (*Config, error) {
 	}
 	if envAllowedRedirectURIs := firstEnv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "AGENTHUB_TOKENDANCE_ALLOWED_REDIRECT_URIS"); envAllowedRedirectURIs != "" {
 		cfg.TokenDanceID.AllowedRedirectURIs = splitEnvList(envAllowedRedirectURIs)
+	}
+
+	// Explicit env var overrides for S3-compatible attachment storage.
+	if envEndpoint := firstEnv("AGENTHUB_S3_ENDPOINT", "S3_ENDPOINT"); envEndpoint != "" {
+		cfg.S3.Endpoint = envEndpoint
+	}
+	if envAccessKey := firstEnv("AGENTHUB_S3_ACCESS_KEY", "S3_ACCESS_KEY"); envAccessKey != "" {
+		cfg.S3.AccessKey = envAccessKey
+	}
+	if envSecretKey := firstEnv("AGENTHUB_S3_SECRET_KEY", "S3_SECRET_KEY"); envSecretKey != "" {
+		cfg.S3.SecretKey = envSecretKey
+	}
+	if envBucket := firstEnv("AGENTHUB_S3_BUCKET", "S3_BUCKET"); envBucket != "" {
+		cfg.S3.Bucket = envBucket
+	}
+	if envRegion := firstEnv("AGENTHUB_S3_REGION", "S3_REGION"); envRegion != "" {
+		cfg.S3.Region = envRegion
+	}
+	if envUseSSL := firstEnv("AGENTHUB_S3_USE_SSL", "S3_USE_SSL"); envUseSSL != "" {
+		useSSL, err := strconv.ParseBool(envUseSSL)
+		if err != nil {
+			return nil, fmt.Errorf("invalid AGENTHUB_S3_USE_SSL: %w", err)
+		}
+		cfg.S3.UseSSL = useSSL
 	}
 
 	// Auto-derive JWKS URI from issuer URL when not explicitly set.
@@ -390,8 +447,12 @@ func (c *Config) Validate() error {
 		return err
 	}
 
-	// Upload: if a directory is configured, it must exist.
-	if c.Upload.Dir != "" {
+	if err := c.S3.Validate(); err != nil {
+		return err
+	}
+
+	// Upload: if local storage is used and a directory is configured, it must exist.
+	if !c.S3.IsConfigured() && c.Upload.Dir != "" {
 		if _, err := os.Stat(c.Upload.Dir); os.IsNotExist(err) {
 			return fmt.Errorf("upload directory does not exist: %s", c.Upload.Dir)
 		}
