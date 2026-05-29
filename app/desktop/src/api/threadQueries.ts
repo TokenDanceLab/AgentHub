@@ -1,12 +1,14 @@
 // TanStack Query hooks for thread CRUD.
 // Replaces Zustand threadStore server-state reads and setInterval polling.
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   fetchThreads,
   fetchThreadItems,
   createThread,
   renameThread,
   deleteThread,
+  archiveThread,
+  updateThreadStatus,
 } from './edgeClient';
 import type { ListResponse, ThreadInfo } from '@shared/types';
 
@@ -25,19 +27,14 @@ export function useRenameThread() {
       renameThread(threadId, title),
     onMutate: async ({ threadId, title }) => {
       await qc.cancelQueries({ queryKey: ['threads'] });
-      const prev = qc.getQueryData<ListResponse<ThreadInfo>>(['threads']);
-      if (prev) {
-        qc.setQueryData<ListResponse<ThreadInfo>>(['threads'], {
-          ...prev,
-          items: prev.items.map((t) =>
-            t.threadId === threadId ? { ...t, title } : t,
-          ),
-        });
-      }
+      const prev = snapshotThreadQueries(qc);
+      updateThreadsInCache(qc, (thread) =>
+        thread.threadId === threadId ? { ...thread, title } : thread,
+      );
       return { prev };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) qc.setQueryData(['threads'], ctx.prev);
+      if (ctx?.prev) restoreThreadQueries(qc, ctx.prev);
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['threads'] });
@@ -51,17 +48,94 @@ export function useDeleteThread() {
     mutationFn: (threadId: string) => deleteThread(threadId),
     onMutate: async (threadId) => {
       await qc.cancelQueries({ queryKey: ['threads'] });
-      const prev = qc.getQueryData<ListResponse<ThreadInfo>>(['threads']);
-      if (prev) {
-        qc.setQueryData<ListResponse<ThreadInfo>>(['threads'], {
-          ...prev,
-          items: prev.items.filter((t) => t.threadId !== threadId),
-        });
-      }
+      const prev = snapshotThreadQueries(qc);
+      setThreadStatusInCache(qc, threadId, 'archived');
+      return { prev };
+    },
+    onSuccess: (result, threadId) => {
+      if (result !== 'deleted') return;
+      updateThreadsInCache(qc, (thread) =>
+        thread.threadId === threadId ? null : thread,
+      );
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) restoreThreadQueries(qc, ctx.prev);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['threads'] });
+    },
+  });
+}
+
+type ThreadQuerySnapshot = Array<[readonly unknown[], ListResponse<ThreadInfo> | undefined]>;
+
+function snapshotThreadQueries(qc: QueryClient): ThreadQuerySnapshot {
+  return qc.getQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] });
+}
+
+function restoreThreadQueries(qc: QueryClient, snapshot: ThreadQuerySnapshot) {
+  for (const [queryKey, value] of snapshot) {
+    qc.setQueryData(queryKey, value);
+  }
+}
+
+function updateThreadsInCache(
+  qc: QueryClient,
+  update: (thread: ThreadInfo) => ThreadInfo | null,
+) {
+  qc.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
+    if (!current) return current;
+    return {
+      ...current,
+      items: current.items.flatMap((thread) => {
+        const next = update(thread);
+        return next ? [next] : [];
+      }),
+    };
+  });
+}
+
+function setThreadStatusInCache(
+  qc: QueryClient,
+  threadId: string,
+  status: 'active' | 'archived',
+) {
+  updateThreadsInCache(qc, (thread) =>
+    thread.threadId === threadId ? { ...thread, status } : thread,
+  );
+}
+
+export function useArchiveThread() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (threadId: string) => archiveThread(threadId),
+    onMutate: async (threadId) => {
+      await qc.cancelQueries({ queryKey: ['threads'] });
+      const prev = snapshotThreadQueries(qc);
+      setThreadStatusInCache(qc, threadId, 'archived');
       return { prev };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) qc.setQueryData(['threads'], ctx.prev);
+      if (ctx?.prev) restoreThreadQueries(qc, ctx.prev);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['threads'] });
+    },
+  });
+}
+
+export function useRestoreThread() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (threadId: string) => updateThreadStatus(threadId, 'active'),
+    onMutate: async (threadId) => {
+      await qc.cancelQueries({ queryKey: ['threads'] });
+      const prev = snapshotThreadQueries(qc);
+      setThreadStatusInCache(qc, threadId, 'active');
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) restoreThreadQueries(qc, ctx.prev);
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['threads'] });
