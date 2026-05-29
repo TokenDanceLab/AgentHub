@@ -15,7 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { StatusBadge } from "@agenthub/shared/components";
-import { SegmentedControl } from "@agenthub/shared/ui";
+import { BottomSheet, SegmentedControl } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import type { Artifact, Preview, Run, RunStatus, ThreadItem } from "@agenthub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -361,33 +361,26 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
       )}
 
       {pendingDecision && (
-        <div className="mobileSheetLayer" role="presentation">
-          <button className="mobileSheetScrim" type="button" aria-label="Close approval decision" disabled={decision.isPending} onClick={() => setPendingDecision(null)} />
-          <section className="mobileBottomSheet" role="dialog" aria-modal="true" aria-label="Confirm approval decision">
-            <div className="mobileSheetHandle" aria-hidden="true" />
-            <div className="mobileSheetHeader">
-              <div>
-                <p className="mobileEyebrow">{pendingDecision === "approved" ? "Approve" : "Reject"}</p>
-                <h2>Confirm approval decision</h2>
-              </div>
-              <button className="mobileIconButton" type="button" disabled={decision.isPending} aria-label="Close approval decision" onClick={() => setPendingDecision(null)}>
-                <X size={18} />
-              </button>
-            </div>
-            <p className="mobileSheetDescription">
-              {pendingDecision === "approved" ? "Confirm approve for this checkpoint." : "Confirm reject for this checkpoint."}
-            </p>
-            <div className="mobileSignalRow" role="status" aria-live="polite">
-              {decision.isPending ? <RefreshCw size={14} className="mobileSpin" /> : sheetError ? <XCircle size={14} /> : <ShieldAlert size={14} />}
-              <span>
-                {decision.isPending
-                  ? "Submitting approval decision to Hub..."
-                  : sheetError
-                    ? "Decision was not submitted. Check Hub session and retry."
-                    : "Ready to submit decision."}
-              </span>
-            </div>
-            <div className="mobileSheetActions">
+        <BottomSheet
+          ariaLabel="Confirm approval decision"
+          title="Confirm approval decision"
+          closeLabel="Close approval decision"
+          eyebrow={pendingDecision === "approved" ? "Approve" : "Reject"}
+          description={pendingDecision === "approved" ? "Confirm approve for this checkpoint." : "Confirm reject for this checkpoint."}
+          closeIcon={<X size={18} />}
+          closeDisabled={decision.isPending}
+          onClose={() => setPendingDecision(null)}
+          layerClassName="mobileSheetLayer"
+          scrimClassName="mobileSheetScrim"
+          sheetClassName="mobileBottomSheet"
+          handleClassName="mobileSheetHandle"
+          headerClassName="mobileSheetHeader"
+          eyebrowClassName="mobileEyebrow"
+          closeButtonClassName="mobileIconButton"
+          descriptionClassName="mobileSheetDescription"
+          footerClassName="mobileSheetActions"
+          footer={(
+            <>
               <button className="mobileActionButton" type="button" disabled={decision.isPending} onClick={() => setPendingDecision(null)}>Cancel</button>
               <button
                 className="mobileActionButton"
@@ -398,35 +391,50 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
                 {decision.isPending && <RefreshCw size={16} className="mobileSpin" />}
                 <span>{pendingDecision === "approved" ? "Confirm approve" : "Confirm reject"}</span>
               </button>
+            </>
+          )}
+        >
+            <div className="mobileSignalRow" role="status" aria-live="polite">
+              {decision.isPending ? <RefreshCw size={14} className="mobileSpin" /> : sheetError ? <XCircle size={14} /> : <ShieldAlert size={14} />}
+              <span>
+                {decision.isPending
+                  ? "Submitting approval decision to Hub..."
+                  : sheetError
+                    ? "Decision was not submitted. Check Hub session and retry."
+                    : "Ready to submit decision."}
+              </span>
             </div>
-          </section>
-        </div>
+        </BottomSheet>
       )}
 
       {selectedResource && (
-        <div className="mobileSheetLayer" role="presentation">
-          <button className="mobileSheetScrim" type="button" aria-label="Close resource details" onClick={() => setSelectedResource(null)} />
-          <section className="mobileBottomSheet" role="dialog" aria-modal="true" aria-label="Output resource details">
-            <div className="mobileSheetHandle" aria-hidden="true" />
-            <div className="mobileSheetHeader">
-              <div>
-                <p className="mobileEyebrow">Output</p>
-                <h2>Output resource details</h2>
-              </div>
-              <button className="mobileIconButton" type="button" aria-label="Close resource details" onClick={() => setSelectedResource(null)}>
-                <X size={18} />
-              </button>
-            </div>
-            <p className="mobileSheetDescription">{"path" in selectedResource ? selectedResource.path : selectedResource.url ?? selectedResource.id}</p>
-            <div className="mobileSheetActions">
+        <BottomSheet
+          ariaLabel="Output resource details"
+          title="Output resource details"
+          closeLabel="Close resource details"
+          eyebrow="Output"
+          description={"path" in selectedResource ? selectedResource.path : selectedResource.url ?? selectedResource.id}
+          closeIcon={<X size={18} />}
+          onClose={() => setSelectedResource(null)}
+          layerClassName="mobileSheetLayer"
+          scrimClassName="mobileSheetScrim"
+          sheetClassName="mobileBottomSheet"
+          handleClassName="mobileSheetHandle"
+          headerClassName="mobileSheetHeader"
+          eyebrowClassName="mobileEyebrow"
+          closeButtonClassName="mobileIconButton"
+          descriptionClassName="mobileSheetDescription"
+          footerClassName="mobileSheetActions"
+          footer={(
+            <>
               <button className="mobileActionButton" type="button" onClick={() => void copySelectedResource()}>
                 <Copy size={16} />
                 <span>{copiedDetail ? "Copied" : "Copy path"}</span>
               </button>
               <button className="mobileActionButton" type="button" onClick={() => setSelectedResource(null)}>Close resource details</button>
-            </div>
-          </section>
-        </div>
+            </>
+          )}
+        />
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { getSurfaceStatusMetadata, getSurfacesByPlatform } from "@agenthub/shared";
-import { SegmentedControl, TokenDanceMark } from "@agenthub/shared/ui";
+import { BottomSheet, SegmentedControl, TokenDanceMark } from "@agenthub/shared/ui";
 import { Bell, Languages, Link2, LogIn, RefreshCw, ShieldCheck, Smartphone, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { mobileLanguages, type MobileLanguage } from "../i18n";
@@ -284,55 +284,30 @@ export function AccountView() {
       </div>
 
       {clearSheetOpen && (
-        <div className="mobileSheetLayer" role="presentation">
-          <button
-            className="mobileSheetScrim"
-            type="button"
-            aria-label={t("settings.clearSession.close")}
-            onClick={() => {
-              if (!isClearBusy) {
-                setClearSheetOpen(false);
-              }
-            }}
-          />
-          <section
-            className="mobileBottomSheet"
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("settings.clearSession.aria")}
-          >
-            <div className="mobileSheetHandle" aria-hidden="true" />
-            <div className="mobileSheetHeader">
-              <div>
-                <p className="mobileEyebrow">{t("settings.clearSession.eyebrow")}</p>
-                <h2>{t("settings.clearSession.title")}</h2>
-              </div>
-              <button
-                className="mobileIconButton"
-                type="button"
-                disabled={isClearBusy}
-                aria-label={t("settings.clearSession.close")}
-                onClick={() => setClearSheetOpen(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <p className="mobileSheetDescription">{t("settings.clearSession.description")}</p>
-            <div className="mobileSheetMetaGrid">
-              <div>
-                <span>{t("settings.clearSession.storage")}</span>
-                <strong>{t("settings.clearSession.storageValue")}</strong>
-              </div>
-              <div>
-                <span>{t("settings.clearSession.effect")}</span>
-                <strong>{t("settings.clearSession.effectValue")}</strong>
-              </div>
-            </div>
-            <div className="mobileSignalRow" role="status" aria-live="polite">
-              {isClearBusy ? <RefreshCw size={14} className="mobileSpin" /> : <ShieldCheck size={14} />}
-              <span>{t(clearSheetStatusKey)}</span>
-            </div>
-            <div className="mobileSheetActions">
+        <BottomSheet
+          ariaLabel={t("settings.clearSession.aria")}
+          title={t("settings.clearSession.title")}
+          closeLabel={t("settings.clearSession.close")}
+          eyebrow={t("settings.clearSession.eyebrow")}
+          description={t("settings.clearSession.description")}
+          closeIcon={<X size={18} />}
+          closeDisabled={isClearBusy}
+          onClose={() => {
+            if (!isClearBusy) {
+              setClearSheetOpen(false);
+            }
+          }}
+          layerClassName="mobileSheetLayer"
+          scrimClassName="mobileSheetScrim"
+          sheetClassName="mobileBottomSheet"
+          handleClassName="mobileSheetHandle"
+          headerClassName="mobileSheetHeader"
+          eyebrowClassName="mobileEyebrow"
+          closeButtonClassName="mobileIconButton"
+          descriptionClassName="mobileSheetDescription"
+          footerClassName="mobileSheetActions"
+          footer={(
+            <>
               <button
                 className="mobileActionButton"
                 type="button"
@@ -356,9 +331,24 @@ export function AccountView() {
                       : t("settings.clearSession.confirm")}
                 </span>
               </button>
+            </>
+          )}
+        >
+            <div className="mobileSheetMetaGrid">
+              <div>
+                <span>{t("settings.clearSession.storage")}</span>
+                <strong>{t("settings.clearSession.storageValue")}</strong>
+              </div>
+              <div>
+                <span>{t("settings.clearSession.effect")}</span>
+                <strong>{t("settings.clearSession.effectValue")}</strong>
+              </div>
             </div>
-          </section>
-        </div>
+            <div className="mobileSignalRow" role="status" aria-live="polite">
+              {isClearBusy ? <RefreshCw size={14} className="mobileSpin" /> : <ShieldCheck size={14} />}
+              <span>{t(clearSheetStatusKey)}</span>
+            </div>
+        </BottomSheet>
       )}
     </div>
   );
