@@ -382,6 +382,11 @@
   transform: translateY(0);
 }
 
+.messageFooterActive {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .agentMsg .messageFooter {
   align-self: flex-start;
 }
@@ -448,6 +453,8 @@
 }
 
 .actionBtn:focus-visible,
+.deleteCancelBtn:focus-visible,
+.deleteConfirmBtn:focus-visible,
 .thinkingToggle:focus-visible,
 .viewFullDiff:focus-visible,
 .copyBtn:focus-visible {
@@ -458,6 +465,8 @@
 }
 
 :global([data-theme='light']) .actionBtn:focus-visible,
+:global([data-theme='light']) .deleteCancelBtn:focus-visible,
+:global([data-theme='light']) .deleteConfirmBtn:focus-visible,
 :global([data-theme='light']) .thinkingToggle:focus-visible,
 :global([data-theme='light']) .viewFullDiff:focus-visible,
 :global([data-theme='light']) .copyBtn:focus-visible {
@@ -466,10 +475,83 @@
 }
 
 :global(html[data-focus-source='pointer']) .actionBtn:focus-visible,
+:global(html[data-focus-source='pointer']) .deleteCancelBtn:focus-visible,
+:global(html[data-focus-source='pointer']) .deleteConfirmBtn:focus-visible,
 :global(html[data-focus-source='pointer']) .thinkingToggle:focus-visible,
 :global(html[data-focus-source='pointer']) .viewFullDiff:focus-visible,
 :global(html[data-focus-source='pointer']) .copyBtn:focus-visible {
   box-shadow: none;
+}
+
+.deleteConfirmBar {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 2px 3px 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.036);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.052);
+}
+
+:global([data-theme='light']) .deleteConfirmBar {
+  background: rgba(15, 23, 42, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.045);
+}
+
+.deleteConfirmText {
+  max-width: 128px;
+  overflow: hidden;
+  color: color-mix(in oklch, var(--foreground) 74%, var(--text-weaker) 26%);
+  font-size: 11.5px;
+  font-weight: 460;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deleteCancelBtn,
+.deleteConfirmBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 20px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-weaker);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 520;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast);
+}
+
+.deleteCancelBtn:hover {
+  background: rgba(255, 255, 255, 0.045);
+  color: color-mix(in oklch, var(--foreground) 80%, var(--text-weaker) 20%);
+}
+
+:global([data-theme='light']) .deleteCancelBtn:hover {
+  background: rgba(15, 23, 42, 0.045);
+}
+
+.deleteConfirmBtn {
+  color: color-mix(in oklch, var(--destructive) 72%, var(--foreground) 28%);
+}
+
+.deleteConfirmBtn:hover {
+  background: color-mix(in oklch, var(--destructive) 13%, transparent);
+  color: color-mix(in oklch, var(--destructive) 86%, var(--foreground) 14%);
+}
+
+.deleteCancelBtn:active,
+.deleteConfirmBtn:active {
+  transform: scale(0.97);
 }
 
 /* ── Thinking accordion ────────────────────── */

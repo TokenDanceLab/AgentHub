@@ -3,6 +3,7 @@ import type { ChatMessage, MessageRole } from '@/components/ChatView.types';
 export interface ThreadItemLike {
   id?: string;
   itemId?: string;
+  threadId?: string;
   type?: string;
   role?: string;
   status?: string;
@@ -48,10 +49,9 @@ const OPTIMISTIC_DEDUPE_WINDOW_MS = 2 * 60 * 1000;
 export function buildChatMessagesFromThreadItems(items: ThreadItemLike[] | undefined): ChatMessage[] {
   if (!items?.length) return [];
 
-  return items
+  return sortMessagesByTimestampStable(items
     .map(projectThreadItemToChatMessage)
-    .filter((msg): msg is ChatMessage => Boolean(msg))
-    .sort(compareByTimestamp);
+    .filter((msg): msg is ChatMessage => Boolean(msg)));
 }
 
 export function buildRunReplayFallbackMessages(
@@ -106,7 +106,15 @@ export function buildRunReplayFallbackMessages(
     });
   }
 
-  return messages.sort(compareByTimestamp);
+  return sortMessagesByTimestampStable(messages);
+}
+
+export function filterOptimisticMessagesForThread(
+  messages: ChatMessage[],
+  activeThreadId: string | null | undefined,
+): ChatMessage[] {
+  if (!activeThreadId) return messages.filter((message) => !message.threadId);
+  return messages.filter((message) => message.threadId === activeThreadId);
 }
 
 export function mergeChatMessages({
@@ -135,7 +143,7 @@ export function mergeChatMessages({
   }
 
   merged.push(...live);
-  return dedupeById(merged).sort(compareByTimestamp);
+  return sortMessagesByTimestampStable(dedupeById(merged));
 }
 
 export function buildDisplayedRunOutputMessage(
@@ -183,6 +191,7 @@ function projectThreadItemToChatMessage(item: ThreadItemLike): ChatMessage | nul
     id: `thread-item-${id}`,
     role,
     timestamp: item.createdAt ?? item.timestamp ?? new Date(0).toISOString(),
+    ...(item.threadId ? { threadId: item.threadId } : {}),
     ...(item.runId ? { parentId: item.runId } : {}),
     blocks: [{ kind: 'text', content }],
   };
@@ -266,6 +275,19 @@ function dedupeById(messages: ChatMessage[]): ChatMessage[] {
   return deduped;
 }
 
-function compareByTimestamp(a: ChatMessage, b: ChatMessage): number {
-  return Date.parse(a.timestamp) - Date.parse(b.timestamp);
+function sortMessagesByTimestampStable(messages: ChatMessage[]): ChatMessage[] {
+  return messages
+    .map((message, index) => ({ message, index }))
+    .sort((a, b) => {
+      const aTime = timestampMs(a.message.timestamp);
+      const bTime = timestampMs(b.message.timestamp);
+      if (aTime !== bTime) return aTime - bTime;
+      return a.index - b.index;
+    })
+    .map(({ message }) => message);
+}
+
+function timestampMs(timestamp: string): number {
+  const parsed = Date.parse(timestamp);
+  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
 }
