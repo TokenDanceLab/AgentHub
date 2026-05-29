@@ -245,14 +245,38 @@
 }
 
 /* ── Empty ─────────────────────────────────── */
-.empty {
-  display: flex;
-  align-items: center;
+.emptyState {
+  align-items: flex-start;
+  max-width: 100%;
+  margin: 0;
+  padding: 10px 4px 4px;
+  text-align: left;
+}
+
+.emptyStateContent {
+  align-items: flex-start;
   gap: 8px;
-  padding: 10px 12px;
-  color: #B0B0B5;
+}
+
+.emptyStateIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: var(--muted-foreground);
+}
+
+.emptyStateTitle {
+  color: var(--muted-foreground);
   font-size: 11px;
+  font-weight: 560;
   line-height: 1.4;
+}
+
+.emptyStateDescription {
+  max-width: 260px;
+  color: color-mix(in oklch, var(--muted-foreground) 78%, transparent);
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 /* ── Highlight ─────────────────────────────── */
