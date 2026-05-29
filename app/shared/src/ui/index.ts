@@ -39,3 +39,5 @@ export { DisclosureRow } from './DisclosureRow';
 export type { DisclosureRowProps } from './DisclosureRow';
 export { SelectableRow } from './SelectableRow';
 export type { SelectableRowProps } from './SelectableRow';
+export { MessageBubble } from './MessageBubble';
+export type { MessageBubbleProps } from './MessageBubble';
