@@ -1341,8 +1341,12 @@ button:disabled {
   padding: 9px 10px;
 }
 
-.mobileResourceRow {
+.mobileResourceRow.mobileResourceRow {
   grid-template-columns: 34px minmax(0, 1fr) auto auto;
+}
+
+.mobileResourceActions.mobileResourceActions {
+  display: contents;
 }
 
 .mobileRunBlockIndex,

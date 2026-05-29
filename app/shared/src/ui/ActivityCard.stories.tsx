@@ -19,3 +19,13 @@ export const DiffActivity: Story = {
     children: 'Updated mobile copy and approval panel states.',
   },
 };
+
+export const RunBlock: Story = {
+  args: {
+    leading: '1',
+    icon: <GitPullRequestArrow size={16} />,
+    label: 'diff',
+    children: 'Updated mobile approval panel states.',
+    actions: <button type="button">Inspect</button>,
+  },
+};
