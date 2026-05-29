@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileText, TerminalSquare, Wrench } from 'lucide-react';
-import { ActivityCard } from '@shared/ui';
+import { ActivityCard, DisclosureRow } from '@shared/ui';
 import type { RunInfo } from '@shared/types';
 import type { FileDiff, ChatMessage } from './ChatView.types';
 import type { SessionMetrics } from '@shared/context/breakdown';
@@ -78,25 +78,23 @@ function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
   const hasOutput = !!tc.output;
 
   return (
-    <div className={styles.toolCallItem}>
-      <button
-        className={styles.toolCallHeader}
-        onClick={() => hasOutput && setExpanded((v) => !v)}
-        aria-expanded={hasOutput ? expanded : undefined}
-        disabled={!hasOutput}
-      >
-        <span className={tc.status === 'completed' ? styles.success : styles.pending}>
-          {tc.toolName}
-        </span>
-        <span className={styles.itemTs}>{new Date(tc.timestamp).toLocaleTimeString()}</span>
-        {hasOutput && (
-          <span className={styles.chevron + (expanded ? ' ' + styles.chevronDown : '')}>▸</span>
-        )}
-      </button>
-      {expanded && tc.output && (
+    <DisclosureRow
+      className={styles.toolCallItem}
+      buttonClassName={styles.toolCallHeader}
+      chevronClassName={hasOutput ? styles.chevron : styles.chevronHidden}
+      labelClassName={tc.status === 'completed' ? styles.success : styles.pending}
+      metaClassName={styles.itemTs}
+      label={tc.toolName}
+      meta={new Date(tc.timestamp).toLocaleTimeString()}
+      expanded={expanded}
+      onToggle={() => setExpanded((v) => !v)}
+      disabled={!hasOutput}
+      bodyClassName={styles.toolCallBody}
+    >
+      {tc.output ? (
         <pre className={styles.toolCallOutput}>{tc.output.slice(0, 5000)}</pre>
-      )}
-    </div>
+      ) : null}
+    </DisclosureRow>
   );
 }
 

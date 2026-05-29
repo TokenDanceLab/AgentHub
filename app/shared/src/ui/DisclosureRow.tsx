@@ -7,6 +7,7 @@ export interface DisclosureRowProps {
   leading?: ReactNode;
   expanded: boolean;
   onToggle: () => void;
+  disabled?: boolean | undefined;
   children?: ReactNode;
   className?: string | undefined;
   buttonClassName?: string | undefined;
@@ -27,6 +28,7 @@ export function DisclosureRow({
   leading,
   expanded,
   onToggle,
+  disabled = false,
   children,
   className,
   buttonClassName,
@@ -43,6 +45,7 @@ export function DisclosureRow({
         className={cx(styles.button, buttonClassName)}
         onClick={onToggle}
         aria-expanded={expanded}
+        disabled={disabled}
       >
         {leading ? <span className={cx(styles.leading, leadingClassName)}>{leading}</span> : null}
         <span
