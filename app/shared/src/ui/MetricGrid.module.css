@@ -1,0 +1,56 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.item {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  min-height: 64px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 8px);
+  padding: 9px 10px;
+  background: color-mix(in oklch, var(--card, white) 74%, transparent);
+  color: var(--foreground);
+  text-align: left;
+}
+
+.itemButton {
+  width: 100%;
+  font: inherit;
+  cursor: pointer;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted-foreground);
+}
+
+.value {
+  display: block;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 760;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
