@@ -314,6 +314,10 @@ async function collectMetrics(page, { mobile = false } = {}) {
     const authStyle = authSheet ? window.getComputedStyle(authSheet) : null;
     const authBrandLogo = authSheet?.querySelector("img[alt='TokenDance']");
     const identityIcon = authSheet?.querySelector("button img[aria-hidden='true']");
+    const shellBrandLogo = document.querySelector("header img[class*='brandMark']");
+    const shellBrandFallbackText = Array.from(document.querySelectorAll("header [class*='brandMark']"))
+      .map((el) => el.textContent?.trim())
+      .filter(Boolean);
 
     return {
       title: document.title,
@@ -332,6 +336,8 @@ async function collectMetrics(page, { mobile = false } = {}) {
       navLabels,
       topbarAccountButtonCount,
       mobileAccountNavIndex,
+      shellBrandLogo: !!shellBrandLogo,
+      shellBrandFallbackText,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -354,6 +360,8 @@ function assertMetrics(name, metrics, { mobile = false, accountSheet = false } =
   assert(metrics.leftOnlyBorderCount === 0, `${name}: left-only border rails are forbidden`, metrics.leftOnlyBorderElements);
   assert(metrics.leftInsetShadowCount === 0, `${name}: inset left rails are forbidden`, metrics.leftInsetShadowElements);
   assert(metrics.rawI18nKeys.length === 0, `${name}: raw i18n keys are visible`, metrics.rawI18nKeys);
+  assert(metrics.shellBrandLogo === true, `${name}: shell must use TokenDance brand image`, metrics);
+  assert(metrics.shellBrandFallbackText.length === 0, `${name}: shell brand text fallback is forbidden`, metrics.shellBrandFallbackText);
   if (mobile) {
     assert(metrics.smallTargets.length === 0, `${name}: mobile controls below 44px`, metrics.smallTargets);
     assert(metrics.mobileAccountNavIndex === 3, `${name}: Account must be the rightmost mobile nav item`, metrics.navLabels);
