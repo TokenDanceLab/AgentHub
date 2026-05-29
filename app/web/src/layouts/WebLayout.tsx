@@ -34,7 +34,7 @@ import { useHubMainChat } from '@/hooks/useHubMainChat';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { useHealth } from '@/hooks/useHealth';
 import { useHubWSConnection } from '@/hooks/useHubWSConnection';
-import { TokenDanceMark } from '@shared/ui';
+import { ContextSummary, TokenDanceMark } from '@shared/ui';
 import { getSurfaceByWebRoute, getSurfaceMetadata, getSurfaceStatusMetadata, type SurfaceMetadata } from '@shared/surfaceMetadata';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { AppError } from '@shared/errors';
@@ -689,40 +689,34 @@ export default function WebLayout() {
               ) : (
                 <>
                   {routeContext && (
-                    <section className={styles.routeContextPanel} aria-label={t('webShell.route.aria', { surface: t(routeContext.surface.labelKey) })}>
-                      <div className={styles.routeContextHeader}>
-                        <span className={styles.routeContextIcon}>{routeContextIcon}</span>
-                        <div>
-                          <p className={styles.routeEyebrow}>{t('webShell.route.eyebrow')}</p>
-                          <h1>{t(routeContext.surface.labelKey)}</h1>
-                        </div>
-                      </div>
-                      <p className={styles.routeContextCopy}>{t(routeContext.surface.descriptionKey)}</p>
-                      <div className={styles.routeContextGrid}>
-                        <div className={styles.routeMetric}>
-                          <strong>{agents.length}</strong>
-                          <span>{t('webShell.route.metrics.agents')}</span>
-                        </div>
-                        <div className={styles.routeMetric}>
-                          <strong>{threads.length}</strong>
-                          <span>{t('webShell.route.metrics.threads')}</span>
-                        </div>
-                        <div className={styles.routeMetric}>
-                          <strong>{routeContext.id ?? t('webShell.route.metrics.shell')}</strong>
-                          <span>{t(routeSourceLabelKey(routeContext.surface))}</span>
-                        </div>
-                        {routeContextStatus && (
-                          <div className={styles.routeMetric}>
-                            <strong>{t(routeContextStatus.labelKey)}</strong>
-                            <span>{t('webShell.route.sources.status')}</span>
-                          </div>
-                        )}
-                        <div className={styles.routeMetric}>
-                          <strong>{routeContext.surface.platform}</strong>
-                          <span>{t('webShell.route.sources.registry')}</span>
-                        </div>
-                      </div>
-                      <div className={styles.routeActionRow}>
+                    <ContextSummary
+                      className={styles.routeContextPanel}
+                      headerClassName={styles.routeContextHeader}
+                      iconClassName={styles.routeContextIcon}
+                      eyebrowClassName={styles.routeEyebrow}
+                      titleClassName={styles.routeContextTitle}
+                      descriptionClassName={styles.routeContextCopy}
+                      listClassName={styles.routeContextGrid}
+                      itemClassName={styles.routeMetric}
+                      valueClassName={styles.routeMetricValue}
+                      labelClassName={styles.routeMetricLabel}
+                      actionsClassName={styles.routeActionRow}
+                      ariaLabel={t('webShell.route.aria', { surface: t(routeContext.surface.labelKey) })}
+                      icon={routeContextIcon}
+                      eyebrow={t('webShell.route.eyebrow')}
+                      title={t(routeContext.surface.labelKey)}
+                      description={t(routeContext.surface.descriptionKey)}
+                      items={[
+                        { id: 'agents', value: agents.length, label: t('webShell.route.metrics.agents') },
+                        { id: 'threads', value: threads.length, label: t('webShell.route.metrics.threads') },
+                        { id: 'source', value: routeContext.id ?? t('webShell.route.metrics.shell'), label: t(routeSourceLabelKey(routeContext.surface)) },
+                        ...(routeContextStatus
+                          ? [{ id: 'status', value: t(routeContextStatus.labelKey), label: t('webShell.route.sources.status') }]
+                          : []),
+                        { id: 'registry', value: routeContext.surface.platform, label: t('webShell.route.sources.registry') },
+                      ]}
+                      actions={(
+                        <>
                         <button className={styles.routeAction} type="button" onClick={() => selectMainSurface('messages')}>
                           <MessageSquare size={16} />
                           <span>{t('webShell.route.actions.messages')}</span>
@@ -731,8 +725,9 @@ export default function WebLayout() {
                           <Settings size={16} />
                           <span>{t('webShell.route.actions.settings')}</span>
                         </button>
-                      </div>
-                    </section>
+                        </>
+                      )}
+                    />
                   )}
                   <Slot name="main-view" {...shellProps} />
                   <Slot name="prompt-input" {...shellProps} />

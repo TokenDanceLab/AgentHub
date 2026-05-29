@@ -21,3 +21,17 @@ export const ThreadContext: Story = {
     ],
   },
 };
+
+export const RouteContext: Story = {
+  args: {
+    eyebrow: 'Route context',
+    title: 'Workspace',
+    description: 'Desktop-style command surface for active agents and threads.',
+    items: [
+      { id: 'agents', label: 'Agents', value: 3 },
+      { id: 'threads', label: 'Threads', value: 8 },
+      { id: 'source', label: 'Source', value: 'Shell' },
+    ],
+    actions: <button type="button">Open messages</button>,
+  },
+};
