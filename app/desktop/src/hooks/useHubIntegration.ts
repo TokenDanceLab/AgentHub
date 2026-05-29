@@ -322,9 +322,12 @@ export function useHubIntegration(
   const postedRouteDecisionsRef = useRef<Set<string>>(new Set());
   const deliveredAgentControlsRef = useRef<Set<string>>(new Set());
   const inFlightAgentControlsRef = useRef<Set<string>>(new Set());
+<<<<<<< HEAD
   /** RunIds whose terminal result has already been reported to Hub (prevents
    *  double doneTask / failTask across run.agent.result and run.finished/failed). */
   const reportedRunIdsRef = useRef<Set<string>>(new Set());
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const store = useTaskBridgeStore;
 
   const rememberOutput = useCallback((runId: string, content: string) => {

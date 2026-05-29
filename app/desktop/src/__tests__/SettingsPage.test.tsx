@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+<<<<<<< HEAD
 import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ComponentProps } from 'react';
+=======
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import '@testing-library/jest-dom/vitest';
 import SettingsPage, { type SectionId } from '@/components/SettingsPage';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
@@ -9,12 +13,32 @@ import enLocale from '@/i18n/locales/en.json';
 import zhLocale from '@/i18n/locales/zh.json';
 import type { AgentInfo, RunInfo } from '@shared/types';
 import type { AgentTask } from '@/stores/taskBridgeStore';
+<<<<<<< HEAD
+=======
+import type {
+  AgentTeamDetail,
+  AgentTeamRun,
+  CoordinatorRouteDecision,
+  CustomAgent,
+  ExecutionTarget,
+  TeamApprovalState,
+  TeamArtifactState,
+  TeamBudget,
+  TeamConflictState,
+  TeamMemberState,
+  TeamRunEventState,
+  TeamTaskState,
+} from '@/api/hubClient';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 const {
   mockAgents,
   mockAgentTeamApprovals,
   mockAgentTeamArtifacts,
+<<<<<<< HEAD
   mockAgentTeamAssignments,
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   mockAgentTeamBudget,
   mockAgentTeamConflicts,
   mockAgentTeamEvents,
@@ -27,6 +51,7 @@ const {
   mockAgentTeams,
   mockCreateAgentTeam,
   mockCancelRun,
+<<<<<<< HEAD
   mockCustomAgents,
   mockFriendRequests,
   mockHubAuthState,
@@ -38,13 +63,29 @@ const {
   mockRuns,
   mockSessions,
   mockContacts,
+=======
+  mockDecideTeamApproval,
+  mockAddAgentTeamMember,
+  mockHubCustomAgents,
+  mockHubTargets,
+  mockHubTargetsState,
+  mockHubSession,
+  mockPingHubTarget,
+  mockRefetchRuns,
+  mockResolveTeamConflict,
+  mockRuns,
+  mockStartTeamRun,
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   mockTasks,
   mockUseHealthState,
 } = vi.hoisted(() => ({
   mockAgents: [] as AgentInfo[],
   mockAgentTeamApprovals: [] as TeamApprovalState[],
   mockAgentTeamArtifacts: [] as TeamArtifactState[],
+<<<<<<< HEAD
   mockAgentTeamAssignments: [] as TeamAssignmentState[],
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   mockAgentTeamBudget: { value: undefined as TeamBudget | undefined },
   mockAgentTeamConflicts: [] as TeamConflictState[],
   mockAgentTeamEvents: [] as TeamRunEventState[],
@@ -52,11 +93,30 @@ const {
   mockAgentTeamRouteLog: [] as CoordinatorRouteDecision[],
   mockAgentTeamRuns: [] as AgentTeamRun[],
   mockAgentTeamState: {
+<<<<<<< HEAD
+=======
     isLoading: false,
     isFetching: false,
     isError: false,
     error: null as Error | null,
   },
+  mockAgentTeamTasks: [] as TeamTaskState[],
+  mockAgentTeamTerminalReason: { value: undefined as string | undefined },
+  mockAgentTeams: [] as AgentTeamDetail[],
+  mockCreateAgentTeam: vi.fn(),
+  mockAddAgentTeamMember: vi.fn(),
+  mockCancelRun: vi.fn(),
+  mockDecideTeamApproval: vi.fn(),
+  mockHubCustomAgents: [] as CustomAgent[],
+  mockHubTargets: [] as ExecutionTarget[],
+  mockHubTargetsState: {
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+    error: null as Error | null,
+  },
+<<<<<<< HEAD
   mockAgentTeamTasks: [] as TeamTaskState[],
   mockAgentTeamTerminalReason: { value: undefined as string | undefined },
   mockAgentTeams: [] as AgentTeamDetail[],
@@ -91,6 +151,21 @@ const {
   mockRuns: [] as RunInfo[],
   mockSessions: [] as Record<string, unknown>[],
   mockContacts: [] as Record<string, unknown>[],
+=======
+  mockHubSession: {
+    hubAuthenticated: true,
+    authAuthenticated: true,
+    token: 'hub_access_token',
+    refreshToken: 'hub_refresh_token',
+    tokenSource: 'hub',
+    username: 'TokenDance User',
+  },
+  mockPingHubTarget: vi.fn(),
+  mockRefetchRuns: vi.fn(),
+  mockResolveTeamConflict: vi.fn(),
+  mockRuns: [] as RunInfo[],
+  mockStartTeamRun: vi.fn(),
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   mockTasks: [] as AgentTask[],
   mockUseHealthState: {
     online: true,
@@ -147,6 +222,86 @@ vi.mock('@/api/agentQueries', () => ({
   useAgentList: () => ({ data: { items: mockAgents } }),
 }));
 
+<<<<<<< HEAD
+=======
+vi.mock('@/api/executionTargetQueries', () => ({
+  useHubExecutionTargets: () => ({
+    data: { items: mockHubTargets, page: { hasMore: false, nextCursor: '' } },
+    ...mockHubTargetsState,
+  }),
+  usePingHubExecutionTarget: () => ({
+    mutate: mockPingHubTarget,
+    isPending: false,
+    variables: undefined,
+  }),
+}));
+
+vi.mock('@/api/agentTeamQueries', () => ({
+  useHubAgentTeams: (options?: { selectedTeamId?: string; selectedRunId?: string }) => {
+    const selectedTeam =
+      mockAgentTeams.find((team) => team.id === options?.selectedTeamId) ??
+      mockAgentTeams.find((team) => mockAgentTeamRuns.some((run) => run.id === options?.selectedRunId && run.team_id === team.id)) ??
+      mockAgentTeams[0];
+    const selectedRun =
+      mockAgentTeamRuns.find((run) => run.id === options?.selectedRunId && (!selectedTeam || run.team_id === selectedTeam.id)) ??
+      mockAgentTeamRuns.find((run) => run.team_id === selectedTeam?.id) ??
+      mockAgentTeamRuns[0];
+    const bundles = mockAgentTeams.map((team) => {
+      const runs = mockAgentTeamRuns.filter((run) => run.team_id === team.id);
+      return { team, runs, latestRun: runs[0] };
+    });
+    return {
+      data: {
+        teams: mockAgentTeams,
+        bundles,
+        customAgents: mockHubCustomAgents,
+        selectedTeam,
+        selectedRun,
+        state: selectedTeam && selectedRun
+          ? {
+              run_id: selectedRun.id,
+              team_id: selectedTeam.id,
+              status: selectedRun.status,
+              members: mockAgentTeamMembers,
+              tasks: mockAgentTeamTasks,
+              approvals: mockAgentTeamApprovals,
+              conflicts: mockAgentTeamConflicts,
+              artifacts: mockAgentTeamArtifacts,
+              run_events: mockAgentTeamEvents,
+              route_log: mockAgentTeamRouteLog,
+              budget: mockAgentTeamBudget.value,
+              terminal_reason: mockAgentTeamTerminalReason.value,
+            }
+          : undefined,
+        tasks: [],
+        events: [],
+      },
+      ...mockAgentTeamState,
+    };
+  },
+  useCreateAgentTeam: () => ({
+    mutateAsync: mockCreateAgentTeam,
+    isPending: false,
+  }),
+  useAddAgentTeamMember: () => ({
+    mutateAsync: mockAddAgentTeamMember,
+    isPending: false,
+  }),
+  useStartTeamRun: () => ({
+    mutateAsync: mockStartTeamRun,
+    isPending: false,
+  }),
+  useDecideTeamApproval: () => ({
+    mutateAsync: mockDecideTeamApproval,
+    isPending: false,
+  }),
+  useResolveTeamConflict: () => ({
+    mutateAsync: mockResolveTeamConflict,
+    isPending: false,
+  }),
+}));
+
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 vi.mock('@/api/runQueries', () => ({
   useRuns: () => ({
     data: { items: mockRuns, page: { hasMore: false } },
@@ -168,13 +323,25 @@ vi.mock('@/stores/taskBridgeStore', () => ({
 
 vi.mock('@/stores/hubStore', () => ({
   useHubStore: (selector: (state: { authenticated: boolean; username: string; clear: () => void }) => unknown) =>
+<<<<<<< HEAD
     selector(mockHubStoreState),
+=======
+    selector({ authenticated: mockHubSession.hubAuthenticated, username: mockHubSession.username, clear: vi.fn() }),
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
+<<<<<<< HEAD
     ...mockHubAuthState,
     tokenSource: 'hub',
+=======
+    token: mockHubSession.authAuthenticated ? mockHubSession.token : null,
+    refreshToken: mockHubSession.authAuthenticated ? mockHubSession.refreshToken : null,
+    user: mockHubSession.authAuthenticated ? { id: 'user_1', username: mockHubSession.username } : null,
+    isAuthenticated: mockHubSession.authAuthenticated,
+    tokenSource: mockHubSession.tokenSource,
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     login: vi.fn(),
     loginWithTokenDance: vi.fn(),
     logout: vi.fn(),
@@ -213,14 +380,45 @@ function changeSelect(currentLabel: string, nextLabel: string, occurrence = 0) {
 describe('SettingsPage tasks', () => {
   beforeEach(() => {
     mockAgents.splice(0, mockAgents.length);
+<<<<<<< HEAD
     mockCustomAgents.splice(0, mockCustomAgents.length);
     mockFriendRequests.splice(0, mockFriendRequests.length);
     mockNotifications.splice(0, mockNotifications.length);
+=======
+    mockAgentTeamApprovals.splice(0, mockAgentTeamApprovals.length);
+    mockAgentTeamArtifacts.splice(0, mockAgentTeamArtifacts.length);
+    mockAgentTeamBudget.value = undefined;
+    mockAgentTeamConflicts.splice(0, mockAgentTeamConflicts.length);
+    mockAgentTeamEvents.splice(0, mockAgentTeamEvents.length);
+    mockAgentTeamMembers.splice(0, mockAgentTeamMembers.length);
+    mockAgentTeamRouteLog.splice(0, mockAgentTeamRouteLog.length);
+    mockAgentTeamRuns.splice(0, mockAgentTeamRuns.length);
+    mockAgentTeamState.isLoading = false;
+    mockAgentTeamState.isFetching = false;
+    mockAgentTeamState.isError = false;
+    mockAgentTeamState.error = null;
+    mockAgentTeamTasks.splice(0, mockAgentTeamTasks.length);
+    mockAgentTeamTerminalReason.value = undefined;
+    mockAgentTeams.splice(0, mockAgentTeams.length);
+    mockHubCustomAgents.splice(0, mockHubCustomAgents.length);
+    mockHubTargets.splice(0, mockHubTargets.length);
+    mockHubTargetsState.isLoading = false;
+    mockHubTargetsState.isFetching = false;
+    mockHubTargetsState.isError = false;
+    mockHubTargetsState.error = null;
+    mockHubSession.hubAuthenticated = true;
+    mockHubSession.authAuthenticated = true;
+    mockHubSession.token = 'hub_access_token';
+    mockHubSession.refreshToken = 'hub_refresh_token';
+    mockHubSession.tokenSource = 'hub';
+    mockHubSession.username = 'TokenDance User';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     mockRuns.splice(0, mockRuns.length);
     mockSessions.splice(0, mockSessions.length);
     mockContacts.splice(0, mockContacts.length);
     mockTasks.splice(0, mockTasks.length);
     mockCancelRun.mockReset();
+<<<<<<< HEAD
     mockHubClient.listContacts.mockReset();
     mockHubClient.listSessions.mockReset();
     mockHubClient.listFriendRequests.mockReset();
@@ -255,6 +453,12 @@ describe('SettingsPage tasks', () => {
         },
       },
     });
+=======
+    mockCreateAgentTeam.mockReset();
+    mockAddAgentTeamMember.mockReset();
+    mockDecideTeamApproval.mockReset();
+    mockPingHubTarget.mockReset();
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     mockRefetchRuns.mockReset();
     mockResolveTeamConflict.mockReset();
     mockStartTeamRun.mockReset();
@@ -361,6 +565,7 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('settings.schedulerGuard')).toBeInTheDocument();
   });
 
+<<<<<<< HEAD
   it('renders Online IM from Hub snapshot without contract placeholder state', async () => {
     mockContacts.splice(0, mockContacts.length, {
       user_id: 'friend-1',
@@ -460,6 +665,375 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('settings.groupChatHubRooms')).toBeInTheDocument();
     expect(screen.getByText('settings.status.snapshot')).toBeInTheDocument();
     expect(screen.queryByText('settings.contractPending')).not.toBeInTheDocument();
+=======
+  it('shows local Orchestrator scheduling separately from Hub TeamRun sign-in', () => {
+    mockHubSession.hubAuthenticated = false;
+    mockHubSession.authAuthenticated = false;
+    mockHubSession.token = '';
+    mockHubSession.refreshToken = '';
+    mockAgents.splice(
+      0,
+      mockAgents.length,
+      {
+        id: 'orchestrator',
+        name: 'Orchestrator',
+        description: 'Local supervisor runtime',
+        status: 'available',
+        capabilities: {
+          streaming: true,
+          toolCalls: true,
+          fileChanges: true,
+          thinkingVisible: true,
+          multiTurn: true,
+          mcpIntegration: true,
+          permissionHooks: true,
+          subAgentSpawn: true,
+        },
+      },
+      {
+        id: 'codex',
+        name: 'Codex',
+        description: 'Local Codex runtime',
+        status: 'available',
+        capabilities: {
+          streaming: true,
+          toolCalls: true,
+          fileChanges: true,
+          thinkingVisible: true,
+          multiTurn: true,
+          mcpIntegration: false,
+          permissionHooks: false,
+          subAgentSpawn: false,
+        },
+      },
+    );
+
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="agentScheduling" />);
+
+    const localPanel = screen.getByTestId('settings-local-orchestration');
+    expect(within(localPanel).getByText('settings.localOrchestration')).toBeInTheDocument();
+    expect(within(localPanel).getByText('settings.localOrchestrationRuntime')).toBeInTheDocument();
+    expect(within(localPanel).getByText('Orchestrator')).toBeInTheDocument();
+    expect(within(localPanel).getByText('1/2')).toBeInTheDocument();
+    expect(screen.getAllByText('settings.targetHubSignInRequired').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('settings.agentTeamSignInRequired').length).toBeGreaterThan(0);
+  });
+
+  it('renders real AgentTeam TeamRun console state and wires approval/conflict actions', () => {
+    mockAgentTeams.splice(0, mockAgentTeams.length, {
+      id: 'team_scheduler',
+      owner_id: 'user_1',
+      name: 'Builder Review Team',
+      description: 'Supervisor, builder, reviewer',
+      members: [
+        { id: 'member_supervisor', team_id: 'team_scheduler', role: 'supervisor' },
+        { id: 'member_builder', team_id: 'team_scheduler', role: 'executor' },
+      ],
+    });
+    mockAgentTeamRuns.splice(0, mockAgentTeamRuns.length, {
+      id: 'team_run_1',
+      team_id: 'team_scheduler',
+      status: 'running',
+      trigger_message: 'Implement scheduler Agent and subagent UI',
+      created_at: '2026-05-28T01:00:00Z',
+      updated_at: '2026-05-28T01:02:00Z',
+    });
+    mockAgentTeamMembers.splice(
+      0,
+      mockAgentTeamMembers.length,
+      {
+        member_id: 'member_supervisor',
+        agent_profile_id: 'profile_supervisor',
+        role: 'supervisor',
+        active_tasks: 1,
+        completed_tasks: 0,
+      },
+      {
+        member_id: 'member_builder',
+        agent_profile_id: 'profile_builder',
+        role: 'executor',
+        active_tasks: 1,
+        completed_tasks: 2,
+      },
+    );
+    mockAgentTeamTasks.splice(0, mockAgentTeamTasks.length, {
+      task_id: 'team_task_1',
+      assignee_member_id: 'member_builder',
+      status: 'running',
+      objective: 'Build TeamRun task board',
+      run_id: 'edge_run_1',
+      attempt: 1,
+      risk_level: 'normal',
+    });
+    mockAgentTeamRouteLog.splice(0, mockAgentTeamRouteLog.length, {
+      action: 'delegate',
+      next_worker: 'member_builder',
+      instructions: 'Build TeamRun task board',
+      reasoning: 'UI subagent owns the Desktop surface',
+    });
+    mockAgentTeamApprovals.splice(0, mockAgentTeamApprovals.length, {
+      approval_id: 'approval_1',
+      status: 'pending',
+      request_id: 'perm_1',
+      tool_name: 'shell',
+      reason: 'Run local test command',
+      member_id: 'member_builder',
+    });
+    mockAgentTeamConflicts.splice(0, mockAgentTeamConflicts.length, {
+      conflict_id: 'conflict_1',
+      path: 'app/desktop/src/components/SettingsPage.tsx',
+      status: 'pending',
+      agent_task_ids: ['task_a', 'task_b'],
+    });
+    mockAgentTeamArtifacts.splice(
+      0,
+      mockAgentTeamArtifacts.length,
+      {
+        agent_task_id: 'task_a',
+        team_task_id: 'team_task_1',
+        member_id: 'member_builder',
+        edge_run_id: 'edge_run_1',
+        conflict_id: 'conflict_1',
+        event_seq: 8,
+        path: 'app/desktop/src/components/SettingsPage.tsx',
+        action: 'modify',
+        tool_name: 'filesystem',
+        status: 'changed',
+        created_at: '2026-05-28T01:04:00Z',
+      },
+      {
+        agent_task_id: 'task_b',
+        team_task_id: 'team_task_2',
+        member_id: 'member_reviewer',
+        edge_run_id: 'edge_run_2',
+        conflict_id: 'conflict_1',
+        event_seq: 9,
+        path: 'app/desktop/src/components/SettingsPage.tsx',
+        action: 'modify',
+        tool_name: 'filesystem',
+        status: 'changed',
+        created_at: '2026-05-28T01:05:00Z',
+      },
+    );
+    mockAgentTeamEvents.splice(0, mockAgentTeamEvents.length, {
+      agent_task_id: 'task_a',
+      edge_run_id: 'edge_run_1',
+      event_seq: 7,
+      event_type: 'agent.message',
+      payload: 'subagent reported progress',
+      created_at: '2026-05-28T01:03:00Z',
+    });
+
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="agentScheduling" />);
+
+    expect(screen.getByTestId('agent-team-console')).toBeInTheDocument();
+    expect(screen.getAllByText('Builder Review Team').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Build TeamRun task board').length).toBeGreaterThan(0);
+    expect(screen.getByText('shell')).toBeInTheDocument();
+    expect(screen.getByText('agent.message')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'settings.acceptAgentTask' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'settings.keepAllArtifacts' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'settings.allow' }));
+    expect(mockDecideTeamApproval).toHaveBeenCalledWith({
+      teamId: 'team_scheduler',
+      runId: 'team_run_1',
+      approvalId: 'approval_1',
+      decision: {
+        decision: 'allow',
+        reason: 'Desktop TeamRun Console decision',
+      },
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'settings.acceptAgentTask' })[0]);
+    expect(mockResolveTeamConflict).toHaveBeenCalledWith({
+      teamId: 'team_scheduler',
+      runId: 'team_run_1',
+      conflictId: 'conflict_1',
+      resolution: {
+        path: 'app/desktop/src/components/SettingsPage.tsx',
+        resolution: 'accept_agent_task',
+        selected_agent_task_id: 'task_a',
+        reason: 'Accepted task_a from Desktop TeamRun Console',
+      },
+    });
+
+    mockResolveTeamConflict.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'settings.markManualMerge' }));
+    expect(mockResolveTeamConflict).toHaveBeenCalledWith({
+      teamId: 'team_scheduler',
+      runId: 'team_run_1',
+      conflictId: 'conflict_1',
+      resolution: {
+        path: 'app/desktop/src/components/SettingsPage.tsx',
+        resolution: 'manual_merge',
+        reason: 'Marked from Desktop TeamRun Console',
+      },
+    });
+  });
+
+  it('switches TeamRun branches and reloads the selected Hub state path', () => {
+    mockAgentTeams.splice(
+      0,
+      mockAgentTeams.length,
+      {
+        id: 'team_builder',
+        owner_id: 'user_1',
+        name: 'Builder Team',
+        description: 'Build branch',
+        members: [],
+      },
+      {
+        id: 'team_review',
+        owner_id: 'user_1',
+        name: 'Review Team',
+        description: 'Review branch',
+        members: [],
+      },
+    );
+    mockAgentTeamRuns.splice(
+      0,
+      mockAgentTeamRuns.length,
+      {
+        id: 'team_run_builder',
+        team_id: 'team_builder',
+        status: 'running',
+        trigger_message: 'Build TeamRun branch',
+      },
+      {
+        id: 'team_run_review',
+        team_id: 'team_review',
+        status: 'completed',
+        trigger_message: 'Review TeamRun result branch',
+      },
+    );
+
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="agentScheduling" />);
+
+    expect(screen.getAllByText('Build TeamRun branch').length).toBeGreaterThan(1);
+    expect(screen.getAllByText('Review TeamRun result branch')).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /Review TeamRun result branch/ }));
+
+    expect(screen.getAllByText('Review TeamRun result branch').length).toBeGreaterThan(1);
+    expect(screen.getByRole('button', { name: /Review TeamRun result branch/ })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('renders TeamRun result, artifact, budget, and terminal reason blocks from Hub state', () => {
+    mockAgentTeams.splice(0, mockAgentTeams.length, {
+      id: 'team_release',
+      owner_id: 'user_1',
+      name: 'Release Team',
+      description: 'Supervisor with reviewer',
+      members: [],
+    });
+    mockAgentTeamRuns.splice(0, mockAgentTeamRuns.length, {
+      id: 'team_run_release',
+      team_id: 'team_release',
+      status: 'completed',
+      trigger_message: 'Prepare release notes and verify artifacts',
+    });
+    mockAgentTeamEvents.splice(0, mockAgentTeamEvents.length, {
+      agent_task_id: 'task_release',
+      edge_run_id: 'edge_run_release',
+      event_seq: 12,
+      event_type: 'agent.result',
+      payload: 'Release notes are ready for reviewer handoff.',
+      created_at: '2026-05-28T02:03:00Z',
+    });
+    mockAgentTeamArtifacts.splice(0, mockAgentTeamArtifacts.length, {
+      team_task_id: 'team_task_release',
+      member_id: 'member_reviewer',
+      edge_run_id: 'edge_run_release',
+      event_seq: 13,
+      path: 'reports/teamrun-summary.md',
+      action: 'write',
+      tool_name: 'filesystem',
+      status: 'created',
+      created_at: '2026-05-28T02:04:00Z',
+    });
+    mockAgentTeamBudget.value = {
+      total_tokens_used: 1280,
+      input_tokens: 980,
+      output_tokens: 300,
+      token_limit: 4000,
+      remaining_tokens: 2720,
+      usage_percent: 32,
+      run_count: 2,
+      context_warnings: 1,
+      compactions: 0,
+    };
+    mockAgentTeamTerminalReason.value = 'Supervisor finished after reviewer approved all artifacts.';
+
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="agentScheduling" />);
+
+    expect(screen.getByText('settings.agentTeamResults')).toBeInTheDocument();
+    expect(screen.getByText('Supervisor finished after reviewer approved all artifacts.')).toBeInTheDocument();
+    expect(screen.getAllByText('Release notes are ready for reviewer handoff.').length).toBeGreaterThan(0);
+    expect(screen.getByText('settings.agentTeamArtifacts')).toBeInTheDocument();
+    expect(screen.getByText('reports/teamrun-summary.md')).toBeInTheDocument();
+    expect(screen.getAllByText('filesystem').length).toBeGreaterThan(0);
+    expect(screen.getByText('settings.agentTeamBudget')).toBeInTheDocument();
+    expect(screen.getByText('1,280 / 4,000')).toBeInTheDocument();
+    expect(screen.getByText('settings.agentTeamBudgetWarnings')).toBeInTheDocument();
+  });
+
+  it('wires Team Builder create, member, and TeamRun actions to Hub mutations', () => {
+    mockAgentTeams.splice(0, mockAgentTeams.length, {
+      id: 'team_scheduler',
+      owner_id: 'user_1',
+      name: 'Builder Review Team',
+      description: 'Supervisor, builder, reviewer',
+      members: [],
+    });
+    mockHubCustomAgents.splice(0, mockHubCustomAgents.length, {
+      id: 'profile_builder',
+      name: 'Builder',
+      agent_type: 'codex',
+      system_prompt: 'Build implementation slices.',
+    });
+
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="agentScheduling" />);
+
+    expect(screen.getByTestId('agent-team-builder')).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('settings.agentTeamNamePlaceholder'), {
+      target: { value: 'Reviewer Squad' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('settings.agentTeamDescriptionPlaceholder'), {
+      target: { value: 'Review implementation and tests.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'settings.agentTeamCreateAction' }));
+    expect(mockCreateAgentTeam).toHaveBeenCalledWith({
+      name: 'Reviewer Squad',
+      description: 'Review implementation and tests.',
+    });
+
+    fireEvent.change(screen.getByDisplayValue('settings.agentTeamSelectProfile'), {
+      target: { value: 'profile_builder' },
+    });
+    fireEvent.change(screen.getByDisplayValue('settings.teamMemberRole.executor'), {
+      target: { value: 'reviewer' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'settings.agentTeamAddMember' }));
+    expect(mockAddAgentTeamMember).toHaveBeenCalledWith({
+      teamId: 'team_scheduler',
+      member: {
+        agent_profile_id: 'profile_builder',
+        role: 'reviewer',
+      },
+    });
+
+    fireEvent.change(screen.getByPlaceholderText('settings.agentTeamRunPromptPlaceholder'), {
+      target: { value: 'Coordinate a Desktop UI review.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'settings.agentTeamStartRunAction' }));
+    expect(mockStartTeamRun).toHaveBeenCalledWith({
+      teamId: 'team_scheduler',
+      run: {
+        trigger_message: 'Coordinate a Desktop UI review.',
+      },
+    });
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   });
 
   it('renders runtime inventory separately from profile composition', () => {
@@ -740,6 +1314,10 @@ describe('SettingsPage tasks', () => {
   it('does not persist controls whose backing API is not wired yet', () => {
     const unavailableSections: Array<[SectionId, string]> = [
       ['skills', 'skillSync'],
+<<<<<<< HEAD
+=======
+      ['remoteControl', 'remoteControl'],
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       ['platforms', 'platformSync'],
       ['securityAudit', 'auditTrail'],
     ];
@@ -783,6 +1361,7 @@ describe('SettingsPage tasks', () => {
       isAuthenticated: false,
     });
 
+<<<<<<< HEAD
     renderSettings('skills');
 
     expect(screen.getByText('settings.status.loginLocked')).toBeInTheDocument();
@@ -795,6 +1374,11 @@ describe('SettingsPage tasks', () => {
     changeSelect('Auto', 'gpt-5.5');
     changeSelect('TokenDance Relay', 'OpenAI');
     changeSelect('High', 'Max');
+=======
+    fireEvent.change(screen.getByDisplayValue('Auto'), { target: { value: 'gpt-5.5' } });
+    fireEvent.change(screen.getByDisplayValue('TokenDance'), { target: { value: 'openai' } });
+    fireEvent.change(screen.getByDisplayValue('High'), { target: { value: 'max' } });
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
     expect(useModelSettingsStore.getState()).toMatchObject({
       defaultModel: 'gpt-5.5',
@@ -810,7 +1394,13 @@ describe('SettingsPage tasks', () => {
     renderSettings('modelMapping');
 
     expect(screen.getByText('opus')).toBeInTheDocument();
+<<<<<<< HEAD
     changeSelect('claude-opus-4-7', 'gpt-5.5');
+=======
+    fireEvent.change(screen.getAllByDisplayValue('deepseek-v4-pro')[0], {
+      target: { value: 'gpt-5.5' },
+    });
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     fireEvent.click(screen.getAllByRole('switch')[1]);
 
     const opus = useModelSettingsStore.getState().aliases.find((item) => item.alias === 'opus');
@@ -848,10 +1438,44 @@ describe('SettingsPage tasks', () => {
     expect(screen.getAllByText('settings.status.interfaceGap').length).toBeGreaterThan(0);
   });
 
+<<<<<<< HEAD
   it('labels security audit with local-source and interface gap states', () => {
     renderSettings('securityAudit');
     expect(screen.getByText('settings.auditTrailSource')).toBeInTheDocument();
     expect(screen.getByText('settings.status.localSource')).toBeInTheDocument();
     expect(screen.getAllByText('settings.status.interfaceGap').length).toBeGreaterThan(0);
+=======
+  it('filters nav items by search query', () => {
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="general" />);
+
+    const searchInput = screen.getByPlaceholderText('settings.searchPlaceholder');
+    fireEvent.change(searchInput, { target: { value: 'appearance' } });
+
+    // Scope nav queries to the sidebar <nav> to avoid matching content headings
+    const nav = screen.getByRole('navigation');
+    expect(within(nav).getByText('settings.appearance')).toBeInTheDocument();
+    expect(within(nav).queryByText('settings.general')).not.toBeInTheDocument();
+  });
+
+  it('shows all nav items when search is empty', () => {
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="general" />);
+
+    const nav = screen.getByRole('navigation');
+    expect(within(nav).getByText('settings.general')).toBeInTheDocument();
+    expect(within(nav).getByText('settings.appearance')).toBeInTheDocument();
+    expect(within(nav).getByText('settings.account')).toBeInTheDocument();
+  });
+
+  it('shows no items when search matches nothing', () => {
+    render(<SettingsPage onBack={vi.fn()} onOpenAuth={vi.fn()} initialSection="general" />);
+
+    const searchInput = screen.getByPlaceholderText('settings.searchPlaceholder');
+    fireEvent.change(searchInput, { target: { value: 'zzzdoesnotexistzzz' } });
+
+    const nav = screen.getByRole('navigation');
+    expect(within(nav).queryByText('settings.general')).not.toBeInTheDocument();
+    expect(within(nav).queryByText('settings.appearance')).not.toBeInTheDocument();
+    expect(within(nav).getByRole('status')).toHaveTextContent('settings.searchEmpty');
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   });
 });

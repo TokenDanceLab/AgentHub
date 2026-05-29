@@ -150,6 +150,7 @@ function readRequestBody(req: IncomingMessage): Promise<string> {
     req.on('error', reject);
   });
 }
+<<<<<<< HEAD
 
 function edgeRunResponse(runId = 'run-1', threadId = 'sess-1') {
   return new Response(
@@ -163,6 +164,8 @@ function edgeRunResponse(runId = 'run-1', threadId = 'sess-1') {
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   );
 }
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 describe('useHubIntegration', () => {
   let hubWS: HubWSHandle;

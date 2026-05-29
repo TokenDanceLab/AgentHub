@@ -274,7 +274,11 @@ describe('PromptInput', () => {
         await Promise.resolve();
       });
 
+<<<<<<< HEAD
       expect(localStorage.getItem('draft_thread-clear')).toBeNull();
+=======
+      expect(localStorage.getItem('ah:draft:thread-clear')).toBeNull();
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     } finally {
       vi.useRealTimers();
     }
@@ -738,6 +742,7 @@ describe('PromptInput', () => {
       undefined,
       { workDir: 'D:\\Code\\TokenDance\\AgentHub' },
     );
+<<<<<<< HEAD
   });
 
   it('persists and reuses recent local workspaces without sending a target id', () => {
@@ -819,6 +824,8 @@ describe('PromptInput', () => {
     fireEvent.click(screen.getByRole('button', { name: 'action.startRun' }));
 
     expect(onSend).toHaveBeenCalledWith('Remote targets should not be selected', undefined, undefined);
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   });
 
   it('lets a manually selected model override the selected agent profile alias', () => {

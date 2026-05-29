@@ -205,6 +205,14 @@ export function useMention({ agents, items, onSelectAgent, onSelectMention }: Us
   const filteredAgents = filteredItems
     .filter((item) => item.kind === 'agent' && item.agent)
     .map((item) => item.agent as AgentInfo);
+<<<<<<< HEAD
+=======
+
+  // Reset selectedIndex when filtered list changes
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query]);
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   const closeMention = useCallback(() => {
     setIsOpen(false);
@@ -222,7 +230,14 @@ export function useMention({ agents, items, onSelectAgent, onSelectMention }: Us
     if (mention) {
       const caretPos = getCaretViewportPosition(ta);
       setQuery(mention.query);
+<<<<<<< HEAD
       setSelectedIndex(0);
+=======
+      setPosition(clampPopoverToViewport({
+        top: caretPos.top - POPOVER_HEIGHT - POPOVER_OFFSET_Y,
+        left: caretPos.left,
+      }));
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       setIsOpen(true);
     } else {
       closeMention();

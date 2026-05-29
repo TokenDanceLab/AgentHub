@@ -42,7 +42,20 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useHubStore } from '@/stores/hubStore';
+<<<<<<< HEAD
 import { APP_VERSION } from '@/config';
+=======
+import { APP_VERSION, HUB_URL } from '@/config';
+import {
+  useAddAgentTeamMember,
+  useCreateAgentTeam,
+  useDecideTeamApproval,
+  useHubAgentTeams,
+  useResolveTeamConflict,
+  useStartTeamRun,
+} from '@/api/agentTeamQueries';
+import type { AgentTeamRunBundle } from '@/api/agentTeamQueries';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import { useAgentList } from '@/api/agentQueries';
 import type { ModelCatalogResponse } from '@/api/modelCatalogQueries';
 import { useHubExecutionTargets, usePingHubExecutionTarget } from '@/api/executionTargetQueries';
@@ -53,19 +66,26 @@ import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
 import { resolveModelDisplayName, type ModelDisplayNameMap } from '@/utils/modelDisplay';
 import { resolveLocalOrchestration } from '@/utils/localOrchestration';
+<<<<<<< HEAD
 import { requestPermission, isPermissionGranted } from '@tauri-apps/plugin-notification';
 import { invoke } from '@tauri-apps/api/core';
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import {
   MAX_CUSTOM_INSTRUCTIONS_CHARS,
   clearCustomInstructions,
   readCustomInstructions,
   writeCustomInstructions,
 } from '@/utils/customInstructions';
+<<<<<<< HEAD
 import { getSelectedWorkspace } from '@/utils/workspaceStore';
 import KeyboardSection from '@/components/settings/sections/KeyboardSection';
 import AgentMarketSection from '@/components/settings/sections/AgentMarketSection';
 import PermissionsSection, { type AllowlistEntry, readAllowlist, mergeAllowlistFromTarget, writeAllowlist } from '@/components/settings/sections/PermissionsSection';
 import DataSection from '@/components/settings/sections/DataSection';
+=======
+import { KEYBOARD_SHORTCUT_GROUPS } from '@/utils/keyboardShortcuts';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import {
   useModelSettingsStore,
   type ResolvedRunModelSettings,
@@ -81,7 +101,10 @@ import type {
   ExecutionTargetType,
   TeamApprovalState,
   TeamArtifactState,
+<<<<<<< HEAD
   TeamAssignmentState,
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   TeamBudget,
   TeamConflictState,
   TeamMemberState,
@@ -161,9 +184,160 @@ interface NavItem {
   group: 'workspace' | 'automation' | 'system';
 }
 
+<<<<<<< HEAD
 const STORAGE_PREFIX = 'agenthub-settings.';
 const DEVICE_ID_KEY = 'agenthub_device_id';
 
+=======
+interface ProjectSkill {
+  id: string;
+  title: string;
+  descriptionKey: string;
+  status: 'ready' | 'review';
+  hasScripts: boolean;
+  hasReferences: boolean;
+}
+
+const STORAGE_PREFIX = 'agenthub-settings.';
+const DEVICE_ID_KEY = 'agenthub_device_id';
+
+const MODEL_OPTIONS = [
+  ['auto', 'Auto'],
+  ['opus[1m]', 'opus[1m]'],
+  ['deepseek-v4-pro', 'deepseek-v4-pro'],
+  ['deepseek-v4-flash', 'deepseek-v4-flash'],
+  ['gpt-5.5', 'gpt-5.5'],
+  ['glm-5.1', 'glm-5.1'],
+] as const;
+
+const PROVIDER_OPTIONS = [
+  ['tokendance-gateway', 'TokenDance'],
+  ['anthropic', 'Anthropic'],
+  ['openai', 'OpenAI'],
+  ['cc-switch-local', 'cc-switch local'],
+] as const;
+
+const REASONING_OPTIONS = [
+  ['low', 'Low'],
+  ['medium', 'Medium'],
+  ['high', 'High'],
+  ['max', 'Max'],
+] as const;
+
+const PROVIDER_HEALTH_OPTIONS = [
+  ['ready', 'Ready'],
+  ['degraded', 'Degraded'],
+  ['disabled', 'Disabled'],
+] as const;
+
+function displayProviderName(value: string | undefined): string | undefined {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  const lower = raw.toLowerCase();
+  if (lower.includes('tokendance') || lower.includes('newapi') || lower.includes('api.vectorcontrol.tech')) {
+    return 'TokenDance';
+  }
+  return raw.replace(/\s+gateway\b/ig, '').trim() || raw;
+}
+
+function modelCatalogOptions(
+  catalog?: ModelCatalogResponse,
+  includeAuto = true,
+  modelDisplayNames?: ModelDisplayNameMap,
+): Array<[SettingsSelectValue, string]> {
+  const options: Array<[SettingsSelectValue, string]> = includeAuto ? [['auto', 'Auto']] : [];
+  const seen = new Set(options.map(([value]) => String(value)));
+  for (const item of catalog?.items ?? []) {
+    if (item.status === 'unavailable') continue;
+    const value = item.value;
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    const label = resolveModelDisplayName(item.label || item.resolvedModel || item.value, modelDisplayNames);
+    const resolvedLabel = resolveModelDisplayName(item.resolvedModel, modelDisplayNames);
+    const detail = resolvedLabel && item.resolvedModel !== item.value && resolvedLabel !== label ? ` -> ${resolvedLabel}` : '';
+    const source = item.sourceLabel ? ` (${item.sourceLabel})` : '';
+    options.push([value, `${label}${detail}${source}`]);
+  }
+  for (const [value, label] of MODEL_OPTIONS) {
+    if (!includeAuto && value === 'auto') continue;
+    if (seen.has(value)) continue;
+    seen.add(value);
+    options.push([value, resolveModelDisplayName(label, modelDisplayNames) || label]);
+  }
+  return options;
+}
+
+function providerCatalogOptions(catalog?: ModelCatalogResponse): Array<[SettingsSelectValue, string]> {
+  const options: Array<[SettingsSelectValue, string]> = PROVIDER_OPTIONS.map(([value, label]) => [value, label]);
+  const seen = new Set(options.map(([value]) => String(value)));
+  for (const source of catalog?.sources ?? []) {
+    if (source.status === 'unavailable' || seen.has(source.id)) continue;
+    seen.add(source.id);
+    options.push([source.id, displayProviderName(source.label) ?? source.label]);
+  }
+  return options;
+}
+
+const PROJECT_SKILLS: ProjectSkill[] = [
+  {
+    id: 'adapter-dev',
+    title: 'adapter-dev',
+    descriptionKey: 'settings.skill.adapterDevDesc',
+    status: 'ready',
+    hasScripts: false,
+    hasReferences: false,
+  },
+  {
+    id: 'dev-loop',
+    title: 'dev-loop',
+    descriptionKey: 'settings.skill.devLoopDesc',
+    status: 'ready',
+    hasScripts: false,
+    hasReferences: true,
+  },
+  {
+    id: 'env-sandbox',
+    title: 'env-sandbox',
+    descriptionKey: 'settings.skill.envSandboxDesc',
+    status: 'ready',
+    hasScripts: false,
+    hasReferences: false,
+  },
+  {
+    id: 'integration-test',
+    title: 'integration-test',
+    descriptionKey: 'settings.skill.integrationTestDesc',
+    status: 'ready',
+    hasScripts: false,
+    hasReferences: false,
+  },
+  {
+    id: 'pre-push',
+    title: 'pre-push',
+    descriptionKey: 'settings.skill.prePushDesc',
+    status: 'review',
+    hasScripts: false,
+    hasReferences: false,
+  },
+  {
+    id: 'test-coverage',
+    title: 'test-coverage',
+    descriptionKey: 'settings.skill.testCoverageDesc',
+    status: 'ready',
+    hasScripts: false,
+    hasReferences: false,
+  },
+  {
+    id: 'ui-screenshot',
+    title: 'ui-screenshot',
+    descriptionKey: 'settings.skill.uiScreenshotDesc',
+    status: 'ready',
+    hasScripts: true,
+    hasReferences: false,
+  },
+];
+
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function readStoredBoolean(key: string, fallback: boolean) {
   try {
     const stored = localStorage.getItem(`${STORAGE_PREFIX}${key}`);
@@ -284,7 +458,15 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [active, setActive] = useState<SectionId>(initialSection);
   const [navSearch, setNavSearch] = useState('');
   const navSearchRef = useRef<HTMLInputElement>(null);
+<<<<<<< HEAD
   const mainRef = useRef<HTMLDivElement>(null);
+=======
+  const [teamDraftName, setTeamDraftName] = useState('');
+  const [teamDraftDescription, setTeamDraftDescription] = useState('');
+  const [teamMemberProfileId, setTeamMemberProfileId] = useState('');
+  const [teamMemberRole, setTeamMemberRole] = useState('executor');
+  const [teamRunPrompt, setTeamRunPrompt] = useState('');
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   // Keyboard shortcut: `/` focuses the search input
   const handleSettingsKeyDown = useCallback((e: KeyboardEvent) => {
@@ -413,8 +595,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   }, []);
   const [detailLevel, setDetailLevel] = useStoredValueState<SelectValue>('detailLevel', 'detailed');
   const [approvalMode, setApprovalMode] = useStoredValueState<SelectValue>('approvalMode', 'ask');
+<<<<<<< HEAD
   const [defaultAgent, setDefaultAgent] = useStoredValueState<string>('defaultAgent', 'auto');
   const [routing, setRouting] = useStoredValueState<string>('routing', 'auto');
+=======
+  const [customInstructions, setCustomInstructions] = useState(() => readCustomInstructions());
+  const [customInstructionsDraft, setCustomInstructionsDraft] = useState(() => readCustomInstructions());
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const defaultModel = useModelSettingsStore((s) => s.defaultModel);
   const defaultProvider = useModelSettingsStore((s) => s.defaultProvider);
   const modelReasoningEffort = useModelSettingsStore((s) => s.reasoningEffort);
@@ -437,6 +624,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const setCredentialTestResult = useModelSettingsStore((s) => s.setCredentialTestResult);
   const resetModelSettings = useModelSettingsStore((s) => s.reset);
   const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
+<<<<<<< HEAD
   const agents = useMemo(() => agentData?.items ?? [], [agentData?.items]);
   const localAgentProfiles = agents.map((agent) => ({
     agent,
@@ -451,6 +639,53 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     return opts;
   }, [agents, t]);
 
+=======
+  const customInstructionsDirty = customInstructionsDraft.trim() !== customInstructions;
+  const customInstructionsRemaining = Math.max(0, MAX_CUSTOM_INSTRUCTIONS_CHARS - customInstructionsDraft.length);
+
+  const handleSaveCustomInstructions = useCallback(() => {
+    const saved = writeCustomInstructions(customInstructionsDraft);
+    setCustomInstructions(saved);
+    setCustomInstructionsDraft(saved);
+  }, [customInstructionsDraft]);
+
+  const handleClearCustomInstructions = useCallback(() => {
+    clearCustomInstructions();
+    setCustomInstructions('');
+    setCustomInstructionsDraft('');
+  }, []);
+
+  const agents = agentData?.items ?? [];
+  const modelSelectOptions = useMemo(
+    () => modelCatalogOptions(modelCatalog, true, modelDisplayNames),
+    [modelCatalog, modelDisplayNames],
+  );
+  const aliasModelSelectOptions = useMemo(
+    () => modelCatalogOptions(modelCatalog, false, modelDisplayNames),
+    [modelCatalog, modelDisplayNames],
+  );
+  const providerSelectOptions = useMemo(
+    () => providerCatalogOptions(modelCatalog),
+    [modelCatalog],
+  );
+  const localAgentProfiles = useMemo(
+    () => agents.map((agent) => ({
+      agent,
+      alias: preferredProfileAlias(agent),
+      route: resolveRunRequestOptions({ model: preferredProfileAlias(agent) }),
+    })),
+    [
+      agents,
+      defaultModel,
+      defaultProvider,
+      modelAliases,
+      modelMappingEnabled,
+      modelReasoningEffort,
+      providerFallbackEnabled,
+      resolveRunRequestOptions,
+    ],
+  );
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const availableRuntimes = agents.filter((agent) => agent.status === 'available').length;
   const runnerHealth = health?.checks?.runners;
   const runnerItems = runnerHealth?.items ?? [];
@@ -528,7 +763,10 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const teamRunState = agentTeamOverview?.state;
   const teamRunTasks = normalizeTeamTasks(teamRunState, agentTeamOverview?.tasks ?? []);
   const teamRunMembers = teamRunState?.members ?? [];
+<<<<<<< HEAD
   const teamRunAssignments = teamRunState?.assignments ?? [];
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const teamRunApprovals = teamRunState?.approvals ?? [];
   const teamRunConflicts = teamRunState?.conflicts ?? [];
   const pendingTeamApprovals = teamRunApprovals.filter(isPendingTeamApproval);
@@ -557,7 +795,19 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     false,
   ].filter(Boolean).length;
   const schedulerLocalMetric = totalRunners > 0 ? runnerSummary : edgeOnline ? t('settings.edgeOnline') : t('settings.edgeOffline');
+<<<<<<< HEAD
   const hubSessionActive = hubAuthenticated || hubAuth.isAuthenticated;
+=======
+  const marketPublishReady = agents.filter((agent) => agent.status === 'available').length;
+  const marketCapabilityCount = countAgentCapabilities(agents);
+  const skillScriptCount = PROJECT_SKILLS.filter((skill) => skill.hasScripts).length;
+  const skillReferenceCount = PROJECT_SKILLS.filter((skill) => skill.hasReferences).length;
+  const skillReadyCount = PROJECT_SKILLS.filter((skill) => skill.status === 'ready').length;
+  const mcpCapableAgents = agents.filter((agent) => agent.capabilities.mcpIntegration).length;
+  const mcpPermissionHookAgents = agents.filter((agent) => agent.capabilities.permissionHooks).length;
+  const mcpSubAgentAgents = agents.filter((agent) => agent.capabilities.subAgentSpawn).length;
+  const mcpAvailable = edgeOnline && mcpCapableAgents > 0;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const accountName = hubAuth.user?.username ?? username ?? t('settings.signedIn');
   const tokenSource = hubAuth.tokenSource;
   const tokenSourceLabel =
@@ -642,6 +892,53 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const handleRefreshRuns = () => {
     void refetchRuns();
   };
+<<<<<<< HEAD
+=======
+  const handleCancelRun = (runId: string) => {
+    void cancelRunMutation.mutateAsync(runId);
+  };
+  const handleCreateAgentTeam = () => {
+    const name = teamDraftName.trim();
+    if (!name) return;
+    void Promise.resolve(createAgentTeamMutation.mutateAsync({
+      name,
+      description: teamDraftDescription.trim(),
+    })).then(() => {
+      setTeamDraftName('');
+      setTeamDraftDescription('');
+    });
+  };
+  const handleAddAgentTeamMember = () => {
+    const teamId = agentTeamOverview?.selectedTeam?.id;
+    if (!teamId || !teamMemberProfileId) return;
+    void addAgentTeamMemberMutation.mutateAsync({
+      teamId,
+      member: {
+        agent_profile_id: teamMemberProfileId,
+        role: teamMemberRole,
+      },
+    });
+  };
+  const handleStartTeamRun = () => {
+    const teamId = agentTeamOverview?.selectedTeam?.id;
+    const trigger = teamRunPrompt.trim();
+    if (!teamId || !trigger) return;
+    void Promise.resolve(startTeamRunMutation.mutateAsync({
+      teamId,
+      run: { trigger_message: trigger },
+    })).then(() => {
+      setTeamRunPrompt('');
+    });
+  };
+  const handleSelectAgentTeam = (team: AgentTeamDetail) => {
+    setSelectedAgentTeamId(team.id);
+    setSelectedTeamRunId('');
+  };
+  const handleSelectTeamRun = (teamId: string, run: AgentTeamRun) => {
+    setSelectedAgentTeamId(teamId);
+    setSelectedTeamRunId(run.id);
+  };
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const schedulerPolicyReadyCount = [
     modelMappingEnabled,
     ccSwitchBridge,
@@ -697,6 +994,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const hasNavResults = filteredNavItems.length > 0;
 
   const activeLabel = navItems.find((item) => item.id === active)?.label ?? t('settings.title');
+<<<<<<< HEAD
   const ACTION_LABELS: Record<BindingId, string> = {
     send: t('shortcut.send'),
     newline: t('shortcut.newline'),
@@ -707,6 +1005,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     help: t('shortcut.help'),
   };
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const setBooleanSetting = (key: string, setter: (value: boolean) => void) => (value: boolean) => {
     setter(value);
     writeStoredValue(key, value);
@@ -1233,6 +1533,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'tasks' && (
+<<<<<<< HEAD
             <TasksSection
               runs={runs}
               activeRuns={activeRuns}
@@ -1248,6 +1549,108 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               onOpenAuth={onOpenAuth}
               latestRun={latestRun}
             />
+=======
+            <Panel title={t('settings.tasks')} description={t('settings.tasksDesc')}>
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<Route size={18} />}
+                  label={t('settings.taskLocalRuns')}
+                  value={`${activeRuns}/${runs.length}`}
+                  detail={runsLoading ? t('settings.loading') : t('settings.taskLocalRunsDesc')}
+                />
+                <SummaryCard
+                  icon={<ClipboardList size={18} />}
+                  label={t('settings.taskHubBridge')}
+                  value={`${activeHubTasks}/${bridgedTasks.length}`}
+                  detail={hubAuthenticated ? t('settings.taskHubBridgeDesc') : t('settings.taskHubBridgeSignedOut')}
+                />
+                <SummaryCard
+                  icon={<Monitor size={18} />}
+                  label={t('settings.taskLastRun')}
+                  value={latestRun ? t(`run.status.${latestRun.status}`, { defaultValue: latestRun.status }) : t('settings.noData')}
+                  detail={latestRun ? formatTimestamp(latestRun.finishedAt ?? latestRun.startedAt ?? latestRun.createdAt) : t('settings.taskLastRunDesc')}
+                />
+                <SummaryCard
+                  icon={<ShieldCheck size={18} />}
+                  label={t('settings.taskApprovalQueue')}
+                  value={t('settings.statusPlanned')}
+                  detail={t('settings.taskApprovalQueueDesc')}
+                />
+              </div>
+              <SettingRow
+                title={t('settings.taskSync')}
+                description={t('settings.taskSyncDesc')}
+                control={
+                  <SwitchControl
+                    checked={taskSyncAvailable && taskSync}
+                    onChange={setBooleanSetting('taskSync', setTaskSync)}
+                    disabled={!taskSyncAvailable}
+                    title={!taskSyncAvailable ? t('settings.requiresHubSignIn') : undefined}
+                    status={!taskSyncAvailable ? t('settings.notConfigured') : undefined}
+                  />
+                }
+              />
+              <SettingRow
+                title={t('settings.taskInbox')}
+                description={t('settings.taskInboxDesc')}
+                value={runsError ? t('settings.edgeOffline') : t('settings.statusInProgress')}
+              />
+              <SettingRow title={t('settings.taskRunBinding')} description={t('settings.taskRunBindingDesc')} value={t('settings.statusInProgress')} />
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <div className={styles.taskSectionTitleRow}>
+                    <div>
+                      <strong>{t('settings.taskRecentRuns')}</strong>
+                      <span>{runsFetching ? t('settings.taskRefreshingRuns') : t('settings.taskRecentRunsDesc')}</span>
+                    </div>
+                    <div className={styles.taskSectionActions}>
+                      <span className={`${styles.statusPill} ${runsError ? '' : styles.statusPillOn}`}>
+                        {runsError ? t('settings.edgeOffline') : t('settings.taskRunLive')}
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.secondaryBtn}
+                        onClick={handleRefreshRuns}
+                        disabled={runsFetching}
+                      >
+                        <RefreshCw size={15} />
+                        {runsFetching ? t('settings.taskRefreshingRuns') : t('settings.taskRefreshRuns')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {recentRuns.length > 0 ? (
+                  <div className={styles.taskList}>
+                    {recentRuns.map((run) => (
+                      <TaskRunRow
+                        key={run.runId}
+                        run={run}
+                        onCancel={isActiveRun(run) ? handleCancelRun : undefined}
+                        cancelling={cancelRunMutation.isPending && cancelRunMutation.variables === run.runId}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.taskNoRuns')} description={t('settings.taskNoRunsDesc')} />
+                )}
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.taskBridgeQueue')}</strong>
+                  <span>{t('settings.taskBridgeQueueDesc')}</span>
+                </div>
+                {recentBridgeTasks.length > 0 ? (
+                  <div className={styles.taskList}>
+                    {recentBridgeTasks.map((task) => (
+                      <HubTaskRow key={task.taskId} task={task} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.taskNoHubTasks')} description={t('settings.taskNoHubTasksDesc')} />
+                )}
+              </div>
+            </Panel>
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'onlineIm' && (
@@ -1273,6 +1676,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'groupChat' && (
+<<<<<<< HEAD
             <GroupChatSection
               hubSessionActive={hubSessionActive}
               isLoading={imIsLoading}
@@ -1286,6 +1690,26 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               setGroupChatEnabled={setGroupChatEnabled}
               onOpenAuth={onOpenAuth}
             />
+=======
+            <Panel title={t('settings.groupChat')} description={t('settings.groupChatDesc')}>
+              <SettingRow
+                title={t('settings.enableGroupChat')}
+                description={t('settings.enableGroupChatDesc')}
+                control={
+                  <SwitchControl
+                    checked={groupChatAvailable && groupChatEnabled}
+                    onChange={setBooleanSetting('groupChat', setGroupChatEnabled)}
+                    disabled={!groupChatAvailable}
+                    title={!groupChatAvailable ? t('settings.requiresHubSignIn') : undefined}
+                    status={!groupChatAvailable ? t('settings.notConfigured') : undefined}
+                  />
+                }
+              />
+              <SettingRow title={t('settings.groupChatAgents')} description={t('settings.groupChatAgentsDesc')} value={t('settings.statusReady')} />
+              <SettingRow title={t('settings.groupChatRooms')} description={t('settings.groupChatRoomsDesc')} value={t('settings.statusPlanned')} />
+              <SettingRow title={t('settings.groupChatModeration')} description={t('settings.groupChatModerationDesc')} value={t('settings.statusPlanned')} />
+            </Panel>
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'agentScheduling' && (
@@ -1425,7 +1849,10 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     state={teamRunState}
                     tasks={teamRunTasks}
                     members={teamRunMembers}
+<<<<<<< HEAD
                     assignments={teamRunAssignments}
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
                     approvals={teamRunApprovals}
                     conflicts={teamRunConflicts}
                     events={teamRunEvents}
@@ -1576,6 +2003,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           {active === 'keyboard' && (
             <Panel title={t('settings.keyboard')} description={t('settings.keyboardDesc')}>
               <div className={styles.shortcutTable}>
+<<<<<<< HEAD
                 {BINDING_IDS.map((id) => {
                   const keys = getBinding(id);
                   const isRecording = recordingBinding === id;
@@ -1600,6 +2028,23 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     </div>
                   );
                 })}
+=======
+                {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
+                  <div key={group.id} className={styles.shortcutGroup}>
+                    <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
+                    {group.shortcuts.map((shortcut) => (
+                      <div key={shortcut.id} className={styles.shortcutRow}>
+                        <span>{t(shortcut.labelKey)}</span>
+                        <div>
+                          {shortcut.keys.map((key) => (
+                            <kbd key={key}>{key}</kbd>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
               </div>
               <button
                 type="button"
@@ -1612,6 +2057,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'mcp' && (
+<<<<<<< HEAD
             <McpSection
               agents={agents}
               edgeOnline={edgeOnline}
@@ -1623,6 +2069,177 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'skills' && (
             <SkillsSection hubSessionActive={hubSessionActive} />
+=======
+            <Panel title={t('settings.mcp')} description={t('settings.mcpDesc')}>
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<Plug size={18} />}
+                  label={t('settings.mcpRuntimeSupport')}
+                  value={`${mcpCapableAgents}/${agents.length}`}
+                  detail={edgeOnline ? t('settings.mcpRuntimeSupportDesc') : t('settings.edgeOffline')}
+                />
+                <SummaryCard
+                  icon={<ShieldCheck size={18} />}
+                  label={t('settings.mcpPermissionHooks')}
+                  value={`${mcpPermissionHookAgents}`}
+                  detail={t('settings.mcpPermissionHooksDesc')}
+                />
+                <SummaryCard
+                  icon={<Bot size={18} />}
+                  label={t('settings.mcpSubAgentSpawn')}
+                  value={`${mcpSubAgentAgents}`}
+                  detail={t('settings.mcpSubAgentSpawnDesc')}
+                />
+                <SummaryCard
+                  icon={<Globe2 size={18} />}
+                  label={t('settings.mcpHubSync')}
+                  value={hubSessionActive && mcpAvailable && enableMcp ? t('settings.enabled') : t('settings.notConfigured')}
+                  detail={hubAuthenticated ? t('settings.mcpHubSyncDesc') : t('settings.mcpHubSyncSignedOut')}
+                />
+              </div>
+              <SettingRow
+                title={t('settings.enableMcp')}
+                description={t('settings.enableMcpDesc')}
+                control={
+                  <SwitchControl
+                    checked={mcpAvailable && enableMcp}
+                    onChange={setBooleanSetting('enableMcp', setEnableMcp)}
+                    disabled={!mcpAvailable}
+                    title={!edgeOnline ? t('settings.requiresEdgeOnline') : t('settings.requiresMcpRuntime')}
+                    status={!mcpAvailable ? t('settings.notConfigured') : undefined}
+                  />
+                }
+              />
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.mcpRuntimeMatrix')}</strong>
+                  <span>{t('settings.mcpRuntimeMatrixDesc')}</span>
+                </div>
+                {agents.length > 0 ? (
+                  <div className={styles.profileGrid}>
+                    {agents.map((agent) => (
+                      <McpRuntimeCard key={`mcp-${agent.id}`} agent={agent} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.mcpNoRuntimes')} description={t('settings.mcpNoRuntimesDesc')} />
+                )}
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.mcpTemplates')}</strong>
+                  <span>{t('settings.mcpTemplatesDesc')}</span>
+                </div>
+                <div className={styles.capabilityGrid}>
+                  <CapabilityCard
+                    title="Filesystem"
+                    description={t('settings.mcpFilesystem')}
+                    status={t('settings.mcpTemplate')}
+                  />
+                  <CapabilityCard
+                    title="GitHub"
+                    description={t('settings.mcpGitHub')}
+                    status={t('settings.notConfigured')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.mcpTokenDanceHub')}
+                    description={t('settings.mcpTokenDanceHubDesc')}
+                    status={hubAuthenticated ? t('settings.statusInProgress') : t('settings.notConfigured')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.mcpRemoteServer')}
+                    description={t('settings.mcpRemoteServerDesc')}
+                    status={t('settings.statusPlanned')}
+                  />
+                </div>
+              </div>
+              <Callout title={t('settings.mcpGuard')} body={t('settings.mcpGuardDesc')} />
+            </Panel>
+          )}
+
+          {active === 'skills' && (
+            <Panel title={t('settings.skills')} description={t('settings.skillsDesc')}>
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<Code2 size={18} />}
+                  label={t('settings.skillProjectRegistry')}
+                  value={`${PROJECT_SKILLS.length}`}
+                  detail={t('settings.skillProjectRegistryDesc')}
+                />
+                <SummaryCard
+                  icon={<ShieldCheck size={18} />}
+                  label={t('settings.skillReviewReady')}
+                  value={`${skillReadyCount}/${PROJECT_SKILLS.length}`}
+                  detail={t('settings.skillReviewReadyDesc')}
+                />
+                <SummaryCard
+                  icon={<TerminalSquare size={18} />}
+                  label={t('settings.skillScripts')}
+                  value={`${skillScriptCount}`}
+                  detail={t('settings.skillScriptsDesc')}
+                />
+                <SummaryCard
+                  icon={<Globe2 size={18} />}
+                  label={t('settings.skillHubSync')}
+                  value={hubSessionActive && skillSyncAvailable && skillSync ? t('settings.enabled') : t('settings.notConfigured')}
+                  detail={hubAuthenticated ? t('settings.skillHubSyncDesc') : t('settings.skillHubSyncSignedOut')}
+                />
+              </div>
+              <SettingRow
+                title={t('settings.skillSync')}
+                description={t('settings.skillSyncDesc')}
+                control={
+                  <SwitchControl
+                    checked={skillSyncAvailable && skillSync}
+                    onChange={setBooleanSetting('skillSync', setSkillSync)}
+                    disabled={!skillSyncAvailable}
+                    title={t('settings.requiresSkillSyncApi')}
+                    status={t('settings.notConfigured')}
+                  />
+                }
+              />
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.skillInstalled')}</strong>
+                  <span>{t('settings.skillInstalledDesc')}</span>
+                </div>
+                <div className={styles.profileGrid}>
+                  {PROJECT_SKILLS.map((skill) => (
+                    <ProjectSkillCard key={skill.id} skill={skill} />
+                  ))}
+                </div>
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.skillGovernance')}</strong>
+                  <span>{t('settings.skillGovernanceDesc')}</span>
+                </div>
+                <div className={styles.capabilityGrid}>
+                  <CapabilityCard
+                    title={t('settings.skillLocalRegistry')}
+                    description={t('settings.skillLocalRegistryDesc')}
+                    status=".agents/skills"
+                  />
+                  <CapabilityCard
+                    title={t('settings.skillReview')}
+                    description={t('settings.skillReviewDesc')}
+                    status={`${skillReadyCount}/${PROJECT_SKILLS.length}`}
+                  />
+                  <CapabilityCard
+                    title={t('settings.skillScriptAudit')}
+                    description={t('settings.skillScriptAuditDesc')}
+                    status={`${skillScriptCount}`}
+                  />
+                  <CapabilityCard
+                    title={t('settings.skillReferences')}
+                    description={t('settings.skillReferencesDesc')}
+                    status={`${skillReferenceCount}`}
+                  />
+                </div>
+              </div>
+              <Callout title={t('settings.skillGuard')} body={t('settings.skillGuardDesc')} />
+            </Panel>
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'hooks' && (
@@ -1638,6 +2255,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'models' && (
+<<<<<<< HEAD
             <ModelsSection
               defaultModel={defaultModel}
               defaultProvider={defaultProvider}
@@ -1658,6 +2276,84 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               toggleModelAlias={toggleModelAlias}
               updateModelAlias={updateModelAlias}
             />
+=======
+            <Panel title={t('settings.models')} description={t('settings.modelsDesc')}>
+              <SettingRow
+                title={t('settings.modelDefault')}
+                description={t('settings.modelDefaultDesc')}
+                control={
+                  <SelectControl
+                    value={defaultModel}
+                    options={modelSelectOptions}
+                    onChange={setDefaultModel}
+                  />
+                }
+              />
+              <SettingRow
+                title={t('settings.modelDefaultProvider')}
+                description={t('settings.modelDefaultProviderDesc')}
+                control={
+                  <SelectControl
+                    value={defaultProvider}
+                    options={providerSelectOptions}
+                    onChange={setDefaultProvider}
+                  />
+                }
+              />
+              <SettingRow
+                title={t('settings.modelReasoning')}
+                description={t('settings.modelReasoningDesc')}
+                control={
+                  <SelectControl
+                    value={modelReasoningEffort}
+                    options={REASONING_OPTIONS.map(([value, label]) => [value, label])}
+                    onChange={(value) => setModelReasoningEffort(value as ReasoningEffortPreference)}
+                  />
+                }
+              />
+              <SettingRow
+                title={t('settings.modelProviderFallback')}
+                description={t('settings.modelProviderFallbackDesc')}
+                control={<Switch checked={providerFallbackEnabled} onChange={setProviderFallbackEnabled} />}
+              />
+              <Callout title={t('settings.modelLocalGuard')} body={t('settings.modelLocalGuardDesc')} />
+            </Panel>
+          )}
+
+          {active === 'modelMapping' && (
+            <Panel title={t('settings.modelMapping')} description={t('settings.modelMappingDesc')}>
+              <SettingRow
+                title={t('settings.enableModelMapping')}
+                description={t('settings.enableModelMappingDesc')}
+                control={<Switch checked={modelMappingEnabled} onChange={setModelMappingEnabled} />}
+              />
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.modelAlias')}</strong>
+                  <span>{t('settings.modelAliasDesc')}</span>
+                </div>
+                <div className={styles.modelAliasList}>
+                  {modelAliases.map((item) => (
+                    <AliasMappingRow
+                      key={item.alias}
+                      alias={item.alias}
+                      model={item.model}
+                      provider={item.provider}
+                      reasoningEffort={item.reasoningEffort}
+                      enabled={item.enabled}
+                      modelOptions={aliasModelSelectOptions}
+                      providerOptions={providerSelectOptions}
+                      onToggle={() => toggleModelAlias(item.alias)}
+                      onModelChange={(model) => updateModelAlias(item.alias, { model })}
+                      onProviderChange={(provider) => updateModelAlias(item.alias, { provider })}
+                      onReasoningChange={(reasoningEffort) => updateModelAlias(item.alias, { reasoningEffort })}
+                    />
+                  ))}
+                </div>
+              </div>
+              <Callout title={t('settings.modelPolicy')} body={t('settings.modelPolicyDesc')} />
+            </Panel>
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'ccSwitch' && (
@@ -1698,7 +2394,27 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'remoteControl' && (
+<<<<<<< HEAD
             <RemoteControlSection hubSessionActive={hubSessionActive} />
+=======
+            <Panel title={t('settings.remoteControl')} description={t('settings.remoteControlDesc')}>
+              <SettingRow
+                title={t('settings.remoteControlEnable')}
+                description={t('settings.remoteControlEnableDesc')}
+                control={
+                  <SwitchControl
+                    checked={remoteControlAvailable && remoteControlEnabled}
+                    onChange={setBooleanSetting('remoteControl', setRemoteControlEnabled)}
+                    disabled={!remoteControlAvailable}
+                    title={t('settings.requiresRemoteControlApi')}
+                    status={t('settings.statusPlanned')}
+                  />
+                }
+              />
+              <SettingRow title={t('settings.remoteControlApproval')} description={t('settings.remoteControlApprovalDesc')} value={t('settings.approvalMode.ask')} />
+              <SettingRow title={t('settings.remoteControlDevices')} description={t('settings.remoteControlDevicesDesc')} value={t('settings.statusPlanned')} />
+            </Panel>
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'git' && (
@@ -1726,7 +2442,31 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'platforms' && (
+<<<<<<< HEAD
             <PlatformsSection hubSessionActive={hubSessionActive} />
+=======
+            <Panel title={t('settings.platforms')} description={t('settings.platformsDesc')}>
+              <SettingRow
+                title={t('settings.platformSync')}
+                description={t('settings.platformSyncDesc')}
+                control={
+                  <SwitchControl
+                    checked={platformSyncAvailable && platformSync}
+                    onChange={setBooleanSetting('platformSync', setPlatformSync)}
+                    disabled={!platformSyncAvailable}
+                    title={t('settings.requiresPlatformSyncApi')}
+                    status={t('settings.statusPlanned')}
+                  />
+                }
+              />
+              <div className={styles.capabilityGrid}>
+                <CapabilityCard title="macOS" description={t('settings.platformMacosDesc')} status={t('settings.statusReady')} />
+                <CapabilityCard title="Windows" description={t('settings.platformWindowsDesc')} status={t('settings.statusReady')} />
+                <CapabilityCard title="Android" description={t('settings.platformAndroidDesc')} status={t('settings.statusPlanned')} />
+                <CapabilityCard title="Web" description={t('settings.platformWebDesc')} status={t('settings.statusPlanned')} />
+              </div>
+            </Panel>
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'account' && (
@@ -1747,10 +2487,31 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'securityAudit' && (
+<<<<<<< HEAD
             <SecurityAuditSection
               auditTrail={auditTrail}
               setAuditTrail={setAuditTrail}
             />
+=======
+            <Panel title={t('settings.securityAudit')} description={t('settings.securityAuditDesc')}>
+              <SettingRow
+                title={t('settings.auditTrail')}
+                description={t('settings.auditTrailDesc')}
+                control={
+                  <SwitchControl
+                    checked={auditTrailAvailable && auditTrail}
+                    onChange={setBooleanSetting('auditTrail', setAuditTrail)}
+                    disabled={!auditTrailAvailable}
+                    title={t('settings.requiresAuditStore')}
+                    status={t('settings.statusPlanned')}
+                  />
+                }
+              />
+              <SettingRow title={t('settings.permissionLedger')} description={t('settings.permissionLedgerDesc')} value={t('settings.statusPlanned')} />
+              <SettingRow title={t('settings.secretScan')} description={t('settings.secretScanDesc')} value={t('settings.statusPlanned')} />
+              <Callout title={t('settings.securityGuard')} body={t('settings.securityGuardDesc')} />
+            </Panel>
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'data' && <DataSection t={t} addToast={addToast} resetModelSettings={resetModelSettings} />}
@@ -1849,10 +2610,13 @@ function previewText(value?: string, max = 110) {
   return normalized.length > max ? `${normalized.slice(0, max - 1)}...` : normalized;
 }
 
+<<<<<<< HEAD
 function pathBasename(value: string) {
   return value.split(/[\\/]+/).filter(Boolean).pop() ?? value;
 }
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function Panel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
     <section className={styles.panel}>
@@ -2079,7 +2843,10 @@ function AgentTeamConsole({
   state,
   tasks,
   members,
+<<<<<<< HEAD
   assignments,
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   approvals,
   conflicts,
   events,
@@ -2102,7 +2869,10 @@ function AgentTeamConsole({
   state?: TeamRunState;
   tasks: TeamTaskState[];
   members: TeamMemberState[];
+<<<<<<< HEAD
   assignments: TeamAssignmentState[];
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   approvals: TeamApprovalState[];
   conflicts: TeamConflictState[];
   events: TeamRunEventState[];
@@ -2125,6 +2895,7 @@ function AgentTeamConsole({
   const completedTasks = tasks.filter((task) => task.status === 'done').length;
   const status = state?.status ?? selectedRun?.status ?? 'unknown';
   const resultRows = buildTeamResultRows(tasks, events, terminalReason);
+<<<<<<< HEAD
   const communicationGraph = buildTeamCommunicationGraph({
     members,
     tasks,
@@ -2134,6 +2905,8 @@ function AgentTeamConsole({
     artifacts,
     conflicts,
   });
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const runTitle = selectedRun?.trigger_message
     ? previewText(selectedRun.trigger_message, 86)
     : t('settings.agentTeamNoRunSelected');
@@ -2167,8 +2940,11 @@ function AgentTeamConsole({
         <TeamMetric label={t('settings.agentTeamRoutes')} value={`${routeLog.length}`} />
       </div>
 
+<<<<<<< HEAD
       <TeamCommunicationGraph graph={communicationGraph} />
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       <div className={styles.teamConsoleGrid}>
         <section className={styles.teamSurface}>
           <div className={styles.teamBlockHeader}>
@@ -2362,6 +3138,7 @@ function TeamMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
+<<<<<<< HEAD
 type TeamGraphNodeKind = 'coordinator' | 'member' | 'task' | 'runtime' | 'artifact' | 'conflict';
 type TeamGraphEdgeKind = 'assignment' | 'route' | 'task' | 'runtime' | 'artifact' | 'conflict';
 
@@ -2743,6 +3520,8 @@ function tFallbackRole(role: string) {
   return role || 'member';
 }
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function TeamTemplateRow({
   team,
   selected,
@@ -2995,7 +3774,11 @@ function TeamBudgetBlock({ budget }: { budget?: TeamBudget }) {
 
 function formatTeamNumber(value?: number) {
   return typeof value === 'number' && Number.isFinite(value)
+<<<<<<< HEAD
     ? new Intl.NumberFormat(i18n.resolvedLanguage?.startsWith('zh') ? 'zh-CN' : 'en-US').format(value)
+=======
+    ? new Intl.NumberFormat('en-US').format(value)
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     : '--';
 }
 
@@ -3287,6 +4070,131 @@ function SummaryCard({ icon, label, value, detail }: { icon: ReactNode; label: s
   );
 }
 
+<<<<<<< HEAD
+=======
+function AliasMappingRow({
+  alias,
+  model,
+  provider,
+  reasoningEffort,
+  enabled,
+  onToggle,
+  onModelChange,
+  onProviderChange,
+  onReasoningChange,
+  modelOptions,
+  providerOptions,
+}: {
+  alias: string;
+  model: string;
+  provider: string;
+  reasoningEffort: ReasoningEffortPreference;
+  enabled: boolean;
+  modelOptions: Array<[SettingsSelectValue, string]>;
+  providerOptions: Array<[SettingsSelectValue, string]>;
+  onToggle: () => void;
+  onModelChange: (model: string) => void;
+  onProviderChange: (provider: string) => void;
+  onReasoningChange: (reasoningEffort: ReasoningEffortPreference) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.modelAliasRow}>
+      <div className={styles.modelAliasHead}>
+        <div>
+          <strong>{alias}</strong>
+          <span>{t('settings.modelAliasRoute', { model, provider })}</span>
+        </div>
+        <Switch checked={enabled} onChange={onToggle} />
+      </div>
+      <div className={styles.modelAliasControls}>
+        <label>
+          <span>{t('settings.modelAliasModel')}</span>
+          <SelectControl
+            value={model}
+            options={modelOptions}
+            onChange={onModelChange}
+          />
+        </label>
+        <label>
+          <span>{t('settings.modelAliasProvider')}</span>
+          <SelectControl
+            value={provider}
+            options={providerOptions}
+            onChange={onProviderChange}
+          />
+        </label>
+        <label>
+          <span>{t('settings.modelAliasReasoning')}</span>
+          <SelectControl
+            value={reasoningEffort}
+            options={REASONING_OPTIONS.map(([value, label]) => [value, label])}
+            onChange={(value) => onReasoningChange(value as ReasoningEffortPreference)}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function ProviderHealthRow({
+  id,
+  name,
+  health,
+  modelCount,
+  notes,
+  onHealthChange,
+  onNotesChange,
+}: {
+  id: string;
+  name: string;
+  health: ProviderHealth;
+  modelCount: number;
+  notes: string;
+  onHealthChange: (health: ProviderHealth) => void;
+  onNotesChange: (notes: string) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.providerRow}>
+      <div className={styles.providerMain}>
+        <div className={styles.connectionIcon}>
+          <Plug size={17} />
+        </div>
+        <div className={styles.settingCopy}>
+          <strong>{name}</strong>
+          <span>{id}</span>
+          <div className={styles.taskMeta}>
+            <span>{t('settings.ccSwitchModelCount', { count: modelCount })}</span>
+          </div>
+        </div>
+        <span className={`${styles.statusPill} ${health === 'ready' ? styles.statusPillOn : ''}`}>
+          {t(`settings.providerHealth.${health}`)}
+        </span>
+      </div>
+      <div className={styles.providerControls}>
+        <label>
+          <span>{t('settings.ccSwitchHealth')}</span>
+          <SelectControl
+            value={health}
+            options={PROVIDER_HEALTH_OPTIONS.map(([value, label]) => [value, label])}
+            onChange={(value) => onHealthChange(value as ProviderHealth)}
+          />
+        </label>
+        <label>
+          <span>{t('settings.ccSwitchNotes')}</span>
+          <textarea
+            className={styles.textInput}
+            value={notes}
+            onChange={(event) => onNotesChange(event.target.value)}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function RuntimeInventoryCard({ agent }: { agent: AgentInfo }) {
   const { t } = useTranslation();
   return (
@@ -3554,7 +4462,19 @@ function SelectControl({
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {
+<<<<<<< HEAD
   return <Select value={value} options={options} onChange={onChange} />;
+=======
+  return (
+    <select className={styles.select} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
+      {options.map(([optionValue, label]) => (
+        <option key={optionValue} value={optionValue}>
+          {label}
+        </option>
+      ))}
+    </select>
+  );
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 function Callout({ title, body }: { title: string; body: string }) {

@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+<<<<<<< HEAD
 import { Check, ChevronDown, Clock3, FileText, FolderOpen, HardDrive, Plus, Server, Square, ArrowUp, LoaderCircle, X } from 'lucide-react';
+=======
+import { Check, ChevronDown, FileText, FolderOpen, HardDrive, Plus, Server, Square, ArrowUp, LoaderCircle, X } from 'lucide-react';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import type { AgentInfo, ThreadInfo } from '@shared/types';
 import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
 import { useInputDraft } from '@/hooks/useInputDraft';
@@ -8,7 +12,11 @@ import { useMention, type MentionItem } from '@/hooks/useMention';
 import MentionPopover from '@/components/MentionPopover';
 import ModelReasoningPicker from '@/components/ModelReasoningPicker';
 import type { ModelReasoningOption } from '@/components/ModelReasoningPicker';
+<<<<<<< HEAD
 import { PermissionModePicker } from '@shared/ui/PermissionModePicker';
+=======
+import PermissionModePicker from '@/components/PermissionModePicker';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
 import type { ModelCatalogItem, ModelCatalogResponse } from '@/api/modelCatalogQueries';
@@ -25,6 +33,7 @@ type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 const PERMISSION_MODES = ['default', 'plan', 'acceptEdits', 'bypassPermissions', 'dontAsk'] as const;
 type PermissionMode = (typeof PERMISSION_MODES)[number];
 const MAX_BROWSER_ATTACHMENT_PREVIEW = 12_000;
+<<<<<<< HEAD
 import {
   addRecentWorkspace,
   getSavedWorkDir,
@@ -54,6 +63,8 @@ function getStoredPermissionMode(): PermissionMode {
   }
   return 'default';
 }
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 interface SendOptions {
   model?: string;
@@ -153,6 +164,7 @@ function pathBasename(value: string): string {
   return value.split(/[\\/]+/).filter(Boolean).pop() ?? value;
 }
 
+<<<<<<< HEAD
 function normalizeWorkDir(value: string | null | undefined): string {
   return (value ?? '').trim().replace(/^["']|["']$/g, '').trim();
 }
@@ -161,6 +173,8 @@ function sameWorkDir(a: string, b: string): boolean {
   return normalizeWorkDir(a).toLowerCase() === normalizeWorkDir(b).toLowerCase();
 }
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function formatBytes(value: number | undefined): string | undefined {
   if (value == null) return undefined;
   if (value < 1024) return `${value} B`;
@@ -275,10 +289,13 @@ function directTargetUnavailableReason(target: ExecutionTargetInventoryItem, t: 
   return t('prompt.targetRemoteDisabled', { type: target.target_type });
 }
 
+<<<<<<< HEAD
 function targetTrustLabel(target: ExecutionTargetInventoryItem, t: (key: string, vars?: Record<string, unknown>) => string): string {
   return t(`prompt.targetTrust.${target.trust_level}`);
 }
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function agentRuntimeTokens(agent?: AgentInfo): string[] {
   if (!agent) return [];
   const raw = [agent.runtimeId, agent.id, agent.name]
@@ -495,8 +512,19 @@ export default function PromptInput({
   const [model, setModel] = useState<string>('');
   const [selectedCatalogRoute, setSelectedCatalogRoute] = useState<SelectedCatalogRoute | null>(null);
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
+<<<<<<< HEAD
   const [permissionMode, setPermissionMode] = useState<PermissionMode>(getStoredPermissionMode);
   const [workDir] = useState(getStoredWorkDir);
+=======
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
+  const [workDir, setWorkDir] = useState('');
+  const [workDirDraft, setWorkDirDraft] = useState('');
+  const [workTargetOpen, setWorkTargetOpen] = useState(false);
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashQuery, setSlashQuery] = useState('');
+  const [slashIndex, setSlashIndex] = useState(0);
+  const desktopRuntimeAvailable = isTauriRuntime();
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const selectedAgentAlias = preferredProfileAlias(selectedAgent);
   const routeModel = model || selectedAgentAlias || undefined;
@@ -511,18 +539,161 @@ export default function PromptInput({
       resolveRunRequestOptions: s.resolveRunRequestOptions,
     })),
   );
+<<<<<<< HEAD
   const resolvedRoute = modelSettings.resolveRunRequestOptions({
     model: routeModel,
     reasoningEffort: reasoningEffort || undefined,
   });
+=======
+  const resolvedRoute = useMemo(
+    () => modelSettings.resolveRunRequestOptions({
+      model: routeModel,
+      reasoningEffort: reasoningEffort || undefined,
+    }),
+    [
+      model,
+      modelSettings.aliases,
+      modelSettings.defaultModel,
+      modelSettings.defaultProvider,
+      modelSettings.defaultReasoningEffort,
+      modelSettings.modelMappingEnabled,
+      modelSettings.providerFallbackEnabled,
+      modelSettings.resolveRunRequestOptions,
+      reasoningEffort,
+      routeModel,
+    ],
+  );
 
   const { restore: restoreDraft, save: saveDraft, flush: flushDraft, clear: clearDraft } = useInputDraft(threadId);
 
+  const writeTextareaValue = useCallback((value: string, cursorPos = value.length) => {
+    const ta = inputRef.current;
+    if (!ta) return;
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    if (nativeSetter) {
+      nativeSetter.call(ta, value);
+    } else {
+      ta.value = value;
+    }
+    ta.selectionStart = ta.selectionEnd = Math.max(0, Math.min(cursorPos, value.length));
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  }, []);
+
+  const closeSlash = useCallback(() => {
+    setSlashOpen(false);
+    setSlashQuery('');
+    setSlashIndex(0);
+  }, []);
+
+  const handleAttach = useCallback(async () => {
+    if (disabled || isStarting) return;
+    const desktopAttachments = await pickDesktopAttachments();
+    if (desktopAttachments && desktopAttachments.length > 0) {
+      setAttachments((prev) => [...prev, ...desktopAttachments]);
+      return;
+    }
+    if (desktopAttachments === null) {
+      attachmentInputRef.current?.click();
+    }
+  }, [disabled, isStarting]);
+
+  const mentionItems = useMemo<MentionItem[]>(() => {
+    const agentItems: MentionItem[] = agents.map((agent) => ({
+      id: `agent:${agent.id}`,
+      kind: 'agent',
+      label: agent.name,
+      description: agent.description || t('prompt.mention.agentDesc'),
+      status: agent.status,
+      keywords: [agent.id, agent.name, 'agent', 'runtime'],
+      replacementText: '',
+      agent,
+    }));
+    const fileItem: MentionItem = {
+      id: 'file:attach',
+      kind: 'file',
+      label: t('prompt.mention.attachFile'),
+      description: desktopRuntimeAvailable ? t('prompt.mention.attachFileDesc') : t('prompt.mention.attachFileBrowserDesc'),
+      keywords: ['file', 'attach', 'attachment', t('prompt.mention.attachFile')],
+      replacementText: '',
+    };
+    const threadItems: MentionItem[] = threads.slice(0, 12).map((thread) => {
+      const title = compactThreadTitle(thread);
+      return {
+        id: `thread:${thread.threadId}`,
+        kind: 'thread',
+        label: title,
+        description: t('prompt.mention.threadDesc', { id: thread.threadId }),
+        keywords: ['thread', 'session', title, thread.threadId],
+        replacementText: threadMentionReplacement(thread),
+        payload: thread,
+      };
+    });
+    return [...agentItems, fileItem, ...threadItems];
+  }, [agents, desktopRuntimeAvailable, t, threads]);
+
+  const handleMentionSelected = useCallback((item: MentionItem) => {
+    if (item.kind === 'file') {
+      void handleAttach();
+    }
+  }, [handleAttach]);
+
+  const {
+    isOpen: mentionOpen, query: mentionQuery, position: mentionPosition,
+    selectedIndex: mentionIndex, filteredItems: mentionFiltered,
+    handleInput: mentionHandleInput, handleKeyDown: mentionHandleKeyDown,
+    selectItem: mentionSelectItem, closeMention,
+  } = useMention({ agents, items: mentionItems, onSelectAgent, onSelectMention: handleMentionSelected });
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
+
+  const clearComposer = useCallback(() => {
+    const ta = inputRef.current;
+    if (ta) {
+      ta.value = '';
+      ta.style.height = 'auto';
+      ta.focus();
+    }
+    setPromptLength(0);
+    setAttachments([]);
+    if (attachmentInputRef.current) attachmentInputRef.current.value = '';
+    clearDraft();
+    closeMention();
+    closeSlash();
+  }, [clearDraft, closeMention, closeSlash]);
+
+  const removeSlashTrigger = useCallback(() => {
+    const ta = inputRef.current;
+    if (!ta) return;
+    const cursor = ta.selectionStart;
+    const parsed = parseSlashCommandAtCursor(ta.value, cursor);
+    if (!parsed) return;
+    const before = ta.value.slice(0, parsed.startIndex);
+    const after = ta.value.slice(cursor);
+    const needsSpace = before.length > 0 && after.length > 0 && !/\s$/.test(before) && !/^\s/.test(after);
+    const nextValue = `${before}${needsSpace ? ' ' : ''}${after}`;
+    const nextCursor = before.length + (needsSpace ? 1 : 0);
+    writeTextareaValue(nextValue, nextCursor);
+  }, [writeTextareaValue]);
+
+<<<<<<< HEAD
   const rememberWorkDir = useCallback((value: string) => {
     const normalized = normalizeWorkDir(value);
     if (!normalized) return;
     addRecentWorkspace({ path: normalized });
     setRecentWorkDirs(readRecentWorkspaces());
+=======
+  useEffect(() => {
+    try {
+      const savedWorkDir = window.localStorage.getItem('agenthub.prompt.workDir') ?? '';
+      setWorkDir(savedWorkDir);
+      setWorkDirDraft(savedWorkDir);
+      const savedMode = window.localStorage.getItem('agenthub.prompt.permissionMode');
+      if (savedMode && PERMISSION_MODES.includes(savedMode as PermissionMode)) {
+        setPermissionMode(savedMode as PermissionMode);
+      }
+    } catch {
+      // localStorage can be unavailable in tests.
+    }
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   }, []);
 
   const applyWorkDir = useCallback((value: string, options: { closeMenu?: boolean } = {}) => {
@@ -647,6 +818,42 @@ export default function PromptInput({
   }, [writeTextareaValue]);
 
   useEffect(() => {
+    const handleWorkDirSelected = (event: Event) => {
+      const nextWorkDir = (event as CustomEvent<{ workDir?: string }>).detail?.workDir?.trim();
+      if (!nextWorkDir) return;
+      setWorkDir(nextWorkDir);
+      setWorkDirDraft(nextWorkDir);
+    };
+    const handleSetComposerDraft = (event: Event) => {
+      const detail = (event as CustomEvent<{ text?: string }>).detail;
+      const nextText = detail?.text ?? '';
+      if (!nextText.trim()) return;
+      clearDraft();
+      setAttachments([]);
+      if (attachmentInputRef.current) attachmentInputRef.current.value = '';
+      closeMention();
+      closeSlash();
+      writeTextareaValue(nextText);
+      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      window.setTimeout(() => inputRef.current?.focus(), 120);
+    };
+    const handleFocusComposer = () => {
+      const input = inputRef.current;
+      if (!input) return;
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      window.setTimeout(() => input.focus(), 120);
+    };
+    window.addEventListener('agenthub:workdir-selected', handleWorkDirSelected);
+    window.addEventListener('agenthub:set-composer-draft', handleSetComposerDraft);
+    window.addEventListener('agenthub:focus-composer', handleFocusComposer);
+    return () => {
+      window.removeEventListener('agenthub:workdir-selected', handleWorkDirSelected);
+      window.removeEventListener('agenthub:set-composer-draft', handleSetComposerDraft);
+      window.removeEventListener('agenthub:focus-composer', handleFocusComposer);
+    };
+  }, [clearDraft, closeMention, closeSlash, writeTextareaValue]);
+
+  useEffect(() => {
     try {
       window.localStorage.setItem('agenthub.prompt.workDir', workDir);
       window.localStorage.setItem('agenthub.prompt.permissionMode', permissionMode);
@@ -702,7 +909,11 @@ export default function PromptInput({
     };
     ta.addEventListener('input', handleUpdate);
     return () => ta.removeEventListener('input', handleUpdate);
+<<<<<<< HEAD
   }, [mentionHandleInput, saveDraft]);
+=======
+  }, [closeMention, closeSlash, mentionHandleInput, saveDraft]);
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   const handleSend = useCallback(async () => {
     const ta = inputRef.current;
@@ -720,10 +931,14 @@ export default function PromptInput({
     }
     if (reasoningEffort) opts.reasoningEffort = reasoningEffort;
     if (permissionMode !== 'default') opts.permissionMode = permissionMode;
+<<<<<<< HEAD
     if (workDir.trim()) {
       opts.workDir = workDir.trim();
       rememberWorkDir(workDir);
     }
+=======
+    if (workDir.trim()) opts.workDir = workDir.trim();
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     const attachmentContext = formatAttachmentContext(attachments);
     const promptWithAttachments = attachmentContext ? `${trimmed}\n\n${attachmentContext}` : trimmed;
     const accepted = await onSend(
@@ -739,14 +954,25 @@ export default function PromptInput({
     clearDraft();
     setAttachments([]);
     if (attachmentInputRef.current) attachmentInputRef.current.value = '';
+<<<<<<< HEAD
   }, [attachments, disabled, isStreaming, isStarting, selectedAgentId, model, selectedAgentAlias, selectedCatalogRoute, reasoningEffort, permissionMode, workDir, onSend, clearDraft, closeMention, rememberWorkDir]);
+=======
+  }, [attachments, disabled, isStreaming, isStarting, selectedAgentId, model, selectedAgentAlias, selectedCatalogRoute, reasoningEffort, permissionMode, workDir, onSend, clearDraft, closeMention]);
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   const handleBrowseWorkDir = useCallback(async () => {
     if (disabled || isStarting) return;
     const selected = await pickDesktopWorkDir();
     if (!selected) return;
+<<<<<<< HEAD
     applyWorkDir(selected, { closeMenu: true });
   }, [applyWorkDir, disabled, isStarting]);
+=======
+    setWorkDirDraft(selected);
+    setWorkDir(selected);
+    setWorkTargetOpen(false);
+  }, [disabled, isStarting]);
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   const handleBrowserAttachmentChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
@@ -768,10 +994,13 @@ export default function PromptInput({
   const effectiveReasoning = reasoningEffort || (resolvedRoute.reasoningEffort as ReasoningEffort | undefined) || 'high';
   const directTargets = executionTargets.filter(isSelectableLocalTarget);
   const unavailableLocalTargets = executionTargets.filter((target) => isRegisteredLocalTarget(target) && !isSelectableLocalTarget(target));
+<<<<<<< HEAD
   const remoteInventoryTargets = executionTargets.filter((target) => target.target_type !== 'local_edge');
   const recentWorkDirOptions = recentWorkDirs.filter((entry) => (
     entry?.path && !directTargets.some((target) => sameWorkDir(targetWorkspaceRoot(target), entry.path))
   ));
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const workTargetLabel = workDir.trim()
     ? compactPathLabel(workDir)
     : t('prompt.targetLocalEdge');
@@ -1185,7 +1414,13 @@ export default function PromptInput({
                     type="button"
                     className={`${styles.workTargetOption} ${!workDir.trim() ? styles.workTargetOptionActive : ''}`}
                     onClick={() => {
+<<<<<<< HEAD
                       applyWorkDir('', { closeMenu: true });
+=======
+                      setWorkDir('');
+                      setWorkDirDraft('');
+                      setWorkTargetOpen(false);
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
                     }}
                   >
                     <HardDrive size={16} />
@@ -1219,7 +1454,12 @@ export default function PromptInput({
                         type="button"
                         className={styles.workDirApplyBtn}
                         onClick={() => {
+<<<<<<< HEAD
                           applyWorkDir(workDirDraft, { closeMenu: true });
+=======
+                          setWorkDir(workDirDraft.trim());
+                          setWorkTargetOpen(false);
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
                         }}
                       >
                         {t('prompt.applyWorkDir')}
@@ -1228,6 +1468,7 @@ export default function PromptInput({
                     <small>{t('prompt.targetFolderDesc')}</small>
                   </div>
 
+<<<<<<< HEAD
                   {recentWorkDirOptions.length > 0 && (
                     <div className={styles.workTargetGroup}>
                       <div className={styles.workTargetGroupHeader}>
@@ -1266,6 +1507,8 @@ export default function PromptInput({
                     </div>
                   )}
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
                   {directTargets.length > 0 && (
                     <div className={styles.workTargetGroup}>
                       <span>{t('prompt.targetRegisteredLocal')}</span>
@@ -1277,14 +1520,26 @@ export default function PromptInput({
                             key={target.id}
                             type="button"
                             className={`${styles.workTargetOption} ${active ? styles.workTargetOptionActive : ''}`}
+<<<<<<< HEAD
                             onClick={() => applyWorkDir(root, { closeMenu: true })}
+=======
+                            onClick={() => {
+                              setWorkDir(root);
+                              setWorkDirDraft(root);
+                              setWorkTargetOpen(false);
+                            }}
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
                           >
                             <Server size={16} />
                             <span>
                               <strong>{target.name}</strong>
                               <small>{root}</small>
                               <em className={styles.workTargetMeta}>
+<<<<<<< HEAD
                                 {t(`prompt.targetHealth.${target.health_state}`)} · {targetTrustLabel(target, t)}
+=======
+                                {t(`prompt.targetHealth.${target.health_state}`)}
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
                               </em>
                             </span>
                             {active && <Check size={15} />}
@@ -1304,6 +1559,7 @@ export default function PromptInput({
                             <strong>{target.name}</strong>
                             <small>{directTargetUnavailableReason(target, t)}</small>
                             <em className={styles.workTargetMeta}>
+<<<<<<< HEAD
                               {t(`prompt.targetHealth.${target.health_state}`)} · {targetTrustLabel(target, t)}
                             </em>
                           </span>
@@ -1323,6 +1579,9 @@ export default function PromptInput({
                             <small>{directTargetUnavailableReason(target, t)}</small>
                             <em className={styles.workTargetMeta}>
                               {t(`settings.targetType.${target.target_type}`, { defaultValue: target.target_type })} · {t(`prompt.targetHealth.${target.health_state}`)} · {targetTrustLabel(target, t)}
+=======
+                              {t(`prompt.targetHealth.${target.health_state}`)}
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
                             </em>
                           </span>
                         </button>

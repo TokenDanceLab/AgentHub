@@ -1,27 +1,23 @@
 import { useState, useCallback, useEffect, useRef, type RefObject } from 'react';
 import type { ChatMessage } from '@/components/ChatView.types';
 
-interface UseAutoScrollOptions {
-  /** Custom scroll-to-bottom implementation (e.g. virtualizer.scrollToIndex).
-   *  When provided, flag-based auto-scroll detection is used instead of position-based. */
-  scrollToBottomFn?: (force?: boolean) => void;
-}
-
 /**
  * Auto-follow chat output while preserving manual history reading.
  *
+<<<<<<< HEAD
  * ChatView renders in normal document flow. When a virtual-list custom path is
  * provided via scrollToBottomFn, flag-based detection keeps scroll-event noise
  * from the custom scroll from being mistaken for a user gesture.
+=======
+ * ChatView renders in normal document flow. This hook therefore uses only DOM
+ * scroll state; there is no virtual-list custom path or estimated row height.
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
  */
 export function useAutoScroll(
   containerRef: RefObject<HTMLDivElement | null>,
   deps: { messages: ChatMessage[]; isStreaming: boolean },
-  options?: UseAutoScrollOptions,
 ): { scrollToBottom: (force?: boolean) => void; isNearBottom: boolean } {
   const BOTTOM_THRESHOLD = 200;
-  const customFn = options?.scrollToBottomFn;
-
   const [isNearBottom, setIsNearBottom] = useState(true);
   const userScrolledRef = useRef(false);
   const autoScrollRef = useRef<{ top: number; time: number } | undefined>(undefined);
@@ -29,6 +25,7 @@ export function useAutoScroll(
   const scrollRafRef = useRef<number | null>(null);
   const prevStreamingRef = useRef(deps.isStreaming);
   const prevMessageCountRef = useRef(deps.messages.length);
+<<<<<<< HEAD
 
   // Flag-based detection for custom scroll function
   const flagRef = useRef(false);
@@ -39,6 +36,8 @@ export function useAutoScroll(
   useEffect(() => {
     customFnRef.current = customFn;
   }, [customFn]);
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   const distanceFromBottom = useCallback(
     (el: HTMLElement) => el.scrollHeight - el.clientHeight - el.scrollTop,
@@ -67,6 +66,7 @@ export function useAutoScroll(
     return Math.abs(el.scrollTop - state.top) < 2;
   }, []);
 
+<<<<<<< HEAD
   const scrollToBottom = useCallback(
     (force?: boolean) => {
       const el = containerRef.current;
@@ -115,18 +115,44 @@ export function useAutoScroll(
     },
     [containerRef, distanceFromBottom, markAutoScroll],
   );
+=======
+  const scrollToBottom = useCallback((force?: boolean) => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    if (force && userScrolledRef.current) {
+      userScrolledRef.current = false;
+      setIsNearBottom(true);
+    }
+
+    if (!force && userScrolledRef.current) return;
+
+    const dist = distanceFromBottom(el);
+    if (dist < 2) {
+      markAutoScroll(el);
+      return;
+    }
+
+    if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current);
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      el.scrollTop = el.scrollHeight;
+      markAutoScroll(el);
+    });
+  }, [containerRef, distanceFromBottom, markAutoScroll]);
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    // Flag-based: skip if we initiated this scroll via custom function
-    if (customFnRef.current && flagRef.current) {
-      return;
-    }
-
     if (!userScrolledRef.current && isAutoScroll(el)) return;
 
+<<<<<<< HEAD
+    if (!userScrolledRef.current && isAutoScroll(el)) return;
+
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     const scrolled = distanceFromBottom(el) > BOTTOM_THRESHOLD;
     if (userScrolledRef.current !== scrolled) {
       userScrolledRef.current = scrolled;
@@ -166,6 +192,7 @@ export function useAutoScroll(
     if (!el) return;
     el.addEventListener('scroll', handleScroll, { passive: true });
     el.addEventListener('wheel', handleWheel, { passive: true });
+<<<<<<< HEAD
     return () => {
       el.removeEventListener('scroll', handleScroll);
       el.removeEventListener('wheel', handleWheel);
@@ -174,6 +201,8 @@ export function useAutoScroll(
 
   // Cleanup timers on unmount
   useEffect(() => {
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     return () => {
       el.removeEventListener('scroll', handleScroll);
       el.removeEventListener('wheel', handleWheel);
@@ -182,7 +211,10 @@ export function useAutoScroll(
 
   useEffect(() => () => {
     if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
+<<<<<<< HEAD
     if (flagTimerRef.current) clearTimeout(flagTimerRef.current);
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current);
   }, []);
 
