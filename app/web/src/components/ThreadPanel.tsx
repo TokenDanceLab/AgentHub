@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { ThreadInfo } from '@shared/types';
 import { useThreads, useRenameThread, useDeleteThread, useCreateThread } from '@/api/threadQueries';
 import { useToastStore } from '@/stores/toastStore';
-import EmptyState from './EmptyState';
+import { EmptyState } from '@shared/ui';
 import styles from './ThreadPanel.module.css';
 
 /** ThreadInfo with optional count metadata the Edge may return. */

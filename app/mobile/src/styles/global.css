@@ -559,7 +559,8 @@ button:disabled {
 }
 
 .mobileCenterState strong,
-.mobileEmptyView h1 {
+.mobileEmptyView h1,
+.mobileEmptyView h2 {
   margin: 0;
   color: var(--td-ink);
   font-size: 15px;
