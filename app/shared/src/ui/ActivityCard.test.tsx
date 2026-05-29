@@ -59,4 +59,24 @@ describe('ActivityCard', () => {
     expect(card?.querySelector('.mobileRunBlockIcon')).toHaveTextContent('file');
     expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
   });
+
+  it('supports body and trailing state rows without an icon column', () => {
+    render(
+      <ActivityCard
+        className="mobileSurfaceRegistryRow"
+        bodyClassName="mobileSurfaceRegistryBody"
+        actionsClassName="mobileSurfaceRegistryActions"
+        label="Account"
+        actions={<span className="mobileSurfaceRegistryState">Ready</span>}
+      >
+        TokenDance ID session surface
+      </ActivityCard>,
+    );
+
+    const card = screen.getByText('Account').closest('article');
+
+    expect(card).toHaveAttribute('data-has-actions', 'true');
+    expect(card).not.toHaveAttribute('data-has-icon');
+    expect(card?.querySelector('.mobileSurfaceRegistryState')).toHaveTextContent('Ready');
+  });
 });

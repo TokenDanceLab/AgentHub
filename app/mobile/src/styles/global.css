@@ -1120,6 +1120,11 @@ button:disabled {
   min-width: 0;
 }
 
+.mobileReadinessMeta,
+.mobileSurfaceRegistryMeta {
+  display: contents;
+}
+
 .mobileReadinessBody strong,
 .mobileReadinessBody span,
 .mobileReadinessState {
@@ -1172,6 +1177,10 @@ button:disabled {
 .mobileSurfaceRegistryBody {
   display: grid;
   gap: 2px;
+  min-width: 0;
+}
+
+.mobileSurfaceRegistryActions {
   min-width: 0;
 }
 
@@ -1341,7 +1350,7 @@ button:disabled {
   padding: 9px 10px;
 }
 
-.mobileResourceRow.mobileResourceRow {
+.mobileResourceRow.mobileResourceRow[data-has-icon='true'][data-has-actions='true'] {
   grid-template-columns: 34px minmax(0, 1fr) auto auto;
 }
 
