@@ -115,18 +115,22 @@ macOS/Linux:
 
 ### 启动 Edge Server
 
+Mock/smoke 模式：
+
 ```powershell
 cd edge-server
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --agent-default claude-code
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile agenthub-runner-mock
 ```
 
-常用 Runtime 切换：
+真实 Runtime preset：
 
 ```powershell
-go run ./cmd/agenthub-edge --agent-default claude-code
-go run ./cmd/agenthub-edge --agent-default codex
-go run ./cmd/agenthub-edge --agent-default opencode
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile codex
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile opencode
 ```
+
+`--runner-profile` 选择实际 executor/runtime command preset；`--agent-default` 只是在 run 未指定 agent 时选择默认 adapter ID，不会单独启动 Claude Code、Codex 或 OpenCode CLI。
 
 ### 启动 Desktop
 
