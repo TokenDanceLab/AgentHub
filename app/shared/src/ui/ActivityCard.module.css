@@ -7,11 +7,27 @@
   min-height: 64px;
 }
 
+.card[data-has-leading='true'] {
+  grid-template-columns: auto 34px minmax(0, 1fr);
+}
+
+.card[data-has-actions='true'] {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+}
+
+.card[data-has-leading='true'][data-has-actions='true'] {
+  grid-template-columns: auto 34px minmax(0, 1fr) auto;
+}
+
+.leading,
 .icon {
   display: grid;
+  place-items: center;
+}
+
+.icon {
   width: 34px;
   height: 34px;
-  place-items: center;
 }
 
 .body {
@@ -36,4 +52,10 @@
 
 .content {
   overflow-wrap: anywhere;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
