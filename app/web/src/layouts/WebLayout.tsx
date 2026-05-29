@@ -877,6 +877,7 @@ export default function WebLayout() {
         )}
 
         <Slot name="permission-dialog" {...shellProps} />
+        <Slot name="search-dialog" {...shellProps} onSelect={() => undefined} />
         <Slot name="shortcut-help" />
         {showAuthModal && (
           <div className={styles.modalLayer}>
