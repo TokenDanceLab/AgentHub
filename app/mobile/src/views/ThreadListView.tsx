@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listThreads } from "@agenthub/shared";
 import type { Thread } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { EmptyState, MetricGrid, SegmentedControl } from "@agenthub/shared/ui";
+import { EmptyState, MetricGrid, SegmentedControl, StatusNotice } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, UserRound, ArrowRight } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
@@ -123,21 +123,17 @@ export function ThreadListView({ onThreadSelect, onOpenAccount }: ThreadListView
               },
             ]}
           />
-          <div className="mobileSignalRow">
-            <Radio size={14} />
-            <span>
-              {isConnected
-                ? workflowUnavailable
-                  ? t("queue.threads.signalPending")
-                  : t("queue.threads.signalOnline")
-                : t("queue.threads.signalOffline")}
-            </span>
-          </div>
+          <StatusNotice className="mobileSignalRow" icon={<Radio size={14} />}>
+            {isConnected
+              ? workflowUnavailable
+                ? t("queue.threads.signalPending")
+                : t("queue.threads.signalOnline")
+              : t("queue.threads.signalOffline")}
+          </StatusNotice>
           {isRefreshing && (
-            <div className="mobileRefreshStatus" role="status" aria-live="polite">
-              <RefreshCw size={13} className="mobileSpin" />
-              <span>{t("queue.threads.refreshing")}</span>
-            </div>
+            <StatusNotice className="mobileRefreshStatus" icon={<RefreshCw size={13} className="mobileSpin" />}>
+              {t("queue.threads.refreshing")}
+            </StatusNotice>
           )}
         </section>
 
