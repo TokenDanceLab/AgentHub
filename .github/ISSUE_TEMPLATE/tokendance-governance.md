@@ -19,6 +19,20 @@ assignees: ""
 
 Describe the user-facing or system-level outcome.
 
+## Risk Register
+
+- Risk ID: `AH-SR-___` or `N/A`
+- Severity: Critical / High / Medium / Low / N/A
+- Status target: Open / Mitigated in repo / Accepted / Closed / N/A
+
+## Affected Surface
+
+- Hub Server:
+- Edge Server:
+- Desktop/Web/Mobile:
+- API/docs/deploy examples:
+- Other repos:
+
 ## Cross-System Boundary
 
 - TokenDance root docs:
@@ -37,3 +51,9 @@ Describe the user-facing or system-level outcome.
 ## Evidence
 
 List tests, docs, screenshots, command output, or links needed to prove completion.
+
+## Privacy Review
+
+- [ ] Evidence uses repo-relative paths or public issue/PR links only.
+- [ ] No secrets, tokens, private hostnames, local filesystem paths, production logs, or operator-only runbook details are included.
+- [ ] Private deployment proof, if required, is stored outside the public repo and referenced only as a sanitized conclusion.
