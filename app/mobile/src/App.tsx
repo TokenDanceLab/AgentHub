@@ -5,12 +5,12 @@ import { ThreadListView } from "./views/ThreadListView";
 import { ChatView } from "./views/ChatView";
 import { RunListView } from "./views/RunListView";
 import { RunStatusView } from "./views/RunStatusView";
-import { SettingsView } from "./views/SettingsView";
+import { AccountView } from "./views/AccountView";
 import { MobileEmptyState } from "./components/MobileEmptyState";
 import { Hash } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-export type MobileView = "threads" | "chat" | "runs" | "settings";
+export type MobileView = "threads" | "chat" | "runs" | "account";
 
 export function App() {
   const { t } = useTranslation();
@@ -49,7 +49,7 @@ export function App() {
         {activeView === "threads" && (
           <ThreadListView
             onThreadSelect={handleThreadSelect}
-            onOpenSettings={() => setActiveView("settings")}
+            onOpenAccount={() => setActiveView("account")}
           />
         )}
         {activeView === "chat" && selectedThread && (
@@ -70,7 +70,7 @@ export function App() {
         {activeView === "runs" && !selectedRun && (
           <RunListView
             onRunSelect={handleRunSelect}
-            onOpenSettings={() => setActiveView("settings")}
+            onOpenAccount={() => setActiveView("account")}
           />
         )}
         {activeView === "runs" && selectedRun && (
@@ -79,7 +79,7 @@ export function App() {
             onBack={() => setSelectedRun(null)}
           />
         )}
-        {activeView === "settings" && <SettingsView />}
+        {activeView === "account" && <AccountView />}
       </main>
 
       <BottomNav activeView={activeView} onNavigate={handleNavigate} />

@@ -7,7 +7,7 @@ const NAV_ITEMS: { view: MobileView; surfaceId: SurfaceId; icon: typeof MessageS
   { view: "threads", surfaceId: "mobile.threads", icon: Hash },
   { view: "chat", surfaceId: "mobile.chat", icon: MessageSquare },
   { view: "runs", surfaceId: "mobile.runs", icon: Play },
-  { view: "settings", surfaceId: "mobile.account", icon: UserRound },
+  { view: "account", surfaceId: "mobile.account", icon: UserRound },
 ];
 
 interface BottomNavProps {
