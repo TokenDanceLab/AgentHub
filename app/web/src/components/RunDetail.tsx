@@ -68,6 +68,7 @@ function buildMetrics(chatMessages: ChatMessage[] | undefined): SessionMetrics |
     inputTokens,
     outputTokens,
     totalTokens,
+    contextLimit: 200000,
     model,
     messages: flatMessages,
   };

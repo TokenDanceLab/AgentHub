@@ -53,9 +53,17 @@
 }
 
 .statRow {
-  display: flex;
-  flex-direction: column;
+  min-height: 50px;
   gap: 2px;
+  border-color: rgba(0,0,0,0.04);
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: rgba(255,255,255,0.35);
+}
+
+[data-theme='dark'] .statRow {
+  border-color: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.035);
 }
 
 .statLabel {
@@ -63,13 +71,13 @@
   color: var(--foreground);
   opacity: 0.5;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0;
 }
 
 .statValue {
-  font-size: var(--font-size-xs);
+  font-size: 13px;
   font-family: var(--font-mono);
-  font-weight: var(--font-weight-medium);
+  font-weight: 700;
 }
 
 /* ── Legend ────────────────────────────────── */
