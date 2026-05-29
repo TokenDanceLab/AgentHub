@@ -9,7 +9,7 @@ import {
   sendMobileNotificationProbe,
   startMobileOidcLogin,
 } from "../native/mobileCommands";
-import tokenDanceLogo from "../assets/tokendance-icon-rounded.svg";
+import tokenDanceLogo from "@agenthub/shared/assets/tokendance-icon-rounded.svg";
 
 type NativeStatusKey =
   | "settings.status.idle"
