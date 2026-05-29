@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listRuns } from "@agenthub/shared";
 import type { Run, RunStatus } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { EmptyState, MetricGrid, SegmentedControl, StatusNotice } from "@agenthub/shared/ui";
+import { EmptyState, MetricGrid, SegmentedControl, StatusNotice, SurfaceHeader } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, ArrowRight, CheckCircle2, Clock3, GitPullRequestArrow, Play, Radio, RefreshCw, ShieldAlert, TerminalSquare, UserRound } from "lucide-react";
@@ -136,27 +136,22 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
 
   return (
     <div className="mobileView">
-      <header className="mobileHeader">
-        <div>
-          <p className="mobileEyebrow">{t("common.appName")}</p>
-          <h1>{t("queue.runs.title")}</h1>
-        </div>
-        <div className="mobileStatusBadge">
-          <div
-            className="mobileStatusDot"
-            style={{
-              backgroundColor: isConnected ? "var(--td-moss)" : "var(--td-danger)",
-            }}
-          />
-          <span>
-            {isConnected
-              ? workflowUnavailable
-                ? t("queue.status.reachable")
-                : t("queue.status.connected")
-              : t("queue.status.offline")}
-          </span>
-        </div>
-      </header>
+      <SurfaceHeader
+        className="mobileHeader"
+        eyebrowClassName="mobileEyebrow"
+        statusClassName="mobileStatusBadge"
+        statusDotClassName="mobileStatusDot"
+        eyebrow={t("common.appName")}
+        title={t("queue.runs.title")}
+        status={{
+          label: isConnected
+            ? workflowUnavailable
+              ? t("queue.status.reachable")
+              : t("queue.status.connected")
+            : t("queue.status.offline"),
+          tone: isConnected ? "online" : "offline",
+        }}
+      />
 
       <div className="mobileScroll mobileRunsSurface">
         <section className="mobileOverviewPanel">
