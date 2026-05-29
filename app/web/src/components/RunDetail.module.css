@@ -243,6 +243,7 @@
   align-items: center;
   gap: 6px;
   width: 100%;
+  min-height: 36px;
   padding: 5px 0;
   border: none;
   background: transparent;
@@ -250,6 +251,10 @@
   font-size: 11px;
   text-align: left;
   font-family: var(--font-sans);
+}
+
+.toolCallBody {
+  padding: 0;
 }
 
 .toolCallOutput {
@@ -270,11 +275,11 @@
 .chevron {
   display: inline-block;
   font-size: 9px;
-  transition: transform 0.15s ease;
   opacity: 0.4;
-  margin-left: auto;
 }
-.chevronDown { transform: rotate(90deg); }
+.chevronHidden {
+  display: none;
+}
 
 .success { color: var(--success); }
 .pending { color: var(--foreground); opacity: 0.5; }
