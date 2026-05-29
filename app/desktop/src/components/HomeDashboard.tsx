@@ -2,8 +2,13 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Activity,
+<<<<<<< HEAD
   GitBranch,
   LogIn,
+=======
+  AlertTriangle,
+  Bot,
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   MessageSquareText,
   Plus,
   Route,
@@ -17,19 +22,32 @@ import type { AgentTeamOverview } from '@/api/agentTeamQueries';
 import { useRuns } from '@/api/runQueries';
 import { useThreads } from '@/api/threadQueries';
 import { useHealth } from '@/hooks/useHealth';
+<<<<<<< HEAD
 import { useHubStore } from '@/stores/hubStore';
 import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import type { ThreadInfo } from '@shared/types';
+=======
+import { resolveLocalOrchestration } from '@/utils/localOrchestration';
+import type { AgentInfo, ThreadInfo } from '@shared/types';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import styles from './HomeDashboard.module.css';
 
 interface Props {
   onNewThread: () => void;
   onSelectThread: (threadId: string) => void;
   onQuickStart: (prompt: string) => void;
+<<<<<<< HEAD
   onOpenTeamRuns?: () => void;
   onOpenRuns?: () => void;
   onOpenApprovals?: () => void;
   onOpenAuth?: () => void;
+=======
+  onViewRuns: () => void;
+  onReviewApprovals: () => void;
+  onViewAllThreads: () => void;
+  onOpenTeamRuns: () => void;
+  onOpenHubAccount: () => void;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   permissionCount?: number;
   agentTeamOverview?: AgentTeamOverview;
   agentTeamsLoading?: boolean;
@@ -38,6 +56,7 @@ interface Props {
   selectedAgentId?: string;
   onSelectAgent?: (agentId: string) => void;
   onStartLocalOrchestration?: (agentId: string, draft: string) => void;
+<<<<<<< HEAD
   workspaces?: WorkspaceEntry[];
   selectedWorkspacePath?: string;
   onSelectWorkspace?: (workspace: WorkspaceEntry) => void;
@@ -45,6 +64,8 @@ interface Props {
   onRemoveWorkspace?: (path: string) => void;
   onClearWorkspaces?: () => void;
   desktopAvailable?: boolean;
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 const QUICK_START_KEYS = [
@@ -55,6 +76,23 @@ const QUICK_START_KEYS = [
 
 function isRunActive(status: string): boolean {
   return ['queued', 'running', 'streaming', 'waiting_for_input', 'waiting_approval'].includes(status);
+}
+
+function isTeamRunActive(status?: string): boolean {
+  if (!status) return false;
+  return [
+    'queued',
+    'planning',
+    'dispatching',
+    'running',
+    'waiting_for_approval',
+    'merging',
+  ].includes(status);
+}
+
+function isPendingTeamApproval(status?: string): boolean {
+  if (!status) return false;
+  return ['pending', 'requested', 'waiting', 'waiting_for_approval'].includes(status);
 }
 
 function isTeamRunActive(status?: string): boolean {
@@ -95,10 +133,18 @@ export default function HomeDashboard({
   onNewThread,
   onSelectThread,
   onQuickStart,
+<<<<<<< HEAD
   onOpenTeamRuns,
   onOpenRuns,
   onOpenApprovals,
   onOpenAuth,
+=======
+  onViewRuns,
+  onReviewApprovals,
+  onViewAllThreads,
+  onOpenTeamRuns,
+  onOpenHubAccount,
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   permissionCount = 0,
   agentTeamOverview,
   agentTeamsLoading = false,
@@ -107,6 +153,7 @@ export default function HomeDashboard({
   selectedAgentId,
   onSelectAgent,
   onStartLocalOrchestration,
+<<<<<<< HEAD
   workspaces = [],
   selectedWorkspacePath,
   onSelectWorkspace,
@@ -114,6 +161,8 @@ export default function HomeDashboard({
   onRemoveWorkspace,
   onClearWorkspaces,
   desktopAvailable = false,
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }: Props) {
   const { t } = useTranslation();
   const { online, health } = useHealth();
@@ -202,7 +251,11 @@ export default function HomeDashboard({
           <button
             type="button"
             className={styles.statFooter}
+<<<<<<< HEAD
             onClick={onOpenRuns}
+=======
+            onClick={onViewRuns}
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
             title={t('home.viewAllRuns')}
             disabled={!onOpenRuns}
           >
@@ -220,8 +273,14 @@ export default function HomeDashboard({
           <button
             type="button"
             className={styles.statFooter}
+<<<<<<< HEAD
             onClick={onOpenApprovals}
             disabled={!onOpenApprovals || permissionCount === 0}
+=======
+            onClick={onReviewApprovals}
+            disabled={permissionCount === 0}
+            title={permissionCount === 0 ? t('home.noPendingApprovals') : t('home.reviewApprovals')}
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           >
             {t('home.reviewApprovals')}
           </button>
@@ -296,6 +355,7 @@ export default function HomeDashboard({
         </div>
       </div>
 
+<<<<<<< HEAD
       {/* Recent Workspaces */}
       <section className={styles.section} aria-label={t('workspace.recent')}>
         <WorkspacePicker
@@ -309,6 +369,8 @@ export default function HomeDashboard({
         />
       </section>
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       {/* AgentTeam / TeamRun command surface */}
       <section className={styles.section} aria-label={t('home.teamRunTitle')}>
         <div className={styles.sectionHeader}>

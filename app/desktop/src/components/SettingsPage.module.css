@@ -738,6 +738,7 @@
   line-height: 1.15;
 }
 
+<<<<<<< HEAD
 .teamGraph {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.65fr);
@@ -1000,6 +1001,8 @@
   line-height: 1.35;
 }
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 .teamConsoleGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
@@ -1648,8 +1651,17 @@
 }
 
 .switch:disabled {
+<<<<<<< HEAD
   cursor: default;
   opacity: 0.5;
+=======
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.switch:disabled span {
+  box-shadow: none;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 .select {
@@ -2363,6 +2375,7 @@
 
   .teamConsoleGrid,
   .teamBuilderGrid,
+<<<<<<< HEAD
   .teamMetricGrid,
   .teamGraph {
     grid-template-columns: 1fr;
@@ -2372,6 +2385,12 @@
     padding: 9px;
   }
 
+=======
+  .teamMetricGrid {
+    grid-template-columns: 1fr;
+  }
+
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   .teamConsoleHeader,
   .teamMiniRow {
     align-items: flex-start;

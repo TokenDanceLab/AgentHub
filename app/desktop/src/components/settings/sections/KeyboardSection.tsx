@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import Panel from '../primitives/Panel';
+<<<<<<< HEAD
 import {
   getResolvedShortcutGroups,
   saveCustomKeybindings,
@@ -11,6 +12,9 @@ import {
   deriveKeysFromEvent,
   type KeyboardShortcut,
 } from '@/utils/keyboardShortcuts';
+=======
+import { KEYBOARD_SHORTCUT_GROUPS } from '@/utils/keyboardShortcuts';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import styles from '../../SettingsPage.module.css';
 
 export default function KeyboardSection() {
@@ -121,6 +125,7 @@ export default function KeyboardSection() {
 
   return (
     <Panel title={t('settings.keyboard')} description={t('settings.keyboardDesc')}>
+<<<<<<< HEAD
       {!editing ? (
         <>
           <div className={styles.shortcutTable}>
@@ -137,6 +142,18 @@ export default function KeyboardSection() {
                     </div>
                   </div>
                 ))}
+=======
+      <div className={styles.shortcutTable}>
+        {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
+          <div key={group.id} className={styles.shortcutGroup}>
+            <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
+            {group.shortcuts.map((shortcut) => (
+              <div key={shortcut.id} className={styles.shortcutRow}>
+                <span>{t(shortcut.labelKey)}</span>
+                <div>
+                  {shortcut.keys.map((key) => <kbd key={key}>{key}</kbd>)}
+                </div>
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
               </div>
             ))}
           </div>

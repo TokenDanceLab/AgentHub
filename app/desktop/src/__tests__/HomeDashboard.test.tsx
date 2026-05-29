@@ -3,6 +3,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import HomeDashboard from '@/components/HomeDashboard';
 import * as useHealthModule from '@/hooks/useHealth';
+<<<<<<< HEAD
+=======
+import type { AgentInfo } from '@shared/types';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -43,6 +47,7 @@ vi.mock('@/api/threadQueries', () => ({
   useThreads: () => mockUseThreads(),
 }));
 
+<<<<<<< HEAD
 vi.mock('@/stores/taskBridgeStore', () => ({
   useTaskBridgeStore: (selector?: (s: { tasks: Array<{ status: string }> }) => unknown) => {
     const state = { tasks: [{ status: 'running' }, { status: 'done' }] };
@@ -56,6 +61,29 @@ vi.mock('@/stores/hubStore', () => ({
     return selector ? selector(state) : state;
   },
 }));
+=======
+const dashboardProps = () => ({
+  onNewThread: vi.fn(),
+  onSelectThread: vi.fn(),
+  onQuickStart: vi.fn(),
+  onViewRuns: vi.fn(),
+  onReviewApprovals: vi.fn(),
+  onViewAllThreads: vi.fn(),
+  onOpenTeamRuns: vi.fn(),
+  onOpenHubAccount: vi.fn(),
+});
+
+const baseCapabilities: AgentInfo['capabilities'] = {
+  streaming: true,
+  toolCalls: true,
+  fileChanges: true,
+  thinkingVisible: true,
+  multiTurn: true,
+  mcpIntegration: true,
+  permissionHooks: true,
+  subAgentSpawn: false,
+};
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 describe('HomeDashboard', () => {
   beforeEach(() => {
@@ -87,10 +115,14 @@ describe('HomeDashboard', () => {
     const onOpenApprovals = vi.fn();
     render(
       <HomeDashboard
+<<<<<<< HEAD
         onNewThread={vi.fn()}
         onSelectThread={vi.fn()}
         onQuickStart={vi.fn()}
         onOpenApprovals={onOpenApprovals}
+=======
+        {...dashboardProps()}
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
         permissionCount={3}
       />,
     );
@@ -104,9 +136,7 @@ describe('HomeDashboard', () => {
   it('renders Hub session and bridged task summary', () => {
     render(
       <HomeDashboard
-        onNewThread={vi.fn()}
-        onSelectThread={vi.fn()}
-        onQuickStart={vi.fn()}
+        {...dashboardProps()}
       />,
     );
 
@@ -213,6 +243,7 @@ describe('HomeDashboard', () => {
     const onOpenRuns = vi.fn();
     render(
       <HomeDashboard
+<<<<<<< HEAD
         onNewThread={vi.fn()}
         onSelectThread={vi.fn()}
         onQuickStart={vi.fn()}
@@ -227,6 +258,8 @@ describe('HomeDashboard', () => {
   it('renders quick start suggestions', () => {
     render(
       <HomeDashboard
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
         {...dashboardProps()}
       />,
     );

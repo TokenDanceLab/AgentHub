@@ -230,6 +230,7 @@
   }
 }
 
+<<<<<<< HEAD
 .customizeLink {
   padding: 10px 14px 14px;
   border-top: 1px solid rgba(15, 23, 42, 0.07);
@@ -261,6 +262,8 @@
   background: rgba(93, 104, 204, 0.08);
 }
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 @media (max-width: 700px) {
   .overlay {
     padding: 14px;

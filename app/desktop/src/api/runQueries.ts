@@ -7,6 +7,7 @@ import { startRun, cancelRun, fetchRuns } from './edgeClient';
 import { RunInfoSchema, safeParse, listResponseSchema } from './schemas';
 import type { RunInfo, ListResponse, StartRunRequest } from '@shared/types';
 
+<<<<<<< HEAD
 type RunPatch = Partial<RunInfo> & { runId: string };
 type RunsSnapshot = Array<[QueryKey, ListResponse<RunInfo> | undefined]>;
 
@@ -61,6 +62,9 @@ export function updateRunStatusInQueries(
 }
 
 export function useRuns(projectId?: string, threadId?: string) {
+=======
+export function useRuns(projectId?: string, threadId?: string, options: { enabled?: boolean } = {}) {
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   return useQuery<ListResponse<RunInfo>>({
     queryKey: ['runs', projectId, threadId],
     queryFn: async () => {

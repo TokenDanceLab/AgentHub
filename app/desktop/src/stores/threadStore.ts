@@ -8,17 +8,23 @@ interface ThreadState {
   selectedAgentId: string | null;
   /** agentId → threadId mapping for the "click agent → open thread" model */
   agentThreadMap: Record<string, string>;
+<<<<<<< HEAD
   /** threadId → list of agent IDs that have participated in this thread (ordered by join time) */
   threadAgents: Record<string, string[]>;
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   selectAgent: (agentId: string) => void;
   selectThread: (id: string) => void;
   selectAgentThread: (agentId: string, threadId: string) => void;
   ensureAgentThread: (agentId: string) => string | null;
+<<<<<<< HEAD
   /**
    * Switch the active agent for a thread mid-conversation.
    * Returns handoff context { previousAgentId, newAgentId } so the caller can inject a system message.
    */
   switchThreadAgent: (threadId: string, agentId: string) => { previousAgentId: string | null; newAgentId: string };
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   pruneMissingThreads: (threadIds: string[]) => void;
   clearSelection: () => void;
 }
@@ -28,6 +34,7 @@ function agentForThread(agentThreadMap: Record<string, string>, threadId: string
   return match?.[0] ?? null;
 }
 
+<<<<<<< HEAD
 /** Derive the active agent for a thread: last entry in threadAgents, falling back to agentThreadMap reverse lookup. */
 function resolveThreadAgent(
   threadId: string | null,
@@ -40,6 +47,8 @@ function resolveThreadAgent(
   return agentForThread(agentThreadMap, threadId);
 }
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 export const useThreadStore = create<ThreadState>()(
   subscribeWithSelector(
     persist(
@@ -47,7 +56,10 @@ export const useThreadStore = create<ThreadState>()(
         selectedThreadId: null,
         selectedAgentId: null,
         agentThreadMap: {},
+<<<<<<< HEAD
         threadAgents: {},
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
         selectAgent: (agentId) => {
           const { agentThreadMap } = get();
@@ -58,14 +70,22 @@ export const useThreadStore = create<ThreadState>()(
         },
 
         selectThread: (id) => {
+<<<<<<< HEAD
           const { agentThreadMap, threadAgents } = get();
           set({
             selectedThreadId: id,
             selectedAgentId: resolveThreadAgent(id, threadAgents, agentThreadMap),
+=======
+          const { agentThreadMap } = get();
+          set({
+            selectedThreadId: id,
+            selectedAgentId: agentForThread(agentThreadMap, id),
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           });
         },
 
         selectAgentThread: (agentId, threadId) => {
+<<<<<<< HEAD
           const { agentThreadMap, threadAgents } = get();
           const nextMap = { ...agentThreadMap };
           const nextThreadAgents = { ...threadAgents };
@@ -74,6 +94,12 @@ export const useThreadStore = create<ThreadState>()(
             // Add agent to the thread's agent list, moving to end if already present
             const existing = nextThreadAgents[threadId] ?? [];
             nextThreadAgents[threadId] = [...existing.filter((id) => id !== agentId), agentId];
+=======
+          const { agentThreadMap } = get();
+          const nextMap = { ...agentThreadMap };
+          if (threadId) {
+            nextMap[agentId] = threadId;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           } else {
             delete nextMap[agentId];
           }
@@ -81,7 +107,10 @@ export const useThreadStore = create<ThreadState>()(
             selectedAgentId: agentId,
             selectedThreadId: threadId || null,
             agentThreadMap: nextMap,
+<<<<<<< HEAD
             threadAgents: nextThreadAgents,
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           });
         },
 
@@ -90,6 +119,7 @@ export const useThreadStore = create<ThreadState>()(
           return agentThreadMap[agentId] ?? null;
         },
 
+<<<<<<< HEAD
         switchThreadAgent: (threadId, agentId) => {
           const { threadAgents } = get();
           const previousAgentId = get().selectedAgentId;
@@ -122,6 +152,19 @@ export const useThreadStore = create<ThreadState>()(
             selectedAgentId: nextAgentId,
             agentThreadMap: nextMap,
             threadAgents: nextThreadAgents,
+=======
+        pruneMissingThreads: (threadIds) => {
+          const existing = new Set(threadIds);
+          const { agentThreadMap, selectedThreadId } = get();
+          const nextMap = Object.fromEntries(
+            Object.entries(agentThreadMap).filter(([, threadId]) => existing.has(threadId)),
+          );
+          const nextThreadId = selectedThreadId && existing.has(selectedThreadId) ? selectedThreadId : null;
+          set({
+            selectedThreadId: nextThreadId,
+            selectedAgentId: nextThreadId ? agentForThread(nextMap, nextThreadId) : null,
+            agentThreadMap: nextMap,
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           });
         },
 
@@ -129,6 +172,7 @@ export const useThreadStore = create<ThreadState>()(
       }),
       {
         name: 'agenthub-thread-selection',
+<<<<<<< HEAD
         version: 2,
         migrate: (persisted) => {
           const state = (persisted && typeof persisted === 'object' && 'state' in persisted)
@@ -141,11 +185,17 @@ export const useThreadStore = create<ThreadState>()(
             threadAgents: state?.threadAgents ?? {},
           };
         },
+=======
+        version: 1,
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
         partialize: (state) => ({
           selectedThreadId: state.selectedThreadId,
           selectedAgentId: state.selectedAgentId,
           agentThreadMap: state.agentThreadMap,
+<<<<<<< HEAD
           threadAgents: state.threadAgents,
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
         }),
       },
     ),

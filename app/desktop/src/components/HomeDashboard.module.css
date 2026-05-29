@@ -68,12 +68,17 @@
 }
 
 .statFooter:disabled {
+<<<<<<< HEAD
   color: var(--muted-foreground);
   cursor: default;
   opacity: 0.5;
 }
 
 .statFooter:disabled:hover {
+=======
+  cursor: not-allowed;
+  opacity: 0.48;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   text-decoration: none;
 }
 

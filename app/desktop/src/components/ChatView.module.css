@@ -38,17 +38,23 @@
   overflow-anchor: none;
 }
 
+<<<<<<< HEAD
 .virtualItem {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   padding-bottom: var(--space-sm, 12px);
+=======
+.messageRow {
+  width: 100%;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   display: flex;
   flex-direction: column;
   align-items: stretch;
 }
 
+<<<<<<< HEAD
 .messageRow {
   width: 100%;
   display: flex;
@@ -56,10 +62,13 @@
   align-items: stretch;
 }
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 .messageRowUser {
   align-items: flex-end;
 }
 
+<<<<<<< HEAD
 .messageRowFocused {
   /* subtle background highlight for roving tabIndex focused message */
   background: rgba(255, 255, 255, 0.018);
@@ -88,6 +97,8 @@
   box-shadow: none;
 }
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 .empty {
   margin: auto;
   color: color-mix(in oklch, var(--foreground) 88%, var(--muted-foreground) 12%);
@@ -669,6 +680,7 @@
   background: color-mix(in oklch, var(--primary) 12%, transparent);
 }
 
+<<<<<<< HEAD
 .fileChangeActions {
   display: flex;
   align-items: center;
@@ -681,6 +693,8 @@
   /* hidden on narrow viewports via mobile media query */
 }
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 /* ── AgentTeam / subagent activity ─────────── */
 
 .agentTaskBlock,
@@ -1695,6 +1709,7 @@
   transform: translateX(-50%) scale(0.97);
 }
 
+<<<<<<< HEAD
 /* ── ErrorBlock ────────────────────────────── */
 
 .errorBlock {
@@ -2051,6 +2066,8 @@
   border-top: 1px solid var(--border);
 }
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 /* Neutral typography pass: chat primary text stays cool and readable. */
 .empty,
 .userMsg,
@@ -2102,9 +2119,13 @@
 .showParamsBtn,
 .diffTruncated,
 .codeLangBadge,
+<<<<<<< HEAD
 .copyBtn,
 .toolGroupHeader,
 .toolGroupLabel {
+=======
+.copyBtn {
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   color: var(--text-weaker);
 }
 
@@ -2120,9 +2141,13 @@
 .toolUseHeader:focus-visible,
 .showParamsBtn:hover,
 .copyBtn:hover,
+<<<<<<< HEAD
 .userMsg .actionBtn:hover,
 .toolGroupHeader:hover,
 .toolGroupHeader:focus-visible {
+=======
+.userMsg .actionBtn:hover {
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   color: var(--text-primary);
 }
 
@@ -2142,8 +2167,14 @@
   -webkit-background-clip: text;
 }
 
+<<<<<<< HEAD
 /* ══════════════════════════════════════════════════════�?   Mobile (< 768px)
    ══════════════════════════════════════════════════════�?*/
+=======
+/* ═══════════════════════════════════════════════════════
+   Mobile (< 768px)
+   ═══════════════════════════════════════════════════════ */
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 @media (max-width: 767px) {
   .stream {
     --composer-clearance: 188px;
