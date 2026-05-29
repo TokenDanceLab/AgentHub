@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, KeyRound } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserProfile } from '@/api/hubClient';
-import tokenDanceLogo from '@/assets/tokendance-icon-rounded.svg';
+import tokenDanceLogo from '@shared/assets/tokendance-icon-rounded.svg';
 import styles from './AuthPage.module.css';
 
 interface LoginFormProps {
