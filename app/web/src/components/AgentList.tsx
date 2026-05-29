@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { MapPin, Search, Settings2, Sparkles } from 'lucide-react';
 import { useState, useMemo, memo, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
+import { EmptyState } from '@shared/ui';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
 import styles from './AgentList.module.css';
 
@@ -89,12 +90,27 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
       </div>
 
       {isEmpty ? (
-        <div className={styles.empty}>
-          <Sparkles size={16} />
-          <span>{online ? t('agent.emptyOnline') : t('agent.emptyOffline')}</span>
-        </div>
+        <EmptyState
+          title={online ? t('agent.emptyOnline') : t('agent.emptyOffline')}
+          description={online ? t('agent.emptyOnlineDescription') : t('agent.emptyOfflineDescription')}
+          icon={<Sparkles size={16} />}
+          titleLevel={3}
+          className={styles.emptyState ?? ''}
+          contentClassName={styles.emptyStateContent ?? ''}
+          iconClassName={styles.emptyStateIcon ?? ''}
+          titleClassName={styles.emptyStateTitle ?? ''}
+          descriptionClassName={styles.emptyStateDescription ?? ''}
+        />
       ) : isSearchEmpty ? (
-        <div className={styles.empty}>{t('agent.noMatch')}</div>
+        <EmptyState
+          title={t('agent.noMatch')}
+          description={t('agent.noMatchDescription')}
+          titleLevel={3}
+          className={styles.emptyState ?? ''}
+          contentClassName={styles.emptyStateContent ?? ''}
+          titleClassName={styles.emptyStateTitle ?? ''}
+          descriptionClassName={styles.emptyStateDescription ?? ''}
+        />
       ) : (
         <ul className={styles.list}>
           {filteredAgents.map((a) => (
