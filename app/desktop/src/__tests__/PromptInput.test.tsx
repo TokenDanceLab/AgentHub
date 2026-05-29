@@ -721,6 +721,87 @@ describe('PromptInput', () => {
     );
   });
 
+  it('persists and reuses recent local workspaces without sending a target id', () => {
+    const onSend = vi.fn();
+    render(
+      <PromptInput
+        agents={[]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={onSend}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.workTarget' }));
+    fireEvent.change(screen.getByLabelText('prompt.targetFolder'), {
+      target: { value: 'D:\\Code\\TokenDance\\AgentHub' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.applyWorkDir' }));
+
+    expect(JSON.parse(localStorage.getItem('agenthub.prompt.recentWorkDirs') ?? '[]')).toEqual([
+      'D:\\Code\\TokenDance\\AgentHub',
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.workTarget' }));
+    expect(screen.getByText('prompt.targetRecentWorkspaces')).toBeInTheDocument();
+    expect(screen.getByText('prompt.targetRecentRunWorkDir')).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Run from recent workspace');
+    fireEvent.click(screen.getByRole('button', { name: 'action.startRun' }));
+
+    expect(onSend).toHaveBeenCalledWith(
+      'Run from recent workspace',
+      undefined,
+      { workDir: 'D:\\Code\\TokenDance\\AgentHub' },
+    );
+    expect(onSend.mock.calls[0]?.[2]).not.toHaveProperty('targetId');
+  });
+
+  it('shows remote and cloud execution targets as disabled inventory only', () => {
+    const onSend = vi.fn();
+    render(
+      <PromptInput
+        agents={[]}
+        executionTargets={[{
+          id: 'target-ssh',
+          name: 'Remote SSH lab',
+          target_type: 'remote_ssh',
+          workspace_root: '/srv/project',
+          workspace_allowlist: ['/srv'],
+          trust_level: 'remote',
+          health_state: 'healthy',
+          is_online: true,
+        }, {
+          id: 'target-cloud',
+          name: 'Cloud runner',
+          target_type: 'cloud_edge',
+          workspace_allowlist: [],
+          trust_level: 'cloud',
+          health_state: 'unknown',
+          is_online: false,
+        }]}
+        selectedAgentId={undefined}
+        onSelectAgent={vi.fn()}
+        onSend={onSend}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'prompt.workTarget' }));
+
+    expect(screen.getByText('prompt.targetRemoteInventory')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Remote SSH lab/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Cloud runner/ })).toBeDisabled();
+    expect(screen.getByText('prompt.targetRemoteDisabled(type=remote_ssh)')).toBeInTheDocument();
+    expect(screen.getByText('prompt.targetNoWorkspace')).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText(/prompt\.placeholder/);
+    typeInPrompt(input, 'Remote targets should not be selected');
+    fireEvent.click(screen.getByRole('button', { name: 'action.startRun' }));
+
+    expect(onSend).toHaveBeenCalledWith('Remote targets should not be selected', undefined, undefined);
+  });
+
   it('lets a manually selected model override the selected agent profile alias', () => {
     const onSend = vi.fn();
     const agents = [makeAgent({ id: 'codex', name: 'Codex Runtime' })];
