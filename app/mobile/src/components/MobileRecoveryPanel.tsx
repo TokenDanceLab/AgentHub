@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { RecoveryPanel } from "@agenthub/shared/ui";
 import { RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -28,38 +29,38 @@ export function MobileRecoveryPanel({
   onSecondaryAction,
 }: MobileRecoveryPanelProps) {
   const { t } = useTranslation();
+  const secondaryAction = secondaryLabel && onSecondaryAction
+    ? {
+        label: secondaryLabel,
+        icon: secondaryIcon,
+        onClick: onSecondaryAction,
+      }
+    : undefined;
 
   return (
-    <section className="mobileRecoveryPanel" role="alert" aria-label={title}>
-      <span className="mobileRecoveryIcon">{icon}</span>
-      <div className="mobileRecoveryBody">
-        <p className="mobileEyebrow">{eyebrow}</p>
-        <h2>{title}</h2>
-        <p className="mobileRecoveryDescription">{description}</p>
-        {meta && <span className="mobileRecoveryMeta">{meta}</span>}
-      </div>
-      <div className="mobileRecoveryActions">
-        <button
-          className="mobileActionButton mobileRecoveryAction"
-          type="button"
-          disabled={isRetrying}
-          onClick={onRetry}
-          aria-busy={isRetrying}
-        >
-          <RefreshCw size={16} className={isRetrying ? "mobileSpin" : undefined} />
-          <span>{isRetrying ? t("common.actions.retrying") : t("common.actions.retry")}</span>
-        </button>
-        {secondaryLabel && onSecondaryAction && (
-          <button
-            className="mobileActionButton"
-            type="button"
-            onClick={onSecondaryAction}
-          >
-            {secondaryIcon}
-            <span>{secondaryLabel}</span>
-          </button>
-        )}
-      </div>
-    </section>
+    <RecoveryPanel
+      icon={icon}
+      eyebrow={eyebrow}
+      title={title}
+      description={description}
+      meta={meta}
+      className="mobileRecoveryPanel"
+      iconClassName="mobileRecoveryIcon"
+      bodyClassName="mobileRecoveryBody"
+      eyebrowClassName="mobileEyebrow"
+      descriptionClassName="mobileRecoveryDescription"
+      metaClassName="mobileRecoveryMeta"
+      actionsClassName="mobileRecoveryActions"
+      actionClassName="mobileActionButton"
+      primaryAction={{
+        label: t("common.actions.retry"),
+        busyLabel: t("common.actions.retrying"),
+        icon: <RefreshCw size={16} className={isRetrying ? "mobileSpin" : undefined} />,
+        busy: isRetrying,
+        className: "mobileRecoveryAction",
+        onClick: onRetry,
+      }}
+      {...(secondaryAction ? { secondaryAction } : {})}
+    />
   );
 }
