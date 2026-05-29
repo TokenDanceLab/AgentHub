@@ -6,17 +6,21 @@
 .trigger {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   max-width: 170px;
-  min-height: 30px;
-  padding: 0 10px;
+  height: var(--composer-control-h, 32px);
+  min-height: var(--composer-control-h, 32px);
+  padding: 0 8px;
   border: 0;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.055);
-  color: var(--muted-foreground);
+  border-radius: var(--composer-control-radius, 10px);
+  background: var(--composer-control-bg, rgba(255, 255, 255, 0.052));
+  box-shadow: none;
+  color: var(--composer-control-text, var(--muted-foreground));
   font: inherit;
   font-size: 13px;
-  font-weight: 620;
+  font-weight: 430;
+  line-height: 20px;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -24,8 +28,8 @@
 .trigger:hover,
 .trigger:focus-visible,
 .trigger[aria-expanded='true'] {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--foreground);
+  background: var(--composer-control-bg-hover, rgba(255, 255, 255, 0.078));
+  color: var(--composer-control-text-active, var(--muted-foreground));
   outline: none;
 }
 
@@ -36,18 +40,22 @@
 
 .trigger span {
   overflow: hidden;
+  line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.trigger svg,
+.optionIcon svg {
+  stroke-width: 1.85;
+}
+
 .popover {
   padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 13px;
-  background: rgba(48, 48, 58, 0.96);
-  box-shadow:
-    0 10px 24px rgba(0, 0, 0, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.032);
+  border: 1px solid var(--composer-panel-edge, rgba(0, 0, 0, 0.34));
+  border-radius: 12px;
+  background: rgba(35, 35, 43, 0.97);
+  box-shadow: var(--composer-panel-shadow, 0 22px 56px rgba(0, 0, 0, 0.38), 0 3px 12px rgba(0, 0, 0, 0.22));
   backdrop-filter: blur(22px) saturate(1.05);
   -webkit-backdrop-filter: blur(22px) saturate(1.05);
   animation: popoverIn 0.12s ease-out;
@@ -70,14 +78,14 @@
 .option {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 9px;
   width: 100%;
-  min-height: 42px;
+  min-height: 36px;
   padding: 0 10px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 9px;
   background: transparent;
-  color: var(--foreground);
+  color: var(--composer-control-text, var(--muted-foreground));
   font: inherit;
   cursor: pointer;
   text-align: left;
@@ -86,7 +94,7 @@
 .option:hover,
 .option:focus-visible,
 .optionActive {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.046);
   outline: none;
 }
 
@@ -95,26 +103,27 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  color: color-mix(in oklch, var(--muted-foreground) 84%, var(--foreground));
+  color: var(--composer-control-icon, color-mix(in oklch, var(--muted-foreground) 84%, var(--foreground)));
 }
 
 .optionLabel {
   min-width: 0;
   overflow: hidden;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 430;
+  line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .check {
   margin-left: auto;
-  color: var(--foreground);
+  color: var(--composer-control-icon-active, var(--muted-foreground));
   opacity: 0.86;
 }
 
 [data-theme='light'] .trigger {
-  background: rgba(15, 23, 42, 0.055);
+  background: transparent;
 }
 
 [data-theme='light'] .trigger:hover,
@@ -127,8 +136,8 @@
   border-color: rgba(15, 23, 42, 0.08);
   background: rgba(248, 249, 252, 0.96);
   box-shadow:
-    0 10px 24px rgba(15, 23, 42, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    0 18px 42px rgba(15, 23, 42, 0.14),
+    0 2px 10px rgba(15, 23, 42, 0.08);
 }
 
 [data-theme='light'] .option:hover,
