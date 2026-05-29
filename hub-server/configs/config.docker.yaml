@@ -24,6 +24,13 @@ jwt:
 upload:
   dir: ./uploads
   max_size: 10485760
+s3:
+  endpoint: ""
+  access_key: ""
+  secret_key: ""
+  bucket: ""
+  region: ""
+  use_ssl: true
 agent_team:
   max_delegation_depth: 3
   max_active_subagents_per_run: 5
