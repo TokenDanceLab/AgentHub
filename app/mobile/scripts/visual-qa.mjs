@@ -6,6 +6,7 @@ const baseUrl = process.env.MOBILE_QA_URL ?? "http://localhost:5174/";
 const outDir = path.resolve("screenshots");
 const viewport = { width: 390, height: 844 };
 const compactViewport = { width: 390, height: 640 };
+const hubUrlPattern = /https?:\/\/(?:api\.hub\.vectorcontrol\.tech|hub\.vectorcontrol\.tech)\/.*/;
 
 const threads = [
   {
@@ -69,6 +70,14 @@ function json(data) {
   };
 }
 
+function postDataJSON(request) {
+  try {
+    return request.postDataJSON();
+  } catch {
+    return {};
+  }
+}
+
 async function installMockHub(page, options = {}) {
   const mockThreads = options.threads ?? threads;
   const mockRuns = options.runs ?? runs;
@@ -82,15 +91,363 @@ async function installMockHub(page, options = {}) {
     window.localStorage.setItem("agenthub.mobile.language", "en");
   });
 
-  await page.route("http://api.hub.vectorcontrol.tech/health", async (route) => route.fulfill(json({
-    status: "ok",
-    version: "visual-qa",
-    uptime: "1h",
-    checks: { database: "ok", redis: "ok" },
-  })));
+  await page.context().route(hubUrlPattern, async (route) => {
+    const url = new URL(route.request().url());
+    const pathname = url.pathname;
 
-  await page.route("http://api.hub.vectorcontrol.tech/v1/**", async (route) => {
+    if (pathname.endsWith("/health")) {
+      return route.fulfill(json({
+        status: "ok",
+        version: "visual-qa",
+        uptime: "1h",
+        checks: { database: "ok", redis: "ok" },
+      }));
+    }
+
+    if (pathname.endsWith("/v1/health")) {
+      return route.fulfill(json({
+        status: "ok",
+        version: "visual-qa",
+        edgeId: "mobile-preview",
+        checks: { runners: { status: "ok", total: 3, available: 2 } },
+      }));
+    }
+
+    if (pathname.endsWith("/v1/threads")) {
+      threadRequestCount += 1;
+      if (threadRequestCount > 1 && options.delayThreadRefreshMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.delayThreadRefreshMs));
+      }
+      return route.fulfill(json({ items: mockThreads, page: { hasMore: false } }));
+    }
+
+    if (pathname.includes("/v1/threads/thread_mobile_approval/items")) {
+      if (options.threadItemsStatus && options.threadItemsStatus >= 400) {
+        return route.fulfill({
+          status: options.threadItemsStatus,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "mock thread items failure" }),
+          headers: { "access-control-allow-origin": "*" },
+        });
+      }
+      const baseThreadItems = [
+        {
+          id: "msg_1",
+          threadId: "thread_mobile_approval",
+          kind: "message",
+          role: "user",
+          content: "Can you verify the approval copy on a phone before release?",
+          createdAt: "2026-05-27T01:11:00Z",
+        },
+        {
+          id: "msg_2",
+          threadId: "thread_mobile_approval",
+          kind: "message",
+          role: "agent",
+          content: "I will check the compact review surface, status wording, and tap targets against the TokenDance design contract.",
+          createdAt: "2026-05-27T01:12:00Z",
+        },
+        {
+          id: "activity_approval_1",
+          threadId: "thread_mobile_approval",
+          kind: "approval",
+          role: "agent",
+          content: "Approval checkpoint is waiting for a mobile reviewer before release handoff.",
+          createdAt: "2026-05-27T01:16:00Z",
+        },
+        {
+          id: "activity_diff_1",
+          threadId: "thread_mobile_approval",
+          kind: "diff",
+          role: "agent",
+          content: "2 files changed in Mobile review copy and visual QA evidence.",
+          createdAt: "2026-05-27T01:18:00Z",
+        },
+      ];
+      const longThreadItems = options.longThread ? [
+        {
+          id: "msg_3",
+          threadId: "thread_mobile_approval",
+          kind: "message",
+          role: "agent",
+          content: "Review note: the bottom dock must stay reachable after scrolling through activity, diff context, and handoff notes.",
+          createdAt: "2026-05-27T01:19:00Z",
+        },
+        {
+          id: "msg_4",
+          threadId: "thread_mobile_approval",
+          kind: "message",
+          role: "user",
+          content: "Keep the latest reply reachable without forcing the reviewer to drag through the whole thread.",
+          createdAt: "2026-05-27T01:20:00Z",
+        },
+        {
+          id: "msg_5",
+          threadId: "thread_mobile_approval",
+          kind: "message",
+          role: "agent",
+          content: "Latest anchor is ready for the final mobile handoff check.",
+          createdAt: "2026-05-27T01:21:00Z",
+        },
+      ] : [];
+      return route.fulfill(json({
+        items: [...baseThreadItems, ...longThreadItems],
+        page: { hasMore: false },
+      }));
+    }
+
+    if (pathname.includes("/v1/threads/thread_mobile_approval/messages")) {
+      messageRequestCount += 1;
+      if (options.messageDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.messageDelayMs));
+      }
+      if (options.messageFailuresBeforeSuccess && messageRequestCount <= options.messageFailuresBeforeSuccess) {
+        return route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "mock transient message failure" }),
+          headers: { "access-control-allow-origin": "*" },
+        });
+      }
+      if (options.messageStatus && options.messageStatus >= 400) {
+        return route.fulfill({
+          status: options.messageStatus,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "mock message failure" }),
+          headers: { "access-control-allow-origin": "*" },
+        });
+      }
+      return route.fulfill(json({
+        id: "msg_new",
+        threadId: "thread_mobile_approval",
+        role: "user",
+        content: "Looks good from mobile.",
+        createdAt: new Date().toISOString(),
+      }));
+    }
+
+    if (pathname.endsWith("/v1/runs")) {
+      runRequestCount += 1;
+      if (runRequestCount > 1 && options.delayRunRefreshMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.delayRunRefreshMs));
+      }
+      const currentRuns = approvalDecisionOutcome
+        ? mockRuns.map((run) => (
+            run.runId === "run_gateway_docs_002"
+              ? { ...run, status: approvalDecisionOutcome === "rejected" ? "failed" : "running" }
+              : run
+          ))
+        : mockRuns;
+      return route.fulfill(json({ items: currentRuns, page: { hasMore: false } }));
+    }
+
+    if (pathname.includes("/v1/runs/run_gateway_docs_002/items")) {
+      return route.fulfill(json({
+        items: [
+          {
+            id: "run_item_approval",
+            threadId: "thread_docs_handoff",
+            kind: "approval",
+            role: "agent",
+            content: "Approve the mobile release note copy before handing off.",
+            createdAt: "2026-05-27T01:01:00Z",
+          },
+          {
+            id: "run_item_diff",
+            threadId: "thread_docs_handoff",
+            kind: "diff",
+            role: "agent",
+            content: "docs/mobile.md +42 -8",
+            createdAt: "2026-05-27T01:02:00Z",
+          },
+          {
+            id: "run_item_code",
+            threadId: "thread_docs_handoff",
+            kind: "code",
+            role: "agent",
+            content: "pnpm --filter mobile typecheck",
+            createdAt: "2026-05-27T01:03:00Z",
+          },
+          {
+            id: "run_item_file",
+            threadId: "thread_docs_handoff",
+            kind: "file",
+            role: "agent",
+            content: "docs/release/gateway-mobile-review.md",
+            createdAt: "2026-05-27T01:04:00Z",
+          },
+        ],
+        page: { hasMore: false },
+      }));
+    }
+
+    if (pathname.includes("/v1/runs/run_gateway_docs_002/logs")) {
+      return route.fulfill(json({
+        stdout: "[mobile] typecheck passed\n[mobile] visual QA running\n",
+        stderr: "[warn] live Hub workflow contract is still pending",
+      }));
+    }
+
+    if (pathname.includes("/v1/runs/run_gateway_docs_002/diff")) {
+      return route.fulfill(json({
+        files: [
+          { path: "app/mobile/src/views/RunStatusView.tsx", additions: 28, deletions: 6 },
+          { path: "app/mobile/README.md", additions: 12, deletions: 2 },
+        ],
+      }));
+    }
+
+    if (pathname.endsWith("/v1/artifacts") || pathname.includes("/v1/runs/run_gateway_docs_002/artifacts")) {
+      return route.fulfill(json({
+        items: [
+          {
+            id: "artifact_release_note",
+            runId: "run_gateway_docs_002",
+            threadId: "thread_docs_handoff",
+            kind: "markdown",
+            path: "docs/release/gateway-mobile-review.md",
+            sizeBytes: 3824,
+            createdAt: "2026-05-27T01:01:00Z",
+          },
+        ],
+        page: { hasMore: false },
+      }));
+    }
+
+    if (pathname.endsWith("/v1/previews") || pathname.includes("/v1/runs/run_gateway_docs_002/previews")) {
+      return route.fulfill(json({
+        items: [
+          {
+            id: "preview_gateway_note",
+            runId: "run_gateway_docs_002",
+            threadId: "thread_docs_handoff",
+            url: "https://preview.agenthub.local/gateway-mobile-review",
+            status: "ready",
+            createdAt: "2026-05-27T01:02:00Z",
+          },
+        ],
+        page: { hasMore: false },
+      }));
+    }
+
+    if (pathname.endsWith("/v1/approvals")) {
+      return route.fulfill(json({
+        items: [
+          {
+            id: "approval_gateway_1",
+            runId: "run_gateway_docs_002",
+            threadId: "thread_docs_handoff",
+            kind: "file_write",
+            summary: "Review generated Gateway release note edits before publish",
+            status: approvalDecisionOutcome ?? "pending",
+            createdAt: "2026-05-27T00:58:00Z",
+          },
+        ],
+        page: { hasMore: false },
+      }));
+    }
+
+    if (pathname.includes("/v1/runs/run_gateway_docs_002/approvals")) {
+      const isDecision = route.request().method() === "POST";
+      if (isDecision) {
+        decisionRequestCount += 1;
+        if (options.decisionDelayMs) {
+          await new Promise((resolve) => setTimeout(resolve, options.decisionDelayMs));
+        }
+        const body = postDataJSON(route.request());
+        const decision = body?.decision === "rejected" ? "rejected" : "approved";
+        if ((options.decisionFailuresBeforeSuccess || options.approvalFailuresBeforeSuccess) && decisionRequestCount <= (options.decisionFailuresBeforeSuccess ?? options.approvalFailuresBeforeSuccess)) {
+          return route.fulfill({
+            status: 503,
+            contentType: "application/json",
+            body: JSON.stringify({ error: "mock approval failure" }),
+            headers: { "access-control-allow-origin": "*" },
+          });
+        }
+        if (options.decisionStatus && options.decisionStatus >= 400) {
+          return route.fulfill({
+            status: options.decisionStatus,
+            contentType: "application/json",
+            body: JSON.stringify({ error: "mock approval decision failure" }),
+            headers: { "access-control-allow-origin": "*" },
+          });
+        }
+        approvalDecisionOutcome = decision;
+        return route.fulfill(json({
+          id: "approval_gateway_1",
+          runId: "run_gateway_docs_002",
+          threadId: "thread_docs_handoff",
+          kind: "file_write",
+          summary: "Review generated Gateway release note edits before publish",
+          status: decision,
+          createdAt: "2026-05-27T00:58:00Z",
+        }));
+      }
+      return route.fulfill(json({
+        items: [
+          {
+            id: "approval_gateway_1",
+            runId: "run_gateway_docs_002",
+            threadId: "thread_docs_handoff",
+            kind: "file_write",
+            summary: "Review generated Gateway release note edits before publish",
+            status: approvalDecisionOutcome ?? "pending",
+            createdAt: "2026-05-27T00:58:00Z",
+          },
+        ],
+        page: { hasMore: false },
+      }));
+    }
+
+    if (pathname.includes("/v1/approvals/") && pathname.endsWith(":decide")) {
+      decisionRequestCount += 1;
+      if (options.decisionDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.decisionDelayMs));
+      }
+      const body = postDataJSON(route.request());
+      const decision = body?.decision === "rejected" ? "rejected" : "approved";
+      if ((options.decisionFailuresBeforeSuccess || options.approvalFailuresBeforeSuccess) && decisionRequestCount <= (options.decisionFailuresBeforeSuccess ?? options.approvalFailuresBeforeSuccess)) {
+        return route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "mock approval failure" }),
+          headers: { "access-control-allow-origin": "*" },
+        });
+      }
+      if (options.decisionStatus && options.decisionStatus >= 400) {
+        return route.fulfill({
+          status: options.decisionStatus,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "mock approval decision failure" }),
+          headers: { "access-control-allow-origin": "*" },
+        });
+      }
+      approvalDecisionOutcome = decision;
+      return route.fulfill(json({
+        id: "approval_gateway_1",
+        runId: "run_gateway_docs_002",
+        threadId: "thread_docs_handoff",
+        kind: "file_write",
+        summary: "Review generated Gateway release note edits before publish",
+        status: decision,
+        createdAt: "2026-05-27T00:58:00Z",
+      }));
+    }
+
+    return route.fulfill(json({ items: [], page: { hasMore: false } }));
+  });
+
+  await page.context().route(hubUrlPattern, async (route) => {
     const pathname = new URL(route.request().url()).pathname;
+
+    if (pathname.endsWith("/health")) {
+      return route.fulfill(json({
+        status: "ok",
+        version: "visual-qa",
+        uptime: "1h",
+        checks: { database: "ok", redis: "ok" },
+      }));
+    }
 
     if (pathname.endsWith("/v1/health")) {
       return route.fulfill(json({
@@ -250,7 +607,7 @@ async function installMockHub(page, options = {}) {
           headers: { "access-control-allow-origin": "*" },
         });
       }
-      const requestBody = route.request().postDataJSON();
+      const requestBody = postDataJSON(route.request());
       approvalDecisionOutcome = requestBody?.decision === "rejected" ? "rejected" : "approved";
       return route.fulfill(json({
         id: "approval_gateway_1",
@@ -429,15 +786,17 @@ async function installRecoveryMockHub(page, failingSurface) {
     window.localStorage.setItem("agenthub.mobile.language", "en");
   });
 
-  await page.route("http://api.hub.vectorcontrol.tech/health", async (route) => route.fulfill(json({
-    status: "ok",
-    version: "visual-qa",
-    uptime: "1h",
-    checks: { database: "ok", redis: "ok" },
-  })));
-
-  await page.route("http://api.hub.vectorcontrol.tech/v1/**", async (route) => {
+  await page.context().route(hubUrlPattern, async (route) => {
     const pathname = new URL(route.request().url()).pathname;
+
+    if (pathname.endsWith("/health")) {
+      return route.fulfill(json({
+        status: "ok",
+        version: "visual-qa",
+        uptime: "1h",
+        checks: { database: "ok", redis: "ok" },
+      }));
+    }
 
     if (pathname.endsWith("/v1/health")) {
       return route.fulfill(json({
@@ -509,15 +868,46 @@ function assertMetrics(fileName, metrics) {
   }
 }
 
+async function openAccountTab(page, labelPattern = /Account/) {
+  await page.locator(".mobileBottomNav").getByRole("button", { name: labelPattern }).click();
+}
+
+async function waitForRunsTab(page) {
+  await page.locator(".mobileBottomNav").getByRole("button", { name: /^Runs(?:,|\.)/ }).waitFor({ timeout: 5000 });
+}
+
+async function waitForAccountHeading(page, heading = /Account|账户/) {
+  await page.getByRole("heading", { name: heading, level: 1 }).waitFor({ timeout: 5000 });
+}
+
+async function assertAccountReadiness(page, fileName) {
+  const readinessRows = await page.locator(".mobileReadinessRow").count();
+  if (readinessRows !== 3) {
+    throw new Error(`${fileName}: expected 3 dense Account readiness rows, got ${readinessRows}`);
+  }
+
+  await page.locator(".mobileReadinessRow").filter({ hasText: /Hub session|Hub 会话/ }).waitFor({ timeout: 5000 });
+  await page.locator(".mobileSignalRow").filter({ hasText: /Ready for native|已准备好/ }).waitFor({ timeout: 5000 });
+}
+
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({
+
+async function newMobilePage(options) {
+  const context = await browser.newContext({
+    ...options,
+    serviceWorkers: "block",
+  });
+  await context.grantPermissions(["clipboard-write"], { origin: new URL(baseUrl).origin });
+  return context.newPage();
+}
+
+const page = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
   hasTouch: true,
   colorScheme: "dark",
 });
-await page.context().grantPermissions(["clipboard-write"], { origin: new URL(baseUrl).origin });
 
 const consoleMessages = [];
 const expectedConsoleFragments = [
@@ -551,13 +941,13 @@ await page.getByRole("button", { name: /^Runs, 1 pending reviews$/ }).waitFor({ 
 results.push(["mobile-design-bottom-nav-badges-mocked-dark.png", await snapshot(page, "mobile-design-bottom-nav-badges-mocked-dark.png")]);
 results.push(["mobile-design-after-threads-mocked-dark.png", await snapshot(page, "mobile-design-after-threads-mocked-dark.png")]);
 results.push(["mobile-design-threads-handoff-mocked-dark.png", await snapshot(page, "mobile-design-threads-handoff-mocked-dark.png")]);
-await page.getByRole("button", { name: /Archived/ }).click();
+await page.getByRole("button", { name: /Archive/ }).click();
 await page.waitForTimeout(200);
 results.push(["mobile-design-threads-filter-archived-mocked-dark.png", await snapshot(page, "mobile-design-threads-filter-archived-mocked-dark.png")]);
 await page.getByRole("button", { name: /All/ }).click();
 await page.waitForTimeout(150);
 
-const threadRefreshPage = await browser.newPage({
+const threadRefreshPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -589,7 +979,7 @@ await page.getByRole("button", { name: /Review approval copy on mobile.*agenthub
 await page.waitForTimeout(250);
 results.push(["mobile-design-after-chat-mocked-dark.png", await snapshot(page, "mobile-design-after-chat-mocked-dark.png")]);
 results.push(["mobile-design-chat-context-mocked-dark.png", await snapshot(page, "mobile-design-chat-context-mocked-dark.png")]);
-await page.getByRole("button", { name: "Copy message from Agent" }).click();
+await page.getByRole("button", { name: "Copy agent message" }).click();
 await page.getByText("Copied").waitFor({ timeout: 1000 });
 results.push(["mobile-design-chat-copy-feedback-mocked-dark.png", await snapshot(page, "mobile-design-chat-copy-feedback-mocked-dark.png")]);
 await page.waitForTimeout(1900);
@@ -601,7 +991,7 @@ await page.getByRole("button", { name: "Chat" }).click();
 await page.waitForTimeout(150);
 results.push(["mobile-design-chat-tab-root-mocked-dark.png", await snapshot(page, "mobile-design-chat-tab-root-mocked-dark.png")]);
 
-const chatRecoveryPage = await browser.newPage({
+const chatRecoveryPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -634,7 +1024,7 @@ await chatRecoveryPage.locator(".mobileRecoveryPanel").getByRole("button", { nam
 await chatRecoveryPage.getByRole("button", { name: /Review approval copy on mobile.*agenthub-mobile/ }).waitFor({ timeout: 5000 });
 await chatRecoveryPage.close();
 
-const chatLatestPage = await browser.newPage({
+const chatLatestPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -666,7 +1056,7 @@ await chatLatestPage.getByRole("button", { name: "Jump to latest message" }).cli
 await chatLatestPage.getByRole("button", { name: "Jump to latest message" }).waitFor({ state: "detached", timeout: 1000 });
 await chatLatestPage.close();
 
-const chatPendingPage = await browser.newPage({
+const chatPendingPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -695,7 +1085,7 @@ await chatPendingPage.getByText("Looks good from mobile.").waitFor({ timeout: 10
 results.push(["mobile-design-chat-send-pending-mocked-dark.png", await snapshot(chatPendingPage, "mobile-design-chat-send-pending-mocked-dark.png")]);
 await chatPendingPage.close();
 
-const chatErrorPage = await browser.newPage({
+const chatErrorPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -726,7 +1116,7 @@ results.push(["mobile-design-chat-send-error-mocked-dark.png", await snapshot(ch
 results.push(["mobile-design-chat-send-error-retry-mocked-dark.png", await snapshot(chatErrorPage, "mobile-design-chat-send-error-retry-mocked-dark.png")]);
 await chatErrorPage.close();
 
-const chatRetrySuccessPage = await browser.newPage({
+const chatRetrySuccessPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -759,7 +1149,7 @@ if (await chatRetrySuccessPage.getByRole("button", { name: "Retry mobile reply" 
 results.push(["mobile-design-chat-send-retry-success-mocked-dark.png", await snapshot(chatRetrySuccessPage, "mobile-design-chat-send-retry-success-mocked-dark.png")]);
 await chatRetrySuccessPage.close();
 
-const chatSuccessPage = await browser.newPage({
+const chatSuccessPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -801,7 +1191,7 @@ results.push(["mobile-design-runs-filter-closed-mocked-dark.png", await snapshot
 await page.locator('.mobileSegmentButton').filter({ hasText: "Review" }).click();
 await page.waitForTimeout(200);
 
-const runRefreshPage = await browser.newPage({
+const runRefreshPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -846,7 +1236,7 @@ await page.getByRole("dialog", { name: "Confirm approval decision" }).waitFor({ 
 results.push(["mobile-design-reject-confirm-sheet-mocked-dark.png", await snapshot(page, "mobile-design-reject-confirm-sheet-mocked-dark.png")]);
 await page.getByRole("button", { name: "Cancel" }).click();
 
-const approvalSubmittingPage = await browser.newPage({
+const approvalSubmittingPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -875,7 +1265,7 @@ await approvalSubmittingPage.getByText("Submitting approval decision to Hub...")
 results.push(["mobile-design-approval-submit-pending-mocked-dark.png", await snapshot(approvalSubmittingPage, "mobile-design-approval-submit-pending-mocked-dark.png")]);
 await approvalSubmittingPage.close();
 
-const approvalErrorPage = await browser.newPage({
+const approvalErrorPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -904,7 +1294,7 @@ await approvalErrorPage.getByText("Decision was not submitted. Check Hub session
 results.push(["mobile-design-approval-submit-error-mocked-dark.png", await snapshot(approvalErrorPage, "mobile-design-approval-submit-error-mocked-dark.png")]);
 await approvalErrorPage.close();
 
-const rejectionErrorPage = await browser.newPage({
+const rejectionErrorPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -935,7 +1325,7 @@ await rejectionErrorPage.getByRole("button", { name: "Cancel" }).waitFor({ timeo
 results.push(["mobile-design-rejection-submit-error-mocked-dark.png", await snapshot(rejectionErrorPage, "mobile-design-rejection-submit-error-mocked-dark.png")]);
 await rejectionErrorPage.close();
 
-const approvalRetrySuccessPage = await browser.newPage({
+const approvalRetrySuccessPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -971,7 +1361,7 @@ if (await approvalRetrySuccessPage.getByRole("dialog", { name: "Confirm approval
 results.push(["mobile-design-approval-submit-retry-success-mocked-dark.png", await snapshot(approvalRetrySuccessPage, "mobile-design-approval-submit-retry-success-mocked-dark.png")]);
 await approvalRetrySuccessPage.close();
 
-const approvalSuccessPage = await browser.newPage({
+const approvalSuccessPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -999,7 +1389,7 @@ await approvalSuccessPage.getByRole("button", { name: "Confirm approve" }).click
 await approvalSuccessPage.getByText("Decision submitted. Hub marked this checkpoint approved.").waitFor({ timeout: 5000 });
 await approvalSuccessPage.getByText("Checkpoint approved", { exact: true }).waitFor({ timeout: 5000 });
 await approvalSuccessPage.getByRole("button", { name: "Back to queue" }).waitFor({ timeout: 5000 });
-await approvalSuccessPage.getByRole("button", { name: "Runs" }).waitFor({ timeout: 5000 });
+await waitForRunsTab(approvalSuccessPage);
 if (await approvalSuccessPage.locator(".mobileApprovalPanel").getByRole("button", { name: /^Approve$/ }).count()) {
   throw new Error("Approval success state should replace the card approve button with a decision lock.");
 }
@@ -1016,7 +1406,7 @@ if (await approvalSuccessPage.getByText("Next review").count()) {
 results.push(["mobile-design-runs-after-approval-return-mocked-dark.png", await snapshot(approvalSuccessPage, "mobile-design-runs-after-approval-return-mocked-dark.png")]);
 await approvalSuccessPage.close();
 
-const rejectionRetrySuccessPage = await browser.newPage({
+const rejectionRetrySuccessPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1052,7 +1442,7 @@ if (await rejectionRetrySuccessPage.getByRole("dialog", { name: "Confirm approva
 results.push(["mobile-design-rejection-submit-retry-success-mocked-dark.png", await snapshot(rejectionRetrySuccessPage, "mobile-design-rejection-submit-retry-success-mocked-dark.png")]);
 await rejectionRetrySuccessPage.close();
 
-const rejectionSuccessPage = await browser.newPage({
+const rejectionSuccessPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1080,7 +1470,7 @@ await rejectionSuccessPage.getByRole("button", { name: "Confirm reject" }).click
 await rejectionSuccessPage.getByText("Decision submitted. Hub marked this checkpoint rejected.").waitFor({ timeout: 5000 });
 await rejectionSuccessPage.getByText("Checkpoint rejected", { exact: true }).waitFor({ timeout: 5000 });
 await rejectionSuccessPage.getByRole("button", { name: "Back to queue" }).waitFor({ timeout: 5000 });
-await rejectionSuccessPage.getByRole("button", { name: "Runs" }).waitFor({ timeout: 5000 });
+await waitForRunsTab(rejectionSuccessPage);
 if (await rejectionSuccessPage.locator(".mobileApprovalPanel").getByRole("button", { name: /^Reject$/ }).count()) {
   throw new Error("Rejection success state should replace the card reject button with a decision lock.");
 }
@@ -1133,7 +1523,7 @@ results.push(["mobile-design-resource-detail-sheet-mocked-dark.png", await snaps
 await page.getByRole("dialog", { name: "Output resource details" }).getByRole("button", { name: "Copy path" }).click();
 await page.getByRole("dialog", { name: "Output resource details" }).getByRole("button", { name: "Copied" }).waitFor({ timeout: 5000 });
 results.push(["mobile-design-resource-detail-copy-mocked-dark.png", await snapshot(page, "mobile-design-resource-detail-copy-mocked-dark.png")]);
-await page.getByRole("button", { name: "Close resource details" }).click();
+await page.getByRole("dialog", { name: "Output resource details" }).getByRole("button", { name: "Close resource details" }).last().click();
 
 await page.getByRole("button", { name: /^Runs/ }).click();
 await page.waitForTimeout(250);
@@ -1142,29 +1532,26 @@ await page.getByText("Run run_mobi").click();
 await page.waitForTimeout(500);
 results.push(["mobile-design-after-run-detail-mocked-dark.png", await snapshot(page, "mobile-design-after-run-detail-mocked-dark.png")]);
 
-await page.getByRole("button", { name: "Settings" }).click();
+await openAccountTab(page);
 await page.waitForTimeout(250);
 results.push(["mobile-design-after-settings-mocked-dark.png", await snapshot(page, "mobile-design-after-settings-mocked-dark.png")]);
 results.push(["mobile-design-settings-readiness-mocked-dark.png", await snapshot(page, "mobile-design-settings-readiness-mocked-dark.png")]);
+await assertAccountReadiness(page, "mobile-design-settings-readiness-mocked-dark.png");
 await page.getByRole("button", { name: "简体中文" }).click();
-await page.getByRole("heading", { name: "设置" }).waitFor({ timeout: 5000 });
-await page.getByRole("button", { name: "线程" }).waitFor({ timeout: 5000 });
+await waitForAccountHeading(page, /^账户$/);
+await page.locator(".mobileBottomNav").getByRole("button", { name: /^线程(?:,|\.)/ }).waitFor({ timeout: 5000 });
 results.push(["mobile-design-settings-language-zh-mocked-dark.png", await snapshot(page, "mobile-design-settings-language-zh-mocked-dark.png")]);
-await page.locator(".mobileBottomNav").getByRole("button", { name: /线程/ }).click();
+await page.locator(".mobileBottomNav").getByRole("button", { name: /^线程(?:,|\.)/ }).click();
 await page.getByRole("heading", { name: "线程", exact: true }).waitFor({ timeout: 5000 });
 results.push(["mobile-design-threads-zh-mocked-dark.png", await snapshot(page, "mobile-design-threads-zh-mocked-dark.png")]);
-await page.locator(".mobileBottomNav").getByRole("button", { name: /运行/ }).click();
+await page.locator(".mobileBottomNav").getByRole("button", { name: /^运行(?:,|\.)/ }).click();
 await page.getByRole("heading", { name: "运行", exact: true }).waitFor({ timeout: 5000 });
 results.push(["mobile-design-runs-zh-mocked-dark.png", await snapshot(page, "mobile-design-runs-zh-mocked-dark.png")]);
-await page.locator(".mobileBottomNav").getByRole("button", { name: "设置" }).click();
-await page.getByRole("heading", { name: "设置", exact: true }).waitFor({ timeout: 5000 });
+await openAccountTab(page, /账户/);
+await waitForAccountHeading(page, /^账户$/);
 await page.getByRole("button", { name: "English" }).click();
-await page.getByRole("heading", { name: "Settings" }).waitFor({ timeout: 5000 });
-await page.locator(".mobileSettingsReadinessTile").filter({ hasText: "Hub session" }).click();
-await page.waitForTimeout(250);
-if (!(await page.locator(".mobileSettingsReadinessTileActive").filter({ hasText: "Hub session" }).count())) {
-  throw new Error("mobile-design-settings-readiness-tile-action-mocked-dark.png: Hub session readiness tile did not keep the active action anchor");
-}
+await waitForAccountHeading(page, /^Account$/);
+await assertAccountReadiness(page, "mobile-design-settings-readiness-tile-action-mocked-dark.png");
 results.push(["mobile-design-settings-readiness-tile-action-mocked-dark.png", await snapshot(page, "mobile-design-settings-readiness-tile-action-mocked-dark.png")]);
 await page.getByRole("button", { name: "Check session" }).click();
 await page.waitForTimeout(250);
@@ -1180,7 +1567,7 @@ await page.getByRole("dialog", { name: "Confirm session clear" }).getByText("Nat
 results.push(["mobile-design-settings-clear-error-mocked-dark.png", await snapshot(page, "mobile-design-settings-clear-error-mocked-dark.png")]);
 await page.getByRole("button", { name: "Cancel" }).click();
 
-const compactSettingsPage = await browser.newPage({
+const compactSettingsPage = await newMobilePage({
   viewport: compactViewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1196,14 +1583,12 @@ compactSettingsPage.on("console", (message) => {
 compactSettingsPage.on("pageerror", (error) => consoleMessages.push(`pageerror: ${error.message}`));
 await installMockHub(compactSettingsPage);
 await compactSettingsPage.goto(baseUrl, { waitUntil: "networkidle", timeout: 20000 });
-await compactSettingsPage.getByRole("button", { name: "Settings" }).click();
+await openAccountTab(compactSettingsPage);
 await compactSettingsPage.waitForTimeout(250);
-await compactSettingsPage.locator(".mobileSettingsReadinessTile").filter({ hasText: "Hub session" }).click();
+await assertAccountReadiness(compactSettingsPage, "mobile-design-settings-compact-feedback-mocked-dark.png");
+await compactSettingsPage.getByRole("button", { name: "Check session" }).click();
 await compactSettingsPage.waitForTimeout(450);
-if (!(await compactSettingsPage.locator(".mobileSettingsReadinessTileActive").filter({ hasText: "Hub session" }).count())) {
-  throw new Error("mobile-design-settings-compact-feedback-mocked-dark.png: Hub session readiness tile did not keep the active action anchor");
-}
-const statusVisibleOnCompactViewport = await compactSettingsPage.locator(".mobileStatusPanel").evaluate((element) => {
+const statusVisibleOnCompactViewport = await compactSettingsPage.locator(".mobileSignalRow").first().evaluate((element) => {
   const rect = element.getBoundingClientRect();
   return rect.top >= 0 && rect.bottom <= window.innerHeight;
 });
@@ -1213,7 +1598,7 @@ if (!statusVisibleOnCompactViewport) {
 results.push(["mobile-design-settings-compact-feedback-mocked-dark.png", await snapshot(compactSettingsPage, "mobile-design-settings-compact-feedback-mocked-dark.png")]);
 await compactSettingsPage.close();
 
-const threadRecoveryPage = await browser.newPage({
+const threadRecoveryPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1233,7 +1618,7 @@ await threadRecoveryPage.getByText("Threads could not sync").waitFor({ timeout: 
 results.push(["mobile-design-threads-recovery-mocked-dark.png", await snapshot(threadRecoveryPage, "mobile-design-threads-recovery-mocked-dark.png")]);
 await threadRecoveryPage.close();
 
-const runsRecoveryPage = await browser.newPage({
+const runsRecoveryPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1252,12 +1637,12 @@ await runsRecoveryPage.goto(baseUrl, { waitUntil: "networkidle", timeout: 20000 
 await runsRecoveryPage.getByRole("button", { name: /^Runs/ }).click();
 await runsRecoveryPage.getByText("Run queue could not sync").waitFor({ timeout: 5000 });
 results.push(["mobile-design-runs-recovery-mocked-dark.png", await snapshot(runsRecoveryPage, "mobile-design-runs-recovery-mocked-dark.png")]);
-await runsRecoveryPage.locator(".mobileRecoveryPanel").getByRole("button", { name: "Settings" }).click();
-await runsRecoveryPage.getByRole("heading", { name: "Settings" }).waitFor({ timeout: 5000 });
+await runsRecoveryPage.locator(".mobileRecoveryPanel").getByRole("button", { name: "Account" }).click();
+await waitForAccountHeading(runsRecoveryPage, /^Account$/);
 results.push(["mobile-design-runs-recovery-settings-mocked-dark.png", await snapshot(runsRecoveryPage, "mobile-design-runs-recovery-settings-mocked-dark.png")]);
 await runsRecoveryPage.close();
 
-const lightThreadRecoveryPage = await browser.newPage({
+const lightThreadRecoveryPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1275,11 +1660,11 @@ await installRecoveryMockHub(lightThreadRecoveryPage, "threads");
 await lightThreadRecoveryPage.goto(baseUrl, { waitUntil: "networkidle", timeout: 20000 });
 await lightThreadRecoveryPage.getByText("Threads could not sync").waitFor({ timeout: 5000 });
 await lightThreadRecoveryPage.locator(".mobileRecoveryPanel").getByRole("button", { name: "Retry" }).waitFor({ timeout: 1000 });
-await lightThreadRecoveryPage.locator(".mobileRecoveryPanel").getByRole("button", { name: "Settings" }).waitFor({ timeout: 1000 });
+await lightThreadRecoveryPage.locator(".mobileRecoveryPanel").getByRole("button", { name: "Account" }).waitFor({ timeout: 1000 });
 results.push(["mobile-design-light-threads-recovery-mocked.png", await snapshot(lightThreadRecoveryPage, "mobile-design-light-threads-recovery-mocked.png")]);
 await lightThreadRecoveryPage.close();
 
-const lightRunsRecoveryPage = await browser.newPage({
+const lightRunsRecoveryPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1298,11 +1683,11 @@ await lightRunsRecoveryPage.goto(baseUrl, { waitUntil: "networkidle", timeout: 2
 await lightRunsRecoveryPage.getByRole("button", { name: /^Runs/ }).click();
 await lightRunsRecoveryPage.getByText("Run queue could not sync").waitFor({ timeout: 5000 });
 await lightRunsRecoveryPage.locator(".mobileRecoveryPanel").getByRole("button", { name: "Retry" }).waitFor({ timeout: 1000 });
-await lightRunsRecoveryPage.locator(".mobileRecoveryPanel").getByRole("button", { name: "Settings" }).waitFor({ timeout: 1000 });
+await lightRunsRecoveryPage.locator(".mobileRecoveryPanel").getByRole("button", { name: "Account" }).waitFor({ timeout: 1000 });
 results.push(["mobile-design-light-runs-recovery-mocked.png", await snapshot(lightRunsRecoveryPage, "mobile-design-light-runs-recovery-mocked.png")]);
 await lightRunsRecoveryPage.close();
 
-const threadEmptyFilterPage = await browser.newPage({
+const threadEmptyFilterPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1318,12 +1703,12 @@ threadEmptyFilterPage.on("console", (message) => {
 threadEmptyFilterPage.on("pageerror", (error) => consoleMessages.push(`pageerror: ${error.message}`));
 await installMockHub(threadEmptyFilterPage, { threads: threads.filter((thread) => thread.status === "active") });
 await threadEmptyFilterPage.goto(baseUrl, { waitUntil: "networkidle", timeout: 20000 });
-await threadEmptyFilterPage.getByRole("button", { name: /Archived/ }).click();
+await threadEmptyFilterPage.getByRole("button", { name: /Archive/ }).click();
 await threadEmptyFilterPage.getByText("No archived threads").waitFor({ timeout: 5000 });
 results.push(["mobile-design-threads-empty-filter-mocked-dark.png", await snapshot(threadEmptyFilterPage, "mobile-design-threads-empty-filter-mocked-dark.png")]);
 await threadEmptyFilterPage.close();
 
-const runsEmptyFilterPage = await browser.newPage({
+const runsEmptyFilterPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1346,14 +1731,13 @@ await runsEmptyFilterPage.getByText("No review runs").waitFor({ timeout: 5000 })
 results.push(["mobile-design-runs-empty-filter-mocked-dark.png", await snapshot(runsEmptyFilterPage, "mobile-design-runs-empty-filter-mocked-dark.png")]);
 await runsEmptyFilterPage.close();
 
-const lightPage = await browser.newPage({
+const lightPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
   hasTouch: true,
   colorScheme: "light",
 });
-await lightPage.context().grantPermissions(["clipboard-write"], { origin: new URL(baseUrl).origin });
 lightPage.on("console", (message) => {
   const text = message.text();
   if (!isExpectedConsoleMessage(text)) {
@@ -1379,9 +1763,10 @@ results.push(["mobile-design-light-chat-composer-scope-mocked.png", await snapsh
 await lightPage.getByRole("button", { name: "Chat" }).click();
 await lightPage.waitForTimeout(150);
 results.push(["mobile-design-light-chat-tab-root-mocked.png", await snapshot(lightPage, "mobile-design-light-chat-tab-root-mocked.png")]);
-await lightPage.getByRole("button", { name: "Settings" }).click();
+await openAccountTab(lightPage);
 await lightPage.waitForTimeout(250);
 results.push(["mobile-design-light-settings-readiness-mocked.png", await snapshot(lightPage, "mobile-design-light-settings-readiness-mocked.png")]);
+await assertAccountReadiness(lightPage, "mobile-design-light-settings-readiness-mocked.png");
 await lightPage.getByRole("button", { name: "Check session" }).click();
 await lightPage.waitForTimeout(250);
 results.push(["mobile-design-light-settings-action-feedback-mocked.png", await snapshot(lightPage, "mobile-design-light-settings-action-feedback-mocked.png")]);
@@ -1423,7 +1808,7 @@ results.push(["mobile-design-light-resource-detail-sheet-mocked.png", await snap
 await lightPage.getByRole("dialog", { name: "Output resource details" }).getByRole("button", { name: "Copy path" }).click();
 await lightPage.getByRole("dialog", { name: "Output resource details" }).getByRole("button", { name: "Copied" }).waitFor({ timeout: 5000 });
 results.push(["mobile-design-light-resource-detail-copy-mocked.png", await snapshot(lightPage, "mobile-design-light-resource-detail-copy-mocked.png")]);
-await lightPage.getByRole("button", { name: "Close resource details" }).click();
+await lightPage.getByRole("dialog", { name: "Output resource details" }).getByRole("button", { name: "Close resource details" }).last().click();
 await lightPage.locator(".mobileReviewDock").getByRole("button", { name: "Approve" }).click();
 await lightPage.getByRole("dialog", { name: "Confirm approval decision" }).waitFor({ timeout: 5000 });
 results.push(["mobile-design-light-approval-confirm-sheet-mocked.png", await snapshot(lightPage, "mobile-design-light-approval-confirm-sheet-mocked.png")]);
@@ -1434,7 +1819,7 @@ await lightPage.getByRole("button", { name: "Confirm approve" }).click();
 await lightPage.getByText("Decision submitted. Hub marked this checkpoint approved.").waitFor({ timeout: 5000 });
 await lightPage.getByText("Checkpoint approved", { exact: true }).waitFor({ timeout: 5000 });
 await lightPage.getByRole("button", { name: "Back to queue" }).waitFor({ timeout: 5000 });
-await lightPage.getByRole("button", { name: "Runs" }).waitFor({ timeout: 5000 });
+await waitForRunsTab(lightPage);
 await lightPage.locator(".mobileApprovalPanel").scrollIntoViewIfNeeded();
 await lightPage.waitForTimeout(150);
 if (await lightPage.locator(".mobileApprovalPanel").getByRole("button", { name: /^Approve$/ }).count()) {
@@ -1456,7 +1841,7 @@ if (await lightPage.getByRole("button", { name: /^Runs, .*pending reviews/ }).co
 results.push(["mobile-design-light-runs-after-approval-return-mocked.png", await snapshot(lightPage, "mobile-design-light-runs-after-approval-return-mocked.png")]);
 await lightPage.close();
 
-const lightApprovalErrorPage = await browser.newPage({
+const lightApprovalErrorPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1487,7 +1872,7 @@ await lightApprovalErrorPage.getByRole("button", { name: "Cancel" }).waitFor({ t
 results.push(["mobile-design-light-approval-submit-error-mocked.png", await snapshot(lightApprovalErrorPage, "mobile-design-light-approval-submit-error-mocked.png")]);
 await lightApprovalErrorPage.close();
 
-const lightRejectionErrorPage = await browser.newPage({
+const lightRejectionErrorPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1518,7 +1903,7 @@ await lightRejectionErrorPage.getByRole("button", { name: "Cancel" }).waitFor({ 
 results.push(["mobile-design-light-rejection-submit-error-mocked.png", await snapshot(lightRejectionErrorPage, "mobile-design-light-rejection-submit-error-mocked.png")]);
 await lightRejectionErrorPage.close();
 
-const lightApprovalRetrySuccessPage = await browser.newPage({
+const lightApprovalRetrySuccessPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1554,7 +1939,7 @@ if (await lightApprovalRetrySuccessPage.getByRole("dialog", { name: "Confirm app
 results.push(["mobile-design-light-approval-submit-retry-success-mocked.png", await snapshot(lightApprovalRetrySuccessPage, "mobile-design-light-approval-submit-retry-success-mocked.png")]);
 await lightApprovalRetrySuccessPage.close();
 
-const lightRejectionRetrySuccessPage = await browser.newPage({
+const lightRejectionRetrySuccessPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1590,7 +1975,7 @@ if (await lightRejectionRetrySuccessPage.getByRole("dialog", { name: "Confirm ap
 results.push(["mobile-design-light-rejection-submit-retry-success-mocked.png", await snapshot(lightRejectionRetrySuccessPage, "mobile-design-light-rejection-submit-retry-success-mocked.png")]);
 await lightRejectionRetrySuccessPage.close();
 
-const lightRejectionSuccessPage = await browser.newPage({
+const lightRejectionSuccessPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1618,7 +2003,7 @@ await lightRejectionSuccessPage.getByRole("button", { name: "Confirm reject" }).
 await lightRejectionSuccessPage.getByText("Decision submitted. Hub marked this checkpoint rejected.").waitFor({ timeout: 5000 });
 await lightRejectionSuccessPage.getByText("Checkpoint rejected", { exact: true }).waitFor({ timeout: 5000 });
 await lightRejectionSuccessPage.getByRole("button", { name: "Back to queue" }).waitFor({ timeout: 5000 });
-await lightRejectionSuccessPage.getByRole("button", { name: "Runs" }).waitFor({ timeout: 5000 });
+await waitForRunsTab(lightRejectionSuccessPage);
 await lightRejectionSuccessPage.locator(".mobileApprovalPanel").scrollIntoViewIfNeeded();
 await lightRejectionSuccessPage.waitForTimeout(150);
 if (await lightRejectionSuccessPage.locator(".mobileApprovalPanel").getByRole("button", { name: /^Reject$/ }).count()) {
@@ -1641,7 +2026,7 @@ if (await lightRejectionSuccessPage.getByRole("button", { name: /^Runs, .*pendin
 results.push(["mobile-design-light-runs-after-rejection-return-mocked.png", await snapshot(lightRejectionSuccessPage, "mobile-design-light-runs-after-rejection-return-mocked.png")]);
 await lightRejectionSuccessPage.close();
 
-const lightChatErrorPage = await browser.newPage({
+const lightChatErrorPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1671,7 +2056,7 @@ await lightChatErrorPage.getByText("Not sent").waitFor({ timeout: 1000 });
 results.push(["mobile-design-light-chat-send-error-retry-mocked.png", await snapshot(lightChatErrorPage, "mobile-design-light-chat-send-error-retry-mocked.png")]);
 await lightChatErrorPage.close();
 
-const lightChatRetrySuccessPage = await browser.newPage({
+const lightChatRetrySuccessPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1704,7 +2089,7 @@ if (await lightChatRetrySuccessPage.getByRole("button", { name: "Retry mobile re
 results.push(["mobile-design-light-chat-send-retry-success-mocked.png", await snapshot(lightChatRetrySuccessPage, "mobile-design-light-chat-send-retry-success-mocked.png")]);
 await lightChatRetrySuccessPage.close();
 
-const lightChatRecoveryPage = await browser.newPage({
+const lightChatRecoveryPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1735,7 +2120,7 @@ if (await lightChatRecoveryPage.getByRole("button", { name: "Send mobile reply" 
 results.push(["mobile-design-light-chat-recovery-mocked.png", await snapshot(lightChatRecoveryPage, "mobile-design-light-chat-recovery-mocked.png")]);
 await lightChatRecoveryPage.close();
 
-const lightThreadEmptyFilterPage = await browser.newPage({
+const lightThreadEmptyFilterPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,
@@ -1751,12 +2136,12 @@ lightThreadEmptyFilterPage.on("console", (message) => {
 lightThreadEmptyFilterPage.on("pageerror", (error) => consoleMessages.push(`pageerror: ${error.message}`));
 await installMockHub(lightThreadEmptyFilterPage, { threads: threads.filter((thread) => thread.status === "active") });
 await lightThreadEmptyFilterPage.goto(baseUrl, { waitUntil: "networkidle", timeout: 20000 });
-await lightThreadEmptyFilterPage.getByRole("button", { name: /Archived/ }).click();
+await lightThreadEmptyFilterPage.getByRole("button", { name: /Archive/ }).click();
 await lightThreadEmptyFilterPage.getByText("No archived threads").waitFor({ timeout: 5000 });
 results.push(["mobile-design-light-threads-empty-filter-mocked.png", await snapshot(lightThreadEmptyFilterPage, "mobile-design-light-threads-empty-filter-mocked.png")]);
 await lightThreadEmptyFilterPage.close();
 
-const lightRunsEmptyFilterPage = await browser.newPage({
+const lightRunsEmptyFilterPage = await newMobilePage({
   viewport,
   deviceScaleFactor: 1,
   isMobile: true,

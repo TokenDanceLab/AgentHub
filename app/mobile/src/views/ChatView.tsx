@@ -1,19 +1,27 @@
-import { useCallback, useMemo, useState } from "react";
-import { ArrowLeft, Copy, RefreshCw, SendHorizonal } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Code2, Copy, FileText, GitPullRequestArrow, RefreshCw, SendHorizonal } from "lucide-react";
 import type { Thread, ThreadItem } from "@agenthub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createThreadMessage, listThreadItems } from "@agenthub/shared";
 import { useTranslation } from "react-i18next";
+import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
 
 interface ChatViewProps {
   thread: Thread;
   onBack: () => void;
 }
 
+type ActivityKind = Exclude<ThreadItem["kind"], "message">;
+type LocalReplyStatus = "sending" | "failed" | "sent";
+
 export function ChatView({ thread, onBack }: ChatViewProps) {
   const { t } = useTranslation();
   const [inputValue, setInputValue] = useState("");
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
+  const [showLatestJump, setShowLatestJump] = useState(false);
+  const [localReply, setLocalReply] = useState<{ content: string; status: LocalReplyStatus } | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const latestRef = useRef<HTMLDivElement | null>(null);
   const queryClient = useQueryClient();
 
   const messages = useQuery({
@@ -23,23 +31,46 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
 
   const sendMessage = useMutation({
     mutationFn: (content: string) => createThreadMessage(thread.id, { role: "user", content }),
-    onSuccess: () => {
-      setInputValue("");
-      void queryClient.invalidateQueries({ queryKey: ["thread-items", thread.id] });
-      void queryClient.invalidateQueries({ queryKey: ["threads"] });
-    },
   });
 
-  const handleSend = useCallback(() => {
-    const content = inputValue.trim();
+  const submitReply = useCallback((content: string) => {
     if (!content || sendMessage.isPending) return;
-    sendMessage.mutate(content);
-  }, [inputValue, sendMessage]);
+    setLocalReply({ content, status: "sending" });
+    setInputValue("");
+    sendMessage.mutate(content, {
+      onSuccess: () => {
+        setLocalReply({ content, status: "sent" });
+        void queryClient.invalidateQueries({ queryKey: ["thread-items", thread.id] });
+        void queryClient.invalidateQueries({ queryKey: ["threads"] });
+      },
+      onError: () => {
+        setInputValue(content);
+        setLocalReply({ content, status: "failed" });
+      },
+    });
+  }, [queryClient, sendMessage, thread.id]);
+
+  const handleSend = useCallback(() => {
+    submitReply(inputValue.trim());
+  }, [inputValue, submitReply]);
+
+  const handleScroll = useCallback(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    setShowLatestJump(distanceFromBottom > 180);
+  }, []);
+
+  const jumpToLatest = useCallback(() => {
+    latestRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+    setShowLatestJump(false);
+  }, []);
 
   const visibleItems = useMemo(
-    () => (messages.data?.items ?? []).filter((item) => item.kind === "message" && item.content.trim()),
+    () => (messages.data?.items ?? []).filter((item) => item.content.trim()),
     [messages.data?.items],
   );
+  const visibleMessageCount = visibleItems.filter((item) => item.kind === "message").length;
 
   async function copyContent(item: ThreadItem) {
     try {
@@ -52,6 +83,10 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
   }
 
   function renderItem(item: ThreadItem) {
+    if (item.kind !== "message") {
+      return renderActivityItem(item);
+    }
+
     const isUser = item.role === "user";
 
     return (
@@ -79,6 +114,32 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
     );
   }
 
+  function renderActivityItem(item: ThreadItem) {
+    const activityMeta: Record<ActivityKind, { icon: typeof CheckCircle2; label: string }> = {
+      approval: { icon: CheckCircle2, label: t("chat.activity.approval") },
+      diff: { icon: GitPullRequestArrow, label: t("chat.activity.diff") },
+      code: { icon: Code2, label: t("chat.activity.code") },
+      file: { icon: FileText, label: t("chat.activity.file") },
+    };
+    const meta = activityMeta[item.kind as ActivityKind];
+    const Icon = meta.icon;
+
+    return (
+      <article className="mobileActivityCard" key={item.id}>
+        <span className="mobileActivityIcon">
+          <Icon size={16} />
+        </span>
+        <span className="mobileActivityBody">
+          <span className="mobileActivityMeta">
+            <strong>{meta.label}</strong>
+            <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+          </span>
+          <span>{item.content}</span>
+        </span>
+      </article>
+    );
+  }
+
   return (
     <div className="mobileView mobileChatView">
       <header className="mobileHeader mobileChatHeader">
@@ -96,7 +157,7 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
         </div>
       </header>
 
-      <div className="mobileScroll mobileChatScroll">
+      <div className="mobileScroll mobileChatScroll" ref={scrollRef} onScroll={handleScroll}>
         <section className="mobileChatContextPanel">
           <div>
             <p className="mobileEyebrow">{t("chat.context.eyebrow")}</p>
@@ -109,7 +170,7 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
             </div>
             <div>
               <dt>{t("chat.context.messages")}</dt>
-              <dd>{visibleItems.length}</dd>
+              <dd>{visibleMessageCount}</dd>
             </div>
             <div>
               <dt>{t("chat.context.updated")}</dt>
@@ -134,14 +195,18 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
         )}
 
         {messages.isError && (
-          <div className="mobileCenterState">
-            <strong>{t("chat.states.syncErrorTitle")}</strong>
-            <p>{t("chat.states.syncErrorDescription")}</p>
-            <button className="mobileActionButton" type="button" onClick={() => messages.refetch()}>
-              <RefreshCw size={16} />
-              <span>{t("chat.actions.retry")}</span>
-            </button>
-          </div>
+          <MobileRecoveryPanel
+            icon={<AlertCircle size={18} />}
+            eyebrow={t("chat.states.syncErrorEyebrow")}
+            title={t("chat.states.syncErrorTitle")}
+            description={t("chat.states.syncErrorDescription")}
+            meta={t("chat.states.replyPaused")}
+            isRetrying={messages.isFetching}
+            onRetry={() => messages.refetch()}
+            secondaryLabel={t("chat.actions.threads")}
+            secondaryIcon={<ArrowLeft size={16} />}
+            onSecondaryAction={onBack}
+          />
         )}
 
         {!messages.isLoading && !messages.isError && visibleItems.length === 0 && (
@@ -153,22 +218,40 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
 
         <div className="mobileMessageList">
           {visibleItems.map(renderItem)}
-          {sendMessage.isPending && (
+          {localReply && (
             <article className="mobileMessageRow mobileMessageRowUser">
-              <div className="mobileMessage mobileUserMsg mobilePendingMsg">
+              <div className={`mobileMessage mobileUserMsg${localReply.status === "sending" ? " mobilePendingMsg" : ""}${localReply.status === "failed" ? " mobileFailedMsg" : ""}`}>
                 <div className="mobileMessageMeta">
                   <strong>{t("chat.participants.user")}</strong>
-                  <time>{t("chat.actions.sending")}</time>
+                  <time>
+                    {localReply.status === "sending"
+                      ? t("chat.actions.sending")
+                      : localReply.status === "failed"
+                        ? t("chat.actions.notSent")
+                        : t("chat.actions.sent")}
+                  </time>
                 </div>
-                <p>{inputValue.trim()}</p>
+                <p>{localReply.content}</p>
               </div>
             </article>
           )}
+          <div ref={latestRef} aria-hidden="true" />
         </div>
       </div>
 
+      {showLatestJump && (
+        <button
+          className="mobileLatestJump"
+          type="button"
+          aria-label={t("chat.actions.jumpToLatest")}
+          onClick={jumpToLatest}
+        >
+          {t("chat.actions.latest")}
+        </button>
+      )}
+
       <form
-        className="mobileComposerDock"
+        className={`mobileComposerDock${messages.isError ? " mobileComposerDockPaused" : ""}`}
         onSubmit={(event) => {
           event.preventDefault();
           handleSend();
@@ -177,16 +260,47 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
         <textarea
           value={inputValue}
           onChange={(event) => setInputValue(event.target.value)}
-          placeholder={t("chat.composer.placeholder")}
+          aria-label={t("chat.composer.label")}
+          placeholder={messages.isError ? t("chat.states.replyPaused") : t("chat.composer.placeholder")}
           rows={2}
-          disabled={sendMessage.isPending}
+          disabled={sendMessage.isPending || messages.isError}
         />
-        <button className="mobileSendButton" type="submit" disabled={!inputValue.trim() || sendMessage.isPending}>
+        <button
+          className="mobileSendButton"
+          type="submit"
+          aria-label={messages.isError ? t("chat.actions.replyPaused") : t("chat.actions.sendMobileReply")}
+          disabled={!inputValue.trim() || sendMessage.isPending || messages.isError}
+        >
           {sendMessage.isPending ? <RefreshCw size={17} className="mobileSpin" /> : <SendHorizonal size={17} />}
-          <span>{sendMessage.isPending ? t("chat.actions.sending") : t("chat.actions.send")}</span>
+          <span>
+            {messages.isError
+              ? t("chat.actions.paused")
+              : sendMessage.isPending
+                ? t("chat.actions.sending")
+                : t("chat.actions.send")}
+          </span>
         </button>
+        {sendMessage.isPending && (
+          <p className="mobileComposerStatus" role="status">{t("chat.states.sendingReply")}</p>
+        )}
         {sendMessage.isError && (
-          <p className="mobileComposerError">{t("chat.states.composerError")}</p>
+          <div className="mobileComposerStatus mobileComposerError" role="status">
+            <span>{t("chat.states.replyStayed")}</span>
+            <button
+              className="mobileActionButton"
+              type="button"
+              aria-label={t("chat.actions.retryMobileReply")}
+              disabled={sendMessage.isPending || !localReply?.content}
+              onClick={() => {
+                if (localReply?.content) {
+                  submitReply(localReply.content);
+                }
+              }}
+            >
+              <RefreshCw size={15} />
+              <span>{t("chat.actions.retry")}</span>
+            </button>
+          </div>
         )}
       </form>
     </div>
