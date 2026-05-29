@@ -161,14 +161,12 @@
 
 ### AgentTeam 底层状态确认
 - **AT-1 已完成**：模型（AgentTeam/AgentTeamMember/AgentTeamRun/AgentTeamAssignment）、迁移（0033/0034）、仓库（15 func）、服务（18 method）、处理器（15 endpoint）、路由（15 条 under `/web/agent-teams`）全部就绪，测试 7/7 通过。
-- **AT-2 部分完成**：StartTeamRun 会创建 Hub session → agent instances → trigger supervisor → dispatch。缺失：① Supervisor 输出解析自动创建 TeamAssignment ② TeamEvent append-only log ③ TeamRunState replay projection。
-- **AT-3 待实现**：CoordinatorRouteDecision 结构化委派 + guardrails（MAX_DEPTH=3, MAX_ACTIVE=5, cycle detection, timeout=30min, budget inheritance）。
-- **模型已新增**：CoordinatorRouteDecision、AgentTeamEvent、TeamRunState、TeamBudget 类型写入 `model/agent_team.go`。
-- **迁移已创建**：0036 `agent_team_events` 表（up + down SQL）。
-- **仓库/服务/处理器**：尚未补全。
+- **AT-2 已完成**：StartTeamRun、TeamEvent append-only log、TeamRunState replay projection、TeamTask/RunEvent/approval/artifact/budget 投影已进入后端主线。
+- **AT-3 已完成**：CoordinatorRouteDecision 结构化委派、assignment 创建、TeamRun 资源 guardrails、owner/member 读写边界和直接 `CreateAssignment` 防绕过路径已在仓内收口。
+- **AT-4 剩余口径**：仍是 Desktop/Edge live smoke（两个真实 Runtime Profile 同一 TeamRun）和 Console/UI 验收；本轮后端 Agent 不修改 Desktop/UI。
 
-### 5 个待修后端 Issue
-- `0374d91` 已修复 #145 #142 #138 #105。仅 #173 状态待确认。
+### 后端 Issue 状态
+- `0374d91` 已修复 #145 #142 #138 #105；#173 `Normalize or validate non-text message content before jsonb writes` 已在 2026-05-25 关闭，roadmap 记录为 2026-05-27 non-text message content normalization slice。
 
 ## 下一步（按角色分工，2026-05-26 深夜）
 
@@ -220,9 +218,9 @@
 - [ ] **禁止修改** `app/desktop/src-tauri/` 下任何文件
 
 ### 后端（我负责）
-- [ ] AT-3：Supervisor 路由决策解析 + guardrails（model/migration 已有，待 service/handler/repo）
-- [ ] AT-2 补全：TeamEvent 持久化 + TeamRunState replay（migration 0036 已有）
-- [ ] #173 状态确认
+- [x] AT-3：Supervisor 路由决策解析 + guardrails（仓内已收口）
+- [x] AT-2 补全：TeamEvent 持久化 + TeamRunState replay（仓内已收口）
+- [x] #173 状态确认（GitHub issue closed 2026-05-25T13:18:51Z）
 - [x] 生产部署验证（2026-05-29 已用 no-server-build tar/load/recreate 流程部署 `f071d03`，磁盘/资源/404/health 已验证）
 
 ### 共享端口与资源
@@ -323,7 +321,7 @@ CI 说明：Go lint 已迁移到 golangci-lint v2 配置，gosec 已切到当前
 - Agent + Edge Callbacks（3 commits）：#130 stream 去重 + #109 生命周期强制 + #99 离线 dispatched + #137 队列失败日志 + #179 NDJSON 失败终止 + #177 CLI LookPath + #108 cancel 响应对齐
 - WS + Auth + Middleware（1 commit）：#178 WS 多设备路由 + #96 撤回原 session + #93 已读序列前进 + #88 typing 成员校验 + #78 DeleteForMe 缓存 + #82 WS 认证对齐
 - 测试：hub-server 13/13 + edge-server 15/15 全绿，race detector 通过
-- 19 issue 已关闭；5 个纯后端 issue 待修（#145 #142 #138 #173 #105）
+- 19 issue 已关闭；后续 5 个纯后端 issue（#145 #142 #138 #173 #105）已在 2026-05-25 至 2026-05-27 批次收口。
 
 - Desktop：项目文档后台 sweep 已完成，`docs/architecture/system-architecture.md` / `docs/architecture/product-requirements.md` / `docs/architecture/implementation-guide.md` / `docs/roadmap.md` / README 系列 / archive + ADR 索引已统一 Runtime/Profile/Configuration/Execution Target、TokenDance ID、Hub/Edge/Desktop/Web 边界。
 - Desktop：设置页按 Codex App 截图方向重构为全屏设置工作台，并新增任务列表、IM 群聊、Agent 调度、在线 IM、Agent 市场、Skill/MCP、模型配置、模型映射、cc-switch、多端、远控、账号鉴权和安全审计等一等入口；顶部快捷图标可直达任务列表和 Agent 调度分区。
