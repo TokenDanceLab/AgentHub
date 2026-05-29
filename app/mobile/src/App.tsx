@@ -7,7 +7,7 @@ import { ChatView } from "./views/ChatView";
 import { RunListView } from "./views/RunListView";
 import { RunStatusView } from "./views/RunStatusView";
 import { AccountView } from "./views/AccountView";
-import { MobileEmptyState } from "./components/MobileEmptyState";
+import { EmptyState } from "@agenthub/shared/ui";
 import { Hash } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -75,12 +75,15 @@ export function App() {
           />
         )}
         {activeView === "chat" && !selectedThread && (
-          <MobileEmptyState
+          <EmptyState
             icon={<Hash size={24} />}
             title={t("empty.selectThread.title")}
             description={t("empty.selectThread.description")}
-            actionLabel={t("empty.selectThread.action")}
-            onAction={() => setActiveView("threads")}
+            titleLevel={1}
+            className="mobileEmptyView"
+            iconClassName="mobileEmptyIcon"
+            actionClassName="mobileEmptyAction"
+            action={{ label: t("empty.selectThread.action"), onClick: () => setActiveView("threads") }}
           />
         )}
         {activeView === "runs" && !selectedRun && (

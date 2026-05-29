@@ -7,7 +7,7 @@ import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search,
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
-import EmptyState from './EmptyState';
+import { EmptyState } from '@shared/ui';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
