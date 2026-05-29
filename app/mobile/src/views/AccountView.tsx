@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { getSurfaceStatusMetadata, getSurfacesByPlatform } from "@agenthub/shared";
-import { BottomSheet, SegmentedControl, StatusNotice, TokenDanceMark } from "@agenthub/shared/ui";
+import { ActivityCard, BottomSheet, SegmentedControl, StatusNotice, TokenDanceMark } from "@agenthub/shared/ui";
 import { Bell, Languages, Link2, LogIn, RefreshCw, ShieldCheck, Smartphone, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { mobileLanguages, type MobileLanguage } from "../i18n";
@@ -159,14 +159,18 @@ export function AccountView() {
             <h2>{t("settings.readiness.title")}</h2>
             <div className="mobileReadinessGrid">
               {readinessItems.map((item) => (
-                <div className="mobileReadinessRow" key={item.title}>
-                  <span className="mobileReadinessIcon">{item.icon}</span>
-                  <span className="mobileReadinessBody">
-                    <strong>{item.title}</strong>
-                    <span>{item.description}</span>
-                  </span>
-                  <span className="mobileReadinessState">{item.state}</span>
-                </div>
+                <ActivityCard
+                  key={item.title}
+                  className="mobileReadinessRow"
+                  icon={item.icon}
+                  iconClassName="mobileReadinessIcon"
+                  bodyClassName="mobileReadinessBody"
+                  metaClassName="mobileReadinessMeta"
+                  label={item.title}
+                  actions={<span className="mobileReadinessState">{item.state}</span>}
+                >
+                  {item.description}
+                </ActivityCard>
               ))}
             </div>
             <StatusNotice
@@ -221,15 +225,17 @@ export function AccountView() {
               {mobileSurfaces.map((surface) => {
                 const status = getSurfaceStatusMetadata(surface.defaultStatus);
                 return (
-                  <div className="mobileSurfaceRegistryRow" key={surface.id}>
-                    <span className="mobileSurfaceRegistryBody">
-                      <strong>{t(surface.labelKey)}</strong>
-                      <span>{t(surface.descriptionKey)}</span>
-                    </span>
-                    <span className="mobileSurfaceRegistryState">
-                      {t(status.labelKey)}
-                    </span>
-                  </div>
+                  <ActivityCard
+                    key={surface.id}
+                    className="mobileSurfaceRegistryRow"
+                    bodyClassName="mobileSurfaceRegistryBody"
+                    metaClassName="mobileSurfaceRegistryMeta"
+                    actionsClassName="mobileSurfaceRegistryActions"
+                    label={t(surface.labelKey)}
+                    actions={<span className="mobileSurfaceRegistryState">{t(status.labelKey)}</span>}
+                  >
+                    {t(surface.descriptionKey)}
+                  </ActivityCard>
                 );
               })}
             </div>

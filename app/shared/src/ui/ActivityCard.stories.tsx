@@ -29,3 +29,11 @@ export const RunBlock: Story = {
     actions: <button type="button">Inspect</button>,
   },
 };
+
+export const BodyWithState: Story = {
+  args: {
+    label: 'Account',
+    children: 'TokenDance ID session surface',
+    actions: <span>Ready</span>,
+  },
+};
