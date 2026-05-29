@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { getSurfaceStatusMetadata, getSurfacesByPlatform } from "@agenthub/shared";
-import { TokenDanceMark } from "@agenthub/shared/ui";
+import { SegmentedControl, TokenDanceMark } from "@agenthub/shared/ui";
 import { Bell, Languages, Link2, LogIn, RefreshCw, ShieldCheck, Smartphone, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { mobileLanguages, type MobileLanguage } from "../i18n";
@@ -243,23 +243,19 @@ export function AccountView() {
                 {t("settings.language.current")}: {currentLanguage === "zh" ? t("settings.language.chinese") : t("settings.language.english")}
               </span>
             </div>
-            <div className="mobileSegmentedToolbar mobileLanguageToolbar" aria-label={t("settings.language.title")}>
-              {mobileLanguages.map((language) => {
-                const isActive = currentLanguage === language.code;
-                return (
-                  <button
-                    key={language.code}
-                    className={`mobileSegmentButton${isActive ? " mobileSegmentButtonActive" : ""}`}
-                    type="button"
-                    aria-pressed={isActive}
-                    onClick={() => void i18n.changeLanguage(language.code)}
-                  >
-                    <Languages size={14} />
-                    <span>{language.code === "zh" ? t("settings.language.chinese") : t("settings.language.english")}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <SegmentedControl
+              ariaLabel={t("settings.language.title")}
+              value={currentLanguage}
+              onChange={(language) => void i18n.changeLanguage(language)}
+              className="mobileSegmentedToolbar mobileLanguageToolbar"
+              optionClassName="mobileSegmentButton"
+              activeOptionClassName="mobileSegmentButtonActive"
+              options={mobileLanguages.map((language) => ({
+                value: language.code,
+                label: language.code === "zh" ? t("settings.language.chinese") : t("settings.language.english"),
+                icon: <Languages size={14} />,
+              }))}
+            />
           </section>
 
           <section className="mobileSettingCard">

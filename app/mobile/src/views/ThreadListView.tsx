@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listThreads } from "@agenthub/shared";
 import type { Thread } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { EmptyState } from "@agenthub/shared/ui";
+import { EmptyState, SegmentedControl } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, UserRound, ArrowRight } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
@@ -61,14 +61,14 @@ export function ThreadListView({ onThreadSelect, onOpenAccount }: ThreadListView
   );
   const nextActiveThread = items.find((thread) => thread.status === "active");
   const filterOptions: Array<{
-    id: ThreadFilter;
+    value: ThreadFilter;
     label: string;
     count: number;
     icon: typeof Play;
   }> = [
-    { id: "all", label: t("queue.common.all"), count: items.length, icon: Play },
-    { id: "active", label: t("queue.common.active"), count: activeCount, icon: MessageSquare },
-    { id: "archived", label: t("queue.threads.filterArchived"), count: archivedCount, icon: Archive },
+    { value: "all", label: t("queue.common.all"), count: items.length, icon: Play },
+    { value: "active", label: t("queue.common.active"), count: activeCount, icon: MessageSquare },
+    { value: "archived", label: t("queue.threads.filterArchived"), count: archivedCount, icon: Archive },
   ];
 
   return (
@@ -166,25 +166,23 @@ export function ThreadListView({ onThreadSelect, onOpenAccount }: ThreadListView
           </button>
         )}
 
-        <div className="mobileSegmentedToolbar mobileThreadFilterToolbar" aria-label={t("queue.threads.filters")}>
-          {filterOptions.map((option) => {
+        <SegmentedControl
+          ariaLabel={t("queue.threads.filters")}
+          value={filter}
+          onChange={setFilter}
+          className="mobileSegmentedToolbar mobileThreadFilterToolbar"
+          optionClassName="mobileSegmentButton"
+          activeOptionClassName="mobileSegmentButtonActive"
+          options={filterOptions.map((option) => {
             const Icon = option.icon;
-            const isActive = option.id === filter;
-            return (
-              <button
-                key={option.id}
-                className={`mobileSegmentButton${isActive ? " mobileSegmentButtonActive" : ""}`}
-                type="button"
-                aria-pressed={isActive}
-                onClick={() => setFilter(option.id)}
-              >
-                <Icon size={14} />
-                <span>{option.label}</span>
-                <strong>{option.count}</strong>
-              </button>
-            );
+            return {
+              value: option.value,
+              label: option.label,
+              meta: option.count,
+              icon: <Icon size={14} />,
+            };
           })}
-        </div>
+        />
 
         {threads.isLoading && (
           <div className="mobileCenterState">
