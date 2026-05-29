@@ -35,4 +35,28 @@ describe('ActivityCard', () => {
     expect(card).toHaveClass('mobileActivityCard');
     expect(card?.querySelector('.mobileActivityIcon')).toHaveTextContent('diff');
   });
+
+  it('renders leading content and actions', () => {
+    render(
+      <ActivityCard
+        className="mobileRunBlock"
+        leading="1"
+        leadingClassName="mobileRunBlockIndex"
+        icon={<span>file</span>}
+        iconClassName="mobileRunBlockIcon"
+        bodyClassName="mobileRunBlockBody"
+        actionsClassName="mobileResourceActions"
+        label="Artifact"
+        actions={<button type="button">Copy</button>}
+      >
+        dist/report.html
+      </ActivityCard>,
+    );
+
+    const card = screen.getByText('Artifact').closest('article');
+
+    expect(card?.querySelector('.mobileRunBlockIndex')).toHaveTextContent('1');
+    expect(card?.querySelector('.mobileRunBlockIcon')).toHaveTextContent('file');
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+  });
 });
