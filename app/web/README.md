@@ -76,7 +76,7 @@ http://127.0.0.1:5175/
 
 ## Design Alignment
 
-Web follows the Desktop command-center layout and token direction. Workbench, Private Chats, Project preview, diff tree, run output, and permission surfaces should use dense glass panels, low-contrast borders, and solid semantic fills. Do not add gradient cards or colored left rails to communicate state; use badges, borders, icons, and concise copy instead. The Web token file maps local CSS variables to `@agenthub/shared` `designTokens`, which is also consumed by Mobile docs and tests as the shared Desktop glass baseline. The shell brand mark uses `app/shared/src/assets/tokendance-icon-rounded.svg`; `AH` text blocks and app-local brand SVG copies are treated as legacy placeholders and should not return to the active shell.
+Web follows the Desktop command-center layout and token direction. Workbench, Private Chats, Project preview, diff tree, run output, and permission surfaces should use dense glass panels, low-contrast borders, and solid semantic fills. Do not add gradient cards or colored left rails to communicate state; use badges, borders, icons, and concise copy instead. The Web token file maps local CSS variables to `@agenthub/shared` `designTokens`, which is also consumed by Mobile docs and tests as the shared Desktop glass baseline. The shell brand mark uses the shared `TokenDanceMark` UI component backed by `app/shared/src/assets/tokendance-icon-rounded.svg`; `AH` text blocks and app-local brand SVG copies are treated as legacy placeholders and should not return to the active shell.
 
 Latest in-app browser evidence:
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { getSurfaceStatusMetadata, getSurfacesByPlatform } from "@agenthub/shared";
+import { TokenDanceMark } from "@agenthub/shared/ui";
 import { Bell, Languages, Link2, LogIn, RefreshCw, ShieldCheck, Smartphone, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { mobileLanguages, type MobileLanguage } from "../i18n";
@@ -9,7 +10,6 @@ import {
   sendMobileNotificationProbe,
   startMobileOidcLogin,
 } from "../native/mobileCommands";
-import tokenDanceLogo from "@agenthub/shared/assets/tokendance-icon-rounded.svg";
 
 type NativeStatusKey =
   | "settings.status.idle"
@@ -102,7 +102,7 @@ export function AccountView() {
         <div className="mobileSettingStack">
           <section className="mobileAccountIdentityPanel" aria-label={t("settings.account.title")}>
             <div className="mobileAccountIdentityHeader">
-              <img className="mobileAccountIdentityLogo" src={tokenDanceLogo} alt="TokenDance" />
+              <TokenDanceMark className="mobileAccountIdentityLogo" />
               <div className="mobileAccountIdentityCopy">
                 <p className="mobileEyebrow">{t("settings.account.title")}</p>
                 <h2>{t("common.appName")}</h2>
