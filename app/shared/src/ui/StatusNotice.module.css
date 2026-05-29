@@ -1,0 +1,24 @@
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.icon,
+.action {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.content {
+  min-width: 0;
+}
+
+.action {
+  margin-left: auto;
+}
