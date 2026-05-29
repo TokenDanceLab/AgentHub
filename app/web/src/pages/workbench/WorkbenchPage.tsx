@@ -331,7 +331,7 @@ export default function WorkbenchPage() {
         const [threadItems, runLogs] = await Promise.all([
           firstThreadId
             ? listThreadItems(firstThreadId, { pageSize: 100 })
-            : Promise.resolve(undefined),
+            : Promise.resolve(null),
           Promise.all(
             runs.items.slice(0, 10).map(async (run) => {
               try {
@@ -377,7 +377,11 @@ export default function WorkbenchPage() {
       if (status === 'connected') {
         dispatch({ type: 'connection.connected' });
       } else if (status === 'disconnected') {
-        dispatch({ type: 'connection.disconnected', error });
+        dispatch(
+          error
+            ? { type: 'connection.disconnected', error }
+            : { type: 'connection.disconnected' },
+        );
       } else {
         dispatch({ type: 'connection.error', error: error ?? 'Edge event stream error' });
       }

@@ -212,7 +212,7 @@ export function getRun(runId: string): Promise<Run> {
 export function startRun(body?: StartRunRequest): Promise<Run> {
   return request('/v1/runs', {
     method: 'POST',
-    body: body ? JSON.stringify(body) : undefined,
+    ...(body ? { body: JSON.stringify(body) } : {}),
   });
 }
 
