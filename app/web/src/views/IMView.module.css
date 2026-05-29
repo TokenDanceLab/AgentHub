@@ -117,13 +117,16 @@
   gap: 6px;
 }
 
-.noSelectionHeader p,
-.noSelectionHeader h2,
 .noSelectionHeader span {
   margin: 0;
 }
 
-.noSelectionHeader p {
+.imSectionHeader {
+  display: block;
+}
+
+.imEyebrow {
+  margin: 0 0 6px;
   color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 760;
@@ -131,7 +134,8 @@
   text-transform: uppercase;
 }
 
-.noSelectionHeader h2 {
+.imTitle {
+  margin: 0;
   color: var(--foreground);
   font-size: 23px;
   line-height: 1.2;
@@ -151,8 +155,8 @@
 }
 
 .noSelectionCard {
-  display: grid;
-  gap: 6px;
+  align-items: start;
+  gap: 10px;
   min-width: 0;
   min-height: 112px;
   border: 1px solid rgba(255, 255, 255, 0.055);
@@ -162,21 +166,38 @@
   color: var(--muted-foreground);
 }
 
+.infoCardIcon {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted-foreground);
+}
+
+.infoCardBody {
+  gap: 6px;
+}
+
+.infoCardMeta {
+  display: contents;
+}
+
+.infoCardDescription {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 [data-theme='dark'] .noSelectionCard {
   border-color: rgba(255, 255, 255, 0.055);
   background: rgba(255, 255, 255, 0.035);
 }
 
-.noSelectionCard strong {
+.infoCardBody strong {
   color: var(--foreground);
   font-size: 13px;
   line-height: 1.35;
-}
-
-.noSelectionCard span {
-  color: var(--muted-foreground);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .lockedShell {
@@ -193,24 +214,12 @@
   gap: 6px;
 }
 
-.lockedHeader p,
-.lockedHeader h2,
 .lockedHeader span {
   margin: 0;
 }
 
-.lockedHeader p {
-  color: var(--muted-foreground);
-  font-size: 11px;
-  font-weight: 760;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.lockedHeader h2 {
-  color: var(--foreground);
+.lockedHeader .imTitle {
   font-size: 24px;
-  line-height: 1.2;
 }
 
 .lockedHeader span {
@@ -227,8 +236,8 @@
 }
 
 .lockedCard {
-  display: grid;
-  gap: 6px;
+  align-items: start;
+  gap: 10px;
   min-width: 0;
   min-height: 116px;
   border: 1px solid rgba(255, 255, 255, 0.055);
@@ -241,18 +250,6 @@
 [data-theme='dark'] .lockedCard {
   border-color: rgba(255, 255, 255, 0.055);
   background: rgba(255, 255, 255, 0.035);
-}
-
-.lockedCard strong {
-  color: var(--foreground);
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.lockedCard span {
-  color: var(--muted-foreground);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .lockedActions {
@@ -296,7 +293,7 @@
     padding: 16px 14px;
   }
 
-  .lockedHeader h2 {
+  .lockedHeader .imTitle {
     font-size: 21px;
   }
 
@@ -317,7 +314,7 @@
     padding: 16px 14px;
   }
 
-  .noSelectionHeader h2 {
+  .noSelectionHeader .imTitle {
     font-size: 21px;
   }
 
