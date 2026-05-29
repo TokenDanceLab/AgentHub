@@ -23,3 +23,5 @@ export { MetricGrid } from './MetricGrid';
 export type { MetricGridItem, MetricGridProps } from './MetricGrid';
 export { StatusNotice } from './StatusNotice';
 export type { StatusNoticeProps } from './StatusNotice';
+export { SurfaceHeader } from './SurfaceHeader';
+export type { SurfaceHeaderProps, SurfaceHeaderStatus } from './SurfaceHeader';
