@@ -31,3 +31,7 @@ export { TriageCard } from './TriageCard';
 export type { TriageCardProps } from './TriageCard';
 export { SectionHeader } from './SectionHeader';
 export type { SectionHeaderAction, SectionHeaderProps } from './SectionHeader';
+export { ContextSummary } from './ContextSummary';
+export type { ContextSummaryItem, ContextSummaryProps } from './ContextSummary';
+export { ActivityCard } from './ActivityCard';
+export type { ActivityCardProps } from './ActivityCard';

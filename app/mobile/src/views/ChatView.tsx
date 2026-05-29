@@ -3,7 +3,7 @@ import { AlertCircle, ArrowLeft, CheckCircle2, Code2, Copy, FileText, GitPullReq
 import type { Thread, ThreadItem } from "@agenthub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createThreadMessage, listThreadItems } from "@agenthub/shared";
-import { StatusNotice } from "@agenthub/shared/ui";
+import { ActivityCard, ContextSummary, StatusNotice } from "@agenthub/shared/ui";
 import { useTranslation } from "react-i18next";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
 
@@ -126,18 +126,18 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
     const Icon = meta.icon;
 
     return (
-      <article className="mobileActivityCard" key={item.id}>
-        <span className="mobileActivityIcon">
-          <Icon size={16} />
-        </span>
-        <span className="mobileActivityBody">
-          <span className="mobileActivityMeta">
-            <strong>{meta.label}</strong>
-            <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
-          </span>
-          <span>{item.content}</span>
-        </span>
-      </article>
+      <ActivityCard
+        key={item.id}
+        className="mobileActivityCard"
+        iconClassName="mobileActivityIcon"
+        bodyClassName="mobileActivityBody"
+        metaClassName="mobileActivityMeta"
+        label={meta.label}
+        meta={<time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>}
+        icon={<Icon size={16} />}
+      >
+        {item.content}
+      </ActivityCard>
     );
   }
 
@@ -159,33 +159,26 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
       </header>
 
       <div className="mobileScroll mobileChatScroll" ref={scrollRef} onScroll={handleScroll}>
-        <section className="mobileChatContextPanel">
-          <div>
-            <p className="mobileEyebrow">{t("chat.context.eyebrow")}</p>
-            <h2>{thread.title || t("chat.context.fallbackTitle")}</h2>
-          </div>
-          <dl>
-            <div>
-              <dt>{t("chat.context.status")}</dt>
-              <dd>{thread.status}</dd>
-            </div>
-            <div>
-              <dt>{t("chat.context.messages")}</dt>
-              <dd>{visibleMessageCount}</dd>
-            </div>
-            <div>
-              <dt>{t("chat.context.updated")}</dt>
-              <dd>
-                {new Date(thread.updatedAt ?? thread.createdAt).toLocaleString([], {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </dd>
-            </div>
-          </dl>
-        </section>
+        <ContextSummary
+          className="mobileChatContextPanel"
+          eyebrowClassName="mobileEyebrow"
+          eyebrow={t("chat.context.eyebrow")}
+          title={thread.title || t("chat.context.fallbackTitle")}
+          items={[
+            { id: "status", label: t("chat.context.status"), value: thread.status },
+            { id: "messages", label: t("chat.context.messages"), value: visibleMessageCount },
+            {
+              id: "updated",
+              label: t("chat.context.updated"),
+              value: new Date(thread.updatedAt ?? thread.createdAt).toLocaleString([], {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+            },
+          ]}
+        />
 
         {messages.isLoading && (
           <div className="mobileCenterState">
