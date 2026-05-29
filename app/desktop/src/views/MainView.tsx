@@ -1,7 +1,9 @@
 import { useCallback, lazy, Suspense } from 'react';
 import type { ViewMode } from '@/config/viewRegistry';
 import type { ChatMessage } from '@/components/ChatView.types';
+import type { AgentTeamOverview } from '@/api/agentTeamQueries';
 import type { AgentInfo } from '@shared/types';
+import { resolveLocalOrchestration } from '@/utils/localOrchestration';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import { SkeletonLine } from '@/components/Skeleton';
@@ -22,6 +24,11 @@ interface Props {
   onFork?: (messageId: string) => void;
   onDelete: (messageId: string) => void;
   onSendMessage: (message: string, agentId?: string, opts?: { model?: string }) => void;
+  agentTeamOverview?: AgentTeamOverview;
+  agentTeamsLoading?: boolean;
+  agentTeamsSignedIn?: boolean;
+  onStartLocalOrchestration?: (agentId: string, draft: string) => void;
+  onOpenTeamRuns?: () => void;
 }
 
 /** Determine which view mode to display based on app state. */
@@ -51,6 +58,11 @@ export default function MainView({
   onFork,
   onDelete,
   onSendMessage,
+  agentTeamOverview,
+  agentTeamsLoading,
+  agentTeamsSignedIn,
+  onStartLocalOrchestration,
+  onOpenTeamRuns,
 }: Props) {
   const viewMode = resolveViewMode(allMessages, messages, threadsCount, isStreaming, isConnected);
   const handleCreateThread = useCallback(() => {
@@ -74,6 +86,7 @@ export default function MainView({
     },
     [onSendMessage, selectedAgentId],
   );
+  const localOrchestration = resolveLocalOrchestration(agents, selectedAgentId);
 
   if (viewMode === 'welcome') {
     return (
@@ -119,6 +132,12 @@ export default function MainView({
           onRetry={onRetry}
           onFork={onFork}
           onDelete={onDelete}
+          agentTeamOverview={agentTeamOverview}
+          agentTeamsLoading={agentTeamsLoading}
+          agentTeamsSignedIn={agentTeamsSignedIn}
+          localOrchestration={localOrchestration}
+          onStartLocalOrchestration={onStartLocalOrchestration}
+          onOpenTeamRuns={onOpenTeamRuns}
         />
       </Suspense>
     </ErrorBoundary>
