@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
@@ -194,38 +194,29 @@ export default function TeamRunConsole() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   const teamsQuery = useAgentTeams(hubReady);
-  const teams = teamsQuery.data ?? [];
+  const teams = useMemo(() => teamsQuery.data ?? [], [teamsQuery.data]);
   const teamIds = useMemo(() => teams.map((team) => team.id), [teams]);
   const runPreviews = useTeamRunsForTeams(teamIds, hubReady && !selectedTeamId && teams.length > 0);
-  const selectedTeam = teams.find((team) => team.id === selectedTeamId) ?? teams[0];
-  const runsQuery = useTeamRuns(selectedTeam?.id, hubReady);
-  const runs = useMemo(() => [...(runsQuery.data ?? [])].sort(latestRunFirst), [runsQuery.data]);
-  const selectedRun = runs.find((run) => run.id === selectedRunId) ?? runs[0];
-  const stateQuery = useTeamRunState(selectedTeam?.id, selectedRun?.id, hubReady);
-  const eventsQuery = useTeamEvents(selectedTeam?.id, selectedRun?.id, hubReady);
-  const state = stateQuery.data;
-
-  useEffect(() => {
-    if (selectedTeamId || teams.length === 0) return;
-    if (runPreviews.length !== teams.length || runPreviews.some((preview) => preview.isFetching)) return;
-
+  const previewSelection = useMemo(() => {
+    if (selectedTeamId || runPreviews.length !== teams.length || runPreviews.some((preview) => preview.isFetching)) {
+      return null;
+    }
     const candidates = runPreviews
       .flatMap((preview) => preview.runs.map((run) => ({ teamId: preview.teamId, run })))
       .sort((a, b) => latestRunFirst(a.run, b.run));
-    const selected = candidates.find((candidate) => isActiveStatus(candidate.run.status)) ?? candidates[0];
-
-    setSelectedTeamId(selected?.teamId ?? teams[0].id);
-    setSelectedRunId(selected?.run.id ?? null);
-  }, [runPreviews, selectedTeamId, teams]);
-
-  useEffect(() => {
-    if (!runs.length) {
-      setSelectedRunId(null);
-      return;
-    }
-    if (selectedRunId && runs.some((run) => run.id === selectedRunId)) return;
-    setSelectedRunId((runs.find((run) => isActiveStatus(run.status)) ?? runs[0]).id);
-  }, [runs, selectedRunId]);
+    return candidates.find((candidate) => isActiveStatus(candidate.run.status)) ?? candidates[0] ?? null;
+  }, [runPreviews, selectedTeamId, teams.length]);
+  const effectiveTeamId = selectedTeamId ?? previewSelection?.teamId ?? teams[0]?.id ?? null;
+  const selectedTeam = teams.find((team) => team.id === effectiveTeamId) ?? teams[0];
+  const runsQuery = useTeamRuns(selectedTeam?.id, hubReady);
+  const runs = useMemo(() => [...(runsQuery.data ?? [])].sort(latestRunFirst), [runsQuery.data]);
+  const effectiveRunId = selectedRunId && runs.some((run) => run.id === selectedRunId)
+    ? selectedRunId
+    : (runs.find((run) => isActiveStatus(run.status)) ?? runs[0])?.id ?? previewSelection?.run.id ?? null;
+  const selectedRun = runs.find((run) => run.id === effectiveRunId) ?? runs[0];
+  const stateQuery = useTeamRunState(selectedTeam?.id, selectedRun?.id, hubReady);
+  const eventsQuery = useTeamEvents(selectedTeam?.id, selectedRun?.id, hubReady);
+  const state = stateQuery.data;
 
   const memberLabels = useMemo(() => {
     const labels = new Map<string, string>();

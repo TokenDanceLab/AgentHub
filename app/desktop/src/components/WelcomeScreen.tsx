@@ -56,6 +56,14 @@ export default memo(function WelcomeScreen({
   const providerFallbackEnabled = useModelSettingsStore((s) => s.providerFallbackEnabled);
   const reasoningEffort = useModelSettingsStore((s) => s.reasoningEffort);
   const aliases = useModelSettingsStore((s) => s.aliases);
+  const routeSettingsKey = [
+    defaultModel,
+    defaultProvider,
+    modelMappingEnabled,
+    providerFallbackEnabled,
+    reasoningEffort,
+    aliases.map((alias) => `${alias.alias}:${alias.model}:${alias.provider}:${alias.reasoningEffort}:${alias.enabled}`).join(','),
+  ].join('|');
 
   const availableAgents = useMemo(
     () => agents.filter((agent) => agent.status === 'available'),
@@ -70,19 +78,10 @@ export default memo(function WelcomeScreen({
     [agents, availableAgents, draftAgentId, selectedAgentId],
   );
   const profileAlias = activeAgent ? preferredProfileAlias(activeAgent) : undefined;
-  const route = useMemo(
-    () => resolveRunRequestOptions({ model: profileAlias }),
-    [
-      aliases,
-      defaultModel,
-      defaultProvider,
-      modelMappingEnabled,
-      profileAlias,
-      providerFallbackEnabled,
-      reasoningEffort,
-      resolveRunRequestOptions,
-    ],
-  );
+  const route = useMemo(() => {
+    void routeSettingsKey;
+    return resolveRunRequestOptions({ model: profileAlias });
+  }, [profileAlias, resolveRunRequestOptions, routeSettingsKey]);
 
   // Fade-in animation on mount
   useEffect(() => {
