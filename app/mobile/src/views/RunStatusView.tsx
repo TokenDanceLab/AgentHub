@@ -15,7 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { StatusBadge } from "@agenthub/shared/components";
-import { BottomSheet, MetricGrid, SegmentedControl, StatusNotice } from "@agenthub/shared/ui";
+import { ActivityCard, BottomSheet, MetricGrid, SegmentedControl, StatusNotice } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import type { Artifact, Preview, Run, RunStatus, ThreadItem } from "@agenthub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -297,14 +297,18 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
             {blocks.map((block, index) => {
               const Icon = blockIcon(block.kind);
               return (
-                <article className="mobileRunBlock" key={block.id}>
-                  <span className="mobileRunBlockIndex">{index + 1}</span>
-                  <span className="mobileRunBlockIcon"><Icon size={16} /></span>
-                  <span className="mobileRunBlockBody">
-                    <strong>{block.kind}</strong>
-                    <span>{block.content}</span>
-                  </span>
-                </article>
+                <ActivityCard
+                  key={block.id}
+                  className="mobileRunBlock"
+                  leading={index + 1}
+                  leadingClassName="mobileRunBlockIndex"
+                  icon={<Icon size={16} />}
+                  iconClassName="mobileRunBlockIcon"
+                  bodyClassName="mobileRunBlockBody"
+                  label={block.kind}
+                >
+                  {block.content}
+                </ActivityCard>
               );
             })}
           </div>
@@ -317,21 +321,29 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
             const isArtifact = "path" in resource;
             const label = isArtifact ? resource.path : resource.url ?? resource.id;
             return (
-              <article className="mobileResourceRow" key={resource.id}>
-                <span className="mobileRunBlockIcon">{isArtifact ? <FileText size={16} /> : <ExternalLink size={16} />}</span>
-                <span className="mobileRunBlockBody">
-                  <strong>{isArtifact ? "Artifact" : "Preview"}</strong>
-                  <span>{label}</span>
-                </span>
-                <button className="mobileActionButton" type="button" onClick={() => void copyResource(resource)}>
-                  <Copy size={15} />
-                  <span>{copiedResourceId === resource.id ? "Copied" : "Copy"}</span>
-                </button>
-                <button className="mobileActionButton" type="button" aria-label={`Inspect ${label}`} onClick={() => { setCopiedDetail(false); setSelectedResource(resource); }}>
-                  <Clipboard size={15} />
-                  <span>Inspect</span>
-                </button>
-              </article>
+              <ActivityCard
+                key={resource.id}
+                className="mobileResourceRow"
+                icon={isArtifact ? <FileText size={16} /> : <ExternalLink size={16} />}
+                iconClassName="mobileRunBlockIcon"
+                bodyClassName="mobileRunBlockBody"
+                label={isArtifact ? "Artifact" : "Preview"}
+                actionsClassName="mobileResourceActions"
+                actions={(
+                  <>
+                    <button className="mobileActionButton" type="button" onClick={() => void copyResource(resource)}>
+                      <Copy size={15} />
+                      <span>{copiedResourceId === resource.id ? "Copied" : "Copy"}</span>
+                    </button>
+                    <button className="mobileActionButton" type="button" aria-label={`Inspect ${label}`} onClick={() => { setCopiedDetail(false); setSelectedResource(resource); }}>
+                      <Clipboard size={15} />
+                      <span>Inspect</span>
+                    </button>
+                  </>
+                )}
+              >
+                {label}
+              </ActivityCard>
             );
           })}
         </section>
