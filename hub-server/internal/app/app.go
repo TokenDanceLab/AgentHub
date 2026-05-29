@@ -198,7 +198,15 @@ func (a *App) Run(ctx context.Context) error {
 	a.AuditHandler = handler.NewAuditHandler(auditSvc)
 
 	// AgentTeam service
-	a.AgentTeamService = service.NewAgentTeamService(a.DB, a.AgentService, a.CacheClient)
+	a.AgentTeamService = service.NewAgentTeamServiceWithGuardrails(a.DB, a.AgentService, a.CacheClient, service.AgentTeamGuardrails{
+		MaxDelegationDepth:       a.Config.AgentTeam.MaxDelegationDepth,
+		MaxActiveSubAgentsPerRun: int64(a.Config.AgentTeam.MaxActiveSubAgentsPerRun),
+		MaxRouteRepeats:          a.Config.AgentTeam.MaxRouteRepeats,
+		MaxTasksPerTeamRun:       int64(a.Config.AgentTeam.MaxTasksPerTeamRun),
+		AssignmentTimeout:        a.Config.AgentTeam.AssignmentTimeout,
+		MaxTeamRunBudgetTokens:   a.Config.AgentTeam.MaxTeamRunBudgetTokens,
+		MaxTeamRunBudgetUsagePct: a.Config.AgentTeam.MaxTeamRunBudgetUsagePct,
+	})
 	a.AgentTeamService.SetControlService(a.AgentControlService)
 	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
 

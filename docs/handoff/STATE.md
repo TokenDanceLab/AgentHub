@@ -1,12 +1,14 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-29 UTC+8 | 分支：fix/hub-device-uuid-contract -> dev/delicious233 | 状态：后端隔离 worktree 推进 AH-SR-024；Desktop/UI 主工作树仅只读确认
+最后更新：2026-05-29 UTC+8 | 分支：fix/hub-device-uuid-contract -> dev/delicious233 | 状态：后端隔离 worktree 推进 AH-SR-025；Desktop/UI 主工作树仅只读确认
 
 ## 本次后端/运维推进（2026-05-29）
 
 - **协作边界**：主工作树 `AgentHub/` 当前由 Desktop/Mobile/Web/Edge Agent 占用且落后远端；本轮后端只在隔离 worktree `AgentHub-backend-device-uuid/` 写入，未修改 `app/desktop/`、`app/mobile/`、`app/web/` 或 `edge-server/`。
 - **AH-SR-024 收口**：AgentTeam read/write boundary 已在仓内缓解。`ListTeams` 现在只返回 owner teams + requester 拥有已安装 Agent Profile 的 readable teams；`GetTeam`、TeamRun runs/state/tasks/events 读取复用 readable-member 检查；`HandleRouteDecision`、`DecideApproval`、`ResolveConflict` 仍要求 team owner，成员读者不能提交路由、审批或冲突决策。
-- **验证证据**：已跑 `hub-server && go test ./internal/service -run "TestAgentTeamService_(GetTeamAllowsAgentProfileOwnerMemberRead|ListTeamsIncludesReadableMemberTeamsWithoutLeaking|MemberReadableTeamCannotMutateRunDecisions)$" -count=1 -v`、`go test ./internal/service -run TestAgentTeamService -count=1 -v`、`go test ./internal/repository -run TestAgentTeam -count=1 -v`、`go test ./... -short -count=1`。
+- **AH-SR-025 收口**：AgentTeam delegation/resource guardrails 已在仓内缓解。`agent_team` 配置和 `AGENTHUB_AGENT_TEAM_*` env 覆盖委派深度、active subagents、route repeat、TeamRun 总任务、assignment timeout 和 budget；`CreateAssignment` 现在补齐 ancestor max-depth、脏数据循环检测、总任务 cap 和 active cap，不能绕过 coordinator route guardrails。
+- **AH-SR-025 验证证据**：已跑 `hub-server && go test ./internal/config -run "TestLoadAgentTeamGuardrailDefaults|TestEnvOverrideAgentTeamGuardrails|TestValidateRejectsInvalidAgentTeamGuardrails|TestJWTSecretHardcodedOverriddenByEnv" -count=1 -v`、`go test ./internal/service -run "TestAgentTeamService_CreateAssignmentRejects(DelegationDepthLimit|DelegationCycle|TeamRunTaskLimit)|TestAgentTeamService_CreateAssignmentUsesConfigured(DelegationDepthLimit|TeamRunTaskLimit)|TestAgentTeamService_HandleRouteDecisionRejectsWhen(ActiveSubagentLimitReached|TaskLimitReached|RouteRepeatLimitReached)|TestAgentTeamService_HandleRouteDecisionRejects(TimedOutAssignment|BudgetExceeded)" -count=1 -v`、`go test ./internal/service -run TestAgentTeamService -count=1 -v`、`go test ./... -short -count=1` 和 `git diff --check`。
+- **AH-SR-024 验证证据**：已跑 `hub-server && go test ./internal/service -run "TestAgentTeamService_(GetTeamAllowsAgentProfileOwnerMemberRead|ListTeamsIncludesReadableMemberTeamsWithoutLeaking|MemberReadableTeamCannotMutateRunDecisions)$" -count=1 -v`、`go test ./internal/service -run TestAgentTeamService -count=1 -v`、`go test ./internal/repository -run TestAgentTeam -count=1 -v`、`go test ./... -short -count=1`。
 - **部署约束**：hk2/serverhub/server 不得 build。Hub runtime 镜像更新只能走开发机/CI 构建、`docker save`、`scp`、hk2 `docker load`、`docker compose ... up -d --no-build --no-deps --force-recreate hub-server`。`hub-server/deployments/deploy.sh` 已同步显式 `--force-recreate`，避免同一 `latest` tag 预加载新镜像后容器不重建。
 - **进度口径**：AT-2/AT-3 后端在 roadmap 中已完成；AT-4 仍是 Desktop/Edge live smoke（两个真实 Runtime Profile 同一 TeamRun）和 Console/UI 验收，不由本轮后端直接修改 UI 完成。
 
