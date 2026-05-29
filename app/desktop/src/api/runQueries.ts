@@ -6,13 +6,14 @@ import { startRun, cancelRun, fetchRuns } from './edgeClient';
 import { RunInfoSchema, safeParse, listResponseSchema } from './schemas';
 import type { RunInfo, ListResponse, StartRunRequest } from '@shared/types';
 
-export function useRuns(projectId?: string, threadId?: string) {
+export function useRuns(projectId?: string, threadId?: string, options: { enabled?: boolean } = {}) {
   return useQuery<ListResponse<RunInfo>>({
     queryKey: ['runs', projectId, threadId],
     queryFn: async () => {
       const raw = await fetchRuns(projectId, threadId);
       return safeParse(listResponseSchema(RunInfoSchema), raw, 'runs');
     },
+    enabled: options.enabled ?? true,
     refetchInterval: 10_000,
   });
 }

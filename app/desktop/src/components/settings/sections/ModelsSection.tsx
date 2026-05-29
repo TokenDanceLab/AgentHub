@@ -37,7 +37,7 @@ export default function ModelsSection({
   const { t } = useTranslation();
   return (
     <Panel title={t('settings.models')} description={t('settings.modelsDesc')}>
-      <SettingRow title={t('settings.modelConfigSource')} description={t('settings.modelConfigSourceDesc')} value={t('settings.status.localSource')} />
+      <SettingRow title={t('settings.modelConfigSource')} description={t('settings.modelConfigSourceDesc')} value={t('settings.statusLocalSource')} />
       <SettingRow title={t('settings.modelDefault')} description={t('settings.modelDefaultDesc')} control={<SelectControl value={defaultModel} options={MODEL_OPTIONS.map(([v, l]) => [v, l])} onChange={setDefaultModel} />} />
       <SettingRow title={t('settings.modelDefaultProvider')} description={t('settings.modelDefaultProviderDesc')} control={<SelectControl value={defaultProvider} options={PROVIDER_OPTIONS.map(([v, l]) => [v, l])} onChange={setDefaultProvider} />} />
       <SettingRow title={t('settings.modelReasoning')} description={t('settings.modelReasoningDesc')} control={<SelectControl value={modelReasoningEffort} options={REASONING_OPTIONS.map(([v, l]) => [v, l])} onChange={(value) => setModelReasoningEffort(value as ReasoningEffortPreference)} />} />
