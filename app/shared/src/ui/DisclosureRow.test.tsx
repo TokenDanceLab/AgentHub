@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DisclosureRow } from './DisclosureRow';
 
 function ControlledDisclosureRow() {
@@ -62,5 +62,22 @@ describe('DisclosureRow', () => {
     expect(screen.getByText('Session')).toHaveClass('statusRowLabel');
     expect(screen.getByText('plan')).toHaveClass('statusRowMeta');
     expect(screen.getByText('Body').parentElement).toHaveClass('statusRowBody');
+  });
+
+  it('supports non-expandable rows without invoking the owner toggle', () => {
+    const onToggle = vi.fn();
+
+    render(
+      <DisclosureRow label="Bash" meta="pending" expanded={false} onToggle={onToggle} disabled>
+        <span>Hidden output</span>
+      </DisclosureRow>,
+    );
+
+    const button = screen.getByRole('button', { name: /Bash/i });
+
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(screen.queryByText('Hidden output')).not.toBeInTheDocument();
   });
 });

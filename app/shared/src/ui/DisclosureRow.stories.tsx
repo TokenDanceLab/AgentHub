@@ -27,3 +27,9 @@ function DisclosureRowDemo() {
 export const Default: Story = {
   render: () => <DisclosureRowDemo />,
 };
+
+export const Disabled: Story = {
+  render: () => (
+    <DisclosureRow label="Bash" meta="pending" expanded={false} onToggle={() => {}} disabled />
+  ),
+};

@@ -128,6 +128,36 @@ const messages = [
     seq_id: 4,
     created_at: "2026-05-30T01:23:00Z",
   },
+  {
+    id: "msg_tool_call",
+    session_id: "session_web_design",
+    sender_id: "profile_codex",
+    sender_type: "agent",
+    content_type: "json",
+    content: JSON.stringify({
+      callId: "call_visual_shell",
+      toolName: "Bash",
+      input: { command: "pnpm visual:qa" },
+      status: "running",
+    }),
+    seq_id: 5,
+    created_at: "2026-05-30T01:24:00Z",
+  },
+  {
+    id: "msg_tool_result",
+    session_id: "session_web_design",
+    sender_id: "profile_codex",
+    sender_type: "agent",
+    content_type: "json",
+    content: JSON.stringify({
+      callId: "call_visual_shell",
+      toolName: "Bash",
+      output: "Web visual QA passed (10 scenes)",
+      status: "completed",
+    }),
+    seq_id: 6,
+    created_at: "2026-05-30T01:25:00Z",
+  },
 ];
 
 function hubEnvelope(data) {
@@ -448,6 +478,15 @@ async function visitAndCapture(page, scene) {
     await page.getByText("Session initialized — gpt-5").waitFor({ state: "visible", timeout: 5000 });
     await page.getByText("Completed — 1420 in / 318 out tokens").waitFor({ state: "visible", timeout: 5000 });
   }
+  if (scene.openRunWithToolCall) {
+    const targetThread = page.getByRole("button", { name: /Web design convergence/i });
+    if ((await targetThread.count()) > 0) {
+      await targetThread.first().click();
+    }
+    await page.getByRole("button", { name: /Bash completed/i }).waitFor({ state: "visible", timeout: 5000 });
+    await page.getByRole("button", { name: /Bash completed/i }).click();
+    await page.getByText("Web visual QA passed (10 scenes)").waitFor({ state: "visible", timeout: 5000 });
+  }
   if (scene.emptyAgents) {
     await page.getByText("No runtimes available").waitFor({ state: "visible", timeout: 5000 });
   }
@@ -511,6 +550,15 @@ async function main() {
       language: "en",
       theme: "dark",
       selectThread: true,
+    },
+    {
+      name: "web-design-run-detail-tool-call-desktop-1440x920",
+      path: "/",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openRunWithToolCall: true,
     },
     {
       name: "web-design-workspace-desktop-empty-agents-1440x920",

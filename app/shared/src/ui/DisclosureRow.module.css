@@ -28,6 +28,15 @@
   color: var(--foreground);
 }
 
+.button:disabled {
+  cursor: default;
+}
+
+.button:disabled:hover {
+  background: transparent;
+  color: var(--muted-foreground);
+}
+
 .leading {
   display: inline-grid;
   place-items: center;
