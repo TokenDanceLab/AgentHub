@@ -1,6 +1,5 @@
 import { type ReactNode, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
 import {
   Archive,
   ArrowLeft,
@@ -11,9 +10,7 @@ import {
   Code2,
   Computer,
   Cpu,
-  Download,
   Eye,
-  EyeOff,
   FolderGit2,
   GitBranch,
   Globe2,
@@ -21,30 +18,24 @@ import {
   Keyboard,
   Link2,
   LockKeyhole,
+  LogOut,
   MessageSquareText,
   Monitor,
   Palette,
   Plug,
   RefreshCw,
-  RotateCcw,
   Route,
   Search,
   Server,
   ShieldCheck,
   SlidersHorizontal,
   TerminalSquare,
-  Trash2,
-  Upload,
   UserCircle,
   Wrench,
   XCircle,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useLanguage } from '@/contexts/LanguageContext';
 import { useHubStore } from '@/stores/hubStore';
-<<<<<<< HEAD
-import { APP_VERSION } from '@/config';
-=======
 import { APP_VERSION, HUB_URL } from '@/config';
 import {
   useAddAgentTeamMember,
@@ -55,7 +46,6 @@ import {
   useStartTeamRun,
 } from '@/api/agentTeamQueries';
 import type { AgentTeamRunBundle } from '@/api/agentTeamQueries';
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import { useAgentList } from '@/api/agentQueries';
 import type { ModelCatalogResponse } from '@/api/modelCatalogQueries';
 import { useHubExecutionTargets, usePingHubExecutionTarget } from '@/api/executionTargetQueries';
@@ -66,28 +56,17 @@ import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
 import { resolveModelDisplayName, type ModelDisplayNameMap } from '@/utils/modelDisplay';
 import { resolveLocalOrchestration } from '@/utils/localOrchestration';
-<<<<<<< HEAD
-import { requestPermission, isPermissionGranted } from '@tauri-apps/plugin-notification';
-import { invoke } from '@tauri-apps/api/core';
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import {
   MAX_CUSTOM_INSTRUCTIONS_CHARS,
   clearCustomInstructions,
   readCustomInstructions,
   writeCustomInstructions,
 } from '@/utils/customInstructions';
-<<<<<<< HEAD
-import { getSelectedWorkspace } from '@/utils/workspaceStore';
-import KeyboardSection from '@/components/settings/sections/KeyboardSection';
-import AgentMarketSection from '@/components/settings/sections/AgentMarketSection';
-import PermissionsSection, { type AllowlistEntry, readAllowlist, mergeAllowlistFromTarget, writeAllowlist } from '@/components/settings/sections/PermissionsSection';
-import DataSection from '@/components/settings/sections/DataSection';
-=======
 import { KEYBOARD_SHORTCUT_GROUPS } from '@/utils/keyboardShortcuts';
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import {
   useModelSettingsStore,
+  type ProviderHealth,
+  type ReasoningEffortPreference,
   type ResolvedRunModelSettings,
 } from '@/stores/modelSettingsStore';
 import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
@@ -101,10 +80,7 @@ import type {
   ExecutionTargetType,
   TeamApprovalState,
   TeamArtifactState,
-<<<<<<< HEAD
   TeamAssignmentState,
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   TeamBudget,
   TeamConflictState,
   TeamMemberState,
@@ -113,30 +89,6 @@ import type {
   TeamTaskState,
 } from '@/api/hubClient';
 import styles from './SettingsPage.module.css';
-import { Select } from '@shared/ui';
-import { useKeybindingStore, BINDING_IDS, getBinding, type BindingId } from '@/stores/keybindingStore';
-import { keysFromEvent } from '@/utils/keybinding';
-import { useToastStore } from '@/stores/toastStore';
-import {
-  createHubClient,
-  type ContactInfo,
-  type FriendRequestInfo,
-  type HubNotification,
-  type Session,
-} from '@/api/hubClient';
-import OnlineImSection from '@/components/settings/sections/OnlineImSection';
-import GroupChatSection from '@/components/settings/sections/GroupChatSection';
-import TasksSection from '@/components/settings/sections/TasksSection';
-import AgentMarketSection from '@/components/settings/sections/AgentMarketSection';
-import McpSection from '@/components/settings/sections/McpSection';
-import ModelsSection from '@/components/settings/sections/ModelsSection';
-import ModelMappingSection from '@/components/settings/sections/ModelMappingSection';
-import CcSwitchSection from '@/components/settings/sections/CcSwitchSection';
-import RemoteControlSection from '@/components/settings/sections/RemoteControlSection';
-import PlatformsSection from '@/components/settings/sections/PlatformsSection';
-import AccountSection from '@/components/settings/sections/AccountSection';
-import SecurityAuditSection from '@/components/settings/sections/SecurityAuditSection';
-import SkillsSection from '@/components/settings/sections/SkillsSection';
 
 export type SectionId =
   | 'general'
@@ -158,16 +110,20 @@ export type SectionId =
   | 'models'
   | 'modelMapping'
   | 'ccSwitch'
-  | 'credentials'
-  | 'workspace'
+  | 'connections'
+  | 'remoteControl'
+  | 'git'
   | 'environment'
+  | 'worktree'
+  | 'browser'
+  | 'computerUse'
   | 'platforms'
   | 'account'
   | 'securityAudit'
-  | 'data';
+  | 'archived';
 
 type SelectValue = 'balanced' | 'detailed' | 'manual' | 'auto' | 'ask' | 'never';
-type SettingsSelectValue = SelectValue | string;
+type SettingsSelectValue = SelectValue | ReasoningEffortPreference | ProviderHealth | string;
 
 interface Props {
   onBack: () => void;
@@ -184,11 +140,6 @@ interface NavItem {
   group: 'workspace' | 'automation' | 'system';
 }
 
-<<<<<<< HEAD
-const STORAGE_PREFIX = 'agenthub-settings.';
-const DEVICE_ID_KEY = 'agenthub_device_id';
-
-=======
 interface ProjectSkill {
   id: string;
   title: string;
@@ -337,7 +288,6 @@ const PROJECT_SKILLS: ProjectSkill[] = [
   },
 ];
 
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function readStoredBoolean(key: string, fallback: boolean) {
   try {
     const stored = localStorage.getItem(`${STORAGE_PREFIX}${key}`);
@@ -407,9 +357,7 @@ function formatTargetEndpoint(target: ExecutionTarget) {
 export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'general', modelCatalog, modelDisplayNames }: Props) {
   const { t } = useTranslation();
   const { themeMode, setThemeMode } = useTheme();
-  const { language, setLanguage } = useLanguage();
   const hubAuth = useAuth();
-  const addToast = useToastStore((s) => s.addToast);
   const hubInventoryEnabled = hubAuth.isAuthenticated && Boolean(hubAuth.token);
   const hubTargetsQuery = useHubExecutionTargets({
     enabled: hubInventoryEnabled,
@@ -454,19 +402,14 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const bridgedTasks = useTaskBridgeStore((s) => s.tasks);
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const username = useHubStore((s) => s.username);
-  const addToast = useToastStore((s) => s.addToast);
   const [active, setActive] = useState<SectionId>(initialSection);
   const [navSearch, setNavSearch] = useState('');
   const navSearchRef = useRef<HTMLInputElement>(null);
-<<<<<<< HEAD
-  const mainRef = useRef<HTMLDivElement>(null);
-=======
   const [teamDraftName, setTeamDraftName] = useState('');
   const [teamDraftDescription, setTeamDraftDescription] = useState('');
   const [teamMemberProfileId, setTeamMemberProfileId] = useState('');
   const [teamMemberRole, setTeamMemberRole] = useState('executor');
   const [teamRunPrompt, setTeamRunPrompt] = useState('');
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   // Keyboard shortcut: `/` focuses the search input
   const handleSettingsKeyDown = useCallback((e: KeyboardEvent) => {
@@ -483,125 +426,26 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     return () => window.removeEventListener('keydown', handleSettingsKeyDown);
   }, [handleSettingsKeyDown]);
 
-  useEffect(() => {
-    if (typeof mainRef.current?.scrollTo === 'function') {
-      mainRef.current.scrollTo(0, 0);
-    }
-  }, [active]);
-
-  const [recordingBinding, setRecordingBinding] = useState<BindingId | null>(null);
-
-  // Keybinding recording: capture keydown when a binding row is clicked
-  useEffect(() => {
-    if (!recordingBinding) return;
-    const handler = (e: KeyboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const keys = keysFromEvent(e);
-      if (keys.length > 0 && keys.some((k) => !['Ctrl', '⌘', 'Shift', 'Alt'].includes(k))) {
-        useKeybindingStore.getState().setBinding(recordingBinding, keys);
-        setRecordingBinding(null);
-      }
-    };
-    const cancel = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setRecordingBinding(null);
-    };
-    window.addEventListener('keydown', handler, true);
-    window.addEventListener('keydown', cancel);
-    return () => {
-      window.removeEventListener('keydown', handler, true);
-      window.removeEventListener('keydown', cancel);
-    };
-  }, [recordingBinding]);
-
-  const handleRestoreDefaults = useCallback(() => {
-    useKeybindingStore.getState().resetAll();
-    addToast({ type: 'success', message: t('settings.keyboard.restored') });
-  }, [addToast, t]);
-
   const [compactMode, setCompactMode] = useStoredBooleanState('compactMode', false);
   const [autoReview, setAutoReview] = useStoredBooleanState('autoReview', true);
   const [fullAccess, setFullAccess] = useStoredBooleanState('fullAccess', false);
   const [enableMcp, setEnableMcp] = useStoredBooleanState('enableMcp', true);
+  const [skillSync, setSkillSync] = useStoredBooleanState('skillSync', true);
   const [taskSync, setTaskSync] = useStoredBooleanState('taskSync', true);
   const [groupChatEnabled, setGroupChatEnabled] = useStoredBooleanState('groupChat', true);
   const [agentSchedulingEnabled, setAgentSchedulingEnabled] = useStoredBooleanState('agentScheduling', true);
   const [enableHooks, setEnableHooks] = useStoredBooleanState('enableHooks', false);
-  const [remoteControlEnabled] = useStoredBooleanState('remoteControl', false);
+  const [remoteControlEnabled, setRemoteControlEnabled] = useStoredBooleanState('remoteControl', false);
   const [autoDetectGit, setAutoDetectGit] = useStoredBooleanState('autoDetectGit', true);
   const [worktreeIsolation, setWorktreeIsolation] = useStoredBooleanState('worktreeIsolation', true);
   const [browserPreview, setBrowserPreview] = useStoredBooleanState('browserPreview', true);
   const [computerConfirm, setComputerConfirm] = useStoredBooleanState('computerConfirm', true);
+  const [platformSync, setPlatformSync] = useStoredBooleanState('platformSync', true);
   const [auditTrail, setAuditTrail] = useStoredBooleanState('auditTrail', true);
-  const [desktopNotifications, setDesktopNotifications] = useStoredBooleanState('desktopNotifications', false);
-  const [closeToTray, setCloseToTray] = useState(true);
-
-  // Load close-to-tray preference from backend on mount.
-  useEffect(() => {
-    invoke<boolean>('get_close_to_tray')
-      .then(setCloseToTray)
-      .catch(() => {
-        // Backend unavailable — fall back to default (true).
-      });
-  }, []);
-
-  // Sync desktop notification toggle with actual OS permission on mount.
-  // If the OS has already granted notification permission (e.g. from a previous
-  // run or system settings), automatically enable the in-app toggle so the user
-  // doesn't have to re-enable it manually.
-  useEffect(() => {
-    const syncPermission = async () => {
-      try {
-        const granted = await isPermissionGranted();
-        if (granted && !desktopNotifications) {
-          setDesktopNotifications(true);
-          writeStoredValue('desktopNotifications', true);
-        }
-      } catch {
-        // Non-Tauri environment (tests/dev in browser) — ignore.
-      }
-    };
-    void syncPermission();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // When the user navigates to the onlineIm section, re-check the OS
-  // notification permission to keep the toggle in sync with system settings.
-  useEffect(() => {
-    if (active !== 'onlineIm') return;
-    const checkPermission = async () => {
-      try {
-        const granted = await isPermissionGranted();
-        if (granted !== desktopNotifications) {
-          setDesktopNotifications(granted);
-          writeStoredValue('desktopNotifications', granted);
-        }
-      } catch {
-        // Non-Tauri environment — ignore.
-      }
-    };
-    void checkPermission();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
-
-  // Persist close-to-tray changes to backend.
-  const handleCloseToTrayToggle = useCallback(async (enabled: boolean) => {
-    setCloseToTray(enabled);
-    try {
-      await invoke('set_close_to_tray', { enabled });
-    } catch {
-      // Silently ignore if backend isn't available.
-    }
-  }, []);
   const [detailLevel, setDetailLevel] = useStoredValueState<SelectValue>('detailLevel', 'detailed');
   const [approvalMode, setApprovalMode] = useStoredValueState<SelectValue>('approvalMode', 'ask');
-<<<<<<< HEAD
-  const [defaultAgent, setDefaultAgent] = useStoredValueState<string>('defaultAgent', 'auto');
-  const [routing, setRouting] = useStoredValueState<string>('routing', 'auto');
-=======
   const [customInstructions, setCustomInstructions] = useState(() => readCustomInstructions());
   const [customInstructionsDraft, setCustomInstructionsDraft] = useState(() => readCustomInstructions());
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const defaultModel = useModelSettingsStore((s) => s.defaultModel);
   const defaultProvider = useModelSettingsStore((s) => s.defaultProvider);
   const modelReasoningEffort = useModelSettingsStore((s) => s.reasoningEffort);
@@ -619,27 +463,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const toggleModelAlias = useModelSettingsStore((s) => s.toggleAlias);
   const setCcSwitchBridge = useModelSettingsStore((s) => s.setCcSwitchBridgeEnabled);
   const updateCcSwitchProvider = useModelSettingsStore((s) => s.updateProvider);
-  const credentials = useModelSettingsStore((s) => s.credentials);
-  const setCredential = useModelSettingsStore((s) => s.setCredential);
-  const setCredentialTestResult = useModelSettingsStore((s) => s.setCredentialTestResult);
-  const resetModelSettings = useModelSettingsStore((s) => s.reset);
   const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
-<<<<<<< HEAD
-  const agents = useMemo(() => agentData?.items ?? [], [agentData?.items]);
-  const localAgentProfiles = agents.map((agent) => ({
-    agent,
-    alias: preferredProfileAlias(agent),
-    route: resolveRunRequestOptions({ model: preferredProfileAlias(agent) }),
-  }));
-  const defaultAgentOptions = useMemo<Array<[string, string]>>(() => {
-    const opts: Array<[string, string]> = [['auto', t('settings.defaultAgent.auto')]];
-    for (const agent of agents) {
-      if (agent.status === 'available') opts.push([agent.id, agent.name]);
-    }
-    return opts;
-  }, [agents, t]);
-
-=======
   const customInstructionsDirty = customInstructionsDraft.trim() !== customInstructions;
   const customInstructionsRemaining = Math.max(0, MAX_CUSTOM_INSTRUCTIONS_CHARS - customInstructionsDraft.length);
 
@@ -685,7 +509,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
       resolveRunRequestOptions,
     ],
   );
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const availableRuntimes = agents.filter((agent) => agent.status === 'available').length;
   const runnerHealth = health?.checks?.runners;
   const runnerItems = runnerHealth?.items ?? [];
@@ -694,15 +517,8 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const runnerSummary = edgeOnline
     ? t('settings.runnerSummary', { available: availableRunners, total: totalRunners })
     : t('settings.edgeOffline');
-  const hubTargets = useMemo(() => hubTargetsQuery.data?.items ?? [], [hubTargetsQuery.data?.items]);
+  const hubTargets = hubTargetsQuery.data?.items ?? [];
   const hubOnlineTargets = hubTargets.filter(isHubTargetConnected).length;
-  const routingOptions = useMemo<Array<[string, string]>>(() => {
-    const opts: Array<[string, string]> = [['auto', t('settings.defaultAgent.auto')]];
-    for (const target of hubTargets) {
-      if (isHubTargetConnected(target)) opts.push([target.id, target.name]);
-    }
-    return opts;
-  }, [hubTargets, t]);
   const hubHealthyTargets = countTargetsByHealth(hubTargets, 'healthy');
   const hubDegradedTargets = countTargetsByHealth(hubTargets, 'degraded');
   const hubOfflineTargets = countTargetsByHealth(hubTargets, 'offline');
@@ -763,16 +579,20 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const teamRunState = agentTeamOverview?.state;
   const teamRunTasks = normalizeTeamTasks(teamRunState, agentTeamOverview?.tasks ?? []);
   const teamRunMembers = teamRunState?.members ?? [];
-<<<<<<< HEAD
   const teamRunAssignments = teamRunState?.assignments ?? [];
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const teamRunApprovals = teamRunState?.approvals ?? [];
   const teamRunConflicts = teamRunState?.conflicts ?? [];
   const pendingTeamApprovals = teamRunApprovals.filter(isPendingTeamApproval);
   const pendingTeamConflicts = teamRunConflicts.filter((conflict) => conflict.status !== 'resolved');
   const teamRunEvents = teamRunState?.run_events ?? [];
   const teamRouteLog = teamRunState?.route_log ?? [];
+  const teamLocalExecutions = buildTeamLocalExecutions({
+    selectedRunId: agentTeamOverview?.selectedRun?.id,
+    bridgeTasks: bridgedTasks,
+    tasks: teamRunTasks,
+    assignments: teamRunAssignments,
+    events: teamRunEvents,
+  });
   const teamActiveMembers = teamRunMembers.filter((member) => (member.active_tasks ?? 0) > 0).length;
   const teamCompletedTasks = teamRunTasks.filter((task) => task.status === 'done').length;
   const agentTeamErrorMessage = agentTeamsQuery.error instanceof Error
@@ -795,9 +615,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     false,
   ].filter(Boolean).length;
   const schedulerLocalMetric = totalRunners > 0 ? runnerSummary : edgeOnline ? t('settings.edgeOnline') : t('settings.edgeOffline');
-<<<<<<< HEAD
-  const hubSessionActive = hubAuthenticated || hubAuth.isAuthenticated;
-=======
   const marketPublishReady = agents.filter((agent) => agent.status === 'available').length;
   const marketCapabilityCount = countAgentCapabilities(agents);
   const skillScriptCount = PROJECT_SKILLS.filter((skill) => skill.hasScripts).length;
@@ -807,7 +624,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const mcpPermissionHookAgents = agents.filter((agent) => agent.capabilities.permissionHooks).length;
   const mcpSubAgentAgents = agents.filter((agent) => agent.capabilities.subAgentSpawn).length;
   const mcpAvailable = edgeOnline && mcpCapableAgents > 0;
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const accountName = hubAuth.user?.username ?? username ?? t('settings.signedIn');
   const tokenSource = hubAuth.tokenSource;
   const tokenSourceLabel =
@@ -817,83 +633,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
         ? t('settings.hubLocalLogin')
         : t('settings.notConfigured');
   const deviceId = readBrowserStorage('local', DEVICE_ID_KEY);
-  const hubClient = useMemo(
-    () => createHubClient({ getToken: () => hubAuth.token }),
-    [hubAuth.token],
-  );
-  const hubSnapshotEnabled = hubSessionActive && Boolean(hubAuth.token);
-  const imContactsQuery = useQuery<ContactInfo[]>({
-    queryKey: ['settings', 'hub', 'contacts', hubAuth.token],
-    enabled: hubSnapshotEnabled,
-    queryFn: () => hubClient.listContacts(),
-  });
-  const imSessionsQuery = useQuery<Session[]>({
-    queryKey: ['settings', 'hub', 'sessions', hubAuth.token],
-    enabled: hubSnapshotEnabled,
-    queryFn: () => hubClient.listSessions(),
-  });
-  const imFriendRequestsQuery = useQuery<FriendRequestInfo[]>({
-    queryKey: ['settings', 'hub', 'friend-requests', hubAuth.token],
-    enabled: hubSnapshotEnabled,
-    queryFn: () => hubClient.listFriendRequests(),
-  });
-  const imNotificationsQuery = useQuery<HubNotification[]>({
-    queryKey: ['settings', 'hub', 'notifications', hubAuth.token],
-    enabled: hubSnapshotEnabled,
-    queryFn: () => hubClient.listNotifications({ limit: 20 }) as Promise<HubNotification[]>,
-  });
-  const customAgentsQuery = useQuery<Record<string, unknown>[]>({
-    queryKey: ['settings', 'hub', 'custom-agents', hubAuth.token],
-    enabled: hubSnapshotEnabled,
-    queryFn: () => hubClient.listCustomAgents(),
-  });
-  const deviceRegistrationQuery = useQuery({
-    queryKey: ['settings', 'hub', 'device-registration', deviceId, hubAuth.token],
-    enabled: hubSnapshotEnabled && Boolean(deviceId),
-    queryFn: () => hubClient.registerDevice({
-      device_id: deviceId ?? '',
-      app_version: APP_VERSION,
-    }),
-  });
-  const imContacts = imContactsQuery.data ?? [];
-  const imSessions = imSessionsQuery.data ?? [];
-  const imFriendRequests = imFriendRequestsQuery.data ?? [];
-  const imNotifications = imNotificationsQuery.data ?? [];
-  const imIsLoading = imContactsQuery.isLoading || imSessionsQuery.isLoading || imFriendRequestsQuery.isLoading || imNotificationsQuery.isLoading;
-  const imIsFetching = imContactsQuery.isFetching || imSessionsQuery.isFetching || imFriendRequestsQuery.isFetching || imNotificationsQuery.isFetching;
-  const imIsError = imContactsQuery.isError || imSessionsQuery.isError || imFriendRequestsQuery.isError || imNotificationsQuery.isError;
-  const imIsSuccess = imContactsQuery.isSuccess && imSessionsQuery.isSuccess && imFriendRequestsQuery.isSuccess && imNotificationsQuery.isSuccess;
-  const imSnapshotStatus = !hubSessionActive
-    ? t('settings.status.loginLocked')
-    : imIsError
-      ? t('settings.status.error')
-      : imIsLoading || imIsFetching || !imIsSuccess
-        ? t('settings.loading')
-        : t('settings.status.snapshot');
-  const deviceRegistrationStatus = !hubSnapshotEnabled || !deviceId
-    ? 'idle'
-    : deviceRegistrationQuery.isError
-      ? 'error'
-      : deviceRegistrationQuery.isSuccess
-        ? 'registered'
-        : deviceRegistrationQuery.isFetching
-          ? 'registering'
-          : 'idle';
-  const desktopDeviceStatus = deviceRegistrationStatus === 'registered'
-    ? t('settings.deviceStatus.registered')
-    : deviceRegistrationStatus === 'registering'
-      ? t('settings.deviceStatus.registering')
-      : deviceRegistrationStatus === 'error'
-        ? t('settings.status.error')
-        : t('settings.deviceStatus.idle');
+  const tokenDanceOidcStatus = tokenSource === 'tokendance' ? t('settings.statusReady') : t('settings.statusInProgress');
   const handleSignOut = () => {
     void hubAuth.logout();
   };
   const handleRefreshRuns = () => {
     void refetchRuns();
   };
-<<<<<<< HEAD
-=======
   const handleCancelRun = (runId: string) => {
     void cancelRunMutation.mutateAsync(runId);
   };
@@ -938,7 +684,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     setSelectedAgentTeamId(teamId);
     setSelectedTeamRunId(run.id);
   };
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const schedulerPolicyReadyCount = [
     modelMappingEnabled,
     ccSwitchBridge,
@@ -967,13 +712,17 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
       { id: 'models', label: t('settings.models'), icon: <SlidersHorizontal size={17} />, group: 'automation' },
       { id: 'modelMapping', label: t('settings.modelMapping'), icon: <Link2 size={17} />, group: 'automation' },
       { id: 'ccSwitch', label: t('settings.ccSwitch'), icon: <Plug size={17} />, group: 'automation' },
-      { id: 'credentials', label: t('settings.credentials'), icon: <LockKeyhole size={17} />, group: 'automation' },
-      { id: 'workspace', label: t('settings.workspace'), icon: <FolderGit2 size={17} />, group: 'system' },
+      { id: 'connections', label: t('settings.connections'), icon: <Globe2 size={17} />, group: 'automation' },
+      { id: 'remoteControl', label: t('settings.remoteControl'), icon: <Computer size={17} />, group: 'automation' },
+      { id: 'git', label: t('settings.git'), icon: <GitBranch size={17} />, group: 'automation' },
       { id: 'environment', label: t('settings.environment'), icon: <HardDrive size={17} />, group: 'system' },
+      { id: 'worktree', label: t('settings.worktree'), icon: <FolderGit2 size={17} />, group: 'system' },
+      { id: 'browser', label: t('settings.browser'), icon: <Eye size={17} />, group: 'system' },
+      { id: 'computerUse', label: t('settings.computerUse'), icon: <Computer size={17} />, group: 'system' },
       { id: 'platforms', label: t('settings.platforms'), icon: <Monitor size={17} />, group: 'system' },
       { id: 'account', label: t('settings.account'), icon: <LockKeyhole size={17} />, group: 'system' },
       { id: 'securityAudit', label: t('settings.securityAudit'), icon: <ShieldCheck size={17} />, group: 'system' },
-      { id: 'data', label: t('settings.data'), icon: <HardDrive size={17} />, group: 'system' },
+      { id: 'archived', label: t('settings.archived'), icon: <Archive size={17} />, group: 'system' },
     ],
     [t],
   );
@@ -994,44 +743,9 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const hasNavResults = filteredNavItems.length > 0;
 
   const activeLabel = navItems.find((item) => item.id === active)?.label ?? t('settings.title');
-<<<<<<< HEAD
-  const ACTION_LABELS: Record<BindingId, string> = {
-    send: t('shortcut.send'),
-    newline: t('shortcut.newline'),
-    search: t('shortcut.search'),
-    toggleSidebar: t('shortcut.toggleSidebar'),
-    toggleRunPanel: t('shortcut.toggleRunPanel'),
-    close: t('shortcut.close'),
-    help: t('shortcut.help'),
-  };
-
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const setBooleanSetting = (key: string, setter: (value: boolean) => void) => (value: boolean) => {
     setter(value);
     writeStoredValue(key, value);
-  };
-
-  const handleDesktopNotificationsToggle = async (value: boolean) => {
-    if (value) {
-      try {
-        const permission = await requestPermission();
-        if (permission === 'granted') {
-          setDesktopNotifications(true);
-          writeStoredValue('desktopNotifications', true);
-          addToast({ type: 'success', message: t('settings.notificationPermissionGranted') });
-        } else {
-          addToast({ type: 'warning', message: t('toast.notificationPermissionDenied') });
-        }
-      } catch {
-        // Non-Tauri environment (tests/dev in browser) — allow the toggle without requesting OS permission
-        setDesktopNotifications(true);
-        writeStoredValue('desktopNotifications', true);
-      }
-    } else {
-      setDesktopNotifications(false);
-      writeStoredValue('desktopNotifications', false);
-    }
   };
 
   return (
@@ -1085,7 +799,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
         </div>
       </aside>
 
-      <main className={styles.main} ref={mainRef}>
+      <main className={styles.main}>
         <div className={styles.content}>
           <div className={styles.header}>
             <span>{t('settings.title')}</span>
@@ -1128,13 +842,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   }
                 />
                 <SettingRow
-                  title={t('settings.closeToTray')}
-                  description={t('settings.closeToTrayDesc')}
-                  control={
-                    <Switch checked={closeToTray} onChange={handleCloseToTrayToggle} />
-                  }
-                />
-                <SettingRow
                   title={t('settings.detailLevel')}
                   description={t('settings.detailLevelDesc')}
                   control={
@@ -1170,19 +877,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   ))}
                 </div>
               </Panel>
-              <Panel title={t('settings.language')} description={t('settings.languageDesc')}>
-                <div className={styles.settingRow}>
-                  <div className={styles.settingCopy}>
-                    <strong>{t('settings.language')}</strong>
-                    <span>{t('settings.languageDesc')}</span>
-                  </div>
-                  <SelectControl
-                    value={language}
-                    options={[['en', 'English'], ['zh', '中文']]}
-                    onChange={(value) => setLanguage(value as 'en' | 'zh')}
-                  />
-                </div>
-              </Panel>
               <Panel title={t('settings.density')}>
                 <SettingRow
                   title={t('settings.compactMode')}
@@ -1197,33 +891,11 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'configuration' && (
             <Panel title={t('settings.configuration')} description={t('settings.configurationDesc')}>
-              <SettingRow
-                title={t('settings.defaultAgent')}
-                description={t('settings.defaultAgentDesc')}
-                control={
-                  <SelectControl
-                    value={defaultAgent}
-                    onChange={(value) => {
-                      setDefaultAgent(value);
-                      writeStoredValue('defaultAgent', value);
-                    }}
-                    options={defaultAgentOptions}
-                  />
-                }
-              />
+              <SettingRow title={t('settings.defaultAgent')} description="Claude Code / Codex / OpenCode" value="Auto" />
               <SettingRow
                 title={t('settings.routing')}
                 description={t('settings.routingDesc')}
-                control={
-                  <SelectControl
-                    value={routing}
-                    onChange={(value) => {
-                      setRouting(value);
-                      writeStoredValue('routing', value);
-                    }}
-                    options={routingOptions}
-                  />
-                }
+                value={t('settings.routingAuto')}
               />
               <SettingRow
                 title={t('settings.approvalMode')}
@@ -1299,14 +971,19 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'permissions' && (
-            <PermissionsSection
-              autoReview={autoReview}
-              setAutoReview={setAutoReview}
-              fullAccess={fullAccess}
-              setFullAccess={setFullAccess}
-              allowlistEntries={allowlistEntries}
-              setAllowlistEntries={setAllowlistEntries}
-            />
+            <Panel title={t('settings.permissions')} description={t('settings.permissionsDesc')}>
+              <SettingRow
+                title={t('settings.autoReview')}
+                description={t('settings.autoReviewDesc')}
+                control={<Switch checked={autoReview} onChange={setBooleanSetting('autoReview', setAutoReview)} />}
+              />
+              <SettingRow
+                title={t('settings.fullAccess')}
+                description={t('settings.fullAccessDesc')}
+                control={<Switch checked={fullAccess} onChange={setBooleanSetting('fullAccess', setFullAccess)} />}
+              />
+              <SettingRow title={t('settings.permissionLedger')} description={t('settings.permissionLedgerDesc')} value={t('settings.statusPlanned')} />
+            </Panel>
           )}
 
           {active === 'agentProfiles' && (
@@ -1442,53 +1119,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   connected={cloudHubTargets.some(isHubTargetConnected)}
                 />
               </div>
-              {/* Remote Edge URL configuration */}
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.remoteEdgeUrl')}</strong>
-                  <span>{t('settings.remoteEdgeUrlDesc')}</span>
-                </div>
-                <div className={styles.settingRow}>
-                  <div className={styles.settingCopy}>
-                    <strong>{t('settings.edgeAddress')}</strong>
-                    <span>{t('settings.edgeAddressDesc')}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
-                    <input
-                      type="text"
-                      value={remoteEdgeUrl}
-                      onChange={(e) => { setRemoteEdgeUrl(e.target.value); setRemoteEdgeSaved(false); }}
-                      placeholder="http://host:3210"
-                      className={styles.textInput}
-                      style={{ width: '280px' }}
-                    />
-                    {remoteEdgeUrl && (
-                      <button
-                        type="button"
-                        className={styles.secondaryBtn}
-                        onClick={() => {
-                          setRemoteEdgeUrl('');
-                          setPersistedEdgeUrl('');
-                          setRemoteEdgeSaved(true);
-                        }}
-                      >
-                        {t('settings.clear')}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className={styles.primaryBtn}
-                      onClick={() => {
-                        setPersistedEdgeUrl(remoteEdgeUrl);
-                        setRemoteEdgeSaved(true);
-                      }}
-                    >
-                      {remoteEdgeSaved ? t('settings.saved') : t('settings.save')}
-                    </button>
-                  </div>
-                </div>
-                <Callout title={t('settings.remoteEdgeNote')} body={t('settings.remoteEdgeNoteDesc')} />
-              </div>
               {runnerItems.length > 0 ? (
                 <div className={styles.runnerList}>
                   {runnerItems.map((runner) => <RunnerRow key={runner.id} runner={runner} />)}
@@ -1525,31 +1155,10 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <EmptyBlock title={t('settings.targetHubEmpty')} description={t('settings.targetHubEmptyDesc')} />
                 )}
               </div>
-              <Callout
-                title={t('settings.remoteControl')}
-                body={t('settings.remoteControlCalloutDesc')}
-              />
             </Panel>
           )}
 
           {active === 'tasks' && (
-<<<<<<< HEAD
-            <TasksSection
-              runs={runs}
-              activeRuns={activeRuns}
-              runsLoading={runsLoading}
-              runsFetching={runsFetching}
-              runsError={runsError}
-              refetchRuns={handleRefreshRuns}
-              cancelRunMutation={cancelRunMutation}
-              bridgedTasks={bridgedTasks}
-              hubSessionActive={hubSessionActive}
-              taskSync={taskSync}
-              setTaskSync={setTaskSync}
-              onOpenAuth={onOpenAuth}
-              latestRun={latestRun}
-            />
-=======
             <Panel title={t('settings.tasks')} description={t('settings.tasksDesc')}>
               <div className={styles.summaryGrid}>
                 <SummaryCard
@@ -1650,47 +1259,31 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 )}
               </div>
             </Panel>
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'onlineIm' && (
-            <OnlineImSection
-              hubSessionActive={hubSessionActive}
-              imSessions={imSessions}
-              imContacts={imContacts}
-              imFriendRequests={imFriendRequests}
-              imNotifications={imNotifications}
-              isLoading={imIsLoading}
-              isFetching={imIsFetching}
-              isError={imIsError}
-              isSuccess={imIsSuccess}
-              refetch={() => {
-                void imContactsQuery.refetch();
-                void imSessionsQuery.refetch();
-                void imFriendRequestsQuery.refetch();
-                void imNotificationsQuery.refetch();
-              }}
-              deviceRegistrationStatus={deviceRegistrationStatus}
-              onOpenAuth={onOpenAuth}
-            />
+            <Panel title={t('settings.onlineIm')} description={t('settings.onlineImDesc')}>
+              <div className={styles.capabilityGrid}>
+                <CapabilityCard
+                  title={t('settings.onlineImSessions')}
+                  description={t('settings.onlineImSessionsDesc')}
+                  status={t('settings.statusReady')}
+                />
+                <CapabilityCard
+                  title={t('settings.onlineImPresence')}
+                  description={t('settings.onlineImPresenceDesc')}
+                  status={t('settings.statusPlanned')}
+                />
+                <CapabilityCard
+                  title={t('settings.onlineImNotifications')}
+                  description={t('settings.onlineImNotificationsDesc')}
+                  status={t('settings.statusPlanned')}
+                />
+              </div>
+            </Panel>
           )}
 
           {active === 'groupChat' && (
-<<<<<<< HEAD
-            <GroupChatSection
-              hubSessionActive={hubSessionActive}
-              isLoading={imIsLoading}
-              isError={imIsError}
-              imSessions={imSessions}
-              imContactsCount={imContacts.length}
-              imSnapshotStatus={imSnapshotStatus}
-              agents={agents}
-              edgeOnline={edgeOnline}
-              groupChatEnabled={groupChatEnabled}
-              setGroupChatEnabled={setGroupChatEnabled}
-              onOpenAuth={onOpenAuth}
-            />
-=======
             <Panel title={t('settings.groupChat')} description={t('settings.groupChatDesc')}>
               <SettingRow
                 title={t('settings.enableGroupChat')}
@@ -1709,7 +1302,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow title={t('settings.groupChatRooms')} description={t('settings.groupChatRoomsDesc')} value={t('settings.statusPlanned')} />
               <SettingRow title={t('settings.groupChatModeration')} description={t('settings.groupChatModerationDesc')} value={t('settings.statusPlanned')} />
             </Panel>
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'agentScheduling' && (
@@ -1849,10 +1441,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     state={teamRunState}
                     tasks={teamRunTasks}
                     members={teamRunMembers}
-<<<<<<< HEAD
                     assignments={teamRunAssignments}
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
                     approvals={teamRunApprovals}
                     conflicts={teamRunConflicts}
                     events={teamRunEvents}
@@ -1860,6 +1449,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     budget={teamRunState?.budget}
                     terminalReason={teamRunState?.terminal_reason}
                     routeLog={teamRouteLog}
+                    localExecutions={teamLocalExecutions}
                     refreshing={agentTeamsQuery.isFetching}
                     approvalBusy={decideTeamApprovalMutation.isPending}
                     conflictBusy={resolveTeamConflictMutation.isPending}
@@ -1984,51 +1574,83 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'agentMarket' && (
-            <AgentMarketSection
-              hubSessionActive={hubSessionActive}
-              agents={agents}
-              edgeOnline={edgeOnline}
-              customAgents={customAgentsQuery.data ?? []}
-              isLoading={customAgentsQuery.isLoading}
-              isFetching={customAgentsQuery.isFetching}
-              isError={customAgentsQuery.isError}
-              isSuccess={customAgentsQuery.isSuccess}
-              refetch={() => {
-                void customAgentsQuery.refetch();
-              }}
-              onOpenAuth={onOpenAuth}
-            />
+            <Panel title={t('settings.agentMarket')} description={t('settings.agentMarketDesc')}>
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<Bot size={18} />}
+                  label={t('settings.marketLocalProfiles')}
+                  value={`${agents.length}`}
+                  detail={edgeOnline ? t('settings.marketLocalProfilesDesc') : t('settings.edgeOffline')}
+                />
+                <SummaryCard
+                  icon={<ShieldCheck size={18} />}
+                  label={t('settings.marketPublishReady')}
+                  value={`${marketPublishReady}/${agents.length}`}
+                  detail={t('settings.marketPublishReadyDesc')}
+                />
+                <SummaryCard
+                  icon={<Code2 size={18} />}
+                  label={t('settings.marketCapabilities')}
+                  value={`${marketCapabilityCount}`}
+                  detail={t('settings.marketCapabilitiesDesc')}
+                />
+                <SummaryCard
+                  icon={<Globe2 size={18} />}
+                  label={t('settings.marketHubSync')}
+                  value={hubAuthenticated ? t('settings.enabled') : t('settings.notConfigured')}
+                  detail={hubAuthenticated ? t('settings.marketHubSyncDesc') : t('settings.marketHubSyncSignedOut')}
+                />
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.marketInstalledProfiles')}</strong>
+                  <span>{t('settings.marketInstalledProfilesDesc')}</span>
+                </div>
+                {agents.length > 0 ? (
+                  <div className={styles.profileGrid}>
+                    {agents.map((agent) => (
+                      <AgentMarketCard key={`market-${agent.id}`} agent={agent} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyBlock title={t('settings.marketNoProfiles')} description={t('settings.marketNoProfilesDesc')} />
+                )}
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.marketReleaseReadiness')}</strong>
+                  <span>{t('settings.marketReleaseReadinessDesc')}</span>
+                </div>
+                <div className={styles.capabilityGrid}>
+                  <CapabilityCard
+                    title={t('settings.agentTemplates')}
+                    description={t('settings.agentTemplatesDesc')}
+                    status={agents.length > 0 ? t('settings.statusInProgress') : t('settings.statusPlanned')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.agentCapabilityTags')}
+                    description={t('settings.agentCapabilityTagsDesc')}
+                    status={marketCapabilityCount > 0 ? t('settings.statusReady') : t('settings.statusPlanned')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.agentReviewFlow')}
+                    description={t('settings.agentReviewFlowDesc')}
+                    status={autoReview ? t('settings.statusInProgress') : t('settings.statusPlanned')}
+                  />
+                  <CapabilityCard
+                    title={t('settings.marketTokenDancePublish')}
+                    description={t('settings.marketTokenDancePublishDesc')}
+                    status={hubAuthenticated ? t('settings.statusInProgress') : t('settings.notConfigured')}
+                  />
+                </div>
+              </div>
+              <Callout title={t('settings.marketGuard')} body={t('settings.marketGuardDesc')} />
+            </Panel>
           )}
 
           {active === 'keyboard' && (
             <Panel title={t('settings.keyboard')} description={t('settings.keyboardDesc')}>
               <div className={styles.shortcutTable}>
-<<<<<<< HEAD
-                {BINDING_IDS.map((id) => {
-                  const keys = getBinding(id);
-                  const isRecording = recordingBinding === id;
-                  return (
-                    <div
-                      key={id}
-                      className={`${styles.shortcutRow} ${isRecording ? styles.shortcutRowRecording : ''}`}
-                      onClick={() => setRecordingBinding(isRecording ? null : id)}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={t('settings.keyboard.clickToRebind')}
-                      title={t('settings.keyboard.clickToRebind')}
-                    >
-                      <span>{ACTION_LABELS[id]}</span>
-                      <div>
-                        {isRecording ? (
-                          <span className={styles.recordingHint}>{t('settings.keyboard.recording')}</span>
-                        ) : (
-                          keys.map((key) => <kbd key={key}>{key}</kbd>)
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-=======
                 {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
                   <div key={group.id} className={styles.shortcutGroup}>
                     <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
@@ -2044,32 +1666,11 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     ))}
                   </div>
                 ))}
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
               </div>
-              <button
-                type="button"
-                className={styles.restoreButton}
-                onClick={handleRestoreDefaults}
-              >
-                {t('settings.keyboard.restoreDefaults')}
-              </button>
             </Panel>
           )}
 
           {active === 'mcp' && (
-<<<<<<< HEAD
-            <McpSection
-              agents={agents}
-              edgeOnline={edgeOnline}
-              hubSessionActive={hubSessionActive}
-              enableMcp={enableMcp}
-              setEnableMcp={setEnableMcp}
-            />
-          )}
-
-          {active === 'skills' && (
-            <SkillsSection hubSessionActive={hubSessionActive} />
-=======
             <Panel title={t('settings.mcp')} description={t('settings.mcpDesc')}>
               <div className={styles.summaryGrid}>
                 <SummaryCard
@@ -2239,7 +1840,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               </div>
               <Callout title={t('settings.skillGuard')} body={t('settings.skillGuardDesc')} />
             </Panel>
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'hooks' && (
@@ -2255,28 +1855,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'models' && (
-<<<<<<< HEAD
-            <ModelsSection
-              defaultModel={defaultModel}
-              defaultProvider={defaultProvider}
-              modelReasoningEffort={modelReasoningEffort}
-              providerFallbackEnabled={providerFallbackEnabled}
-              setDefaultModel={setDefaultModel}
-              setDefaultProvider={setDefaultProvider}
-              setModelReasoningEffort={setModelReasoningEffort}
-              setProviderFallbackEnabled={setProviderFallbackEnabled}
-            />
-          )}
-
-          {active === 'modelMapping' && (
-            <ModelMappingSection
-              modelMappingEnabled={modelMappingEnabled}
-              setModelMappingEnabled={setModelMappingEnabled}
-              modelAliases={modelAliases}
-              toggleModelAlias={toggleModelAlias}
-              updateModelAlias={updateModelAlias}
-            />
-=======
             <Panel title={t('settings.models')} description={t('settings.modelsDesc')}>
               <SettingRow
                 title={t('settings.modelDefault')}
@@ -2353,50 +1931,52 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               </div>
               <Callout title={t('settings.modelPolicy')} body={t('settings.modelPolicyDesc')} />
             </Panel>
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'ccSwitch' && (
-            <CcSwitchSection
-              ccSwitchBridge={ccSwitchBridge}
-              setCcSwitchBridge={setCcSwitchBridge}
-              ccSwitchProviders={ccSwitchProviders}
-              updateCcSwitchProvider={updateCcSwitchProvider}
-            />
-          )}
-
-          {active === 'credentials' && (
-            <Panel title={t('settings.credentials')} description={t('settings.credentialsDesc')}>
+            <Panel title={t('settings.ccSwitch')} description={t('settings.ccSwitchDesc')}>
               <SettingRow
-                title={t('settings.credentialsLocalNote')}
-                description={t('settings.credentialsLocalNoteDesc')}
+                title={t('settings.ccSwitchBridge')}
+                description={t('settings.ccSwitchBridgeDesc')}
+                control={<Switch checked={ccSwitchBridge} onChange={setCcSwitchBridge} />}
               />
               <div className={styles.taskSection}>
                 <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.credentialsProviders')}</strong>
-                  <span>{t('settings.credentialsProvidersDesc')}</span>
+                  <strong>{t('settings.ccSwitchProviders')}</strong>
+                  <span>{t('settings.ccSwitchProvidersDesc')}</span>
                 </div>
                 <div className={styles.providerList}>
-                  {credentials.map((cred) => (
-                    <ProviderCredentialRow
-                      key={cred.providerId}
-                      credential={cred}
-                      onApiKeyChange={(apiKey) => setCredential(cred.providerId, { apiKey })}
-                      onBaseUrlChange={(baseUrl) => setCredential(cred.providerId, { baseUrl })}
-                      onToggleEnabled={() => setCredential(cred.providerId, { enabled: !cred.enabled })}
-                      onTestConnection={() => testProviderConnection(cred.providerId)}
+                  {ccSwitchProviders.map((provider) => (
+                    <ProviderHealthRow
+                      key={provider.id}
+                      id={provider.id}
+                      name={provider.name}
+                      health={provider.health}
+                      modelCount={provider.modelCount}
+                      notes={provider.notes}
+                      onHealthChange={(health) => updateCcSwitchProvider(provider.id, { health })}
+                      onNotesChange={(notes) => updateCcSwitchProvider(provider.id, { notes })}
                     />
                   ))}
                 </div>
               </div>
-              <Callout title={t('settings.credentialsGuard')} body={t('settings.credentialsGuardDesc')} />
+              <Callout title={t('settings.ccSwitchHealth')} body={t('settings.ccSwitchHealthDesc')} />
+            </Panel>
+          )}
+
+          {active === 'connections' && (
+            <Panel title={t('settings.connections')} description={t('settings.connectionsDesc')}>
+              <ConnectionRow
+                name="Hub"
+                description={hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
+                connected={hubAuthenticated}
+              />
+              <ConnectionRow name="Edge" description={`${t('settings.edgeLocal')} · ${runnerSummary}`} connected={edgeOnline} />
+              <ConnectionRow name="WebSocket" description={t('status.wsConnected')} connected={edgeOnline} />
             </Panel>
           )}
 
           {active === 'remoteControl' && (
-<<<<<<< HEAD
-            <RemoteControlSection hubSessionActive={hubSessionActive} />
-=======
             <Panel title={t('settings.remoteControl')} description={t('settings.remoteControlDesc')}>
               <SettingRow
                 title={t('settings.remoteControlEnable')}
@@ -2414,7 +1994,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow title={t('settings.remoteControlApproval')} description={t('settings.remoteControlApprovalDesc')} value={t('settings.approvalMode.ask')} />
               <SettingRow title={t('settings.remoteControlDevices')} description={t('settings.remoteControlDevicesDesc')} value={t('settings.statusPlanned')} />
             </Panel>
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'git' && (
@@ -2433,18 +2012,59 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
           {active === 'environment' && (
             <Panel title={t('settings.environment')} description={t('settings.environmentDesc')}>
-              <SettingRow title={t('settings.environmentOs')} description={t('settings.environmentOsDesc')} value={envOs} />
-              <SettingRow title={t('settings.environmentShell')} description={t('settings.environmentShellDesc')} value={envShell} />
-              <SettingRow title="Node.js" description={t('settings.environmentNodeDesc')} value={envNodeVersion} />
-              <SettingRow title={t('settings.environmentPackageManager')} description={t('settings.environmentPmDesc')} value={envPackageManager} />
+              <SettingRow title="Shell" description="PowerShell 7" value="pwsh" />
+              <SettingRow title="Node" description={t('settings.environmentNodeDesc')} value="pnpm" />
               <SettingRow title="Tauri" description={t('settings.environmentTauriDesc')} value={t('settings.enabled')} />
             </Panel>
           )}
 
+          {active === 'worktree' && (
+            <Panel title={t('settings.worktree')} description={t('settings.worktreeDesc')}>
+              <SettingRow title={t('settings.defaultWorkspace')} description="D:\\Code\\TokenDance" />
+              <SettingRow
+                title={t('settings.worktreeIsolation')}
+                description={t('settings.worktreeIsolationDesc')}
+                control={
+                  <Switch
+                    checked={worktreeIsolation}
+                    onChange={setBooleanSetting('worktreeIsolation', setWorktreeIsolation)}
+                  />
+                }
+              />
+              <SettingRow title={t('settings.worktreePolicy')} description=".worktrees/<feature>" />
+            </Panel>
+          )}
+
+          {active === 'browser' && (
+            <Panel title={t('settings.browser')} description={t('settings.browserDesc')}>
+              <SettingRow
+                title={t('settings.browserPreview')}
+                description={t('settings.browserPreviewDesc')}
+                control={
+                  <Switch checked={browserPreview} onChange={setBooleanSetting('browserPreview', setBrowserPreview)} />
+                }
+              />
+              <SettingRow title={t('settings.browserEngine')} description="Chromium / Playwright" value="Auto" />
+            </Panel>
+          )}
+
+          {active === 'computerUse' && (
+            <Panel title={t('settings.computerUse')} description={t('settings.computerUseDesc')}>
+              <SettingRow
+                title={t('settings.computerConfirm')}
+                description={t('settings.computerConfirmDesc')}
+                control={
+                  <Switch
+                    checked={computerConfirm}
+                    onChange={setBooleanSetting('computerConfirm', setComputerConfirm)}
+                  />
+                }
+              />
+              <Callout title={t('settings.computerUseGuard')} body={t('settings.computerUseGuardDesc')} />
+            </Panel>
+          )}
+
           {active === 'platforms' && (
-<<<<<<< HEAD
-            <PlatformsSection hubSessionActive={hubSessionActive} />
-=======
             <Panel title={t('settings.platforms')} description={t('settings.platformsDesc')}>
               <SettingRow
                 title={t('settings.platformSync')}
@@ -2466,33 +2086,89 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                 <CapabilityCard title="Web" description={t('settings.platformWebDesc')} status={t('settings.statusPlanned')} />
               </div>
             </Panel>
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
           {active === 'account' && (
-            <AccountSection
-              hubSessionActive={hubSessionActive}
-              accountName={accountName}
-              tokenSource={tokenSource ?? ''}
-              tokenSourceLabel={tokenSourceLabel}
-              desktopDeviceStatus={desktopDeviceStatus}
-              deviceId={deviceId}
-              deviceRegistration={{
-                status: deviceRegistrationStatus,
-                error: deviceRegistrationQuery.error instanceof Error ? deviceRegistrationQuery.error.message : null,
-              }}
-              onOpenAuth={onOpenAuth}
-              onSignOut={handleSignOut}
-            />
+            <Panel title={t('settings.account')} description={t('settings.accountDesc')}>
+              <div className={styles.accountCard}>
+                <UserCircle size={34} />
+                <div className={styles.accountInfo}>
+                  <strong>{hubSessionActive ? accountName : t('settings.notSignedIn')}</strong>
+                  <span>{hubSessionActive ? t('settings.accountConnected') : t('settings.accountDisconnected')}</span>
+                </div>
+                {hubSessionActive ? (
+                  <button className={styles.secondaryBtn} onClick={handleSignOut}>
+                    <LogOut size={16} />
+                    {t('settings.signOut')}
+                  </button>
+                ) : (
+                  <button className={styles.primaryBtn} onClick={onOpenAuth}>
+                    <UserCircle size={16} />
+                    {t('settings.signIn')}
+                  </button>
+                )}
+              </div>
+              <div className={styles.summaryGrid}>
+                <SummaryCard
+                  icon={<LockKeyhole size={18} />}
+                  label={t('settings.hubSession')}
+                  value={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')}
+                  detail={hubSessionActive ? t('settings.hubSessionDesc') : t('settings.hubSessionSignedOutDesc')}
+                />
+                <SummaryCard
+                  icon={<Globe2 size={18} />}
+                  label="TokenDance ID"
+                  value={tokenSource === 'tokendance' ? t('settings.enabled') : t('settings.statusInProgress')}
+                  detail={tokenSource === 'tokendance' ? t('settings.tokenDanceSessionDesc') : t('settings.tokenDanceOidcPendingDesc')}
+                />
+                <SummaryCard
+                  icon={<Monitor size={18} />}
+                  label={t('settings.desktopDevice')}
+                  value={deviceId ? shortId(deviceId) : t('settings.notConfigured')}
+                  detail={deviceId ? t('settings.desktopDeviceDesc') : t('settings.desktopDeviceMissingDesc')}
+                />
+                <SummaryCard
+                  icon={<Route size={18} />}
+                  label={t('settings.syncScope')}
+                  value={hubSessionActive ? 'Hub' : t('settings.notConfigured')}
+                  detail={t('settings.syncScopeDesc')}
+                />
+              </div>
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.identityBoundary')}</strong>
+                  <span>{t('settings.identityBoundaryDesc')}</span>
+                </div>
+                <div className={styles.capabilityGrid}>
+                  <CapabilityCard
+                    title={t('settings.hubSession')}
+                    description={t('settings.hubSessionCapabilityDesc')}
+                    status={hubSessionActive ? t('settings.statusReady') : t('settings.notConfigured')}
+                  />
+                  <CapabilityCard
+                    title="TokenDance ID OIDC"
+                    description={t('settings.tokenDanceOidcDesc')}
+                    status={tokenDanceOidcStatus}
+                  />
+                  <CapabilityCard
+                    title={t('settings.authTokenSource')}
+                    description={t('settings.authTokenSourceDesc')}
+                    status={tokenSourceLabel}
+                  />
+                  <CapabilityCard
+                    title={t('settings.deviceProof')}
+                    description={t('settings.deviceProofDesc')}
+                    status={deviceId ? t('settings.statusInProgress') : t('settings.notConfigured')}
+                  />
+                </div>
+              </div>
+              <SettingRow title={t('settings.hubEndpoint')} description={HUB_URL} value={hubSessionActive ? t('settings.enabled') : t('settings.notConfigured')} />
+              <SettingRow title={t('settings.appVersion')} description={APP_VERSION} value={t('settings.statusReady')} />
+              <Callout title={t('settings.accountGuard')} body={t('settings.accountGuardDesc')} />
+            </Panel>
           )}
 
           {active === 'securityAudit' && (
-<<<<<<< HEAD
-            <SecurityAuditSection
-              auditTrail={auditTrail}
-              setAuditTrail={setAuditTrail}
-            />
-=======
             <Panel title={t('settings.securityAudit')} description={t('settings.securityAuditDesc')}>
               <SettingRow
                 title={t('settings.auditTrail')}
@@ -2511,10 +2187,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               <SettingRow title={t('settings.secretScan')} description={t('settings.secretScanDesc')} value={t('settings.statusPlanned')} />
               <Callout title={t('settings.securityGuard')} body={t('settings.securityGuardDesc')} />
             </Panel>
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
           )}
 
-          {active === 'data' && <DataSection t={t} addToast={addToast} resetModelSettings={resetModelSettings} />}
+          {active === 'archived' && (
+            <Panel title={t('settings.archived')} description={t('settings.archivedDesc')}>
+              <EmptyBlock title={t('settings.noArchived')} description={t('settings.noArchivedDesc')} />
+            </Panel>
+          )}
         </div>
       </main>
     </div>
@@ -2530,7 +2209,7 @@ function useStoredValueState<T extends string>(key: string, fallback: T) {
 }
 
 function isActiveRun(run: RunInfo) {
-  return ['queued', 'started', 'running', 'streaming', 'waiting_for_input', 'waiting_approval', 'cancelling'].includes(run.status);
+  return ['queued', 'started', 'running', 'cancelling'].includes(run.status);
 }
 
 function isActiveBridgeTask(task: AgentTask) {
@@ -2545,6 +2224,16 @@ function getRecentRuns(runs: RunInfo[], limit: number) {
 
 function getRecentTasks(tasks: AgentTask[], limit: number) {
   return [...tasks].sort((a, b) => timestampOf(b.createdAt) - timestampOf(a.createdAt)).slice(0, limit);
+}
+
+function countAgentCapabilities(agents: AgentInfo[]) {
+  const names = new Set<string>();
+  for (const agent of agents) {
+    for (const [name, enabled] of Object.entries(agent.capabilities)) {
+      if (enabled) names.add(name);
+    }
+  }
+  return names.size;
 }
 
 function timestampOf(value?: string) {
@@ -2604,19 +2293,37 @@ function normalizeTeamTasks(state: TeamRunState | undefined, tasks: Array<{
   }));
 }
 
+function parseRecord(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+  if (typeof value !== 'string') return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function getFirstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return undefined;
+}
+
 function previewText(value?: string, max = 110) {
   if (!value) return '';
   const normalized = value.replace(/\s+/g, ' ').trim();
   return normalized.length > max ? `${normalized.slice(0, max - 1)}...` : normalized;
 }
 
-<<<<<<< HEAD
 function pathBasename(value: string) {
   return value.split(/[\\/]+/).filter(Boolean).pop() ?? value;
 }
 
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function Panel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
     <section className={styles.panel}>
@@ -2684,7 +2391,6 @@ function HubTaskRow({ task }: { task: AgentTask }) {
         <span>{task.prompt}</span>
         <div className={styles.taskMeta}>
           <span>{task.agentId}</span>
-          <span>{task.targetId ? t('settings.taskTarget', { target: shortId(task.targetId) }) : t('prompt.targetAuto')}</span>
           <span>{task.runId ? shortId(task.runId) : t('settings.taskUnbound')}</span>
         </div>
       </div>
@@ -2843,10 +2549,7 @@ function AgentTeamConsole({
   state,
   tasks,
   members,
-<<<<<<< HEAD
   assignments,
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   approvals,
   conflicts,
   events,
@@ -2854,6 +2557,7 @@ function AgentTeamConsole({
   budget,
   terminalReason,
   routeLog,
+  localExecutions,
   refreshing,
   approvalBusy,
   conflictBusy,
@@ -2869,10 +2573,7 @@ function AgentTeamConsole({
   state?: TeamRunState;
   tasks: TeamTaskState[];
   members: TeamMemberState[];
-<<<<<<< HEAD
   assignments: TeamAssignmentState[];
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   approvals: TeamApprovalState[];
   conflicts: TeamConflictState[];
   events: TeamRunEventState[];
@@ -2880,6 +2581,7 @@ function AgentTeamConsole({
   budget?: TeamBudget;
   terminalReason?: string;
   routeLog: CoordinatorRouteDecision[];
+  localExecutions: TeamLocalExecution[];
   refreshing: boolean;
   approvalBusy: boolean;
   conflictBusy: boolean;
@@ -2895,7 +2597,6 @@ function AgentTeamConsole({
   const completedTasks = tasks.filter((task) => task.status === 'done').length;
   const status = state?.status ?? selectedRun?.status ?? 'unknown';
   const resultRows = buildTeamResultRows(tasks, events, terminalReason);
-<<<<<<< HEAD
   const communicationGraph = buildTeamCommunicationGraph({
     members,
     tasks,
@@ -2905,8 +2606,6 @@ function AgentTeamConsole({
     artifacts,
     conflicts,
   });
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const runTitle = selectedRun?.trigger_message
     ? previewText(selectedRun.trigger_message, 86)
     : t('settings.agentTeamNoRunSelected');
@@ -2940,11 +2639,9 @@ function AgentTeamConsole({
         <TeamMetric label={t('settings.agentTeamRoutes')} value={`${routeLog.length}`} />
       </div>
 
-<<<<<<< HEAD
       <TeamCommunicationGraph graph={communicationGraph} />
+      <TeamLocalExecutionPanel executions={localExecutions} />
 
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       <div className={styles.teamConsoleGrid}>
         <section className={styles.teamSurface}>
           <div className={styles.teamBlockHeader}>
@@ -3138,7 +2835,247 @@ function TeamMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-<<<<<<< HEAD
+type TeamLocalExecutionSource = 'desktopBridge' | 'hubProjection';
+
+interface TeamLocalExecution {
+  id: string;
+  source: TeamLocalExecutionSource;
+  status: string;
+  title: string;
+  runtimeLabel: string;
+  agentTaskId?: string;
+  edgeRunId?: string;
+  hubTaskId?: string;
+  assignmentId?: string;
+  memberId?: string;
+  latestEventType?: string;
+  eventCount: number;
+  error?: string;
+  createdAt?: string;
+}
+
+function TeamLocalExecutionPanel({ executions }: { executions: TeamLocalExecution[] }) {
+  const { t } = useTranslation();
+  return (
+    <section className={styles.teamSurface} data-testid="agent-team-local-execution">
+      <div className={styles.teamBlockHeader}>
+        <strong>{t('settings.agentTeamLocalExecution')}</strong>
+        <span>{t('settings.agentTeamLocalExecutionDesc')}</span>
+      </div>
+      {executions.length > 0 ? (
+        <div className={styles.teamList}>
+          {executions.slice(0, 8).map((execution) => (
+            <TeamLocalExecutionRow key={execution.id} execution={execution} />
+          ))}
+        </div>
+      ) : (
+        <EmptyBlock
+          title={t('settings.agentTeamNoLocalExecution')}
+          description={t('settings.agentTeamNoLocalExecutionDesc')}
+        />
+      )}
+    </section>
+  );
+}
+
+function TeamLocalExecutionRow({ execution }: { execution: TeamLocalExecution }) {
+  const { t } = useTranslation();
+  const sourceLabel = execution.source === 'desktopBridge'
+    ? t('settings.agentTeamLocalSource')
+    : t('settings.agentTeamHubProjectionSource');
+  return (
+    <div className={`${styles.teamMiniRow} ${styles.teamExecutionRow}`}>
+      <div>
+        <strong>{previewText(execution.title, 120)}</strong>
+        <span>{execution.error || sourceLabel}</span>
+        <div className={styles.taskMeta}>
+          <span>{execution.runtimeLabel}</span>
+          {execution.agentTaskId ? <span>{t('settings.agentTeamHubTask')}: {shortId(execution.agentTaskId)}</span> : null}
+          {execution.edgeRunId ? <span>{t('settings.agentTeamEdgeRun')}: {shortId(execution.edgeRunId)}</span> : null}
+          {execution.hubTaskId ? <span>{shortId(execution.hubTaskId)}</span> : null}
+          {execution.assignmentId ? <span>{shortId(execution.assignmentId)}</span> : null}
+          {execution.memberId ? <span>{shortId(execution.memberId)}</span> : null}
+          {execution.latestEventType ? <span>{execution.latestEventType}</span> : null}
+          {execution.eventCount > 0 ? <span>{t('settings.agentTeamLocalEvents', { count: execution.eventCount })}</span> : null}
+          {execution.createdAt ? <span>{formatTimestamp(execution.createdAt)}</span> : null}
+        </div>
+      </div>
+      <em>{t(`settings.taskStatus.${execution.status}`, { defaultValue: execution.status })}</em>
+    </div>
+  );
+}
+
+function buildTeamLocalExecutions({
+  selectedRunId,
+  bridgeTasks,
+  tasks,
+  assignments,
+  events,
+}: {
+  selectedRunId?: string;
+  bridgeTasks: AgentTask[];
+  tasks: TeamTaskState[];
+  assignments: TeamAssignmentState[];
+  events: TeamRunEventState[];
+}): TeamLocalExecution[] {
+  if (!selectedRunId) return [];
+
+  const rows = new Map<string, TeamLocalExecution>();
+
+  const matchingEvents = (agentTaskId?: string, edgeRunId?: string) =>
+    events.filter((event) =>
+      (agentTaskId && event.agent_task_id === agentTaskId)
+      || (edgeRunId && event.edge_run_id === edgeRunId));
+
+  const keyFor = (agentTaskId?: string, edgeRunId?: string, fallback?: string) =>
+    agentTaskId ? `agent:${agentTaskId}` : edgeRunId ? `run:${edgeRunId}` : `hub:${fallback ?? rows.size}`;
+
+  const addOrMerge = (next: TeamLocalExecution) => {
+    const previousEntry = rows.get(next.id)
+      ? [next.id, rows.get(next.id)] as const
+      : [...rows.entries()].find(([, row]) =>
+        (next.agentTaskId && row.agentTaskId === next.agentTaskId)
+        || (next.edgeRunId && row.edgeRunId === next.edgeRunId));
+    const previousKey = previousEntry?.[0];
+    const previous = previousEntry?.[1];
+    if (!previous) {
+      rows.set(next.id, next);
+      return;
+    }
+    rows.set(previousKey ?? next.id, {
+      ...previous,
+      source: previous.source === 'desktopBridge' ? previous.source : next.source,
+      status: previous.source === 'desktopBridge' ? previous.status : next.status,
+      title: previous.source === 'desktopBridge' ? previous.title : next.title,
+      runtimeLabel: previous.source === 'desktopBridge' ? previous.runtimeLabel : next.runtimeLabel,
+      agentTaskId: previous.agentTaskId ?? next.agentTaskId,
+      edgeRunId: previous.edgeRunId ?? next.edgeRunId,
+      hubTaskId: previous.hubTaskId ?? next.hubTaskId,
+      assignmentId: previous.assignmentId ?? next.assignmentId,
+      memberId: previous.memberId ?? next.memberId,
+      latestEventType: previous.latestEventType ?? next.latestEventType,
+      eventCount: Math.max(previous.eventCount, next.eventCount),
+    });
+  };
+
+  bridgeTasks
+    .filter((task) => teamRunIdFromBridgeTask(task) === selectedRunId)
+    .forEach((bridgeTask) => {
+      const hubTask = findProjectedTeamTask(bridgeTask, tasks);
+      const assignment = findProjectedAssignment(bridgeTask, assignments);
+      const executionEvents = matchingEvents(bridgeTask.taskId, bridgeTask.runId);
+      addOrMerge({
+        id: keyFor(bridgeTask.taskId, bridgeTask.runId),
+        source: 'desktopBridge',
+        status: bridgeTask.status,
+        title: hubTask?.objective || bridgeTask.prompt || bridgeTask.taskId,
+        runtimeLabel: bridgeTask.agentId || 'Local Edge',
+        agentTaskId: bridgeTask.taskId,
+        edgeRunId: bridgeTask.runId,
+        hubTaskId: hubTask?.task_id,
+        assignmentId: assignment?.assignment_id ?? hubTask?.assignment_id,
+        memberId: hubTask?.assignee_member_id ?? assignment?.to_member_id,
+        latestEventType: executionEvents[executionEvents.length - 1]?.event_type,
+        eventCount: executionEvents.length,
+        error: bridgeTask.error,
+        createdAt: bridgeTask.createdAt,
+      });
+    });
+
+  tasks.forEach((task) => {
+    const agentTaskId = task.agent_task_id;
+    const edgeRunId = task.edge_run_id ?? task.run_id;
+    if (!agentTaskId && !edgeRunId) return;
+    const assignment = assignments.find((item) =>
+      item.assignment_id === task.assignment_id
+      || (agentTaskId && item.agent_task_id === agentTaskId)
+      || (edgeRunId && (item.edge_run_id === edgeRunId || item.run_id === edgeRunId)));
+    const executionEvents = matchingEvents(agentTaskId, edgeRunId);
+    addOrMerge({
+      id: keyFor(agentTaskId, edgeRunId, task.task_id),
+      source: 'hubProjection',
+      status: task.status,
+      title: task.objective || task.task_id,
+      runtimeLabel: 'Hub TeamRun',
+      agentTaskId,
+      edgeRunId,
+      hubTaskId: task.task_id,
+      assignmentId: assignment?.assignment_id ?? task.assignment_id,
+      memberId: task.assignee_member_id ?? assignment?.to_member_id,
+      latestEventType: executionEvents[executionEvents.length - 1]?.event_type,
+      eventCount: executionEvents.length,
+    });
+  });
+
+  assignments.forEach((assignment) => {
+    const agentTaskId = assignment.agent_task_id;
+    const edgeRunId = assignment.edge_run_id ?? assignment.run_id;
+    if (!agentTaskId && !edgeRunId) return;
+    const executionEvents = matchingEvents(agentTaskId, edgeRunId);
+    addOrMerge({
+      id: keyFor(agentTaskId, edgeRunId, assignment.assignment_id),
+      source: 'hubProjection',
+      status: assignment.status || 'dispatched',
+      title: assignment.type || assignment.assignment_id,
+      runtimeLabel: 'Hub assignment',
+      agentTaskId,
+      edgeRunId,
+      assignmentId: assignment.assignment_id,
+      memberId: assignment.to_member_id,
+      latestEventType: executionEvents[executionEvents.length - 1]?.event_type,
+      eventCount: executionEvents.length,
+    });
+  });
+
+  events.forEach((event) => {
+    if (!event.agent_task_id && !event.edge_run_id) return;
+    addOrMerge({
+      id: keyFor(event.agent_task_id, event.edge_run_id, `${event.event_seq}`),
+      source: 'hubProjection',
+      status: event.event_type,
+      title: event.event_type,
+      runtimeLabel: 'Hub event',
+      agentTaskId: event.agent_task_id,
+      edgeRunId: event.edge_run_id,
+      latestEventType: event.event_type,
+      eventCount: 1,
+      createdAt: event.created_at,
+    });
+  });
+
+  return [...rows.values()].sort((a, b) =>
+    executionRank(a.status) - executionRank(b.status)
+    || timestampOf(b.createdAt) - timestampOf(a.createdAt)
+    || a.id.localeCompare(b.id));
+}
+
+function teamRunIdFromBridgeTask(task: AgentTask) {
+  const data = task.dispatchPayload ?? {};
+  const modelParams = parseRecord(data.model_params);
+  const nested = parseRecord(modelParams.agenthub_team_context);
+  return getFirstString(data.team_run_id, data.teamRunId, nested.team_run_id, nested.teamRunId);
+}
+
+function findProjectedTeamTask(task: AgentTask, tasks: TeamTaskState[]) {
+  return tasks.find((candidate) =>
+    candidate.agent_task_id === task.taskId
+    || (task.runId && (candidate.edge_run_id === task.runId || candidate.run_id === task.runId)));
+}
+
+function findProjectedAssignment(task: AgentTask, assignments: TeamAssignmentState[]) {
+  return assignments.find((candidate) =>
+    candidate.agent_task_id === task.taskId
+    || (task.runId && (candidate.edge_run_id === task.runId || candidate.run_id === task.runId)));
+}
+
+function executionRank(status: string) {
+  if (status === 'running') return 0;
+  if (status === 'queued' || status === 'dispatched' || status === 'pending') return 1;
+  if (status === 'failed' || status === 'cancelled') return 2;
+  if (status === 'done') return 3;
+  return 4;
+}
+
 type TeamGraphNodeKind = 'coordinator' | 'member' | 'task' | 'runtime' | 'artifact' | 'conflict';
 type TeamGraphEdgeKind = 'assignment' | 'route' | 'task' | 'runtime' | 'artifact' | 'conflict';
 
@@ -3165,7 +3102,6 @@ interface TeamCommunicationGraphModel {
 
 function TeamCommunicationGraph({ graph }: { graph: TeamCommunicationGraphModel }) {
   const { t } = useTranslation();
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const nodeClass: Record<TeamGraphNodeKind, string> = {
     artifact: styles.teamGraphNodeArtifact ?? '',
     conflict: styles.teamGraphNodeConflict ?? '',
@@ -3174,22 +3110,6 @@ function TeamCommunicationGraph({ graph }: { graph: TeamCommunicationGraphModel 
     runtime: styles.teamGraphNodeRuntime ?? '',
     task: styles.teamGraphNodeTask ?? '',
   };
-  const selectedNode = selectedNodeId
-    ? graph.nodes.find((node) => node.id === selectedNodeId)
-    : undefined;
-  const relatedNodeIds = new Set<string>();
-  const visibleEdges = selectedNode
-    ? graph.edges.filter((edge) => {
-        const related = edge.from === selectedNode.id || edge.to === selectedNode.id;
-        if (related) {
-          relatedNodeIds.add(edge.from);
-          relatedNodeIds.add(edge.to);
-        }
-        return related;
-      })
-    : graph.edges;
-  const incomingCount = selectedNode ? graph.edges.filter((edge) => edge.to === selectedNode.id).length : 0;
-  const outgoingCount = selectedNode ? graph.edges.filter((edge) => edge.from === selectedNode.id).length : 0;
 
   return (
     <section className={styles.teamSurface} data-testid="agent-team-communication-graph">
@@ -3200,70 +3120,26 @@ function TeamCommunicationGraph({ graph }: { graph: TeamCommunicationGraphModel 
       {graph.nodes.length > 0 || graph.edges.length > 0 ? (
         <div className={styles.teamGraph}>
           <div className={styles.teamGraphNodes} aria-label={t('settings.agentTeamGraphNodes')}>
-            <button
-              type="button"
-              data-team-graph-node="all"
-              className={`${styles.teamGraphNode} ${styles.teamGraphNodeAll} ${!selectedNode ? styles.teamGraphNodeActive : ''}`}
-              aria-pressed={!selectedNode}
-              onClick={() => setSelectedNodeId(null)}
-            >
-              <strong>{t('settings.agentTeamGraphAllLinks')}</strong>
-              <span>{t('settings.agentTeamGraphAllLinksDesc', { count: graph.edges.length })}</span>
-              <em>{graph.nodes.length} / {graph.edges.length}</em>
-            </button>
             {graph.nodes.map((node) => (
-              <button
-                type="button"
-                data-team-graph-node={node.kind}
-                key={node.id}
-                className={[
-                  styles.teamGraphNode,
-                  nodeClass[node.kind],
-                  selectedNode?.id === node.id ? styles.teamGraphNodeActive : '',
-                  selectedNode && selectedNode.id !== node.id && !relatedNodeIds.has(node.id) ? styles.teamGraphNodeMuted : '',
-                ].filter(Boolean).join(' ')}
-                aria-pressed={selectedNode?.id === node.id}
-                onClick={() => setSelectedNodeId(node.id)}
-              >
+              <div key={node.id} className={`${styles.teamGraphNode} ${nodeClass[node.kind]}`}>
                 <strong>{node.label}</strong>
                 <span>{node.meta}</span>
                 {node.status ? <em>{node.status}</em> : null}
-              </button>
+              </div>
             ))}
           </div>
-          <div className={styles.teamGraphInspector}>
-            <div className={styles.teamGraphInspectorHead}>
-              <strong>{selectedNode?.label ?? t('settings.agentTeamGraphAllLinks')}</strong>
-              <span>{selectedNode ? t(`settings.agentTeamGraphKind.${selectedNode.kind}`, { defaultValue: selectedNode.kind }) : t('settings.agentTeamGraphAllLinksDesc', { count: graph.edges.length })}</span>
-              {selectedNode ? (
-                <div className={styles.taskMeta}>
-                  <span>{t('settings.agentTeamGraphIncoming', { count: incomingCount })}</span>
-                  <span>{t('settings.agentTeamGraphOutgoing', { count: outgoingCount })}</span>
-                </div>
-              ) : null}
-            </div>
-            <div className={styles.teamGraphEdges} aria-label={t('settings.agentTeamGraphEdges')}>
-              {visibleEdges.map((edge) => {
+          <div className={styles.teamGraphEdges} aria-label={t('settings.agentTeamGraphEdges')}>
+            {graph.edges.map((edge) => {
               const from = graph.nodes.find((node) => node.id === edge.from);
               const to = graph.nodes.find((node) => node.id === edge.to);
               return (
-                <div
-                  key={edge.id}
-                  data-team-graph-edge={edge.kind}
-                  className={`${styles.teamGraphEdge} ${selectedNode && edge.from !== selectedNode.id && edge.to !== selectedNode.id ? styles.teamGraphEdgeMuted : ''}`}
-                >
+                <div key={edge.id} className={styles.teamGraphEdge}>
                   <span>{from?.label ?? shortGraphId(edge.from)}</span>
                   <strong>{edge.label}</strong>
                   <span>{to?.label ?? shortGraphId(edge.to)}</span>
                 </div>
               );
-              })}
-              {visibleEdges.length === 0 ? (
-                <div className={styles.teamGraphEmptyEdge}>
-                  {t('settings.agentTeamGraphNoSelectedEdges')}
-                </div>
-              ) : null}
-            </div>
+            })}
           </div>
         </div>
       ) : (
@@ -3520,8 +3396,6 @@ function tFallbackRole(role: string) {
   return role || 'member';
 }
 
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function TeamTemplateRow({
   team,
   selected,
@@ -3774,11 +3648,7 @@ function TeamBudgetBlock({ budget }: { budget?: TeamBudget }) {
 
 function formatTeamNumber(value?: number) {
   return typeof value === 'number' && Number.isFinite(value)
-<<<<<<< HEAD
-    ? new Intl.NumberFormat(i18n.resolvedLanguage?.startsWith('zh') ? 'zh-CN' : 'en-US').format(value)
-=======
     ? new Intl.NumberFormat('en-US').format(value)
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     : '--';
 }
 
@@ -4070,8 +3940,6 @@ function SummaryCard({ icon, label, value, detail }: { icon: ReactNode; label: s
   );
 }
 
-<<<<<<< HEAD
-=======
 function AliasMappingRow({
   alias,
   model,
@@ -4194,7 +4062,6 @@ function ProviderHealthRow({
   );
 }
 
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 function RuntimeInventoryCard({ agent }: { agent: AgentInfo }) {
   const { t } = useTranslation();
   return (
@@ -4256,6 +4123,94 @@ function LocalAgentProfileCard({
         {alias ? <span>{t('settings.profileAlias')}: {alias}</span> : null}
         <span>{t('settings.executionTargets')}: {t('settings.targetLocalEdge')}</span>
         <span>{t('settings.profileConfigSource')}: AGENTS.md / memory / skills</span>
+      </div>
+    </div>
+  );
+}
+
+function AgentMarketCard({ agent }: { agent: AgentInfo }) {
+  const { t } = useTranslation();
+  const capabilityNames = Object.entries(agent.capabilities)
+    .filter(([, enabled]) => enabled)
+    .map(([name]) => t(`settings.capability.${name}`, { defaultValue: name }));
+
+  return (
+    <div className={styles.profileCard}>
+      <div className={styles.profileHeader}>
+        <div className={styles.profileIcon}>
+          <Bot size={17} />
+        </div>
+        <div>
+          <strong>{agent.name}</strong>
+          <span>{agent.description || t('settings.marketProfileDefaultDesc')}</span>
+        </div>
+        <em className={`${styles.profileStatus} ${styles[`profileStatus_${agent.status}`]}`}>
+          {t(`agent.status.${agent.status}`)}
+        </em>
+      </div>
+      <div className={styles.profileMeta}>
+        <span>{t('settings.profileRuntime')}: {agent.id}</span>
+        <span>{t('settings.marketInstallSource')}: Local Edge</span>
+        <span>{t('settings.marketPublishStatus')}: {agent.status === 'available' ? t('settings.statusInProgress') : t('settings.statusPlanned')}</span>
+      </div>
+      <div className={styles.profileMeta}>
+        {capabilityNames.length > 0 ? (
+          capabilityNames.map((name) => <span key={name}>{name}</span>)
+        ) : (
+          <span>{t('settings.marketNoCapabilityTags')}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProjectSkillCard({ skill }: { skill: ProjectSkill }) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.profileCard}>
+      <div className={styles.profileHeader}>
+        <div className={styles.profileIcon}>
+          <Code2 size={17} />
+        </div>
+        <div>
+          <strong>{skill.title}</strong>
+          <span>{t(skill.descriptionKey)}</span>
+        </div>
+        <em className={`${styles.profileStatus} ${skill.status === 'ready' ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
+          {skill.status === 'ready' ? t('settings.statusReady') : t('settings.statusInProgress')}
+        </em>
+      </div>
+      <div className={styles.profileMeta}>
+        <span>{t('settings.skillLocalRegistry')}: .agents/skills/{skill.id}</span>
+        <span>{t('settings.skillScripts')}: {skill.hasScripts ? t('settings.enabled') : t('settings.notConfigured')}</span>
+        <span>{t('settings.skillReferences')}: {skill.hasReferences ? t('settings.enabled') : t('settings.notConfigured')}</span>
+      </div>
+    </div>
+  );
+}
+
+function McpRuntimeCard({ agent }: { agent: AgentInfo }) {
+  const { t } = useTranslation();
+  const { mcpIntegration, permissionHooks, subAgentSpawn } = agent.capabilities;
+  return (
+    <div className={styles.profileCard}>
+      <div className={styles.profileHeader}>
+        <div className={styles.profileIcon}>
+          <Plug size={17} />
+        </div>
+        <div>
+          <strong>{agent.name}</strong>
+          <span>{agent.description || t('settings.mcpRuntimeDefaultDesc')}</span>
+        </div>
+        <em className={`${styles.profileStatus} ${mcpIntegration ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
+          {mcpIntegration ? t('settings.statusReady') : t('settings.notConfigured')}
+        </em>
+      </div>
+      <div className={styles.profileMeta}>
+        <span>{t('settings.profileRuntime')}: {agent.id}</span>
+        <span>{t('settings.mcpIntegration')}: {mcpIntegration ? t('settings.enabled') : t('settings.notConfigured')}</span>
+        <span>{t('settings.mcpPermissionHooks')}: {permissionHooks ? t('settings.enabled') : t('settings.notConfigured')}</span>
+        <span>{t('settings.mcpSubAgentSpawn')}: {subAgentSpawn ? t('settings.enabled') : t('settings.notConfigured')}</span>
       </div>
     </div>
   );
@@ -4462,9 +4417,6 @@ function SelectControl({
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {
-<<<<<<< HEAD
-  return <Select value={value} options={options} onChange={onChange} />;
-=======
   return (
     <select className={styles.select} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
       {options.map(([optionValue, label]) => (
@@ -4474,7 +4426,6 @@ function SelectControl({
       ))}
     </select>
   );
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 function Callout({ title, body }: { title: string; body: string }) {
@@ -4484,128 +4435,6 @@ function Callout({ title, body }: { title: string; body: string }) {
       <div>
         <strong>{title}</strong>
         <span>{body}</span>
-      </div>
-    </div>
-  );
-}
-
-function ProviderCredentialRow({
-  credential,
-  onApiKeyChange,
-  onBaseUrlChange,
-  onToggleEnabled,
-  onTestConnection,
-}: {
-  credential: ProviderCredential;
-  onApiKeyChange: (value: string) => void;
-  onBaseUrlChange: (value: string) => void;
-  onToggleEnabled: () => void;
-  onTestConnection: () => void;
-}) {
-  const { t } = useTranslation();
-  const [reveal, setReveal] = useState(false);
-
-  const displayKey = reveal ? credential.apiKey : maskApiKey(credential.apiKey);
-  const testLabel = (() => {
-    switch (credential.testResult) {
-      case 'connecting': return t('settings.credentials.testing');
-      case 'success': return t('settings.credentials.testSuccess');
-      case 'error': return t('settings.credentials.testError');
-      default: return t('settings.credentials.testConnection');
-    }
-  })();
-
-  const statusPillClass = credential.testResult === 'success'
-    ? styles.statusPillOn
-    : credential.testResult === 'error'
-      ? styles.statusPillOn
-      : credential.enabled
-        ? styles.statusPillOn
-        : '';
-
-  const statusLabel = credential.testResult === 'success'
-    ? t('settings.credentials.testSuccess')
-    : credential.testResult === 'error'
-      ? credential.testError || t('settings.credentials.testError')
-      : credential.enabled
-        ? t('settings.enabled')
-        : t('settings.disabled');
-
-  return (
-    <div className={styles.providerRow}>
-      <div className={styles.providerMain}>
-        <div className={styles.connectionIcon}>
-          <LockKeyhole size={17} />
-        </div>
-        <div className={styles.settingCopy}>
-          <strong>{credential.providerId}</strong>
-          <span>{t('settings.credentials.apiKey')}</span>
-        </div>
-        <div className={styles.switchControl}>
-          <span className={[styles.statusPill, statusPillClass].filter(Boolean).join(' ')}>
-            {statusLabel}
-          </span>
-          <Switch checked={credential.enabled} onChange={onToggleEnabled} />
-        </div>
-      </div>
-      <div className={styles.providerControls}>
-        <label>
-          <span>{t('settings.credentials.apiKey')}</span>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <input
-              className={styles.textInput}
-              type={reveal ? 'text' : 'password'}
-              value={displayKey || ''}
-              onChange={(e) => onApiKeyChange(e.target.value)}
-              placeholder={t('settings.credentials.apiKeyPlaceholder')}
-              style={{ flex: 1, minWidth: 0 }}
-            />
-            {credential.apiKey ? (
-              <button
-                type="button"
-                onClick={() => setReveal(!reveal)}
-                style={{
-                  position: 'absolute',
-                  right: 4,
-                  background: 'transparent',
-                  border: 0,
-                  cursor: 'pointer',
-                  color: 'var(--settings-muted)',
-                  padding: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-                title={reveal ? t('settings.credentials.hideKey') : t('settings.credentials.showKey')}
-              >
-                {reveal ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            ) : null}
-          </div>
-        </label>
-        <label>
-          <span>{t('settings.credentials.baseUrl')}</span>
-          <input
-            className={styles.textInput}
-            type="text"
-            value={credential.baseUrl}
-            onChange={(e) => onBaseUrlChange(e.target.value)}
-            placeholder={t('settings.credentials.baseUrlPlaceholder')}
-          />
-        </label>
-        <label style={{ alignItems: 'center' }}>
-          <button
-            type="button"
-            className={styles.secondaryBtn}
-            onClick={onTestConnection}
-            disabled={credential.testResult === 'connecting' || !credential.enabled}
-          >
-            <RefreshCw
-              size={14}
-              style={credential.testResult === 'connecting' ? { animation: 'spin 1s linear infinite' } : undefined}
-            />
-            {testLabel}
-          </button>
-        </label>
       </div>
     </div>
   );

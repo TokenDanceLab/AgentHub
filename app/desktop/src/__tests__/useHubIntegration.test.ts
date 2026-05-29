@@ -50,13 +50,11 @@ const hoisted = vi.hoisted(() => {
     },
     removeTask: (taskId: string) => {
       const task = storeTasks.find((t) => t.taskId === taskId);
+      storeTasks = storeTasks.filter((t) => t.taskId !== taskId);
       if (task?.runId) {
-        storeRunToTask = Object.fromEntries(
-          Object.entries(storeRunToTask).filter(([runId]) => runId !== task.runId),
-        );
-      }
-      if (task?.status !== 'done' && task?.status !== 'failed') {
-        storeTasks = storeTasks.filter((t) => t.taskId !== taskId);
+        const next = { ...storeRunToTask };
+        delete next[task.runId];
+        storeRunToTask = next;
       }
     },
     getActiveTasks: () => storeTasks.filter((t) => t.status === 'queued' || t.status === 'running'),
@@ -150,22 +148,6 @@ function readRequestBody(req: IncomingMessage): Promise<string> {
     req.on('error', reject);
   });
 }
-<<<<<<< HEAD
-
-function edgeRunResponse(runId = 'run-1', threadId = 'sess-1') {
-  return new Response(
-    JSON.stringify({
-      id: runId,
-      runId,
-      projectId: 'proj-1',
-      threadId,
-      status: 'started',
-    }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } },
-  );
-}
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 describe('useHubIntegration', () => {
   let hubWS: HubWSHandle;
@@ -224,12 +206,18 @@ describe('useHubIntegration', () => {
     } as unknown as HubClient;
 
     // Mock fetch for Edge REST calls
-    fetchMock = vi.fn((url: string) => {
-      if (url.endsWith('/v1/threads')) {
-        return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
-      }
-      return Promise.resolve(edgeRunResponse());
-    });
+    fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'run-1',
+          runId: 'run-1',
+          projectId: 'proj-1',
+          threadId: 'sess-1',
+          status: 'started',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
     globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
   });
 
@@ -248,10 +236,48 @@ describe('useHubIntegration', () => {
     }
   }
 
-  function getRunPostBody() {
-    const runCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/v1/runs'));
-    expect(runCall).toBeTruthy();
-    return JSON.parse(runCall![1].body);
+  function fetchCallEndingWith(path: string) {
+    const call = fetchMock.mock.calls.find(([input]) => String(input).endsWith(path));
+    if (!call) {
+      throw new Error(`fetch call ending with ${path} not found`);
+    }
+    return call;
+  }
+
+  function fetchBodyFor(path: string) {
+    const [, init] = fetchCallEndingWith(path);
+    return JSON.parse(String((init as RequestInit).body));
+  }
+
+  function fetchCallCountEndingWith(path: string) {
+    return fetchMock.mock.calls.filter(([input]) => String(input).endsWith(path)).length;
+  }
+
+  function mockRunSequence(...runIds: string[]) {
+    const queue = [...runIds];
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.endsWith('/v1/threads')) {
+        return new Response(JSON.stringify({ threadId: 'thread-ok' }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/v1/runs')) {
+        const runId = queue.shift() ?? 'run-1';
+        return new Response(
+          JSON.stringify({
+            id: runId,
+            runId,
+            projectId: 'proj',
+            threadId: 'sess',
+            status: 'started',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
   }
 
   // ── agent.dispatch → Edge run ──────────────────────────
@@ -274,9 +300,68 @@ describe('useHubIntegration', () => {
         headers: { 'Content-Type': 'application/json' },
       }),
     );
-    const fetchBody = getRunPostBody();
+    const threadBody = fetchBodyFor('/v1/threads');
+    expect(threadBody.threadId).toBe('sess-1');
+    expect(threadBody.projectId).toBe('proj_local');
+    const fetchBody = fetchBodyFor('/v1/runs');
     expect(fetchBody.threadId).toBe('sess-1');
     expect(fetchBody.agentId).toBe('claude-code');
+  });
+
+  it('normalizes legacy Claude agent ids before starting Edge run', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({ agent_type: 'claude' }));
+    });
+
+    const fetchBody = fetchBodyFor('/v1/runs');
+    expect(fetchBody.agentId).toBe('claude-code');
+  });
+
+  it('passes Hub profile runtime config into Edge run request', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({
+        agent_type: 'codex',
+        system_prompt: 'You are a careful reviewer.',
+        tool_whitelist: '["Read","Grep"]',
+        model_params: JSON.stringify({
+          model: 'gpt-5.5',
+          reasoning_effort: 'high',
+          thinking_mode: 'adaptive',
+          permission_mode: 'plan',
+          work_dir: 'D:\\Code\\TokenDance\\AgentHub',
+          include_partial: true,
+          max_thinking_tokens: 4096,
+          append_system_prompt: 'Keep output concise.',
+          config_overrides: { reasoning_summary: 'auto' },
+          ephemeral: true,
+        }),
+      }));
+    });
+
+    const fetchBody = fetchBodyFor('/v1/runs');
+    expect(fetchBody).toMatchObject({
+      agentId: 'codex',
+      model: 'gpt-5.5',
+      reasoningEffort: 'high',
+      thinkingMode: 'adaptive',
+      permissionMode: 'plan',
+      workDir: 'D:\\Code\\TokenDance\\AgentHub',
+      includePartial: true,
+      maxThinkingTokens: 4096,
+      systemPrompt: 'You are a careful reviewer.',
+      appendSystemPrompt: 'Keep output concise.',
+      allowedTools: ['Read', 'Grep'],
+      configOverrides: { reasoning_summary: 'auto' },
+      ephemeral: true,
+    });
   });
 
   it('maps taskId → runId and runId → taskId bidirectionally', async () => {
@@ -290,21 +375,6 @@ describe('useHubIntegration', () => {
 
     expect(result.current.getRunByTaskId('task-1')).toBe('run-1');
     expect(result.current.getTaskByRunId('run-1')?.taskId).toBe('task-1');
-  });
-
-  it('keeps target_id evidence on bridged Hub tasks', async () => {
-    const { result } = renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
-    );
-
-    await act(async () => {
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({ target_id: 'target-local-b' }));
-    });
-
-    expect(result.current.getTaskByRunId('run-1')).toMatchObject({
-      taskId: 'task-1',
-      targetId: 'target-local-b',
-    });
   });
 
   it('reports failure to Hub when fetch fails', async () => {
@@ -355,6 +425,67 @@ describe('useHubIntegration', () => {
       { runId: 'run-1', content: 'Hello' },
       { runId: 'run-1' },
     );
+  });
+
+  it('streams stdout run.output.batch to Hub and remembers it for final output', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.output.batch', {
+        runId: 'run-1',
+        stream: 'stdout',
+        chunks: [
+          { offset: 0, text: 'stdout part 1\n' },
+          { offset: 14, text: 'stdout part 2\n' },
+        ],
+      }));
+      fireEdgeEvent(makeEvent('run.finished', { runId: 'run-1', status: 'finished' }));
+    });
+
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledWith(
+      'task-1',
+      'run.output.batch',
+      {
+        runId: 'run-1',
+        stream: 'stdout',
+        chunks: [
+          { offset: 0, text: 'stdout part 1\n' },
+          { offset: 14, text: 'stdout part 2\n' },
+        ],
+      },
+      { runId: 'run-1' },
+    );
+    expect(hubClient.doneTask).toHaveBeenCalledWith(
+      'task-1',
+      'stdout part 1\nstdout part 2\n',
+      'run-1',
+    );
+  });
+
+  it('does not stream stderr run.output.batch to Hub', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.output.batch', {
+        runId: 'run-1',
+        stream: 'stderr',
+        chunks: [{ offset: 0, text: 'diagnostic only' }],
+      }));
+    });
+
+    expect(hubClient.streamTaskEvent).not.toHaveBeenCalled();
   });
 
   it('posts supervisor route decisions from typed Edge events to Hub TeamRun', async () => {
@@ -484,10 +615,21 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true, content: 'done' }));
     });
 
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledWith(
+      'task-1',
+      'run.agent.result',
+      { runId: 'run-1', success: true, content: 'done' },
+      { runId: 'run-1' },
+    );
     expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'done', 'run-1');
+    expect(hoisted.storeTasks).toContainEqual(expect.objectContaining({
+      taskId: 'task-1',
+      runId: 'run-1',
+      status: 'done',
+    }));
   });
 
-  it('calls doneTask on run.finished when adapter result is absent', async () => {
+  it('uses remembered output for successful run.agent.result without content', async () => {
     renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),
     );
@@ -497,17 +639,11 @@ describe('useHubIntegration', () => {
     });
 
     act(() => {
-      fireEdgeEvent(makeEvent('run.finished', { runId: 'run-1', output: 'finished output' }));
+      fireEdgeEvent(makeEvent('run.agent.text_block', { runId: 'run-1', content: 'visible answer' }));
+      fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true }));
     });
 
-    expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'finished output', 'run-1');
-    expect(hoisted.storeTasks).toEqual([
-      expect.objectContaining({
-        taskId: 'task-1',
-        status: 'done',
-      }),
-    ]);
-    expect(hoisted.storeRunToTask).toEqual({});
+    expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'visible answer', 'run-1');
   });
 
   it('calls failTask on failed run.agent.result', async () => {
@@ -556,27 +692,13 @@ describe('useHubIntegration', () => {
     expect(hubClient.streamTaskEvent).not.toHaveBeenCalled();
   });
 
-  it('keeps terminal task records after result while clearing run mapping', async () => {
+  it('does not subscribe to Hub events when hubWS is null', () => {
     renderHook(() =>
-      useHubIntegration({ hubWS, hubClient }),
+      useHubIntegration({ hubWS: null, hubClient }),
     );
 
-    await act(async () => {
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
-    });
-
-    act(() => {
-      fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true, content: 'done' }));
-    });
-
-    expect(hoisted.storeTasks).toEqual([
-      expect.objectContaining({
-        taskId: 'task-1',
-        runId: 'run-1',
-        status: 'done',
-      }),
-    ]);
-    expect(hoisted.storeRunToTask).toEqual({});
+    expect(hubWS.on).not.toHaveBeenCalled();
+    expect((hoisted.mockStream as StreamHandle).subscribe).toHaveBeenCalled();
   });
 
   // ── Hub cancel → Edge cancel ────────────────────────
@@ -920,14 +1042,7 @@ describe('useHubIntegration', () => {
   // ── Concurrent tasks ──────────────────────────────────
 
   it('handles concurrent agent.dispatch events independently', async () => {
-    const runIds = ['run-A', 'run-B'];
-    fetchMock.mockImplementation((url: string) => {
-      if (url.endsWith('/v1/threads')) {
-        return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
-      }
-      const runId = runIds.shift() ?? 'run-extra';
-      return Promise.resolve(edgeRunResponse(runId, runId === 'run-A' ? 'sess-A' : 'sess-B'));
-    });
+    mockRunSequence('run-A', 'run-B');
 
     const { result } = renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),
@@ -944,18 +1059,12 @@ describe('useHubIntegration', () => {
     expect(result.current.getTaskByRunId('run-B')?.taskId).toBe('task-B');
     expect(hubClient.ackTask).toHaveBeenCalledWith('task-A', 'run-A');
     expect(hubClient.ackTask).toHaveBeenCalledWith('task-B', 'run-B');
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchCallCountEndingWith('/v1/threads')).toBe(2);
+    expect(fetchCallCountEndingWith('/v1/runs')).toBe(2);
   });
 
   it('cleans up mapping for one task without affecting others', async () => {
-    const runIds = ['run-A', 'run-B'];
-    fetchMock.mockImplementation((url: string) => {
-      if (url.endsWith('/v1/threads')) {
-        return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
-      }
-      const runId = runIds.shift() ?? 'run-extra';
-      return Promise.resolve(edgeRunResponse(runId, runId === 'run-A' ? 'sess-A' : 'sess-B'));
-    });
+    mockRunSequence('run-A', 'run-B');
 
     renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),
@@ -991,17 +1100,18 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.agent.result', { runId: 'run-1', success: true, content: 'done' }));
     });
     expect(hubClient.doneTask).toHaveBeenCalledTimes(1);
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledTimes(1);
+    expect(hoisted.storeTasks).toContainEqual(expect.objectContaining({
+      taskId: 'task-1',
+      runId: 'run-1',
+      status: 'done',
+    }));
 
-    // Second event for the same runId — mapping cleaned up, should be ignored
+    // Second event for the same runId is ignored while terminal evidence stays visible locally.
     act(() => {
       fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'late' }));
     });
-    expect(hubClient.streamTaskEvent).not.toHaveBeenCalledWith(
-      'task-1',
-      'run.agent.text_delta',
-      { runId: 'run-1', content: 'late' },
-      { runId: 'run-1' },
-    );
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledTimes(1);
   });
 
   // ── Edge cases ────────────────────────────────────────
@@ -1030,7 +1140,7 @@ describe('useHubIntegration', () => {
       );
     });
 
-    const fetchBody = getRunPostBody();
+    const fetchBody = fetchBodyFor('/v1/runs');
     expect(fetchBody.model).toBe('claude-sonnet-4-6');
   });
 
@@ -1046,7 +1156,7 @@ describe('useHubIntegration', () => {
       );
     });
 
-    const fetchBody = getRunPostBody();
+    const fetchBody = fetchBodyFor('/v1/runs');
     expect(fetchBody.model).toBeUndefined();
   });
 

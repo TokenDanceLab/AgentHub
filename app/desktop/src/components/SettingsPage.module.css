@@ -738,7 +738,6 @@
   line-height: 1.15;
 }
 
-<<<<<<< HEAD
 .teamGraph {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.65fr);
@@ -764,50 +763,6 @@
   gap: 8px;
 }
 
-.teamGraphInspector {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.teamGraphInspectorHead {
-  min-width: 0;
-  padding: 9px 10px;
-  border: 1px solid color-mix(in oklch, var(--settings-chip-border) 78%, transparent);
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.28);
-}
-
-[data-theme='dark'] .teamGraphInspectorHead {
-  border-color: rgba(0, 0, 0, 0.16);
-  background: rgba(255, 255, 255, 0.034);
-}
-
-.teamGraphInspectorHead strong,
-.teamGraphInspectorHead span {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.teamGraphInspectorHead strong {
-  color: var(--foreground);
-  font-size: 12.5px;
-  font-weight: 720;
-  line-height: 1.25;
-}
-
-.teamGraphInspectorHead span {
-  margin-top: 3px;
-  color: var(--settings-muted);
-  font-size: 11.5px;
-  font-weight: 560;
-  line-height: 1.25;
-}
-
 .teamGraphEdges {
   display: flex;
   min-width: 0;
@@ -825,66 +780,17 @@
   gap: 3px;
   padding: 9px 10px 9px 12px;
   border: 1px solid color-mix(in oklch, var(--settings-chip-border) 82%, transparent);
+  border-left: 2px solid color-mix(in oklch, var(--team-node-accent) 58%, transparent);
   border-radius: 12px;
   background: color-mix(in oklch, var(--settings-glass-bg) 92%, transparent);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  box-shadow:
-    inset 0 0 0 1px color-mix(in oklch, var(--team-node-accent) 12%, transparent),
-    0 6px 16px rgba(15, 23, 42, 0.035);
-  transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    box-shadow 150ms ease,
-    opacity 150ms ease,
-    transform 150ms ease;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
 }
 
 [data-theme='dark'] .teamGraphNode {
   border-color: rgba(0, 0, 0, 0.2);
+  border-left-color: color-mix(in oklch, var(--team-node-accent) 52%, rgba(255, 255, 255, 0.08));
   background: rgba(42, 43, 51, 0.72);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in oklch, var(--team-node-accent) 14%, transparent),
-    0 8px 20px rgba(0, 0, 0, 0.1);
-}
-
-.teamGraphNode:hover,
-.teamGraphNode:focus-visible {
-  background: var(--settings-glass-hover);
-  border-color: color-mix(in oklch, var(--team-node-accent) 34%, var(--settings-chip-border));
-  transform: translateY(-1px);
-}
-
-.teamGraphNode:focus-visible {
-  outline: none;
-  box-shadow:
-    inset 0 0 0 1px color-mix(in oklch, var(--team-node-accent) 34%, transparent),
-    0 0 0 3px color-mix(in oklch, var(--team-node-accent) 18%, transparent);
-}
-
-.teamGraphNodeActive {
-  border-color: color-mix(in oklch, var(--team-node-accent) 46%, var(--settings-chip-border));
-  background: color-mix(in oklch, var(--team-node-accent) 10%, var(--settings-glass-bg));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in oklch, var(--team-node-accent) 28%, transparent),
-    0 8px 20px rgba(15, 23, 42, 0.055);
-}
-
-[data-theme='dark'] .teamGraphNodeActive {
-  background: color-mix(in oklch, var(--team-node-accent) 12%, rgba(42, 43, 51, 0.78));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in oklch, var(--team-node-accent) 30%, transparent),
-    0 10px 22px rgba(0, 0, 0, 0.14);
-}
-
-.teamGraphNodeMuted {
-  opacity: 0.42;
-}
-
-.teamGraphNodeAll {
-  --team-node-accent: var(--settings-accent);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
 }
 
 .teamGraphNode strong {
@@ -962,10 +868,6 @@
   background: rgba(255, 255, 255, 0.032);
 }
 
-.teamGraphEdgeMuted {
-  opacity: 0.46;
-}
-
 .teamGraphEdge span {
   overflow: hidden;
   color: color-mix(in oklch, var(--foreground) 72%, var(--settings-muted));
@@ -990,19 +892,6 @@
   white-space: nowrap;
 }
 
-.teamGraphEmptyEdge {
-  min-height: 52px;
-  padding: 12px;
-  border: 1px dashed color-mix(in oklch, var(--settings-chip-border) 84%, transparent);
-  border-radius: 10px;
-  color: var(--settings-muted);
-  font-size: 12px;
-  font-weight: 620;
-  line-height: 1.35;
-}
-
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 .teamConsoleGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
@@ -1087,6 +976,11 @@
   align-items: stretch;
   flex-direction: column;
   gap: 10px;
+}
+
+.teamExecutionRow {
+  min-height: 58px;
+  padding-block: 11px;
 }
 
 .teamMiniRow:first-child {
@@ -1651,17 +1545,12 @@
 }
 
 .switch:disabled {
-<<<<<<< HEAD
-  cursor: default;
-  opacity: 0.5;
-=======
   cursor: not-allowed;
   opacity: 0.48;
 }
 
 .switch:disabled span {
   box-shadow: none;
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 .select {
@@ -1811,300 +1700,6 @@
   background: rgba(255, 255, 255, 0.055);
 }
 
-/* ── Keyboard shortcut editing UI ── */
-
-.shortcutActions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.shortcutActions button {
-  white-space: nowrap;
-}
-
-/* Editable table container */
-.shortcutEditTable {
-  display: grid;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
-  backdrop-filter: blur(20px) saturate(1.14);
-  -webkit-backdrop-filter: blur(20px) saturate(1.14);
-}
-
-[data-theme='dark'] .shortcutEditTable {
-  border-color: var(--settings-glass-border);
-}
-
-.shortcutEditGroup {
-  display: grid;
-}
-
-.shortcutEditGroup + .shortcutEditGroup {
-  border-top: 1px solid rgba(0, 0, 0, 0.055);
-}
-
-[data-theme='dark'] .shortcutEditGroup + .shortcutEditGroup {
-  border-top-color: rgba(255, 255, 255, 0.06);
-}
-
-.shortcutEditGroupTitle {
-  min-height: 34px;
-  padding: 10px 16px 6px;
-  color: var(--settings-muted);
-  font-size: 11px;
-  font-weight: 780;
-  letter-spacing: 0;
-  line-height: 1.45;
-  text-transform: uppercase;
-}
-
-.shortcutEditRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  min-height: 56px;
-  padding: 10px 16px;
-}
-
-.shortcutEditGroupTitle + .shortcutEditRow,
-.shortcutEditRow + .shortcutEditRow {
-  border-top: 1px solid rgba(0, 0, 0, 0.055);
-}
-
-[data-theme='dark'] .shortcutEditGroupTitle + .shortcutEditRow,
-[data-theme='dark'] .shortcutEditRow + .shortcutEditRow {
-  border-top-color: rgba(255, 255, 255, 0.06);
-}
-
-.shortcutEditRowCapturing {
-  background: rgba(93, 104, 204, 0.06);
-}
-
-[data-theme='dark'] .shortcutEditRowCapturing {
-  background: rgba(93, 104, 204, 0.09);
-}
-
-.shortcutEditInfo {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 2px;
-}
-
-.shortcutEditLabel {
-  color: var(--foreground);
-  font-size: 14px;
-  font-weight: 650;
-  line-height: 1.5;
-}
-
-.shortcutEditDetail {
-  color: var(--settings-muted);
-  font-size: 12px;
-  font-weight: 520;
-  line-height: 1.35;
-}
-
-.shortcutEditBinding {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.shortcutDisplayKeys {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.shortcutDisplayKeys kbd {
-  min-width: 26px;
-  height: 25px;
-  padding: 0 8px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-bottom-color: rgba(0, 0, 0, 0.16);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.62);
-  color: var(--foreground);
-  font: inherit;
-  font-size: 12px;
-  line-height: 23px;
-  text-align: center;
-}
-
-[data-theme='dark'] .shortcutDisplayKeys kbd {
-  border-color: rgba(255, 255, 255, 0.08);
-  border-bottom-color: rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.055);
-}
-
-.shortcutCaptureArea {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  min-width: 140px;
-  min-height: 32px;
-  padding: 4px 12px;
-  border: 2px dashed var(--settings-accent);
-  border-radius: 8px;
-  background: rgba(93, 104, 204, 0.04);
-  outline: none;
-  cursor: pointer;
-  transition: border-color var(--duration-fast), background var(--duration-fast);
-}
-
-[data-theme='dark'] .shortcutCaptureArea {
-  background: rgba(93, 104, 204, 0.07);
-}
-
-.shortcutCaptureArea:focus-visible {
-  box-shadow: 0 0 0 3px rgba(93, 104, 204, 0.18);
-}
-
-.shortcutCaptureKeys {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.shortcutCaptureKeys kbd {
-  min-width: 26px;
-  height: 25px;
-  padding: 0 8px;
-  border: 1px solid color-mix(in oklch, var(--settings-accent) 34%, rgba(0, 0, 0, 0.08));
-  border-bottom-color: color-mix(in oklch, var(--settings-accent) 42%, rgba(0, 0, 0, 0.16));
-  border-radius: 7px;
-  background: color-mix(in oklch, var(--settings-accent) 8%, rgba(255, 255, 255, 0.62));
-  color: var(--foreground);
-  font: inherit;
-  font-size: 12px;
-  line-height: 23px;
-  text-align: center;
-  animation: keyCaptureIn 0.12s ease-out;
-}
-
-[data-theme='dark'] .shortcutCaptureKeys kbd {
-  border-color: color-mix(in oklch, var(--settings-accent) 34%, rgba(255, 255, 255, 0.08));
-  border-bottom-color: color-mix(in oklch, var(--settings-accent) 42%, rgba(255, 255, 255, 0.16));
-  background: color-mix(in oklch, var(--settings-accent) 10%, rgba(255, 255, 255, 0.055));
-}
-
-@keyframes keyCaptureIn {
-  from {
-    opacity: 0;
-    transform: scale(0.88);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.shortcutCaptureHint {
-  color: var(--settings-muted);
-  font-size: 12px;
-  font-weight: 600;
-  user-select: none;
-}
-
-.shortcutConflict {
-  color: var(--destructive, #e53e3e);
-  font-size: 11px;
-  font-weight: 650;
-  text-align: center;
-  max-width: 180px;
-  line-height: 1.3;
-}
-
-.shortcutEditActions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.shortcutEditBtn,
-.shortcutConfirmBtn,
-.shortcutCancelBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 7px;
-  background: transparent;
-  color: var(--foreground);
-  cursor: pointer;
-  transition: background var(--duration-fast), border-color var(--duration-fast);
-}
-
-[data-theme='dark'] .shortcutEditBtn,
-[data-theme='dark'] .shortcutConfirmBtn,
-[data-theme='dark'] .shortcutCancelBtn {
-  border-color: rgba(255, 255, 255, 0.09);
-}
-
-.shortcutEditBtn:hover,
-.shortcutEditBtn:focus-visible {
-  outline: none;
-  background: rgba(93, 104, 204, 0.1);
-  border-color: rgba(93, 104, 204, 0.24);
-}
-
-.shortcutConfirmBtn {
-  border-color: rgba(34, 197, 94, 0.28);
-  color: #22c55e;
-}
-
-.shortcutConfirmBtn:hover,
-.shortcutConfirmBtn:focus-visible {
-  outline: none;
-  background: rgba(34, 197, 94, 0.1);
-}
-
-.shortcutConfirmBtn:disabled {
-  opacity: 0.38;
-  cursor: default;
-}
-
-.shortcutCancelBtn {
-  border-color: rgba(229, 62, 62, 0.24);
-  color: #e53e3e;
-}
-
-.shortcutCancelBtn:hover,
-.shortcutCancelBtn:focus-visible {
-  outline: none;
-  background: rgba(229, 62, 62, 0.08);
-}
-
-/* Footer bar */
-.shortcutEditFooter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.shortcutEditFooterActions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 .connectionIcon {
   display: grid;
   width: 34px;
@@ -2225,22 +1820,6 @@
   color: var(--settings-muted);
   font-size: 13px;
   line-height: 1.4;
-}
-
-.authGapBlock {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 78px;
-  padding: 16px;
-  margin-bottom: 12px;
-  border: 1px solid var(--settings-glass-border);
-  border-radius: 12px;
-  background: var(--settings-glass-bg);
-  box-shadow: var(--settings-glass-shadow);
-  backdrop-filter: blur(20px) saturate(1.14);
-  -webkit-backdrop-filter: blur(20px) saturate(1.14);
 }
 
 .emptyBlock {
@@ -2375,7 +1954,6 @@
 
   .teamConsoleGrid,
   .teamBuilderGrid,
-<<<<<<< HEAD
   .teamMetricGrid,
   .teamGraph {
     grid-template-columns: 1fr;
@@ -2385,12 +1963,6 @@
     padding: 9px;
   }
 
-=======
-  .teamMetricGrid {
-    grid-template-columns: 1fr;
-  }
-
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   .teamConsoleHeader,
   .teamMiniRow {
     align-items: flex-start;
@@ -2405,8 +1977,7 @@
   .connectionRow,
   .runnerRow,
   .taskRow,
-  .accountCard,
-  .authGapBlock {
+  .accountCard {
     align-items: flex-start;
     flex-wrap: wrap;
   }
@@ -2447,58 +2018,4 @@
     width: 100%;
     text-align: left;
   }
-}
-
-.shortcutRowRecording {
-  background: rgba(59, 130, 246, 0.08);
-  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.2);
-}
-
-[data-theme='dark'] .shortcutRowRecording {
-  background: rgba(59, 130, 246, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.25);
-}
-
-.recordingHint {
-  color: var(--muted-foreground);
-  font-size: 12px;
-  font-weight: 500;
-  animation: pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.restoreButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-  padding: 8px 14px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.48);
-  color: var(--foreground);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.restoreButton:hover {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(0, 0, 0, 0.14);
-}
-
-[data-theme='dark'] .restoreButton {
-  border-color: rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.055);
-}
-
-[data-theme='dark'] .restoreButton:hover {
-  background: rgba(255, 255, 255, 0.085);
-  border-color: rgba(255, 255, 255, 0.14);
 }

@@ -10,9 +10,12 @@ import CodeBlock from './CodeBlock';
 import EmptyState from './EmptyState';
 import TaskList from './TaskList';
 import ToolTimeline from './ToolTimeline';
+import TeamRunDock from './TeamRunDock';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
+import type { AgentTeamOverview } from '@/api/agentTeamQueries';
+import type { LocalOrchestrationStatus } from '@/utils/localOrchestration';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -23,6 +26,12 @@ interface Props {
   onRetry?: (messageId: string) => void;
   onFork?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
+  agentTeamOverview?: AgentTeamOverview;
+  agentTeamsLoading?: boolean;
+  agentTeamsSignedIn?: boolean;
+  localOrchestration?: LocalOrchestrationStatus;
+  onStartLocalOrchestration?: (agentId: string, draft: string) => void;
+  onOpenTeamRuns?: () => void;
 }
 
 const LONG_AGENT_TEXT_MAX_LINES = 24;
@@ -876,6 +885,12 @@ export default function ChatView({
   onRetry,
   onFork,
   onDelete,
+  agentTeamOverview,
+  agentTeamsLoading,
+  agentTeamsSignedIn,
+  localOrchestration,
+  onStartLocalOrchestration,
+  onOpenTeamRuns,
 }: Props) {
   const { t, i18n } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
@@ -1122,6 +1137,16 @@ export default function ChatView({
         role="log"
         aria-live="polite"
       >
+        {(agentTeamsSignedIn || localOrchestration?.available || agentTeamsLoading) && (
+          <TeamRunDock
+            overview={agentTeamOverview}
+            loading={agentTeamsLoading}
+            signedIn={agentTeamsSignedIn}
+            localOrchestration={localOrchestration}
+            onStartLocalOrchestration={onStartLocalOrchestration}
+            onOpenConsole={onOpenTeamRuns}
+          />
+        )}
         {visibleMessages.length === 0 ? (
           <EmptyState
             title={t('chat.emptyTitle')}

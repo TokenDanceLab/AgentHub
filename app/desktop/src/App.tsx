@@ -1769,7 +1769,26 @@ export default function App() {
               ) : viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
               ) : (
-                <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onFork={handleForkThread} onDelete={handleDelete} onSendMessage={handleSend} />
+                <Slot
+                  name="main-view"
+                  messages={messages}
+                  allMessages={allMessages}
+                  threadsCount={threads.length}
+                  isStreaming={composerLocked}
+                  isConnected={isConnected}
+                  agents={agents}
+                  selectedAgentId={selectedAgentId}
+                  onSelectAgent={handleSelectAgent}
+                  onRetry={handleRetry}
+                  onFork={handleForkThread}
+                  onDelete={handleDelete}
+                  onSendMessage={handleSend}
+                  agentTeamOverview={agentTeamsQuery.data}
+                  agentTeamsLoading={agentTeamsQuery.isLoading || agentTeamsQuery.isFetching}
+                  agentTeamsSignedIn={hubInventoryEnabled}
+                  onStartLocalOrchestration={handleStartLocalOrchestration}
+                  onOpenTeamRuns={() => openSettings('agentScheduling')}
+                />
               )}
             </div>
 
