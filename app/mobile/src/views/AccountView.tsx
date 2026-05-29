@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { getSurfaceStatusMetadata, getSurfacesByPlatform } from "@agenthub/shared";
-import { BottomSheet, SegmentedControl, TokenDanceMark } from "@agenthub/shared/ui";
+import { BottomSheet, SegmentedControl, StatusNotice, TokenDanceMark } from "@agenthub/shared/ui";
 import { Bell, Languages, Link2, LogIn, RefreshCw, ShieldCheck, Smartphone, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { mobileLanguages, type MobileLanguage } from "../i18n";
@@ -169,10 +169,12 @@ export function AccountView() {
                 </div>
               ))}
             </div>
-            <div className="mobileSignalRow" role="status" aria-live="polite">
-              {isBusy ? <RefreshCw size={14} className="mobileSpin" /> : <ShieldCheck size={14} />}
-              <span>{t(statusKey)}</span>
-            </div>
+            <StatusNotice
+              className="mobileSignalRow"
+              icon={isBusy ? <RefreshCw size={14} className="mobileSpin" /> : <ShieldCheck size={14} />}
+            >
+              {t(statusKey)}
+            </StatusNotice>
             {canRetryNativeAction && (
               <button
                 className="mobileActionButton mobileRetryAction"
@@ -344,10 +346,12 @@ export function AccountView() {
                 <strong>{t("settings.clearSession.effectValue")}</strong>
               </div>
             </div>
-            <div className="mobileSignalRow" role="status" aria-live="polite">
-              {isClearBusy ? <RefreshCw size={14} className="mobileSpin" /> : <ShieldCheck size={14} />}
-              <span>{t(clearSheetStatusKey)}</span>
-            </div>
+            <StatusNotice
+              className="mobileSignalRow"
+              icon={isClearBusy ? <RefreshCw size={14} className="mobileSpin" /> : <ShieldCheck size={14} />}
+            >
+              {t(clearSheetStatusKey)}
+            </StatusNotice>
         </BottomSheet>
       )}
     </div>

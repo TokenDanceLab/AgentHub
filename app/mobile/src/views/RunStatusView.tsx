@@ -15,7 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { StatusBadge } from "@agenthub/shared/components";
-import { BottomSheet, MetricGrid, SegmentedControl } from "@agenthub/shared/ui";
+import { BottomSheet, MetricGrid, SegmentedControl, StatusNotice } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import type { Artifact, Preview, Run, RunStatus, ThreadItem } from "@agenthub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -258,17 +258,21 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
           <h2>{approval?.summary ?? t("runDetail.review.pending")}</h2>
           <p>{decisionStatus === "approved" ? t("runDetail.review.approved") : decisionStatus === "rejected" ? t("runDetail.review.rejected") : t("runDetail.review.description")}</p>
           {decisionNotice && (
-            <div className="mobileDecisionNotice" role="status">
+            <StatusNotice className="mobileDecisionNotice">
               {decisionNotice === "approved"
                 ? "Decision submitted. Hub marked this checkpoint approved."
                 : "Decision submitted. Hub marked this checkpoint rejected."}
-            </div>
+            </StatusNotice>
           )}
           {decisionStatus && decisionStatus !== "pending" && (
-            <div className="mobileDecisionLock">
-              {decisionStatus === "approved" ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-              <span>{decisionStatus === "approved" ? "Checkpoint approved" : "Checkpoint rejected"}</span>
-            </div>
+            <StatusNotice
+              className="mobileDecisionLock"
+              icon={decisionStatus === "approved" ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+              role="note"
+              ariaLive="off"
+            >
+              {decisionStatus === "approved" ? "Checkpoint approved" : "Checkpoint rejected"}
+            </StatusNotice>
           )}
           {decisionStatus && decisionStatus !== "pending" && (
             <button className="mobileActionButton" type="button" onClick={onBack}>Back to queue</button>
@@ -406,16 +410,16 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
             </>
           )}
         >
-            <div className="mobileSignalRow" role="status" aria-live="polite">
-              {decision.isPending ? <RefreshCw size={14} className="mobileSpin" /> : sheetError ? <XCircle size={14} /> : <ShieldAlert size={14} />}
-              <span>
-                {decision.isPending
-                  ? "Submitting approval decision to Hub..."
-                  : sheetError
-                    ? "Decision was not submitted. Check Hub session and retry."
-                    : "Ready to submit decision."}
-              </span>
-            </div>
+            <StatusNotice
+              className="mobileSignalRow"
+              icon={decision.isPending ? <RefreshCw size={14} className="mobileSpin" /> : sheetError ? <XCircle size={14} /> : <ShieldAlert size={14} />}
+            >
+              {decision.isPending
+                ? "Submitting approval decision to Hub..."
+                : sheetError
+                  ? "Decision was not submitted. Check Hub session and retry."
+                  : "Ready to submit decision."}
+            </StatusNotice>
         </BottomSheet>
       )}
 

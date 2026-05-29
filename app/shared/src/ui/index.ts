@@ -21,3 +21,5 @@ export { BottomSheet } from './BottomSheet';
 export type { BottomSheetProps } from './BottomSheet';
 export { MetricGrid } from './MetricGrid';
 export type { MetricGridItem, MetricGridProps } from './MetricGrid';
+export { StatusNotice } from './StatusNotice';
+export type { StatusNoticeProps } from './StatusNotice';
