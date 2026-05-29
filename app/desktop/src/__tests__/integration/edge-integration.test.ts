@@ -1,4 +1,3 @@
-// @ts-nocheck — uses Node built-ins (http, crypto, Buffer) for in-process mock Edge server.
 // These are not available under the DOM-centric tsconfig (types: [vitest/globals]).
 //
 // Desktop↔Edge integration test — REST + WebSocket protocol contract verification.
@@ -221,7 +220,7 @@ class MockEdgeServer {
   private handleUpgrade(
     req: http.IncomingMessage,
     socket: import('node:net').Socket,
-    head: Buffer,
+    _head: Buffer,
   ): void {
     const url = new URL(req.url || '/', `http://127.0.0.1:${this.port}`);
     if (url.pathname !== '/v1/events') {

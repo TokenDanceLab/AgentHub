@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import IMView from '@/views/IMView';
+import { useIMChat } from '@/hooks/useIMChat';
 
 Element.prototype.scrollIntoView = vi.fn();
 
@@ -109,8 +110,7 @@ describe('IMView', () => {
   });
 
   it('shows empty state when no conversations', () => {
-    const { useIMChat } = require('@/hooks/useIMChat');
-    vi.mocked(useIMChat).mockReturnValue({
+    vi.mocked(useIMChat).mockReturnValueOnce({
       ...vi.mocked(useIMChat)(),
       contacts: [],
       status: 'loaded' as const,

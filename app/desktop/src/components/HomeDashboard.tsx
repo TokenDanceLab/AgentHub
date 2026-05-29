@@ -13,7 +13,6 @@ import {
 import { useRuns } from '@/api/runQueries';
 import { useThreads } from '@/api/threadQueries';
 import { useHealth } from '@/hooks/useHealth';
-import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import type { ThreadInfo } from '@shared/types';
 import styles from './HomeDashboard.module.css';
 
@@ -64,8 +63,8 @@ export default function HomeDashboard({
   const { data: runData } = useRuns();
   const { data: threadData } = useThreads();
 
-  const runs = runData?.items ?? [];
-  const threads = threadData?.items ?? [];
+  const runs = useMemo(() => runData?.items ?? [], [runData?.items]);
+  const threads = useMemo(() => threadData?.items ?? [], [threadData?.items]);
 
   const activeRunCount = useMemo(() => runs.filter((r) => isRunActive(r.status)).length, [runs]);
   const recentThreads = useMemo(() => getRecentThreads(threads, 5), [threads]);

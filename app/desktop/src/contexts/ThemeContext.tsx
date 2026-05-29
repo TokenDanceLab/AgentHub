@@ -33,18 +33,14 @@ function getSystemTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
-function resolveTheme(mode: ThemeMode): Theme {
-  if (mode === 'system') return getSystemTheme();
-  return mode;
-}
-
 function applyTheme(theme: Theme) {
   document.documentElement.setAttribute('data-theme', theme);
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getStoredMode);
-  const [resolvedTheme, setResolvedTheme] = useState<Theme>(() => resolveTheme(getStoredMode()));
+  const [systemTheme, setSystemTheme] = useState<Theme>(getSystemTheme);
+  const resolvedTheme = themeMode === 'system' ? systemTheme : themeMode;
 
   // Persist to localStorage and resolve
   const setThemeMode = useCallback((mode: ThemeMode) => {
@@ -56,18 +52,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Keep resolvedTheme in sync with themeMode + system changes
-  useEffect(() => {
-    const resolved = resolveTheme(themeMode);
-    setResolvedTheme(resolved);
-  }, [themeMode]);
-
   // Listen for system theme changes when in system mode
   useEffect(() => {
     if (themeMode !== 'system') return;
     const mql = window.matchMedia('(prefers-color-scheme: light)');
     const handler = () => {
-      setResolvedTheme(getSystemTheme());
+      setSystemTheme(getSystemTheme());
     };
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);

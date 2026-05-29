@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Circle, Plus, Square, ArrowUp, LoaderCircle } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
@@ -22,6 +22,26 @@ type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 const PERMISSION_MODES = ['default', 'plan', 'acceptEdits', 'bypassPermissions', 'dontAsk'] as const;
 type PermissionMode = (typeof PERMISSION_MODES)[number];
 
+function getStoredWorkDir(): string {
+  try {
+    return window.localStorage.getItem('agenthub.prompt.workDir') ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function getStoredPermissionMode(): PermissionMode {
+  try {
+    const savedMode = window.localStorage.getItem('agenthub.prompt.permissionMode');
+    if (savedMode && PERMISSION_MODES.includes(savedMode as PermissionMode)) {
+      return savedMode as PermissionMode;
+    }
+  } catch {
+    // localStorage can be unavailable in tests.
+  }
+  return 'default';
+}
+
 interface SendOptions {
   model?: string;
   reasoningEffort?: ReasoningEffort;
@@ -33,7 +53,7 @@ interface Props {
   agents: AgentInfo[];
   selectedAgentId?: string;
   onSelectAgent: (agentId: string) => void;
-  onSend: (prompt: string, agentId?: string, opts?: SendOptions) => boolean | void | Promise<boolean | void>;
+  onSend: (prompt: string, agentId?: string, opts?: SendOptions) => boolean | undefined | Promise<boolean | undefined>;
   isStreaming?: boolean;
   isStarting?: boolean;
   onCancel?: () => void;
@@ -50,8 +70,8 @@ export default function PromptInput({
   const [promptLength, setPromptLength] = useState(0);
   const [model, setModel] = useState<string>('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
-  const [workDir, setWorkDir] = useState('');
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(getStoredPermissionMode);
+  const [workDir] = useState(getStoredWorkDir);
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const selectedAgentAlias = preferredProfileAlias(selectedAgent);
   const routeModel = model || selectedAgentAlias || undefined;
@@ -66,24 +86,10 @@ export default function PromptInput({
       resolveRunRequestOptions: s.resolveRunRequestOptions,
     })),
   );
-  const resolvedRoute = useMemo(
-    () => modelSettings.resolveRunRequestOptions({
-      model: routeModel,
-      reasoningEffort: reasoningEffort || undefined,
-    }),
-    [
-      model,
-      modelSettings.aliases,
-      modelSettings.defaultModel,
-      modelSettings.defaultProvider,
-      modelSettings.defaultReasoningEffort,
-      modelSettings.modelMappingEnabled,
-      modelSettings.providerFallbackEnabled,
-      modelSettings.resolveRunRequestOptions,
-      reasoningEffort,
-      routeModel,
-    ],
-  );
+  const resolvedRoute = modelSettings.resolveRunRequestOptions({
+    model: routeModel,
+    reasoningEffort: reasoningEffort || undefined,
+  });
 
   const {
     isOpen: mentionOpen, query: mentionQuery, position: mentionPosition,
@@ -93,18 +99,6 @@ export default function PromptInput({
   } = useMention({ agents, onSelectAgent });
 
   const { restore: restoreDraft, save: saveDraft, flush: flushDraft, clear: clearDraft } = useInputDraft(threadId);
-
-  useEffect(() => {
-    try {
-      setWorkDir(window.localStorage.getItem('agenthub.prompt.workDir') ?? '');
-      const savedMode = window.localStorage.getItem('agenthub.prompt.permissionMode');
-      if (savedMode && PERMISSION_MODES.includes(savedMode as PermissionMode)) {
-        setPermissionMode(savedMode as PermissionMode);
-      }
-    } catch {
-      // localStorage can be unavailable in tests.
-    }
-  }, []);
 
   useEffect(() => {
     try {
@@ -121,14 +115,7 @@ export default function PromptInput({
     restoreDraft(ta);
     setPromptLength(ta.value.length);
     return () => { if (ta) flushDraft(ta.value, threadId); };
-  }, [threadId]);
-
-  useEffect(() => {
-    return () => {
-      const ta = inputRef.current;
-      if (ta) flushDraft(ta.value);
-    };
-  }, []);
+  }, [flushDraft, restoreDraft, threadId]);
 
   useEffect(() => {
     const ta = inputRef.current;
@@ -142,7 +129,7 @@ export default function PromptInput({
     };
     ta.addEventListener('input', handleUpdate);
     return () => ta.removeEventListener('input', handleUpdate);
-  }, [mentionHandleInput]);
+  }, [mentionHandleInput, saveDraft]);
 
   const handleSend = useCallback(async () => {
     const ta = inputRef.current;

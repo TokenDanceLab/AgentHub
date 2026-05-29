@@ -5,8 +5,6 @@ import {
   createThread,
   fetchThreadItems,
   fetchThreads,
-  fetchThreadItems,
-  createThread,
   renameThread,
   deleteThread,
   type CreateThreadRequest,
@@ -25,7 +23,10 @@ export function useThreadItems(threadId?: string) {
   return useQuery<ListResponse<ThreadItemInfo>>({
     enabled: Boolean(threadId),
     queryKey: ['threadItems', threadId],
-    queryFn: () => fetchThreadItems(threadId!),
+    queryFn: () => {
+      if (!threadId) throw new Error('threadId is required');
+      return fetchThreadItems(threadId);
+    },
     refetchInterval: 10_000,
   });
 }
@@ -84,8 +85,8 @@ export function useDeleteThread() {
 export function useCreateThread() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ title, threadId }: { title?: string; threadId?: string }) =>
-      createThread(title, threadId),
+    mutationFn: (request: CreateThreadRequest | undefined) =>
+      createThread(request),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['threads'] });
     },
@@ -95,7 +96,10 @@ export function useCreateThread() {
 export function useThreadMessages(threadId: string | null) {
   return useQuery({
     queryKey: ['threadItems', threadId],
-    queryFn: () => fetchThreadItems(threadId!),
+    queryFn: () => {
+      if (!threadId) throw new Error('threadId is required');
+      return fetchThreadItems(threadId);
+    },
     enabled: !!threadId,
     staleTime: 5_000,
   });

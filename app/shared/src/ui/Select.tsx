@@ -125,6 +125,7 @@ export function Select({ value, options, onChange, placeholder, className }: Sel
             ref={dropdownRef}
             className={`${styles.dropdown} ${position === 'up' ? styles.dropdownUp : ''}`}
             role="listbox"
+            onKeyDown={handleKey}
             style={
               triggerRef.current
                 ? {

@@ -41,6 +41,12 @@ function trimTaskHistory(tasks: AgentTask[]): AgentTask[] {
     .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
 }
 
+function omitRunMapping(runToTask: Record<string, string>, runId: string): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(runToTask).filter(([candidate]) => candidate !== runId),
+  );
+}
+
 export const useTaskBridgeStore = create<TaskBridgeState>()(
   subscribeWithSelector((set, get) => ({
     tasks: [],
@@ -72,12 +78,12 @@ export const useTaskBridgeStore = create<TaskBridgeState>()(
         newTasks[idx] = updated;
 
         // Maintain runToTask index
-        const newRunToTask = { ...s.runToTask };
+        let newRunToTask = s.runToTask;
         if (oldTask.runId && oldTask.runId !== updated.runId) {
-          delete newRunToTask[oldTask.runId];
+          newRunToTask = omitRunMapping(newRunToTask, oldTask.runId);
         }
         if (updated.runId) {
-          newRunToTask[updated.runId] = taskId;
+          newRunToTask = { ...newRunToTask, [updated.runId]: taskId };
         }
 
         return { tasks: trimTaskHistory(newTasks), runToTask: newRunToTask };
@@ -88,9 +94,9 @@ export const useTaskBridgeStore = create<TaskBridgeState>()(
         const task = s.tasks.find((t) => t.taskId === taskId);
         if (!task) return s;
 
-        const newRunToTask = { ...s.runToTask };
+        let newRunToTask = s.runToTask;
         if (task.runId) {
-          delete newRunToTask[task.runId];
+          newRunToTask = omitRunMapping(newRunToTask, task.runId);
         }
 
         const isTerminal = task.status === 'done' || task.status === 'failed';

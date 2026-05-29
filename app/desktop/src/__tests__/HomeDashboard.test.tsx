@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import HomeDashboard from '@/components/HomeDashboard';
 import * as useHealthModule from '@/hooks/useHealth';
-import * as threadQueriesModule from '@/api/threadQueries';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
