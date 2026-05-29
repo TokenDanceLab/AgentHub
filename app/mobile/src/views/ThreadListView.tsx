@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listThreads } from "@agenthub/shared";
 import type { Thread } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { EmptyState, MetricGrid, SegmentedControl, StatusNotice } from "@agenthub/shared/ui";
+import { EmptyState, MetricGrid, SegmentedControl, StatusNotice, SurfaceHeader } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, UserRound, ArrowRight } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
@@ -73,25 +73,22 @@ export function ThreadListView({ onThreadSelect, onOpenAccount }: ThreadListView
 
   return (
     <div className="mobileView">
-      <header className="mobileHeader">
-        <div>
-          <p className="mobileEyebrow">{t("queue.threads.eyebrow")}</p>
-          <h1>{t("queue.threads.title")}</h1>
-        </div>
-        <div className="mobileStatusBadge">
-          <span
-            className="mobileStatusDot"
-            style={{ backgroundColor: isConnected ? "var(--td-moss)" : "var(--td-danger)" }}
-          />
-          <span>
-            {isConnected
-              ? workflowUnavailable
-                ? t("queue.status.reachable")
-                : t("queue.status.connected")
-              : t("queue.status.offline")}
-          </span>
-        </div>
-      </header>
+      <SurfaceHeader
+        className="mobileHeader"
+        eyebrowClassName="mobileEyebrow"
+        statusClassName="mobileStatusBadge"
+        statusDotClassName="mobileStatusDot"
+        eyebrow={t("queue.threads.eyebrow")}
+        title={t("queue.threads.title")}
+        status={{
+          label: isConnected
+            ? workflowUnavailable
+              ? t("queue.status.reachable")
+              : t("queue.status.connected")
+            : t("queue.status.offline"),
+          tone: isConnected ? "online" : "offline",
+        }}
+      />
 
       <div className="mobileScroll mobileThreadSurface">
         <section className="mobileOverviewPanel">
