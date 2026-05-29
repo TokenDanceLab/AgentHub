@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listThreads } from "@agenthub/shared";
 import type { Thread } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { EmptyState, SegmentedControl } from "@agenthub/shared/ui";
+import { EmptyState, MetricGrid, SegmentedControl } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, UserRound, ArrowRight } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
@@ -110,20 +110,19 @@ export function ThreadListView({ onThreadSelect, onOpenAccount }: ThreadListView
               <RefreshCw size={18} className={threads.isFetching ? "mobileSpin" : undefined} />
             </button>
           </div>
-          <div className="mobileMetricGrid">
-            <div className="mobileMetricTile">
-              <strong>{activeCount}</strong>
-              <span>{t("queue.common.active")}</span>
-            </div>
-            <div className="mobileMetricTile">
-              <strong>{archivedCount}</strong>
-              <span>{t("queue.common.archived")}</span>
-            </div>
-            <div className="mobileMetricTile">
-              <strong>{isConnected ? t("queue.threads.hubReady") : t("queue.threads.hubDown")}</strong>
-              <span>{t("queue.threads.metricHub")}</span>
-            </div>
-          </div>
+          <MetricGrid
+            className="mobileMetricGrid"
+            itemClassName="mobileMetricTile"
+            items={[
+              { id: "active", value: activeCount, label: t("queue.common.active") },
+              { id: "archived", value: archivedCount, label: t("queue.common.archived") },
+              {
+                id: "hub",
+                value: isConnected ? t("queue.threads.hubReady") : t("queue.threads.hubDown"),
+                label: t("queue.threads.metricHub"),
+              },
+            ]}
+          />
           <div className="mobileSignalRow">
             <Radio size={14} />
             <span>

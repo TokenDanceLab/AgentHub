@@ -19,3 +19,5 @@ export { SegmentedControl } from './SegmentedControl';
 export type { SegmentedControlOption, SegmentedControlProps } from './SegmentedControl';
 export { BottomSheet } from './BottomSheet';
 export type { BottomSheetProps } from './BottomSheet';
+export { MetricGrid } from './MetricGrid';
+export type { MetricGridItem, MetricGridProps } from './MetricGrid';
