@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -156,10 +157,23 @@ func Timeout(d time.Duration) gin.HandlerFunc {
 		case <-ctx.Done():
 			// Deadline fired — discard handler output and write 504.
 			tw.markTimedOut()
-			// Restore original writer so handler.Fail writes directly.
-			c.Writer = tw.ResponseWriter
-			c.Abort()
-			fail(c, errcode.ErrTimeout)
+			writeTimeout(tw.ResponseWriter)
 		}
 	}
+}
+
+func writeTimeout(w gin.ResponseWriter) {
+	status := errcode.ErrTimeout.HTTPStatus
+	if status == 0 {
+		status = http.StatusGatewayTimeout
+	}
+	header := w.Header()
+	if header.Get("Content-Type") == "" {
+		header.Set("Content-Type", "application/json; charset=utf-8")
+	}
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(responseBody{
+		Code:    errcode.ErrTimeout.Code,
+		Message: errcode.ErrTimeout.Message,
+	})
 }
