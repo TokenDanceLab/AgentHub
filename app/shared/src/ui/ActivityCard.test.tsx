@@ -79,4 +79,15 @@ describe('ActivityCard', () => {
     expect(card).not.toHaveAttribute('data-has-icon');
     expect(card?.querySelector('.mobileSurfaceRegistryState')).toHaveTextContent('Ready');
   });
+
+  it('supports compact icon and label rows without body copy', () => {
+    render(
+      <ActivityCard icon={<span>terminal</span>} label="No output yet" />,
+    );
+
+    const card = screen.getByText('No output yet').closest('article');
+
+    expect(card).toHaveAttribute('data-has-icon', 'true');
+    expect(card).not.toHaveTextContent('undefined');
+  });
 });

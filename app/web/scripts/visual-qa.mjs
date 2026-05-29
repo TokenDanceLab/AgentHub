@@ -398,7 +398,8 @@ async function visitAndCapture(page, scene) {
 
   if (scene.openRun) {
     await page.locator("nav button[aria-label='Open run detail']").click();
-    await page.waitForTimeout(150);
+    await page.getByRole("region", { name: "Run Detail" }).waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("No active run").waitFor({ state: "visible", timeout: 5000 });
   }
   if (scene.openAccount) {
     await page.getByRole("button", { name: /Account|Sign in/ }).click();
