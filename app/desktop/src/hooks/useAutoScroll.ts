@@ -175,7 +175,7 @@ export function useAutoScroll(
     const prev = prevStreamingRef.current;
     prevStreamingRef.current = deps.isStreaming;
     if (deps.isStreaming && !prev) {
-      scrollToBottom(true);
+      scrollToBottom(false);
     }
   }, [deps.isStreaming, scrollToBottom]);
 
@@ -183,7 +183,7 @@ export function useAutoScroll(
     const prev = prevMessageCountRef.current;
     prevMessageCountRef.current = deps.messages.length;
     if (deps.messages.length > prev) {
-      scrollToBottom(true);
+      scrollToBottom(false);
     }
   }, [deps.messages.length, scrollToBottom]);
 

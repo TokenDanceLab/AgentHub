@@ -15,6 +15,7 @@ export interface ChatMessage {
   timestamp: string;
   blocks: MessageBlock[];
   parentId?: string;
+  threadId?: string;
   /** Agent display name — shown with avatar in agent messages */
   agentName?: string;
 }

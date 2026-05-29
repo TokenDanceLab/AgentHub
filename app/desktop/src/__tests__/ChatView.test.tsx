@@ -39,8 +39,8 @@ vi.mock('@/stores/toastStore', () => ({
   },
 }));
 
-import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import ChatView from '@/components/ChatView';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -63,7 +63,43 @@ function makeAgentTextMessage(content: string, id = 'msg-agent-1'): ChatMessage 
   };
 }
 
+function installAnimationFrameShim() {
+  vi.useFakeTimers();
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => (
+    window.setTimeout(() => callback(Date.now()), 0)
+  ));
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+    window.clearTimeout(id);
+  });
+}
+
+function setScrollMetrics(
+  element: HTMLElement,
+  metrics: { scrollHeight: number; clientHeight: number; scrollTop: number },
+) {
+  Object.defineProperty(element, 'scrollHeight', { configurable: true, value: metrics.scrollHeight });
+  Object.defineProperty(element, 'clientHeight', { configurable: true, value: metrics.clientHeight });
+  Object.defineProperty(element, 'scrollTop', {
+    configurable: true,
+    writable: true,
+    value: metrics.scrollTop,
+  });
+}
+
+async function flushScheduledScrollWork() {
+  for (let i = 0; i < 8; i += 1) {
+    await act(async () => {
+      vi.runOnlyPendingTimers();
+    });
+  }
+}
+
 describe('ChatView', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
   it('renders empty state when messages array is empty', () => {
     render(<ChatView messages={[]} />);
     expect(screen.getByText('chat.emptyTitle')).toBeInTheDocument();
@@ -101,6 +137,27 @@ describe('ChatView', () => {
 
     expect(onRetry).toHaveBeenCalledWith('agent-answer-1');
     expect(onFork).toHaveBeenCalledWith('agent-answer-1');
+  });
+
+  it('requires inline confirmation before deleting an agent message', () => {
+    const onDelete = vi.fn();
+    const msg = makeAgentTextMessage('Delete this agent answer', 'agent-delete-1');
+
+    render(<ChatView messages={[msg]} onDelete={onDelete} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'chat.delete' }));
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(screen.getByRole('group', { name: 'chat.deleteConfirm' })).toHaveTextContent('chat.deleteConfirmShort');
+
+    fireEvent.click(screen.getByRole('button', { name: 'thread.cancel' }));
+    expect(screen.queryByRole('group', { name: 'chat.deleteConfirm' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'chat.delete' }));
+    fireEvent.click(screen.getByRole('button', { name: 'chat.deleteConfirmAction' }));
+
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onDelete).toHaveBeenCalledWith('agent-delete-1');
+    expect(screen.queryByRole('group', { name: 'chat.deleteConfirm' })).not.toBeInTheDocument();
   });
 
   it('renders runtime names instead of long model ids in agent metadata', () => {
@@ -397,5 +454,55 @@ describe('ChatView', () => {
     const { container } = render(<ChatView messages={[]} />);
     const bar = container.querySelector('[class*="streamProgress"]');
     expect(bar).not.toBeInTheDocument();
+  });
+
+  it('does not force-scroll while the user is reading history and an agent message streams', async () => {
+    installAnimationFrameShim();
+    const older = makeAgentTextMessage('Earlier output', 'agent-old');
+    const { container, rerender } = render(<ChatView messages={[older]} isStreaming={false} />);
+    const stream = container.querySelector('[role="log"]') as HTMLElement;
+    setScrollMetrics(stream, { scrollHeight: 1400, clientHeight: 400, scrollTop: 220 });
+
+    fireEvent.wheel(stream, { deltaY: -120 });
+    fireEvent.scroll(stream);
+    const readingPosition = stream.scrollTop;
+
+    rerender(
+      <ChatView
+        messages={[
+          older,
+          makeAgentTextMessage('Streaming answer chunk', 'agent-streaming'),
+        ]}
+        isStreaming={true}
+      />,
+    );
+    await flushScheduledScrollWork();
+
+    expect(stream.scrollTop).toBe(readingPosition);
+    expect(screen.getByRole('button', { name: 'chat.scrollToBottom' })).toBeInTheDocument();
+  });
+
+  it('force-scrolls to the bottom when the next message is from the user', async () => {
+    installAnimationFrameShim();
+    const older = makeAgentTextMessage('Earlier output', 'agent-old');
+    const { container, rerender } = render(<ChatView messages={[older]} isStreaming={false} />);
+    const stream = container.querySelector('[role="log"]') as HTMLElement;
+    setScrollMetrics(stream, { scrollHeight: 1400, clientHeight: 400, scrollTop: 220 });
+
+    fireEvent.wheel(stream, { deltaY: -120 });
+    fireEvent.scroll(stream);
+
+    rerender(
+      <ChatView
+        messages={[
+          older,
+          { ...makeUserMessage('Follow-up prompt'), id: 'user-follow-up' },
+        ]}
+        isStreaming={false}
+      />,
+    );
+    await flushScheduledScrollWork();
+
+    expect(stream.scrollTop).toBe(1400);
   });
 });

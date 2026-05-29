@@ -21,12 +21,6 @@ import { useHubAgentTeams, type AgentTeamOverview } from '@/api/agentTeamQueries
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useModelsDevDisplayNames } from '@/api/modelsDevCatalog';
 import { createHubClient } from '@/api/hubClient';
-<<<<<<< HEAD
-import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
-import { useRunEvidence } from '@/api/runEvidenceQueries';
-import { useThreads } from '@/api/threadQueries';
-import { createThread } from '@/api/edgeClient';
-=======
 import {
   startRun,
   cancelRun,
@@ -37,7 +31,6 @@ import {
 import { useThreads, useThreadMessages } from '@/api/threadQueries';
 import { useRuns } from '@/api/runQueries';
 import { useHubExecutionTargets } from '@/api/executionTargetQueries';
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useHubEventStream } from '@/hooks/useHubEventStream';
 import { useHubIntegration } from '@/hooks/useHubIntegration';
@@ -55,24 +48,19 @@ import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
 import { useHubStore } from '@/stores/hubStore';
-import { getBinding } from '@/stores/keybindingStore';
-import { matchesBinding } from '@/utils/keybinding';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
 import HomeDashboard from '@/components/HomeDashboard';
-import { NotificationBell } from '@/components/NotificationBell';
 import { ToastContainer } from '@/components/Toast';
 import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
 import {
   AlertTriangle,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   Circle,
   Copy,
-  GitBranch,
   Home,
   MessageSquareText,
   Maximize2,
@@ -101,28 +89,12 @@ import {
   buildChatMessagesFromThreadItems,
   buildDisplayedRunOutputMessage,
   buildRunReplayFallbackMessages,
+  filterOptimisticMessagesForThread,
   mergeChatMessages,
 } from '@/utils/chatMessages';
 import { resolveThreadSelectionId, type ThreadSelectionInput } from '@/utils/threadSelection';
 import { resolveTopMenuClickState, type TopMenuId } from '@/utils/topMenuState';
 import { buildAutomaticThreadTitle, canAutoRenameThreadTitle, getAutomaticThreadTitle } from '@/utils/threadTitle';
-<<<<<<< HEAD
-import {
-  addRecentWorkspace,
-  setSavedWorkDir,
-  getSavedWorkDir,
-  migrateLegacyRecentWorkDirs,
-  readRecentWorkspaces,
-  clearRecentWorkspaces,
-  removeRecentWorkspace,
-  updateWorkspaceBranch,
-  syncWorkspacesToBackend,
-  restoreWorkspacesFromBackend,
-  type WorkspaceEntry,
-} from '@/utils/workspaceStore';
-import { useGitStatus } from '@/hooks/useGitStatus';
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '@/App.module.css';
 
@@ -132,8 +104,6 @@ interface OptimisticRun {
   outputText: string;
   toolCalls: [];
   changedFiles: [];
-  artifacts?: [];
-  previews?: [];
 }
 
 interface SendRunOptions {
@@ -165,6 +135,7 @@ const LEFT_SIDEBAR_MIN = 248;
 const LEFT_SIDEBAR_MAX = 420;
 const RUN_CARD_MIN_WORKSPACE_WIDTH = 1180;
 const TOP_MENU_ORDER: TopMenuId[] = ['file', 'edit', 'view', 'window', 'help'];
+const HIDDEN_MESSAGES_STORAGE_PREFIX = 'agenthub.chat.hiddenMessages.';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -172,7 +143,7 @@ function clamp(value: number, min: number, max: number): number {
 
 function isRunActiveStatus(status: string | undefined): boolean {
   if (!status) return false;
-  return ['queued', 'running', 'streaming', 'waiting_for_input', 'waiting_approval', 'RUNNING', 'STREAMING', 'WAITING_FOR_INPUT'].includes(status);
+  return ['queued', 'running', 'streaming', 'waiting_for_input', 'RUNNING', 'STREAMING', 'WAITING_FOR_INPUT'].includes(status);
 }
 
 function getActiveRunConflictId(error: unknown): string | undefined {
@@ -199,6 +170,41 @@ function setComposerDraft(text: string) {
 
 function shortRunId(value: string): string {
   return value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
+}
+
+function hiddenMessagesStorageKey(threadId: string): string {
+  return `${HIDDEN_MESSAGES_STORAGE_PREFIX}${threadId}`;
+}
+
+function readHiddenMessageIds(threadId: string | null | undefined): Set<string> {
+  if (!threadId || typeof window === 'undefined') return new Set();
+  try {
+    const raw = window.localStorage.getItem(hiddenMessagesStorageKey(threadId));
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((value): value is string => typeof value === 'string' && value.length > 0));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeHiddenMessageIds(threadId: string | null | undefined, ids: Set<string>): void {
+  if (!threadId || typeof window === 'undefined') return;
+  try {
+    const key = hiddenMessagesStorageKey(threadId);
+    if (ids.size === 0) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+    window.localStorage.setItem(key, JSON.stringify([...ids]));
+  } catch {
+    // localStorage can be unavailable in restricted browser contexts; in-memory hiding still works.
+  }
+}
+
+function hideMessages(messages: ChatMessage[], hiddenIds: Set<string>): ChatMessage[] {
+  if (hiddenIds.size === 0) return messages;
+  return messages.filter((message) => !hiddenIds.has(message.id));
 }
 
 function isTeamRunActiveStatus(status: string | undefined): boolean {
@@ -280,15 +286,15 @@ function useFocusSourceTracking() {
 }
 
 function DesktopHubTaskBridge() {
-  const { isAuthenticated, token, tryAutoLogin } = useAuth();
+  const hubAuth = useAuth();
 
   useEffect(() => {
-    if (!isAuthenticated && !token) {
-      void tryAutoLogin();
+    if (!hubAuth.isAuthenticated && !hubAuth.token) {
+      void hubAuth.tryAutoLogin();
     }
-  }, [isAuthenticated, token, tryAutoLogin]);
+  }, [hubAuth.isAuthenticated, hubAuth.token, hubAuth.tryAutoLogin]);
 
-  if (!isAuthenticated || !token) {
+  if (!hubAuth.isAuthenticated || !hubAuth.token) {
     return null;
   }
 
@@ -349,9 +355,6 @@ export default function App() {
   const hubAuth = useAuth();
 
   const { data: threadData } = useThreads();
-<<<<<<< HEAD
-  const threads = useMemo(() => threadData?.items ?? [], [threadData?.items]);
-=======
   const threads = threadData?.items ?? [];
   const pendingCreatedThreadIdsRef = useRef<Set<string>>(new Set());
   const emptyCreatedThreadIdsRef = useRef<Set<string>>(new Set());
@@ -394,7 +397,6 @@ export default function App() {
       };
     });
   }, [queryClient]);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
@@ -407,15 +409,12 @@ export default function App() {
   const { setOnline, setConnected, wsLatency } = useConnectionStore(
     useShallow((s) => ({ setOnline: s.setOnline, setConnected: s.setConnected, wsLatency: s.wsLatency })),
   );
-  const { selectedThreadId, selectedAgentId, selectThread } = useThreadStore(
-    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectedAgentId: s.selectedAgentId, selectThread: s.selectThread })),
+  const { selectedThreadId, selectedAgentId, selectThread, selectAgentThread } = useThreadStore(
+    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectedAgentId: s.selectedAgentId, selectThread: s.selectThread, selectAgentThread: s.selectAgentThread })),
   );
   const activeThreadId = resolveThreadSelectionId(selectedThreadId as ThreadSelectionInput);
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online, activeThreadId);
   const { data: agentData } = useAgentList(online);
-<<<<<<< HEAD
-  const agents = useMemo(() => agentData?.items ?? [], [agentData?.items]);
-=======
   const agents = agentData?.items ?? [];
   const modelCatalogQuery = useModelCatalog(online);
   const modelsDevDisplayNamesQuery = useModelsDevDisplayNames(true);
@@ -429,15 +428,11 @@ export default function App() {
     : agentTeamSummary.activeRuns > 0
       ? t('workspace.teamRunsActive', { count: agentTeamSummary.activeRuns })
       : t('settings.agentScheduling');
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
-  const [viewMode, setViewMode] = useState<'agent' | 'im' | 'teamrun'>('agent');
+  const [hiddenMessageIds, setHiddenMessageIds] = useState<Set<string>>(() => readHiddenMessageIds(activeThreadId));
+  const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
-  const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
-  const [fileExplorerOpen, setFileExplorerOpen] = useState(true);
-  const [agentSelectorOpen, setAgentSelectorOpen] = useState(false);
-  const agentSelectorRef = useRef<HTMLDivElement | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
   const [pendingComposerDraft, setPendingComposerDraft] = useState('');
@@ -466,6 +461,7 @@ export default function App() {
   );
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
+  const [rightPanelMounted, setRightPanelMounted] = useState(rightPanelOpen);
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const topMenuRef = useRef<HTMLElement | null>(null);
@@ -474,21 +470,15 @@ export default function App() {
   // Mobile/tablet overlays
   const [navPanelOpen, setNavPanelOpen] = useState(false);
 
-  // Migrate legacy workspace data on mount
-  useEffect(() => {
-    migrateLegacyRecentWorkDirs();
-    void restoreWorkspacesFromBackend().then(() => {
-      setRecentWorkspaces(readRecentWorkspaces());
-    });
-  }, []);
-
   // Sync health → connection store
   const prevOnlineRef = useRef<boolean | null>(null);
+  const healthRef = useRef(health);
+  healthRef.current = health;
   useEffect(() => {
     if (prevOnlineRef.current === online) return;
     prevOnlineRef.current = online;
-    setOnline(online, health);
-  }, [health, online, setOnline]);
+    setOnline(online, healthRef.current);
+  }, [online, setOnline]);
 
   // Sync isConnected → connection store
   useEffect(() => {
@@ -513,6 +503,10 @@ export default function App() {
   }, [threads, online, addToast, t]);
 
   useEffect(() => {
+    setHiddenMessageIds(readHiddenMessageIds(activeThreadId));
+  }, [activeThreadId]);
+
+  useEffect(() => {
     if (!threadData?.items) return;
     const liveThreadIds = new Set(threads.map((thread) => thread.threadId));
     const knownThreadIds = new Set(liveThreadIds);
@@ -531,7 +525,6 @@ export default function App() {
   });
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const displayedRun = currentRun ?? optimisticRun;
-  const runEvidence = useRunEvidence(displayedRun?.runId);
   const runIsActive = isRunActiveStatus(displayedRun?.status);
   const runCardConstrained = workspaceWidth > 0 && workspaceWidth < RUN_CARD_MIN_WORKSPACE_WIDTH;
   const effectiveRightPanelOpen = rightPanelOpen && !runCardConstrained;
@@ -559,79 +552,42 @@ export default function App() {
   const allMessages = useMemo(() => {
     const merged = mergeChatMessages({
       persisted: replayMessages,
-      optimistic: userMessages,
+      optimistic: filterOptimisticMessagesForThread(userMessages, activeThreadId),
       live: messages,
     });
     const labeled = applyRuntimeAgentLabel(merged, selectedAgent?.name);
-    if (!displayedRun) return labeled;
+    if (!displayedRun) return hideMessages(labeled, hiddenMessageIds);
 
     const hasVisibleAgentFeedback = messages.some(
       (msg) => msg.role === 'agent' && msg.blocks.some((block) => block.kind !== 'session_init'),
     );
-    if (hasVisibleAgentFeedback) return labeled;
+    if (hasVisibleAgentFeedback) return hideMessages(labeled, hiddenMessageIds);
 
     const runOutputMessage = buildDisplayedRunOutputMessage(displayedRun, selectedAgent?.name);
-    if (!runOutputMessage) return labeled;
+    if (!runOutputMessage) return hideMessages(labeled, hiddenMessageIds);
 
-    return [
+    return hideMessages([
       ...labeled,
       runOutputMessage,
-    ];
-  }, [displayedRun, messages, replayMessages, selectedAgent?.name, userMessages]);
+    ], hiddenMessageIds);
+  }, [activeThreadId, displayedRun, hiddenMessageIds, messages, replayMessages, selectedAgent?.name, userMessages]);
   const effectiveLeftSidebarWidth = clamp(leftSidebarWidth, LEFT_SIDEBAR_MIN, LEFT_SIDEBAR_MAX);
   const shellStyle = {
     '--left-sidebar-width': `${effectiveLeftSidebarWidth}px`,
   } as CSSProperties;
 
   useEffect(() => {
-    if (currentRun) {
-      queueMicrotask(() => setOptimisticRun(null));
-    }
+    if (currentRun) setOptimisticRun(null);
   }, [currentRun]);
 
   useEffect(() => {
-    if (!openTopMenu) return undefined;
-
-    const closeOnPointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Node && topMenuRef.current?.contains(target)) return;
-      setOpenTopMenu(null);
-      setHoverOpenedTopMenu(null);
-      hoverOpenedTopMenuRef.current = null;
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setOpenTopMenu(null);
-      setHoverOpenedTopMenu(null);
-      hoverOpenedTopMenuRef.current = null;
-    };
-
-    window.addEventListener('pointerdown', closeOnPointerDown, true);
-    window.addEventListener('keydown', closeOnEscape, true);
-    return () => {
-      window.removeEventListener('pointerdown', closeOnPointerDown, true);
-      window.removeEventListener('keydown', closeOnEscape, true);
-    };
-  }, [openTopMenu]);
-
-  // Close agent selector on outside click
-  useEffect(() => {
-    if (!agentSelectorOpen) return undefined;
-    const closeOnPointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && agentSelectorRef.current?.contains(event.target)) return;
-      setAgentSelectorOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setAgentSelectorOpen(false);
-    };
-    window.addEventListener('pointerdown', closeOnPointerDown, true);
-    window.addEventListener('keydown', closeOnEscape, true);
-    return () => {
-      window.removeEventListener('pointerdown', closeOnPointerDown, true);
-      window.removeEventListener('keydown', closeOnEscape, true);
-    };
-  }, [agentSelectorOpen]);
+    if (effectiveRightPanelOpen) {
+      setRightPanelMounted(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setRightPanelMounted(false), 220);
+    return () => window.clearTimeout(timer);
+  }, [effectiveRightPanelOpen]);
 
   useEffect(() => {
     if (!openTopMenu) return undefined;
@@ -680,6 +636,7 @@ export default function App() {
     }
     const tempRunId = `starting-${Date.now()}`;
     const tempUserMessageId = `user-${tempRunId}`;
+    const initialThreadId = opts?.threadId ?? activeThreadId ?? undefined;
     setRunStartPending(true);
     setUserMessages((prev) => [
       ...prev,
@@ -687,6 +644,7 @@ export default function App() {
         id: tempUserMessageId,
         role: 'user',
         timestamp: new Date().toISOString(),
+        ...(initialThreadId ? { threadId: initialThreadId } : {}),
         blocks: [{ kind: 'text', content: prompt }],
       },
     ]);
@@ -724,15 +682,19 @@ export default function App() {
       if (opts?.workDir) req.workDir = opts.workDir;
       if (agentId) req.agentId = agentId;
       if (requestThreadId) {
+        setUserMessages((prev) => prev.map((msg) => (
+          msg.id === tempUserMessageId ? { ...msg, threadId: requestThreadId } : msg
+        )));
         req.threadId = requestThreadId;
-<<<<<<< HEAD
-        req.sessionId = requestThreadId;
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       }
       setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
       const started = await startRun(req);
       setOptimisticRun({ ...started, outputText: '', toolCalls: [], changedFiles: [] });
+      if (started.threadId) {
+        setUserMessages((prev) => prev.map((msg) => (
+          msg.id === tempUserMessageId ? { ...msg, threadId: started.threadId } : msg
+        )));
+      }
       if (started.threadId && started.threadId !== requestThreadId) {
         selectThread(started.threadId);
       }
@@ -788,11 +750,7 @@ export default function App() {
   const handleCancel = useCallback(async () => {
     const runId = currentRun?.runId ?? (optimisticRun?.runId.startsWith('starting-') ? undefined : optimisticRun?.runId);
     if (runId) {
-      try {
-        await cancelRun(runId);
-      } catch (error) {
-        console.warn('Failed to cancel run:', error);
-      }
+      try { await cancelRun(runId); } catch {}
     }
   }, [currentRun?.runId, optimisticRun?.runId]);
 
@@ -800,7 +758,6 @@ export default function App() {
     const id = resolveThreadSelectionId(selection);
     if (!id) return;
     selectThread(id);
-    setUserMessages([]);
     setLeftSidebarView('thread');
   }, [selectThread, setLeftSidebarView]);
   const handleThreadTitleEdited = useCallback((threadId: string) => {
@@ -825,7 +782,6 @@ export default function App() {
     const existing = store.agentThreadMap[agentId];
     if (existing) {
       store.selectAgentThread(agentId, existing);
-      setUserMessages([]);
       setLeftSidebarView('thread');
       return;
     }
@@ -834,7 +790,6 @@ export default function App() {
       const thread = await createThread(agent?.name ? `${agent.name}` : undefined);
         addThreadToCache(thread, { empty: true });
         store.selectAgentThread(agentId, thread.threadId);
-        setUserMessages([]);
         setLeftSidebarView('thread');
       queryClient.invalidateQueries({ queryKey: ['threads'] });
     } catch {
@@ -843,40 +798,6 @@ export default function App() {
     }
   }, [addThreadToCache, agents, queryClient, setLeftSidebarView]);
 
-<<<<<<< HEAD
-  const handleSwitchThreadAgent = useCallback((agentId: string) => {
-    if (!activeThreadId) return;
-    if (agentId === selectedAgentId) {
-      setAgentSelectorOpen(false);
-      return;
-    }
-    const previousAgent = agents.find((a) => a.id === selectedAgentId);
-    const nextAgent = agents.find((a) => a.id === agentId);
-    const handoff = switchThreadAgent(activeThreadId, agentId);
-    setAgentSelectorOpen(false);
-    // Inject a system message indicating the agent handoff
-    if (handoff.previousAgentId && handoff.previousAgentId !== agentId) {
-      const prevName = previousAgent?.name ?? handoff.previousAgentId;
-      const nextName = nextAgent?.name ?? agentId;
-      setUserMessages((prev) => [
-        ...prev,
-        {
-          id: `handoff-${Date.now()}`,
-          role: 'system',
-          timestamp: new Date().toISOString(),
-          blocks: [
-            {
-              kind: 'text',
-              content: `Switched active agent from **${prevName}** to **${nextName}**. Subsequent messages will be sent to ${nextName}.`,
-            },
-          ],
-        },
-      ]);
-    }
-  }, [activeThreadId, agents, selectedAgentId, switchThreadAgent]);
-
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const handleStartLocalOrchestration = useCallback(async (agentId: string, draft: string) => {
     await handleSelectAgent(agentId);
     setViewMode('agent');
@@ -889,7 +810,6 @@ export default function App() {
       addThreadToCache(thread, { empty: true });
       if (selectedAgent?.id) {
         selectAgentThread(selectedAgent.id, thread.threadId);
-        setUserMessages([]);
         setLeftSidebarView('thread');
       } else {
         handleSelectThread(thread.threadId);
@@ -911,22 +831,6 @@ export default function App() {
     setSettingsOpen(true);
   }, []);
 
-<<<<<<< HEAD
-  const openRunWorkbench = useCallback(() => {
-    setLeftSidebarView('thread');
-    setViewMode('agent');
-    if (displayedRun) {
-      setRightPanelOpen(true);
-      return;
-    }
-    openSettings('tasks');
-  }, [displayedRun, openSettings, setLeftSidebarView, setRightPanelOpen]);
-
-  const openTeamRunConsole = useCallback(() => {
-    setLeftSidebarView('thread');
-    setViewMode('teamrun');
-  }, [setLeftSidebarView]);
-=======
   const handleOpenAuth = useCallback(() => {
     useHubStore.getState().setShowAuthModal(true);
   }, []);
@@ -1031,7 +935,6 @@ export default function App() {
     setLeftSidebarView('thread');
     if (displayedRun) setRightPanelOpen(true);
   }, [displayedRun, openSettings, permissionRequests.length, setLeftSidebarView, setRightPanelOpen]);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   const handleStartResize = useCallback((side: 'left' | 'right') => (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -1088,29 +991,6 @@ export default function App() {
     }
   }, [addToast, decidePermission, permissionRequests, t]);
 
-<<<<<<< HEAD
-  const handleReviewDecidePermission = useCallback(async (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
-    const request = permissionRequests.find((item) => item.requestId === requestId);
-    if (!request?.runId) {
-      addToast({ type: 'error', message: t('toast.error') });
-      throw new Error('permission request missing run');
-    }
-    try {
-      await decidePermissionRest({ runId: request.runId, requestId, decision, reason });
-      decidePermission(requestId, decision, reason);
-    } catch (error) {
-      addToast({ type: 'error', message: t('toast.error') });
-      throw error;
-    }
-  }, [addToast, decidePermission, permissionRequests, t]);
-
-  const handleRetry = useCallback((messageId: string) => {
-    const msg = allMessages.find((m) => m.id === messageId);
-    if (!msg) return;
-    const prompt = msg.blocks.find((b) => b.kind === 'text')?.content;
-    if (prompt) handleSend(prompt, selectedAgentId ?? undefined);
-  }, [allMessages, handleSend, selectedAgentId]);
-=======
   const handleRetry = useCallback(async (messageId?: string) => {
     const retry = findRetryPrompt(allMessages, messageId);
     if (!retry) {
@@ -1128,7 +1008,6 @@ export default function App() {
       addThreadToCache(thread, { suppressCreatedToast: true });
       if (selectedAgent?.id) {
         selectAgentThread(selectedAgent.id, thread.threadId);
-        setUserMessages([]);
         setLeftSidebarView('thread');
       } else {
         handleSelectThread(thread.threadId);
@@ -1160,11 +1039,16 @@ export default function App() {
     setLeftSidebarView,
     t,
   ]);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   const handleDelete = useCallback((messageId: string) => {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
-  }, []);
+    setHiddenMessageIds((prev) => {
+      const next = new Set(prev);
+      next.add(messageId);
+      writeHiddenMessageIds(activeThreadId, next);
+      return next;
+    });
+  }, [activeThreadId]);
 
   useEffect(() => {
     if (!pendingComposerDraft || leftSidebarView === 'home' || viewMode !== 'agent') return undefined;
@@ -1432,14 +1316,12 @@ export default function App() {
       }
       if (isEditableShortcutTarget(e.target)) return;
 
-      if (shortcutHelpOpen && !matchesBinding(e, getBinding('help'))) return;
-      if (matchesBinding(e, getBinding('help'))) {
+      const shellModifier = e.ctrlKey || e.metaKey;
+      if (shortcutHelpOpen && !(e.key === '?' && !shellModifier)) return;
+      if (e.key === '?' && !shellModifier) {
         e.preventDefault();
         setShortcutHelpOpen((v) => !v);
       }
-<<<<<<< HEAD
-      if (matchesBinding(e, getBinding('toggleSidebar')) && !workspaceExpanded && !isMobile) {
-=======
       if (shellModifier && e.altKey && e.key.toLowerCase() === 'n' && online) {
         e.preventDefault();
         void handleQuickChat();
@@ -1457,11 +1339,10 @@ export default function App() {
         void handleWindowCommand('close');
       }
       if (shellModifier && e.key.toLowerCase() === 'b' && !workspaceExpanded && !isMobile) {
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
         e.preventDefault();
         setLeftSidebarCollapsed(!leftSidebarCollapsed);
       }
-      if (matchesBinding(e, getBinding('toggleRunPanel')) && displayedRun && !workspaceExpanded && !isMobile) {
+      if (shellModifier && e.key.toLowerCase() === 'j' && displayedRun && !workspaceExpanded && !isMobile) {
         e.preventDefault();
         setRightPanelOpen(!rightPanelOpen);
       }
@@ -1491,14 +1372,8 @@ export default function App() {
     if (target.closest('button, input, select, a')) return;
     try {
       const w = getCurrentWindow();
-      if (await w.isMaximized()) {
-        void w.unmaximize();
-      } else {
-        void w.maximize();
-      }
-    } catch (error) {
-      console.warn('Failed to toggle window maximize:', error);
-    }
+      (await w.isMaximized()) ? w.unmaximize() : w.maximize();
+    } catch {}
   }, []);
 
   // ── Render ─────────────────────────────────
@@ -1610,11 +1485,7 @@ export default function App() {
             </ShellIconButton>
             <ShellIconButton className={styles.winBtn} onClick={async () => {
               const w = getCurrentWindow();
-              if (await w.isMaximized()) {
-                void w.unmaximize();
-              } else {
-                void w.maximize();
-              }
+              (await w.isMaximized()) ? w.unmaximize() : w.maximize();
             }} label={t('window.maximize')} tooltipSide="bottom">
               <Square size={11} />
             </ShellIconButton>
@@ -1732,38 +1603,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* File Explorer section */}
-            {workDirForGit && (
-              <div className={`${styles.sidebarSection} ${styles.fileExplorerSection}`}>
-                <button
-                  type="button"
-                  className={styles.sidebarSectionLabel}
-                  onClick={() => setFileExplorerOpen((v) => !v)}
-                  aria-expanded={fileExplorerOpen}
-                >
-                  <ChevronRight
-                    size={12}
-                    className={styles.sidebarSectionLabelChevron}
-                    style={{ transform: fileExplorerOpen ? 'rotate(90deg)' : undefined, transition: 'transform 0.15s ease' }}
-                  />
-                  <FolderTree size={13} />
-                  {t('fileExplorer.title')}
-                </button>
-                {fileExplorerOpen && (
-                  <div className={styles.fileExplorerScroll}>
-                    <Suspense fallback={null}>
-                      <Slot
-                        name="file-explorer"
-                        rootDir={workDirForGit}
-                        onFileSelect={handleFileSelect}
-                        gitStatus={gitStatus.status}
-                      />
-                    </Suspense>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Sidebar footer */}
             <div className={styles.sidebarFooter}>
               <ShellIconButton className={styles.navIconBtn} onClick={() => openSettings('general')} label={t('nav.settings')} tooltipSide="top">
@@ -1807,86 +1646,7 @@ export default function App() {
             {/* Workspace header */}
             <div className={styles.workspaceHeader}>
               <div className={`${styles.workspaceHeaderDot} ${online ? styles.workspaceHeaderDotOnline : styles.workspaceHeaderDotOffline}`} />
-<<<<<<< HEAD
-              {/* Git status badge */}
-              {gitStatus.status && (
-                <div className={styles.gitBranchBadge} title={
-                  gitStatus.status.branch
-                    ? [
-                        `Branch: ${gitStatus.status.branch}`,
-                        gitStatus.status.ahead > 0 && `${gitStatus.status.ahead} ahead`,
-                        gitStatus.status.behind > 0 && `${gitStatus.status.behind} behind`,
-                        gitStatus.status.files.length > 0 && `${gitStatus.status.files.length} change(s)`,
-                      ].filter(Boolean).join(', ')
-                    : t('workspace.gitClean')
-                }>
-                  <GitBranch size={12} className={styles.gitBranchIcon} />
-                  {gitStatus.status.branch ? (
-                    <>
-                      <span className={styles.gitBranchName}>{gitStatus.status.branch}</span>
-                      {gitStatus.status.ahead > 0 && (
-                        <span className={styles.gitAhead}>
-                          <GitCommit size={10} />{gitStatus.status.ahead}
-                        </span>
-                      )}
-                      {gitStatus.status.behind > 0 && (
-                        <span className={styles.gitBehind}>
-                          <GitCommit size={10} />{gitStatus.status.behind}
-                        </span>
-                      )}
-                      {gitStatus.status.files.length > 0 && (
-                        <span className={styles.gitChangeCount}>{gitStatus.status.files.length}</span>
-                      )}
-                    </>
-                  ) : (
-                    <span className={styles.gitBranchDetached}>{t('workspace.gitNoRepo')}</span>
-                  )}
-                </div>
-              )}
-              {gitStatus.error && (
-                <div className={styles.gitBranchBadge} title={gitStatus.error}>
-                  <GitBranch size={12} className={styles.gitBranchIcon} />
-                  <span className={styles.gitBranchDetached}>{t('workspace.gitNoRepo')}</span>
-                </div>
-              )}
-              {/* Agent selector dropdown */}
-              <div className={styles.agentSelector} ref={agentSelectorRef}>
-                <button
-                  type="button"
-                  className={styles.agentSelectorTrigger}
-                  onClick={() => setAgentSelectorOpen((v) => !v)}
-                  aria-haspopup="listbox"
-                  aria-expanded={agentSelectorOpen}
-                  disabled={!activeThreadId}
-                  title={activeThreadId ? t('workspace.switchAgent') : t('workspace.noThreadToSwitch')}
-                >
-                  <h2>{selectedAgent ? selectedAgent.name : 'AgentHub'}</h2>
-                  <ChevronDown size={12} className={`${styles.agentSelectorChevron} ${agentSelectorOpen ? styles.agentSelectorChevronOpen : ''}`} />
-                </button>
-                {agentSelectorOpen && (
-                  <div className={styles.agentSelectorPanel} role="listbox" aria-label={t('workspace.switchAgent')}>
-                    {agents.map((agent) => (
-                      <button
-                        key={agent.id}
-                        type="button"
-                        role="option"
-                        aria-selected={agent.id === selectedAgentId}
-                        className={`${styles.agentSelectorItem} ${agent.id === selectedAgentId ? styles.agentSelectorItemActive : ''}`}
-                        onClick={() => handleSwitchThreadAgent(agent.id)}
-                      >
-                        <span className={styles.agentSelectorItemDot} data-online={online} />
-                        <span className={styles.agentSelectorItemName}>{agent.name}</span>
-                        {agent.id === selectedAgentId && (
-                          <span className={styles.agentSelectorItemCheck} aria-hidden="true">&#10003;</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-=======
               <h2>{selectedAgent ? selectedAgent.name : 'AgentHub'}</h2>
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
               {selectedThread && <span className={styles.workspaceThreadTitle}>{selectedThread.title}</span>}
               <div className={styles.workspaceHeaderActions}>
                 <ShellIconButton
@@ -1899,25 +1659,12 @@ export default function App() {
                 </ShellIconButton>
                 <ShellIconButton
                   className={styles.workspaceHeaderBtn}
-                  onClick={() => setViewMode((mode) => {
-                    if (mode === 'agent') return 'im';
-                    if (mode === 'im') return 'team';
-                    return 'agent';
-                  })}
-                  label={viewMode === 'agent' ? t('im.groupChat') : viewMode === 'im' ? t('menu.view.teamRuns') : t('nav.agent')}
+                  onClick={() => setViewMode((mode) => (mode === 'agent' ? 'im' : 'agent'))}
+                  label={viewMode === 'agent' ? t('im.groupChat') : t('nav.agent')}
                   tooltipSide="bottom"
-                  aria-pressed={viewMode === 'im' || viewMode === 'team'}
+                  aria-pressed={viewMode === 'im'}
                 >
                   <MessageSquareText size={15} />
-                </ShellIconButton>
-                <ShellIconButton
-                  className={styles.workspaceHeaderBtn}
-                  onClick={openTeamRunConsole}
-                  label={t('teamrun.open')}
-                  tooltipSide="bottom"
-                  aria-pressed={viewMode === 'teamrun'}
-                >
-                  <GitBranch size={15} />
                 </ShellIconButton>
                 <ShellIconButton
                   className={styles.workspaceHeaderBtn}
@@ -1942,7 +1689,6 @@ export default function App() {
                     ) : null}
                   </span>
                 </ShellIconButton>
-                <NotificationBell />
                 {displayedRun && !effectiveRightPanelOpen && (
                   <ShellIconButton
                     className={styles.workspaceHeaderBtn}
@@ -2012,12 +1758,6 @@ export default function App() {
                   onOpenTeamRuns={() => openSettings('agentScheduling')}
                   onOpenHubAccount={handleOpenHubAccount}
                   permissionCount={permissionRequests.length}
-<<<<<<< HEAD
-                  onOpenTeamRuns={openTeamRunConsole}
-                  onOpenRuns={openRunWorkbench}
-                  onOpenApprovals={openRunWorkbench}
-                  onOpenAuth={() => useHubStore.getState().setShowAuthModal(true)}
-=======
                   agentTeamOverview={agentTeamsQuery.data}
                   agentTeamsLoading={agentTeamsQuery.isLoading || agentTeamsQuery.isFetching}
                   agentTeamsSignedIn={hubInventoryEnabled}
@@ -2025,12 +1765,9 @@ export default function App() {
                   selectedAgentId={selectedAgentId ?? undefined}
                   onSelectAgent={handleSelectAgent}
                   onStartLocalOrchestration={handleStartLocalOrchestration}
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
                 />
               ) : viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
-              ) : viewMode === 'teamrun' ? (
-                <ErrorBoundary><Suspense fallback={null}><Slot name="teamrun-console" /></Suspense></ErrorBoundary>
               ) : (
                 <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onFork={handleForkThread} onDelete={handleDelete} onSendMessage={handleSend} />
               )}
@@ -2043,7 +1780,7 @@ export default function App() {
               </div>
             )}
 
-            {!isMobile && !workspaceExpanded && displayedRun && (
+            {!isMobile && !workspaceExpanded && displayedRun && rightPanelMounted && (
               <div
                 className={`${styles.rightPanel} ${effectiveRightPanelOpen ? styles.rightPanelOpen : styles.rightPanelClosing}`}
                 role="dialog"
@@ -2059,12 +1796,6 @@ export default function App() {
                         outputText={displayedRun?.outputText ?? ''}
                         toolCalls={displayedRun?.toolCalls ?? []}
                         changedFiles={displayedRun?.changedFiles ?? []}
-                        diffs={runEvidence.diffs}
-                        approvals={permissionRequests}
-                        artifacts={runEvidence.artifacts.length > 0 ? runEvidence.artifacts : displayedRun && 'artifacts' in displayedRun ? displayedRun.artifacts : []}
-                        previews={runEvidence.previews.length > 0 ? runEvidence.previews : displayedRun && 'previews' in displayedRun ? displayedRun.previews : []}
-                        evidence={runEvidence}
-                        onDecideApproval={handleReviewDecidePermission}
                         onCancel={handleCancel}
                         chatMessages={allMessages}
                       />
@@ -2079,36 +1810,12 @@ export default function App() {
       </>
       )}
 
-      {/* Bottom status bar */}
-      <Slot
-        name="status-bar"
-        online={online}
-        health={health}
-        isConnected={isConnected}
-        error={edgeStatus.lastError ?? null}
-        wsLatency={wsLatency}
-        hubAuthenticated={hubAuthenticated}
-      />
-
       {/* Modals */}
       <Suspense fallback={null}>
         <Slot name="search-dialog" messages={allMessages} threads={threads} onSelect={handleSearchMessageSelect} onSelectThread={handleSearchThreadSelect} />
-<<<<<<< HEAD
-      </Suspense>
-      <Suspense fallback={null}>
-        <Slot
-          name="file-search-dialog"
-          workspaceDir={workDirForGit || undefined}
-          onSelectFile={handleFileSelect}
-          onOpenInVSCode={handleOpenInVSCode}
-          open={fileSearchOpen}
-          onClose={() => setFileSearchOpen(false)}
-        />
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       </Suspense>
       <Slot name="permission-dialog" requests={permissionRequests} onDecide={handleDecidePermission} />
-      <Slot name="shortcut-help" open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} onNavigateToKeyboard={() => openSettings('keyboard')} />
+      <Slot name="shortcut-help" open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
 
       {showAuthModal && (
         <div className={styles.modalOverlay} onClick={() => useHubStore.getState().setShowAuthModal(false)}>
