@@ -76,10 +76,12 @@ export const initialWorkbenchState: WorkbenchState = {
 export function createWorkbenchState(
   snapshot?: WorkbenchSnapshot | null,
 ): WorkbenchState {
-  return workbenchReducer(initialWorkbenchState, {
-    type: 'snapshot.loaded',
-    snapshot,
-  });
+  return workbenchReducer(
+    initialWorkbenchState,
+    snapshot === undefined
+      ? { type: 'snapshot.loaded' }
+      : { type: 'snapshot.loaded', snapshot },
+  );
 }
 
 export function workbenchReducer(
@@ -129,7 +131,10 @@ export function workbenchReducer(
     case 'connection.disconnected':
       return {
         ...state,
-        connection: { status: 'disconnected', error: action.error },
+        connection: {
+          status: 'disconnected',
+          ...(action.error ? { error: action.error } : {}),
+        },
       };
     case 'connection.error':
       return {
@@ -166,9 +171,9 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
         projects: upsertBy(state.projects, projectId, (current) => ({
           id: projectId,
           name: text(payload.name) ?? current?.name ?? projectId,
-          description: text(payload.description) ?? current?.description,
           createdAt: text(payload.createdAt) ?? current?.createdAt ?? sentAt,
-          updatedAt: text(payload.updatedAt) ?? sentAt,
+          ...optionalString('description', text(payload.description) ?? current?.description),
+          ...optionalString('updatedAt', text(payload.updatedAt) ?? sentAt),
         })),
       };
     }
@@ -187,12 +192,11 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
             text(envelope.scope?.projectId) ??
             current?.projectId ??
             '',
-          conversationId:
-            text(payload.conversationId) ?? current?.conversationId,
-          title: text(payload.title) ?? current?.title,
           status: threadStatus(payload.status) ?? current?.status ?? 'active',
           createdAt: text(payload.createdAt) ?? current?.createdAt ?? sentAt,
-          updatedAt: text(payload.updatedAt) ?? sentAt,
+          ...optionalString('conversationId', text(payload.conversationId) ?? current?.conversationId),
+          ...optionalString('title', text(payload.title) ?? current?.title),
+          ...optionalString('updatedAt', text(payload.updatedAt) ?? sentAt),
         })),
       };
     }
@@ -256,7 +260,7 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
           id: runnerId,
           name: text(payload.name) ?? current?.name ?? runnerId,
           status: event.type === 'runner.online' ? 'online' : 'offline',
-          capabilities: text(payload.capabilities) ?? current?.capabilities,
+          ...optionalString('capabilities', text(payload.capabilities) ?? current?.capabilities),
         })),
       };
     }
@@ -286,8 +290,8 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
             '',
           status: runStatus(event.type, payload.status) ?? current?.status ?? 'queued',
           createdAt: text(payload.createdAt) ?? current?.createdAt ?? sentAt,
-          startedAt: text(payload.startedAt) ?? current?.startedAt,
-          finishedAt: text(payload.finishedAt) ?? current?.finishedAt,
+          ...optionalString('startedAt', text(payload.startedAt) ?? current?.startedAt),
+          ...optionalString('finishedAt', text(payload.finishedAt) ?? current?.finishedAt),
         })),
       };
     }
@@ -304,10 +308,10 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
       const chunks =
         event.type === 'run.output.batch'
           ? chunkTexts(payload.chunks, text(payload.stream))
-          : [{ stream: text(payload.stream), text: text(payload.text) ?? '' }];
+          : [chunkText(text(payload.text) ?? '', text(payload.stream))];
       const notice = truncationNotice(payload);
       if (notice) {
-        chunks.push({ stream: text(payload.stream), text: notice });
+        chunks.push(chunkText(notice, text(payload.stream)));
       }
       const nextLog = chunks.reduce<RunLogs>((acc, chunk) => {
         if (chunk.stream === 'stderr') {
@@ -340,7 +344,7 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
           summary: text(payload.summary) ?? current?.summary ?? 'Approval required',
           status: 'pending',
           createdAt: text(payload.createdAt) ?? current?.createdAt ?? sentAt,
-          decidedAt: current?.decidedAt,
+          ...(current?.decidedAt ? { decidedAt: current.decidedAt } : {}),
         })),
       };
     }
@@ -395,9 +399,9 @@ function applyEvent(state: WorkbenchState, event: AnyEvent): WorkbenchState {
           id: previewId,
           runId,
           threadId: text(payload.threadId) ?? current?.threadId ?? run?.threadId ?? '',
-          url: text(payload.url) ?? current?.url,
           status: 'ready',
           createdAt: text(payload.createdAt) ?? current?.createdAt ?? sentAt,
+          ...optionalString('url', text(payload.url) ?? current?.url),
         })),
       };
     }
@@ -535,8 +539,8 @@ function setRunStatus(runs: Run[], runId: string, status: Run['status']): Run[] 
     threadId: current?.threadId ?? '',
     status,
     createdAt: current?.createdAt ?? EPOCH,
-    startedAt: current?.startedAt,
-    finishedAt: current?.finishedAt,
+    ...optionalString('startedAt', current?.startedAt),
+    ...optionalString('finishedAt', current?.finishedAt),
   }));
 }
 
@@ -548,13 +552,24 @@ function chunkTexts(
   return value.map((chunk) => {
     if (chunk && typeof chunk === 'object') {
       const record = chunk as Record<string, unknown>;
-      return {
-        stream: text(record.stream) ?? fallbackStream,
-        text: text(record.text) ?? '',
-      };
+      return chunkText(text(record.text) ?? '', text(record.stream) ?? fallbackStream);
     }
-    return { stream: fallbackStream, text: '' };
+    return chunkText('', fallbackStream);
   });
+}
+
+function chunkText(textValue: string, stream?: string): { stream?: string; text: string } {
+  return {
+    text: textValue,
+    ...(stream ? { stream } : {}),
+  };
+}
+
+function optionalString<K extends string>(
+  key: K,
+  value: string | undefined,
+): Partial<Record<K, string>> {
+  return value ? { [key]: value } as Record<K, string> : {};
 }
 
 function truncationNotice(payload: Record<string, unknown>): string | undefined {
