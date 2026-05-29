@@ -24,13 +24,17 @@ type NativeStatusKey =
   | "settings.status.sessionCleared"
   | "settings.status.nativeBridgeUnavailable";
 
+type NativeActionKind = "login" | "session" | "notification";
+
 export function AccountView() {
   const { t, i18n } = useTranslation();
   const [statusKey, setStatusKey] = useState<NativeStatusKey>("settings.status.idle");
   const [isBusy, setIsBusy] = useState(false);
+  const [lastNativeAction, setLastNativeAction] = useState<NativeActionKind>("login");
   const [clearSheetOpen, setClearSheetOpen] = useState(false);
   const [clearSheetStatusKey, setClearSheetStatusKey] = useState<NativeStatusKey>("settings.status.idle");
   const [isClearBusy, setIsClearBusy] = useState(false);
+  const canRetryNativeAction = statusKey === "settings.status.nativeBridgeUnavailable";
   const currentLanguage: MobileLanguage = i18n.language?.startsWith("zh") ? "zh" : "en";
   const mobileSurfaces = getSurfacesByPlatform("mobile");
   const readinessItems = [
@@ -54,7 +58,8 @@ export function AccountView() {
     },
   ];
 
-  async function runNativeAction(action: () => Promise<NativeStatusKey>, pendingKey: NativeStatusKey) {
+  async function runNativeAction(action: () => Promise<NativeStatusKey>, pendingKey: NativeStatusKey, actionKind: NativeActionKind) {
+    setLastNativeAction(actionKind);
     setIsBusy(true);
     setStatusKey(pendingKey);
     try {
@@ -105,7 +110,7 @@ export function AccountView() {
                 onClick={() => void runNativeAction(async () => {
                   await startMobileOidcLogin();
                   return "settings.status.loginStarted";
-                }, "settings.status.startingLogin")}
+                }, "settings.status.startingLogin", "login")}
               >
                 <LogIn size={16} />
                 <span>{t("settings.account.signIn")}</span>
@@ -117,7 +122,7 @@ export function AccountView() {
                 onClick={() => void runNativeAction(async () => {
                   const token = await readHubAccessToken();
                   return token ? "settings.status.sessionPresent" : "settings.status.sessionMissing";
-                }, "settings.status.checkingSession")}
+                }, "settings.status.checkingSession", "session")}
               >
                 <ShieldCheck size={16} />
                 <span>{t("settings.account.checkSession")}</span>
@@ -156,6 +161,38 @@ export function AccountView() {
               {isBusy ? <RefreshCw size={14} className="mobileSpin" /> : <ShieldCheck size={14} />}
               <span>{t(statusKey)}</span>
             </div>
+            {canRetryNativeAction && (
+              <button
+                className="mobileActionButton mobileRetryAction"
+                type="button"
+                disabled={isBusy}
+                onClick={() => void runNativeAction(async () => {
+                  if (lastNativeAction === "session") {
+                    const token = await readHubAccessToken();
+                    return token ? "settings.status.sessionPresent" : "settings.status.sessionMissing";
+                  }
+                  if (lastNativeAction === "notification") {
+                    const granted = await sendMobileNotificationProbe();
+                    return granted ? "settings.status.notificationSent" : "settings.status.notificationDenied";
+                  }
+                  await startMobileOidcLogin();
+                  return "settings.status.loginStarted";
+                }, lastNativeAction === "session"
+                  ? "settings.status.checkingSession"
+                  : lastNativeAction === "notification"
+                    ? "settings.status.requestingNotifications"
+                    : "settings.status.startingLogin", lastNativeAction)}
+              >
+                <RefreshCw size={16} />
+                <span>
+                  {lastNativeAction === "session"
+                    ? t("settings.status.retryCheck")
+                    : lastNativeAction === "notification"
+                      ? t("settings.status.retryAlert")
+                      : t("settings.status.retrySignIn")}
+                </span>
+              </button>
+            )}
           </section>
 
           <section className="mobileSettingCard">
@@ -223,7 +260,7 @@ export function AccountView() {
               onClick={() => void runNativeAction(async () => {
                 const granted = await sendMobileNotificationProbe();
                 return granted ? "settings.status.notificationSent" : "settings.status.notificationDenied";
-              }, "settings.status.requestingNotifications")}
+              }, "settings.status.requestingNotifications", "notification")}
             >
               <Bell size={16} />
               <span>{t("settings.notifications.testAlert")}</span>
