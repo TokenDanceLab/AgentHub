@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listRuns } from "@agenthub/shared";
 import type { Run, RunStatus } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { ActionList, EmptyState, MetricGrid, SegmentedControl, StatusNotice, SurfaceHeader, TriageCard } from "@agenthub/shared/ui";
+import { ActionList, EmptyState, MetricGrid, SectionHeader, SegmentedControl, StatusNotice, SurfaceHeader, TriageCard } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, ArrowRight, CheckCircle2, Clock3, GitPullRequestArrow, Play, Radio, RefreshCw, ShieldAlert, TerminalSquare, UserRound } from "lucide-react";
@@ -155,21 +155,19 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
 
       <div className="mobileScroll mobileRunsSurface">
         <section className="mobileOverviewPanel">
-          <div className="mobileOverviewTitleRow">
-            <div>
-              <p className="mobileEyebrow">{t("queue.runs.eyebrow")}</p>
-              <h2>{t("queue.runs.overviewTitle")}</h2>
-            </div>
-            <button
-              className="mobileIconButton"
-              type="button"
-              aria-label={t("queue.runs.refresh")}
-              aria-busy={isRefreshing}
-              onClick={() => runs.refetch()}
-            >
-              <RefreshCw size={18} className={isRefreshing ? "mobileSpin" : undefined} />
-            </button>
-          </div>
+          <SectionHeader
+            className="mobileOverviewTitleRow"
+            eyebrowClassName="mobileEyebrow"
+            actionClassName="mobileIconButton"
+            eyebrow={t("queue.runs.eyebrow")}
+            title={t("queue.runs.overviewTitle")}
+            action={{
+              ariaLabel: t("queue.runs.refresh"),
+              busy: isRefreshing,
+              onClick: () => runs.refetch(),
+              icon: <RefreshCw size={18} className={isRefreshing ? "mobileSpin" : undefined} />,
+            }}
+          />
           <MetricGrid
             className="mobileMetricGrid"
             itemClassName="mobileMetricTile"
