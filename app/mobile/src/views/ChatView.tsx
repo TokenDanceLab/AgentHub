@@ -3,6 +3,7 @@ import { AlertCircle, ArrowLeft, CheckCircle2, Code2, Copy, FileText, GitPullReq
 import type { Thread, ThreadItem } from "@agenthub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createThreadMessage, listThreadItems } from "@agenthub/shared";
+import { StatusNotice } from "@agenthub/shared/ui";
 import { useTranslation } from "react-i18next";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
 
@@ -281,26 +282,30 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
           </span>
         </button>
         {sendMessage.isPending && (
-          <p className="mobileComposerStatus" role="status">{t("chat.states.sendingReply")}</p>
+          <StatusNotice className="mobileComposerStatus">{t("chat.states.sendingReply")}</StatusNotice>
         )}
         {sendMessage.isError && (
-          <div className="mobileComposerStatus mobileComposerError" role="status">
-            <span>{t("chat.states.replyStayed")}</span>
-            <button
-              className="mobileActionButton"
-              type="button"
-              aria-label={t("chat.actions.retryMobileReply")}
-              disabled={sendMessage.isPending || !localReply?.content}
-              onClick={() => {
-                if (localReply?.content) {
-                  submitReply(localReply.content);
-                }
-              }}
-            >
-              <RefreshCw size={15} />
-              <span>{t("chat.actions.retry")}</span>
-            </button>
-          </div>
+          <StatusNotice
+            className="mobileComposerStatus mobileComposerError"
+            action={(
+              <button
+                className="mobileActionButton"
+                type="button"
+                aria-label={t("chat.actions.retryMobileReply")}
+                disabled={sendMessage.isPending || !localReply?.content}
+                onClick={() => {
+                  if (localReply?.content) {
+                    submitReply(localReply.content);
+                  }
+                }}
+              >
+                <RefreshCw size={15} />
+                <span>{t("chat.actions.retry")}</span>
+              </button>
+            )}
+          >
+            {t("chat.states.replyStayed")}
+          </StatusNotice>
         )}
       </form>
     </div>

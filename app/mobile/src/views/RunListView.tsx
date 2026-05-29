@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listRuns } from "@agenthub/shared";
 import type { Run, RunStatus } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { EmptyState, MetricGrid, SegmentedControl } from "@agenthub/shared/ui";
+import { EmptyState, MetricGrid, SegmentedControl, StatusNotice } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, ArrowRight, CheckCircle2, Clock3, GitPullRequestArrow, Play, Radio, RefreshCw, ShieldAlert, TerminalSquare, UserRound } from "lucide-react";
@@ -184,21 +184,17 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
               { id: "total", value: items.length, label: t("queue.common.total") },
             ]}
           />
-          <div className="mobileSignalRow">
-            <Radio size={14} />
-            <span>
-              {isConnected
-                ? workflowUnavailable
-                  ? t("queue.runs.signalPending")
-                  : t("queue.runs.signalOnline")
-                : t("queue.runs.signalOffline")}
-            </span>
-          </div>
+          <StatusNotice className="mobileSignalRow" icon={<Radio size={14} />}>
+            {isConnected
+              ? workflowUnavailable
+                ? t("queue.runs.signalPending")
+                : t("queue.runs.signalOnline")
+              : t("queue.runs.signalOffline")}
+          </StatusNotice>
           {isRefreshing && (
-            <div className="mobileRefreshStatus" role="status" aria-live="polite">
-              <RefreshCw size={13} className="mobileSpin" />
-              <span>{t("queue.runs.refreshing")}</span>
-            </div>
+            <StatusNotice className="mobileRefreshStatus" icon={<RefreshCw size={13} className="mobileSpin" />}>
+              {t("queue.runs.refreshing")}
+            </StatusNotice>
           )}
         </section>
 
