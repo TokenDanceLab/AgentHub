@@ -13,11 +13,12 @@
   flex: 0 0 auto;
   place-items: center;
   border-radius: 10px;
-  color: oklch(1 0 0);
+  color: var(--brand);
   font-weight: 900;
   font-size: var(--font-size-sm);
-  background: linear-gradient(135deg, var(--brand), oklch(0.6 0.12 215));
-  box-shadow: 0 10px 22px oklch(0.55 0.16 255 / 0.24);
+  background: oklch(0.55 0.16 255 / 0.12);
+  border: 1px solid oklch(0.55 0.16 255 / 0.22);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.22);
 }
 
 .text {

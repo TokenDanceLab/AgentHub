@@ -217,6 +217,37 @@
   letter-spacing: 0;
 }
 
+.header p {
+  max-width: 680px;
+  margin: 9px 0 0;
+  color: #8e8e93;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.headerMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.headerMeta span {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 4px 8px;
+  border: 1px solid var(--settings-chip-border);
+  border-radius: 7px;
+  background: var(--settings-chip-bg);
+  color: #8e8e93;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .panel {
   margin-bottom: 34px;
 }
@@ -1137,8 +1168,8 @@
   .navItem {
     flex: 0 0 auto;
     width: auto;
-    min-height: 36px;
-    padding: 0 11px;
+    min-height: 44px;
+    padding: 0 13px;
     border: 1px solid transparent;
     background: rgba(255, 255, 255, 0.025);
     white-space: nowrap;
@@ -1156,6 +1187,7 @@
 
   .backBtn {
     width: fit-content;
+    min-height: 44px;
     margin-bottom: 8px;
   }
 
@@ -1219,5 +1251,27 @@
     max-width: none;
     width: 100%;
     text-align: left;
+  }
+
+  .select {
+    height: 44px;
+  }
+
+  .switch {
+    width: 52px;
+    height: 44px;
+  }
+
+  .switch span {
+    top: 13px;
+    left: 6px;
+  }
+
+  .switchOn span {
+    transform: translateX(22px);
+  }
+
+  .segmented button {
+    height: 44px;
   }
 }

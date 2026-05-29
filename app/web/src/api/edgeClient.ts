@@ -3,9 +3,11 @@ import type {
   AgentInfo,
   HealthResponse,
   ListResponse,
+  Run,
   RunInfo,
   Runner,
   StartRunRequest,
+  Thread,
   ThreadInfo,
 } from '@shared/types';
 
@@ -13,7 +15,7 @@ function page<T>(items: T[]): ListResponse<T> {
   return { items, page: { hasMore: false } };
 }
 
-function toThreadInfo(thread: { id: string; projectId: string; title?: string; status: string; createdAt: string; updatedAt?: string }): ThreadInfo {
+function toThreadInfo(thread: Thread): ThreadInfo {
   return {
     threadId: thread.id,
     projectId: thread.projectId,
@@ -24,15 +26,15 @@ function toThreadInfo(thread: { id: string; projectId: string; title?: string; s
   };
 }
 
-function toRunInfo(run: { runId: string; projectId: string; threadId: string; status: string; createdAt?: string; startedAt?: string; finishedAt?: string }): RunInfo {
+function toRunInfo(run: Run): RunInfo {
   return {
     runId: run.runId,
     projectId: run.projectId,
     threadId: run.threadId,
     status: run.status,
     createdAt: run.createdAt,
-    startedAt: run.startedAt,
-    finishedAt: run.finishedAt,
+    ...(run.startedAt !== undefined ? { startedAt: run.startedAt } : {}),
+    ...(run.finishedAt !== undefined ? { finishedAt: run.finishedAt } : {}),
   };
 }
 

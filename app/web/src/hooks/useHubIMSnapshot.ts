@@ -53,9 +53,7 @@ export function useHubIMSnapshot(token: string | null): HubIMSnapshot {
       getToken: () => token,
     });
 
-    setSnapshot((current) => ({
-      ...current,
-      error: undefined,
+    setSnapshot(() => ({
       messagesBySessionId: emptyMessagesBySessionId,
       sessions: [],
       status: 'loading',

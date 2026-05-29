@@ -150,3 +150,4 @@ hub-server/.tmp/
 
 # Tauri Android generated (source tracked, builds ignored by inner .gitignore)
 # app/desktop/src-tauri/gen/android/ is committed
+app/mobile/src-tauri/gen/

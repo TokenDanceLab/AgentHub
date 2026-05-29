@@ -1,0 +1,658 @@
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
+
+export const MOBILE_LANGUAGE_STORAGE_KEY = "agenthub.mobile.language";
+
+export const mobileLanguages = [
+  { code: "en", label: "English", nativeLabel: "English" },
+  { code: "zh", label: "Chinese", nativeLabel: "简体中文" },
+] as const;
+
+export type MobileLanguage = (typeof mobileLanguages)[number]["code"];
+
+const resources = {
+  en: {
+    translation: {
+      common: {
+        appName: "AgentHub Mobile",
+        actions: {
+          retry: "Retry",
+          retrying: "Retrying",
+        },
+      },
+      nav: {
+        primary: "Primary navigation",
+        threads: "Threads",
+        chat: "Chat",
+        runs: "Runs",
+        settings: "Settings",
+        activeThreads: "active threads",
+        pendingReviews: "pending reviews",
+      },
+      empty: {
+        selectThread: {
+          title: "Select a thread",
+          description: "Open a thread first, then continue the conversation from Mobile.",
+          action: "Browse threads",
+        },
+      },
+      chat: {
+        participants: {
+          user: "You",
+          agent: "Agent",
+        },
+        actions: {
+          backToThreads: "Back to threads",
+          copyUser: "Copy user message",
+          copyAgent: "Copy agent message",
+          copy: "Copy",
+          copied: "Copied",
+          retry: "Retry",
+          send: "Send",
+          sending: "Sending",
+        },
+        context: {
+          eyebrow: "Desktop-aligned context",
+          fallbackProject: "Workspace thread",
+          fallbackTitle: "Untitled thread",
+          status: "Status",
+          messages: "Messages",
+          updated: "Updated",
+        },
+        states: {
+          loadingTitle: "Loading messages",
+          loadingDescription: "Replaying the thread from Hub.",
+          syncErrorTitle: "Messages could not sync",
+          syncErrorDescription: "Keep the thread selected and retry once the Hub session is available.",
+          emptyTitle: "No messages in this thread",
+          emptyDescription: "Send the first handoff note or continue from Desktop after sync.",
+          composerError: "Message was not sent. Check Hub session and retry.",
+        },
+        composer: {
+          placeholder: "Message AgentHub...",
+        },
+      },
+      runDetail: {
+        actions: {
+          back: "Back to runs",
+        },
+        header: {
+          eyebrow: "Execution detail",
+          title: "Run {{runId}}",
+        },
+        context: {
+          eyebrow: "Run context",
+          status: "Status",
+          thread: "Thread",
+          started: "Started",
+          waitingOutput: "Waiting for output...",
+        },
+      },
+      settings: {
+        title: "Account",
+        eyebrow: "Mobile identity",
+        readiness: {
+          aria: "Mobile readiness",
+          eyebrow: "Runtime readiness",
+          title: "Native mobile bridge",
+          checks: "3 checks",
+          tokenDanceId: "TokenDance ID",
+          hubSession: "Hub session",
+          notifications: "Notifications",
+          stub: "Stub",
+          bridge: "Bridge",
+          probe: "Probe",
+          deepLinkPending: "Deep link pending",
+          nativeCommandWired: "Native command wired",
+          permissionGate: "Permission gate",
+          deepLink: "Deep link",
+          secureStore: "Secure store",
+          localProbe: "Local probe",
+        },
+        language: {
+          title: "Language",
+          description: "Mobile follows the device language by default. Override it here for QA or bilingual handoff.",
+          current: "Current",
+          english: "English",
+          chinese: "简体中文",
+        },
+        surfaces: {
+          title: "Client surfaces",
+          description: "Mobile uses the shared Desktop/Web surface registry, with Account as the phone-first identity tab.",
+          count: "{{count}} surfaces",
+        },
+        account: {
+          title: "Account",
+          description: "TokenDance ID session is stored by the Mobile native layer.",
+          signIn: "Sign in",
+          checkSession: "Check session",
+          clear: "Clear",
+        },
+        notifications: {
+          title: "Notifications",
+          description: "Local notification permission is required before run alerts.",
+          testAlert: "Test alert",
+        },
+        status: {
+          nativeAction: "Native action",
+          idle: "Ready for native Mobile integration checks.",
+          startingLogin: "Starting TokenDance ID login...",
+          loginStarted: "TokenDance ID login flow started.",
+          checkingSession: "Checking stored Hub session...",
+          sessionPresent: "Hub session is present in native storage.",
+          sessionMissing: "No Hub session is stored on this device.",
+          requestingNotifications: "Requesting notification permission...",
+          notificationSent: "Notification permission granted and probe sent.",
+          notificationDenied: "Notification permission was not granted.",
+          clearingSession: "Clearing stored Hub session...",
+          sessionCleared: "Stored Hub session cleared.",
+          nativeBridgeUnavailable: "Native bridge is unavailable in browser preview.",
+          unknownNativeFailure: "Unknown native command failure",
+          retrySignIn: "Retry sign in",
+          retryCheck: "Retry check",
+          retryAlert: "Retry alert",
+        },
+        about: {
+          title: "About",
+          version: "AgentHub Mobile v0.1.0",
+          description: "Built on Tauri 2, React 19, and the TokenDance design contract.",
+        },
+        clearSession: {
+          aria: "Confirm session clear",
+          eyebrow: "Hub session",
+          title: "Clear stored session?",
+          close: "Close session clear confirmation",
+          description: "This removes the Hub access token stored by the Mobile native layer. You will need to sign in again before this device can sync private Hub work.",
+          storage: "Storage",
+          storageValue: "Mobile native Hub session",
+          effect: "Effect",
+          effectValue: "Local device sign-out only",
+          clearing: "Clearing",
+          retry: "Retry clear",
+          confirm: "Confirm clear",
+          cancel: "Cancel",
+        },
+      },
+      queue: {
+        status: {
+          connected: "Connected",
+          reachable: "Reachable",
+          offline: "Offline",
+        },
+        statusLabels: {
+          online: "Online",
+          offline: "Offline",
+          queued: "Queued",
+          starting: "Starting",
+          running: "Running",
+          review: "Review",
+          done: "Done",
+          error: "Error",
+          cancelled: "Cancelled",
+          pending: "Pending",
+        },
+        common: {
+          all: "All",
+          active: "Active",
+          archived: "Archived",
+          review: "Review",
+          closed: "Closed",
+          total: "Total",
+          settings: "Settings",
+          showAll: "Show all",
+          lastAttempt: "Last attempt {{time}}",
+        },
+        threads: {
+          title: "Threads",
+          eyebrow: "Command center",
+          overviewTitle: "Thread handoff",
+          refresh: "Refresh threads",
+          metricThreads: "Threads",
+          metricHub: "Hub",
+          hubReady: "OK",
+          hubDown: "Down",
+          filterArchived: "Archive",
+          localWorkspace: "Local workspace",
+          signalOnline: "Hub API online",
+          signalPending: "Hub reachable; workflow sync pending",
+          signalOffline: "Hub health unavailable",
+          refreshing: "Refreshing thread handoff...",
+          continueHandoff: "Continue handoff",
+          continueAria: "Continue handoff thread {{title}}",
+          filters: "Thread filters",
+          loadingTitle: "Loading threads",
+          loadingDescription: "Syncing the latest Hub workspace state.",
+          recoveryEyebrowReachable: "Workflow recovery",
+          recoveryEyebrowOffline: "Connection recovery",
+          recoveryTitle: "Threads could not sync",
+          recoveryReachable: "Hub health is reachable, but workflow endpoints did not return thread JSON. Retry after the API or session contract is ready.",
+          recoveryOffline: "Hub did not return the handoff queue. Keep this screen open and retry when the network or session is back.",
+          emptyTitle: "No threads yet",
+          emptyDescription: "Start a thread from Desktop or Web, then continue it here.",
+          emptyFilterTitle: "No {{filter}} threads",
+          emptyFilterDescription: "Switch filters to inspect the full Hub handoff queue.",
+        },
+        runs: {
+          title: "Runs",
+          eyebrow: "Execution monitor",
+          overviewTitle: "Recent activity",
+          refresh: "Refresh runs",
+          metricActive: "Active",
+          metricReview: "Review",
+          signalOnline: "Hub execution API online",
+          signalPending: "Hub reachable; run sync pending",
+          signalOffline: "Hub health unavailable",
+          refreshing: "Refreshing run queue...",
+          nextReview: "Next review",
+          nextReviewAria: "Open next review run {{runId}}",
+          runLabel: "Run {{runId}}",
+          filters: "Run filters",
+          loadingTitle: "Loading runs",
+          loadingDescription: "Syncing the latest Hub execution state.",
+          recoveryEyebrowReachable: "Workflow recovery",
+          recoveryEyebrowOffline: "Execution recovery",
+          recoveryTitle: "Run queue could not sync",
+          recoveryReachable: "Hub health is reachable, but workflow endpoints did not return run JSON. Retry after the API or session contract is ready.",
+          recoveryOffline: "The last execution state is unavailable. Retry before approving or acting on a run from another device.",
+          emptyTitle: "No recent runs",
+          emptyDescription: "Runs started from Desktop, Web, or Hub will appear here for mobile review.",
+          emptyFilterTitle: "No {{filter}} runs",
+          emptyFilterDescription: "Switch filters to inspect the full execution queue.",
+        },
+      },
+      surface: {
+        status: {
+          realSnapshot: {
+            label: "Real snapshot",
+            description: "Rendered from a verified live response or preserved service snapshot.",
+          },
+          localSource: {
+            label: "Local source",
+            description: "Backed by browser, workspace, or local configuration state.",
+          },
+          loginLocked: {
+            label: "Hub session required",
+            description: "Hub session required: the shell does not claim an active session or show fake private chat data.",
+          },
+          interfaceGap: {
+            label: "Interface gap",
+            description: "The entry is visible, but the client/API wiring is not complete.",
+          },
+          error: {
+            label: "Edge unavailable/error",
+            description: "No verified workflow source is connected in this client shell.",
+          },
+          demoFallback: {
+            label: "Demo fallback",
+            description: "The shell labels collaboration and project preview data as demo content when real sources are unavailable.",
+          },
+          catalogFallback: {
+            label: "Catalog fallback",
+            description: "Catalog data is unavailable, so the catalog state is explicitly labeled as fallback.",
+          },
+        },
+        mobile: {
+          threads: {
+            label: "Threads",
+            description: "Hub handoff queue with Desktop-style context and recovery state.",
+          },
+          chat: {
+            label: "Chat",
+            description: "Selected thread conversation with mobile composer and copy actions.",
+          },
+          runs: {
+            label: "Runs",
+            description: "Execution queue, review shortcuts, diff, blocks, outputs, and logs.",
+          },
+          account: {
+            label: "Account",
+            description: "TokenDance ID sign-in, Hub session checks, language, notifications, and client readiness.",
+          },
+        },
+      },
+    },
+  },
+  zh: {
+    translation: {
+      common: {
+        appName: "AgentHub Mobile",
+        actions: {
+          retry: "重试",
+          retrying: "重试中",
+        },
+      },
+      nav: {
+        primary: "主导航",
+        threads: "线程",
+        chat: "对话",
+        runs: "运行",
+        settings: "设置",
+        activeThreads: "个活跃线程",
+        pendingReviews: "个待审阅",
+      },
+      empty: {
+        selectThread: {
+          title: "选择线程",
+          description: "先打开一个线程，然后在移动端继续对话。",
+          action: "浏览线程",
+        },
+      },
+      chat: {
+        participants: {
+          user: "你",
+          agent: "Agent",
+        },
+        actions: {
+          backToThreads: "返回线程",
+          copyUser: "复制用户消息",
+          copyAgent: "复制 Agent 消息",
+          copy: "复制",
+          copied: "已复制",
+          retry: "重试",
+          send: "发送",
+          sending: "发送中",
+        },
+        context: {
+          eyebrow: "对齐 Desktop 的上下文",
+          fallbackProject: "工作区线程",
+          fallbackTitle: "未命名线程",
+          status: "状态",
+          messages: "消息",
+          updated: "更新",
+        },
+        states: {
+          loadingTitle: "正在加载消息",
+          loadingDescription: "正在从 Hub 回放线程。",
+          syncErrorTitle: "消息无法同步",
+          syncErrorDescription: "保持当前线程选中，Hub 会话可用后重试。",
+          emptyTitle: "此线程暂无消息",
+          emptyDescription: "发送第一条交接备注，或在同步后从 Desktop 继续。",
+          composerError: "消息未发送。请检查 Hub 会话后重试。",
+        },
+        composer: {
+          placeholder: "向 AgentHub 发送消息...",
+        },
+      },
+      runDetail: {
+        actions: {
+          back: "返回运行",
+        },
+        header: {
+          eyebrow: "执行详情",
+          title: "运行 {{runId}}",
+        },
+        context: {
+          eyebrow: "运行上下文",
+          status: "状态",
+          thread: "线程",
+          started: "启动",
+          waitingOutput: "等待输出...",
+        },
+      },
+      settings: {
+        title: "账户",
+        eyebrow: "移动身份",
+        readiness: {
+          aria: "移动端就绪状态",
+          eyebrow: "运行时就绪",
+          title: "原生移动桥接",
+          checks: "3 项检查",
+          tokenDanceId: "TokenDance ID",
+          hubSession: "Hub 会话",
+          notifications: "通知",
+          stub: "待实现",
+          bridge: "已接入",
+          probe: "探测",
+          deepLinkPending: "深链待接入",
+          nativeCommandWired: "原生命令已接线",
+          permissionGate: "权限门控",
+          deepLink: "深链",
+          secureStore: "安全存储",
+          localProbe: "本机探测",
+        },
+        language: {
+          title: "语言",
+          description: "移动端默认跟随设备语言。这里可以为了 QA 或双语交接临时切换。",
+          current: "当前",
+          english: "English",
+          chinese: "简体中文",
+        },
+        surfaces: {
+          title: "客户端界面",
+          description: "Mobile 复用 Desktop/Web 的共享 surface registry，并把账户作为手机优先的身份入口。",
+          count: "{{count}} 个界面",
+        },
+        account: {
+          title: "账户",
+          description: "TokenDance ID 会话由移动端原生层保存。",
+          signIn: "登录",
+          checkSession: "检查会话",
+          clear: "清除",
+        },
+        notifications: {
+          title: "通知",
+          description: "运行提醒需要先获得本机通知权限。",
+          testAlert: "测试提醒",
+        },
+        status: {
+          nativeAction: "原生动作",
+          idle: "已准备好检查移动端原生集成。",
+          startingLogin: "正在启动 TokenDance ID 登录...",
+          loginStarted: "TokenDance ID 登录流程已启动。",
+          checkingSession: "正在检查已保存的 Hub 会话...",
+          sessionPresent: "原生存储中存在 Hub 会话。",
+          sessionMissing: "此设备未保存 Hub 会话。",
+          requestingNotifications: "正在请求通知权限...",
+          notificationSent: "通知权限已授予，测试提醒已发送。",
+          notificationDenied: "通知权限未授予。",
+          clearingSession: "正在清除已保存的 Hub 会话...",
+          sessionCleared: "已清除保存的 Hub 会话。",
+          nativeBridgeUnavailable: "浏览器预览中无法使用原生桥接。",
+          unknownNativeFailure: "未知原生命令失败",
+          retrySignIn: "重试登录",
+          retryCheck: "重试检查",
+          retryAlert: "重试提醒",
+        },
+        about: {
+          title: "关于",
+          version: "AgentHub Mobile v0.1.0",
+          description: "基于 Tauri 2、React 19 和 TokenDance 设计契约构建。",
+        },
+        clearSession: {
+          aria: "确认清除会话",
+          eyebrow: "Hub 会话",
+          title: "清除已保存会话？",
+          close: "关闭清除会话确认",
+          description: "这会移除移动端原生层保存的 Hub access token。此设备需要重新登录后才能同步私有 Hub 工作。",
+          storage: "存储",
+          storageValue: "移动端原生 Hub 会话",
+          effect: "影响",
+          effectValue: "仅退出当前设备",
+          clearing: "清除中",
+          retry: "重试清除",
+          confirm: "确认清除",
+          cancel: "取消",
+        },
+      },
+      queue: {
+        status: {
+          connected: "已连接",
+          reachable: "可达",
+          offline: "离线",
+        },
+        statusLabels: {
+          online: "在线",
+          offline: "离线",
+          queued: "排队",
+          starting: "启动中",
+          running: "运行中",
+          review: "审阅",
+          done: "完成",
+          error: "错误",
+          cancelled: "已取消",
+          pending: "待处理",
+        },
+        common: {
+          all: "全部",
+          active: "活跃",
+          archived: "归档",
+          review: "审阅",
+          closed: "关闭",
+          total: "总计",
+          settings: "设置",
+          showAll: "显示全部",
+          lastAttempt: "上次尝试 {{time}}",
+        },
+        threads: {
+          title: "线程",
+          eyebrow: "指挥中心",
+          overviewTitle: "线程交接",
+          refresh: "刷新线程",
+          metricThreads: "线程",
+          metricHub: "Hub",
+          hubReady: "正常",
+          hubDown: "断开",
+          filterArchived: "归档",
+          localWorkspace: "本地工作区",
+          signalOnline: "Hub API 在线",
+          signalPending: "Hub 可达；工作流同步待完成",
+          signalOffline: "Hub 健康检查不可用",
+          refreshing: "正在刷新线程交接...",
+          continueHandoff: "继续交接",
+          continueAria: "继续交接线程 {{title}}",
+          filters: "线程筛选",
+          loadingTitle: "正在加载线程",
+          loadingDescription: "正在同步最新 Hub 工作区状态。",
+          recoveryEyebrowReachable: "工作流恢复",
+          recoveryEyebrowOffline: "连接恢复",
+          recoveryTitle: "线程无法同步",
+          recoveryReachable: "Hub 健康检查可达，但工作流端点未返回线程 JSON。请在 API 或会话契约就绪后重试。",
+          recoveryOffline: "Hub 未返回交接队列。保持此页面打开，网络或会话恢复后重试。",
+          emptyTitle: "暂无线程",
+          emptyDescription: "从 Desktop 或 Web 启动线程后，可在这里继续。",
+          emptyFilterTitle: "没有{{filter}}线程",
+          emptyFilterDescription: "切换筛选以查看完整 Hub 交接队列。",
+        },
+        runs: {
+          title: "运行",
+          eyebrow: "执行监控",
+          overviewTitle: "最近活动",
+          refresh: "刷新运行",
+          metricActive: "活跃",
+          metricReview: "审阅",
+          signalOnline: "Hub 执行 API 在线",
+          signalPending: "Hub 可达；运行同步待完成",
+          signalOffline: "Hub 健康检查不可用",
+          refreshing: "正在刷新运行队列...",
+          nextReview: "下一项审阅",
+          nextReviewAria: "打开下一项审阅运行 {{runId}}",
+          runLabel: "运行 {{runId}}",
+          filters: "运行筛选",
+          loadingTitle: "正在加载运行",
+          loadingDescription: "正在同步最新 Hub 执行状态。",
+          recoveryEyebrowReachable: "工作流恢复",
+          recoveryEyebrowOffline: "执行恢复",
+          recoveryTitle: "运行队列无法同步",
+          recoveryReachable: "Hub 健康检查可达，但工作流端点未返回运行 JSON。请在 API 或会话契约就绪后重试。",
+          recoveryOffline: "最近执行状态不可用。审阅或操作来自其他设备的运行前请先重试。",
+          emptyTitle: "暂无最近运行",
+          emptyDescription: "从 Desktop、Web 或 Hub 启动的运行会出现在这里供移动端审阅。",
+          emptyFilterTitle: "没有{{filter}}运行",
+          emptyFilterDescription: "切换筛选以查看完整执行队列。",
+        },
+      },
+      surface: {
+        status: {
+          realSnapshot: {
+            label: "真实快照",
+            description: "来自已验证的实时响应或保留的服务快照。",
+          },
+          localSource: {
+            label: "本地来源",
+            description: "来自浏览器、工作区或本地配置状态。",
+          },
+          loginLocked: {
+            label: "需要 Hub 会话",
+            description: "需要 Hub 会话：外壳不会声称会话已激活，也不会显示假的私聊数据。",
+          },
+          interfaceGap: {
+            label: "接口缺口",
+            description: "入口可见，但客户端或接口接线尚未完成。",
+          },
+          error: {
+            label: "Edge 不可用/错误",
+            description: "这个客户端外壳没有连接到已验证的工作流来源。",
+          },
+          demoFallback: {
+            label: "演示兜底",
+            description: "真实来源不可用时，协作和项目预览数据会标注为演示内容。",
+          },
+          catalogFallback: {
+            label: "目录兜底",
+            description: "目录数据不可用，因此目录状态会明确标注为兜底。",
+          },
+        },
+        mobile: {
+          threads: {
+            label: "线程",
+            description: "Hub 交接队列，包含 Desktop 风格上下文和恢复状态。",
+          },
+          chat: {
+            label: "对话",
+            description: "选中线程的会话界面，包含移动端输入框和复制动作。",
+          },
+          runs: {
+            label: "运行",
+            description: "执行队列、审阅快捷入口、Diff、结构化块、输出和日志。",
+          },
+          account: {
+            label: "账户",
+            description: "TokenDance ID 登录、Hub 会话检查、语言、通知和客户端就绪状态。",
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+function normalizeLanguage(language?: string | null): MobileLanguage {
+  return language?.toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+function detectInitialLanguage(): MobileLanguage {
+  try {
+    const stored = window.localStorage.getItem(MOBILE_LANGUAGE_STORAGE_KEY);
+    if (stored === "en" || stored === "zh") {
+      return stored;
+    }
+  } catch {
+    // Ignore blocked storage and fall back to the platform language.
+  }
+  return normalizeLanguage(window.navigator.language);
+}
+
+void i18n
+  .use(initReactI18next)
+  .init({
+    resources,
+    lng: detectInitialLanguage(),
+    fallbackLng: "en",
+    interpolation: {
+      escapeValue: false,
+    },
+    returnNull: false,
+  });
+
+i18n.on("languageChanged", (language) => {
+  const normalized = normalizeLanguage(language);
+  document.documentElement.lang = normalized === "zh" ? "zh-Hans" : "en";
+  try {
+    window.localStorage.setItem(MOBILE_LANGUAGE_STORAGE_KEY, normalized);
+  } catch {
+    // Storage can be unavailable in restricted WebViews; language still changes in memory.
+  }
+});
+
+document.documentElement.lang = i18n.language === "zh" ? "zh-Hans" : "en";
+
+export { i18n };
