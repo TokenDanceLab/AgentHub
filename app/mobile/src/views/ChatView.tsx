@@ -3,7 +3,7 @@ import { AlertCircle, ArrowLeft, CheckCircle2, Code2, Copy, FileText, GitPullReq
 import type { Thread, ThreadItem } from "@agenthub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createThreadMessage, listThreadItems } from "@agenthub/shared";
-import { ActivityCard, ContextSummary, StatusNotice } from "@agenthub/shared/ui";
+import { ActivityCard, ContextSummary, MessageBubble, StatusNotice } from "@agenthub/shared/ui";
 import { useTranslation } from "react-i18next";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
 
@@ -91,27 +91,29 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
     const isUser = item.role === "user";
 
     return (
-      <article
+      <MessageBubble
         key={item.id}
         className={`mobileMessageRow${isUser ? " mobileMessageRowUser" : ""}`}
+        bubbleClassName={`mobileMessage ${isUser ? "mobileUserMsg" : "mobileAgentMsg"}`}
+        metaClassName="mobileMessageMeta"
+        actionsClassName="mobileMessageActions"
+        align={isUser ? "end" : "start"}
+        author={isUser ? t("chat.participants.user") : t("chat.participants.agent")}
+        timestamp={new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        actions={(
+          <button
+            className="mobileMessageAction"
+            type="button"
+            onClick={() => void copyContent(item)}
+            aria-label={isUser ? t("chat.actions.copyUser") : t("chat.actions.copyAgent")}
+          >
+            <Copy size={14} />
+            <span>{copiedItemId === item.id ? t("chat.actions.copied") : t("chat.actions.copy")}</span>
+          </button>
+        )}
       >
-        <div className={`mobileMessage ${isUser ? "mobileUserMsg" : "mobileAgentMsg"}`}>
-          <div className="mobileMessageMeta">
-            <strong>{isUser ? t("chat.participants.user") : t("chat.participants.agent")}</strong>
-            <time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
-            <button
-              className="mobileMessageAction"
-              type="button"
-              onClick={() => void copyContent(item)}
-              aria-label={isUser ? t("chat.actions.copyUser") : t("chat.actions.copyAgent")}
-            >
-              <Copy size={14} />
-              <span>{copiedItemId === item.id ? t("chat.actions.copied") : t("chat.actions.copy")}</span>
-            </button>
-          </div>
-          <p>{item.content}</p>
-        </div>
-      </article>
+        {item.content}
+      </MessageBubble>
     );
   }
 
@@ -213,21 +215,22 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
         <div className="mobileMessageList">
           {visibleItems.map(renderItem)}
           {localReply && (
-            <article className="mobileMessageRow mobileMessageRowUser">
-              <div className={`mobileMessage mobileUserMsg${localReply.status === "sending" ? " mobilePendingMsg" : ""}${localReply.status === "failed" ? " mobileFailedMsg" : ""}`}>
-                <div className="mobileMessageMeta">
-                  <strong>{t("chat.participants.user")}</strong>
-                  <time>
-                    {localReply.status === "sending"
-                      ? t("chat.actions.sending")
-                      : localReply.status === "failed"
-                        ? t("chat.actions.notSent")
-                        : t("chat.actions.sent")}
-                  </time>
-                </div>
-                <p>{localReply.content}</p>
-              </div>
-            </article>
+            <MessageBubble
+              className="mobileMessageRow mobileMessageRowUser"
+              bubbleClassName={`mobileMessage mobileUserMsg${localReply.status === "sending" ? " mobilePendingMsg" : ""}${localReply.status === "failed" ? " mobileFailedMsg" : ""}`}
+              metaClassName="mobileMessageMeta"
+              align="end"
+              author={t("chat.participants.user")}
+              timestamp={
+                localReply.status === "sending"
+                  ? t("chat.actions.sending")
+                  : localReply.status === "failed"
+                    ? t("chat.actions.notSent")
+                    : t("chat.actions.sent")
+              }
+            >
+              {localReply.content}
+            </MessageBubble>
           )}
           <div ref={latestRef} aria-hidden="true" />
         </div>
