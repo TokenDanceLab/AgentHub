@@ -32,6 +32,12 @@ describe('LoginForm', () => {
 
   it('renders the TokenDance ID primary login only', () => {
     renderForm();
+<<<<<<< HEAD
+=======
+    expect(screen.getByText('auth.tokenDanceLogin')).toBeInTheDocument();
+    expect(screen.getByText('auth.tokenDanceLogin').closest('button')?.querySelector('img')).toBeInTheDocument();
+  });
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
     expect(screen.getByText('auth.tokenDancePrimary')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'auth.tokenDanceLogin' })).toBeInTheDocument();

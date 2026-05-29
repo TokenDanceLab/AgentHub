@@ -21,10 +21,23 @@ import { useHubAgentTeams, type AgentTeamOverview } from '@/api/agentTeamQueries
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useModelsDevDisplayNames } from '@/api/modelsDevCatalog';
 import { createHubClient } from '@/api/hubClient';
+<<<<<<< HEAD
 import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useThreads } from '@/api/threadQueries';
 import { createThread } from '@/api/edgeClient';
+=======
+import {
+  startRun,
+  cancelRun,
+  createThread,
+  renameThread,
+  decidePermission as decidePermissionRest,
+} from '@/api/edgeClient';
+import { useThreads, useThreadMessages } from '@/api/threadQueries';
+import { useRuns } from '@/api/runQueries';
+import { useHubExecutionTargets } from '@/api/executionTargetQueries';
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useHubEventStream } from '@/hooks/useHubEventStream';
 import { useHubIntegration } from '@/hooks/useHubIntegration';
@@ -93,6 +106,7 @@ import {
 import { resolveThreadSelectionId, type ThreadSelectionInput } from '@/utils/threadSelection';
 import { resolveTopMenuClickState, type TopMenuId } from '@/utils/topMenuState';
 import { buildAutomaticThreadTitle, canAutoRenameThreadTitle, getAutomaticThreadTitle } from '@/utils/threadTitle';
+<<<<<<< HEAD
 import {
   addRecentWorkspace,
   setSavedWorkDir,
@@ -107,6 +121,8 @@ import {
   type WorkspaceEntry,
 } from '@/utils/workspaceStore';
 import { useGitStatus } from '@/hooks/useGitStatus';
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '@/App.module.css';
 
@@ -333,7 +349,52 @@ export default function App() {
   const hubAuth = useAuth();
 
   const { data: threadData } = useThreads();
+<<<<<<< HEAD
   const threads = useMemo(() => threadData?.items ?? [], [threadData?.items]);
+=======
+  const threads = threadData?.items ?? [];
+  const pendingCreatedThreadIdsRef = useRef<Set<string>>(new Set());
+  const emptyCreatedThreadIdsRef = useRef<Set<string>>(new Set());
+  const manuallyNamedThreadIdsRef = useRef<Set<string>>(new Set());
+  const silentCreatedThreadToastIdsRef = useRef<Set<string>>(new Set());
+  const addThreadToCache = useCallback((thread: ThreadInfo, opts?: { suppressCreatedToast?: boolean; empty?: boolean }) => {
+    pendingCreatedThreadIdsRef.current.add(thread.threadId);
+    if (opts?.empty) {
+      emptyCreatedThreadIdsRef.current.add(thread.threadId);
+    }
+    if (opts?.suppressCreatedToast) {
+      silentCreatedThreadToastIdsRef.current.add(thread.threadId);
+    }
+    queryClient.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
+      if (!current) return current;
+      if (current.items.some((item) => item.threadId === thread.threadId)) return current;
+      return { ...current, items: [thread, ...current.items] };
+    });
+  }, [queryClient]);
+  const updateThreadInCache = useCallback((thread: ThreadInfo) => {
+    queryClient.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
+      if (!current) return current;
+      let found = false;
+      const items = current.items.map((item) => {
+        if (item.threadId !== thread.threadId) return item;
+        found = true;
+        return { ...item, ...thread };
+      });
+      return { ...current, items: found ? items : [thread, ...items] };
+    });
+  }, [queryClient]);
+  const setThreadTitleInCache = useCallback((threadId: string, title: string) => {
+    queryClient.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        items: current.items.map((thread) =>
+          thread.threadId === threadId ? { ...thread, title } : thread,
+        ),
+      };
+    });
+  }, [queryClient]);
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
@@ -352,7 +413,23 @@ export default function App() {
   const activeThreadId = resolveThreadSelectionId(selectedThreadId as ThreadSelectionInput);
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online, activeThreadId);
   const { data: agentData } = useAgentList(online);
+<<<<<<< HEAD
   const agents = useMemo(() => agentData?.items ?? [], [agentData?.items]);
+=======
+  const agents = agentData?.items ?? [];
+  const modelCatalogQuery = useModelCatalog(online);
+  const modelsDevDisplayNamesQuery = useModelsDevDisplayNames(true);
+  const agentTeamSummary = useMemo(
+    () => summarizeAgentTeamOverview(agentTeamsQuery.data),
+    [agentTeamsQuery.data],
+  );
+  const teamRunBadgeCount = agentTeamSummary.blockingCount || agentTeamSummary.activeRuns;
+  const teamRunButtonLabel = agentTeamSummary.blockingCount > 0
+    ? t('workspace.teamRunsWithBlocks', { count: agentTeamSummary.blockingCount })
+    : agentTeamSummary.activeRuns > 0
+      ? t('workspace.teamRunsActive', { count: agentTeamSummary.activeRuns })
+      : t('settings.agentScheduling');
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
   const [viewMode, setViewMode] = useState<'agent' | 'im' | 'teamrun'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
@@ -557,6 +634,31 @@ export default function App() {
   }, [agentSelectorOpen]);
 
   useEffect(() => {
+    if (!openTopMenu) return undefined;
+
+    const closeOnPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && topMenuRef.current?.contains(target)) return;
+      setOpenTopMenu(null);
+      setHoverOpenedTopMenu(null);
+      hoverOpenedTopMenuRef.current = null;
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpenTopMenu(null);
+      setHoverOpenedTopMenu(null);
+      hoverOpenedTopMenuRef.current = null;
+    };
+
+    window.addEventListener('pointerdown', closeOnPointerDown, true);
+    window.addEventListener('keydown', closeOnEscape, true);
+    return () => {
+      window.removeEventListener('pointerdown', closeOnPointerDown, true);
+      window.removeEventListener('keydown', closeOnEscape, true);
+    };
+  }, [openTopMenu]);
+
+  useEffect(() => {
     const node = workspaceRef.current;
     if (!node || typeof ResizeObserver === 'undefined') return;
 
@@ -623,7 +725,10 @@ export default function App() {
       if (agentId) req.agentId = agentId;
       if (requestThreadId) {
         req.threadId = requestThreadId;
+<<<<<<< HEAD
         req.sessionId = requestThreadId;
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       }
       setOptimisticRun({ runId: tempRunId, status: 'queued', outputText: '', toolCalls: [], changedFiles: [] });
       const started = await startRun(req);
@@ -738,6 +843,7 @@ export default function App() {
     }
   }, [addThreadToCache, agents, queryClient, setLeftSidebarView]);
 
+<<<<<<< HEAD
   const handleSwitchThreadAgent = useCallback((agentId: string) => {
     if (!activeThreadId) return;
     if (agentId === selectedAgentId) {
@@ -769,6 +875,8 @@ export default function App() {
     }
   }, [activeThreadId, agents, selectedAgentId, switchThreadAgent]);
 
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const handleStartLocalOrchestration = useCallback(async (agentId: string, draft: string) => {
     await handleSelectAgent(agentId);
     setViewMode('agent');
@@ -803,6 +911,7 @@ export default function App() {
     setSettingsOpen(true);
   }, []);
 
+<<<<<<< HEAD
   const openRunWorkbench = useCallback(() => {
     setLeftSidebarView('thread');
     setViewMode('agent');
@@ -817,6 +926,112 @@ export default function App() {
     setLeftSidebarView('thread');
     setViewMode('teamrun');
   }, [setLeftSidebarView]);
+=======
+  const handleOpenAuth = useCallback(() => {
+    useHubStore.getState().setShowAuthModal(true);
+  }, []);
+
+  const handleOpenHubAccount = useCallback(() => {
+    if (hubAuthenticated) {
+      openSettings('account');
+      return;
+    }
+    handleOpenAuth();
+  }, [handleOpenAuth, hubAuthenticated, openSettings]);
+
+  const desktopWindowAvailable = isTauriRuntime();
+  const handleWindowCommand = useCallback(async (command: 'minimize' | 'toggleMaximize' | 'close') => {
+    if (!desktopWindowAvailable) {
+      addToast({ type: 'info', message: t('menu.nativeWindowUnavailable') });
+      return;
+    }
+    try {
+      const windowHandle = getCurrentWindow();
+      if (command === 'minimize') {
+        await windowHandle.minimize();
+        return;
+      }
+      if (command === 'close') {
+        await windowHandle.close();
+        return;
+      }
+      (await windowHandle.isMaximized()) ? await windowHandle.unmaximize() : await windowHandle.maximize();
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addToast, desktopWindowAvailable, t]);
+
+  const handleOpenFolder = useCallback(async () => {
+    if (!desktopWindowAvailable) {
+      addToast({ type: 'info', message: t('prompt.browseWorkDirUnavailable') });
+      return;
+    }
+    try {
+      const selected = await (await import('@tauri-apps/plugin-dialog')).open({ directory: true, multiple: false });
+      const workDir = Array.isArray(selected) ? selected[0] : selected;
+      if (typeof workDir !== 'string' || !workDir.trim()) return;
+      window.localStorage.setItem('agenthub.prompt.workDir', workDir);
+      window.dispatchEvent(new CustomEvent('agenthub:workdir-selected', { detail: { workDir } }));
+      addToast({ type: 'success', message: t('toast.workDirSelected') });
+      focusComposer();
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addToast, desktopWindowAvailable, t]);
+
+  const handleEditCommand = useCallback((command: 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'selectAll') => {
+    const active = document.activeElement;
+    if (command === 'selectAll' && active instanceof HTMLInputElement) {
+      active.select();
+      return;
+    }
+    if (command === 'selectAll' && active instanceof HTMLTextAreaElement) {
+      active.select();
+      return;
+    }
+    const commandMap = {
+      undo: 'undo',
+      redo: 'redo',
+      cut: 'cut',
+      copy: 'copy',
+      paste: 'paste',
+      delete: 'delete',
+      selectAll: 'selectAll',
+    } as const;
+    try {
+      document.execCommand(commandMap[command]);
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addToast, t]);
+
+  const handleCopyDiagnostics = useCallback(async () => {
+    const diagnostic = [
+      'AgentHub Desktop diagnostics',
+      `Edge: ${online ? `online ${health?.version ?? 'v1'}` : 'offline'}`,
+      `WebSocket: ${isConnected ? 'connected' : 'disconnected'}`,
+      wsLatency != null ? `Latency: ${wsLatency}ms` : null,
+      selectedAgent ? `Agent: ${selectedAgent.name} (${selectedAgent.id})` : null,
+      selectedThread ? `Thread: ${selectedThread.threadId}` : null,
+      displayedRun ? `Run: ${displayedRun.runId} (${displayedRun.status})` : null,
+    ].filter(Boolean).join('\n');
+    try {
+      await navigator.clipboard.writeText(diagnostic);
+      addToast({ type: 'success', message: t('toast.copied') });
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addToast, displayedRun, health?.version, isConnected, online, selectedAgent, selectedThread, t, wsLatency]);
+
+  const handleReviewApprovalsFromHome = useCallback(() => {
+    if (permissionRequests.length === 0) {
+      openSettings('permissions');
+      return;
+    }
+    setLeftSidebarView('thread');
+    if (displayedRun) setRightPanelOpen(true);
+  }, [displayedRun, openSettings, permissionRequests.length, setLeftSidebarView, setRightPanelOpen]);
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   const handleStartResize = useCallback((side: 'left' | 'right') => (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -873,6 +1088,7 @@ export default function App() {
     }
   }, [addToast, decidePermission, permissionRequests, t]);
 
+<<<<<<< HEAD
   const handleReviewDecidePermission = useCallback(async (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
     const request = permissionRequests.find((item) => item.requestId === requestId);
     if (!request?.runId) {
@@ -894,6 +1110,57 @@ export default function App() {
     const prompt = msg.blocks.find((b) => b.kind === 'text')?.content;
     if (prompt) handleSend(prompt, selectedAgentId ?? undefined);
   }, [allMessages, handleSend, selectedAgentId]);
+=======
+  const handleRetry = useCallback(async (messageId?: string) => {
+    const retry = findRetryPrompt(allMessages, messageId);
+    if (!retry) {
+      addToast({ type: 'info', message: t('toast.retryNoPrompt') });
+      return;
+    }
+    await handleSend(retry.prompt, selectedAgentId ?? undefined);
+  }, [addToast, allMessages, handleSend, selectedAgentId, t]);
+
+  const handleForkThread = useCallback(async (messageId?: string) => {
+    try {
+      const sourceTitle = selectedThread?.title ?? selectedAgent?.name ?? 'AgentHub';
+      const forkTitle = `Fork: ${sourceTitle}`.slice(0, 96);
+      const thread = await createThread(forkTitle);
+      addThreadToCache(thread, { suppressCreatedToast: true });
+      if (selectedAgent?.id) {
+        selectAgentThread(selectedAgent.id, thread.threadId);
+        setUserMessages([]);
+        setLeftSidebarView('thread');
+      } else {
+        handleSelectThread(thread.threadId);
+      }
+      queryClient.invalidateQueries({ queryKey: ['threads'] });
+      const draft = buildForkDraft({
+        sourceTitle,
+        sourceThreadId: selectedThread?.threadId ?? activeThreadId ?? undefined,
+        messages: allMessages,
+        messageId,
+      });
+      setPendingComposerDraft(draft);
+      addToast({ type: 'success', message: t('toast.forkCreated') });
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [
+    activeThreadId,
+    addThreadToCache,
+    addToast,
+    allMessages,
+    handleSelectThread,
+    queryClient,
+    selectAgentThread,
+    selectedAgent?.id,
+    selectedAgent?.name,
+    selectedThread?.threadId,
+    selectedThread?.title,
+    setLeftSidebarView,
+    t,
+  ]);
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
   const handleDelete = useCallback((messageId: string) => {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
@@ -1170,7 +1437,27 @@ export default function App() {
         e.preventDefault();
         setShortcutHelpOpen((v) => !v);
       }
+<<<<<<< HEAD
       if (matchesBinding(e, getBinding('toggleSidebar')) && !workspaceExpanded && !isMobile) {
+=======
+      if (shellModifier && e.altKey && e.key.toLowerCase() === 'n' && online) {
+        e.preventDefault();
+        void handleQuickChat();
+      } else if (shellModifier && e.key.toLowerCase() === 'n' && online) {
+        e.preventDefault();
+        void handleCreateThread();
+      } else if (shellModifier && e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        void handleOpenFolder();
+      } else if (shellModifier && e.key === ',') {
+        e.preventDefault();
+        openSettings('general');
+      } else if (shellModifier && e.key.toLowerCase() === 'w') {
+        e.preventDefault();
+        void handleWindowCommand('close');
+      }
+      if (shellModifier && e.key.toLowerCase() === 'b' && !workspaceExpanded && !isMobile) {
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
         e.preventDefault();
         setLeftSidebarCollapsed(!leftSidebarCollapsed);
       }
@@ -1520,6 +1807,7 @@ export default function App() {
             {/* Workspace header */}
             <div className={styles.workspaceHeader}>
               <div className={`${styles.workspaceHeaderDot} ${online ? styles.workspaceHeaderDotOnline : styles.workspaceHeaderDotOffline}`} />
+<<<<<<< HEAD
               {/* Git status badge */}
               {gitStatus.status && (
                 <div className={styles.gitBranchBadge} title={
@@ -1596,6 +1884,9 @@ export default function App() {
                   </div>
                 )}
               </div>
+=======
+              <h2>{selectedAgent ? selectedAgent.name : 'AgentHub'}</h2>
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
               {selectedThread && <span className={styles.workspaceThreadTitle}>{selectedThread.title}</span>}
               <div className={styles.workspaceHeaderActions}>
                 <ShellIconButton
@@ -1721,10 +2012,20 @@ export default function App() {
                   onOpenTeamRuns={() => openSettings('agentScheduling')}
                   onOpenHubAccount={handleOpenHubAccount}
                   permissionCount={permissionRequests.length}
+<<<<<<< HEAD
                   onOpenTeamRuns={openTeamRunConsole}
                   onOpenRuns={openRunWorkbench}
                   onOpenApprovals={openRunWorkbench}
                   onOpenAuth={() => useHubStore.getState().setShowAuthModal(true)}
+=======
+                  agentTeamOverview={agentTeamsQuery.data}
+                  agentTeamsLoading={agentTeamsQuery.isLoading || agentTeamsQuery.isFetching}
+                  agentTeamsSignedIn={hubInventoryEnabled}
+                  agents={agents}
+                  selectedAgentId={selectedAgentId ?? undefined}
+                  onSelectAgent={handleSelectAgent}
+                  onStartLocalOrchestration={handleStartLocalOrchestration}
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
                 />
               ) : viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
@@ -1792,6 +2093,7 @@ export default function App() {
       {/* Modals */}
       <Suspense fallback={null}>
         <Slot name="search-dialog" messages={allMessages} threads={threads} onSelect={handleSearchMessageSelect} onSelectThread={handleSearchThreadSelect} />
+<<<<<<< HEAD
       </Suspense>
       <Suspense fallback={null}>
         <Slot
@@ -1802,6 +2104,8 @@ export default function App() {
           open={fileSearchOpen}
           onClose={() => setFileSearchOpen(false)}
         />
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       </Suspense>
       <Slot name="permission-dialog" requests={permissionRequests} onDecide={handleDecidePermission} />
       <Slot name="shortcut-help" open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} onNavigateToKeyboard={() => openSettings('keyboard')} />
