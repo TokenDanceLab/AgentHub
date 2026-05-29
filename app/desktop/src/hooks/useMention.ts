@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import type { AgentInfo } from '@shared/types';
 
 export interface MentionState {
@@ -147,11 +147,6 @@ export function useMention({ agents, onSelectAgent }: UseMentionOptions): UseMen
 
   const filteredAgents = filterAgents(agents, query);
 
-  // Reset selectedIndex when filtered list changes
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
-
   const closeMention = useCallback(() => {
     setIsOpen(false);
     setQuery('');
@@ -167,6 +162,7 @@ export function useMention({ agents, onSelectAgent }: UseMentionOptions): UseMen
 
     if (mention) {
       setQuery(mention.query);
+      setSelectedIndex(0);
       setIsOpen(true);
       // Compute position after a frame so textarea layout is up to date
       requestAnimationFrame(() => {

@@ -1,9 +1,9 @@
-import { lazy, type ComponentType } from 'react';
+import { lazy } from 'react';
 import { MessageSquare, Bot, PanelRight, Search, Keyboard, Shield, Users, GitBranch } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /** Slot in the layout shell that views can occupy. */
-export type ViewSlot = 'sidebar' | 'centerSidebar' | 'center' | 'rightPanel' | 'agentOverlay' | 'modal';
+export type ViewSlot = 'shell' | 'sidebar' | 'centerSidebar' | 'center' | 'rightPanel' | 'agentOverlay' | 'modal';
 
 /**
  * Standardized props that every registered view component can receive.
@@ -23,7 +23,7 @@ export interface ViewConfig {
   /** Unique identifier; doubles as route key or slot selector. */
   id: string;
   /** The React component that renders this view. */
-  component: ComponentType<any>;
+  component: unknown;
   /** Which layout zone this view occupies. */
   slot: ViewSlot;
   /** Visible on mobile (< 768px). */
@@ -43,7 +43,6 @@ export interface ViewConfig {
 // ═══════════════════════════════════════════════════════════════════
 
 // Lazy imports
-const ChatView = lazy(() => import('@/components/ChatView'));
 const RunDetail = lazy(() => import('@/components/RunDetail'));
 const SearchDialog = lazy(() => import('@/components/SearchDialog'));
 const IMView = lazy(() => import('@/views/IMView'));
@@ -63,7 +62,7 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
   'status-bar': {
     id: 'status-bar',
     component: StatusBar,
-    slot: 'shell' as ViewSlot,
+    slot: 'shell',
     showOnMobile: true,
     showOnTablet: true,
     icon: Shield,
@@ -99,7 +98,7 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
   'prompt-input': {
     id: 'prompt-input',
     component: PromptInput,
-    slot: 'shell' as ViewSlot,
+    slot: 'shell',
     showOnMobile: true,
     showOnTablet: true,
     icon: MessageSquare,

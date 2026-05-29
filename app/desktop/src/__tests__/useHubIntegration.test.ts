@@ -51,9 +51,9 @@ const hoisted = vi.hoisted(() => {
     removeTask: (taskId: string) => {
       const task = storeTasks.find((t) => t.taskId === taskId);
       if (task?.runId) {
-        const next = { ...storeRunToTask };
-        delete next[task.runId];
-        storeRunToTask = next;
+        storeRunToTask = Object.fromEntries(
+          Object.entries(storeRunToTask).filter(([runId]) => runId !== task.runId),
+        );
       }
       if (task?.status !== 'done' && task?.status !== 'failed') {
         storeTasks = storeTasks.filter((t) => t.taskId !== taskId);
@@ -136,6 +136,19 @@ function makeDispatchPayload(overrides: Record<string, unknown> = {}): Record<st
 
 type HubEventHandler = (payload: unknown) => void;
 
+function edgeRunResponse(runId = 'run-1', threadId = 'sess-1') {
+  return new Response(
+    JSON.stringify({
+      id: runId,
+      runId,
+      projectId: 'proj-1',
+      threadId,
+      status: 'started',
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  );
+}
+
 describe('useHubIntegration', () => {
   let hubWS: HubWSHandle;
   let hubClient: HubClient;
@@ -186,24 +199,19 @@ describe('useHubIntegration', () => {
       registerDevice: vi.fn().mockResolvedValue({ id: 'dev-1' }),
       ackTask: vi.fn().mockResolvedValue(undefined),
       streamTask: vi.fn().mockResolvedValue(undefined),
+      streamTaskEvent: vi.fn().mockResolvedValue(undefined),
       doneTask: vi.fn().mockResolvedValue(undefined),
       failTask: vi.fn().mockResolvedValue(undefined),
       postTeamRouteDecision: vi.fn().mockResolvedValue({ id: 'assignment-1' }),
     } as unknown as HubClient;
 
     // Mock fetch for Edge REST calls
-    fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          id: 'run-1',
-          runId: 'run-1',
-          projectId: 'proj-1',
-          threadId: 'sess-1',
-          status: 'started',
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    );
+    fetchMock = vi.fn((url: string) => {
+      if (url.endsWith('/v1/threads')) {
+        return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      return Promise.resolve(edgeRunResponse());
+    });
     globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
   });
 
@@ -220,6 +228,12 @@ describe('useHubIntegration', () => {
     for (const fn of hoisted.edgeHandlers) {
       fn(event);
     }
+  }
+
+  function getRunPostBody() {
+    const runCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/v1/runs'));
+    expect(runCall).toBeTruthy();
+    return JSON.parse(runCall![1].body);
   }
 
   // ── agent.dispatch → Edge run ──────────────────────────
@@ -242,7 +256,7 @@ describe('useHubIntegration', () => {
         headers: { 'Content-Type': 'application/json' },
       }),
     );
-    const fetchBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const fetchBody = getRunPostBody();
     expect(fetchBody.threadId).toBe('sess-1');
     expect(fetchBody.agentId).toBe('claude-code');
   });
@@ -302,7 +316,12 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'Hello' }));
     });
 
-    expect(hubClient.streamTask).toHaveBeenCalledWith('task-1', 'Hello', 'run-1');
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledWith(
+      'task-1',
+      'run.agent.text_delta',
+      { runId: 'run-1', content: 'Hello' },
+      { runId: 'run-1' },
+    );
   });
 
   it('posts supervisor route decisions from typed Edge events to Hub TeamRun', async () => {
@@ -501,7 +520,7 @@ describe('useHubIntegration', () => {
       fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'unknown-run', content: 'x' }));
     });
 
-    expect(hubClient.streamTask).not.toHaveBeenCalled();
+    expect(hubClient.streamTaskEvent).not.toHaveBeenCalled();
   });
 
   it('keeps terminal task records after result while clearing run mapping', async () => {
@@ -587,31 +606,14 @@ describe('useHubIntegration', () => {
   // ── Concurrent tasks ──────────────────────────────────
 
   it('handles concurrent agent.dispatch events independently', async () => {
-    fetchMock
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'run-A',
-            runId: 'run-A',
-            projectId: 'proj',
-            threadId: 'sess-A',
-            status: 'started',
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'run-B',
-            runId: 'run-B',
-            projectId: 'proj',
-            threadId: 'sess-B',
-            status: 'started',
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      );
+    const runIds = ['run-A', 'run-B'];
+    fetchMock.mockImplementation((url: string) => {
+      if (url.endsWith('/v1/threads')) {
+        return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      const runId = runIds.shift() ?? 'run-extra';
+      return Promise.resolve(edgeRunResponse(runId, runId === 'run-A' ? 'sess-A' : 'sess-B'));
+    });
 
     const { result } = renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),
@@ -628,17 +630,18 @@ describe('useHubIntegration', () => {
     expect(result.current.getTaskByRunId('run-B')?.taskId).toBe('task-B');
     expect(hubClient.ackTask).toHaveBeenCalledWith('task-A', 'run-A');
     expect(hubClient.ackTask).toHaveBeenCalledWith('task-B', 'run-B');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it('cleans up mapping for one task without affecting others', async () => {
-    fetchMock
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ id: 'run-A', runId: 'run-A', projectId: 'proj', threadId: 'sess-A', status: 'started' }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ id: 'run-B', runId: 'run-B', projectId: 'proj', threadId: 'sess-B', status: 'started' }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
-      );
+    const runIds = ['run-A', 'run-B'];
+    fetchMock.mockImplementation((url: string) => {
+      if (url.endsWith('/v1/threads')) {
+        return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      const runId = runIds.shift() ?? 'run-extra';
+      return Promise.resolve(edgeRunResponse(runId, runId === 'run-A' ? 'sess-A' : 'sess-B'));
+    });
 
     renderHook(() =>
       useHubIntegration({ hubWS, hubClient }),
@@ -679,7 +682,12 @@ describe('useHubIntegration', () => {
     act(() => {
       fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'late' }));
     });
-    expect(hubClient.streamTask).not.toHaveBeenCalled();
+    expect(hubClient.streamTaskEvent).not.toHaveBeenCalledWith(
+      'task-1',
+      'run.agent.text_delta',
+      { runId: 'run-1', content: 'late' },
+      { runId: 'run-1' },
+    );
   });
 
   // ── Edge cases ────────────────────────────────────────
@@ -708,7 +716,7 @@ describe('useHubIntegration', () => {
       );
     });
 
-    const fetchBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const fetchBody = getRunPostBody();
     expect(fetchBody.model).toBe('claude-sonnet-4-6');
   });
 
@@ -724,7 +732,7 @@ describe('useHubIntegration', () => {
       );
     });
 
-    const fetchBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const fetchBody = getRunPostBody();
     expect(fetchBody.model).toBeUndefined();
   });
 

@@ -10,7 +10,7 @@ interface IMMessageViewProps {
   currentUserId?: string;
   canRecall?: boolean;
   recallingMessageIds?: Record<string, boolean>;
-  onRecallMessage?: (message: IMMessage) => void | Promise<unknown>;
+  onRecallMessage?: (message: IMMessage) => undefined | Promise<unknown>;
 }
 
 function formatTime(timestamp: string): string {
@@ -80,7 +80,7 @@ const IMMessageBubble = memo(function IMMessageBubble({
   isOwn: boolean;
   canRecall: boolean;
   recalling: boolean;
-  onRecallMessage?: (message: IMMessage) => void | Promise<unknown>;
+  onRecallMessage?: (message: IMMessage) => undefined | Promise<unknown>;
 }) {
   const { t } = useTranslation();
   const label = (key: string, fallback: string, vars?: Record<string, unknown>) => {

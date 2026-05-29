@@ -5,7 +5,7 @@ import styles from './IMMessageInput.module.css';
 const MAX_CHARS = 2000;
 
 interface IMMessageInputProps {
-  onSend: (content: string) => boolean | void | Promise<boolean | void>;
+  onSend: (content: string) => boolean | undefined | Promise<boolean | undefined>;
   disabled?: boolean;
   placeholder?: string;
 }
