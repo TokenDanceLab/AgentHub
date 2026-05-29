@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { ThreadInfo } from '@shared/types';
 import { useThreads, useRenameThread, useDeleteThread, useCreateThread } from '@/api/threadQueries';
 import { useToastStore } from '@/stores/toastStore';
-import { EmptyState } from '@shared/ui';
+import { EmptyState, SelectableRow } from '@shared/ui';
 import styles from './ThreadPanel.module.css';
 
 /** ThreadInfo with optional count metadata the Edge may return. */
@@ -273,41 +273,52 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect }: Props
             const hasUnread = ext.runCount != null && ext.runCount > 0 && th.threadId !== selectedId;
 
             return (
-              <li key={th.threadId} className={styles.itemRow}>
-                <button
-                  className={`${styles.item} ${th.threadId === selectedId ? styles.selected : ''}`}
-                  onClick={() => onSelect(th)}
-                >
-                  {hasUnread && <span className={styles.unreadDot} />}
-                  <MessageSquare size={14} />
-                  <div className={styles.itemInfo}>
-                    <div className={styles.name} title={displayTitle}>{displayTitle}</div>
-                    <div className={styles.meta}>
+              <li key={th.threadId}>
+                <SelectableRow
+                  className={styles.itemRow}
+                  buttonClassName={styles.item}
+                  selectedClassName={styles.selected}
+                  leadingClassName={styles.unreadDotWrap}
+                  iconClassName={styles.itemIcon}
+                  bodyClassName={styles.itemInfo}
+                  titleClassName={styles.name}
+                  metaClassName={styles.meta}
+                  actionsClassName={styles.actions}
+                  selected={th.threadId === selectedId}
+                  ariaLabel={displayTitle}
+                  onSelect={() => onSelect(th)}
+                  leading={hasUnread ? <span className={styles.unreadDot} /> : null}
+                  icon={<MessageSquare size={14} />}
+                  title={<span title={displayTitle}>{displayTitle}</span>}
+                  meta={(
+                    <>
                       {relativeTime(th.updatedAt, t)}
                       {count && <span className={styles.count}>{` · ${count}`}</span>}
-                    </div>
-                  </div>
-                </button>
-                <div className={styles.actions}>
-                  <button
-                    className={styles.actionBtn}
-                    onClick={(e) => handleStartEdit(e, th)}
-                    title={t('thread.rename')}
-                    aria-label={t('thread.rename')}
-                    disabled={!online}
-                  >
-                    <Pencil size={12} />
-                  </button>
-                  <button
-                    className={styles.actionBtn}
-                    onClick={(e) => handleStartDelete(e, th.threadId)}
-                    title={t('thread.delete')}
-                    aria-label={t('thread.delete')}
-                    disabled={!online}
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
+                    </>
+                  )}
+                  actions={(
+                    <>
+                      <button
+                        className={styles.actionBtn}
+                        onClick={(e) => handleStartEdit(e, th)}
+                        title={t('thread.rename')}
+                        aria-label={t('thread.rename')}
+                        disabled={!online}
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        className={styles.actionBtn}
+                        onClick={(e) => handleStartDelete(e, th.threadId)}
+                        title={t('thread.delete')}
+                        aria-label={t('thread.delete')}
+                        disabled={!online}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </>
+                  )}
+                />
               </li>
             );
           })}
