@@ -523,6 +523,15 @@ async function visitAndCapture(page, scene) {
     if ((await targetThread.count()) > 0) {
       await targetThread.first().click();
     }
+    const openRunDetail = page.getByRole("button", { name: "Open run detail" });
+    if ((await openRunDetail.count()) > 0) {
+      await openRunDetail.first().click();
+    }
+    await page.getByRole("complementary", { name: "Run Detail" }).waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("1% of 200.0K context used").waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("1.4K", { exact: true }).first().waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("318", { exact: true }).first().waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("1.7K", { exact: true }).first().waitFor({ state: "visible", timeout: 5000 });
     await page.getByRole("button", { name: /Bash completed/i }).waitFor({ state: "visible", timeout: 5000 });
     await page.getByRole("button", { name: /Bash completed/i }).click();
     await page.getByText("Web visual QA passed (10 scenes)").waitFor({ state: "visible", timeout: 5000 });
