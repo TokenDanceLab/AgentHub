@@ -27,3 +27,5 @@ export { SurfaceHeader } from './SurfaceHeader';
 export type { SurfaceHeaderProps, SurfaceHeaderStatus } from './SurfaceHeader';
 export { ActionList } from './ActionList';
 export type { ActionListItem, ActionListProps } from './ActionList';
+export { TriageCard } from './TriageCard';
+export type { TriageCardProps } from './TriageCard';
