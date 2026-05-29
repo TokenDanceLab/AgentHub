@@ -9,6 +9,7 @@ import {
   sendMobileNotificationProbe,
   startMobileOidcLogin,
 } from "../native/mobileCommands";
+import tokenDanceLogo from "../assets/tokendance-icon-rounded.svg";
 
 type NativeStatusKey =
   | "settings.status.idle"
@@ -99,9 +100,20 @@ export function AccountView() {
 
       <div className="mobileScroll">
         <div className="mobileSettingStack">
-          <section className="mobileSettingCard">
-            <h3>{t("settings.account.title")}</h3>
-            <p>{t("settings.account.description")}</p>
+          <section className="mobileAccountIdentityPanel" aria-label={t("settings.account.title")}>
+            <div className="mobileAccountIdentityHeader">
+              <img className="mobileAccountIdentityLogo" src={tokenDanceLogo} alt="TokenDance" />
+              <div className="mobileAccountIdentityCopy">
+                <p className="mobileEyebrow">{t("settings.account.title")}</p>
+                <h2>{t("common.appName")}</h2>
+                <span>{t("settings.account.description")}</span>
+              </div>
+            </div>
+            <div className="mobileAccountIdentityMeta" aria-label={t("settings.readiness.aria")}>
+              <span>{t("settings.readiness.tokenDanceId")}</span>
+              <span>{t("settings.readiness.secureStore")}</span>
+              <span>{t("settings.status.nativeAction")}</span>
+            </div>
             <div className="mobileSettingActions">
               <button
                 className="mobileActionButton"

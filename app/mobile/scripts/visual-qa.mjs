@@ -881,6 +881,14 @@ async function waitForAccountHeading(page, heading = /Account|账户/) {
 }
 
 async function assertAccountReadiness(page, fileName) {
+  await page.locator(".mobileAccountIdentityPanel img[alt='TokenDance']").waitFor({ timeout: 5000 });
+  const identityChips = await page.locator(".mobileAccountIdentityMeta span").count();
+  if (identityChips !== 3) {
+    throw new Error(`${fileName}: expected 3 Account identity chips, got ${identityChips}`);
+  }
+  await page.locator(".mobileAccountIdentityPanel").filter({ hasText: /AgentHub Mobile/ }).waitFor({ timeout: 5000 });
+  await page.locator(".mobileAccountIdentityPanel").filter({ hasText: /TokenDance ID/ }).waitFor({ timeout: 5000 });
+
   const readinessRows = await page.locator(".mobileReadinessRow").count();
   if (readinessRows !== 3) {
     throw new Error(`${fileName}: expected 3 dense Account readiness rows, got ${readinessRows}`);
