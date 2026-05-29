@@ -50,7 +50,6 @@ src/
   App.tsx                         # Mobile route state and tab dispatch
   components/
     BottomNav.tsx                 # 4-tab mobile navigation
-    MobileEmptyState.tsx          # Shared Mobile empty state
     MobileRecoveryPanel.tsx       # Shared Mobile Hub/API recovery state
   hooks/
     useHubSocket.ts               # Hub WebSocket hook with reconnect/backoff
@@ -68,6 +67,8 @@ src/
   styles/
     global.css                    # TokenDance tokens and Mobile semantic classes
 ```
+
+Mobile empty states consume `@agenthub/shared/ui` `EmptyState` with Mobile glass/touch-target class overrides, so Chat root and Web empty states share one component contract.
 
 ## Verification
 
