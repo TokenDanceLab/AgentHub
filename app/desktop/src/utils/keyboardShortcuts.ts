@@ -55,6 +55,7 @@ export const KEYBOARD_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
 ];
 
 export const KEYBOARD_SHORTCUTS = KEYBOARD_SHORTCUT_GROUPS.flatMap((group) => group.shortcuts);
+<<<<<<< HEAD
 
 // ---------------------------------------------------------------------------
 // Custom keybinding persistence
@@ -199,3 +200,5 @@ export function deriveKeysFromEvent(e: KeyboardEvent): string[] | null {
 
   return parts;
 }
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)

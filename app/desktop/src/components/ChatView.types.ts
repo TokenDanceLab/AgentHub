@@ -33,7 +33,11 @@ export type MessageBlock =
       status: 'pending' | 'running' | 'draining' | 'completed' | 'failed';
       children?: ToolResultBlock[];
     }
+<<<<<<< HEAD
   | { kind: 'file_change'; path: string; action: 'created' | 'modified' | 'deleted'; diff?: string; structuredDiff?: FileDiff }
+=======
+  | { kind: 'file_change'; path: string; action: 'created' | 'modified' | 'deleted'; diff?: string }
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   | {
       kind: 'agent_task';
       taskId: string;
@@ -84,6 +88,7 @@ export type MessageBlock =
       model?: string;
       provider?: string;
       variant?: 'usage' | 'warning' | 'compaction';
+<<<<<<< HEAD
     }
   | {
       kind: 'error';
@@ -164,6 +169,8 @@ export type MessageBlock =
       description?: string | undefined;
       thumbnailUrl?: string | undefined;
       siteName?: string | undefined;
+=======
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     };
 
 // Tool result subtypes (nested under tool_use, 参考: Cline DiffEditRow 双格式)

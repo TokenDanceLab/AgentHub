@@ -7,7 +7,7 @@
 
 /* ── Dark Theme : Codex-style Linear Glass ───────────────────────────────
    Source target: codex-theme-v1 / linear / dark
-   accent #5d68cc, surface #25252d, ink #e3e4e6.
+   accent #5d68cc, surface #25252d, ink #d7d9e1.
    Purple is not the default atmosphere; reserve it for explicit semantic
    states such as skills or local product accents.
    ───────────────────────────────────────────────────────────────────── */
@@ -15,19 +15,23 @@
   /* Base layer — deep charcoal, not pure black */
   --app-bg: #1f1f27;
   --background: #1f1f27;
-  --foreground: #e3e4e6;
+  --foreground: #d7d9e1;
 
   /* Cards — Codex-style translucent glass over the dark workspace */
   --card: #25252d;
-  --card-foreground: #e3e4e6;
+  --card-foreground: #d7d9e1;
   --popover: #30303a;
-  --popover-foreground: #e3e4e6;
+  --popover-foreground: #d7d9e1;
 
   /* Primary — linear Codex blue, not the old purple atmosphere */
   --primary: #5d68cc;
   --primary-foreground: #f4f5ff;
   --secondary: rgba(255, 255, 255, 0.055);
+<<<<<<< HEAD
   --secondary-foreground: #e3e4e6;
+=======
+  --secondary-foreground: #d7d9e1;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   --muted: rgba(255, 255, 255, 0.042);
   --muted-foreground: #a2a6b1;
   --accent: #5d68cc;
@@ -87,7 +91,11 @@
   --hover-overlay: rgba(255, 255, 255, 0.04);
 
   --text-strong: #f0f2f7;
+<<<<<<< HEAD
   --text-primary: #e3e4e6;
+=======
+  --text-primary: #d7d9e1;
+>>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   --text-weaker: #858a96;
   --text-weakest: #656a75;
 
