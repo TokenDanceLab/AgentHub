@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { UserCircle, LockKeyhole, Globe2, Monitor, Route, LogOut, LogIn } from 'lucide-react';
+import { UserCircle, LockKeyhole, Globe2, Monitor, Route, LogOut } from 'lucide-react';
 import Panel from '../primitives/Panel';
 import SettingRow from '../primitives/SettingRow';
 import SummaryCard from '../primitives/SummaryCard';
@@ -43,7 +43,7 @@ export default function AccountSection({
         {hubSessionActive ? (
           <button className={styles.secondaryBtn} onClick={onSignOut}><LogOut size={16} />{t('settings.signOut')}</button>
         ) : (
-          <button className={styles.primaryBtn} onClick={onOpenAuth}><LogIn size={16} />{t('settings.signIn')}</button>
+          <button className={styles.primaryBtn} onClick={onOpenAuth}><UserCircle size={16} />{t('settings.signIn')}</button>
         )}
       </div>
       <div className={styles.summaryGrid}>

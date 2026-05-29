@@ -214,6 +214,237 @@ export interface CoordinatorRouteDecision {
   correlation_id?: string;
 }
 
+export interface AgentTeam {
+  id: string;
+  owner_id?: string;
+  name: string;
+  description?: string;
+  avatar_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AgentTeamMember {
+  id: string;
+  team_id: string;
+  agent_profile_id?: string;
+  role: 'supervisor' | 'executor' | 'reviewer' | string;
+  position?: number;
+  created_at?: string;
+}
+
+export interface AgentTeamDetail extends AgentTeam {
+  members?: AgentTeamMember[];
+}
+
+export interface AgentTeamRun {
+  id: string;
+  team_id: string;
+  session_id?: string;
+  trigger_user_id?: string;
+  trigger_message?: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AgentTeamAssignment {
+  id: string;
+  team_run_id: string;
+  from_member_id?: string;
+  to_member_id?: string;
+  type?: string;
+  task_prompt?: string;
+  context?: string;
+  status?: string;
+  run_id?: string;
+  result?: string;
+  depth?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AgentTeamTask {
+  id: string;
+  team_run_id: string;
+  assignment_id?: string;
+  assignee_member_id?: string;
+  parent_task_id?: string;
+  status: 'pending' | 'dispatched' | 'running' | 'done' | 'failed' | 'cancelled' | string;
+  objective?: string;
+  input_refs?: Record<string, unknown>;
+  run_id?: string;
+  attempt?: number;
+  risk_level?: 'normal' | 'high' | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AgentTeamEvent {
+  id: string;
+  team_run_id: string;
+  seq: number;
+  type: string;
+  payload?: string | Record<string, unknown>;
+  created_at?: string;
+}
+
+export interface TeamMemberState {
+  member_id: string;
+  agent_profile_id?: string;
+  role: string;
+  active_tasks?: number;
+  completed_tasks?: number;
+}
+
+export interface TeamTaskState {
+  task_id: string;
+  assignment_id?: string;
+  assignee_member_id?: string;
+  parent_task_id?: string;
+  status: string;
+  objective?: string;
+  run_id?: string;
+  agent_task_id?: string;
+  edge_run_id?: string;
+  attempt?: number;
+  risk_level?: string;
+}
+
+export interface TeamAssignmentState {
+  assignment_id: string;
+  from_member_id?: string;
+  to_member_id?: string;
+  type?: string;
+  status?: string;
+  depth?: number;
+  run_id?: string;
+  agent_task_id?: string;
+  edge_run_id?: string;
+}
+
+export interface TeamApprovalState {
+  approval_id: string;
+  agent_task_id?: string;
+  team_task_id?: string;
+  assignment_id?: string;
+  member_id?: string;
+  edge_run_id?: string;
+  request_id?: string;
+  tool_name?: string;
+  tool_use_id?: string;
+  status: string;
+  reason?: string;
+  decided_by?: string;
+  created_at?: string;
+  decided_at?: string;
+  edge_control?: Record<string, unknown>;
+}
+
+export interface TeamArtifactState {
+  agent_task_id?: string;
+  team_task_id?: string;
+  assignment_id?: string;
+  member_id?: string;
+  edge_run_id?: string;
+  source_event_id?: string;
+  event_seq?: number;
+  path: string;
+  action?: string;
+  tool_name?: string;
+  status?: string;
+  conflict_id?: string;
+  created_at?: string;
+}
+
+export interface TeamConflictState {
+  conflict_id: string;
+  path: string;
+  status: string;
+  agent_task_ids?: string[];
+  team_task_ids?: string[];
+  assignment_ids?: string[];
+  member_ids?: string[];
+  edge_run_ids?: string[];
+  actions?: string[];
+  first_seen_at?: string;
+  last_seen_at?: string;
+  resolution?: string;
+  resolved_by?: string;
+  resolved_at?: string;
+  reason?: string;
+  selected_agent_task_id?: string;
+}
+
+export interface TeamRunEventState {
+  agent_task_id: string;
+  edge_run_id?: string;
+  event_seq: number;
+  event_type: string;
+  payload?: string;
+  created_at?: string;
+}
+
+export interface TeamBudget {
+  total_tokens_used?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  token_limit?: number;
+  remaining_tokens?: number;
+  usage_percent?: number;
+  run_count?: number;
+  context_warnings?: number;
+  compactions?: number;
+}
+
+export interface TeamRunState {
+  run_id: string;
+  team_id: string;
+  status: string;
+  members?: TeamMemberState[];
+  tasks?: TeamTaskState[];
+  dependencies?: Array<Record<string, unknown>>;
+  assignments?: TeamAssignmentState[];
+  approvals?: TeamApprovalState[];
+  artifacts?: TeamArtifactState[];
+  conflicts?: TeamConflictState[];
+  run_events?: TeamRunEventState[];
+  route_log?: CoordinatorRouteDecision[];
+  budget?: TeamBudget;
+  terminal_reason?: string;
+}
+
+export interface TeamApprovalDecisionRequest {
+  decision: 'allow' | 'deny';
+  reason?: string;
+}
+
+export interface TeamConflictResolutionRequest {
+  resolution: string;
+  path?: string;
+  selected_agent_task_id?: string;
+  reason?: string;
+}
+
+export interface CreateAgentTeamRequest {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateAgentTeamRequest {
+  name: string;
+  description?: string;
+}
+
+export interface AddAgentTeamMemberRequest {
+  agent_profile_id: string;
+  role: 'supervisor' | 'executor' | 'reviewer' | string;
+}
+
+export interface StartAgentTeamRunRequest {
+  trigger_message: string;
+}
+
 // ── Custom agents ────────────────────────────────
 
 export interface CustomAgentRequest {
@@ -224,6 +455,20 @@ export interface CustomAgentRequest {
   capability_tags?: string;
   tool_whitelist?: string;
   model_params?: string;
+}
+
+export interface CustomAgent {
+  id: string;
+  owner_user_id?: string;
+  name: string;
+  avatar_url?: string;
+  agent_type: string;
+  system_prompt?: string;
+  capability_tags?: string;
+  tool_whitelist?: string;
+  model_params?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ── Execution targets ───────────────────────────
@@ -725,6 +970,70 @@ export function createHubClient(opts: HubClientOptions = {}) {
     cancelAgentTask: (taskId: string) =>
       request<void>(`/web/agent-tasks/${encodeURIComponent(taskId)}/cancel`, { method: 'POST' }),
 
+    // ── Agent teams / TeamRun console ─────────────
+
+    createAgentTeam: (data: CreateAgentTeamRequest) =>
+      request<AgentTeam>('/web/agent-teams', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    listAgentTeams: () =>
+      request<AgentTeam[]>('/web/agent-teams'),
+
+    getAgentTeam: (teamId: string) =>
+      request<AgentTeamDetail>(`/web/agent-teams/${encodeURIComponent(teamId)}`),
+
+    updateAgentTeam: (teamId: string, data: UpdateAgentTeamRequest) =>
+      request<void>(`/web/agent-teams/${encodeURIComponent(teamId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    deleteAgentTeam: (teamId: string) =>
+      request<void>(`/web/agent-teams/${encodeURIComponent(teamId)}`, { method: 'DELETE' }),
+
+    addAgentTeamMember: (teamId: string, data: AddAgentTeamMemberRequest) =>
+      request<void>(`/web/agent-teams/${encodeURIComponent(teamId)}/members`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    removeAgentTeamMember: (teamId: string, memberId: string) =>
+      request<void>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
+        { method: 'DELETE' },
+      ),
+
+    startTeamRun: (teamId: string, data: StartAgentTeamRunRequest) =>
+      request<AgentTeamRun>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    listTeamRuns: (teamId: string) =>
+      request<AgentTeamRun[]>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs`),
+
+    getTeamRun: (teamId: string, runId: string) =>
+      request<AgentTeamRun>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}`,
+      ),
+
+    getTeamRunState: (teamId: string, runId: string) =>
+      request<TeamRunState>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/state`,
+      ),
+
+    listTeamEvents: (teamId: string, runId: string) =>
+      request<AgentTeamEvent[]>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/events`,
+      ),
+
+    listTeamTasks: (teamId: string, runId: string) =>
+      request<AgentTeamTask[]>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/tasks`,
+      ),
+
     postTeamRouteDecision: (teamId: string, runId: string, decision: CoordinatorRouteDecision) =>
       request<Record<string, unknown>>(
         `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/route-decisions`,
@@ -734,10 +1043,38 @@ export function createHubClient(opts: HubClientOptions = {}) {
         },
       ),
 
+    decideTeamApproval: (
+      teamId: string,
+      runId: string,
+      approvalId: string,
+      decision: TeamApprovalDecisionRequest,
+    ) =>
+      request<TeamApprovalState>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}/decide`,
+        {
+          method: 'POST',
+          body: JSON.stringify(decision),
+        },
+      ),
+
+    resolveTeamConflict: (
+      teamId: string,
+      runId: string,
+      conflictId: string,
+      resolution: TeamConflictResolutionRequest,
+    ) =>
+      request<TeamConflictState>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/conflicts/${encodeURIComponent(conflictId)}/resolve`,
+        {
+          method: 'POST',
+          body: JSON.stringify(resolution),
+        },
+      ),
+
     // ── Custom agents ─────────────────────────────
 
     listCustomAgents: () =>
-      request<Record<string, unknown>[]>('/web/custom-agents'),
+      request<CustomAgent[]>('/web/custom-agents'),
 
     createCustomAgent: (data: CustomAgentRequest) =>
       request<Record<string, unknown>>('/web/custom-agents', {

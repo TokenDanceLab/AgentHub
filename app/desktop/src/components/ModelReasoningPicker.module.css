@@ -1,27 +1,37 @@
 .root {
   position: relative;
+  display: inline-flex;
   min-width: 0;
+  max-width: min(260px, 30vw);
 }
 
 .trigger {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  max-width: min(340px, 38vw);
-  height: 32px;
-  padding: 0 9px;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: var(--composer-control-h, 32px);
+  min-height: var(--composer-control-h, 32px);
+  padding: 0 8px;
   border: 0;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.055);
-  color: var(--foreground);
+  border-radius: var(--composer-control-radius, 10px);
+  background: var(--composer-control-bg, rgba(255, 255, 255, 0.052));
+  box-shadow: none;
+  color: var(--composer-control-text, var(--foreground));
   font: inherit;
+  font-size: 13px;
+  font-weight: 430;
+  line-height: 20px;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 .trigger:hover,
 .trigger:focus-visible {
-  background: rgba(255, 255, 255, 0.082);
+  background: var(--composer-control-bg-hover, rgba(255, 255, 255, 0.078));
+  color: var(--composer-control-text-active, var(--foreground));
   outline: none;
 }
 
@@ -36,24 +46,39 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  color: color-mix(in oklch, var(--muted-foreground) 82%, var(--foreground));
+  color: var(--composer-control-icon, color-mix(in oklch, var(--muted-foreground) 82%, var(--foreground)));
+}
+
+.decorativeModelIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  line-height: 0;
+}
+
+.decorativeModelIcon svg {
+  flex: 0 0 auto;
 }
 
 .triggerModel {
   min-width: 0;
   overflow: hidden;
-  color: var(--foreground);
-  font-size: 14px;
-  font-weight: 620;
+  color: var(--composer-control-text, var(--foreground));
+  font-size: 13px;
+  font-weight: 430;
+  line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .triggerReasoning {
   flex: 0 0 auto;
-  color: var(--muted-foreground);
+  color: var(--composer-control-text, var(--muted-foreground));
   font-size: 13px;
-  font-weight: 560;
+  font-weight: 430;
+  line-height: 20px;
   white-space: nowrap;
 }
 
@@ -68,16 +93,20 @@
   transform: rotate(180deg);
 }
 
+.chevron svg,
+.providerDot svg,
+.modelIcon svg {
+  stroke-width: 1.85;
+}
+
 .popover {
-  max-height: min(380px, calc(100vh - 24px));
+  max-height: min(292px, calc(100vh - 24px));
   overflow-y: auto;
-  padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 14px;
-  background: rgba(30, 32, 39, 0.96);
-  box-shadow:
-    0 12px 28px rgba(0, 0, 0, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  padding: 5px;
+  border: 1px solid var(--composer-panel-edge, rgba(0, 0, 0, 0.34));
+  border-radius: 12px;
+  background: rgba(29, 30, 37, 0.97);
+  box-shadow: var(--composer-panel-shadow, 0 22px 56px rgba(0, 0, 0, 0.38), 0 3px 12px rgba(0, 0, 0, 0.22));
   animation: popoverIn 0.12s ease-out;
   backdrop-filter: blur(24px) saturate(1.08);
   -webkit-backdrop-filter: blur(24px) saturate(1.08);
@@ -98,39 +127,61 @@
 }
 
 .sectionLabel {
-  padding: 4px 8px 8px;
-  color: var(--muted-foreground);
-  font-size: 12px;
-  font-weight: 700;
+  padding: 5px 7px 6px;
+  color: var(--composer-control-icon, var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 440;
   letter-spacing: 0;
   text-transform: uppercase;
+}
+
+.reasoningBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 29px;
+  padding: 0 0 5px;
+}
+
+.reasoningBar .sectionLabel {
+  flex: 0 0 auto;
+  padding: 0 5px;
+}
+
+.reasoningOptions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .modelList {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .modelRow {
-  border-radius: 11px;
+  border-radius: 8px;
 }
 
 .modelRowActive {
-  background: rgba(255, 255, 255, 0.052);
+  background: rgba(255, 255, 255, 0.036);
 }
 
 .modelButton {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
   width: 100%;
-  min-height: 42px;
-  padding: 7px 9px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 7px;
   border: 0;
-  border-radius: 11px;
+  border-radius: 8px;
   background: transparent;
-  color: var(--foreground);
+  color: var(--composer-control-text, var(--muted-foreground));
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -138,50 +189,91 @@
 
 .modelButton:hover,
 .modelButton:focus-visible {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.046);
   outline: none;
 }
 
 .modelText {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .modelName {
   overflow: hidden;
-  color: var(--foreground);
-  font-size: 14px;
-  font-weight: 620;
+  color: var(--composer-control-text, var(--muted-foreground));
+  font-size: 13.5px;
+  font-weight: 430;
+  line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.modelRowActive .modelName {
+  color: var(--composer-control-text-active, var(--muted-foreground));
 }
 
 .modelProvider {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 1 auto;
+  max-width: 132px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05);
   overflow: hidden;
-  color: var(--muted-foreground);
-  font-size: 12px;
-  font-weight: 520;
+  color: var(--composer-control-text, var(--muted-foreground));
+  font-size: 11.5px;
+  font-weight: 440;
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.modelDescription {
+  overflow: hidden;
+  color: color-mix(in oklch, var(--muted-foreground) 88%, var(--foreground));
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+  min-height: 1.45em;
+  padding-bottom: 1px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.defaultBadge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 450;
+  line-height: 1;
+}
+
 .check {
-  margin-left: auto;
-  color: var(--foreground);
+  color: var(--composer-control-icon-active, var(--muted-foreground));
   opacity: 0.86;
 }
 
 .reasoningStrip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 5px;
-  padding: 0 9px 9px 37px;
+  gap: 4px;
+  padding: 0 8px 8px 35px;
 }
 
 .reasoningChip {
-  min-height: 28px;
+  height: 25px;
+  min-height: 25px;
   padding: 0 8px;
   border: 0;
   border-radius: 8px;
@@ -189,24 +281,25 @@
   color: var(--muted-foreground);
   font: inherit;
   font-size: 12px;
-  font-weight: 620;
+  font-weight: 430;
+  line-height: 18px;
   cursor: pointer;
 }
 
 .reasoningChip:hover,
 .reasoningChip:focus-visible {
   background: rgba(255, 255, 255, 0.07);
-  color: var(--foreground);
+  color: var(--composer-control-text-active, var(--muted-foreground));
   outline: none;
 }
 
 .reasoningChipActive {
-  background: rgba(255, 255, 255, 0.11);
-  color: var(--foreground);
+  background: rgba(255, 255, 255, 0.085);
+  color: var(--composer-control-text-active, var(--muted-foreground));
 }
 
 [data-theme='light'] .trigger {
-  background: rgba(15, 23, 42, 0.055);
+  background: transparent;
 }
 
 [data-theme='light'] .trigger:hover,
@@ -218,8 +311,8 @@
   border-color: rgba(15, 23, 42, 0.08);
   background: rgba(248, 249, 252, 0.96);
   box-shadow:
-    0 12px 28px rgba(15, 23, 42, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+    0 18px 42px rgba(15, 23, 42, 0.14),
+    0 2px 10px rgba(15, 23, 42, 0.08);
 }
 
 [data-theme='light'] .modelRowActive,
@@ -236,4 +329,31 @@
 [data-theme='light'] .reasoningChip:focus-visible,
 [data-theme='light'] .reasoningChipActive {
   background: rgba(15, 23, 42, 0.082);
+}
+
+/* Neutral typography pass: model identity is primary text, metadata is weak. */
+.trigger,
+.triggerModel,
+.triggerReasoning,
+.modelButton,
+.modelName {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.modelRowActive .modelName,
+.check,
+.reasoningChip:hover,
+.reasoningChip:focus-visible,
+.reasoningChipActive {
+  color: var(--text-strong);
+}
+
+.chevron,
+.sectionLabel,
+.modelProvider,
+.modelDescription,
+.defaultBadge,
+.reasoningChip {
+  color: var(--text-weaker);
 }

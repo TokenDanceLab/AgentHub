@@ -35,8 +35,9 @@ function mockFetch(status: number, data: unknown) {
 }
 
 function mockFetchSequence(responses: Array<{ status: number; data: unknown }>) {
+  const fetchSpy = vi.spyOn(globalThis, 'fetch');
   for (const r of responses) {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+    fetchSpy.mockResolvedValueOnce(
       new Response(JSON.stringify(r.data), {
         status: r.status,
         statusText: r.status === 200 ? 'OK' : 'Error',
@@ -44,6 +45,7 @@ function mockFetchSequence(responses: Array<{ status: number; data: unknown }>) 
       }),
     );
   }
+  return fetchSpy;
 }
 
 // ── Tests ────────────────────────────────────────
@@ -233,6 +235,100 @@ describe('hubClient', () => {
         trigger_message_id: 'msg-1',
         target_id: 'target-relay-1',
       });
+    });
+  });
+
+  describe('agent teams', () => {
+    const client = createHubClient({ baseUrl: 'http://test.local', getToken: () => 'tok' });
+
+    it('lists AgentTeams through the Hub web endpoint', async () => {
+      const fetchSpy = mockFetch(200, {
+        code: 'ok',
+        data: [
+          {
+            id: 'team-1',
+            owner_id: 'user_1',
+            name: 'Builder Review Team',
+          },
+        ],
+      });
+
+      const res = await client.listAgentTeams();
+
+      expect(res[0].name).toBe('Builder Review Team');
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe('http://test.local/web/agent-teams');
+      expect(init.method).toBeUndefined();
+      expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
+    });
+
+    it('creates teams, adds members, and starts TeamRuns with Hub request bodies', async () => {
+      const fetchSpy = mockFetchSequence([
+        { status: 200, data: { code: 'ok', data: { id: 'team-1', name: 'Builder Review Team' } } },
+        { status: 200, data: { code: 'ok', data: null } },
+        { status: 200, data: { code: 'ok', data: { id: 'run-1', team_id: 'team-1', status: 'running' } } },
+      ]);
+
+      await client.createAgentTeam({ name: 'Builder Review Team', description: 'Build and review.' });
+      await client.addAgentTeamMember('team-1', { agent_profile_id: 'profile-1', role: 'reviewer' });
+      await client.startTeamRun('team-1', { trigger_message: 'Implement Desktop TeamRun Console.' });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://test.local/web/agent-teams');
+      expect((fetchSpy.mock.calls[0]?.[1] as RequestInit).method).toBe('POST');
+      expect(JSON.parse((fetchSpy.mock.calls[0]?.[1] as RequestInit).body as string)).toEqual({
+        name: 'Builder Review Team',
+        description: 'Build and review.',
+      });
+      expect(fetchSpy.mock.calls[1]?.[0]).toBe('http://test.local/web/agent-teams/team-1/members');
+      expect(JSON.parse((fetchSpy.mock.calls[1]?.[1] as RequestInit).body as string)).toEqual({
+        agent_profile_id: 'profile-1',
+        role: 'reviewer',
+      });
+      expect(fetchSpy.mock.calls[2]?.[0]).toBe('http://test.local/web/agent-teams/team-1/runs');
+      expect(JSON.parse((fetchSpy.mock.calls[2]?.[1] as RequestInit).body as string)).toEqual({
+        trigger_message: 'Implement Desktop TeamRun Console.',
+      });
+    });
+
+    it('reads TeamRun state, tasks, and events from encoded TeamRun paths', async () => {
+      const fetchSpy = mockFetchSequence([
+        { status: 200, data: { code: 'ok', data: { run_id: 'run/1', team_id: 'team/1', status: 'running' } } },
+        { status: 200, data: { code: 'ok', data: [{ id: 'task-1', status: 'running' }] } },
+        { status: 200, data: { code: 'ok', data: [{ id: 'event-1', seq: 1, type: 'team.route.decided' }] } },
+      ]);
+
+      await client.getTeamRunState('team/1', 'run/1');
+      await client.listTeamTasks('team/1', 'run/1');
+      await client.listTeamEvents('team/1', 'run/1');
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://test.local/web/agent-teams/team%2F1/runs/run%2F1/state');
+      expect(fetchSpy.mock.calls[1]?.[0]).toBe('http://test.local/web/agent-teams/team%2F1/runs/run%2F1/tasks');
+      expect(fetchSpy.mock.calls[2]?.[0]).toBe('http://test.local/web/agent-teams/team%2F1/runs/run%2F1/events');
+    });
+
+    it('posts TeamRun approval and conflict decisions to real Hub endpoints', async () => {
+      const fetchSpy = mockFetchSequence([
+        { status: 200, data: { code: 'ok', data: { approval_id: 'approval-1', status: 'allowed' } } },
+        { status: 200, data: { code: 'ok', data: { conflict_id: 'conflict-1', status: 'resolved' } } },
+      ]);
+
+      await client.decideTeamApproval('team-1', 'run-1', 'approval-1', {
+        decision: 'allow',
+        reason: 'verified',
+      });
+      await client.resolveTeamConflict('team-1', 'run-1', 'conflict-1', {
+        resolution: 'manual_merge',
+        path: 'src/App.tsx',
+      });
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://test.local/web/agent-teams/team-1/runs/run-1/approvals/approval-1/decide');
+      expect((fetchSpy.mock.calls[0]?.[1] as RequestInit).method).toBe('POST');
+      expect(JSON.parse((fetchSpy.mock.calls[0]?.[1] as RequestInit).body as string)).toEqual({
+        decision: 'allow',
+        reason: 'verified',
+      });
+      expect(fetchSpy.mock.calls[1]?.[0]).toBe('http://test.local/web/agent-teams/team-1/runs/run-1/conflicts/conflict-1/resolve');
+      expect((fetchSpy.mock.calls[1]?.[1] as RequestInit).method).toBe('POST');
     });
   });
 
