@@ -80,6 +80,7 @@ import type {
   ExecutionTargetType,
   TeamApprovalState,
   TeamArtifactState,
+  TeamAssignmentState,
   TeamBudget,
   TeamConflictState,
   TeamMemberState,
@@ -578,6 +579,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const teamRunState = agentTeamOverview?.state;
   const teamRunTasks = normalizeTeamTasks(teamRunState, agentTeamOverview?.tasks ?? []);
   const teamRunMembers = teamRunState?.members ?? [];
+  const teamRunAssignments = teamRunState?.assignments ?? [];
   const teamRunApprovals = teamRunState?.approvals ?? [];
   const teamRunConflicts = teamRunState?.conflicts ?? [];
   const pendingTeamApprovals = teamRunApprovals.filter(isPendingTeamApproval);
@@ -1432,6 +1434,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                     state={teamRunState}
                     tasks={teamRunTasks}
                     members={teamRunMembers}
+                    assignments={teamRunAssignments}
                     approvals={teamRunApprovals}
                     conflicts={teamRunConflicts}
                     events={teamRunEvents}
@@ -2288,6 +2291,10 @@ function previewText(value?: string, max = 110) {
   return normalized.length > max ? `${normalized.slice(0, max - 1)}...` : normalized;
 }
 
+function pathBasename(value: string) {
+  return value.split(/[\\/]+/).filter(Boolean).pop() ?? value;
+}
+
 function Panel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
     <section className={styles.panel}>
@@ -2513,6 +2520,7 @@ function AgentTeamConsole({
   state,
   tasks,
   members,
+  assignments,
   approvals,
   conflicts,
   events,
@@ -2535,6 +2543,7 @@ function AgentTeamConsole({
   state?: TeamRunState;
   tasks: TeamTaskState[];
   members: TeamMemberState[];
+  assignments: TeamAssignmentState[];
   approvals: TeamApprovalState[];
   conflicts: TeamConflictState[];
   events: TeamRunEventState[];
@@ -2557,6 +2566,15 @@ function AgentTeamConsole({
   const completedTasks = tasks.filter((task) => task.status === 'done').length;
   const status = state?.status ?? selectedRun?.status ?? 'unknown';
   const resultRows = buildTeamResultRows(tasks, events, terminalReason);
+  const communicationGraph = buildTeamCommunicationGraph({
+    members,
+    tasks,
+    assignments,
+    routeLog,
+    events,
+    artifacts,
+    conflicts,
+  });
   const runTitle = selectedRun?.trigger_message
     ? previewText(selectedRun.trigger_message, 86)
     : t('settings.agentTeamNoRunSelected');
@@ -2589,6 +2607,8 @@ function AgentTeamConsole({
         <TeamMetric label={t('settings.agentTeamApprovals')} value={`${pendingApprovals.length}/${approvals.length}`} />
         <TeamMetric label={t('settings.agentTeamRoutes')} value={`${routeLog.length}`} />
       </div>
+
+      <TeamCommunicationGraph graph={communicationGraph} />
 
       <div className={styles.teamConsoleGrid}>
         <section className={styles.teamSurface}>
@@ -2781,6 +2801,326 @@ function TeamMetric({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+type TeamGraphNodeKind = 'coordinator' | 'member' | 'task' | 'runtime' | 'artifact' | 'conflict';
+type TeamGraphEdgeKind = 'assignment' | 'route' | 'task' | 'runtime' | 'artifact' | 'conflict';
+
+interface TeamGraphNode {
+  id: string;
+  label: string;
+  meta: string;
+  kind: TeamGraphNodeKind;
+  status?: string;
+}
+
+interface TeamGraphEdge {
+  id: string;
+  from: string;
+  to: string;
+  label: string;
+  kind: TeamGraphEdgeKind;
+}
+
+interface TeamCommunicationGraphModel {
+  nodes: TeamGraphNode[];
+  edges: TeamGraphEdge[];
+}
+
+function TeamCommunicationGraph({ graph }: { graph: TeamCommunicationGraphModel }) {
+  const { t } = useTranslation();
+  const nodeClass: Record<TeamGraphNodeKind, string> = {
+    artifact: styles.teamGraphNodeArtifact ?? '',
+    conflict: styles.teamGraphNodeConflict ?? '',
+    coordinator: styles.teamGraphNodeCoordinator ?? '',
+    member: styles.teamGraphNodeMember ?? '',
+    runtime: styles.teamGraphNodeRuntime ?? '',
+    task: styles.teamGraphNodeTask ?? '',
+  };
+
+  return (
+    <section className={styles.teamSurface} data-testid="agent-team-communication-graph">
+      <div className={styles.teamBlockHeader}>
+        <strong>{t('settings.agentTeamCommunicationGraph')}</strong>
+        <span>{t('settings.agentTeamCommunicationGraphDesc')}</span>
+      </div>
+      {graph.nodes.length > 0 || graph.edges.length > 0 ? (
+        <div className={styles.teamGraph}>
+          <div className={styles.teamGraphNodes} aria-label={t('settings.agentTeamGraphNodes')}>
+            {graph.nodes.map((node) => (
+              <div key={node.id} className={`${styles.teamGraphNode} ${nodeClass[node.kind]}`}>
+                <strong>{node.label}</strong>
+                <span>{node.meta}</span>
+                {node.status ? <em>{node.status}</em> : null}
+              </div>
+            ))}
+          </div>
+          <div className={styles.teamGraphEdges} aria-label={t('settings.agentTeamGraphEdges')}>
+            {graph.edges.map((edge) => {
+              const from = graph.nodes.find((node) => node.id === edge.from);
+              const to = graph.nodes.find((node) => node.id === edge.to);
+              return (
+                <div key={edge.id} className={styles.teamGraphEdge}>
+                  <span>{from?.label ?? shortGraphId(edge.from)}</span>
+                  <strong>{edge.label}</strong>
+                  <span>{to?.label ?? shortGraphId(edge.to)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <EmptyBlock
+          title={t('settings.agentTeamNoCommunicationGraph')}
+          description={t('settings.agentTeamNoCommunicationGraphDesc')}
+        />
+      )}
+    </section>
+  );
+}
+
+function buildTeamCommunicationGraph({
+  members,
+  tasks,
+  assignments,
+  routeLog,
+  events,
+  artifacts,
+  conflicts,
+}: {
+  members: TeamMemberState[];
+  tasks: TeamTaskState[];
+  assignments: TeamAssignmentState[];
+  routeLog: CoordinatorRouteDecision[];
+  events: TeamRunEventState[];
+  artifacts: TeamArtifactState[];
+  conflicts: TeamConflictState[];
+}): TeamCommunicationGraphModel {
+  const nodeMap = new Map<string, TeamGraphNode>();
+  const edgeMap = new Map<string, TeamGraphEdge>();
+  const supervisor = members.find((member) => member.role === 'supervisor') ?? members[0];
+  const coordinatorId = supervisor ? memberNodeId(supervisor.member_id) : 'coordinator:supervisor';
+  const taskByAgentTask = new Map<string, TeamTaskState>();
+
+  const addNode = (node: TeamGraphNode) => {
+    const previous = nodeMap.get(node.id);
+    nodeMap.set(node.id, previous ? { ...previous, ...node } : node);
+  };
+  const addEdge = (edge: TeamGraphEdge) => {
+    if (edge.from === edge.to || edgeMap.has(edge.id)) return;
+    edgeMap.set(edge.id, edge);
+  };
+  const ensureMember = (memberId?: string, role = 'member') => {
+    if (!memberId) return undefined;
+    const id = memberNodeId(memberId);
+    if (!nodeMap.has(id)) {
+      addNode({ id, label: shortId(memberId), meta: role, kind: 'member' });
+    }
+    return id;
+  };
+  const ensureTask = (taskId?: string, fallback?: Partial<TeamTaskState>) => {
+    if (!taskId) return undefined;
+    const id = taskNodeId(taskId);
+    if (!nodeMap.has(id)) {
+      addNode({
+        id,
+        label: previewText(fallback?.objective || taskId, 48),
+        meta: shortId(taskId),
+        kind: 'task',
+        status: fallback?.status,
+      });
+    }
+    return id;
+  };
+
+  if (!supervisor && (routeLog.length > 0 || assignments.length > 0 || tasks.length > 0)) {
+    addNode({
+      id: coordinatorId,
+      label: 'Supervisor',
+      meta: 'coordinator',
+      kind: 'coordinator',
+    });
+  }
+
+  members.forEach((member) => {
+    addNode({
+      id: memberNodeId(member.member_id),
+      label: tFallbackRole(member.role),
+      meta: member.agent_profile_id ? shortId(member.agent_profile_id) : shortId(member.member_id),
+      kind: member.role === 'supervisor' ? 'coordinator' : 'member',
+      status: `${member.active_tasks ?? 0}/${member.completed_tasks ?? 0}`,
+    });
+  });
+
+  tasks.forEach((task) => {
+    addNode({
+      id: taskNodeId(task.task_id),
+      label: previewText(task.objective || task.task_id, 48),
+      meta: task.assignee_member_id ? shortId(task.assignee_member_id) : shortId(task.task_id),
+      kind: 'task',
+      status: task.status,
+    });
+    if (task.agent_task_id) taskByAgentTask.set(task.agent_task_id, task);
+    if (task.assignee_member_id) {
+      const memberId = ensureMember(task.assignee_member_id);
+      if (memberId) {
+        addEdge({
+          id: `task:${task.assignee_member_id}:${task.task_id}`,
+          from: memberId,
+          to: taskNodeId(task.task_id),
+          label: 'owns',
+          kind: 'task',
+        });
+      }
+    }
+    if (task.parent_task_id) {
+      const parentId = ensureTask(task.parent_task_id);
+      if (parentId) {
+        addEdge({
+          id: `parent:${task.parent_task_id}:${task.task_id}`,
+          from: parentId,
+          to: taskNodeId(task.task_id),
+          label: 'forks',
+          kind: 'task',
+        });
+      }
+    }
+    if (task.edge_run_id || task.run_id) {
+      const runtimeId = runtimeNodeId(task.edge_run_id ?? task.run_id);
+      addNode({ id: runtimeId, label: shortId(task.edge_run_id ?? task.run_id), meta: 'Edge run', kind: 'runtime' });
+      addEdge({
+        id: `runtime:${task.task_id}:${task.edge_run_id ?? task.run_id}`,
+        from: taskNodeId(task.task_id),
+        to: runtimeId,
+        label: 'runs',
+        kind: 'runtime',
+      });
+    }
+  });
+
+  assignments.forEach((assignment) => {
+    const from = ensureMember(assignment.from_member_id, 'from') ?? coordinatorId;
+    const to = ensureMember(assignment.to_member_id, 'to');
+    if (!to) return;
+    addEdge({
+      id: `assignment:${assignment.assignment_id}`,
+      from,
+      to,
+      label: assignment.type || assignment.status || 'assigns',
+      kind: 'assignment',
+    });
+  });
+
+  routeLog.forEach((decision, index) => {
+    const worker = ensureMember(decision.next_worker, 'worker');
+    if (!worker) return;
+    addEdge({
+      id: `route:${decision.correlation_id ?? index}:${decision.action}:${decision.next_worker}`,
+      from: coordinatorId,
+      to: worker,
+      label: decision.action,
+      kind: 'route',
+    });
+  });
+
+  events.slice(0, 8).forEach((event) => {
+    const task = taskByAgentTask.get(event.agent_task_id);
+    const taskId = task ? ensureTask(task.task_id, task) : ensureTask(event.agent_task_id, {
+      objective: event.event_type,
+      status: event.event_type,
+    });
+    if (!taskId || !event.edge_run_id) return;
+    const runtimeId = runtimeNodeId(event.edge_run_id);
+    addNode({ id: runtimeId, label: shortId(event.edge_run_id), meta: 'runtime event', kind: 'runtime' });
+    addEdge({
+      id: `event:${event.agent_task_id}:${event.edge_run_id}:${event.event_seq}`,
+      from: taskId,
+      to: runtimeId,
+      label: previewText(event.event_type, 22),
+      kind: 'runtime',
+    });
+  });
+
+  artifacts.slice(0, 6).forEach((artifact, index) => {
+    const sourceId = ensureTask(artifact.team_task_id ?? artifact.agent_task_id)
+      ?? ensureMember(artifact.member_id)
+      ?? (artifact.edge_run_id ? runtimeNodeId(artifact.edge_run_id) : undefined);
+    if (artifact.edge_run_id && !nodeMap.has(runtimeNodeId(artifact.edge_run_id))) {
+      addNode({ id: runtimeNodeId(artifact.edge_run_id), label: shortId(artifact.edge_run_id), meta: 'Edge run', kind: 'runtime' });
+    }
+    const artifactId = `artifact:${artifact.path}:${artifact.event_seq ?? index}`;
+    addNode({
+      id: artifactId,
+      label: previewText(pathBasename(artifact.path), 36),
+      meta: previewText(artifact.path, 44),
+      kind: 'artifact',
+      status: artifact.status || artifact.action,
+    });
+    if (sourceId) {
+      addEdge({
+        id: `artifact:${sourceId}:${artifactId}`,
+        from: sourceId,
+        to: artifactId,
+        label: artifact.action || artifact.tool_name || 'artifact',
+        kind: 'artifact',
+      });
+    }
+  });
+
+  conflicts.slice(0, 4).forEach((conflict) => {
+    const conflictId = `conflict:${conflict.conflict_id}`;
+    addNode({
+      id: conflictId,
+      label: previewText(pathBasename(conflict.path), 36),
+      meta: previewText(conflict.path, 44),
+      kind: 'conflict',
+      status: conflict.status,
+    });
+    const sourceIds = [
+      ...(conflict.team_task_ids ?? []).map((id) => ensureTask(id)),
+      ...(conflict.agent_task_ids ?? []).map((id) => {
+        const task = taskByAgentTask.get(id);
+        return task ? ensureTask(task.task_id, task) : ensureTask(id);
+      }),
+      ...(conflict.member_ids ?? []).map((id) => ensureMember(id)),
+    ].filter((id): id is string => Boolean(id));
+    sourceIds.slice(0, 4).forEach((sourceId) => {
+      addEdge({
+        id: `conflict:${sourceId}:${conflict.conflict_id}`,
+        from: sourceId,
+        to: conflictId,
+        label: 'conflict',
+        kind: 'conflict',
+      });
+    });
+  });
+
+  return {
+    nodes: [...nodeMap.values()].slice(0, 14),
+    edges: [...edgeMap.values()]
+      .filter((edge) => nodeMap.has(edge.from) && nodeMap.has(edge.to))
+      .slice(0, 16),
+  };
+}
+
+function memberNodeId(value: string) {
+  return `member:${value}`;
+}
+
+function taskNodeId(value: string) {
+  return `task:${value}`;
+}
+
+function runtimeNodeId(value?: string) {
+  return `runtime:${value ?? 'unknown'}`;
+}
+
+function shortGraphId(value: string) {
+  return shortId(value.replace(/^(member|task|runtime|artifact|conflict|coordinator):/, ''));
+}
+
+function tFallbackRole(role: string) {
+  return role || 'member';
 }
 
 function TeamTemplateRow({
