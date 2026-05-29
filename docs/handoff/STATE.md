@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-29 UTC+8 | 分支：fix/hub-device-uuid-contract -> dev/delicious233 | 状态：后端隔离 worktree继续推进 Hub 存储/资源护栏；Desktop/UI 主工作树仅只读确认
+最后更新：2026-05-29 UTC+8 | 分支：fix/hub-device-uuid-contract -> dev/delicious233 | 状态：后端隔离 worktree完成 B9 S3 存储硬化并真实部署 hk2；Desktop/UI 主工作树仅只读确认
 
 ## 本次后端/运维推进（2026-05-29）
 
@@ -9,7 +9,7 @@
 - **AH-SR-025 收口**：AgentTeam delegation/resource guardrails 已在仓内缓解。`agent_team` 配置和 `AGENTHUB_AGENT_TEAM_*` env 覆盖委派深度、active subagents、route repeat、TeamRun 总任务、assignment timeout 和 budget；`CreateAssignment` 现在补齐 ancestor max-depth、脏数据循环检测、总任务 cap 和 active cap，不能绕过 coordinator route guardrails。
 - **AH-SR-017 收口**：生产探针发现主 API 对未知路径、`/metrics`、`/debug/pprof/` 返回空 `200`。仓内已修 Timeout middleware 的 header-only status flush，并给 router 增加显式 JSON 404/405；admin metrics/pprof 仍由独立 Basic Auth admin mux 管理。
 - **B9 S3 对象存储收口**：附件存储已支持 S3-compatible backend。`AGENTHUB_S3_*` 环境变量已接入 config、生产 compose 和 `.env.production.example`；未配置 S3 时继续使用本地 `Upload.Dir`，配置 S3 后不再要求本地 upload dir 存在。S3 配置不完整会启动前 fail fast，避免误以为对象存储已启用但实际写入 hk2 根盘；S3 `PutObject` 使用 `If-None-Match: *`，已存在 hash object 不覆盖。
-- **hk2 生产部署证据**：2026-05-29 已通过本机构建镜像 tar -> `scp -J hk1` -> hk2 `git pull --ff-only` -> `docker load` -> `docker compose ... up -d --no-build --no-deps --force-recreate hub-server` 部署 commit `f071d03`。生产容器 image id/digest `sha256:9d074e9c1a2f9cd2fd95e2c3735a6c30c67f6caaca478fc69153bfcb64534356`，tar SHA-256 `a5ec4311942947f5579b2b70463b04f1d2c2a14d7cf36e068f017432796def65`，Docker health `healthy`；本机与 SNI HTTPS `/health` 均 `status=ok`、`migrations=39`；公网 `/metrics`、`/debug/pprof/`、`/does-not-exist` 均返回 404。Hub 约 6.4MiB/256MiB、PG 约 26.6MiB/512MiB、Redis 约 5.8MiB/384MiB，根盘 63%；本地 tar 与 hk2 `/tmp/agenthub-hub-*.tar` 已清理，未在 hk2/serverhub/server build。
+- **hk2 生产部署证据**：2026-05-29 已通过本机构建镜像 tar -> `scp -J hk1` -> hk2 `git pull --ff-only` -> `docker load` -> `docker compose ... up -d --no-build --no-deps --force-recreate hub-server` 部署 commit `bc3af60`。生产容器 image id/digest `sha256:3e6c4c5402fd0e4bd578f8ffb32a4ac2e3ade441b8753eca7370a58c2c85a26a`，tar SHA-256 `ae80e5eb67c2ff828d4062421d852a6a738870197a0188e2708e2b6cb1d5e4c7`，Docker health `healthy`；本机、hk2 SNI HTTPS 与公网 `/health` 均 `status=ok`、`migrations=39`；公网 `/metrics`、`/debug/pprof/`、`/does-not-exist` 均返回 404。当前生产 S3 env 为空，按设计继续使用本地 upload 行为；Hub 约 7.8MiB/256MiB、PG 约 24.8MiB/512MiB、Redis 约 11MiB/384MiB，根盘 65%；本地 tar 与 hk2 `/tmp/agenthub-hub-*.tar` 已清理，未在 hk2/serverhub/server build。
 - **B9 验证证据**：已跑 `hub-server && go test ./internal/config -run "Test(EnvOverrideS3Config|S3Config_IsConfigured|S3Config_IsEmpty|ValidateS3ConfigRequiresCompleteCredentials|ValidateS3ConfigDoesNotRequireLocalUploadDir)$" -count=1 -v`、`go test ./internal/service -run "Test(LocalStorage_PutAndGet|S3Storage_LocalPathReturnsEmpty|S3Storage_PutReturnsTrue|S3Storage_PutReturnsFalseWhenBlobAlreadyExists|SaveAttachment_StorageInjection)$" -count=1 -v`、`go test ./internal/config ./internal/service ./internal/app -count=1`、`go test ./... -short -count=1`、`docker compose -f deployments/docker-compose.prod.yml --env-file deployments/.env.production.example config --quiet` 和 `git diff --check`。
 - **AH-SR-025 验证证据**：已跑 `hub-server && go test ./internal/config -run "TestLoadAgentTeamGuardrailDefaults|TestEnvOverrideAgentTeamGuardrails|TestValidateRejectsInvalidAgentTeamGuardrails|TestJWTSecretHardcodedOverriddenByEnv" -count=1 -v`、`go test ./internal/service -run "TestAgentTeamService_CreateAssignmentRejects(DelegationDepthLimit|DelegationCycle|TeamRunTaskLimit)|TestAgentTeamService_CreateAssignmentUsesConfigured(DelegationDepthLimit|TeamRunTaskLimit)|TestAgentTeamService_HandleRouteDecisionRejectsWhen(ActiveSubagentLimitReached|TaskLimitReached|RouteRepeatLimitReached)|TestAgentTeamService_HandleRouteDecisionRejects(TimedOutAssignment|BudgetExceeded)" -count=1 -v`、`go test ./internal/service -run TestAgentTeamService -count=1 -v`、`go test ./... -short -count=1` 和 `git diff --check`。
 - **AH-SR-017 验证证据**：已跑 `hub-server && go test ./internal/router -run TestNoRouteReturnsNotFound -count=1 -v`、`go test ./internal/middleware -run "TestTimeout_(FlushesHeaderOnlyStatus|HandlerCompletesNormally|Returns504WhenHandlerSlow)" -count=1 -v`、`go test ./... -short -count=1` 和 `git diff --check`。
@@ -223,7 +223,7 @@
 - [x] AT-3：Supervisor 路由决策解析 + guardrails（仓内已收口）
 - [x] AT-2 补全：TeamEvent 持久化 + TeamRunState replay（仓内已收口）
 - [x] #173 状态确认（GitHub issue closed 2026-05-25T13:18:51Z）
-- [x] 生产部署验证（2026-05-29 已用 no-server-build tar/load/recreate 流程部署 `f071d03`，磁盘/资源/404/health 已验证）
+- [x] 生产部署验证（2026-05-29 已用 no-server-build tar/load/recreate 流程部署 `bc3af60`，磁盘/资源/404/health 已验证）
 
 ### 共享端口与资源
 | 资源 | Desktop | Mobile |
