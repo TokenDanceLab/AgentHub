@@ -171,7 +171,11 @@ async function installMockHub(context) {
     }
 
     if (pathname === "/web/agent-profiles") {
-      return route.fulfill(json(hubEnvelope({ items: agentProfiles, page: { hasMore: false } })));
+      const emptyAgents = request.headers()["x-agenthub-visual-empty-agents"] === "1";
+      return route.fulfill(json(hubEnvelope({
+        items: emptyAgents ? [] : agentProfiles,
+        page: { hasMore: false },
+      })));
     }
 
     if (pathname === "/client/auth/me") {
@@ -245,7 +249,8 @@ async function installMockHub(context) {
   });
 }
 
-async function preparePage(page, { authenticated = false, language = "en", theme = "dark" } = {}) {
+async function preparePage(page, { authenticated = false, language = "en", theme = "dark", emptyAgents = false } = {}) {
+  await page.setExtraHTTPHeaders(emptyAgents ? { "x-agenthub-visual-empty-agents": "1" } : {});
   await page.addInitScript(({ authenticated: isAuthenticated, language: lang, theme: selectedTheme }) => {
     window.localStorage.setItem("agenthub-language", lang);
     window.localStorage.setItem("agenthub-theme", selectedTheme);
@@ -443,6 +448,9 @@ async function visitAndCapture(page, scene) {
     await page.getByText("Session initialized — gpt-5").waitFor({ state: "visible", timeout: 5000 });
     await page.getByText("Completed — 1420 in / 318 out tokens").waitFor({ state: "visible", timeout: 5000 });
   }
+  if (scene.emptyAgents) {
+    await page.getByText("No runtimes available").waitFor({ state: "visible", timeout: 5000 });
+  }
 
   const screenshotPath = path.join(outDir, `${scene.name}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -503,6 +511,15 @@ async function main() {
       language: "en",
       theme: "dark",
       selectThread: true,
+    },
+    {
+      name: "web-design-workspace-desktop-empty-agents-1440x920",
+      path: "/",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      emptyAgents: true,
     },
     {
       name: "web-design-settings-mobile-zh-390x844",
