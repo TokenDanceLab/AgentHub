@@ -190,6 +190,15 @@ function runtimePayloadToBlocks(content: unknown): MessageBlock[] | null {
   const record = parseJsonRecord(content);
   if (!record) return null;
 
+  const envelopeEventType = readString(record, 'event_type');
+  if (envelopeEventType) {
+    const blocks = runtimeEventToBlocks({
+      event_type: envelopeEventType,
+      payload: record.payload,
+    });
+    if (blocks.length > 0) return blocks;
+  }
+
   const batchText = outputBatchText(record);
   if (batchText) return [{ kind: 'text', content: batchText }];
 
