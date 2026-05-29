@@ -42,6 +42,7 @@ export function ActivityCard({
     <article
       className={cx(styles.card, className)}
       data-has-actions={actions ? 'true' : undefined}
+      data-has-icon={icon ? 'true' : undefined}
       data-has-leading={leading ? 'true' : undefined}
     >
       {leading ? <span className={cx(styles.leading, leadingClassName)}>{leading}</span> : null}
