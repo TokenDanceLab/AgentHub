@@ -81,8 +81,8 @@ func TestLocalStorage_PutAndGet(t *testing.T) {
 
 func TestS3Storage_LocalPathReturnsEmpty(t *testing.T) {
 	s3 := service.NewS3Storage(
-		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) error {
-			return nil
+		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
+			return true, nil
 		},
 		func(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
 			return io.NopCloser(strings.NewReader("")), nil
@@ -120,8 +120,8 @@ func TestSaveAttachment_StorageInjection(t *testing.T) {
 
 func TestS3Storage_PutReturnsTrue(t *testing.T) {
 	s3 := service.NewS3Storage(
-		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) error {
-			return nil
+		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
+			return true, nil
 		},
 		func(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
 			return io.NopCloser(strings.NewReader("")), nil
@@ -137,5 +137,27 @@ func TestS3Storage_PutReturnsTrue(t *testing.T) {
 	}
 	if !created {
 		t.Error("S3Storage.Put should return true for a new blob")
+	}
+}
+
+func TestS3Storage_PutReturnsFalseWhenBlobAlreadyExists(t *testing.T) {
+	s3 := service.NewS3Storage(
+		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
+			return false, nil
+		},
+		func(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
+			return io.NopCloser(strings.NewReader("")), nil
+		},
+		func(ctx context.Context, bucket, key string) error {
+			return nil
+		},
+		"test-bucket",
+	)
+	created, err := s3.Put(context.Background(), "key", strings.NewReader("data"), "text/plain")
+	if err != nil {
+		t.Fatalf("Put() error = %v", err)
+	}
+	if created {
+		t.Error("S3Storage.Put should return false when the object already exists")
 	}
 }
