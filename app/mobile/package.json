@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "visual:qa": "node scripts/visual-qa.mjs",
+    "emulator:qa": "node scripts/emulator-qa.mjs"
   },
   "dependencies": {
     "@agenthub/shared": "workspace:*",
