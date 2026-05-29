@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { LogIn, MessageSquare, ShieldCheck, TerminalSquare, Users, WifiOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { ActivityCard, SectionHeader } from '@shared/ui';
 import type { IMContact, IMMessage } from '@/components/IM/types';
 import IMContactList from '@/components/IM/IMContactList';
 import IMMessageView from '@/components/IM/IMMessageView';
@@ -55,26 +56,49 @@ export default function IMView({ hubWS: hubWsProp }: ViewProps) {
       <div className={styles.root}>
         <div className={styles.lockedShell}>
           <div className={styles.lockedHeader}>
-            <p>{t('im.locked.eyebrow')}</p>
-            <h2>{t('im.locked.title')}</h2>
+            <SectionHeader
+              className={styles.imSectionHeader ?? ''}
+              eyebrowClassName={styles.imEyebrow ?? ''}
+              titleClassName={styles.imTitle ?? ''}
+              eyebrow={t('im.locked.eyebrow')}
+              title={t('im.locked.title')}
+            />
             <span>{t('im.locked.description')}</span>
           </div>
           <div className={styles.lockedGrid}>
-            <div className={styles.lockedCard}>
-              <ShieldCheck size={18} />
-              <strong>{t('im.locked.sessionTitle')}</strong>
-              <span>{t('im.locked.sessionDescription')}</span>
-            </div>
-            <div className={styles.lockedCard}>
-              <MessageSquare size={18} />
-              <strong>{t('im.locked.surfaceTitle')}</strong>
-              <span>{t('im.locked.surfaceDescription')}</span>
-            </div>
-            <div className={styles.lockedCard}>
-              <WifiOff size={18} />
-              <strong>{t('im.locked.realtimeTitle')}</strong>
-              <span>{t('im.locked.realtimeDescription')}</span>
-            </div>
+            <ActivityCard
+              className={styles.lockedCard}
+              icon={<ShieldCheck size={18} />}
+              iconClassName={styles.infoCardIcon}
+              bodyClassName={styles.infoCardBody}
+              metaClassName={styles.infoCardMeta}
+              contentClassName={styles.infoCardDescription}
+              label={t('im.locked.sessionTitle')}
+            >
+              {t('im.locked.sessionDescription')}
+            </ActivityCard>
+            <ActivityCard
+              className={styles.lockedCard}
+              icon={<MessageSquare size={18} />}
+              iconClassName={styles.infoCardIcon}
+              bodyClassName={styles.infoCardBody}
+              metaClassName={styles.infoCardMeta}
+              contentClassName={styles.infoCardDescription}
+              label={t('im.locked.surfaceTitle')}
+            >
+              {t('im.locked.surfaceDescription')}
+            </ActivityCard>
+            <ActivityCard
+              className={styles.lockedCard}
+              icon={<WifiOff size={18} />}
+              iconClassName={styles.infoCardIcon}
+              bodyClassName={styles.infoCardBody}
+              metaClassName={styles.infoCardMeta}
+              contentClassName={styles.infoCardDescription}
+              label={t('im.locked.realtimeTitle')}
+            >
+              {t('im.locked.realtimeDescription')}
+            </ActivityCard>
           </div>
           <div className={styles.lockedActions}>
             <button className={styles.lockedButton} type="button" onClick={() => setShowAuthModal(true)}>
@@ -121,26 +145,49 @@ export default function IMView({ hubWS: hubWsProp }: ViewProps) {
         ) : (
           <div className={styles.noSelection}>
             <div className={styles.noSelectionHeader}>
-              <p>{t('im.noSelection.eyebrow')}</p>
-              <h2>{t('im.noSelection.title')}</h2>
+              <SectionHeader
+                className={styles.imSectionHeader ?? ''}
+                eyebrowClassName={styles.imEyebrow ?? ''}
+                titleClassName={styles.imTitle ?? ''}
+                eyebrow={t('im.noSelection.eyebrow')}
+                title={t('im.noSelection.title')}
+              />
               <span>{t('im.noSelection.description')}</span>
             </div>
             <div className={styles.noSelectionGrid}>
-              <div className={styles.noSelectionCard}>
-                <Users size={17} />
-                <strong>{t('im.noSelection.sessionsTitle')}</strong>
-                <span>{t('im.noSelection.sessionsDescription')}</span>
-              </div>
-              <div className={styles.noSelectionCard}>
-                <MessageSquare size={17} />
-                <strong>{t('im.noSelection.timelineTitle')}</strong>
-                <span>{t('im.noSelection.timelineDescription')}</span>
-              </div>
-              <div className={styles.noSelectionCard}>
-                <TerminalSquare size={17} />
-                <strong>{t('im.noSelection.dispatchTitle')}</strong>
-                <span>{t('im.noSelection.dispatchDescription')}</span>
-              </div>
+              <ActivityCard
+                className={styles.noSelectionCard}
+                icon={<Users size={17} />}
+                iconClassName={styles.infoCardIcon}
+                bodyClassName={styles.infoCardBody}
+                metaClassName={styles.infoCardMeta}
+                contentClassName={styles.infoCardDescription}
+                label={t('im.noSelection.sessionsTitle')}
+              >
+                {t('im.noSelection.sessionsDescription')}
+              </ActivityCard>
+              <ActivityCard
+                className={styles.noSelectionCard}
+                icon={<MessageSquare size={17} />}
+                iconClassName={styles.infoCardIcon}
+                bodyClassName={styles.infoCardBody}
+                metaClassName={styles.infoCardMeta}
+                contentClassName={styles.infoCardDescription}
+                label={t('im.noSelection.timelineTitle')}
+              >
+                {t('im.noSelection.timelineDescription')}
+              </ActivityCard>
+              <ActivityCard
+                className={styles.noSelectionCard}
+                icon={<TerminalSquare size={17} />}
+                iconClassName={styles.infoCardIcon}
+                bodyClassName={styles.infoCardBody}
+                metaClassName={styles.infoCardMeta}
+                contentClassName={styles.infoCardDescription}
+                label={t('im.noSelection.dispatchTitle')}
+              >
+                {t('im.noSelection.dispatchDescription')}
+              </ActivityCard>
             </div>
           </div>
         )}
