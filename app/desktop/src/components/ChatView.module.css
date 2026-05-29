@@ -10,44 +10,48 @@
 .stream {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
+  --composer-clearance: 226px;
   --chat-column-width: 760px;
   --chat-side-pad: max(30px, calc((100% - var(--run-card-space, 0px) - var(--chat-column-width)) / 2));
   padding:
     34px
     calc(var(--chat-side-pad) + var(--run-card-space, 0px))
-    166px
+    var(--composer-clearance)
     var(--chat-side-pad);
-  scroll-padding-bottom: 166px;
+  scroll-padding-bottom: var(--composer-clearance);
   overflow-anchor: auto; /* browser scroll anchoring as safety net */
   background: transparent;
   transition: padding 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.virtualItem {
-  position: absolute;
-  top: 0;
-  left: 0;
+.messageList {
   width: 100%;
-  padding-bottom: var(--space-sm);
+  min-height: 0;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  justify-content: flex-end;
+  overflow-anchor: none;
+}
+
+.messageRow {
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: stretch;
 }
 
-.virtualItemUser {
+.messageRowUser {
   align-items: flex-end;
-}
-
-.virtualContent {
-  position: relative;
-  width: 100%;
-  flex-shrink: 0;
 }
 
 .empty {
   margin: auto;
-  color: var(--foreground);
+  color: color-mix(in oklch, var(--foreground) 88%, var(--muted-foreground) 12%);
   opacity: 0.4;
   font-size: var(--font-size-sm);
 }
@@ -64,8 +68,8 @@
   margin: 0;
   padding: 0;
   border-radius: 0;
-  font-size: 16.5px;
-  line-height: 1.66;
+  font-size: 15.5px;
+  line-height: 1.64;
   overflow: visible;
   animation: messageIn 0.2s ease-out;
 }
@@ -77,20 +81,120 @@
   margin-left: 0;
   margin-right: 0;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.032), rgba(255,255,255,0.012)),
+    linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.003)),
     var(--input-panel-bg);
-  color: var(--foreground);
-  border: 1px solid var(--input-panel-border);
-  border-radius: 12px;
-  padding: 10px 14px;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.035) inset;
+  color: color-mix(in oklch, var(--foreground) 74%, var(--muted-foreground) 26%);
+  border: 1px solid rgba(0, 0, 0, 0.065);
+  border-radius: 18px;
+  padding: 9px 13px 10px;
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.045),
+    0 1px 3px rgba(0, 0, 0, 0.055);
 }
 
 [data-theme='light'] .userMsg {
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.56)),
+    linear-gradient(180deg, rgba(255,255,255,0.64), rgba(255,255,255,0.52)),
     var(--input-panel-bg);
-  border-color: var(--input-panel-border);
+  border-color: rgba(15, 23, 42, 0.035);
+}
+
+.userAttachmentList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: min(260px, 100%);
+  margin-top: 2px;
+}
+
+.userAttachmentChip {
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr);
+  grid-template-areas:
+    "icon name"
+    "icon meta";
+  align-items: center;
+  column-gap: 7px;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.userAttachmentChip svg {
+  grid-area: icon;
+  color: var(--muted-foreground);
+}
+
+.userAttachmentName,
+.userAttachmentMeta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userAttachmentName {
+  grid-area: name;
+  color: color-mix(in oklch, var(--foreground) 88%, var(--muted-foreground) 12%);
+  font-size: 12px;
+  font-weight: 520;
+  line-height: 1.5;
+  min-height: 1.5em;
+  padding: 1px 0 2px;
+}
+
+.userAttachmentMeta {
+  grid-area: meta;
+  color: var(--text-weaker);
+  font-size: 11px;
+  line-height: 1.45;
+  min-height: 1.45em;
+  padding: 1px 0 2px;
+}
+
+[data-theme='light'] .userAttachmentChip {
+  border-color: rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.035);
+}
+
+.longTextBlock {
+  min-width: 0;
+}
+
+.longTextToggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin-top: 6px;
+  padding: 4px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 520;
+  cursor: pointer;
+}
+
+.longTextToggle:hover,
+.longTextToggle:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.055);
+  color: color-mix(in oklch, var(--foreground) 90%, var(--muted-foreground) 10%);
+}
+
+[data-theme='light'] .longTextToggle {
+  border-color: rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.035);
+}
+
+[data-theme='light'] .longTextToggle:hover,
+[data-theme='light'] .longTextToggle:focus-visible {
+  background: rgba(15, 23, 42, 0.055);
 }
 
 /* Agent: pure text on canvas, no background */
@@ -157,16 +261,17 @@
 .agentAvatar {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-bottom: 2px;
+  gap: 6px;
+  min-height: 20px;
+  margin: 0 0 1px;
 }
 
 .avatarCircle {
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.055);
-  color: var(--muted-foreground);
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.032);
+  color: color-mix(in oklch, var(--muted-foreground) 82%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -178,13 +283,32 @@
   stroke-width: 2;
 }
 
+.decorativeAgentIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  line-height: 0;
+}
+
+.decorativeAgentIcon svg {
+  flex: 0 0 auto;
+  stroke-width: 1.85;
+}
+
 [data-theme='light'] .avatarCircle {
   background: rgba(0,0,0,0.045);
 }
 
 .agentNameLabel {
-  font-size: 16px;
-  color: var(--text-weaker);
+  max-width: min(42vw, 380px);
+  overflow: hidden;
+  color: color-mix(in oklch, var(--text-weaker) 86%, var(--foreground) 14%);
+  font-size: 12px;
+  font-weight: 460;
+  line-height: 1.2;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -226,6 +350,18 @@
   opacity: 0.68;
 }
 
+.messageTokenUsage {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-weaker);
+  font-size: 11.5px;
+  font-weight: 450;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.68;
+}
+
 .timestampExact {
   display: none;
 }
@@ -258,29 +394,58 @@
 
 .actionBtn:hover {
   background: rgba(255,255,255,0.045);
-  color: var(--foreground);
+  color: color-mix(in oklch, var(--foreground) 88%, var(--muted-foreground) 12%);
+}
+
+.actionBtn:focus-visible,
+.thinkingToggle:focus-visible,
+.viewFullDiff:focus-visible,
+.copyBtn:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.045);
+  color: color-mix(in oklch, var(--foreground) 88%, var(--muted-foreground) 12%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+:global([data-theme='light']) .actionBtn:focus-visible,
+:global([data-theme='light']) .thinkingToggle:focus-visible,
+:global([data-theme='light']) .viewFullDiff:focus-visible,
+:global([data-theme='light']) .copyBtn:focus-visible {
+  background: rgba(0, 0, 0, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+
+:global(html[data-focus-source='pointer']) .actionBtn:focus-visible,
+:global(html[data-focus-source='pointer']) .thinkingToggle:focus-visible,
+:global(html[data-focus-source='pointer']) .viewFullDiff:focus-visible,
+:global(html[data-focus-source='pointer']) .copyBtn:focus-visible {
+  box-shadow: none;
 }
 
 /* ── Thinking accordion ────────────────────── */
 
 .thinkingToggle {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  width: min(100%, 560px);
-  padding: 5px 0;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 2px 6px 2px 2px;
   border: none;
-  border-radius: 7px;
+  border-radius: 6px;
   background: transparent;
   cursor: pointer;
-  font-size: 14px;
-  font-family: var(--font-mono);
-  color: var(--text-weaker);
-  transition: background var(--duration-fast), border-color var(--duration-fast);
+  font-size: 12px;
+  font-family: var(--font-sans);
+  font-weight: 460;
+  color: color-mix(in oklch, var(--text-weaker) 78%, transparent);
+  transition: background var(--duration-fast), color var(--duration-fast);
 }
 
 .thinkingToggle:hover {
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(255, 255, 255, 0.032);
+  color: var(--muted-foreground);
 }
 
 .runningText {
@@ -291,7 +456,7 @@
       90deg,
       var(--text-weaker) 0%,
       var(--text-weaker) 35%,
-      var(--foreground) 50%,
+      color-mix(in oklch, var(--foreground) 76%, var(--muted-foreground) 24%) 50%,
       var(--text-weaker) 65%,
       var(--text-weaker) 100%
     );
@@ -302,7 +467,7 @@
 }
 
 .settledText {
-  color: var(--text-weaker);
+  color: color-mix(in oklch, var(--text-weaker) 78%, var(--foreground) 22%);
 }
 
 @keyframes textSweep {
@@ -311,16 +476,22 @@
 }
 
 .thinkingContent {
-  padding: var(--space-xs) var(--space-sm);
-  font-size: 13px;
-  font-family: var(--font-mono);
-  color: var(--text-weaker);
+  width: min(100%, 680px);
+  margin: 3px 0 8px 10px;
+  padding: 2px 0 2px 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.075);
+  font-size: 12.5px;
+  font-family: var(--font-sans);
+  line-height: 1.56;
+  color: color-mix(in oklch, var(--text-weaker) 72%, var(--foreground) 28%);
   white-space: pre-wrap;
   max-height: 16rem;
   overflow-y: auto;
-  border: 1px solid rgba(255, 255, 255, 0.055);
-  border-radius: 8px;
-  margin-left: 0;
+  border-radius: 0;
+}
+
+[data-theme='light'] .thinkingContent {
+  border-left-color: rgba(15, 23, 42, 0.12);
 }
 
 /* ── File change ─────────────────────────── */
@@ -367,7 +538,7 @@
 
 .fileChangeAction {
   flex: 0 0 auto;
-  font-weight: 520;
+  font-weight: 460;
 }
 
 .fileChangePath {
@@ -385,7 +556,7 @@
   flex: 0 0 auto;
   font-family: var(--font-mono);
   font-size: 14px;
-  font-weight: 520;
+  font-weight: 460;
 }
 
 .fileChangeAdd {
@@ -453,6 +624,135 @@
   background: color-mix(in oklch, var(--primary) 12%, transparent);
 }
 
+/* ── AgentTeam / subagent activity ─────────── */
+
+.agentTaskBlock,
+.childAgentBlock,
+.routeDecisionBlock {
+  width: min(100%, 680px);
+  margin: 4px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.095);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.038);
+  color: color-mix(in oklch, var(--foreground) 84%, var(--muted-foreground) 16%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.035) inset;
+}
+
+[data-theme='light'] .agentTaskBlock,
+[data-theme='light'] .childAgentBlock,
+[data-theme='light'] .routeDecisionBlock {
+  border-color: rgba(15, 23, 42, 0.095);
+  background: rgba(15, 23, 42, 0.035);
+}
+
+.agentTaskHeader,
+.childAgentHeader,
+.routeDecisionHeader,
+.agentTaskMeta,
+.childAgentMeta,
+.routeDecisionMeta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.agentTaskHeader strong,
+.childAgentHeader strong {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 560;
+  line-height: 1.5;
+  min-height: 1.5em;
+  padding: 1px 0 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentTaskIcon,
+.childAgentIcon,
+.routeDecisionIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: color-mix(in oklch, var(--primary) 76%, var(--foreground) 24%);
+}
+
+.agentTaskKind,
+.childAgentKind,
+.routeDecisionKind {
+  flex: 0 0 auto;
+  color: color-mix(in oklch, var(--foreground) 74%, var(--muted-foreground) 26%);
+  font-size: 12px;
+  font-weight: 560;
+  line-height: 1.45;
+}
+
+.childAgentName {
+  flex: 0 1 auto;
+  max-width: 132px;
+  overflow: hidden;
+  padding: 1px 7px;
+  border: 1px solid color-mix(in oklch, var(--primary) 26%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--primary) 9%, transparent);
+  color: color-mix(in oklch, var(--foreground) 86%, var(--primary) 14%);
+  font-size: 11px;
+  font-weight: 560;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentTaskSummary,
+.childAgentSummary,
+.routeDecisionBlock p {
+  margin: 6px 0 0 21px;
+  color: color-mix(in oklch, var(--foreground) 78%, var(--muted-foreground) 22%);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.agentTaskMeta,
+.childAgentMeta,
+.routeDecisionMeta {
+  flex-wrap: wrap;
+  margin: 7px 0 0 21px;
+  color: color-mix(in oklch, var(--foreground) 68%, var(--muted-foreground) 32%);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.agentTaskMeta code,
+.childAgentMeta code {
+  max-width: 220px;
+  overflow: hidden;
+  color: color-mix(in oklch, var(--text-weaker) 86%, var(--foreground) 14%);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.routeDecisionHeader em {
+  width: fit-content;
+  max-width: 180px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--primary) 11%, transparent);
+  color: var(--primary);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 560;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Inline run status ───────────────────── */
 
 .sessionMeta {
@@ -495,6 +795,9 @@
 .statusRowLabel {
   min-width: 0;
   overflow: hidden;
+  line-height: 1.5;
+  min-height: 1.5em;
+  padding: 1px 0 2px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -504,7 +807,7 @@
   min-width: max-content;
   color: var(--muted-foreground);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 520;
   letter-spacing: 0;
   text-transform: uppercase;
   opacity: 0.72;
@@ -519,11 +822,12 @@
   align-items: center;
   max-width: 180px;
   min-height: 22px;
-  padding: 2px 7px;
+  padding: 2px 7px 3px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.04);
   color: var(--muted-foreground);
   font-size: 12px;
+  line-height: 1.45;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -535,12 +839,144 @@
   margin-right: 2px;
 }
 
-.tokenUsage {
-  display: flex;
-  gap: var(--space-lg);
-  font-size: var(--font-size-xs);
+.contextUsageStrip {
+  width: min(100%, 680px);
+  margin: 2px 0 4px;
   color: var(--muted-foreground);
+}
+
+.contextUsageDetailed {
+  padding: 7px 0 7px 12px;
+  border-left: 1px solid color-mix(in oklch, var(--primary) 44%, transparent);
+}
+
+.contextUsageWarning {
+  border-left-color: color-mix(in oklch, var(--warning) 70%, transparent);
+}
+
+.contextUsageCompaction {
+  border-left-color: color-mix(in oklch, var(--info) 70%, transparent);
+}
+
+.contextUsageHeader {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  line-height: 18px;
+}
+
+.contextUsageIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: color-mix(in oklch, var(--primary) 76%, var(--foreground) 24%);
+  opacity: 0.74;
+}
+
+.contextUsageWarning .contextUsageIcon {
+  color: var(--warning);
+}
+
+.contextUsageTitle {
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in oklch, var(--foreground) 78%, var(--muted-foreground) 22%);
+  font-size: 12.5px;
+  font-weight: 520;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contextUsagePercent,
+.contextUsageThreshold {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 520;
+  line-height: 18px;
+}
+
+[data-theme='light'] .contextUsagePercent,
+[data-theme='light'] .contextUsageThreshold {
+  background: rgba(15, 23, 42, 0.052);
+}
+
+.contextUsageWarning .contextUsagePercent {
+  color: var(--warning);
+}
+
+.contextUsageBar {
+  position: relative;
+  width: min(100%, 320px);
+  height: 3px;
+  margin: 7px 0 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.075);
+}
+
+[data-theme='light'] .contextUsageBar {
+  background: rgba(15, 23, 42, 0.075);
+}
+
+.contextUsageBar::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--usage-percent, 0%);
+  border-radius: inherit;
+  background: color-mix(in oklch, var(--primary) 78%, var(--foreground) 22%);
+  content: "";
+}
+
+.contextUsageWarning .contextUsageBar::before {
+  background: var(--warning);
+}
+
+.contextUsageCompaction .contextUsageBar::before {
+  background: var(--info);
+}
+
+.contextUsageStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 7px;
+}
+
+.contextUsageStat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  color: color-mix(in oklch, var(--foreground) 62%, var(--muted-foreground) 38%);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.contextUsageStat strong {
+  color: color-mix(in oklch, var(--foreground) 82%, var(--muted-foreground) 18%);
   font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 520;
+}
+
+.contextUsageModel {
+  margin-top: 5px;
+  overflow: hidden;
+  color: var(--text-weaker);
+  font-size: 11px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Progressive Disclosure ───────────────── */
@@ -622,12 +1058,18 @@
 }
 .toolName {
   font-weight: var(--font-weight-medium);
+  line-height: 1.5;
+  min-height: 1.5em;
+  padding: 1px 0 2px;
   white-space: nowrap;
 }
 .toolParamSummary {
   color: var(--foreground);
   opacity: 0.52;
   overflow: hidden;
+  line-height: 1.5;
+  min-height: 1.5em;
+  padding: 1px 0 2px;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 0 1 auto;
@@ -641,7 +1083,8 @@
   padding: 1px 8px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 520;
+  line-height: 1.45;
   background: rgba(255, 255, 255, 0.045);
   border: 0;
   flex-shrink: 0;
@@ -858,21 +1301,6 @@
   color: var(--foreground);
 }
 
-/* ── Streaming progress bar ──────────────── */
-
-.streamProgress {
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--primary) 50%,
-    transparent 100%
-  );
-  animation: progressSweep 1.5s ease-in-out infinite;
-  opacity: 0.8;
-  flex-shrink: 0;
-}
-
 .pendingThinking {
   width: min(100%, 720px);
   margin: 8px auto 0;
@@ -897,11 +1325,6 @@
   background-clip: text;
   -webkit-background-clip: text;
   animation: textSweep 1.8s ease-in-out infinite;
-}
-
-@keyframes progressSweep {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
 }
 
 /* ── User msg actionBar tint ──────────────── */
@@ -955,12 +1378,101 @@
   transform: translateX(-50%) scale(0.97);
 }
 
+/* Neutral typography pass: chat primary text stays cool and readable. */
+.empty,
+.userMsg,
+.userAttachmentName,
+.agentMsg,
+.agentTaskBlock,
+.childAgentBlock,
+.routeDecisionBlock,
+.agentTaskHeader strong,
+.childAgentHeader strong,
+.agentTaskSummary,
+.childAgentSummary,
+.routeDecisionBlock p,
+.contextUsageTitle,
+.contextUsageStat strong,
+.toolParamSummary,
+.fileChangePath,
+.fileChangeDiff {
+  color: var(--text-primary);
+}
+
+.longTextToggle,
+.agentNameLabel,
+.timestamp,
+.messageTokenUsage,
+.actionBtn,
+.thinkingToggle,
+.settledText,
+.thinkingContent,
+.fileChangeHeader,
+.agentTaskKind,
+.childAgentKind,
+.routeDecisionKind,
+.agentTaskMeta,
+.childAgentMeta,
+.routeDecisionMeta,
+.statusRow,
+.statusRowHeader,
+.statusRowMeta,
+.inlinePill,
+.sessionMetaLabel,
+.contextUsageStrip,
+.contextUsagePercent,
+.contextUsageThreshold,
+.contextUsageStat,
+.contextUsageModel,
+.toolUseHeader,
+.toolStatusPending,
+.showParamsBtn,
+.diffTruncated,
+.codeLangBadge,
+.copyBtn {
+  color: var(--text-weaker);
+}
+
+.longTextToggle:hover,
+.longTextToggle:focus-visible,
+.actionBtn:hover,
+.actionBtn:focus-visible,
+.thinkingToggle:hover,
+.fileChangeHeader:hover,
+.fileChangeHeader:focus-visible,
+.statusRowHeader:hover,
+.toolUseHeader:hover,
+.toolUseHeader:focus-visible,
+.showParamsBtn:hover,
+.copyBtn:hover,
+.userMsg .actionBtn:hover {
+  color: var(--text-primary);
+}
+
+.runningText,
+.pendingThinkingLabel {
+  background:
+    linear-gradient(
+      90deg,
+      var(--text-weaker) 0%,
+      var(--text-weaker) 35%,
+      var(--text-primary) 50%,
+      var(--text-weaker) 65%,
+      var(--text-weaker) 100%
+    );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
 /* ═══════════════════════════════════════════════════════
    Mobile (< 768px)
    ═══════════════════════════════════════════════════════ */
 @media (max-width: 767px) {
   .stream {
-    padding: var(--space-sm);
+    --composer-clearance: 188px;
+    padding: 14px 16px var(--composer-clearance);
+    scroll-padding-bottom: var(--composer-clearance);
     gap: var(--space-xs);
   }
 
@@ -969,7 +1481,7 @@
   }
 
   .userMsg {
-    max-width: 86%;
+    max-width: min(86%, 620px);
   }
 
   .actionBar {
@@ -977,8 +1489,8 @@
   }
 
   .actionBtn {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
   }
 
   .toolUseHeader {
@@ -1030,6 +1542,7 @@
   }
 
   .stream {
-    padding: var(--space-md);
+    padding: var(--space-md) var(--space-md) var(--composer-clearance);
+    scroll-padding-bottom: var(--composer-clearance);
   }
 }
