@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Activity,
+  GitBranch,
   MessageSquareText,
   Plus,
   ShieldCheck,
@@ -20,6 +21,7 @@ interface Props {
   onNewThread: () => void;
   onSelectThread: (threadId: string) => void;
   onQuickStart: (prompt: string) => void;
+  onOpenTeamRuns?: () => void;
   permissionCount?: number;
 }
 
@@ -54,6 +56,7 @@ export default function HomeDashboard({
   onNewThread,
   onSelectThread,
   onQuickStart,
+  onOpenTeamRuns,
   permissionCount = 0,
 }: Props) {
   const { t } = useTranslation();
@@ -108,6 +111,22 @@ export default function HomeDashboard({
           <div className={styles.statValue}>{permissionCount}</div>
           <button type="button" className={styles.statFooter} onClick={() => {}}>
             {t('home.reviewApprovals')}
+          </button>
+        </div>
+
+        {/* TeamRuns */}
+        <div className={styles.statCard}>
+          <div className={styles.statLabel}>
+            <GitBranch size={14} />
+            {t('home.activeTeamRuns')}
+          </div>
+          <div className={styles.statValue}>{t('home.teamRunConsole')}</div>
+          <button
+            type="button"
+            className={styles.statFooter}
+            onClick={onOpenTeamRuns}
+          >
+            {t('home.openTeamRuns')}
           </button>
         </div>
 

@@ -214,6 +214,188 @@ export interface CoordinatorRouteDecision {
   correlation_id?: string;
 }
 
+// ── Agent teams / TeamRuns ───────────────────────
+
+export interface AgentTeam {
+  id: string;
+  owner_id?: string;
+  name: string;
+  description?: string;
+  avatar_url?: string;
+  created_at?: string;
+  updated_at?: string;
+  members?: AgentTeamMember[];
+}
+
+export interface AgentTeamMember {
+  id: string;
+  team_id: string;
+  agent_profile_id?: string;
+  role: string;
+  position?: number;
+  created_at?: string;
+}
+
+export interface AgentTeamRun {
+  id: string;
+  team_id: string;
+  session_id?: string;
+  trigger_user_id?: string;
+  trigger_message?: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AgentTeamEvent {
+  id: string;
+  team_run_id: string;
+  seq: number;
+  type: string;
+  payload: string;
+  created_at?: string;
+}
+
+export interface TeamMemberState {
+  member_id: string;
+  agent_profile_id?: string;
+  role: string;
+  active_tasks: number;
+  completed_tasks: number;
+}
+
+export interface TeamTaskState {
+  task_id: string;
+  assignment_id?: string;
+  assignee_member_id: string;
+  parent_task_id?: string;
+  status: string;
+  objective: string;
+  run_id?: string;
+  agent_task_id?: string;
+  edge_run_id?: string;
+  attempt: number;
+  risk_level: string;
+}
+
+export interface TeamTaskDependencyState {
+  task_id: string;
+  depends_on_task_id: string;
+  kind: string;
+}
+
+export interface TeamAssignmentState {
+  assignment_id: string;
+  from_member_id: string;
+  to_member_id: string;
+  type: string;
+  status: string;
+  depth: number;
+  run_id?: string;
+  agent_task_id?: string;
+  edge_run_id?: string;
+}
+
+export interface TeamApprovalEdgeControl {
+  runId: string;
+  requestId: string;
+  decision: string;
+  reason?: string;
+}
+
+export interface TeamApprovalState {
+  approval_id: string;
+  agent_task_id: string;
+  team_task_id?: string;
+  assignment_id?: string;
+  member_id?: string;
+  edge_run_id?: string;
+  request_id: string;
+  tool_name?: string;
+  tool_use_id?: string;
+  status: string;
+  reason?: string;
+  decided_by?: string;
+  created_at?: string;
+  decided_at?: string;
+  edge_control?: TeamApprovalEdgeControl;
+}
+
+export interface TeamArtifactState {
+  agent_task_id: string;
+  team_task_id?: string;
+  assignment_id?: string;
+  member_id?: string;
+  edge_run_id?: string;
+  source_event_id?: string;
+  event_seq?: number;
+  path: string;
+  action?: string;
+  tool_name?: string;
+  status?: string;
+  conflict_id?: string;
+  created_at?: string;
+}
+
+export interface TeamConflictState {
+  conflict_id: string;
+  path: string;
+  status: string;
+  agent_task_ids: string[];
+  team_task_ids?: string[];
+  assignment_ids?: string[];
+  member_ids?: string[];
+  edge_run_ids?: string[];
+  actions?: string[];
+  first_seen_at?: string;
+  last_seen_at?: string;
+  resolution?: string;
+  resolved_by?: string;
+  resolved_at?: string;
+  reason?: string;
+  selected_agent_task_id?: string;
+}
+
+export interface TeamRunEventState {
+  agent_task_id: string;
+  edge_run_id?: string;
+  event_seq: number;
+  event_type: string;
+  payload: string;
+  created_at?: string;
+}
+
+export interface TeamBudget {
+  total_tokens_used: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  token_limit: number;
+  remaining_tokens?: number;
+  usage_percent?: number;
+  run_count: number;
+  context_warnings?: number;
+  compactions?: number;
+}
+
+export interface TeamRunState {
+  run_id: string;
+  team_id: string;
+  status: string;
+  members: TeamMemberState[];
+  tasks: TeamTaskState[];
+  dependencies: TeamTaskDependencyState[];
+  assignments: TeamAssignmentState[];
+  approvals: TeamApprovalState[];
+  artifacts: TeamArtifactState[];
+  conflicts: TeamConflictState[];
+  run_events: TeamRunEventState[];
+  route_log: CoordinatorRouteDecision[];
+  budget?: TeamBudget;
+  terminal_reason?: string;
+}
+
+export type HubListResponse<T> = T[] | { items: T[] };
+
 // ── Custom agents ────────────────────────────────
 
 export interface CustomAgentRequest {
@@ -732,6 +914,24 @@ export function createHubClient(opts: HubClientOptions = {}) {
           method: 'POST',
           body: JSON.stringify(decision),
         },
+      ),
+
+    listAgentTeams: () =>
+      request<HubListResponse<AgentTeam>>('/web/agent-teams'),
+
+    listTeamRuns: (teamId: string) =>
+      request<HubListResponse<AgentTeamRun>>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs`,
+      ),
+
+    getTeamRunState: (teamId: string, runId: string) =>
+      request<TeamRunState>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/state`,
+      ),
+
+    listTeamEvents: (teamId: string, runId: string) =>
+      request<HubListResponse<AgentTeamEvent>>(
+        `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/events`,
       ),
 
     // ── Custom agents ─────────────────────────────

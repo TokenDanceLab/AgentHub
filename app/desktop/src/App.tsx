@@ -50,6 +50,7 @@ import {
   ClipboardList,
   Circle,
   Copy,
+  GitBranch,
   Home,
   MessageSquareText,
   LogIn,
@@ -187,7 +188,7 @@ export default function App() {
   const { data: agentData } = useAgentList(online);
   const agents = agentData?.items ?? [];
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
-  const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
+  const [viewMode, setViewMode] = useState<'agent' | 'im' | 'teamrun'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -408,6 +409,11 @@ export default function App() {
     setSettingsInitialSection(section);
     setSettingsOpen(true);
   }, []);
+
+  const openTeamRunConsole = useCallback(() => {
+    setLeftSidebarView('thread');
+    setViewMode('teamrun');
+  }, [setLeftSidebarView]);
 
   const handleStartResize = useCallback((side: 'left' | 'right') => (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -755,6 +761,15 @@ export default function App() {
                 </ShellIconButton>
                 <ShellIconButton
                   className={styles.workspaceHeaderBtn}
+                  onClick={openTeamRunConsole}
+                  label={t('teamrun.open')}
+                  tooltipSide="bottom"
+                  aria-pressed={viewMode === 'teamrun'}
+                >
+                  <GitBranch size={15} />
+                </ShellIconButton>
+                <ShellIconButton
+                  className={styles.workspaceHeaderBtn}
                   onClick={() => openSettings('tasks')}
                   label={t('settings.tasks')}
                   tooltipSide="bottom"
@@ -826,9 +841,12 @@ export default function App() {
                     }
                   }}
                   permissionCount={permissionRequests.length}
+                  onOpenTeamRuns={openTeamRunConsole}
                 />
               ) : viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
+              ) : viewMode === 'teamrun' ? (
+                <ErrorBoundary><Suspense fallback={null}><Slot name="teamrun-console" /></Suspense></ErrorBoundary>
               ) : (
                 <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onDelete={handleDelete} onSendMessage={handleSend} />
               )}
