@@ -198,6 +198,7 @@ AgentHub/
 | [功能实现文档](docs/architecture/implementation-guide.md) | 实现顺序、接口更新规则、Adapter 细节和验收命令 |
 | [客户端路线图](docs/operations/client-roadmap.md) | Desktop/Edge 客户端方向阶段任务和验收 |
 | [API 契约](api/) | REST API 和 WebSocket typed events 的契约入口 |
+| [安全风险台账](docs/governance/security-risk-register.md) | AgentHub 风险 ID、严重度、状态、证据和下一步 |
 | [调研索引](docs/reference/) | 跨仓库调研和工程规格 |
 | [调研与历史归档](docs/archive/) | 旧版架构、协议、memory、workspace 等历史材料 |
 
