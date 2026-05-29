@@ -162,13 +162,42 @@ export {
   getWorkbenchSectionSource,
   type WorkbenchDataMode,
   type WorkbenchCatalogState,
+  type WorkbenchSectionSource,
 } from './workbenchDataMode';
+
+export {
+  SURFACE_METADATA,
+  SURFACE_STATUS_METADATA,
+  getSurfaceByDesktopSectionId,
+  getSurfaceByWebRoute,
+  getSurfaceMetadata,
+  getSurfaceStatusMetadata,
+  getSurfacesByCategory,
+  getSurfacesByPlatform,
+  type SurfaceCategory,
+  type SurfaceId,
+  type SurfaceMetadata,
+  type SurfacePlatform,
+  type SurfaceStatus,
+  type SurfaceStatusMetadata,
+} from './surfaceMetadata';
+
+export {
+  DESKTOP_GLASS_TOKEN_ALIASES,
+  DESKTOP_GLASS_SURFACE_RULES,
+  getGlassTokenAlias,
+  getSurfaceRulesForPlatform,
+  type DesignPlatform,
+  type GlassTokenAlias,
+  type DesignSurfaceRule,
+} from './designTokens';
 
 // Hub REST client (shared across Desktop and Web)
 export {
   createHubClient,
   type HubClient,
   type HubEnvelope,
+  type HubCustomAgent,
   type HubSession,
   type HubMessage,
   type HubContactInfo,

@@ -1,16 +1,12 @@
-import { lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
-
-const AgentSquare = lazy(() => import('./pages/AgentSquare'));
-const GroupWorkspace = lazy(() => import('./pages/GroupWorkspace'));
-const PrivateChats = lazy(() => import('./pages/PrivateChats'));
-const Project = lazy(() => import('./pages/Project'));
-const Workbench = lazy(() => import('./pages/Workbench'));
+import App from './App';
 
 export const router = createBrowserRouter([
-  { path: '/', element: <Workbench /> },
-  { path: '/agent-square', element: <AgentSquare /> },
-  { path: '/group/:id', element: <GroupWorkspace /> },
-  { path: '/chats', element: <PrivateChats /> },
-  { path: '/project/:id', element: <Project /> },
+  { path: '/', element: <App /> },
+  { path: '/agent-square', element: <App /> },
+  { path: '/group/:id', element: <App /> },
+  { path: '/chats', element: <App /> },
+  { path: '/settings', element: <App /> },
+  { path: '/project/:id', element: <App /> },
+  { path: '*', element: <App /> },
 ]);

@@ -1,6 +1,7 @@
 /* ============================================================
-   AgentHub Web Design Tokens -- OKLCH color system
-   Shared with app/desktop. DO NOT hardcode hex in components.
+   AgentHub Web Design Tokens
+   Mapped to @agenthub/shared designTokens Desktop glass aliases.
+   Do not add app-local gradients, left rails, or new palettes here.
    ============================================================ */
 
 :root {

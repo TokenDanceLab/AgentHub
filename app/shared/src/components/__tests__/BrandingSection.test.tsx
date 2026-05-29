@@ -59,12 +59,12 @@ describe('BrandingSection', () => {
     expect(container.firstElementChild).toHaveClass('my-custom-class');
   });
 
-  it('applies custom gradient style when gradient prop is set', () => {
+  it('applies custom solid accent style when accent prop is set', () => {
     const { container } = render(
-      <BrandingSection title="AgentHub" gradient="linear-gradient(135deg, #667eea, #764ba2)" />,
+      <BrandingSection title="AgentHub" accent="#667eea" />,
     );
 
     const mark = container.querySelector('[aria-hidden="true"]');
-    expect(mark).toHaveStyle({ background: 'linear-gradient(135deg, #667eea, #764ba2)' });
+    expect(mark).toHaveStyle({ backgroundColor: '#667eea' });
   });
 });

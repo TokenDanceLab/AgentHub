@@ -114,10 +114,23 @@ export default function RunDetail({
 
   if (!run) {
     return (
-      <div className={styles.panel}>
+      <aside className={styles.panel} aria-label={t('run.title')}>
         <div className={styles.title}>{t('run.title')}</div>
-        <div className={styles.empty}>{t('run.empty')}</div>
-      </div>
+        <div className={styles.emptyStack}>
+          <div className={styles.emptyCard}>
+            <TerminalSquare size={16} />
+            <span>{t('run.empty')}</span>
+          </div>
+          <div className={styles.emptyCard}>
+            <FileText size={16} />
+            <span>{t('run.emptyOutput')}</span>
+          </div>
+          <div className={styles.emptyCard}>
+            <Wrench size={16} />
+            <span>{t('run.emptySources')}</span>
+          </div>
+        </div>
+      </aside>
     );
   }
 

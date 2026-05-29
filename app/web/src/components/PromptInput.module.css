@@ -285,9 +285,9 @@
 .contextGlyph {
   width: 14px;
   height: 14px;
-  border: 2px solid var(--muted-foreground);
-  border-right-color: transparent;
+  border: 0;
   border-radius: 50%;
+  background: var(--muted-foreground);
   flex: 0 0 auto;
   opacity: 0.58;
 }
@@ -376,6 +376,13 @@
     display: none;
   }
 
+  .attachBtn,
+  .sendBtn,
+  .stopBtn {
+    width: 44px;
+    height: 44px;
+  }
+
   .capsule {
     min-height: 0;
     padding: 9px 11px 8px;
@@ -383,7 +390,7 @@
   }
 
   .textarea {
-    min-height: 28px;
+    min-height: 44px;
     font-size: 16px;
     line-height: 1.52;
   }

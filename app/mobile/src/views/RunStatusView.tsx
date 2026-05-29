@@ -4,6 +4,7 @@ import type { StatusVariant } from "@agenthub/shared/components";
 import type { Run, RunStatus } from "@agenthub/shared";
 import { useQuery } from "@tanstack/react-query";
 import { getRun, getRunLogs } from "@agenthub/shared";
+import { useTranslation } from "react-i18next";
 
 interface RunStatusViewProps {
   run: Run;
@@ -22,6 +23,7 @@ function runStatusToVariant(s: RunStatus): StatusVariant {
 }
 
 export function RunStatusView({ run, onBack }: RunStatusViewProps) {
+  const { t } = useTranslation();
   const runDetail = useQuery({
     queryKey: ["run", run.runId],
     queryFn: () => getRun(run.runId),
@@ -36,44 +38,50 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
   const status = runDetail.data?.status ?? run.status;
 
   return (
-    <div className="flex flex-col h-full">
-      <header
-        className="glass shrink-0 flex items-center gap-3 px-3"
-        style={{
-          height: "calc(56px + env(safe-area-inset-top))",
-          paddingTop: "env(safe-area-inset-top)",
-        }}
-      >
+    <div className="mobileView">
+      <header className="mobileHeader mobileChatHeader">
         <button
           onClick={onBack}
-          className="flex items-center justify-center rounded-lg"
-          style={{ width: 40, height: 40, color: "var(--td-ink-70)" }}
-          aria-label="Back"
+          className="mobileIconButton"
+          type="button"
+          aria-label={t("runDetail.actions.back")}
         >
           <ArrowLeft size={20} />
         </button>
-        <div className="flex-1 min-w-0 flex items-center gap-2">
-          <h2 className="text-base font-semibold truncate" style={{ color: "var(--td-ink)" }}>
-            Run {run.runId.slice(0, 8)}
-          </h2>
+        <div className="mobileHeaderTitle">
+          <p className="mobileEyebrow">{t("runDetail.header.eyebrow")}</p>
+          <h1>{t("runDetail.header.title", { runId: run.runId.slice(0, 8) })}</h1>
+        </div>
+        <div className="mobileStatusBadge">
           <StatusBadge status={runStatusToVariant(status)} />
         </div>
         {runDetail.isFetching && (
-          <RefreshCw size={14} className="animate-spin" style={{ color: "var(--td-ink-30)" }} />
+          <RefreshCw size={14} className="mobileSpin" />
         )}
       </header>
 
-      <div className="flex-1 scroll-container px-3 py-3">
-        <pre
-          className="text-xs font-mono whitespace-pre-wrap rounded-lg p-3"
-          style={{
-            backgroundColor: "var(--td-surface)",
-            border: "1px solid var(--td-line)",
-            color: "var(--td-ink-70)",
-            minHeight: 100,
-          }}
-        >
-          {logs.data?.stdout ?? "Waiting for output..."}
+      <div className="mobileScroll">
+        <section className="mobileOverviewPanel">
+          <p className="mobileEyebrow">{t("runDetail.context.eyebrow")}</p>
+          <h2>{run.projectId}</h2>
+          <div className="mobileMetricGrid">
+            <div className="mobileMetricTile">
+              <strong>{status}</strong>
+              <span>{t("runDetail.context.status")}</span>
+            </div>
+            <div className="mobileMetricTile">
+              <strong>{run.threadId.slice(0, 8)}</strong>
+              <span>{t("runDetail.context.thread")}</span>
+            </div>
+            <div className="mobileMetricTile">
+              <strong>{new Date(run.startedAt ?? run.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</strong>
+              <span>{t("runDetail.context.started")}</span>
+            </div>
+          </div>
+        </section>
+
+        <pre className="mobileLogBlock">
+          {logs.data?.stdout ?? t("runDetail.context.waitingOutput")}
         </pre>
       </div>
     </div>

@@ -1,101 +1,270 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { listThreads, getHealth } from "@agenthub/shared";
-import type { Thread, Run } from "@agenthub/shared";
-import { StatusBadge } from "@agenthub/shared/components";
+import { listThreads } from "@agenthub/shared";
+import type { Thread } from "@agenthub/shared";
 import type { StatusVariant } from "@agenthub/shared/components";
-import { MessageSquare, AlertCircle, RefreshCw } from "lucide-react";
+import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, Settings, ArrowRight } from "lucide-react";
+import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
+import { MobileStatusBadge } from "../components/MobileStatusBadge";
+import { getMobileHubHealth } from "../native/hubHealth";
+import { useTranslation } from "react-i18next";
 
 interface ThreadListViewProps {
   onThreadSelect: (thread: Thread) => void;
-  onRunSelect: (run: Run) => void;
+  onOpenSettings: () => void;
 }
 
 function threadStatusToVariant(status: Thread["status"]): StatusVariant {
   return status === "active" ? "online" : "offline";
 }
 
-export function ThreadListView({ onThreadSelect }: ThreadListViewProps) {
-  const health = useQuery({ queryKey: ["health"], queryFn: getHealth });
+function threadStatusLabelKey(status: Thread["status"]): string {
+  return status === "active" ? "queue.statusLabels.online" : "queue.statusLabels.offline";
+}
+
+type ThreadFilter = "all" | "active" | "archived";
+
+function matchesThreadFilter(thread: Thread, filter: ThreadFilter): boolean {
+  if (filter === "all") return true;
+  return thread.status === filter;
+}
+
+function formatThreadTime(thread: Thread): string {
+  return new Date(thread.updatedAt ?? thread.createdAt).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function ThreadListView({ onThreadSelect, onOpenSettings }: ThreadListViewProps) {
+  const { t } = useTranslation();
+  const [filter, setFilter] = useState<ThreadFilter>("all");
+  const health = useQuery({ queryKey: ["mobile-hub-health"], queryFn: getMobileHubHealth, retry: false });
   const threads = useQuery({
     queryKey: ["threads"],
     queryFn: () => listThreads({ pageSize: 50 }),
+    retry: false,
   });
 
   const isConnected = health.data?.status === "ok";
+  const workflowUnavailable = isConnected && threads.isError;
+  const isRefreshing = threads.isFetching && !threads.isLoading;
+  const items = threads.data?.items ?? [];
+  const activeCount = items.filter((thread) => thread.status === "active").length;
+  const archivedCount = items.filter((thread) => thread.status === "archived").length;
+  const visibleItems = useMemo(
+    () => items.filter((thread) => matchesThreadFilter(thread, filter)),
+    [filter, items],
+  );
+  const nextActiveThread = items.find((thread) => thread.status === "active");
+  const filterOptions: Array<{
+    id: ThreadFilter;
+    label: string;
+    count: number;
+    icon: typeof Play;
+  }> = [
+    { id: "all", label: t("queue.common.all"), count: items.length, icon: Play },
+    { id: "active", label: t("queue.common.active"), count: activeCount, icon: MessageSquare },
+    { id: "archived", label: t("queue.threads.filterArchived"), count: archivedCount, icon: Archive },
+  ];
 
   return (
-    <div className="flex flex-col h-full">
-      <header
-        className="glass shrink-0 flex items-center justify-between px-4"
-        style={{
-          height: "calc(56px + env(safe-area-inset-top))",
-          paddingTop: "env(safe-area-inset-top)",
-        }}
-      >
-        <h1 className="text-lg font-semibold" style={{ color: "var(--td-ink)" }}>
-          AgentHub
-        </h1>
-        <div className="flex items-center gap-2">
-          <div
-            className="w-2 h-2 rounded-full"
-            style={{
-              backgroundColor: isConnected ? "var(--td-moss)" : "var(--td-danger)",
-            }}
+    <div className="mobileView">
+      <header className="mobileHeader">
+        <div>
+          <p className="mobileEyebrow">{t("queue.threads.eyebrow")}</p>
+          <h1>{t("queue.threads.title")}</h1>
+        </div>
+        <div className="mobileStatusBadge">
+          <span
+            className="mobileStatusDot"
+            style={{ backgroundColor: isConnected ? "var(--td-moss)" : "var(--td-danger)" }}
           />
-          <span className="text-xs" style={{ color: "var(--td-ink-50)" }}>
-            {isConnected ? "Connected" : "Offline"}
+          <span>
+            {isConnected
+              ? workflowUnavailable
+                ? t("queue.status.reachable")
+                : t("queue.status.connected")
+              : t("queue.status.offline")}
           </span>
         </div>
       </header>
 
-      <div className="flex-1 scroll-container px-3 py-2">
+      <div className="mobileScroll mobileThreadSurface">
+        <section className="mobileOverviewPanel">
+          <div className="mobileOverviewTitleRow">
+            <div>
+              <p className="mobileEyebrow">{t("queue.threads.eyebrow")}</p>
+              <h2>{t("queue.threads.overviewTitle")}</h2>
+            </div>
+            <button
+              className="mobileIconButton"
+              type="button"
+              aria-label={t("queue.threads.refresh")}
+              aria-busy={threads.isFetching}
+              onClick={() => threads.refetch()}
+            >
+              <RefreshCw size={18} className={threads.isFetching ? "mobileSpin" : undefined} />
+            </button>
+          </div>
+          <div className="mobileMetricGrid">
+            <div className="mobileMetricTile">
+              <strong>{activeCount}</strong>
+              <span>{t("queue.common.active")}</span>
+            </div>
+            <div className="mobileMetricTile">
+              <strong>{archivedCount}</strong>
+              <span>{t("queue.common.archived")}</span>
+            </div>
+            <div className="mobileMetricTile">
+              <strong>{isConnected ? t("queue.threads.hubReady") : t("queue.threads.hubDown")}</strong>
+              <span>{t("queue.threads.metricHub")}</span>
+            </div>
+          </div>
+          <div className="mobileSignalRow">
+            <Radio size={14} />
+            <span>
+              {isConnected
+                ? workflowUnavailable
+                  ? t("queue.threads.signalPending")
+                  : t("queue.threads.signalOnline")
+                : t("queue.threads.signalOffline")}
+            </span>
+          </div>
+          {isRefreshing && (
+            <div className="mobileRefreshStatus" role="status" aria-live="polite">
+              <RefreshCw size={13} className="mobileSpin" />
+              <span>{t("queue.threads.refreshing")}</span>
+            </div>
+          )}
+        </section>
+
+        {nextActiveThread && filter !== "archived" && (
+          <button
+            className="mobileRunTriageCard"
+            type="button"
+            aria-label={t("queue.threads.continueAria", { title: nextActiveThread.title || nextActiveThread.id })}
+            onClick={() => onThreadSelect(nextActiveThread)}
+          >
+            <span className="mobileRunTriageIcon">
+              <MessageSquare size={18} />
+            </span>
+            <div className="mobileRunTriageBody">
+              <p>{t("queue.threads.continueHandoff")}</p>
+              <h2>{nextActiveThread.title || nextActiveThread.id}</h2>
+              <span>
+                <Clock3 size={12} />
+                {formatThreadTime(nextActiveThread)}
+              </span>
+            </div>
+            <span className="mobileRunTriageAction" aria-hidden="true">
+              <ArrowRight size={17} />
+            </span>
+          </button>
+        )}
+
+        <div className="mobileSegmentedToolbar mobileThreadFilterToolbar" aria-label={t("queue.threads.filters")}>
+          {filterOptions.map((option) => {
+            const Icon = option.icon;
+            const isActive = option.id === filter;
+            return (
+              <button
+                key={option.id}
+                className={`mobileSegmentButton${isActive ? " mobileSegmentButtonActive" : ""}`}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setFilter(option.id)}
+              >
+                <Icon size={14} />
+                <span>{option.label}</span>
+                <strong>{option.count}</strong>
+              </button>
+            );
+          })}
+        </div>
+
         {threads.isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <RefreshCw size={24} className="animate-spin" style={{ color: "var(--td-ink-30)" }} />
+          <div className="mobileCenterState">
+            <RefreshCw size={24} className="mobileSpin" />
+            <strong>{t("queue.threads.loadingTitle")}</strong>
+            <p>{t("queue.threads.loadingDescription")}</p>
           </div>
         )}
 
         {threads.isError && (
-          <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <AlertCircle size={32} style={{ color: "var(--td-danger)" }} />
-            <p className="text-sm" style={{ color: "var(--td-ink-50)" }}>
-              Failed to load threads
-            </p>
-          </div>
-        )}
-
-        {threads.data?.items.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <MessageSquare size={32} style={{ color: "var(--td-ink-30)" }} />
-            <p className="text-sm" style={{ color: "var(--td-ink-50)" }}>
-              No threads yet
-            </p>
-          </div>
-        )}
-
-        {threads.data?.items.map((thread) => (
-          <button
-            key={thread.id}
-            onClick={() => onThreadSelect(thread)}
-            className="w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg
-                       transition-colors duration-150 mb-1"
-            style={{
-              backgroundColor: "var(--td-surface)",
-              border: "1px solid var(--td-line)",
+          <MobileRecoveryPanel
+            icon={<AlertCircle size={18} />}
+            eyebrow={isConnected ? t("queue.threads.recoveryEyebrowReachable") : t("queue.threads.recoveryEyebrowOffline")}
+            title={t("queue.threads.recoveryTitle")}
+            description={
+              isConnected
+                ? t("queue.threads.recoveryReachable")
+                : t("queue.threads.recoveryOffline")
+            }
+            meta={threads.errorUpdatedAt ? t("queue.common.lastAttempt", { time: new Date(threads.errorUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : undefined}
+            isRetrying={threads.isFetching}
+            onRetry={() => {
+              void health.refetch();
+              void threads.refetch();
             }}
-          >
-            <MessageSquare size={20} style={{ color: "var(--td-ink-50)" }} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate" style={{ color: "var(--td-ink)" }}>
-                {thread.title || thread.id}
-              </p>
-              <p className="text-xs truncate" style={{ color: "var(--td-ink-50)" }}>
-                {thread.projectId}
-              </p>
-            </div>
-            <StatusBadge status={threadStatusToVariant(thread.status)} />
-          </button>
-        ))}
+            secondaryLabel={t("queue.common.settings")}
+            secondaryIcon={<Settings size={16} />}
+            onSecondaryAction={onOpenSettings}
+          />
+        )}
+
+        {!threads.isLoading && !threads.isError && items.length === 0 && (
+          <div className="mobileCenterState">
+            <MessageSquare size={32} />
+            <strong>{t("queue.threads.emptyTitle")}</strong>
+            <p>{t("queue.threads.emptyDescription")}</p>
+          </div>
+        )}
+
+        {!threads.isLoading && !threads.isError && items.length > 0 && visibleItems.length === 0 && (
+          <div className="mobileCenterState">
+            <Archive size={32} />
+            <strong>{t("queue.threads.emptyFilterTitle", { filter: t(`queue.common.${filter}`) })}</strong>
+            <p>{t("queue.threads.emptyFilterDescription")}</p>
+            <button className="mobileActionButton" type="button" onClick={() => setFilter("all")}>
+              <Play size={16} />
+              <span>{t("queue.common.showAll")}</span>
+            </button>
+          </div>
+        )}
+
+        {!threads.isError && (
+          <div className="mobileListStack">
+            {visibleItems.map((thread) => (
+              <button
+                key={thread.id}
+                onClick={() => onThreadSelect(thread)}
+                className="mobileThreadItem"
+                type="button"
+              >
+                <span className="mobileThreadIcon">
+                  <MessageSquare size={18} />
+                </span>
+                <span className="mobileListItemBody">
+                  <span className="mobileListItemTitle">{thread.title || thread.id}</span>
+                  <span className="mobileRunMetaStack">
+                    <span className="mobileListItemMeta">{thread.projectId || t("queue.threads.localWorkspace")}</span>
+                    <span className="mobileListItemMeta">
+                      <Clock3 size={12} />
+                      {formatThreadTime(thread)}
+                    </span>
+                  </span>
+                </span>
+                <MobileStatusBadge
+                  status={threadStatusToVariant(thread.status)}
+                  label={t(threadStatusLabelKey(thread.status))}
+                />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
