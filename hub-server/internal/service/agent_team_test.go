@@ -839,6 +839,152 @@ func TestAgentTeamService_HandleRouteDecisionRejectsBudgetExceeded(t *testing.T)
 	assert.Contains(t, events[0].Payload, "budget exceeded")
 }
 
+func TestAgentTeamService_CreateAssignmentRejectsDelegationDepthLimit(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	_, supervisor, _, run := seedAgentTeamRun(t, db)
+	supervisor2 := addTeamSupervisor(t, db, supervisor.TeamID, "profile-supervisor-2")
+	supervisor3 := addTeamSupervisor(t, db, supervisor.TeamID, "profile-supervisor-3")
+	supervisor4 := addTeamSupervisor(t, db, supervisor.TeamID, "profile-supervisor-4")
+	supervisor5 := addTeamSupervisor(t, db, supervisor.TeamID, "profile-supervisor-5")
+
+	require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor.ID,
+		ToMemberID:   supervisor2.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "depth 1",
+		Status:       model.AssignmentStatusDone,
+		Depth:        1,
+	}))
+	require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor2.ID,
+		ToMemberID:   supervisor3.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "depth 2",
+		Status:       model.AssignmentStatusDone,
+		Depth:        2,
+	}))
+	require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor3.ID,
+		ToMemberID:   supervisor4.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "depth 3",
+		Status:       model.AssignmentStatusDone,
+		Depth:        model.MaxDelegationDepth,
+	}))
+
+	assignment, err := svc.CreateAssignment(context.Background(), "user-1", run.ID, supervisor4.ID, supervisor5.ID, model.AssignmentTypeDelegate, "too deep", "")
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, assignment)
+}
+
+func TestAgentTeamService_CreateAssignmentRejectsTeamRunTaskLimit(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	_, supervisor, executor, run := seedAgentTeamRun(t, db)
+
+	for i := 0; i < model.MaxTasksPerTeamRun; i++ {
+		require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
+			TeamRunID:    run.ID,
+			FromMemberID: supervisor.ID,
+			ToMemberID:   executor.ID,
+			Type:         model.AssignmentTypeDelegate,
+			TaskPrompt:   "completed task",
+			Status:       model.AssignmentStatusDone,
+			Depth:        1,
+		}))
+	}
+
+	assignment, err := svc.CreateAssignment(context.Background(), "user-1", run.ID, supervisor.ID, executor.ID, model.AssignmentTypeDelegate, "too many", "")
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, assignment)
+}
+
+func TestAgentTeamService_CreateAssignmentRejectsDelegationCycle(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	_, supervisor, _, run := seedAgentTeamRun(t, db)
+	supervisor2 := addTeamSupervisor(t, db, supervisor.TeamID, "profile-supervisor-cycle-2")
+	supervisor3 := addTeamSupervisor(t, db, supervisor.TeamID, "profile-supervisor-cycle-3")
+
+	require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor.ID,
+		ToMemberID:   supervisor2.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "cycle depth 1",
+		Status:       model.AssignmentStatusDone,
+		Depth:        1,
+	}))
+	require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor2.ID,
+		ToMemberID:   supervisor3.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "cycle depth 2",
+		Status:       model.AssignmentStatusDone,
+		Depth:        2,
+	}))
+
+	assignment, err := svc.CreateAssignment(context.Background(), "user-1", run.ID, supervisor3.ID, supervisor.ID, model.AssignmentTypeDelegate, "cycle", "")
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, assignment)
+}
+
+func TestAgentTeamService_CreateAssignmentUsesConfiguredDelegationDepthLimit(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, AgentTeamGuardrails{
+		MaxDelegationDepth: 1,
+	})
+	_, supervisor, _, run := seedAgentTeamRun(t, db)
+	supervisor2 := addTeamSupervisor(t, db, supervisor.TeamID, "profile-config-depth-2")
+	supervisor3 := addTeamSupervisor(t, db, supervisor.TeamID, "profile-config-depth-3")
+
+	require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor.ID,
+		ToMemberID:   supervisor2.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "depth 1",
+		Status:       model.AssignmentStatusDone,
+		Depth:        1,
+	}))
+
+	assignment, err := svc.CreateAssignment(context.Background(), "user-1", run.ID, supervisor2.ID, supervisor3.ID, model.AssignmentTypeDelegate, "too deep for config", "")
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, assignment)
+}
+
+func TestAgentTeamService_CreateAssignmentUsesConfiguredTeamRunTaskLimit(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, AgentTeamGuardrails{
+		MaxTasksPerTeamRun: 1,
+	})
+	_, supervisor, executor, run := seedAgentTeamRun(t, db)
+
+	require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
+		TeamRunID:    run.ID,
+		FromMemberID: supervisor.ID,
+		ToMemberID:   executor.ID,
+		Type:         model.AssignmentTypeDelegate,
+		TaskPrompt:   "first task",
+		Status:       model.AssignmentStatusDone,
+		Depth:        1,
+	}))
+
+	assignment, err := svc.CreateAssignment(context.Background(), "user-1", run.ID, supervisor.ID, executor.ID, model.AssignmentTypeDelegate, "over configured task limit", "")
+	require.Error(t, err)
+	assert.Equal(t, errcode.ErrBadRequest, err)
+	assert.Nil(t, assignment)
+}
+
 func TestAgentTeamService_ListTeamTasksIsOwnerScoped(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
@@ -1875,6 +2021,17 @@ func addReadableTeamMemberForUser(t *testing.T, db *gorm.DB, teamID, userID stri
 		TeamID:         teamID,
 		AgentProfileID: &agent.ID,
 		Role:           model.TeamMemberRoleExecutor,
+	}
+	require.NoError(t, repository.AddTeamMember(db, member))
+	return member
+}
+
+func addTeamSupervisor(t *testing.T, db *gorm.DB, teamID, profileID string) *model.AgentTeamMember {
+	t.Helper()
+	member := &model.AgentTeamMember{
+		TeamID:         teamID,
+		AgentProfileID: &profileID,
+		Role:           model.TeamMemberRoleSupervisor,
 	}
 	require.NoError(t, repository.AddTeamMember(db, member))
 	return member

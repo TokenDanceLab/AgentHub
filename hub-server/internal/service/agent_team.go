@@ -39,13 +39,67 @@ type AgentTeamService struct {
 	agentSvc    agentTeamAgentSvc
 	cacheClient agentTeamCache
 	controlSvc  agentTeamControlSvc
+	guardrails  AgentTeamGuardrails
+}
+
+type AgentTeamGuardrails struct {
+	MaxDelegationDepth       int
+	MaxActiveSubAgentsPerRun int64
+	MaxRouteRepeats          int
+	MaxTasksPerTeamRun       int64
+	AssignmentTimeout        time.Duration
+	MaxTeamRunBudgetTokens   int64
+	MaxTeamRunBudgetUsagePct float64
+}
+
+func DefaultAgentTeamGuardrails() AgentTeamGuardrails {
+	return AgentTeamGuardrails{
+		MaxDelegationDepth:       model.MaxDelegationDepth,
+		MaxActiveSubAgentsPerRun: model.MaxActiveSubAgentsPerRun,
+		MaxRouteRepeats:          model.MaxRouteRepeats,
+		MaxTasksPerTeamRun:       model.MaxTasksPerTeamRun,
+		AssignmentTimeout:        model.DefaultAssignmentTimeout,
+		MaxTeamRunBudgetTokens:   model.MaxTeamRunBudgetTokens,
+		MaxTeamRunBudgetUsagePct: model.MaxTeamRunBudgetUsagePct,
+	}
+}
+
+func (g AgentTeamGuardrails) normalized() AgentTeamGuardrails {
+	defaults := DefaultAgentTeamGuardrails()
+	if g.MaxDelegationDepth <= 0 {
+		g.MaxDelegationDepth = defaults.MaxDelegationDepth
+	}
+	if g.MaxActiveSubAgentsPerRun <= 0 {
+		g.MaxActiveSubAgentsPerRun = defaults.MaxActiveSubAgentsPerRun
+	}
+	if g.MaxRouteRepeats <= 0 {
+		g.MaxRouteRepeats = defaults.MaxRouteRepeats
+	}
+	if g.MaxTasksPerTeamRun <= 0 {
+		g.MaxTasksPerTeamRun = defaults.MaxTasksPerTeamRun
+	}
+	if g.AssignmentTimeout <= 0 {
+		g.AssignmentTimeout = defaults.AssignmentTimeout
+	}
+	if g.MaxTeamRunBudgetTokens <= 0 {
+		g.MaxTeamRunBudgetTokens = defaults.MaxTeamRunBudgetTokens
+	}
+	if g.MaxTeamRunBudgetUsagePct <= 0 {
+		g.MaxTeamRunBudgetUsagePct = defaults.MaxTeamRunBudgetUsagePct
+	}
+	return g
 }
 
 func NewAgentTeamService(db *gorm.DB, agentSvc agentTeamAgentSvc, cacheClient *cache.Client) *AgentTeamService {
+	return NewAgentTeamServiceWithGuardrails(db, agentSvc, cacheClient, DefaultAgentTeamGuardrails())
+}
+
+func NewAgentTeamServiceWithGuardrails(db *gorm.DB, agentSvc agentTeamAgentSvc, cacheClient *cache.Client, guardrails AgentTeamGuardrails) *AgentTeamService {
 	return &AgentTeamService{
 		db:          db,
 		agentSvc:    agentSvc,
 		cacheClient: resolveAgentTeamCache(cacheClient),
+		guardrails:  guardrails.normalized(),
 	}
 }
 
@@ -1592,7 +1646,7 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 	if err != nil {
 		return nil, err
 	}
-	if taskCount >= model.MaxTasksPerTeamRun {
+	if taskCount >= s.guardrails.MaxTasksPerTeamRun {
 		return nil, s.rejectRouteDecision(runID, decision, "task limit reached")
 	}
 	timedOut, err := s.hasTimedOutActiveAssignment(runID)
@@ -1606,14 +1660,14 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 	if err != nil {
 		return nil, err
 	}
-	if activeCount >= model.MaxActiveSubAgentsPerRun {
+	if activeCount >= s.guardrails.MaxActiveSubAgentsPerRun {
 		return nil, s.rejectRouteDecision(runID, decision, "active subagent limit reached")
 	}
 	repeatCount, err := s.countMatchingRouteDecisions(runID, decision)
 	if err != nil {
 		return nil, err
 	}
-	if repeatCount >= model.MaxRouteRepeats {
+	if repeatCount >= s.guardrails.MaxRouteRepeats {
 		return nil, s.rejectRouteDecision(runID, decision, "route repeat limit reached")
 	}
 	budgetExceeded, err := s.teamRunBudgetExceeded(runID)
@@ -1662,7 +1716,7 @@ func (s *AgentTeamService) hasTimedOutActiveAssignment(runID string) (bool, erro
 	if err != nil {
 		return false, err
 	}
-	deadline := time.Now().Add(-model.DefaultAssignmentTimeout)
+	deadline := time.Now().Add(-s.guardrails.AssignmentTimeout)
 	for _, assignment := range assignments {
 		if assignment.CreatedAt.IsZero() || !isActiveAssignmentStatus(assignment.Status) {
 			continue
@@ -1694,10 +1748,10 @@ func (s *AgentTeamService) teamRunBudgetExceeded(runID string) (bool, error) {
 	if budget.TokenLimit > 0 && budget.TotalTokensUsed >= budget.TokenLimit {
 		return true, nil
 	}
-	if budget.TotalTokensUsed >= model.MaxTeamRunBudgetTokens {
+	if budget.TotalTokensUsed >= s.guardrails.MaxTeamRunBudgetTokens {
 		return true, nil
 	}
-	if budget.UsagePercent >= model.MaxTeamRunBudgetUsagePct {
+	if budget.UsagePercent >= s.guardrails.MaxTeamRunBudgetUsagePct {
 		return true, nil
 	}
 	return false, nil
@@ -1878,8 +1932,13 @@ func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRun
 	// 4. Build ancestor chain and compute depth.
 	ancestorDepth := 0
 	var ancestorIDs []string // member IDs in the chain (both from and to)
+	visitedAncestors := map[string]struct{}{}
 	parentID := fromMemberID
 	for {
+		if _, seen := visitedAncestors[parentID]; seen {
+			return nil, errcode.ErrBadRequest
+		}
+		visitedAncestors[parentID] = struct{}{}
 		parentAssignment, aErr := repository.GetAssignmentByToMember(s.db, teamRunID, parentID)
 		if aErr != nil {
 			if errors.Is(aErr, gorm.ErrRecordNotFound) {
@@ -1887,22 +1946,31 @@ func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRun
 			}
 			return nil, aErr
 		}
-		ancestorDepth = parentAssignment.Depth
+		if parentAssignment.Depth > ancestorDepth {
+			ancestorDepth = parentAssignment.Depth
+		}
 		ancestorIDs = append(ancestorIDs, parentAssignment.FromMemberID, parentAssignment.ToMemberID)
 		parentID = parentAssignment.FromMemberID
 	}
 
 	newDepth := ancestorDepth + 1
-	if newDepth > model.MaxDelegationDepth {
+	if newDepth > s.guardrails.MaxDelegationDepth {
 		return nil, errcode.ErrBadRequest
 	}
 
-	// 5. Check active assignments limit for this team run.
+	// 5. Check total and active assignment limits for this team run.
+	taskCount, err := repository.CountAssignmentsByTeamRun(s.db, teamRunID)
+	if err != nil {
+		return nil, err
+	}
+	if taskCount >= s.guardrails.MaxTasksPerTeamRun {
+		return nil, errcode.ErrBadRequest
+	}
 	activeCount, err := repository.CountActiveAssignmentsByTeamRun(s.db, teamRunID)
 	if err != nil {
 		return nil, err
 	}
-	if activeCount >= model.MaxActiveSubAgentsPerRun {
+	if activeCount >= s.guardrails.MaxActiveSubAgentsPerRun {
 		return nil, errcode.ErrBadRequest
 	}
 

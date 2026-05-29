@@ -24,3 +24,11 @@ jwt:
 upload:
   dir: ./uploads
   max_size: 10485760
+agent_team:
+  max_delegation_depth: 3
+  max_active_subagents_per_run: 5
+  max_route_repeats: 3
+  max_tasks_per_team_run: 20
+  assignment_timeout: 30m
+  max_team_run_budget_tokens: 200000
+  max_team_run_budget_usage_pct: 95
