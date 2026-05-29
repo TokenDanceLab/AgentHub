@@ -1,0 +1,71 @@
+.row {
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast, 0.16s),
+    color var(--duration-fast, 0.16s);
+}
+
+.button:hover {
+  background: var(--hover-overlay, var(--muted));
+  color: var(--foreground);
+}
+
+.leading {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.chevron {
+  display: inline-block;
+  flex: 0 0 auto;
+  font-size: 10px;
+  opacity: 0.52;
+  transition: transform var(--duration-fast, 0.16s) var(--ease-out, ease);
+}
+
+.chevronExpanded {
+  transform: rotate(90deg);
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  margin-left: auto;
+  min-width: max-content;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.body {
+  min-width: 0;
+  padding: 8px 10px 2px;
+}

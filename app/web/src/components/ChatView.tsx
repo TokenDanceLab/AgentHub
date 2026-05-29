@@ -7,7 +7,7 @@ import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search,
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
-import { EmptyState } from '@shared/ui';
+import { DisclosureRow, EmptyState } from '@shared/ui';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
@@ -210,18 +210,20 @@ function StatusRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className={styles.statusRow}>
-      <button
-        className={styles.statusRowHeader}
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-      >
-        <span className={styles.chevron + (expanded ? ' ' + styles.chevronDown : '')}>▸</span>
-        <span className={styles.statusRowLabel}>{label}</span>
-        {meta && <span className={styles.statusRowMeta}>{meta}</span>}
-      </button>
-      {expanded && children && <div className={styles.statusRowBody}>{children}</div>}
-    </div>
+    <DisclosureRow
+      className={styles.statusRow ?? ''}
+      buttonClassName={styles.statusRowHeader ?? ''}
+      chevronClassName={styles.chevron ?? ''}
+      labelClassName={styles.statusRowLabel ?? ''}
+      metaClassName={styles.statusRowMeta ?? ''}
+      bodyClassName={styles.statusRowBody ?? ''}
+      label={label}
+      meta={meta}
+      expanded={expanded}
+      onToggle={() => setExpanded((v) => !v)}
+    >
+      {children}
+    </DisclosureRow>
   );
 }
 
