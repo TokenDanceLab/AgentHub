@@ -92,6 +92,22 @@ describe('HomeDashboard', () => {
     expect(screen.getByText('3')).toBeInTheDocument();
   });
 
+  it('opens TeamRun Console from the dashboard card', () => {
+    const onOpenTeamRuns = vi.fn();
+    render(
+      <HomeDashboard
+        onNewThread={vi.fn()}
+        onSelectThread={vi.fn()}
+        onQuickStart={vi.fn()}
+        onOpenTeamRuns={onOpenTeamRuns}
+      />,
+    );
+
+    expect(screen.getByText('home.activeTeamRuns')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('home.openTeamRuns'));
+    expect(onOpenTeamRuns).toHaveBeenCalledTimes(1);
+  });
+
   it('renders target health card', () => {
     render(
       <HomeDashboard
