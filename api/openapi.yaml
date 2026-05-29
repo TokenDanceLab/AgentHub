@@ -86,6 +86,7 @@ paths:
       operationId: getHealth
       summary: Health check.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       responses:
         "200":
@@ -102,6 +103,7 @@ paths:
         clients use `access_token` query auth; native clients may use the same
         local Edge token through Authorization or X-AgentHub-Edge-Token.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       security:
         - edgeWebSocketQueryToken: []
@@ -121,6 +123,7 @@ paths:
       operationId: listProjects
       summary: List projects.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/PageSize"
@@ -133,6 +136,7 @@ paths:
       operationId: createProject
       summary: Create or register a project.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       responses:
         "201":
@@ -144,6 +148,7 @@ paths:
       operationId: getProject
       summary: Get project.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ProjectId"
@@ -157,6 +162,7 @@ paths:
       operationId: updateProject
       summary: Update project.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ProjectId"
@@ -168,6 +174,7 @@ paths:
       operationId: deleteProject
       summary: Delete or unregister project.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ProjectId"
@@ -181,6 +188,7 @@ paths:
       operationId: getProjectMemory
       summary: Get project memory metadata.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ProjectId"
@@ -192,6 +200,7 @@ paths:
       operationId: updateProjectMemory
       summary: Update project memory metadata.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ProjectId"
@@ -205,6 +214,7 @@ paths:
       operationId: listConversations
       summary: List conversations.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       responses:
         "200":
@@ -214,6 +224,7 @@ paths:
       operationId: createConversation
       summary: Create conversation.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       responses:
         "201":
@@ -225,6 +236,7 @@ paths:
       operationId: getConversation
       summary: Get conversation.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
         - $ref: "#/components/parameters/ConversationId"
@@ -236,6 +248,7 @@ paths:
       operationId: updateConversation
       summary: Update conversation.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
         - $ref: "#/components/parameters/ConversationId"
@@ -249,6 +262,7 @@ paths:
       operationId: archiveConversation
       summary: Archive conversation.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
         - $ref: "#/components/parameters/ConversationId"
@@ -262,6 +276,7 @@ paths:
       operationId: listConversationMembers
       summary: List conversation members.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
         - $ref: "#/components/parameters/ConversationId"
@@ -273,6 +288,7 @@ paths:
       operationId: addConversationMember
       summary: Add conversation member.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
         - $ref: "#/components/parameters/ConversationId"
@@ -286,6 +302,7 @@ paths:
       operationId: removeConversationMember
       summary: Remove conversation member.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
         - $ref: "#/components/parameters/ConversationId"
@@ -300,6 +317,7 @@ paths:
       operationId: listThreads
       summary: List threads.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ProjectIdQuery"
@@ -313,6 +331,7 @@ paths:
       operationId: createThread
       summary: Create thread.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       responses:
         "201":
@@ -324,6 +343,7 @@ paths:
       operationId: getThread
       summary: Get thread.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ThreadId"
@@ -335,6 +355,7 @@ paths:
       operationId: updateThread
       summary: Update thread.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ThreadId"
@@ -348,6 +369,7 @@ paths:
       operationId: archiveThread
       summary: Archive thread.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ThreadId"
@@ -361,6 +383,7 @@ paths:
       operationId: forkThread
       summary: Fork thread.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ThreadId"
@@ -374,6 +397,7 @@ paths:
       operationId: listThreadItems
       summary: List thread items.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ThreadId"
@@ -389,6 +413,7 @@ paths:
       operationId: createThreadMessage
       summary: Create user message in thread.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ThreadId"
@@ -416,6 +441,7 @@ paths:
       operationId: getItem
       summary: Get item.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ItemId"
@@ -429,6 +455,7 @@ paths:
       operationId: listRunners
       summary: List runners.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       responses:
         "200":
@@ -444,6 +471,7 @@ paths:
       operationId: listAgents
       summary: List available agent adapters.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       responses:
         "200":
@@ -459,6 +487,7 @@ paths:
       operationId: getRunner
       summary: Get runner.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/RunnerId"
@@ -472,6 +501,7 @@ paths:
       operationId: pingRunner
       summary: Ping runner.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/RunnerId"
@@ -485,6 +515,7 @@ paths:
       operationId: drainRunner
       summary: Stop assigning new runs to runner.
       x-agenthub-phase: P2
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/RunnerId"
@@ -498,6 +529,7 @@ paths:
       operationId: listRuns
       summary: List AgentRuns.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       security:
         - edgeBearerAuth: []
@@ -521,6 +553,7 @@ paths:
         inside one of the allowed roots or the request is rejected before run
         creation.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       security:
         - edgeBearerAuth: []
@@ -547,6 +580,7 @@ paths:
       operationId: getRun
       summary: Get AgentRun.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/RunId"
@@ -560,6 +594,7 @@ paths:
       operationId: cancelRun
       summary: Cancel AgentRun.
       x-agenthub-phase: P0
+      x-agenthub-status: implemented
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/RunId"
@@ -573,6 +608,7 @@ paths:
       operationId: interruptRun
       summary: Interrupt AgentRun.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/RunId"
@@ -586,6 +622,7 @@ paths:
       operationId: resumeRun
       summary: Resume AgentRun.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/RunId"
@@ -599,6 +636,7 @@ paths:
       operationId: retryRun
       summary: Retry AgentRun.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/RunId"
@@ -612,6 +650,7 @@ paths:
       operationId: listRunItems
       summary: List run items.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/RunId"
@@ -625,6 +664,7 @@ paths:
       operationId: getRunLogs
       summary: Get run logs snapshot.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/RunId"
@@ -638,6 +678,7 @@ paths:
       operationId: getRunDiff
       summary: Get run diff snapshot.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/RunId"
@@ -651,6 +692,7 @@ paths:
       operationId: listApprovals
       summary: List approval requests.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       responses:
         "200":
@@ -662,6 +704,7 @@ paths:
       operationId: getApproval
       summary: Get approval request.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ApprovalId"
@@ -675,6 +718,7 @@ paths:
       operationId: decideApproval
       summary: Decide approval request.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ApprovalId"
@@ -688,6 +732,7 @@ paths:
       operationId: listArtifacts
       summary: List artifacts.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       responses:
         "200":
@@ -699,6 +744,7 @@ paths:
       operationId: getArtifact
       summary: Get artifact metadata.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ArtifactId"
@@ -712,6 +758,7 @@ paths:
       operationId: getArtifactContent
       summary: Get artifact content or redirect.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ArtifactId"
@@ -727,6 +774,7 @@ paths:
       operationId: applyArtifact
       summary: Apply artifact to target workspace.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ArtifactId"
@@ -740,6 +788,7 @@ paths:
       operationId: discardArtifact
       summary: Discard artifact.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/ArtifactId"
@@ -753,6 +802,7 @@ paths:
       operationId: listPreviews
       summary: List previews.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       responses:
         "200":
@@ -762,6 +812,7 @@ paths:
       operationId: createPreview
       summary: Start preview.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       responses:
         "202":
@@ -773,6 +824,7 @@ paths:
       operationId: getPreview
       summary: Get preview.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/PreviewId"
@@ -786,6 +838,7 @@ paths:
       operationId: stopPreview
       summary: Stop preview.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Edge
       parameters:
         - $ref: "#/components/parameters/PreviewId"
@@ -799,6 +852,7 @@ paths:
       operationId: getWorkspace
       summary: Get workspace.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Runner
       parameters:
         - $ref: "#/components/parameters/WorkspaceId"
@@ -812,6 +866,7 @@ paths:
       operationId: listWorkspaceFiles
       summary: List workspace files.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Runner
       parameters:
         - $ref: "#/components/parameters/WorkspaceId"
@@ -826,6 +881,7 @@ paths:
       summary: Read workspace file by path.
       description: File path is passed in the JSON body so slash-containing paths do not become ambiguous URL segments.
       x-agenthub-phase: P0
+      x-agenthub-status: planned
       x-agenthub-owner: Runner
       parameters:
         - $ref: "#/components/parameters/WorkspaceId"
@@ -839,6 +895,7 @@ paths:
       operationId: searchWorkspaceFiles
       summary: Search workspace files.
       x-agenthub-phase: P1
+      x-agenthub-status: planned
       x-agenthub-owner: Runner
       parameters:
         - $ref: "#/components/parameters/WorkspaceId"
