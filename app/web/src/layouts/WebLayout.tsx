@@ -50,6 +50,7 @@ import AuthPage from '@/components/AuthPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import SettingsPage from '@/components/SettingsPage';
 import { ToastContainer } from '@/components/Toast';
+import tokenDanceLogo from '@/assets/tokendance-icon-rounded.svg';
 import styles from './WebLayout.module.css';
 
 type MainSurface = 'workspace' | 'messages' | 'settings';
@@ -534,9 +535,7 @@ export default function WebLayout() {
               </button>
             )}
 
-            <div className={styles.brandMark} aria-hidden="true">
-              AH
-            </div>
+            <img className={styles.brandMark} src={tokenDanceLogo} alt="" aria-hidden="true" />
             <div className={styles.brandText}>
               <strong>AgentHub</strong>
               <span>{t('webShell.brand.subtitle')}</span>
