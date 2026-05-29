@@ -1,6 +1,6 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-29 UTC+8 | 分支：fix/hub-device-uuid-contract -> dev/delicious233 | 状态：后端隔离 worktree 推进 AH-SR-025；Desktop/UI 主工作树仅只读确认
+最后更新：2026-05-29 UTC+8 | 分支：fix/hub-device-uuid-contract -> dev/delicious233 | 状态：后端隔离 worktree完成 AH-SR-017/024/025/026 仓内收口并部署 hk2；Desktop/UI 主工作树仅只读确认
 
 ## 本次后端/运维推进（2026-05-29）
 
@@ -8,11 +8,12 @@
 - **AH-SR-024 收口**：AgentTeam read/write boundary 已在仓内缓解。`ListTeams` 现在只返回 owner teams + requester 拥有已安装 Agent Profile 的 readable teams；`GetTeam`、TeamRun runs/state/tasks/events 读取复用 readable-member 检查；`HandleRouteDecision`、`DecideApproval`、`ResolveConflict` 仍要求 team owner，成员读者不能提交路由、审批或冲突决策。
 - **AH-SR-025 收口**：AgentTeam delegation/resource guardrails 已在仓内缓解。`agent_team` 配置和 `AGENTHUB_AGENT_TEAM_*` env 覆盖委派深度、active subagents、route repeat、TeamRun 总任务、assignment timeout 和 budget；`CreateAssignment` 现在补齐 ancestor max-depth、脏数据循环检测、总任务 cap 和 active cap，不能绕过 coordinator route guardrails。
 - **AH-SR-017 收口**：生产探针发现主 API 对未知路径、`/metrics`、`/debug/pprof/` 返回空 `200`。仓内已修 Timeout middleware 的 header-only status flush，并给 router 增加显式 JSON 404/405；admin metrics/pprof 仍由独立 Basic Auth admin mux 管理。
+- **hk2 生产部署证据**：2026-05-29 已通过本机构建镜像 tar -> `scp -J hk1` -> hk2 `git pull --ff-only` -> `docker load` -> `docker compose ... up -d --no-build --no-deps --force-recreate hub-server` 部署 commit `f071d03`。生产容器 image id/digest `sha256:9d074e9c1a2f9cd2fd95e2c3735a6c30c67f6caaca478fc69153bfcb64534356`，tar SHA-256 `a5ec4311942947f5579b2b70463b04f1d2c2a14d7cf36e068f017432796def65`，Docker health `healthy`；本机与 SNI HTTPS `/health` 均 `status=ok`、`migrations=39`；公网 `/metrics`、`/debug/pprof/`、`/does-not-exist` 均返回 404。Hub 约 6.4MiB/256MiB、PG 约 26.6MiB/512MiB、Redis 约 5.8MiB/384MiB，根盘 63%；本地 tar 与 hk2 `/tmp/agenthub-hub-*.tar` 已清理，未在 hk2/serverhub/server build。
 - **AH-SR-025 验证证据**：已跑 `hub-server && go test ./internal/config -run "TestLoadAgentTeamGuardrailDefaults|TestEnvOverrideAgentTeamGuardrails|TestValidateRejectsInvalidAgentTeamGuardrails|TestJWTSecretHardcodedOverriddenByEnv" -count=1 -v`、`go test ./internal/service -run "TestAgentTeamService_CreateAssignmentRejects(DelegationDepthLimit|DelegationCycle|TeamRunTaskLimit)|TestAgentTeamService_CreateAssignmentUsesConfigured(DelegationDepthLimit|TeamRunTaskLimit)|TestAgentTeamService_HandleRouteDecisionRejectsWhen(ActiveSubagentLimitReached|TaskLimitReached|RouteRepeatLimitReached)|TestAgentTeamService_HandleRouteDecisionRejects(TimedOutAssignment|BudgetExceeded)" -count=1 -v`、`go test ./internal/service -run TestAgentTeamService -count=1 -v`、`go test ./... -short -count=1` 和 `git diff --check`。
 - **AH-SR-017 验证证据**：已跑 `hub-server && go test ./internal/router -run TestNoRouteReturnsNotFound -count=1 -v`、`go test ./internal/middleware -run "TestTimeout_(FlushesHeaderOnlyStatus|HandlerCompletesNormally|Returns504WhenHandlerSlow)" -count=1 -v`、`go test ./... -short -count=1` 和 `git diff --check`。
 - **AH-SR-024 验证证据**：已跑 `hub-server && go test ./internal/service -run "TestAgentTeamService_(GetTeamAllowsAgentProfileOwnerMemberRead|ListTeamsIncludesReadableMemberTeamsWithoutLeaking|MemberReadableTeamCannotMutateRunDecisions)$" -count=1 -v`、`go test ./internal/service -run TestAgentTeamService -count=1 -v`、`go test ./internal/repository -run TestAgentTeam -count=1 -v`、`go test ./... -short -count=1`。
 - **部署约束**：hk2/serverhub/server 不得 build。Hub runtime 镜像更新只能走开发机/CI 构建、`docker save`、`scp`、hk2 `docker load`、`docker compose ... up -d --no-build --no-deps --force-recreate hub-server`。`hub-server/deployments/deploy.sh` 已同步显式 `--force-recreate`，避免同一 `latest` tag 预加载新镜像后容器不重建。
-- **进度口径**：AT-2/AT-3 后端在 roadmap 中已完成；AT-4 仍是 Desktop/Edge live smoke（两个真实 Runtime Profile 同一 TeamRun）和 Console/UI 验收，不由本轮后端直接修改 UI 完成。
+- **进度口径**：本轮后端/安全/部署收口已完成；AT-2/AT-3 后端在 roadmap 中已完成。AT-4 仍是 Desktop/Edge live smoke（两个真实 Runtime Profile 同一 TeamRun）和 Console/UI 验收，不由本轮后端直接修改 UI 完成。
 
 ## 本次后端/运维推进（2026-05-27 凌晨）
 
@@ -222,7 +223,7 @@
 - [ ] AT-3：Supervisor 路由决策解析 + guardrails（model/migration 已有，待 service/handler/repo）
 - [ ] AT-2 补全：TeamEvent 持久化 + TeamRunState replay（migration 0036 已有）
 - [ ] #173 状态确认
-- [ ] 生产部署验证（注意：不在服务器编译，磁盘敏感）
+- [x] 生产部署验证（2026-05-29 已用 no-server-build tar/load/recreate 流程部署 `f071d03`，磁盘/资源/404/health 已验证）
 
 ### 共享端口与资源
 | 资源 | Desktop | Mobile |
