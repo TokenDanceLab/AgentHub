@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listThreads } from "@agenthub/shared";
 import type { Thread } from "@agenthub/shared";
 import type { StatusVariant } from "@agenthub/shared/components";
-import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, Settings, ArrowRight } from "lucide-react";
+import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, UserRound, ArrowRight } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
 import { MobileStatusBadge } from "../components/MobileStatusBadge";
 import { getMobileHubHealth } from "../native/hubHealth";
@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 
 interface ThreadListViewProps {
   onThreadSelect: (thread: Thread) => void;
-  onOpenSettings: () => void;
+  onOpenAccount: () => void;
 }
 
 function threadStatusToVariant(status: Thread["status"]): StatusVariant {
@@ -38,7 +38,7 @@ function formatThreadTime(thread: Thread): string {
   });
 }
 
-export function ThreadListView({ onThreadSelect, onOpenSettings }: ThreadListViewProps) {
+export function ThreadListView({ onThreadSelect, onOpenAccount }: ThreadListViewProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<ThreadFilter>("all");
   const health = useQuery({ queryKey: ["mobile-hub-health"], queryFn: getMobileHubHealth, retry: false });
@@ -209,9 +209,9 @@ export function ThreadListView({ onThreadSelect, onOpenSettings }: ThreadListVie
               void health.refetch();
               void threads.refetch();
             }}
-            secondaryLabel={t("queue.common.settings")}
-            secondaryIcon={<Settings size={16} />}
-            onSecondaryAction={onOpenSettings}
+            secondaryLabel={t("queue.common.account")}
+            secondaryIcon={<UserRound size={16} />}
+            onSecondaryAction={onOpenAccount}
           />
         )}
 
