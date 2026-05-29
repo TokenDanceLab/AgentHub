@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import TeamRunConsole from '@/components/TeamRunConsole';
 
@@ -173,33 +173,56 @@ describe('TeamRunConsole', () => {
 
     expect(screen.getByText('teamrun.signedOutTitle')).toBeInTheDocument();
     expect(screen.getByText('teamrun.signedOutDesc')).toBeInTheDocument();
+    expect(screen.getByText('teamrun.localEdgeHint')).toBeInTheDocument();
+    expect(screen.getByText('settings.signIn')).toBeInTheDocument();
+    expect(screen.getByText('teamrun.viewFixtureDemo')).toBeInTheDocument();
     expect(mockUseAgentTeams).toHaveBeenCalledWith(false);
   });
 
-  it('shows empty team state', () => {
+  it('opens a read-only fixture demo from the signed-out state', () => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      token: null,
+      loginWithTokenDance: mockLoginWithTokenDance,
+    });
+
+    render(<TeamRunConsole />);
+    fireEvent.click(screen.getByText('teamrun.viewFixtureDemo'));
+
+    expect(screen.getByText('teamrun.sourceFixture')).toBeInTheDocument();
+    expect(screen.getByText('teamrun.readOnly')).toBeInTheDocument();
+    expect(screen.getByText('teamrun.backToSignIn')).toBeInTheDocument();
+    expect(screen.getByText('Frontend Console Demo')).toBeInTheDocument();
+  });
+
+  it('shows clearly labeled fixture demo data when Hub has no live teams', () => {
     mockUseAgentTeams.mockReturnValue({ data: [], isFetching: false, error: null });
     mockUseTeamRuns.mockReturnValue({ data: [], isFetching: false, error: null });
     mockUseTeamRunState.mockReturnValue({ data: undefined, isLoading: false, error: null });
 
     render(<TeamRunConsole />);
 
-    expect(screen.getByText('teamrun.noTeams')).toBeInTheDocument();
-    expect(screen.getByText('teamrun.emptyTitle')).toBeInTheDocument();
+    expect(screen.getByText('teamrun.sourceFixture')).toBeInTheDocument();
+    expect(screen.getByText('Frontend Console Demo')).toBeInTheDocument();
+    expect(screen.getAllByText('Prepare TeamRun Console demo evidence').length).toBeGreaterThan(0);
+    expect(screen.getByText('teamrun.readOnly')).toBeInTheDocument();
   });
 
-  it('shows empty run state for a selected team', () => {
+  it('falls back to fixture demo data when a live team has no TeamRuns yet', () => {
     mockUseTeamRuns.mockReturnValue({ data: [], isFetching: false, error: null });
     mockUseTeamRunState.mockReturnValue({ data: undefined, isLoading: false, error: null });
 
     render(<TeamRunConsole />);
 
-    expect(screen.getByText('Builder Team')).toBeInTheDocument();
-    expect(screen.getByText('teamrun.noRuns')).toBeInTheDocument();
+    expect(screen.getByText('teamrun.sourceFixture')).toBeInTheDocument();
+    expect(screen.getByText('Frontend Console Demo')).toBeInTheDocument();
+    expect(screen.getAllByText('Prepare TeamRun Console demo evidence').length).toBeGreaterThan(0);
   });
 
   it('renders active TeamRun state with tasks and route activity', () => {
     render(<TeamRunConsole />);
 
+    expect(screen.getByText('teamrun.sourceLive')).toBeInTheDocument();
     expect(screen.getAllByText('Ship TeamRun console').length).toBeGreaterThan(0);
     expect(screen.getByText('Route work to the builder')).toBeInTheDocument();
     expect(screen.getByText('Implement read-only console')).toBeInTheDocument();

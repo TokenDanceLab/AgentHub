@@ -5,6 +5,7 @@ import {
   Boxes,
   CheckCircle2,
   CircleDashed,
+  Database,
   FileWarning,
   GitBranch,
   KeyRound,
@@ -17,12 +18,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAgentTeams, useTeamEvents, useTeamRuns, useTeamRunsForTeams, useTeamRunState } from '@/api/teamRunQueries';
 import type {
   AgentTeam,
+  AgentTeamEvent,
   AgentTeamRun,
   CoordinatorRouteDecision,
   TeamApprovalState,
   TeamArtifactState,
   TeamConflictState,
   TeamRunEventState,
+  TeamRunState,
   TeamTaskState,
 } from '@/api/hubClient';
 import styles from './TeamRunConsole.module.css';
@@ -30,6 +33,176 @@ import styles from './TeamRunConsole.module.css';
 const ACTIVE_STATUSES = new Set(['queued', 'running', 'dispatching', 'started', 'waiting_approval']);
 const DONE_STATUSES = new Set(['done', 'completed', 'finished', 'approved']);
 const FAILED_STATUSES = new Set(['failed', 'cancelled', 'rejected', 'blocked']);
+
+const DEMO_TEAM: AgentTeam = {
+  id: 'fixture-teamrun-team',
+  name: 'Frontend Console Demo',
+  description: 'Fixture AgentTeam for read-only TeamRun review',
+  created_at: '2026-05-30T09:00:00Z',
+  updated_at: '2026-05-30T09:15:00Z',
+};
+
+const DEMO_RUN: AgentTeamRun = {
+  id: 'fixture-teamrun-run',
+  team_id: DEMO_TEAM.id,
+  trigger_message: 'Prepare TeamRun Console demo evidence',
+  status: 'running',
+  created_at: '2026-05-30T09:00:00Z',
+  updated_at: '2026-05-30T09:18:00Z',
+};
+
+const DEMO_STATE: TeamRunState = {
+  run_id: DEMO_RUN.id,
+  team_id: DEMO_TEAM.id,
+  status: 'running',
+  members: [
+    { member_id: 'fixture-supervisor', agent_profile_id: 'profile-supervisor', role: 'supervisor', active_tasks: 1, completed_tasks: 1 },
+    { member_id: 'fixture-ui-builder', agent_profile_id: 'profile-ui-builder', role: 'frontend', active_tasks: 1, completed_tasks: 0 },
+    { member_id: 'fixture-reviewer', agent_profile_id: 'profile-reviewer', role: 'reviewer', active_tasks: 0, completed_tasks: 1 },
+  ],
+  tasks: [
+    {
+      task_id: 'fixture-task-plan',
+      assignee_member_id: 'fixture-supervisor',
+      status: 'done',
+      objective: 'Lock read-only TeamRun Console scope',
+      run_id: 'fixture-agent-task-plan',
+      agent_task_id: 'fixture-agent-task-plan',
+      edge_run_id: 'fixture-edge-plan',
+      attempt: 1,
+      risk_level: 'low',
+    },
+    {
+      task_id: 'fixture-task-console',
+      assignee_member_id: 'fixture-ui-builder',
+      parent_task_id: 'fixture-task-plan',
+      status: 'running',
+      objective: 'Add fixture/live data-source markers and demo-safe summaries',
+      run_id: 'fixture-agent-task-console',
+      agent_task_id: 'fixture-agent-task-console',
+      edge_run_id: 'fixture-edge-console',
+      attempt: 2,
+      risk_level: 'medium',
+    },
+    {
+      task_id: 'fixture-task-visual',
+      assignee_member_id: 'fixture-reviewer',
+      parent_task_id: 'fixture-task-console',
+      status: 'waiting_approval',
+      objective: 'Capture Desktop visual evidence without horizontal overflow',
+      run_id: 'fixture-agent-task-visual',
+      agent_task_id: 'fixture-agent-task-visual',
+      edge_run_id: 'fixture-edge-visual',
+      attempt: 1,
+      risk_level: 'medium',
+    },
+  ],
+  dependencies: [
+    { task_id: 'fixture-task-console', depends_on_task_id: 'fixture-task-plan', kind: 'parent_task' },
+    { task_id: 'fixture-task-visual', depends_on_task_id: 'fixture-task-console', kind: 'parent_task' },
+  ],
+  assignments: [],
+  approvals: [
+    {
+      approval_id: 'fixture-approval-visual',
+      agent_task_id: 'fixture-agent-task-visual',
+      team_task_id: 'fixture-task-visual',
+      request_id: 'fixture-request-visual',
+      tool_name: 'visual-evidence',
+      status: 'pending',
+      created_at: '2026-05-30T09:16:00Z',
+    },
+  ],
+  artifacts: [
+    {
+      agent_task_id: 'fixture-agent-task-console',
+      team_task_id: 'fixture-task-console',
+      path: 'app/desktop/src/components/TeamRunConsole.tsx',
+      action: 'modify',
+      status: 'created',
+      created_at: '2026-05-30T09:12:00Z',
+    },
+    {
+      agent_task_id: 'fixture-agent-task-visual',
+      team_task_id: 'fixture-task-visual',
+      path: 'app/desktop/screenshots/teamrun-console-demo.png',
+      action: 'create',
+      status: 'pending',
+      conflict_id: 'fixture-conflict-css',
+      created_at: '2026-05-30T09:17:00Z',
+    },
+  ],
+  conflicts: [
+    {
+      conflict_id: 'fixture-conflict-css',
+      path: 'app/desktop/src/components/TeamRunConsole.module.css',
+      status: 'open',
+      agent_task_ids: ['fixture-agent-task-visual'],
+      team_task_ids: ['fixture-task-visual'],
+    },
+  ],
+  run_events: [
+    {
+      agent_task_id: 'fixture-agent-task-console',
+      edge_run_id: 'fixture-edge-console',
+      event_seq: 14,
+      event_type: 'run.agent.delta',
+      payload: JSON.stringify({ summary: 'Console demo state prepared with fixture source labeling.' }),
+      created_at: '2026-05-30T09:13:00Z',
+    },
+    {
+      agent_task_id: 'fixture-agent-task-visual',
+      edge_run_id: 'fixture-edge-visual',
+      event_seq: 17,
+      event_type: 'run.approval.requested',
+      payload: JSON.stringify({ summary: 'Visual acceptance screenshot is waiting for review.' }),
+      created_at: '2026-05-30T09:17:00Z',
+    },
+  ],
+  route_log: [
+    {
+      action: 'delegate',
+      next_worker: 'frontend',
+      instructions: 'Keep the console read-only and mark fixture data clearly.',
+      reasoning: 'Desktop owns the demonstrable collaboration surface.',
+    },
+    {
+      action: 'review',
+      next_worker: 'reviewer',
+      instructions: 'Confirm no overlap between task board and summary rail.',
+      reasoning: 'Demo evidence must be visually inspectable.',
+    },
+  ],
+  budget: {
+    total_tokens_used: 18400,
+    token_limit: 50000,
+    remaining_tokens: 31600,
+    usage_percent: 37,
+    run_count: 3,
+    context_warnings: 0,
+    compactions: 1,
+  },
+  terminal_reason: 'Fixture demo: live Hub TeamRun data was not available in this session.',
+};
+
+const DEMO_EVENTS: AgentTeamEvent[] = [
+  {
+    id: 'fixture-event-1',
+    team_run_id: DEMO_RUN.id,
+    seq: 1,
+    type: 'team.run.started',
+    payload: '{}',
+    created_at: '2026-05-30T09:00:00Z',
+  },
+  {
+    id: 'fixture-event-2',
+    team_run_id: DEMO_RUN.id,
+    seq: 2,
+    type: 'team.task.assigned',
+    payload: '{}',
+    created_at: '2026-05-30T09:08:00Z',
+  },
+];
 
 function isActiveStatus(status: string | undefined): boolean {
   return Boolean(status && ACTIVE_STATUSES.has(status.toLowerCase()));
@@ -190,6 +363,7 @@ export default function TeamRunConsole() {
   const { t } = useTranslation();
   const auth = useAuth();
   const hubReady = auth.isAuthenticated && Boolean(auth.token);
+  const [showSignedOutDemo, setShowSignedOutDemo] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
@@ -216,7 +390,16 @@ export default function TeamRunConsole() {
   const selectedRun = runs.find((run) => run.id === effectiveRunId) ?? runs[0];
   const stateQuery = useTeamRunState(selectedTeam?.id, selectedRun?.id, hubReady);
   const eventsQuery = useTeamEvents(selectedTeam?.id, selectedRun?.id, hubReady);
-  const state = stateQuery.data;
+  const liveState = stateQuery.data;
+  const useDemoData = showSignedOutDemo || (hubReady && !teamsQuery.isFetching && !runsQuery.isFetching && !stateQuery.isLoading && !liveState);
+  const displayTeams = useDemoData ? [DEMO_TEAM] : teams;
+  const displayRuns = useDemoData ? [DEMO_RUN] : runs;
+  const displayTeam = useDemoData ? DEMO_TEAM : selectedTeam;
+  const displayRun = useDemoData ? DEMO_RUN : selectedRun;
+  const state = useDemoData ? DEMO_STATE : liveState;
+  const teamEvents = useDemoData ? DEMO_EVENTS : (eventsQuery.data ?? []);
+  const sourceLabel = useDemoData ? t('teamrun.sourceFixture') : t('teamrun.sourceLive');
+  const sourceDescription = useDemoData ? t('teamrun.sourceFixtureDesc') : t('teamrun.sourceLiveDesc');
 
   const memberLabels = useMemo(() => {
     const labels = new Map<string, string>();
@@ -249,17 +432,21 @@ export default function TeamRunConsole() {
 
   const pendingApprovals = (state?.approvals ?? []).filter((approval) => isActiveStatus(approval.status) || approval.status.toLowerCase() === 'pending');
   const latestEvents = [...(state?.run_events ?? [])].sort((a, b) => b.event_seq - a.event_seq).slice(0, 8);
-  const teamEvents = eventsQuery.data ?? [];
+  const visibleState = state;
 
-  if (!hubReady) {
+  if (!hubReady && !showSignedOutDemo) {
     return (
       <div className={styles.root}>
         <div className={styles.lockedState}>
           <KeyRound size={22} />
           <h2>{t('teamrun.signedOutTitle')}</h2>
           <p>{t('teamrun.signedOutDesc')}</p>
+          <span className={styles.lockedHint}>{t('teamrun.localEdgeHint')}</span>
           <button type="button" className={styles.primaryButton} onClick={() => { void auth.loginWithTokenDance(); }}>
             {t('settings.signIn')}
+          </button>
+          <button type="button" className={styles.secondaryButton} onClick={() => setShowSignedOutDemo(true)}>
+            {t('teamrun.viewFixtureDemo')}
           </button>
         </div>
       </div>
@@ -283,6 +470,21 @@ export default function TeamRunConsole() {
         </div>
       </header>
 
+      <section className={`${styles.sourceBanner} ${useDemoData ? styles.sourceBannerDemo : ''}`} aria-label={t('teamrun.source')}>
+        <span className={styles.sourceIcon}><Database size={15} /></span>
+        <span>
+          <strong>{sourceLabel}</strong>
+          <small>{sourceDescription}</small>
+          <small>{t('teamrun.readOnlyDesc')}</small>
+        </span>
+        <span className={styles.readOnlyPill}>{t('teamrun.readOnly')}</span>
+        {showSignedOutDemo && (
+          <button type="button" className={styles.inlineButton} onClick={() => setShowSignedOutDemo(false)}>
+            {t('teamrun.backToSignIn')}
+          </button>
+        )}
+      </section>
+
       {error && (
         <div className={styles.errorBanner} role="alert">
           <AlertTriangle size={15} />
@@ -297,19 +499,21 @@ export default function TeamRunConsole() {
               <h3>{t('teamrun.teams')}</h3>
               {teamsQuery.isFetching && <span>{t('settings.loading')}</span>}
             </div>
-            {teams.length === 0 ? (
+            {displayTeams.length === 0 ? (
               <EmptyPanel title={t('teamrun.noTeams')} body={t('teamrun.noTeamsDesc')} />
             ) : (
               <div className={styles.selectorList}>
-                {teams.map((team: AgentTeam) => (
+                {displayTeams.map((team: AgentTeam) => (
                   <button
                     key={team.id}
                     type="button"
-                    className={`${styles.selectorItem} ${team.id === selectedTeam?.id ? styles.selectorItemActive : ''}`}
+                    className={`${styles.selectorItem} ${team.id === displayTeam?.id ? styles.selectorItemActive : ''}`}
                     onClick={() => {
+                      if (useDemoData) return;
                       setSelectedTeamId(team.id);
                       setSelectedRunId(null);
                     }}
+                    disabled={useDemoData}
                   >
                     <strong>{team.name}</strong>
                     <span>{team.description || t('teamrun.teamDefaultDesc')}</span>
@@ -324,16 +528,17 @@ export default function TeamRunConsole() {
               <h3>{t('teamrun.runs')}</h3>
               {runsQuery.isFetching && <span>{t('settings.loading')}</span>}
             </div>
-            {selectedTeam && runs.length === 0 ? (
+            {displayTeam && displayRuns.length === 0 ? (
               <EmptyPanel title={t('teamrun.noRuns')} body={t('teamrun.noRunsDesc')} />
             ) : (
               <div className={styles.selectorList}>
-                {runs.map((run: AgentTeamRun) => (
+                {displayRuns.map((run: AgentTeamRun) => (
                   <button
                     key={run.id}
                     type="button"
-                    className={`${styles.selectorItem} ${run.id === selectedRun?.id ? styles.selectorItemActive : ''}`}
+                    className={`${styles.selectorItem} ${run.id === displayRun?.id ? styles.selectorItemActive : ''}`}
                     onClick={() => setSelectedRunId(run.id)}
+                    disabled={useDemoData}
                   >
                     <span className={`${styles.statusPill} ${statusClass(run.status)}`}>{run.status}</span>
                     <strong>{run.trigger_message || shortId(run.id)}</strong>
@@ -346,34 +551,34 @@ export default function TeamRunConsole() {
         </aside>
 
         <main className={styles.board}>
-          {!selectedTeam || !selectedRun ? (
+          {!displayTeam || !displayRun ? (
             <EmptyPanel title={t('teamrun.emptyTitle')} body={t('teamrun.emptyDesc')} />
           ) : stateQuery.isLoading ? (
             <EmptyPanel title={t('settings.loading')} body={t('teamrun.loadingState')} />
-          ) : !state ? (
+          ) : !visibleState && !useDemoData ? (
             <EmptyPanel title={t('teamrun.noState')} body={t('teamrun.noStateDesc')} />
-          ) : (
+          ) : visibleState ? (
             <>
               <section className={styles.runSummary}>
                 <div>
-                  <span className={`${styles.statusPill} ${statusClass(state.status)}`}>{state.status}</span>
-                  <h3>{selectedRun.trigger_message || t('teamrun.runFallback')}</h3>
-                  <p>{state.terminal_reason || t('teamrun.replayDesc')}</p>
+                  <span className={`${styles.statusPill} ${statusClass(visibleState.status)}`}>{visibleState.status}</span>
+                  <h3>{displayRun.trigger_message || t('teamrun.runFallback')}</h3>
+                  <p>{visibleState.terminal_reason || t('teamrun.replayDesc')}</p>
                 </div>
-                {state.budget && (
+                {visibleState.budget && (
                   <div className={styles.budgetCard}>
                     <span>{t('teamrun.budget')}</span>
-                    <strong>{state.budget.total_tokens_used.toLocaleString()}</strong>
-                    <small>{state.budget.run_count} runs / {Math.round(state.budget.usage_percent ?? 0)}%</small>
+                    <strong>{visibleState.budget.total_tokens_used.toLocaleString()}</strong>
+                    <small>{visibleState.budget.run_count} runs / {Math.round(visibleState.budget.usage_percent ?? 0)}%</small>
                   </div>
                 )}
               </section>
 
               <section className={styles.memberStrip} aria-label={t('teamrun.members')}>
-                {state.members.length === 0 ? (
+                {visibleState.members.length === 0 ? (
                   <EmptyPanel title={t('teamrun.noMembers')} body={t('teamrun.noMembersDesc')} />
                 ) : (
-                  state.members.map((member) => (
+                  visibleState.members.map((member) => (
                     <div key={member.member_id} className={styles.memberCard}>
                       <strong>{member.role}</strong>
                       <span>{shortId(member.agent_profile_id || member.member_id)}</span>
@@ -406,6 +611,8 @@ export default function TeamRunConsole() {
                 ))}
               </section>
             </>
+          ) : (
+            <EmptyPanel title={t('teamrun.noState')} body={t('teamrun.noStateDesc')} />
           )}
         </main>
 
