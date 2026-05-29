@@ -4,7 +4,7 @@ import { X, ChevronDown } from 'lucide-react';
 import type { UserProfile } from '@/api/hubClient';
 import { HUB_URL } from '@/config';
 import LoginForm from '@/components/LoginForm';
-import tokenDanceLogo from '@/assets/tokendance-icon-rounded.svg';
+import tokenDanceLogo from '@shared/assets/tokendance-icon-rounded.svg';
 import styles from './AuthPage.module.css';
 
 type HubStatus = 'connected' | 'disconnected' | 'checking';
