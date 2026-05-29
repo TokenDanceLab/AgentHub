@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, ChevronDown, FileText, FolderOpen, HardDrive, Plus, Server, Square, ArrowUp, LoaderCircle, X } from 'lucide-react';
+import { Check, ChevronDown, Clock3, FileText, FolderOpen, HardDrive, Plus, Server, Square, ArrowUp, LoaderCircle, X } from 'lucide-react';
 import type { AgentInfo, ThreadInfo } from '@shared/types';
 import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
 import { useInputDraft } from '@/hooks/useInputDraft';
@@ -25,6 +25,9 @@ type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 const PERMISSION_MODES = ['default', 'plan', 'acceptEdits', 'bypassPermissions', 'dontAsk'] as const;
 type PermissionMode = (typeof PERMISSION_MODES)[number];
 const MAX_BROWSER_ATTACHMENT_PREVIEW = 12_000;
+const WORK_DIR_STORAGE_KEY = 'agenthub.prompt.workDir';
+const RECENT_WORK_DIRS_STORAGE_KEY = 'agenthub.prompt.recentWorkDirs';
+const MAX_RECENT_WORK_DIRS = 6;
 
 interface SendOptions {
   model?: string;
@@ -122,6 +125,47 @@ function compactPathLabel(value: string): string {
 
 function pathBasename(value: string): string {
   return value.split(/[\\/]+/).filter(Boolean).pop() ?? value;
+}
+
+function normalizeWorkDir(value: string | null | undefined): string {
+  return (value ?? '').trim().replace(/^["']|["']$/g, '').trim();
+}
+
+function sameWorkDir(a: string, b: string): boolean {
+  return normalizeWorkDir(a).toLowerCase() === normalizeWorkDir(b).toLowerCase();
+}
+
+function pushRecentWorkDir(items: string[], value: string): string[] {
+  const normalized = normalizeWorkDir(value);
+  if (!normalized) return items;
+  return [
+    normalized,
+    ...items.map(normalizeWorkDir).filter((item) => item && !sameWorkDir(item, normalized)),
+  ].slice(0, MAX_RECENT_WORK_DIRS);
+}
+
+function readRecentWorkDirs(): string[] {
+  try {
+    const raw = window.localStorage.getItem(RECENT_WORK_DIRS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item): item is string => typeof item === 'string')
+      .map(normalizeWorkDir)
+      .filter(Boolean)
+      .slice(0, MAX_RECENT_WORK_DIRS);
+  } catch {
+    return [];
+  }
+}
+
+function persistRecentWorkDirs(items: string[]): void {
+  try {
+    window.localStorage.setItem(RECENT_WORK_DIRS_STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // Ignore persistence failures; the current selection still applies.
+  }
 }
 
 function formatBytes(value: number | undefined): string | undefined {
@@ -236,6 +280,10 @@ function directTargetUnavailableReason(target: ExecutionTargetInventoryItem, t: 
   if (!targetWorkspaceRoot(target)) return t('prompt.targetNoWorkspace');
   if (!target.is_online || target.health_state === 'offline') return t('prompt.targetLocalOffline');
   return t('prompt.targetRemoteDisabled', { type: target.target_type });
+}
+
+function targetTrustLabel(target: ExecutionTargetInventoryItem, t: (key: string, vars?: Record<string, unknown>) => string): string {
+  return t(`prompt.targetTrust.${target.trust_level}`);
 }
 
 function agentRuntimeTokens(agent?: AgentInfo): string[] {
@@ -457,6 +505,7 @@ export default function PromptInput({
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
   const [workDir, setWorkDir] = useState('');
   const [workDirDraft, setWorkDirDraft] = useState('');
+  const [recentWorkDirs, setRecentWorkDirs] = useState<string[]>([]);
   const [workTargetOpen, setWorkTargetOpen] = useState(false);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
@@ -496,6 +545,33 @@ export default function PromptInput({
   );
 
   const { restore: restoreDraft, save: saveDraft, flush: flushDraft, clear: clearDraft } = useInputDraft(threadId);
+
+  const rememberWorkDir = useCallback((value: string) => {
+    const normalized = normalizeWorkDir(value);
+    if (!normalized) return;
+    setRecentWorkDirs((prev) => {
+      const next = pushRecentWorkDir(prev, normalized);
+      persistRecentWorkDirs(next);
+      return next;
+    });
+  }, []);
+
+  const applyWorkDir = useCallback((value: string, options: { closeMenu?: boolean } = {}) => {
+    const normalized = normalizeWorkDir(value);
+    setWorkDir(normalized);
+    setWorkDirDraft(normalized);
+    if (normalized) rememberWorkDir(normalized);
+    if (options.closeMenu) setWorkTargetOpen(false);
+  }, [rememberWorkDir]);
+
+  const clearRecentWorkDirs = useCallback(() => {
+    setRecentWorkDirs([]);
+    try {
+      window.localStorage.removeItem(RECENT_WORK_DIRS_STORAGE_KEY);
+    } catch {
+      // localStorage can be unavailable in tests.
+    }
+  }, []);
 
   const writeTextareaValue = useCallback((value: string, cursorPos = value.length) => {
     const ta = inputRef.current;
@@ -606,9 +682,11 @@ export default function PromptInput({
 
   useEffect(() => {
     try {
-      const savedWorkDir = window.localStorage.getItem('agenthub.prompt.workDir') ?? '';
+      const savedWorkDir = normalizeWorkDir(window.localStorage.getItem(WORK_DIR_STORAGE_KEY) ?? '');
+      const savedRecent = readRecentWorkDirs();
       setWorkDir(savedWorkDir);
       setWorkDirDraft(savedWorkDir);
+      setRecentWorkDirs(savedWorkDir ? pushRecentWorkDir(savedRecent, savedWorkDir) : savedRecent);
       const savedMode = window.localStorage.getItem('agenthub.prompt.permissionMode');
       if (savedMode && PERMISSION_MODES.includes(savedMode as PermissionMode)) {
         setPermissionMode(savedMode as PermissionMode);
@@ -620,10 +698,9 @@ export default function PromptInput({
 
   useEffect(() => {
     const handleWorkDirSelected = (event: Event) => {
-      const nextWorkDir = (event as CustomEvent<{ workDir?: string }>).detail?.workDir?.trim();
+      const nextWorkDir = normalizeWorkDir((event as CustomEvent<{ workDir?: string }>).detail?.workDir);
       if (!nextWorkDir) return;
-      setWorkDir(nextWorkDir);
-      setWorkDirDraft(nextWorkDir);
+      applyWorkDir(nextWorkDir);
     };
     const handleSetComposerDraft = (event: Event) => {
       const detail = (event as CustomEvent<{ text?: string }>).detail;
@@ -652,11 +729,11 @@ export default function PromptInput({
       window.removeEventListener('agenthub:set-composer-draft', handleSetComposerDraft);
       window.removeEventListener('agenthub:focus-composer', handleFocusComposer);
     };
-  }, [clearDraft, closeMention, closeSlash, writeTextareaValue]);
+  }, [applyWorkDir, clearDraft, closeMention, closeSlash, writeTextareaValue]);
 
   useEffect(() => {
     try {
-      window.localStorage.setItem('agenthub.prompt.workDir', workDir);
+      window.localStorage.setItem(WORK_DIR_STORAGE_KEY, workDir);
       window.localStorage.setItem('agenthub.prompt.permissionMode', permissionMode);
     } catch {
       // Ignore persistence failures; the controls still apply to the current run.
@@ -735,7 +812,10 @@ export default function PromptInput({
     }
     if (reasoningEffort) opts.reasoningEffort = reasoningEffort;
     if (permissionMode !== 'default') opts.permissionMode = permissionMode;
-    if (workDir.trim()) opts.workDir = workDir.trim();
+    if (workDir.trim()) {
+      opts.workDir = workDir.trim();
+      rememberWorkDir(workDir);
+    }
     const attachmentContext = formatAttachmentContext(attachments);
     const promptWithAttachments = attachmentContext ? `${trimmed}\n\n${attachmentContext}` : trimmed;
     const accepted = await onSend(
@@ -751,16 +831,14 @@ export default function PromptInput({
     clearDraft();
     setAttachments([]);
     if (attachmentInputRef.current) attachmentInputRef.current.value = '';
-  }, [attachments, disabled, isStreaming, isStarting, selectedAgentId, model, selectedAgentAlias, selectedCatalogRoute, reasoningEffort, permissionMode, workDir, onSend, clearDraft, closeMention]);
+  }, [attachments, disabled, isStreaming, isStarting, selectedAgentId, model, selectedAgentAlias, selectedCatalogRoute, reasoningEffort, permissionMode, workDir, onSend, clearDraft, closeMention, rememberWorkDir]);
 
   const handleBrowseWorkDir = useCallback(async () => {
     if (disabled || isStarting) return;
     const selected = await pickDesktopWorkDir();
     if (!selected) return;
-    setWorkDirDraft(selected);
-    setWorkDir(selected);
-    setWorkTargetOpen(false);
-  }, [disabled, isStarting]);
+    applyWorkDir(selected, { closeMenu: true });
+  }, [applyWorkDir, disabled, isStarting]);
 
   const handleBrowserAttachmentChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
@@ -782,6 +860,10 @@ export default function PromptInput({
   const effectiveReasoning = reasoningEffort || (resolvedRoute.reasoningEffort as ReasoningEffort | undefined) || 'high';
   const directTargets = executionTargets.filter(isSelectableLocalTarget);
   const unavailableLocalTargets = executionTargets.filter((target) => isRegisteredLocalTarget(target) && !isSelectableLocalTarget(target));
+  const remoteInventoryTargets = executionTargets.filter((target) => target.target_type !== 'local_edge');
+  const recentWorkDirOptions = recentWorkDirs.filter((path) => (
+    path && !directTargets.some((target) => sameWorkDir(targetWorkspaceRoot(target), path))
+  ));
   const workTargetLabel = workDir.trim()
     ? compactPathLabel(workDir)
     : t('prompt.targetLocalEdge');
@@ -1195,9 +1277,7 @@ export default function PromptInput({
                     type="button"
                     className={`${styles.workTargetOption} ${!workDir.trim() ? styles.workTargetOptionActive : ''}`}
                     onClick={() => {
-                      setWorkDir('');
-                      setWorkDirDraft('');
-                      setWorkTargetOpen(false);
+                      applyWorkDir('', { closeMenu: true });
                     }}
                   >
                     <HardDrive size={16} />
@@ -1231,8 +1311,7 @@ export default function PromptInput({
                         type="button"
                         className={styles.workDirApplyBtn}
                         onClick={() => {
-                          setWorkDir(workDirDraft.trim());
-                          setWorkTargetOpen(false);
+                          applyWorkDir(workDirDraft, { closeMenu: true });
                         }}
                       >
                         {t('prompt.applyWorkDir')}
@@ -1240,6 +1319,38 @@ export default function PromptInput({
                     </div>
                     <small>{t('prompt.targetFolderDesc')}</small>
                   </div>
+
+                  {recentWorkDirOptions.length > 0 && (
+                    <div className={styles.workTargetGroup}>
+                      <div className={styles.workTargetGroupHeader}>
+                        <span>{t('prompt.targetRecentWorkspaces')}</span>
+                        <button type="button" onClick={clearRecentWorkDirs}>
+                          {t('prompt.clearRecentWorkspaces')}
+                        </button>
+                      </div>
+                      {recentWorkDirOptions.map((path) => {
+                        const active = sameWorkDir(path, workDir);
+                        return (
+                          <button
+                            key={path}
+                            type="button"
+                            className={`${styles.workTargetOption} ${active ? styles.workTargetOptionActive : ''}`}
+                            onClick={() => applyWorkDir(path, { closeMenu: true })}
+                          >
+                            <Clock3 size={16} />
+                            <span>
+                              <strong>{compactPathLabel(path)}</strong>
+                              <small>{path}</small>
+                              <em className={styles.workTargetMeta}>
+                                {t('prompt.targetRecentRunWorkDir')}
+                              </em>
+                            </span>
+                            {active && <Check size={15} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {directTargets.length > 0 && (
                     <div className={styles.workTargetGroup}>
@@ -1252,18 +1363,14 @@ export default function PromptInput({
                             key={target.id}
                             type="button"
                             className={`${styles.workTargetOption} ${active ? styles.workTargetOptionActive : ''}`}
-                            onClick={() => {
-                              setWorkDir(root);
-                              setWorkDirDraft(root);
-                              setWorkTargetOpen(false);
-                            }}
+                            onClick={() => applyWorkDir(root, { closeMenu: true })}
                           >
                             <Server size={16} />
                             <span>
                               <strong>{target.name}</strong>
                               <small>{root}</small>
                               <em className={styles.workTargetMeta}>
-                                {t(`prompt.targetHealth.${target.health_state}`)}
+                                {t(`prompt.targetHealth.${target.health_state}`)} · {targetTrustLabel(target, t)}
                               </em>
                             </span>
                             {active && <Check size={15} />}
@@ -1283,7 +1390,25 @@ export default function PromptInput({
                             <strong>{target.name}</strong>
                             <small>{directTargetUnavailableReason(target, t)}</small>
                             <em className={styles.workTargetMeta}>
-                              {t(`prompt.targetHealth.${target.health_state}`)}
+                              {t(`prompt.targetHealth.${target.health_state}`)} · {targetTrustLabel(target, t)}
+                            </em>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {remoteInventoryTargets.length > 0 && (
+                    <div className={styles.workTargetGroup}>
+                      <span>{t('prompt.targetRemoteInventory')}</span>
+                      {remoteInventoryTargets.map((target) => (
+                        <button key={target.id} type="button" className={styles.workTargetOption} disabled>
+                          <Server size={16} />
+                          <span>
+                            <strong>{target.name}</strong>
+                            <small>{directTargetUnavailableReason(target, t)}</small>
+                            <em className={styles.workTargetMeta}>
+                              {t(`settings.targetType.${target.target_type}`, { defaultValue: target.target_type })} · {t(`prompt.targetHealth.${target.health_state}`)} · {targetTrustLabel(target, t)}
                             </em>
                           </span>
                         </button>
