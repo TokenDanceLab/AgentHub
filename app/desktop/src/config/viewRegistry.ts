@@ -1,5 +1,5 @@
 import { lazy, type ComponentType } from 'react';
-import { MessageSquare, Bot, PanelRight, Search, Keyboard, Shield, Users } from 'lucide-react';
+import { MessageSquare, Bot, PanelRight, Search, Keyboard, Shield, Users, GitBranch } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /** Slot in the layout shell that views can occupy. */
@@ -47,6 +47,7 @@ const ChatView = lazy(() => import('@/components/ChatView'));
 const RunDetail = lazy(() => import('@/components/RunDetail'));
 const SearchDialog = lazy(() => import('@/components/SearchDialog'));
 const IMView = lazy(() => import('@/views/IMView'));
+const TeamRunConsole = lazy(() => import('@/components/TeamRunConsole'));
 
 // Eager imports
 import StatusBar from '@/components/StatusBar';
@@ -150,6 +151,16 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
     showOnTablet: true,
     icon: Users,
     label: 'view.messages',
+    lazy: true,
+  },
+  'teamrun-console': {
+    id: 'teamrun-console',
+    component: TeamRunConsole,
+    slot: 'center',
+    showOnMobile: true,
+    showOnTablet: true,
+    icon: GitBranch,
+    label: 'view.teamRunConsole',
     lazy: true,
   },
 };
