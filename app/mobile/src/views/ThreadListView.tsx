@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listThreads } from "@agenthub/shared";
 import type { Thread } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { EmptyState, MetricGrid, SegmentedControl, StatusNotice, SurfaceHeader } from "@agenthub/shared/ui";
+import { ActionList, EmptyState, MetricGrid, SegmentedControl, StatusNotice, SurfaceHeader } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, UserRound, ArrowRight } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
@@ -229,35 +229,42 @@ export function ThreadListView({ onThreadSelect, onOpenAccount }: ThreadListView
         )}
 
         {!threads.isError && (
-          <div className="mobileListStack">
-            {visibleItems.map((thread) => (
-              <button
-                key={thread.id}
-                onClick={() => onThreadSelect(thread)}
-                className="mobileThreadItem"
-                type="button"
-              >
-                <span className="mobileThreadIcon">
-                  <MessageSquare size={18} />
-                </span>
-                <span className="mobileListItemBody">
-                  <span className="mobileListItemTitle">{thread.title || thread.id}</span>
-                  <span className="mobileRunMetaStack">
-                    <span className="mobileListItemMeta">{thread.projectId || t("queue.threads.localWorkspace")}</span>
-                    <span className="mobileListItemMeta">
-                      <Clock3 size={12} />
-                      {formatThreadTime(thread)}
-                    </span>
-                  </span>
-                </span>
-                <StatusBadge
-                  status={threadStatusToVariant(thread.status)}
-                  label={t(threadStatusLabelKey(thread.status))}
-                  className={`mobileQueueStatusBadge mobileQueueStatusBadge-${getStatusVariantClassName(threadStatusToVariant(thread.status))}`}
-                />
-              </button>
-            ))}
-          </div>
+          <ActionList
+            className="mobileListStack"
+            itemClassName="mobileThreadItem"
+            iconClassName="mobileThreadIcon"
+            bodyClassName="mobileListItemBody"
+            titleClassName="mobileListItemTitle"
+            metaStackClassName="mobileRunMetaStack"
+            metaClassName="mobileListItemMeta"
+            items={visibleItems.map((thread) => {
+              const variant = threadStatusToVariant(thread.status);
+              const title = thread.title || thread.id;
+              const project = thread.projectId || t("queue.threads.localWorkspace");
+              const updatedAt = formatThreadTime(thread);
+              return {
+                id: thread.id,
+                title,
+                ariaLabel: `${title} ${project} ${updatedAt} ${t(threadStatusLabelKey(thread.status))}`,
+                icon: <MessageSquare size={18} />,
+                meta: [
+                  project,
+                  <>
+                    <Clock3 size={12} />
+                    {updatedAt}
+                  </>,
+                ],
+                trailing: (
+                  <StatusBadge
+                    status={variant}
+                    label={t(threadStatusLabelKey(thread.status))}
+                    className={`mobileQueueStatusBadge mobileQueueStatusBadge-${getStatusVariantClassName(variant)}`}
+                  />
+                ),
+                onClick: () => onThreadSelect(thread),
+              };
+            })}
+          />
         )}
       </div>
     </div>

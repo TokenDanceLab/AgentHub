@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listRuns } from "@agenthub/shared";
 import type { Run, RunStatus } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { EmptyState, MetricGrid, SegmentedControl, StatusNotice, SurfaceHeader } from "@agenthub/shared/ui";
+import { ActionList, EmptyState, MetricGrid, SegmentedControl, StatusNotice, SurfaceHeader } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, ArrowRight, CheckCircle2, Clock3, GitPullRequestArrow, Play, Radio, RefreshCw, ShieldAlert, TerminalSquare, UserRound } from "lucide-react";
@@ -288,38 +288,44 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
         )}
 
         {!runs.isError && (
-          <div className="mobileListStack">
-            {visibleItems.map((run) => (
-              <button
-                key={run.runId}
-                className={runRowClassName(run.status)}
-                type="button"
-                onClick={() => onRunSelect(run)}
-              >
-                <span className="mobileRunIcon">
-                  <TerminalSquare size={18} />
-                </span>
-                <span className="mobileListItemBody">
-                  <span className="mobileListItemTitle">{t("queue.runs.runLabel", { runId: run.runId.slice(0, 8) })}</span>
-                  <span className="mobileRunMetaStack">
-                    <span className="mobileListItemMeta">
-                      <Clock3 size={12} />
-                      {formatRunTime(run)}
-                    </span>
-                    <span className="mobileListItemMeta">
-                      <GitPullRequestArrow size={12} />
-                      {run.threadId}
-                    </span>
-                  </span>
-                </span>
-                <StatusBadge
-                  status={runStatusToVariant(run.status)}
-                  label={t(runStatusLabelKey(run.status))}
-                  className={`mobileQueueStatusBadge mobileQueueStatusBadge-${getStatusVariantClassName(runStatusToVariant(run.status))}`}
-                />
-              </button>
-            ))}
-          </div>
+          <ActionList
+            className="mobileListStack"
+            iconClassName="mobileRunIcon"
+            bodyClassName="mobileListItemBody"
+            titleClassName="mobileListItemTitle"
+            metaStackClassName="mobileRunMetaStack"
+            metaClassName="mobileListItemMeta"
+            items={visibleItems.map((run) => {
+              const variant = runStatusToVariant(run.status);
+              const title = t("queue.runs.runLabel", { runId: run.runId.slice(0, 8) });
+              const startedAt = formatRunTime(run);
+              return {
+                id: run.runId,
+                className: runRowClassName(run.status),
+                title,
+                ariaLabel: `${title} ${startedAt} ${run.threadId} ${t(runStatusLabelKey(run.status))}`,
+                icon: <TerminalSquare size={18} />,
+                meta: [
+                  <>
+                    <Clock3 size={12} />
+                    {startedAt}
+                  </>,
+                  <>
+                    <GitPullRequestArrow size={12} />
+                    {run.threadId}
+                  </>,
+                ],
+                trailing: (
+                  <StatusBadge
+                    status={variant}
+                    label={t(runStatusLabelKey(run.status))}
+                    className={`mobileQueueStatusBadge mobileQueueStatusBadge-${getStatusVariantClassName(variant)}`}
+                  />
+                ),
+                onClick: () => onRunSelect(run),
+              };
+            })}
+          />
         )}
       </div>
     </div>
