@@ -55,7 +55,7 @@
   padding: 0 16px;
   border: none;
   border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, var(--brand), var(--info));
+  background: var(--brand);
   color: var(--primary-foreground);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);

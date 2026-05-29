@@ -77,7 +77,7 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
     <div className={styles.page}>
       {/* Close button */}
       {onClose && (
-        <button className={styles.closeBtn} onClick={onClose} title="关闭">
+        <button className={styles.closeBtn} onClick={onClose} title={t('action.close')} aria-label={t('action.close')}>
           <X size={16} />
         </button>
       )}
@@ -102,7 +102,7 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
         <span className={`${styles.advancedToggleIcon} ${showAdvanced ? styles.advancedToggleIconOpen : ''}`}>
           <ChevronDown size={14} />
         </span>
-        高级设置
+        {t('auth.advancedSettings')}
       </button>
 
       {showAdvanced && (

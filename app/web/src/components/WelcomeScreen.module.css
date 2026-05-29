@@ -562,5 +562,7 @@
   .chip {
     flex: 0 1 auto;
     justify-content: center;
+    min-height: 44px;
+    padding: 0 13px;
   }
 }

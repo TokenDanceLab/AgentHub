@@ -148,6 +148,7 @@ export function parseUnifiedPatch(patch: string): ParsedPatch {
  * Handles unified patches, legacy before/after inputs, empty diffs, and malformed patches.
  */
 export function normalize(diff: ReviewDiff): ViewDiff {
+  const status = diff.status ? { status: diff.status } : {};
   if (diff.patch) {
     const parsed = parseUnifiedPatch(diff.patch);
     if (parsed.hunks.length > 0) {
@@ -156,7 +157,7 @@ export function normalize(diff: ReviewDiff): ViewDiff {
         patch: diff.patch,
         additions: diff.additions,
         deletions: diff.deletions,
-        status: diff.status,
+        ...status,
         hunks: parsed.hunks,
       };
     }
@@ -166,7 +167,7 @@ export function normalize(diff: ReviewDiff): ViewDiff {
       patch: diff.patch,
       additions: diff.additions,
       deletions: diff.deletions,
-      status: diff.status,
+      ...status,
       hunks: [],
     };
   }
@@ -181,7 +182,7 @@ export function normalize(diff: ReviewDiff): ViewDiff {
       patch: '',
       additions: diff.additions,
       deletions: diff.deletions,
-      status: diff.status,
+      ...status,
       hunks: [],
     };
   }
@@ -196,7 +197,7 @@ export function normalize(diff: ReviewDiff): ViewDiff {
     patch: builtPatch,
     additions: diff.additions,
     deletions: diff.deletions,
-    status: diff.status,
+    ...status,
   });
 }
 
@@ -268,12 +269,8 @@ export function parseUnifiedDiff(
           return {
             type,
             content: line.slice(1),
-            oldLineNumber: type !== 'added'
-              ? (h.oldStart ?? 0) + i
-              : undefined,
-            newLineNumber: type !== 'deleted'
-              ? (h.newStart ?? 0) + i
-              : undefined,
+            ...(type !== 'added' ? { oldLineNumber: (h.oldStart ?? 0) + i } : {}),
+            ...(type !== 'deleted' ? { newLineNumber: (h.newStart ?? 0) + i } : {}),
           };
         });
         return { header, lines };

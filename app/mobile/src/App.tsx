@@ -3,12 +3,17 @@ import type { Run, Thread } from "@agenthub/shared";
 import { BottomNav } from "./components/BottomNav";
 import { ThreadListView } from "./views/ThreadListView";
 import { ChatView } from "./views/ChatView";
+import { RunListView } from "./views/RunListView";
 import { RunStatusView } from "./views/RunStatusView";
 import { SettingsView } from "./views/SettingsView";
+import { MobileEmptyState } from "./components/MobileEmptyState";
+import { Hash } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export type MobileView = "threads" | "chat" | "runs" | "settings";
 
 export function App() {
+  const { t } = useTranslation();
   const [activeView, setActiveView] = useState<MobileView>("threads");
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
   const [selectedRun, setSelectedRun] = useState<Run | null>(null);
@@ -28,14 +33,23 @@ export function App() {
     setActiveView("threads");
   }, []);
 
+  const handleNavigate = useCallback((view: MobileView) => {
+    if (view === "chat") {
+      setSelectedThread(null);
+    }
+    if (view === "runs") {
+      setSelectedRun(null);
+    }
+    setActiveView(view);
+  }, []);
+
   return (
-    <div className="flex flex-col h-dvh bg-[var(--td-canvas)]">
-      {/* Main content area */}
-      <main className="flex-1 min-h-0">
+    <div className="mobileAppShell">
+      <main className="mobileAppMain">
         {activeView === "threads" && (
           <ThreadListView
             onThreadSelect={handleThreadSelect}
-            onRunSelect={handleRunSelect}
+            onOpenSettings={() => setActiveView("settings")}
           />
         )}
         {activeView === "chat" && selectedThread && (
@@ -44,17 +58,31 @@ export function App() {
             onBack={handleBackToThreads}
           />
         )}
+        {activeView === "chat" && !selectedThread && (
+          <MobileEmptyState
+            icon={<Hash size={24} />}
+            title={t("empty.selectThread.title")}
+            description={t("empty.selectThread.description")}
+            actionLabel={t("empty.selectThread.action")}
+            onAction={() => setActiveView("threads")}
+          />
+        )}
+        {activeView === "runs" && !selectedRun && (
+          <RunListView
+            onRunSelect={handleRunSelect}
+            onOpenSettings={() => setActiveView("settings")}
+          />
+        )}
         {activeView === "runs" && selectedRun && (
           <RunStatusView
             run={selectedRun}
-            onBack={() => setActiveView("threads")}
+            onBack={() => setSelectedRun(null)}
           />
         )}
         {activeView === "settings" && <SettingsView />}
       </main>
 
-      {/* Bottom navigation */}
-      <BottomNav activeView={activeView} onNavigate={setActiveView} />
+      <BottomNav activeView={activeView} onNavigate={handleNavigate} />
     </div>
   );
 }

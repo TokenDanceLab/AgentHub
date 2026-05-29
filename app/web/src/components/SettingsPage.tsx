@@ -55,6 +55,11 @@ import {
   type ReasoningEffortPreference,
   type ResolvedRunModelSettings,
 } from '@/stores/modelSettingsStore';
+import {
+  getSurfaceByDesktopSectionId,
+  getSurfaceStatusMetadata,
+  type SurfaceMetadata,
+} from '@shared/surfaceMetadata';
 import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
 import styles from './SettingsPage.module.css';
 
@@ -102,8 +107,12 @@ interface Props {
 interface NavItem {
   id: SectionId;
   label: string;
+  description: string;
+  sourceLabel: string;
+  statusLabel: string;
   icon: ReactNode;
   group: 'workspace' | 'automation' | 'system';
+  surface?: SurfaceMetadata;
 }
 
 interface ShortcutRow {
@@ -152,6 +161,30 @@ const PROVIDER_HEALTH_OPTIONS = [
   ['degraded', 'Degraded'],
   ['disabled', 'Disabled'],
 ] as const;
+
+function buildNavItem(
+  id: SectionId,
+  labelKey: string,
+  icon: ReactNode,
+  group: NavItem['group'],
+  t: ReturnType<typeof useTranslation>['t'],
+): NavItem {
+  const surface = getSurfaceByDesktopSectionId(id);
+  const status = surface ? getSurfaceStatusMetadata(surface.defaultStatus) : null;
+  const item = {
+    id,
+    label: t(surface?.labelKey ?? labelKey),
+    description: surface
+      ? t(surface.descriptionKey)
+      : t(`settings.webLocal.${id}.description`, { defaultValue: t('settings.webLocal.description') }),
+    sourceLabel: surface ? t('settings.sharedDesktopSection') : t('settings.webLocal.section'),
+    statusLabel: status ? t(status.labelKey) : t('settings.webLocal.status'),
+    icon,
+    group,
+  };
+
+  return surface ? { ...item, surface } : item;
+}
 
 const PROJECT_SKILLS: ProjectSkill[] = [
   {
@@ -429,41 +462,42 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
 
   const navItems = useMemo<NavItem[]>(
     () => [
-      { id: 'general', label: t('settings.general'), icon: <SlidersHorizontal size={17} />, group: 'workspace' },
-      { id: 'appearance', label: t('settings.appearance'), icon: <Palette size={17} />, group: 'workspace' },
-      { id: 'configuration', label: t('settings.configuration'), icon: <Wrench size={17} />, group: 'workspace' },
-      { id: 'personalization', label: t('settings.personalization'), icon: <UserCircle size={17} />, group: 'workspace' },
-      { id: 'permissions', label: t('settings.permissions'), icon: <ShieldCheck size={17} />, group: 'workspace' },
-      { id: 'agentProfiles', label: t('settings.agentProfiles'), icon: <Bot size={17} />, group: 'workspace' },
-      { id: 'executionTargets', label: t('settings.executionTargets'), icon: <Server size={17} />, group: 'workspace' },
-      { id: 'tasks', label: t('settings.tasks'), icon: <ClipboardList size={17} />, group: 'workspace' },
-      { id: 'onlineIm', label: t('settings.onlineIm'), icon: <Globe2 size={17} />, group: 'workspace' },
-      { id: 'groupChat', label: t('settings.groupChat'), icon: <MessageSquareText size={17} />, group: 'workspace' },
-      { id: 'agentScheduling', label: t('settings.agentScheduling'), icon: <Route size={17} />, group: 'workspace' },
-      { id: 'agentMarket', label: t('settings.agentMarket'), icon: <Bot size={17} />, group: 'workspace' },
-      { id: 'keyboard', label: t('settings.keyboard'), icon: <Keyboard size={17} />, group: 'workspace' },
-      { id: 'mcp', label: t('settings.mcp'), icon: <Plug size={17} />, group: 'automation' },
-      { id: 'skills', label: t('settings.skills'), icon: <Code2 size={17} />, group: 'automation' },
-      { id: 'hooks', label: t('settings.hooks'), icon: <TerminalSquare size={17} />, group: 'automation' },
-      { id: 'models', label: t('settings.models'), icon: <SlidersHorizontal size={17} />, group: 'automation' },
-      { id: 'modelMapping', label: t('settings.modelMapping'), icon: <Link2 size={17} />, group: 'automation' },
-      { id: 'ccSwitch', label: t('settings.ccSwitch'), icon: <Plug size={17} />, group: 'automation' },
-      { id: 'connections', label: t('settings.connections'), icon: <Globe2 size={17} />, group: 'automation' },
-      { id: 'remoteControl', label: t('settings.remoteControl'), icon: <Computer size={17} />, group: 'automation' },
-      { id: 'git', label: t('settings.git'), icon: <GitBranch size={17} />, group: 'automation' },
-      { id: 'environment', label: t('settings.environment'), icon: <HardDrive size={17} />, group: 'system' },
-      { id: 'worktree', label: t('settings.worktree'), icon: <FolderGit2 size={17} />, group: 'system' },
-      { id: 'browser', label: t('settings.browser'), icon: <Eye size={17} />, group: 'system' },
-      { id: 'computerUse', label: t('settings.computerUse'), icon: <Computer size={17} />, group: 'system' },
-      { id: 'platforms', label: t('settings.platforms'), icon: <Monitor size={17} />, group: 'system' },
-      { id: 'account', label: t('settings.account'), icon: <LockKeyhole size={17} />, group: 'system' },
-      { id: 'securityAudit', label: t('settings.securityAudit'), icon: <ShieldCheck size={17} />, group: 'system' },
-      { id: 'archived', label: t('settings.archived'), icon: <Archive size={17} />, group: 'system' },
+      buildNavItem('general', 'settings.general', <SlidersHorizontal size={17} />, 'workspace', t),
+      buildNavItem('appearance', 'settings.appearance', <Palette size={17} />, 'workspace', t),
+      buildNavItem('configuration', 'settings.configuration', <Wrench size={17} />, 'workspace', t),
+      buildNavItem('personalization', 'settings.personalization', <UserCircle size={17} />, 'workspace', t),
+      buildNavItem('permissions', 'settings.permissions', <ShieldCheck size={17} />, 'workspace', t),
+      buildNavItem('agentProfiles', 'settings.agentProfiles', <Bot size={17} />, 'workspace', t),
+      buildNavItem('executionTargets', 'settings.executionTargets', <Server size={17} />, 'workspace', t),
+      buildNavItem('tasks', 'settings.tasks', <ClipboardList size={17} />, 'workspace', t),
+      buildNavItem('onlineIm', 'settings.onlineIm', <Globe2 size={17} />, 'workspace', t),
+      buildNavItem('groupChat', 'settings.groupChat', <MessageSquareText size={17} />, 'workspace', t),
+      buildNavItem('agentScheduling', 'settings.agentScheduling', <Route size={17} />, 'workspace', t),
+      buildNavItem('agentMarket', 'settings.agentMarket', <Bot size={17} />, 'workspace', t),
+      buildNavItem('keyboard', 'settings.keyboard', <Keyboard size={17} />, 'workspace', t),
+      buildNavItem('mcp', 'settings.mcp', <Plug size={17} />, 'automation', t),
+      buildNavItem('skills', 'settings.skills', <Code2 size={17} />, 'automation', t),
+      buildNavItem('hooks', 'settings.hooks', <TerminalSquare size={17} />, 'automation', t),
+      buildNavItem('models', 'settings.models', <SlidersHorizontal size={17} />, 'automation', t),
+      buildNavItem('modelMapping', 'settings.modelMapping', <Link2 size={17} />, 'automation', t),
+      buildNavItem('ccSwitch', 'settings.ccSwitch', <Plug size={17} />, 'automation', t),
+      buildNavItem('connections', 'settings.connections', <Globe2 size={17} />, 'automation', t),
+      buildNavItem('remoteControl', 'settings.remoteControl', <Computer size={17} />, 'automation', t),
+      buildNavItem('git', 'settings.git', <GitBranch size={17} />, 'automation', t),
+      buildNavItem('environment', 'settings.environment', <HardDrive size={17} />, 'system', t),
+      buildNavItem('worktree', 'settings.worktree', <FolderGit2 size={17} />, 'system', t),
+      buildNavItem('browser', 'settings.browser', <Eye size={17} />, 'system', t),
+      buildNavItem('computerUse', 'settings.computerUse', <Computer size={17} />, 'system', t),
+      buildNavItem('platforms', 'settings.platforms', <Monitor size={17} />, 'system', t),
+      buildNavItem('account', 'settings.account', <LockKeyhole size={17} />, 'system', t),
+      buildNavItem('securityAudit', 'settings.securityAudit', <ShieldCheck size={17} />, 'system', t),
+      buildNavItem('archived', 'settings.archived', <Archive size={17} />, 'system', t),
     ],
     [t],
   );
 
-  const activeLabel = navItems.find((item) => item.id === active)?.label ?? t('settings.title');
+  const activeItem = navItems.find((item) => item.id === active);
+  const activeLabel = activeItem?.label ?? t('settings.title');
   const shortcuts: ShortcutRow[] = [
     { keys: ['Enter'], action: t('shortcut.send') },
     { keys: ['Shift', 'Enter'], action: t('shortcut.newline') },
@@ -531,6 +565,15 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           <div className={styles.header}>
             <span>{t('settings.title')}</span>
             <h1>{activeLabel}</h1>
+            {activeItem ? (
+              <>
+                <p>{activeItem.description}</p>
+                <div className={styles.headerMeta}>
+                  <span>{activeItem.sourceLabel}</span>
+                  <span>{activeItem.statusLabel}</span>
+                </div>
+              </>
+            ) : null}
           </div>
 
           {active === 'general' && (

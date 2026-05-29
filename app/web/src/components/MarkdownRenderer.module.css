@@ -88,7 +88,9 @@
 .root blockquote {
   margin: 0.5em 0;
   padding: 0.25em 0.75em;
-  border-left: 3px solid var(--primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--muted);
   opacity: 0.85;
 }
 
