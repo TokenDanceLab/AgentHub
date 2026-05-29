@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listThreads } from "@agenthub/shared";
 import type { Thread } from "@agenthub/shared";
 import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/components";
-import { ActionList, EmptyState, MetricGrid, SegmentedControl, StatusNotice, SurfaceHeader, TriageCard } from "@agenthub/shared/ui";
+import { ActionList, EmptyState, MetricGrid, SectionHeader, SegmentedControl, StatusNotice, SurfaceHeader, TriageCard } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, UserRound, ArrowRight } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
@@ -92,21 +92,19 @@ export function ThreadListView({ onThreadSelect, onOpenAccount }: ThreadListView
 
       <div className="mobileScroll mobileThreadSurface">
         <section className="mobileOverviewPanel">
-          <div className="mobileOverviewTitleRow">
-            <div>
-              <p className="mobileEyebrow">{t("queue.threads.eyebrow")}</p>
-              <h2>{t("queue.threads.overviewTitle")}</h2>
-            </div>
-            <button
-              className="mobileIconButton"
-              type="button"
-              aria-label={t("queue.threads.refresh")}
-              aria-busy={threads.isFetching}
-              onClick={() => threads.refetch()}
-            >
-              <RefreshCw size={18} className={threads.isFetching ? "mobileSpin" : undefined} />
-            </button>
-          </div>
+          <SectionHeader
+            className="mobileOverviewTitleRow"
+            eyebrowClassName="mobileEyebrow"
+            actionClassName="mobileIconButton"
+            eyebrow={t("queue.threads.eyebrow")}
+            title={t("queue.threads.overviewTitle")}
+            action={{
+              ariaLabel: t("queue.threads.refresh"),
+              busy: threads.isFetching,
+              onClick: () => threads.refetch(),
+              icon: <RefreshCw size={18} className={threads.isFetching ? "mobileSpin" : undefined} />,
+            }}
+          />
           <MetricGrid
             className="mobileMetricGrid"
             itemClassName="mobileMetricTile"
