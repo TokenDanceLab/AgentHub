@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // writeTempConfig creates a temporary YAML config file and returns its path.
@@ -458,6 +459,106 @@ tokendance_id:
 	}
 	if cfg.TokenDanceID.RedirectURI != "https://legacy.example/callback" {
 		t.Errorf("RedirectURI = %q", cfg.TokenDanceID.RedirectURI)
+	}
+}
+
+func TestLoadAgentTeamGuardrailDefaults(t *testing.T) {
+	path := writeTempConfig(t, validJWTYAML)
+	t.Setenv("AGENTHUB_JWT_SECRET", "agent-team-default-secret")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.AgentTeam.MaxDelegationDepth != 3 {
+		t.Errorf("MaxDelegationDepth = %d, want 3", cfg.AgentTeam.MaxDelegationDepth)
+	}
+	if cfg.AgentTeam.MaxActiveSubAgentsPerRun != 5 {
+		t.Errorf("MaxActiveSubAgentsPerRun = %d, want 5", cfg.AgentTeam.MaxActiveSubAgentsPerRun)
+	}
+	if cfg.AgentTeam.MaxRouteRepeats != 3 {
+		t.Errorf("MaxRouteRepeats = %d, want 3", cfg.AgentTeam.MaxRouteRepeats)
+	}
+	if cfg.AgentTeam.MaxTasksPerTeamRun != 20 {
+		t.Errorf("MaxTasksPerTeamRun = %d, want 20", cfg.AgentTeam.MaxTasksPerTeamRun)
+	}
+	if cfg.AgentTeam.AssignmentTimeout != 30*time.Minute {
+		t.Errorf("AssignmentTimeout = %s, want 30m", cfg.AgentTeam.AssignmentTimeout)
+	}
+	if cfg.AgentTeam.MaxTeamRunBudgetTokens != 200_000 {
+		t.Errorf("MaxTeamRunBudgetTokens = %d, want 200000", cfg.AgentTeam.MaxTeamRunBudgetTokens)
+	}
+	if cfg.AgentTeam.MaxTeamRunBudgetUsagePct != 95 {
+		t.Errorf("MaxTeamRunBudgetUsagePct = %f, want 95", cfg.AgentTeam.MaxTeamRunBudgetUsagePct)
+	}
+}
+
+func TestEnvOverrideAgentTeamGuardrails(t *testing.T) {
+	path := writeTempConfig(t, validJWTYAML)
+	t.Setenv("AGENTHUB_JWT_SECRET", "agent-team-env-secret")
+	t.Setenv("AGENTHUB_AGENT_TEAM_MAX_DELEGATION_DEPTH", "2")
+	t.Setenv("AGENTHUB_AGENT_TEAM_MAX_ACTIVE_SUBAGENTS_PER_RUN", "3")
+	t.Setenv("AGENTHUB_AGENT_TEAM_MAX_ROUTE_REPEATS", "4")
+	t.Setenv("AGENTHUB_AGENT_TEAM_MAX_TASKS_PER_TEAM_RUN", "7")
+	t.Setenv("AGENTHUB_AGENT_TEAM_ASSIGNMENT_TIMEOUT", "45m")
+	t.Setenv("AGENTHUB_AGENT_TEAM_MAX_TEAM_RUN_BUDGET_TOKENS", "12345")
+	t.Setenv("AGENTHUB_AGENT_TEAM_MAX_TEAM_RUN_BUDGET_USAGE_PCT", "80.5")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.AgentTeam.MaxDelegationDepth != 2 {
+		t.Errorf("MaxDelegationDepth = %d, want 2", cfg.AgentTeam.MaxDelegationDepth)
+	}
+	if cfg.AgentTeam.MaxActiveSubAgentsPerRun != 3 {
+		t.Errorf("MaxActiveSubAgentsPerRun = %d, want 3", cfg.AgentTeam.MaxActiveSubAgentsPerRun)
+	}
+	if cfg.AgentTeam.MaxRouteRepeats != 4 {
+		t.Errorf("MaxRouteRepeats = %d, want 4", cfg.AgentTeam.MaxRouteRepeats)
+	}
+	if cfg.AgentTeam.MaxTasksPerTeamRun != 7 {
+		t.Errorf("MaxTasksPerTeamRun = %d, want 7", cfg.AgentTeam.MaxTasksPerTeamRun)
+	}
+	if cfg.AgentTeam.AssignmentTimeout != 45*time.Minute {
+		t.Errorf("AssignmentTimeout = %s, want 45m", cfg.AgentTeam.AssignmentTimeout)
+	}
+	if cfg.AgentTeam.MaxTeamRunBudgetTokens != 12345 {
+		t.Errorf("MaxTeamRunBudgetTokens = %d, want 12345", cfg.AgentTeam.MaxTeamRunBudgetTokens)
+	}
+	if cfg.AgentTeam.MaxTeamRunBudgetUsagePct != 80.5 {
+		t.Errorf("MaxTeamRunBudgetUsagePct = %f, want 80.5", cfg.AgentTeam.MaxTeamRunBudgetUsagePct)
+	}
+}
+
+func TestValidateRejectsInvalidAgentTeamGuardrails(t *testing.T) {
+	cfg := &Config{
+		DB: DBConfig{
+			Host: "localhost",
+			Port: 5432,
+			User: "agenthub",
+			Name: "agenthub",
+		},
+		Redis: RedisConfig{
+			Host: "localhost",
+			Port: 6379,
+		},
+		JWT: JWTConfig{
+			Secret: "strong-agenthub-secret",
+		},
+		AgentTeam: AgentTeamConfig{
+			MaxDelegationDepth: -1,
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected invalid AgentTeam guardrail to be rejected")
+	}
+	if !strings.Contains(err.Error(), "agent_team.max_delegation_depth") {
+		t.Fatalf("Validate() error = %q, want agent_team.max_delegation_depth", err.Error())
 	}
 }
 
