@@ -3,6 +3,7 @@ package tests
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,7 +30,7 @@ func TestMessagePinRejectsCrossSessionMessage(t *testing.T) {
 	mustCode(t, resp, "MSG_NOT_FOUND", "pin message from another session")
 }
 
-func TestListPinsDoesNotLeakHistoricalCrossSessionPin(t *testing.T) {
+func TestMessagePinsRejectHistoricalCrossSessionPinAtDatabase(t *testing.T) {
 	t.Cleanup(func() { CleanDB(t, db) })
 
 	alice := seedPinSecurityUser(t, "tpinsec2_a", "AlicePinSec2")
@@ -50,13 +51,17 @@ func TestListPinsDoesNotLeakHistoricalCrossSessionPin(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("seed visible pin: %v", err)
 	}
-	if err := db.Create(&model.MessagePin{
+	err := db.Create(&model.MessagePin{
 		SessionID:      aliceSessionID,
 		MessageID:      otherMessageID,
 		PinnedByUserID: alice.ID,
 		PinnedAt:       time.Now().Add(time.Second),
-	}).Error; err != nil {
-		t.Fatalf("seed cross-session pin: %v", err)
+	}).Error
+	if err == nil {
+		t.Fatal("expected database to reject cross-session message pin")
+	}
+	if !strings.Contains(err.Error(), "fk_message_pins_message_session") {
+		t.Fatalf("expected message/session foreign key rejection, got %v", err)
 	}
 
 	resp := parse(get("/client/sessions/"+aliceSessionID+"/pins", alice.Token))
