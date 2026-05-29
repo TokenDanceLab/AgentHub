@@ -24,7 +24,7 @@ type NativeStatusKey =
   | "settings.status.sessionCleared"
   | "settings.status.nativeBridgeUnavailable";
 
-export function SettingsView() {
+export function AccountView() {
   const { t, i18n } = useTranslation();
   const [statusKey, setStatusKey] = useState<NativeStatusKey>("settings.status.idle");
   const [isBusy, setIsBusy] = useState(false);

@@ -4,14 +4,14 @@ import { listRuns } from "@agenthub/shared";
 import type { Run, RunStatus } from "@agenthub/shared";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { useTranslation } from "react-i18next";
-import { AlertCircle, ArrowRight, CheckCircle2, Clock3, GitPullRequestArrow, Play, Radio, RefreshCw, Settings, ShieldAlert, TerminalSquare } from "lucide-react";
+import { AlertCircle, ArrowRight, CheckCircle2, Clock3, GitPullRequestArrow, Play, Radio, RefreshCw, ShieldAlert, TerminalSquare, UserRound } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
 import { MobileStatusBadge } from "../components/MobileStatusBadge";
 import { getMobileHubHealth } from "../native/hubHealth";
 
 interface RunListViewProps {
   onRunSelect: (run: Run) => void;
-  onOpenSettings: () => void;
+  onOpenAccount: () => void;
 }
 
 function runStatusToVariant(status: RunStatus): StatusVariant {
@@ -97,7 +97,7 @@ function isClosedRun(run: Run): boolean {
   return ["finished", "failed", "cancelled"].includes(run.status);
 }
 
-export function RunListView({ onRunSelect, onOpenSettings }: RunListViewProps) {
+export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<RunFilter>("all");
   const health = useQuery({ queryKey: ["mobile-hub-health"], queryFn: getMobileHubHealth, retry: false });
@@ -274,9 +274,9 @@ export function RunListView({ onRunSelect, onOpenSettings }: RunListViewProps) {
               void health.refetch();
               void runs.refetch();
             }}
-            secondaryLabel={t("queue.common.settings")}
-            secondaryIcon={<Settings size={16} />}
-            onSecondaryAction={onOpenSettings}
+            secondaryLabel={t("queue.common.account")}
+            secondaryIcon={<UserRound size={16} />}
+            onSecondaryAction={onOpenAccount}
           />
         )}
 
