@@ -76,8 +76,34 @@ func (s *AgentTeamService) CreateTeam(ctx context.Context, userID, name, descrip
 	return team, nil
 }
 
-// GetTeam returns a team by ID, verifying that the requesting user is the owner.
+// GetTeam returns a team by ID when the requesting user owns the team or owns
+// an Agent Profile installed as a team member.
 func (s *AgentTeamService) GetTeam(ctx context.Context, userID, teamID string) (*model.AgentTeam, error) {
+	return s.getTeamForRead(ctx, userID, teamID)
+}
+
+func (s *AgentTeamService) getTeamForRead(ctx context.Context, userID, teamID string) (*model.AgentTeam, error) {
+	team, err := repository.GetTeamByID(s.db, teamID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentNotFound
+		}
+		return nil, err
+	}
+	if team.OwnerID == userID {
+		return team, nil
+	}
+	isMember, err := repository.TeamHasAgentOwnedByUser(s.db, teamID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !isMember {
+		return nil, errcode.AgentNotFound
+	}
+	return team, nil
+}
+
+func (s *AgentTeamService) requireTeamOwner(ctx context.Context, userID, teamID string) (*model.AgentTeam, error) {
 	team, err := repository.GetTeamByID(s.db, teamID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -91,9 +117,10 @@ func (s *AgentTeamService) GetTeam(ctx context.Context, userID, teamID string) (
 	return team, nil
 }
 
-// ListTeams returns all teams owned by the given user.
+// ListTeams returns all teams owned by the user or readable through one of the
+// user's Agent Profiles installed as a team member.
 func (s *AgentTeamService) ListTeams(ctx context.Context, userID string) ([]model.AgentTeam, error) {
-	return repository.ListTeamsByOwner(s.db, userID)
+	return repository.ListTeamsReadableByUser(s.db, userID)
 }
 
 // UpdateTeam updates a team's name and description, verifying owner access.
@@ -437,7 +464,7 @@ func supervisorRouteModelParams() string {
 
 // GetTeamRun returns a single team run, verifying owner access.
 func (s *AgentTeamService) GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error) {
-	team, err := s.GetTeam(ctx, userID, teamID)
+	team, err := s.getTeamForRead(ctx, userID, teamID)
 	if err != nil {
 		return nil, err
 	}
@@ -458,7 +485,7 @@ func (s *AgentTeamService) GetTeamRun(ctx context.Context, userID, teamID, runID
 
 // ListTeamRuns returns all runs for a team, verifying owner access.
 func (s *AgentTeamService) ListTeamRuns(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error) {
-	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+	if _, err := s.getTeamForRead(ctx, userID, teamID); err != nil {
 		return nil, err
 	}
 	return repository.ListTeamRunsByTeam(s.db, teamID)
@@ -466,7 +493,7 @@ func (s *AgentTeamService) ListTeamRuns(ctx context.Context, userID, teamID stri
 
 // GetTeamRunState returns a replayable projection of a team run.
 func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error) {
-	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+	if _, err := s.getTeamForRead(ctx, userID, teamID); err != nil {
 		return nil, err
 	}
 	run, err := repository.GetTeamRunByID(s.db, runID)
@@ -671,6 +698,9 @@ func (s *AgentTeamService) DecideApproval(ctx context.Context, userID, teamID, r
 	if approvalID == "" || !validApprovalDecision(decision.Decision) {
 		return nil, errcode.ErrBadRequest
 	}
+	if _, err := s.requireTeamOwner(ctx, userID, teamID); err != nil {
+		return nil, err
+	}
 
 	state, err := s.GetTeamRunState(ctx, userID, teamID, runID)
 	if err != nil {
@@ -809,6 +839,9 @@ func (s *AgentTeamService) ResolveConflict(ctx context.Context, userID, teamID, 
 	}
 	if resolution.ConflictID == "" || !validConflictResolution(resolution.Resolution) {
 		return nil, errcode.ErrBadRequest
+	}
+	if _, err := s.requireTeamOwner(ctx, userID, teamID); err != nil {
+		return nil, err
 	}
 
 	state, err := s.GetTeamRunState(ctx, userID, teamID, runID)
@@ -1462,7 +1495,7 @@ func assignmentStatusFromPending(status string) string {
 
 // ListTeamTasks returns first-class TeamTask rows for a run after owner checks.
 func (s *AgentTeamService) ListTeamTasks(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error) {
-	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+	if _, err := s.getTeamForRead(ctx, userID, teamID); err != nil {
 		return nil, err
 	}
 	run, err := repository.GetTeamRunByID(s.db, runID)
@@ -1487,7 +1520,7 @@ func (s *AgentTeamService) ListTeamTasks(ctx context.Context, userID, teamID, ru
 
 // ListTeamEvents returns append-only events for a team run after owner checks.
 func (s *AgentTeamService) ListTeamEvents(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error) {
-	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+	if _, err := s.getTeamForRead(ctx, userID, teamID); err != nil {
 		return nil, err
 	}
 	run, err := repository.GetTeamRunByID(s.db, runID)
@@ -1513,7 +1546,7 @@ func (s *AgentTeamService) ListTeamEvents(ctx context.Context, userID, teamID, r
 // HandleRouteDecision consumes a typed supervisor route decision and records
 // the accepted or rejected route in the TeamEvent log.
 func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error) {
-	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+	if _, err := s.requireTeamOwner(ctx, userID, teamID); err != nil {
 		return nil, err
 	}
 	run, err := repository.GetTeamRunByID(s.db, runID)

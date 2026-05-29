@@ -56,18 +56,47 @@ func TestAgentTeamService_GetTeam(t *testing.T) {
 }
 
 func TestAgentTeamService_GetTeamWrongOwner(t *testing.T) {
-	db, mock := newMockAgentTeamDB(t)
+	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
 
-	rows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
-		AddRow("team-1", "user-2", "My Team", "desc", "", time.Now(), time.Now())
-	mock.ExpectQuery(`SELECT * FROM "agent_teams"`).
-		WillReturnRows(rows)
+	team := &model.AgentTeam{OwnerID: "user-2", Name: "My Team", Description: "desc"}
+	require.NoError(t, repository.CreateTeam(db, team))
 
-	_, err := svc.GetTeam(context.Background(), "user-1", "team-1")
+	_, err := svc.GetTeam(context.Background(), "user-1", team.ID)
 	require.Error(t, err)
 	assert.Equal(t, errcode.AgentNotFound, err)
-	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAgentTeamService_GetTeamAllowsAgentProfileOwnerMemberRead(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+
+	team := &model.AgentTeam{OwnerID: "owner-user", Name: "Shared Team"}
+	require.NoError(t, repository.CreateTeam(db, team))
+	memberAgent := &model.CustomAgent{
+		OwnerUserID:  "member-user",
+		Name:         "Member Agent",
+		AgentType:    "codex",
+		SystemPrompt: "Help the team",
+	}
+	require.NoError(t, repository.CreateCustomAgent(db, memberAgent))
+	require.NoError(t, repository.AddTeamMember(db, &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: &memberAgent.ID,
+		Role:           model.TeamMemberRoleExecutor,
+	}))
+
+	got, err := svc.GetTeam(context.Background(), "member-user", team.ID)
+	require.NoError(t, err)
+	assert.Equal(t, team.ID, got.ID)
+
+	_, err = svc.GetTeam(context.Background(), "intruder-user", team.ID)
+	require.Error(t, err)
+	assert.Equal(t, errcode.AgentNotFound, err)
+
+	err = svc.UpdateTeam(context.Background(), "member-user", team.ID, "Should Not Write", "")
+	require.Error(t, err)
+	assert.Equal(t, errcode.AgentNotFound, err)
 }
 
 func TestAgentTeamService_GetTeamNotFound(t *testing.T) {
@@ -84,19 +113,61 @@ func TestAgentTeamService_GetTeamNotFound(t *testing.T) {
 }
 
 func TestAgentTeamService_ListTeams(t *testing.T) {
-	db, mock := newMockAgentTeamDB(t)
+	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
 
-	rows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
-		AddRow("team-1", "user-1", "Team 1", "", "", time.Now(), time.Now()).
-		AddRow("team-2", "user-1", "Team 2", "", "", time.Now(), time.Now())
-	mock.ExpectQuery(`SELECT * FROM "agent_teams"`).
-		WillReturnRows(rows)
+	require.NoError(t, repository.CreateTeam(db, &model.AgentTeam{OwnerID: "user-1", Name: "Team 1"}))
+	require.NoError(t, repository.CreateTeam(db, &model.AgentTeam{OwnerID: "user-1", Name: "Team 2"}))
 
 	teams, err := svc.ListTeams(context.Background(), "user-1")
 	require.NoError(t, err)
 	assert.Len(t, teams, 2)
-	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAgentTeamService_ListTeamsIncludesReadableMemberTeamsWithoutLeaking(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+
+	ownedTeam := &model.AgentTeam{OwnerID: "member-user", Name: "Owned Team"}
+	require.NoError(t, repository.CreateTeam(db, ownedTeam))
+
+	sharedTeam := &model.AgentTeam{OwnerID: "owner-user", Name: "Shared Team"}
+	require.NoError(t, repository.CreateTeam(db, sharedTeam))
+	memberAgent := &model.CustomAgent{
+		OwnerUserID:  "member-user",
+		Name:         "Member Agent",
+		AgentType:    "codex",
+		SystemPrompt: "Read shared team",
+	}
+	require.NoError(t, repository.CreateCustomAgent(db, memberAgent))
+	require.NoError(t, repository.AddTeamMember(db, &model.AgentTeamMember{
+		TeamID:         sharedTeam.ID,
+		AgentProfileID: &memberAgent.ID,
+		Role:           model.TeamMemberRoleExecutor,
+	}))
+
+	foreignTeam := &model.AgentTeam{OwnerID: "foreign-owner", Name: "Foreign Team"}
+	require.NoError(t, repository.CreateTeam(db, foreignTeam))
+	foreignAgent := &model.CustomAgent{
+		OwnerUserID:  "foreign-member",
+		Name:         "Foreign Agent",
+		AgentType:    "codex",
+		SystemPrompt: "Not visible",
+	}
+	require.NoError(t, repository.CreateCustomAgent(db, foreignAgent))
+	require.NoError(t, repository.AddTeamMember(db, &model.AgentTeamMember{
+		TeamID:         foreignTeam.ID,
+		AgentProfileID: &foreignAgent.ID,
+		Role:           model.TeamMemberRoleExecutor,
+	}))
+
+	teams, err := svc.ListTeams(context.Background(), "member-user")
+	require.NoError(t, err)
+	gotIDs := make([]string, 0, len(teams))
+	for _, team := range teams {
+		gotIDs = append(gotIDs, team.ID)
+	}
+	assert.ElementsMatch(t, []string{ownedTeam.ID, sharedTeam.ID}, gotIDs)
 }
 
 func TestAgentTeamService_UpdateTeam(t *testing.T) {
@@ -1453,6 +1524,107 @@ func TestAgentTeamService_DecideApprovalRejectsAlreadyDecided(t *testing.T) {
 	assert.Nil(t, decided)
 }
 
+func TestAgentTeamService_MemberReadableTeamCannotMutateRunDecisions(t *testing.T) {
+	db := setupAgentTeamStateSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	team, _, executor, run := seedAgentTeamRun(t, db)
+	addReadableTeamMemberForUser(t, db, team.ID, "member-user")
+
+	state, err := svc.GetTeamRunState(context.Background(), "member-user", team.ID, run.ID)
+	require.NoError(t, err)
+	require.NotNil(t, state)
+
+	reviewerProfileID := "profile-reviewer"
+	reviewer := &model.AgentTeamMember{
+		TeamID:         team.ID,
+		AgentProfileID: &reviewerProfileID,
+		Role:           model.TeamMemberRoleReviewer,
+	}
+	require.NoError(t, repository.AddTeamMember(db, reviewer))
+	firstTaskID := "agent-task-conflict-one"
+	secondTaskID := "agent-task-conflict-two"
+	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: executor.ID,
+		Status:           model.TeamTaskStatusDone,
+		Objective:        "Change shared file",
+		RunID:            &firstTaskID,
+	}))
+	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: reviewer.ID,
+		Status:           model.TeamTaskStatusDone,
+		Objective:        "Review shared file",
+		RunID:            &secondTaskID,
+	}))
+	for _, event := range []model.AgentRunEvent{
+		{
+			TaskID:          firstTaskID,
+			EdgeRunID:       "edge-conflict-one",
+			SessionID:       run.SessionID,
+			AgentInstanceID: "agent-one",
+			EventType:       "run.agent.file_change",
+			Payload:         `{"path":"shared.txt","action":"modified","status":"completed"}`,
+		},
+		{
+			TaskID:          secondTaskID,
+			EdgeRunID:       "edge-conflict-two",
+			SessionID:       run.SessionID,
+			AgentInstanceID: "agent-two",
+			EventType:       "run.agent.file_change",
+			Payload:         `{"path":"shared.txt","action":"modified","status":"completed"}`,
+		},
+	} {
+		require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &event))
+	}
+
+	resolved, err := svc.ResolveConflict(context.Background(), "member-user", team.ID, run.ID, model.TeamConflictResolution{
+		ConflictID:          conflictIDForPath("shared.txt"),
+		Resolution:          model.TeamConflictResolutionAcceptAgentTask,
+		SelectedAgentTaskID: firstTaskID,
+	})
+	require.Error(t, err)
+	assert.Equal(t, errcode.AgentNotFound, err)
+	assert.Nil(t, resolved)
+
+	pending := &model.PendingAgentTask{
+		ID:                "agent-task-member-approval",
+		AgentInstanceID:   "agent-executor",
+		TriggeredByUserID: "user-1",
+		TriggerMessageID:  "msg-member-approval",
+		Status:            model.TaskStatusRunning,
+		EdgeRunID:         "edge-run-member-approval",
+		ExpireAt:          time.Now().Add(time.Hour),
+	}
+	require.NoError(t, db.Create(pending).Error)
+	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
+		TeamRunID:        run.ID,
+		AssigneeMemberID: executor.ID,
+		Status:           model.TeamTaskStatusRunning,
+		Objective:        "Run gated command",
+		RunID:            &pending.ID,
+	}))
+	require.NoError(t, repository.CreateAgentRunEventWithNextSeq(db, &model.AgentRunEvent{
+		TaskID:          pending.ID,
+		EdgeRunID:       pending.EdgeRunID,
+		SessionID:       run.SessionID,
+		AgentInstanceID: "agent-executor",
+		EventType:       "run.agent.permission_requested",
+		Payload:         `{"requestId":"req-member-approval","toolUseId":"tool-member-approval","toolName":"Bash","status":"pending"}`,
+	}))
+
+	decided, err := svc.DecideApproval(context.Background(), "member-user", team.ID, run.ID, "req-member-approval", model.TeamApprovalDecision{
+		Decision: "allow",
+	})
+	require.Error(t, err)
+	assert.Equal(t, errcode.AgentNotFound, err)
+	assert.Nil(t, decided)
+
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	assert.Empty(t, events)
+}
+
 func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	svc := NewAgentTeamService(db, nil, nil)
@@ -1688,6 +1860,24 @@ func seedAgentTeamRun(t *testing.T, db *gorm.DB) (*model.AgentTeam, *model.Agent
 	}
 	require.NoError(t, repository.CreateTeamRun(db, run))
 	return team, supervisor, executor, run
+}
+
+func addReadableTeamMemberForUser(t *testing.T, db *gorm.DB, teamID, userID string) *model.AgentTeamMember {
+	t.Helper()
+	agent := &model.CustomAgent{
+		OwnerUserID:  userID,
+		Name:         "Readable Member Agent",
+		AgentType:    "codex",
+		SystemPrompt: "Read shared team state",
+	}
+	require.NoError(t, repository.CreateCustomAgent(db, agent))
+	member := &model.AgentTeamMember{
+		TeamID:         teamID,
+		AgentProfileID: &agent.ID,
+		Role:           model.TeamMemberRoleExecutor,
+	}
+	require.NoError(t, repository.AddTeamMember(db, member))
+	return member
 }
 
 func stringPtr(value string) *string {
