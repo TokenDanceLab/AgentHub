@@ -487,6 +487,36 @@ async function collectMetrics(page, { mobile = false } = {}) {
       const directSpanCount = Array.from(row.children).filter((child) => child.tagName === "SPAN").length;
       return style.display === "grid" && directSpanCount >= 3;
     });
+    const settingsModelAliasRows = Array.from(document.querySelectorAll("[class*='modelAliasRow']")).filter((row) =>
+      row.className?.toString().split(/\s+/).some((className) => /modelAliasRow_/.test(className))
+    );
+    const visibleSettingsModelAliasRows = settingsModelAliasRows.filter((row) => {
+      const rect = row.getBoundingClientRect();
+      const style = window.getComputedStyle(row);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedSettingsModelAliasRows = visibleSettingsModelAliasRows.filter((row) => {
+      const style = window.getComputedStyle(row);
+      const directSpanCount = Array.from(row.children).filter((child) => child.tagName === "SPAN").length;
+      const hasSharedBody = Array.from(row.children).some((child) => {
+        const childStyle = window.getComputedStyle(child);
+        return child.tagName === "SPAN" && childStyle.display === "grid";
+      });
+      return style.display === "grid" && directSpanCount >= 2 && hasSharedBody;
+    });
+    const settingsProviderRows = Array.from(document.querySelectorAll("[class*='providerRow']")).filter((row) =>
+      row.className?.toString().split(/\s+/).some((className) => /providerRow_/.test(className))
+    );
+    const visibleSettingsProviderRows = settingsProviderRows.filter((row) => {
+      const rect = row.getBoundingClientRect();
+      const style = window.getComputedStyle(row);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedSettingsProviderRows = visibleSettingsProviderRows.filter((row) => {
+      const style = window.getComputedStyle(row);
+      const directSpanCount = Array.from(row.children).filter((child) => child.tagName === "SPAN").length;
+      return style.display === "grid" && directSpanCount >= 3;
+    });
     const settingsEmptyBlocks = Array.from(document.querySelectorAll("[class*='emptyBlock']")).filter((block) =>
       block.className?.toString().split(/\s+/).some((className) => /emptyBlock_/.test(className))
     );
@@ -559,6 +589,10 @@ async function collectMetrics(page, { mobile = false } = {}) {
       sharedSettingsTargetCardCount: sharedSettingsTargetCards.length,
       visibleSettingsConnectionRowCount: visibleSettingsConnectionRows.length,
       sharedSettingsConnectionRowCount: sharedSettingsConnectionRows.length,
+      visibleSettingsModelAliasRowCount: visibleSettingsModelAliasRows.length,
+      sharedSettingsModelAliasRowCount: sharedSettingsModelAliasRows.length,
+      visibleSettingsProviderRowCount: visibleSettingsProviderRows.length,
+      sharedSettingsProviderRowCount: sharedSettingsProviderRows.length,
       visibleSettingsEmptyBlockCount: visibleSettingsEmptyBlocks.length,
       sharedSettingsEmptyBlockCount: sharedSettingsEmptyBlocks.length,
       visibleSettingsCalloutCount: visibleSettingsCallouts.length,
@@ -723,6 +757,18 @@ async function visitAndCapture(page, scene) {
     await page.getByText("WebSocket", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
     await page.locator("[class*='connectionRow']").first().waitFor({ state: "visible", timeout: 5000 });
   }
+  if (scene.openSettingsModelMapping) {
+    await page.getByRole("button", { name: /^Model Mapping$/ }).first().click();
+    await page.locator("h1").filter({ hasText: /^Model Mapping$/ }).waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("Model aliases", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator("[class*='modelAliasRow']").first().waitFor({ state: "visible", timeout: 5000 });
+  }
+  if (scene.openSettingsCcSwitch) {
+    await page.getByRole("button", { name: /^cc-switch$/ }).first().click();
+    await page.locator("h1").filter({ hasText: /^cc-switch$/ }).waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("Provider list", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator("[class*='providerRow']").first().waitFor({ state: "visible", timeout: 5000 });
+  }
   if (scene.openSettingsArchived) {
     await page.getByRole("button", { name: /^Archived Chats$/ }).first().click();
     await page.locator("h1").filter({ hasText: /^Archived Chats$/ }).waitFor({ state: "visible", timeout: 5000 });
@@ -774,6 +820,14 @@ async function visitAndCapture(page, scene) {
   if (scene.openSettingsConnections) {
     assert(metrics.visibleSettingsConnectionRowCount >= 3, `${scene.name}: connections settings should render status rows`, metrics);
     assert(metrics.sharedSettingsConnectionRowCount >= 3, `${scene.name}: connection rows should use shared ActivityCard grid structure`, metrics);
+  }
+  if (scene.openSettingsModelMapping) {
+    assert(metrics.visibleSettingsModelAliasRowCount >= 3, `${scene.name}: model mapping should render alias rows`, metrics);
+    assert(metrics.sharedSettingsModelAliasRowCount >= 3, `${scene.name}: model alias rows should use shared ActivityCard grid structure`, metrics);
+  }
+  if (scene.openSettingsCcSwitch) {
+    assert(metrics.visibleSettingsProviderRowCount >= 3, `${scene.name}: cc-switch should render provider rows`, metrics);
+    assert(metrics.sharedSettingsProviderRowCount >= 3, `${scene.name}: provider rows should use shared ActivityCard grid structure`, metrics);
   }
   if (scene.openSettingsArchived) {
     assert(metrics.visibleSettingsEmptyBlockCount >= 1, `${scene.name}: archived settings should render an empty state`, metrics);
@@ -937,6 +991,24 @@ async function main() {
       language: "en",
       theme: "dark",
       openSettingsConnections: true,
+    },
+    {
+      name: "web-design-settings-model-mapping-desktop-1440x920",
+      path: "/settings",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openSettingsModelMapping: true,
+    },
+    {
+      name: "web-design-settings-cc-switch-desktop-1440x920",
+      path: "/settings",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openSettingsCcSwitch: true,
     },
     {
       name: "web-design-settings-archived-empty-desktop-1440x920",
