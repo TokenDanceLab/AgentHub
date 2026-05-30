@@ -679,6 +679,8 @@
   "welcome.runtimeList": "Available Runtime adapters",
   "welcome.runtimeDefaultDesc": "Runtime profile routed through Hub and Desktop.",
   "welcome.noRuntimes": "No Runtime adapters detected",
+  "welcome.noRuntimesDescription": "Connect a Desktop runtime or refresh Hub session state before dispatching from this workspace.",
+  "welcome.edgeOfflineDescription": "Runtime routing is unavailable. Keep this workspace open while the Desktop runtime reconnects.",
   "welcome.profileName": "{{runtime}} Profile",
   "welcome.profileFallback": "Auto Profile",
   "welcome.profileDesc": "Runtime, model route, config sources, and execution target are composed before dispatch.",

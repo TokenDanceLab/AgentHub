@@ -12,12 +12,12 @@ import {
   Route,
   Server,
   Sparkles,
-  Wifi,
   WifiOff,
 } from 'lucide-react';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
 import type { AgentInfo } from '@shared/types';
+import { EmptyState } from '@shared/ui';
 import styles from './WelcomeScreen.module.css';
 
 interface Props {
@@ -83,6 +83,19 @@ export default memo(function WelcomeScreen({
       resolveRunRequestOptions,
     ],
   );
+  const runtimeEmptyState = (
+    <EmptyState
+      className={styles.emptyRuntime ?? ''}
+      contentClassName={styles.emptyRuntimeContent ?? ''}
+      iconClassName={styles.emptyRuntimeIcon ?? ''}
+      titleClassName={styles.emptyRuntimeTitle ?? ''}
+      descriptionClassName={styles.emptyRuntimeDescription ?? ''}
+      icon={online ? <Server size={17} /> : <WifiOff size={17} />}
+      title={online ? t('welcome.noRuntimes') : t('welcome.edgeOffline')}
+      description={online ? t('welcome.noRuntimesDescription') : t('welcome.edgeOfflineDescription')}
+      titleLevel={3}
+    />
+  );
 
   // Fade-in animation on mount
   useEffect(() => {
@@ -116,6 +129,8 @@ export default memo(function WelcomeScreen({
           <span>{t('welcome.eyebrow')}</span>
           <h1>{t('welcome.headline')}</h1>
         </div>
+
+        {agents.length === 0 ? runtimeEmptyState : null}
 
         <div className={styles.launcher}>
           <div className={styles.modeRow} aria-label={t('welcome.launcherLabel')}>
@@ -172,10 +187,7 @@ export default memo(function WelcomeScreen({
                     </button>
                   ))
                 ) : (
-                  <div className={styles.emptyRuntime}>
-                    {online ? <Wifi size={16} /> : <WifiOff size={16} />}
-                    <span>{online ? t('welcome.noRuntimes') : t('welcome.edgeOffline')}</span>
-                  </div>
+                  runtimeEmptyState
                 )}
               </div>
             )}
