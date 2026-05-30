@@ -97,6 +97,10 @@
   "chat.thinking": "思考中...",
   "chat.toolCall": "工具: {{name}}",
   "chat.viewFullDiff": "查看完整差异",
+  "chat.fileAction.created": "已创建",
+  "chat.fileAction.modified": "已修改",
+  "chat.fileAction.deleted": "已删除",
+  "chat.fileAction.noPreview": "暂无文件预览。",
 
   "connectAgent.connect": "连接",
   "connectAgent.connected": "已连接",
