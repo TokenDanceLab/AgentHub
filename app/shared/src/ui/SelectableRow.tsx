@@ -8,6 +8,7 @@ export interface SelectableRowProps {
   leading?: ReactNode;
   actions?: ReactNode;
   selected?: boolean;
+  disabled?: boolean;
   ariaLabel?: string;
   onSelect?: () => void;
   className?: string | undefined;
@@ -32,6 +33,7 @@ export function SelectableRow({
   leading,
   actions,
   selected = false,
+  disabled = false,
   ariaLabel,
   onSelect,
   className,
@@ -51,6 +53,7 @@ export function SelectableRow({
         type="button"
         aria-label={ariaLabel}
         aria-current={selected ? 'true' : undefined}
+        disabled={disabled}
         onClick={onSelect}
       >
         {leading ? <span className={cx(styles.leading, leadingClassName)} aria-hidden="true">{leading}</span> : null}

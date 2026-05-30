@@ -421,6 +421,21 @@ async function collectMetrics(page, { mobile = false } = {}) {
       const style = window.getComputedStyle(button);
       return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
     });
+    const agentRows = Array.from(document.querySelectorAll("[class*='agentRow']")).filter((row) =>
+      row.className?.toString().split(/\s+/).some((className) => /agentRow_/.test(className))
+    );
+    const visibleAgentRows = agentRows.filter((row) => {
+      const rect = row.getBoundingClientRect();
+      const style = window.getComputedStyle(row);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedAgentRows = visibleAgentRows.filter((row) => {
+      const directButton = Array.from(row.children).find((child) => child.tagName === "BUTTON");
+      if (!directButton) return false;
+      const directButtonStyle = window.getComputedStyle(directButton);
+      const directSpanCount = Array.from(directButton.children).filter((child) => child.tagName === "SPAN").length;
+      return directButtonStyle.display === "flex" && directSpanCount >= 2 && directButton.getAttribute("type") === "button";
+    });
     const settingsAccountCards = Array.from(document.querySelectorAll("[class*='summaryCard'], [class*='capabilityCard']"));
     const visibleSettingsAccountCards = settingsAccountCards.filter((card) => {
       const rect = card.getBoundingClientRect();
@@ -593,6 +608,8 @@ async function collectMetrics(page, { mobile = false } = {}) {
           }
         : null,
       visibleSearchResultButtonCount: visibleSearchResultButtons.length,
+      visibleAgentRowCount: visibleAgentRows.length,
+      sharedAgentRowCount: sharedAgentRows.length,
       visibleSettingsAccountCardCount: visibleSettingsAccountCards.length,
       sharedSettingsAccountCardCount: sharedSettingsAccountCards.length,
       visibleSettingsTaskRowCount: visibleSettingsTaskRows.length,
@@ -813,6 +830,10 @@ async function visitAndCapture(page, scene) {
     assert(metrics.visibleThreadRowButtonCount === 2, `${scene.name}: shared thread rows should expose two visible selectable buttons`, metrics);
     assert(metrics.nestedThreadActionButtons === 0, `${scene.name}: thread row actions must not nest buttons inside the selectable row`, metrics);
   }
+  if (scene.verifyAgentRows) {
+    assert(metrics.visibleAgentRowCount >= 2, `${scene.name}: agent runtime list should render visible rows`, metrics);
+    assert(metrics.sharedAgentRowCount >= 2, `${scene.name}: agent runtime rows should use shared SelectableRow structure`, metrics);
+  }
   if (scene.openRunWithToolCall) {
     assert(metrics.visibleRunDetailSectionCount >= 3, `${scene.name}: run detail should render output/tool/file sections`, metrics);
     assert(metrics.sharedRunDetailSectionCount >= 3, `${scene.name}: run detail sections should use shared ActivityCard grid structure`, metrics);
@@ -883,6 +904,7 @@ async function main() {
       authenticated: true,
       language: "en",
       theme: "dark",
+      verifyAgentRows: true,
     },
     {
       name: "web-design-workspace-mobile-390x844",
