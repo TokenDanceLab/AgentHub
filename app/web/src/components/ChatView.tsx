@@ -52,8 +52,12 @@ function summarizeInput(input: Record<string, unknown>): string {
   return str.length > 40 ? str.slice(0, 40) + '...' : str;
 }
 
+function localeFromLanguage(language: string | undefined): string {
+  return language?.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US';
+}
+
 // ── Relative time formatter ──────────────────
-function relativeTime(timestamp: string): { relative: string; exact: string } {
+function relativeTime(timestamp: string, t: TFunction, language: string | undefined): { relative: string; exact: string } {
   const now = Date.now();
   const then = new Date(timestamp).getTime();
   const diff = now - then;
@@ -63,20 +67,21 @@ function relativeTime(timestamp: string): { relative: string; exact: string } {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
-  const exact = new Date(timestamp).toLocaleString('en-US', {
+  const locale = localeFromLanguage(language);
+  const exact = new Date(timestamp).toLocaleString(locale, {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   });
 
-  if (minutes < 1) return { relative: 'Just now', exact };
-  if (minutes < 60) return { relative: `${minutes} min ago`, exact };
-  if (hours < 24) return { relative: `${hours}h ago`, exact };
-  if (days === 1) return { relative: 'Yesterday', exact };
-  if (days < 7) return { relative: `${days}d ago`, exact };
+  if (minutes < 1) return { relative: t('time.justNow'), exact };
+  if (minutes < 60) return { relative: t('time.minutesAgo', { count: minutes }), exact };
+  if (hours < 24) return { relative: t('time.hoursAgo', { count: hours }), exact };
+  if (days === 1) return { relative: t('time.yesterday'), exact };
+  if (days < 7) return { relative: t('time.daysAgo', { count: days }), exact };
 
-  const shortDate = new Date(timestamp).toLocaleDateString('en-US', {
+  const shortDate = new Date(timestamp).toLocaleDateString(locale, {
     month: 'short',
     day: 'numeric',
   });
@@ -380,7 +385,7 @@ function extractMessageText(msg: ChatMessage): string {
 
 // ── ChatView ────────────────────────────────
 export default function ChatView({ messages, isStreaming, onRetry, onDelete }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -439,7 +444,7 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
 
   const renderMessage = useCallback(
     (msg: ChatMessage) => {
-      const rt = relativeTime(msg.timestamp);
+      const rt = relativeTime(msg.timestamp, t, i18n.resolvedLanguage || i18n.language);
       return (
         <div
           className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
@@ -471,16 +476,20 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
             <div className={styles.actionBar}>
               <button
                 className={styles.actionBtn}
-                title="Copy"
+                title={t('chat.action.copy')}
+                aria-label={t('chat.action.copy')}
                 onClick={() => handleCopy(msg)}
+                type="button"
               >
                 <Copy size={14} />
               </button>
               {onRetry && (
                 <button
                   className={styles.actionBtn}
-                  title="Retry"
+                  title={t('chat.action.retry')}
+                  aria-label={t('chat.action.retry')}
                   onClick={() => onRetry(msg.id)}
+                  type="button"
                 >
                   <RefreshCw size={14} />
                 </button>
@@ -488,8 +497,10 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
               {onDelete && (
                 <button
                   className={styles.actionBtn}
-                  title="Delete"
+                  title={t('chat.action.delete')}
+                  aria-label={t('chat.action.delete')}
                   onClick={() => onDelete(msg.id)}
+                  type="button"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -497,12 +508,12 @@ export default function ChatView({ messages, isStreaming, onRetry, onDelete }: P
             </div>
           </div>
           {copiedMessageId === msg.id && (
-            <span className={styles.copyToast}>Copied!</span>
+            <span className={styles.copyToast}>{t('chat.action.copied')}</span>
           )}
         </div>
       );
     },
-    [t, isStreaming, lastMsg?.id, copiedMessageId, handleCopy, onRetry, onDelete],
+    [t, i18n.resolvedLanguage, i18n.language, isStreaming, lastMsg?.id, copiedMessageId, handleCopy, onRetry, onDelete],
   );
 
   const handleScrollToBottom = useCallback(() => {
