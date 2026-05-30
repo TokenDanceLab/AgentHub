@@ -325,7 +325,7 @@ function assert(condition, message, details) {
 
 async function collectMetrics(page, { mobile = false } = {}) {
   return page.evaluate(({ mobile: isMobile }) => {
-    const rawKeyPattern = /\b(?:agent|welcome|prompt|webShell|settings|auth|im|surface|mobile)\.[A-Za-z0-9_.-]+\b/;
+    const rawKeyPattern = /\b(?:agent|welcome|prompt|webShell|settings|auth|im|notification|surface|mobile)\.[A-Za-z0-9_.-]+\b/;
     const all = Array.from(document.querySelectorAll("*"));
     const visible = all.filter((el) => {
       const rect = el.getBoundingClientRect();
@@ -578,6 +578,26 @@ async function collectMetrics(page, { mobile = false } = {}) {
       const hasBlockContent = Array.from(section.querySelectorAll("[class*='cardSectionContent']")).some((content) => content.tagName === "DIV");
       return section.tagName === "ARTICLE" && style.display === "grid" && directSpanCount >= 2 && hasBlockContent;
     });
+    const notificationPanel = document.querySelector("[class*='dropdown'][role='menu']");
+    const notificationPanelRect = notificationPanel?.getBoundingClientRect();
+    const notificationEmptyBlocks = notificationPanel
+      ? Array.from(notificationPanel.querySelectorAll("[class*='empty']")).filter((block) =>
+          block.className?.toString().split(/\s+/).some((className) => /empty_/.test(className))
+        )
+      : [];
+    const sharedNotificationEmptyBlocks = notificationEmptyBlocks.filter((block) =>
+      block.tagName === "SECTION" && block.getAttribute("aria-label")
+    );
+    const notificationItems = notificationPanel
+      ? Array.from(notificationPanel.querySelectorAll("[class*='itemCard']")).filter((item) =>
+          item.className?.toString().split(/\s+/).some((className) => /itemCard_/.test(className))
+        )
+      : [];
+    const sharedNotificationItems = notificationItems.filter((item) => {
+      const style = window.getComputedStyle(item);
+      const directSpanCount = Array.from(item.children).filter((child) => child.tagName === "SPAN").length;
+      return item.tagName === "ARTICLE" && style.display === "grid" && directSpanCount >= 2;
+    });
 
     return {
       title: document.title,
@@ -633,6 +653,16 @@ async function collectMetrics(page, { mobile = false } = {}) {
       imAuthorityBandCount,
       visibleRunDetailSectionCount: visibleRunDetailSections.length,
       sharedRunDetailSectionCount: sharedRunDetailSections.length,
+      notificationPanel: notificationPanelRect
+        ? {
+            width: Math.round(notificationPanelRect.width),
+            height: Math.round(notificationPanelRect.height),
+          }
+        : null,
+      visibleNotificationEmptyCount: notificationEmptyBlocks.length,
+      sharedNotificationEmptyCount: sharedNotificationEmptyBlocks.length,
+      visibleNotificationItemCount: notificationItems.length,
+      sharedNotificationItemCount: sharedNotificationItems.length,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -814,6 +844,11 @@ async function visitAndCapture(page, scene) {
     await page.getByText("Visual QA covers account nav, run overlay, settings, and legacy route bridges.").waitFor({ state: "visible", timeout: 5000 });
     await page.getByRole("textbox", { name: "Message input" }).waitFor({ state: "visible", timeout: 5000 });
   }
+  if (scene.openNotifications) {
+    await page.getByRole("button", { name: "Notifications", exact: true }).click();
+    await page.getByRole("menu", { name: "Notifications panel" }).waitFor({ state: "visible", timeout: 5000 });
+    await page.getByRole("region", { name: "No notifications yet" }).waitFor({ state: "visible", timeout: 5000 });
+  }
 
   const screenshotPath = path.join(outDir, `${scene.name}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -879,6 +914,11 @@ async function visitAndCapture(page, scene) {
     assert(metrics.sharedImMessageRowCount >= 2, `${scene.name}: IM message rows should use shared MessageBubble structure`, metrics);
     assert(metrics.imAuthorityBandCount === 0, `${scene.name}: IM authority must not render left color bands`, metrics);
   }
+  if (scene.openNotifications) {
+    assert(metrics.notificationPanel, `${scene.name}: notifications panel should be visible`, metrics);
+    assert(metrics.visibleNotificationEmptyCount >= 1, `${scene.name}: notifications panel should render an empty state`, metrics);
+    assert(metrics.sharedNotificationEmptyCount >= 1, `${scene.name}: notification empty state should use shared EmptyState structure`, metrics);
+  }
   if (scene.expectSettingsCallout) {
     assert(metrics.visibleSettingsCalloutCount >= 1, `${scene.name}: settings should render guard callouts`, metrics);
     assert(metrics.sharedSettingsCalloutCount >= 1, `${scene.name}: settings callouts should use shared StatusNotice structure`, metrics);
@@ -914,6 +954,16 @@ async function main() {
       authenticated: true,
       language: "en",
       theme: "dark",
+    },
+    {
+      name: "web-design-notifications-mobile-390x844",
+      path: "/",
+      viewport: mobileViewport,
+      mobile: true,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openNotifications: true,
     },
     {
       name: "web-design-messages-mobile-390x844",
