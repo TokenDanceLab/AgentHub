@@ -292,14 +292,45 @@
 }
 
 .emptyRuntime {
-  display: flex;
-  min-height: 76px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: var(--muted-foreground);
+  min-height: 112px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.035);
+  box-shadow: none;
+}
+
+[data-theme='dark'] .emptyRuntime {
+  border-color: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.emptyRuntimeContent {
+  max-width: 100%;
+  gap: 7px;
+}
+
+.emptyRuntimeIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.055);
+}
+
+[data-theme='dark'] .emptyRuntimeIcon {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.emptyRuntimeTitle {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 760;
+}
+
+.emptyRuntimeDescription {
+  max-width: 420px;
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1.45;
 }
 
 .profilePreview,

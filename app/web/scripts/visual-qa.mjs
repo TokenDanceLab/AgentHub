@@ -209,7 +209,7 @@ function json(data) {
   };
 }
 
-async function installMockHub(context) {
+async function installMockHub(context, { emptyAgents = false } = {}) {
   await context.route(hubUrlPattern, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -229,7 +229,6 @@ async function installMockHub(context) {
     }
 
     if (pathname === "/web/agent-profiles") {
-      const emptyAgents = request.headers()["x-agenthub-visual-empty-agents"] === "1";
       return route.fulfill(json(hubEnvelope({
         items: emptyAgents ? [] : agentProfiles,
         page: { hasMore: false },
@@ -246,7 +245,7 @@ async function installMockHub(context) {
     }
 
     if (pathname === "/client/sessions") {
-      return route.fulfill(json(hubEnvelope(sessions)));
+      return route.fulfill(json(hubEnvelope(emptyAgents ? [] : sessions)));
     }
 
     if (pathname === "/client/contacts") {
@@ -446,6 +445,17 @@ async function collectMetrics(page, { mobile = false } = {}) {
       const directSpanCount = Array.from(directButton.children).filter((child) => child.tagName === "SPAN").length;
       return directButtonStyle.display === "flex" && directSpanCount >= 2 && directButton.getAttribute("type") === "button";
     });
+    const welcomeRuntimeEmptyBlocks = Array.from(document.querySelectorAll("[class*='emptyRuntime']")).filter((block) =>
+      block.className?.toString().split(/\s+/).some((className) => /emptyRuntime_/.test(className))
+    );
+    const visibleWelcomeRuntimeEmptyBlocks = welcomeRuntimeEmptyBlocks.filter((block) => {
+      const rect = block.getBoundingClientRect();
+      const style = window.getComputedStyle(block);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedWelcomeRuntimeEmptyBlocks = visibleWelcomeRuntimeEmptyBlocks.filter((block) =>
+      block.tagName === "SECTION" && block.getAttribute("aria-label")
+    );
     const settingsAccountCards = Array.from(document.querySelectorAll("[class*='summaryCard'], [class*='capabilityCard']"));
     const visibleSettingsAccountCards = settingsAccountCards.filter((card) => {
       const rect = card.getBoundingClientRect();
@@ -665,6 +675,8 @@ async function collectMetrics(page, { mobile = false } = {}) {
       visibleSearchResultButtonCount: visibleSearchResultButtons.length,
       visibleAgentRowCount: visibleAgentRows.length,
       sharedAgentRowCount: sharedAgentRows.length,
+      visibleWelcomeRuntimeEmptyCount: visibleWelcomeRuntimeEmptyBlocks.length,
+      sharedWelcomeRuntimeEmptyCount: sharedWelcomeRuntimeEmptyBlocks.length,
       visibleSettingsAccountCardCount: visibleSettingsAccountCards.length,
       sharedSettingsAccountCardCount: sharedSettingsAccountCards.length,
       visibleSettingsTaskRowCount: visibleSettingsTaskRows.length,
@@ -824,7 +836,9 @@ async function visitAndCapture(page, scene) {
     }, undefined, { timeout: 5000 });
   }
   if (scene.emptyAgents) {
+    await page.getByText("Which Agent should run today?").waitFor({ state: "visible", timeout: 5000 });
     await page.getByText("No runtimes available").waitFor({ state: "visible", timeout: 5000 });
+    await page.getByRole("region", { name: "No Runtime adapters detected" }).waitFor({ state: "visible", timeout: 5000 });
   }
   if (scene.openSettingsAccount) {
     await page.getByRole("button", { name: /Account|账号/ }).first().click();
@@ -908,6 +922,10 @@ async function visitAndCapture(page, scene) {
     assert(metrics.visibleAgentRowCount >= 2, `${scene.name}: agent runtime list should render visible rows`, metrics);
     assert(metrics.sharedAgentRowCount >= 2, `${scene.name}: agent runtime rows should use shared SelectableRow structure`, metrics);
   }
+  if (scene.emptyAgents) {
+    assert(metrics.visibleWelcomeRuntimeEmptyCount >= 1, `${scene.name}: welcome runtime empty state should be visible`, metrics);
+    assert(metrics.sharedWelcomeRuntimeEmptyCount >= 1, `${scene.name}: welcome runtime empty state should use shared EmptyState structure`, metrics);
+  }
   if (scene.openRunWithToolCall) {
     assert(metrics.visibleRunDetailSectionCount >= 3, `${scene.name}: run detail should render output/tool/file sections`, metrics);
     assert(metrics.sharedRunDetailSectionCount >= 3, `${scene.name}: run detail sections should use shared ActivityCard grid structure`, metrics);
@@ -980,11 +998,6 @@ async function visitAndCapture(page, scene) {
 async function main() {
   await mkdir(outDir, { recursive: true });
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    viewport: desktopViewport,
-    serviceWorkers: "block",
-  });
-  await installMockHub(context);
 
   const scenes = [
     {
@@ -1213,10 +1226,16 @@ async function main() {
 
   try {
     for (const scene of scenes) {
+      const context = await browser.newContext({
+        viewport: scene.viewport,
+        serviceWorkers: "block",
+      });
+      await installMockHub(context, { emptyAgents: scene.emptyAgents });
       const page = await context.newPage();
       await page.setViewportSize(scene.viewport);
       await visitAndCapture(page, scene);
       await page.close();
+      await context.close();
     }
   } finally {
     await browser.close();

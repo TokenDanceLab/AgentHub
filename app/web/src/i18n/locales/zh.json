@@ -839,6 +839,8 @@
   "welcome.runtimeList": "可用 Runtime adapter",
   "welcome.runtimeDefaultDesc": "通过 Hub 和 Desktop 路由的 Runtime Profile。",
   "welcome.noRuntimes": "未检测到 Runtime adapter",
+  "welcome.noRuntimesDescription": "连接 Desktop runtime 或刷新 Hub 会话状态后，再从当前工作区派发任务。",
+  "welcome.edgeOfflineDescription": "Runtime 路由暂不可用。保持当前工作区打开，等待 Desktop runtime 重连。",
   "welcome.model": "模型",
   "welcome.provider": "Provider",
   "welcome.reasoning": "推理",
