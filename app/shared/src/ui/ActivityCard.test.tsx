@@ -90,4 +90,17 @@ describe('ActivityCard', () => {
     expect(card).toHaveAttribute('data-has-icon', 'true');
     expect(card).not.toHaveTextContent('undefined');
   });
+
+  it('can render block content for previews and logs', () => {
+    render(
+      <ActivityCard label="Output" contentAs="div">
+        <pre>Build passed</pre>
+      </ActivityCard>,
+    );
+
+    const content = screen.getByText('Build passed').parentElement;
+
+    expect(content?.tagName).toBe('DIV');
+    expect(screen.getByText('Output').closest('article')).toBeInTheDocument();
+  });
 });
