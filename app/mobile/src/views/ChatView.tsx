@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, CheckCircle2, Code2, Copy, FileText, GitPullRequestArrow, RefreshCw, SendHorizonal } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Code2, Copy, FileText, GitPullRequestArrow, MessageSquareText, RefreshCw, SendHorizonal } from "lucide-react";
 import type { Thread, ThreadItem } from "@agenthub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createThreadMessage, listThreadItems } from "@agenthub/shared";
-import { ActivityCard, ContextSummary, MessageBubble, StatusNotice } from "@agenthub/shared/ui";
+import { ActivityCard, ContextSummary, EmptyState, MessageBubble, StatusNotice } from "@agenthub/shared/ui";
 import { useTranslation } from "react-i18next";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
 
@@ -206,10 +206,16 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
         )}
 
         {!messages.isLoading && !messages.isError && visibleItems.length === 0 && (
-          <div className="mobileCenterState">
-            <strong>{t("chat.states.emptyTitle")}</strong>
-            <p>{t("chat.states.emptyDescription")}</p>
-          </div>
+          <EmptyState
+            className="mobileCenterState"
+            contentClassName="mobileCenterStateContent"
+            iconClassName="mobileEmptyIcon"
+            titleClassName="mobileCenterStateTitle"
+            descriptionClassName="mobileCenterStateDescription"
+            title={t("chat.states.emptyTitle")}
+            description={t("chat.states.emptyDescription")}
+            icon={<MessageSquareText size={24} />}
+          />
         )}
 
         <div className="mobileMessageList">
