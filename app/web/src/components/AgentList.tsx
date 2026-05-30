@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { MapPin, Search, Settings2, Sparkles } from 'lucide-react';
 import { useState, useMemo, memo, type ReactNode } from 'react';
 import type { AgentInfo } from '@shared/types';
-import { EmptyState } from '@shared/ui';
+import { EmptyState, SelectableRow } from '@shared/ui';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
 import styles from './AgentList.module.css';
 
@@ -115,33 +115,43 @@ export default memo(function AgentList({ agents, online, selectedId, onSelect }:
         <ul className={styles.list}>
           {filteredAgents.map((a) => (
             <li key={a.id}>
-              <button
-                className={`${styles.item} ${a.id === selectedId ? styles.selected : ''}`}
-                onClick={() => onSelect?.(a.id)}
-                aria-pressed={a.id === selectedId}
+              <SelectableRow
+                className={styles.agentRow}
+                buttonClassName={styles.item}
+                selectedClassName={styles.selected}
+                iconClassName={styles.avatar}
+                bodyClassName={styles.info}
+                titleClassName={styles.nameLine}
+                metaClassName={styles.metaLine}
+                selected={a.id === selectedId}
                 disabled={a.status !== 'available'}
-              >
-                <span className={styles.avatar}>
+                ariaLabel={a.name}
+                onSelect={() => onSelect?.(a.id)}
+                icon={(
+                  <>
                   {agentIcon(a.name) || <Settings2 size={17} />}
                   <span className={`${styles.statusDot} ${styles[`status_${a.status}`]}`} />
-                </span>
-                <div className={styles.info}>
-                  <div className={styles.nameLine}>
+                  </>
+                )}
+                title={(
+                  <>
                     <span className={styles.name}>{highlightMatch(a.name)}</span>
                     <span className={`${styles.statusText} ${styles[`statusText_${a.status}`]}`}>
                       {t(`agent.status.${a.status}`)}
                     </span>
-                  </div>
-                  <div className={styles.metaLine}>
+                  </>
+                )}
+                meta={(
+                  <>
                     {a.version && <span className={styles.version}>{a.version}</span>}
                     <span className={styles.runtimeMeta}>
                       <MapPin size={10} aria-hidden="true" />
                       {a.runtimeId ?? t('agent.runtime.hubProfile')}
                     </span>
                     <span className={styles.runtimeMeta}>{t('agent.runtime.cliAdapter')}</span>
-                  </div>
-                </div>
-              </button>
+                  </>
+                )}
+              />
             </li>
           ))}
           {otherAgents.length > 0 && !searchQuery.trim() && (
