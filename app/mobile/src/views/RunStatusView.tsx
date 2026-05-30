@@ -38,6 +38,7 @@ interface RunStatusViewProps {
 
 type RunSection = "review" | "diff" | "blocks" | "outputs" | "logs";
 type Decision = "approved" | "rejected";
+type LogFilter = "all" | "review" | "diff" | "mobile" | "error";
 type RunDiffFile = {
   path?: string;
   filePath?: string;
@@ -71,12 +72,12 @@ function blockIcon(kind: ThreadItem["kind"]) {
   }
 }
 
-function logRows(stdout?: string, stderr?: string) {
+function logRows(stdout: string | undefined, stderr: string | undefined, waitingLabel: string) {
   const rows = [
     ...(stdout ?? "").split(/\r?\n/).filter(Boolean).map((line) => ({ source: "stdout", line })),
     ...(stderr ?? "").split(/\r?\n/).filter(Boolean).map((line) => ({ source: "stderr", line })),
   ];
-  return rows.length ? rows : [{ source: "stdout", line: "Waiting for output..." }];
+  return rows.length ? rows : [{ source: "stdout", line: waitingLabel }];
 }
 
 function diffFilePath(file: RunDiffFile) {
@@ -97,7 +98,7 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [activeSection, setActiveSection] = useState<RunSection>("review");
-  const [logFilter, setLogFilter] = useState("All");
+  const [logFilter, setLogFilter] = useState<LogFilter>("all");
   const [pendingDecision, setPendingDecision] = useState<Decision | null>(null);
   const [sheetError, setSheetError] = useState(false);
   const [decisionNotice, setDecisionNotice] = useState<Decision | null>(null);
@@ -136,16 +137,23 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
   const runArtifacts = artifacts.data?.items.filter((item) => item.runId === run.runId) ?? [];
   const runPreviews = previews.data?.items.filter((item) => item.runId === run.runId) ?? [];
   const resources = [...runArtifacts, ...runPreviews];
-  const allLogRows = logRows(logs.data?.stdout, logs.data?.stderr);
+  const allLogRows = logRows(logs.data?.stdout, logs.data?.stderr, t("runDetail.context.waitingOutput"));
   const filteredLogRows = useMemo(() => {
-    if (logFilter === "All") return allLogRows;
+    if (logFilter === "all") return allLogRows;
     const needle = logFilter.toLowerCase();
     return allLogRows.filter((row) => row.source.toLowerCase().includes(needle) || row.line.toLowerCase().includes(needle));
   }, [allLogRows, logFilter]);
+  const logFilterOptions: Array<{ value: LogFilter; label: string }> = [
+    { value: "all", label: t("runDetail.logs.filters.all") },
+    { value: "review", label: t("runDetail.logs.filters.review") },
+    { value: "diff", label: t("runDetail.logs.filters.diff") },
+    { value: "mobile", label: t("runDetail.logs.filters.mobile") },
+    { value: "error", label: t("runDetail.logs.filters.error") },
+  ];
 
   const decision = useMutation({
     mutationFn: (nextDecision: Decision) => {
-      if (!approval) throw new Error("Missing approval");
+      if (!approval) throw new Error(t("runDetail.review.missingApproval"));
       return decideApproval(approval.id, { decision: nextDecision });
     },
     onSuccess: (_result, nextDecision) => {
@@ -218,7 +226,11 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
             items={[
               {
                 id: "review",
-                value: decisionStatus === "approved" ? "Approved" : decisionStatus === "rejected" ? "Rejected" : "Review",
+                value: decisionStatus === "approved"
+                  ? t("runDetail.summary.approved")
+                  : decisionStatus === "rejected"
+                    ? t("runDetail.summary.rejected")
+                    : t("runDetail.summary.reviewValue"),
                 label: t("runDetail.summary.review"),
                 onClick: () => jumpTo("review"),
               },
@@ -260,8 +272,8 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
           {decisionNotice && (
             <StatusNotice className="mobileDecisionNotice">
               {decisionNotice === "approved"
-                ? "Decision submitted. Hub marked this checkpoint approved."
-                : "Decision submitted. Hub marked this checkpoint rejected."}
+                ? t("runDetail.review.decisionApproved")
+                : t("runDetail.review.decisionRejected")}
             </StatusNotice>
           )}
           {decisionStatus && decisionStatus !== "pending" && (
@@ -271,11 +283,11 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
               role="note"
               ariaLive="off"
             >
-              {decisionStatus === "approved" ? "Checkpoint approved" : "Checkpoint rejected"}
+              {decisionStatus === "approved" ? t("runDetail.review.lockApproved") : t("runDetail.review.lockRejected")}
             </StatusNotice>
           )}
           {decisionStatus && decisionStatus !== "pending" && (
-            <button className="mobileActionButton" type="button" onClick={onBack}>Back to queue</button>
+            <button className="mobileActionButton" type="button" onClick={onBack}>{t("runDetail.actions.backToQueue")}</button>
           )}
         </section>
 
@@ -332,17 +344,17 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
                 icon={isArtifact ? <FileText size={16} /> : <ExternalLink size={16} />}
                 iconClassName="mobileRunBlockIcon"
                 bodyClassName="mobileRunBlockBody"
-                label={isArtifact ? "Artifact" : "Preview"}
+                label={isArtifact ? t("runDetail.outputs.artifact") : t("runDetail.outputs.preview")}
                 actionsClassName="mobileResourceActions"
                 actions={(
                   <>
                     <button className="mobileActionButton" type="button" onClick={() => void copyResource(resource)}>
                       <Copy size={15} />
-                      <span>{copiedResourceId === resource.id ? "Copied" : "Copy"}</span>
+                      <span>{copiedResourceId === resource.id ? t("common.copied") : t("runDetail.actions.copy")}</span>
                     </button>
-                    <button className="mobileActionButton" type="button" aria-label={`Inspect ${label}`} onClick={() => { setCopiedDetail(false); setSelectedResource(resource); }}>
+                    <button className="mobileActionButton" type="button" aria-label={t("runDetail.actions.inspectResource", { label })} onClick={() => { setCopiedDetail(false); setSelectedResource(resource); }}>
                       <Clipboard size={15} />
-                      <span>Inspect</span>
+                      <span>{t("runDetail.actions.inspect")}</span>
                     </button>
                   </>
                 )}
@@ -363,10 +375,7 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
             className="mobileLogFilterBar"
             optionClassName="mobileLogFilterChip"
             activeOptionClassName="mobileLogFilterChipActive"
-            options={["All", "Review", "Diff", "Mobile", "Error"].map((filter) => ({
-              value: filter,
-              label: filter,
-            }))}
+            options={logFilterOptions}
           />
           <div className="mobileLogFrame">
             {filteredLogRows.map((row, index) => (
@@ -384,22 +393,22 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
         <div className="mobileReviewDock">
           <button className="mobileActionButton" type="button" onClick={() => { setSheetError(false); setPendingDecision("approved"); }}>
             <CheckCircle2 size={16} />
-            <span>Approve</span>
+            <span>{t("runDetail.actions.approve")}</span>
           </button>
           <button className="mobileActionButton mobileDangerAction" type="button" onClick={() => { setSheetError(false); setPendingDecision("rejected"); }}>
             <XCircle size={16} />
-            <span>Reject</span>
+            <span>{t("runDetail.actions.reject")}</span>
           </button>
         </div>
       )}
 
       {pendingDecision && (
         <BottomSheet
-          ariaLabel="Confirm approval decision"
-          title="Confirm approval decision"
-          closeLabel="Close approval decision"
-          eyebrow={pendingDecision === "approved" ? "Approve" : "Reject"}
-          description={pendingDecision === "approved" ? "Confirm approve for this checkpoint." : "Confirm reject for this checkpoint."}
+          ariaLabel={t("runDetail.decisionSheet.aria")}
+          title={t("runDetail.decisionSheet.title")}
+          closeLabel={t("runDetail.decisionSheet.close")}
+          eyebrow={pendingDecision === "approved" ? t("runDetail.actions.approve") : t("runDetail.actions.reject")}
+          description={pendingDecision === "approved" ? t("runDetail.decisionSheet.approveDescription") : t("runDetail.decisionSheet.rejectDescription")}
           closeIcon={<X size={18} />}
           closeDisabled={decision.isPending}
           onClose={() => setPendingDecision(null)}
@@ -414,7 +423,7 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
           footerClassName="mobileSheetActions"
           footer={(
             <>
-              <button className="mobileActionButton" type="button" disabled={decision.isPending} onClick={() => setPendingDecision(null)}>Cancel</button>
+              <button className="mobileActionButton" type="button" disabled={decision.isPending} onClick={() => setPendingDecision(null)}>{t("common.cancel")}</button>
               <button
                 className="mobileActionButton"
                 type="button"
@@ -422,7 +431,7 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
                 onClick={() => decision.mutate(pendingDecision)}
               >
                 {decision.isPending && <RefreshCw size={16} className="mobileSpin" />}
-                <span>{pendingDecision === "approved" ? "Confirm approve" : "Confirm reject"}</span>
+                <span>{pendingDecision === "approved" ? t("runDetail.decisionSheet.confirmApprove") : t("runDetail.decisionSheet.confirmReject")}</span>
               </button>
             </>
           )}
@@ -432,20 +441,20 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
               icon={decision.isPending ? <RefreshCw size={14} className="mobileSpin" /> : sheetError ? <XCircle size={14} /> : <ShieldAlert size={14} />}
             >
               {decision.isPending
-                ? "Submitting approval decision to Hub..."
+                ? t("runDetail.decisionSheet.submitting")
                 : sheetError
-                  ? "Decision was not submitted. Check Hub session and retry."
-                  : "Ready to submit decision."}
+                  ? t("runDetail.decisionSheet.error")
+                  : t("runDetail.decisionSheet.ready")}
             </StatusNotice>
         </BottomSheet>
       )}
 
       {selectedResource && (
         <BottomSheet
-          ariaLabel="Output resource details"
-          title="Output resource details"
-          closeLabel="Close resource details"
-          eyebrow="Output"
+          ariaLabel={t("runDetail.resourceSheet.aria")}
+          title={t("runDetail.resourceSheet.title")}
+          closeLabel={t("runDetail.resourceSheet.close")}
+          eyebrow={t("runDetail.resourceSheet.eyebrow")}
           description={"path" in selectedResource ? selectedResource.path : selectedResource.url ?? selectedResource.id}
           closeIcon={<X size={18} />}
           onClose={() => setSelectedResource(null)}
@@ -462,9 +471,9 @@ export function RunStatusView({ run, onBack }: RunStatusViewProps) {
             <>
               <button className="mobileActionButton" type="button" onClick={() => void copySelectedResource()}>
                 <Copy size={16} />
-                <span>{copiedDetail ? "Copied" : "Copy path"}</span>
+                <span>{copiedDetail ? t("common.copied") : t("runDetail.actions.copyPath")}</span>
               </button>
-              <button className="mobileActionButton" type="button" onClick={() => setSelectedResource(null)}>Close resource details</button>
+              <button className="mobileActionButton" type="button" onClick={() => setSelectedResource(null)}>{t("runDetail.resourceSheet.close")}</button>
             </>
           )}
         />
