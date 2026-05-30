@@ -30,10 +30,27 @@
 }
 
 .empty {
-  padding: var(--space-xl) var(--space-md);
-  color: var(--muted-foreground);
+  max-width: 100%;
+  min-height: 184px;
+  padding: var(--space-lg) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--card) 72%, transparent);
+}
+
+.emptyIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+}
+
+.emptyTitle {
+  font-size: var(--font-size-lg);
+}
+
+.emptyDescription {
+  max-width: 360px;
   font-size: var(--font-size-sm);
-  text-align: center;
 }
 
 /* ── File Tree Sidebar ──────────────────────────────────────────── */

@@ -148,5 +148,17 @@
   "action.apply": "应用",
   "action.discard": "丢弃",
   "action.approve": "批准",
-  "action.reject": "拒绝"
+  "action.reject": "拒绝",
+  "diff.empty.title": "暂无变更可显示",
+  "diff.empty.description": "运行报告变更文件后，Diff 输出会显示在这里。",
+  "diff.changedFiles_one": "{{count}} 个变更文件",
+  "diff.changedFiles_other": "{{count}} 个变更文件",
+  "diff.actions.expandAll": "展开全部文件",
+  "diff.actions.collapseAll": "收起全部文件",
+  "diff.actions.acceptFile": "接受文件",
+  "diff.actions.acceptAll": "接受此文件的全部变更",
+  "diff.actions.undoAccept": "撤销接受",
+  "diff.actions.rejectFile": "拒绝文件",
+  "diff.actions.rejectAll": "拒绝此文件的全部变更",
+  "diff.actions.undoReject": "撤销拒绝"
 }
