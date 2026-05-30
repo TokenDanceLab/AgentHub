@@ -549,6 +549,20 @@ async function collectMetrics(page, { mobile = false } = {}) {
       const style = window.getComputedStyle(band);
       return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
     }).length;
+    const runDetailSections = Array.from(document.querySelectorAll("[class*='cardSection']")).filter((section) =>
+      section.className?.toString().split(/\s+/).some((className) => /cardSection_/.test(className))
+    );
+    const visibleRunDetailSections = runDetailSections.filter((section) => {
+      const rect = section.getBoundingClientRect();
+      const style = window.getComputedStyle(section);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedRunDetailSections = visibleRunDetailSections.filter((section) => {
+      const style = window.getComputedStyle(section);
+      const directSpanCount = Array.from(section.children).filter((child) => child.tagName === "SPAN").length;
+      const hasBlockContent = Array.from(section.querySelectorAll("[class*='cardSectionContent']")).some((content) => content.tagName === "DIV");
+      return section.tagName === "ARTICLE" && style.display === "grid" && directSpanCount >= 2 && hasBlockContent;
+    });
 
     return {
       title: document.title,
@@ -600,6 +614,8 @@ async function collectMetrics(page, { mobile = false } = {}) {
       visibleImMessageRowCount: visibleImMessageRows.length,
       sharedImMessageRowCount: sharedImMessageRows.length,
       imAuthorityBandCount,
+      visibleRunDetailSectionCount: visibleRunDetailSections.length,
+      sharedRunDetailSectionCount: sharedRunDetailSections.length,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -796,6 +812,10 @@ async function visitAndCapture(page, scene) {
   if (scene.verifyThreadRows) {
     assert(metrics.visibleThreadRowButtonCount === 2, `${scene.name}: shared thread rows should expose two visible selectable buttons`, metrics);
     assert(metrics.nestedThreadActionButtons === 0, `${scene.name}: thread row actions must not nest buttons inside the selectable row`, metrics);
+  }
+  if (scene.openRunWithToolCall) {
+    assert(metrics.visibleRunDetailSectionCount >= 3, `${scene.name}: run detail should render output/tool/file sections`, metrics);
+    assert(metrics.sharedRunDetailSectionCount >= 3, `${scene.name}: run detail sections should use shared ActivityCard grid structure`, metrics);
   }
   if (scene.openSearch) {
     assert(metrics.searchDialog, `${scene.name}: search dialog should be visible`, metrics);
