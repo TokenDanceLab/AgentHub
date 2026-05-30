@@ -212,15 +212,36 @@
 /* ── Empty state ─────────────────────────── */
 
 .empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   flex: 1;
-  gap: var(--space-sm);
-  color: var(--foreground);
-  opacity: 0.4;
+  max-width: none;
+  min-height: 220px;
+  margin: var(--space-md);
+  padding: var(--space-xl) var(--space-lg);
+  border: 1px solid oklch(0.84 0.008 250 / 0.42);
+  border-radius: 8px;
+  background: oklch(1 0 0 / 0.22);
+}
+
+.emptyIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+}
+
+.emptyTitle {
+  font-size: var(--font-size-md);
+  font-weight: 650;
+}
+
+.emptyDescription {
+  max-width: 280px;
   font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+[data-theme='dark'] .empty {
+  border-color: oklch(1 0 0 / 0.08);
+  background: oklch(0.24 0.009 250 / 0.4);
 }
 
 /* ── Responsive ──────────────────────────── */
