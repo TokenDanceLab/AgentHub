@@ -2079,29 +2079,55 @@ function ProviderHealthRow({
   );
 }
 
+function ProfileActivityCard({
+  icon,
+  title,
+  description,
+  status,
+  statusClassName,
+  children,
+}: {
+  icon: ReactNode;
+  title: ReactNode;
+  description: ReactNode;
+  status: ReactNode;
+  statusClassName: string | undefined;
+  children: ReactNode;
+}) {
+  return (
+    <ActivityCard
+      className={styles.profileCard}
+      iconClassName={styles.profileIcon}
+      labelClassName={styles.profileTitle}
+      contentClassName={styles.profileContent}
+      actionsClassName={styles.profileActions}
+      icon={icon}
+      label={title}
+      actions={<em className={`${styles.profileStatus} ${statusClassName ?? ''}`}>{status}</em>}
+    >
+      <span className={styles.profileDescription}>{description}</span>
+      {children}
+    </ActivityCard>
+  );
+}
+
 function RuntimeInventoryCard({ agent }: { agent: AgentInfo }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
-          <Bot size={17} />
-        </div>
-        <div>
-          <strong>{agent.name}</strong>
-          <span>{agent.description || t('settings.runtimeDefaultDesc')}</span>
-        </div>
-        <em className={`${styles.profileStatus} ${styles[`profileStatus_${agent.status}`]}`}>
-          {t(`agent.status.${agent.status}`)}
-        </em>
-      </div>
-      <div className={styles.profileMeta}>
+    <ProfileActivityCard
+      icon={<Bot size={17} />}
+      title={agent.name}
+      description={agent.description || t('settings.runtimeDefaultDesc')}
+      status={t(`agent.status.${agent.status}`)}
+      statusClassName={styles[`profileStatus_${agent.status}`]}
+    >
+      <span className={styles.profileMeta}>
         <span>{t('settings.runtimeAdapter')}: {agent.id}</span>
         <span>{t('settings.profileRuntime')}: {t('settings.statusReady')}</span>
         <span>{t('settings.profileModel')}: {t('settings.statusPlanned')}</span>
         <span>{t('settings.profileConfig')}: {t('settings.statusPlanned')}</span>
-      </div>
-    </div>
+      </span>
+    </ProfileActivityCard>
   );
 }
 
@@ -2119,20 +2145,14 @@ function LocalAgentProfileCard({
   const { t } = useTranslation();
   const profileReady = edgeOnline && agent.status === 'available';
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
-          <Bot size={17} />
-        </div>
-        <div>
-          <strong>{t('settings.localProfileName', { runtime: agent.name })}</strong>
-          <span>{t('settings.localProfileDesc')}</span>
-        </div>
-        <em className={`${styles.profileStatus} ${profileReady ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
-          {profileReady ? t('settings.enabled') : t('settings.notConfigured')}
-        </em>
-      </div>
-      <div className={styles.profileMeta}>
+    <ProfileActivityCard
+      icon={<Bot size={17} />}
+      title={t('settings.localProfileName', { runtime: agent.name })}
+      description={t('settings.localProfileDesc')}
+      status={profileReady ? t('settings.enabled') : t('settings.notConfigured')}
+      statusClassName={profileReady ? styles.profileStatus_available : styles.profileStatus_configuring}
+    >
+      <span className={styles.profileMeta}>
         <span>{t('settings.profileRuntime')}: {agent.id}</span>
         <span>{t('settings.profileModel')}: {route.model ?? t('prompt.routeAuto')}</span>
         <span>{t('settings.modelAliasProvider')}: {route.provider ?? t('prompt.routeAuto')}</span>
@@ -2140,8 +2160,8 @@ function LocalAgentProfileCard({
         {alias ? <span>{t('settings.profileAlias')}: {alias}</span> : null}
         <span>{t('settings.executionTargets')}: {t('settings.targetLocalEdge')}</span>
         <span>{t('settings.profileConfigSource')}: AGENTS.md / memory / skills</span>
-      </div>
-    </div>
+      </span>
+    </ProfileActivityCard>
   );
 }
 
@@ -2152,57 +2172,45 @@ function AgentMarketCard({ agent }: { agent: AgentInfo }) {
     .map(([name]) => t(`settings.capability.${name}`, { defaultValue: name }));
 
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
-          <Bot size={17} />
-        </div>
-        <div>
-          <strong>{agent.name}</strong>
-          <span>{agent.description || t('settings.marketProfileDefaultDesc')}</span>
-        </div>
-        <em className={`${styles.profileStatus} ${styles[`profileStatus_${agent.status}`]}`}>
-          {t(`agent.status.${agent.status}`)}
-        </em>
-      </div>
-      <div className={styles.profileMeta}>
+    <ProfileActivityCard
+      icon={<Bot size={17} />}
+      title={agent.name}
+      description={agent.description || t('settings.marketProfileDefaultDesc')}
+      status={t(`agent.status.${agent.status}`)}
+      statusClassName={styles[`profileStatus_${agent.status}`]}
+    >
+      <span className={styles.profileMeta}>
         <span>{t('settings.profileRuntime')}: {agent.runtimeId ?? agent.id}</span>
         <span>{t('settings.marketInstallSource')}: TokenDance Hub</span>
         <span>{t('settings.marketPublishStatus')}: {agent.status === 'available' ? t('settings.statusInProgress') : t('settings.statusPlanned')}</span>
-      </div>
-      <div className={styles.profileMeta}>
+      </span>
+      <span className={styles.profileMeta}>
         {capabilityNames.length > 0 ? (
           capabilityNames.map((name) => <span key={name}>{name}</span>)
         ) : (
           <span>{t('settings.marketNoCapabilityTags')}</span>
         )}
-      </div>
-    </div>
+      </span>
+    </ProfileActivityCard>
   );
 }
 
 function ProjectSkillCard({ skill }: { skill: ProjectSkill }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
-          <Code2 size={17} />
-        </div>
-        <div>
-          <strong>{skill.title}</strong>
-          <span>{t(skill.descriptionKey)}</span>
-        </div>
-        <em className={`${styles.profileStatus} ${skill.status === 'ready' ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
-          {skill.status === 'ready' ? t('settings.statusReady') : t('settings.statusInProgress')}
-        </em>
-      </div>
-      <div className={styles.profileMeta}>
+    <ProfileActivityCard
+      icon={<Code2 size={17} />}
+      title={skill.title}
+      description={t(skill.descriptionKey)}
+      status={skill.status === 'ready' ? t('settings.statusReady') : t('settings.statusInProgress')}
+      statusClassName={skill.status === 'ready' ? styles.profileStatus_available : styles.profileStatus_configuring}
+    >
+      <span className={styles.profileMeta}>
         <span>{t('settings.skillLocalRegistry')}: .agents/skills/{skill.id}</span>
         <span>{t('settings.skillScripts')}: {skill.hasScripts ? t('settings.enabled') : t('settings.notConfigured')}</span>
         <span>{t('settings.skillReferences')}: {skill.hasReferences ? t('settings.enabled') : t('settings.notConfigured')}</span>
-      </div>
-    </div>
+      </span>
+    </ProfileActivityCard>
   );
 }
 
@@ -2210,26 +2218,20 @@ function McpRuntimeCard({ agent }: { agent: AgentInfo }) {
   const { t } = useTranslation();
   const { mcpIntegration, permissionHooks, subAgentSpawn } = agent.capabilities;
   return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
-          <Plug size={17} />
-        </div>
-        <div>
-          <strong>{agent.name}</strong>
-          <span>{agent.description || t('settings.mcpRuntimeDefaultDesc')}</span>
-        </div>
-        <em className={`${styles.profileStatus} ${mcpIntegration ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
-          {mcpIntegration ? t('settings.statusReady') : t('settings.notConfigured')}
-        </em>
-      </div>
-      <div className={styles.profileMeta}>
+    <ProfileActivityCard
+      icon={<Plug size={17} />}
+      title={agent.name}
+      description={agent.description || t('settings.mcpRuntimeDefaultDesc')}
+      status={mcpIntegration ? t('settings.statusReady') : t('settings.notConfigured')}
+      statusClassName={mcpIntegration ? styles.profileStatus_available : styles.profileStatus_configuring}
+    >
+      <span className={styles.profileMeta}>
         <span>{t('settings.profileRuntime')}: {agent.id}</span>
         <span>{t('settings.mcpIntegration')}: {mcpIntegration ? t('settings.enabled') : t('settings.notConfigured')}</span>
         <span>{t('settings.mcpPermissionHooks')}: {permissionHooks ? t('settings.enabled') : t('settings.notConfigured')}</span>
         <span>{t('settings.mcpSubAgentSpawn')}: {subAgentSpawn ? t('settings.enabled') : t('settings.notConfigured')}</span>
-      </div>
-    </div>
+      </span>
+    </ProfileActivityCard>
   );
 }
 
