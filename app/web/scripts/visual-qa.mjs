@@ -461,6 +461,32 @@ async function collectMetrics(page, { mobile = false } = {}) {
       const directSpanCount = Array.from(card.children).filter((child) => child.tagName === "SPAN").length;
       return style.display === "grid" && directSpanCount >= 3;
     });
+    const settingsTargetCards = Array.from(document.querySelectorAll("[class*='targetCard']")).filter((card) =>
+      card.className?.toString().split(/\s+/).some((className) => /targetCard_/.test(className))
+    );
+    const visibleSettingsTargetCards = settingsTargetCards.filter((card) => {
+      const rect = card.getBoundingClientRect();
+      const style = window.getComputedStyle(card);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedSettingsTargetCards = visibleSettingsTargetCards.filter((card) => {
+      const style = window.getComputedStyle(card);
+      const directSpanCount = Array.from(card.children).filter((child) => child.tagName === "SPAN").length;
+      return style.display === "grid" && directSpanCount >= 3;
+    });
+    const settingsConnectionRows = Array.from(document.querySelectorAll("[class*='connectionRow']")).filter((row) =>
+      row.className?.toString().split(/\s+/).some((className) => /connectionRow_/.test(className))
+    );
+    const visibleSettingsConnectionRows = settingsConnectionRows.filter((row) => {
+      const rect = row.getBoundingClientRect();
+      const style = window.getComputedStyle(row);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedSettingsConnectionRows = visibleSettingsConnectionRows.filter((row) => {
+      const style = window.getComputedStyle(row);
+      const directSpanCount = Array.from(row.children).filter((child) => child.tagName === "SPAN").length;
+      return style.display === "grid" && directSpanCount >= 3;
+    });
 
     return {
       title: document.title,
@@ -497,6 +523,10 @@ async function collectMetrics(page, { mobile = false } = {}) {
       sharedSettingsTaskRowCount: sharedSettingsTaskRows.length,
       visibleSettingsProfileCardCount: visibleSettingsProfileCards.length,
       sharedSettingsProfileCardCount: sharedSettingsProfileCards.length,
+      visibleSettingsTargetCardCount: visibleSettingsTargetCards.length,
+      sharedSettingsTargetCardCount: sharedSettingsTargetCards.length,
+      visibleSettingsConnectionRowCount: visibleSettingsConnectionRows.length,
+      sharedSettingsConnectionRowCount: sharedSettingsConnectionRows.length,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -643,6 +673,17 @@ async function visitAndCapture(page, scene) {
     await page.locator("[class*='profileCard']").first().waitFor({ state: "visible", timeout: 5000 });
     await page.getByText("adapter-dev", { exact: true }).scrollIntoViewIfNeeded();
   }
+  if (scene.openSettingsTargets) {
+    await page.getByRole("button", { name: /^Execution Targets$/ }).first().click();
+    await page.locator("h1").filter({ hasText: /^Execution Targets$/ }).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator("[class*='targetCard']").first().waitFor({ state: "visible", timeout: 5000 });
+  }
+  if (scene.openSettingsConnections) {
+    await page.getByRole("button", { name: /^Connections$/ }).first().click();
+    await page.locator("h1").filter({ hasText: /^Connections$/ }).waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("WebSocket", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator("[class*='connectionRow']").first().waitFor({ state: "visible", timeout: 5000 });
+  }
 
   const screenshotPath = path.join(outDir, `${scene.name}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -674,6 +715,14 @@ async function visitAndCapture(page, scene) {
   if (scene.openSettingsSkills) {
     assert(metrics.visibleSettingsProfileCardCount >= 7, `${scene.name}: skill settings should render installed skill cards`, metrics);
     assert(metrics.sharedSettingsProfileCardCount >= 7, `${scene.name}: skill profile cards should use shared ActivityCard grid structure`, metrics);
+  }
+  if (scene.openSettingsTargets) {
+    assert(metrics.visibleSettingsTargetCardCount >= 4, `${scene.name}: execution target settings should render route cards`, metrics);
+    assert(metrics.sharedSettingsTargetCardCount >= 4, `${scene.name}: execution target cards should use shared ActivityCard grid structure`, metrics);
+  }
+  if (scene.openSettingsConnections) {
+    assert(metrics.visibleSettingsConnectionRowCount >= 3, `${scene.name}: connections settings should render status rows`, metrics);
+    assert(metrics.sharedSettingsConnectionRowCount >= 3, `${scene.name}: connection rows should use shared ActivityCard grid structure`, metrics);
   }
 
   return { screenshotPath, metrics };
@@ -795,6 +844,24 @@ async function main() {
       language: "en",
       theme: "dark",
       openSettingsSkills: true,
+    },
+    {
+      name: "web-design-settings-targets-desktop-1440x920",
+      path: "/settings",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openSettingsTargets: true,
+    },
+    {
+      name: "web-design-settings-connections-desktop-1440x920",
+      path: "/settings",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openSettingsConnections: true,
     },
     {
       name: "web-design-run-overlay-mobile-390x844",

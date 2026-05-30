@@ -2251,32 +2251,40 @@ function ExecutionTargetCard({
   connected?: boolean;
 }) {
   return (
-    <div className={styles.targetCard}>
-      <div className={styles.targetTop}>
-        <div className={styles.targetIcon}>{icon}</div>
-        <span className={`${styles.statusPill} ${connected ? styles.statusPillOn : ''}`}>{status}</span>
-      </div>
-      <strong>{title}</strong>
-      <span>{description}</span>
-      <em>{metric}</em>
-    </div>
+    <ActivityCard
+      className={styles.targetCard}
+      iconClassName={styles.targetIcon}
+      labelClassName={styles.targetTitle}
+      contentClassName={styles.targetContent}
+      actionsClassName={styles.targetActions}
+      icon={icon}
+      label={title}
+      actions={<span className={`${styles.statusPill} ${connected ? styles.statusPillOn : ''}`}>{status}</span>}
+    >
+      <span className={styles.targetDescription}>{description}</span>
+      <em className={styles.targetMetric}>{metric}</em>
+    </ActivityCard>
   );
 }
 
 function RunnerRow({ runner }: { runner: RunnerHealthItem }) {
   return (
-    <div className={styles.runnerRow}>
-      <div className={styles.connectionIcon}>
-        <Cpu size={17} />
-      </div>
-      <div className={styles.settingCopy}>
-        <strong>{runner.name}</strong>
-        <span>{runner.capabilities?.join(' / ') || runner.id}</span>
-      </div>
-      <span className={`${styles.statusPill} ${runner.status === 'online' ? styles.statusPillOn : ''}`}>
-        {runner.status}
-      </span>
-    </div>
+    <ActivityCard
+      className={styles.runnerRow}
+      iconClassName={styles.connectionIcon}
+      labelClassName={styles.settingTitle}
+      contentClassName={styles.settingContent}
+      actionsClassName={styles.settingActions}
+      icon={<Cpu size={17} />}
+      label={runner.name}
+      actions={
+        <span className={`${styles.statusPill} ${runner.status === 'online' ? styles.statusPillOn : ''}`}>
+          {runner.status}
+        </span>
+      }
+    >
+      <span className={styles.settingDescription}>{runner.capabilities?.join(' / ') || runner.id}</span>
+    </ActivityCard>
   );
 }
 
@@ -2293,32 +2301,46 @@ function SettingRow({
   control?: ReactNode;
   action?: boolean;
 }) {
+  const actions = control ?? (value ? <span className={styles.settingValue}>{value}</span> : null);
   return (
-    <div className={styles.settingRow}>
-      <div className={styles.settingCopy}>
-        <strong>{title}</strong>
-        <span>{description}</span>
-      </div>
-      {control ?? (value ? <span className={styles.settingValue}>{value}</span> : null)}
-      {action ? <ChevronRight size={17} className={styles.rowChevron} /> : null}
-    </div>
+    <ActivityCard
+      className={styles.settingRow}
+      labelClassName={styles.settingTitle}
+      contentClassName={styles.settingContent}
+      actionsClassName={styles.settingActions}
+      label={title}
+      actions={
+        actions || action ? (
+          <>
+            {actions}
+            {action ? <ChevronRight size={17} className={styles.rowChevron} /> : null}
+          </>
+        ) : undefined
+      }
+    >
+      <span className={styles.settingDescription}>{description}</span>
+    </ActivityCard>
   );
 }
 
 function ConnectionRow({ name, description, connected }: { name: string; description: string; connected: boolean }) {
   return (
-    <div className={styles.connectionRow}>
-      <div className={styles.connectionIcon}>
-        <Link2 size={17} />
-      </div>
-      <div className={styles.settingCopy}>
-        <strong>{name}</strong>
-        <span>{description}</span>
-      </div>
-      <span className={`${styles.statusPill} ${connected ? styles.statusPillOn : ''}`}>
-        {connected ? 'Online' : 'Offline'}
-      </span>
-    </div>
+    <ActivityCard
+      className={styles.connectionRow}
+      iconClassName={styles.connectionIcon}
+      labelClassName={styles.settingTitle}
+      contentClassName={styles.settingContent}
+      actionsClassName={styles.settingActions}
+      icon={<Link2 size={17} />}
+      label={name}
+      actions={
+        <span className={`${styles.statusPill} ${connected ? styles.statusPillOn : ''}`}>
+          {connected ? 'Online' : 'Offline'}
+        </span>
+      }
+    >
+      <span className={styles.settingDescription}>{description}</span>
+    </ActivityCard>
   );
 }
 
