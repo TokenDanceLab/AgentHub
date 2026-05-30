@@ -90,6 +90,8 @@
   "chat.action.retry": "重试",
   "chat.action.delete": "删除",
   "chat.action.copied": "已复制",
+  "code.copy": "复制代码",
+  "code.copied": "已复制",
   "webChat.signInRequired": "请先登录 Hub，再分发 Agent 任务。",
   "webChat.sessionRequired": "请先从 Threads 选择一个 Hub 会话。",
   "webChat.groupSessionRequired": "请先选择一个 Hub 群组会话，再分发 Agent 任务。",

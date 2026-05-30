@@ -70,6 +70,8 @@
   "chat.action.retry": "Retry",
   "chat.action.delete": "Delete",
   "chat.action.copied": "Copied",
+  "code.copy": "Copy code",
+  "code.copied": "Copied",
   "webChat.signInRequired": "Sign in to Hub before dispatching an agent task.",
   "webChat.sessionRequired": "Select a Hub session from Threads before sending.",
   "webChat.groupSessionRequired": "Select a Hub group session before dispatching an agent task.",
