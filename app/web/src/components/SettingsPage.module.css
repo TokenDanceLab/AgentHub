@@ -379,14 +379,6 @@
   color: #6366f1;
 }
 
-.profileHeader div:nth-child(2) {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .summaryBody {
   flex-direction: column-reverse;
   align-items: flex-start;
@@ -395,7 +387,6 @@
 }
 
 .summaryMeta,
-.profileCard span,
 .targetCard span,
 .profileMeta span {
   color: #8e8e93;
@@ -404,7 +395,7 @@
 }
 
 .summaryLabel,
-.profileCard strong,
+.profileTitle,
 .targetCard strong {
   color: var(--foreground);
   font-size: 14px;
@@ -420,18 +411,29 @@
 }
 
 .profileCard {
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
   min-height: 132px;
-  flex-direction: column;
-  gap: 13px;
   padding: 15px;
 }
 
-.profileHeader {
+.profileContent {
   display: flex;
   min-width: 0;
-  align-items: flex-start;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profileDescription {
+  color: #8e8e93;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.profileActions {
+  grid-column: 2;
+  justify-content: flex-start;
 }
 
 .profileStatus {
@@ -457,6 +459,7 @@
 
 .profileMeta {
   display: flex;
+  min-width: 0;
   flex-wrap: wrap;
   gap: 7px;
 }
@@ -1265,10 +1268,6 @@
   .profileGrid,
   .targetGrid {
     grid-template-columns: 1fr;
-  }
-
-  .profileHeader {
-    flex-wrap: wrap;
   }
 
   .taskSectionTitleRow {
