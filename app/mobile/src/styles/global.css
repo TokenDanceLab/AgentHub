@@ -558,16 +558,36 @@ button:disabled {
   text-align: center;
 }
 
+.mobileCenterState.mobileCenterState {
+  max-width: none;
+  margin: 10px 0 0;
+  padding: 18px 16px;
+  color: var(--td-ink-50);
+  opacity: 1 !important;
+  animation: none !important;
+}
+
+.mobileCenterState .mobileCenterStateContent {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(100%, 280px);
+  opacity: 1;
+}
+
 .mobileCenterState strong,
+.mobileCenterStateTitle,
 .mobileEmptyView h1,
 .mobileEmptyView h2 {
   margin: 0;
   color: var(--td-ink);
-  font-size: 15px;
+  font-size: 16px;
+  font-weight: 700;
   line-height: 1.45;
 }
 
 .mobileCenterState p,
+.mobileCenterStateDescription,
 .mobileEmptyView p,
 .mobileRecoveryDescription,
 .mobileRecoveryMeta {
@@ -575,6 +595,30 @@ button:disabled {
   color: var(--td-ink-50);
   font-size: 13px;
   line-height: 1.55;
+}
+
+.mobileCenterState .mobileCenterStateTitle {
+  color: var(--td-ink) !important;
+  font-size: 16px;
+  font-weight: 700;
+  opacity: 1;
+}
+
+.mobileCenterState .mobileCenterStateDescription {
+  max-width: 28ch;
+  color: var(--td-ink-70) !important;
+  font-size: 13px;
+  opacity: 1;
+}
+
+.mobileCenterState .mobileEmptyIcon {
+  width: 44px;
+  height: 44px;
+  border-color: var(--td-line);
+  border-radius: var(--td-radius-control);
+  background: rgba(93, 104, 204, 0.12);
+  color: var(--td-ink-70) !important;
+  opacity: 1;
 }
 
 .mobileActionButton,
