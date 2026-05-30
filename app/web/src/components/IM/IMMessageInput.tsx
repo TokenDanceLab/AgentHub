@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, memo } from 'react';
 import { Send } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import styles from './IMMessageInput.module.css';
 
 const MAX_CHARS = 2000;
@@ -13,10 +14,12 @@ interface IMMessageInputProps {
 const IMMessageInput = memo(function IMMessageInput({
   onSend,
   disabled = false,
-  placeholder = 'Type a message...',
+  placeholder,
 }: IMMessageInputProps) {
+  const { t } = useTranslation();
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const resolvedPlaceholder = placeholder ?? t('im.input.placeholder');
 
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
@@ -60,14 +63,14 @@ const IMMessageInput = memo(function IMMessageInput({
             value={value}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder}
+            placeholder={resolvedPlaceholder}
             disabled={disabled}
             rows={1}
-            aria-label="Message input"
+            aria-label={t('im.input.label')}
           />
           <div className={styles.footer}>
             <span className={styles.hint}>
-              <kbd>Enter</kbd> to send
+              {t('im.input.enterHint')}
             </span>
             <span className={`${styles.charCount} ${overLimit ? styles.charCountOver : ''}`}>
               {value.length}/{MAX_CHARS}
@@ -79,8 +82,9 @@ const IMMessageInput = memo(function IMMessageInput({
           className={styles.sendBtn}
           onClick={handleSend}
           disabled={disabled || value.trim().length === 0}
-          aria-label="Send message"
-          title="Send message"
+          aria-label={t('im.input.send')}
+          title={t('im.input.send')}
+          type="button"
         >
           <Send size={16} />
         </button>

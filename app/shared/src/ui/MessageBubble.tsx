@@ -6,6 +6,8 @@ export interface MessageBubbleProps {
   timestamp: ReactNode;
   children: ReactNode;
   align?: 'start' | 'end';
+  contentAs?: 'p' | 'div';
+  ariaLabel?: string;
   actions?: ReactNode;
   className?: string | undefined;
   bubbleClassName?: string | undefined;
@@ -24,6 +26,8 @@ export function MessageBubble({
   timestamp,
   children,
   align = 'start',
+  contentAs = 'p',
+  ariaLabel,
   actions,
   className,
   bubbleClassName,
@@ -32,15 +36,17 @@ export function MessageBubble({
   contentClassName,
   actionsClassName,
 }: MessageBubbleProps) {
+  const ContentTag = contentAs;
+
   return (
-    <article className={cx(styles.row, align === 'end' && styles.rowEnd, className)} data-align={align}>
+    <article className={cx(styles.row, align === 'end' && styles.rowEnd, className)} data-align={align} aria-label={ariaLabel}>
       <div className={cx(styles.bubble, bubbleClassName)}>
         <div className={cx(styles.meta, metaClassName)}>
           <strong className={authorClassName}>{author}</strong>
           <time>{timestamp}</time>
           {actions ? <span className={cx(styles.actions, actionsClassName)}>{actions}</span> : null}
         </div>
-        <p className={cx(styles.content, contentClassName)}>{children}</p>
+        <ContentTag className={cx(styles.content, contentClassName)}>{children}</ContentTag>
       </div>
     </article>
   );
