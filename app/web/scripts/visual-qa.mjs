@@ -448,6 +448,19 @@ async function collectMetrics(page, { mobile = false } = {}) {
       const directSpanCount = Array.from(row.children).filter((child) => child.tagName === "SPAN").length;
       return style.display === "grid" && directSpanCount >= 3;
     });
+    const settingsProfileCards = Array.from(document.querySelectorAll("[class*='profileCard']")).filter((card) =>
+      card.className?.toString().split(/\s+/).some((className) => /profileCard_/.test(className))
+    );
+    const visibleSettingsProfileCards = settingsProfileCards.filter((card) => {
+      const rect = card.getBoundingClientRect();
+      const style = window.getComputedStyle(card);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedSettingsProfileCards = visibleSettingsProfileCards.filter((card) => {
+      const style = window.getComputedStyle(card);
+      const directSpanCount = Array.from(card.children).filter((child) => child.tagName === "SPAN").length;
+      return style.display === "grid" && directSpanCount >= 3;
+    });
 
     return {
       title: document.title,
@@ -482,6 +495,8 @@ async function collectMetrics(page, { mobile = false } = {}) {
       sharedSettingsAccountCardCount: sharedSettingsAccountCards.length,
       visibleSettingsTaskRowCount: visibleSettingsTaskRows.length,
       sharedSettingsTaskRowCount: sharedSettingsTaskRows.length,
+      visibleSettingsProfileCardCount: visibleSettingsProfileCards.length,
+      sharedSettingsProfileCardCount: sharedSettingsProfileCards.length,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -621,6 +636,13 @@ async function visitAndCapture(page, scene) {
     await page.locator("[class*='taskRow']").first().waitFor({ state: "visible", timeout: 5000 });
     await firstRunRow.scrollIntoViewIfNeeded();
   }
+  if (scene.openSettingsSkills) {
+    await page.getByRole("button", { name: /Skill Management/ }).first().click();
+    await page.locator("h1").filter({ hasText: /Skill Management/ }).waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("adapter-dev", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator("[class*='profileCard']").first().waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("adapter-dev", { exact: true }).scrollIntoViewIfNeeded();
+  }
 
   const screenshotPath = path.join(outDir, `${scene.name}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -648,6 +670,10 @@ async function visitAndCapture(page, scene) {
   if (scene.openSettingsTasks) {
     assert(metrics.visibleSettingsTaskRowCount >= 3, `${scene.name}: tasks settings should render recent run rows`, metrics);
     assert(metrics.sharedSettingsTaskRowCount >= 3, `${scene.name}: task rows should use shared ActivityCard grid structure`, metrics);
+  }
+  if (scene.openSettingsSkills) {
+    assert(metrics.visibleSettingsProfileCardCount >= 7, `${scene.name}: skill settings should render installed skill cards`, metrics);
+    assert(metrics.sharedSettingsProfileCardCount >= 7, `${scene.name}: skill profile cards should use shared ActivityCard grid structure`, metrics);
   }
 
   return { screenshotPath, metrics };
@@ -760,6 +786,15 @@ async function main() {
       language: "en",
       theme: "dark",
       openSettingsTasks: true,
+    },
+    {
+      name: "web-design-settings-skills-desktop-1440x920",
+      path: "/settings",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openSettingsSkills: true,
     },
     {
       name: "web-design-run-overlay-mobile-390x844",
