@@ -507,6 +507,18 @@ async function collectMetrics(page, { mobile = false } = {}) {
       return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
     });
     const sharedSettingsCallouts = visibleSettingsCallouts.filter((callout) => callout.getAttribute("role") === "status");
+    const imMessageRows = Array.from(document.querySelectorAll("article[aria-label*='message from']"));
+    const visibleImMessageRows = imMessageRows.filter((row) => {
+      const rect = row.getBoundingClientRect();
+      const style = window.getComputedStyle(row);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedImMessageRows = visibleImMessageRows.filter((row) => row.getAttribute("data-align") === "start" || row.getAttribute("data-align") === "end");
+    const imAuthorityBandCount = Array.from(document.querySelectorAll("[class*='authorityBand']")).filter((band) => {
+      const rect = band.getBoundingClientRect();
+      const style = window.getComputedStyle(band);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    }).length;
 
     return {
       title: document.title,
@@ -551,6 +563,9 @@ async function collectMetrics(page, { mobile = false } = {}) {
       sharedSettingsEmptyBlockCount: sharedSettingsEmptyBlocks.length,
       visibleSettingsCalloutCount: visibleSettingsCallouts.length,
       sharedSettingsCalloutCount: sharedSettingsCallouts.length,
+      visibleImMessageRowCount: visibleImMessageRows.length,
+      sharedImMessageRowCount: sharedImMessageRows.length,
+      imAuthorityBandCount,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -714,6 +729,12 @@ async function visitAndCapture(page, scene) {
     await page.getByText("No archived chats", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
     await page.locator("[class*='emptyBlock']").first().waitFor({ state: "visible", timeout: 5000 });
   }
+  if (scene.openIMConversation) {
+    await page.locator("[role='option']").filter({ hasText: "Web design convergence" }).click();
+    await page.getByText("Keep Web and Mobile aligned with the Desktop glass shell.").waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("Visual QA covers account nav, run overlay, settings, and legacy route bridges.").waitFor({ state: "visible", timeout: 5000 });
+    await page.getByRole("textbox", { name: "Message input" }).waitFor({ state: "visible", timeout: 5000 });
+  }
 
   const screenshotPath = path.join(outDir, `${scene.name}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -758,6 +779,11 @@ async function visitAndCapture(page, scene) {
     assert(metrics.visibleSettingsEmptyBlockCount >= 1, `${scene.name}: archived settings should render an empty state`, metrics);
     assert(metrics.sharedSettingsEmptyBlockCount >= 1, `${scene.name}: settings empty block should use shared EmptyState structure`, metrics);
   }
+  if (scene.openIMConversation) {
+    assert(metrics.visibleImMessageRowCount >= 2, `${scene.name}: IM conversation should render visible message rows`, metrics);
+    assert(metrics.sharedImMessageRowCount >= 2, `${scene.name}: IM message rows should use shared MessageBubble structure`, metrics);
+    assert(metrics.imAuthorityBandCount === 0, `${scene.name}: IM authority must not render left color bands`, metrics);
+  }
   if (scene.expectSettingsCallout) {
     assert(metrics.visibleSettingsCalloutCount >= 1, `${scene.name}: settings should render guard callouts`, metrics);
     assert(metrics.sharedSettingsCalloutCount >= 1, `${scene.name}: settings callouts should use shared StatusNotice structure`, metrics);
@@ -801,6 +827,16 @@ async function main() {
       authenticated: true,
       language: "en",
       theme: "dark",
+    },
+    {
+      name: "web-design-messages-conversation-mobile-390x844",
+      path: "/chats",
+      viewport: mobileViewport,
+      mobile: true,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openIMConversation: true,
     },
     {
       name: "web-design-workspace-desktop-status-1440x920",
