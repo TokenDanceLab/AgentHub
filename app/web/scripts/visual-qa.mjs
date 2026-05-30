@@ -158,6 +158,24 @@ const messages = [
     seq_id: 6,
     created_at: "2026-05-30T01:25:00Z",
   },
+  {
+    id: "msg_file_change",
+    session_id: "session_web_design",
+    sender_id: "profile_codex",
+    sender_type: "agent",
+    content_type: "json",
+    content: JSON.stringify({
+      path: "app/web/src/components/ChatView.tsx",
+      action: "modified",
+      diff: [
+        "@@ shared preview @@",
+        "- <details className={styles.fileCard}>",
+        "+ <CodePreviewCard title={block.path} code={block.diff} />",
+      ].join("\n"),
+    }),
+    seq_id: 7,
+    created_at: "2026-05-30T01:26:00Z",
+  },
 ];
 
 function hubEnvelope(data) {
@@ -535,6 +553,11 @@ async function visitAndCapture(page, scene) {
     await page.getByRole("button", { name: /Bash completed/i }).waitFor({ state: "visible", timeout: 5000 });
     await page.getByRole("button", { name: /Bash completed/i }).click();
     await page.getByText("Web visual QA passed (10 scenes)").waitFor({ state: "visible", timeout: 5000 });
+    const chatLog = page.getByRole("log");
+    const chatFilePreview = chatLog.getByText("app/web/src/components/ChatView.tsx");
+    await chatFilePreview.waitFor({ state: "visible", timeout: 5000 });
+    await chatLog.getByText("+ <CodePreviewCard title={block.path} code={block.diff} />").waitFor({ state: "visible", timeout: 5000 });
+    await chatFilePreview.scrollIntoViewIfNeeded();
   }
   if (scene.openSearch) {
     await page.keyboard.press(process.platform === "darwin" ? "Meta+KeyK" : "Control+KeyK");
