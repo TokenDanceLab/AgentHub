@@ -40,4 +40,16 @@ describe('MessageBubble', () => {
     expect(screen.getByText('Reply').parentElement).toHaveClass('mobileUserMsg');
     expect(screen.getByText('Action').parentElement).toHaveClass('mobileMessageActions');
   });
+
+  it('can render block content for markdown consumers', () => {
+    render(
+      <MessageBubble author="Agent" timestamp="09:24" contentAs="div" contentClassName="markdownContent">
+        <p>Rendered markdown paragraph</p>
+      </MessageBubble>,
+    );
+
+    const content = screen.getByText('Rendered markdown paragraph').parentElement;
+    expect(content?.tagName).toBe('DIV');
+    expect(content).toHaveClass('markdownContent');
+  });
 });

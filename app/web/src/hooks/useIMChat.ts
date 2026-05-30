@@ -43,6 +43,10 @@ function hubMessageToIMMessage(msg: HubMessageLike, authority: AuthorityType = '
   };
 }
 
+function isDisplayableIMMessage(msg: HubMessageLike): boolean {
+  return !msg.content_type || msg.content_type === 'text';
+}
+
 function sessionToContact(session: Session): IMContact {
   const sessionId = session.id ?? session.session_id ?? '';
   return {
@@ -94,7 +98,9 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
       if (!authenticated || !getAccessToken()) return;
       try {
         const snapshot = await hubClientRef.current.getMessages(sessionId, { limit: 50 });
-        const converted = snapshot.map((msg: MessageResponse) => hubMessageToIMMessage(msg));
+        const converted = snapshot
+          .filter((msg: MessageResponse) => isDisplayableIMMessage(msg))
+          .map((msg: MessageResponse) => hubMessageToIMMessage(msg));
         setMessages((prev) => {
           const next = new Map(prev);
           next.set(sessionId, mergeMessages(next.get(sessionId) ?? [], converted));
@@ -131,7 +137,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
       const msg = rawPayload as HubMessageLike;
       const sessionId = msg?.session_id ?? msg?.sessionId;
       const messageId = msg?.id ?? msg?.message_id;
-      if (!messageId || !sessionId) return;
+      if (!messageId || !sessionId || !isDisplayableIMMessage(msg)) return;
 
       const imMsg = hubMessageToIMMessage(msg);
       setMessages((prev) => {

@@ -1,4 +1,6 @@
 import { useRef, useEffect, memo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { MessageBubble } from '@shared/ui';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import type { IMMessage } from './types';
 import styles from './IMMessageView.module.css';
@@ -8,13 +10,13 @@ interface IMMessageViewProps {
   currentUserId?: string | undefined;
 }
 
-function formatTime(timestamp: string): string {
+function formatTime(timestamp: string, justNowLabel: string): string {
   const d = new Date(timestamp);
   const now = Date.now();
   const diff = now - d.getTime();
   const minutes = Math.floor(diff / 60000);
 
-  if (minutes < 1) return 'Just now';
+  if (minutes < 1) return justNowLabel;
   if (minutes < 60) return `${minutes}m ago`;
 
   return d.toLocaleTimeString('en-US', {
@@ -27,11 +29,11 @@ function formatTime(timestamp: string): string {
 function authorityClass(authority: string): string {
   switch (authority) {
     case 'edge':
-      return styles.authorityEdge ?? '';
+      return styles.bubbleEdge ?? '';
     case 'hybrid':
-      return styles.authorityHybrid ?? '';
+      return styles.bubbleHybrid ?? '';
     default:
-      return styles.authorityHub ?? '';
+      return styles.bubbleHub ?? '';
   }
 }
 
@@ -67,45 +69,36 @@ function SenderAvatar({
 const IMMessageBubble = memo(function IMMessageBubble({
   message,
   isOwn,
+  justNowLabel,
 }: {
   message: IMMessage;
   isOwn: boolean;
+  justNowLabel: string;
 }) {
   const isRecalled = message.content === '[Message recalled]';
 
   return (
-    <div
-      className={`${styles.bubble} ${
-        isOwn ? styles.userBubble : styles.agentBubble
-      }`}
-      role="article"
-      aria-label={`${message.senderType} message from ${message.senderName}`}
+    <MessageBubble
+      className={styles.messageRow}
+      bubbleClassName={`${styles.bubble} ${isOwn ? styles.userBubble : styles.agentBubble} ${authorityClass(message.authority)}`}
+      metaClassName={styles.senderRow}
+      contentClassName={`${styles.content} ${isRecalled ? styles.recalled : ''}`}
+      align={isOwn ? 'end' : 'start'}
+      contentAs="div"
+      author={(
+        <>
+          <SenderAvatar name={message.senderName} senderType={message.senderType} />
+          <span className={styles.senderName}>{message.senderName}</span>
+          <span className={`${styles.authorityBadge} ${authorityBadgeClass(message.authority)}`}>
+            {message.authority}
+          </span>
+        </>
+      )}
+      timestamp={formatTime(message.timestamp, justNowLabel)}
+      ariaLabel={`${message.senderType} message from ${message.senderName}`}
     >
-      {/* Authority color band (left edge for agent messages) */}
-      <div
-        className={`${styles.authorityBand} ${authorityClass(message.authority)}`}
-        aria-hidden="true"
-      />
-
-      {/* Sender row */}
-      <div className={styles.senderRow}>
-        <SenderAvatar name={message.senderName} senderType={message.senderType} />
-        <span className={styles.senderName}>{message.senderName}</span>
-        <span className={`${styles.authorityBadge} ${authorityBadgeClass(message.authority)}`}>
-          {message.authority}
-        </span>
-      </div>
-
-      {/* Content */}
-      <div className={`${styles.content} ${isRecalled ? styles.recalled : ''}`}>
-        <MarkdownRenderer content={message.content} />
-      </div>
-
-      {/* Timestamp */}
-      <time className={styles.timestamp} dateTime={message.timestamp}>
-        {formatTime(message.timestamp)}
-      </time>
-    </div>
+      <MarkdownRenderer content={message.content} />
+    </MessageBubble>
   );
 });
 
@@ -113,6 +106,7 @@ const IMMessageView = memo(function IMMessageView({
   messages,
   currentUserId,
 }: IMMessageViewProps) {
+  const { t } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
@@ -124,8 +118,8 @@ const IMMessageView = memo(function IMMessageView({
     return (
       <div className={styles.root}>
         <div className={styles.empty}>
-          <span>No messages yet</span>
-          <span>Start a conversation to begin</span>
+          <span>{t('im.message.emptyTitle')}</span>
+          <span>{t('im.message.emptyDescription')}</span>
         </div>
       </div>
     );
@@ -137,11 +131,8 @@ const IMMessageView = memo(function IMMessageView({
         {messages.map((msg) => {
           const isOwn = currentUserId ? msg.senderId === currentUserId : msg.senderType === 'user';
           return (
-            <div
-              key={msg.id}
-              className={isOwn ? styles.userRow : styles.agentRow}
-            >
-              <IMMessageBubble message={msg} isOwn={isOwn} />
+            <div key={msg.id} className={styles.messageItem}>
+              <IMMessageBubble message={msg} isOwn={isOwn} justNowLabel={t('im.message.justNow')} />
             </div>
           );
         })}
