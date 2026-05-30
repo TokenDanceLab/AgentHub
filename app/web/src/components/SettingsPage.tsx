@@ -60,6 +60,7 @@ import {
   getSurfaceStatusMetadata,
   type SurfaceMetadata,
 } from '@shared/surfaceMetadata';
+import { ActivityCard } from '@shared/ui';
 import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
 import styles from './SettingsPage.module.css';
 
@@ -1914,24 +1915,33 @@ function ModeCard({
 
 function CapabilityCard({ title, description, status }: { title: string; description: string; status: string }) {
   return (
-    <div className={styles.capabilityCard}>
-      <strong>{title}</strong>
-      <span>{description}</span>
-      <em>{status}</em>
-    </div>
+    <ActivityCard
+      className={styles.capabilityCard}
+      metaClassName={styles.capabilityMeta}
+      labelClassName={styles.capabilityLabel}
+      contentClassName={styles.capabilityDescription}
+      label={title}
+      meta={<em className={styles.capabilityStatus}>{status}</em>}
+    >
+      {description}
+    </ActivityCard>
   );
 }
 
 function SummaryCard({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail: string }) {
   return (
-    <div className={styles.summaryCard}>
-      <div className={styles.summaryIcon}>{icon}</div>
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-        <small>{detail}</small>
-      </div>
-    </div>
+    <ActivityCard
+      className={styles.summaryCard}
+      iconClassName={styles.summaryIcon}
+      metaClassName={styles.summaryBody}
+      labelClassName={styles.summaryLabel}
+      contentClassName={styles.summaryDetail}
+      label={value}
+      meta={<span className={styles.summaryMeta}>{label}</span>}
+      icon={icon}
+    >
+      {detail}
+    </ActivityCard>
   );
 }
 
