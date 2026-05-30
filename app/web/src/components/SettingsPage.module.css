@@ -797,6 +797,43 @@
   white-space: nowrap;
 }
 
+.taskRow {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.taskRowContent {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.taskRowLabel {
+  overflow: visible;
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 700;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.taskRowDescription {
+  min-width: 0;
+  color: #8e8e93;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.taskRowActions {
+  grid-column: 2;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
 .settingCopy,
 .accountInfo {
   display: flex;
