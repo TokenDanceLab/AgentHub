@@ -1155,6 +1155,7 @@
 
 .callout {
   display: flex;
+  align-items: flex-start;
   gap: 12px;
   padding: 14px 16px;
   margin-top: 12px;
@@ -1162,26 +1163,29 @@
   border-radius: 12px;
   background: rgba(99, 102, 241, 0.08);
   color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
-.callout svg {
+.calloutIcon {
   flex-shrink: 0;
   color: #6366f1;
 }
 
-.callout div {
+.calloutContent {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 4px;
 }
 
-.callout strong {
+.calloutContent strong {
+  color: var(--foreground);
   font-size: 13px;
   font-weight: 750;
 }
 
-.callout span {
+.calloutContent span {
   color: #8e8e93;
   font-size: 13px;
   line-height: 1.4;
@@ -1190,10 +1194,11 @@
 .emptyBlock {
   display: flex;
   min-height: 160px;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  max-width: none;
+  margin: 0;
+  padding: 20px 18px;
   border: 1px solid var(--settings-glass-border);
   border-radius: 10px;
   background: var(--settings-glass-bg);
@@ -1204,17 +1209,35 @@
   text-align: center;
 }
 
+.emptyBlockContent {
+  gap: 8px;
+}
+
+.emptyBlockIcon {
+  width: 44px;
+  height: 44px;
+  border-color: var(--settings-glass-border);
+  border-radius: 10px;
+  background: var(--settings-icon-bg);
+  color: #6366f1;
+}
+
 [data-theme='dark'] .emptyBlock {
   color-scheme: dark;
 }
 
-.emptyBlock strong {
+.emptyBlockTitle {
+  margin: 0;
   color: var(--foreground);
   font-size: 14px;
+  font-weight: 750;
+  line-height: 1.25;
 }
 
-.emptyBlock span {
+.emptyBlockDescription {
   max-width: 360px;
+  margin: 0;
+  color: #8e8e93;
   font-size: 13px;
   line-height: 1.45;
 }
