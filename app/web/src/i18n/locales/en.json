@@ -86,6 +86,7 @@
   "action.cancelRun": "Cancel",
   "prompt.placeholder": "Type a message, @Agent to mention...",
   "prompt.agentSelector": "Select Agent",
+  "prompt.agentSuggestions": "Agent suggestions",
   "prompt.activeGoal": "Active goal",
   "prompt.attachCustom": "Add custom attachment",
   "prompt.clearGoal": "Clear goal",

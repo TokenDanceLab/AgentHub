@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Circle } from 'lucide-react';
 import type { AgentInfo } from '@shared/types';
 import styles from './MentionPopover.module.css';
@@ -45,6 +46,7 @@ export default function MentionPopover({
   onSelect,
   onClose,
 }: Props) {
+  const { t } = useTranslation();
   const listRef = useRef<HTMLUListElement>(null);
 
   // Scroll selected item into view
@@ -79,7 +81,7 @@ export default function MentionPopover({
       className={styles.popover}
       style={{ top: position.top, left: position.left }}
       role="listbox"
-      aria-label="Agent suggestions"
+      aria-label={t('prompt.agentSuggestions')}
     >
       <ul ref={listRef} className={styles.list}>
         {agents.map((agent, i) => (
