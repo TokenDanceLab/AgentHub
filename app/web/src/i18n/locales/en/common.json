@@ -148,5 +148,17 @@
   "action.apply": "Apply",
   "action.discard": "Discard",
   "action.approve": "Approve",
-  "action.reject": "Reject"
+  "action.reject": "Reject",
+  "diff.empty.title": "No changes to display",
+  "diff.empty.description": "Diff output will appear here after the run reports changed files.",
+  "diff.changedFiles_one": "{{count}} changed file",
+  "diff.changedFiles_other": "{{count}} changed files",
+  "diff.actions.expandAll": "Expand all files",
+  "diff.actions.collapseAll": "Collapse all files",
+  "diff.actions.acceptFile": "Accept file",
+  "diff.actions.acceptAll": "Accept all changes in this file",
+  "diff.actions.undoAccept": "Undo accept",
+  "diff.actions.rejectFile": "Reject file",
+  "diff.actions.rejectAll": "Reject all changes in this file",
+  "diff.actions.undoReject": "Undo reject"
 }
