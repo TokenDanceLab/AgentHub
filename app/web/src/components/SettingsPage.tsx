@@ -1984,15 +1984,16 @@ function AliasMappingRow({
 }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.modelAliasRow}>
-      <div className={styles.modelAliasHead}>
-        <div>
-          <strong>{alias}</strong>
-          <span>{t('settings.modelAliasRoute', { model, provider })}</span>
-        </div>
-        <Switch checked={enabled} onChange={onToggle} />
-      </div>
-      <div className={styles.modelAliasControls}>
+    <ActivityCard
+      className={styles.modelAliasRow}
+      labelClassName={styles.settingTitle}
+      contentClassName={styles.modelAliasContent}
+      actionsClassName={styles.settingActions}
+      label={alias}
+      actions={<Switch checked={enabled} onChange={onToggle} />}
+    >
+      <span className={styles.settingDescription}>{t('settings.modelAliasRoute', { model, provider })}</span>
+      <span className={styles.modelAliasControls}>
         <label>
           <span>{t('settings.modelAliasModel')}</span>
           <SelectControl
@@ -2017,8 +2018,8 @@ function AliasMappingRow({
             onChange={(value) => onReasoningChange(value as ReasoningEffortPreference)}
           />
         </label>
-      </div>
-    </div>
+      </span>
+    </ActivityCard>
   );
 }
 
@@ -2041,23 +2042,25 @@ function ProviderHealthRow({
 }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.providerRow}>
-      <div className={styles.providerMain}>
-        <div className={styles.connectionIcon}>
-          <Plug size={17} />
-        </div>
-        <div className={styles.settingCopy}>
-          <strong>{name}</strong>
-          <span>{id}</span>
-          <div className={styles.taskMeta}>
-            <span>{t('settings.ccSwitchModelCount', { count: modelCount })}</span>
-          </div>
-        </div>
+    <ActivityCard
+      className={styles.providerRow}
+      iconClassName={styles.connectionIcon}
+      labelClassName={styles.settingTitle}
+      contentClassName={styles.providerContent}
+      actionsClassName={styles.settingActions}
+      icon={<Plug size={17} />}
+      label={name}
+      actions={
         <span className={`${styles.statusPill} ${health === 'ready' ? styles.statusPillOn : ''}`}>
           {t(`settings.providerHealth.${health}`)}
         </span>
-      </div>
-      <div className={styles.providerControls}>
+      }
+    >
+      <span className={styles.settingDescription}>{id}</span>
+      <span className={styles.taskMeta}>
+        <span>{t('settings.ccSwitchModelCount', { count: modelCount })}</span>
+      </span>
+      <span className={styles.providerControls}>
         <label>
           <span>{t('settings.ccSwitchHealth')}</span>
           <SelectControl
@@ -2074,8 +2077,8 @@ function ProviderHealthRow({
             onChange={(event) => onNotesChange(event.target.value)}
           />
         </label>
-      </div>
-    </div>
+      </span>
+    </ActivityCard>
   );
 }
 
