@@ -1,5 +1,6 @@
 import { useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { MessageSquareText } from 'lucide-react';
 import { EmptyState, MessageBubble } from '@shared/ui';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
@@ -11,19 +12,22 @@ interface IMMessageViewProps {
   currentUserId?: string | undefined;
 }
 
-function formatTime(timestamp: string, justNowLabel: string): string {
+function localeFromLanguage(language: string | undefined): string {
+  return language?.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US';
+}
+
+function formatTime(timestamp: string, t: TFunction, language: string | undefined): string {
   const d = new Date(timestamp);
   const now = Date.now();
   const diff = now - d.getTime();
   const minutes = Math.floor(diff / 60000);
 
-  if (minutes < 1) return justNowLabel;
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t('time.justNow');
+  if (minutes < 60) return t('time.minutesAgo', { count: minutes });
 
-  return d.toLocaleTimeString('en-US', {
+  return d.toLocaleTimeString(localeFromLanguage(language), {
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true,
   });
 }
 
@@ -70,13 +74,16 @@ function SenderAvatar({
 const IMMessageBubble = memo(function IMMessageBubble({
   message,
   isOwn,
-  justNowLabel,
+  t,
+  language,
 }: {
   message: IMMessage;
   isOwn: boolean;
-  justNowLabel: string;
+  t: TFunction;
+  language: string | undefined;
 }) {
   const isRecalled = message.content === '[Message recalled]';
+  const senderTypeLabel = t(`im.message.sender.${message.senderType}`);
 
   return (
     <MessageBubble
@@ -95,8 +102,8 @@ const IMMessageBubble = memo(function IMMessageBubble({
           </span>
         </>
       )}
-      timestamp={formatTime(message.timestamp, justNowLabel)}
-      ariaLabel={`${message.senderType} message from ${message.senderName}`}
+      timestamp={formatTime(message.timestamp, t, language)}
+      ariaLabel={t('im.message.ariaLabel', { type: senderTypeLabel, name: message.senderName })}
     >
       <MarkdownRenderer content={message.content} />
     </MessageBubble>
@@ -107,7 +114,7 @@ const IMMessageView = memo(function IMMessageView({
   messages,
   currentUserId,
 }: IMMessageViewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
@@ -139,7 +146,12 @@ const IMMessageView = memo(function IMMessageView({
           const isOwn = currentUserId ? msg.senderId === currentUserId : msg.senderType === 'user';
           return (
             <div key={msg.id} className={styles.messageItem}>
-              <IMMessageBubble message={msg} isOwn={isOwn} justNowLabel={t('im.message.justNow')} />
+              <IMMessageBubble
+                message={msg}
+                isOwn={isOwn}
+                t={t}
+                language={i18n.resolvedLanguage || i18n.language}
+              />
             </div>
           );
         })}
