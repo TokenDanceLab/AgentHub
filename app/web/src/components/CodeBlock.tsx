@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Copy, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/prism-light';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import styles from './CodeBlock.module.css';
@@ -10,8 +11,10 @@ interface CodeBlockProps {
 }
 
 export default function CodeBlock({ content, language }: CodeBlockProps) {
+  const { t } = useTranslation();
   const [highlighted, setHighlighted] = useState(false);
   const [copied, setCopied] = useState(false);
+  const copyLabel = copied ? t('code.copied') : t('code.copy');
 
   // Show plain text on first paint, then highlight on next frame
   useEffect(() => {
@@ -36,8 +39,9 @@ export default function CodeBlock({ content, language }: CodeBlockProps) {
         <button
           className={styles.copyBtn}
           onClick={handleCopy}
-          title={copied ? 'Copied!' : 'Copy code'}
-          aria-label={copied ? 'Copied!' : 'Copy code'}
+          title={copyLabel}
+          aria-label={copyLabel}
+          type="button"
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}
         </button>
