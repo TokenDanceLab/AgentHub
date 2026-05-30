@@ -848,11 +848,17 @@ async function snapshot(page, fileName) {
         height: Math.round(rect.height),
       };
     });
+    const rawI18nKeys = Array.from(document.body.querySelectorAll("*"))
+      .flatMap((node) => Array.from(node.childNodes))
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent?.trim() ?? "")
+      .filter((text) => /(?:^|\s)(?:common|nav|empty|chat|runDetail|settings|queue)\.(?=[A-Za-z])[A-Za-z0-9_.-]+/.test(text));
 
     return {
       scrollWidth: document.documentElement.scrollWidth,
       innerWidth: window.innerWidth,
       buttons,
+      rawI18nKeys,
     };
   });
 }
@@ -865,6 +871,10 @@ function assertMetrics(fileName, metrics) {
   const tooSmall = metrics.buttons.filter((button) => button.width < 44 || button.height < 44);
   if (tooSmall.length > 0) {
     throw new Error(`${fileName}: touch targets below 44px ${JSON.stringify(tooSmall)}`);
+  }
+
+  if (metrics.rawI18nKeys.length > 0) {
+    throw new Error(`${fileName}: raw i18n keys visible ${JSON.stringify(metrics.rawI18nKeys)}`);
   }
 }
 
