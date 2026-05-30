@@ -47,6 +47,11 @@
   min-width: 0;
 }
 
+.notificationSlot {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
 .brandMark {
   display: block;
   width: 28px;

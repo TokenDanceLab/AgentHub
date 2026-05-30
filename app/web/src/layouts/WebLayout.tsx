@@ -52,6 +52,7 @@ import {
 import { Slot } from '@/views/viewRegistry';
 import AuthPage from '@/components/AuthPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { NotificationBell } from '@/components/NotificationBell';
 import SettingsPage from '@/components/SettingsPage';
 import { ToastContainer } from '@/components/Toast';
 import styles from './WebLayout.module.css';
@@ -647,6 +648,9 @@ export default function WebLayout() {
             <span className={hubRealtime.authenticated ? styles.statusPillOnline : styles.statusPill}>
               {hubRealtime.authenticated ? <Wifi size={14} /> : <WifiOff size={14} />}
               <span>{realtimeLabel}</span>
+            </span>
+            <span className={styles.notificationSlot}>
+              <NotificationBell />
             </span>
             <button
               className={styles.accountBtn}
