@@ -435,6 +435,19 @@ async function collectMetrics(page, { mobile = false } = {}) {
       });
       return style.display === "grid" && hasSharedBody;
     });
+    const settingsTaskRows = Array.from(document.querySelectorAll("[class*='taskRow']")).filter((row) =>
+      row.className?.toString().split(/\s+/).some((className) => /taskRow_/.test(className))
+    );
+    const visibleSettingsTaskRows = settingsTaskRows.filter((row) => {
+      const rect = row.getBoundingClientRect();
+      const style = window.getComputedStyle(row);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedSettingsTaskRows = visibleSettingsTaskRows.filter((row) => {
+      const style = window.getComputedStyle(row);
+      const directSpanCount = Array.from(row.children).filter((child) => child.tagName === "SPAN").length;
+      return style.display === "grid" && directSpanCount >= 3;
+    });
 
     return {
       title: document.title,
@@ -467,6 +480,8 @@ async function collectMetrics(page, { mobile = false } = {}) {
       visibleSearchResultButtonCount: visibleSearchResultButtons.length,
       visibleSettingsAccountCardCount: visibleSettingsAccountCards.length,
       sharedSettingsAccountCardCount: sharedSettingsAccountCards.length,
+      visibleSettingsTaskRowCount: visibleSettingsTaskRows.length,
+      sharedSettingsTaskRowCount: sharedSettingsTaskRows.length,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -597,6 +612,15 @@ async function visitAndCapture(page, scene) {
     await page.getByText("TokenDance ID", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
     await page.locator("[class*='summaryCard'], [class*='capabilityCard']").first().waitFor({ state: "visible", timeout: 5000 });
   }
+  if (scene.openSettingsTasks) {
+    await page.getByRole("button", { name: /^Tasks$/ }).first().click();
+    await page.locator("h1").filter({ hasText: /^Tasks$/ }).waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("Recent runs", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
+    const firstRunRow = page.getByText("run_1", { exact: true });
+    await firstRunRow.waitFor({ state: "visible", timeout: 5000 });
+    await page.locator("[class*='taskRow']").first().waitFor({ state: "visible", timeout: 5000 });
+    await firstRunRow.scrollIntoViewIfNeeded();
+  }
 
   const screenshotPath = path.join(outDir, `${scene.name}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -620,6 +644,10 @@ async function visitAndCapture(page, scene) {
   if (scene.openSettingsAccount) {
     assert(metrics.visibleSettingsAccountCardCount >= 8, `${scene.name}: account settings should render dense summary/capability cards`, metrics);
     assert(metrics.sharedSettingsAccountCardCount >= 8, `${scene.name}: account settings cards should use shared ActivityCard grid structure`, metrics);
+  }
+  if (scene.openSettingsTasks) {
+    assert(metrics.visibleSettingsTaskRowCount >= 3, `${scene.name}: tasks settings should render recent run rows`, metrics);
+    assert(metrics.sharedSettingsTaskRowCount >= 3, `${scene.name}: task rows should use shared ActivityCard grid structure`, metrics);
   }
 
   return { screenshotPath, metrics };
@@ -723,6 +751,15 @@ async function main() {
       language: "en",
       theme: "dark",
       openSettingsAccount: true,
+    },
+    {
+      name: "web-design-settings-tasks-desktop-1440x920",
+      path: "/settings",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openSettingsTasks: true,
     },
     {
       name: "web-design-run-overlay-mobile-390x844",

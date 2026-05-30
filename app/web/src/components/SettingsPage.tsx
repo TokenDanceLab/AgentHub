@@ -1786,56 +1786,66 @@ function TaskRunRow({
   const { t } = useTranslation();
   const timestamp = run.finishedAt ?? run.startedAt ?? run.createdAt;
   return (
-    <div className={styles.taskRow}>
-      <div className={styles.connectionIcon}>
-        <Route size={17} />
-      </div>
-      <div className={styles.settingCopy}>
-        <strong>{shortId(run.runId)}</strong>
-        <span>{run.projectId} / {run.threadId}</span>
-        <div className={styles.taskMeta}>
-          <span>{formatTimestamp(timestamp)}</span>
-        </div>
-      </div>
-      <span className={`${styles.statusPill} ${isActiveRun(run) ? styles.statusPillOn : ''}`}>
-        {t(`run.status.${run.status}`, { defaultValue: run.status })}
+    <ActivityCard
+      className={styles.taskRow}
+      iconClassName={styles.connectionIcon}
+      labelClassName={styles.taskRowLabel}
+      contentClassName={styles.taskRowContent}
+      actionsClassName={styles.taskRowActions}
+      icon={<Route size={17} />}
+      label={shortId(run.runId)}
+      actions={(
+        <>
+          <span className={`${styles.statusPill} ${isActiveRun(run) ? styles.statusPillOn : ''}`}>
+            {t(`run.status.${run.status}`, { defaultValue: run.status })}
+          </span>
+          {onCancel ? (
+            <button
+              type="button"
+              className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
+              onClick={() => onCancel(run.runId)}
+              disabled={cancelling}
+              aria-label={t('settings.taskCancelRun')}
+              title={t('settings.taskCancelRun')}
+            >
+              <XCircle size={15} />
+              {cancelling ? t('settings.taskCancellingRun') : t('settings.taskCancelRun')}
+            </button>
+          ) : null}
+        </>
+      )}
+    >
+      <span className={styles.taskRowDescription}>{run.projectId} / {run.threadId}</span>
+      <span className={styles.taskMeta}>
+        <span>{formatTimestamp(timestamp)}</span>
       </span>
-      {onCancel ? (
-        <button
-          type="button"
-          className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
-          onClick={() => onCancel(run.runId)}
-          disabled={cancelling}
-          aria-label={t('settings.taskCancelRun')}
-          title={t('settings.taskCancelRun')}
-        >
-          <XCircle size={15} />
-          {cancelling ? t('settings.taskCancellingRun') : t('settings.taskCancelRun')}
-        </button>
-      ) : null}
-    </div>
+    </ActivityCard>
   );
 }
 
 function HubTaskRow({ task }: { task: AgentTask }) {
   const { t } = useTranslation();
   return (
-    <div className={styles.taskRow}>
-      <div className={styles.connectionIcon}>
-        <ClipboardList size={17} />
-      </div>
-      <div className={styles.settingCopy}>
-        <strong>{shortId(task.taskId)}</strong>
-        <span>{task.prompt}</span>
-        <div className={styles.taskMeta}>
-          <span>{task.agentId}</span>
-          <span>{task.runId ? shortId(task.runId) : t('settings.taskUnbound')}</span>
-        </div>
-      </div>
-      <span className={`${styles.statusPill} ${isActiveBridgeTask(task) ? styles.statusPillOn : ''}`}>
-        {t(`settings.taskStatus.${task.status}`, { defaultValue: task.status })}
+    <ActivityCard
+      className={styles.taskRow}
+      iconClassName={styles.connectionIcon}
+      labelClassName={styles.taskRowLabel}
+      contentClassName={styles.taskRowContent}
+      actionsClassName={styles.taskRowActions}
+      icon={<ClipboardList size={17} />}
+      label={shortId(task.taskId)}
+      actions={(
+        <span className={`${styles.statusPill} ${isActiveBridgeTask(task) ? styles.statusPillOn : ''}`}>
+          {t(`settings.taskStatus.${task.status}`, { defaultValue: task.status })}
+        </span>
+      )}
+    >
+      <span className={styles.taskRowDescription}>{task.prompt}</span>
+      <span className={styles.taskMeta}>
+        <span>{task.agentId}</span>
+        <span>{task.runId ? shortId(task.runId) : t('settings.taskUnbound')}</span>
       </span>
-    </div>
+    </ActivityCard>
   );
 }
 
@@ -1857,34 +1867,40 @@ function HubExecutionTargetRow({
     : shortId(target.id);
 
   return (
-    <div className={styles.taskRow}>
-      <div className={styles.connectionIcon}>
-        <Server size={17} />
-      </div>
-      <div className={styles.settingCopy}>
-        <strong>{target.name}</strong>
-        <span>{identityLabel}</span>
-        <div className={styles.taskMeta}>
-          <span>{t(`settings.targetType.${target.target_type}`, { defaultValue: target.target_type })}</span>
-          <span>{t(`settings.targetTrust.${target.trust_level}`, { defaultValue: target.trust_level })}</span>
-          <span>{workspaceLabel}</span>
-        </div>
-      </div>
-      <span className={`${styles.statusPill} ${target.is_online ? styles.statusPillOn : ''}`}>
-        {t(`settings.targetHealth.${target.health_state}`, { defaultValue: target.health_state })}
+    <ActivityCard
+      className={styles.taskRow}
+      iconClassName={styles.connectionIcon}
+      labelClassName={styles.taskRowLabel}
+      contentClassName={styles.taskRowContent}
+      actionsClassName={styles.taskRowActions}
+      icon={<Server size={17} />}
+      label={target.name}
+      actions={(
+        <>
+          <span className={`${styles.statusPill} ${target.is_online ? styles.statusPillOn : ''}`}>
+            {t(`settings.targetHealth.${target.health_state}`, { defaultValue: target.health_state })}
+          </span>
+          <button
+            type="button"
+            className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
+            onClick={() => onPing(target.id)}
+            disabled={pinging}
+            aria-label={t('settings.targetPing')}
+            title={t('settings.targetPing')}
+          >
+            <RefreshCw size={15} />
+            {pinging ? t('settings.targetPinging') : t('settings.targetPing')}
+          </button>
+        </>
+      )}
+    >
+      <span className={styles.taskRowDescription}>{identityLabel}</span>
+      <span className={styles.taskMeta}>
+        <span>{t(`settings.targetType.${target.target_type}`, { defaultValue: target.target_type })}</span>
+        <span>{t(`settings.targetTrust.${target.trust_level}`, { defaultValue: target.trust_level })}</span>
+        <span>{workspaceLabel}</span>
       </span>
-      <button
-        type="button"
-        className={`${styles.secondaryBtn} ${styles.taskRowAction}`}
-        onClick={() => onPing(target.id)}
-        disabled={pinging}
-        aria-label={t('settings.targetPing')}
-        title={t('settings.targetPing')}
-      >
-        <RefreshCw size={15} />
-        {pinging ? t('settings.targetPinging') : t('settings.targetPing')}
-      </button>
-    </div>
+    </ActivityCard>
   );
 }
 
