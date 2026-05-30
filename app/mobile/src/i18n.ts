@@ -15,6 +15,8 @@ const resources = {
     translation: {
       common: {
         appName: "AgentHub Mobile",
+        cancel: "Cancel",
+        copied: "Copied",
         actions: {
           retry: "Retry",
           retrying: "Retrying",
@@ -95,6 +97,13 @@ const resources = {
       runDetail: {
         actions: {
           back: "Back to runs",
+          backToQueue: "Back to queue",
+          approve: "Approve",
+          reject: "Reject",
+          copy: "Copy",
+          copyPath: "Copy path",
+          inspect: "Inspect",
+          inspectResource: "Inspect {{label}}",
         },
         header: {
           eyebrow: "Execution detail",
@@ -109,6 +118,9 @@ const resources = {
         },
         summary: {
           review: "Review",
+          reviewValue: "Review",
+          approved: "Approved",
+          rejected: "Rejected",
           blocks: "Blocks",
           outputs: "Outputs",
         },
@@ -125,6 +137,11 @@ const resources = {
           description: "Confirm the checkpoint before this run continues.",
           approved: "Checkpoint approved. The run can continue.",
           rejected: "Checkpoint rejected. The run is held for follow-up.",
+          decisionApproved: "Decision submitted. Hub marked this checkpoint approved.",
+          decisionRejected: "Decision submitted. Hub marked this checkpoint rejected.",
+          lockApproved: "Checkpoint approved",
+          lockRejected: "Checkpoint rejected",
+          missingApproval: "Missing approval",
         },
         diff: {
           title: "{{count}} changed files",
@@ -134,9 +151,36 @@ const resources = {
         },
         outputs: {
           title: "{{count}} outputs",
+          artifact: "Artifact",
+          preview: "Preview",
         },
         logs: {
           title: "Execution logs",
+          filters: {
+            all: "All",
+            review: "Review",
+            diff: "Diff",
+            mobile: "Mobile",
+            error: "Error",
+          },
+        },
+        decisionSheet: {
+          aria: "Confirm approval decision",
+          title: "Confirm approval decision",
+          close: "Close approval decision",
+          approveDescription: "Confirm approve for this checkpoint.",
+          rejectDescription: "Confirm reject for this checkpoint.",
+          confirmApprove: "Confirm approve",
+          confirmReject: "Confirm reject",
+          submitting: "Submitting approval decision to Hub...",
+          error: "Decision was not submitted. Check Hub session and retry.",
+          ready: "Ready to submit decision.",
+        },
+        resourceSheet: {
+          aria: "Output resource details",
+          title: "Output resource details",
+          close: "Close resource details",
+          eyebrow: "Output",
         },
       },
       settings: {
@@ -368,6 +412,8 @@ const resources = {
     translation: {
       common: {
         appName: "AgentHub Mobile",
+        cancel: "取消",
+        copied: "已复制",
         actions: {
           retry: "重试",
           retrying: "重试中",
@@ -448,6 +494,13 @@ const resources = {
       runDetail: {
         actions: {
           back: "返回运行",
+          backToQueue: "返回队列",
+          approve: "通过",
+          reject: "拒绝",
+          copy: "复制",
+          copyPath: "复制路径",
+          inspect: "查看",
+          inspectResource: "查看 {{label}}",
         },
         header: {
           eyebrow: "执行详情",
@@ -462,6 +515,9 @@ const resources = {
         },
         summary: {
           review: "审阅",
+          reviewValue: "审阅",
+          approved: "已通过",
+          rejected: "已拒绝",
           blocks: "块",
           outputs: "输出",
         },
@@ -478,6 +534,11 @@ const resources = {
           description: "确认检查点后，此运行才会继续。",
           approved: "检查点已通过，运行可以继续。",
           rejected: "检查点已拒绝，运行已暂停等待后续处理。",
+          decisionApproved: "决策已提交，Hub 已将此检查点标记为通过。",
+          decisionRejected: "决策已提交，Hub 已将此检查点标记为拒绝。",
+          lockApproved: "检查点已通过",
+          lockRejected: "检查点已拒绝",
+          missingApproval: "缺少审批记录",
         },
         diff: {
           title: "{{count}} 个变更文件",
@@ -487,9 +548,36 @@ const resources = {
         },
         outputs: {
           title: "{{count}} 个输出",
+          artifact: "产物",
+          preview: "预览",
         },
         logs: {
           title: "执行日志",
+          filters: {
+            all: "全部",
+            review: "审阅",
+            diff: "变更",
+            mobile: "移动端",
+            error: "错误",
+          },
+        },
+        decisionSheet: {
+          aria: "确认审批决策",
+          title: "确认审批决策",
+          close: "关闭审批决策",
+          approveDescription: "确认通过此检查点。",
+          rejectDescription: "确认拒绝此检查点。",
+          confirmApprove: "确认通过",
+          confirmReject: "确认拒绝",
+          submitting: "正在向 Hub 提交审批决策...",
+          error: "决策未提交。请检查 Hub 会话后重试。",
+          ready: "可以提交决策。",
+        },
+        resourceSheet: {
+          aria: "输出资源详情",
+          title: "输出资源详情",
+          close: "关闭资源详情",
+          eyebrow: "输出",
         },
       },
       settings: {
