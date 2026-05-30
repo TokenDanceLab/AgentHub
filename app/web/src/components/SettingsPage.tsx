@@ -60,7 +60,7 @@ import {
   getSurfaceStatusMetadata,
   type SurfaceMetadata,
 } from '@shared/surfaceMetadata';
-import { ActivityCard } from '@shared/ui';
+import { ActivityCard, EmptyState, StatusNotice } from '@shared/ui';
 import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
 import styles from './SettingsPage.module.css';
 
@@ -2379,22 +2379,26 @@ function SelectControl({
 
 function Callout({ title, body }: { title: string; body: string }) {
   return (
-    <div className={styles.callout}>
-      <ShieldCheck size={18} />
-      <div>
+    <StatusNotice className={styles.callout ?? ''} iconClassName={styles.calloutIcon ?? ''} contentClassName={styles.calloutContent ?? ''} icon={<ShieldCheck size={18} />}>
+      <>
         <strong>{title}</strong>
         <span>{body}</span>
-      </div>
-    </div>
+      </>
+    </StatusNotice>
   );
 }
 
 function EmptyBlock({ title, description }: { title: string; description: string }) {
   return (
-    <div className={styles.emptyBlock}>
-      <Archive size={24} />
-      <strong>{title}</strong>
-      <span>{description}</span>
-    </div>
+    <EmptyState
+      className={styles.emptyBlock ?? ''}
+      contentClassName={styles.emptyBlockContent ?? ''}
+      iconClassName={styles.emptyBlockIcon ?? ''}
+      titleClassName={styles.emptyBlockTitle ?? ''}
+      descriptionClassName={styles.emptyBlockDescription ?? ''}
+      icon={<Archive size={24} />}
+      title={title}
+      description={description}
+    />
   );
 }

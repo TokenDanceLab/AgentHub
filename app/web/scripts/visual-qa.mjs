@@ -487,6 +487,26 @@ async function collectMetrics(page, { mobile = false } = {}) {
       const directSpanCount = Array.from(row.children).filter((child) => child.tagName === "SPAN").length;
       return style.display === "grid" && directSpanCount >= 3;
     });
+    const settingsEmptyBlocks = Array.from(document.querySelectorAll("[class*='emptyBlock']")).filter((block) =>
+      block.className?.toString().split(/\s+/).some((className) => /emptyBlock_/.test(className))
+    );
+    const visibleSettingsEmptyBlocks = settingsEmptyBlocks.filter((block) => {
+      const rect = block.getBoundingClientRect();
+      const style = window.getComputedStyle(block);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedSettingsEmptyBlocks = visibleSettingsEmptyBlocks.filter((block) =>
+      block.tagName === "SECTION" && block.getAttribute("aria-label")
+    );
+    const settingsCallouts = Array.from(document.querySelectorAll("[class*='callout']")).filter((callout) =>
+      callout.className?.toString().split(/\s+/).some((className) => /callout_/.test(className))
+    );
+    const visibleSettingsCallouts = settingsCallouts.filter((callout) => {
+      const rect = callout.getBoundingClientRect();
+      const style = window.getComputedStyle(callout);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedSettingsCallouts = visibleSettingsCallouts.filter((callout) => callout.getAttribute("role") === "status");
 
     return {
       title: document.title,
@@ -527,6 +547,10 @@ async function collectMetrics(page, { mobile = false } = {}) {
       sharedSettingsTargetCardCount: sharedSettingsTargetCards.length,
       visibleSettingsConnectionRowCount: visibleSettingsConnectionRows.length,
       sharedSettingsConnectionRowCount: sharedSettingsConnectionRows.length,
+      visibleSettingsEmptyBlockCount: visibleSettingsEmptyBlocks.length,
+      sharedSettingsEmptyBlockCount: sharedSettingsEmptyBlocks.length,
+      visibleSettingsCalloutCount: visibleSettingsCallouts.length,
+      sharedSettingsCalloutCount: sharedSettingsCallouts.length,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -684,6 +708,12 @@ async function visitAndCapture(page, scene) {
     await page.getByText("WebSocket", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
     await page.locator("[class*='connectionRow']").first().waitFor({ state: "visible", timeout: 5000 });
   }
+  if (scene.openSettingsArchived) {
+    await page.getByRole("button", { name: /^Archived Chats$/ }).first().click();
+    await page.locator("h1").filter({ hasText: /^Archived Chats$/ }).waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("No archived chats", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator("[class*='emptyBlock']").first().waitFor({ state: "visible", timeout: 5000 });
+  }
 
   const screenshotPath = path.join(outDir, `${scene.name}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -723,6 +753,14 @@ async function visitAndCapture(page, scene) {
   if (scene.openSettingsConnections) {
     assert(metrics.visibleSettingsConnectionRowCount >= 3, `${scene.name}: connections settings should render status rows`, metrics);
     assert(metrics.sharedSettingsConnectionRowCount >= 3, `${scene.name}: connection rows should use shared ActivityCard grid structure`, metrics);
+  }
+  if (scene.openSettingsArchived) {
+    assert(metrics.visibleSettingsEmptyBlockCount >= 1, `${scene.name}: archived settings should render an empty state`, metrics);
+    assert(metrics.sharedSettingsEmptyBlockCount >= 1, `${scene.name}: settings empty block should use shared EmptyState structure`, metrics);
+  }
+  if (scene.expectSettingsCallout) {
+    assert(metrics.visibleSettingsCalloutCount >= 1, `${scene.name}: settings should render guard callouts`, metrics);
+    assert(metrics.sharedSettingsCalloutCount >= 1, `${scene.name}: settings callouts should use shared StatusNotice structure`, metrics);
   }
 
   return { screenshotPath, metrics };
@@ -844,6 +882,7 @@ async function main() {
       language: "en",
       theme: "dark",
       openSettingsSkills: true,
+      expectSettingsCallout: true,
     },
     {
       name: "web-design-settings-targets-desktop-1440x920",
@@ -862,6 +901,15 @@ async function main() {
       language: "en",
       theme: "dark",
       openSettingsConnections: true,
+    },
+    {
+      name: "web-design-settings-archived-empty-desktop-1440x920",
+      path: "/settings",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openSettingsArchived: true,
     },
     {
       name: "web-design-run-overlay-mobile-390x844",
