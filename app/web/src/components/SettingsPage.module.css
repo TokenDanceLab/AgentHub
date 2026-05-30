@@ -284,7 +284,7 @@
 
 .capabilityGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 12px;
 }
 
@@ -292,16 +292,13 @@
 .profileGrid,
 .targetGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 12px;
   margin-bottom: 12px;
 }
 
 .capabilityCard {
-  display: flex;
   min-height: 116px;
-  flex-direction: column;
-  gap: 8px;
   padding: 16px;
   border: 1px solid var(--settings-glass-border);
   border-radius: 10px;
@@ -315,21 +312,26 @@
   color-scheme: dark;
 }
 
-.capabilityCard strong {
+.capabilityMeta {
+  align-items: flex-start;
+}
+
+.capabilityLabel {
   color: var(--foreground);
   font-size: 14px;
   font-weight: 750;
   line-height: 1.25;
+  white-space: normal;
 }
 
-.capabilityCard span {
-  flex: 1;
+.capabilityDescription {
   color: #8e8e93;
   font-size: 13px;
   line-height: 1.42;
 }
 
-.capabilityCard em {
+.capabilityStatus {
+  flex-shrink: 0;
   width: fit-content;
   padding: 4px 8px;
   border-radius: 999px;
@@ -359,8 +361,7 @@
 }
 
 .summaryCard {
-  display: flex;
-  gap: 13px;
+  grid-template-columns: 36px minmax(0, 1fr);
   min-height: 104px;
   padding: 15px;
 }
@@ -378,7 +379,6 @@
   color: #6366f1;
 }
 
-.summaryCard div:last-child,
 .profileHeader div:nth-child(2) {
   display: flex;
   min-width: 0;
@@ -387,7 +387,14 @@
   gap: 4px;
 }
 
-.summaryCard span,
+.summaryBody {
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
+}
+
+.summaryMeta,
 .profileCard span,
 .targetCard span,
 .profileMeta span {
@@ -396,16 +403,17 @@
   line-height: 1.4;
 }
 
-.summaryCard strong,
+.summaryLabel,
 .profileCard strong,
 .targetCard strong {
   color: var(--foreground);
   font-size: 14px;
   font-weight: 750;
   line-height: 1.25;
+  white-space: normal;
 }
 
-.summaryCard small {
+.summaryDetail {
   color: #8e8e93;
   font-size: 12px;
   line-height: 1.35;
