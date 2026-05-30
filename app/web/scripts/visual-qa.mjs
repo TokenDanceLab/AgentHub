@@ -643,6 +643,23 @@ async function collectMetrics(page, { mobile = false } = {}) {
         height: Math.round(rect.height),
       };
     });
+    const mentionPopover = document.querySelector("[role='listbox'][class*='popover']");
+    const mentionPopoverRect = mentionPopover?.getBoundingClientRect();
+    const mentionOptionButtons = mentionPopover
+      ? Array.from(mentionPopover.querySelectorAll("button")).filter((button) => {
+          const rect = button.getBoundingClientRect();
+          const style = window.getComputedStyle(button);
+          return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+        })
+      : [];
+    const mentionOptionButtonRects = mentionOptionButtons.map((button) => {
+      const rect = button.getBoundingClientRect();
+      return {
+        label: button.textContent?.trim().replace(/\s+/g, " ").slice(0, 80),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      };
+    });
 
     return {
       title: document.title,
@@ -713,6 +730,16 @@ async function collectMetrics(page, { mobile = false } = {}) {
       visibleCodeBlockCount: visibleCodeBlocks.length,
       visibleCodeCopyButtonCount: visibleCodeCopyButtons.length,
       codeCopyButtonRects,
+      mentionPopover: mentionPopoverRect
+        ? {
+            left: Math.round(mentionPopoverRect.left),
+            right: Math.round(mentionPopoverRect.right),
+            width: Math.round(mentionPopoverRect.width),
+            height: Math.round(mentionPopoverRect.height),
+          }
+        : null,
+      visibleMentionOptionCount: mentionOptionButtons.length,
+      mentionOptionButtonRects,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -902,6 +929,14 @@ async function visitAndCapture(page, scene) {
     await page.getByRole("menu", { name: "Notifications panel" }).waitFor({ state: "visible", timeout: 5000 });
     await page.getByRole("region", { name: "No notifications yet" }).waitFor({ state: "visible", timeout: 5000 });
   }
+  if (scene.openMentionPopover) {
+    const prompt = page.getByPlaceholder("Type a message, @Agent to mention...");
+    await prompt.waitFor({ state: "visible", timeout: 5000 });
+    await prompt.fill("@");
+    const listbox = page.getByRole("listbox", { name: "Agent suggestions" });
+    await listbox.waitFor({ state: "visible", timeout: 5000 });
+    await listbox.getByRole("button", { name: /Codex/i }).waitFor({ state: "visible", timeout: 5000 });
+  }
 
   const screenshotPath = path.join(outDir, `${scene.name}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -987,6 +1022,19 @@ async function visitAndCapture(page, scene) {
     assert(metrics.visibleNotificationEmptyCount >= 1, `${scene.name}: notifications panel should render an empty state`, metrics);
     assert(metrics.sharedNotificationEmptyCount >= 1, `${scene.name}: notification empty state should use shared EmptyState structure`, metrics);
   }
+  if (scene.openMentionPopover) {
+    assert(metrics.mentionPopover, `${scene.name}: mention popover should be visible`, metrics);
+    assert(metrics.mentionPopover.left >= 0, `${scene.name}: mention popover should not overflow left`, metrics.mentionPopover);
+    assert(metrics.mentionPopover.right <= metrics.innerWidth, `${scene.name}: mention popover should not overflow right`, metrics.mentionPopover);
+    assert(metrics.visibleMentionOptionCount >= 1, `${scene.name}: mention popover should render agent options`, metrics);
+    if (scene.mobile) {
+      assert(
+        metrics.mentionOptionButtonRects.every((button) => button.width >= 44 && button.height >= 44),
+        `${scene.name}: mention option buttons must be 44px mobile targets`,
+        metrics.mentionOptionButtonRects,
+      );
+    }
+  }
   if (scene.expectSettingsCallout) {
     assert(metrics.visibleSettingsCalloutCount >= 1, `${scene.name}: settings should render guard callouts`, metrics);
     assert(metrics.sharedSettingsCalloutCount >= 1, `${scene.name}: settings callouts should use shared StatusNotice structure`, metrics);
@@ -1017,6 +1065,16 @@ async function main() {
       authenticated: true,
       language: "en",
       theme: "dark",
+    },
+    {
+      name: "web-design-mention-popover-mobile-390x844",
+      path: "/",
+      viewport: mobileViewport,
+      mobile: true,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openMentionPopover: true,
     },
     {
       name: "web-design-codeblock-mobile-390x844",

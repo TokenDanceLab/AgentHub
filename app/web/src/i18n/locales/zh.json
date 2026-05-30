@@ -224,6 +224,7 @@
 
   "prompt.agentSelector": "选择代理",
   "prompt.activeGoal": "进行中的目标",
+  "prompt.agentSuggestions": "Agent 建议",
   "prompt.attachCustom": "添加自定义附件",
   "prompt.clearGoal": "清除目标",
   "prompt.editGoal": "编辑目标",
