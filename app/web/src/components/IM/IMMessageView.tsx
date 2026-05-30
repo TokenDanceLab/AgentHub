@@ -1,6 +1,7 @@
 import { useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MessageBubble } from '@shared/ui';
+import { MessageSquareText } from 'lucide-react';
+import { EmptyState, MessageBubble } from '@shared/ui';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import type { IMMessage } from './types';
 import styles from './IMMessageView.module.css';
@@ -117,10 +118,16 @@ const IMMessageView = memo(function IMMessageView({
   if (messages.length === 0) {
     return (
       <div className={styles.root}>
-        <div className={styles.empty}>
-          <span>{t('im.message.emptyTitle')}</span>
-          <span>{t('im.message.emptyDescription')}</span>
-        </div>
+        <EmptyState
+          className={styles.empty ?? ''}
+          iconClassName={styles.emptyIcon ?? ''}
+          titleClassName={styles.emptyTitle ?? ''}
+          descriptionClassName={styles.emptyDescription ?? ''}
+          icon={<MessageSquareText size={20} />}
+          title={t('im.message.emptyTitle')}
+          description={t('im.message.emptyDescription')}
+          titleLevel={3}
+        />
       </div>
     );
   }
