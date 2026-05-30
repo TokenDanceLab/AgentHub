@@ -387,7 +387,7 @@
 }
 
 .summaryMeta,
-.targetCard span,
+.targetDescription,
 .profileMeta span {
   color: #8e8e93;
   font-size: 13px;
@@ -396,7 +396,7 @@
 
 .summaryLabel,
 .profileTitle,
-.targetCard strong {
+.targetTitle {
   color: var(--foreground);
   font-size: 14px;
   font-weight: 750;
@@ -465,7 +465,7 @@
 }
 
 .profileMeta span,
-.targetCard em {
+.targetMetric {
   width: fit-content;
   max-width: 100%;
   overflow: hidden;
@@ -479,21 +479,23 @@
 }
 
 .targetCard {
-  display: flex;
+  grid-template-columns: 36px minmax(0, 1fr);
   min-height: 156px;
-  flex-direction: column;
-  gap: 9px;
   padding: 15px;
 }
 
-.targetTop {
+.targetContent {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  min-width: 0;
+  flex-direction: column;
+  gap: 9px;
 }
 
-.targetCard em {
+.targetActions {
+  align-self: start;
+}
+
+.targetMetric {
   margin-top: auto;
   color: var(--foreground);
   font-size: 12px;
@@ -723,7 +725,18 @@
 .settingRow,
 .connectionRow,
 .runnerRow,
-.taskRow,
+.taskRow {
+  align-items: center;
+  gap: 10px 16px;
+  min-height: 66px;
+  padding: 14px 16px;
+  border: 1px solid var(--settings-glass-border);
+  background: var(--settings-glass-bg);
+  border-radius: 10px;
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+}
+
 .accountCard {
   display: flex;
   align-items: center;
@@ -835,6 +848,37 @@
   grid-column: 2;
   flex-wrap: wrap;
   justify-content: flex-start;
+}
+
+.settingContent {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.settingActions {
+  flex-shrink: 0;
+  justify-content: flex-end;
+}
+
+.settingTitle {
+  overflow: visible;
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 700;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.settingDescription {
+  min-width: 0;
+  color: #8e8e93;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .settingCopy,
@@ -1258,7 +1302,10 @@
   .settingRow,
   .connectionRow,
   .runnerRow,
-  .taskRow,
+  .taskRow {
+    align-items: flex-start;
+  }
+
   .accountCard {
     align-items: flex-start;
     flex-wrap: wrap;
