@@ -20,6 +20,14 @@
   gap: var(--space-md);
 }
 
+.messageItem {
+  min-width: 0;
+}
+
+.messageRow {
+  min-width: 0;
+}
+
 /* ── Message bubble ──────────────────────── */
 
 .bubble {
@@ -36,7 +44,7 @@
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 0.58),
     0 12px 28px oklch(0.24 0.012 250 / 0.08);
-  animation: bubbleIn 0.2s var(--ease-out);
+  opacity: 1;
   backdrop-filter: blur(18px) saturate(1.18);
   -webkit-backdrop-filter: blur(18px) saturate(1.18);
 }
@@ -54,21 +62,27 @@
 }
 
 /* User message — right aligned */
-.userRow {
-  align-items: flex-end;
-}
-
 .userBubble {
   background: oklch(0.56 0.13 252 / 0.7);
   color: var(--primary-foreground);
   border-bottom-right-radius: 4px;
 }
 
-/* Agent message — left aligned */
-.agentRow {
-  align-items: flex-start;
+.userBubble .senderName,
+.userBubble .senderRow time,
+.userBubble .content {
+  color: var(--primary-foreground);
 }
 
+.userBubble .senderName {
+  opacity: 0.82;
+}
+
+.userBubble .senderRow time {
+  opacity: 0.58;
+}
+
+/* Agent message — left aligned */
 .agentBubble {
   background: oklch(1 0 0 / 0.52);
   color: var(--foreground);
@@ -79,27 +93,20 @@
   background: oklch(0.25 0.009 250 / 0.58);
 }
 
-/* ── Authority color band ────────────────── */
-
-.authorityBand {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 3px 0 0 3px;
+.agentBubble .content {
+  color: var(--foreground);
 }
 
-.authorityHub {
-  background: var(--brand);
+.bubbleHub {
+  border-color: color-mix(in oklch, var(--brand) 18%, oklch(1 0 0 / 0.12));
 }
 
-.authorityEdge {
-  background: var(--success);
+.bubbleEdge {
+  border-color: color-mix(in oklch, var(--success) 20%, oklch(1 0 0 / 0.12));
 }
 
-.authorityHybrid {
-  background: var(--warning);
+.bubbleHybrid {
+  border-color: color-mix(in oklch, var(--warning) 24%, oklch(1 0 0 / 0.12));
 }
 
 /* ── Sender header ───────────────────────── */
@@ -109,6 +116,10 @@
   align-items: center;
   gap: var(--space-xs);
   margin-bottom: 2px;
+}
+
+.senderRow strong {
+  display: contents;
 }
 
 .avatar {
@@ -166,12 +177,11 @@
 
 /* ── Timestamp ───────────────────────────── */
 
-.timestamp {
+.senderRow time {
   font-size: 10px;
   color: var(--foreground);
   opacity: 0.4;
-  margin-top: 4px;
-  align-self: flex-end;
+  margin-left: auto;
 }
 
 /* ── Recalled message ────────────────────── */
@@ -184,12 +194,15 @@
 /* ── Markdown content ────────────────────── */
 
 .content {
+  color: inherit;
   font-size: var(--font-size-sm);
   line-height: 1.6;
 }
 
 .content p {
   margin: 0;
+  color: inherit;
+  opacity: 1;
 }
 
 .content p + p {
