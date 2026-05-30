@@ -982,6 +982,12 @@ await page.waitForTimeout(150);
 results.push(["mobile-design-chat-empty-cta-mocked-dark.png", await snapshot(page, "mobile-design-chat-empty-cta-mocked-dark.png")]);
 await page.getByRole("button", { name: "Browse threads" }).click();
 await page.waitForTimeout(150);
+await page.getByRole("button", { name: /Runtime bridge smoke follow-up.*agenthub-desktop/ }).click();
+await page.locator("section.mobileCenterState[aria-label='No messages in this thread']").waitFor({ timeout: 5000 });
+await page.getByRole("heading", { name: "No messages in this thread" }).waitFor({ timeout: 5000 });
+results.push(["mobile-design-chat-empty-thread-mocked-dark.png", await snapshot(page, "mobile-design-chat-empty-thread-mocked-dark.png")]);
+await page.getByRole("button", { name: "Back to threads" }).click();
+await page.waitForTimeout(150);
 
 await page.getByRole("button", { name: /Review approval copy on mobile.*agenthub-mobile/ }).click();
 await page.waitForTimeout(250);
