@@ -7,7 +7,7 @@ import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search,
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
 import MarkdownRenderer from './MarkdownRenderer';
 import CodeBlock from './CodeBlock';
-import { DisclosureRow, EmptyState } from '@shared/ui';
+import { CodePreviewCard, DisclosureRow, EmptyState } from '@shared/ui';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
@@ -231,13 +231,26 @@ function StatusRow({
 function DiffCard({ diff }: { diff: FileDiff }) {
   const { t } = useTranslation();
   const totalLines = diff.hunks.reduce((sum, h) => sum + h.lines.length, 0);
+  const previewLines = diff.hunks
+    .slice(0, 3)
+    .flatMap((h) => h.lines)
+    .slice(0, 15)
+    .map((line) => `${line.type === 'added' ? '+' : line.type === 'deleted' ? '-' : ' '} ${line.content}`);
+  const hiddenLineCount = Math.max(totalLines - previewLines.length, 0);
 
   return (
-    <div className={styles.diffCard}>
-      <div className={styles.diffCardHeader}>
-        <code>{diff.filePath}</code>
-        <span className={styles.diffAdded}>+{diff.additions}</span>
-        <span className={styles.diffDeleted}>-{diff.deletions}</span>
+    <CodePreviewCard
+      className={styles.diffCard ?? ''}
+      headerClassName={styles.diffCardHeader ?? ''}
+      titleClassName={styles.diffCardTitle ?? ''}
+      metaClassName={styles.diffStats ?? ''}
+      bodyClassName={styles.diffInline ?? ''}
+      lineClassName={styles.diffLine ?? ''}
+      actionsClassName={styles.diffActions ?? ''}
+      title={diff.filePath}
+      meta={`+${diff.additions} -${diff.deletions}`}
+      code={[...previewLines, ...(hiddenLineCount > 0 ? [`... ${hiddenLineCount} more lines`] : [])].join('\n')}
+      actions={(
         <button
           className={styles.viewFullDiff}
           onClick={() =>
@@ -248,52 +261,25 @@ function DiffCard({ diff }: { diff: FileDiff }) {
         >
           {t('chat.viewFullDiff')} →
         </button>
-      </div>
-      <div className={styles.diffInline}>
-        {diff.hunks
-          .slice(0, 3)
-          .flatMap((h) => h.lines)
-          .slice(0, 15)
-          .map((line, i) => (
-            <div
-              key={i}
-              className={
-                line.type === 'added'
-                  ? styles.lineAdded
-                  : line.type === 'deleted'
-                    ? styles.lineDeleted
-                    : styles.lineContext
-              }
-            >
-              <span className={styles.linePrefix}>
-                {line.type === 'added' ? '+' : line.type === 'deleted' ? '-' : ' '}
-              </span>
-              {line.content}
-            </div>
-          ))}
-        {totalLines > 15 && (
-          <div className={styles.diffTruncated}>... {totalLines - 15} more lines</div>
-        )}
-      </div>
-    </div>
+      )}
+    />
   );
 }
 
 // ── FileChangeBlock ─────────────────────────
 function FileChangeBlock({ block }: { block: Extract<MessageBlock, { kind: 'file_change' }> }) {
-  const actionClass =
-    block.action === 'created'
-      ? styles.added
-      : block.action === 'deleted'
-        ? styles.removed
-        : styles.modified;
+  const { t } = useTranslation();
   return (
-    <details className={`${styles.fileCard} ${actionClass}`}>
-      <summary>
-        {block.action} — <code>{block.path}</code>
-      </summary>
-      {block.diff && <pre className={styles.diff}>{block.diff.slice(0, 5000)}</pre>}
-    </details>
+    <CodePreviewCard
+      className={styles.fileCard ?? ''}
+      headerClassName={styles.fileCardHeader ?? ''}
+      titleClassName={styles.fileCardTitle ?? ''}
+      metaClassName={styles.fileCardMeta ?? ''}
+      bodyClassName={styles.diff ?? ''}
+      title={block.path}
+      meta={t(`chat.fileAction.${block.action}`)}
+      code={block.diff?.slice(0, 5000) ?? t('chat.fileAction.noPreview')}
+    />
   );
 }
 
