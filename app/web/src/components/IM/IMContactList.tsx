@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, memo } from 'react';
-import { Plus } from 'lucide-react';
+import { MessageSquare, Plus, SearchX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { EmptyState } from '@shared/ui';
 import type { IMContact } from './types';
 import styles from './IMContactList.module.css';
 
@@ -97,11 +98,18 @@ const IMContactList = memo(function IMContactList({
         />
       </div>
 
-      <div className={styles.list} role="listbox" aria-label={t('im.contact.title')}>
+      <div className={styles.list} role={filtered.length === 0 ? undefined : 'listbox'} aria-label={filtered.length === 0 ? undefined : t('im.contact.title')}>
         {filtered.length === 0 ? (
-          <div className={styles.empty}>
-            {search ? t('im.contact.noMatch') : t('im.contact.empty')}
-          </div>
+          <EmptyState
+            className={styles.empty ?? ''}
+            iconClassName={styles.emptyIcon ?? ''}
+            titleClassName={styles.emptyTitle ?? ''}
+            descriptionClassName={styles.emptyDescription ?? ''}
+            icon={search ? <SearchX size={18} /> : <MessageSquare size={18} />}
+            title={search ? t('im.contact.noMatch') : t('im.contact.empty')}
+            description={search ? t('im.contact.noMatchDescription') : t('im.contact.emptyDescription')}
+            titleLevel={3}
+          />
         ) : (
           filtered.map((contact) => (
             <div

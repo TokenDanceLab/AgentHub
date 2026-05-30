@@ -177,16 +177,35 @@
 }
 
 .empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-xl);
-  gap: var(--space-xs);
-  color: var(--foreground);
-  opacity: 0.4;
-  font-size: var(--font-size-xs);
-  text-align: center;
+  max-width: none;
+  min-height: 148px;
+  margin: var(--space-sm) var(--space-md);
+  padding: var(--space-lg) var(--space-sm);
+  border: 1px solid oklch(0.84 0.008 250 / 0.42);
+  border-radius: 8px;
+  background: oklch(1 0 0 / 0.24);
+}
+
+.emptyIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+}
+
+.emptyTitle {
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+}
+
+.emptyDescription {
+  max-width: 210px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+[data-theme='dark'] .empty {
+  border-color: oklch(1 0 0 / 0.08);
+  background: oklch(0.24 0.009 250 / 0.4);
 }
 
 /* Add contact form */
