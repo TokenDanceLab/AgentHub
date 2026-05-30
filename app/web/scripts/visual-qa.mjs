@@ -99,6 +99,16 @@ const messages = [
     created_at: "2026-05-30T01:21:00Z",
   },
   {
+    id: "msg_code_block",
+    session_id: "session_web_design",
+    sender_id: "profile_codex",
+    sender_type: "agent",
+    content_type: "code",
+    content: "export function glassSurface() {\n  return 'desktop-aligned';\n}",
+    seq_id: 3,
+    created_at: "2026-05-30T01:21:30Z",
+  },
+  {
     id: "msg_session_init",
     session_id: "session_web_design",
     sender_id: "profile_codex",
@@ -112,7 +122,7 @@ const messages = [
         permissionMode: "approval",
       },
     }),
-    seq_id: 3,
+    seq_id: 4,
     created_at: "2026-05-30T01:22:00Z",
   },
   {
@@ -125,7 +135,7 @@ const messages = [
       success: true,
       tokenUsage: { input: 1420, output: 318 },
     }),
-    seq_id: 4,
+    seq_id: 5,
     created_at: "2026-05-30T01:23:00Z",
   },
   {
@@ -140,7 +150,7 @@ const messages = [
       input: { command: "pnpm visual:qa" },
       status: "running",
     }),
-    seq_id: 5,
+    seq_id: 6,
     created_at: "2026-05-30T01:24:00Z",
   },
   {
@@ -155,7 +165,7 @@ const messages = [
       output: "Web visual QA passed (10 scenes)",
       status: "completed",
     }),
-    seq_id: 6,
+    seq_id: 7,
     created_at: "2026-05-30T01:25:00Z",
   },
   {
@@ -173,7 +183,7 @@ const messages = [
         "+ <CodePreviewCard title={block.path} code={block.diff} />",
       ].join("\n"),
     }),
-    seq_id: 7,
+    seq_id: 8,
     created_at: "2026-05-30T01:26:00Z",
   },
 ];
@@ -598,6 +608,31 @@ async function collectMetrics(page, { mobile = false } = {}) {
       const directSpanCount = Array.from(item.children).filter((child) => child.tagName === "SPAN").length;
       return item.tagName === "ARTICLE" && style.display === "grid" && directSpanCount >= 2;
     });
+    const codeBlocks = Array.from(document.querySelectorAll("[class*='wrapper']")).filter((block) =>
+      block.className?.toString().split(/\s+/).some((className) => /wrapper_/.test(className)) &&
+      block.querySelector("[class*='copyBtn']")
+    );
+    const visibleCodeBlocks = codeBlocks.filter((block) => {
+      const rect = block.getBoundingClientRect();
+      const style = window.getComputedStyle(block);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const codeCopyButtons = visibleCodeBlocks
+      .map((block) => block.querySelector("[class*='copyBtn']"))
+      .filter(Boolean);
+    const visibleCodeCopyButtons = codeCopyButtons.filter((button) => {
+      const rect = button.getBoundingClientRect();
+      const style = window.getComputedStyle(button);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const codeCopyButtonRects = visibleCodeCopyButtons.map((button) => {
+      const rect = button.getBoundingClientRect();
+      return {
+        label: button.getAttribute("aria-label"),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      };
+    });
 
     return {
       title: document.title,
@@ -663,6 +698,9 @@ async function collectMetrics(page, { mobile = false } = {}) {
       sharedNotificationEmptyCount: sharedNotificationEmptyBlocks.length,
       visibleNotificationItemCount: notificationItems.length,
       sharedNotificationItemCount: sharedNotificationItems.length,
+      visibleCodeBlockCount: visibleCodeBlocks.length,
+      visibleCodeCopyButtonCount: visibleCodeCopyButtons.length,
+      codeCopyButtonRects,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -735,6 +773,7 @@ async function visitAndCapture(page, scene) {
     if ((await targetThread.count()) > 0) {
       await targetThread.first().click();
     }
+    await page.getByText("desktop-aligned").waitFor({ state: "visible", timeout: 5000 });
     await page.getByText("Session initialized — gpt-5").waitFor({ state: "visible", timeout: 5000 });
     await page.getByText("Completed — 1420 in / 318 out tokens").waitFor({ state: "visible", timeout: 5000 });
   }
@@ -877,6 +916,17 @@ async function visitAndCapture(page, scene) {
     assert(metrics.searchDialog, `${scene.name}: search dialog should be visible`, metrics);
     assert(metrics.visibleSearchResultButtonCount >= 1, `${scene.name}: search results should render as selectable rows`, metrics);
   }
+  if (scene.selectThread) {
+    assert(metrics.visibleCodeBlockCount >= 1, `${scene.name}: code messages should render through CodeBlock`, metrics);
+    assert(metrics.visibleCodeCopyButtonCount >= 1, `${scene.name}: code blocks should expose a copy button`, metrics);
+    if (scene.mobile) {
+      assert(
+        metrics.codeCopyButtonRects.every((button) => button.width >= 44 && button.height >= 44),
+        `${scene.name}: code copy buttons must be 44px mobile targets`,
+        metrics.codeCopyButtonRects,
+      );
+    }
+  }
   if (scene.openSettingsAccount) {
     assert(metrics.visibleSettingsAccountCardCount >= 8, `${scene.name}: account settings should render dense summary/capability cards`, metrics);
     assert(metrics.sharedSettingsAccountCardCount >= 8, `${scene.name}: account settings cards should use shared ActivityCard grid structure`, metrics);
@@ -954,6 +1004,16 @@ async function main() {
       authenticated: true,
       language: "en",
       theme: "dark",
+    },
+    {
+      name: "web-design-codeblock-mobile-390x844",
+      path: "/",
+      viewport: mobileViewport,
+      mobile: true,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      selectThread: true,
     },
     {
       name: "web-design-notifications-mobile-390x844",
