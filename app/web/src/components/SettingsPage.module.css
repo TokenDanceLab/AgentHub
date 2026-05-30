@@ -571,7 +571,6 @@
 .modelAliasRow,
 .providerRow {
   min-width: 0;
-  padding: 14px;
   border: 1px solid var(--settings-glass-border);
   border-radius: 10px;
   background: var(--settings-glass-bg);
@@ -580,51 +579,39 @@
   -webkit-backdrop-filter: blur(20px) saturate(1.14);
 }
 
-.modelAliasHead,
-.providerMain {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+.modelAliasRow {
+  align-items: start;
+  gap: 10px 16px;
+  min-height: 118px;
+  padding: 14px 16px;
 }
 
-.modelAliasHead > div:first-child,
-.providerMain > .settingCopy {
+.providerRow {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px 16px;
+  min-height: 144px;
+  padding: 14px 16px;
+}
+
+.modelAliasContent,
+.providerContent {
   display: flex;
   min-width: 0;
-  flex: 1;
   flex-direction: column;
-  gap: 4px;
-}
-
-.modelAliasHead strong,
-.providerMain strong {
-  color: var(--foreground);
-  font-size: 14px;
-  font-weight: 750;
-}
-
-.modelAliasHead span,
-.providerMain span {
-  min-width: 0;
-  overflow: hidden;
-  color: #8e8e93;
-  font-size: 13px;
-  line-height: 1.4;
-  text-overflow: ellipsis;
+  gap: 8px;
 }
 
 .modelAliasControls,
 .providerControls {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 128px), 1fr));
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 2px;
 }
 
 .providerControls {
-  grid-template-columns: minmax(140px, 0.35fr) minmax(0, 1fr);
+  grid-template-columns: 1fr;
 }
 
 .modelAliasControls label,
@@ -646,7 +633,7 @@
 }
 
 .textInput {
-  min-height: 34px;
+  min-height: 44px;
   padding: 8px 12px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 9px;
@@ -1349,10 +1336,20 @@
     flex-wrap: wrap;
   }
 
-  .modelAliasHead,
-  .providerMain {
+  .modelAliasRow,
+  .providerRow {
+    grid-template-columns: minmax(0, 1fr);
     align-items: flex-start;
-    flex-wrap: wrap;
+  }
+
+  .providerRow {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .modelAliasRow > .settingActions,
+  .providerRow > .settingActions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
   }
 
   .modelAliasControls,
