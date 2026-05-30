@@ -421,6 +421,20 @@ async function collectMetrics(page, { mobile = false } = {}) {
       const style = window.getComputedStyle(button);
       return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
     });
+    const settingsAccountCards = Array.from(document.querySelectorAll("[class*='summaryCard'], [class*='capabilityCard']"));
+    const visibleSettingsAccountCards = settingsAccountCards.filter((card) => {
+      const rect = card.getBoundingClientRect();
+      const style = window.getComputedStyle(card);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const sharedSettingsAccountCards = visibleSettingsAccountCards.filter((card) => {
+      const style = window.getComputedStyle(card);
+      const hasSharedBody = Array.from(card.children).some((child) => {
+        const childStyle = window.getComputedStyle(child);
+        return child.tagName === "SPAN" && childStyle.display === "grid";
+      });
+      return style.display === "grid" && hasSharedBody;
+    });
 
     return {
       title: document.title,
@@ -451,6 +465,8 @@ async function collectMetrics(page, { mobile = false } = {}) {
           }
         : null,
       visibleSearchResultButtonCount: visibleSearchResultButtons.length,
+      visibleSettingsAccountCardCount: visibleSettingsAccountCards.length,
+      sharedSettingsAccountCardCount: sharedSettingsAccountCards.length,
       authSheet: authRect && authStyle
         ? {
             width: Math.round(authRect.width),
@@ -575,6 +591,12 @@ async function visitAndCapture(page, scene) {
   if (scene.emptyAgents) {
     await page.getByText("No runtimes available").waitFor({ state: "visible", timeout: 5000 });
   }
+  if (scene.openSettingsAccount) {
+    await page.getByRole("button", { name: /Account|账号/ }).first().click();
+    await page.locator("h1").filter({ hasText: /Account|账号/ }).waitFor({ state: "visible", timeout: 5000 });
+    await page.getByText("TokenDance ID", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator("[class*='summaryCard'], [class*='capabilityCard']").first().waitFor({ state: "visible", timeout: 5000 });
+  }
 
   const screenshotPath = path.join(outDir, `${scene.name}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -594,6 +616,10 @@ async function visitAndCapture(page, scene) {
   if (scene.openSearch) {
     assert(metrics.searchDialog, `${scene.name}: search dialog should be visible`, metrics);
     assert(metrics.visibleSearchResultButtonCount >= 1, `${scene.name}: search results should render as selectable rows`, metrics);
+  }
+  if (scene.openSettingsAccount) {
+    assert(metrics.visibleSettingsAccountCardCount >= 8, `${scene.name}: account settings should render dense summary/capability cards`, metrics);
+    assert(metrics.sharedSettingsAccountCardCount >= 8, `${scene.name}: account settings cards should use shared ActivityCard grid structure`, metrics);
   }
 
   return { screenshotPath, metrics };
@@ -688,6 +714,15 @@ async function main() {
       authenticated: true,
       language: "zh",
       theme: "dark",
+    },
+    {
+      name: "web-design-settings-account-desktop-1440x920",
+      path: "/settings",
+      viewport: desktopViewport,
+      authenticated: true,
+      language: "en",
+      theme: "dark",
+      openSettingsAccount: true,
     },
     {
       name: "web-design-run-overlay-mobile-390x844",
