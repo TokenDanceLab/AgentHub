@@ -39,6 +39,25 @@ describe('SelectableRow', () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
+  it('supports disabled selectable rows', () => {
+    const onSelect = vi.fn();
+
+    render(
+      <SelectableRow
+        title="Claude Code"
+        disabled
+        ariaLabel="Claude Code"
+        onSelect={onSelect}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: 'Claude Code' });
+    fireEvent.click(button);
+
+    expect(button).toBeDisabled();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it('accepts consuming app class overrides', () => {
     render(
       <SelectableRow
