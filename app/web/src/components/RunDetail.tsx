@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileText, TerminalSquare, Wrench } from 'lucide-react';
 import { ActivityCard, DisclosureRow } from '@shared/ui';
@@ -96,6 +96,36 @@ function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
         <pre className={styles.toolCallOutput}>{tc.output.slice(0, 5000)}</pre>
       ) : null}
     </DisclosureRow>
+  );
+}
+
+function RunDetailSection({
+  icon,
+  title,
+  count,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  count?: number;
+  children: ReactNode;
+}) {
+  return (
+    <ActivityCard
+      className={styles.cardSection}
+      icon={icon}
+      iconClassName={styles.cardSectionIcon}
+      label={title}
+      labelClassName={styles.cardSectionTitle}
+      bodyClassName={styles.cardSectionBody}
+      metaClassName={styles.cardSectionHeader}
+      contentClassName={styles.cardSectionContent}
+      actionsClassName={styles.cardSectionActions}
+      actions={typeof count === 'number' ? <span className={styles.cardCount}>{count}</span> : undefined}
+      contentAs="div"
+    >
+      {children}
+    </ActivityCard>
   );
 }
 
@@ -213,37 +243,23 @@ export default function RunDetail({
       {hasAnyContent && (
         <div className={styles.tabContent}>
           {hasOutput && (
-            <section className={styles.cardSection}>
-              <div className={styles.cardHeader}>
-                <TerminalSquare size={14} />
-                <span>{t('run.output')}</span>
-              </div>
+            <RunDetailSection icon={<TerminalSquare size={14} />} title={t('run.output')}>
               <pre className={styles.output}>{outputText}</pre>
-            </section>
+            </RunDetailSection>
           )}
 
           {hasToolCalls && (
-            <section className={styles.cardSection}>
-              <div className={styles.cardHeader}>
-                <Wrench size={14} />
-                <span>{t('run.toolCalls')}</span>
-                <span className={styles.cardCount}>{toolCalls.length}</span>
-              </div>
+            <RunDetailSection icon={<Wrench size={14} />} title={t('run.toolCalls')} count={toolCalls.length}>
               <div className={styles.list}>
                 {latestTools.map((tc) => (
                   <ToolCallItem key={tc.callId} tc={tc} />
                 ))}
               </div>
-            </section>
+            </RunDetailSection>
           )}
 
           {hasFileChanges && (
-            <section className={styles.cardSection}>
-              <div className={styles.cardHeader}>
-                <FileText size={14} />
-                <span>{t('run.fileChanges')}</span>
-                <span className={styles.cardCount}>{changedFiles.length}</span>
-              </div>
+            <RunDetailSection icon={<FileText size={14} />} title={t('run.fileChanges')} count={changedFiles.length}>
               <div className={styles.sourceList}>
                 {latestFiles.map((f) => (
                   <ActivityCard
@@ -257,18 +273,13 @@ export default function RunDetail({
                   />
                 ))}
               </div>
-            </section>
+            </RunDetailSection>
           )}
 
           {diffs && diffs.length > 0 && (
-            <section className={styles.cardSection}>
-              <div className={styles.cardHeader}>
-                <FileText size={14} />
-                <span>{t('run.preview')}</span>
-                <span className={styles.cardCount}>{diffs.length}</span>
-              </div>
+            <RunDetailSection icon={<FileText size={14} />} title={t('run.preview')} count={diffs.length}>
               <DiffViewer files={diffs} />
-            </section>
+            </RunDetailSection>
           )}
         </div>
       )}
