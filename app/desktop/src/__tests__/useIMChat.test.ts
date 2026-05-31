@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useIMChat } from '@/hooks/useIMChat';
+import { useNotificationStore } from '@/stores/notificationStore';
 import type { HubClient } from '@/api/hubClient';
 import type { HubWSHandle } from '@/api/hubWS';
 import type { HubEventType } from '@shared/hubEvents';
@@ -168,6 +169,7 @@ describe('useIMChat', () => {
     authenticated = true;
     addToast.mockClear();
     vi.clearAllMocks();
+    useNotificationStore.getState().clearAll();
   });
 
   it('loads contacts and sessions as Hub conversation rows', async () => {
@@ -531,6 +533,23 @@ describe('useIMChat', () => {
 
     expect(hubClient.readAllNotifications).toHaveBeenCalled();
     expect(result.current.notifications[0]?.read).toBe(true);
+    expect(useNotificationStore.getState().unreadCount).toBe(0);
+  });
+
+  it('mirrors Hub notifications into the desktop notification badge', async () => {
+    const ws = createMockHubWS();
+    const hubClient = createMockHubClient();
+
+    renderHook(() => useIMChat({ hubClient, hubWS: ws }));
+
+    await waitFor(() => expect(useNotificationStore.getState().notifications).toHaveLength(1));
+    expect(useNotificationStore.getState().notifications[0]).toMatchObject({
+      id: 'hub:notif-1',
+      type: 'message',
+      title: 'Mention',
+      read: false,
+    });
+    expect(useNotificationStore.getState().unreadCount).toBe(1);
   });
 
   it('marks a loaded session read through Hub using the latest sequence', async () => {
