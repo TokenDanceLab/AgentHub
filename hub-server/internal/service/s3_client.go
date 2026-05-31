@@ -2,13 +2,16 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
 
 	"github.com/agenthub/hub-server/internal/config"
 )
@@ -19,10 +22,11 @@ func NewS3StorageFromConfig(ctx context.Context, cfg config.S3Config) (*S3Storag
 	if region == "" {
 		region = "us-east-1"
 	}
+	endpoint := normalizeS3Endpoint(cfg.Endpoint, cfg.UseSSL)
 
 	resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		return aws.Endpoint{
-			URL:               cfg.Endpoint,
+			URL:               endpoint,
 			SigningRegion:     region,
 			HostnameImmutable: true,
 		}, nil
@@ -42,14 +46,18 @@ func NewS3StorageFromConfig(ctx context.Context, cfg config.S3Config) (*S3Storag
 	})
 
 	return NewS3Storage(
-		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) error {
+		func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error) {
 			_, err := client.PutObject(ctx, &s3.PutObjectInput{
 				Bucket:      aws.String(bucket),
 				Key:         aws.String(key),
 				Body:        body,
 				ContentType: aws.String(contentType),
+				IfNoneMatch: aws.String("*"),
 			})
-			return err
+			if isS3ObjectAlreadyExists(err) {
+				return false, nil
+			}
+			return err == nil, err
 		},
 		func(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
 			out, err := client.GetObject(ctx, &s3.GetObjectInput{
@@ -70,4 +78,30 @@ func NewS3StorageFromConfig(ctx context.Context, cfg config.S3Config) (*S3Storag
 		},
 		cfg.Bucket,
 	), nil
+}
+
+func normalizeS3Endpoint(endpoint string, useSSL bool) string {
+	endpoint = strings.TrimSpace(endpoint)
+	if strings.Contains(endpoint, "://") {
+		return endpoint
+	}
+	scheme := "http"
+	if useSSL {
+		scheme = "https"
+	}
+	return scheme + "://" + endpoint
+}
+
+func isS3ObjectAlreadyExists(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		switch apiErr.ErrorCode() {
+		case "PreconditionFailed", "PreconditionFailedException":
+			return true
+		}
+	}
+	return false
 }

@@ -115,18 +115,22 @@ macOS/Linux:
 
 ### 启动 Edge Server
 
+Mock/smoke 模式：
+
 ```powershell
 cd edge-server
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --agent-default claude-code
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile agenthub-runner-mock
 ```
 
-常用 Runtime 切换：
+真实 Runtime preset：
 
 ```powershell
-go run ./cmd/agenthub-edge --agent-default claude-code
-go run ./cmd/agenthub-edge --agent-default codex
-go run ./cmd/agenthub-edge --agent-default opencode
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile codex
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile opencode
 ```
+
+`--runner-profile` 选择实际 executor/runtime command preset；`--agent-default` 只是在 run 未指定 agent 时选择默认 adapter ID，不会单独启动 Claude Code、Codex 或 OpenCode CLI。
 
 ### 启动 Desktop
 
@@ -194,6 +198,7 @@ AgentHub/
 | [功能实现文档](docs/architecture/implementation-guide.md) | 实现顺序、接口更新规则、Adapter 细节和验收命令 |
 | [客户端路线图](docs/operations/client-roadmap.md) | Desktop/Edge 客户端方向阶段任务和验收 |
 | [API 契约](api/) | REST API 和 WebSocket typed events 的契约入口 |
+| [安全风险台账](docs/governance/security-risk-register.md) | AgentHub 风险 ID、严重度、状态、证据和下一步 |
 | [调研索引](docs/reference/) | 跨仓库调研和工程规格 |
 | [调研与历史归档](docs/archive/) | 旧版架构、协议、memory、workspace 等历史材料 |
 

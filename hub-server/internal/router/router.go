@@ -1,6 +1,8 @@
 package router
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/cache"
@@ -18,6 +20,18 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 	r.Use(middleware.AccessLog())
 	r.Use(middleware.PrometheusMiddleware())
 	r.Use(middleware.Timeout(config.DefaultRequestTimeout))
+	r.NoRoute(func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    "NOT_FOUND",
+			"message": "route not found",
+		})
+	})
+	r.NoMethod(func(c *gin.Context) {
+		c.JSON(http.StatusMethodNotAllowed, gin.H{
+			"code":    "METHOD_NOT_ALLOWED",
+			"message": "method not allowed",
+		})
+	})
 
 	if healthHandler != nil {
 		r.GET("/health", healthHandler.Check)
