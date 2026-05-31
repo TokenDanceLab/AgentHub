@@ -3,8 +3,11 @@ import {
   cancelRun,
   createThread,
   decidePermission,
+  fetchArtifacts,
   fetchHealth,
+  fetchPreviews,
   fetchRunners,
+  fetchRunDiff,
   fetchThreadItems,
   startRun,
 } from '../api/edgeClient';
@@ -294,6 +297,64 @@ describe('edgeClient', () => {
         code: 'permission_request_not_found',
         status: 404,
       });
+    });
+  });
+
+  describe('run evidence', () => {
+    it('fetches run diff from the run-scoped Edge source', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          runId: 'run_abc123',
+          files: [{ path: 'src/app.ts', diff: '@@ -1 +1 @@\n-old\n+new', status: 'modified' }],
+        }),
+      } as Response);
+
+      const result = await fetchRunDiff('run_abc123');
+
+      expect(result.files[0]?.path).toBe('src/app.ts');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/runs\/run_abc123\/diff$/),
+        expect.anything(),
+      );
+    });
+
+    it('fetches artifact and preview lists without run-local fake paths', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            items: [{
+              id: 'artifact-1',
+              runId: 'run_abc123',
+              threadId: 'thread-1',
+              kind: 'patch',
+              path: 'changes.diff',
+              sizeBytes: 12,
+              createdAt: '2026-01-01T00:00:00Z',
+            }],
+            page: { hasMore: false },
+          }),
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            items: [{
+              id: 'preview-1',
+              runId: 'run_abc123',
+              threadId: 'thread-1',
+              url: 'http://127.0.0.1:4173',
+              status: 'ready',
+              createdAt: '2026-01-01T00:00:00Z',
+            }],
+            page: { hasMore: false },
+          }),
+        } as Response);
+
+      await expect(fetchArtifacts()).resolves.toMatchObject({ items: [{ id: 'artifact-1' }] });
+      await expect(fetchPreviews()).resolves.toMatchObject({ items: [{ id: 'preview-1' }] });
+      expect(fetchSpy).toHaveBeenNthCalledWith(1, expect.stringMatching(/\/v1\/artifacts$/), expect.anything());
+      expect(fetchSpy).toHaveBeenNthCalledWith(2, expect.stringMatching(/\/v1\/previews$/), expect.anything());
     });
   });
 });
