@@ -271,8 +271,18 @@ export default function RunDetail({
     setApprovalError(null);
     try {
       await onDecideApproval(requestId, decision, decision === 'deny' ? 'review panel denied' : undefined);
-    } catch {
-      setApprovalError(t('run.reviewApprovalFailed'));
+    } catch (error) {
+      const status = typeof (error as { status?: unknown })?.status === 'number'
+        ? (error as { status: number }).status
+        : undefined;
+      const code = typeof (error as { code?: unknown })?.code === 'string'
+        ? (error as { code: string }).code
+        : undefined;
+      setApprovalError(
+        status === 404 || code === 'permission_request_not_found'
+          ? t('run.reviewApprovalAlreadyHandled')
+          : t('run.reviewApprovalFailed'),
+      );
     } finally {
       setApprovalActionId(null);
     }
@@ -318,6 +328,7 @@ export default function RunDetail({
                     <span className={styles.reviewSummary}>
                       {Object.keys(approval.toolInput).join(', ') || approval.requestId}
                     </span>
+                    <span className={styles.sourceTag}>{t('run.reviewApprovalSource')}</span>
                     {onDecideApproval && (
                       <span className={styles.reviewActions}>
                         <button
@@ -326,7 +337,9 @@ export default function RunDetail({
                           disabled={approvalActionId !== null}
                           aria-label={t('run.reviewAllow')}
                         >
-                          <Check size={12} />
+                          {approvalActionId === `${approval.requestId}:allow`
+                            ? <span className={styles.actionText}>{t('run.reviewDecisionPending')}</span>
+                            : <Check size={12} />}
                         </button>
                         <button
                           className={styles.iconAction}
@@ -334,7 +347,9 @@ export default function RunDetail({
                           disabled={approvalActionId !== null}
                           aria-label={t('run.reviewDeny')}
                         >
-                          <XCircle size={12} />
+                          {approvalActionId === `${approval.requestId}:deny`
+                            ? <span className={styles.actionText}>{t('run.reviewDecisionPending')}</span>
+                            : <XCircle size={12} />}
                         </button>
                       </span>
                     )}
