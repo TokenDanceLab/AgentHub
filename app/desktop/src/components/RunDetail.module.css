@@ -189,6 +189,7 @@
 
 .reviewSummary,
 .runtimeSummary,
+.sourceTag,
 .gapText,
 .errorText {
   min-width: 0;
@@ -197,6 +198,15 @@
   white-space: nowrap;
   color: color-mix(in oklch, var(--muted-foreground) 74%, transparent);
   font-size: 11px;
+}
+
+.sourceTag {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: color-mix(in oklch, var(--muted-foreground) 86%, transparent);
+  font-size: 10px;
 }
 
 .errorText {
@@ -216,8 +226,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
+  min-width: 22px;
   height: 22px;
+  padding: 0 5px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: transparent;
@@ -228,6 +239,11 @@
 .iconAction:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.actionText {
+  font-size: 10px;
+  font-weight: 600;
 }
 
 .runtimeItem {
