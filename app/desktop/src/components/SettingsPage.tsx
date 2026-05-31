@@ -74,6 +74,7 @@ import RemoteControlSection from '@/components/settings/sections/RemoteControlSe
 import PlatformsSection from '@/components/settings/sections/PlatformsSection';
 import AccountSection from '@/components/settings/sections/AccountSection';
 import SecurityAuditSection from '@/components/settings/sections/SecurityAuditSection';
+import SkillsSection from '@/components/settings/sections/SkillsSection';
 
 export type SectionId =
   | 'general'
@@ -123,76 +124,8 @@ interface NavItem {
   group: 'workspace' | 'automation' | 'system';
 }
 
-interface ProjectSkill {
-  id: string;
-  title: string;
-  descriptionKey: string;
-  status: 'ready' | 'review';
-  hasScripts: boolean;
-  hasReferences: boolean;
-}
-
 const STORAGE_PREFIX = 'agenthub-settings.';
 const DEVICE_ID_KEY = 'agenthub_device_id';
-
-const PROJECT_SKILLS: ProjectSkill[] = [
-  {
-    id: 'adapter-dev',
-    title: 'adapter-dev',
-    descriptionKey: 'settings.skill.adapterDevDesc',
-    status: 'ready',
-    hasScripts: false,
-    hasReferences: false,
-  },
-  {
-    id: 'dev-loop',
-    title: 'dev-loop',
-    descriptionKey: 'settings.skill.devLoopDesc',
-    status: 'ready',
-    hasScripts: false,
-    hasReferences: true,
-  },
-  {
-    id: 'env-sandbox',
-    title: 'env-sandbox',
-    descriptionKey: 'settings.skill.envSandboxDesc',
-    status: 'ready',
-    hasScripts: false,
-    hasReferences: false,
-  },
-  {
-    id: 'integration-test',
-    title: 'integration-test',
-    descriptionKey: 'settings.skill.integrationTestDesc',
-    status: 'ready',
-    hasScripts: false,
-    hasReferences: false,
-  },
-  {
-    id: 'pre-push',
-    title: 'pre-push',
-    descriptionKey: 'settings.skill.prePushDesc',
-    status: 'review',
-    hasScripts: false,
-    hasReferences: false,
-  },
-  {
-    id: 'test-coverage',
-    title: 'test-coverage',
-    descriptionKey: 'settings.skill.testCoverageDesc',
-    status: 'ready',
-    hasScripts: false,
-    hasReferences: false,
-  },
-  {
-    id: 'ui-screenshot',
-    title: 'ui-screenshot',
-    descriptionKey: 'settings.skill.uiScreenshotDesc',
-    status: 'ready',
-    hasScripts: true,
-    hasReferences: false,
-  },
-];
 
 function readStoredBoolean(key: string, fallback: boolean) {
   try {
@@ -346,7 +279,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [autoReview, setAutoReview] = useStoredBooleanState('autoReview', true);
   const [fullAccess, setFullAccess] = useStoredBooleanState('fullAccess', false);
   const [enableMcp, setEnableMcp] = useStoredBooleanState('enableMcp', true);
-  const [skillSync, setSkillSync] = useStoredBooleanState('skillSync', true);
   const [taskSync, setTaskSync] = useStoredBooleanState('taskSync', true);
   const [groupChatEnabled, setGroupChatEnabled] = useStoredBooleanState('groupChat', true);
   const [agentSchedulingEnabled, setAgentSchedulingEnabled] = useStoredBooleanState('agentScheduling', true);
@@ -466,9 +398,6 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     false,
   ].filter(Boolean).length;
   const schedulerLocalMetric = totalRunners > 0 ? runnerSummary : edgeOnline ? t('settings.edgeOnline') : t('settings.edgeOffline');
-  const skillScriptCount = PROJECT_SKILLS.filter((skill) => skill.hasScripts).length;
-  const skillReferenceCount = PROJECT_SKILLS.filter((skill) => skill.hasReferences).length;
-  const skillReadyCount = PROJECT_SKILLS.filter((skill) => skill.status === 'ready').length;
   const hubSessionActive = hubAuthenticated || hubAuth.isAuthenticated;
   const accountName = hubAuth.user?.username ?? username ?? t('settings.signedIn');
   const tokenSource = hubAuth.tokenSource;
@@ -1254,79 +1183,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'skills' && (
-            <Panel title={t('settings.skills')} description={t('settings.skillsDesc')}>
-              <div className={styles.summaryGrid}>
-                <SummaryCard
-                  icon={<Code2 size={18} />}
-                  label={t('settings.skillProjectRegistry')}
-                  value={`${PROJECT_SKILLS.length}`}
-                  detail={t('settings.skillProjectRegistryDesc')}
-                />
-                <SummaryCard
-                  icon={<ShieldCheck size={18} />}
-                  label={t('settings.skillReviewReady')}
-                  value={`${skillReadyCount}/${PROJECT_SKILLS.length}`}
-                  detail={t('settings.skillReviewReadyDesc')}
-                />
-                <SummaryCard
-                  icon={<TerminalSquare size={18} />}
-                  label={t('settings.skillScripts')}
-                  value={`${skillScriptCount}`}
-                  detail={t('settings.skillScriptsDesc')}
-                />
-                <SummaryCard
-                  icon={<Globe2 size={18} />}
-                  label={t('settings.skillHubSync')}
-                  value={hubAuthenticated && skillSync ? t('settings.enabled') : t('settings.notConfigured')}
-                  detail={hubAuthenticated ? t('settings.skillHubSyncDesc') : t('settings.skillHubSyncSignedOut')}
-                />
-              </div>
-              <SettingRow
-                title={t('settings.skillSync')}
-                description={t('settings.skillSyncDesc')}
-                control={<Switch checked={skillSync} onChange={setBooleanSetting('skillSync', setSkillSync)} />}
-              />
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.skillInstalled')}</strong>
-                  <span>{t('settings.skillInstalledDesc')}</span>
-                </div>
-                <div className={styles.profileGrid}>
-                  {PROJECT_SKILLS.map((skill) => (
-                    <ProjectSkillCard key={skill.id} skill={skill} />
-                  ))}
-                </div>
-              </div>
-              <div className={styles.taskSection}>
-                <div className={styles.taskSectionHeader}>
-                  <strong>{t('settings.skillGovernance')}</strong>
-                  <span>{t('settings.skillGovernanceDesc')}</span>
-                </div>
-                <div className={styles.capabilityGrid}>
-                  <CapabilityCard
-                    title={t('settings.skillLocalRegistry')}
-                    description={t('settings.skillLocalRegistryDesc')}
-                    status=".agents/skills"
-                  />
-                  <CapabilityCard
-                    title={t('settings.skillReview')}
-                    description={t('settings.skillReviewDesc')}
-                    status={`${skillReadyCount}/${PROJECT_SKILLS.length}`}
-                  />
-                  <CapabilityCard
-                    title={t('settings.skillScriptAudit')}
-                    description={t('settings.skillScriptAuditDesc')}
-                    status={`${skillScriptCount}`}
-                  />
-                  <CapabilityCard
-                    title={t('settings.skillReferences')}
-                    description={t('settings.skillReferencesDesc')}
-                    status={`${skillReferenceCount}`}
-                  />
-                </div>
-              </div>
-              <Callout title={t('settings.skillGuard')} body={t('settings.skillGuardDesc')} />
-            </Panel>
+            <SkillsSection hubSessionActive={hubSessionActive} />
           )}
 
           {active === 'hooks' && (
@@ -1731,31 +1588,6 @@ function LocalAgentProfileCard({
         {alias ? <span>{t('settings.profileAlias')}: {alias}</span> : null}
         <span>{t('settings.executionTargets')}: {t('settings.targetLocalEdge')}</span>
         <span>{t('settings.profileConfigSource')}: AGENTS.md / memory / skills</span>
-      </div>
-    </div>
-  );
-}
-
-function ProjectSkillCard({ skill }: { skill: ProjectSkill }) {
-  const { t } = useTranslation();
-  return (
-    <div className={styles.profileCard}>
-      <div className={styles.profileHeader}>
-        <div className={styles.profileIcon}>
-          <Code2 size={17} />
-        </div>
-        <div>
-          <strong>{skill.title}</strong>
-          <span>{t(skill.descriptionKey)}</span>
-        </div>
-        <em className={`${styles.profileStatus} ${skill.status === 'ready' ? styles.profileStatus_available : styles.profileStatus_configuring}`}>
-          {skill.status === 'ready' ? t('settings.statusReady') : t('settings.statusInProgress')}
-        </em>
-      </div>
-      <div className={styles.profileMeta}>
-        <span>{t('settings.skillLocalRegistry')}: .agents/skills/{skill.id}</span>
-        <span>{t('settings.skillScripts')}: {skill.hasScripts ? t('settings.enabled') : t('settings.notConfigured')}</span>
-        <span>{t('settings.skillReferences')}: {skill.hasReferences ? t('settings.enabled') : t('settings.notConfigured')}</span>
       </div>
     </div>
   );
