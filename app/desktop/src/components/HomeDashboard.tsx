@@ -37,7 +37,7 @@ const QUICK_START_KEYS = [
 ] as const;
 
 function isRunActive(status: string): boolean {
-  return ['queued', 'running', 'streaming', 'waiting_for_input'].includes(status);
+  return ['queued', 'running', 'streaming', 'waiting_for_input', 'waiting_approval'].includes(status);
 }
 
 function formatTimestamp(ts: string): string {
