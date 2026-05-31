@@ -83,6 +83,8 @@ interface OptimisticRun {
   outputText: string;
   toolCalls: [];
   changedFiles: [];
+  artifacts?: [];
+  previews?: [];
 }
 
 const LEFT_SIDEBAR_MIN = 248;
@@ -95,7 +97,7 @@ function clamp(value: number, min: number, max: number): number {
 
 function isRunActiveStatus(status: string | undefined): boolean {
   if (!status) return false;
-  return ['queued', 'running', 'streaming', 'waiting_for_input', 'RUNNING', 'STREAMING', 'WAITING_FOR_INPUT'].includes(status);
+  return ['queued', 'running', 'streaming', 'waiting_for_input', 'waiting_approval', 'RUNNING', 'STREAMING', 'WAITING_FOR_INPUT'].includes(status);
 }
 
 function getActiveRunConflictId(error: unknown): string | undefined {
@@ -405,6 +407,16 @@ export default function App() {
     setSettingsOpen(true);
   }, []);
 
+  const openRunWorkbench = useCallback(() => {
+    setLeftSidebarView('thread');
+    setViewMode('agent');
+    if (displayedRun) {
+      setRightPanelOpen(true);
+      return;
+    }
+    openSettings('tasks');
+  }, [displayedRun, openSettings, setLeftSidebarView, setRightPanelOpen]);
+
   const openTeamRunConsole = useCallback(() => {
     setLeftSidebarView('thread');
     setViewMode('teamrun');
@@ -462,6 +474,21 @@ export default function App() {
       decidePermission(requestId, decision, reason);
     } catch {
       addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addToast, decidePermission, permissionRequests, t]);
+
+  const handleReviewDecidePermission = useCallback(async (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
+    const request = permissionRequests.find((item) => item.requestId === requestId);
+    if (!request?.runId) {
+      addToast({ type: 'error', message: t('toast.error') });
+      throw new Error('permission request missing run');
+    }
+    try {
+      await decidePermissionRest({ runId: request.runId, requestId, decision, reason });
+      decidePermission(requestId, decision, reason);
+    } catch (error) {
+      addToast({ type: 'error', message: t('toast.error') });
+      throw error;
     }
   }, [addToast, decidePermission, permissionRequests, t]);
 
@@ -848,8 +875,8 @@ export default function App() {
                   }}
                   permissionCount={permissionRequests.length}
                   onOpenTeamRuns={openTeamRunConsole}
-                  onOpenRuns={() => openSettings('tasks')}
-                  onOpenApprovals={() => openSettings('tasks')}
+                  onOpenRuns={openRunWorkbench}
+                  onOpenApprovals={openRunWorkbench}
                   onOpenAuth={() => useHubStore.getState().setShowAuthModal(true)}
                 />
               ) : viewMode === 'im' ? (
@@ -884,6 +911,10 @@ export default function App() {
                         outputText={displayedRun?.outputText ?? ''}
                         toolCalls={displayedRun?.toolCalls ?? []}
                         changedFiles={displayedRun?.changedFiles ?? []}
+                        approvals={permissionRequests}
+                        artifacts={displayedRun && 'artifacts' in displayedRun ? displayedRun.artifacts : []}
+                        previews={displayedRun && 'previews' in displayedRun ? displayedRun.previews : []}
+                        onDecideApproval={handleReviewDecidePermission}
                         onCancel={handleCancel}
                         chatMessages={allMessages}
                       />

@@ -1362,7 +1362,7 @@ function useStoredValueState<T extends string>(key: string, fallback: T) {
 }
 
 function isActiveRun(run: RunInfo) {
-  return ['queued', 'started', 'running', 'cancelling'].includes(run.status);
+  return ['queued', 'started', 'running', 'streaming', 'waiting_for_input', 'waiting_approval', 'cancelling'].includes(run.status);
 }
 
 function isActiveBridgeTask(task: AgentTask) {
