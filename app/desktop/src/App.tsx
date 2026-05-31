@@ -19,6 +19,7 @@ import { useEdgeStatus } from '@/hooks/useEdgeStatus';
 import { useAgentList } from '@/api/agentQueries';
 import { createHubClient } from '@/api/hubClient';
 import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
+import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useThreads } from '@/api/threadQueries';
 import { createThread } from '@/api/edgeClient';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
@@ -255,6 +256,7 @@ export default function App() {
   const selectedThread = threads.find((th) => th.threadId === selectedThreadId);
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const displayedRun = currentRun ?? optimisticRun;
+  const runEvidence = useRunEvidence(displayedRun?.runId);
   const runIsActive = isRunActiveStatus(displayedRun?.status);
   const runCardConstrained = workspaceWidth > 0 && workspaceWidth < RUN_CARD_MIN_WORKSPACE_WIDTH;
   const effectiveRightPanelOpen = rightPanelOpen && !runCardConstrained;
@@ -911,9 +913,11 @@ export default function App() {
                         outputText={displayedRun?.outputText ?? ''}
                         toolCalls={displayedRun?.toolCalls ?? []}
                         changedFiles={displayedRun?.changedFiles ?? []}
+                        diffs={runEvidence.diffs}
                         approvals={permissionRequests}
-                        artifacts={displayedRun && 'artifacts' in displayedRun ? displayedRun.artifacts : []}
-                        previews={displayedRun && 'previews' in displayedRun ? displayedRun.previews : []}
+                        artifacts={runEvidence.artifacts.length > 0 ? runEvidence.artifacts : displayedRun && 'artifacts' in displayedRun ? displayedRun.artifacts : []}
+                        previews={runEvidence.previews.length > 0 ? runEvidence.previews : displayedRun && 'previews' in displayedRun ? displayedRun.previews : []}
+                        evidence={runEvidence}
                         onDecideApproval={handleReviewDecidePermission}
                         onCancel={handleCancel}
                         chatMessages={allMessages}
