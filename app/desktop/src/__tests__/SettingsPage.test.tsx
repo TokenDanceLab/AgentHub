@@ -652,7 +652,25 @@ describe('SettingsPage tasks', () => {
     expect(screen.getByText('ui-screenshot')).toBeInTheDocument();
     expect(screen.getByText('settings.skillScriptAudit')).toBeInTheDocument();
     expect(screen.getByText('settings.skillReferences')).toBeInTheDocument();
+    expect(screen.getByText('settings.skillLocalRegistry')).toBeInTheDocument();
+    expect(screen.getAllByText('settings.status.interfaceGap').length).toBeGreaterThan(0);
+    expect(screen.getByRole('switch')).toBeDisabled();
     expect(screen.getByText('settings.skillGuard')).toBeInTheDocument();
+  });
+
+  it('locks Skill Hub sync while signed out without pretending sync is available', () => {
+    mockHubStoreState.authenticated = false;
+    Object.assign(mockHubAuthState, {
+      token: null,
+      refreshToken: null,
+      user: null,
+      isAuthenticated: false,
+    });
+
+    renderSettings('skills');
+
+    expect(screen.getByText('settings.status.loginLocked')).toBeInTheDocument();
+    expect(screen.getByRole('switch')).toBeDisabled();
   });
 
   it('persists model defaults from the model configuration panel', () => {

@@ -41,6 +41,7 @@ import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
 import HomeDashboard from '@/components/HomeDashboard';
+import { NotificationBell } from '@/components/NotificationBell';
 import { ToastContainer } from '@/components/Toast';
 import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
 import {
@@ -788,6 +789,7 @@ export default function App() {
                 >
                   <Route size={15} />
                 </ShellIconButton>
+                <NotificationBell />
                 {displayedRun && !effectiveRightPanelOpen && (
                   <ShellIconButton
                     className={styles.workspaceHeaderBtn}
@@ -846,6 +848,9 @@ export default function App() {
                   }}
                   permissionCount={permissionRequests.length}
                   onOpenTeamRuns={openTeamRunConsole}
+                  onOpenRuns={() => openSettings('tasks')}
+                  onOpenApprovals={() => openSettings('tasks')}
+                  onOpenAuth={() => useHubStore.getState().setShowAuthModal(true)}
                 />
               ) : viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
