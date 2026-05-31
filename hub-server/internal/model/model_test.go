@@ -57,7 +57,7 @@ func TestUserJSONMarshal(t *testing.T) {
 	u := User{
 		ID:           "user-abc-123",
 		Username:     "alice",
-		PasswordHash: "$2a$10$xXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXx",
+		PasswordHash: stringPtr("$2a$10$xXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXx"),
 		Nickname:     "Alice",
 		AvatarURL:    "https://example.com/avatar.png",
 		CreatedAt:    now,
@@ -144,9 +144,9 @@ func TestUserJSONUnmarshal(t *testing.T) {
 	if u.AvatarURL != "https://example.com/charlie.png" {
 		t.Errorf("AvatarURL = %q, want https://example.com/charlie.png", u.AvatarURL)
 	}
-	// PasswordHash should remain empty (not in JSON).
-	if u.PasswordHash != "" {
-		t.Errorf("PasswordHash = %q, want empty (not in JSON)", u.PasswordHash)
+	// PasswordHash should remain nil (not in JSON).
+	if u.PasswordHash != nil {
+		t.Errorf("PasswordHash = %q, want nil (not in JSON)", *u.PasswordHash)
 	}
 }
 
@@ -164,9 +164,13 @@ func TestUserJSONPasswordExcluded(t *testing.T) {
 	if err := json.Unmarshal([]byte(jsonStr), &u); err != nil {
 		t.Fatalf("json.Unmarshal error = %v", err)
 	}
-	if u.PasswordHash != "" {
-		t.Errorf("PasswordHash = %q, want empty (json:\"-\" should skip it)", u.PasswordHash)
+	if u.PasswordHash != nil {
+		t.Errorf("PasswordHash = %q, want nil (json:\"-\" should skip it)", *u.PasswordHash)
 	}
+}
+
+func stringPtr(s string) *string {
+	return &s
 }
 
 // --- Message JSON serialization ---
