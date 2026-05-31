@@ -1,6 +1,14 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-29 UTC+8 | 分支：fix/hub-device-uuid-contract -> dev/delicious233 | 状态：后端隔离 worktree推进 Hub runtime event 资源护栏；Desktop/UI 主工作树仅只读确认
+最后更新：2026-05-31 UTC+8 | 分支：feat/desktop-run-workbench | 状态：Desktop Run Workbench 真实闭环实现中；active run sync、typed blocks、review surface 已进入验证
+
+## 本次 Desktop Run Workbench 推进（2026-05-31）
+
+- **基线保存**：上一轮 Desktop 日常工作台闭环已提交 `27ee3a7 feat(desktop): 收口日常工作台闭环`；`corepack pnpm` 与 `vite.config.ts` 的 `host: 127.0.0.1` 作为本轮 Desktop 基线保留。
+- **Team A 进展**：`runQueries` 增加 runs query cache upsert/status helper；`useChatMessages` 在 `run.queued`、`run.started`、`run.status.changed`、terminal events 与 approval wait 时同步 active run 状态；Home/Settings active run 统计纳入 `waiting_approval`，Home Run/Approval CTA 优先打开主工作台 Run 面板。
+- **Team B 进展**：Run detail 复用现有 Chat message typed blocks，新增 Runtime blocks 审阅区，覆盖 thinking、tool call/result、file change、result、text/code/session fallback。
+- **Team C 进展**：Run detail 新增统一 Run review surface，集中展示 pending approvals、diff、artifact、preview；artifact/preview 没有事件载荷时明确显示 gap，不伪装下载或预览；审批动作在 review 面板保留失败态。
+- **验证证据**：`corepack.cmd pnpm typecheck`、focused Vitest（`runQueries` / `useChatMessages` / `RunDetail` / `HomeDashboard`）、`corepack.cmd pnpm test`（731 passed / 27 skipped）、`corepack.cmd pnpm build` 与 `git diff --check` 已通过。Playwright 截图覆盖 `1440x900`、`1280x720`、`375x812`，三档均确认 Run review、pending approval、diff、artifact gap、preview gap、offline chip 存在，`scrollWidth === innerWidth` 且无 `run.*` 裸 key。
 
 ## 本次后端/运维推进（2026-05-29）
 
