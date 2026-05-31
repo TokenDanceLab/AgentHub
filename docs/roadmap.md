@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-29（Hub no-server-build production deploy verification）
+最后更新：2026-05-31（Desktop Run Workbench closure）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -9,6 +9,14 @@
 ---
 
 ## 1. 当前状态总览
+
+### 1.0 近期更新（Desktop Run Workbench，2026-05-31）
+
+- [x] Desktop 日常工作台闭环保存点：`27ee3a7 feat(desktop): 收口日常工作台闭环`。
+- [x] Active Run Sync：Edge WS run lifecycle 事件即时同步 TanStack Query `runs` 缓存，Home/Settings 对 `waiting_approval` 计入 active runs，Home CTA 可回到主工作台 Run 面板。
+- [x] Runtime Typed Blocks UI：Run detail 增加 typed Runtime blocks 审阅列表，覆盖 text/code/thinking/tool/file/result/session fallback。
+- [x] Approval / Diff / Artifact Review Surface：Run detail 收敛 pending approvals、diff、artifact/preview 证据；artifact/preview 缺接口或事件载荷时显示明确 gap，不做假预览。
+- [x] Desktop Run Workbench 最终验收：`pnpm typecheck`、全量 `pnpm test`、`pnpm build`、Playwright 1440x900 / 1280x720 / 375px 截图。
 
 ### 1.1 版本矩阵
 
