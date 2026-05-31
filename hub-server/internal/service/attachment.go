@@ -109,7 +109,7 @@ func (s *LocalStorage) LocalPath(key string) string {
 
 // S3Storage stores attachment blobs in an S3-compatible object store.
 type S3Storage struct {
-	putObject    func(ctx context.Context, bucket, key string, body io.Reader, contentType string) error
+	putObject    func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error)
 	getObject    func(ctx context.Context, bucket, key string) (io.ReadCloser, error)
 	deleteObject func(ctx context.Context, bucket, key string) error
 	bucket       string
@@ -119,7 +119,7 @@ type S3Storage struct {
 // Callers in production should inject real s3.Client calls via NewS3StorageFromConfig;
 // tests may inject mock functions directly.
 func NewS3Storage(
-	putObject func(ctx context.Context, bucket, key string, body io.Reader, contentType string) error,
+	putObject func(ctx context.Context, bucket, key string, body io.Reader, contentType string) (bool, error),
 	getObject func(ctx context.Context, bucket, key string) (io.ReadCloser, error),
 	deleteObject func(ctx context.Context, bucket, key string) error,
 	bucket string,
@@ -133,10 +133,7 @@ func NewS3Storage(
 }
 
 func (s *S3Storage) Put(ctx context.Context, key string, body io.Reader, contentType string) (bool, error) {
-	if err := s.putObject(ctx, s.bucket, key, body, contentType); err != nil {
-		return false, err
-	}
-	return true, nil
+	return s.putObject(ctx, s.bucket, key, body, contentType)
 }
 
 func (s *S3Storage) Get(ctx context.Context, key string) (io.ReadCloser, error) {

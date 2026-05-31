@@ -26,6 +26,23 @@ func TestTimeout_HandlerCompletesNormally(t *testing.T) {
 	}
 }
 
+func TestTimeout_FlushesHeaderOnlyStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(Timeout(5 * time.Second))
+	r.GET("/gone", func(c *gin.Context) {
+		c.Status(http.StatusGone)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/gone", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusGone {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusGone)
+	}
+}
+
 func TestTimeout_Returns504WhenHandlerSlow(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
