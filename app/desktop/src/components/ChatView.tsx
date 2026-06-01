@@ -860,7 +860,7 @@ const BlockRenderer = memo(function BlockRenderer({
     default:
       return null;
   }
-}
+});
 
 // ── Message text extraction (for copy) ──────
 function extractMessageText(msg: ChatMessage): string {
