@@ -415,6 +415,12 @@
   margin: var(--space-xs) 0;
 }
 
+.evidenceSource {
+  padding: 0 0 6px;
+  color: color-mix(in oklch, var(--muted-foreground) 74%, transparent);
+  font-size: 11px;
+}
+
 /* Secondary summary when diff review is the primary view */
 .tabContentSecondary {
   flex: 0 0 auto;
