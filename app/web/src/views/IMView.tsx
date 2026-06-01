@@ -1,6 +1,18 @@
 import { useState, useMemo, useCallback } from 'react';
-import { MessageCircle } from 'lucide-react';
-import type { IMContact } from '@/components/IM/types';
+import { useTranslation } from 'react-i18next';
+import {
+  Forward,
+  LogIn,
+  MessageCircle,
+  MessageSquare,
+  ShieldCheck,
+  TerminalSquare,
+  Users,
+  WifiOff,
+  X,
+} from 'lucide-react';
+import type { IMContact, IMMessage } from '@/components/IM/types';
+import type { SortOption } from '@/components/IM/IMContactList';
 import IMContactList from '@/components/IM/IMContactList';
 import IMMessageView from '@/components/IM/IMMessageView';
 import IMMessageInput from '@/components/IM/IMMessageInput';
@@ -8,6 +20,7 @@ import { useIMChat } from '@/hooks/useIMChat';
 import { useHubStore } from '@/stores/hubStore';
 import type { HubWSHandle } from '@/api/hubWS';
 import type { ViewProps } from '@/viewRegistryConfig';
+import { ActivityCard, SectionHeader } from '@shared/ui';
 import styles from './IMView.module.css';
 
 export default function IMView({ hubWS: hubWsProp }: ViewProps) {
