@@ -1,4 +1,6 @@
 use crate::edge_manager::SharedEdgeManager;
+use crate::QuittingState;
+use std::sync::atomic::Ordering;
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -33,6 +35,12 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             match id {
                 "show" => {
                     if let Some(window) = app.get_webview_window("main") {
+                        // On macOS, restore the Dock icon when showing the window.
+                        #[cfg(target_os = "macos")]
+                        {
+                            use tauri::ActivationPolicy;
+                            let _ = app.set_activation_policy(ActivationPolicy::Regular);
+                        }
                         let _ = window.show();
                         let _ = window.set_focus();
                     }
@@ -57,6 +65,8 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
                     });
                 }
                 "quit" => {
+                    let quitting = app.state::<QuittingState>();
+                    quitting.0.store(true, Ordering::Relaxed);
                     app.exit(0);
                 }
                 _ => {}
@@ -71,6 +81,12 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             {
                 let app = tray.app_handle();
                 if let Some(window) = app.get_webview_window("main") {
+                    // On macOS, restore the Dock icon when showing the window.
+                    #[cfg(target_os = "macos")]
+                    {
+                        use tauri::ActivationPolicy;
+                        let _ = app.set_activation_policy(ActivationPolicy::Regular);
+                    }
                     let _ = window.show();
                     let _ = window.set_focus();
                 }

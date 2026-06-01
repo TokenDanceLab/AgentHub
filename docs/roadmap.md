@@ -1,10 +1,30 @@
 # AgentHub 全局路线图
 
-最后更新：2026-06-01（M8 audit closeout + AgentTeam backend + Desktop UI batch + handoff convergence）
+最后更新：2026-06-01（M8 audit closeout + AgentTeam backend + Desktop UI batch + handoff convergence + Sprint completion）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
 > 本文是 AgentHub 全部七层（Desktop / Edge / Hub / CI/CD / Testing / Documentation / Engineering Standards）的**唯一事实源**，取代各方向分散路线图。每项任务均引用审计报告具体发现，含文件路径、优先级和工期。
+
+---
+
+## 本次 Sprint 完成（2026-06-01）
+
+| 交付项 | 详情 | 验收 |
+|--------|------|:--:|
+| **E2E 测试全部修复** | 27/27 全部通过，覆盖 Desktop/Edge/Hub 全链路 | 27/27 |
+| **Claude Code adapter：NDJSON 事件补齐** | 补 `run.agent.thinking` / `run.agent.structured_output` 2 个 NDJSON 事件；三 adapter（Claude Code / Codex / OpenCode）统一命名与接口 | `go test ./internal/adapters/ -count=1` |
+| **Codex adapter：能力标记补齐** | ThinkingVisible / MCPIntegration / TokenUsage 三个能力标记补齐，对齐 Claude Code adapter 标准化字段 | `go test ./internal/adapters/ -count=1` |
+| **OpenCode adapter：--thinking 修复 + Diff 引擎 Go 移植** | `--thinking` flag 修复后正确输出推理链路；Diff 计算从 JS 移植到 Go 层，统一 Edge 侧结构化 diff 输出 | `go test ./internal/adapters/ -count=1` |
+| **Edge Server --remote-mode：8 执行场景全部打通** | 本地离线/本地在线/Remote SSH/Tailscale/Cloud Edge/Hub Relay/Web 中继/Web 直连 8 场景链路验证通过 | 8/8 |
+| **OIDC 全链路验证脚本 + 8 处配置修复** | `scripts/verify-oidc-readiness.ps1` 结构化检查；修复 Hub OIDC 配置、callback、token storage、WS auth 等 8 处 | 脚本通过 + 8 修复 |
+| **Agent 决策循环（DecisionLoop）** | 14 测试覆盖；maxSteps / phase tracking / approval gating 全实现 | 14/14 tests |
+| **WS 自动重连（指数退避+jitter）** | Desktop/Web 双端 WebSocket 断开后指数退避重连，带 jitter 防止惊群，不丢失未读消息 | Vitest + Playwright |
+| **Draining 状态全栈** | RunState 状态机 → StatusBar 指示器 → ToolTimeline 面板 → CSS 动画，区分"run 完成"和"工具仍在后台运行" | 4 层贯通 |
+| **RAF 流式渲染替代 setInterval + visibility 感知** | `requestAnimationFrame` 驱动流式输出渲染，Page Visibility API 暂停后台 tab 渲染，避免资源浪费 | Playwright 性能截图 |
+| **三级审批（YOLO/Auto/Manual + 风险分级 + 22 前端测试）** | YOLO（全自动）/ Auto（风险分级自动）/ Manual（人工确认）三级审批模式，22 个前端单元测试全部通过 | 22/22 |
+| **竞品源码就位** | AionUi / Kanna / OpenCode / Codex / Cherry Studio 五套竞品源码已拉取并归档到 `docs/reference/projects/`，共 645MB | 5/5 仓库 |
+| **竞品差距报告** | chat-flow 23 项精确差距 + agent-integration 19 项精确差距，逐项对照分析 | 42 项 |
 
 ---
 
