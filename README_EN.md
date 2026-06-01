@@ -8,7 +8,7 @@ Chat with AI Agents like teammates. @mention them, create group chats, and keep 
 
 [中文文档](README.md) &nbsp;·&nbsp; [Product Requirements](docs/architecture/product-requirements.md) &nbsp;·&nbsp; [System Architecture](docs/architecture/system-architecture.md) &nbsp;·&nbsp; [API](api/) &nbsp;·&nbsp; [Website](https://hub.vectorcontrol.tech)
 
-<img src="https://img.shields.io/badge/status-P0--P1_Complete-blue?style=flat-square" alt="status">
+<img src="https://img.shields.io/badge/v0.1.0-Active_Development-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go" alt="go">
 <img src="https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react" alt="react">
 <img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square" alt="license">

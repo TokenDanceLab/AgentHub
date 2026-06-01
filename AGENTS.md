@@ -430,7 +430,7 @@ corepack.cmd pnpm exec vite build
 |------|-----------|------|
 | edge-server | 75% | CI 强制阻断 |
 | hub-server | 40% | CI 强制阻断 |
-| app/desktop | 不做硬性要求 | 551/560 tests |
+| app/desktop | 不做硬性要求 | 不做硬性要求 |
 | app/web | 不做硬性要求 | build 通过即可 |
 
 - CI 使用 `go test -short` 跳过需要真实 CLI 的集成测试。

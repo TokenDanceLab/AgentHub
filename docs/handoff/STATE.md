@@ -275,8 +275,8 @@ git checkout dev/delicious233
 
 ### 运行后端测试
 ```bash
-cd edge-server && go test ./... -short -count=1   # 15/15 包
-cd ../hub-server && go test ./... -short -count=1  # 14/14 包
+cd edge-server && go test ./... -short -count=1   # 17/17 包
+cd ../hub-server && go test ./... -short -count=1  # 17/17 包
 ```
 
 ### 运行前端测试
@@ -307,8 +307,8 @@ Desktop (React 19 + Tauri) → Edge Server (Go, :3210) → CLI Agents
 | 层 | 技术栈 | 测试 | 关键特性 |
 |---|------|:--:|------|
 | **Desktop** | React 19, TypeScript, Zustand, TanStack Query, OKLCH tokens, CSS Modules | CI-safe Vitest；全量 edge-real/lint 仍有既有债 | viewRegistry, @shared/ui, Storybook, RunState 状态机, IM UI, AuthPage, 虚拟滚动 |
-| **Edge** | Go, gorilla/websocket, NDJSON | 15/15 包 | 3 Adapter (Claude/Codex/OpenCode), Prometheus, event bus dropped counter, Orchestrator, E2E 19/19 API |
-| **Hub** | Go, Gin, GORM, Redis, PostgreSQL | 14/14 包 | DI 架构, CORS→BodyLimit→RateLimit 链, 39 migrations, 公开 API |
+| **Edge** | Go, gorilla/websocket, NDJSON | 17/17 包 | 3 Adapter (Claude/Codex/OpenCode), Prometheus, event bus dropped counter, Orchestrator, E2E 19/19 API |
+| **Hub** | Go, Gin, GORM, Redis, PostgreSQL | 17/17 包 | DI 架构, CORS→BodyLimit→RateLimit 链, 39 migrations, 公开 API |
 
 CI 说明：Go lint 已迁移到 golangci-lint v2 配置，gosec 已切到当前 `github.com/securego/gosec/v2` 模块路径；当前 Edge/Hub 仍有既有 lint/gosec 债。Actions 中 lint/gosec 作为可见债务步骤运行，build/test/race/govulncheck/coverage 仍是硬阻断。
 
@@ -562,4 +562,4 @@ cd app/desktop && pnpm tauri dev
 |---|---|---|
 | 前端接手指南 | `.ops/frontend-handoff.md` | 前端 agent |
 | 后端接口审计 | `.ops/backend-audit.md` | 后端 agent |
-| 运维手册 | `.ops/deployment.md` | 运维 |
+| 运维手册 | `.ops/hk2-deployment.md` | 运维 |
