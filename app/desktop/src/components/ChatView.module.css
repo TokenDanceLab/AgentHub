@@ -1067,6 +1067,149 @@
   white-space: nowrap;
 }
 
+/* ── Error Block ─────────────────────────── */
+.errorBlock {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: min(100%, 680px);
+  margin: 2px 0 4px;
+  padding: 7px 8px 7px 12px;
+  border-left: 3px solid var(--muted-foreground);
+  border-radius: 0 4px 4px 0;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+[data-theme='light'] .errorBlock {
+  background: rgba(15, 23, 42, 0.028);
+}
+
+/* Category-specific border and icon colors */
+.errorBlockAuth {
+  border-left-color: #ef4444;
+}
+.errorBlockQuota {
+  border-left-color: #f59e0b;
+}
+.errorBlockModel {
+  border-left-color: #8b5cf6;
+}
+.errorBlockNetwork {
+  border-left-color: #f97316;
+}
+.errorBlockServer {
+  border-left-color: #ef4444;
+}
+.errorBlockContextLength {
+  border-left-color: #ec4899;
+}
+.errorBlockTool {
+  border-left-color: #6366f1;
+}
+.errorBlockUnknown {
+  border-left-color: var(--muted-foreground);
+}
+
+.errorBlockIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  min-height: 18px;
+  margin-top: 1px;
+  opacity: 0.74;
+}
+
+.errorBlockAuth .errorBlockIcon { color: #ef4444; }
+.errorBlockQuota .errorBlockIcon { color: #f59e0b; }
+.errorBlockModel .errorBlockIcon { color: #8b5cf6; }
+.errorBlockNetwork .errorBlockIcon { color: #f97316; }
+.errorBlockServer .errorBlockIcon { color: #ef4444; }
+.errorBlockContextLength .errorBlockIcon { color: #ec4899; }
+.errorBlockTool .errorBlockIcon { color: #6366f1; }
+.errorBlockUnknown .errorBlockIcon { color: var(--muted-foreground); }
+
+.errorBlockMessage {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in oklch, var(--foreground) 78%, var(--muted-foreground) 22%);
+  font-size: 12.5px;
+  font-weight: 480;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.errorBlockActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.errorBlockActionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 520;
+  line-height: 1.45;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+
+.errorBlockActionBtn:hover {
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--foreground);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.errorBlockActionBtn:active {
+  transform: scale(0.97);
+}
+
+.errorBlockDismissBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-weaker);
+  cursor: pointer;
+  transition: color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+
+.errorBlockDismissBtn:hover {
+  color: var(--foreground);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+[data-theme='light'] .errorBlockActionBtn {
+  border-color: rgba(15, 23, 42, 0.086);
+}
+
+[data-theme='light'] .errorBlockActionBtn:hover {
+  background: rgba(15, 23, 42, 0.038);
+  border-color: rgba(15, 23, 42, 0.14);
+}
+
+[data-theme='light'] .errorBlockDismissBtn:hover {
+  background: rgba(15, 23, 42, 0.038);
+}
+
 /* ── Progressive Disclosure ───────────────── */
 
 .chevron {
