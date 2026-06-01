@@ -122,3 +122,14 @@ export function checkConflicts(keys: string[], capturingId: string): KeyboardSho
   }
   return null;
 }
+
+export function getBinding(id: string): string[] | undefined {
+  return KEYBOARD_SHORTCUTS.find((s) => s.id === id)?.keys;
+}
+
+export function matchesBinding(e: KeyboardEvent, keys: string[] | undefined): boolean {
+  if (!keys || keys.length === 0) return false;
+  const actual = deriveKeysFromEvent(e);
+  if (!actual || actual.length === 0) return false;
+  return actual.join('+') === keys.join('+');
+}
