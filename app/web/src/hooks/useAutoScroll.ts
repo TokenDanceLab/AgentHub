@@ -205,13 +205,17 @@ export function useAutoScroll(
     }
   }, [deps.messages.length, scrollToBottom]);
 
-  // Attach wheel listener
+  // Attach scroll listeners
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    el.addEventListener('scroll', handleScroll, { passive: true });
     el.addEventListener('wheel', handleWheel, { passive: true });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [containerRef, handleWheel]);
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      el.removeEventListener('wheel', handleWheel);
+    };
+  }, [containerRef, handleScroll, handleWheel]);
 
   // Cleanup timers on unmount
   useEffect(() => {
