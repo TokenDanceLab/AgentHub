@@ -1,6 +1,6 @@
 # AgentHub Governance Execution
 
-最后更新：2026-06-01
+最后更新：2026-06-02
 
 This file maps TokenDance system governance into AgentHub execution items. AgentHub is the multi-agent collaboration platform; it is a relying party of TokenDance ID and owns Hub, Edge, Desktop, Web, and Mobile clients.
 
