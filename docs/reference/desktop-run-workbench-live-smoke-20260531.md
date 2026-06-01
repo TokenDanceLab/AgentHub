@@ -25,6 +25,23 @@ start, terminal replay, cancel, offline reconnect, and active-run count recovery
 - `powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\integration-smoke.ps1 -Agent codex -EdgeAddr 127.0.0.1:3231` stopped at the environment check because `go` was not recognized.
 - `powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228` stopped at the same `go` prerequisite check.
 
+## 2026-06-01 dev/trump Sync Recheck
+
+- `origin/dev/delicious233` had advanced through #225, #226, and #227, and the
+  local `dev/trump` sync candidate kept only this #228 gap record on top of that
+  upstream baseline.
+- `codex` and `claude` were still discoverable; `opencode` was still not
+  discoverable.
+- `go` was still not discoverable on PATH.
+- `rg --files -g '*agenthub-edge*.exe'` did not find a prebuilt Edge binary in
+  the repository checkout.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\integration-smoke.ps1 -Agent codex -EdgeAddr 127.0.0.1:3231`
+  stopped at the environment check because `go` was not recognized.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\integration-smoke.ps1 -Agent claude-code -EdgeAddr 127.0.0.1:3232`
+  stopped at the same `go` prerequisite check.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228`
+  stopped at the same `go` prerequisite check.
+
 ## Result
 
 Live Runtime smoke is locked for this machine until Local Edge can be started.
