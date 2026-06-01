@@ -11,11 +11,12 @@ export default defineConfig({
     },
   },
   clearScreen: false,
+  envPrefix: ['VITE_', 'TAURI_'],
   server: {
     port: 5175,
     strictPort: true,
   },
   build: {
-    target: ['es2021', 'chrome100', 'safari13'],
+    target: ['es2021', 'chrome100', 'safari15'],
   },
 });

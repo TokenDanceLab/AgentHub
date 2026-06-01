@@ -79,7 +79,7 @@ export function getResolvedShortcutGroups(): KeyboardShortcutGroup[] {
   return KEYBOARD_SHORTCUT_GROUPS.map((group) => ({
     ...group,
     shortcuts: group.shortcuts.map((s) =>
-      s.id in custom ? { ...s, keys: custom[s.id] } : s,
+      s.id in custom ? { ...s, keys: custom[s.id]! } : s,
     ),
   }));
 }

@@ -573,7 +573,7 @@
   border-radius: 10px;
   padding: 14px;
   background: rgba(255, 255, 255, 0.35);
-  color: #8E8E93;
+  color: var(--text-weaker);
   font-size: 12px;
 }
 
