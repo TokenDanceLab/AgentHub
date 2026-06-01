@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Monitor, Globe2, Server, Computer, Cpu } from 'lucide-react';
+import { Monitor, Globe2, Server, Computer } from 'lucide-react';
 import type { RunnerHealthItem } from '@shared/types';
 import Panel from '../primitives/Panel';
 import ExecutionTargetCard from '../primitives/ExecutionTargetCard';

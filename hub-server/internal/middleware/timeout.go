@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -19,10 +20,11 @@ import (
 // (http: superfluous response.WriteHeader call).
 type timeoutWriter struct {
 	gin.ResponseWriter
-	hdr  http.Header
-	buf  bytes.Buffer
-	code int
-	wrote bool
+	hdr         http.Header
+	buf         bytes.Buffer
+	code        int
+	wrote       bool
+	wroteHeader bool
 
 	mu       sync.Mutex
 	timedOut bool
@@ -53,6 +55,7 @@ func (w *timeoutWriter) WriteHeader(code int) {
 		return
 	}
 	w.code = code
+	w.wroteHeader = true
 }
 
 func (w *timeoutWriter) WriteHeaderNow() {
@@ -95,6 +98,7 @@ func (w *timeoutWriter) flush() {
 	}
 	code := w.code
 	wrote := w.wrote
+	wroteHeader := w.wroteHeader
 	// Copy headers (must happen before WriteHeader)
 	for k, vs := range w.hdr {
 		for _, v := range vs {
@@ -103,8 +107,10 @@ func (w *timeoutWriter) flush() {
 	}
 	w.mu.Unlock()
 
-	if wrote {
+	if wrote || wroteHeader {
 		w.ResponseWriter.WriteHeader(code)
+	}
+	if wrote {
 		// Safe to read buf without lock: after handler done and not timedOut,
 		// no other goroutine writes to buf.
 		w.buf.WriteTo(w.ResponseWriter)
@@ -156,10 +162,24 @@ func Timeout(d time.Duration) gin.HandlerFunc {
 		case <-ctx.Done():
 			// Deadline fired — discard handler output and write 504.
 			tw.markTimedOut()
-			// Restore original writer so handler.Fail writes directly.
-			c.Writer = tw.ResponseWriter
-			c.Abort()
-			fail(c, errcode.ErrTimeout)
+			writeTimeout(tw.ResponseWriter)
+			<-done
 		}
 	}
+}
+
+func writeTimeout(w gin.ResponseWriter) {
+	status := errcode.ErrTimeout.HTTPStatus
+	if status == 0 {
+		status = http.StatusGatewayTimeout
+	}
+	header := w.Header()
+	if header.Get("Content-Type") == "" {
+		header.Set("Content-Type", "application/json; charset=utf-8")
+	}
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(responseBody{
+		Code:    errcode.ErrTimeout.Code,
+		Message: errcode.ErrTimeout.Message,
+	})
 }

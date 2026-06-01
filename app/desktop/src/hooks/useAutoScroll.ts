@@ -36,7 +36,9 @@ export function useAutoScroll(
 
   // Stable ref for customFn to avoid dependency churn
   const customFnRef = useRef(customFn);
-  customFnRef.current = customFn;
+  useEffect(() => {
+    customFnRef.current = customFn;
+  }, [customFn]);
 
   const distanceFromBottom = useCallback(
     (el: HTMLElement) => el.scrollHeight - el.clientHeight - el.scrollTop,
@@ -164,6 +166,14 @@ export function useAutoScroll(
     if (!el) return;
     el.addEventListener('scroll', handleScroll, { passive: true });
     el.addEventListener('wheel', handleWheel, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      el.removeEventListener('wheel', handleWheel);
+    };
+  }, [containerRef, handleScroll, handleWheel]);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
     return () => {
       el.removeEventListener('scroll', handleScroll);
       el.removeEventListener('wheel', handleWheel);

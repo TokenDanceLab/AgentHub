@@ -4,22 +4,18 @@ import zh from './locales/zh.json';
 import en from './locales/en.json';
 
 const SUPPORTED = ['zh', 'en'] as const;
+type SupportedLanguage = (typeof SUPPORTED)[number];
+
+function isSupportedLanguage(value: string): value is SupportedLanguage {
+  return SUPPORTED.includes(value as SupportedLanguage);
+}
 
 function detectLanguage(): string {
   if (typeof navigator === 'undefined') return 'en';
-
-  // 1) Check user preference stored by LanguageContext
-  try {
-    const stored = localStorage.getItem('agenthub-lang');
-    if (stored === 'en' || stored === 'zh') return stored;
-  } catch {
-    /* localStorage unavailable */
-  }
-
-  // 2) Fall back to browser language
-  const raw = navigator.language || (navigator as any).userLanguage || '';
+  const legacyNavigator = navigator as Navigator & { userLanguage?: string };
+  const raw = navigator.language || legacyNavigator.userLanguage || '';
   const base = raw.split('-')[0];
-  return SUPPORTED.includes(base as any) ? base : 'en';
+  return isSupportedLanguage(base) ? base : 'en';
 }
 
 try {

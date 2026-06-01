@@ -1564,6 +1564,35 @@ func TestPostPermissionDecideRejectsSecondDecision(t *testing.T) {
 	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
 }
 
+func TestPostPermissionDecideRejectsExpiredRequestWithoutPublishing(t *testing.T) {
+	h := newTestHandler()
+	now := time.Date(2026, 5, 29, 8, 0, 0, 0, time.UTC)
+	registry := NewPermissionRegistry(time.Minute)
+	registry.now = func() time.Time { return now }
+	h.PermissionRegistry = registry
+	h.PermissionRegistry.Register(PendingPermission{
+		ProjectID: "proj_1",
+		ThreadID:  "thread_1",
+		RunID:     "run_1",
+		RequestID: "req_1",
+		ToolName:  "Bash",
+		ToolUseID: "tool_1",
+	})
+
+	now = now.Add(2 * time.Minute)
+	req := httptest.NewRequest(http.MethodPost, "/v1/permissions/decide", strings.NewReader(`{"runId":"run_1","requestId":"req_1","decision":"allow"}`))
+	rec := httptest.NewRecorder()
+	h.PostPermissionDecide(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404; body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "permission_request_not_found")
+	if got := h.Bus.HistoryLen(); got != 0 {
+		t.Fatalf("event history len = %d, want 0", got)
+	}
+}
+
 func TestMuxPermissionDecideWrongMethod(t *testing.T) {
 	h := newTestHandler()
 	mux := http.NewServeMux()

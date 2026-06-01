@@ -460,13 +460,12 @@ export function useHubIntegration(
         }
 
         case 'run.finished': {
-          // If run.agent.result already reported this run, just clean up local state.
-          if (reportedRunIdsRef.current.has(runId)) {
-            store.getState().removeTask(taskId);
-            forgetOutput(runId);
-            break;
-          }
-          const output = outputByRunRef.current.get(runId) || 'Run finished';
+          const output =
+            typeof payload.content === 'string'
+              ? payload.content
+              : typeof payload.output === 'string'
+                ? payload.output
+                : outputByRunRef.current.get(runId) || 'Run finished';
           hubClient.doneTask(taskId, output, runId).catch(() => {});
           reportedRunIdsRef.current.add(runId);
           store.getState().removeTask(taskId);
@@ -534,6 +533,7 @@ export function useHubIntegration(
         getString(data, 'thread_id') ||
         getString(data, 'session_id') ||
         'hub-dispatch';
+      const targetId = getString(data, 'target_id');
 
       // Build initial task record
       const task: AgentTask = {
@@ -541,6 +541,7 @@ export function useHubIntegration(
         agentId,
         prompt,
         threadId,
+        targetId: targetId || undefined,
         status: 'queued',
         dispatchPayload: data,
         createdAt: new Date().toISOString(),
@@ -648,18 +649,18 @@ export function useHubIntegration(
       unsubCancel();
       unsubControl();
     };
-  }, [hubWS, hubClient, edgeBaseUrl, onDispatch]);
+  }, [hubWS, hubClient, edgeBaseUrl, onDispatch, store]);
 
   // ── Return stable handle ──────────────────────────────
 
   const getTaskByRunId = useCallback(
     (runId: string) => store.getState().getTaskByRunId(runId),
-    [],
+    [store],
   );
 
   const getRunByTaskId = useCallback(
     (taskId: string) => store.getState().getRunByTaskId(taskId),
-    [],
+    [store],
   );
 
   // Read tasks reactively from the store

@@ -78,12 +78,12 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
     <div className={styles.page}>
       {/* Close button */}
       {onClose && (
-        <button className={styles.closeBtn} onClick={onClose} title={t('window.close')}>
+        <button className={styles.closeBtn} onClick={onClose} title={t('auth.close')}>
           <X size={16} />
         </button>
       )}
 
-      {/* Clean header — no dark background */}
+      {/* Clean header without the old dark auth shell. */}
       <div className={styles.header}>
         <img className={styles.logo} src={tokenDanceLogo} alt="TokenDance" />
         <h1 className={styles.appName}>{t('auth.title')}</h1>

@@ -137,7 +137,8 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
 
   function connectViaTransport(): void {
     if (closed) return;
-    const t = providedTransport!;
+    const t = providedTransport;
+    if (!t) return;
 
     // Clean up previous subscriptions
     if (unsubMessage) { unsubMessage(); unsubMessage = null; }

@@ -4,7 +4,8 @@ import { Search, User, Bot, MessageSquareText } from 'lucide-react';
 import { useSearchStore } from '@/stores/searchStore';
 import { useShallow } from 'zustand/shallow';
 import type { ChatMessage } from '@/components/ChatView.types';
-import type { ThreadInfo } from '@shared/types';
+import { getBinding } from '@/stores/keybindingStore';
+import { matchesBinding } from '@/utils/keybinding';
 import styles from './SearchDialog.module.css';
 
 interface Props {
@@ -89,7 +90,7 @@ export default function SearchDialog({ messages, onSelect, threads = [], onSelec
   // Ctrl+K to open, Esc to close
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      if (matchesBinding(e, getBinding('search'))) {
         e.preventDefault();
         useSearchStore.getState().openDialog();
       }

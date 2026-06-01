@@ -39,13 +39,67 @@ type AgentTeamService struct {
 	agentSvc    agentTeamAgentSvc
 	cacheClient agentTeamCache
 	controlSvc  agentTeamControlSvc
+	guardrails  AgentTeamGuardrails
+}
+
+type AgentTeamGuardrails struct {
+	MaxDelegationDepth       int
+	MaxActiveSubAgentsPerRun int64
+	MaxRouteRepeats          int
+	MaxTasksPerTeamRun       int64
+	AssignmentTimeout        time.Duration
+	MaxTeamRunBudgetTokens   int64
+	MaxTeamRunBudgetUsagePct float64
+}
+
+func DefaultAgentTeamGuardrails() AgentTeamGuardrails {
+	return AgentTeamGuardrails{
+		MaxDelegationDepth:       model.MaxDelegationDepth,
+		MaxActiveSubAgentsPerRun: model.MaxActiveSubAgentsPerRun,
+		MaxRouteRepeats:          model.MaxRouteRepeats,
+		MaxTasksPerTeamRun:       model.MaxTasksPerTeamRun,
+		AssignmentTimeout:        model.DefaultAssignmentTimeout,
+		MaxTeamRunBudgetTokens:   model.MaxTeamRunBudgetTokens,
+		MaxTeamRunBudgetUsagePct: model.MaxTeamRunBudgetUsagePct,
+	}
+}
+
+func (g AgentTeamGuardrails) normalized() AgentTeamGuardrails {
+	defaults := DefaultAgentTeamGuardrails()
+	if g.MaxDelegationDepth <= 0 {
+		g.MaxDelegationDepth = defaults.MaxDelegationDepth
+	}
+	if g.MaxActiveSubAgentsPerRun <= 0 {
+		g.MaxActiveSubAgentsPerRun = defaults.MaxActiveSubAgentsPerRun
+	}
+	if g.MaxRouteRepeats <= 0 {
+		g.MaxRouteRepeats = defaults.MaxRouteRepeats
+	}
+	if g.MaxTasksPerTeamRun <= 0 {
+		g.MaxTasksPerTeamRun = defaults.MaxTasksPerTeamRun
+	}
+	if g.AssignmentTimeout <= 0 {
+		g.AssignmentTimeout = defaults.AssignmentTimeout
+	}
+	if g.MaxTeamRunBudgetTokens <= 0 {
+		g.MaxTeamRunBudgetTokens = defaults.MaxTeamRunBudgetTokens
+	}
+	if g.MaxTeamRunBudgetUsagePct <= 0 {
+		g.MaxTeamRunBudgetUsagePct = defaults.MaxTeamRunBudgetUsagePct
+	}
+	return g
 }
 
 func NewAgentTeamService(db *gorm.DB, agentSvc agentTeamAgentSvc, cacheClient *cache.Client) *AgentTeamService {
+	return NewAgentTeamServiceWithGuardrails(db, agentSvc, cacheClient, DefaultAgentTeamGuardrails())
+}
+
+func NewAgentTeamServiceWithGuardrails(db *gorm.DB, agentSvc agentTeamAgentSvc, cacheClient *cache.Client, guardrails AgentTeamGuardrails) *AgentTeamService {
 	return &AgentTeamService{
 		db:          db,
 		agentSvc:    agentSvc,
 		cacheClient: resolveAgentTeamCache(cacheClient),
+		guardrails:  guardrails.normalized(),
 	}
 }
 
@@ -76,8 +130,34 @@ func (s *AgentTeamService) CreateTeam(ctx context.Context, userID, name, descrip
 	return team, nil
 }
 
-// GetTeam returns a team by ID, verifying that the requesting user is the owner.
+// GetTeam returns a team by ID when the requesting user owns the team or owns
+// an Agent Profile installed as a team member.
 func (s *AgentTeamService) GetTeam(ctx context.Context, userID, teamID string) (*model.AgentTeam, error) {
+	return s.getTeamForRead(ctx, userID, teamID)
+}
+
+func (s *AgentTeamService) getTeamForRead(ctx context.Context, userID, teamID string) (*model.AgentTeam, error) {
+	team, err := repository.GetTeamByID(s.db, teamID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.AgentNotFound
+		}
+		return nil, err
+	}
+	if team.OwnerID == userID {
+		return team, nil
+	}
+	isMember, err := repository.TeamHasAgentOwnedByUser(s.db, teamID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !isMember {
+		return nil, errcode.AgentNotFound
+	}
+	return team, nil
+}
+
+func (s *AgentTeamService) requireTeamOwner(ctx context.Context, userID, teamID string) (*model.AgentTeam, error) {
 	team, err := repository.GetTeamByID(s.db, teamID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -91,9 +171,10 @@ func (s *AgentTeamService) GetTeam(ctx context.Context, userID, teamID string) (
 	return team, nil
 }
 
-// ListTeams returns all teams owned by the given user.
+// ListTeams returns all teams owned by the user or readable through one of the
+// user's Agent Profiles installed as a team member.
 func (s *AgentTeamService) ListTeams(ctx context.Context, userID string) ([]model.AgentTeam, error) {
-	return repository.ListTeamsByOwner(s.db, userID)
+	return repository.ListTeamsReadableByUser(s.db, userID)
 }
 
 // UpdateTeam updates a team's name and description, verifying owner access.
@@ -437,7 +518,7 @@ func supervisorRouteModelParams() string {
 
 // GetTeamRun returns a single team run, verifying owner access.
 func (s *AgentTeamService) GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error) {
-	team, err := s.GetTeam(ctx, userID, teamID)
+	team, err := s.getTeamForRead(ctx, userID, teamID)
 	if err != nil {
 		return nil, err
 	}
@@ -458,7 +539,7 @@ func (s *AgentTeamService) GetTeamRun(ctx context.Context, userID, teamID, runID
 
 // ListTeamRuns returns all runs for a team, verifying owner access.
 func (s *AgentTeamService) ListTeamRuns(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error) {
-	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+	if _, err := s.getTeamForRead(ctx, userID, teamID); err != nil {
 		return nil, err
 	}
 	return repository.ListTeamRunsByTeam(s.db, teamID)
@@ -466,7 +547,7 @@ func (s *AgentTeamService) ListTeamRuns(ctx context.Context, userID, teamID stri
 
 // GetTeamRunState returns a replayable projection of a team run.
 func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error) {
-	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+	if _, err := s.getTeamForRead(ctx, userID, teamID); err != nil {
 		return nil, err
 	}
 	run, err := repository.GetTeamRunByID(s.db, runID)
@@ -671,6 +752,9 @@ func (s *AgentTeamService) DecideApproval(ctx context.Context, userID, teamID, r
 	if approvalID == "" || !validApprovalDecision(decision.Decision) {
 		return nil, errcode.ErrBadRequest
 	}
+	if _, err := s.requireTeamOwner(ctx, userID, teamID); err != nil {
+		return nil, err
+	}
 
 	state, err := s.GetTeamRunState(ctx, userID, teamID, runID)
 	if err != nil {
@@ -809,6 +893,9 @@ func (s *AgentTeamService) ResolveConflict(ctx context.Context, userID, teamID, 
 	}
 	if resolution.ConflictID == "" || !validConflictResolution(resolution.Resolution) {
 		return nil, errcode.ErrBadRequest
+	}
+	if _, err := s.requireTeamOwner(ctx, userID, teamID); err != nil {
+		return nil, err
 	}
 
 	state, err := s.GetTeamRunState(ctx, userID, teamID, runID)
@@ -1462,7 +1549,7 @@ func assignmentStatusFromPending(status string) string {
 
 // ListTeamTasks returns first-class TeamTask rows for a run after owner checks.
 func (s *AgentTeamService) ListTeamTasks(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error) {
-	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+	if _, err := s.getTeamForRead(ctx, userID, teamID); err != nil {
 		return nil, err
 	}
 	run, err := repository.GetTeamRunByID(s.db, runID)
@@ -1487,7 +1574,7 @@ func (s *AgentTeamService) ListTeamTasks(ctx context.Context, userID, teamID, ru
 
 // ListTeamEvents returns append-only events for a team run after owner checks.
 func (s *AgentTeamService) ListTeamEvents(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error) {
-	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+	if _, err := s.getTeamForRead(ctx, userID, teamID); err != nil {
 		return nil, err
 	}
 	run, err := repository.GetTeamRunByID(s.db, runID)
@@ -1513,7 +1600,7 @@ func (s *AgentTeamService) ListTeamEvents(ctx context.Context, userID, teamID, r
 // HandleRouteDecision consumes a typed supervisor route decision and records
 // the accepted or rejected route in the TeamEvent log.
 func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error) {
-	if _, err := s.GetTeam(ctx, userID, teamID); err != nil {
+	if _, err := s.requireTeamOwner(ctx, userID, teamID); err != nil {
 		return nil, err
 	}
 	run, err := repository.GetTeamRunByID(s.db, runID)
@@ -1559,7 +1646,7 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 	if err != nil {
 		return nil, err
 	}
-	if taskCount >= model.MaxTasksPerTeamRun {
+	if taskCount >= s.guardrails.MaxTasksPerTeamRun {
 		return nil, s.rejectRouteDecision(runID, decision, "task limit reached")
 	}
 	timedOut, err := s.hasTimedOutActiveAssignment(runID)
@@ -1573,14 +1660,14 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 	if err != nil {
 		return nil, err
 	}
-	if activeCount >= model.MaxActiveSubAgentsPerRun {
+	if activeCount >= s.guardrails.MaxActiveSubAgentsPerRun {
 		return nil, s.rejectRouteDecision(runID, decision, "active subagent limit reached")
 	}
 	repeatCount, err := s.countMatchingRouteDecisions(runID, decision)
 	if err != nil {
 		return nil, err
 	}
-	if repeatCount >= model.MaxRouteRepeats {
+	if repeatCount >= s.guardrails.MaxRouteRepeats {
 		return nil, s.rejectRouteDecision(runID, decision, "route repeat limit reached")
 	}
 	budgetExceeded, err := s.teamRunBudgetExceeded(runID)
@@ -1629,7 +1716,7 @@ func (s *AgentTeamService) hasTimedOutActiveAssignment(runID string) (bool, erro
 	if err != nil {
 		return false, err
 	}
-	deadline := time.Now().Add(-model.DefaultAssignmentTimeout)
+	deadline := time.Now().Add(-s.guardrails.AssignmentTimeout)
 	for _, assignment := range assignments {
 		if assignment.CreatedAt.IsZero() || !isActiveAssignmentStatus(assignment.Status) {
 			continue
@@ -1661,10 +1748,10 @@ func (s *AgentTeamService) teamRunBudgetExceeded(runID string) (bool, error) {
 	if budget.TokenLimit > 0 && budget.TotalTokensUsed >= budget.TokenLimit {
 		return true, nil
 	}
-	if budget.TotalTokensUsed >= model.MaxTeamRunBudgetTokens {
+	if budget.TotalTokensUsed >= s.guardrails.MaxTeamRunBudgetTokens {
 		return true, nil
 	}
-	if budget.UsagePercent >= model.MaxTeamRunBudgetUsagePct {
+	if budget.UsagePercent >= s.guardrails.MaxTeamRunBudgetUsagePct {
 		return true, nil
 	}
 	return false, nil
@@ -1845,8 +1932,13 @@ func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRun
 	// 4. Build ancestor chain and compute depth.
 	ancestorDepth := 0
 	var ancestorIDs []string // member IDs in the chain (both from and to)
+	visitedAncestors := map[string]struct{}{}
 	parentID := fromMemberID
 	for {
+		if _, seen := visitedAncestors[parentID]; seen {
+			return nil, errcode.ErrBadRequest
+		}
+		visitedAncestors[parentID] = struct{}{}
 		parentAssignment, aErr := repository.GetAssignmentByToMember(s.db, teamRunID, parentID)
 		if aErr != nil {
 			if errors.Is(aErr, gorm.ErrRecordNotFound) {
@@ -1854,22 +1946,31 @@ func (s *AgentTeamService) CreateAssignment(ctx context.Context, userID, teamRun
 			}
 			return nil, aErr
 		}
-		ancestorDepth = parentAssignment.Depth
+		if parentAssignment.Depth > ancestorDepth {
+			ancestorDepth = parentAssignment.Depth
+		}
 		ancestorIDs = append(ancestorIDs, parentAssignment.FromMemberID, parentAssignment.ToMemberID)
 		parentID = parentAssignment.FromMemberID
 	}
 
 	newDepth := ancestorDepth + 1
-	if newDepth > model.MaxDelegationDepth {
+	if newDepth > s.guardrails.MaxDelegationDepth {
 		return nil, errcode.ErrBadRequest
 	}
 
-	// 5. Check active assignments limit for this team run.
+	// 5. Check total and active assignment limits for this team run.
+	taskCount, err := repository.CountAssignmentsByTeamRun(s.db, teamRunID)
+	if err != nil {
+		return nil, err
+	}
+	if taskCount >= s.guardrails.MaxTasksPerTeamRun {
+		return nil, errcode.ErrBadRequest
+	}
 	activeCount, err := repository.CountActiveAssignmentsByTeamRun(s.db, teamRunID)
 	if err != nil {
 		return nil, err
 	}
-	if activeCount >= model.MaxActiveSubAgentsPerRun {
+	if activeCount >= s.guardrails.MaxActiveSubAgentsPerRun {
 		return nil, errcode.ErrBadRequest
 	}
 

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Command, Keyboard, MessageSquareText, PanelLeft, Settings2, X } from 'lucide-react';
-import { getResolvedShortcutGroups, type ShortcutGroupId } from '@/utils/keyboardShortcuts';
+import { BINDING_IDS, getBinding } from '@/stores/keybindingStore';
 import styles from './ShortcutHelp.module.css';
 
 interface Props {
@@ -95,44 +94,28 @@ export default function ShortcutHelp({ open, onClose, onNavigateToKeyboard }: Pr
           </button>
         </div>
 
-        <div className={styles.groupList}>
-          {getResolvedShortcutGroups().map((group) => (
-            <section key={group.id} className={styles.group} aria-label={t(group.labelKey)}>
-              <div className={styles.groupHeader}>
-                <span className={styles.groupIcon} aria-hidden="true">{groupIcon(group.id)}</span>
-                <span>{t(group.labelKey)}</span>
-              </div>
-              <div className={styles.commandList}>
-                {group.shortcuts.map((shortcut) => (
-                  <div key={shortcut.id} className={styles.commandRow}>
-                    <div className={styles.commandText}>
-                      <span className={styles.commandLabel}>{t(shortcut.labelKey)}</span>
-                      {shortcut.detailKey ? <span className={styles.commandDetail}>{t(shortcut.detailKey)}</span> : null}
-                    </div>
-                    <div className={styles.keyGroup} aria-label={shortcut.keys.join(' + ')}>
-                      {shortcut.keys.map((key) => <kbd key={key}>{key}</kbd>)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
-
-        {onNavigateToKeyboard ? (
-          <div className={styles.customizeLink}>
-            <button
-              type="button"
-              className={styles.customizeBtn}
-              onClick={() => {
-                onClose();
-                onNavigateToKeyboard();
-              }}
-            >
-              {t('shortcut.customizeLink')}
-            </button>
-          </div>
-        ) : null}
+        <table className={styles.table}>
+          <tbody>
+            {BINDING_IDS.map((id) => {
+              const keys = getBinding(id);
+              return (
+                <tr key={id} className={styles.row}>
+                  <td className={styles.keys}>
+                    {keys.map((key, i) => (
+                      <span key={key}>
+                        <kbd className={styles.kbd}>{key}</kbd>
+                        {i < keys.length - 1 && (
+                          <span className={styles.plus}>+</span>
+                        )}
+                      </span>
+                    ))}
+                  </td>
+                  <td className={styles.desc}>{t(`shortcut.${id}`)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );

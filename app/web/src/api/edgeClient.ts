@@ -63,10 +63,10 @@ export async function fetchHealth(): Promise<HealthResponse> {
     version: 'web-preview',
     edgeId: 'web-hub-only',
     checks: {
-      executor: { status: 'stubbed', detail: 'Web connects through Hub; browser code does not probe Local Edge.' },
+      executor: { status: 'stubbed', message: 'Web connects through Hub; browser code does not probe Local Edge.' },
       runners: {
         status: 'stubbed',
-        detail: 'Runtime readiness is reported by Desktop/Local Edge during dispatch, not by this web preview.',
+        message: 'Runtime readiness is reported by Desktop/Local Edge during dispatch, not by this web preview.',
         total: 0,
         available: 0,
         items: [],

@@ -36,11 +36,10 @@ export function useHubCustomAgents(token: string | null) {
     let cancelled = false;
     const timeoutId = window.setTimeout(() => controller.abort(), 2500);
 
-    setState((current) => ({
-      agents: current.agents,
-      isLoading: true,
-      source: current.source,
-    }));
+    setState((current) => {
+      const { error: _error, ...rest } = current;
+      return { ...rest, isLoading: true };
+    });
 
     const client = createHubClient({
       baseUrl: getHubBaseUrl(),

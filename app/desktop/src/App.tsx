@@ -21,16 +21,10 @@ import { useHubAgentTeams, type AgentTeamOverview } from '@/api/agentTeamQueries
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useModelsDevDisplayNames } from '@/api/modelsDevCatalog';
 import { createHubClient } from '@/api/hubClient';
-import {
-  startRun,
-  cancelRun,
-  createThread,
-  renameThread,
-  decidePermission as decidePermissionRest,
-} from '@/api/edgeClient';
-import { useThreads, useThreadMessages } from '@/api/threadQueries';
-import { useRuns } from '@/api/runQueries';
-import { useHubExecutionTargets } from '@/api/executionTargetQueries';
+import { startRun, cancelRun, decidePermission as decidePermissionRest } from '@/api/edgeClient';
+import { useRunEvidence } from '@/api/runEvidenceQueries';
+import { useThreads } from '@/api/threadQueries';
+import { createThread } from '@/api/edgeClient';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useHubEventStream } from '@/hooks/useHubEventStream';
 import { useHubIntegration } from '@/hooks/useHubIntegration';
@@ -48,10 +42,13 @@ import { useShallow } from 'zustand/shallow';
 import { SkeletonLine } from '@/components/Skeleton';
 import { useToastStore } from '@/stores/toastStore';
 import { useHubStore } from '@/stores/hubStore';
+import { getBinding } from '@/stores/keybindingStore';
+import { matchesBinding } from '@/utils/keybinding';
 import { Slot } from '@/views/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AuthPage from '@/components/AuthPage';
 import HomeDashboard from '@/components/HomeDashboard';
+import { NotificationBell } from '@/components/NotificationBell';
 import { ToastContainer } from '@/components/Toast';
 import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
 import {
@@ -62,9 +59,7 @@ import {
   ClipboardList,
   Circle,
   Copy,
-  FolderTree,
   GitBranch,
-  GitCommit,
   Home,
   MessageSquareText,
   Maximize2,
@@ -121,6 +116,8 @@ interface OptimisticRun {
   outputText: string;
   toolCalls: [];
   changedFiles: [];
+  artifacts?: [];
+  previews?: [];
 }
 
 interface SendRunOptions {
@@ -159,7 +156,7 @@ function clamp(value: number, min: number, max: number): number {
 
 function isRunActiveStatus(status: string | undefined): boolean {
   if (!status) return false;
-  return ['queued', 'running', 'streaming', 'waiting_for_input', 'RUNNING', 'STREAMING', 'WAITING_FOR_INPUT'].includes(status);
+  return ['queued', 'running', 'streaming', 'waiting_for_input', 'waiting_approval', 'RUNNING', 'STREAMING', 'WAITING_FOR_INPUT'].includes(status);
 }
 
 function getActiveRunConflictId(error: unknown): string | undefined {
@@ -267,15 +264,15 @@ function useFocusSourceTracking() {
 }
 
 function DesktopHubTaskBridge() {
-  const hubAuth = useAuth();
+  const { isAuthenticated, token, tryAutoLogin } = useAuth();
 
   useEffect(() => {
-    if (!hubAuth.isAuthenticated && !hubAuth.token) {
-      void hubAuth.tryAutoLogin();
+    if (!isAuthenticated && !token) {
+      void tryAutoLogin();
     }
-  }, [hubAuth.isAuthenticated, hubAuth.token, hubAuth.tryAutoLogin]);
+  }, [isAuthenticated, token, tryAutoLogin]);
 
-  if (!hubAuth.isAuthenticated || !hubAuth.token) {
+  if (!isAuthenticated || !token) {
     return null;
   }
 
@@ -336,48 +333,7 @@ export default function App() {
   const hubAuth = useAuth();
 
   const { data: threadData } = useThreads();
-  const threads = threadData?.items ?? [];
-  const pendingCreatedThreadIdsRef = useRef<Set<string>>(new Set());
-  const emptyCreatedThreadIdsRef = useRef<Set<string>>(new Set());
-  const manuallyNamedThreadIdsRef = useRef<Set<string>>(new Set());
-  const silentCreatedThreadToastIdsRef = useRef<Set<string>>(new Set());
-  const addThreadToCache = useCallback((thread: ThreadInfo, opts?: { suppressCreatedToast?: boolean; empty?: boolean }) => {
-    pendingCreatedThreadIdsRef.current.add(thread.threadId);
-    if (opts?.empty) {
-      emptyCreatedThreadIdsRef.current.add(thread.threadId);
-    }
-    if (opts?.suppressCreatedToast) {
-      silentCreatedThreadToastIdsRef.current.add(thread.threadId);
-    }
-    queryClient.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
-      if (!current) return current;
-      if (current.items.some((item) => item.threadId === thread.threadId)) return current;
-      return { ...current, items: [thread, ...current.items] };
-    });
-  }, [queryClient]);
-  const updateThreadInCache = useCallback((thread: ThreadInfo) => {
-    queryClient.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
-      if (!current) return current;
-      let found = false;
-      const items = current.items.map((item) => {
-        if (item.threadId !== thread.threadId) return item;
-        found = true;
-        return { ...item, ...thread };
-      });
-      return { ...current, items: found ? items : [thread, ...items] };
-    });
-  }, [queryClient]);
-  const setThreadTitleInCache = useCallback((threadId: string, title: string) => {
-    queryClient.setQueriesData<ListResponse<ThreadInfo>>({ queryKey: ['threads'] }, (current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        items: current.items.map((thread) =>
-          thread.threadId === threadId ? { ...thread, title } : thread,
-        ),
-      };
-    });
-  }, [queryClient]);
+  const threads = useMemo(() => threadData?.items ?? [], [threadData?.items]);
 
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
@@ -390,27 +346,15 @@ export default function App() {
   const { setOnline, setConnected, wsLatency } = useConnectionStore(
     useShallow((s) => ({ setOnline: s.setOnline, setConnected: s.setConnected, wsLatency: s.wsLatency })),
   );
-  const { selectedThreadId, selectedAgentId, selectThread, selectAgentThread, switchThreadAgent } = useThreadStore(
-    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectedAgentId: s.selectedAgentId, selectThread: s.selectThread, selectAgentThread: s.selectAgentThread, switchThreadAgent: s.switchThreadAgent })),
+  const { selectedThreadId, selectedAgentId, selectThread } = useThreadStore(
+    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectedAgentId: s.selectedAgentId, selectThread: s.selectThread })),
   );
   const activeThreadId = resolveThreadSelectionId(selectedThreadId as ThreadSelectionInput);
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online, activeThreadId);
   const { data: agentData } = useAgentList(online);
-  const agents = agentData?.items ?? [];
-  const modelCatalogQuery = useModelCatalog(online);
-  const modelsDevDisplayNamesQuery = useModelsDevDisplayNames(true);
-  const agentTeamSummary = useMemo(
-    () => summarizeAgentTeamOverview(agentTeamsQuery.data),
-    [agentTeamsQuery.data],
-  );
-  const teamRunBadgeCount = agentTeamSummary.blockingCount || agentTeamSummary.activeRuns;
-  const teamRunButtonLabel = agentTeamSummary.blockingCount > 0
-    ? t('workspace.teamRunsWithBlocks', { count: agentTeamSummary.blockingCount })
-    : agentTeamSummary.activeRuns > 0
-      ? t('workspace.teamRunsActive', { count: agentTeamSummary.activeRuns })
-      : t('settings.agentScheduling');
+  const agents = useMemo(() => agentData?.items ?? [], [agentData?.items]);
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
-  const [viewMode, setViewMode] = useState<'agent' | 'im' | 'team'>('agent');
+  const [viewMode, setViewMode] = useState<'agent' | 'im' | 'teamrun'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
@@ -445,7 +389,6 @@ export default function App() {
   );
   const [optimisticRun, setOptimisticRun] = useState<OptimisticRun | null>(null);
   const [runStartPending, setRunStartPending] = useState(false);
-  const [rightPanelMounted, setRightPanelMounted] = useState(rightPanelOpen);
   const [workspaceWidth, setWorkspaceWidth] = useState(0);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const topMenuRef = useRef<HTMLElement | null>(null);
@@ -464,13 +407,11 @@ export default function App() {
 
   // Sync health → connection store
   const prevOnlineRef = useRef<boolean | null>(null);
-  const healthRef = useRef(health);
-  healthRef.current = health;
   useEffect(() => {
     if (prevOnlineRef.current === online) return;
     prevOnlineRef.current = online;
-    setOnline(online, healthRef.current);
-  }, [online, setOnline]);
+    setOnline(online, health);
+  }, [health, online, setOnline]);
 
   // Sync isConnected → connection store
   useEffect(() => {
@@ -513,6 +454,7 @@ export default function App() {
   });
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const displayedRun = currentRun ?? optimisticRun;
+  const runEvidence = useRunEvidence(displayedRun?.runId);
   const runIsActive = isRunActiveStatus(displayedRun?.status);
   const runCardConstrained = workspaceWidth > 0 && workspaceWidth < RUN_CARD_MIN_WORKSPACE_WIDTH;
   const effectiveRightPanelOpen = rightPanelOpen && !runCardConstrained;
@@ -565,17 +507,10 @@ export default function App() {
   } as CSSProperties;
 
   useEffect(() => {
-    if (currentRun) setOptimisticRun(null);
-  }, [currentRun]);
-
-  useEffect(() => {
-    if (effectiveRightPanelOpen) {
-      setRightPanelMounted(true);
-      return;
+    if (currentRun) {
+      queueMicrotask(() => setOptimisticRun(null));
     }
-    const timer = window.setTimeout(() => setRightPanelMounted(false), 220);
-    return () => window.clearTimeout(timer);
-  }, [effectiveRightPanelOpen]);
+  }, [currentRun]);
 
   useEffect(() => {
     if (!openTopMenu) return undefined;
@@ -748,7 +683,11 @@ export default function App() {
   const handleCancel = useCallback(async () => {
     const runId = currentRun?.runId ?? (optimisticRun?.runId.startsWith('starting-') ? undefined : optimisticRun?.runId);
     if (runId) {
-      try { await cancelRun(runId); } catch {}
+      try {
+        await cancelRun(runId);
+      } catch (error) {
+        console.warn('Failed to cancel run:', error);
+      }
     }
   }, [currentRun?.runId, optimisticRun?.runId]);
 
@@ -864,194 +803,20 @@ export default function App() {
     setSettingsOpen(true);
   }, []);
 
-  const handleOpenAuth = useCallback(() => {
-    useHubStore.getState().setShowAuthModal(true);
-  }, []);
-
-  const handleOpenHubAccount = useCallback(() => {
-    if (hubAuthenticated) {
-      openSettings('account');
-      return;
-    }
-    handleOpenAuth();
-  }, [handleOpenAuth, hubAuthenticated, openSettings]);
-
-  const desktopWindowAvailable = isTauriRuntime();
-  const handleWindowCommand = useCallback(async (command: 'minimize' | 'toggleMaximize' | 'close') => {
-    if (!desktopWindowAvailable) {
-      addToast({ type: 'info', message: t('menu.nativeWindowUnavailable') });
-      return;
-    }
-    try {
-      const windowHandle = getCurrentWindow();
-      if (command === 'minimize') {
-        await windowHandle.minimize();
-        return;
-      }
-      if (command === 'close') {
-        await windowHandle.close();
-        return;
-      }
-      (await windowHandle.isMaximized()) ? await windowHandle.unmaximize() : await windowHandle.maximize();
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addToast, desktopWindowAvailable, t]);
-
-  const handleOpenFolder = useCallback(async () => {
-    if (!desktopWindowAvailable) {
-      addToast({ type: 'info', message: t('prompt.browseWorkDirUnavailable') });
-      return;
-    }
-    try {
-      const selected = await (await import('@tauri-apps/plugin-dialog')).open({ directory: true, multiple: false });
-      const workDir = Array.isArray(selected) ? selected[0] : selected;
-      if (typeof workDir !== 'string' || !workDir.trim()) return;
-      const normalizedPath = workDir.trim();
-      setSavedWorkDir(normalizedPath);
-      addRecentWorkspace({ path: normalizedPath });
-      window.localStorage.setItem('agenthub.prompt.workDir', normalizedPath);
-      window.dispatchEvent(new CustomEvent('agenthub:workdir-selected', { detail: { workDir: normalizedPath } }));
-      addToast({ type: 'success', message: t('toast.workDirSelected') });
-      focusComposer();
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addToast, desktopWindowAvailable, t]);
-
-  // ── File search dialog handlers ──
-
-  const handleFileSelect = useCallback(async (filePath: string) => {
-    // Open file with the system's default application via Tauri shell plugin.
-    try {
-      const { open } = await import('@tauri-apps/plugin-shell');
-      await open(filePath);
-    } catch {
-      // Fallback: open via file:// protocol (works in some Electron-like contexts).
-      try {
-        window.open(`file:///${filePath.replace(/\\/g, '/')}`, '_blank');
-      } catch {
-        addToast({ type: 'error', message: t('toast.error') });
-      }
-    }
-  }, [addToast, t]);
-
-  const handleOpenInVSCode = useCallback((filePath: string) => {
-    try {
-      window.open(`vscode://file/${filePath}`, '_blank');
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addToast, t]);
-
-  // ── Workspace state ──
-  const [recentWorkspaces, setRecentWorkspaces] = useState<WorkspaceEntry[]>(() => readRecentWorkspaces());
-
-  const handleSelectWorkspace = useCallback((workspace: WorkspaceEntry) => {
-    setSavedWorkDir(workspace.path);
-    addRecentWorkspace({ path: workspace.path });
-    setRecentWorkspaces(readRecentWorkspaces());
-    void syncWorkspacesToBackend();
-    window.localStorage.setItem('agenthub.prompt.workDir', workspace.path);
-    window.dispatchEvent(new CustomEvent('agenthub:workdir-selected', { detail: { workDir: workspace.path } }));
-    addToast({ type: 'success', message: t('toast.workDirSelected') });
-    focusComposer();
-  }, [addToast, t]);
-
-  const handleRemoveWorkspace = useCallback((path: string) => {
-    removeRecentWorkspace(path);
-    setRecentWorkspaces(readRecentWorkspaces());
-    void syncWorkspacesToBackend();
-  }, []);
-
-  const handleClearWorkspaces = useCallback(() => {
-    clearRecentWorkspaces();
-    setRecentWorkspaces([]);
-    void syncWorkspacesToBackend();
-  }, []);
-
-  const handleBrowseWorkspace = useCallback(async () => {
-    await handleOpenFolder();
-    setRecentWorkspaces(readRecentWorkspaces());
-    void syncWorkspacesToBackend();
-  }, [handleOpenFolder]);
-
-  // ── Git status ──
-  const [workDirForGit, setWorkDirForGit] = useState<string>(() => getSavedWorkDir());
-  const gitStatus = useGitStatus(workDirForGit);
-
-  // Listen for workdir changes from other parts of the app
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.workDir) {
-        setWorkDirForGit(detail.workDir);
-      }
-    };
-    window.addEventListener('agenthub:workdir-selected', handler);
-    return () => window.removeEventListener('agenthub:workdir-selected', handler);
-  }, []);
-
-  // Persist git branch info into workspace entries
-  useEffect(() => {
-    if (gitStatus.status?.branch && workDirForGit) {
-      updateWorkspaceBranch(workDirForGit, gitStatus.status.branch);
-      setRecentWorkspaces(readRecentWorkspaces());
-    }
-  }, [gitStatus.status?.branch, workDirForGit]);
-
-  const handleEditCommand = useCallback((command: 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'selectAll') => {
-    const active = document.activeElement;
-    if (command === 'selectAll' && active instanceof HTMLInputElement) {
-      active.select();
-      return;
-    }
-    if (command === 'selectAll' && active instanceof HTMLTextAreaElement) {
-      active.select();
-      return;
-    }
-    const commandMap = {
-      undo: 'undo',
-      redo: 'redo',
-      cut: 'cut',
-      copy: 'copy',
-      paste: 'paste',
-      delete: 'delete',
-      selectAll: 'selectAll',
-    } as const;
-    try {
-      document.execCommand(commandMap[command]);
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addToast, t]);
-
-  const handleCopyDiagnostics = useCallback(async () => {
-    const diagnostic = [
-      'AgentHub Desktop diagnostics',
-      `Edge: ${online ? `online ${health?.version ?? 'v1'}` : 'offline'}`,
-      `WebSocket: ${isConnected ? 'connected' : 'disconnected'}`,
-      wsLatency != null ? `Latency: ${wsLatency}ms` : null,
-      selectedAgent ? `Agent: ${selectedAgent.name} (${selectedAgent.id})` : null,
-      selectedThread ? `Thread: ${selectedThread.threadId}` : null,
-      displayedRun ? `Run: ${displayedRun.runId} (${displayedRun.status})` : null,
-    ].filter(Boolean).join('\n');
-    try {
-      await navigator.clipboard.writeText(diagnostic);
-      addToast({ type: 'success', message: t('toast.copied') });
-    } catch {
-      addToast({ type: 'error', message: t('toast.error') });
-    }
-  }, [addToast, displayedRun, health?.version, isConnected, online, selectedAgent, selectedThread, t, wsLatency]);
-
-  const handleReviewApprovalsFromHome = useCallback(() => {
-    if (permissionRequests.length === 0) {
-      openSettings('permissions');
-      return;
-    }
+  const openRunWorkbench = useCallback(() => {
     setLeftSidebarView('thread');
-    if (displayedRun) setRightPanelOpen(true);
-  }, [displayedRun, openSettings, permissionRequests.length, setLeftSidebarView, setRightPanelOpen]);
+    setViewMode('agent');
+    if (displayedRun) {
+      setRightPanelOpen(true);
+      return;
+    }
+    openSettings('tasks');
+  }, [displayedRun, openSettings, setLeftSidebarView, setRightPanelOpen]);
+
+  const openTeamRunConsole = useCallback(() => {
+    setLeftSidebarView('thread');
+    setViewMode('teamrun');
+  }, [setLeftSidebarView]);
 
   const handleStartResize = useCallback((side: 'left' | 'right') => (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -1108,55 +873,27 @@ export default function App() {
     }
   }, [addToast, decidePermission, permissionRequests, t]);
 
-  const handleRetry = useCallback(async (messageId?: string) => {
-    const retry = findRetryPrompt(allMessages, messageId);
-    if (!retry) {
-      addToast({ type: 'info', message: t('toast.retryNoPrompt') });
-      return;
-    }
-    await handleSend(retry.prompt, selectedAgentId ?? undefined);
-  }, [addToast, allMessages, handleSend, selectedAgentId, t]);
-
-  const handleForkThread = useCallback(async (messageId?: string) => {
-    try {
-      const sourceTitle = selectedThread?.title ?? selectedAgent?.name ?? 'AgentHub';
-      const forkTitle = `Fork: ${sourceTitle}`.slice(0, 96);
-      const thread = await createThread(forkTitle);
-      addThreadToCache(thread, { suppressCreatedToast: true });
-      if (selectedAgent?.id) {
-        selectAgentThread(selectedAgent.id, thread.threadId);
-        setUserMessages([]);
-        setLeftSidebarView('thread');
-      } else {
-        handleSelectThread(thread.threadId);
-      }
-      queryClient.invalidateQueries({ queryKey: ['threads'] });
-      const draft = buildForkDraft({
-        sourceTitle,
-        sourceThreadId: selectedThread?.threadId ?? activeThreadId ?? undefined,
-        messages: allMessages,
-        messageId,
-      });
-      setPendingComposerDraft(draft);
-      addToast({ type: 'success', message: t('toast.forkCreated') });
-    } catch {
+  const handleReviewDecidePermission = useCallback(async (requestId: string, decision: 'allow' | 'deny', reason?: string) => {
+    const request = permissionRequests.find((item) => item.requestId === requestId);
+    if (!request?.runId) {
       addToast({ type: 'error', message: t('toast.error') });
+      throw new Error('permission request missing run');
     }
-  }, [
-    activeThreadId,
-    addThreadToCache,
-    addToast,
-    allMessages,
-    handleSelectThread,
-    queryClient,
-    selectAgentThread,
-    selectedAgent?.id,
-    selectedAgent?.name,
-    selectedThread?.threadId,
-    selectedThread?.title,
-    setLeftSidebarView,
-    t,
-  ]);
+    try {
+      await decidePermissionRest({ runId: request.runId, requestId, decision, reason });
+      decidePermission(requestId, decision, reason);
+    } catch (error) {
+      addToast({ type: 'error', message: t('toast.error') });
+      throw error;
+    }
+  }, [addToast, decidePermission, permissionRequests, t]);
+
+  const handleRetry = useCallback((messageId: string) => {
+    const msg = allMessages.find((m) => m.id === messageId);
+    if (!msg) return;
+    const prompt = msg.blocks.find((b) => b.kind === 'text')?.content;
+    if (prompt) handleSend(prompt, selectedAgentId ?? undefined);
+  }, [allMessages, handleSend, selectedAgentId]);
 
   const handleDelete = useCallback((messageId: string) => {
     setUserMessages((prev) => prev.filter((m) => m.id !== messageId));
@@ -1428,36 +1165,16 @@ export default function App() {
       }
       if (isEditableShortcutTarget(e.target)) return;
 
-      const shellModifier = e.ctrlKey || e.metaKey;
-      if (shortcutHelpOpen && !(e.key === '?' && !shellModifier)) return;
-      if (e.key === '?' && !shellModifier) {
+      if (shortcutHelpOpen && !matchesBinding(e, getBinding('help'))) return;
+      if (matchesBinding(e, getBinding('help'))) {
         e.preventDefault();
         setShortcutHelpOpen((v) => !v);
       }
-      if (shellModifier && e.altKey && e.key.toLowerCase() === 'n' && online) {
-        e.preventDefault();
-        void handleQuickChat();
-      } else if (shellModifier && e.key.toLowerCase() === 'n' && online) {
-        e.preventDefault();
-        void handleCreateThread();
-      } else if (shellModifier && e.key.toLowerCase() === 'o') {
-        e.preventDefault();
-        void handleOpenFolder();
-      } else if (shellModifier && e.key === ',') {
-        e.preventDefault();
-        openSettings('general');
-      } else if (shellModifier && e.key.toLowerCase() === 'w') {
-        e.preventDefault();
-        void handleWindowCommand('close');
-      } else if (shellModifier && e.key.toLowerCase() === 'p') {
-        e.preventDefault();
-        setFileSearchOpen(true);
-      }
-      if (shellModifier && e.key.toLowerCase() === 'b' && !workspaceExpanded && !isMobile) {
+      if (matchesBinding(e, getBinding('toggleSidebar')) && !workspaceExpanded && !isMobile) {
         e.preventDefault();
         setLeftSidebarCollapsed(!leftSidebarCollapsed);
       }
-      if (shellModifier && e.key.toLowerCase() === 'j' && displayedRun && !workspaceExpanded && !isMobile) {
+      if (matchesBinding(e, getBinding('toggleRunPanel')) && displayedRun && !workspaceExpanded && !isMobile) {
         e.preventDefault();
         setRightPanelOpen(!rightPanelOpen);
       }
@@ -1487,8 +1204,14 @@ export default function App() {
     if (target.closest('button, input, select, a')) return;
     try {
       const w = getCurrentWindow();
-      (await w.isMaximized()) ? w.unmaximize() : w.maximize();
-    } catch {}
+      if (await w.isMaximized()) {
+        void w.unmaximize();
+      } else {
+        void w.maximize();
+      }
+    } catch (error) {
+      console.warn('Failed to toggle window maximize:', error);
+    }
   }, []);
 
   // ── Render ─────────────────────────────────
@@ -1600,7 +1323,11 @@ export default function App() {
             </ShellIconButton>
             <ShellIconButton className={styles.winBtn} onClick={async () => {
               const w = getCurrentWindow();
-              (await w.isMaximized()) ? w.unmaximize() : w.maximize();
+              if (await w.isMaximized()) {
+                void w.unmaximize();
+              } else {
+                void w.maximize();
+              }
             }} label={t('window.maximize')} tooltipSide="bottom">
               <Square size={11} />
             </ShellIconButton>
@@ -1894,6 +1621,15 @@ export default function App() {
                 </ShellIconButton>
                 <ShellIconButton
                   className={styles.workspaceHeaderBtn}
+                  onClick={openTeamRunConsole}
+                  label={t('teamrun.open')}
+                  tooltipSide="bottom"
+                  aria-pressed={viewMode === 'teamrun'}
+                >
+                  <GitBranch size={15} />
+                </ShellIconButton>
+                <ShellIconButton
+                  className={styles.workspaceHeaderBtn}
                   onClick={() => openSettings('tasks')}
                   label={t('settings.tasks')}
                   tooltipSide="bottom"
@@ -1915,6 +1651,7 @@ export default function App() {
                     ) : null}
                   </span>
                 </ShellIconButton>
+                <NotificationBell />
                 {displayedRun && !effectiveRightPanelOpen && (
                   <ShellIconButton
                     className={styles.workspaceHeaderBtn}
@@ -1984,25 +1721,15 @@ export default function App() {
                   onOpenTeamRuns={() => openSettings('agentScheduling')}
                   onOpenHubAccount={handleOpenHubAccount}
                   permissionCount={permissionRequests.length}
-                  agentTeamOverview={agentTeamsQuery.data}
-                  agentTeamsLoading={agentTeamsQuery.isLoading || agentTeamsQuery.isFetching}
-                  agentTeamsSignedIn={hubInventoryEnabled}
-                  agents={agents}
-                  selectedAgentId={selectedAgentId ?? undefined}
-                  onSelectAgent={handleSelectAgent}
-                  onStartLocalOrchestration={handleStartLocalOrchestration}
-                  workspaces={recentWorkspaces}
-                  selectedWorkspacePath={workDirForGit || undefined}
-                  onSelectWorkspace={handleSelectWorkspace}
-                  onBrowseWorkspace={handleBrowseWorkspace}
-                  onRemoveWorkspace={handleRemoveWorkspace}
-                  onClearWorkspaces={handleClearWorkspaces}
-                  desktopAvailable={desktopWindowAvailable}
+                  onOpenTeamRuns={openTeamRunConsole}
+                  onOpenRuns={openRunWorkbench}
+                  onOpenApprovals={openRunWorkbench}
+                  onOpenAuth={() => useHubStore.getState().setShowAuthModal(true)}
                 />
               ) : viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
-              ) : viewMode === 'team' ? (
-                <ErrorBoundary><Suspense fallback={null}><Slot name="team-run-console" /></Suspense></ErrorBoundary>
+              ) : viewMode === 'teamrun' ? (
+                <ErrorBoundary><Suspense fallback={null}><Slot name="teamrun-console" /></Suspense></ErrorBoundary>
               ) : (
                 <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onFork={handleForkThread} onDelete={handleDelete} onSendMessage={handleSend} />
               )}
@@ -2015,7 +1742,7 @@ export default function App() {
               </div>
             )}
 
-            {!isMobile && !workspaceExpanded && displayedRun && rightPanelMounted && (
+            {!isMobile && !workspaceExpanded && displayedRun && (
               <div
                 className={`${styles.rightPanel} ${effectiveRightPanelOpen ? styles.rightPanelOpen : styles.rightPanelClosing}`}
                 role="dialog"
@@ -2031,6 +1758,12 @@ export default function App() {
                         outputText={displayedRun?.outputText ?? ''}
                         toolCalls={displayedRun?.toolCalls ?? []}
                         changedFiles={displayedRun?.changedFiles ?? []}
+                        diffs={runEvidence.diffs}
+                        approvals={permissionRequests}
+                        artifacts={runEvidence.artifacts.length > 0 ? runEvidence.artifacts : displayedRun && 'artifacts' in displayedRun ? displayedRun.artifacts : []}
+                        previews={runEvidence.previews.length > 0 ? runEvidence.previews : displayedRun && 'previews' in displayedRun ? displayedRun.previews : []}
+                        evidence={runEvidence}
+                        onDecideApproval={handleReviewDecidePermission}
                         onCancel={handleCancel}
                         chatMessages={allMessages}
                       />

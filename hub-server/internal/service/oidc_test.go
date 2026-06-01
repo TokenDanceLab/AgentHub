@@ -43,7 +43,7 @@ func setupOIDCDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE users (
 			id TEXT PRIMARY KEY,
 			username TEXT NOT NULL UNIQUE,
-			password_hash TEXT NOT NULL DEFAULT '',
+			password_hash TEXT,
 			nickname TEXT NOT NULL,
 			avatar_url TEXT DEFAULT '',
 			tokendance_sub TEXT,
@@ -284,6 +284,7 @@ func TestHandleCallback_SuccessUsesConfiguredJWKSAndIssuesHubSession(t *testing.
 	require.NotEmpty(t, result.User.ID)
 	require.NotNil(t, result.User.TokenDanceSub)
 	assert.Equal(t, "td-sub-1", *result.User.TokenDanceSub)
+	assert.Nil(t, result.User.PasswordHash)
 
 	claims, err := jwtutil.ParseToken(result.AccessToken, "hub-local-secret-minimum-32-chars")
 	require.NoError(t, err)
