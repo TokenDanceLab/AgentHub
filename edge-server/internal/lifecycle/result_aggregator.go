@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
 )
@@ -376,6 +377,18 @@ func (ra *ResultAggregator) handleRunComplete(evt events.EventEnvelope, status a
 	ra.mu.Unlock()
 
 	ra.registry.SetStatus(inst.ID, status, "")
+
+	// P1: Emit sub-agent status event on completion/error/cancellation.
+	ra.publish(adapters.BusEventSubAgentStatus, map[string]any{
+		"runId":    runID,
+		"parentId": inst.ParentID,
+	}, map[string]any{
+		"agentId":   inst.ID,
+		"agentName": inst.Name,
+		"status":    string(status),
+		"progress":  string(status),
+	})
+
 	ra.checkAllChildrenComplete(inst.ParentID)
 }
 
