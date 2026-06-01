@@ -9,8 +9,13 @@ export type {
   Message,
   Runner,
   Run,
+  RunInfo,
   RunStatus,
   StartRunRequest,
+  AgentCapabilities,
+  AgentInfo,
+  ThreadInfo,
+  ThreadItemInfo,
   RunLogs,
   RunDiff,
   Approval,
@@ -86,6 +91,106 @@ export { HUB_EVENTS } from './hubEvents';
 export type { HubEventType } from './hubEvents';
 
 export {
+  createHubClient,
+  HubError,
+  isHubResponseEnvelope,
+  parseHubError,
+  unwrapHubResponse,
+} from './hubClient';
+export type {
+  AddAgentToSessionRequest,
+  AuthResponse,
+  ChangePasswordRequest,
+  Contact,
+  ContactInfo,
+  CreateGroupSessionRequest,
+  CreatePrivateSessionRequest,
+  CustomAgentRequest,
+  Device,
+  FriendRequestInfo,
+  HubAddAgentToSessionRequest,
+  HubAgentDispatchFrame,
+  HubAgentDispatchPayload,
+  HubAgentCancelFrame,
+  HubAgentCancelPayload,
+  HubAgentDoneFrame,
+  HubAgentDonePayload,
+  HubAgentFailedFrame,
+  HubAgentFailedPayload,
+  HubAgentStreamFrame,
+  HubAgentStreamPayload,
+  HubAgentTask,
+  HubAgentTaskStatus,
+  HubAuthResponse,
+  HubChangePasswordRequest,
+  HubClient,
+  HubClientOptions,
+  HubContactInfo,
+  HubCreateGroupSessionRequest,
+  HubCreatePrivateSessionRequest,
+  HubCreateSessionResponse,
+  HubCustomAgent,
+  HubCustomAgentRequest,
+  HubDevice,
+  HubDeviceKickedFrame,
+  HubDeviceKickedPayload,
+  HubDeviceOfflineFrame,
+  HubDeviceOnlineFrame,
+  HubDevicePresencePayload,
+  HubAuditEvent,
+  HubExecutionTarget,
+  HubExecutionTargetRequest,
+  HubExecutionTargetType,
+  HubFrame,
+  HubFriendAcceptedFrame,
+  HubFriendEventPayload,
+  HubFriendRequestFrame,
+  HubFriendRequest,
+  HubKnownFrame,
+  HubLoginRequest,
+  HubListResponse,
+  HubMessage,
+  HubNotification,
+  HubNotificationNewFrame,
+  HubOidcAuthorizeRequest,
+  HubOidcAuthorizeResponse,
+  HubOidcCallbackRequest,
+  HubOidcCallbackResponse,
+  HubRegisterDeviceRequest,
+  HubRegisterRequest,
+  HubRelayCommand,
+  HubRelayCommandRequest,
+  HubResponseEnvelope,
+  HubSearchResult,
+  HubSendMessageRequest,
+  HubSendMessageResponse,
+  HubSession,
+  HubSessionMember,
+  HubTaskAckRequest,
+  HubTaskDoneRequest,
+  HubTaskFailRequest,
+  HubTaskRunRequest,
+  HubTaskStreamRequest,
+  HubTriggerAgentTaskRequest,
+  HubUpdateProfileRequest,
+  HubUpdateSessionInfoRequest,
+  HubUpdateSessionSettingsRequest,
+  HubUserProfile,
+  LoginRequest,
+  MessageResponse,
+  RegisterDeviceRequest,
+  RegisterRequest,
+  ReplyToInfo,
+  SearchResult,
+  SendMessageRequest,
+  SendMessageResponse,
+  Session,
+  SessionMember,
+  UpdateProfileRequest,
+  UserProfile,
+} from './hubClient';
+
+export {
   setBaseUrl,
   getBaseUrl,
   getHealth,
@@ -127,7 +232,58 @@ export {
 } from './apiClient';
 
 export { EventClient } from './eventClient';
-export type { EventListener, EventClientOptions } from './eventClient';
+export type {
+  EventClientOptions,
+  EventConnectionListener,
+  EventConnectionStatus,
+  EventListener,
+} from './eventClient';
+
+export {
+  createWorkbenchState,
+  initialWorkbenchState,
+  workbenchReducer,
+} from './workbenchState';
+export type {
+  WorkbenchAction,
+  WorkbenchConnectionStatus,
+  WorkbenchSnapshot,
+  WorkbenchState,
+} from './workbenchState';
+export {
+  getWorkbenchCatalogState,
+  getWorkbenchDataMode,
+  getWorkbenchSectionSource,
+  workbenchDataModeLabels,
+  workbenchDataModeTones,
+} from './workbenchDataMode';
+export type {
+  WorkbenchCatalogState,
+  WorkbenchCatalogTone,
+  WorkbenchDataMode,
+  WorkbenchSectionSource,
+  WorkbenchSectionSourceInput,
+} from './workbenchDataMode';
+
+export {
+  SURFACE_METADATA,
+  SURFACE_STATUS_METADATA,
+  getSurfaceByDesktopSectionId,
+  getSurfaceByWebRoute,
+  getSurfaceMetadata,
+  getSurfaceStatusMetadata,
+  getSurfacesByCategory,
+  surfaceMetadataById,
+  surfaceStatusById,
+} from './surfaceMetadata';
+export type {
+  SurfaceCategory,
+  SurfaceId,
+  SurfaceMetadata,
+  SurfacePlatform,
+  SurfaceStatus,
+  SurfaceStatusMetadata,
+} from './surfaceMetadata';
 
 export {
   mockProject,
@@ -146,30 +302,3 @@ export {
   playRunLifecycle,
   playMessageStream,
 } from './mock';
-
-// Workbench state management (shared across Desktop and Web)
-export {
-  workbenchReducer,
-  type WorkbenchState,
-  type WorkbenchAction,
-  type WorkbenchSnapshot,
-} from './workbenchState';
-
-// Workbench data mode classifier
-export {
-  getWorkbenchDataMode,
-  getWorkbenchCatalogState,
-  getWorkbenchSectionSource,
-  type WorkbenchDataMode,
-  type WorkbenchCatalogState,
-} from './workbenchDataMode';
-
-// Hub REST client (shared across Desktop and Web)
-export {
-  createHubClient,
-  type HubClient,
-  type HubEnvelope,
-  type HubSession,
-  type HubMessage,
-  type HubContactInfo,
-} from './hubClient';

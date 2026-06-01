@@ -2,7 +2,6 @@
 // Uses mocked fetch (via vitest) to avoid hitting real servers.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { HubAuth } from './hubAuth';
 
 // ── Mock setup ────────────────────────────────────
 
@@ -19,7 +18,9 @@ const localStorageMock = (() => {
   return {
     getItem: vi.fn((key: string) => store[key] ?? null),
     setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
-    removeItem: vi.fn((key: string) => { delete store[key]; }),
+    removeItem: vi.fn((key: string) => {
+      store = Object.fromEntries(Object.entries(store).filter(([entryKey]) => entryKey !== key));
+    }),
     clear: vi.fn(() => { store = {}; }),
     get length() { return Object.keys(store).length; },
     key: vi.fn((index: number) => Object.keys(store)[index] ?? null),
@@ -31,7 +32,9 @@ const sessionStorageMock = (() => {
   return {
     getItem: vi.fn((key: string) => store[key] ?? null),
     setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
-    removeItem: vi.fn((key: string) => { delete store[key]; }),
+    removeItem: vi.fn((key: string) => {
+      store = Object.fromEntries(Object.entries(store).filter(([entryKey]) => entryKey !== key));
+    }),
     clear: vi.fn(() => { store = {}; }),
     get length() { return Object.keys(store).length; },
     key: vi.fn((index: number) => Object.keys(store)[index] ?? null),
@@ -97,8 +100,8 @@ describe('PKCE helpers', () => {
 describe('OIDC state validation', () => {
   it('detects state mismatch (CSRF protection)', () => {
     // Use let to avoid TypeScript narrowing these to literal types
-    let expectedState = 'server-state-abc';
-    let receivedState = 'attacker-state-xyz';
+    const expectedState = 'server-state-abc';
+    const receivedState = 'attacker-state-xyz';
     const isValid = receivedState === expectedState;
     expect(isValid).toBe(false);
   });
