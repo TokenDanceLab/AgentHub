@@ -158,8 +158,9 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	}
 
 	// Session continuity from run context
-	if ctx.SessionID != "" {
-		// --session-id for explicit ID assignment; --resume for picking up existing session
+	if ctx.SessionID != "" && ctx.ContinueLast {
+		args = append(args, "--resume", ctx.SessionID)
+	} else if ctx.SessionID != "" {
 		args = append(args, "--session-id", ctx.SessionID)
 	} else if ctx.ContinueLast {
 		args = append(args, "--continue")
