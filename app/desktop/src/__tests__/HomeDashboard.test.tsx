@@ -93,10 +93,10 @@ describe('HomeDashboard', () => {
   });
 
   it('renders pending approvals card', () => {
-    const onOpenApprovals = vi.fn();
+    const props = dashboardProps();
     render(
       <HomeDashboard
-        {...dashboardProps()}
+        {...props}
         permissionCount={3}
       />,
     );
@@ -104,7 +104,7 @@ describe('HomeDashboard', () => {
     expect(screen.getByText('home.pendingApprovals')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     fireEvent.click(screen.getByText('home.reviewApprovals'));
-    expect(onOpenApprovals).toHaveBeenCalledTimes(1);
+    expect(props.onReviewApprovals).toHaveBeenCalledTimes(1);
   });
 
   it('renders Hub session and bridged task summary', () => {
@@ -115,8 +115,8 @@ describe('HomeDashboard', () => {
     );
 
     expect(screen.getByText('home.hubSession')).toBeInTheDocument();
-    expect(screen.getByText('home.hubConnected')).toBeInTheDocument();
-    expect(screen.getByText('home.hubBridgeSummary')).toBeInTheDocument();
+    expect(screen.getByText('home.localOnly')).toBeInTheDocument();
+    expect(screen.getByText('home.hubSignedOut')).toBeInTheDocument();
   });
 
   it('opens TeamRun Console from the dashboard card', () => {

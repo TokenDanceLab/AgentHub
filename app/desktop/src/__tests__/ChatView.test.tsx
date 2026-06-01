@@ -262,9 +262,9 @@ describe('ChatView', () => {
       ],
     };
     render(<ChatView messages={[msg]} />);
-    // The toggle button should show tool name and status
-    expect(screen.getByText('read_file')).toBeInTheDocument();
-    expect(screen.getByText(/chat\.toolStatus\.completed/)).toBeInTheDocument();
+    // Tools now render inside ToolGroup with summary chips
+    expect(screen.getByTestId('tool-group')).toBeInTheDocument();
+    expect(screen.getByText('chat.toolGroupSummary(count=1)')).toBeInTheDocument();
   });
 
   it('renders file_change blocks with summary metadata', () => {

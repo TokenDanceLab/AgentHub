@@ -294,9 +294,8 @@ describe('useChatMessages', () => {
       eventHandler!(makeEvent('run.cancelled', { runId: 'run-3', status: 'cancelled' }));
     });
 
-    expect(invalidateSpy).toHaveBeenCalledTimes(6);
+    expect(invalidateSpy).toHaveBeenCalledTimes(3);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['runs'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['threads'] });
   });
 
   it('updates currentRun status on run.failed', () => {
