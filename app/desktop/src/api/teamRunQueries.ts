@@ -4,12 +4,13 @@ import {
   type AgentTeam,
   type AgentTeamEvent,
   type AgentTeamRun,
-  type HubListResponse,
   type TeamRunState,
 } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
 
 const hubClient = createHubClient({ getToken: getAccessToken });
+
+type HubListResponse<T> = T[] | { items: T[] } | null | undefined;
 
 function listItems<T>(value: HubListResponse<T> | null | undefined): T[] {
   if (Array.isArray(value)) return value;

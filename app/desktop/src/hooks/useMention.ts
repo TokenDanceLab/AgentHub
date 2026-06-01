@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { AgentInfo } from '@shared/types';
 
 export type MentionKind = 'agent' | 'file' | 'thread';
