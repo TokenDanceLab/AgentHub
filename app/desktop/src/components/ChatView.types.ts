@@ -85,6 +85,46 @@ export type MessageBlock =
       model?: string;
       provider?: string;
       variant?: 'usage' | 'warning' | 'compaction';
+    }
+  | {
+      kind: 'artifact';
+      artifactId: string;
+      artifactType: string;
+      title: string;
+      artifactUrl?: string;
+      url?: string;
+      previewUrl?: string;
+      canApplyDiff?: boolean;
+      diffApplied?: boolean;
+      size?: number;
+    }
+  | {
+      kind: 'approval';
+      approvalId: string;
+      status: string;
+    }
+  | {
+      kind: 'tool_group';
+      totalCount: number;
+    }
+  | {
+      kind: 'deploy_card';
+      deployId?: string;
+    }
+  | {
+      kind: 'link_card';
+      url: string;
+    }
+  | {
+      kind: 'error';
+    }
+  | {
+      kind: 'citation';
+      url?: string;
+      text?: string;
+    }
+  | {
+      kind: 'compact';
     };
 
 // Tool result subtypes (nested under tool_use, 参考: Cline DiffEditRow 双格式)
