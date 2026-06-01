@@ -107,6 +107,36 @@ export const RunInfoSchema = z.object({
  * Parse an API response with a Zod schema. On failure, logs a warning
  * and returns the raw data (never throws), so schema drift cannot white-screen the UI.
  */
+export const RunDiffFileSchema = z.object({
+  path: z.string(),
+  diff: z.string(),
+  status: z.enum(['added', 'modified', 'deleted']),
+});
+
+export const RunDiffSchema = z.object({
+  runId: z.string(),
+  files: z.array(RunDiffFileSchema),
+});
+
+export const ArtifactSchema = z.object({
+  id: z.string(),
+  runId: z.string(),
+  threadId: z.string(),
+  kind: z.string(),
+  path: z.string(),
+  sizeBytes: z.number(),
+  createdAt: z.string(),
+});
+
+export const PreviewSchema = z.object({
+  id: z.string(),
+  runId: z.string(),
+  threadId: z.string(),
+  url: z.string().optional(),
+  status: z.enum(['starting', 'ready', 'stopped']),
+  createdAt: z.string(),
+});
+
 export function safeParse<T>(schema: z.ZodType<T>, data: unknown, label: string): T {
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
