@@ -79,7 +79,7 @@ describe('ConversationList', () => {
 
     // Click the second conversation
     const buttons = screen.getAllByRole('button');
-    fireEvent.click(buttons[1]);
+    fireEvent.click(buttons[1]!);
     expect(onSelect).toHaveBeenCalledWith('second');
   });
 
