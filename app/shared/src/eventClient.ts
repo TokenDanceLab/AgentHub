@@ -21,7 +21,6 @@ export class EventClient {
   private listeners = new Set<EventListener>();
   private connectionListeners = new Set<EventConnectionListener>();
   private typeListeners = new Map<string, Set<EventListener>>();
-  private connectionListeners = new Set<EventConnectionListener>();
   private baseUrl: string;
   private cursor: string | undefined;
   private reconnectDelayMs: number;
@@ -134,11 +133,6 @@ export class EventClient {
     return () => set?.delete(listener);
   }
 
-  onConnection(listener: EventConnectionListener): () => void {
-    this.connectionListeners.add(listener);
-    return () => this.connectionListeners.delete(listener);
-  }
-
   private dispatchConnection(status: EventConnectionStatus, error?: string): void {
     for (const fn of this.connectionListeners) {
       try {
@@ -165,19 +159,6 @@ export class EventClient {
         } catch {
           // ignore
         }
-      }
-    }
-  }
-
-  private dispatchConnection(
-    status: EventConnectionStatus,
-    error?: string,
-  ): void {
-    for (const fn of this.connectionListeners) {
-      try {
-        fn(status, error);
-      } catch {
-        // Don't let one listener break others.
       }
     }
   }
