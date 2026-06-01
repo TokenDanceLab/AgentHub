@@ -15,6 +15,16 @@ start, terminal replay, cancel, offline reconnect, and active-run count recovery
 - Prebuilt Edge binary: no `edge-server/*.exe` binary was present in this worktree.
 - Runtime CLI availability: Codex and Claude CLIs were discoverable; OpenCode was not discoverable.
 
+## 2026-06-01 Recheck
+
+- Stack hygiene recheck ran after restacking #226/#227/#228 on top of #225.
+- `codex` was discoverable on PATH.
+- `claude` was discoverable on PATH.
+- `opencode` was not discoverable on PATH.
+- `go` was still not discoverable on PATH, and no `edge-server/*.exe` prebuilt Edge binary was present.
+- `powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\integration-smoke.ps1 -Agent codex -EdgeAddr 127.0.0.1:3231` stopped at the environment check because `go` was not recognized.
+- `powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\client-smoke.ps1 -EdgeAddr 127.0.0.1:3228` stopped at the same `go` prerequisite check.
+
 ## Result
 
 Live Runtime smoke is locked for this machine until Local Edge can be started.
