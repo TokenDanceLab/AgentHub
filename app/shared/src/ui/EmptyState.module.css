@@ -63,7 +63,6 @@
   font-size: var(--font-size-sm, 0.875rem);
   font-weight: 560;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.15s;
 }
 
 .action:hover {
@@ -71,8 +70,14 @@
   background: color-mix(in oklch, var(--primary) 10%, var(--card));
 }
 
-.action:active {
-  transform: scale(0.98);
+@media (prefers-reduced-motion: no-preference) {
+  .action {
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  }
+
+  .action:active {
+    transform: scale(0.98);
+  }
 }
 
 .suggestions {
@@ -96,17 +101,25 @@
   font-family: var(--font-sans);
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .suggestionChip {
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  }
+
+  .suggestionChip:hover {
+    transform: translateY(-1px);
+  }
+
+  .suggestionChip:active {
+    transform: scale(0.98);
+  }
 }
 
 .suggestionChip:hover {
   border-color: color-mix(in oklch, var(--primary) 22%, var(--border));
   background: color-mix(in oklch, var(--primary) 8%, var(--card));
-  transform: translateY(-1px);
-}
-
-.suggestionChip:active {
-  transform: scale(0.98);
 }
 
 .suggestionIcon {
@@ -120,16 +133,16 @@
   .container {
     animation: emptyStateIn 0.18s ease-out;
   }
-}
 
-@keyframes emptyStateIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  @keyframes emptyStateIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
 

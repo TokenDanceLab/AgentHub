@@ -1,7 +1,7 @@
-import { useRef, useEffect, memo } from 'react';
+import { useRef, useEffect, memo, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { MessageSquareText } from 'lucide-react';
+import { MessageSquareText, CornerUpLeft, Forward, RotateCcw, X } from 'lucide-react';
 import { EmptyState, MessageBubble } from '@shared/ui';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import type { IMMessage } from './types';
@@ -10,6 +10,9 @@ import styles from './IMMessageView.module.css';
 interface IMMessageViewProps {
   messages: IMMessage[];
   currentUserId?: string | undefined;
+  onReply?: (message: IMMessage) => void;
+  onRecall?: (message: IMMessage) => void;
+  onForward?: (message: IMMessage) => void;
 }
 
 function localeFromLanguage(language: string | undefined): string {
@@ -71,48 +74,134 @@ function SenderAvatar({
   );
 }
 
+/** Check if message can be recalled (own message, not already recalled, within 2 min) */
+function canRecallMessage(message: IMMessage, currentUserId?: string): boolean {
+  if (message.recalled || message.content === '[Message recalled]') return false;
+  if (message.senderType !== 'user') return false;
+  if (currentUserId && message.senderId !== currentUserId) return false;
+  const elapsed = Date.now() - new Date(message.timestamp).getTime();
+  return elapsed < 2 * 60 * 1000;
+}
+
 const IMMessageBubble = memo(function IMMessageBubble({
   message,
   isOwn,
   t,
   language,
+  replyPreview,
+  onReply,
+  onRecall,
+  onForward,
 }: {
   message: IMMessage;
   isOwn: boolean;
   t: TFunction;
   language: string | undefined;
+  replyPreview?: IMMessage | undefined;
+  onReply?: (message: IMMessage) => void;
+  onRecall?: (message: IMMessage) => void;
+  onForward?: (message: IMMessage) => void;
 }) {
   const isRecalled = message.content === '[Message recalled]';
   const senderTypeLabel = t(`im.message.sender.${message.senderType}`);
+  const [hovered, setHovered] = useState(false);
+  const showActions = !isRecalled && (onReply || onRecall || onForward);
+  const canRecall = canRecallMessage(message, undefined) && isOwn;
+
+  const handleMouseEnter = useCallback(() => setHovered(true), []);
+  const handleMouseLeave = useCallback(() => setHovered(false), []);
 
   return (
-    <MessageBubble
-      className={styles.messageRow}
-      bubbleClassName={`${styles.bubble} ${isOwn ? styles.userBubble : styles.agentBubble} ${authorityClass(message.authority)}`}
-      metaClassName={styles.senderRow}
-      contentClassName={`${styles.content} ${isRecalled ? styles.recalled : ''}`}
-      align={isOwn ? 'end' : 'start'}
-      contentAs="div"
-      author={(
-        <>
-          <SenderAvatar name={message.senderName} senderType={message.senderType} />
-          <span className={styles.senderName}>{message.senderName}</span>
-          <span className={`${styles.authorityBadge} ${authorityBadgeClass(message.authority)}`}>
-            {message.authority}
-          </span>
-        </>
-      )}
-      timestamp={formatTime(message.timestamp, t, language)}
-      ariaLabel={t('im.message.ariaLabel', { type: senderTypeLabel, name: message.senderName })}
+    <div
+      className={styles.bubbleWrapper}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-      <MarkdownRenderer content={message.content} />
-    </MessageBubble>
+      {/* Reply preview — show the message being replied to */}
+      {replyPreview ? (
+        <div className={`${styles.replyPreview} ${isOwn ? styles.replyPreviewOwn : styles.replyPreviewOther}`}>
+          <CornerUpLeft size={12} className={styles.replyPreviewIcon} />
+          <div className={styles.replyPreviewContent}>
+            <span className={styles.replyPreviewSender}>{replyPreview.senderName}</span>
+            <span className={styles.replyPreviewText}>
+              {replyPreview.content.length > 80
+                ? replyPreview.content.slice(0, 80) + '...'
+                : replyPreview.content}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      <MessageBubble
+        className={styles.messageRow}
+        bubbleClassName={`${styles.bubble} ${isOwn ? styles.userBubble : styles.agentBubble} ${authorityClass(message.authority)}`}
+        metaClassName={styles.senderRow}
+        contentClassName={`${styles.content} ${isRecalled ? styles.recalled : ''}`}
+        align={isOwn ? 'end' : 'start'}
+        contentAs="div"
+        author={(
+          <>
+            <SenderAvatar name={message.senderName} senderType={message.senderType} />
+            <span className={styles.senderName}>{message.senderName}</span>
+            <span className={`${styles.authorityBadge} ${authorityBadgeClass(message.authority)}`}>
+              {message.authority}
+            </span>
+          </>
+        )}
+        timestamp={formatTime(message.timestamp, t, language)}
+        ariaLabel={t('im.message.ariaLabel', { type: senderTypeLabel, name: message.senderName })}
+      >
+        <MarkdownRenderer content={message.content} />
+      </MessageBubble>
+
+      {/* Action buttons — show on hover for non-recalled messages */}
+      {showActions && hovered ? (
+        <div className={`${styles.actionBar} ${isOwn ? styles.actionBarOwn : styles.actionBarOther}`}>
+          {onReply ? (
+            <button
+              type="button"
+              className={styles.actionBtn}
+              onClick={() => onReply(message)}
+              title="Reply"
+              aria-label="Reply"
+            >
+              <CornerUpLeft size={14} />
+            </button>
+          ) : null}
+          {onForward ? (
+            <button
+              type="button"
+              className={styles.actionBtn}
+              onClick={() => onForward(message)}
+              title="Forward"
+              aria-label="Forward"
+            >
+              <Forward size={14} />
+            </button>
+          ) : null}
+          {onRecall && canRecall ? (
+            <button
+              type="button"
+              className={styles.actionBtn}
+              onClick={() => onRecall(message)}
+              title="Recall"
+              aria-label="Recall"
+            >
+              <RotateCcw size={14} />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 });
 
 const IMMessageView = memo(function IMMessageView({
   messages,
   currentUserId,
+  onReply,
+  onRecall,
+  onForward,
 }: IMMessageViewProps) {
   const { t, i18n } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -139,11 +228,18 @@ const IMMessageView = memo(function IMMessageView({
     );
   }
 
+  // Build a lookup of messages by ID for reply previews
+  const messageById = new Map<string, IMMessage>();
+  for (const msg of messages) {
+    if (!messageById.has(msg.id)) messageById.set(msg.id, msg);
+  }
+
   return (
     <div className={styles.root}>
       <div className={styles.stream} role="log" aria-live="polite">
         {messages.map((msg) => {
           const isOwn = currentUserId ? msg.senderId === currentUserId : msg.senderType === 'user';
+          const replyPreview = msg.replyToId ? messageById.get(msg.replyToId) : undefined;
           return (
             <div key={msg.id} className={styles.messageItem}>
               <IMMessageBubble
@@ -151,6 +247,10 @@ const IMMessageView = memo(function IMMessageView({
                 isOwn={isOwn}
                 t={t}
                 language={i18n.resolvedLanguage || i18n.language}
+                {...(replyPreview ? { replyPreview } : {})}
+                {...(onReply ? { onReply } : {})}
+                {...(onRecall ? { onRecall } : {})}
+                {...(onForward ? { onForward } : {})}
               />
             </div>
           );

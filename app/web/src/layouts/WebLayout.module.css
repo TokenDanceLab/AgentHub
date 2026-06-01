@@ -98,6 +98,8 @@
 .accountBtn,
 .statusPill,
 .statusPillOnline,
+.statusPillReconnecting,
+.statusPillError,
 .surfaceTab,
 .surfaceTabActive {
   display: inline-flex;
@@ -117,6 +119,8 @@
 [data-theme='dark'] .accountBtn,
 [data-theme='dark'] .statusPill,
 [data-theme='dark'] .statusPillOnline,
+[data-theme='dark'] .statusPillReconnecting,
+[data-theme='dark'] .statusPillError,
 [data-theme='dark'] .surfaceTab,
 [data-theme='dark'] .surfaceTabActive {
   border-color: rgba(255, 255, 255, 0.065);
@@ -143,7 +147,9 @@
 
 .accountBtn,
 .statusPill,
-.statusPillOnline {
+.statusPillOnline,
+.statusPillReconnecting,
+.statusPillError {
   gap: 6px;
   max-width: 180px;
   padding: 0 10px;
@@ -153,7 +159,9 @@
 
 .accountBtn span,
 .statusPill span,
-.statusPillOnline span {
+.statusPillOnline span,
+.statusPillReconnecting span,
+.statusPillError span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -161,6 +169,24 @@
 
 .statusPillOnline {
   color: oklch(0.46 0.13 152);
+}
+
+.statusPillReconnecting {
+  color: oklch(0.58 0.16 82);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.statusPillError {
+  color: oklch(0.48 0.18 27);
 }
 
 .iconBtn:hover,
@@ -579,6 +605,47 @@
   font-weight: 650;
 }
 
+/* ── Recovery banner ───────────────────── */
+
+.recoveryBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 10px 0;
+  padding: 8px 12px;
+  border: 1px solid oklch(0.48 0.18 27 / 0.3);
+  border-radius: 8px;
+  background: oklch(0.48 0.18 27 / 0.08);
+  color: oklch(0.48 0.18 27);
+  font-size: 13px;
+  font-weight: 620;
+}
+
+[data-theme='dark'] .recoveryBanner {
+  border-color: oklch(0.55 0.16 27 / 0.22);
+  background: oklch(0.48 0.18 27 / 0.06);
+}
+
+.recoveryRetryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.recoveryRetryBtn:hover {
+  background: oklch(0.48 0.18 27 / 0.12);
+}
+
 .scrim {
   position: fixed;
   inset: 54px 0 0;
@@ -639,7 +706,9 @@
   .iconBtnActive,
   .accountBtn,
   .statusPill,
-  .statusPillOnline {
+  .statusPillOnline,
+  .statusPillReconnecting,
+  .statusPillError {
     min-height: 44px;
   }
 
@@ -653,6 +722,8 @@
   .accountBtn,
   .statusPill,
   .statusPillOnline,
+  .statusPillReconnecting,
+  .statusPillError,
   .surfaceTabs {
     display: none;
   }

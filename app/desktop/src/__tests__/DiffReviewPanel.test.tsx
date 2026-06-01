@@ -1,11 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import DiffReviewPanel from '@/components/DiffReviewPanel';
-import type { DiffReviewFile } from '@/components/DiffReviewPanel';
+import { DiffReviewPanel } from '@shared/ui/DiffReviewPanel';
+import type { DiffReviewFile } from '@shared/ui/DiffReviewPanel';
 
-// Import i18n so useTranslation works
-import '@/i18n';
+// i18n no longer needed — shared DiffReviewPanel uses label props, not useTranslation
 
 function makeHunk(lines: Array<{
   type: 'context' | 'added' | 'deleted';

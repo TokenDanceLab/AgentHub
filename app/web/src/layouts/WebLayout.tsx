@@ -19,8 +19,9 @@ import {
   WifiOff,
   Wrench,
   X,
+  UserCog,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAgentList } from '@/api/agentQueries';
@@ -57,7 +58,7 @@ import SettingsPage from '@/components/SettingsPage';
 import { ToastContainer } from '@/components/Toast';
 import styles from './WebLayout.module.css';
 
-type MainSurface = 'workspace' | 'messages' | 'settings';
+type MainSurface = 'workspace' | 'messages' | 'teamRun' | 'settings';
 type WebRunInfo = RunInfo & ReturnType<typeof projectRunDetail>;
 
 interface RouteContext {
@@ -68,11 +69,13 @@ interface RouteContext {
 const SURFACE_PATHS: Record<MainSurface, string> = {
   workspace: '/',
   messages: '/chats',
+  teamRun: '/team',
   settings: '/settings',
 };
 
 function surfaceFromPath(pathname: string): MainSurface {
   if (pathname === '/chats' || pathname.startsWith('/chats/')) return 'messages';
+  if (pathname === '/team' || pathname.startsWith('/team/')) return 'teamRun';
   if (pathname === '/settings' || pathname.startsWith('/settings/')) return 'settings';
   return 'workspace';
 }
@@ -155,6 +158,12 @@ export default function WebLayout() {
   const setMobileSidebarOpen = useUIStore((s) => s.setMobileSidebarOpen);
   const setMobileRightPanelOpen = useUIStore((s) => s.setMobileRightPanelOpen);
   const setOnline = useConnectionStore((s) => s.setOnline);
+  const reconnecting = useConnectionStore((s) => s.reconnecting);
+  const recoveryState = useConnectionStore((s) => s.recoveryState);
+  const recoveryError = useConnectionStore((s) => s.recoveryError);
+  const setRecoveryState = useConnectionStore((s) => s.setRecoveryState);
+  const setRecoveryError = useConnectionStore((s) => s.setRecoveryError);
+  const setLastEventSeq = useConnectionStore((s) => s.setLastEventSeq);
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const username = useHubStore((s) => s.username);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
@@ -170,6 +179,7 @@ export default function WebLayout() {
   const [optimisticRun, setOptimisticRun] = useState<WebRunInfo | null>(null);
   const [taskRunEvents, setTaskRunEvents] = useState<AgentRunEvent[]>([]);
   const [runStartPending, setRunStartPending] = useState(false);
+  const recoveryInProgressRef = useRef(false);
   const [mainSurface, setMainSurface] = useState<MainSurface>(() =>
     typeof window === 'undefined' ? 'workspace' : surfaceFromPath(window.location.pathname),
   );
@@ -242,6 +252,62 @@ export default function WebLayout() {
     window.addEventListener('popstate', syncSurfaceFromPath);
     return () => window.removeEventListener('popstate', syncSurfaceFromPath);
   }, []);
+
+  // Track last event seq cursor for stream recovery
+  useEffect(() => {
+    const taskId = optimisticRun?.runId;
+    if (!taskId || taskRunEvents.length === 0) return;
+    let maxSeq = 0;
+    for (const event of taskRunEvents) {
+      if (event.event_seq != null && event.event_seq > maxSeq) {
+        maxSeq = event.event_seq;
+      }
+    }
+    if (maxSeq > 0) {
+      setLastEventSeq(taskId, maxSeq);
+    }
+  }, [optimisticRun?.runId, setLastEventSeq, taskRunEvents]);
+
+  // Stream recovery on WebSocket reconnection
+  useEffect(() => {
+    const taskId = optimisticRun?.runId;
+
+    // Detect reconnection via the justReconnected flag from useHubWSConnection
+    if (hubRealtime.justReconnected && taskId && !recoveryInProgressRef.current) {
+      recoveryInProgressRef.current = true;
+      setRecoveryState('recovering');
+      setRecoveryError(null);
+
+      hubClient.listTaskRunEvents(taskId)
+        .then((recovered) => {
+          // Merge recovered events with existing ones (mergeAgentRunEvents deduplicates by key)
+          setTaskRunEvents((current) => mergeAgentRunEvents(current, recovered));
+          setRecoveryState('idle');
+          recoveryInProgressRef.current = false;
+        })
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : 'Failed to recover stream events';
+          setRecoveryError(message);
+          setRecoveryState('failed');
+          recoveryInProgressRef.current = false;
+        });
+    }
+
+    // Reset when connection is lost
+    const isConnected = hubRealtime.authenticated && hubRealtime.status === 'connected';
+    if (!isConnected) {
+      recoveryInProgressRef.current = false;
+    }
+  }, [hubRealtime.justReconnected, hubRealtime.authenticated, hubRealtime.status, optimisticRun?.runId, hubClient, setRecoveryState, setRecoveryError]);
+
+  // Clear recovery state when optimisticRun changes (new task started)
+  useEffect(() => {
+    if (!optimisticRun?.runId) {
+      setRecoveryState('idle');
+      setRecoveryError(null);
+      recoveryInProgressRef.current = false;
+    }
+  }, [optimisticRun?.runId, setRecoveryState, setRecoveryError]);
 
   const selectMainSurface = useCallback((surface: MainSurface) => {
     setMainSurface(surface);
@@ -477,6 +543,9 @@ export default function WebLayout() {
       hubWS: hubRealtime.hubWS,
       hubWSStatus: hubRealtime.status,
       hubWSAuthenticated: hubRealtime.authenticated,
+      hubReconnecting: reconnecting,
+      hubRecoveryState: recoveryState,
+      hubRecoveryError: recoveryError,
       hubAuthenticated,
       isConnected: online,
       isStreaming: runStartPending || optimisticRun?.status === 'queued' || optimisticRun?.status === 'running',
@@ -518,6 +587,9 @@ export default function WebLayout() {
       hubRealtime.authenticated,
       hubRealtime.hubWS,
       hubRealtime.status,
+      reconnecting,
+      recoveryState,
+      recoveryError,
       online,
       optimisticRun,
       projectedRun,
@@ -566,9 +638,15 @@ export default function WebLayout() {
   const showDesktopDetail = !isMobile && rightPanelOpen;
   const realtimeLabel = !hubAuthenticated
     ? t('webShell.status.realtimeSignIn')
-    : hubRealtime.authenticated
-      ? t('webShell.status.realtimeLive')
-      : t('webShell.status.realtimeState', { state: hubRealtime.status });
+    : recoveryState === 'recovering'
+      ? t('status.reconnecting')
+      : recoveryState === 'failed'
+        ? t('webChat.recoveryFailed')
+        : reconnecting
+          ? t('status.reconnecting')
+          : hubRealtime.authenticated
+            ? t('webShell.status.realtimeLive')
+            : t('webShell.status.realtimeState', { state: hubRealtime.status });
   const routeContextIcon =
     routeContext?.surface.id === 'web.agentSquare'
       ? <Bot size={16} />
@@ -636,6 +714,17 @@ export default function WebLayout() {
                 <MessageSquare size={15} />
                 <span>{t('webShell.surface.messages')}</span>
               </button>
+              <button
+                className={mainSurface === 'teamRun' ? styles.surfaceTabActive : styles.surfaceTab}
+                onClick={() => selectMainSurface('teamRun')}
+                aria-label={t('view.teamRun', 'TeamRun')}
+                aria-selected={mainSurface === 'teamRun'}
+                role="tab"
+                type="button"
+              >
+                <UserCog size={15} />
+                <span>{t('view.teamRun', 'TeamRun')}</span>
+              </button>
             </div>
             <span className={online ? styles.statusPillOnline : styles.statusPill}>
               {online ? <Wifi size={14} /> : <WifiOff size={14} />}
@@ -645,7 +734,11 @@ export default function WebLayout() {
                   : t('webShell.status.restIdle')}
               </span>
             </span>
-            <span className={hubRealtime.authenticated ? styles.statusPillOnline : styles.statusPill}>
+            <span className={
+              recoveryState === 'failed' ? styles.statusPillError :
+              recoveryState === 'recovering' || reconnecting ? styles.statusPillReconnecting :
+              hubRealtime.authenticated ? styles.statusPillOnline : styles.statusPill
+            }>
               {hubRealtime.authenticated ? <Wifi size={14} /> : <WifiOff size={14} />}
               <span>{realtimeLabel}</span>
             </span>
@@ -763,6 +856,8 @@ export default function WebLayout() {
                 />
               ) : mainSurface === 'messages' ? (
                 <Slot name="im-view" {...shellProps} />
+              ) : mainSurface === 'teamRun' ? (
+                <Slot name="team-run-console" {...shellProps} />
               ) : (
                 <>
                   {routeContext && (
@@ -805,6 +900,32 @@ export default function WebLayout() {
                         </>
                       )}
                     />
+                  )}
+                  {recoveryState === 'failed' && optimisticRun && (
+                    <div className={styles.recoveryBanner}>
+                      <span>{t('webChat.recoveryFailed')}</span>
+                      <button
+                        className={styles.recoveryRetryBtn}
+                        type="button"
+                        onClick={() => {
+                          if (optimisticRun?.runId) {
+                            setRecoveryState('recovering');
+                            hubClient.listTaskRunEvents(optimisticRun.runId)
+                              .then((recovered) => {
+                                setTaskRunEvents((current) => mergeAgentRunEvents(current, recovered));
+                                setRecoveryState('idle');
+                                setRecoveryError(null);
+                              })
+                              .catch((err) => {
+                                setRecoveryError(err instanceof Error ? err.message : 'Recovery failed');
+                                setRecoveryState('failed');
+                              });
+                          }
+                        }}
+                      >
+                        {t('chat.action.retry')}
+                      </button>
+                    </div>
                   )}
                   <Slot name="main-view" {...shellProps} />
                   <Slot name="prompt-input" {...shellProps} />
@@ -861,6 +982,19 @@ export default function WebLayout() {
             >
               <MessageSquare size={20} />
               <span>{t('webShell.surface.messages')}</span>
+            </button>
+            <button
+              className={mainSurface === 'teamRun' ? styles.mobileSurfaceNavItemActive : styles.mobileSurfaceNavItem}
+              type="button"
+              aria-current={mainSurface === 'teamRun' ? 'page' : undefined}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setMobileRightPanelOpen(false);
+                selectMainSurface('teamRun');
+              }}
+            >
+              <UserCog size={20} />
+              <span>{t('view.teamRun', 'TeamRun')}</span>
             </button>
             <button
               className={detailOpen ? styles.mobileSurfaceNavItemActive : styles.mobileSurfaceNavItem}

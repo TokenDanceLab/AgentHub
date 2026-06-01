@@ -1,4 +1,5 @@
-import React, { type ReactNode } from 'react';
+import React, { useRef, type ReactNode } from 'react';
+import { useFocusTrap } from './focusTrap';
 import styles from './BottomSheet.module.css';
 
 export interface BottomSheetProps {
@@ -50,6 +51,12 @@ export function BottomSheet({
   descriptionClassName,
   footerClassName,
 }: BottomSheetProps) {
+  const sheetRef = useRef<HTMLElement | null>(null);
+  // BottomSheet is always 'active' when mounted — the parent controls
+  // visibility via conditional rendering, so trap focus on mount and
+  // return focus to the trigger on unmount.
+  useFocusTrap(sheetRef, true);
+
   return (
     <div className={cx(styles.layer, layerClassName)} role="presentation">
       <button
@@ -59,7 +66,7 @@ export function BottomSheet({
         disabled={closeDisabled}
         onClick={onClose}
       />
-      <section className={cx(styles.sheet, sheetClassName)} role="dialog" aria-modal="true" aria-label={ariaLabel}>
+      <section className={cx(styles.sheet, sheetClassName)} ref={sheetRef} role="dialog" aria-modal="true" aria-label={ariaLabel} tabIndex={-1}>
         <div className={cx(styles.handle, handleClassName)} aria-hidden="true" />
         <div className={cx(styles.header, headerClassName)}>
           <div>

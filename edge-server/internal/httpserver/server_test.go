@@ -21,7 +21,7 @@ func TestCORSMiddlewareAllowsTrustedLocalOrigin(t *testing.T) {
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}))
+	}), false)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 	req.Header.Set("Origin", "http://localhost:5199")
@@ -45,7 +45,7 @@ func TestCORSMiddlewareRejectsUntrustedOrigin(t *testing.T) {
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}))
+	}), false)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", nil)
 	req.Header.Set("Origin", "https://example.com")
@@ -66,7 +66,7 @@ func TestCORSMiddlewareAllowsNoOrigin(t *testing.T) {
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}))
+	}), false)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 	rec := httptest.NewRecorder()
@@ -185,7 +185,7 @@ func TestCORSMiddlewareAllowsLocalhostVariants(t *testing.T) {
 			handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				called = true
 				w.WriteHeader(http.StatusOK)
-			}))
+			}), false)
 
 			req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 			req.Header.Set("Origin", tt.origin)
@@ -211,7 +211,7 @@ func TestCORSMiddlewareAllowsLocalhostVariants(t *testing.T) {
 func TestCORSWithOptionsRequest(t *testing.T) {
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called for OPTIONS")
-	}))
+	}), false)
 
 	req := httptest.NewRequest(http.MethodOptions, "/v1/health", nil)
 	req.Header.Set("Origin", "http://localhost:5199")
@@ -228,7 +228,7 @@ func TestCORSHeadersSet(t *testing.T) {
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}))
+	}), false)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 	req.Header.Set("Origin", "http://localhost:5199")
@@ -940,6 +940,95 @@ func TestLocalAuthMiddleware_HealthEndpointExempt(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("health endpoint should be exempt from auth")
+	}
+}
+
+func TestLocalAuthMiddleware_WebSocketRequiresAuth(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}), "edge-secret", testHubJWTSecret)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Connection", "upgrade")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401 (WebSocket must authenticate)", rec.Code)
+	}
+	if called {
+		t.Fatal("handler should not be called for unauthenticated WebSocket")
+	}
+}
+
+func TestLocalAuthMiddleware_WebSocketAuthTokenViaQueryParam(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}), "edge-secret", testHubJWTSecret)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/events?access_token=edge-secret", nil)
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Connection", "upgrade")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (WebSocket with valid access_token)", rec.Code)
+	}
+	if !called {
+		t.Fatal("handler should be called for authenticated WebSocket via access_token query param")
+	}
+}
+
+func TestLocalAuthMiddleware_WebSocketAuthTokenViaHeader(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}), "edge-secret", testHubJWTSecret)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Connection", "upgrade")
+	req.Header.Set("Authorization", "Bearer edge-secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (WebSocket with valid Authorization header)", rec.Code)
+	}
+	if !called {
+		t.Fatal("handler should be called for authenticated WebSocket via Authorization header")
+	}
+}
+
+func TestLocalAuthMiddleware_WebSocketAllowedWhenAuthDisabled(t *testing.T) {
+	called := false
+	handler := localAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}), "", "")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/events", nil)
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Connection", "upgrade")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (WebSocket allowed when auth disabled)", rec.Code)
+	}
+	if !called {
+		t.Fatal("handler should be called for WebSocket when auth is disabled")
 	}
 }
 

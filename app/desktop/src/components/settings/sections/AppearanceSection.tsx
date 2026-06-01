@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/contexts/LanguageContext';
 import Panel from '../primitives/Panel';
 import SettingRow from '../primitives/SettingRow';
+import SelectControl from '../primitives/SelectControl';
 import Switch from '../primitives/Switch';
 import { writeStoredValue } from '../utils';
 import styles from '../../SettingsPage.module.css';
@@ -12,8 +14,14 @@ interface AppearanceSectionProps {
   setCompactMode: (value: boolean) => void;
 }
 
+const LANGUAGE_OPTIONS: Array<[string, string]> = [
+  ['en', 'English'],
+  ['zh', '中文'],
+];
+
 export default function AppearanceSection({ themeMode, setThemeMode, compactMode, setCompactMode }: AppearanceSectionProps) {
   const { t } = useTranslation();
+  const { language, setLanguage } = useLanguage();
   return (
     <>
       <Panel title={t('settings.theme')} description={t('settings.themeDesc')}>
@@ -28,6 +36,19 @@ export default function AppearanceSection({ themeMode, setThemeMode, compactMode
             </button>
           ))}
         </div>
+      </Panel>
+      <Panel title={t('settings.language')} description={t('settings.languageDesc')}>
+        <SettingRow
+          title={t('settings.language')}
+          description={t('settings.languageDesc')}
+          control={
+            <SelectControl
+              value={language}
+              options={LANGUAGE_OPTIONS}
+              onChange={(value) => setLanguage(value as 'en' | 'zh')}
+            />
+          }
+        />
       </Panel>
       <Panel title={t('settings.density')}>
         <SettingRow

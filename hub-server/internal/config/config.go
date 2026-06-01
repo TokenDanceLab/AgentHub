@@ -51,10 +51,11 @@ func (t TokenDanceIDConfig) LogValue() slog.Value {
 }
 
 type ServerConfig struct {
-	Port      int    `mapstructure:"port"`
-	LogLevel  string `mapstructure:"log_level"`
-	LogFile   string `mapstructure:"log_file"`
-	AdminPort int    `mapstructure:"admin_port"`
+	Port         int    `mapstructure:"port"`
+	LogLevel     string `mapstructure:"log_level"`
+	LogFile      string `mapstructure:"log_file"`
+	AdminPort    int    `mapstructure:"admin_port"`
+	AuditLogFile string `mapstructure:"audit_log_file"`
 }
 
 type DBConfig struct {

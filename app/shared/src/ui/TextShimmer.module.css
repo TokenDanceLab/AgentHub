@@ -4,7 +4,12 @@
   gap: 6px;
   padding: 12px 0;
   opacity: 0;
-  transition: opacity 0.3s;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shimmer {
+    transition: opacity 0.3s;
+  }
 }
 
 .visible { opacity: 1; }
@@ -21,16 +26,18 @@
   gap: 4px;
 }
 
-.bar {
-  height: 12px;
-  border-radius: var(--radius-sm, 0.25rem);
-  background: oklch(0 0 0 / 0.08);
-  opacity: 0.72;
-  animation: shimmer 1.8s ease-in-out infinite;
-}
+@media (prefers-reduced-motion: no-preference) {
+  .bar {
+    height: 12px;
+    border-radius: var(--radius-sm, 0.25rem);
+    background: oklch(0 0 0 / 0.08);
+    opacity: 0.72;
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
 
-@keyframes shimmer {
-  0% { opacity: 0.48; }
-  50% { opacity: 0.86; }
-  100% { opacity: 0.48; }
+  @keyframes shimmer {
+    0% { opacity: 0.48; }
+    50% { opacity: 0.86; }
+    100% { opacity: 0.48; }
+  }
 }

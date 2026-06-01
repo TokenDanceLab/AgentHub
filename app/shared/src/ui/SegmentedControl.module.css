@@ -57,3 +57,18 @@
   font-weight: 720;
   line-height: 1;
 }
+
+/* ── Responsive ─────────────────── */
+
+@media (max-width: 480px) {
+  .option {
+    padding: 0 8px;
+    font-size: 11px;
+    min-height: var(--touch-target-min, 44px);
+  }
+
+  .root {
+    padding: 3px;
+    gap: 2px;
+  }
+}

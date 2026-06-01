@@ -79,3 +79,23 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* ── Responsive ─────────────────── */
+
+@media (max-width: 480px) {
+  .summary {
+    gap: 8px;
+  }
+
+  .title {
+    font-size: 15px;
+  }
+
+  .description {
+    font-size: 12px;
+  }
+
+  .item {
+    gap: 4px;
+  }
+}

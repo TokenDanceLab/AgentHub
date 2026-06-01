@@ -35,3 +35,13 @@
 }
 
 .input:focus-visible { outline: none; }
+
+/* ── Responsive ─────────────────── */
+
+@media (max-width: 480px) {
+  .input {
+    height: var(--touch-target-min, 44px);
+    font-size: var(--font-size-base, 1rem);
+    padding: 0 12px 0 40px;
+  }
+}

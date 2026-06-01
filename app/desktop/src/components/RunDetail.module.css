@@ -308,3 +308,37 @@
 }
 .usageLabel { font-size: 11px; color: #8E8E93; }
 .usageValue { font-size: 11px; font-family: var(--font-mono); }
+
+/* ── Event summary grid ─────────────────────── */
+.summaryGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  padding: 4px 0 8px;
+}
+
+.summaryItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.summaryIcon {
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
+.summaryLabel {
+  font-size: 11px;
+  color: var(--text-weakest);
+  flex: 1;
+  min-width: 0;
+}
+
+.summaryValue {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--muted-foreground);
+}

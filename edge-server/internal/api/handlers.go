@@ -44,6 +44,15 @@ type Handler struct {
 	WorkspaceAllowlist []string              // optional absolute/relative roots allowed for request workDir
 	SkillRegistry      *skills.SkillRegistry // optional SKILL.md registry; nil = no skills injection
 
+	// LocalAuthToken is the pre-shared bearer token required on all state-
+	// changing endpoints (POST/PATCH/DELETE).  It is auto-generated when the
+	// server starts in non-dev mode without an explicit token.
+	LocalAuthToken string
+	// HubJWTSecret is the shared key for validating Hub-issued HS256 JWTs.
+	// When configured, Hub-issued tokens are accepted in addition to (or instead
+	// of) the local auth token.
+	HubJWTSecret string
+
 	PermissionRegistry *PermissionRegistry
 
 	runCreateMu              sync.Mutex
@@ -53,13 +62,27 @@ type Handler struct {
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return security.IsTrustedLocalOrigin(r.Header.Get("Origin"))
+		origin := r.Header.Get("Origin")
+		if security.IsTrustedLocalOrigin(origin) {
+			return true
+		}
+		// Allow non-browser WebSocket clients that do not send an Origin
+		// header (e.g. Node.js ws, test clients) when connecting to localhost.
+		if origin == "" && security.IsTrustedLocalHost(r.Host) {
+			return true
+		}
+		return false
 	},
 }
 
 const (
 	defaultRunCleanupTerminalTTL              = 24 * time.Hour
 	defaultRunCleanupMaxTerminalRunsPerThread = 50
+
+	// CloseCodeEventGap is the WebSocket close code sent when the event bus
+	// detects dropped events for this subscriber. The client should reconnect
+	// with a known-good cursor to trigger a full resync.
+	CloseCodeEventGap = 4001
 )
 
 // ---------------------------------------------------------------------------
@@ -106,8 +129,15 @@ func isPathWithin(root, path string) bool {
 }
 
 func (h *Handler) validateWorkDirAllowed(workDir string) error {
-	if workDir == "" || len(h.WorkspaceAllowlist) == 0 {
+	// Empty workDir is allowed (no workspace path specified).
+	if workDir == "" {
 		return nil
+	}
+	// Fail-closed: an empty or nil allowlist rejects any non-empty workDir.
+	// This prevents accidental "allow all" when the operator forgets to configure
+	// the workspace allowlist (AH-SR-006).
+	if len(h.WorkspaceAllowlist) == 0 {
+		return fmt.Errorf("workspace allowlist is not configured; configure at least one allowed workspace root to enable file system access")
 	}
 	candidate, err := normalizedRealPath(workDir)
 	if err != nil {
@@ -598,6 +628,8 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		MCPConfig               string                               `json:"mcpConfig"`
 		Ephemeral               bool                                 `json:"ephemeral"`
 		HubTaskID               string                               `json:"hubTaskId"` // Edge-to-Hub direct callback task ID
+		Messages                []runnerctx.Message                  `json:"messages,omitempty"`
+		PinnedMessages          []runnerctx.Message                  `json:"pinnedMessages,omitempty"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
@@ -630,6 +662,11 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
 		h.runCreateMu.Unlock()
 		writeJSON(w, http.StatusForbidden, errorResponse("workspace_not_allowed", err.Error()))
+		return
+	}
+	if err := validatePermissionMode(req.PermissionMode); err != nil {
+		h.runCreateMu.Unlock()
+		writeJSON(w, http.StatusBadRequest, errorResponse("invalid_permission_mode", err.Error()))
 		return
 	}
 	if active, ok := activeRunForThread(repository.ListRuns(req.ThreadID)); ok {
@@ -727,6 +764,8 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			MCPConfig:              req.MCPConfig,
 			Ephemeral:              req.Ephemeral,
 			HubTaskID:              req.HubTaskID,
+			Messages:               req.Messages,
+			PinnedMessages:         req.PinnedMessages,
 		}
 		// Inject Skills directory context (SKILL.md discovery) into the system prompt.
 		// The SkillRegistry is shared across runs and lazily lists name+description.
@@ -920,6 +959,14 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
+			if evt.Type == events.GapEventType {
+				slog.Warn("event bus gap detected, closing websocket to force client resync",
+					"subscriber", subID)
+				closeMsg := websocket.FormatCloseMessage(CloseCodeEventGap,
+					"event gap: dropped events detected, reconnect to resync")
+				_ = conn.WriteMessage(websocket.CloseMessage, closeMsg)
+				return
+			}
 			if err := conn.WriteJSON(evt); err != nil {
 				slog.Info("websocket write error", "err", err)
 				return
@@ -1031,6 +1078,24 @@ func isActiveRunStatus(status string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// validatePermissionMode returns an error if mode is not a recognised
+// Claude Code --permission-mode value. An empty mode is allowed and means
+// "use the adapter default".
+func validatePermissionMode(mode string) error {
+	if mode == "" {
+		return nil
+	}
+	// SEC-02: Reject 'bypassPermissions' — it disables ALL security hooks at
+	// the CLI level, giving the agent unrestricted shell access regardless
+	// of SecurityHook settings. Only the whitelist modes are allowed.
+	switch mode {
+	case "default", "acceptEdits", "plan", "dontAsk":
+		return nil
+	default:
+		return fmt.Errorf("unknown permission mode %q: valid values are default, acceptEdits, plan, dontAsk", mode)
 	}
 }
 

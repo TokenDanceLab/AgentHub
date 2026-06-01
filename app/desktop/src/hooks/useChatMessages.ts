@@ -7,7 +7,7 @@ import { useReducer, useEffect, useRef, useCallback } from 'react';
 import { createEventStream } from '@/api/eventClient';
 import type { StreamHandle } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
-import type { ChatMessage, MessageBlock, ToolResultBlock } from '@/components/ChatView.types';
+import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useRunStore } from '@/stores/runStore';
@@ -54,6 +54,8 @@ export interface PermissionRequestItem {
   runId: string;
   toolName: string;
   toolInput: Record<string, unknown>;
+  /** Risk level from edge-server: low | medium | high | critical */
+  riskLevel?: string;
   decision?: 'allow' | 'deny';
   reason?: string;
   timestamp: string;
@@ -594,11 +596,21 @@ function processEvent(state: State, event: EventEnvelope): State {
         output: outputStr,
       };
       if (currentRun) {
+        const updated = currentRun.toolCalls.map((tc) =>
+          tc.callId === callId ? { ...tc, status: 'completed', output: outputStr } : tc,
+        );
+        // If draining and all tool calls are now terminal → transition to COMPLETED
+        const allDone = updated.every(
+          (tc) => tc.status === 'completed' || tc.status === 'failed',
+        );
+        const newStatus =
+          currentRun.status === RunState.DRAINING && allDone
+            ? RunState.COMPLETED
+            : currentRun.status;
         currentRun = {
           ...currentRun,
-          toolCalls: currentRun.toolCalls.map((tc) =>
-            tc.callId === callId ? { ...tc, status: 'completed', output: outputStr } : tc,
-          ),
+          status: newStatus,
+          toolCalls: updated,
         };
       }
       // Nest result as child of matching tool_use block
@@ -629,6 +641,7 @@ function processEvent(state: State, event: EventEnvelope): State {
         path: filePath,
         action,
         diff: event.payload.diff as string | undefined,
+        structuredDiff: event.payload.structuredDiff as FileDiff | undefined,
       };
       if (runId && currentRun && currentRun.runId === runId) {
         currentRun = {
@@ -886,6 +899,16 @@ function processEvent(state: State, event: EventEnvelope): State {
       const block = parseContextUsageBlock(event, variant);
       if (block) {
         messages = appendOrUpdateAgentBlock(messages, event, agentName, block);
+        // Push live token stats to the UI store so StatusBar can display them
+        if (block.total != null) {
+          useRunStore.getState().setTokenStats({
+            inputTokens: block.input ?? 0,
+            outputTokens: block.output ?? 0,
+            totalTokens: block.total,
+            contextLimit: block.contextLimit,
+            usagePercent: block.usagePercent,
+          });
+        }
       }
       break;
     }
@@ -898,13 +921,30 @@ function processEvent(state: State, event: EventEnvelope): State {
           currentRun.status !== RunState.RUNNING &&
           currentRun.status !== RunState.STREAMING &&
           currentRun.status !== RunState.WAITING_FOR_INPUT &&
-          currentRun.status !== RunState.COMPLETED
+          currentRun.status !== RunState.DRAINING
         ) {
           console.warn(
             `[useChatMessages] run.finished: unexpected status ${currentRun.status} → ${RunState.COMPLETED}`,
           );
         }
-        currentRun = { ...currentRun, status: RunState.COMPLETED };
+        // Draining: final answer received but background tools still running
+        const hasPending = currentRun.toolCalls.some(
+          (tc) => tc.status === 'pending' || tc.status === 'running',
+        );
+        const nextStatus = hasPending ? RunState.DRAINING : RunState.COMPLETED;
+        currentRun = { ...currentRun, status: nextStatus };
+
+        // Mark still-running tool call blocks as 'draining' for visual distinction
+        if (hasPending) {
+          messages = messages.map((msg) => ({
+            ...msg,
+            blocks: msg.blocks.map((b) =>
+              b.kind === 'tool_use' && (b.status === 'pending' || b.status === 'running')
+                ? { ...b, status: 'draining' as const }
+                : b,
+            ),
+          }));
+        }
       }
       break;
     }
@@ -913,7 +953,12 @@ function processEvent(state: State, event: EventEnvelope): State {
       isStreaming = false;
       const rid = event.payload.runId as string;
       if (currentRun && currentRun.runId === rid) {
-        if (currentRun.status !== RunState.RUNNING && currentRun.status !== RunState.STREAMING) {
+        if (
+          currentRun.status !== RunState.RUNNING &&
+          currentRun.status !== RunState.STREAMING &&
+          currentRun.status !== RunState.WAITING_FOR_INPUT &&
+          currentRun.status !== RunState.DRAINING
+        ) {
           console.warn(
             `[useChatMessages] run.failed: unexpected status ${currentRun.status} → ${RunState.FAILED}`,
           );
@@ -930,7 +975,8 @@ function processEvent(state: State, event: EventEnvelope): State {
         if (
           currentRun.status !== RunState.RUNNING &&
           currentRun.status !== RunState.STREAMING &&
-          currentRun.status !== RunState.WAITING_FOR_INPUT
+          currentRun.status !== RunState.WAITING_FOR_INPUT &&
+          currentRun.status !== RunState.DRAINING
         ) {
           console.warn(
             `[useChatMessages] run.cancelled: unexpected status ${currentRun.status} → ${RunState.CANCELLED}`,
@@ -959,12 +1005,14 @@ function processEvent(state: State, event: EventEnvelope): State {
       const runId = event.payload.runId as string;
       const toolName = event.payload.toolName as string;
       const toolInput = (event.payload.toolInput ?? event.payload.input ?? {}) as Record<string, unknown>;
+      const riskLevel = (event.payload.riskLevel as string) ?? undefined;
       const existingIdx = state.permissionRequests.findIndex((r) => r.requestId === reqId);
       const item: PermissionRequestItem = {
         requestId: reqId,
         runId,
         toolName,
         toolInput,
+        riskLevel,
         timestamp: ts,
       };
       let reqs: PermissionRequestItem[];
@@ -1045,6 +1093,9 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
   // Loop detector — persists across renders, resets per run
   const loopDetectorRef = useRef(new Map<string, LoopEntry>());
   const currentRunIdRef = useRef<string | null>(null);
+  // Track pending tool call IDs for draining-state detection.
+  // run.finished + non-empty pending set → DRAINING instead of COMPLETED.
+  const pendingToolCallIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     mountedRef.current = true;
@@ -1070,11 +1121,22 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
       if (!mountedRef.current) return;
       if (!eventMatchesSelectedThread(event, selectedThreadId)) return;
 
-      // ── Tool call loop detection ──
+      // ── Tool call loop detection + draining tracking ──
       if (event.type === 'run.agent.tool_call') {
         const toolName = event.payload.toolName as string;
         const input = event.payload.input as Record<string, unknown> | undefined;
         const runId = event.payload.runId as string;
+        const callId = event.payload.callId as string;
+        const status = event.payload.status as string | undefined;
+
+        // Track pending tool calls for draining-state detection
+        if (callId && runId && runId === currentRunIdRef.current) {
+          if (status === 'completed' || status === 'failed') {
+            pendingToolCallIdsRef.current.delete(callId);
+          } else {
+            pendingToolCallIdsRef.current.add(callId);
+          }
+        }
 
         if (runId && runId === currentRunIdRef.current) {
           const sig = hashSignature(toolName, input);
@@ -1104,37 +1166,58 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
         }
       }
 
-      // Reset loop detector on new run
+      // Reset loop detector and pending tool calls on new run
       if (event.type === 'run.started') {
         const runId = event.payload.runId as string;
         currentRunIdRef.current = runId;
         loopDetectorRef.current.clear();
+        pendingToolCallIdsRef.current.clear();
         useRunStore.getState().setRun(runId);
       } else if (event.type === 'run.finished') {
-        useRunStore.getState().setRunState(RunState.COMPLETED);
+        // Draining: agent returned final result but background tools still running
+        const isDraining = pendingToolCallIdsRef.current.size > 0;
+        useRunStore.getState().setRunState(isDraining ? RunState.DRAINING : RunState.COMPLETED);
         queryClient.invalidateQueries({ queryKey: ['runs'] });
         const threadId = eventThreadId(event);
         if (threadId) queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
       } else if (event.type === 'run.failed') {
+        pendingToolCallIdsRef.current.clear();
         useRunStore.getState().setRunState(RunState.FAILED);
         queryClient.invalidateQueries({ queryKey: ['runs'] });
         const threadId = eventThreadId(event);
         if (threadId) queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
       } else if (event.type === 'run.cancelled') {
+        pendingToolCallIdsRef.current.clear();
         useRunStore.getState().setRunState(RunState.CANCELLED);
         queryClient.invalidateQueries({ queryKey: ['runs'] });
         const threadId = eventThreadId(event);
         if (threadId) queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
+      } else if (event.type === 'run.agent.tool_result') {
+        const callId = event.payload.callId as string;
+        if (callId) {
+          pendingToolCallIdsRef.current.delete(callId);
+          // If we were draining and all tools now complete → transition to COMPLETED
+          if (
+            pendingToolCallIdsRef.current.size === 0 &&
+            useRunStore.getState().runState === 'DRAINING'
+          ) {
+            useRunStore.getState().setRunState(RunState.COMPLETED);
+          }
+        }
       }
 
       dispatch({ type: 'EVENT_RECEIVED', event });
     });
 
     // QW-3: Poll WebSocket ping-pong latency every 2 s and push to connection store
+    const prevLatencyRef = { current: null as number | null };
     const latencyTimer = setInterval(() => {
       if (!mountedRef.current) return;
       const lat = streamRef.current?.getLatency() ?? null;
-      useConnectionStore.getState().setWsLatency(lat);
+      if (lat !== prevLatencyRef.current) {
+        prevLatencyRef.current = lat;
+        useConnectionStore.getState().setWsLatency(lat);
+      }
     }, 2000);
 
     return () => {

@@ -107,6 +107,10 @@ vi.mock('react-i18next', () => ({
     },
     i18n: { language: 'en' },
   }),
+  initReactI18next: {
+    type: '3rdParty' as const,
+    init: () => {},
+  },
 }));
 
 vi.mock('@/contexts/ThemeContext', () => ({
@@ -116,6 +120,14 @@ vi.mock('@/contexts/ThemeContext', () => ({
     theme: 'dark',
     toggleTheme: vi.fn(),
   }),
+}));
+
+vi.mock('@/contexts/LanguageContext', () => ({
+  useLanguage: () => ({
+    language: 'en' as const,
+    setLanguage: vi.fn(),
+  }),
+  LanguageProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 vi.mock('@/hooks/useHealth', () => ({
@@ -1031,7 +1043,6 @@ describe('SettingsPage tasks', () => {
   it('does not persist controls whose backing API is not wired yet', () => {
     const unavailableSections: Array<[SectionId, string]> = [
       ['skills', 'skillSync'],
-      ['remoteControl', 'remoteControl'],
       ['platforms', 'platformSync'],
       ['securityAudit', 'auditTrail'],
     ];

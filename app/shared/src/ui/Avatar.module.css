@@ -23,3 +23,19 @@
   color: var(--brand, oklch(0.55 0.16 255));
   box-shadow: none;
 }
+
+/* ── Responsive ─────────────────── */
+
+@media (max-width: 480px) {
+  .sm {
+    width: var(--touch-target-min, 44px);
+    height: var(--touch-target-min, 44px);
+    font-size: 13px;
+  }
+
+  .md {
+    width: var(--touch-target-min, 44px);
+    height: var(--touch-target-min, 44px);
+    font-size: 14px;
+  }
+}
