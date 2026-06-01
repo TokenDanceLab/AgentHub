@@ -249,8 +249,36 @@ func buildAdapterRegistry(cfg config) *adapters.Registry {
 			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.OpenCodePath)
 		}
 	}
+	if cfg.ClaudeCodePath != "" {
+		childAgents := registeredChildAgentIDs(reg)
+		a := adapters.NewOrchestratorAdapter(
+			cfg.ClaudeCodePath,
+			cfg.AgentModel,
+			adapters.DefaultOrchestratorPrompt(childAgents),
+			childAgents,
+		)
+		if err := reg.Register(a); err != nil {
+			slog.Warn("failed to register orchestrator adapter", "err", err)
+		} else {
+			reg.SetDefault("orchestrator", a.Metadata().ID)
+			slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.ClaudeCodePath, "children", childAgents)
+		}
+	}
+	if cfg.AgentDefault != "" {
+		reg.SetDefault("default", cfg.AgentDefault)
+	}
 
 	return reg
+}
+
+func registeredChildAgentIDs(reg *adapters.Registry) []string {
+	ids := make([]string, 0, 3)
+	for _, id := range []string{"claude-code", "codex", "opencode"} {
+		if _, ok := reg.Get(id); ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 func newStoreFromConfig(cfg config) (store.Repository, error) {
