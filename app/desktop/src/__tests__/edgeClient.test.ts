@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   cancelRun,
   createThread,
+  decidePermission,
   fetchHealth,
   fetchRunners,
   fetchThreadItems,
@@ -242,6 +243,57 @@ describe('edgeClient', () => {
         expect.stringMatching(/\/v1\/runs\/run_x:cancel$/),
         expect.anything(),
       );
+    });
+  });
+
+  describe('decidePermission', () => {
+    it('posts the run-scoped permission decision to Local Edge', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+      } as Response);
+
+      await decidePermission({
+        runId: 'run_abc123',
+        requestId: 'perm_1',
+        decision: 'allow',
+        reason: 'review panel',
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/permissions\/decide$/),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            runId: 'run_abc123',
+            requestId: 'perm_1',
+            decision: 'allow',
+            reason: 'review panel',
+          }),
+        }),
+      );
+    });
+
+    it('rejects duplicate or expired permission decisions without local success', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        json: () => Promise.resolve({
+          error: {
+            code: 'permission_request_not_found',
+            message: 'permission request not found',
+          },
+        }),
+      } as Response);
+
+      await expect(decidePermission({
+        runId: 'run_abc123',
+        requestId: 'perm_missing',
+        decision: 'deny',
+      })).rejects.toMatchObject({
+        code: 'permission_request_not_found',
+        status: 404,
+      });
     });
   });
 });
