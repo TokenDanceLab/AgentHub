@@ -7,7 +7,7 @@ import { useReducer, useEffect, useRef, useCallback } from 'react';
 import { createEventStream } from '@/api/eventClient';
 import type { StreamHandle } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
-import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from '@/components/ChatView.types';
+import type { ChatMessage, MessageBlock, ToolResultBlock } from '@/components/ChatView.types';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useRunStore } from '@/stores/runStore';
@@ -650,7 +650,6 @@ function processEvent(state: State, event: EventEnvelope): State {
         path: filePath,
         action,
         diff: event.payload.diff as string | undefined,
-        structuredDiff: event.payload.structuredDiff as FileDiff | undefined,
       };
       if (runId && currentRun && currentRun.runId === runId) {
         currentRun = {
@@ -1216,8 +1215,8 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
         if (runId) {
           upsertRunInQueries(queryClient, {
             runId,
-            projectId: (event.payload.projectId ?? event.scope.projectId) as string | undefined,
-            threadId: (event.payload.threadId ?? event.scope.threadId) as string | undefined,
+            projectId: (event.payload.projectId ?? event.scope.projectId) as string,
+            threadId: (event.payload.threadId ?? event.scope.threadId) as string,
             status: 'queued',
             createdAt: (event.payload.createdAt as string | undefined) ?? event.sentAt,
           });
@@ -1237,8 +1236,8 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
         useRunStore.getState().setRun(runId);
         upsertRunInQueries(queryClient, {
           runId,
-          projectId: (event.payload.projectId ?? event.scope.projectId) as string | undefined,
-          threadId: (event.payload.threadId ?? event.scope.threadId) as string | undefined,
+          projectId: (event.payload.projectId ?? event.scope.projectId) as string,
+          threadId: (event.payload.threadId ?? event.scope.threadId) as string,
           status: 'running',
           startedAt: (event.payload.startedAt as string | undefined) ?? event.sentAt,
         });
