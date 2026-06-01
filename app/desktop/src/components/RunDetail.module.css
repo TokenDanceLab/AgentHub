@@ -55,9 +55,9 @@
   font-weight: 600;
   font-family: var(--font-mono);
 }
-.statusDone    { background: rgba(105, 201, 103, 0.09); color: #69c967; }
-.statusFailed  { background: rgba(255, 126, 120, 0.09); color: #ff7e78; }
-.statusRunning { background: rgba(93, 104, 204, 0.11); color: #aeb7ff; }
+.statusDone    { background: rgba(105, 201, 103, 0.09); color: var(--success); }
+.statusFailed  { background: rgba(255, 126, 120, 0.09); color: var(--diff-removed-border); }
+.statusRunning { background: rgba(93, 104, 204, 0.11); color: var(--skill); }
 .statusPending { background: rgba(255, 255, 255, 0.07); color: var(--muted-foreground); }
 
 .runId {
@@ -86,11 +86,11 @@
 }
 
 .outputWarning {
-  color: #f4c76b;
+  color: var(--warning);
 }
 
 .outputError {
-  color: #ff9a95;
+  color: var(--destructive);
 }
 
 [data-theme='light'] .output {
@@ -281,7 +281,7 @@
   padding: 1px 5px;
   border-radius: 999px;
   background: rgba(0,0,0,0.035);
-  color: #8E8E93;
+  color: var(--muted-foreground);
   font-size: 10px;
   font-weight: 600;
 }
@@ -388,7 +388,7 @@
 }
 
 .action {
-  color: #8E8E93;
+  color: var(--muted-foreground);
   font-size: 10px;
   text-transform: uppercase;
   flex-shrink: 0;

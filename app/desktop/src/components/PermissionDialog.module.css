@@ -377,7 +377,7 @@
 
 .riskHigh {
   background: rgba(249, 115, 22, 0.12);
-  color: #f97316;
+  color: var(--warning);
 }
 
 .riskCritical {
@@ -387,7 +387,7 @@
 
 .riskDefault {
   background: rgba(148, 163, 184, 0.12);
-  color: #94a3b8;
+  color: var(--muted-foreground);
 }
 
 /* ── Approval mode selector ────────────────── */
@@ -427,7 +427,7 @@
 }
 
 .modeIconYOLO {
-  color: #f97316;
+  color: var(--warning);
 }
 
 .modeIconAuto {

@@ -104,7 +104,7 @@ describeReal('Real Edge Server E2E', () => {
     }
 
     // Start the server on the test port
-    serverProcess = spawn(BINARY_PATH, ['--addr', `127.0.0.1:${TEST_PORT}`], {
+    serverProcess = spawn(BINARY_PATH, ['--addr', `127.0.0.1:${TEST_PORT}`, '--dev'], {
       cwd: EDGE_SERVER_DIR,
       stdio: 'pipe',
     });

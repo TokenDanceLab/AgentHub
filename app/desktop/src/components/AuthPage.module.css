@@ -18,7 +18,7 @@
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -54,7 +54,7 @@
 
 .tagline {
   font-size: 12px;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   margin: 4px 0 0;
 }
 
@@ -72,7 +72,7 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -80,7 +80,7 @@
 }
 
 .tabActive {
-  background: #fff;
+  background: var(--card);
   color: var(--foreground);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
@@ -100,7 +100,7 @@
 .label {
   font-size: 12px;
   font-weight: 500;
-  color: #8e8e93;
+  color: var(--muted-foreground);
 }
 
 .input {
@@ -144,7 +144,7 @@
   right: 10px;
   border: none;
   background: transparent;
-  color: #b0b0b5;
+  color: var(--text-weakest);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -152,14 +152,14 @@
 
 .error {
   font-size: 11px;
-  color: #dc2626;
+  color: var(--destructive);
 }
 
 .errorBanner {
   padding: 8px 12px;
   border-radius: 8px;
   background: rgba(239, 68, 68, 0.06);
-  color: #dc2626;
+  color: var(--destructive);
   font-size: 12px;
   display: flex;
   align-items: center;
@@ -170,8 +170,8 @@
   padding: 10px 0;
   border: none;
   border-radius: 10px;
-  background: #111827;
-  color: #fff;
+  background: var(--primary);
+  color: var(--primary-foreground);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -179,7 +179,7 @@
   width: 100%;
 }
 
-.submitButton:hover { background: #1f2937; }
+.submitButton:hover { opacity: 0.88; }
 .submitButton:active { transform: scale(0.98); }
 .submitButton:disabled {
   opacity: 0.4;
@@ -192,7 +192,7 @@
   align-items: center;
   gap: 10px;
   margin: 2px 0;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 500;
 }
@@ -258,7 +258,7 @@
 
 .identityHint {
   margin: -2px 0 0;
-  color: #6b7280;
+  color: var(--muted-foreground);
   font-size: 11px;
   line-height: 1.45;
   text-align: center;
@@ -269,7 +269,7 @@
   border: 1px solid rgba(0, 122, 255, 0.16);
   border-radius: 10px;
   background: rgba(0, 122, 255, 0.07);
-  color: #1d4ed8;
+  color: var(--primary);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -325,7 +325,7 @@
   padding: 6px 0;
   border: none;
   background: transparent;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 12px;
   cursor: pointer;
   width: 100%;
@@ -367,7 +367,7 @@
   gap: 6px;
   margin-top: 6px;
   font-size: 11px;
-  color: #8e8e93;
+  color: var(--muted-foreground);
 }
 
 .hubStatusDot {
@@ -380,7 +380,7 @@
 .hubStatusDotConnected { background: var(--color-success); }
 .hubStatusDotDisconnected { background: var(--color-danger); }
 .hubStatusDotChecking {
-  background: #f59e0b;
+  background: var(--warning);
   animation: pulse 1.5s infinite;
 }
 
