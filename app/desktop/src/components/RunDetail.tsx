@@ -17,6 +17,7 @@ import { parseUnifiedDiff } from '@shared/diff';
 import type { FileDiff, ChatMessage } from './ChatView.types';
 import type { SessionMetrics } from '@shared/context/breakdown';
 import type { PermissionRequestItem } from '@/hooks/useChatMessages';
+import type { RunEvidenceState } from '@/api/runEvidenceQueries';
 import { RunState, RunStateMachine } from '@/utils/runStateMachine';
 import DiffViewer from './DiffViewer';
 import DiffReviewPanel from './DiffReviewPanel';
@@ -56,6 +57,7 @@ interface Props {
   approvals?: PermissionRequestItem[];
   artifacts?: RunArtifactEntry[];
   previews?: RunPreviewEntry[];
+  evidence?: RunEvidenceState;
   onDecideApproval?: (requestId: string, decision: 'allow' | 'deny', reason?: string) => Promise<void> | void;
   chatMessages?: ChatMessage[];
 }
@@ -215,6 +217,7 @@ export default function RunDetail({
   approvals = [],
   artifacts = [],
   previews = [],
+  evidence,
   onDecideApproval,
   chatMessages,
 }: Props) {
@@ -253,6 +256,22 @@ export default function RunDetail({
   const hasFileChanges = changedFiles.length > 0;
   const reviewDiffs = diffs && diffs.length > 0 ? diffs : eventDiffs;
   const hasDiffs = reviewDiffs.length > 0;
+  const diffSource =
+    diffs && diffs.length > 0
+      ? t('run.reviewSourceEdge')
+      : eventDiffs.length > 0
+        ? t('run.reviewSourceEvents')
+        : null;
+  const artifactSource = evidence?.artifactSource === 'edge'
+    ? t('run.reviewSourceEdge')
+    : artifacts.length > 0
+      ? t('run.reviewSourceEvents')
+      : null;
+  const previewSource = evidence?.previewSource === 'edge'
+    ? t('run.reviewSourceEdge')
+    : previews.length > 0
+      ? t('run.reviewSourceEvents')
+      : null;
   const hasAnyContent = hasOutput || hasToolCalls || hasFileChanges || runtimeBlocks.length > 0;
   const latestFiles = changedFiles.slice(-4).reverse();
   const latestTools = toolCalls.slice(-4).reverse();
@@ -364,8 +383,34 @@ export default function RunDetail({
 
           <div className={styles.reviewCard}>
             <div className={styles.reviewCardTitle}>
+              <FileText size={13} />
+              <span>{t('run.reviewDiff')}</span>
+              {diffSource && <span className={styles.sourceTag}>{diffSource}</span>}
+              <span className={styles.cardCount}>{reviewDiffs.length}</span>
+            </div>
+            {hasDiffs ? (
+              <div className={styles.reviewList}>
+                {reviewDiffs.slice(0, 3).map((file) => (
+                  <div key={file.filePath} className={styles.reviewItem}>
+                    <code className={styles.filePath}>{file.filePath}</code>
+                    <span className={styles.action}>{file.status}</span>
+                  </div>
+                ))}
+              </div>
+            ) : evidence?.diffLoading ? (
+              <span className={styles.gapText}>{t('run.reviewLoading')}</span>
+            ) : evidence?.diffError ? (
+              <span className={styles.gapText}>{t('run.reviewDiffError')}</span>
+            ) : (
+              <span className={styles.gapText}>{t('run.reviewDiffGap')}</span>
+            )}
+          </div>
+
+          <div className={styles.reviewCard}>
+            <div className={styles.reviewCardTitle}>
               <Package size={13} />
               <span>{t('run.reviewArtifacts')}</span>
+              {artifactSource && <span className={styles.sourceTag}>{artifactSource}</span>}
               <span className={styles.cardCount}>{artifacts.length}</span>
             </div>
             {artifacts.length > 0 ? (
@@ -377,6 +422,10 @@ export default function RunDetail({
                   </div>
                 ))}
               </div>
+            ) : evidence?.artifactLoading ? (
+              <span className={styles.gapText}>{t('run.reviewLoading')}</span>
+            ) : evidence?.artifactError ? (
+              <span className={styles.gapText}>{t('run.reviewArtifactError')}</span>
             ) : (
               <span className={styles.gapText}>{t('run.reviewArtifactGap')}</span>
             )}
@@ -386,6 +435,7 @@ export default function RunDetail({
             <div className={styles.reviewCardTitle}>
               <Eye size={13} />
               <span>{t('run.reviewPreviews')}</span>
+              {previewSource && <span className={styles.sourceTag}>{previewSource}</span>}
               <span className={styles.cardCount}>{previews.length}</span>
             </div>
             {previews.length > 0 ? (
@@ -397,6 +447,10 @@ export default function RunDetail({
                   </div>
                 ))}
               </div>
+            ) : evidence?.previewLoading ? (
+              <span className={styles.gapText}>{t('run.reviewLoading')}</span>
+            ) : evidence?.previewError ? (
+              <span className={styles.gapText}>{t('run.reviewPreviewError')}</span>
             ) : (
               <span className={styles.gapText}>{t('run.reviewPreviewGap')}</span>
             )}
@@ -424,6 +478,7 @@ export default function RunDetail({
 
       {hasDiffs && (
         <div className={styles.diffReviewPrimary}>
+          {diffSource && <div className={styles.evidenceSource}>{t('run.reviewDiffSource', { source: diffSource })}</div>}
           <DiffReviewPanel files={reviewDiffs} />
         </div>
       )}
@@ -491,6 +546,7 @@ export default function RunDetail({
               <div className={styles.cardHeader}>
                 <FileText size={14} />
                 <span>{t('run.preview')}</span>
+                {diffSource && <span className={styles.sourceTag}>{diffSource}</span>}
                 <span className={styles.cardCount}>{reviewDiffs.length}</span>
               </div>
               <DiffViewer files={reviewDiffs} />
