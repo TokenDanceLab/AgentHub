@@ -46,6 +46,17 @@ describe('notificationStore', () => {
     expect(useNotificationStore.getState().unreadCount).toBe(0);
   });
 
+  it('updates an existing notification instead of duplicating it', () => {
+    const store = useNotificationStore.getState();
+    store.addNotification(makeNotification({ id: 'hub:notif-1', read: false, title: 'Unread' }));
+    store.addNotification(makeNotification({ id: 'hub:notif-1', read: true, title: 'Read' }));
+
+    const { notifications, unreadCount } = useNotificationStore.getState();
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({ id: 'hub:notif-1', read: true, title: 'Read' });
+    expect(unreadCount).toBe(0);
+  });
+
   it('caps the list at 100 items', () => {
     const store = useNotificationStore.getState();
     for (let i = 0; i < 120; i++) {

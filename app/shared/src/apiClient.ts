@@ -56,6 +56,21 @@ async function request<T>(
   return res.json() as Promise<T>;
 }
 
+async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
+  const res = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: {
+      ...init?.headers,
+    },
+  });
+
+  if (!res.ok) {
+    throw await parseError(res);
+  }
+
+  return res.blob();
+}
+
 function qs(params: Record<string, string | number | undefined>): string {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -197,7 +212,7 @@ export function getRun(runId: string): Promise<Run> {
 export function startRun(body?: StartRunRequest): Promise<Run> {
   return request('/v1/runs', {
     method: 'POST',
-    body: body ? JSON.stringify(body) : undefined,
+    ...(body ? { body: JSON.stringify(body) } : {}),
   });
 }
 
@@ -261,7 +276,7 @@ export function getArtifact(artifactId: string): Promise<Artifact> {
 export function getArtifactContent(
   artifactId: string,
 ): Promise<Blob> {
-  return request(
+  return requestBlob(
     `/v1/artifacts/${encodeURIComponent(artifactId)}/content`,
   );
 }

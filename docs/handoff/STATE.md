@@ -1,6 +1,14 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-29 UTC+8 | 分支：fix/hub-device-uuid-contract -> dev/delicious233 | 状态：后端隔离 worktree推进 Hub runtime event 资源护栏；Desktop/UI 主工作树仅只读确认
+最后更新：2026-05-31 UTC+8 | 分支：feat/desktop-run-workbench | 状态：Desktop Run Workbench 真实闭环实现中；active run sync、typed blocks、review surface 已进入验证
+
+## 本次 Desktop Run Workbench 推进（2026-05-31）
+
+- **基线保存**：上一轮 Desktop 日常工作台闭环已提交 `27ee3a7 feat(desktop): 收口日常工作台闭环`；`corepack pnpm` 与 `vite.config.ts` 的 `host: 127.0.0.1` 作为本轮 Desktop 基线保留。
+- **Team A 进展**：`runQueries` 增加 runs query cache upsert/status helper；`useChatMessages` 在 `run.queued`、`run.started`、`run.status.changed`、terminal events 与 approval wait 时同步 active run 状态；Home/Settings active run 统计纳入 `waiting_approval`，Home Run/Approval CTA 优先打开主工作台 Run 面板。
+- **Team B 进展**：Run detail 复用现有 Chat message typed blocks，新增 Runtime blocks 审阅区，覆盖 thinking、tool call/result、file change、result、text/code/session fallback。
+- **Team C 进展**：Run detail 新增统一 Run review surface，集中展示 pending approvals、diff、artifact、preview；artifact/preview 没有事件载荷时明确显示 gap，不伪装下载或预览；审批动作在 review 面板保留失败态。
+- **验证证据**：`corepack.cmd pnpm typecheck`、focused Vitest（`runQueries` / `useChatMessages` / `RunDetail` / `HomeDashboard`）、`corepack.cmd pnpm test`（731 passed / 27 skipped）、`corepack.cmd pnpm build` 与 `git diff --check` 已通过。Playwright 截图覆盖 `1440x900`、`1280x720`、`375x812`，三档均确认 Run review、pending approval、diff、artifact gap、preview gap、offline chip 存在，`scrollWidth === innerWidth` 且无 `run.*` 裸 key。
 
 ## 本次后端/运维推进（2026-05-29）
 
@@ -450,6 +458,7 @@ CI 说明：Go lint 已迁移到 golangci-lint v2 配置，gosec 已切到当前
 - Desktop：Settings `Agent Scheduling` 已接本地 run、Hub bridge task、Agent Profile、Edge health 与策略开关；下一优先级建议继续把 Agent Market、Skill/MCP、模型映射、cc-switch、远控/审计从预留 surface 接到真实 Hub/Edge/API 或本机配置源，并把 runStore/TanStack Query active run 列表同步链补齐。
 - Desktop：Settings `Agent Market` 已接本地 Agent Profile 和 capability 字段；下一优先级建议继续把 Skill/MCP、模型映射、cc-switch、远控/审计接到真实 Hub/Edge/API 或本机配置源，并补 Profile 发布/安装的 Hub API 契约。
 - Desktop：Settings `Skill Management` 已接项目级 `.agents/skills` registry 快照；下一优先级建议继续把 MCP、模型映射、cc-switch、远控/审计接到真实 Edge capability、Hub API 或本机配置源。
+- Desktop：2026-05-31 日常工作台闭环已推进。Home 已接真实 active runs / pending approvals / target health / Hub session / recent threads / Hub task bridge 摘要，并把空 CTA 改成可导航动作；Settings Skills 明确本地 `.agents/skills` 为权威来源，Hub sync 显示 login locked 或 interface gap；IM 增加 refresh / retry / unread session summary，Hub notifications 会同步到 Desktop notification badge。验证通过 focused Vitest、Desktop typecheck、全量 test、build、`git diff --check` 和 1440/1280/375px Playwright overflow 截图。下一优先级是 Run Workbench：active run 同步链、typed runtime blocks、approval/diff/artifact review surface。
 - Worktree 建议：下一轮优先拆 `feat/hub-edge-target-routing`（按 `target_id -> device_id` 派发、pending queue 隔离、禁止 fallback）、`feat/runtime-event-blocks-ui`（typed blocks/tool group/artifact projection）、`feat/operational-home-console`（两端 Home 展示 active runs、pending approvals、target health、TokenDance ID session state）和 `feat/runtime-typed-control-callbacks`（normalized callback/control event）。Execution Target 不要一口吃成远程/云执行；所有任务都必须保持 Web Hub-only、Hub-issued session 授权和 secret-free 证据边界。
 - Edge：active-run 真实 HTTP smoke 已用可控慢 runner 收口；后续若 3210 真实 runtime 仍出现双 202，应重点确认当前进程版本和 runtime 是否在第二个 POST 前已完成。
 - Edge：raw output cap 和 structured adapter payload cap 已 repo 内缓解；后续用 live runtime 做截断 metadata smoke，确认真实 Codex/Claude/OpenCode adapter 事件在客户端可读。

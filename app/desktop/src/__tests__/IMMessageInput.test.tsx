@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { IMMessageInput } from '@/components/IM';
 
@@ -53,13 +53,23 @@ describe('IMMessageInput', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it('sends message on Enter', () => {
+  it('clears input after send', async () => {
     const onSend = vi.fn();
     render(<IMMessageInput onSend={onSend} />);
     const textarea = screen.getByPlaceholderText('Type a message...') as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: 'Sent' } });
     fireEvent.keyDown(textarea, { key: 'Enter' });
-    expect(onSend).toHaveBeenCalledWith('Sent');
+    await waitFor(() => expect(textarea.value).toBe(''));
+  });
+
+  it('keeps input when send is rejected', async () => {
+    const onSend = vi.fn(async () => false);
+    render(<IMMessageInput onSend={onSend} />);
+    const textarea = screen.getByPlaceholderText('Type a message...') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'Keep me' } });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('Keep me'));
+    expect(textarea.value).toBe('Keep me');
   });
 
   it('disables send button when disabled prop is true', () => {

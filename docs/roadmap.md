@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-29（Hub no-server-build production deploy verification）
+最后更新：2026-05-31（Desktop Run Workbench closure）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -9,6 +9,14 @@
 ---
 
 ## 1. 当前状态总览
+
+### 1.0 近期更新（Desktop Run Workbench，2026-05-31）
+
+- [x] Desktop 日常工作台闭环保存点：`27ee3a7 feat(desktop): 收口日常工作台闭环`。
+- [x] Active Run Sync：Edge WS run lifecycle 事件即时同步 TanStack Query `runs` 缓存，Home/Settings 对 `waiting_approval` 计入 active runs，Home CTA 可回到主工作台 Run 面板。
+- [x] Runtime Typed Blocks UI：Run detail 增加 typed Runtime blocks 审阅列表，覆盖 text/code/thinking/tool/file/result/session fallback。
+- [x] Approval / Diff / Artifact Review Surface：Run detail 收敛 pending approvals、diff、artifact/preview 证据；artifact/preview 缺接口或事件载荷时显示明确 gap，不做假预览。
+- [x] Desktop Run Workbench 最终验收：`pnpm typecheck`、全量 `pnpm test`、`pnpm build`、Playwright 1440x900 / 1280x720 / 375px 截图。
 
 ### 1.1 版本矩阵
 
@@ -560,6 +568,7 @@ Hub 调度（远程）:
 - [x] Agent Market 验收：`pnpm vitest run src/__tests__/SettingsPage.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/errors.test.ts src/__tests__/Toast.test.tsx` 通过 45/45；`python -m json.tool src/i18n/locales/{en,zh}.json` 与 `git diff --check -- app/desktop/src/...` 通过；Playwright 桌面和 375px 移动端无 console error、无 raw i18n key、无横向溢出，真实页面读到 OpenCode / Claude Code / Codex 三个本地 Profile，截图见 `app/desktop/screenshots/settings-agent-market-real-profiles.png`、`app/desktop/screenshots/settings-agent-market-real-profiles-mobile.png`。
 - [x] Desktop Settings `Skill Management` 已从单行路径推进到项目级 registry 概览：基于当前 `.agents/skills/*/SKILL.md` 快照展示 7 个仓库级 Skill、6/7 可审核状态、1 个含脚本 Skill、1 个 references Skill、Hub sync 边界和脚本审计入口。
 - [x] Skill Management 验收：`pnpm vitest run src/__tests__/SettingsPage.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/errors.test.ts src/__tests__/Toast.test.tsx` 通过 46/46；`python -m json.tool src/i18n/locales/{en,zh}.json` 与 `git diff --check -- app/desktop/src/...` 通过；Playwright 桌面和 375px 移动端无 console error、无 raw i18n key、无横向溢出，截图见 `app/desktop/screenshots/settings-skill-registry-real-data.png`、`app/desktop/screenshots/settings-skill-registry-real-data-mobile.png`。
+- [x] 2026-05-31 Desktop 日常工作台闭环：Home 已展示真实 active runs、pending approvals、Execution Target health、Hub session、recent threads 和 Hub task bridge 摘要；Settings Skills 改为本地 `.agents/skills` 权威来源并把 Hub sync 标为 login locked / interface gap；IM 增加刷新、错误重试、未读会话摘要，并把 Hub notifications 同步到 Desktop notification badge。验证通过 Desktop focused Vitest、`corepack.cmd pnpm typecheck`、`corepack.cmd pnpm test`、`corepack.cmd pnpm build`、`git diff --check` 和 1440/1280/375px Playwright overflow 截图。
 - [x] 2026-05-25 客户端 run start 反馈已落地：提交后显示 queued 乐观运行、启动中禁用输入与重复提交、409 `active_run_exists` 会打开现有 run、显示 toast，并保留未接受的草稿。
 - [x] 前端依赖：`AppError` 保留 HTTP status 和顶层 `runId` 到 details；`PromptInput` 支持 async send result；`ToastContainer` 已挂回 App shell。
 - [ ] 后续补强：把 runStore/TanStack Query 中 active run 订阅和历史 run 列表刷新接到同一条状态链，避免只靠 optimistic run。
@@ -1073,6 +1082,10 @@ pnpm typecheck                                         # 零错误
 | 74 | 同上 — 删除 tracked Edge coverage | `.gitignore` | 同上 |
 | 69 | 删除 tracked Desktop bundle analyzer 输出 | `.gitignore` | `app/desktop/stats.html` |
 | 114 | dev/smoke 脚本更新（runner 已移除） | `scripts/client-smoke.ps1` | 更新引用 |
+
+**2026-05-26 Worker A CI 定位记录**：
+- PR #199 合入后 `Cross-platform build (windows-latest)` 红灯定位到 `edge-server/internal/lifecycle` 的 `TestProcessExecutorPublishesOutputAndFinished`：Windows runner 实际 stdout 为 `"stdout chunk\n"`，测试期望包含动态 `run=run_TestProcessExecutorPublishesOutputAndFinished_...`。
+- 同一 run 的 go-edge、go-hub、ubuntu/macOS cross-build、frontend、validate 均通过；该问题属于 Edge Go 后端测试跨平台断言/命令输出差异，不在本轮 `api/**`、`docs/**`、`app/shared/**` 修复范围内，后续由 Edge/CI worker 在 `edge-server/internal/lifecycle/process_executor_test.go` 或 CI Windows 命令路径收口。
 
 **验收**：
 - CI 全绿
