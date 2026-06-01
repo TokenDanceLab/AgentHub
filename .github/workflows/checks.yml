@@ -283,6 +283,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Lint Web
+        run: pnpm lint
+
       - name: Build Web
         run: pnpm build
 
