@@ -257,17 +257,14 @@ func saveFileSnapshot(path string, snapshot fileSnapshot) error {
 	if err != nil {
 		return fmt.Errorf("create store snapshot temp file: %w", err)
 	}
+	defer temp.Close()
 	tempPath := temp.Name()
 	defer os.Remove(tempPath)
 
 	encoder := json.NewEncoder(temp)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(snapshot); err != nil {
-		_ = temp.Close()
 		return fmt.Errorf("encode store snapshot: %w", err)
-	}
-	if err := temp.Close(); err != nil {
-		return fmt.Errorf("close store snapshot temp file: %w", err)
 	}
 	if err := os.Rename(tempPath, path); err != nil {
 		return fmt.Errorf("replace store snapshot: %w", err)

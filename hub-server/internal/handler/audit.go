@@ -60,6 +60,10 @@ func (h *AuditHandler) ListAuditEvents(c *gin.Context) {
 		c.Query("event_type"), c.Query("severity"),
 		since, until, c.Query("pageCursor"), pageSize)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}

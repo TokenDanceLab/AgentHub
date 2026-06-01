@@ -68,6 +68,7 @@ func (s *LocalStorage) Put(ctx context.Context, key string, body io.Reader, cont
 		}
 		return false, err
 	}
+	defer dst.Close()
 
 	keep := false
 	defer func() {
@@ -77,10 +78,6 @@ func (s *LocalStorage) Put(ctx context.Context, key string, body io.Reader, cont
 	}()
 
 	if _, err := io.Copy(dst, body); err != nil {
-		_ = dst.Close()
-		return true, err
-	}
-	if err := dst.Close(); err != nil {
 		return true, err
 	}
 
