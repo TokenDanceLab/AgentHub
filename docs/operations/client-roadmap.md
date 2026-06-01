@@ -11,6 +11,7 @@
 | 当前进展、并行工作、阻塞 | `docs/handoff/STATE.md` |
 | 全局路线和验收 | `docs/roadmap.md` |
 | 客户端详细阶段任务 | `docs/roadmaps/client.md` |
+| Desktop UI 调试、截图和脱敏 SOP | `docs/operations/desktop-ui-qa-sop.md` |
 | 架构边界和术语 | `docs/architecture/system-architecture.md` |
 | 实现顺序和目录边界 | `docs/architecture/implementation-guide.md` |
 | REST / WebSocket 契约 | `api/README.md`、`api/openapi.yaml`、`api/events.md` |

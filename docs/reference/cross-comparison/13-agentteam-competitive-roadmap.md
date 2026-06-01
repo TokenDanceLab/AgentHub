@@ -1,30 +1,29 @@
 # AgentTeam 竞品深度研究与长期路线
 
-> 状态：2026-05-26 研究结论，面向 AgentHub P1-P4 产品路线。
+> 状态：2026-05-28 实现复核，面向 AgentHub P1-P4 产品路线。
 > 范围：AgentTeam、多 Agent 编排、Agent 通信、TeamRun、运行时事件和 UI 呈现。
 
 ---
 
 ## 0. 结论
 
-AgentHub 现在不是没有多 Agent 代码，而是缺少**产品级 AgentTeam 模型**。
+AgentHub 现在已经不是“没有产品级 AgentTeam 模型”的状态；Hub 侧 AgentTeam / TeamRun / TeamTask / TeamEvent / TeamRunState 和 typed route guardrail 已经有源码与测试落点。但它仍没有达到 AionUI、LobeHub 或 OpenHands 语境下的完整 AgentTeam 产品闭环。
 
 当前已有三块能力：
 
 1. Hub IM 层有 `AgentInstance`：能把某个 Agent Profile 加到 group session，再对一个 Agent 触发 `PendingAgentTask`。
-2. Desktop bridge 能把 Hub 的 `agent.dispatch` 转成一个 Local Edge `POST /v1/runs`。
-3. Edge Runtime 层有本地 `OrchestratorAdapter`、runtime `AgentInstance` registry、in-memory `MessageQueue` 和 `ResultAggregator`，可以作为子 Agent 原型。
+2. Hub AgentTeam 层已有 `AgentTeam`、`AgentTeamMember`、`AgentTeamRun`、`AgentTeamTask`、`AgentTeamEvent`、`TeamRunState`、approval/conflict 投影和 append-only replay。
+3. Hub structured route 层已有 `CoordinatorRouteDecision`、`team.route.decided` / `team.route.rejected`、任务数/活跃 subagent/重复 route/budget/timeout guardrail。
+4. Desktop bridge 能把 Hub 的 `agent.dispatch` 转成一个 Local Edge `POST /v1/runs`，也能把 runtime structured route decision 自动 POST 到 Hub route decision endpoint。
+5. Edge Runtime 层仍有本地 `OrchestratorAdapter`、runtime `AgentInstance` registry、in-memory `MessageQueue` 和 `ResultAggregator`，可以作为旧 sub-agent 原型和迁移参考。
 
-但这些还不是 AionUI、LobeHub 或 OpenHands 语境下的 AgentTeam。缺口是：
+仍未完成的产品缺口是：
 
-- 没有 `AgentTeam` / `AgentTeamMember` / `TeamRun` / `TeamTask` / `TeamEvent` 持久模型。
-- 没有可查询、可恢复的 `TeamRunState` 聚合，无法从一个团队目标恢复成员、任务、路由决策、审批门、预算和终止原因。
-- Agent 间通信只在 Edge 进程内用 channel，不进入 Hub 消息主序列、审计或 replay。
-- Orchestrator 主要依赖 Runtime 输出中的调度指令，不是显式 Supervisor/Executor 状态机。
-- 当前 dispatch 仍偏 prompt/text JSON 扫描，缺 `CoordinatorRouteDecision` 这类 typed router schema、校验和失败恢复。
-- 子 Agent 已有 registry/depth 概念，但缺统一硬上限：最大委派深度、活跃子 Agent 数、重复路由次数、预算和时长。
+- AgentTeam backend 有切片，但 Web/Desktop 还没有完整 Team Builder / TeamRun Console：task board、member status、subagent activity row、branch switch、typed team blocks、pending approval count、result blocks。
+- AT-4 仍缺本地两个真实 Runtime Profile 的 live TeamRun smoke；不能把后端 handler/service 测试当作用户可用产品验收。
+- Edge `OrchestratorAdapter` 仍存在 prompt-driven 子 Agent spawn 语义，后续需要收敛为“Supervisor 输出 typed route -> Hub 创建 TeamAssignment/TeamTask -> Desktop/Edge 执行”的单一产品路径。
+- Agent 间通信正在从 Edge channel 迁移到 Hub TeamEvent / TeamAssignment，但旧 Edge MessageQueue 仍不应作为产品语义继续扩大。
 - `ContextBudget` 已能预警和分配 child budget，但还没有把自动 compact、checkpoint、最小上下文切片和恢复策略纳入 TeamRun。
-- Web/Desktop 没有 Team 组合、成员角色、并发树、任务看板、冲突合并、审批队列的完整 UI。
 - 权限还没有覆盖“哪个 Agent 可以在什么 Execution Target、workspace、provider budget 下委派谁”。
 
 因此下一阶段路线应从：
@@ -449,6 +448,8 @@ AgentTeam 比单 Agent 更危险，因为它把自动委派、并行执行和共
 
 目标：把产品对象立起来，但不声称远程/云完成。
 
+2026-05-28 复核：Hub model/API 已有实现证据；Web/Desktop Team list、member table、readiness summary 仍未形成可验收产品面。
+
 - Hub model/migration：`agent_teams`、`agent_team_members`。
 - API：`GET/POST /web/agent-teams`、`GET/PATCH/DELETE /web/agent-teams/{id}`。
 - Web/Desktop Settings：Team list、member table、readiness summary。
@@ -458,6 +459,8 @@ AgentTeam 比单 Agent 更危险，因为它把自动委派、并行执行和共
 ### B. 近期：TeamRunState + 结构化路由（1-2 周）
 
 目标：把当前 prompt-only subagent dispatch 收敛到 typed route 和可恢复 snapshot。
+
+2026-05-28 复核：TeamRunState、typed `CoordinatorRouteDecision`、route accepted/rejected event 和多类 guardrail 已有实现证据；仍需把旧 Edge prompt-driven spawn 收敛为 Hub TeamAssignment 主路径。
 
 - 定义 `CoordinatorRouteDecision` schema 和 `team.route.decided` / `team.route.rejected` 事件。
 - 保留旧文本 JSON dispatch 兼容，但新 TeamRun 只消费 typed route。
@@ -469,6 +472,8 @@ AgentTeam 比单 Agent 更危险，因为它把自动委派、并行执行和共
 ### C. 近期：TeamRun 最小闭环（2-3 周）
 
 目标：一个 TeamRun 能派发两个本地 Profile，并在 UI 聚合。
+
+2026-05-28 复核：Hub 后端 dispatch binding 已推进到 pending agent task；仍缺 Codex + Claude Code 或 Codex + OpenCode 的真实本地 TeamRun smoke，也缺 Desktop/Web TeamRun Console。
 
 - Hub model/migration：`team_runs`、`team_tasks`、`team_events`。
 - API：`POST /web/team-runs`、`GET /web/team-runs/{id}`、`GET /web/team-runs/{id}/events`。
