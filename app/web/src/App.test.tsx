@@ -1,29 +1,27 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import i18n from '@/i18n';
-import { router } from '@/router';
 import App from '@/App';
 
-vi.mock('@/pages/Workbench', () => ({
-  default: () => <div data-testid="page-workbench">Workbench route content</div>,
+vi.mock('@lobehub/icons', () => ({
+  ClaudeCode: () => <span data-testid="icon-claude-code" />,
+  Codex: () => <span data-testid="icon-codex" />,
+  ModelIcon: () => <span data-testid="icon-model" />,
+  OpenCode: () => <span data-testid="icon-opencode" />,
 }));
 
-vi.mock('@/pages/AgentSquare', () => ({
-  default: () => <div data-testid="page-agent-square">Agent Square route content</div>,
+vi.mock('@/views/viewRegistry', () => ({
+  Slot: ({ name }: { name: string }) => <div data-testid={`slot-${name}`}>{name}</div>,
 }));
 
-vi.mock('@/pages/PrivateChats', () => ({
-  default: () => <div data-testid="page-private-chats">Private Chats route content</div>,
+vi.mock('@/components/SettingsPage', () => ({
+  default: () => <div data-testid="settings-page">Settings route content</div>,
 }));
 
-vi.mock('@/pages/GroupWorkspace', () => ({
-  default: () => <div data-testid="page-group-workspace">Group Workspace route content</div>,
-}));
-
-vi.mock('@/pages/Project', () => ({
-  default: () => <div data-testid="page-project">Project route content</div>,
+vi.mock('@/components/AuthPage', () => ({
+  default: () => <div data-testid="auth-page">Auth route content</div>,
 }));
 
 function visibleText(container: HTMLElement) {
@@ -32,8 +30,7 @@ function visibleText(container: HTMLElement) {
   return clone.textContent ?? '';
 }
 
-async function renderShell(path = '/') {
-  await router.navigate(path);
+function renderShell() {
   return render(<App />);
 }
 
@@ -58,66 +55,41 @@ describe('Web shell', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders translated shell copy without raw shell keys or fake live claims', async () => {
-    const { container } = await renderShell();
-
-    expect(await screen.findByTestId('page-workbench')).toBeInTheDocument();
+  it('renders the workspace shell without raw shell keys or fake live claims', () => {
+    const { container } = renderShell();
     const text = visibleText(container);
 
-    expect(text).toContain('Workbench Edge unavailable');
-    expect(text).toContain('Workbench Edge unavailable/error');
+    expect(screen.getByText('AgentHub')).toBeInTheDocument();
+    expect(screen.getByTestId('slot-agent-list')).toBeInTheDocument();
+    expect(screen.getByTestId('slot-thread-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('slot-main-view')).toBeInTheDocument();
+    expect(screen.getByTestId('slot-prompt-input')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open run detail' }));
+    expect(screen.getByTestId('slot-run-detail')).toBeInTheDocument();
+    expect(text).toContain('Hub path idle');
+    expect(text).toContain('Sign in for realtime');
     expect(text).not.toMatch(/shell\.(?:brand|toolbar|status|sidebar|statusPanel|workspace|page|source)/);
-    expect(text).not.toMatch(/synced|live|success|marketplace connected|session active/i);
+    expect(text).not.toMatch(/synced|marketplace connected|session active/i);
   });
 
-  it('navigates the shell to all five routed pages', async () => {
-    await renderShell();
+  it('switches between workspace, messages, and settings surfaces', () => {
+    renderShell();
 
-    const sidebar = screen.getByLabelText('Workspace navigation');
-    const nav = within(sidebar);
+    fireEvent.click(screen.getByRole('tab', { name: 'Messages' }));
+    expect(screen.getByTestId('slot-im-view')).toBeInTheDocument();
 
-    expect(await screen.findByTestId('page-workbench')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Workspace' }));
+    expect(screen.getByTestId('slot-main-view')).toBeInTheDocument();
 
-    fireEvent.click(nav.getByRole('button', { name: /Agent Square/i }));
-    expect(await screen.findByTestId('page-agent-square')).toBeInTheDocument();
-
-    fireEvent.click(nav.getByRole('button', { name: /Private Chats/i }));
-    expect(await screen.findByTestId('page-private-chats')).toBeInTheDocument();
-
-    fireEvent.click(nav.getByRole('button', { name: /Group Workspace/i }));
-    expect(await screen.findByTestId('page-group-workspace')).toBeInTheDocument();
-
-    fireEvent.click(nav.getByRole('button', { name: /Project Preview/i }));
-    expect(await screen.findByTestId('page-project')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(screen.getByTestId('settings-page')).toBeInTheDocument();
   });
 
-  it('shows explicit source badges for each shell source state', async () => {
-    await renderShell();
+  it('keeps explicit source state labels visible in the shell chrome', () => {
+    renderShell();
 
-    const sidebar = screen.getByLabelText('Workspace navigation');
-    const nav = within(sidebar);
-    const statusPanel = () => within(screen.getByLabelText('Status and source panel'));
-
-    expect(statusPanel().getByText('Edge unavailable/error')).toBeInTheDocument();
-    expect(statusPanel().getByText(/no verified Local Edge workbench source/i)).toBeInTheDocument();
-
-    fireEvent.click(nav.getByRole('button', { name: /Agent Square/i }));
-    expect(await screen.findByTestId('page-agent-square')).toBeInTheDocument();
-    expect(statusPanel().getByText('Catalog fallback')).toBeInTheDocument();
-    expect(statusPanel().getByText(/Hub custom-agent data is unavailable/i)).toBeInTheDocument();
-
-    fireEvent.click(nav.getByRole('button', { name: /Private Chats/i }));
-    expect(await screen.findByTestId('page-private-chats')).toBeInTheDocument();
-    expect(statusPanel().getByText('Hub session required')).toBeInTheDocument();
-    expect(statusPanel().getByText(/does not claim an active session/i)).toBeInTheDocument();
-
-    fireEvent.click(nav.getByRole('button', { name: /Group Workspace/i }));
-    expect(await screen.findByTestId('page-group-workspace')).toBeInTheDocument();
-    expect(statusPanel().getByText('Demo fallback')).toBeInTheDocument();
-    expect(statusPanel().getByText(/Group\/Project demo fallback/i)).toBeInTheDocument();
-
-    fireEvent.click(nav.getByRole('button', { name: /Project Preview/i }));
-    expect(await screen.findByTestId('page-project')).toBeInTheDocument();
-    expect(statusPanel().getByText('Demo fallback')).toBeInTheDocument();
+    expect(screen.getByText('Hub path idle')).toBeInTheDocument();
+    expect(screen.getByText('Sign in for realtime')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
   });
 });
