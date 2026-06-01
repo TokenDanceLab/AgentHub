@@ -1,11 +1,7 @@
 import { useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-<<<<<<< HEAD
-import { BINDING_IDS, getBinding } from '@/stores/keybindingStore';
-=======
 import { Command, Keyboard, MessageSquareText, PanelLeft, Settings2, X } from 'lucide-react';
 import { KEYBOARD_SHORTCUT_GROUPS, type ShortcutGroupId } from '@/utils/keyboardShortcuts';
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import styles from './ShortcutHelp.module.css';
 
 interface Props {
@@ -29,11 +25,7 @@ function groupIcon(id: ShortcutGroupId): ReactNode {
   }
 }
 
-<<<<<<< HEAD
-export default function ShortcutHelp({ open, onClose, onNavigateToKeyboard }: Props) {
-=======
 export default function ShortcutHelp({ open, onClose }: Props) {
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -103,30 +95,6 @@ export default function ShortcutHelp({ open, onClose }: Props) {
           </button>
         </div>
 
-<<<<<<< HEAD
-        <table className={styles.table}>
-          <tbody>
-            {BINDING_IDS.map((id) => {
-              const keys = getBinding(id);
-              return (
-                <tr key={id} className={styles.row}>
-                  <td className={styles.keys}>
-                    {keys.map((key, i) => (
-                      <span key={key}>
-                        <kbd className={styles.kbd}>{key}</kbd>
-                        {i < keys.length - 1 && (
-                          <span className={styles.plus}>+</span>
-                        )}
-                      </span>
-                    ))}
-                  </td>
-                  <td className={styles.desc}>{t(`shortcut.${id}`)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-=======
         <div className={styles.groupList}>
           {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
             <section key={group.id} className={styles.group} aria-label={t(group.labelKey)}>
@@ -150,7 +118,6 @@ export default function ShortcutHelp({ open, onClose }: Props) {
             </section>
           ))}
         </div>
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       </div>
     </div>
   );

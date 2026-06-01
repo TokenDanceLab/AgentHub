@@ -17,15 +17,9 @@ describe('ShortcutHelp', () => {
     expect(screen.getByText('shortcut.group.composer')).toBeInTheDocument();
     expect(screen.getByText('shortcut.toggleSidebar')).toBeInTheDocument();
     expect(screen.getByText('shortcut.toggleRunPanel')).toBeInTheDocument();
-<<<<<<< HEAD
-    expect(screen.getAllByText('Ctrl')).toHaveLength(3);
-    expect(screen.getByText('B')).toBeInTheDocument();
-    expect(screen.getByText('J')).toBeInTheDocument();
-=======
     expect(screen.getByText('shortcut.newThread')).toBeInTheDocument();
     expect(screen.getByText('shortcut.slashCommands')).toBeInTheDocument();
     expect(screen.getAllByText('Ctrl/⌘').length).toBeGreaterThan(4);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   });
 
   it('closes on Escape', () => {

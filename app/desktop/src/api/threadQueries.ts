@@ -7,12 +7,8 @@ import {
   fetchThreads,
   renameThread,
   deleteThread,
-<<<<<<< HEAD
-  type CreateThreadRequest,
-=======
   archiveThread,
   updateThreadStatus,
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 } from './edgeClient';
 import type { ListResponse, ThreadInfo, ThreadItemInfo } from '@shared/types';
 

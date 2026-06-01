@@ -926,6 +926,199 @@ function hasVisibleMessage(message: ChatMessage): boolean {
   return message.blocks.some(hasVisibleBlock);
 }
 
+// ── MessageCard (memoized message row) ───────
+interface MessageCardProps {
+  msg: ChatMessage;
+  t: (key: string, vars?: Record<string, unknown>) => string;
+  language: string;
+  isStreaming: boolean;
+  isLastMsg: boolean;
+  isCopying: boolean;
+  isDeleting: boolean;
+  onCopy: (msg: ChatMessage) => void;
+  onRetry?: (messageId: string) => void;
+  onFork?: (messageId: string) => void;
+  onDeleteClick?: (messageId: string) => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: (messageId: string) => void;
+}
+
+function messageBlockSignature(blocks: ChatMessage['blocks']): string {
+  return blocks.map((b) => {
+    if (b.kind === 'tool_use') return `tool:${b.callId}:${b.status}:${b.children?.length ?? 0}`;
+    if (b.kind === 'text') return `text:${b.content.length}`;
+    if (b.kind === 'thinking') return `think:${b.content.length}`;
+    if (b.kind === 'code') return `code:${b.content.length}`;
+    if (b.kind === 'result') return `result:${b.success}:${b.tokenUsage?.input ?? 0}:${b.tokenUsage?.output ?? 0}`;
+    if (b.kind === 'context_usage') return `ctx:${b.variant ?? ''}:${b.total ?? 0}:${b.usagePercent ?? 0}`;
+    if (b.kind === 'file_change') return `file:${b.path}:${b.action}`;
+    if (b.kind === 'agent_task') return `task:${b.taskId}:${b.status}`;
+    if (b.kind === 'child_agent') return `child:${b.childId}:${b.status}`;
+    if (b.kind === 'route_decision') return `route:${b.action}`;
+    if (b.kind === 'artifact') return `artifact:${b.artifactId}`;
+    if (b.kind === 'approval') return `approval:${b.approvalId}:${b.status}`;
+    if (b.kind === 'tool_group') return `tgrp:${b.totalCount}`;
+    return b.kind;
+  }).join('|');
+}
+
+const MessageCard = memo(function MessageCard({
+  msg,
+  t,
+  language,
+  isStreaming,
+  isLastMsg,
+  isCopying,
+  isDeleting,
+  onCopy,
+  onRetry,
+  onFork,
+  onDeleteClick,
+  onCancelDelete,
+  onConfirmDelete,
+}: MessageCardProps) {
+  const isActive = isStreaming && isLastMsg;
+  const messageTime = formatMessageTime(msg.timestamp, language);
+  const tokenUsageFooter = formatTokenUsageFooter(msg, t);
+
+  return (
+    <div
+      className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
+    >
+      {msg.role === 'agent' && msg.agentName && (
+        <div className={styles.agentAvatar} title={msg.agentName}>
+          <div className={styles.avatarCircle}>
+            <AgentAvatarIcon name={msg.agentName} />
+          </div>
+          <span className={styles.agentNameLabel}>{agentDisplayName(msg.agentName)}</span>
+        </div>
+      )}
+
+      {msg.role === 'agent' ? <TaskList blocks={msg.blocks} /> : null}
+      {msg.role === 'agent' ? <ToolTimeline blocks={msg.blocks} /> : null}
+
+      {msg.blocks.map((block, i) => {
+        return (
+          <BlockRenderer
+            key={blockKey(block, i)}
+            block={block}
+            t={t}
+            role={msg.role}
+            active={isActive}
+          />
+        );
+      })}
+
+      {msg.role !== 'user' && (
+        <div className={`${styles.messageFooter} ${isDeleting ? styles.messageFooterActive : ''}`}>
+          {isDeleting ? (
+            <div className={styles.deleteConfirmBar} role="group" aria-label={t('chat.deleteConfirm')}>
+              <span className={styles.deleteConfirmText}>{t('chat.deleteConfirmShort')}</span>
+              <button
+                type="button"
+                className={styles.deleteCancelBtn}
+                onClick={onCancelDelete}
+              >
+                {t('thread.cancel')}
+              </button>
+              <button
+                type="button"
+                className={styles.deleteConfirmBtn}
+                onClick={() => onConfirmDelete(msg.id)}
+              >
+                {t('chat.deleteConfirmAction')}
+              </button>
+            </div>
+          ) : (
+            <div className={styles.actionBar}>
+              <button
+                className={styles.actionBtn}
+                title={t('chat.copy')}
+                aria-label={t('chat.copy')}
+                onClick={() => onCopy(msg)}
+              >
+                <Copy size={14} />
+              </button>
+              {onRetry && (
+                <button
+                  className={styles.actionBtn}
+                  title={t('chat.retry')}
+                  aria-label={t('chat.retry')}
+                  onClick={() => onRetry(msg.id)}
+                >
+                  <RefreshCw size={14} />
+                </button>
+              )}
+              {onFork && (
+                <button
+                  className={styles.actionBtn}
+                  title={t('chat.fork')}
+                  aria-label={t('chat.fork')}
+                  onClick={() => onFork(msg.id)}
+                >
+                  <GitFork size={14} />
+                </button>
+              )}
+              {onDeleteClick && (
+                <button
+                  className={styles.actionBtn}
+                  title={t('chat.delete')}
+                  aria-label={t('chat.delete')}
+                  onClick={() => onDeleteClick(msg.id)}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          )}
+          <span
+            className={styles.timestamp}
+            title={messageTime.exact}
+            aria-label={messageTime.exact}
+          >
+            {messageTime.short}
+          </span>
+          {tokenUsageFooter ? (
+            <span
+              className={styles.messageTokenUsage}
+              title={tokenUsageFooter}
+              aria-label={tokenUsageFooter}
+            >
+              · {tokenUsageFooter}
+            </span>
+          ) : null}
+        </div>
+      )}
+      {isCopying && (
+        <span className={styles.copyToast}>{t('chat.copied')}</span>
+      )}
+    </div>
+  );
+}, (prev, next) => {
+  // Always re-render the streaming last message (blocks change rapidly)
+  if (next.isLastMsg && next.isStreaming) return false;
+  // Transition from streaming to settled — re-render to finalize
+  if (prev.isStreaming && !next.isStreaming && prev.isLastMsg) return false;
+
+  // Message identity
+  if (prev.msg.id !== next.msg.id) return false;
+
+  // Visual state toggles
+  if (prev.isCopying !== next.isCopying) return false;
+  if (prev.isDeleting !== next.isDeleting) return false;
+
+  // Block content signature
+  if (messageBlockSignature(prev.msg.blocks) !== messageBlockSignature(next.msg.blocks)) return false;
+
+  // Metadata
+  if (prev.msg.timestamp !== next.msg.timestamp) return false;
+  if (prev.msg.agentName !== next.msg.agentName) return false;
+  if (prev.msg.role !== next.msg.role) return false;
+  if (prev.language !== next.language) return false;
+
+  return true;
+});
+
 // ── ChatView ────────────────────────────────
 export default function ChatView({
   messages,
@@ -1047,133 +1240,6 @@ export default function ChatView({
   const lastMsgHasText =
     lastMsg?.role === 'agent' && lastMsg.blocks.some((b) => b.kind === 'text');
 
-  const handleConfirmDelete = useCallback((messageId: string) => {
-    onDelete?.(messageId);
-    setDeletingMessageId(null);
-  }, [onDelete]);
-
-  const renderMessage = useCallback(
-    (msg: ChatMessage) => {
-      const messageTime = formatMessageTime(msg.timestamp, i18n.language);
-      const tokenUsageFooter = formatTokenUsageFooter(msg, t);
-      const isConfirmingDelete = deletingMessageId === msg.id;
-      return (
-        <div
-          className={`${styles.message} ${msg.role === 'user' ? styles.userMsg : msg.role === 'system' ? styles.systemMsg : styles.agentMsg}`}
-        >
-          {msg.role === 'agent' && msg.agentName && (
-            <div className={styles.agentAvatar} title={msg.agentName}>
-              <div className={styles.avatarCircle}>
-                <AgentAvatarIcon name={msg.agentName} />
-              </div>
-              <span className={styles.agentNameLabel}>{agentDisplayName(msg.agentName)}</span>
-            </div>
-          )}
-
-          {msg.role === 'agent' ? <TaskList blocks={msg.blocks} /> : null}
-          {msg.role === 'agent' ? <ToolTimeline blocks={msg.blocks} /> : null}
-
-          {msg.blocks.map((block, i) => {
-            return (
-              <BlockRenderer
-                key={blockKey(block, i)}
-                block={block}
-                t={t}
-                role={msg.role}
-                active={Boolean(isStreaming && msg.id === lastMsg?.id)}
-              />
-            );
-          })}
-
-          {msg.role !== 'user' && (
-            <div className={`${styles.messageFooter} ${isConfirmingDelete ? styles.messageFooterActive : ''}`}>
-              {isConfirmingDelete ? (
-                <div className={styles.deleteConfirmBar} role="group" aria-label={t('chat.deleteConfirm')}>
-                  <span className={styles.deleteConfirmText}>{t('chat.deleteConfirmShort')}</span>
-                  <button
-                    type="button"
-                    className={styles.deleteCancelBtn}
-                    onClick={() => setDeletingMessageId(null)}
-                  >
-                    {t('thread.cancel')}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.deleteConfirmBtn}
-                    onClick={() => handleConfirmDelete(msg.id)}
-                  >
-                    {t('chat.deleteConfirmAction')}
-                  </button>
-                </div>
-              ) : (
-                <div className={styles.actionBar}>
-                  <button
-                    className={styles.actionBtn}
-                    title={t('chat.copy')}
-                    aria-label={t('chat.copy')}
-                    onClick={() => handleCopy(msg)}
-                  >
-                    <Copy size={14} />
-                  </button>
-                  {onRetry && (
-                    <button
-                      className={styles.actionBtn}
-                      title={t('chat.retry')}
-                      aria-label={t('chat.retry')}
-                      onClick={() => onRetry(msg.id)}
-                    >
-                      <RefreshCw size={14} />
-                    </button>
-                  )}
-                  {onFork && (
-                    <button
-                      className={styles.actionBtn}
-                      title={t('chat.fork')}
-                      aria-label={t('chat.fork')}
-                      onClick={() => onFork(msg.id)}
-                    >
-                      <GitFork size={14} />
-                    </button>
-                  )}
-                  {onDelete && (
-                    <button
-                      className={styles.actionBtn}
-                      title={t('chat.delete')}
-                      aria-label={t('chat.delete')}
-                      onClick={() => setDeletingMessageId(msg.id)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              )}
-              <span
-                className={styles.timestamp}
-                title={messageTime.exact}
-                aria-label={messageTime.exact}
-              >
-                {messageTime.short}
-              </span>
-              {tokenUsageFooter ? (
-                <span
-                  className={styles.messageTokenUsage}
-                  title={tokenUsageFooter}
-                  aria-label={tokenUsageFooter}
-                >
-                  · {tokenUsageFooter}
-                </span>
-              ) : null}
-            </div>
-          )}
-          {copiedMessageId === msg.id && (
-            <span className={styles.copyToast}>{t('chat.copied')}</span>
-          )}
-        </div>
-      );
-    },
-    [t, i18n.language, isStreaming, lastMsg?.id, copiedMessageId, deletingMessageId, handleCopy, handleConfirmDelete, onRetry, onFork, onDelete],
-  );
-
   const handleScrollToBottom = useCallback(() => {
     scrollToBottom(true);
   }, [scrollToBottom]);
@@ -1210,7 +1276,24 @@ export default function ChatView({
                 data-message-id={msg.id}
                 className={`${styles.messageRow} ${msg.role === 'user' ? styles.messageRowUser : ''}`}
               >
-                {renderMessage(msg)}
+                <MessageCard
+                  msg={msg}
+                  t={t}
+                  language={i18n.language}
+                  isStreaming={isStreaming ?? false}
+                  isLastMsg={msg.id === lastMsg?.id}
+                  isCopying={copiedMessageId === msg.id}
+                  isDeleting={deletingMessageId === msg.id}
+                  onCopy={handleCopy}
+                  onRetry={onRetry}
+                  onFork={onFork}
+                  onDeleteClick={onDelete ? setDeletingMessageId : undefined}
+                  onCancelDelete={() => setDeletingMessageId(null)}
+                  onConfirmDelete={(messageId: string) => {
+                    onDelete?.(messageId);
+                    setDeletingMessageId(null);
+                  }}
+                />
               </div>
             ))}
           </div>
