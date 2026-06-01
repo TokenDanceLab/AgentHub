@@ -277,6 +277,7 @@ export {
   getSurfaceMetadata,
   getSurfaceStatusMetadata,
   getSurfacesByCategory,
+  getSurfacesByPlatform,
   surfaceMetadataById,
   surfaceStatusById,
 } from './surfaceMetadata';

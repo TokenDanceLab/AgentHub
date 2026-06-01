@@ -838,7 +838,7 @@ const resources = {
   },
 } as const;
 
-function normalizeLanguage(language?: string | null): MobileLanguage {
+export function normalizeLanguage(language?: string | null): MobileLanguage {
   return language?.toLowerCase().startsWith("zh") ? "zh" : "en";
 }
 
