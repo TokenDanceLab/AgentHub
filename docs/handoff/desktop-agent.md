@@ -21,10 +21,10 @@
 ```
 
 ```powershell
-cd D:\Code\AgentHub
+cd D:\Code\TokenDance\AgentHub
 git worktree add .worktrees/feat-desktop-sidecar -b feat/desktop-sidecar
 # 或如果已存在：
-cd D:\Code\AgentHub\.worktrees\feat-desktop-sidecar
+cd D:\Code\TokenDance\AgentHub\.worktrees\feat-desktop-sidecar
 ```
 
 ## 全局架构
@@ -226,7 +226,7 @@ Desktop 只通过 REST + WebSocket 与 Edge Server 通信：
 ## 构建和测试
 
 ```powershell
-cd D:\Code\AgentHub\.worktrees\feat-desktop-sidecar\app\desktop
+cd D:\Code\TokenDance\AgentHub\.worktrees\feat-desktop-sidecar\app\desktop
 
 # 安装依赖
 pnpm install
@@ -254,7 +254,7 @@ pnpm exec playwright install chromium
 
 ```powershell
 # 先构建 Edge（另一个 worktree）
-cd D:\Code\AgentHub\.worktrees\feat-edge-adapters\edge-server
+cd D:\Code\TokenDance\AgentHub\.worktrees\feat-edge-adapters\edge-server
 go build -o agenthub-edge.exe ./cmd/agenthub-edge
 
 # 启动 (mock 模式，用来开发 UI)
