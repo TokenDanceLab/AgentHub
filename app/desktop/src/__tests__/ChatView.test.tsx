@@ -28,6 +28,10 @@ vi.mock('@lobehub/icons', () => ({
   ),
 }));
 
+vi.mock('@/hooks/useStreamingText', () => ({
+  useStreamingText: (content: string) => content,
+}));
+
 vi.mock('@/stores/toastStore', () => ({
   useToastStore: (selector: (s: { toasts: unknown[]; addToast: ReturnType<typeof vi.fn>; removeToast: ReturnType<typeof vi.fn> }) => unknown) => {
     const store = {
