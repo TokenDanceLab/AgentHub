@@ -50,7 +50,9 @@ export function useAutoScroll(
 
   // Stable ref for customFn to avoid dependency churn
   const customFnRef = useRef(customFn);
-  customFnRef.current = customFn;
+  useEffect(() => {
+    customFnRef.current = customFn;
+  }, [customFn]);
 
   // ── Helpers ───────────────────────────────────
 
@@ -207,9 +209,13 @@ export function useAutoScroll(
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    el.addEventListener('scroll', handleScroll, { passive: true });
     el.addEventListener('wheel', handleWheel, { passive: true });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [containerRef, handleWheel]);
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      el.removeEventListener('wheel', handleWheel);
+    };
+  }, [containerRef, handleScroll, handleWheel]);
 
   // Cleanup timers on unmount
   useEffect(() => {
