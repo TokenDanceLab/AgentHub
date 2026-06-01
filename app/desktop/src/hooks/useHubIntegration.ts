@@ -471,6 +471,7 @@ export function useHubIntegration(
         getString(data, 'thread_id') ||
         getString(data, 'session_id') ||
         'hub-dispatch';
+      const targetId = getString(data, 'target_id');
 
       // Build initial task record
       const task: AgentTask = {
@@ -478,6 +479,7 @@ export function useHubIntegration(
         agentId,
         prompt,
         threadId,
+        targetId: targetId || undefined,
         status: 'queued',
         dispatchPayload: data,
         createdAt: new Date().toISOString(),
