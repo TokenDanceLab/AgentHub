@@ -198,6 +198,11 @@ func TestAgentTeamHandler_DecideApproval(t *testing.T) {
 }
 
 type mockAgentTeamService struct {
+	createTeam          func(ctx context.Context, userID, name, description string) (*model.AgentTeam, error)
+	listTeams           func(ctx context.Context, userID string) ([]model.AgentTeam, error)
+	getTeamWithMembers  func(ctx context.Context, userID, teamID string) (*model.TeamDetail, error)
+	addTeamMember       func(ctx context.Context, userID, teamID, agentProfileID, role string) error
+	startTeamRun        func(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error)
 	handleRouteDecision func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
 	listTeamTasks       func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
 	listTeamEvents      func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
@@ -206,7 +211,10 @@ type mockAgentTeamService struct {
 }
 
 func (m *mockAgentTeamService) CreateTeam(ctx context.Context, userID, name, description string) (*model.AgentTeam, error) {
-	return nil, nil
+	if m.createTeam == nil {
+		return nil, nil
+	}
+	return m.createTeam(ctx, userID, name, description)
 }
 
 func (m *mockAgentTeamService) GetTeam(ctx context.Context, userID, teamID string) (*model.AgentTeam, error) {
@@ -214,11 +222,17 @@ func (m *mockAgentTeamService) GetTeam(ctx context.Context, userID, teamID strin
 }
 
 func (m *mockAgentTeamService) GetTeamWithMembers(ctx context.Context, userID, teamID string) (*model.TeamDetail, error) {
-	return nil, nil
+	if m.getTeamWithMembers == nil {
+		return nil, nil
+	}
+	return m.getTeamWithMembers(ctx, userID, teamID)
 }
 
 func (m *mockAgentTeamService) ListTeams(ctx context.Context, userID string) ([]model.AgentTeam, error) {
-	return nil, nil
+	if m.listTeams == nil {
+		return nil, nil
+	}
+	return m.listTeams(ctx, userID)
 }
 
 func (m *mockAgentTeamService) UpdateTeam(ctx context.Context, userID, teamID, name, description string) error {
@@ -230,7 +244,10 @@ func (m *mockAgentTeamService) DeleteTeam(ctx context.Context, userID, teamID st
 }
 
 func (m *mockAgentTeamService) AddTeamMember(ctx context.Context, userID, teamID, agentProfileID, role string) error {
-	return nil
+	if m.addTeamMember == nil {
+		return nil
+	}
+	return m.addTeamMember(ctx, userID, teamID, agentProfileID, role)
 }
 
 func (m *mockAgentTeamService) RemoveTeamMember(ctx context.Context, userID, teamID, memberID string) error {
@@ -238,7 +255,10 @@ func (m *mockAgentTeamService) RemoveTeamMember(ctx context.Context, userID, tea
 }
 
 func (m *mockAgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, triggerMessage string) (*model.AgentTeamRun, error) {
-	return nil, nil
+	if m.startTeamRun == nil {
+		return nil, nil
+	}
+	return m.startTeamRun(ctx, userID, teamID, triggerMessage)
 }
 
 func (m *mockAgentTeamService) GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error) {

@@ -80,10 +80,6 @@
   "chat.scrollToBottom": "滚动到底部",
   "chat.sessionInit": "会话已初始化 — {{model}}",
   "chat.thinking": "思考中...",
-<<<<<<< HEAD
-  "chat.toolCall": "工具: {{name}}",
-  "chat.viewFullDiff": "查看完整差异",
-=======
   "chat.thinkingLabel": "正在思考",
   "chat.thinkingSettledLabel": "思考过程",
   "chat.charCount": "{{count}} 字符",
@@ -168,7 +164,6 @@
   "chat.deleteConfirmShort": "删除这条消息？",
   "chat.deleteConfirmAction": "删除",
 
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "connectAgent.connect": "连接",
   "connectAgent.connected": "已连接",
   "connectAgent.description": "下载 AgentHub 桌面应用或打开网页客户端以开始使用",
@@ -266,15 +261,6 @@
   "menu.view": "视图",
   "menu.window": "窗口",
   "menu.help": "帮助",
-<<<<<<< HEAD
-  "diffReview.empty": "没有可审阅的 diff",
-  "diffReview.acceptAll": "全部接受",
-  "diffReview.rejectAll": "全部拒绝",
-  "diffReview.original": "原始",
-  "diffReview.modified": "修改后",
-  "diffReview.acceptLine": "接受此行",
-  "diffReview.rejectLine": "拒绝此行",
-=======
   "menu.desktopOnly": "仅 Desktop 原生窗口可用",
   "menu.nativeWindowUnavailable": "窗口命令只能在 Desktop 原生窗口中执行",
   "menu.requiresEdge": "需要本地 Edge 在线",
@@ -317,7 +303,6 @@
   "menu.help.desktopSettingsDesc": "打开本地客户端配置",
   "menu.help.about": "关于 AgentHub",
 
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "nav.agent": "智能体",
   "nav.closeSidebar": "关闭侧边栏",
   "nav.collapseSidebar": "收起侧边栏",
@@ -354,8 +339,6 @@
   "prompt.model": "模型",
   "prompt.placeholder": "输入消息，@Agent 提及代理...",
   "prompt.reasoning": "推理强度",
-<<<<<<< HEAD
-=======
   "prompt.modelReasoning": "模型与推理强度",
   "prompt.modelRoute": "模型路由",
   "prompt.groupAgents": "Agent",
@@ -369,7 +352,6 @@
   "prompt.reasoning.medium": "中",
   "prompt.reasoning.high": "高",
   "prompt.reasoning.max": "最高",
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "prompt.routeAlias": "别名",
   "prompt.routeAuto": "自动",
   "prompt.routeModel": "模型",
@@ -377,9 +359,6 @@
   "prompt.routeProvider": "Provider",
   "prompt.routeReasoning": "推理",
   "prompt.starting": "正在启动运行",
-<<<<<<< HEAD
-  "prompt.targetAuto": "自动目标",
-=======
   "prompt.slash.commands": "命令",
   "prompt.slash.empty": "没有匹配的命令",
   "prompt.slash.groupAgents": "Agent",
@@ -453,7 +432,6 @@
   "prompt.permission.bypassPermissions": "完全访问",
   "prompt.permission.dontAsk": "不询问",
 
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "run.close": "关闭运行详情",
   "run.collapsedRail": "已收起的运行详情控制栏",
   "run.empty": "当前没有正在执行的任务",
@@ -484,39 +462,6 @@
   "run.artifact.noPreview": "无法预览",
   "run.emptyOutput": "暂无输出",
   "run.emptySources": "暂无来源",
-<<<<<<< HEAD
-  "run.reviewSurface": "运行审阅",
-  "run.reviewApprovals": "审批",
-  "run.reviewNoApprovals": "暂无待审批项",
-  "run.reviewAllow": "允许审批",
-  "run.reviewDeny": "拒绝审批",
-  "run.reviewApprovalFailed": "审批提交失败，请求仍在等待处理。",
-  "run.reviewApprovalAlreadyHandled": "Local Edge 已找不到该审批请求，将保持等待状态直到下一次运行更新。",
-  "run.reviewApprovalSource": "Local Edge",
-  "run.reviewDecisionPending": "提交中",
-  "run.reviewDiff": "Diff",
-  "run.reviewDiffGap": "暂未收到该运行的 diff 数据。",
-  "run.reviewDiffError": "运行 diff 来源暂不可用。",
-  "run.reviewDiffSource": "Diff 来源：{{source}}",
-  "run.reviewLoading": "正在读取来源...",
-  "run.reviewSourceEdge": "Local Edge",
-  "run.reviewSourceEvents": "Runtime 事件",
-  "run.reviewArtifacts": "产物",
-  "run.reviewArtifactGap": "该运行暂未收到 artifact API 载荷。",
-  "run.reviewArtifactError": "Artifact 来源被锁定，或 Edge 暂未实现该接口。",
-  "run.reviewPreviews": "预览",
-  "run.reviewPreviewGap": "该运行暂未收到 preview URL。",
-  "run.reviewPreviewError": "Preview 来源被锁定，或 Edge 暂未实现该接口。",
-  "run.runtimeBlocks": "Runtime 块",
-  "run.block.thinking": "思考",
-  "run.block.toolCall": "工具",
-  "run.block.fileChange": "文件",
-  "run.block.result": "结果",
-  "run.block.session": "会话",
-  "run.block.code": "代码",
-  "run.block.text": "文本",
-  "run.block.raw": "原始",
-=======
   "search.title": "搜索",
   "search.messages": "搜索消息和会话",
   "search.results": "搜索结果",
@@ -524,7 +469,6 @@
   "search.sidebarPlaceholder": "搜索会话和消息...",
   "search.openGlobal": "打开全局搜索",
   "search.empty": "没有找到结果",
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "run.status.CANCELLED": "已取消",
   "run.status.COMPLETED": "已完成",
   "run.status.FAILED": "失败",
@@ -543,10 +487,6 @@
   "run.title": "执行详情",
   "run.toolCalls": "工具调用",
   "shortcut.close": "关闭 / 取消",
-<<<<<<< HEAD
-  "shortcut.customizeLink": "在设置中自定义快捷键…",
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "shortcut.close.detail": "关闭弹窗、菜单或移动端面板",
   "shortcut.closeWindow": "关闭 Desktop 窗口",
   "shortcut.closeWindow.detail": "浏览器预览会给出 Desktop-only 提示",
@@ -578,13 +518,9 @@
   "shortcut.toggleRunPanel": "切换运行详情面板",
   "shortcut.toggleRunPanel.detail": "有当前 Run 时显示或隐藏右侧详情",
   "shortcut.toggleSidebar": "切换左侧栏",
-<<<<<<< HEAD
-  "status.hubClickToLogin": "点击登录 Hub",
-=======
   "shortcut.toggleSidebar.detail": "收起或恢复 Runtime 与会话列表",
 
   "status.hubClickToLogin": "Hub 账号",
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "status.hubConnected": "Hub: 已连接",
   "status.hubDisconnected": "Hub: —",
   "status.offline": "边缘端: 离线",
@@ -598,12 +534,9 @@
   "workspace.share": "复制工作区上下文",
   "workspace.expand": "展开工作区",
   "workspace.collapse": "恢复工作区",
-<<<<<<< HEAD
-=======
   "workspace.teamRunsActive": "{{count}} 个 TeamRun 活跃",
   "workspace.teamRunsWithBlocks": "{{count}} 个 TeamRun 阻塞",
 
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "settings.title": "设置",
   "settings.back": "返回应用",
   "settings.general": "常规",
@@ -701,12 +634,6 @@
   "settings.instructionsRuntimeDesc": "保存后会作为 appendSystemPrompt 附加到每次本地运行请求，不写入聊天正文。",
   "settings.instructionsCharsRemaining": "剩余 {{count}} 字",
   "settings.saveInstructions": "保存指令",
-<<<<<<< HEAD
-  "settings.saved": "已保存",
-  "settings.save": "保存",
-  "settings.clear": "清空",
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "settings.clearInstructions": "清空",
   "settings.personalizationNote": "本地优先",
   "settings.personalizationNoteDesc": "这些偏好先保存在当前桌面客户端；登录 Hub 后可扩展为跨设备同步。",
@@ -761,16 +688,7 @@
   "settings.statusPublished": "已发布",
   "settings.statusLoginLocked": "需要登录",
   "settings.statusInProgress": "接入中",
-<<<<<<< HEAD
-  "settings.status.snapshot": "真实快照",
-  "settings.status.localSource": "本地来源",
-  "settings.status.loginLocked": "登录锁定",
-  "settings.status.error": "错误",
-  "settings.status.interfaceGap": "接口缺口",
-  "settings.online": "在线",
-=======
   "settings.statusLocalSource": "本机配置",
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "settings.offline": "离线",
   "settings.edgeOnline": "Edge 在线",
   "settings.edgeOffline": "Edge 离线",
@@ -889,9 +807,6 @@
   "settings.schedulerPolicyApprovalDesc": "工具、文件、命令或远程动作执行前应用本机权限规则。",
   "settings.schedulerGuard": "调度边界",
   "settings.schedulerGuardDesc": "调度负责选择 Agent Profile、模型和 Execution Target；流式输出、工具调用、文件修改仍是 Run 的基础能力。",
-<<<<<<< HEAD
-  "settings.agentMarketDesc": "从 Hub 读取可用于市场的 CustomAgent；Local Edge Runtime 只作为模板来源。",
-=======
   "settings.agentTeamApi": "Hub AgentTeam API",
   "settings.agentTeamApiDesc": "从 Hub 读取 AgentTeam、TeamRun、TeamRunState、TeamTask、TeamEvent、审批和冲突接口。",
   "settings.agentTeamBuilder": "Team Builder",
@@ -1027,7 +942,6 @@
   "settings.teamRouteAction.approve": "审批",
   "settings.teamRouteAction.finish": "结束",
   "settings.agentMarketDesc": "预留 Agent 模板、能力标签、评分和审核发布入口。",
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "settings.agentTemplates": "模板库",
   "settings.agentTemplatesDesc": "按任务类型沉淀 CustomAgent 配置包和启动模板。",
   "settings.agentCapabilityTags": "能力标签",
@@ -1382,8 +1296,6 @@
   "thread.title": "会话",
   "thread.emptyHint": "暂无最近会话，选择上方智能体开始聊天",
   "thread.untitled": "未命名会话",
-<<<<<<< HEAD
-=======
   "thread.filterLabel": "会话状态",
   "thread.active": "活跃",
   "thread.archived": "已归档",
@@ -1398,7 +1310,6 @@
   "thread.status.waitingApproval": "待审批",
   "thread.status.failed": "失败",
 
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "time.daysAgo": "{{count}}天前",
   "time.hoursAgo": "{{count}}小时前",
   "time.justNow": "刚刚",
@@ -1414,13 +1325,10 @@
   "toast.threadCreated": "会话已创建",
   "toast.threadDeleted": "会话已删除",
   "toast.threadRenamed": "会话已重命名",
-<<<<<<< HEAD
-=======
   "toast.threadArchived": "会话已归档",
   "toast.threadRestored": "会话已恢复",
   "toast.workDirSelected": "工作区已选择",
 
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "welcome.approval": "按策略审批",
   "welcome.commandPlaceholder": "描述任务，AgentHub 会选择 Profile、模型和执行位置",
   "welcome.createThread": "创建会话",
@@ -1500,14 +1408,9 @@
   "home.activeRuns": "活跃 Run",
   "home.viewAllRuns": "查看运行队列",
   "home.pendingApprovals": "待审批",
-<<<<<<< HEAD
-  "home.reviewApprovals": "处理审批",
-  "home.targetHealth": "执行目标健康",
-=======
   "home.reviewApprovals": "查看审批",
   "home.noPendingApprovals": "当前没有待审批请求",
   "home.targetHealth": "目标健康",
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   "home.online": "在线",
   "home.offline": "离线",
   "home.edgeConnected": "Local Edge 已连接",
@@ -1517,75 +1420,6 @@
   "home.noRecentThreads": "暂无最近 Thread",
   "home.newThread": "新建 Thread",
   "home.quickStartLabel": "快速开始",
-<<<<<<< HEAD
-  "home.quickStart1": "审查当前改动",
-  "home.quickStart2": "运行聚焦测试",
-  "home.quickStart3": "解释这个工作区",
-  "home.hubSession": "Hub 会话",
-  "home.hubConnected": "已连接",
-  "home.localOnly": "仅本地",
-  "home.hubBridgeSummary": "{{count}} 个桥接任务 · {{user}}",
-  "home.hubUserFallback": "Hub 用户",
-  "home.hubSignedOut": "登录后同步任务、IM 和设备。",
-  "home.signInHub": "登录",
-  "home.activeTeamRuns": "活跃 TeamRun",
-  "home.teamRunConsole": "控制台",
-  "home.openTeamRuns": "打开 TeamRun",
-  "teamrun.open": "打开 TeamRun 控制台",
-  "teamrun.eyebrow": "Hub 可恢复状态",
-  "teamrun.title": "TeamRun 控制台",
-  "teamrun.subtitle": "从 Hub 的 TeamRunState 恢复 AgentTeam 协作状态，不直接读取 Local Edge。",
-  "teamrun.signedOutTitle": "登录后查看 TeamRun",
-  "teamrun.signedOutDesc": "TeamRun 控制台读取 Hub AgentTeam 状态；Local Edge 执行链路保持独立。",
-  "teamrun.localEdgeHint": "Local Edge 运行仍从主工作区使用；此视图只读取 Hub TeamRun 状态。",
-  "teamrun.source": "TeamRun 数据来源",
-  "teamrun.sourceLive": "Live Hub 数据",
-  "teamrun.sourceLiveDesc": "正在渲染 Hub 返回的 TeamRunState、TeamEvent 与 Runtime event 投影。",
-  "teamrun.sourceFixture": "Fixture demo 数据",
-  "teamrun.sourceFixtureDesc": "当前没有可用的 live TeamRun，因此此只读视图明确标注为 fixture 证据。",
-  "teamrun.readOnly": "只读 v1",
-  "teamrun.readOnlyDesc": "Team Builder CRUD、审批决策、冲突处理与 Hub projection 补全放到下一轮。",
-  "teamrun.viewFixtureDemo": "查看 fixture demo",
-  "teamrun.backToSignIn": "返回登录",
-  "teamrun.loadError": "无法从 Hub 加载 TeamRun 数据。",
-  "teamrun.members": "成员",
-  "teamrun.tasks": "TeamTask",
-  "teamrun.pendingApprovals": "审批",
-  "teamrun.teams": "AgentTeam",
-  "teamrun.runs": "运行",
-  "teamrun.teamDefaultDesc": "AgentTeam 协作模板",
-  "teamrun.noTeams": "暂无 AgentTeam",
-  "teamrun.noTeamsDesc": "先在 Hub 或 Settings 中创建 AgentTeam，再打开 TeamRun。",
-  "teamrun.noRuns": "暂无 TeamRun",
-  "teamrun.noRunsDesc": "为该 AgentTeam 启动 TeamRun 后会显示任务看板。",
-  "teamrun.emptyTitle": "选择 TeamRun",
-  "teamrun.emptyDesc": "选择 AgentTeam 和 TeamRun 以恢复协作状态。",
-  "teamrun.loadingState": "正在从 Hub 事件恢复 TeamRunState。",
-  "teamrun.noState": "暂无状态快照",
-  "teamrun.noStateDesc": "Hub 没有返回该运行的 TeamRunState。",
-  "teamrun.runFallback": "TeamRun 目标",
-  "teamrun.replayDesc": "状态来自 TeamEvent 和 Runtime event 回放。",
-  "teamrun.budget": "预算",
-  "teamrun.noMembers": "暂无成员",
-  "teamrun.noMembersDesc": "该 TeamRun 暂未投影出 AgentTeam 成员。",
-  "teamrun.bucket.pending": "待处理",
-  "teamrun.bucket.running": "运行中",
-  "teamrun.bucket.done": "完成",
-  "teamrun.bucket.blocked": "阻塞",
-  "teamrun.noTasksInBucket": "暂无 TeamTask",
-  "teamrun.routeLog": "路由记录",
-  "teamrun.noRouteLog": "暂无 typed route decision。",
-  "teamrun.runtimeEvents": "Runtime 事件",
-  "teamrun.noRuntimeEvents": "暂无 Runtime event 摘要。",
-  "teamrun.approvals": "审批",
-  "teamrun.noApprovals": "暂无审批投影。",
-  "teamrun.artifacts": "产物",
-  "teamrun.noArtifacts": "暂无产物投影。",
-  "teamrun.conflicts": "冲突",
-  "teamrun.noConflicts": "暂无文件冲突投影。",
-  "teamrun.teamEvents": "TeamEvent",
-  "teamrun.noTeamEvents": "暂无 append-only TeamEvent。"
-=======
   "home.quickStart1": "审查代码库并提出改进建议",
   "home.quickStart2": "为此模块编写单元测试",
   "home.quickStart3": "解释一个复杂函数",
@@ -1620,5 +1454,4 @@
   "home.teamRunHubSyncEmpty": "Hub 同步暂无 TeamRun",
   "settings.searchPlaceholder": "搜索设置...",
   "settings.searchEmpty": "没有匹配的设置"
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
