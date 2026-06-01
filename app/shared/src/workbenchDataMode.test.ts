@@ -27,7 +27,7 @@ function state(
 }
 
 describe('workbenchDataMode', () => {
-  it.each<Array<[string, WorkbenchState, WorkbenchDataMode]>>([
+  it.each<[string, WorkbenchState, WorkbenchDataMode]>([
     ['loading while Edge snapshot is pending', state({ connection: { status: 'loading' } }), 'loading'],
     [
       'live when connected with snapshot data',

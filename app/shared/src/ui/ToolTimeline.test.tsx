@@ -8,7 +8,7 @@ describe('ToolTimeline', () => {
     const blocks: ToolTimelineBlock[] = [
       { kind: 'tool_use', callId: 'c1', toolName: 'bash', input: {}, status: 'completed' },
     ];
-    const { container } = render(<ToolTimeline blocks={blocks} />);
+    const { container } = render(<ToolTimeline blocks={blocks as any} />);
     expect(container.innerHTML).toBe('');
   });
 
@@ -17,7 +17,7 @@ describe('ToolTimeline', () => {
       { kind: 'tool_use', callId: 'c1', toolName: 'bash', input: { command: 'ls' }, status: 'completed' },
       { kind: 'file_change', path: 'src/app.ts', action: 'modified' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     expect(screen.getByTestId('tool-timeline')).toBeDefined();
     const entries = screen.getAllByTestId('tool-timeline-entry');
     expect(entries).toHaveLength(2);
@@ -28,7 +28,7 @@ describe('ToolTimeline', () => {
       { kind: 'tool_use', callId: 'c1', toolName: 'Read', input: {}, status: 'completed' },
       { kind: 'tool_use', callId: 'c2', toolName: 'Write', input: {}, status: 'running' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     expect(screen.getByText('Read')).toBeDefined();
     expect(screen.getByText('Write')).toBeDefined();
   });
@@ -38,7 +38,7 @@ describe('ToolTimeline', () => {
       { kind: 'file_change', path: 'src/components/Modal.tsx', action: 'modified' },
       { kind: 'file_change', path: 'README.md', action: 'deleted' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     expect(screen.getByText('Modal.tsx', { exact: true })).toBeDefined();
     expect(screen.getByText('README.md', { exact: true })).toBeDefined();
   });
@@ -48,7 +48,7 @@ describe('ToolTimeline', () => {
       { kind: 'file_change', path: 'src/a.ts', action: 'created' },
       { kind: 'file_change', path: 'src/b.ts', action: 'modified' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     // The action text appears in the meta span
     expect(screen.getByText('created')).toBeDefined();
   });
@@ -58,7 +58,7 @@ describe('ToolTimeline', () => {
       { kind: 'agent_task', taskId: 't1', title: 'Fix linter errors', status: 'completed' },
       { kind: 'agent_task', taskId: 't2', title: 'Write tests', status: 'running' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     expect(screen.getByText('Fix linter errors')).toBeDefined();
     expect(screen.getByText('Write tests')).toBeDefined();
   });
@@ -68,7 +68,7 @@ describe('ToolTimeline', () => {
       { kind: 'agent_task', taskId: 't1', title: 'Task A', status: 'completed', worker: 'opus' },
       { kind: 'agent_task', taskId: 't2', title: 'Task B', status: 'completed' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     expect(screen.getByText('opus')).toBeDefined();
   });
 
@@ -77,7 +77,7 @@ describe('ToolTimeline', () => {
       { kind: 'child_agent', childId: 'a1', title: 'Review PR', status: 'completed' },
       { kind: 'child_agent', childId: 'a2', title: 'Run tests', status: 'running', agentName: 'sonnet' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     expect(screen.getByText('Review PR')).toBeDefined();
     expect(screen.getByText('Run tests')).toBeDefined();
     expect(screen.getByText('sonnet')).toBeDefined();
@@ -88,7 +88,7 @@ describe('ToolTimeline', () => {
       { kind: 'route_decision', action: 'review', instructions: 'Review the code changes' },
       { kind: 'route_decision', action: 'block', blockedReason: 'Security scan required' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     expect(screen.getByText('Review the code changes')).toBeDefined();
     expect(screen.getByText('Security scan required')).toBeDefined();
   });
@@ -98,7 +98,7 @@ describe('ToolTimeline', () => {
       { kind: 'route_decision', action: 'next', summary: 'Proceed to deploy' },
       { kind: 'route_decision', action: 'test', summary: 'Test summary' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     expect(screen.getByText('Proceed to deploy')).toBeDefined();
   });
 
@@ -107,7 +107,7 @@ describe('ToolTimeline', () => {
       { kind: 'route_decision', action: 'reroute' },
       { kind: 'route_decision', action: 'approve' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     // The action appears as both the main label (<strong title="reroute">) and
     // the meta (<span>action text</span>). Expect at least 2 occurrences.
     const rerouteEls = screen.getAllByText('reroute');
@@ -122,7 +122,7 @@ describe('ToolTimeline', () => {
       { kind: 'tool_use', callId: 'c4', toolName: 'edit', input: {}, status: 'completed' },
       { kind: 'tool_use', callId: 'c5', toolName: 'grep', input: {}, status: 'failed' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     expect(screen.getByText('pending')).toBeDefined();
     expect(screen.getByText('running')).toBeDefined();
     expect(screen.getByText('draining')).toBeDefined();
@@ -136,7 +136,7 @@ describe('ToolTimeline', () => {
       { kind: 'tool_use', callId: 'c2', toolName: 'write', input: {}, status: 'completed' },
       { kind: 'tool_use', callId: 'c3', toolName: 'read', input: {}, status: 'completed' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     expect(screen.getByText('3 items')).toBeDefined();
   });
 
@@ -148,7 +148,7 @@ describe('ToolTimeline', () => {
       { kind: 'tool_use', callId: 'c4', toolName: 'd', input: {}, status: 'completed' },
       { kind: 'tool_use', callId: 'c5', toolName: 'e', input: {}, status: 'completed' },
     ];
-    render(<ToolTimeline blocks={blocks} maxEntries={2} />);
+    render(<ToolTimeline blocks={blocks as any} maxEntries={2} />);
     const entries = screen.getAllByTestId('tool-timeline-entry');
     expect(entries).toHaveLength(2);
   });
@@ -163,7 +163,7 @@ describe('ToolTimeline', () => {
       { kind: 'tool_use', callId: 'c1', toolName: 'test', input: {}, status: 'completed' },
       { kind: 'tool_use', callId: 'c2', toolName: 'fail', input: {}, status: 'failed' },
     ];
-    render(<ToolTimeline blocks={blocks} labels={labels} />);
+    render(<ToolTimeline blocks={blocks as any} labels={labels} />);
     expect(screen.getByText('Agent Timeline')).toBeDefined();
     expect(screen.getByText('success')).toBeDefined();
     expect(screen.getByText('error')).toBeDefined();
@@ -177,7 +177,7 @@ describe('ToolTimeline', () => {
       { kind: 'tool_use', callId: 'c1', toolName: 'a', input: {}, status: 'completed' },
       { kind: 'tool_use', callId: 'c2', toolName: 'b', input: {}, status: 'completed' },
     ];
-    render(<ToolTimeline blocks={blocks} labels={labels} />);
+    render(<ToolTimeline blocks={blocks as any} labels={labels} />);
     expect(screen.getByText('total: 2')).toBeDefined();
   });
 
@@ -186,7 +186,7 @@ describe('ToolTimeline', () => {
       { kind: 'tool_use', callId: 'c1', toolName: 't1', input: {}, status: 'completed' },
       { kind: 'tool_use', callId: 'c2', toolName: 't2', input: {}, status: 'completed' },
     ];
-    render(<ToolTimeline blocks={blocks} className="custom-timeline" />);
+    render(<ToolTimeline blocks={blocks as any} className="custom-timeline" />);
     expect(screen.getByTestId('tool-timeline').className).toContain('custom-timeline');
   });
 
@@ -197,7 +197,7 @@ describe('ToolTimeline', () => {
       { kind: 'code', language: 'ts', content: 'x' },
       { kind: 'tool_use', callId: 'c2', toolName: 'write', input: {}, status: 'running' },
     ] as readonly { kind?: string; [key: string]: unknown }[];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     // Only the two tool_use blocks should render
     const entries = screen.getAllByTestId('tool-timeline-entry');
     expect(entries).toHaveLength(2);
@@ -214,7 +214,7 @@ describe('ToolTimeline', () => {
       },
       { kind: 'tool_use', callId: 'c2', toolName: 'tool2', input: {}, status: 'completed' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     // meta should contain file_path and truncated command/description
     expect(screen.getByText(/\/src\/app\.ts/)).toBeDefined();
   });
@@ -224,7 +224,7 @@ describe('ToolTimeline', () => {
       { kind: 'route_decision', action: 'reroute', instructions: 'Go here' },
       { kind: 'route_decision', action: 'block', blockedReason: 'Nope' },
     ];
-    render(<ToolTimeline blocks={blocks} />);
+    render(<ToolTimeline blocks={blocks as any} />);
     // Unblocked route should show "done", blocked should show "failed"
     expect(screen.getByText('done')).toBeDefined();
     expect(screen.getByText('failed')).toBeDefined();
