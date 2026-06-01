@@ -294,7 +294,7 @@ function TeamRunTaskCard({
       <div className={styles.taskMeta}>
         <span>{memberLabel}</span>
         {dependencyCount > 0 && <span>{dependencyCount} dep</span>}
-        {task.attempt > 0 && <span>try {task.attempt}</span>}
+        {(task.attempt ?? 0) > 0 && <span>try {task.attempt}</span>}
       </div>
       {(task.agent_task_id || task.edge_run_id) && (
         <div className={styles.idRow}>
@@ -324,7 +324,7 @@ function RuntimeEventItem({ event }: { event: TeamRunEventState }) {
       <span className={styles.activityIcon}><Network size={14} /></span>
       <span className={styles.activityBody}>
         <strong>{event.event_type}</strong>
-        <span>{parsePayloadSummary(event.payload) || `seq ${event.event_seq}`}</span>
+        <span>{parsePayloadSummary(event.payload ?? '') || `seq ${event.event_seq}`}</span>
       </span>
     </div>
   );
@@ -412,7 +412,8 @@ export default function TeamRunConsole() {
   const dependencyCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const dep of state?.dependencies ?? []) {
-      counts.set(dep.task_id, (counts.get(dep.task_id) ?? 0) + 1);
+      const tid = String(dep.task_id ?? '');
+      counts.set(tid, (counts.get(tid) ?? 0) + 1);
     }
     return counts;
   }, [state?.dependencies]);
@@ -464,8 +465,8 @@ export default function TeamRunConsole() {
           <p>{t('teamrun.subtitle')}</p>
         </div>
         <div className={styles.headerMetrics}>
-          <MetricCard label={t('teamrun.members')} value={state?.members.length ?? 0} icon={<Users size={14} />} />
-          <MetricCard label={t('teamrun.tasks')} value={state?.tasks.length ?? 0} icon={<CheckCircle2 size={14} />} />
+          <MetricCard label={t('teamrun.members')} value={state?.members?.length ?? 0} icon={<Users size={14} />} />
+          <MetricCard label={t('teamrun.tasks')} value={state?.tasks?.length ?? 0} icon={<CheckCircle2 size={14} />} />
           <MetricCard label={t('teamrun.pendingApprovals')} value={pendingApprovals.length} icon={<ShieldCheck size={14} />} />
         </div>
       </header>
@@ -568,17 +569,17 @@ export default function TeamRunConsole() {
                 {visibleState.budget && (
                   <div className={styles.budgetCard}>
                     <span>{t('teamrun.budget')}</span>
-                    <strong>{visibleState.budget.total_tokens_used.toLocaleString()}</strong>
+                    <strong>{(visibleState.budget.total_tokens_used ?? 0).toLocaleString()}</strong>
                     <small>{visibleState.budget.run_count} runs / {Math.round(visibleState.budget.usage_percent ?? 0)}%</small>
                   </div>
                 )}
               </section>
 
               <section className={styles.memberStrip} aria-label={t('teamrun.members')}>
-                {visibleState.members.length === 0 ? (
+                {(visibleState.members ?? []).length === 0 ? (
                   <EmptyPanel title={t('teamrun.noMembers')} body={t('teamrun.noMembersDesc')} />
                 ) : (
-                  visibleState.members.map((member) => (
+                  (visibleState.members ?? []).map((member) => (
                     <div key={member.member_id} className={styles.memberCard}>
                       <strong>{member.role}</strong>
                       <span>{shortId(member.agent_profile_id || member.member_id)}</span>
@@ -603,7 +604,7 @@ export default function TeamRunConsole() {
                           key={task.task_id}
                           task={task}
                           dependencyCount={dependencyCounts.get(task.task_id) ?? 0}
-                          memberLabel={memberLabels.get(task.assignee_member_id) ?? shortId(task.assignee_member_id)}
+                          memberLabel={memberLabels.get(task.assignee_member_id ?? '') ?? shortId(task.assignee_member_id)}
                         />
                       ))
                     )}
@@ -620,12 +621,12 @@ export default function TeamRunConsole() {
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
               <h3>{t('teamrun.routeLog')}</h3>
-              <span>{state?.route_log.length ?? 0}</span>
+              <span>{state?.route_log?.length ?? 0}</span>
             </div>
             {(state?.route_log ?? []).length === 0 ? (
               <div className={styles.mutedText}>{t('teamrun.noRouteLog')}</div>
             ) : (
-              state?.route_log.slice(-6).map((route, index) => (
+              (state?.route_log ?? []).slice(-6).map((route, index) => (
                 <RouteLogItem key={`${route.action}-${index}`} route={route} index={index} />
               ))
             )}
@@ -634,7 +635,7 @@ export default function TeamRunConsole() {
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
               <h3>{t('teamrun.runtimeEvents')}</h3>
-              <span>{state?.run_events.length ?? 0}</span>
+              <span>{state?.run_events?.length ?? 0}</span>
             </div>
             {latestEvents.length === 0 ? (
               <div className={styles.mutedText}>{t('teamrun.noRuntimeEvents')}</div>
@@ -646,7 +647,7 @@ export default function TeamRunConsole() {
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
               <h3>{t('teamrun.approvals')}</h3>
-              <span>{state?.approvals.length ?? 0}</span>
+              <span>{state?.approvals?.length ?? 0}</span>
             </div>
             {(state?.approvals ?? []).slice(0, 5).map((approval) => (
               <ApprovalItem key={approval.approval_id || approval.request_id} approval={approval} />
@@ -657,7 +658,7 @@ export default function TeamRunConsole() {
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
               <h3>{t('teamrun.artifacts')}</h3>
-              <span>{state?.artifacts.length ?? 0}</span>
+              <span>{state?.artifacts?.length ?? 0}</span>
             </div>
             {(state?.artifacts ?? []).slice(0, 6).map((artifact) => (
               <ArtifactItem key={`${artifact.agent_task_id}-${artifact.path}-${artifact.event_seq}`} artifact={artifact} />
@@ -668,7 +669,7 @@ export default function TeamRunConsole() {
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
               <h3>{t('teamrun.conflicts')}</h3>
-              <span>{state?.conflicts.length ?? 0}</span>
+              <span>{state?.conflicts?.length ?? 0}</span>
             </div>
             {(state?.conflicts ?? []).slice(0, 4).map((conflict) => (
               <ConflictItem key={conflict.conflict_id} conflict={conflict} />
