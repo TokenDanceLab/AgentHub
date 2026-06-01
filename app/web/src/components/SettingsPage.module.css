@@ -57,7 +57,7 @@
   width: 100%;
   border: 0;
   background: transparent;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -125,7 +125,7 @@
 
 .navGroupLabel {
   padding: 12px 11px 5px;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 12px;
   font-weight: 650;
 }
@@ -204,7 +204,7 @@
 .header span {
   display: block;
   margin-bottom: 8px;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   font-weight: 650;
 }
@@ -220,7 +220,7 @@
 .header p {
   max-width: 680px;
   margin: 9px 0 0;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -240,7 +240,7 @@
   border: 1px solid var(--settings-chip-border);
   border-radius: 7px;
   background: var(--settings-chip-bg);
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 12px;
   font-weight: 750;
   line-height: 1.25;
@@ -266,7 +266,7 @@
 .panelHeader p {
   max-width: 640px;
   margin: 6px 0 0;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -325,7 +325,7 @@
 }
 
 .capabilityDescription {
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.42;
 }
@@ -336,7 +336,7 @@
   padding: 4px 8px;
   border-radius: 999px;
   background: rgba(99, 102, 241, 0.12);
-  color: #6366f1;
+  color: var(--primary);
   font-size: 11px;
   font-style: normal;
   font-weight: 750;
@@ -376,7 +376,7 @@
   place-items: center;
   border-radius: 10px;
   background: var(--settings-icon-bg);
-  color: #6366f1;
+  color: var(--primary);
 }
 
 .summaryBody {
@@ -389,7 +389,7 @@
 .summaryMeta,
 .targetDescription,
 .profileMeta span {
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.4;
 }
@@ -405,7 +405,7 @@
 }
 
 .summaryDetail {
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 12px;
   line-height: 1.35;
 }
@@ -425,7 +425,7 @@
 }
 
 .profileDescription {
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -441,7 +441,7 @@
   padding: 4px 8px;
   border-radius: 999px;
   background: rgba(142, 142, 147, 0.14);
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 11px;
   font-style: normal;
   font-weight: 750;
@@ -449,12 +449,12 @@
 
 .profileStatus_available {
   background: rgba(34, 197, 94, 0.14);
-  color: #22c55e;
+  color: var(--success);
 }
 
 .profileStatus_configuring {
   background: rgba(245, 158, 11, 0.14);
-  color: #f59e0b;
+  color: var(--warning);
 }
 
 .profileMeta {
@@ -526,7 +526,7 @@
 }
 
 .taskSectionHeader span {
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.4;
 }
@@ -620,7 +620,7 @@
   min-width: 0;
   flex-direction: column;
   gap: 6px;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 12px;
   font-weight: 700;
 }
@@ -699,14 +699,14 @@
 }
 
 .modeCard small {
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.35;
 }
 
 .modeCheck {
   flex-shrink: 0;
-  color: #6366f1;
+  color: var(--primary);
 }
 
 .settingRow,
@@ -792,7 +792,7 @@
   padding: 3px 7px;
   border-radius: 999px;
   background: rgba(142, 142, 147, 0.12);
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.25;
@@ -825,7 +825,7 @@
 
 .taskRowDescription {
   min-width: 0;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -862,7 +862,7 @@
 
 .settingDescription {
   min-width: 0;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -887,7 +887,7 @@
 
 .settingCopy span,
 .accountInfo span {
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.4;
 }
@@ -901,7 +901,7 @@
 }
 
 .rowChevron {
-  color: #8e8e93;
+  color: var(--muted-foreground);
 }
 
 .switch {
@@ -927,17 +927,13 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--card);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   transition: transform 0.18s ease;
 }
 
 .switchOn {
-  background: #6366f1;
-}
-
-[data-theme='dark'] .switchOn {
-  background: #818cf8;
+  background: var(--primary);
 }
 
 .switchOn span {
@@ -979,7 +975,7 @@
   border: 0;
   border-radius: 9px;
   background: transparent;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font: inherit;
   font-size: 13px;
   font-weight: 700;
@@ -1065,7 +1061,7 @@
   place-items: center;
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.05);
-  color: #8e8e93;
+  color: var(--muted-foreground);
 }
 
 [data-theme='dark'] .connectionIcon {
@@ -1081,14 +1077,14 @@
   padding: 0 10px;
   border-radius: 999px;
   background: rgba(142, 142, 147, 0.14);
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 12px;
   font-weight: 700;
 }
 
 .statusPillOn {
   background: rgba(34, 197, 94, 0.14);
-  color: #22c55e;
+  color: var(--success);
 }
 
 .primaryBtn,
@@ -1109,13 +1105,8 @@
 
 .primaryBtn {
   border: 0;
-  background: #111827;
-  color: #fff;
-}
-
-[data-theme='dark'] .primaryBtn {
-  background: #f4f4f5;
-  color: #18181b;
+  background: var(--foreground);
+  color: var(--background);
 }
 
 .secondaryBtn {
@@ -1156,7 +1147,7 @@
 
 .calloutIcon {
   flex-shrink: 0;
-  color: #6366f1;
+  color: var(--primary);
 }
 
 .calloutContent {
@@ -1173,7 +1164,7 @@
 }
 
 .calloutContent span {
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.4;
 }
@@ -1192,7 +1183,7 @@
   box-shadow: var(--settings-glass-shadow);
   backdrop-filter: blur(20px) saturate(1.14);
   -webkit-backdrop-filter: blur(20px) saturate(1.14);
-  color: #8e8e93;
+  color: var(--muted-foreground);
   text-align: center;
 }
 
@@ -1206,7 +1197,7 @@
   border-color: var(--settings-glass-border);
   border-radius: 10px;
   background: var(--settings-icon-bg);
-  color: #6366f1;
+  color: var(--primary);
 }
 
 [data-theme='dark'] .emptyBlock {
@@ -1224,7 +1215,7 @@
 .emptyBlockDescription {
   max-width: 360px;
   margin: 0;
-  color: #8e8e93;
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.45;
 }
