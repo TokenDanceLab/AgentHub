@@ -12,10 +12,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', '../shared/src/**/*.test.ts', '../shared/src/**/*.test.tsx'],
+    include: ['../shared/src/**/*.test.ts', '../shared/src/**/*.test.tsx'],
     exclude: ['../shared/src/events.test.ts'],
     setupFiles: ['./src/__tests__/setup.ts'],
-    execArgv: ['--max-old-space-size=8192'],
+    execArgv: ['--max-old-space-size=4096'],
+    memoryLimit: '512MB',
     maxWorkers: 4,
   },
 });
