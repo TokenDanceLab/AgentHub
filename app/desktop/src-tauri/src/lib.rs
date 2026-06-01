@@ -76,6 +76,7 @@ pub fn run() {
             notifications::notify_run_failed,
             get_close_to_tray,
             set_close_to_tray,
+            tray::set_tray_labels,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
