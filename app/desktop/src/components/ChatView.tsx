@@ -15,6 +15,8 @@ import TeamRunDock from './TeamRunDock';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
+import { useConnectionStore } from '@/stores/connectionStore';
+import { useShallow } from 'zustand/shallow';
 import type { AgentTeamOverview } from '@/api/agentTeamQueries';
 import type { LocalOrchestrationStatus } from '@/utils/localOrchestration';
 import type { TeamLocalExecution } from '@/utils/teamLocalExecution';
@@ -1254,6 +1256,11 @@ export default function ChatView({
 }: Props) {
   const { t, i18n } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
+  const connectionStatus = useConnectionStore(useShallow((s) => s.connectionStatus));
+  const wasEverConnectedRef = useRef(false);
+  const connectionStatusRef = useRef(connectionStatus);
+  const [connectionBannerDismissed, setConnectionBannerDismissed] = useState(false);
+  const [connectionBannerFadeOut, setConnectionBannerFadeOut] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastMessageIdRef = useRef<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -1338,6 +1345,33 @@ export default function ChatView({
   const showScrollIndicator = isStreaming && !isNearBottom;
 
   useEffect(() => {
+    if (connectionStatus === 'connected') {
+      wasEverConnectedRef.current = true;
+    }
+    // Trigger fade-out when transitioning to connected from visible state
+    if (
+      connectionStatus === 'connected' &&
+      connectionStatusRef.current !== 'connected' &&
+      !connectionBannerDismissed &&
+      wasEverConnectedRef.current
+    ) {
+      setConnectionBannerFadeOut(true);
+      const timer = setTimeout(() => {
+        setConnectionBannerDismissed(false);
+        setConnectionBannerFadeOut(false);
+      }, 400);
+      connectionStatusRef.current = connectionStatus;
+      return () => clearTimeout(timer);
+    }
+    if (connectionStatus === 'connected') {
+      setConnectionBannerDismissed(false);
+      setConnectionBannerFadeOut(false);
+    }
+    connectionStatusRef.current = connectionStatus;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionStatus]);
+
+  useEffect(() => {
     if (!deletingMessageId) return;
     if (visibleMessages.some((message) => message.id === deletingMessageId)) return;
     setDeletingMessageId(null);
@@ -1375,8 +1409,61 @@ export default function ChatView({
     setDeletingMessageId(null);
   }, [onDelete]);
 
+  const showConnectionBanner =
+    !connectionBannerDismissed &&
+    wasEverConnectedRef.current &&
+    (connectionStatus === 'reconnecting' || connectionStatus === 'disconnected');
+  const isReconnecting = connectionStatus === 'reconnecting';
+
+  const handleConnectionRefresh = useCallback(() => {
+    wasEverConnectedRef.current = true;
+    setConnectionBannerDismissed(false);
+    window.dispatchEvent(new CustomEvent('agenthub:reconnect'));
+  }, []);
+
+  const handleConnectionBannerDismiss = useCallback(() => {
+    setConnectionBannerDismissed(true);
+  }, []);
+
   return (
     <div className={styles.root}>
+      {showConnectionBanner && (
+        <div
+          className={`${styles.connectionBanner} ${isReconnecting ? styles.connectionBannerReconnecting : styles.connectionBannerFailed} ${connectionBannerFadeOut ? styles.connectionBannerFadeOut : ''}`}
+          role="alert"
+        >
+          <span className={styles.connectionBannerIcon} aria-hidden="true">
+            <AlertTriangle size={14} />
+          </span>
+          <span className={styles.connectionBannerMsg}>
+            {isReconnecting ? t('status.reconnecting') : t('connection.lost')}
+          </span>
+          {!isReconnecting && (
+            <>
+              <span className={styles.connectionBannerDetail}>
+                {t('connection.failed')}
+              </span>
+              <button
+                type="button"
+                className={styles.connectionBannerBtn}
+                onClick={handleConnectionRefresh}
+              >
+                <RefreshCw size={12} />
+                <span>{t('connection.refresh')}</span>
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            className={styles.connectionBannerDismiss}
+            onClick={handleConnectionBannerDismiss}
+            title={t('banner.dismiss')}
+            aria-label={t('banner.dismiss')}
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
       <div
         ref={scrollRef}
         className={styles.stream}

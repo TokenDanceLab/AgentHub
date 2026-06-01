@@ -16,6 +16,7 @@ import { classifyError } from '@/utils/errorClassifier';
 import { cancelRun } from '@/api/edgeClient';
 import { queryClient } from '@/api/queryClient';
 import { updateRunStatusInQueries, upsertRunInQueries } from '@/api/runQueries';
+import type { TransportStatus } from '@/api/transport';
 
 const MAX_MESSAGES = 500;
 const MAX_OUTPUT_TEXT = 20000;
@@ -79,7 +80,7 @@ interface State {
 type Action =
   | { type: 'EVENT_RECEIVED'; event: EventEnvelope }
   | { type: 'CLEAR_MESSAGES' }
-  | { type: 'SET_CONNECTED'; connected: boolean }
+  | { type: 'SET_CONNECTED'; status: TransportStatus }
   | { type: 'RESOLVE_PERMISSION'; requestId: string; decision: 'allow' | 'deny'; reason?: string };
 
 export interface ChatState extends State {
@@ -1116,7 +1117,7 @@ function reducer(state: State, action: Action): State {
     case 'CLEAR_MESSAGES':
       return { messages: [], isConnected: state.isConnected, isStreaming: false, currentRun: null, permissionRequests: [], agentName: state.agentName };
     case 'SET_CONNECTED':
-      return { ...state, isConnected: action.connected };
+      return { ...state, isConnected: action.status === 'connected' };
     case 'RESOLVE_PERMISSION': {
       const reqs = state.permissionRequests.map((r) =>
         r.requestId === action.requestId
@@ -1165,7 +1166,7 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
   useEffect(() => {
     mountedRef.current = true;
     if (!online) {
-      dispatch({ type: 'SET_CONNECTED', connected: false });
+      dispatch({ type: 'SET_CONNECTED', status: 'disconnected' });
       return;
     }
 
@@ -1177,9 +1178,10 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
     const stream = createEventStream(streamCursor);
     streamRef.current = stream;
 
-    stream.onStatusChange((connected) => {
+    stream.onStatusChange((status: TransportStatus) => {
       if (!mountedRef.current) return;
-      dispatch({ type: 'SET_CONNECTED', connected });
+      dispatch({ type: 'SET_CONNECTED', status });
+      useConnectionStore.getState().setConnectionStatus(status);
     });
 
     stream.subscribe((event: EventEnvelope) => {
