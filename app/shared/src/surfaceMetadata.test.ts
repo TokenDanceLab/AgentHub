@@ -36,10 +36,10 @@ describe('surfaceMetadata', () => {
   it('keeps surface ids, desktop sections, and web route patterns unique', () => {
     const ids = SURFACE_METADATA.map((surface) => surface.id);
     const desktopSectionIds = SURFACE_METADATA.flatMap((surface) =>
-      surface.desktopSectionId === undefined ? [] : [surface.desktopSectionId],
+      'desktopSectionId' in surface ? [surface.desktopSectionId] : [],
     );
     const webRoutePatterns = SURFACE_METADATA.flatMap((surface) =>
-      surface.webRoutePattern === undefined ? [] : [surface.webRoutePattern],
+      'webRoutePattern' in surface ? [surface.webRoutePattern] : [],
     );
 
     expect(new Set(ids).size).toBe(ids.length);

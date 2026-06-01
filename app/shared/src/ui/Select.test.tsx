@@ -11,17 +11,17 @@ const options: Array<[string, string]> = [
 
 describe('Select', () => {
   it('renders placeholder when no value', () => {
-    render(<Select options={options} placeholder="Pick one" />);
+    render(<Select options={options} value="" onChange={() => {}} placeholder="Pick one" />);
     expect(screen.getByText('Pick one')).toBeInTheDocument();
   });
 
   it('renders selected label when value is set', () => {
-    render(<Select options={options} value="b" />);
+    render(<Select options={options} value="b" onChange={() => {}} />);
     expect(screen.getByText('Option B')).toBeInTheDocument();
   });
 
   it('opens dropdown on trigger click', () => {
-    render(<Select options={options} placeholder="Select" />);
+    render(<Select options={options} value="" onChange={() => {}} placeholder="Select" />);
     fireEvent.click(screen.getByRole('button'));
     expect(screen.getByRole('listbox')).toBeInTheDocument();
   });
@@ -35,7 +35,7 @@ describe('Select', () => {
   });
 
   it('closes on Escape', () => {
-    render(<Select options={options} placeholder="Select" />);
+    render(<Select options={options} value="" onChange={() => {}} placeholder="Select" />);
     fireEvent.click(screen.getByRole('button'));
     expect(screen.getByRole('listbox')).toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
