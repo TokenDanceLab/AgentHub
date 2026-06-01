@@ -273,7 +273,7 @@
   padding: 6px 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(251, 191, 36, 0.12);
-  color: #fbbf24;
+  color: var(--warning);
   font-size: 13px;
   line-height: 1.45;
   animation: bannerSlideIn 0.25s ease-out;
@@ -282,12 +282,12 @@
 
 .connectionBannerReconnecting {
   background: rgba(251, 191, 36, 0.1);
-  color: #fbbf24;
+  color: var(--warning);
 }
 
 .connectionBannerFailed {
   background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  color: var(--destructive);
 }
 
 .connectionBannerIcon {
@@ -311,7 +311,7 @@
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  color: color-mix(in oklch, #ef4444 78%, var(--foreground) 22%);
+  color: color-mix(in oklch, var(--destructive) 78%, var(--foreground) 22%);
   font-size: 12px;
   font-weight: 460;
   text-overflow: ellipsis;
@@ -326,10 +326,10 @@
   gap: 4px;
   min-height: 24px;
   padding: 2px 10px;
-  border: 1px solid color-mix(in oklch, #ef4444 40%, transparent);
+  border: 1px solid color-mix(in oklch, var(--destructive) 40%, transparent);
   border-radius: 5px;
   background: transparent;
-  color: #ef4444;
+  color: var(--destructive);
   font-size: 11px;
   font-weight: 520;
   line-height: 1.45;
@@ -339,7 +339,7 @@
 
 .connectionBannerBtn:hover {
   background: rgba(239, 68, 68, 0.12);
-  border-color: #ef4444;
+  border-color: var(--destructive);
 }
 
 .connectionBannerBtn:active {
@@ -380,7 +380,7 @@
 }
 
 [data-theme='light'] .connectionBannerBtn {
-  border-color: color-mix(in oklch, #ef4444 40%, transparent);
+  border-color: color-mix(in oklch, var(--destructive) 40%, transparent);
 }
 
 [data-theme='light'] .connectionBannerBtn:hover {
@@ -797,7 +797,7 @@
 .fileChangePath {
   min-width: 0;
   overflow: hidden;
-  color: color-mix(in oklch, #b8bdff 82%, var(--foreground));
+  color: color-mix(in oklch, var(--skill) 82%, var(--foreground));
   font-family: var(--font-sans);
   font-size: inherit;
   text-overflow: ellipsis;
@@ -1260,25 +1260,25 @@
 
 /* Category-specific border and icon colors */
 .errorBlockAuth {
-  border-left-color: #ef4444;
+  border-left-color: var(--destructive);
 }
 .errorBlockQuota {
-  border-left-color: #f59e0b;
+  border-left-color: var(--warning);
 }
 .errorBlockModel {
-  border-left-color: #8b5cf6;
+  border-left-color: var(--primary);
 }
 .errorBlockNetwork {
-  border-left-color: #f97316;
+  border-left-color: var(--warning);
 }
 .errorBlockServer {
-  border-left-color: #ef4444;
+  border-left-color: var(--destructive);
 }
 .errorBlockContextLength {
-  border-left-color: #ec4899;
+  border-left-color: var(--destructive);
 }
 .errorBlockTool {
-  border-left-color: #6366f1;
+  border-left-color: var(--primary);
 }
 .errorBlockUnknown {
   border-left-color: var(--muted-foreground);
@@ -1295,13 +1295,13 @@
   opacity: 0.74;
 }
 
-.errorBlockAuth .errorBlockIcon { color: #ef4444; }
-.errorBlockQuota .errorBlockIcon { color: #f59e0b; }
-.errorBlockModel .errorBlockIcon { color: #8b5cf6; }
-.errorBlockNetwork .errorBlockIcon { color: #f97316; }
-.errorBlockServer .errorBlockIcon { color: #ef4444; }
-.errorBlockContextLength .errorBlockIcon { color: #ec4899; }
-.errorBlockTool .errorBlockIcon { color: #6366f1; }
+.errorBlockAuth .errorBlockIcon { color: var(--destructive); }
+.errorBlockQuota .errorBlockIcon { color: var(--warning); }
+.errorBlockModel .errorBlockIcon { color: var(--primary); }
+.errorBlockNetwork .errorBlockIcon { color: var(--warning); }
+.errorBlockServer .errorBlockIcon { color: var(--destructive); }
+.errorBlockContextLength .errorBlockIcon { color: var(--destructive); }
+.errorBlockTool .errorBlockIcon { color: var(--primary); }
 .errorBlockUnknown .errorBlockIcon { color: var(--muted-foreground); }
 
 .errorBlockMessage {
@@ -1504,8 +1504,8 @@
 }
 
 .toolStatusDraining {
-  background: color-mix(in oklch, #8b5cf6 10%, transparent);
-  color: color-mix(in oklch, #8b5cf6 72%, var(--foreground));
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
+  color: color-mix(in oklch, var(--primary) 72%, var(--foreground));
   animation: statusPulse 1.5s ease-in-out infinite;
 }
 
@@ -1659,7 +1659,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
-  color: color-mix(in oklch, #b8bdff 82%, var(--foreground));
+  color: color-mix(in oklch, var(--skill) 82%, var(--foreground));
 }
 .diffStatBadge {
   display: inline-flex;
