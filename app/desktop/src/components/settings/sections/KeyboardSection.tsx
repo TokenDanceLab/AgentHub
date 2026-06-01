@@ -113,20 +113,22 @@ export default function KeyboardSection() {
   return (
     <Panel title={t('settings.keyboard')} description={t('settings.keyboardDesc')}>
       <div className={styles.shortcutTable}>
-        {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
-          <div key={group.id} className={styles.shortcutGroup}>
-            <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
-            {group.shortcuts.map((shortcut) => (
-              <div key={shortcut.id} className={styles.shortcutRow}>
-                <span>{t(shortcut.labelKey)}</span>
-                <div>
-                  {shortcut.keys.map((key) => <kbd key={key}>{key}</kbd>)}
-                </div>
+        {!editing ? (
+          <>
+            {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
+              <div key={group.id} className={styles.shortcutGroup}>
+                <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
+                {group.shortcuts.map((shortcut) => (
+                  <div key={shortcut.id} className={styles.shortcutRow}>
+                    <span>{t(shortcut.labelKey)}</span>
+                    <div>
+                      {shortcut.keys.map((key) => <kbd key={key}>{key}</kbd>)}
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
-          </div>
-
-          <div className={styles.shortcutActions}>
+            <div className={styles.shortcutActions}>
             <button
               type="button"
               className={styles.primaryBtn}
@@ -257,6 +259,7 @@ export default function KeyboardSection() {
           </div>
         </>
       )}
-    </Panel>
+    </div>
+  </Panel>
   );
 }
