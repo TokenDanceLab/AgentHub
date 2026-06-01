@@ -14,6 +14,7 @@ import { useRunStore } from '@/stores/runStore';
 import { RunState } from '@/utils/runStateMachine';
 import { cancelRun } from '@/api/edgeClient';
 import { queryClient } from '@/api/queryClient';
+import { updateRunStatusInQueries, upsertRunInQueries } from '@/api/runQueries';
 
 const MAX_MESSAGES = 500;
 const MAX_OUTPUT_TEXT = 20000;
@@ -36,6 +37,8 @@ function hashSignature(toolName: string, input: Record<string, unknown> | undefi
 
 interface RunStateData {
   runId: string;
+  projectId?: string;
+  threadId?: string;
   status: RunState;
   outputText: string;
   toolCalls: Array<{
@@ -47,6 +50,8 @@ interface RunStateData {
   }>;
   changedFiles: Array<{ path: string; action: string; timestamp: string }>;
   tasks: Array<{ taskId: string; description: string; status: string; summary?: string }>;
+  artifacts: Array<{ id: string; path: string; kind: string; createdAt: string; sizeBytes?: number }>;
+  previews: Array<{ id: string; url?: string; status: string; createdAt: string }>;
 }
 
 export interface PermissionRequestItem {
@@ -463,11 +468,15 @@ function processEvent(state: State, event: EventEnvelope): State {
       const rid = event.payload.runId as string;
       currentRun = {
         runId: rid,
+        projectId: (event.payload.projectId ?? event.scope.projectId) as string | undefined,
+        threadId: (event.payload.threadId ?? event.scope.threadId) as string | undefined,
         status: RunState.RUNNING,
         outputText: '',
         toolCalls: [],
         changedFiles: [],
         tasks: [],
+        artifacts: [],
+        previews: [],
       };
       isStreaming = true;
       agentName = '';
@@ -1015,6 +1024,9 @@ function processEvent(state: State, event: EventEnvelope): State {
         riskLevel,
         timestamp: ts,
       };
+      if (currentRun && currentRun.runId === runId) {
+        currentRun = { ...currentRun, status: RunState.WAITING_FOR_INPUT };
+      }
       let reqs: PermissionRequestItem[];
       if (existingIdx >= 0) {
         reqs = [...state.permissionRequests];
@@ -1022,7 +1034,7 @@ function processEvent(state: State, event: EventEnvelope): State {
       } else {
         reqs = [...state.permissionRequests, item];
       }
-      return { ...state, permissionRequests: reqs.slice(-50) };
+      return { ...state, currentRun, permissionRequests: reqs.slice(-50) };
     }
 
     case 'run.agent.permission_decided': {
@@ -1033,6 +1045,49 @@ function processEvent(state: State, event: EventEnvelope): State {
         r.requestId === reqId ? { ...r, decision, reason } : r,
       );
       return { ...state, permissionRequests: reqs };
+    }
+
+    case 'artifact.created': {
+      const runId = event.payload.runId as string;
+      const artifactId = event.payload.artifactId as string;
+      if (currentRun && currentRun.runId === runId && artifactId) {
+        const artifact = {
+          id: artifactId,
+          path: (event.payload.path as string | undefined) ?? artifactId,
+          kind: (event.payload.kind as string | undefined) ?? 'artifact',
+          createdAt: ts,
+          sizeBytes: event.payload.sizeBytes as number | undefined,
+        };
+        currentRun = {
+          ...currentRun,
+          artifacts: [
+            ...currentRun.artifacts.filter((item) => item.id !== artifactId),
+            artifact,
+          ].slice(-20),
+        };
+      }
+      break;
+    }
+
+    case 'preview.ready': {
+      const runId = event.payload.runId as string;
+      const previewId = event.payload.previewId as string;
+      if (currentRun && currentRun.runId === runId && previewId) {
+        const preview = {
+          id: previewId,
+          url: event.payload.url as string | undefined,
+          status: (event.payload.status as string | undefined) ?? 'ready',
+          createdAt: ts,
+        };
+        currentRun = {
+          ...currentRun,
+          previews: [
+            ...currentRun.previews.filter((item) => item.id !== previewId),
+            preview,
+          ].slice(-20),
+        };
+      }
+      break;
     }
 
     default:
@@ -1166,44 +1221,64 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
         }
       }
 
-      // Reset loop detector and pending tool calls on new run
+      if (event.type === 'run.queued') {
+        const runId = event.payload.runId as string | undefined;
+        if (runId) {
+          upsertRunInQueries(queryClient, {
+            runId,
+            projectId: (event.payload.projectId ?? event.scope.projectId) as string | undefined,
+            threadId: (event.payload.threadId ?? event.scope.threadId) as string | undefined,
+            status: 'queued',
+            createdAt: (event.payload.createdAt as string | undefined) ?? event.sentAt,
+          });
+        }
+      } else if (event.type === 'run.status.changed') {
+        const runId = event.payload.runId as string | undefined;
+        const status = event.payload.status as string | undefined;
+        if (runId && status) updateRunStatusInQueries(queryClient, runId, status);
+      }
+
+      // Reset loop detector on new run
       if (event.type === 'run.started') {
         const runId = event.payload.runId as string;
         currentRunIdRef.current = runId;
         loopDetectorRef.current.clear();
         pendingToolCallIdsRef.current.clear();
         useRunStore.getState().setRun(runId);
+        upsertRunInQueries(queryClient, {
+          runId,
+          projectId: (event.payload.projectId ?? event.scope.projectId) as string | undefined,
+          threadId: (event.payload.threadId ?? event.scope.threadId) as string | undefined,
+          status: 'running',
+          startedAt: (event.payload.startedAt as string | undefined) ?? event.sentAt,
+        });
       } else if (event.type === 'run.finished') {
-        // Draining: agent returned final result but background tools still running
-        const isDraining = pendingToolCallIdsRef.current.size > 0;
-        useRunStore.getState().setRunState(isDraining ? RunState.DRAINING : RunState.COMPLETED);
+        const runId = event.payload.runId as string;
+        useRunStore.getState().setRunState(RunState.COMPLETED);
+        updateRunStatusInQueries(queryClient, runId, 'finished', {
+          finishedAt: (event.payload.finishedAt as string | undefined) ?? event.sentAt,
+        });
         queryClient.invalidateQueries({ queryKey: ['runs'] });
-        const threadId = eventThreadId(event);
-        if (threadId) queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
+        queryClient.invalidateQueries({ queryKey: ['threads'] });
       } else if (event.type === 'run.failed') {
-        pendingToolCallIdsRef.current.clear();
+        const runId = event.payload.runId as string;
         useRunStore.getState().setRunState(RunState.FAILED);
+        updateRunStatusInQueries(queryClient, runId, 'failed', {
+          finishedAt: (event.payload.finishedAt as string | undefined) ?? event.sentAt,
+        });
         queryClient.invalidateQueries({ queryKey: ['runs'] });
-        const threadId = eventThreadId(event);
-        if (threadId) queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
+        queryClient.invalidateQueries({ queryKey: ['threads'] });
       } else if (event.type === 'run.cancelled') {
-        pendingToolCallIdsRef.current.clear();
+        const runId = event.payload.runId as string;
         useRunStore.getState().setRunState(RunState.CANCELLED);
+        updateRunStatusInQueries(queryClient, runId, 'cancelled', {
+          finishedAt: (event.payload.finishedAt as string | undefined) ?? event.sentAt,
+        });
         queryClient.invalidateQueries({ queryKey: ['runs'] });
-        const threadId = eventThreadId(event);
-        if (threadId) queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
-      } else if (event.type === 'run.agent.tool_result') {
-        const callId = event.payload.callId as string;
-        if (callId) {
-          pendingToolCallIdsRef.current.delete(callId);
-          // If we were draining and all tools now complete → transition to COMPLETED
-          if (
-            pendingToolCallIdsRef.current.size === 0 &&
-            useRunStore.getState().runState === 'DRAINING'
-          ) {
-            useRunStore.getState().setRunState(RunState.COMPLETED);
-          }
-        }
+        queryClient.invalidateQueries({ queryKey: ['threads'] });
+      } else if (event.type === 'run.agent.permission_requested' || event.type === 'approval.requested') {
+        const runId = event.payload.runId as string | undefined;
+        if (runId) updateRunStatusInQueries(queryClient, runId, 'waiting_approval');
       }
 
       dispatch({ type: 'EVENT_RECEIVED', event });

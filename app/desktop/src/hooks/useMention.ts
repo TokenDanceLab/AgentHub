@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import type { AgentInfo } from '@shared/types';
 
 export type MentionKind = 'agent' | 'file' | 'thread';
@@ -206,11 +206,6 @@ export function useMention({ agents, items, onSelectAgent, onSelectMention }: Us
     .filter((item) => item.kind === 'agent' && item.agent)
     .map((item) => item.agent as AgentInfo);
 
-  // Reset selectedIndex when filtered list changes
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
-
   const closeMention = useCallback(() => {
     setIsOpen(false);
     setQuery('');
@@ -227,10 +222,7 @@ export function useMention({ agents, items, onSelectAgent, onSelectMention }: Us
     if (mention) {
       const caretPos = getCaretViewportPosition(ta);
       setQuery(mention.query);
-      setPosition(clampPopoverToViewport({
-        top: caretPos.top - POPOVER_HEIGHT - POPOVER_OFFSET_Y,
-        left: caretPos.left,
-      }));
+      setSelectedIndex(0);
       setIsOpen(true);
     } else {
       closeMention();

@@ -13,8 +13,7 @@ export interface HealthResponse {
 
 export interface HealthCheck {
   status: string;
-  detail?: string;
-  [key: string]: unknown;
+  message?: string;
 }
 
 export interface RunnerHealthItem {
@@ -24,12 +23,13 @@ export interface RunnerHealthItem {
   capabilities?: string[];
 }
 
-export interface RunnerHealthCheck extends HealthCheck {
-  total?: number;
-  available?: number;
-  unavailable?: number;
-  statuses?: Record<string, number>;
+export interface RunnerHealthCheck {
+  status: string;
+  message?: string;
+  runnerIds?: string[];
   items?: RunnerHealthItem[];
+  available?: number;
+  total?: number;
 }
 
 export interface HealthChecks {
@@ -115,8 +115,8 @@ export interface Message {
 export interface Runner {
   id: string;
   name: string;
-  status: 'online' | 'offline' | 'draining';
-  capabilities?: string | undefined;
+  status: string;
+  capabilities?: string;
 }
 
 export type RunStatus =
@@ -138,6 +138,18 @@ export interface Run {
   finishedAt?: string | undefined;
 }
 
+export interface StartRunRequest {
+  projectId?: string;
+  threadId?: string;
+  prompt?: string;
+  agentId?: string;
+  model?: string;
+  provider?: string;
+  modelAlias?: string;
+  reasoningEffort?: string;
+  modelMappingEnabled?: boolean;
+  providerFallbackEnabled?: boolean;
+}
 export interface RunInfo {
   runId: string;
   projectId: string;
@@ -150,6 +162,8 @@ export interface RunInfo {
 
 // ── Agent types ─────────────────────────────────
 
+// Compatibility aliases for Desktop code that still consumes the original
+// Edge REST shape while the domain model above is being consolidated.
 export interface AgentCapabilities {
   streaming: boolean;
   toolCalls: boolean;
@@ -178,7 +192,37 @@ export interface AgentInfo {
   capabilities: AgentCapabilities;
 }
 
-// ── Request types ───────────────────────────────
+export interface RunInfo {
+  runId: string;
+  projectId: string;
+  threadId: string;
+  status: string;
+  createdAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+export interface ThreadInfo {
+  threadId: string;
+  projectId: string;
+  title: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ThreadItemInfo {
+  itemId: string;
+  projectId: string;
+  threadId: string;
+  runId?: string;
+  type: string;
+  role?: string;
+  status: string;
+  content?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface StartRunRequest {
   projectId?: string;

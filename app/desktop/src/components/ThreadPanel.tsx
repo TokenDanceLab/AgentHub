@@ -59,7 +59,7 @@ export default memo(function ThreadPanel({ online, selectedId, onSelect, onCreat
 
   // TanStack Query — server state
   const { data } = useThreads();
-  const threads = data?.items ?? [];
+  const threads = useMemo(() => data?.items ?? [], [data?.items]);
   const renameMutation = useRenameThread();
   const deleteMutation = useDeleteThread();
   const createMutation = useCreateThread();

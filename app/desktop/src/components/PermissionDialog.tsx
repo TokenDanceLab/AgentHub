@@ -171,10 +171,9 @@ export default function PermissionDialog({
 
   // Auto-expand when a new pending request arrives
   useEffect(() => {
-    if (latestPending) {
-      setExpanded(true);
-    }
-  }, [latestPending?.requestId]);
+    if (!latestPending) return;
+    queueMicrotask(() => setExpanded(true));
+  }, [latestPending]);
 
   const dismiss = useCallback((requestId: string) => {
     setDismissedIds((prev) => {

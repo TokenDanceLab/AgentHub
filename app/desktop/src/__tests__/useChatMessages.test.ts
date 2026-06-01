@@ -20,6 +20,7 @@ import { createEventStream } from '@/api/eventClient';
 import { cancelRun } from '@/api/edgeClient';
 import { useToastStore } from '@/stores/toastStore';
 import { useChatMessages } from '@/hooks/useChatMessages';
+import { queryClient } from '@/api/queryClient';
 import { RunState } from '@/utils/runStateMachine';
 import type { EventEnvelope } from '@shared/events';
 
@@ -42,12 +43,14 @@ describe('useChatMessages', () => {
   beforeEach(() => {
     eventHandler = null;
     statusHandler = null;
+    queryClient.clear();
     vi.mocked(createEventStream).mockClear();
     vi.mocked(cancelRun).mockClear();
     vi.mocked(cancelRun).mockResolvedValue({
       id: 'run-1',
       status: 'cancelled',
     } as any);
+    vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined);
     const addToast = vi.fn();
     vi.mocked(useToastStore.getState).mockReturnValue({ addToast } as any);
     vi.mocked(createEventStream).mockReturnValue({
@@ -278,6 +281,22 @@ describe('useChatMessages', () => {
 
     expect(result.current.currentRun?.status).toBe(RunState.COMPLETED);
     expect(result.current.isStreaming).toBe(false);
+  });
+
+  it('invalidates run and thread queries on terminal run events', () => {
+    renderHook(() => useChatMessages(true));
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    invalidateSpy.mockClear();
+
+    act(() => {
+      eventHandler!(makeEvent('run.finished', { runId: 'run-1', status: 'finished' }));
+      eventHandler!(makeEvent('run.failed', { runId: 'run-2', status: 'failed' }));
+      eventHandler!(makeEvent('run.cancelled', { runId: 'run-3', status: 'cancelled' }));
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledTimes(6);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['runs'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['threads'] });
   });
 
   it('updates currentRun status on run.failed', () => {
@@ -873,6 +892,76 @@ describe('useChatMessages', () => {
     expect(result.current.currentRun?.outputText).toBe('Hello World');
   });
 
+  it('syncs active and terminal run events into the runs query cache', () => {
+    queryClient.setQueryData(['runs'], { items: [], page: { hasMore: false } });
+    const { result } = renderHook(() => useChatMessages(true));
+
+    act(() => {
+      eventHandler!(
+        makeEvent('run.queued', {
+          runId: 'run-1',
+          projectId: 'project-1',
+          threadId: 'thread-1',
+        }),
+      );
+    });
+    expect(queryClient.getQueryData<any>(['runs'])?.items[0]).toMatchObject({
+      runId: 'run-1',
+      status: 'queued',
+    });
+
+    act(() => {
+      eventHandler!(makeEvent('run.started', { runId: 'run-1', status: 'running' }));
+    });
+    expect(result.current.currentRun?.runId).toBe('run-1');
+    expect(queryClient.getQueryData<any>(['runs'])?.items[0]).toMatchObject({
+      runId: 'run-1',
+      status: 'running',
+    });
+
+    act(() => {
+      eventHandler!(makeEvent('run.finished', { runId: 'run-1' }));
+    });
+    expect(queryClient.getQueryData<any>(['runs'])?.items[0]).toMatchObject({
+      runId: 'run-1',
+      status: 'finished',
+    });
+  });
+
+  it('tracks artifact and preview events for the current run review surface', () => {
+    const { result } = renderHook(() => useChatMessages(true));
+
+    act(() => {
+      eventHandler!(makeEvent('run.started', { runId: 'run-1', status: 'running' }));
+    });
+    act(() => {
+      eventHandler!(
+        makeEvent('artifact.created', {
+          runId: 'run-1',
+          artifactId: 'artifact-1',
+          kind: 'patch',
+          path: 'changes.diff',
+        }),
+      );
+      eventHandler!(
+        makeEvent('preview.ready', {
+          runId: 'run-1',
+          previewId: 'preview-1',
+          url: 'http://127.0.0.1:5173',
+        }),
+      );
+    });
+
+    expect(result.current.currentRun?.artifacts[0]).toMatchObject({
+      id: 'artifact-1',
+      path: 'changes.diff',
+    });
+    expect(result.current.currentRun?.previews[0]).toMatchObject({
+      id: 'preview-1',
+      status: 'ready',
+    });
+  });
+
   it('marks permission decisions locally without sending an ignored WebSocket control frame', () => {
     const { result } = renderHook(() => useChatMessages(true));
     const stream = vi.mocked(createEventStream).mock.results[0]?.value;
@@ -984,7 +1073,7 @@ describe('useChatMessages', () => {
 
       const addToastFn = vi.mocked(useToastStore.getState)().addToast;
       // Only 1 warning (at 3rd) + 1 error (at 5th)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const calls = (addToastFn as any).mock.calls as any[];
       const warningCalls = calls.filter(
         (c: any[]) => c[0].type === 'warning',
