@@ -15,6 +15,7 @@ vi.mock('../native/mobileCommands', () => ({
 
 vi.mock('../native/hubHealth', () => ({
   checkHubHealth: vi.fn(() => Promise.resolve({ reachable: true })),
+  getMobileHubHealth: vi.fn(() => Promise.resolve({ status: "ok" })),
 }));
 
 function renderWithProviders(ui: React.ReactElement) {
