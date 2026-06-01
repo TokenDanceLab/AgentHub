@@ -1,3 +1,6 @@
+> ⚠️ **HISTORICAL PLANNING DOCUMENT — See `docs/handoff/STATE.md` and `docs/roadmap.md` for current status.**
+> Most planned work in this document has been completed. This file is retained as a historical reference.
+
 # AgentHub Hub Server 需求文档
 
 最后更新：2026-05-25 | 基于 `dev/delicious233` 当前代码 | 面向 Agent 可执行
@@ -17,7 +20,7 @@
 | Agent 任务调度 | 80% | dispatch→ack→stream→done/fail，taskId↔edgeRunId |
 | WebSocket | 85% | per-user 路由、心跳、丢帧告警、panic recovery |
 | 中间件链 | 90% | CORS/APIVersion/BodyLimit/RateLimit/RequestID/AccessLog/Timeout |
-| 数据库 | 90% | 28 migrations, GORM+PG, Upsert/jsonb校验/seq分配 |
+| 数据库 | 90% | 39 migrations, GORM+PG, Upsert/jsonb校验/seq分配 |
 | 缓存 | 85% | Redis singleflight/seq/路由/离线任务队列 |
 | EventBus | 85% | ants pool 1024/panic recovery/metrics |
 | 生产部署 | 80% | Docker Compose, nginx 反代 |

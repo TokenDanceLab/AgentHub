@@ -1,3 +1,6 @@
+> ⚠️ **HISTORICAL PLANNING DOCUMENT — See `docs/handoff/STATE.md` and `docs/roadmap.md` for current status.**
+> Most planned work in this document has been completed. This file is retained as a historical reference.
+
 # AgentHub Hub Server 开发流程文档
 
 最后更新：2026-05-25 | 基于 `dev/delicious233` 当前代码 | 面向 Agent 可执行
