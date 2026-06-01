@@ -312,6 +312,9 @@ importers:
         specifier: ^5.0.13
         version: 5.0.13(@types/react@19.2.15)(immer@11.1.8)(react@19.2.6)(use-sync-external-store@1.6.0(react@19.2.6))
     devDependencies:
+      '@eslint/js':
+        specifier: ^10.0.1
+        version: 10.0.1(eslint@10.4.0)
       '@testing-library/jest-dom':
         specifier: ^6.9.1
         version: 6.9.1
@@ -330,12 +333,21 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^4.4.0
         version: 4.7.0(vite@6.4.2(@types/node@25.9.1))
+      eslint:
+        specifier: ^10.4.0
+        version: 10.4.0
+      eslint-plugin-react-hooks:
+        specifier: ^7.1.1
+        version: 7.1.1(eslint@10.4.0)
       jsdom:
         specifier: ^29.1.1
         version: 29.1.1
       typescript:
         specifier: ~5.8.0
         version: 5.8.3
+      typescript-eslint:
+        specifier: ^8.59.4
+        version: 8.59.4(eslint@10.4.0)(typescript@5.8.3)
       vite:
         specifier: ^6.3.0
         version: 6.4.2(@types/node@25.9.1)

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { MessageCircle } from 'lucide-react';
-import type { IMContact, IMMessage } from '@/components/IM/types';
+import type { IMContact } from '@/components/IM/types';
 import IMContactList from '@/components/IM/IMContactList';
 import IMMessageView from '@/components/IM/IMMessageView';
 import IMMessageInput from '@/components/IM/IMMessageInput';
