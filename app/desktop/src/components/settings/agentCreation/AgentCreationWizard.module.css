@@ -153,7 +153,7 @@
 
 .wizardStepActive .wizardStepIdx {
   background: var(--settings-accent);
-  color: #fff;
+  color: var(--primary-foreground);
 }
 
 .wizardStepDone .wizardStepIdx {
@@ -566,13 +566,8 @@
 
 .wizardPrimaryBtn {
   border: 0;
-  background: #111827;
-  color: #fff;
-}
-
-[data-theme='dark'] .wizardPrimaryBtn {
-  background: #f4f4f5;
-  color: #18181b;
+  background: var(--foreground);
+  color: var(--background);
 }
 
 .wizardSecondaryBtn {
@@ -584,7 +579,7 @@
 .wizardDangerBtn {
   border: 1px solid rgba(239, 68, 68, 0.2);
   background: transparent;
-  color: #ef4444;
+  color: var(--destructive);
 }
 
 .wizardPrimaryBtn:disabled,

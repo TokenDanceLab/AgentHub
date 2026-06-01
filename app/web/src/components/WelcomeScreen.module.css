@@ -62,7 +62,7 @@
   border: 1px solid rgba(0, 0, 0, 0.07);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.54);
-  color: #6366f1;
+  color: var(--primary);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.74),
     0 16px 38px rgba(15, 23, 42, 0.08);
@@ -266,29 +266,17 @@
 
 .status_available {
   background: rgba(52, 199, 89, 0.14);
-  color: #1f8f45;
+  color: var(--success);
 }
 
 .status_configuring {
   background: rgba(255, 204, 0, 0.16);
-  color: #a26a00;
+  color: var(--warning);
 }
 
 .status_unavailable {
   background: rgba(255, 69, 58, 0.13);
-  color: #b42318;
-}
-
-[data-theme='dark'] .status_available {
-  color: #7ee29b;
-}
-
-[data-theme='dark'] .status_configuring {
-  color: #ffd66b;
-}
-
-[data-theme='dark'] .status_unavailable {
-  color: #ff9b95;
+  color: var(--destructive);
 }
 
 .emptyRuntime {
@@ -396,17 +384,17 @@
   width: 9px;
   height: 9px;
   border-radius: 999px;
-  background: #8e8e93;
+  background: var(--muted-foreground);
   box-shadow: 0 0 0 5px rgba(142, 142, 147, 0.1);
 }
 
 .targetDotOnline {
-  background: #34c759;
+  background: var(--success);
   box-shadow: 0 0 0 5px rgba(52, 199, 89, 0.14);
 }
 
 .targetDotOffline {
-  background: #ff453a;
+  background: var(--destructive);
   box-shadow: 0 0 0 5px rgba(255, 69, 58, 0.13);
 }
 

@@ -118,7 +118,7 @@
   box-sizing: border-box;
 }
 
-.input::placeholder { color: #b0b0b5; }
+.input::placeholder { color: var(--text-weakest); }
 
 .input:focus {
   background: rgba(0, 0, 0, 0.02);
