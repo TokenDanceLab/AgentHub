@@ -195,7 +195,7 @@ export default function HomeDashboard({
             className={styles.statFooter}
             onClick={onViewRuns}
             title={t('home.viewAllRuns')}
-            disabled={!onOpenRuns}
+            disabled={!onViewRuns}
           >
             {t('home.viewAllRuns')}
           </button>
@@ -237,8 +237,8 @@ export default function HomeDashboard({
             <button
               type="button"
               className={styles.statFooter}
-              onClick={onOpenAuth}
-              disabled={!onOpenAuth}
+              onClick={onOpenHubAccount}
+              disabled={!onOpenHubAccount}
             >
               {t('home.signInHub')}
             </button>
