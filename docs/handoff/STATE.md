@@ -1,6 +1,35 @@
 # AgentHub 项目状态
 
-最后更新：2026-05-30 UTC+8 | 分支：dev/desktop-clean-20260530（基于 origin/dev/delicious233） | 状态：Desktop clean worktree 收敛聊天删除确认、会话隔离、滚动跟随、聊天区 TeamRun 状态入口和 TeamRun 本地执行诊断；不推 master
+最后更新：2026-06-02 UTC+8 | 分支：dev/delicious233 | 状态：Desktop 0 TS error / Web 0 TS error / Mobile 0 TS error / Go 全量通过
+
+## 近三轮 Sprint 交付汇总（2026-05-31 ~ 2026-06-02）
+
+| 交付项 | 详情 | 状态 |
+|--------|------|:--:|
+| **ErrorBoundary 升级** | Chunk error 自动恢复，避免 lazy-load 失败导致白屏 | ✅ |
+| **Desktop ChatView 虚拟化移植** | 消息列表虚拟滚动正式落地 Desktop 主视图 | ✅ |
+| **多预设主题引擎** | 6 套主题（One Dark Pro / Codex Dark / GitHub Light / Monokai / Solarized Dark / Nord），CSS 变量驱动 | ✅ |
+| **WS 重连 UI 横幅** | WebSocket 断开后顶部横幅提示，含重试倒计时和手动重连 | ✅ |
+| **noUncheckedIndexedAccess: true** | Desktop 全局 `tsconfig.json` 已启用，零 TS error | ✅ |
+| **i18n Desktop en.json 1496 key 完全同步** | 中英文 key 一一对应，零缺失/多余 key | ✅ |
+| **CSS 硬编码颜色→CSS 变量** | Desktop 150+ 处硬编码颜色替换为 `--td-*` CSS 变量 | ✅ |
+| **Mobile 测试 2→27 用例** | Mobile 测试从 2 个扩展到 27 个，覆盖核心视图和 hooks | ✅ |
+| **Hub log+metrics 测试补充** | Hub 日志与 metrics 新增 16 个测试用例 | ✅ |
+| **12 处 handler 错误码透传修复** | 修复 handler 层吞掉底层错误码、统一返回 500 的问题 | ✅ |
+| **API 响应格式统一** | `{code, data, message}` envelope 在所有 endpoint 一致 | ✅ |
+| **ViewSlot/ViewMode 类型修复** | 修复 viewRegistry 的类型定义和 slot 匹配 | ✅ |
+| **johnny-hub-fixes 分支评估已删除** | 已评估并清理，产出已合入主线 | ✅ |
+| **trump-frontend-closeout 已删除** | 分支已合并/关闭，不再保留为活跃引用 | ✅ |
+
+### 工程指标（2026-06-02）
+
+| 组件 | TypeScript | Go |
+|------|:--:|:--:|
+| Desktop | 0 TS error | — |
+| Web | 0 TS error | — |
+| Mobile | 0 TS error | — |
+| Edge Server | — | 全部通过 |
+| Hub Server | — | 全部通过 |
 
 ## 本次 Desktop/UI 推进（2026-05-30）
 
