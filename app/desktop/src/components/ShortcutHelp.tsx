@@ -1,12 +1,13 @@
 import { useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Command, Keyboard, MessageSquareText, PanelLeft, Settings2, X } from 'lucide-react';
-import { KEYBOARD_SHORTCUT_GROUPS, type ShortcutGroupId } from '@/utils/keyboardShortcuts';
+import { getResolvedShortcutGroups, type ShortcutGroupId } from '@/utils/keyboardShortcuts';
 import styles from './ShortcutHelp.module.css';
 
 interface Props {
   open: boolean;
   onClose: () => void;
+  onNavigateToKeyboard?: () => void;
 }
 
 function groupIcon(id: ShortcutGroupId): ReactNode {
@@ -24,7 +25,7 @@ function groupIcon(id: ShortcutGroupId): ReactNode {
   }
 }
 
-export default function ShortcutHelp({ open, onClose }: Props) {
+export default function ShortcutHelp({ open, onClose, onNavigateToKeyboard }: Props) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -95,7 +96,7 @@ export default function ShortcutHelp({ open, onClose }: Props) {
         </div>
 
         <div className={styles.groupList}>
-          {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
+          {getResolvedShortcutGroups().map((group) => (
             <section key={group.id} className={styles.group} aria-label={t(group.labelKey)}>
               <div className={styles.groupHeader}>
                 <span className={styles.groupIcon} aria-hidden="true">{groupIcon(group.id)}</span>
@@ -117,6 +118,21 @@ export default function ShortcutHelp({ open, onClose }: Props) {
             </section>
           ))}
         </div>
+
+        {onNavigateToKeyboard ? (
+          <div className={styles.customizeLink}>
+            <button
+              type="button"
+              className={styles.customizeBtn}
+              onClick={() => {
+                onClose();
+                onNavigateToKeyboard();
+              }}
+            >
+              {t('shortcut.customizeLink')}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

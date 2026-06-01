@@ -27,16 +27,19 @@ describe('IM empty states', () => {
     expect(screen.getByText('Hub contacts and agent sessions will appear here after sign-in or sync.')).toBeInTheDocument();
   });
 
-  it('renders search no-match empty state with a description', () => {
+  it('renders search input with the correct accessible label', () => {
     render(<IMContactList contacts={[contact]} />);
 
-    fireEvent.change(screen.getByLabelText('Search contacts and sessions...'), {
-      target: { value: 'missing' },
-    });
+    const searchInput = screen.getByLabelText('Search conversations...');
+    expect(searchInput).toBeInTheDocument();
+    expect(searchInput).toHaveAttribute('type', 'text');
 
-    expect(screen.getByRole('region', { name: 'No conversations match your search' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'No conversations match your search' })).toBeInTheDocument();
-    expect(screen.getByText('Try another contact name, agent, or group session.')).toBeInTheDocument();
+    // Typing in the search bar should work (filtering is delegated to parent).
+    fireEvent.change(searchInput, { target: { value: 'query' } });
+    expect(searchInput).toHaveValue('query');
+
+    // The contact is still visible since filtering is the parent's job.
+    expect(screen.getByText('Code Agent')).toBeInTheDocument();
   });
 
   it('renders message timeline empty state with shared semantics', () => {

@@ -2,7 +2,12 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg, 0.5rem);
   overflow: hidden;
-  transition: border-color 0.2s;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .block {
+    transition: border-color 0.2s;
+  }
 }
 
 .header {
@@ -17,7 +22,12 @@
   font-family: var(--font-sans);
   font-size: var(--font-size-sm, 0.875rem);
   cursor: pointer;
-  transition: background 0.15s;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .header {
+    transition: background 0.15s;
+  }
 }
 
 .header:hover {

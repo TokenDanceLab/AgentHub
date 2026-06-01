@@ -9,6 +9,7 @@ import { MessageSquare, AlertCircle, RefreshCw, Radio, Clock3, Play, Archive, Us
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
 import { getMobileHubHealth } from "../native/hubHealth";
 import { useTranslation } from "react-i18next";
+import { i18n } from "../i18n";
 
 interface ThreadListViewProps {
   onThreadSelect: (thread: Thread) => void;
@@ -31,7 +32,8 @@ function matchesThreadFilter(thread: Thread, filter: ThreadFilter): boolean {
 }
 
 function formatThreadTime(thread: Thread): string {
-  return new Date(thread.updatedAt ?? thread.createdAt).toLocaleString([], {
+  const locale = i18n.resolvedLanguage || i18n.language;
+  return new Date(thread.updatedAt ?? thread.createdAt).toLocaleString(locale, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -189,7 +191,7 @@ export function ThreadListView({ onThreadSelect, onOpenAccount }: ThreadListView
                 ? t("queue.threads.recoveryReachable")
                 : t("queue.threads.recoveryOffline")
             }
-            meta={threads.errorUpdatedAt ? t("queue.common.lastAttempt", { time: new Date(threads.errorUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : undefined}
+            meta={threads.errorUpdatedAt ? t("queue.common.lastAttempt", { time: new Date(threads.errorUpdatedAt).toLocaleTimeString(i18n.resolvedLanguage || i18n.language, { hour: "2-digit", minute: "2-digit" }) }) : undefined}
             isRetrying={threads.isFetching}
             onRetry={() => {
               void health.refetch();

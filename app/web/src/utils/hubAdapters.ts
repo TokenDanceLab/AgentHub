@@ -248,6 +248,61 @@ function runtimePayloadToBlocks(content: unknown): MessageBlock[] | null {
     return [block];
   }
 
+  // ── Error block detection ─────────────────
+  const errorMessage = readFirstString(record, ['error', 'error_message', 'errorMessage', 'message']);
+  const errorType = readFirstString(record, ['error_type', 'errorType', 'error_code', 'errorCode']);
+  const errorDetail = readFirstString(record, ['detail', 'stack', 'stack_trace', 'stackTrace']);
+  const isRetryable = record.retryable === true || record.retry === true || record.can_retry === true;
+  if (errorMessage || errorType) {
+    const errorBlock: Extract<MessageBlock, { kind: 'error' }> = {
+      kind: 'error',
+      message: errorMessage ?? errorType,
+      detail: errorDetail,
+      retryable: isRetryable,
+    };
+    return [errorBlock];
+  }
+
+  // ── Citation block detection ──────────────
+  const citationUrl = readString(record, 'url');
+  const citationText = readFirstString(record, ['text', 'content', 'snippet']);
+  const citationTitle = readString(record, 'title');
+  if (citationUrl && (citationText || citationTitle)) {
+    const citationBlock: Extract<MessageBlock, { kind: 'citation' }> = {
+      kind: 'citation',
+      url: citationUrl,
+      text: citationText,
+      title: citationTitle ?? citationUrl,
+    };
+    return [citationBlock];
+  }
+
+  // ── Simple text content ─────────────────────
+  // Records whose only meaningful keys are content/text should be
+  // surfaced as plain text blocks (matching the old null-fallback in
+  // hubMessageToChatMessage) rather than being swallowed by the
+  // compact-block fallback below.
+  const simpleText = readFirstString(record, ['content', 'text']);
+  if (simpleText) {
+    return [{ kind: 'text', content: simpleText }];
+  }
+
+  // ── Compact block for unrecognized JSON ───
+  const recordKeys = Object.keys(record).filter((k) => record[k] !== undefined && record[k] !== null);
+  if (recordKeys.length > 0) {
+    const summary = stringifyRuntimeValue(content).slice(0, 200);
+    const textBlock: Extract<MessageBlock, { kind: 'text' }> = {
+      kind: 'text',
+      content: summary,
+    };
+    const compactBlock: Extract<MessageBlock, { kind: 'compact' }> = {
+      kind: 'compact',
+      summary: summary.length > 100 ? summary.slice(0, 100) + '...' : summary,
+      items: [textBlock],
+    };
+    return [compactBlock];
+  }
+
   return null;
 }
 
@@ -304,6 +359,33 @@ function runtimeEventToBlocks(event: AgentRunEventLike): MessageBlock[] {
       if (!record) return [];
       const text = outputBatchText(record);
       return text ? [{ kind: 'text', content: text }] : [];
+    }
+
+    case 'run.agent.error':
+    case 'run.error': {
+      if (!record) {
+        const errorText = typeof payload === 'string' ? payload : stringifyRuntimeValue(payload);
+        return [{ kind: 'error', message: errorText.slice(0, 500) }];
+      }
+      const errorBlock: Extract<MessageBlock, { kind: 'error' }> = {
+        kind: 'error',
+        message: readFirstString(record, ['message', 'error', 'error_message', 'errorMessage']),
+        detail: readFirstString(record, ['detail', 'stack', 'stack_trace', 'stackTrace']),
+        retryable: record.retryable === true || record.retry === true,
+      };
+      return [errorBlock];
+    }
+
+    case 'run.agent.citation':
+    case 'run.citation': {
+      if (!record) return [];
+      const citationBlock: Extract<MessageBlock, { kind: 'citation' }> = {
+        kind: 'citation',
+        url: readString(record, 'url'),
+        text: readFirstString(record, ['text', 'content', 'snippet']),
+        title: readString(record, 'title'),
+      };
+      return citationBlock.url ? [citationBlock] : [];
     }
 
     default:

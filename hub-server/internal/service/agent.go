@@ -196,6 +196,16 @@ type dispatchPayload struct {
 	TeamRunID        string `json:"team_run_id,omitempty"`
 	TeamMemberID     string `json:"team_member_id,omitempty"`
 	TeamMemberRole   string `json:"team_member_role,omitempty"`
+	// Context continuity: thread history and pinned messages for all agent runtimes.
+	Messages       []dispatchMessage `json:"messages,omitempty"`
+	PinnedMessages []dispatchMessage `json:"pinned_messages,omitempty"`
+}
+
+// dispatchMessage represents a single message in thread history or pinned context.
+type dispatchMessage struct {
+	Role      string `json:"role"`
+	Content   string `json:"content"`
+	Timestamp string `json:"timestamp"` // RFC 3339
 }
 
 type dispatchTeamContext struct {
@@ -365,7 +375,7 @@ func (s *AgentService) validateDispatchTarget(ctx context.Context, userID, targe
 		return nil, errcode.TargetNotFound
 	}
 	switch target.TargetType {
-	case "local_edge", "hub_relay":
+	case "local_edge", "hub_relay", "remote_ssh", "tailscale", "cloud_edge":
 		if target.DeviceID == nil || strings.TrimSpace(*target.DeviceID) == "" {
 			return nil, errcode.TargetNotRoutable.WithMessage("execution target is not bound to a device")
 		}
@@ -436,6 +446,10 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 		dp.TeamMemberRole = teamContext.TeamMemberRole
 	}
 
+	// Load thread history for context continuity (all agent runtimes).
+	dp.Messages = s.loadThreadHistory(ai.SessionID, task.TriggerMessageID)
+	dp.PinnedMessages = s.loadPinnedMessages(ai.SessionID)
+
 	payload, _ := json.Marshal(dp)
 
 	cacheClient := resolveAgentCache(s.cacheClient)
@@ -500,6 +514,95 @@ func (s *AgentService) resolveDispatchTeamContext(ai *model.AgentInstance) dispa
 	return dispatchTeamContext{
 		TeamID:    run.TeamID,
 		TeamRunID: run.ID,
+	}
+}
+
+// loadThreadHistory loads recent thread messages (before the trigger message) for context continuity.
+// Limits to a maximum of 50 messages to avoid oversized dispatch payloads.
+func (s *AgentService) loadThreadHistory(sessionID, triggerMessageID string) []dispatchMessage {
+	if sessionID == "" || triggerMessageID == "" {
+		return nil
+	}
+	triggerMsg, err := repository.GetMessageByID(s.db, triggerMessageID)
+	if err != nil || triggerMsg == nil {
+		return nil
+	}
+	msgs, err := repository.GetMessagesBySession(s.db, sessionID, triggerMsg.SeqID, 50)
+	if err != nil || len(msgs) == 0 {
+		return nil
+	}
+	// Reverse to chronological order (GetMessagesBySession returns DESC).
+	result := make([]dispatchMessage, len(msgs))
+	for i := range msgs {
+		content := extractMessageText(&msgs[i])
+		result[len(msgs)-1-i] = dispatchMessage{
+			Role:      mapSenderType(msgs[i].SenderType),
+			Content:   content,
+			Timestamp: msgs[i].CreatedAt.UTC().Format(time.RFC3339),
+		}
+	}
+	return result
+}
+
+// loadPinnedMessages loads pinned messages for a session for context continuity.
+func (s *AgentService) loadPinnedMessages(sessionID string) []dispatchMessage {
+	if sessionID == "" {
+		return nil
+	}
+	pins, err := repository.ListPinsBySession(s.db, sessionID)
+	if err != nil || len(pins) == 0 {
+		return nil
+	}
+	messageIDs := make([]string, len(pins))
+	for i, p := range pins {
+		messageIDs[i] = p.MessageID
+	}
+	msgs, err := repository.GetMessagesByIDs(s.db, messageIDs)
+	if err != nil {
+		return nil
+	}
+	result := make([]dispatchMessage, 0, len(msgs))
+	for _, m := range msgs {
+		content := extractMessageText(&m)
+		if content == "" {
+			continue
+		}
+		result = append(result, dispatchMessage{
+			Role:      mapSenderType(m.SenderType),
+			Content:   content,
+			Timestamp: m.CreatedAt.UTC().Format(time.RFC3339),
+		})
+	}
+	return result
+}
+
+// extractMessageText extracts the human-readable text from a message's JSON content.
+func extractMessageText(msg *model.Message) string {
+	if msg == nil {
+		return ""
+	}
+	switch msg.ContentType {
+	case model.ContentTypeText, model.ContentTypeCode, model.ContentTypeDiff:
+		var payload struct {
+			Text string `json:"text"`
+		}
+		if err := json.Unmarshal([]byte(msg.Content), &payload); err == nil && payload.Text != "" {
+			return payload.Text
+		}
+	}
+	// For non-text messages or unparseable content, just return raw content.
+	return msg.Content
+}
+
+// mapSenderType maps Hub sender types to standard roles (user/assistant/system).
+func mapSenderType(t string) string {
+	switch t {
+	case model.SenderTypeAgent:
+		return "assistant"
+	case model.SenderTypeUser:
+		return "user"
+	default:
+		return t
 	}
 }
 

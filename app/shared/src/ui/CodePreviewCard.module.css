@@ -69,3 +69,24 @@
   color: var(--td-ink, var(--foreground));
   font-weight: 700;
 }
+
+/* ── Responsive ─────────────────── */
+
+@media (max-width: 480px) {
+  .card {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .header {
+    gap: 6px;
+  }
+
+  .title {
+    font-size: 11px;
+  }
+
+  .body {
+    font-size: 10px;
+  }
+}

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"strings"
@@ -11,6 +12,11 @@ import (
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/gin-gonic/gin"
 )
+
+// AuditPermissionFn is an optional callback that receives permission-decision
+// audit events. Set by the app during initialization to wire the AuditService
+// into middleware without creating import cycles.
+var AuditPermissionFn func(ctx context.Context, userID string, decision string, allowed bool, details map[string]interface{}, clientIP string)
 
 // AuthMiddleware returns a Gin middleware that validates JWT bearer tokens and
 // classifies the auth source.
@@ -87,6 +93,10 @@ func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
 	// Fallback to local HS256 JWT.
 	claims, err := jwtutil.ParseToken(tokenStr, cfg.JWT.Secret)
 	if err != nil {
+		auditPermission(c, "", "auth_validate", false, map[string]interface{}{
+			"reason": "invalid_token",
+			"path":   c.FullPath(),
+		}, c.ClientIP())
 		fail(c, errcode.AuthInvalidToken)
 		c.Abort()
 		return
@@ -104,6 +114,10 @@ func validateToken(c *gin.Context, cfg *config.Config, tokenStr string) {
 func RequireHubSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.GetString("auth_source") != "hub_local" {
+			auditPermission(c, c.GetString("user_id"), "hub_session_required", false, map[string]interface{}{
+				"auth_source": c.GetString("auth_source"),
+				"path":        c.FullPath(),
+			}, c.ClientIP())
 			fail(c, &errcode.Error{
 				Code:       "FORBIDDEN",
 				Message:    "Hub-issued session is required for this API",
@@ -129,16 +143,26 @@ func RequireLocalAuth() gin.HandlerFunc {
 //
 // This middleware MUST be applied after AuthMiddleware, which populates the
 // "user_id" context value.
+//
+// Permission decisions (denied/granted) are audited via AuditPermissionFn
+// when it is set.
 func RequireAdmin() gin.HandlerFunc {
 	adminUsers := getAdminUsers()
 	return func(c *gin.Context) {
 		userID := c.GetString("user_id")
+		clientIP := c.ClientIP()
 		if userID == "" {
+			auditPermission(c, userID, "admin_access", false, map[string]interface{}{
+				"reason": "missing_user_id",
+			}, clientIP)
 			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
 		}
 		if len(adminUsers) == 0 {
+			auditPermission(c, userID, "admin_access", false, map[string]interface{}{
+				"reason": "admin_users_not_configured",
+			}, clientIP)
 			fail(c, &errcode.Error{
 				Code:       "FORBIDDEN",
 				Message:    "admin access not configured — set AGENTHUB_ADMIN_USERS",
@@ -149,10 +173,17 @@ func RequireAdmin() gin.HandlerFunc {
 		}
 		for _, admin := range adminUsers {
 			if admin == userID {
+				auditPermission(c, userID, "admin_access", true, map[string]interface{}{
+					"path": c.FullPath(),
+				}, clientIP)
 				c.Next()
 				return
 			}
 		}
+		auditPermission(c, userID, "admin_access", false, map[string]interface{}{
+			"reason": "not_in_admin_list",
+			"path":   c.FullPath(),
+		}, clientIP)
 		fail(c, &errcode.Error{
 			Code:       "FORBIDDEN",
 			Message:    "admin access required",
@@ -183,4 +214,13 @@ func getAdminUsers() []string {
 		}
 	})
 	return adminUsersList
+}
+
+// auditPermission is a helper that calls the package-level AuditPermissionFn
+// when set, recording permission decisions for the audit log.
+func auditPermission(c *gin.Context, userID string, decision string, allowed bool, details map[string]interface{}, clientIP string) {
+	if AuditPermissionFn == nil {
+		return
+	}
+	AuditPermissionFn(c.Request.Context(), userID, decision, allowed, details, clientIP)
 }

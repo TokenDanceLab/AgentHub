@@ -1,5 +1,6 @@
 import { type ReactNode, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import {
   Archive,
   ArrowLeft,
@@ -10,7 +11,9 @@ import {
   Code2,
   Computer,
   Cpu,
+  Download,
   Eye,
+  EyeOff,
   FolderGit2,
   GitBranch,
   Globe2,
@@ -24,19 +27,24 @@ import {
   Palette,
   Plug,
   RefreshCw,
+  RotateCcw,
   Route,
   Search,
   Server,
   ShieldCheck,
   SlidersHorizontal,
   TerminalSquare,
+  Trash2,
+  Upload,
   UserCircle,
   Wrench,
   XCircle,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useHubStore } from '@/stores/hubStore';
-import { APP_VERSION, HUB_URL } from '@/config';
+import { useToastStore } from '@/stores/toastStore';
+import { APP_VERSION, HUB_URL, getPersistedEdgeUrl, setPersistedEdgeUrl } from '@/config';
 import {
   useAddAgentTeamMember,
   useCreateAgentTeam,
@@ -56,15 +64,24 @@ import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
 import { resolveModelDisplayName, type ModelDisplayNameMap } from '@/utils/modelDisplay';
 import { resolveLocalOrchestration } from '@/utils/localOrchestration';
+import { requestPermission, isPermissionGranted } from '@tauri-apps/plugin-notification';
+import { invoke } from '@tauri-apps/api/core';
 import {
   MAX_CUSTOM_INSTRUCTIONS_CHARS,
   clearCustomInstructions,
   readCustomInstructions,
   writeCustomInstructions,
 } from '@/utils/customInstructions';
-import { KEYBOARD_SHORTCUT_GROUPS } from '@/utils/keyboardShortcuts';
+import { getSelectedWorkspace } from '@/utils/workspaceStore';
+import KeyboardSection from '@/components/settings/sections/KeyboardSection';
+import AgentMarketSection from '@/components/settings/sections/AgentMarketSection';
+import PermissionsSection, { type AllowlistEntry, readAllowlist, mergeAllowlistFromTarget, writeAllowlist } from '@/components/settings/sections/PermissionsSection';
+import DataSection from '@/components/settings/sections/DataSection';
 import {
   useModelSettingsStore,
+  maskApiKey,
+  type CredentialTestResult,
+  type ProviderCredential,
   type ProviderHealth,
   type ReasoningEffortPreference,
   type ResolvedRunModelSettings,
@@ -110,17 +127,13 @@ export type SectionId =
   | 'models'
   | 'modelMapping'
   | 'ccSwitch'
-  | 'connections'
-  | 'remoteControl'
-  | 'git'
+  | 'credentials'
+  | 'workspace'
   | 'environment'
-  | 'worktree'
-  | 'browser'
-  | 'computerUse'
   | 'platforms'
   | 'account'
   | 'securityAudit'
-  | 'archived';
+  | 'data';
 
 type SelectValue = 'balanced' | 'detailed' | 'manual' | 'auto' | 'ask' | 'never';
 type SettingsSelectValue = SelectValue | ReasoningEffortPreference | ProviderHealth | string;
@@ -357,7 +370,9 @@ function formatTargetEndpoint(target: ExecutionTarget) {
 export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'general', modelCatalog, modelDisplayNames }: Props) {
   const { t } = useTranslation();
   const { themeMode, setThemeMode } = useTheme();
+  const { language, setLanguage } = useLanguage();
   const hubAuth = useAuth();
+  const addToast = useToastStore((s) => s.addToast);
   const hubInventoryEnabled = hubAuth.isAuthenticated && Boolean(hubAuth.token);
   const hubTargetsQuery = useHubExecutionTargets({
     enabled: hubInventoryEnabled,
@@ -411,6 +426,10 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [teamMemberRole, setTeamMemberRole] = useState('executor');
   const [teamRunPrompt, setTeamRunPrompt] = useState('');
 
+  // Remote Edge URL configuration
+  const [remoteEdgeUrl, setRemoteEdgeUrl] = useState(getPersistedEdgeUrl);
+  const [remoteEdgeSaved, setRemoteEdgeSaved] = useState(false);
+
   // Keyboard shortcut: `/` focuses the search input
   const handleSettingsKeyDown = useCallback((e: KeyboardEvent) => {
     const target = e.target as HTMLElement;
@@ -425,6 +444,48 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     window.addEventListener('keydown', handleSettingsKeyDown);
     return () => window.removeEventListener('keydown', handleSettingsKeyDown);
   }, [handleSettingsKeyDown]);
+
+  // Detect real environment values via Tauri APIs
+  useEffect(() => {
+    const detect = async () => {
+      try {
+        // OS detection
+        const ua = navigator.userAgent;
+        if (ua.includes('Windows NT') || ua.includes('Win')) {
+          setEnvOs('Windows');
+          setEnvShell('PowerShell 5+ / pwsh');
+        } else if (ua.includes('Mac OS X') || ua.includes('macOS')) {
+          setEnvOs('macOS');
+          setEnvShell('zsh / bash');
+        } else if (ua.includes('Linux') && !ua.includes('Android')) {
+          setEnvOs('Linux');
+          setEnvShell('bash');
+        } else {
+          setEnvOs(navigator.platform || 'Unknown');
+          setEnvShell('Unknown');
+        }
+        setEnvPackageManager('pnpm (default)');
+        setEnvNodeVersion('>=20 (required by Tauri 2.x)');
+        // Try to detect real Node version via Tauri shell plugin
+        try {
+          const shell = await import('@tauri-apps/plugin-shell');
+          const nodeResult = await shell.Command.create('exec-sh', ['node', '-v']).execute();
+          if (nodeResult.code === 0 && nodeResult.stdout) {
+            setEnvNodeVersion(nodeResult.stdout.trim());
+          }
+          const pmResult = await shell.Command.create('exec-sh', ['pnpm', '-v']).execute();
+          if (pmResult.code === 0 && pmResult.stdout) {
+            setEnvPackageManager(`pnpm ${pmResult.stdout.trim()}`);
+          }
+        } catch {
+          // Tauri shell plugin not available or command failed, keep fallback values
+        }
+      } catch {
+        // Environment detection failed, keep defaults
+      }
+    };
+    void detect();
+  }, []);
 
   const [compactMode, setCompactMode] = useStoredBooleanState('compactMode', false);
   const [autoReview, setAutoReview] = useStoredBooleanState('autoReview', true);
@@ -442,10 +503,99 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const [computerConfirm, setComputerConfirm] = useStoredBooleanState('computerConfirm', true);
   const [platformSync, setPlatformSync] = useStoredBooleanState('platformSync', true);
   const [auditTrail, setAuditTrail] = useStoredBooleanState('auditTrail', true);
+  const [desktopNotifications, setDesktopNotifications] = useStoredBooleanState('desktopNotifications', false);
+  const [closeToTray, setCloseToTray] = useState(true);
+
+  // Load close-to-tray preference from backend on mount.
+  useEffect(() => {
+    invoke<boolean>('get_close_to_tray')
+      .then(setCloseToTray)
+      .catch(() => {
+        // Backend unavailable — fall back to default (true).
+      });
+  }, []);
+
+  // Sync desktop notification toggle with actual OS permission on mount.
+  // If the OS has already granted notification permission (e.g. from a previous
+  // run or system settings), automatically enable the in-app toggle so the user
+  // doesn't have to re-enable it manually.
+  useEffect(() => {
+    const syncPermission = async () => {
+      try {
+        const granted = await isPermissionGranted();
+        if (granted && !desktopNotifications) {
+          setDesktopNotifications(true);
+          writeStoredValue('desktopNotifications', true);
+        }
+      } catch {
+        // Non-Tauri environment (tests/dev in browser) — ignore.
+      }
+    };
+    void syncPermission();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When the user navigates to the onlineIm section, re-check the OS
+  // notification permission to keep the toggle in sync with system settings.
+  useEffect(() => {
+    if (active !== 'onlineIm') return;
+    const checkPermission = async () => {
+      try {
+        const granted = await isPermissionGranted();
+        if (granted !== desktopNotifications) {
+          setDesktopNotifications(granted);
+          writeStoredValue('desktopNotifications', granted);
+        }
+      } catch {
+        // Non-Tauri environment — ignore.
+      }
+    };
+    void checkPermission();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
+  // Persist close-to-tray changes to backend.
+  const handleCloseToTrayToggle = useCallback(async (enabled: boolean) => {
+    setCloseToTray(enabled);
+    try {
+      await invoke('set_close_to_tray', { enabled });
+    } catch {
+      // Silently ignore if backend isn't available.
+    }
+  }, []);
   const [detailLevel, setDetailLevel] = useStoredValueState<SelectValue>('detailLevel', 'detailed');
   const [approvalMode, setApprovalMode] = useStoredValueState<SelectValue>('approvalMode', 'ask');
+  const [allowlistEntries, setAllowlistEntries] = useState<AllowlistEntry[]>(() => readAllowlist());
+
+  // Auto-merge execution target workspace_allowlist paths into the AllowlistEditor.
+  // This ensures directories configured on Hub targets are reflected in the local allowlist UI.
+  useEffect(() => {
+    if (!hubTargetsQuery.data?.items) return;
+    const allTargetPaths: string[] = [];
+    for (const target of hubTargetsQuery.data.items) {
+      if (target.workspace_allowlist && target.workspace_allowlist.length > 0) {
+        for (const p of target.workspace_allowlist) allTargetPaths.push(p);
+      }
+    }
+    if (allTargetPaths.length === 0) return;
+    setAllowlistEntries((prev) => {
+      const merged = mergeAllowlistFromTarget(prev, allTargetPaths);
+      // Only persist if new paths were actually added
+      if (merged.length !== prev.length) {
+        writeAllowlist(merged);
+        return merged;
+      }
+      return prev;
+    });
+  }, [hubTargetsQuery.data?.items]);
   const [customInstructions, setCustomInstructions] = useState(() => readCustomInstructions());
   const [customInstructionsDraft, setCustomInstructionsDraft] = useState(() => readCustomInstructions());
+  // Environment detection state
+  const [envOs, setEnvOs] = useState('Detecting...');
+  const [envShell, setEnvShell] = useState('Detecting...');
+  const [envNodeVersion, setEnvNodeVersion] = useState('Detecting...');
+  const [envPackageManager, setEnvPackageManager] = useState('Detecting...');
+  const [workspaceTab, setWorkspaceTab] = useState<'git' | 'worktree' | 'browser' | 'computerUse'>('git');
   const defaultModel = useModelSettingsStore((s) => s.defaultModel);
   const defaultProvider = useModelSettingsStore((s) => s.defaultProvider);
   const modelReasoningEffort = useModelSettingsStore((s) => s.reasoningEffort);
@@ -463,6 +613,10 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const toggleModelAlias = useModelSettingsStore((s) => s.toggleAlias);
   const setCcSwitchBridge = useModelSettingsStore((s) => s.setCcSwitchBridgeEnabled);
   const updateCcSwitchProvider = useModelSettingsStore((s) => s.updateProvider);
+  const credentials = useModelSettingsStore((s) => s.credentials);
+  const setCredential = useModelSettingsStore((s) => s.setCredential);
+  const setCredentialTestResult = useModelSettingsStore((s) => s.setCredentialTestResult);
+  const resetModelSettings = useModelSettingsStore((s) => s.reset);
   const resolveRunRequestOptions = useModelSettingsStore((s) => s.resolveRunRequestOptions);
   const customInstructionsDirty = customInstructionsDraft.trim() !== customInstructions;
   const customInstructionsRemaining = Math.max(0, MAX_CUSTOM_INSTRUCTIONS_CHARS - customInstructionsDraft.length);
@@ -478,6 +632,29 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
     setCustomInstructions('');
     setCustomInstructionsDraft('');
   }, []);
+
+  const testProviderConnection = useCallback(async (providerId: string) => {
+    const cred = credentials.find((c) => c.providerId === providerId);
+    if (!cred) return;
+    setCredentialTestResult(providerId, 'connecting');
+    try {
+      const baseUrl = cred.baseUrl || `https://api.${providerId}.com/v1`;
+      const url = baseUrl.replace(/\/$/, '') + '/models';
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (cred.apiKey) {
+        headers['Authorization'] = `Bearer ${cred.apiKey}`;
+      }
+      const response = await fetch(url, { method: 'GET', headers, signal: AbortSignal.timeout(10000) });
+      if (response.ok) {
+        setCredentialTestResult(providerId, 'success');
+      } else {
+        setCredentialTestResult(providerId, 'error', `HTTP ${response.status}`);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setCredentialTestResult(providerId, 'error', message);
+    }
+  }, [credentials, setCredentialTestResult]);
 
   const agents = agentData?.items ?? [];
   const modelSelectOptions = useMemo(
@@ -705,17 +882,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
       { id: 'models', label: t('settings.models'), icon: <SlidersHorizontal size={17} />, group: 'automation' },
       { id: 'modelMapping', label: t('settings.modelMapping'), icon: <Link2 size={17} />, group: 'automation' },
       { id: 'ccSwitch', label: t('settings.ccSwitch'), icon: <Plug size={17} />, group: 'automation' },
-      { id: 'connections', label: t('settings.connections'), icon: <Globe2 size={17} />, group: 'automation' },
-      { id: 'remoteControl', label: t('settings.remoteControl'), icon: <Computer size={17} />, group: 'automation' },
-      { id: 'git', label: t('settings.git'), icon: <GitBranch size={17} />, group: 'automation' },
+      { id: 'credentials', label: t('settings.credentials'), icon: <LockKeyhole size={17} />, group: 'automation' },
+      { id: 'workspace', label: t('settings.workspace'), icon: <FolderGit2 size={17} />, group: 'system' },
       { id: 'environment', label: t('settings.environment'), icon: <HardDrive size={17} />, group: 'system' },
-      { id: 'worktree', label: t('settings.worktree'), icon: <FolderGit2 size={17} />, group: 'system' },
-      { id: 'browser', label: t('settings.browser'), icon: <Eye size={17} />, group: 'system' },
-      { id: 'computerUse', label: t('settings.computerUse'), icon: <Computer size={17} />, group: 'system' },
       { id: 'platforms', label: t('settings.platforms'), icon: <Monitor size={17} />, group: 'system' },
       { id: 'account', label: t('settings.account'), icon: <LockKeyhole size={17} />, group: 'system' },
       { id: 'securityAudit', label: t('settings.securityAudit'), icon: <ShieldCheck size={17} />, group: 'system' },
-      { id: 'archived', label: t('settings.archived'), icon: <Archive size={17} />, group: 'system' },
+      { id: 'data', label: t('settings.data'), icon: <HardDrive size={17} />, group: 'system' },
     ],
     [t],
   );
@@ -739,6 +912,28 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
   const setBooleanSetting = (key: string, setter: (value: boolean) => void) => (value: boolean) => {
     setter(value);
     writeStoredValue(key, value);
+  };
+
+  const handleDesktopNotificationsToggle = async (value: boolean) => {
+    if (value) {
+      try {
+        const permission = await requestPermission();
+        if (permission === 'granted') {
+          setDesktopNotifications(true);
+          writeStoredValue('desktopNotifications', true);
+          addToast({ type: 'success', message: t('settings.notificationPermissionGranted') });
+        } else {
+          addToast({ type: 'warning', message: t('toast.notificationPermissionDenied') });
+        }
+      } catch {
+        // Non-Tauri environment (tests/dev in browser) — allow the toggle without requesting OS permission
+        setDesktopNotifications(true);
+        writeStoredValue('desktopNotifications', true);
+      }
+    } else {
+      setDesktopNotifications(false);
+      writeStoredValue('desktopNotifications', false);
+    }
   };
 
   return (
@@ -835,6 +1030,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   }
                 />
                 <SettingRow
+                  title={t('settings.closeToTray')}
+                  description={t('settings.closeToTrayDesc')}
+                  control={
+                    <Switch checked={closeToTray} onChange={handleCloseToTrayToggle} />
+                  }
+                />
+                <SettingRow
                   title={t('settings.detailLevel')}
                   description={t('settings.detailLevelDesc')}
                   control={
@@ -868,6 +1070,19 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                       {t(`settings.theme.${mode}`)}
                     </button>
                   ))}
+                </div>
+              </Panel>
+              <Panel title={t('settings.language')} description={t('settings.languageDesc')}>
+                <div className={styles.settingRow}>
+                  <div className={styles.settingCopy}>
+                    <strong>{t('settings.language')}</strong>
+                    <span>{t('settings.languageDesc')}</span>
+                  </div>
+                  <SelectControl
+                    value={language}
+                    options={[['en', 'English'], ['zh', '中文']]}
+                    onChange={(value) => setLanguage(value as 'en' | 'zh')}
+                  />
                 </div>
               </Panel>
               <Panel title={t('settings.density')}>
@@ -964,19 +1179,14 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'permissions' && (
-            <Panel title={t('settings.permissions')} description={t('settings.permissionsDesc')}>
-              <SettingRow
-                title={t('settings.autoReview')}
-                description={t('settings.autoReviewDesc')}
-                control={<Switch checked={autoReview} onChange={setBooleanSetting('autoReview', setAutoReview)} />}
-              />
-              <SettingRow
-                title={t('settings.fullAccess')}
-                description={t('settings.fullAccessDesc')}
-                control={<Switch checked={fullAccess} onChange={setBooleanSetting('fullAccess', setFullAccess)} />}
-              />
-              <SettingRow title={t('settings.permissionLedger')} description={t('settings.permissionLedgerDesc')} value={t('settings.statusPlanned')} />
-            </Panel>
+            <PermissionsSection
+              autoReview={autoReview}
+              setAutoReview={setAutoReview}
+              fullAccess={fullAccess}
+              setFullAccess={setFullAccess}
+              allowlistEntries={allowlistEntries}
+              setAllowlistEntries={setAllowlistEntries}
+            />
           )}
 
           {active === 'agentProfiles' && (
@@ -1112,6 +1322,53 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   connected={cloudHubTargets.some(isHubTargetConnected)}
                 />
               </div>
+              {/* Remote Edge URL configuration */}
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.remoteEdgeUrl')}</strong>
+                  <span>{t('settings.remoteEdgeUrlDesc')}</span>
+                </div>
+                <div className={styles.settingRow}>
+                  <div className={styles.settingCopy}>
+                    <strong>{t('settings.edgeAddress')}</strong>
+                    <span>{t('settings.edgeAddressDesc')}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                    <input
+                      type="text"
+                      value={remoteEdgeUrl}
+                      onChange={(e) => { setRemoteEdgeUrl(e.target.value); setRemoteEdgeSaved(false); }}
+                      placeholder="http://host:3210"
+                      className={styles.textInput}
+                      style={{ width: '280px' }}
+                    />
+                    {remoteEdgeUrl && (
+                      <button
+                        type="button"
+                        className={styles.secondaryBtn}
+                        onClick={() => {
+                          setRemoteEdgeUrl('');
+                          setPersistedEdgeUrl('');
+                          setRemoteEdgeSaved(true);
+                        }}
+                      >
+                        {t('settings.clear')}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className={styles.primaryBtn}
+                      onClick={() => {
+                        setPersistedEdgeUrl(remoteEdgeUrl);
+                        setRemoteEdgeSaved(true);
+                      }}
+                    >
+                      {remoteEdgeSaved ? t('settings.saved') : t('settings.save')}
+                    </button>
+                  </div>
+                </div>
+                <Callout title={t('settings.remoteEdgeNote')} body={t('settings.remoteEdgeNoteDesc')} />
+              </div>
               {runnerItems.length > 0 ? (
                 <div className={styles.runnerList}>
                   {runnerItems.map((runner) => <RunnerRow key={runner.id} runner={runner} />)}
@@ -1148,6 +1405,10 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   <EmptyBlock title={t('settings.targetHubEmpty')} description={t('settings.targetHubEmptyDesc')} />
                 )}
               </div>
+              <Callout
+                title={t('settings.remoteControl')}
+                body={t('settings.remoteControlCalloutDesc')}
+              />
             </Panel>
           )}
 
@@ -1273,6 +1534,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
                   status={t('settings.statusPlanned')}
                 />
               </div>
+              <SettingRow
+                title={t('settings.desktopNotifications')}
+                description={t('settings.desktopNotificationsDesc')}
+                control={
+                  <Switch checked={desktopNotifications} onChange={handleDesktopNotificationsToggle} />
+                }
+              />
             </Panel>
           )}
 
@@ -1640,27 +1908,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             </Panel>
           )}
 
-          {active === 'keyboard' && (
-            <Panel title={t('settings.keyboard')} description={t('settings.keyboardDesc')}>
-              <div className={styles.shortcutTable}>
-                {KEYBOARD_SHORTCUT_GROUPS.map((group) => (
-                  <div key={group.id} className={styles.shortcutGroup}>
-                    <div className={styles.shortcutGroupTitle}>{t(group.labelKey)}</div>
-                    {group.shortcuts.map((shortcut) => (
-                      <div key={shortcut.id} className={styles.shortcutRow}>
-                        <span>{t(shortcut.labelKey)}</span>
-                        <div>
-                          {shortcut.keys.map((key) => (
-                            <kbd key={key}>{key}</kbd>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </Panel>
-          )}
+          {active === 'keyboard' && <KeyboardSection />}
 
           {active === 'mcp' && (
             <Panel title={t('settings.mcp')} description={t('settings.mcpDesc')}>
@@ -1956,103 +2204,122 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             </Panel>
           )}
 
-          {active === 'connections' && (
-            <Panel title={t('settings.connections')} description={t('settings.connectionsDesc')}>
-              <ConnectionRow
-                name="Hub"
-                description={hubAuthenticated ? t('status.hubConnected') : t('status.hubDisconnected')}
-                connected={hubAuthenticated}
+          {active === 'credentials' && (
+            <Panel title={t('settings.credentials')} description={t('settings.credentialsDesc')}>
+              <SettingRow
+                title={t('settings.credentialsLocalNote')}
+                description={t('settings.credentialsLocalNoteDesc')}
               />
-              <ConnectionRow name="Edge" description={`${t('settings.edgeLocal')} · ${runnerSummary}`} connected={edgeOnline} />
-              <ConnectionRow name="WebSocket" description={t('status.wsConnected')} connected={edgeOnline} />
+              <div className={styles.taskSection}>
+                <div className={styles.taskSectionHeader}>
+                  <strong>{t('settings.credentialsProviders')}</strong>
+                  <span>{t('settings.credentialsProvidersDesc')}</span>
+                </div>
+                <div className={styles.providerList}>
+                  {credentials.map((cred) => (
+                    <ProviderCredentialRow
+                      key={cred.providerId}
+                      credential={cred}
+                      onApiKeyChange={(apiKey) => setCredential(cred.providerId, { apiKey })}
+                      onBaseUrlChange={(baseUrl) => setCredential(cred.providerId, { baseUrl })}
+                      onToggleEnabled={() => setCredential(cred.providerId, { enabled: !cred.enabled })}
+                      onTestConnection={() => testProviderConnection(cred.providerId)}
+                    />
+                  ))}
+                </div>
+              </div>
+              <Callout title={t('settings.credentialsGuard')} body={t('settings.credentialsGuardDesc')} />
             </Panel>
           )}
 
-          {active === 'remoteControl' && (
-            <Panel title={t('settings.remoteControl')} description={t('settings.remoteControlDesc')}>
-              <SettingRow
-                title={t('settings.remoteControlEnable')}
-                description={t('settings.remoteControlEnableDesc')}
-                control={
-                  <SwitchControl
-                    checked={remoteControlAvailable && remoteControlEnabled}
-                    onChange={setBooleanSetting('remoteControl', setRemoteControlEnabled)}
-                    disabled={!remoteControlAvailable}
-                    title={t('settings.requiresRemoteControlApi')}
-                    status={t('settings.statusPlanned')}
+          {active === 'workspace' && (
+            <Panel title={t('settings.workspace')} description={t('settings.workspaceDesc')}>
+              <div className={styles.segmented}>
+                {(['git', 'worktree', 'browser', 'computerUse'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    className={workspaceTab === tab ? styles.segmentActive : ''}
+                    onClick={() => setWorkspaceTab(tab)}
+                  >
+                    {tab === 'git' && 'Git'}
+                    {tab === 'worktree' && t('settings.worktree')}
+                    {tab === 'browser' && t('settings.browser')}
+                    {tab === 'computerUse' && t('settings.computerUse')}
+                  </button>
+                ))}
+              </div>
+              {workspaceTab === 'git' && (
+                <>
+                  <SettingRow
+                    title={t('settings.autoDetectGit')}
+                    description={t('settings.autoDetectGitDesc')}
+                    control={
+                      <Switch checked={autoDetectGit} onChange={setBooleanSetting('autoDetectGit', setAutoDetectGit)} />
+                    }
                   />
-                }
-              />
-              <SettingRow title={t('settings.remoteControlApproval')} description={t('settings.remoteControlApprovalDesc')} value={t('settings.approvalMode.ask')} />
-              <SettingRow title={t('settings.remoteControlDevices')} description={t('settings.remoteControlDevicesDesc')} value={t('settings.statusPlanned')} />
-            </Panel>
-          )}
-
-          {active === 'git' && (
-            <Panel title={t('settings.git')} description={t('settings.gitDesc')}>
-              <SettingRow
-                title={t('settings.autoDetectGit')}
-                description={t('settings.autoDetectGitDesc')}
-                control={
-                  <Switch checked={autoDetectGit} onChange={setBooleanSetting('autoDetectGit', setAutoDetectGit)} />
-                }
-              />
-              <SettingRow title={t('settings.branchPolicy')} description="feat/* -> dev/delicious233 -> master" />
-              <SettingRow title={t('settings.commitStyle')} description="type(scope): summary" />
+                  <SettingRow title={t('settings.branchPolicy')} description="feat/* -> dev/delicious233 -> master" />
+                  <SettingRow title={t('settings.commitStyle')} description="type(scope): summary" />
+                </>
+              )}
+              {workspaceTab === 'worktree' && (
+                <>
+                  <SettingRow
+                    title={t('settings.defaultWorkspace')}
+                    description={(() => {
+                      const ws = getSelectedWorkspace();
+                      return ws ? `${ws.name} (${ws.path})` : t('settings.noWorkspaceSelected');
+                    })()}
+                  />
+                  <SettingRow
+                    title={t('settings.worktreeIsolation')}
+                    description={t('settings.worktreeIsolationDesc')}
+                    control={
+                      <Switch
+                        checked={worktreeIsolation}
+                        onChange={setBooleanSetting('worktreeIsolation', setWorktreeIsolation)}
+                      />
+                    }
+                  />
+                  <SettingRow title={t('settings.worktreePolicy')} description=".worktrees/<feature>" />
+                </>
+              )}
+              {workspaceTab === 'browser' && (
+                <>
+                  <SettingRow
+                    title={t('settings.browserPreview')}
+                    description={t('settings.browserPreviewDesc')}
+                    control={
+                      <Switch checked={browserPreview} onChange={setBooleanSetting('browserPreview', setBrowserPreview)} />
+                    }
+                  />
+                  <SettingRow title={t('settings.browserEngine')} description="Chromium / Playwright" value="Auto" />
+                </>
+              )}
+              {workspaceTab === 'computerUse' && (
+                <>
+                  <SettingRow
+                    title={t('settings.computerConfirm')}
+                    description={t('settings.computerConfirmDesc')}
+                    control={
+                      <Switch
+                        checked={computerConfirm}
+                        onChange={setBooleanSetting('computerConfirm', setComputerConfirm)}
+                      />
+                    }
+                  />
+                  <Callout title={t('settings.computerUseGuard')} body={t('settings.computerUseGuardDesc')} />
+                </>
+              )}
             </Panel>
           )}
 
           {active === 'environment' && (
             <Panel title={t('settings.environment')} description={t('settings.environmentDesc')}>
-              <SettingRow title="Shell" description="PowerShell 7" value="pwsh" />
-              <SettingRow title="Node" description={t('settings.environmentNodeDesc')} value="pnpm" />
+              <SettingRow title={t('settings.environmentOs')} description={t('settings.environmentOsDesc')} value={envOs} />
+              <SettingRow title={t('settings.environmentShell')} description={t('settings.environmentShellDesc')} value={envShell} />
+              <SettingRow title="Node.js" description={t('settings.environmentNodeDesc')} value={envNodeVersion} />
+              <SettingRow title={t('settings.environmentPackageManager')} description={t('settings.environmentPmDesc')} value={envPackageManager} />
               <SettingRow title="Tauri" description={t('settings.environmentTauriDesc')} value={t('settings.enabled')} />
-            </Panel>
-          )}
-
-          {active === 'worktree' && (
-            <Panel title={t('settings.worktree')} description={t('settings.worktreeDesc')}>
-              <SettingRow title={t('settings.defaultWorkspace')} description="D:\\Code\\TokenDance" />
-              <SettingRow
-                title={t('settings.worktreeIsolation')}
-                description={t('settings.worktreeIsolationDesc')}
-                control={
-                  <Switch
-                    checked={worktreeIsolation}
-                    onChange={setBooleanSetting('worktreeIsolation', setWorktreeIsolation)}
-                  />
-                }
-              />
-              <SettingRow title={t('settings.worktreePolicy')} description=".worktrees/<feature>" />
-            </Panel>
-          )}
-
-          {active === 'browser' && (
-            <Panel title={t('settings.browser')} description={t('settings.browserDesc')}>
-              <SettingRow
-                title={t('settings.browserPreview')}
-                description={t('settings.browserPreviewDesc')}
-                control={
-                  <Switch checked={browserPreview} onChange={setBooleanSetting('browserPreview', setBrowserPreview)} />
-                }
-              />
-              <SettingRow title={t('settings.browserEngine')} description="Chromium / Playwright" value="Auto" />
-            </Panel>
-          )}
-
-          {active === 'computerUse' && (
-            <Panel title={t('settings.computerUse')} description={t('settings.computerUseDesc')}>
-              <SettingRow
-                title={t('settings.computerConfirm')}
-                description={t('settings.computerConfirmDesc')}
-                control={
-                  <Switch
-                    checked={computerConfirm}
-                    onChange={setBooleanSetting('computerConfirm', setComputerConfirm)}
-                  />
-                }
-              />
-              <Callout title={t('settings.computerUseGuard')} body={t('settings.computerUseGuardDesc')} />
             </Panel>
           )}
 
@@ -2181,11 +2448,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
             </Panel>
           )}
 
-          {active === 'archived' && (
-            <Panel title={t('settings.archived')} description={t('settings.archivedDesc')}>
-              <EmptyBlock title={t('settings.noArchived')} description={t('settings.noArchivedDesc')} />
-            </Panel>
-          )}
+          {active === 'data' && <DataSection t={t} addToast={addToast} resetModelSettings={resetModelSettings} />}
         </div>
       </main>
     </div>
@@ -3436,7 +3699,7 @@ function TeamBudgetBlock({ budget }: { budget?: TeamBudget }) {
 
 function formatTeamNumber(value?: number) {
   return typeof value === 'number' && Number.isFinite(value)
-    ? new Intl.NumberFormat('en-US').format(value)
+    ? new Intl.NumberFormat(i18n.resolvedLanguage?.startsWith('zh') ? 'zh-CN' : 'en-US').format(value)
     : '--';
 }
 
@@ -4223,6 +4486,128 @@ function Callout({ title, body }: { title: string; body: string }) {
       <div>
         <strong>{title}</strong>
         <span>{body}</span>
+      </div>
+    </div>
+  );
+}
+
+function ProviderCredentialRow({
+  credential,
+  onApiKeyChange,
+  onBaseUrlChange,
+  onToggleEnabled,
+  onTestConnection,
+}: {
+  credential: ProviderCredential;
+  onApiKeyChange: (value: string) => void;
+  onBaseUrlChange: (value: string) => void;
+  onToggleEnabled: () => void;
+  onTestConnection: () => void;
+}) {
+  const { t } = useTranslation();
+  const [reveal, setReveal] = useState(false);
+
+  const displayKey = reveal ? credential.apiKey : maskApiKey(credential.apiKey);
+  const testLabel = (() => {
+    switch (credential.testResult) {
+      case 'connecting': return t('settings.credentials.testing');
+      case 'success': return t('settings.credentials.testSuccess');
+      case 'error': return t('settings.credentials.testError');
+      default: return t('settings.credentials.testConnection');
+    }
+  })();
+
+  const statusPillClass = credential.testResult === 'success'
+    ? styles.statusPillOn
+    : credential.testResult === 'error'
+      ? styles.statusPillOn
+      : credential.enabled
+        ? styles.statusPillOn
+        : '';
+
+  const statusLabel = credential.testResult === 'success'
+    ? t('settings.credentials.testSuccess')
+    : credential.testResult === 'error'
+      ? credential.testError || t('settings.credentials.testError')
+      : credential.enabled
+        ? t('settings.enabled')
+        : t('settings.disabled');
+
+  return (
+    <div className={styles.providerRow}>
+      <div className={styles.providerMain}>
+        <div className={styles.connectionIcon}>
+          <LockKeyhole size={17} />
+        </div>
+        <div className={styles.settingCopy}>
+          <strong>{credential.providerId}</strong>
+          <span>{t('settings.credentials.apiKey')}</span>
+        </div>
+        <div className={styles.switchControl}>
+          <span className={[styles.statusPill, statusPillClass].filter(Boolean).join(' ')}>
+            {statusLabel}
+          </span>
+          <Switch checked={credential.enabled} onChange={onToggleEnabled} />
+        </div>
+      </div>
+      <div className={styles.providerControls}>
+        <label>
+          <span>{t('settings.credentials.apiKey')}</span>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <input
+              className={styles.textInput}
+              type={reveal ? 'text' : 'password'}
+              value={displayKey || ''}
+              onChange={(e) => onApiKeyChange(e.target.value)}
+              placeholder={t('settings.credentials.apiKeyPlaceholder')}
+              style={{ flex: 1, minWidth: 0 }}
+            />
+            {credential.apiKey ? (
+              <button
+                type="button"
+                onClick={() => setReveal(!reveal)}
+                style={{
+                  position: 'absolute',
+                  right: 4,
+                  background: 'transparent',
+                  border: 0,
+                  cursor: 'pointer',
+                  color: 'var(--settings-muted)',
+                  padding: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title={reveal ? t('settings.credentials.hideKey') : t('settings.credentials.showKey')}
+              >
+                {reveal ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            ) : null}
+          </div>
+        </label>
+        <label>
+          <span>{t('settings.credentials.baseUrl')}</span>
+          <input
+            className={styles.textInput}
+            type="text"
+            value={credential.baseUrl}
+            onChange={(e) => onBaseUrlChange(e.target.value)}
+            placeholder={t('settings.credentials.baseUrlPlaceholder')}
+          />
+        </label>
+        <label style={{ alignItems: 'center' }}>
+          <button
+            type="button"
+            className={styles.secondaryBtn}
+            onClick={onTestConnection}
+            disabled={credential.testResult === 'connecting' || !credential.enabled}
+          >
+            <RefreshCw
+              size={14}
+              style={credential.testResult === 'connecting' ? { animation: 'spin 1s linear infinite' } : undefined}
+            />
+            {testLabel}
+          </button>
+        </label>
       </div>
     </div>
   );

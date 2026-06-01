@@ -7,6 +7,7 @@ type ButtonSize = 'sm' | 'md' | 'lg';
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  fullWidth?: boolean;
 }
 
 function variantClass(v: ButtonVariant): string {
@@ -29,8 +30,8 @@ function sizeClass(s: ButtonSize): string {
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', children, ...props }, ref) => {
-    const cls = [styles.base, variantClass(variant), sizeClass(size), className]
+  ({ className, variant = 'primary', size = 'md', fullWidth, children, ...props }, ref) => {
+    const cls = [styles.base, variantClass(variant), sizeClass(size), fullWidth && styles.fullWidth, className]
       .filter(Boolean)
       .join(' ');
     return (

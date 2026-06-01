@@ -188,6 +188,27 @@ export interface PendingAgentTask {
   expire_at?: string;
 }
 
+export interface AgentRunEventSummary {
+  task_id: string;
+  edge_run_id?: string;
+  status: string;
+  total_events: number;
+  last_event_seq: number;
+  event_type_counts: Record<string, number>;
+  tool_call_count: number;
+  step_count: number;
+  artifact_count: number;
+  approval_count: number;
+  pending_approvals: number;
+  decided_approvals: number;
+  input_tokens: number;
+  output_tokens: number;
+  output_bytes: number;
+  started_at?: string;
+  finished_at?: string;
+  elapsed_ms?: number;
+}
+
 export interface TriggerAgentTaskOptions {
   agent_instance_id?: string;
   agent_type?: string;
@@ -969,6 +990,11 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     cancelAgentTask: (taskId: string) =>
       request<void>(`/web/agent-tasks/${encodeURIComponent(taskId)}/cancel`, { method: 'POST' }),
+
+    // ── Agent run event summary ────────────────────
+
+    getTaskRunEventSummary: (taskId: string) =>
+      request<AgentRunEventSummary>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events/summary`),
 
     // ── Agent teams / TeamRun console ─────────────
 
