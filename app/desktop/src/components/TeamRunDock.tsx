@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, GitBranch, Route, UsersRound } from 'lucide-react';
+import { AlertTriangle, GitBranch, Route, TerminalSquare, UsersRound } from 'lucide-react';
 import type { AgentTeamOverview } from '@/api/agentTeamQueries';
 import type {
   AgentTeamRun,
@@ -9,12 +9,14 @@ import type {
   TeamRunState,
 } from '@/api/hubClient';
 import type { LocalOrchestrationStatus } from '@/utils/localOrchestration';
+import type { TeamLocalExecution } from '@/utils/teamLocalExecution';
 import styles from './TeamRunDock.module.css';
 
 interface Props {
   overview?: AgentTeamOverview;
   loading?: boolean;
   signedIn?: boolean;
+  localExecutions?: TeamLocalExecution[];
   localOrchestration?: LocalOrchestrationStatus;
   onStartLocalOrchestration?: (agentId: string, draft: string) => void;
   onOpenConsole?: () => void;
@@ -85,10 +87,16 @@ function formatBudgetUsage(state?: TeamRunState): string | undefined {
   return String(Math.round(usage));
 }
 
+function shortId(value?: string) {
+  if (!value) return undefined;
+  return value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
+}
+
 export default function TeamRunDock({
   overview,
   loading = false,
   signedIn = false,
+  localExecutions = [],
   localOrchestration,
   onStartLocalOrchestration,
   onOpenConsole,
@@ -97,6 +105,7 @@ export default function TeamRunDock({
   const summary = useMemo(() => summarizeDock(overview), [overview]);
   const hasTeam = Boolean(summary.selectedTeam);
   const hasRun = Boolean(summary.selectedRun || summary.state);
+  const primaryExecution = localExecutions[0];
   const canStartLocalOrchestration = Boolean(
     localOrchestration?.available &&
     localOrchestration.orchestratorId &&
@@ -108,6 +117,12 @@ export default function TeamRunDock({
     : hasRun
       ? t(`settings.teamRunStatus.${status}`, { defaultValue: status })
       : t('chat.teamRunNoRun');
+  const primaryExecutionStatus = primaryExecution
+    ? t(`settings.taskStatus.${primaryExecution.status}`, { defaultValue: primaryExecution.status })
+    : undefined;
+  const primaryExecutionSource = primaryExecution?.source === 'desktopBridge'
+    ? t('settings.agentTeamLocalSource')
+    : t('settings.agentTeamHubProjectionSource');
   const budgetUsage = formatBudgetUsage(summary.state);
   const localName = localOrchestration?.orchestratorName ?? 'Orchestrator';
   const description = !signedIn
@@ -183,6 +198,29 @@ export default function TeamRunDock({
           <span>{t('chat.teamRunBudgetUsage', { percent: budgetUsage })}</span>
         ) : null}
       </div>
+
+      {primaryExecution ? (
+        <div className={styles.localExecution} data-testid="teamrun-dock-local-execution">
+          <span className={styles.localExecutionIcon} aria-hidden="true">
+            <TerminalSquare size={12} />
+          </span>
+          <strong>{primaryExecution.runtimeLabel}</strong>
+          <span>{primaryExecutionSource}</span>
+          <span>{primaryExecutionStatus}</span>
+          {primaryExecution.agentTaskId ? (
+            <span>{t('settings.agentTeamHubTask')}: {shortId(primaryExecution.agentTaskId)}</span>
+          ) : null}
+          {primaryExecution.edgeRunId ? (
+            <span>{t('settings.agentTeamEdgeRun')}: {shortId(primaryExecution.edgeRunId)}</span>
+          ) : null}
+          {primaryExecution.latestEventType ? (
+            <span>{primaryExecution.latestEventType}</span>
+          ) : null}
+          {primaryExecution.eventCount > 0 ? (
+            <span>{t('settings.agentTeamLocalEvents', { count: primaryExecution.eventCount })}</span>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

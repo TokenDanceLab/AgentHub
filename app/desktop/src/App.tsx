@@ -42,6 +42,7 @@ import { useThreadStore } from '@/stores/threadStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import { useSearchStore } from '@/stores/searchStore';
+import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import { readCustomInstructions } from '@/utils/customInstructions';
 import { buildForkDraft, findRetryPrompt } from '@/utils/messageActions';
 import { useShallow } from 'zustand/shallow';
@@ -93,6 +94,7 @@ import {
   mergeChatMessages,
 } from '@/utils/chatMessages';
 import { resolveThreadSelectionId, type ThreadSelectionInput } from '@/utils/threadSelection';
+import { buildTeamLocalExecutions, normalizeTeamTasks } from '@/utils/teamLocalExecution';
 import { resolveTopMenuClickState, type TopMenuId } from '@/utils/topMenuState';
 import { buildAutomaticThreadTitle, canAutoRenameThreadTitle, getAutomaticThreadTitle } from '@/utils/threadTitle';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -416,12 +418,23 @@ export default function App() {
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online, activeThreadId);
   const { data: agentData } = useAgentList(online);
   const agents = agentData?.items ?? [];
+  const bridgedTasks = useTaskBridgeStore((s) => s.tasks);
   const modelCatalogQuery = useModelCatalog(online);
   const modelsDevDisplayNamesQuery = useModelsDevDisplayNames(true);
   const agentTeamSummary = useMemo(
     () => summarizeAgentTeamOverview(agentTeamsQuery.data),
     [agentTeamsQuery.data],
   );
+  const teamLocalExecutions = useMemo(() => {
+    const overview = agentTeamsQuery.data;
+    return buildTeamLocalExecutions({
+      selectedRunId: overview?.selectedRun?.id,
+      bridgeTasks: bridgedTasks,
+      tasks: normalizeTeamTasks(overview?.state, overview?.tasks ?? []),
+      assignments: overview?.state?.assignments ?? [],
+      events: overview?.state?.run_events ?? [],
+    });
+  }, [agentTeamsQuery.data, bridgedTasks]);
   const teamRunBadgeCount = agentTeamSummary.blockingCount || agentTeamSummary.activeRuns;
   const teamRunButtonLabel = agentTeamSummary.blockingCount > 0
     ? t('workspace.teamRunsWithBlocks', { count: agentTeamSummary.blockingCount })
@@ -1786,6 +1799,7 @@ export default function App() {
                   agentTeamOverview={agentTeamsQuery.data}
                   agentTeamsLoading={agentTeamsQuery.isLoading || agentTeamsQuery.isFetching}
                   agentTeamsSignedIn={hubInventoryEnabled}
+                  teamLocalExecutions={teamLocalExecutions}
                   onStartLocalOrchestration={handleStartLocalOrchestration}
                   onOpenTeamRuns={() => openSettings('agentScheduling')}
                 />
