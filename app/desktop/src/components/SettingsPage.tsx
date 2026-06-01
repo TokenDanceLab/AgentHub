@@ -2829,6 +2829,7 @@ interface TeamCommunicationGraphModel {
 
 function TeamCommunicationGraph({ graph }: { graph: TeamCommunicationGraphModel }) {
   const { t } = useTranslation();
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const nodeClass: Record<TeamGraphNodeKind, string> = {
     artifact: styles.teamGraphNodeArtifact ?? '',
     conflict: styles.teamGraphNodeConflict ?? '',
@@ -2837,6 +2838,22 @@ function TeamCommunicationGraph({ graph }: { graph: TeamCommunicationGraphModel 
     runtime: styles.teamGraphNodeRuntime ?? '',
     task: styles.teamGraphNodeTask ?? '',
   };
+  const selectedNode = selectedNodeId
+    ? graph.nodes.find((node) => node.id === selectedNodeId)
+    : undefined;
+  const relatedNodeIds = new Set<string>();
+  const visibleEdges = selectedNode
+    ? graph.edges.filter((edge) => {
+        const related = edge.from === selectedNode.id || edge.to === selectedNode.id;
+        if (related) {
+          relatedNodeIds.add(edge.from);
+          relatedNodeIds.add(edge.to);
+        }
+        return related;
+      })
+    : graph.edges;
+  const incomingCount = selectedNode ? graph.edges.filter((edge) => edge.to === selectedNode.id).length : 0;
+  const outgoingCount = selectedNode ? graph.edges.filter((edge) => edge.from === selectedNode.id).length : 0;
 
   return (
     <section className={styles.teamSurface} data-testid="agent-team-communication-graph">
@@ -2847,26 +2864,70 @@ function TeamCommunicationGraph({ graph }: { graph: TeamCommunicationGraphModel 
       {graph.nodes.length > 0 || graph.edges.length > 0 ? (
         <div className={styles.teamGraph}>
           <div className={styles.teamGraphNodes} aria-label={t('settings.agentTeamGraphNodes')}>
+            <button
+              type="button"
+              data-team-graph-node="all"
+              className={`${styles.teamGraphNode} ${styles.teamGraphNodeAll} ${!selectedNode ? styles.teamGraphNodeActive : ''}`}
+              aria-pressed={!selectedNode}
+              onClick={() => setSelectedNodeId(null)}
+            >
+              <strong>{t('settings.agentTeamGraphAllLinks')}</strong>
+              <span>{t('settings.agentTeamGraphAllLinksDesc', { count: graph.edges.length })}</span>
+              <em>{graph.nodes.length} / {graph.edges.length}</em>
+            </button>
             {graph.nodes.map((node) => (
-              <div key={node.id} className={`${styles.teamGraphNode} ${nodeClass[node.kind]}`}>
+              <button
+                type="button"
+                data-team-graph-node={node.kind}
+                key={node.id}
+                className={[
+                  styles.teamGraphNode,
+                  nodeClass[node.kind],
+                  selectedNode?.id === node.id ? styles.teamGraphNodeActive : '',
+                  selectedNode && selectedNode.id !== node.id && !relatedNodeIds.has(node.id) ? styles.teamGraphNodeMuted : '',
+                ].filter(Boolean).join(' ')}
+                aria-pressed={selectedNode?.id === node.id}
+                onClick={() => setSelectedNodeId(node.id)}
+              >
                 <strong>{node.label}</strong>
                 <span>{node.meta}</span>
                 {node.status ? <em>{node.status}</em> : null}
-              </div>
+              </button>
             ))}
           </div>
-          <div className={styles.teamGraphEdges} aria-label={t('settings.agentTeamGraphEdges')}>
-            {graph.edges.map((edge) => {
+          <div className={styles.teamGraphInspector}>
+            <div className={styles.teamGraphInspectorHead}>
+              <strong>{selectedNode?.label ?? t('settings.agentTeamGraphAllLinks')}</strong>
+              <span>{selectedNode ? t(`settings.agentTeamGraphKind.${selectedNode.kind}`, { defaultValue: selectedNode.kind }) : t('settings.agentTeamGraphAllLinksDesc', { count: graph.edges.length })}</span>
+              {selectedNode ? (
+                <div className={styles.taskMeta}>
+                  <span>{t('settings.agentTeamGraphIncoming', { count: incomingCount })}</span>
+                  <span>{t('settings.agentTeamGraphOutgoing', { count: outgoingCount })}</span>
+                </div>
+              ) : null}
+            </div>
+            <div className={styles.teamGraphEdges} aria-label={t('settings.agentTeamGraphEdges')}>
+              {visibleEdges.map((edge) => {
               const from = graph.nodes.find((node) => node.id === edge.from);
               const to = graph.nodes.find((node) => node.id === edge.to);
               return (
-                <div key={edge.id} className={styles.teamGraphEdge}>
+                <div
+                  key={edge.id}
+                  data-team-graph-edge={edge.kind}
+                  className={`${styles.teamGraphEdge} ${selectedNode && edge.from !== selectedNode.id && edge.to !== selectedNode.id ? styles.teamGraphEdgeMuted : ''}`}
+                >
                   <span>{from?.label ?? shortGraphId(edge.from)}</span>
                   <strong>{edge.label}</strong>
                   <span>{to?.label ?? shortGraphId(edge.to)}</span>
                 </div>
               );
-            })}
+              })}
+              {visibleEdges.length === 0 ? (
+                <div className={styles.teamGraphEmptyEdge}>
+                  {t('settings.agentTeamGraphNoSelectedEdges')}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : (

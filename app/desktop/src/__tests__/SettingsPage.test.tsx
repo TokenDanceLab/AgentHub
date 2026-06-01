@@ -581,6 +581,13 @@ describe('SettingsPage tasks', () => {
     expect(within(graph).getByText('runs')).toBeInTheDocument();
     expect(within(graph).getAllByText('modify').length).toBeGreaterThan(0);
     expect(within(graph).getAllByText('conflict').length).toBeGreaterThan(0);
+    fireEvent.click(within(graph).getByRole('button', { name: /executor/ }));
+    expect(within(graph).getByRole('button', { name: /executor/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(graph).getByText('settings.agentTeamGraphIncoming')).toBeInTheDocument();
+    expect(within(graph).getByText('settings.agentTeamGraphOutgoing')).toBeInTheDocument();
+    expect(within(graph).queryByText('runs')).not.toBeInTheDocument();
+    fireEvent.click(within(graph).getByRole('button', { name: /settings.agentTeamGraphAllLinks/ }));
+    expect(within(graph).getByText('runs')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'settings.acceptAgentTask' })).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'settings.keepAllArtifacts' })).toBeInTheDocument();
 
