@@ -102,6 +102,24 @@ func (f *FileStore) GetThread(id string) (Thread, bool) {
 	return f.store.GetThread(id)
 }
 
+func (f *FileStore) UpdateThread(id string, title *string, status *string) (Thread, bool) {
+	thread, ok := f.store.UpdateThread(id, title, status)
+	if !ok {
+		return Thread{}, false
+	}
+	_ = f.persist()
+	return thread, true
+}
+
+func (f *FileStore) DeleteThread(id string) bool {
+	ok := f.store.DeleteThread(id)
+	if !ok {
+		return false
+	}
+	_ = f.persist()
+	return true
+}
+
 func (f *FileStore) ListThreads(projectID string) []Thread {
 	return f.store.ListThreads(projectID)
 }
