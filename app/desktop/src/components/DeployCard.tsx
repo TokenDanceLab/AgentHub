@@ -23,8 +23,8 @@ const STATUS_CLASS: Record<string, string | undefined> = {
 };
 
 export default function DeployCard({ block }: Props) {
-  const StatusIcon = STATUS_ICON[block.status] ?? Rocket;
-  const statusClass = STATUS_CLASS[block.status] ?? '';
+  const StatusIcon = STATUS_ICON[block.status ?? 'pending'] ?? Rocket;
+  const statusClass = STATUS_CLASS[block.status ?? 'pending'] ?? '';
   const isSpinning = block.status === 'building' || block.status === 'deploying';
 
   return (
