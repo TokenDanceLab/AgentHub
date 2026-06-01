@@ -46,6 +46,18 @@ function mockFetchSequence(responses: Array<{ status: number; data: unknown }>) 
   return fetchSpy;
 }
 
+function mockFetch(status: number, data: unknown, statusText = status === 200 ? 'OK' : 'Error') {
+  const fetchSpy = vi.spyOn(globalThis, 'fetch');
+  fetchSpy.mockResolvedValue(
+    new Response(JSON.stringify(data), {
+      status,
+      statusText,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  );
+  return fetchSpy;
+}
+
 function getHeader(init: RequestInit, name: string): string | null {
   const headers = init.headers;
   if (headers instanceof Headers) {
@@ -510,7 +522,7 @@ describe('hubClient', () => {
 
       await client.me();
 
-      expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://localhost:8080/client/auth/me');
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://api.hub.vectorcontrol.tech/client/auth/me');
     });
   });
 });
