@@ -176,6 +176,7 @@ AgentHub/
 ├── app/
 │   ├── desktop/            # Tauri 桌面端入口
 │   ├── web/                # Web 工作台和页面预览
+│   ├── mobile/             # Mobile 轻量 IM、审批和预览
 │   └── shared/             # 前端共享组件、状态、类型和 API/event client
 ├── hub-server/             # 中心 Hub：账号、IM、群聊、同步、中继
 ├── edge-server/            # Edge 节点：项目、上下文、run 生命周期、Runtime adapters
