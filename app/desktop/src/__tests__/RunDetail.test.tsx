@@ -248,8 +248,47 @@ describe('RunDetail', () => {
     expect(screen.getByText('run.reviewSurface')).toBeInTheDocument();
     expect(screen.getByText('run.reviewArtifactGap')).toBeInTheDocument();
     expect(screen.getByText('run.reviewPreviewGap')).toBeInTheDocument();
+    expect(screen.getByText('run.reviewApprovalSource')).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('run.reviewAllow'));
     await waitFor(() => expect(screen.getByText('run.reviewApprovalFailed')).toBeInTheDocument());
+    expect(screen.getByLabelText('run.reviewAllow')).toBeInTheDocument();
+    expect(screen.getByLabelText('run.reviewDeny')).toBeInTheDocument();
+  });
+
+  it('keeps approval pending and explains duplicate or expired Edge decisions', async () => {
+    const run = makeRun({ status: RunState.WAITING_FOR_INPUT });
+    const onDecideApproval = async () => {
+      throw Object.assign(new Error('permission request not found'), {
+        code: 'permission_request_not_found',
+        status: 404,
+      });
+    };
+
+    render(
+      <RunDetail
+        run={run}
+        toolCalls={[]}
+        changedFiles={[]}
+        outputText=""
+        approvals={[
+          {
+            requestId: 'perm-duplicate',
+            runId: run.runId,
+            toolName: 'Bash',
+            toolInput: { command: 'npm test' },
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+        ]}
+        onDecideApproval={onDecideApproval}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('run.reviewDeny'));
+
+    await waitFor(() => expect(screen.getByText('run.reviewApprovalAlreadyHandled')).toBeInTheDocument());
+    expect(screen.getByText('Bash')).toBeInTheDocument();
+    expect(screen.getByLabelText('run.reviewAllow')).toBeInTheDocument();
+    expect(screen.getByLabelText('run.reviewDeny')).toBeInTheDocument();
   });
 });
