@@ -1,9 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
-import { LogIn, MessageSquare, ShieldCheck, TerminalSquare, Users, WifiOff, X, Forward } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { ActivityCard, SectionHeader } from '@shared/ui';
-import type { IMContact, IMMessage } from '@/components/IM/types';
-import type { SortOption } from '@/components/IM/IMContactList';
+import { MessageCircle } from 'lucide-react';
+import type { IMContact } from '@/components/IM/types';
 import IMContactList from '@/components/IM/IMContactList';
 import IMMessageView from '@/components/IM/IMMessageView';
 import IMMessageInput from '@/components/IM/IMMessageInput';

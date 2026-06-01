@@ -43,7 +43,6 @@ export interface ViewConfig {
 // ═══════════════════════════════════════════════════════════════════
 
 // Lazy imports
-const ChatView = lazy(() => import('@/components/ChatView'));
 const RunDetail = lazy(() => import('@/components/RunDetail'));
 const SearchDialog = lazy(() => import('@/components/SearchDialog'));
 const IMView = lazy(() => import('@/views/IMView'));

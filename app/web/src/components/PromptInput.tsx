@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+﻿import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowUp,
@@ -39,7 +39,7 @@ interface Props {
   agents: AgentInfo[];
   selectedAgentId?: string;
   onSelectAgent: (agentId: string) => void;
-  onSend: (prompt: string, agentId?: string, opts?: SendOptions) => boolean | void | Promise<boolean | void>;
+  onSend: (prompt: string, agentId?: string, opts?: SendOptions) => boolean | undefined | Promise<boolean | undefined>;
   isStreaming?: boolean;
   isStarting?: boolean;
   onCancel?: () => void;
@@ -52,7 +52,7 @@ interface Props {
 
 function modelDesc(name: string): string {
   const m: Record<string, string> = {
-    'claude-opus-4-7': 'Anthropic flagship — strongest reasoning & coding',
+    'claude-opus-4-7': 'Anthropic flagship 鈥?strongest reasoning & coding',
     'claude-opus-4-5': 'Previous-gen flagship, balanced performance',
     'claude-sonnet-4-6': 'Fast, cost-effective for daily tasks',
     'claude-haiku-4-5': 'Lightning-fast for simple tasks',
@@ -180,7 +180,7 @@ export default function PromptInput({
     : t('prompt.placeholder');
   const selectedTarget = executionTargets.find((target) => target.id === selectedTargetId);
   const targetLabel = selectedTarget
-    ? `${selectedTarget.name} · ${t(`settings.targetHealth.${selectedTarget.health_state}`, { defaultValue: selectedTarget.health_state })}`
+    ? `${selectedTarget.name} 路 ${t(`settings.targetHealth.${selectedTarget.health_state}`, { defaultValue: selectedTarget.health_state })}`
     : t('prompt.targetAuto');
 
   return (
@@ -274,7 +274,7 @@ export default function PromptInput({
                       : t('prompt.targetLocked');
                     return (
                       <option key={target.id} value={target.id} disabled={!dispatchable}>
-                        {target.name} · {suffix}
+                        {target.name} 路 {suffix}
                       </option>
                     );
                   })}
