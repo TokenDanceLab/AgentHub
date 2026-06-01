@@ -46,3 +46,13 @@
   align-items: center;
   flex: 0 0 auto;
 }
+
+/* ── Responsive ─────────────────── */
+
+@media (max-width: 480px) {
+  .button {
+    min-height: var(--touch-target-min, 44px);
+    padding: 6px 10px;
+    gap: 8px;
+  }
+}

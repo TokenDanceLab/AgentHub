@@ -5,6 +5,7 @@ import { queryClient } from '@/api/queryClient';
 import App from '@/App';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { LanguageProvider } from '@/contexts/LanguageContext';
 import '@/i18n';
 import '@/styles/tokens.css';
 import '@/styles/themes.css';
@@ -15,12 +16,14 @@ function AppShell() {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <ErrorBoundary>
-          <AppShell />
-        </ErrorBoundary>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <ErrorBoundary>
+            <AppShell />
+          </ErrorBoundary>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </LanguageProvider>
   </StrictMode>,
 );

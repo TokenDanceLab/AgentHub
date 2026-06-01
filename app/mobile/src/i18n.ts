@@ -54,6 +54,7 @@ const resources = {
           latest: "Latest",
           jumpToLatest: "Jump to latest message",
           send: "Send",
+          forward: "Forward",
           sendMobileReply: "Send mobile reply",
           retryMobileReply: "Retry mobile reply",
           paused: "Paused",
@@ -92,6 +93,14 @@ const resources = {
         composer: {
           label: "Mobile reply",
           placeholder: "Message AgentHub...",
+        },
+        sheets: {
+          contextActions: "Message actions",
+          closeSheet: "Close sheet",
+        },
+        replyIndicator: {
+          prefix: "Replying to {{author}}",
+          dismiss: "Dismiss reply",
         },
       },
       runDetail: {
@@ -227,6 +236,9 @@ const resources = {
           title: "Notifications",
           description: "Local notification permission is required before run alerts.",
           testAlert: "Test alert",
+          runCompleted: "Run completed",
+          runFailed: "Run failed",
+          approvalNeeded: "Approval needed",
         },
         status: {
           nativeAction: "Native action",
@@ -246,6 +258,14 @@ const resources = {
           retrySignIn: "Retry sign in",
           retryCheck: "Retry check",
           retryAlert: "Retry alert",
+        },
+        theme: {
+          title: "Theme",
+          description: "Override the system color scheme. OLED Black saves battery on AMOLED screens.",
+          system: "System",
+          light: "Light",
+          dark: "Dark",
+          oled: "OLED",
         },
         about: {
           title: "About",
@@ -624,6 +644,9 @@ const resources = {
           title: "通知",
           description: "运行提醒需要先获得本机通知权限。",
           testAlert: "测试提醒",
+          runCompleted: "运行完成",
+          runFailed: "运行失败",
+          approvalNeeded: "需要审批",
         },
         status: {
           nativeAction: "原生动作",
@@ -643,6 +666,14 @@ const resources = {
           retrySignIn: "重试登录",
           retryCheck: "重试检查",
           retryAlert: "重试提醒",
+        },
+        theme: {
+          title: "主题",
+          description: "覆盖系统色彩方案。OLED 纯黑可在 AMOLED 屏幕上省电。",
+          system: "跟随系统",
+          light: "浅色",
+          dark: "深色",
+          oled: "OLED",
         },
         about: {
           title: "关于",

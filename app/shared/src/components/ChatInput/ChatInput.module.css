@@ -63,7 +63,12 @@
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: opacity 150ms;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sendBtn {
+    transition: opacity 150ms;
+  }
 }
 
 .sendBtn:hover {

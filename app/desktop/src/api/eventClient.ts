@@ -6,7 +6,7 @@
 // When no transport is provided, creates its own WebSocket internally
 // (backward compatible with existing callers).
 
-import { WS_URL } from '@/config';
+import { WS_URL, getEdgeWsUrl } from '@/config';
 import { withEdgeAuthQuery } from './edgeAuth';
 import type { Transport, TransportStatus } from './transport';
 import type { EventEnvelope } from '@shared/events';
@@ -36,7 +36,7 @@ export interface EventStreamOptions {
 }
 
 export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOptions): StreamHandle {
-  let baseUrl = WS_URL;
+  let baseUrl = getEdgeWsUrl();
   let cursor: string | undefined;
 
   // If first arg looks like a URL, use it as base; otherwise treat as cursor
@@ -55,6 +55,8 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
   let ws: WebSocket | null = null;
   let reconnectDelay = 1000;
   const MAX_RECONNECT_DELAY = 30000;
+  const MAX_RETRIES = 10;
+  let retryCount = 0;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   const handlers: EventHandler[] = [];
@@ -170,6 +172,7 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
     ws = new WebSocket(url);
 
     ws.onopen = () => {
+      retryCount = 0;
       reconnectDelay = 1000;
       startHeartbeat();
       notifyStatus(true);
@@ -197,10 +200,22 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
 
   function scheduleReconnect() {
     if (closed) return;
+    if (retryCount >= MAX_RETRIES) {
+      console.error('[EventStream] Max retries reached, giving up');
+      notifyStatus(false);
+      return;
+    }
+    retryCount++;
+
+    // Exponential backoff with ±20% jitter to avoid thundering herd
+    const rawDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+    const jitter = rawDelay * 0.2 * (Math.random() * 2 - 1);
+    const delay = Math.round(Math.max(0, rawDelay + jitter));
+
     reconnectTimer = setTimeout(() => {
       connectDirect();
-      reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
-    }, reconnectDelay);
+      reconnectDelay = rawDelay;
+    }, delay);
   }
 
   // ── Initiate connection ─────────────────────────────
@@ -236,6 +251,7 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
 
     close(): void {
       closed = true;
+      retryCount = 0;
       clearHeartbeat();
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);

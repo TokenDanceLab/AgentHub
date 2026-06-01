@@ -497,7 +497,7 @@ func TestCodexFullTurnSequence(t *testing.T) {
 	if len(emitter.eventsOfType(BusEventSessionInit)) != 1 {
 		t.Error("missing session_init (thread.started)")
 	}
-	if len(emitter.eventsOfType(BusEventSessionStateChanged)) != 1 {
+	if len(emitter.eventsOfType(BusEventSessionStateChanged)) != 2 {
 		t.Error("missing session_state_changed (turn.started)")
 	}
 	if len(emitter.eventsOfType(BusEventToolCall)) < 2 {
@@ -523,10 +523,10 @@ func TestCodexFullTurnSequence(t *testing.T) {
 	if emitter.events[0].Type != BusEventSessionInit {
 		t.Errorf("event[0] type = %s, want %s", emitter.events[0].Type, BusEventSessionInit)
 	}
-	// Last event should be result
+	// Last event should be session_state_changed (idle emitted after turn.completed)
 	last := emitter.events[len(emitter.events)-1]
-	if last.Type != BusEventResult {
-		t.Errorf("last event type = %s, want %s", last.Type, BusEventResult)
+	if last.Type != BusEventSessionStateChanged {
+		t.Errorf("last event type = %s, want %s", last.Type, BusEventSessionStateChanged)
 	}
 }
 
@@ -536,7 +536,7 @@ func TestCodexEmptyLine(t *testing.T) {
 	input := "  \n{\"type\":\"turn.started\"}\n\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":0,\"cached_input_tokens\":0,\"output_tokens\":0,\"reasoning_output_tokens\":0}}"
 	emitter := parseCodexLines(t, input)
 
-	if len(emitter.eventsOfType(BusEventSessionStateChanged)) != 1 {
+	if len(emitter.eventsOfType(BusEventSessionStateChanged)) != 2 {
 		t.Error("missing turn.started")
 	}
 	if len(emitter.eventsOfType(BusEventResult)) != 1 {

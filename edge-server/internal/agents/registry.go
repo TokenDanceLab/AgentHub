@@ -39,6 +39,7 @@ const (
 	StatusIdle          Status = "idle"
 	StatusError         Status = "error"
 	StatusWaitingInput  Status = "waiting_for_input"
+	StatusDraining      Status = "draining"
 	StatusCompleted     Status = "completed"
 	StatusDisconnected  Status = "disconnected"
 )

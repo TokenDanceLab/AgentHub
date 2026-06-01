@@ -1,9 +1,9 @@
 import { lazy, type ComponentType } from 'react';
-import { MessageSquare, Bot, PanelRight, Search, Keyboard, Shield, Users } from 'lucide-react';
+import { MessageSquare, Bot, PanelRight, Search, Keyboard, Shield, Users, Route, FolderTree } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /** Slot in the layout shell that views can occupy. */
-export type ViewSlot = 'sidebar' | 'centerSidebar' | 'center' | 'rightPanel' | 'agentOverlay' | 'modal';
+export type ViewSlot = 'sidebar' | 'centerSidebar' | 'center' | 'rightPanel' | 'agentOverlay' | 'modal' | 'file-explorer';
 
 /**
  * Standardized props that every registered view component can receive.
@@ -44,9 +44,12 @@ export interface ViewConfig {
 
 // Lazy imports
 const ChatView = lazy(() => import('@/components/ChatView'));
+const FileExplorer = lazy(() => import('@/components/FileExplorer'));
+const FileSearchDialog = lazy(() => import('@/components/FileSearchDialog'));
 const RunDetail = lazy(() => import('@/components/RunDetail'));
 const SearchDialog = lazy(() => import('@/components/SearchDialog'));
 const IMView = lazy(() => import('@/views/IMView'));
+const TeamRunConsole = lazy(() => import('@/views/TeamRunConsole'));
 
 // Eager imports
 import StatusBar from '@/components/StatusBar';
@@ -152,6 +155,36 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
     label: 'view.messages',
     lazy: true,
   },
+  'team-run-console': {
+    id: 'team-run-console',
+    component: TeamRunConsole,
+    slot: 'center',
+    showOnMobile: true,
+    showOnTablet: true,
+    icon: Route,
+    label: 'view.teamRuns',
+    lazy: true,
+  },
+  'file-explorer': {
+    id: 'file-explorer',
+    component: FileExplorer,
+    slot: 'file-explorer',
+    showOnMobile: false,
+    showOnTablet: true,
+    icon: FolderTree,
+    label: 'fileExplorer.title',
+    lazy: true,
+  },
+  'file-search-dialog': {
+    id: 'file-search-dialog',
+    component: FileSearchDialog,
+    slot: 'modal',
+    showOnMobile: true,
+    showOnTablet: true,
+    icon: Search,
+    label: 'fileSearch.title',
+    lazy: true,
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -189,7 +222,7 @@ export const VIEW_LIST: ViewConfig[] = Object.values(VIEW_REGISTRY);
 
 // ── Main content view mode (used by MainView resolution) ──
 
-export type ViewMode = 'welcome' | 'loading' | 'chat' | 'im';
+export type ViewMode = 'welcome' | 'loading' | 'chat' | 'im' | 'team';
 
 export interface ViewDescriptor {
   mode: ViewMode;
@@ -201,4 +234,5 @@ export const VIEWS: Record<ViewMode, ViewDescriptor> = {
   loading: { mode: 'loading', label: 'Loading' },
   chat: { mode: 'chat', label: 'Chat' },
   im: { mode: 'im', label: 'Messages' },
+  team: { mode: 'team', label: 'TeamRun Console' },
 };

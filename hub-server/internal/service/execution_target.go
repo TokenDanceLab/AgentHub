@@ -3,7 +3,12 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
+	"net"
+	"net/http"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -190,9 +195,57 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 	switch t.TargetType {
 	case "local_edge":
 		return repository.UpdateTargetOnlineStatus(s.db, id, true)
-	case "remote_ssh", "tailscale", "cloud_edge", "hub_relay":
+	case "remote_ssh", "tailscale", "cloud_edge":
+		if t.Host == "" {
+			return errcode.TargetNotRoutable.WithMessage("execution target has no host configured")
+		}
+		port := t.Port
+		if port == 0 {
+			port = 3210
+		}
+		addr := net.JoinHostPort(t.Host, fmt.Sprintf("%d", port))
+		return pingEdgeServer(ctx, addr, t.AuthMethod, t.ID, id, s.db)
+	case "hub_relay":
 		return errcode.TargetNotRoutable.WithMessage("execution target health proof is not available")
 	default:
 		return errcode.ErrBadRequest.WithMessage("unsupported target_type")
 	}
+}
+
+// pingEdgeServer performs an actual HTTP GET /v1/health against the Edge Server
+// and updates the target's online status and last_seen_at accordingly.
+func pingEdgeServer(ctx context.Context, addr string, authMethod, targetID, targetOwnerID string, db *gorm.DB) error {
+	scheme := "http"
+	url := scheme + "://" + addr + "/v1/health"
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
+		return errcode.TargetNotRoutable.WithMessage("failed to build ping request: " + err.Error())
+	}
+
+	// If the target has an auth method configured, attach the token.
+	// In practice, remote SSH Edge uses SSH tunnel auth (no HTTP auth needed),
+	// Tailscale uses mTLS/networking auth (no HTTP auth needed),
+	// Cloud Edge uses Hub JWT (attached by the caller).
+	if authMethod != "" && authMethod != "none" {
+		req.Header.Set("Authorization", "Bearer "+authMethod)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		slog.Debug("execution target ping failed", "target_id", targetOwnerID, "addr", addr, "err", err)
+		_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
+		return errcode.TargetNotRoutable.WithMessage("ping failed: " + err.Error())
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		_ = repository.UpdateTargetOnlineStatus(db, targetID, true)
+		return nil
+	}
+
+	_ = repository.UpdateTargetOnlineStatus(db, targetID, false)
+	return errcode.TargetNotRoutable.WithMessage(fmt.Sprintf("ping returned HTTP %d", resp.StatusCode))
 }

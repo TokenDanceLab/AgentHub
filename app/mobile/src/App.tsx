@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listRuns, listThreads, type Run, type Thread } from "@agenthub/shared";
 import { BottomNav } from "./components/BottomNav";
@@ -10,6 +10,8 @@ import { AccountView } from "./views/AccountView";
 import { EmptyState } from "@agenthub/shared/ui";
 import { Hash } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useKeyboardAvoidance } from "./hooks/useKeyboardAvoidance";
+import { useRunNotifications } from "./hooks/useRunNotifications";
 
 export type MobileView = "threads" | "chat" | "runs" | "account";
 
@@ -33,6 +35,19 @@ export function App() {
   const cachedRuns = runsBadge.data?.items ?? [];
   const activeThreadCount = cachedThreads.filter((thread) => thread.status === "active").length;
   const pendingReviewCount = cachedRuns.filter((run) => run.status === "waiting_approval").length;
+
+  const { visualViewportHeight, isKeyboardVisible, keyboardHeight, cssVars } = useKeyboardAvoidance();
+
+  // Background poller — triggers native notifications on run status changes.
+  useRunNotifications();
+
+  // Apply keyboard-aware CSS custom properties to <html> so the whole layout can react.
+  useEffect(() => {
+    const root = document.documentElement;
+    for (const [prop, value] of Object.entries(cssVars)) {
+      root.style.setProperty(prop, value);
+    }
+  }, [cssVars]);
 
   const handleThreadSelect = useCallback((thread: Thread) => {
     setSelectedThread(thread);
@@ -60,7 +75,14 @@ export function App() {
   }, []);
 
   return (
-    <div className="mobileAppShell">
+    <div
+      className="mobileAppShell"
+      style={{
+        height: `${visualViewportHeight}px`,
+        // When keyboard is visible, allow the main area to shrink so the composer stays visible
+        // The scroll container inside will handle overflow
+      }}
+    >
       <main className="mobileAppMain">
         {activeView === "threads" && (
           <ThreadListView

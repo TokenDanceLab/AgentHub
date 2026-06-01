@@ -6,6 +6,7 @@ import { getStatusVariantClassName, StatusBadge } from "@agenthub/shared/compone
 import { ActionList, EmptyState, MetricGrid, SectionHeader, SegmentedControl, StatusNotice, SurfaceHeader, TriageCard } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
 import { useTranslation } from "react-i18next";
+import { i18n } from "../i18n";
 import { AlertCircle, ArrowRight, CheckCircle2, Clock3, GitPullRequestArrow, Play, Radio, RefreshCw, ShieldAlert, TerminalSquare, UserRound } from "lucide-react";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
 import { getMobileHubHealth } from "../native/hubHealth";
@@ -58,7 +59,8 @@ function runStatusLabelKey(status: RunStatus): string {
 
 function formatRunTime(run: Run): string {
   const timestamp = run.startedAt ?? run.createdAt;
-  return new Date(timestamp).toLocaleString([], {
+  const locale = i18n.resolvedLanguage || i18n.language;
+  return new Date(timestamp).toLocaleString(locale, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -248,7 +250,7 @@ export function RunListView({ onRunSelect, onOpenAccount }: RunListViewProps) {
                 ? t("queue.runs.recoveryReachable")
                 : t("queue.runs.recoveryOffline")
             }
-            meta={runs.errorUpdatedAt ? t("queue.common.lastAttempt", { time: new Date(runs.errorUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : undefined}
+            meta={runs.errorUpdatedAt ? t("queue.common.lastAttempt", { time: new Date(runs.errorUpdatedAt).toLocaleTimeString(i18n.resolvedLanguage || i18n.language, { hour: "2-digit", minute: "2-digit" }) }) : undefined}
             isRetrying={runs.isFetching}
             onRetry={() => {
               void health.refetch();

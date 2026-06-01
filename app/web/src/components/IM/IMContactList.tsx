@@ -1,8 +1,10 @@
 import { useState, useMemo, useCallback, memo } from 'react';
-import { MessageSquare, Plus, SearchX } from 'lucide-react';
+import { MessageSquare, Plus, SearchX, Pin } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@shared/ui';
 import type { IMContact } from './types';
+import IMSearchBar from './IMSearchBar';
+import IMSessionActions from './IMSessionActions';
 import styles from './IMContactList.module.css';
 
 interface IMContactListProps {
@@ -10,6 +12,15 @@ interface IMContactListProps {
   onSelect?: (contact: IMContact) => void;
   onAdd?: (name: string) => void;
   selectedId?: string | undefined;
+  sortBy?: 'recent' | 'pinned' | 'name';
+  onSortChange?: (sort: 'recent' | 'pinned' | 'name') => void;
+  showArchived?: boolean;
+  onToggleShowArchived?: () => void;
+  onPinToggle?: (sessionId: string) => void;
+  onArchiveToggle?: (sessionId: string) => void;
+  onMuteToggle?: (sessionId: string) => void;
+  onSearchSessions?: (query: string) => void;
+  onClearSearch?: () => void;
 }
 
 function avatarClass(type: string): string {
@@ -23,22 +34,50 @@ function avatarClass(type: string): string {
   }
 }
 
+export type SortOption = 'recent' | 'pinned' | 'name';
+
 const IMContactList = memo(function IMContactList({
   contacts,
   onSelect,
   onAdd,
   selectedId,
+  sortBy = 'recent',
+  onSortChange,
+  showArchived = false,
+  onToggleShowArchived,
+  onPinToggle,
+  onArchiveToggle,
+  onMuteToggle,
+  onSearchSessions,
+  onClearSearch,
 }: IMContactListProps) {
   const { t } = useTranslation();
-  const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [addName, setAddName] = useState('');
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return contacts;
-    const lower = search.toLowerCase();
-    return contacts.filter((c) => c.name.toLowerCase().includes(lower));
-  }, [contacts, search]);
+  const sorted = useMemo(() => {
+    const list = [...contacts];
+    // Filter out archived unless explicitly shown
+    const filtered = showArchived ? list : list.filter((c) => !c.archived);
+
+    switch (sortBy) {
+      case 'pinned':
+        return filtered.sort((a, b) => {
+          if (a.pinned && !b.pinned) return -1;
+          if (!a.pinned && b.pinned) return 1;
+          return (b.lastSeen ?? '').localeCompare(a.lastSeen ?? '');
+        });
+      case 'name':
+        return filtered.sort((a, b) => a.name.localeCompare(b.name));
+      case 'recent':
+      default:
+        return filtered.sort((a, b) => {
+          if (a.pinned && !b.pinned) return -1;
+          if (!a.pinned && b.pinned) return 1;
+          return (b.lastSeen ?? '').localeCompare(a.lastSeen ?? '');
+        });
+    }
+  }, [contacts, sortBy, showArchived]);
 
   const handleAdd = useCallback(() => {
     const trimmed = addName.trim();
@@ -55,6 +94,12 @@ const IMContactList = memo(function IMContactList({
     },
     [handleAdd],
   );
+
+  const sortOptions: { key: SortOption; label: string }[] = [
+    { key: 'recent', label: t('im.sort.recent') },
+    { key: 'pinned', label: t('im.sort.pinned') },
+    { key: 'name', label: t('im.sort.name') },
+  ];
 
   return (
     <div className={styles.root}>
@@ -88,33 +133,54 @@ const IMContactList = memo(function IMContactList({
         </div>
       )}
 
-      <div className={styles.searchBar}>
-        <input
-          className={styles.searchInput}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('im.contact.search')}
-          aria-label={t('im.contact.search')}
-        />
+      <IMSearchBar
+        onSearch={onSearchSessions}
+        onClear={onClearSearch}
+      />
+
+      {/* Sort controls */}
+      <div className={styles.sortBar}>
+        <div className={styles.sortGroup}>
+          {sortOptions.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              className={`${styles.sortBtn} ${sortBy === opt.key ? styles.sortBtnActive : ''}`}
+              onClick={() => onSortChange?.(opt.key)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {onToggleShowArchived && (
+          <button
+            type="button"
+            className={`${styles.archiveToggle} ${showArchived ? styles.archiveToggleActive : ''}`}
+            onClick={onToggleShowArchived}
+            title={showArchived ? t('im.hideArchived') : t('im.showArchived')}
+          >
+            {showArchived ? t('im.hideArchived') : t('im.showArchived')}
+          </button>
+        )}
       </div>
 
-      <div className={styles.list} role={filtered.length === 0 ? undefined : 'listbox'} aria-label={filtered.length === 0 ? undefined : t('im.contact.title')}>
-        {filtered.length === 0 ? (
+      <div className={styles.list} role={sorted.length === 0 ? undefined : 'listbox'} aria-label={sorted.length === 0 ? undefined : t('im.contact.title')}>
+        {sorted.length === 0 ? (
           <EmptyState
             className={styles.empty ?? ''}
             iconClassName={styles.emptyIcon ?? ''}
             titleClassName={styles.emptyTitle ?? ''}
             descriptionClassName={styles.emptyDescription ?? ''}
-            icon={search ? <SearchX size={18} /> : <MessageSquare size={18} />}
-            title={search ? t('im.contact.noMatch') : t('im.contact.empty')}
-            description={search ? t('im.contact.noMatchDescription') : t('im.contact.emptyDescription')}
+            icon={<MessageSquare size={18} />}
+            title={t('im.contact.empty')}
+            description={t('im.contact.emptyDescription')}
             titleLevel={3}
           />
         ) : (
-          filtered.map((contact) => (
+          sorted.map((contact) => (
             <div
               key={contact.id}
-              className={styles.item}
+              className={`${styles.item} ${selectedId === contact.id ? styles.itemSelected : ''}`}
               role="option"
               aria-selected={selectedId === contact.id}
               onClick={() => onSelect?.(contact)}
@@ -123,13 +189,34 @@ const IMContactList = memo(function IMContactList({
                 {contact.name.charAt(0).toUpperCase()}
               </div>
               <div className={styles.itemInfo}>
-                <div className={styles.itemName}>{contact.name}</div>
+                <div className={styles.itemNameRow}>
+                  <span className={styles.itemName}>{contact.name}</span>
+                  {contact.pinned && (
+                    <Pin size={10} className={styles.pinIcon} aria-label={t('im.pinned')} />
+                  )}
+                  {contact.muted && (
+                    <span className={styles.mutedBadge} aria-label={t('im.muted')}>
+                      {t('im.muted')}
+                    </span>
+                  )}
+                </div>
                 <div className={styles.itemMeta}>
                   {contact.type}
                   {contact.authority ? ` · ${contact.authority}` : ''}
                   {contact.lastSeen ? ` · ${contact.lastSeen}` : ''}
                 </div>
               </div>
+              <IMSessionActions
+                pinned={contact.pinned}
+                archived={contact.archived}
+                muted={contact.muted}
+                onPin={() => onPinToggle?.(contact.id)}
+                onUnpin={() => onPinToggle?.(contact.id)}
+                onArchive={() => onArchiveToggle?.(contact.id)}
+                onUnarchive={() => onArchiveToggle?.(contact.id)}
+                onMute={() => onMuteToggle?.(contact.id)}
+                onUnmute={() => onMuteToggle?.(contact.id)}
+              />
               <div
                 className={`${styles.onlineDot} ${
                   contact.online ? styles.onlineDotOn : styles.onlineDotOff
