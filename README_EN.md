@@ -165,6 +165,7 @@ AgentHub/
 ├── app/
 │   ├── desktop/            # Tauri desktop app
 │   ├── web/                # Web workspace and page preview
+│   ├── mobile/             # Mobile lightweight IM, approvals, and previews
 │   └── shared/             # shared frontend components, state, types, API/event clients
 ├── hub-server/             # central Hub: auth, IM, groups, sync, relay
 ├── edge-server/            # Edge node: projects, context, run lifecycle, Runtime adapters
