@@ -21,7 +21,7 @@ import {
   X,
   UserCog,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAgentList } from '@/api/agentQueries';
@@ -34,7 +34,9 @@ import { useConnectionStore } from '@/stores/connectionStore';
 import { useHubStore } from '@/stores/hubStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useThreadStore } from '@/stores/threadStore';
-import { getAccessToken, useAuth } from '@/hooks/useAuth';
+import { getAccessToken } from '@/hooks/useAuth';
+import { useWebAuth } from '@/hooks/useWebAuth';
+import { useStreamRecovery } from '@/hooks/useStreamRecovery';
 import { useHubMainChat } from '@/hooks/useHubMainChat';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { useHealth } from '@/hooks/useHealth';
@@ -142,7 +144,7 @@ function isAgentMissing(error: unknown): boolean {
 
 export default function WebLayout() {
   const { t } = useTranslation();
-  const { tryAutoLogin } = useAuth();
+  const { ensureAuth } = useWebAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
@@ -162,9 +164,6 @@ export default function WebLayout() {
   const reconnecting = useConnectionStore((s) => s.reconnecting);
   const recoveryState = useConnectionStore((s) => s.recoveryState);
   const recoveryError = useConnectionStore((s) => s.recoveryError);
-  const setRecoveryState = useConnectionStore((s) => s.setRecoveryState);
-  const setRecoveryError = useConnectionStore((s) => s.setRecoveryError);
-  const setLastEventSeq = useConnectionStore((s) => s.setLastEventSeq);
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const username = useHubStore((s) => s.username);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
@@ -180,7 +179,6 @@ export default function WebLayout() {
   const [optimisticRun, setOptimisticRun] = useState<WebRunInfo | null>(null);
   const [taskRunEvents, setTaskRunEvents] = useState<AgentRunEvent[]>([]);
   const [runStartPending, setRunStartPending] = useState(false);
-  const recoveryInProgressRef = useRef(false);
   const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
   const [mainSurface, setMainSurface] = useState<MainSurface>('workspace');
   const [routeContext, setRouteContext] = useState<RouteContext | null>(null);
@@ -215,22 +213,14 @@ export default function WebLayout() {
       }
     : null;
 
-  useEffect(() => {
-    let cancelled = false;
-    void tryAutoLogin()
-      .then((authenticated) => {
-        if (authenticated && !cancelled) {
-          void queryClient.refetchQueries({ queryKey: ['threads'] });
-          void queryClient.refetchQueries({ queryKey: ['agents'] });
-        }
-      })
-      .catch(() => {
-        /* Auth surfaces handle explicit login errors. */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [queryClient, tryAutoLogin]);
+  const { retryRecovery } = useStreamRecovery({
+    optimisticRun,
+    taskRunEvents,
+    setTaskRunEvents,
+    hubClient,
+    justReconnected: hubRealtime.justReconnected,
+    isConnected: hubRealtime.authenticated && hubRealtime.status === 'connected',
+  });
 
   useEffect(() => {
     setOnline(online, health);
@@ -252,93 +242,6 @@ export default function WebLayout() {
     window.addEventListener('popstate', syncSurfaceFromPath);
     return () => window.removeEventListener('popstate', syncSurfaceFromPath);
   }, []);
-
-  // Track last event seq cursor for stream recovery
-  useEffect(() => {
-    const taskId = optimisticRun?.runId;
-    if (!taskId || taskRunEvents.length === 0) return;
-    let maxSeq = 0;
-    for (const event of taskRunEvents) {
-      if (event.event_seq != null && event.event_seq > maxSeq) {
-        maxSeq = event.event_seq;
-      }
-    }
-    if (maxSeq > 0) {
-      setLastEventSeq(taskId, maxSeq);
-    }
-  }, [optimisticRun?.runId, setLastEventSeq, taskRunEvents]);
-
-  // Stream recovery on WebSocket reconnection with exponential backoff.
-  // Matches the pattern in Desktop's eventClient.ts: base delay 1s, double each
-  // retry, max 30s, with +/-20% jitter. Max 3 recovery fetch attempts before
-  // surfacing the "failed" banner.
-  useEffect(() => {
-    const taskId = optimisticRun?.runId;
-
-    // Detect reconnection via the justReconnected flag from useHubWSConnection
-    if (hubRealtime.justReconnected && taskId && !recoveryInProgressRef.current) {
-      recoveryInProgressRef.current = true;
-      setRecoveryState('recovering');
-      setRecoveryError(null);
-
-      let cancelled = false;
-      const BASE_DELAY_MS = 1000;
-      const MAX_DELAY_MS = 30000;
-      const MAX_RECOVERY_RETRIES = 3;
-
-      const attemptRecovery = async () => {
-        for (let attempt = 0; attempt <= MAX_RECOVERY_RETRIES; attempt++) {
-          if (cancelled) return;
-          try {
-            const recovered = await hubClient.listTaskRunEvents(taskId);
-            if (!cancelled) {
-              setTaskRunEvents((current) => mergeAgentRunEvents(current, recovered));
-              setRecoveryState('idle');
-              recoveryInProgressRef.current = false;
-            }
-            return;
-          } catch (err) {
-            if (cancelled) return;
-            if (attempt >= MAX_RECOVERY_RETRIES) {
-              const message = err instanceof Error ? err.message : 'Failed to recover stream events';
-              setRecoveryError(message);
-              setRecoveryState('failed');
-              recoveryInProgressRef.current = false;
-              return;
-            }
-            // Exponential backoff with +/-20% jitter (matching Desktop's eventClient.ts)
-            const rawDelay = Math.min(BASE_DELAY_MS * Math.pow(2, attempt), MAX_DELAY_MS);
-            const jitter = rawDelay * 0.2 * (Math.random() * 2 - 1);
-            const delay = Math.round(Math.max(0, rawDelay + jitter));
-            await new Promise<void>((resolve) => setTimeout(resolve, delay));
-          }
-        }
-      };
-
-      void attemptRecovery();
-
-      return () => {
-        cancelled = true;
-        recoveryInProgressRef.current = false;
-      };
-    }
-
-    // Reset when connection is lost
-    const isConnected = hubRealtime.authenticated && hubRealtime.status === 'connected';
-    if (!isConnected) {
-      recoveryInProgressRef.current = false;
-    }
-    // Cleanup function must be synchronous — no-op when not in recovery.
-  }, [hubRealtime.justReconnected, hubRealtime.authenticated, hubRealtime.status, optimisticRun?.runId, hubClient, setRecoveryState, setRecoveryError]);
-
-  // Clear recovery state when optimisticRun changes (new task started)
-  useEffect(() => {
-    if (!optimisticRun?.runId) {
-      setRecoveryState('idle');
-      setRecoveryError(null);
-      recoveryInProgressRef.current = false;
-    }
-  }, [optimisticRun?.runId, setRecoveryState, setRecoveryError]);
 
   const selectMainSurface = useCallback((surface: MainSurface) => {
     setMainSurface(surface);
@@ -384,11 +287,7 @@ export default function WebLayout() {
         return;
       }
 
-      if (!hubAuthenticated || !getAccessToken()) {
-        setShowAuthModal(true);
-        addToast({ type: 'error', message: t('webChat.signInRequired') });
-        return;
-      }
+      if (!ensureAuth()) return;
 
       let groupThread =
         selectedThread?.sessionType === 'group'
@@ -399,7 +298,7 @@ export default function WebLayout() {
       }
       selectAgentThread(agentId, groupThread.threadId);
     },
-    [addToast, createWorkspaceThread, hubAuthenticated, selectAgentThread, selectedThread, setShowAuthModal, t, threads],
+    [createWorkspaceThread, ensureAuth, selectAgentThread, selectedThread, threads],
   );
 
   useEffect(() => {
@@ -418,11 +317,7 @@ export default function WebLayout() {
   const handleSend = useCallback(
     async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string; targetId?: string }) => {
       if (!prompt.trim() || runStartPending) return false;
-      if (!hubAuthenticated || !getAccessToken()) {
-        setShowAuthModal(true);
-        addToast({ type: 'error', message: t('webChat.signInRequired') });
-        return false;
-      }
+      if (!ensureAuth()) return false;
       let targetThread = selectedThread;
       if (!targetThread) {
         targetThread = await createWorkspaceThread();
@@ -500,14 +395,13 @@ export default function WebLayout() {
       agents,
       appendOptimistic,
       createWorkspaceThread,
-      hubAuthenticated,
+      ensureAuth,
       hubClient,
       refreshMessages,
       removeMessage,
       runStartPending,
       selectedAgent,
       selectedThread,
-      setShowAuthModal,
       t,
     ],
   );
@@ -580,9 +474,23 @@ export default function WebLayout() {
     };
   }, [addToast, changedFiles, hubRealtime.hubWS, optimisticRun?.runId, outputText, toolCalls]);
 
-  const shellProps = useMemo(
+  // Split shellProps into three focused blocks to keep each useMemo readable
+  const routingProps = useMemo(
     () => ({
       agents,
+      executionTargets,
+      selectedTargetId: selectedExecutionTargetId,
+      selectedAgentId: activeAgentId,
+      selectedId: selectedThreadId ?? undefined,
+      onSelectAgent: handleSelectAgent,
+      onSelect: handleSelectThread,
+      onSelectTarget: setSelectedExecutionTargetId,
+    }),
+    [agents, executionTargets, selectedExecutionTargetId, activeAgentId, selectedThreadId, handleSelectAgent, handleSelectThread],
+  );
+
+  const connectionProps = useMemo(
+    () => ({
       online,
       health,
       hubWS: hubRealtime.hubWS,
@@ -594,10 +502,12 @@ export default function WebLayout() {
       hubAuthenticated,
       isConnected: online,
       isStreaming: runStartPending || optimisticRun?.status === 'queued' || optimisticRun?.status === 'running',
-      executionTargets,
-      selectedTargetId: selectedExecutionTargetId,
-      selectedAgentId: activeAgentId,
-      selectedId: selectedThreadId ?? undefined,
+    }),
+    [online, health, hubRealtime.hubWS, hubRealtime.status, hubRealtime.authenticated, reconnecting, recoveryState, recoveryError, hubAuthenticated, runStartPending, optimisticRun],
+  );
+
+  const chatProps = useMemo(
+    () => ({
       messages: hubMessages,
       allMessages: hubMessages,
       threadsCount: threads.length,
@@ -607,9 +517,6 @@ export default function WebLayout() {
       changedFiles,
       outputText,
       chatMessages: hubMessages,
-      onSelectAgent: handleSelectAgent,
-      onSelect: handleSelectThread,
-      onSelectTarget: setSelectedExecutionTargetId,
       onRetry: () => {
         const lastUserMessage = [...hubMessages].reverse().find((message) => message.role === 'user');
         const text = lastUserMessage?.blocks.find((block) => block.kind === 'text')?.content;
@@ -623,35 +530,12 @@ export default function WebLayout() {
       onSend: handleSend,
       onSendMessage: handleSend,
     }),
-    [
-      activeAgentId,
-      agents,
-      executionTargets,
-      handleCancel,
-      handleSelectAgent,
-      handleSelectThread,
-      handleSend,
-      health,
-      hubAuthenticated,
-      hubRealtime.authenticated,
-      hubRealtime.hubWS,
-      hubRealtime.status,
-      reconnecting,
-      recoveryState,
-      recoveryError,
-      online,
-      optimisticRun,
-      projectedRun,
-      outputText,
-      toolCalls,
-      changedFiles,
-      removeMessage,
-      runStartPending,
-      selectedExecutionTargetId,
-      selectedThreadId,
-      threads.length,
-      hubMessages,
-    ],
+    [hubMessages, threads.length, optimisticRun, projectedRun, outputText, toolCalls, changedFiles, handleSend, activeAgentId, selectedExecutionTargetId, removeMessage, handleCancel],
+  );
+
+  const shellProps = useMemo(
+    () => ({ ...routingProps, ...connectionProps, ...chatProps }),
+    [routingProps, connectionProps, chatProps],
   );
 
   const runDetailFallback = (

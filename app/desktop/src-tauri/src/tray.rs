@@ -1,5 +1,6 @@
 use crate::edge_manager::SharedEdgeManager;
 use crate::QuittingState;
+use serde::Deserialize;
 use std::sync::atomic::Ordering;
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
@@ -7,16 +8,69 @@ use tauri::{
     AppHandle, Manager, Runtime,
 };
 
-pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
-    let icon = app.default_window_icon().cloned().unwrap();
+const TRAY_ID: &str = "main-tray";
 
-    let show_item = MenuItemBuilder::with_id("show", "Show Window").build(app)?;
-    let hide_item = MenuItemBuilder::with_id("hide", "Hide Window").build(app)?;
-    let start_item = MenuItemBuilder::with_id("start_edge", "Start Edge").build(app)?;
-    let stop_item = MenuItemBuilder::with_id("stop_edge", "Stop Edge").build(app)?;
-    let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+/// Labels for tray menu items, supplied by the frontend i18n system.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TrayLabels {
+    #[serde(default = "default_show")]
+    pub show: String,
+    #[serde(default = "default_hide")]
+    pub hide: String,
+    #[serde(default = "default_start_edge")]
+    pub start_edge: String,
+    #[serde(default = "default_stop_edge")]
+    pub stop_edge: String,
+    #[serde(default = "default_quit")]
+    pub quit: String,
+    #[serde(default = "default_tooltip")]
+    pub tooltip: String,
+}
 
-    let menu = MenuBuilder::new(app)
+fn default_show() -> String {
+    "Show Window".into()
+}
+fn default_hide() -> String {
+    "Hide Window".into()
+}
+fn default_start_edge() -> String {
+    "Start Edge".into()
+}
+fn default_stop_edge() -> String {
+    "Stop Edge".into()
+}
+fn default_quit() -> String {
+    "Quit".into()
+}
+fn default_tooltip() -> String {
+    "AgentHub Desktop".into()
+}
+
+impl Default for TrayLabels {
+    fn default() -> Self {
+        Self {
+            show: default_show(),
+            hide: default_hide(),
+            start_edge: default_start_edge(),
+            stop_edge: default_stop_edge(),
+            quit: default_quit(),
+            tooltip: default_tooltip(),
+        }
+    }
+}
+
+/// Build the tray menu from label strings (so it can be rebuilt when the language changes).
+fn build_menu<R: Runtime>(
+    app: &AppHandle<R>,
+    labels: &TrayLabels,
+) -> tauri::Result<tauri::menu::Menu<R>> {
+    let show_item = MenuItemBuilder::with_id("show", &labels.show).build(app)?;
+    let hide_item = MenuItemBuilder::with_id("hide", &labels.hide).build(app)?;
+    let start_item = MenuItemBuilder::with_id("start_edge", &labels.start_edge).build(app)?;
+    let stop_item = MenuItemBuilder::with_id("stop_edge", &labels.stop_edge).build(app)?;
+    let quit_item = MenuItemBuilder::with_id("quit", &labels.quit).build(app)?;
+
+    MenuBuilder::new(app)
         .item(&show_item)
         .item(&hide_item)
         .separator()
@@ -24,12 +78,18 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .item(&stop_item)
         .separator()
         .item(&quit_item)
-        .build()?;
+        .build()
+}
 
-    let _tray = TrayIconBuilder::new()
+pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
+    let icon = app.default_window_icon().cloned().unwrap();
+    let labels = TrayLabels::default();
+    let menu = build_menu(app, &labels)?;
+
+    let _tray = TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
         .menu(&menu)
-        .tooltip("AgentHub Desktop")
+        .tooltip(&labels.tooltip)
         .on_menu_event(move |app, event| {
             let id = event.id().as_ref();
             match id {
@@ -94,5 +154,21 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         })
         .build(app)?;
 
+    Ok(())
+}
+
+/// Tauri command — called by the frontend after i18n initialisation to
+/// localise the tray menu.  Rebuilds the menu with the supplied labels
+/// and replaces it on the existing tray icon.
+#[tauri::command]
+pub fn set_tray_labels(app: AppHandle, labels: TrayLabels) -> Result<(), String> {
+    let tray = app
+        .tray_by_id(TRAY_ID)
+        .ok_or_else(|| "tray icon not found".to_string())?;
+    let menu = build_menu(&app, &labels).map_err(|e| e.to_string())?;
+    tray.set_menu(Some(menu))
+        .map_err(|e| e.to_string())?;
+    tray.set_tooltip(Some(&labels.tooltip))
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
