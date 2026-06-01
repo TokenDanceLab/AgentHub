@@ -1469,6 +1469,7 @@ function HubTaskRow({ task }: { task: AgentTask }) {
         <span>{task.prompt}</span>
         <div className={styles.taskMeta}>
           <span>{task.agentId}</span>
+          <span>{task.targetId ? t('settings.taskTarget', { target: shortId(task.targetId) }) : t('prompt.targetAuto')}</span>
           <span>{task.runId ? shortId(task.runId) : t('settings.taskUnbound')}</span>
         </div>
       </div>
