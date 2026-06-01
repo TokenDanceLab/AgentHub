@@ -12,6 +12,7 @@ import { useConnectionStore } from '@/stores/connectionStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useRunStore } from '@/stores/runStore';
 import { RunState } from '@/utils/runStateMachine';
+import { classifyError } from '@/utils/errorClassifier';
 import { cancelRun } from '@/api/edgeClient';
 import { queryClient } from '@/api/queryClient';
 import { updateRunStatusInQueries, upsertRunInQueries } from '@/api/runQueries';
@@ -950,6 +951,26 @@ function processEvent(state: State, event: EventEnvelope): State {
     case 'run.failed': {
       isStreaming = false;
       const rid = event.payload.runId as string;
+      // Produce error block for rendering
+      const errorMessage = stringField(event.payload.error) ?? stringField(event.payload.message) ?? 'Unknown error';
+      const statusCode = typeof event.payload.statusCode === 'number' ? event.payload.statusCode : undefined;
+      const classification = classifyError(errorMessage, statusCode);
+      const errorBlock: MessageBlock = {
+        kind: 'error',
+        message: errorMessage,
+        code: stringField(event.payload.code) ?? undefined,
+        statusCode,
+        category: classification.category,
+        retryable: classification.retryable,
+      };
+      const last = messages[messages.length - 1];
+      if (canAppendToAgentMessage(last, rid)) {
+        messages = [...messages.slice(0, -1), { ...last, blocks: [...last.blocks, errorBlock] }];
+      } else {
+        const msg = newAgentMessage(event.id, ts, agentName, rid);
+        msg.blocks = [errorBlock];
+        messages = [...messages, msg];
+      }
       if (currentRun && currentRun.runId === rid) {
         if (
           currentRun.status !== RunState.RUNNING &&

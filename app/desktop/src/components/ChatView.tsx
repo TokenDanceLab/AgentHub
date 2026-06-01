@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect, useLayoutEffect, memo } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, ChevronRight, Route, GitFork, Gauge } from 'lucide-react';
+import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, ChevronRight, Route, GitFork, Gauge, AlertTriangle, X, Settings } from 'lucide-react';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
 import { formatTokens, formatCost } from '@shared/context/breakdown';
 import type { ChatMessage, MessageBlock, ToolResultBlock, FileDiff } from './ChatView.types';
@@ -763,6 +763,90 @@ function RouteDecisionBlock({ block }: { block: Extract<MessageBlock, { kind: 'r
   );
 }
 
+// ── ErrorBlock ─────────────────────────────
+type ErrorBlockType = Extract<MessageBlock, { kind: 'error' }>;
+
+function errorCategoryClass(category: ErrorBlockType['category']): string {
+  switch (category) {
+    case 'auth': return styles.errorBlockAuth;
+    case 'quota': return styles.errorBlockQuota;
+    case 'model': return styles.errorBlockModel;
+    case 'network': return styles.errorBlockNetwork;
+    case 'server': return styles.errorBlockServer;
+    case 'context_length': return styles.errorBlockContextLength;
+    case 'tool': return styles.errorBlockTool;
+    default: return styles.errorBlockUnknown;
+  }
+}
+
+function errorCategoryIcon(category: ErrorBlockType['category']): ReactNode {
+  switch (category) {
+    case 'auth': return <AlertTriangle size={14} />;
+    case 'quota': return <Gauge size={14} />;
+    case 'model': return <Bot size={14} />;
+    case 'network': return <Globe size={14} />;
+    case 'server': return <AlertTriangle size={14} />;
+    case 'context_length': return <FileText size={14} />;
+    case 'tool': return <Wrench size={14} />;
+    default: return <AlertTriangle size={14} />;
+  }
+}
+
+function ErrorBlock({ block }: { block: ErrorBlockType }) {
+  const { t } = useTranslation();
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed) return null;
+
+  const categoryClass = errorCategoryClass(block.category) ?? styles.errorBlockUnknown;
+
+  return (
+    <div className={`${styles.errorBlock} ${categoryClass}`} data-testid="error-block">
+      <span className={styles.errorBlockIcon} aria-hidden="true">
+        {errorCategoryIcon(block.category)}
+      </span>
+      <span className={styles.errorBlockMessage}>
+        {block.message || t('chat.errorUnknown')}
+      </span>
+      <div className={styles.errorBlockActions}>
+        {block.retryable && (
+          <button
+            type="button"
+            className={styles.errorBlockActionBtn}
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('agenthub:retry-run'));
+            }}
+          >
+            <RefreshCw size={12} />
+            <span>{t('chat.retry')}</span>
+          </button>
+        )}
+        {(block.category === 'auth' || block.category === 'model') && (
+          <button
+            type="button"
+            className={styles.errorBlockActionBtn}
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('agenthub:open-settings'));
+            }}
+          >
+            <Settings size={12} />
+            <span>{t('chat.openSettings')}</span>
+          </button>
+        )}
+        <button
+          type="button"
+          className={styles.errorBlockDismissBtn}
+          onClick={() => setDismissed(true)}
+          title={t('chat.dismiss')}
+          aria-label={t('chat.dismiss')}
+        >
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Stable block key generation ──────────────
 function blockKey(block: MessageBlock, index: number): string {
   switch (block.kind) {
@@ -858,6 +942,9 @@ const BlockRenderer = memo(function BlockRenderer({
       if (block.success) return null;
       return <StatusRow label={t('chat.result.failed', { error: block.error ?? 'unknown error' })} meta="failed" />;
 
+    case 'error':
+      return <ErrorBlock block={block} />;
+
     case 'context_usage':
       return isDetailedContextUsage(block) ? <ContextUsageInline block={block} /> : null;
 
@@ -895,6 +982,8 @@ function extractMessageText(msg: ChatMessage): string {
             : `Result: failed — ${block.error ?? 'unknown error'}`;
         case 'context_usage':
           return `Context usage: total=${block.total ?? '?'} input=${block.input ?? '?'} output=${block.output ?? '?'} percent=${block.usagePercent ?? '?'}`;
+        case 'error':
+          return `${block.category ? `[${block.category}] ` : ''}Error: ${block.message}`;
         default:
           return '';
       }
@@ -920,6 +1009,8 @@ function hasVisibleBlock(block: MessageBlock): boolean {
     case 'agent_task':
     case 'child_agent':
     case 'route_decision':
+      return true;
+    case 'error':
       return true;
     default:
       return false;
@@ -962,6 +1053,7 @@ function messageBlockSignature(blocks: ChatMessage['blocks']): string {
     if (b.kind === 'artifact') return `artifact:${b.artifactId}`;
     if (b.kind === 'approval') return `approval:${b.approvalId}:${b.status}`;
     if (b.kind === 'tool_group') return `tgrp:${b.blocks.map((tb) => `${tb.callId}:${tb.status}:${tb.children?.length ?? 0}`).join(',')}`;
+    if (b.kind === 'error') return `error:${b.category ?? ''}:${b.message}`;
     return b.kind;
   }).join('|');
 }
