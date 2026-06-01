@@ -112,7 +112,7 @@ describe('hubClient helpers', () => {
     await expect(client.streamTask('task-1', 'delta', 'run-1')).resolves.toBeUndefined();
     await expect(client.doneTask('task-1', 'final', 'run-1')).resolves.toBeUndefined();
     await expect(client.failTask('task-1', 'boom', 'run-1')).resolves.toBeUndefined();
-    await expect(client.triggerAgentTask('m1')).resolves.toMatchObject({ id: 't1' });
+    await expect(client.triggerAgentTask('m1', { target_id: 'target-1' })).resolves.toMatchObject({ id: 't1' });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('http://hub.local/web/custom-agents');
     expect(fetchMock.mock.calls[1]?.[0]).toBe('http://hub.local/edge/devices:register');
@@ -142,6 +142,7 @@ describe('hubClient helpers', () => {
     });
     expect(JSON.parse(String(fetchMock.mock.calls[6]?.[1]?.body))).toEqual({
       trigger_message_id: 'm1',
+      target_id: 'target-1',
     });
     expect(customAgent.agent_type).toBe('codex');
   });

@@ -274,6 +274,21 @@ describe('useHubIntegration', () => {
     expect(result.current.getTaskByRunId('run-1')?.taskId).toBe('task-1');
   });
 
+  it('keeps target_id evidence on bridged Hub tasks', async () => {
+    const { result } = renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload({ target_id: 'target-local-b' }));
+    });
+
+    expect(result.current.getTaskByRunId('run-1')).toMatchObject({
+      taskId: 'task-1',
+      targetId: 'target-local-b',
+    });
+  });
+
   it('reports failure to Hub when fetch fails', async () => {
     fetchMock.mockRejectedValueOnce(new Error('Edge unavailable'));
 

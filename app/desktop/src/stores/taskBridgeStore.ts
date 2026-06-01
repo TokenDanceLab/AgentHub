@@ -12,6 +12,7 @@ export interface AgentTask {
   prompt: string;
   threadId?: string;
   runId?: string;
+  targetId?: string;
   status: 'queued' | 'running' | 'done' | 'failed';
   dispatchPayload: Record<string, unknown>;
   error?: string;
