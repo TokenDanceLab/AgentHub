@@ -166,6 +166,45 @@ func TestStoreFiltersListsByProjectAndThread(t *testing.T) {
 	}
 }
 
+func TestStoreUpdatesAndDeletesThreads(t *testing.T) {
+	s := New()
+	_, _ = s.CreateProject("proj_test", "Test Project")
+	thread, err := s.CreateThread("thread_test", "proj_test", "Test Thread")
+	if err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	run, err := s.CreateRun("run_test", "proj_test", thread.ID)
+	if err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	if _, err := s.CreateThreadMessage("item_test", thread.ID, "user", "hello"); err != nil {
+		t.Fatalf("CreateThreadMessage returned error: %v", err)
+	}
+
+	title := "Renamed Thread"
+	status := "archived"
+	updated, ok := s.UpdateThread(thread.ID, &title, &status)
+	if !ok {
+		t.Fatal("UpdateThread returned ok=false")
+	}
+	if updated.Title != title || updated.Status != status || updated.UpdatedAt == "" {
+		t.Fatalf("updated thread = %#v, want title/status and updatedAt", updated)
+	}
+
+	if !s.DeleteThread(thread.ID) {
+		t.Fatal("DeleteThread returned false")
+	}
+	if _, ok := s.GetThread(thread.ID); ok {
+		t.Fatal("thread still exists after delete")
+	}
+	if _, ok := s.GetRun(run.ID); ok {
+		t.Fatal("thread run still exists after delete")
+	}
+	if items := s.ListThreadItems(thread.ID); len(items) != 0 {
+		t.Fatalf("thread items = %#v, want none after delete", items)
+	}
+}
+
 func TestStoreUpdatesRunStatusTimestamps(t *testing.T) {
 	s := New()
 	_, _ = s.CreateProject("proj_test", "Test Project")

@@ -234,6 +234,50 @@ func TestBuildConfigRejectsRunnerWorkDirWithoutCommand(t *testing.T) {
 	}
 }
 
+func TestBuildAdapterRegistryRegistersOrchestrator(t *testing.T) {
+	reg := buildAdapterRegistry(config{
+		AgentDefault:   "claude-code",
+		ClaudeCodePath: "claude",
+		CodexPath:      "codex",
+		OpenCodePath:   "opencode",
+		AgentModel:     "sonnet",
+	})
+
+	if _, ok := reg.Get("claude-code"); !ok {
+		t.Fatal("claude-code adapter was not registered")
+	}
+	if _, ok := reg.Get("codex"); !ok {
+		t.Fatal("codex adapter was not registered")
+	}
+	if _, ok := reg.Get("opencode"); !ok {
+		t.Fatal("opencode adapter was not registered")
+	}
+	orchestrator, ok := reg.Get("orchestrator")
+	if !ok {
+		t.Fatal("orchestrator adapter was not registered")
+	}
+	if !orchestrator.Capabilities().SubAgentSpawn {
+		t.Fatal("orchestrator SubAgentSpawn = false, want true")
+	}
+	if got, ok := reg.Default("orchestrator"); !ok || got.Metadata().ID != "orchestrator" {
+		t.Fatalf("orchestrator default = %#v, ok=%v", got, ok)
+	}
+	if got, ok := reg.Default("default"); !ok || got.Metadata().ID != "claude-code" {
+		t.Fatalf("default adapter = %#v, ok=%v", got, ok)
+	}
+}
+
+func TestBuildAdapterRegistrySkipsOrchestratorWithoutClaude(t *testing.T) {
+	reg := buildAdapterRegistry(config{
+		CodexPath:    "codex",
+		OpenCodePath: "opencode",
+	})
+
+	if _, ok := reg.Get("orchestrator"); ok {
+		t.Fatal("orchestrator adapter registered without Claude Code path")
+	}
+}
+
 func TestNewStoreFromConfigUsesMemoryStoreByDefault(t *testing.T) {
 	repository, err := newStoreFromConfig(config{})
 	if err != nil {
@@ -346,8 +390,8 @@ func TestBuildAdapterRegistryAllAdapters(t *testing.T) {
 		OpenCodePath:   "opencode",
 	})
 	adapters := reg.List()
-	if len(adapters) != 3 {
-		t.Fatalf("expected 3 adapters, got %d", len(adapters))
+	if len(adapters) != 4 {
+		t.Fatalf("expected 4 adapters, got %d", len(adapters))
 	}
 }
 

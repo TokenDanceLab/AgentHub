@@ -16,6 +16,7 @@ import (
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/gorilla/websocket"
 )
 
 func newTestHandler() *Handler {
@@ -109,6 +110,85 @@ func TestGetHealth(t *testing.T) {
 	contentType := rec.Header().Get("Content-Type")
 	if !strings.Contains(contentType, "application/json") {
 		t.Errorf("expected JSON content-type, got %q", contentType)
+	}
+}
+
+func TestGetModelCatalogRedactsLocalConfigSecrets(t *testing.T) {
+	tempDir := t.TempDir()
+	codexHome := filepath.Join(tempDir, ".codex")
+	claudeHome := filepath.Join(tempDir, ".claude")
+	ccSwitchHome := filepath.Join(tempDir, ".cc-switch")
+	if err := os.MkdirAll(codexHome, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(claudeHome, "cc-haha"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(ccSwitchHome, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CODEX_HOME", codexHome)
+	t.Setenv("CLAUDE_CONFIG_DIR", claudeHome)
+	t.Setenv("CC_SWITCH_HOME", ccSwitchHome)
+
+	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(`
+model = "gpt-5.5"
+model_provider = "newapi"
+
+[model_providers.newapi]
+name = "TokenDance Gateway"
+base_url = "https://api.vectorcontrol.tech/v1"
+wire_api = "responses"
+api_key = "SHOULD_NOT_LEAK"
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(claudeHome, "settings.json"), []byte(`{
+  "model": "opus[1m]",
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "SHOULD_NOT_LEAK",
+    "ANTHROPIC_BASE_URL": "https://api.vectorcontrol.tech",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-7[1M]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL_NAME": "deepseek-v4-pro",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME": "glm-5.1"
+  }
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(claudeHome, "cc-haha", "providers.json"), []byte(`{
+  "providers": [{
+    "name": "MetAPI / Opus",
+    "baseUrl": "https://api.vectorcontrol.tech/v1",
+    "apiKey": "SHOULD_NOT_LEAK",
+    "models": { "main": "claude-opus-4-6", "opus": "" }
+  }]
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ccSwitchHome, "settings.json"), []byte(`{
+  "currentProviderClaude": "SHOULD_NOT_LEAK"
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	h := newTestHandler()
+	req := httptest.NewRequest(http.MethodGet, "/v1/model-catalog", nil)
+	rec := httptest.NewRecorder()
+
+	h.GetModelCatalog(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, "SHOULD_NOT_LEAK") {
+		t.Fatalf("model catalog leaked secret material: %s", body)
+	}
+	for _, want := range []string{"gpt-5.5", "opus[1m]", "deepseek-v4-pro", "claude-opus-4-6", "cc-switch"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("model catalog missing %q in %s", want, body)
+		}
 	}
 }
 
@@ -278,6 +358,63 @@ func TestProjectThreadRoutes(t *testing.T) {
 	}
 }
 
+func TestThreadUpdateArchiveDeleteRoutes(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	h.ensureDefaults()
+	if _, err := h.Store.CreateThread("thread_manage", "proj_local", "Manage Thread"); err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	if _, err := h.Store.CreateRun("run_manage", "proj_local", "thread_manage"); err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	if _, err := h.Store.CreateThreadMessage("item_manage", "thread_manage", "user", "hello"); err != nil {
+		t.Fatalf("CreateThreadMessage returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPatch, "/v1/threads/thread_manage", strings.NewReader(`{"title":"Renamed","status":"active"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PATCH /v1/threads/thread_manage status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode patch body: %v", err)
+	}
+	if body["title"] != "Renamed" || body["status"] != "active" {
+		t.Fatalf("patch body = %#v, want renamed active thread", body)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/v1/threads/thread_manage:archive", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("POST archive status = %d, want 202 body=%s", rec.Code, rec.Body.String())
+	}
+	thread, ok := h.Store.GetThread("thread_manage")
+	if !ok || thread.Status != "archived" {
+		t.Fatalf("archived thread = %#v ok=%v, want archived", thread, ok)
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/v1/threads/thread_manage", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("DELETE /v1/threads/thread_manage status = %d, want 204 body=%s", rec.Code, rec.Body.String())
+	}
+	if _, ok := h.Store.GetThread("thread_manage"); ok {
+		t.Fatal("thread still exists after delete")
+	}
+	if runs := h.Store.ListRuns("thread_manage"); len(runs) != 0 {
+		t.Fatalf("runs after delete = %#v, want none", runs)
+	}
+	if items := h.Store.ListThreadItems("thread_manage"); len(items) != 0 {
+		t.Fatalf("items after delete = %#v, want none", items)
+	}
+}
+
 func TestHandlerAcceptsInjectedRepository(t *testing.T) {
 	repository := &recordingRepository{Repository: store.New()}
 	h := &Handler{
@@ -339,6 +476,28 @@ func TestPostRuns(t *testing.T) {
 	}
 }
 
+func TestPostRunsAcceptsDesktopModelRoutingMetadata(t *testing.T) {
+	h := newTestHandler()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{
+		"prompt":"route with model metadata",
+		"model":"newapi/deepseek-v4-pro",
+		"provider":"tokendance-gateway",
+		"modelAlias":"sonnet",
+		"modelMappingEnabled":true,
+		"providerFallbackEnabled":true,
+		"reasoningEffort":"high"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestPostRunsBindsProjectAndThread(t *testing.T) {
 	h := newTestHandler()
 	executor := &fakeRunExecutor{}
@@ -382,6 +541,110 @@ func TestPostRunsBindsProjectAndThread(t *testing.T) {
 	}
 }
 
+func TestPostRunsPersistsUserPromptAndUsesThreadSession(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+	if _, err := h.Store.CreateThread("thread_context", "proj_local", "Context Thread"); err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{
+		"projectId":"proj_local",
+		"threadId":"thread_context",
+		"prompt":"remember green-842"
+	}`))
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.contexts) != 1 {
+		t.Fatalf("executor contexts = %d, want 1", len(executor.contexts))
+	}
+	wantSessionID := runtimeSessionIDForThread("thread_context")
+	if executor.contexts[0].SessionID != wantSessionID {
+		t.Fatalf("session id = %q, want %q", executor.contexts[0].SessionID, wantSessionID)
+	}
+	if wantSessionID == "thread_context" || len(wantSessionID) != 36 || strings.Count(wantSessionID, "-") != 4 {
+		t.Fatalf("derived session id = %q, want UUID-shaped runtime id", wantSessionID)
+	}
+
+	items := h.Store.ListThreadItems("thread_context")
+	var userItem *store.Item
+	var runItem *store.Item
+	for i := range items {
+		item := items[i]
+		switch item.Type {
+		case "user_message":
+			userItem = &item
+		case "run":
+			runItem = &item
+		}
+	}
+	if userItem == nil {
+		t.Fatalf("thread items = %#v, want user_message item", items)
+	}
+	if userItem.Role != "user" || userItem.Content != "remember green-842" || userItem.RunID == "" {
+		t.Fatalf("user item = %#v, want persisted prompt bound to run", *userItem)
+	}
+	if runItem == nil || runItem.Status != "queued" {
+		t.Fatalf("thread items = %#v, want queued run item", items)
+	}
+}
+
+func TestPostRunsResumesThreadRuntimeSessionAfterAssistantHistory(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+	if _, err := h.Store.CreateThread("thread_resume", "proj_local", "Resume Thread"); err != nil {
+		t.Fatalf("CreateThread returned error: %v", err)
+	}
+	if _, err := h.Store.CreateRun("run_existing", "proj_local", "thread_resume"); err != nil {
+		t.Fatalf("CreateRun returned error: %v", err)
+	}
+	h.Store.SetRunStatus("run_existing", "finished")
+	if _, err := h.Store.CreateItem(store.Item{
+		ID:        "item_existing_agent",
+		ProjectID: "proj_local",
+		ThreadID:  "thread_resume",
+		RunID:     "run_existing",
+		Type:      "agent_message",
+		Role:      "agent",
+		Status:    "created",
+		Content:   "remembered state",
+	}); err != nil {
+		t.Fatalf("CreateItem returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(`{
+		"projectId":"proj_local",
+		"threadId":"thread_resume",
+		"sessionId":"thread_resume",
+		"prompt":"resume this thread"
+	}`))
+	rec := httptest.NewRecorder()
+
+	h.PostRuns(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(executor.contexts) != 1 {
+		t.Fatalf("executor contexts = %d, want 1", len(executor.contexts))
+	}
+	if !executor.contexts[0].ContinueLast {
+		t.Fatal("ContinueLast = false, want true for thread with prior assistant history")
+	}
+	if got, want := executor.contexts[0].SessionID, runtimeSessionIDForThread("thread_resume"); got != want {
+		t.Fatalf("session id = %q, want %q", got, want)
+	}
+}
+
 func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
 	h := newTestHandler()
 	executor := &fakeRunExecutor{}
@@ -404,6 +667,9 @@ func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
 		"appendSystemPrompt":"Keep output concise.",
 		"allowedTools":["Read","Grep"],
 		"configOverrides":{"reasoning_summary":"auto"},
+		"agentDefinitions":{"reviewer":{"description":"Review code","prompt":"Check correctness","tools":["Read"],"model":"sonnet"}},
+		"mcpConfig":"{\"servers\":{\"filesystem\":{\"command\":\"node\"}}}",
+		"hubTaskId":"task_hub_1",
 		"ephemeral":true
 	}`
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(body))
@@ -438,6 +704,15 @@ func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
 	}
 	if ctx.ConfigOverrides["reasoning_summary"] != "auto" {
 		t.Fatalf("config overrides = %#v", ctx.ConfigOverrides)
+	}
+	if ctx.AgentDefinitions["reviewer"].Prompt != "Check correctness" || ctx.AgentDefinitions["reviewer"].Tools[0] != "Read" {
+		t.Fatalf("agent definitions = %#v", ctx.AgentDefinitions)
+	}
+	if ctx.MCPConfig != `{"servers":{"filesystem":{"command":"node"}}}` {
+		t.Fatalf("mcp config = %#v", ctx.MCPConfig)
+	}
+	if ctx.HubTaskID != "task_hub_1" {
+		t.Fatalf("hub task id = %#v", ctx.HubTaskID)
 	}
 }
 
@@ -1431,6 +1706,39 @@ func TestWebSocketUpgrade(t *testing.T) {
 		// Expected: upgrade fails in test server, handler returns early.
 		// The 200 is because httptest doesn't switch protocols.
 		t.Logf("WS upgrade in test returned %d (expected in httptest)", rec.Code)
+	}
+}
+
+func TestWebSocketRespondsToApplicationPing(t *testing.T) {
+	h := newTestHandler()
+	server := httptest.NewServer(http.HandlerFunc(h.GetEvents))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	header := http.Header{}
+	header.Set("Origin", "http://localhost:5173")
+	conn, resp, err := websocket.DefaultDialer.Dial(wsURL, header)
+	if err != nil {
+		if resp != nil {
+			t.Fatalf("dial failed with status %d: %v", resp.StatusCode, err)
+		}
+		t.Fatalf("dial failed: %v", err)
+	}
+	defer conn.Close()
+
+	if err := conn.WriteJSON(map[string]any{"type": "ping", "ts": float64(123)}); err != nil {
+		t.Fatalf("write ping: %v", err)
+	}
+	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
+	var got map[string]any
+	if err := conn.ReadJSON(&got); err != nil {
+		t.Fatalf("read pong: %v", err)
+	}
+	if got["type"] != "pong" {
+		t.Fatalf("type = %v, want pong; frame=%v", got["type"], got)
+	}
+	if got["ts"] != float64(123) {
+		t.Fatalf("ts = %v, want 123; frame=%v", got["ts"], got)
 	}
 }
 

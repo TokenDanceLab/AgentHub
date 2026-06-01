@@ -107,11 +107,13 @@ func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg Proc
 const defaultRunTimeout = 30 * time.Minute
 
 const (
-	defaultMaxConcurrentRuns = 5
-	defaultReadBufferSize    = 32 * 1024
-	defaultRunOutputMaxBytes = 1 * 1024 * 1024 // 1MB cap on run output before temp log write
-	hubCallbackFinalMaxBytes = 32 * 1024
-	hubCallbackChunkMaxBytes = 16 * 1024
+	defaultMaxConcurrentRuns          = 5
+	defaultReadBufferSize             = 32 * 1024
+	defaultRunOutputMaxBytes          = 1 * 1024 * 1024 // 1MB cap on run output before temp log write
+	hubCallbackFinalMaxBytes          = 32 * 1024
+	hubCallbackChunkMaxBytes          = 16 * 1024
+	persistedAssistantMessageMaxBytes = 200 * 1024
+	persistedFailureMessageMaxBytes   = 8 * 1024
 )
 
 type runOutputLimiter struct {
@@ -316,26 +318,31 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	if adapter != nil {
 		// Adapter mode: BuildCommand provides full command configuration
 		cmdPath, args, env, workDir = adapter.BuildCommand(adapters.RunProcessContext{
-			Run:                runCtx.Run,
-			Prompt:             runCtx.Prompt,
-			AgentID:            runCtx.AgentID,
-			Model:              runCtx.Model,
-			WorkDir:            runCtx.WorkDir,
-			SessionID:          runCtx.SessionID,
-			ContinueLast:       runCtx.ContinueLast,
-			ForkSession:        runCtx.ForkSession,
-			ReasoningEffort:    runCtx.ReasoningEffort,
-			ThinkingMode:       runCtx.ThinkingMode,
-			MaxThinkingTokens:  runCtx.MaxThinkingTokens,
-			PermissionMode:     runCtx.PermissionMode,
-			IncludePartial:     runCtx.IncludePartial,
-			SystemPrompt:       runCtx.SystemPrompt,
-			AppendSystemPrompt: runCtx.AppendSystemPrompt,
-			AllowedTools:       runCtx.AllowedTools,
-			ConfigOverrides:    runCtx.ConfigOverrides,
-			Ephemeral:          runCtx.Ephemeral,
-			AgentName:          runCtx.AgentName,
-			Budget:             runCtx.Budget,
+			Run:                    runCtx.Run,
+			Prompt:                 runCtx.Prompt,
+			AgentID:                runCtx.AgentID,
+			Model:                  runCtx.Model,
+			WorkDir:                runCtx.WorkDir,
+			SessionID:              runCtx.SessionID,
+			ContinueLast:           runCtx.ContinueLast,
+			ForkSession:            runCtx.ForkSession,
+			ReasoningEffort:        runCtx.ReasoningEffort,
+			ThinkingMode:           runCtx.ThinkingMode,
+			MaxThinkingTokens:      runCtx.MaxThinkingTokens,
+			PermissionMode:         runCtx.PermissionMode,
+			IncludePartial:         runCtx.IncludePartial,
+			StructuredOutputSchema: runCtx.StructuredOutputSchema,
+			SystemPrompt:           runCtx.SystemPrompt,
+			AppendSystemPrompt:     runCtx.AppendSystemPrompt,
+			SkillsPrompt:           runCtx.SkillsPrompt,
+			AgentDefinitions:       runCtx.AgentDefinitions,
+			MCPConfig:              runCtx.MCPConfig,
+			AllowedTools:           runCtx.AllowedTools,
+			HubTaskID:              runCtx.HubTaskID,
+			ConfigOverrides:        runCtx.ConfigOverrides,
+			Ephemeral:              runCtx.Ephemeral,
+			AgentName:              runCtx.AgentName,
+			Budget:                 runCtx.Budget,
 		})
 	} else {
 		// Profile mode: use configured command template
@@ -484,7 +491,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		return
 	}
 	if waitErr != nil {
-		e.publishFailed(run, waitErr)
+		e.publishFailed(run, errorWithRunOutput(waitErr, outStore))
 		e.sendSubAgentResult(run.ID, "failed", map[string]any{"error": waitErr.Error()})
 		return
 	}
@@ -579,6 +586,9 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 	if ok {
 		exitCode := ExitCodeFromErr(err)
 		classified := ClassifyError(err, exitCode)
+		if classified != nil {
+			e.persistAgentFailureMessage(failed, classified.Message)
+		}
 		e.bus.Publish("run.failed", runScope(failed), map[string]any{
 			"runId":  failed.ID,
 			"status": failed.Status,
@@ -588,6 +598,67 @@ func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 		e.fireHubFail(failed.ID, classified.Message)
 	}
 	e.checkPersistError(run.ID)
+}
+
+func errorWithRunOutput(err error, outStore *runnerctx.RunOutputStore) error {
+	if err == nil || outStore == nil {
+		return err
+	}
+	output, readErr := outStore.ReadAll()
+	output = strings.TrimSpace(output)
+	if readErr != nil || output == "" {
+		return err
+	}
+	chunks := splitHubCallbackText(output, persistedFailureMessageMaxBytes)
+	if len(chunks) == 0 {
+		return err
+	}
+	message := chunks[0]
+	if len(chunks) > 1 || len(output) > len(message) {
+		message += "\n[output truncated]"
+	}
+	return fmt.Errorf("%w: %s", err, message)
+}
+
+func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content string) {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return
+	}
+	repository, ok := e.store.(interface {
+		store.Reader
+		store.Writer
+	})
+	if !ok {
+		return
+	}
+	for _, item := range repository.ListThreadItems(run.ThreadID) {
+		if item.RunID == run.ID && item.Type == "agent_message" {
+			return
+		}
+	}
+	item, err := repository.CreateItem(store.Item{
+		ID:        transcriptItemID(run.ID),
+		ProjectID: run.ProjectID,
+		ThreadID:  run.ThreadID,
+		RunID:     run.ID,
+		Type:      "agent_message",
+		Role:      "agent",
+		Status:    "failed",
+		Content:   content,
+	})
+	if err != nil {
+		slog.Warn("process: failed to persist run failure message", "runId", run.ID, "err", err)
+		return
+	}
+	scope := map[string]any{
+		"projectId": item.ProjectID,
+		"threadId":  item.ThreadID,
+		"runId":     item.RunID,
+		"itemId":    item.ID,
+	}
+	e.bus.Publish("message.created", scope, item)
+	e.bus.Publish("item.created", scope, item)
 }
 
 func (e *ProcessExecutor) publishCancelled(run store.Run) {
@@ -706,6 +777,10 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		scope,
 	)
 	emitter = newHubCallbackEmitter(e, run.ID, emitter)
+	transcriptEmitter := newThreadTranscriptEmitter(e.store, run, emitter)
+	if transcriptEmitter != nil {
+		emitter = transcriptEmitter
+	}
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
@@ -716,6 +791,9 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	if err := adapter.ParseStream(ctx, stdout, stdin, emitter, run); err != nil {
 		slog.Error("structured output parse error", "runId", run.ID, "err", err)
 		*parseErr = err
+	}
+	if transcriptEmitter != nil {
+		transcriptEmitter.Flush()
 	}
 }
 
@@ -952,6 +1030,76 @@ func (e *hubCallbackEmitter) Emit(eventType string, scope map[string]any, payloa
 			e.executor.recordHubFinalFallback(e.runID, text)
 		}
 	}
+}
+
+type threadTranscriptEmitter struct {
+	writer    store.Writer
+	run       store.Run
+	inner     adapters.EventEmitter
+	collector *hubOutputCollector
+	mu        sync.Mutex
+	persisted bool
+}
+
+func newThreadTranscriptEmitter(repository store.RunLifecycleStore, run store.Run, inner adapters.EventEmitter) *threadTranscriptEmitter {
+	writer, ok := repository.(store.Writer)
+	if !ok || inner == nil {
+		return nil
+	}
+	return &threadTranscriptEmitter{
+		writer:    writer,
+		run:       run,
+		inner:     inner,
+		collector: newHubOutputCollector(persistedAssistantMessageMaxBytes),
+	}
+}
+
+func (e *threadTranscriptEmitter) Emit(eventType string, scope map[string]any, payload any) {
+	e.inner.Emit(eventType, scope, payload)
+	switch eventType {
+	case adapters.BusEventTextDelta, adapters.BusEventTextBlock:
+		if text := extractHubCallbackText(payload); text != "" {
+			e.collector.Append(text)
+		}
+	case adapters.BusEventResult:
+		if text := extractHubCallbackText(payload); text != "" {
+			e.collector.SetFallback(text)
+		}
+	}
+}
+
+func (e *threadTranscriptEmitter) Flush() {
+	e.mu.Lock()
+	if e.persisted {
+		e.mu.Unlock()
+		return
+	}
+	e.persisted = true
+	e.mu.Unlock()
+
+	content := e.collector.Final()
+	if strings.TrimSpace(content) == "" {
+		return
+	}
+	item, err := e.writer.CreateItem(store.Item{
+		ID:        transcriptItemID(e.run.ID),
+		ProjectID: e.run.ProjectID,
+		ThreadID:  e.run.ThreadID,
+		RunID:     e.run.ID,
+		Type:      "agent_message",
+		Role:      "agent",
+		Status:    "created",
+		Content:   content,
+	})
+	if err != nil {
+		slog.Warn("process: failed to persist assistant transcript", "runId", e.run.ID, "err", err)
+		return
+	}
+	_ = item
+}
+
+func transcriptItemID(runID string) string {
+	return fmt.Sprintf("item_%s_agent_%d", strings.TrimPrefix(runID, "run_"), time.Now().UnixNano())
 }
 
 type hubOutputCollector struct {

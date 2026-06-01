@@ -1,8 +1,10 @@
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,8 +14,10 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -155,6 +159,150 @@ func TestProcessExecutorPublishesOutputAndFinished(t *testing.T) {
 		default:
 			t.Fatalf("unexpected event type %q", evt.Type)
 		}
+	}
+}
+
+type recordingLifecycleEmitter struct {
+	events []string
+}
+
+func (e *recordingLifecycleEmitter) Emit(eventType string, _ map[string]any, _ any) {
+	e.events = append(e.events, eventType)
+}
+
+type recordingContextAdapter struct {
+	contexts chan adapters.RunProcessContext
+}
+
+func (a *recordingContextAdapter) Metadata() adapters.AdapterMetadata {
+	return adapters.AdapterMetadata{ID: "recording-agent", Name: "Recording Agent"}
+}
+
+func (a *recordingContextAdapter) Capabilities() adapters.AgentCapabilities {
+	return adapters.AgentCapabilities{Streaming: true, MultiTurn: true}
+}
+
+func (a *recordingContextAdapter) BuildCommand(ctx adapters.RunProcessContext) (string, []string, []string, string) {
+	a.contexts <- ctx
+	return os.Args[0], []string{processExecutorHelperRunFlag, "--", "success"}, append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"), ""
+}
+
+func (a *recordingContextAdapter) ParseStream(ctx context.Context, stdout io.Reader, _ io.Writer, emitter adapters.EventEmitter, run store.Run) error {
+	_, err := io.Copy(io.Discard, stdout)
+	if err != nil {
+		return err
+	}
+	emitter.Emit(adapters.BusEventResult, map[string]any{
+		"projectId": run.ProjectID,
+		"threadId":  run.ThreadID,
+		"runId":     run.ID,
+	}, map[string]any{"success": true})
+	return ctx.Err()
+}
+
+func (a *recordingContextAdapter) NeedsStdin() bool { return false }
+
+func (a *recordingContextAdapter) Available() bool { return true }
+
+func TestThreadTranscriptEmitterPersistsAssistantMessage(t *testing.T) {
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	inner := &recordingLifecycleEmitter{}
+	emitter := newThreadTranscriptEmitter(s, run, inner)
+	if emitter == nil {
+		t.Fatal("newThreadTranscriptEmitter returned nil")
+	}
+
+	emitter.Emit(adapters.BusEventTextDelta, nil, map[string]any{"content": "OK"})
+	emitter.Emit(adapters.BusEventTextBlock, nil, map[string]any{"content": "-OUTPUT"})
+	emitter.Flush()
+	emitter.Flush()
+
+	items := s.ListThreadItems(run.ThreadID)
+	var assistantItems []store.Item
+	for _, item := range items {
+		if item.Type == "agent_message" {
+			assistantItems = append(assistantItems, item)
+		}
+	}
+	if len(assistantItems) != 1 {
+		t.Fatalf("assistant items = %#v, want exactly one persisted assistant message", assistantItems)
+	}
+	if assistantItems[0].Role != "agent" || assistantItems[0].RunID != run.ID || assistantItems[0].Content != "OK-OUTPUT" {
+		t.Fatalf("assistant item = %#v, want persisted agent transcript", assistantItems[0])
+	}
+	if len(inner.events) != 2 {
+		t.Fatalf("inner events = %#v, want passthrough events", inner.events)
+	}
+}
+
+func TestProcessExecutorPassesRuntimeContextToAdapter(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+	adapter := &recordingContextAdapter{contexts: make(chan adapters.RunProcessContext, 1)}
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: "agenthub-adapter-sentinel",
+	}, adapter, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	runCtx := RunProcessContext{
+		Run:                    run,
+		Prompt:                 "coordinate this",
+		AgentID:                "recording-agent",
+		Model:                  "sonnet",
+		SessionID:              "session-1",
+		ContinueLast:           true,
+		ReasoningEffort:        "high",
+		ThinkingMode:           "adaptive",
+		PermissionMode:         "plan",
+		WorkDir:                t.TempDir(),
+		IncludePartial:         true,
+		StructuredOutputSchema: `{"type":"object"}`,
+		SystemPrompt:           "system",
+		AppendSystemPrompt:     "append",
+		SkillsPrompt:           "skills",
+		AgentDefinitions: map[string]runnerctx.AgentDefinition{
+			"reviewer": {Description: "Review", Prompt: "Review code", Tools: []string{"Read"}, Model: "sonnet"},
+		},
+		MCPConfig:       `{"servers":{"fs":{"command":"node"}}}`,
+		AllowedTools:    []string{"Read"},
+		HubTaskID:       "task-1",
+		ConfigOverrides: map[string]string{"reasoning_summary": "auto"},
+		Ephemeral:       true,
+	}
+	if err := executor.Start(run, runCtx); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	var got adapters.RunProcessContext
+	select {
+	case got = <-adapter.contexts:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for adapter BuildCommand context")
+	}
+	for {
+		evt := nextEventWithin(t, ch, 20*time.Second)
+		if evt.Type == "run.finished" {
+			break
+		}
+		if evt.Type == "run.failed" {
+			t.Fatalf("run failed: %#v", evt.Payload)
+		}
+	}
+
+	if got.StructuredOutputSchema != runCtx.StructuredOutputSchema || got.SkillsPrompt != runCtx.SkillsPrompt {
+		t.Fatalf("structured/skills context = %#v", got)
+	}
+	if got.AgentDefinitions["reviewer"].Prompt != "Review code" || got.MCPConfig != runCtx.MCPConfig {
+		t.Fatalf("agent/mcp context = %#v", got)
+	}
+	if got.HubTaskID != "task-1" || got.ConfigOverrides["reasoning_summary"] != "auto" || !got.Ephemeral {
+		t.Fatalf("runtime metadata context = %#v", got)
 	}
 }
 
@@ -517,6 +665,7 @@ func TestProcessExecutorPublishesFailedForNonZeroExit(t *testing.T) {
 		case "run.started":
 			sawStarted = true
 		case "run.output.batch":
+		case "message.created", "item.created":
 		case "run.failed":
 			if !sawStarted {
 				t.Fatal("run.failed arrived before run.started")
@@ -527,6 +676,20 @@ func TestProcessExecutorPublishesFailedForNonZeroExit(t *testing.T) {
 			}
 			if payload["status"] != "failed" || payload["error"] == "" {
 				t.Fatalf("failed payload = %#v, want failed status and error", payload)
+			}
+			items := s.ListThreadItems(run.ThreadID)
+			var failureItem *store.Item
+			for i := range items {
+				if items[i].RunID == run.ID && items[i].Type == "agent_message" {
+					failureItem = &items[i]
+					break
+				}
+			}
+			if failureItem == nil {
+				t.Fatalf("thread items = %#v, want failed agent_message", items)
+			}
+			if failureItem.Status != "failed" || !strings.Contains(failureItem.Content, "failure chunk") {
+				t.Fatalf("failure item = %#v, want stderr-backed failed message", *failureItem)
 			}
 			return
 		default:
@@ -549,7 +712,14 @@ func TestProcessExecutorPublishesFailedWhenCommandCannotStart(t *testing.T) {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
-	evt := nextEvent(t, ch)
+	var evt events.EventEnvelope
+	for {
+		evt = nextEvent(t, ch)
+		if evt.Type == "message.created" || evt.Type == "item.created" {
+			continue
+		}
+		break
+	}
 	if evt.Type != "run.failed" {
 		t.Fatalf("event type = %q, want run.failed", evt.Type)
 	}

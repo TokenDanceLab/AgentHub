@@ -2,6 +2,8 @@ package api
 
 import (
 	"crypto/rand"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +24,7 @@ import (
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/metrics"
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/skills"
@@ -34,12 +37,12 @@ type Handler struct {
 	Registry           *runners.Registry
 	Store              store.Repository
 	Executor           lifecycle.RunExecutor
-	AdapterRegistry    *adapters.Registry     // nil if no agent adapters configured
-	AgentRegistry      *agents.Registry       // runtime agent instance registry
-	MessageQueue       *agents.Queue          // inter-agent message queue
+	AdapterRegistry    *adapters.Registry // nil if no agent adapters configured
+	AgentRegistry      *agents.Registry   // runtime agent instance registry
+	MessageQueue       *agents.Queue      // inter-agent message queue
 	Metrics            *metrics.EdgeMetrics
-	WorkspaceAllowlist []string               // optional absolute/relative roots allowed for request workDir
-	SkillRegistry      *skills.SkillRegistry  // optional SKILL.md registry; nil = no skills injection
+	WorkspaceAllowlist []string              // optional absolute/relative roots allowed for request workDir
+	SkillRegistry      *skills.SkillRegistry // optional SKILL.md registry; nil = no skills injection
 
 	PermissionRegistry *PermissionRegistry
 
@@ -408,6 +411,62 @@ func (h *Handler) GetThread(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusNotFound, errorResponse("not_found", "thread not found"))
 }
 
+func (h *Handler) PatchThread(w http.ResponseWriter, r *http.Request, threadID string) {
+	var req struct {
+		Title  *string `json:"title"`
+		Status *string `json:"status"`
+	}
+	if err := decodeOptionalJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
+		return
+	}
+	if req.Status != nil {
+		normalized := strings.ToLower(strings.TrimSpace(*req.Status))
+		if normalized != "active" && normalized != "archived" {
+			writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "status must be active or archived"))
+			return
+		}
+		req.Status = &normalized
+	}
+	if req.Title != nil {
+		trimmed := strings.TrimSpace(*req.Title)
+		req.Title = &trimmed
+	}
+	thread, ok := ensureStore(h).UpdateThread(threadID, req.Title, req.Status)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "thread not found"))
+		return
+	}
+	h.Bus.Publish("thread.updated", map[string]any{
+		"projectId": thread.ProjectID,
+		"threadId":  thread.ID,
+	}, thread)
+	writeJSON(w, http.StatusOK, thread)
+}
+
+func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request, threadID string) {
+	if ok := ensureStore(h).DeleteThread(threadID); !ok {
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "thread not found"))
+		return
+	}
+	h.Bus.Publish("thread.deleted", map[string]any{"threadId": threadID}, map[string]any{"threadId": threadID})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) ArchiveThread(w http.ResponseWriter, r *http.Request, threadID string) {
+	status := "archived"
+	thread, ok := ensureStore(h).UpdateThread(threadID, nil, &status)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, errorResponse("not_found", "thread not found"))
+		return
+	}
+	h.Bus.Publish("thread.updated", map[string]any{
+		"projectId": thread.ProjectID,
+		"threadId":  thread.ID,
+	}, thread)
+	writeJSON(w, http.StatusAccepted, thread)
+}
+
 func (h *Handler) GetThreadItems(w http.ResponseWriter, r *http.Request, threadID string) {
 	repository := ensureStore(h)
 	if _, ok := repository.GetThread(threadID); !ok {
@@ -512,27 +571,33 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		ProjectID              string            `json:"projectId"`
-		ThreadID               string            `json:"threadId"`
-		Prompt                 string            `json:"prompt"`
-		AgentID                string            `json:"agentId"`
-		Model                  string            `json:"model"`
-		SessionID              string            `json:"sessionId"`
-		Continue               bool              `json:"continue"`
-		Fork                   bool              `json:"fork"`
-		ReasoningEffort        string            `json:"reasoningEffort"`
-		ThinkingMode           string            `json:"thinkingMode"`
-		MaxThinkingTokens      int               `json:"maxThinkingTokens"`
-		PermissionMode         string            `json:"permissionMode"`
-		WorkDir                string            `json:"workDir"`
-		IncludePartial         bool              `json:"includePartial"`
-		StructuredOutputSchema string            `json:"structuredOutputSchema"`
-		SystemPrompt           string            `json:"systemPrompt"`
-		AppendSystemPrompt     string            `json:"appendSystemPrompt"`
-		AllowedTools           []string          `json:"allowedTools"`
-		ConfigOverrides        map[string]string `json:"configOverrides"`
-		Ephemeral              bool              `json:"ephemeral"`
-		HubTaskID              string            `json:"hubTaskId"` // Edge-to-Hub direct callback task ID
+		ProjectID               string                               `json:"projectId"`
+		ThreadID                string                               `json:"threadId"`
+		Prompt                  string                               `json:"prompt"`
+		AgentID                 string                               `json:"agentId"`
+		Model                   string                               `json:"model"`
+		Provider                string                               `json:"provider"`
+		ModelAlias              string                               `json:"modelAlias"`
+		ModelMappingEnabled     bool                                 `json:"modelMappingEnabled"`
+		ProviderFallbackEnabled bool                                 `json:"providerFallbackEnabled"`
+		SessionID               string                               `json:"sessionId"`
+		Continue                bool                                 `json:"continue"`
+		Fork                    bool                                 `json:"fork"`
+		ReasoningEffort         string                               `json:"reasoningEffort"`
+		ThinkingMode            string                               `json:"thinkingMode"`
+		MaxThinkingTokens       int                                  `json:"maxThinkingTokens"`
+		PermissionMode          string                               `json:"permissionMode"`
+		WorkDir                 string                               `json:"workDir"`
+		IncludePartial          bool                                 `json:"includePartial"`
+		StructuredOutputSchema  string                               `json:"structuredOutputSchema"`
+		SystemPrompt            string                               `json:"systemPrompt"`
+		AppendSystemPrompt      string                               `json:"appendSystemPrompt"`
+		AllowedTools            []string                             `json:"allowedTools"`
+		ConfigOverrides         map[string]string                    `json:"configOverrides"`
+		AgentDefinitions        map[string]runnerctx.AgentDefinition `json:"agentDefinitions"`
+		MCPConfig               string                               `json:"mcpConfig"`
+		Ephemeral               bool                                 `json:"ephemeral"`
+		HubTaskID               string                               `json:"hubTaskId"` // Edge-to-Hub direct callback task ID
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorResponse("bad_request", "invalid json body"))
@@ -543,6 +608,9 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.ThreadID == "" {
 		req.ThreadID = "thread_local"
+	}
+	if (req.SessionID == "" || req.SessionID == req.ThreadID) && !req.Ephemeral {
+		req.SessionID = runtimeSessionIDForThread(req.ThreadID)
 	}
 
 	repository := ensureStore(h)
@@ -568,6 +636,9 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		h.runCreateMu.Unlock()
 		writeJSON(w, http.StatusConflict, activeRunExistsResponse(active))
 		return
+	}
+	if !req.Continue && req.SessionID != "" && threadHasAssistantHistory(repository.ListThreadItems(req.ThreadID)) {
+		req.Continue = true
 	}
 
 	// #175: Reject unknown agentId — do not fall back to default adapter.
@@ -598,6 +669,27 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 
 	// Emit run.queued
 	h.Bus.Publish("run.queued", scope, run)
+	if strings.TrimSpace(req.Prompt) != "" {
+		if item, err := ensureStore(h).CreateItem(store.Item{
+			ID:        genID("item_"),
+			ProjectID: run.ProjectID,
+			ThreadID:  run.ThreadID,
+			RunID:     run.ID,
+			Type:      "user_message",
+			Role:      "user",
+			Status:    "created",
+			Content:   req.Prompt,
+		}); err == nil {
+			itemScope := map[string]any{
+				"projectId": item.ProjectID,
+				"threadId":  item.ThreadID,
+				"runId":     item.RunID,
+				"itemId":    item.ID,
+			}
+			h.Bus.Publish("message.created", itemScope, item)
+			h.Bus.Publish("item.created", itemScope, item)
+		}
+	}
 	_, _ = ensureStore(h).CreateItem(store.Item{
 		ID:        genID("item_"),
 		ProjectID: run.ProjectID,
@@ -631,6 +723,8 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			AppendSystemPrompt:     req.AppendSystemPrompt,
 			AllowedTools:           req.AllowedTools,
 			ConfigOverrides:        req.ConfigOverrides,
+			AgentDefinitions:       req.AgentDefinitions,
+			MCPConfig:              req.MCPConfig,
 			Ephemeral:              req.Ephemeral,
 			HubTaskID:              req.HubTaskID,
 		}
@@ -776,12 +870,16 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	heartbeat := time.NewTicker(30 * time.Second)
 	defer heartbeat.Stop()
 
+	clientControl := make(chan map[string]any, 8)
+
 	// Read goroutine to detect close and handle pong timeout.
 	// When the read deadline expires (no pong within 60s), the connection
 	// is closed to force the write loop to exit.
 	done := make(chan struct{})
+	readDone := make(chan struct{})
 	defer close(done)
 	go func() {
+		defer close(readDone)
 		defer conn.Close()
 		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		conn.SetPongHandler(func(string) error {
@@ -794,18 +892,30 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			default:
 			}
-			_, _, err := conn.ReadMessage()
+			_, message, err := conn.ReadMessage()
 			if err != nil {
 				break
 			}
-			// Inbound messages from the client are discarded by design
-			// (the server pushes events; the client only sends close/pong).
+			if response, ok := websocketClientControlResponse(message); ok {
+				select {
+				case clientControl <- response:
+				case <-done:
+					return
+				}
+			}
 		}
 	}()
 
 	// Write loop: push events and heartbeats.
 	for {
 		select {
+		case <-readDone:
+			return
+		case response := <-clientControl:
+			if err := conn.WriteJSON(response); err != nil {
+				slog.Info("websocket control write error", "err", err)
+				return
+			}
 		case evt, ok := <-ch:
 			if !ok {
 				return
@@ -821,6 +931,45 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+func websocketClientControlResponse(message []byte) (map[string]any, bool) {
+	var frame struct {
+		Type string `json:"type"`
+		Ts   any    `json:"ts,omitempty"`
+	}
+	if err := json.Unmarshal(message, &frame); err != nil || frame.Type != "ping" {
+		return nil, false
+	}
+	response := map[string]any{"type": "pong"}
+	if frame.Ts != nil {
+		response["ts"] = frame.Ts
+	}
+	return response, true
+}
+
+func runtimeSessionIDForThread(threadID string) string {
+	seed := sha1.Sum([]byte("agenthub-runtime-session:" + threadID))
+	session := make([]byte, 16)
+	copy(session, seed[:16])
+	session[6] = (session[6] & 0x0f) | 0x50
+	session[8] = (session[8] & 0x3f) | 0x80
+	return strings.Join([]string{
+		hex.EncodeToString(session[0:4]),
+		hex.EncodeToString(session[4:6]),
+		hex.EncodeToString(session[6:8]),
+		hex.EncodeToString(session[8:10]),
+		hex.EncodeToString(session[10:16]),
+	}, "-")
+}
+
+func threadHasAssistantHistory(items []store.Item) bool {
+	for _, item := range items {
+		if item.Type == "agent_message" && (item.Role == "agent" || item.Role == "assistant") && strings.TrimSpace(item.Content) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // ---------------------------------------------------------------------------
@@ -1015,6 +1164,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/health", h.GetHealth)
 	mux.HandleFunc("/v1/runners", h.GetRunners)
 	mux.HandleFunc("/v1/agents", h.GetAgents)
+	mux.HandleFunc("/v1/model-catalog", h.GetModelCatalog)
 	mux.HandleFunc("/v1/projects", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -1053,11 +1203,24 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			h.PostThreadMessage(w, r, threadID)
 			return
 		}
+		if strings.HasSuffix(r.URL.Path, ":archive") && r.Method == http.MethodPost {
+			threadID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/threads/"), ":archive")
+			h.ArchiveThread(w, r, threadID)
+			return
+		}
 		if r.Method == http.MethodGet {
 			h.GetThread(w, r)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
+		threadID := strings.TrimPrefix(r.URL.Path, "/v1/threads/")
+		switch r.Method {
+		case http.MethodPatch:
+			h.PatchThread(w, r, threadID)
+		case http.MethodDelete:
+			h.DeleteThread(w, r, threadID)
+		default:
+			writeJSON(w, http.StatusMethodNotAllowed, errorResponse("method_not_allowed", "method not allowed"))
+		}
 	})
 	mux.HandleFunc("/v1/items/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
