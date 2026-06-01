@@ -55,13 +55,7 @@ import {
   type ReasoningEffortPreference,
   type ResolvedRunModelSettings,
 } from '@/stores/modelSettingsStore';
-import {
-  getSurfaceByDesktopSectionId,
-  getSurfaceStatusMetadata,
-  type SurfaceMetadata,
-} from '@shared/surfaceMetadata';
-import { ActivityCard, EmptyState, StatusNotice } from '@shared/ui';
-import type { AgentInfo, RunInfo, RunnerHealthItem } from '@shared/types';
+import type { AgentInfo, RunInfo } from '@shared/types';
 import styles from './SettingsPage.module.css';
 
 export type SectionId =
@@ -2266,27 +2260,6 @@ function ExecutionTargetCard({
     >
       <span className={styles.targetDescription}>{description}</span>
       <em className={styles.targetMetric}>{metric}</em>
-    </ActivityCard>
-  );
-}
-
-function RunnerRow({ runner }: { runner: RunnerHealthItem }) {
-  return (
-    <ActivityCard
-      className={styles.runnerRow}
-      iconClassName={styles.connectionIcon}
-      labelClassName={styles.settingTitle}
-      contentClassName={styles.settingContent}
-      actionsClassName={styles.settingActions}
-      icon={<Cpu size={17} />}
-      label={runner.name}
-      actions={
-        <span className={`${styles.statusPill} ${runner.status === 'online' ? styles.statusPillOn : ''}`}>
-          {runner.status}
-        </span>
-      }
-    >
-      <span className={styles.settingDescription}>{runner.capabilities?.join(' / ') || runner.id}</span>
     </ActivityCard>
   );
 }

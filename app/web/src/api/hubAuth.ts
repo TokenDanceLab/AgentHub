@@ -189,8 +189,6 @@ async function exchangeCodeForToken(
 // ── Auth factory ──────────────────────────────────
 
 export function createHubAuth(client?: HubClient): HubAuth {
-  const hubClient = client || createHubClient();
-
   const state: HubAuthState = {
     // Access token is loaded from tab-scoped sessionStorage on tryAutoLogin.
     // Legacy localStorage token keys are cleared by the storage layer.
@@ -218,7 +216,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
     return state.token;
   }
 
-  let authClient = createHubClient({ getToken });
+  let authClient = client || createHubClient({ getToken });
 
   async function completeLogin(token: string, refreshToken: string | null, source: 'tokendance' | 'hub', user?: UserProfile) {
     await saveStoredHubRefreshToken(refreshToken);
@@ -278,9 +276,9 @@ export function createHubAuth(client?: HubClient): HubAuth {
           redirect_uri: redirectUri,
         });
       } catch (err) {
-        throw new Error(
+        throw Object.assign(new Error(
           `Failed to start OIDC login: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        );
+        ), { cause: err });
       }
 
       const { state: serverState, authorization_url: authUrl } = authorizeResp;
@@ -351,9 +349,9 @@ export function createHubAuth(client?: HubClient): HubAuth {
           return true;
         } catch (err) {
           leaveCallbackRoute();
-          throw new Error(
+          throw Object.assign(new Error(
             `Token exchange failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
-          );
+          ), { cause: err });
         }
       }
 
