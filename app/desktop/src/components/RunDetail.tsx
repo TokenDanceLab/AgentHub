@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Brain,
@@ -19,6 +19,12 @@ import type { SessionMetrics } from '@shared/context/breakdown';
 import type { PermissionRequestItem } from '@/hooks/useChatMessages';
 import type { RunEvidenceState } from '@/api/runEvidenceQueries';
 import { RunState, RunStateMachine } from '@/utils/runStateMachine';
+import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
+import { createHubClient, type AgentRunEventSummary } from '@/api/hubClient';
+import { getAccessToken } from '@/hooks/useAuth';
+import { getSavedWorkDir } from '@/utils/workspaceStore';
+import { useGitStatus } from '@/hooks/useGitStatus';
+import { useGitDiff } from '@/hooks/useGitDiff';
 import DiffViewer from './DiffViewer';
 import { DiffReviewPanel } from '@shared/ui/DiffReviewPanel';
 import ContextUsage from './ContextUsage';
