@@ -28,13 +28,11 @@ function makeFile(overrides: Partial<FileDiff> = {}): FileDiff {
   };
 }
 
-// Helper: find the file section in the diff panel by file path
+// Helper: find the diff panel section that contains file diffs
 function getDiffPanel(): HTMLElement {
-  // The diff panel is the second child of the root grid
-  const root = document.querySelector('[class*="root"]');
-  const panels = root?.children ?? [];
-  // First child is fileTree, second is diffPanel (or first if no tree on mobile)
-  return (panels[1] ?? panels[0]) as HTMLElement;
+  const panel = document.querySelector('[class*="diffPanel"]');
+  if (!panel) throw new Error('Diff panel not found');
+  return panel as HTMLElement;
 }
 
 describe('DiffViewer', () => {
@@ -160,11 +158,11 @@ describe('DiffViewer', () => {
     expect(onAccept).toHaveBeenCalledWith('src/accept.ts');
   });
 
-  it('does not call onAcceptFile when no handler provided', () => {
+  it('does not render accept button when no handler provided', () => {
     const files = [makeFile({ filePath: 'src/accept.ts' })];
     render(<DiffViewer files={files} />);
     const panel = getDiffPanel();
-    expect(() => fireEvent.click(within(panel).getByLabelText('Accept file'))).not.toThrow();
+    expect(within(panel).queryByLabelText('Accept file')).not.toBeInTheDocument();
   });
 
   // ── Reject callback ────────────────────────────
@@ -178,11 +176,11 @@ describe('DiffViewer', () => {
     expect(onReject).toHaveBeenCalledWith('src/reject.ts');
   });
 
-  it('does not call onRejectFile when no handler provided', () => {
+  it('does not render reject button when no handler provided', () => {
     const files = [makeFile({ filePath: 'src/reject.ts' })];
     render(<DiffViewer files={files} />);
     const panel = getDiffPanel();
-    expect(() => fireEvent.click(within(panel).getByLabelText('Reject file'))).not.toThrow();
+    expect(within(panel).queryByLabelText('Reject file')).not.toBeInTheDocument();
   });
 
   // ── Hunk headers ───────────────────────────────
