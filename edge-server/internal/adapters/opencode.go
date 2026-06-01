@@ -1,4 +1,4 @@
-package adapters
+﻿package adapters
 
 import (
 	"context"
@@ -97,9 +97,9 @@ func (a *OpenCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []string,
 	// to prompt the user. If permission ruleset would trigger permission.asked,
 	// OpenCode blocks forever waiting for a reply that never comes.
 	// --dangerously-skip-permissions makes OpenCode auto-approve everything;
-	// AgentHub's SecurityHook is the real gatekeeper.  We skip when the caller
-	// has NOT requested manual mode (i.e. default or bypassPermissions).
-	if ctx.PermissionMode != "manual" {
+	// AgentHub's SecurityHook is the real gatekeeper. Only skip permissions
+	// when the caller explicitly requests bypassPermissions or yolo mode.
+	if ctx.PermissionMode == "bypassPermissions" || ctx.PermissionMode == "yolo" {
 		args = append(args, "--dangerously-skip-permissions")
 	}
 
