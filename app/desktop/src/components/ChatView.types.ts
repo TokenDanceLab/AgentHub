@@ -126,6 +126,11 @@ export type MessageBlock =
     }
   | {
       kind: 'error';
+      message: string;
+      code?: string;
+      statusCode?: number;
+      category?: 'auth' | 'quota' | 'model' | 'network' | 'server' | 'context_length' | 'tool' | 'unknown';
+      retryable?: boolean;
     }
   | {
       kind: 'citation';
