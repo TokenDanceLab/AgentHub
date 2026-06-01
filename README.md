@@ -8,7 +8,7 @@
 
 [English](README_EN.md) &nbsp;·&nbsp; [产品需求](docs/architecture/product-requirements.md) &nbsp;·&nbsp; [系统架构](docs/architecture/system-architecture.md) &nbsp;·&nbsp; [API 契约](api/) &nbsp;·&nbsp; [官网](https://hub.vectorcontrol.tech)
 
-<img src="https://img.shields.io/badge/状态-P0_完成-blue?style=flat-square" alt="status">
+<img src="https://img.shields.io/badge/状态-P0--P1_完成-blue?style=flat-square" alt="status">
 <img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go" alt="go">
 <img src="https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react" alt="react">
 <img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square" alt="license">
