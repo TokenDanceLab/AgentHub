@@ -33,7 +33,6 @@ pub fn spawn_health_check(app: AppHandle, edge: SharedEdgeManager) {
 
             if health.online != was_online {
                 was_online = health.online;
-                let _ = app.emit("edge-health", &health);
             }
 
             // Always emit periodically to keep UI in sync
