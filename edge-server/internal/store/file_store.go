@@ -266,6 +266,10 @@ func saveFileSnapshot(path string, snapshot fileSnapshot) error {
 	if err := encoder.Encode(snapshot); err != nil {
 		return fmt.Errorf("encode store snapshot: %w", err)
 	}
+	// Close before rename — required on Windows where open handles block os.Rename.
+	if err := temp.Close(); err != nil {
+		return fmt.Errorf("close store snapshot temp: %w", err)
+	}
 	if err := os.Rename(tempPath, path); err != nil {
 		return fmt.Errorf("replace store snapshot: %w", err)
 	}
