@@ -908,19 +908,6 @@ function processEvent(state: State, event: EventEnvelope): State {
       const block = parseContextUsageBlock(event, variant);
       if (block) {
         messages = appendOrUpdateAgentBlock(messages, event, agentName, block);
-<<<<<<< HEAD
-        // Push live token stats to the UI store so StatusBar can display them
-        if (block.total != null) {
-          useRunStore.getState().setTokenStats({
-            inputTokens: block.input ?? 0,
-            outputTokens: block.output ?? 0,
-            totalTokens: block.total,
-            contextLimit: block.contextLimit,
-            usagePercent: block.usagePercent,
-          });
-        }
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       }
       break;
     }
@@ -1262,12 +1249,8 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
           finishedAt: (event.payload.finishedAt as string | undefined) ?? event.sentAt,
         });
         queryClient.invalidateQueries({ queryKey: ['runs'] });
-<<<<<<< HEAD
-        queryClient.invalidateQueries({ queryKey: ['threads'] });
-=======
         const threadId = eventThreadId(event);
         if (threadId) queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       } else if (event.type === 'run.failed') {
         const runId = event.payload.runId as string;
         useRunStore.getState().setRunState(RunState.FAILED);
@@ -1275,12 +1258,8 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
           finishedAt: (event.payload.finishedAt as string | undefined) ?? event.sentAt,
         });
         queryClient.invalidateQueries({ queryKey: ['runs'] });
-<<<<<<< HEAD
-        queryClient.invalidateQueries({ queryKey: ['threads'] });
-=======
         const threadId = eventThreadId(event);
         if (threadId) queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       } else if (event.type === 'run.cancelled') {
         const runId = event.payload.runId as string;
         useRunStore.getState().setRunState(RunState.CANCELLED);
@@ -1288,15 +1267,8 @@ export function useChatMessages(online: boolean, selectedThreadId?: string | nul
           finishedAt: (event.payload.finishedAt as string | undefined) ?? event.sentAt,
         });
         queryClient.invalidateQueries({ queryKey: ['runs'] });
-<<<<<<< HEAD
-        queryClient.invalidateQueries({ queryKey: ['threads'] });
-      } else if (event.type === 'run.agent.permission_requested' || event.type === 'approval.requested') {
-        const runId = event.payload.runId as string | undefined;
-        if (runId) updateRunStatusInQueries(queryClient, runId, 'waiting_approval');
-=======
         const threadId = eventThreadId(event);
         if (threadId) queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
       }
 
       dispatch({ type: 'EVENT_RECEIVED', event });

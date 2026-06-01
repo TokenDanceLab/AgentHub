@@ -1,17 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-<<<<<<< HEAD
-  cancelRun,
-  createThread,
-  decidePermission,
-  fetchArtifacts,
-  fetchHealth,
-  fetchPreviews,
-  fetchRunners,
-  fetchRunDiff,
-  fetchThreadItems,
-  startRun,
-=======
   fetchHealth,
   fetchRunners,
   startRun,
@@ -21,7 +9,6 @@ import {
   deleteThread,
   updateThreadStatus,
   renameThread,
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 } from '../api/edgeClient';
 
 describe('edgeClient', () => {

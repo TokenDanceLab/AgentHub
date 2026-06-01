@@ -3,10 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import HomeDashboard from '@/components/HomeDashboard';
 import * as useHealthModule from '@/hooks/useHealth';
-<<<<<<< HEAD
-=======
 import type { AgentInfo } from '@shared/types';
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -47,21 +44,6 @@ vi.mock('@/api/threadQueries', () => ({
   useThreads: () => mockUseThreads(),
 }));
 
-<<<<<<< HEAD
-vi.mock('@/stores/taskBridgeStore', () => ({
-  useTaskBridgeStore: (selector?: (s: { tasks: Array<{ status: string }> }) => unknown) => {
-    const state = { tasks: [{ status: 'running' }, { status: 'done' }] };
-    return selector ? selector(state) : state;
-  },
-}));
-
-vi.mock('@/stores/hubStore', () => ({
-  useHubStore: (selector?: (s: { authenticated: boolean; username: string | null }) => unknown) => {
-    const state = { authenticated: true, username: 'Ding' };
-    return selector ? selector(state) : state;
-  },
-}));
-=======
 const dashboardProps = () => ({
   onNewThread: vi.fn(),
   onSelectThread: vi.fn(),
@@ -83,7 +65,6 @@ const baseCapabilities: AgentInfo['capabilities'] = {
   permissionHooks: true,
   subAgentSpawn: false,
 };
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 
 describe('HomeDashboard', () => {
   beforeEach(() => {
@@ -115,14 +96,7 @@ describe('HomeDashboard', () => {
     const onOpenApprovals = vi.fn();
     render(
       <HomeDashboard
-<<<<<<< HEAD
-        onNewThread={vi.fn()}
-        onSelectThread={vi.fn()}
-        onQuickStart={vi.fn()}
-        onOpenApprovals={onOpenApprovals}
-=======
         {...dashboardProps()}
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
         permissionCount={3}
       />,
     );
@@ -243,23 +217,6 @@ describe('HomeDashboard', () => {
     const onOpenRuns = vi.fn();
     render(
       <HomeDashboard
-<<<<<<< HEAD
-        onNewThread={vi.fn()}
-        onSelectThread={vi.fn()}
-        onQuickStart={vi.fn()}
-        onOpenRuns={onOpenRuns}
-      />,
-    );
-
-    fireEvent.click(screen.getByText('home.viewAllRuns'));
-    expect(onOpenRuns).toHaveBeenCalledTimes(1);
-  });
-
-  it('renders quick start suggestions', () => {
-    render(
-      <HomeDashboard
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
         {...dashboardProps()}
       />,
     );

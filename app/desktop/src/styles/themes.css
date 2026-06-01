@@ -27,11 +27,7 @@
   --primary: #5d68cc;
   --primary-foreground: #f4f5ff;
   --secondary: rgba(255, 255, 255, 0.055);
-<<<<<<< HEAD
-  --secondary-foreground: #e3e4e6;
-=======
   --secondary-foreground: #d7d9e1;
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   --muted: rgba(255, 255, 255, 0.042);
   --muted-foreground: #a2a6b1;
   --accent: #5d68cc;
@@ -91,11 +87,7 @@
   --hover-overlay: rgba(255, 255, 255, 0.04);
 
   --text-strong: #f0f2f7;
-<<<<<<< HEAD
-  --text-primary: #e3e4e6;
-=======
   --text-primary: #d7d9e1;
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   --text-weaker: #858a96;
   --text-weakest: #656a75;
 

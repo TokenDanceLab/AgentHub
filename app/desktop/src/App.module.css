@@ -218,18 +218,11 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-<<<<<<< HEAD
-  background: rgba(246,246,247,0.68);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 14px;
-=======
   min-height: 0;
   background: rgba(246, 246, 247, 0.82);
   backdrop-filter: blur(26px) saturate(1.08);
   -webkit-backdrop-filter: blur(26px) saturate(1.08);
   border-radius: 12px;
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   overflow: hidden;
   border: 1px solid rgba(15,23,42,0.055);
   position: relative;
@@ -325,26 +318,14 @@
 }
 
 [data-theme='dark'] .sidebar {
-<<<<<<< HEAD
-  background: rgba(35,35,45,0.55);
-  backdrop-filter: blur(40px) saturate(1.2);
-  -webkit-backdrop-filter: blur(40px) saturate(1.2);
-  border-color: rgba(255,255,255,0.06);
-=======
   background: rgba(31, 31, 39, 0.82);
   backdrop-filter: blur(26px) saturate(1.08);
   -webkit-backdrop-filter: blur(26px) saturate(1.08);
   border-color: rgba(0,0,0,0.26);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 /* ── Sidebar sections ──────────────────────── */
 .sidebarSection {
-<<<<<<< HEAD
-  border-bottom: 1px solid rgba(0,0,0,0.04);
-}
-
-=======
   min-height: 0;
   flex: 0 0 auto;
   border-bottom: 1px solid rgba(0,0,0,0.035);
@@ -354,7 +335,6 @@
   border-bottom-color: rgba(255,255,255,0.042);
 }
 
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 .threadSection {
   flex: 1 1 auto;
   display: flex;
@@ -367,11 +347,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-<<<<<<< HEAD
-  padding-bottom: 50px; /* leave space for footer */
-=======
   padding-bottom: 8px;
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 /* ... rest of sidebar sections ... */
@@ -383,13 +359,8 @@
   line-height: 1.5;
   min-height: 1.5em;
   text-transform: uppercase;
-<<<<<<< HEAD
-  letter-spacing: 0.06em;
-  color: #9CA3AF;
-=======
   letter-spacing: 0;
   color: var(--text-weaker);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 .sidebarScroll {
@@ -411,11 +382,6 @@
   display: flex;
   align-items: center;
   gap: 6px;
-<<<<<<< HEAD
-  padding: 7px 12px;
-  border-radius: 8px;
-  background: rgba(0,0,0,0.03);
-=======
   width: calc(100% - 16px);
   padding: 7px 10px;
   border: 1px solid rgba(15,23,42,0.045);
@@ -426,7 +392,6 @@
   font: inherit;
   text-align: left;
   transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 [data-theme='dark'] .sidebarSearch {
@@ -464,13 +429,8 @@
 
 /* ── Nav icons (bottom of sidebar) ─────────── */
 .sidebarFooter {
-<<<<<<< HEAD
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-=======
   position: relative;
   z-index: 5;
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -478,13 +438,9 @@
   gap: 8px;
   padding: 10px 14px;
   border-top: 1px solid rgba(0,0,0,0.04);
-<<<<<<< HEAD
-  background: transparent;
-=======
   background: rgba(246, 246, 247, 0.9);
   backdrop-filter: blur(18px) saturate(1.06);
   -webkit-backdrop-filter: blur(18px) saturate(1.06);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 [data-theme='dark'] .sidebarFooter {
@@ -529,20 +485,13 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-<<<<<<< HEAD
-  background: var(--card);
-=======
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(22px) saturate(1.05);
   -webkit-backdrop-filter: blur(22px) saturate(1.05);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   border-radius: 16px;
   box-shadow: 0 4px 24px -2px rgba(0,0,0,0.03),
               0 2px 8px -1px rgba(0,0,0,0.015);
   overflow: hidden;
-<<<<<<< HEAD
-  border: 1px solid rgba(0,0,0,0.04);
-=======
   border: 1px solid rgba(15,23,42,0.06);
   transition:
     border-color 0.18s ease,
@@ -560,7 +509,6 @@
 
 .workspaceWithRunCard {
   --run-card-space: 258px;
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 .workspaceHeader {
@@ -866,29 +814,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-<<<<<<< HEAD
-  height: 34px;
-  padding: 0 12px;
-  background: transparent;
-=======
   height: 36px;
   padding: 0 10px 0 10px;
   background: rgba(244, 244, 245, 0.72);
   backdrop-filter: blur(24px) saturate(1.12);
   -webkit-backdrop-filter: blur(24px) saturate(1.12);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   flex-shrink: 0;
   font-size: 11px;
   user-select: none;
   cursor: default;
 }
 
-<<<<<<< HEAD
-.topBarLeft, .topBarRight {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-=======
 [data-theme='dark'] .topBar {
   background: rgba(28, 28, 36, 0.88);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.42);
@@ -1110,21 +1046,16 @@
 
 [data-theme='light'] .topMenuItem kbd {
   background: transparent;
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 .statusBadge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-<<<<<<< HEAD
-  color: #8E8E93;
-=======
   min-height: 22px;
   margin-left: 6px;
   padding: 1px 0 3px;
   color: var(--text-weaker);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   font-size: 11px;
   line-height: 1.62;
 }
@@ -1231,11 +1162,6 @@
 }
 
 .authModal {
-<<<<<<< HEAD
-  background: var(--card);
-  border-radius: 16px;
-  box-shadow: 0 16px 48px -8px rgba(0,0,0,0.12);
-=======
   background:
     linear-gradient(180deg, rgba(255,255,255,0.86), rgba(255,255,255,0.68)),
     rgba(248, 249, 252, 0.92);
@@ -1246,20 +1172,10 @@
     inset 0 1px 0 rgba(255,255,255,0.72);
   backdrop-filter: blur(28px) saturate(1.08);
   -webkit-backdrop-filter: blur(28px) saturate(1.08);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   max-height: 90vh;
   overflow-y: auto;
 }
 
-<<<<<<< HEAD
-.startupGate {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-=======
 [data-theme='dark'] .authModal {
   background:
     linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.018)),
@@ -1268,7 +1184,6 @@
   box-shadow:
     0 18px 56px rgba(0,0,0,0.28),
     inset 0 1px 0 rgba(255,255,255,0.045);
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 }
 
 .sidebarBrand {

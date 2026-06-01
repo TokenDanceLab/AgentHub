@@ -1,10 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
-<<<<<<< HEAD
-import { Circle, Wifi, WifiOff, Sun, Moon, UserCircle, Loader2 } from 'lucide-react';
-=======
 import { Circle, Wifi, WifiOff, Sun, Moon, UserCircle } from 'lucide-react';
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import type { HealthResponse } from '@shared/types';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHubStore } from '@/stores/hubStore';
