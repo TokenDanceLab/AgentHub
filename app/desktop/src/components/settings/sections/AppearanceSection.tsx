@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { THEME_PRESETS, THEME_PRESET_META, type ThemePreset } from '@/contexts/ThemeContext';
 import Panel from '../primitives/Panel';
 import SettingRow from '../primitives/SettingRow';
 import SelectControl from '../primitives/SelectControl';
@@ -7,11 +8,15 @@ import Switch from '../primitives/Switch';
 import { writeStoredValue } from '../utils';
 import styles from '../../SettingsPage.module.css';
 
+type ThemeMode = 'dark' | 'light' | 'system';
+
 interface AppearanceSectionProps {
-  themeMode: string;
-  setThemeMode: (mode: string) => void;
+  themeMode: ThemeMode;
+  setThemeMode: (mode: ThemeMode) => void;
   compactMode: boolean;
   setCompactMode: (value: boolean) => void;
+  themePreset: ThemePreset | undefined;
+  setThemePreset: (preset: ThemePreset | undefined) => void;
 }
 
 const LANGUAGE_OPTIONS: Array<[string, string]> = [
@@ -19,7 +24,10 @@ const LANGUAGE_OPTIONS: Array<[string, string]> = [
   ['zh', '中文'],
 ];
 
-export default function AppearanceSection({ themeMode, setThemeMode, compactMode, setCompactMode }: AppearanceSectionProps) {
+export default function AppearanceSection({
+  themeMode, setThemeMode, compactMode, setCompactMode,
+  themePreset, setThemePreset,
+}: AppearanceSectionProps) {
   const { t } = useTranslation();
   const { language, setLanguage } = useLanguage();
   return (
@@ -37,6 +45,48 @@ export default function AppearanceSection({ themeMode, setThemeMode, compactMode
           ))}
         </div>
       </Panel>
+
+      <Panel title={t('settings.themePreset')} description={t('settings.themePresetDesc')}>
+        <div className={styles.presetGrid}>
+          <button
+            type="button"
+            className={`${styles.presetCard} ${themePreset === undefined ? styles.presetCardActive : ''}`}
+            onClick={() => setThemePreset(undefined)}
+          >
+            <div className={styles.presetSwatches}>
+              <span className={styles.presetSwatch} style={{ background: '#5d68cc' }} />
+              <span className={styles.presetSwatch} style={{ background: '#25252d' }} />
+              <span className={styles.presetSwatch} style={{ background: '#d7d9e1' }} />
+            </div>
+            <div className={styles.presetCardLabel}>
+              <strong>AgentHub</strong>
+              <small>{t('settings.themePresetDefault')}</small>
+            </div>
+          </button>
+          {THEME_PRESETS.map((key) => {
+            const meta = THEME_PRESET_META[key];
+            const [accent, surface, muted] = meta.darkPreview;
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`${styles.presetCard} ${themePreset === key ? styles.presetCardActive : ''}`}
+                onClick={() => setThemePreset(key)}
+              >
+                <div className={styles.presetSwatches}>
+                  <span className={styles.presetSwatch} style={{ background: accent }} />
+                  <span className={styles.presetSwatch} style={{ background: surface }} />
+                  <span className={styles.presetSwatch} style={{ background: muted }} />
+                </div>
+                <div className={styles.presetCardLabel}>
+                  <strong>{meta.label}</strong>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Panel>
+
       <Panel title={t('settings.language')} description={t('settings.languageDesc')}>
         <SettingRow
           title={t('settings.language')}

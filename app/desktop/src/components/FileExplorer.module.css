@@ -185,7 +185,7 @@
 
 .menuItem:hover {
   background: var(--color-active, #094771);
-  color: #fff;
+  color: var(--primary-foreground);
 }
 
 .menuItemDanger {
@@ -195,7 +195,7 @@
 
 .menuItemDanger:hover {
   background: var(--color-danger, #e53e3e);
-  color: #fff;
+  color: var(--destructive-foreground);
 }
 
 .menuDivider {
