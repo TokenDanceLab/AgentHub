@@ -128,8 +128,7 @@ func TestProcessExecutorPublishesOutputAndFinished(t *testing.T) {
 				if !ok || len(chunks) == 0 {
 					t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
 				}
-				text, _ := chunks[0]["text"].(string)
-				stdoutText += text
+				stdoutText += outputChunksText(chunks)
 			}
 		case "run.finished":
 			if !seenOutput["stdout"] || !seenOutput["stderr"] {
@@ -204,8 +203,7 @@ func TestProcessExecutorRunsCommandWithInjectedContext(t *testing.T) {
 				t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
 			}
 			sawStdoutBatch = true
-			text, _ := chunks[0]["text"].(string)
-			stdoutText += text
+			stdoutText += outputChunksText(chunks)
 		case "run.finished":
 			if !sawStarted {
 				t.Fatal("run.finished arrived before run.started")
@@ -273,8 +271,7 @@ func TestProcessExecutorRunsCommandInConfiguredWorkDir(t *testing.T) {
 			if !ok || len(chunks) == 0 {
 				t.Fatalf("output chunks = %#v, want non-empty []map[string]any", payload["chunks"])
 			}
-			text, _ := chunks[0]["text"].(string)
-			stdoutText += text
+			stdoutText += outputChunksText(chunks)
 		case "run.finished":
 			want := "cwd=" + filepath.Clean(workDir)
 			if !strings.Contains(stdoutText, want) {
@@ -670,6 +667,16 @@ func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleS
 	return executor
 }
 
+func outputChunksText(chunks []map[string]any) string {
+	var text strings.Builder
+	for _, chunk := range chunks {
+		if value, ok := chunk["text"].(string); ok {
+			text.WriteString(value)
+		}
+	}
+	return text.String()
+}
+
 func TestProcessExecutorHelperRunsFromModeArgument(t *testing.T) {
 	cmd := exec.Command(os.Args[0], processExecutorHelperRunFlag, "--", "success")
 	cmd.Env = withoutEnvKey(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER")
@@ -716,10 +723,13 @@ func TestProcessExecutorHelper(t *testing.T) {
 	}
 	switch mode {
 	case "success":
-		fmt.Fprint(os.Stdout, "stdout chunk\n")
-		fmt.Fprintf(os.Stdout, "run=%s\n", os.Getenv("AGENTHUB_RUN_ID"))
-		fmt.Fprintf(os.Stdout, "project=%s\n", os.Getenv("AGENTHUB_PROJECT_ID"))
-		fmt.Fprintf(os.Stdout, "thread=%s\n", os.Getenv("AGENTHUB_THREAD_ID"))
+		fmt.Fprintf(
+			os.Stdout,
+			"stdout chunk\nrun=%s\nproject=%s\nthread=%s\n",
+			os.Getenv("AGENTHUB_RUN_ID"),
+			os.Getenv("AGENTHUB_PROJECT_ID"),
+			os.Getenv("AGENTHUB_THREAD_ID"),
+		)
 		fmt.Fprint(os.Stderr, "stderr chunk\n")
 	case "fail":
 		fmt.Fprint(os.Stderr, "failure chunk\n")
@@ -736,9 +746,13 @@ func TestProcessExecutorHelper(t *testing.T) {
 	case "args":
 		fmt.Fprintf(os.Stdout, "args=%s\n", strings.Join(os.Args, "\n"))
 	case "env":
-		fmt.Fprintf(os.Stdout, "profileRun=%s\n", os.Getenv("PROFILE_RUN"))
-		fmt.Fprintf(os.Stdout, "profileProject=%s\n", os.Getenv("PROFILE_PROJECT"))
-		fmt.Fprintf(os.Stdout, "profileThread=%s\n", os.Getenv("PROFILE_THREAD"))
+		fmt.Fprintf(
+			os.Stdout,
+			"profileRun=%s\nprofileProject=%s\nprofileThread=%s\n",
+			os.Getenv("PROFILE_RUN"),
+			os.Getenv("PROFILE_PROJECT"),
+			os.Getenv("PROFILE_THREAD"),
+		)
 	case "inherited-env":
 		fmt.Fprintf(os.Stdout, "inherited=%s\n", os.Getenv("AGENTHUB_INHERITED_ENV_FOR_TEST"))
 	case "sanitized-env":

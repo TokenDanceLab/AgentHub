@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { GitBranch } from 'lucide-react';
 import Panel from '../primitives/Panel';
 import SettingRow from '../primitives/SettingRow';
 import Switch from '../primitives/Switch';

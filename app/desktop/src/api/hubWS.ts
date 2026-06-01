@@ -175,10 +175,12 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
     },
 
     on(type: HubEventType, handler: (payload: unknown) => void): () => void {
-      if (!typedHandlers.has(type)) {
-        typedHandlers.set(type, new Set());
+      let handlers = typedHandlers.get(type);
+      if (!handlers) {
+        handlers = new Set();
+        typedHandlers.set(type, handlers);
       }
-      typedHandlers.get(type)!.add(handler);
+      handlers.add(handler);
       return () => {
         typedHandlers.get(type)?.delete(handler);
       };

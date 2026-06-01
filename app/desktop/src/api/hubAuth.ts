@@ -64,10 +64,16 @@ function generateCodeVerifier(): string {
 
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]!);
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
   }
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function withCause(message: string, cause: unknown): Error {
+  const error = new Error(message) as Error & { cause?: unknown };
+  error.cause = cause;
+  return error;
 }
 
 async function computeCodeChallenge(verifier: string): Promise<string> {
@@ -235,8 +241,6 @@ async function exchangeCodeForToken(
 // ── Auth factory ──────────────────────────────────
 
 export function createHubAuth(client?: HubClient): HubAuth {
-  const hubClient = client || createHubClient();
-
   const state: HubAuthState = {
     // Access token loaded from secure store on tryAutoLogin.
     // Legacy localStorage read is handled via loadStoredHubAccessToken fallback.
@@ -264,7 +268,10 @@ export function createHubAuth(client?: HubClient): HubAuth {
     return state.token;
   }
 
-  let authClient = createHubClient({ getToken });
+  const createAuthClient = () => client ?? createHubClient({ getToken });
+  const createPublicClient = () => client ?? createHubClient();
+
+  let authClient = createAuthClient();
 
   async function completeLogin(token: string, refreshToken: string | null, source: 'tokendance' | 'hub', user?: UserProfile) {
     await saveStoredHubRefreshToken(refreshToken);
@@ -276,7 +283,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       localStorage.setItem(TOKEN_SOURCE_KEY, source);
     }
 
-    authClient = createHubClient({ getToken });
+    authClient = createAuthClient();
     // If user profile is already available (from OIDC callback), use it directly
     if (user) {
       state.user = user;
@@ -333,7 +340,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       // 2. Call Hub to bind PKCE/state/device and get the authorization URL.
       // For Tauri, the local loopback callback is sent before Hub creates the
       // state so Hub and TokenDance ID use the same redirect_uri end to end.
-      const authClient = createHubClient();
+      const authClient = createPublicClient();
 
       let authorizeResp: { state: string; authorization_url: string };
       try {
@@ -354,8 +361,9 @@ export function createHubAuth(client?: HubClient): HubAuth {
         }
         authorizeResp = await authClient.oidcAuthorize(authorizeBody);
       } catch (err) {
-        throw new Error(
+        throw withCause(
           `Failed to start OIDC login: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          err,
         );
       }
 
@@ -380,12 +388,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       }
 
       // 6. Wait for the callback to arrive
-      let callback: CallbackResult;
-      try {
-        callback = await callbackResult;
-      } catch (err) {
-        throw err;
-      }
+      const callback = await callbackResult;
 
       // Validate state matches (CSRF protection)
       if (callback.state !== serverState) {
@@ -397,8 +400,9 @@ export function createHubAuth(client?: HubClient): HubAuth {
       try {
         tokenResp = await exchangeCodeForToken(callback.code, callback.state, codeVerifier, redirectUri, deviceId);
       } catch (err) {
-        throw new Error(
+        throw withCause(
           `Token exchange failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          err,
         );
       }
 
@@ -442,7 +446,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
         }
       }
       if (!state.token) return false;
-      authClient = createHubClient({ getToken });
+      authClient = createAuthClient();
       try {
         state.user = await authClient.me();
         state.isAuthenticated = true;
@@ -453,13 +457,13 @@ export function createHubAuth(client?: HubClient): HubAuth {
         const refreshToken = state.refreshToken ?? (await loadStoredHubRefreshToken());
         if (refreshToken) {
           try {
-            const refreshClient = createHubClient();
+            const refreshClient = createPublicClient();
             const res = await refreshClient.refresh(refreshToken);
             state.token = res.access_token;
             state.refreshToken = res.refresh_token;
             await saveStoredHubAccessToken(res.access_token);
             await saveStoredHubRefreshToken(res.refresh_token);
-            authClient = createHubClient({ getToken });
+            authClient = createAuthClient();
             state.user = await authClient.me();
             state.isAuthenticated = true;
             useHubStore.getState().setAuthenticated(true, state.user?.id, state.user?.username);

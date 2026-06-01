@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createEventStream, EventHandler } from '../api/eventClient';
+import { createEventStream } from '../api/eventClient';
 
 // Track WebSocket instances created by the stream
 const instances: MockWebSocket[] = [];
