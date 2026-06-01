@@ -110,10 +110,17 @@ export type MessageBlock =
   | {
       kind: 'deploy_card';
       deployId?: string;
+      status?: string;
+      statusMessage?: string;
+      url?: string;
     }
   | {
       kind: 'link_card';
       url: string;
+      title?: string;
+      siteName?: string;
+      description?: string;
+      thumbnailUrl?: string;
     }
   | {
       kind: 'error';
