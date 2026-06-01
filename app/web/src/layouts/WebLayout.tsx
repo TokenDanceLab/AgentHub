@@ -846,38 +846,7 @@ export default function WebLayout() {
                       <button
                         className={styles.recoveryRetryBtn}
                         type="button"
-                        onClick={() => {
-                          const taskId = optimisticRun?.runId;
-                          if (!taskId) return;
-                          setRecoveryState('recovering');
-                          setRecoveryError(null);
-
-                          const BASE_DELAY_MS = 1000;
-                          const MAX_DELAY_MS = 30000;
-                          const MAX_RETRIES = 3;
-
-                          void (async () => {
-                            for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-                              try {
-                                const recovered = await hubClient.listTaskRunEvents(taskId);
-                                setTaskRunEvents((current) => mergeAgentRunEvents(current, recovered));
-                                setRecoveryState('idle');
-                                setRecoveryError(null);
-                                return;
-                              } catch (err) {
-                                if (attempt >= MAX_RETRIES) {
-                                  setRecoveryError(err instanceof Error ? err.message : 'Recovery failed');
-                                  setRecoveryState('failed');
-                                  return;
-                                }
-                                const rawDelay = Math.min(BASE_DELAY_MS * Math.pow(2, attempt), MAX_DELAY_MS);
-                                const jitter = rawDelay * 0.2 * (Math.random() * 2 - 1);
-                                const delay = Math.round(Math.max(0, rawDelay + jitter));
-                                await new Promise<void>((resolve) => setTimeout(resolve, delay));
-                              }
-                            }
-                          })();
-                        }}
+                        onClick={retryRecovery}
                       >
                         {t('chat.action.retry')}
                       </button>
