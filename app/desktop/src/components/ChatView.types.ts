@@ -105,6 +105,8 @@ export type MessageBlock =
     }
   | {
       kind: 'tool_group';
+      /** The consecutive tool_use blocks in this group */
+      blocks: Extract<MessageBlock, { kind: 'tool_use' }>[];
       totalCount: number;
     }
   | {
