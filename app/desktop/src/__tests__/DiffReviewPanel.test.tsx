@@ -77,8 +77,8 @@ describe('DiffReviewPanel', () => {
     const files = [makeFile()];
     render(<DiffReviewPanel files={files} />);
 
-    const acceptAllBtn = screen.getByRole('button', { name: 'Accept all' });
-    const rejectAllBtn = screen.getByRole('button', { name: 'Reject all' });
+    const acceptAllBtn = screen.getByRole('button', { name: 'Accept All' });
+    const rejectAllBtn = screen.getByRole('button', { name: 'Reject All' });
 
     expect(acceptAllBtn).toBeInTheDocument();
     expect(rejectAllBtn).toBeInTheDocument();
@@ -90,7 +90,7 @@ describe('DiffReviewPanel', () => {
     const files = [makeFile()];
     render(<DiffReviewPanel files={files} onAcceptAll={onAcceptAll} />);
 
-    const acceptAllBtn = screen.getByRole('button', { name: 'Accept all' });
+    const acceptAllBtn = screen.getByRole('button', { name: 'Accept All' });
     fireEvent.click(acceptAllBtn);
 
     expect(onAcceptAll).toHaveBeenCalledTimes(1);
@@ -102,7 +102,7 @@ describe('DiffReviewPanel', () => {
     const files = [makeFile()];
     render(<DiffReviewPanel files={files} onRejectAll={onRejectAll} />);
 
-    const rejectAllBtn = screen.getByRole('button', { name: 'Reject all' });
+    const rejectAllBtn = screen.getByRole('button', { name: 'Reject All' });
     fireEvent.click(rejectAllBtn);
 
     expect(onRejectAll).toHaveBeenCalledTimes(1);
