@@ -35,9 +35,9 @@
   color: var(--color-text-secondary, #9ca3af);
 }
 
-.sectionIconPending { color: #f59e0b; }
-.sectionIconDone { color: #10b981; }
-.sectionIconConflict { color: #ef4444; }
+.sectionIconPending { color: var(--warning); }
+.sectionIconDone { color: var(--success); }
+.sectionIconConflict { color: var(--destructive); }
 
 /* Approval cards */
 .approvalCard {
@@ -116,14 +116,14 @@
 
 .approveBtn {
   background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
+  color: var(--success);
 }
 
 .approveBtn:hover:not(:disabled) { background: rgba(16, 185, 129, 0.25); }
 
 .denyBtn {
   background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: var(--destructive);
 }
 
 .denyBtn:hover:not(:disabled) { background: rgba(239, 68, 68, 0.25); }
@@ -153,8 +153,8 @@
   text-transform: capitalize;
 }
 
-.approvedIcon { color: #10b981; }
-.deniedIcon { color: #ef4444; }
+.approvedIcon { color: var(--success); }
+.deniedIcon { color: var(--destructive); }
 
 .decidedTool {
   color: var(--color-text-secondary, #9ca3af);
@@ -185,7 +185,7 @@
 }
 
 .conflictIcon {
-  color: #ef4444;
+  color: var(--destructive);
   flex-shrink: 0;
 }
 
@@ -204,7 +204,7 @@
   padding: 1px 6px;
   border-radius: 4px;
   background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
+  color: var(--success);
 }
 
 .pendingBadge {
@@ -212,7 +212,7 @@
   padding: 1px 6px;
   border-radius: 4px;
   background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: var(--destructive);
 }
 
 .conflictTasks {
@@ -245,7 +245,7 @@
   font-size: 12px;
   font-weight: 500;
   background: var(--color-primary, #6366f1);
-  color: #fff;
+  color: var(--primary-foreground);
   cursor: pointer;
 }
 
