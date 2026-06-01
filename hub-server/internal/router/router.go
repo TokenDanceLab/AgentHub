@@ -160,6 +160,14 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, jwtSecret string, cacheClien
 		edge.POST("/agent-tasks/:id/fail", agentHandler.TaskFail)
 	}
 
+	// Cloud Edge registration (authenticated, no device type restriction)
+	cloud := r.Group("/cloud")
+	cloud.Use(middleware.AuthMiddleware(cfg))
+	cloud.Use(middleware.RequireHubSession())
+	{
+		cloud.POST("/edge/register", deviceHandler.CloudEdgeRegister)
+	}
+
 	web := r.Group("/web")
 	web.Use(middleware.AuthMiddleware(cfg))
 	web.Use(middleware.RequireHubSession())

@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/model"
 )
 
@@ -18,10 +19,18 @@ type DeviceService interface {
 
 type DeviceHandler struct {
 	deviceService DeviceService
+	jwtSecret     string
+	jwtTTL        time.Duration
 }
 
 func NewDeviceHandler(deviceService DeviceService) *DeviceHandler {
 	return &DeviceHandler{deviceService: deviceService}
+}
+
+// SetJWTConfig injects the JWT secret and TTL for cloud edge registration.
+func (h *DeviceHandler) SetJWTConfig(secret string, ttl time.Duration) {
+	h.jwtSecret = secret
+	h.jwtTTL = ttl
 }
 
 type registerDeviceReq struct {
@@ -114,4 +123,80 @@ func newDeviceResponse(device *model.Device) deviceResponse {
 		LastActiveAt: device.LastActiveAt,
 		CreatedAt:    device.CreatedAt,
 	}
+}
+
+// cloudEdgeRegisterReq is the request body for POST /cloud/edge/register.
+type cloudEdgeRegisterReq struct {
+	DeviceID     string   `json:"device_id" binding:"required"`
+	Name         string   `json:"name"`
+	Host         string   `json:"host"`
+	Port         int      `json:"port"`
+	AppVersion   string   `json:"app_version"`
+	Capabilities []string `json:"capabilities"`
+}
+
+// cloudEdgeRegisterResp is the response for POST /cloud/edge/register.
+type cloudEdgeRegisterResp struct {
+	DeviceID   string `json:"device_id"`
+	DeviceType string `json:"device_type"`
+	JWT        string `json:"jwt"`
+}
+
+// CloudEdgeRegister handles POST /cloud/edge/register.
+// It registers a cloud-hosted Edge server and issues a JWT for the cloud edge to
+// authenticate its WebSocket connection.
+func (h *DeviceHandler) CloudEdgeRegister(c *gin.Context) {
+	if h.jwtSecret == "" {
+		Fail(c, errcode.ErrInternal.WithMessage("JWT secret not configured for cloud edge registration"))
+		return
+	}
+
+	var req cloudEdgeRegisterReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+
+	deviceID, ok := normalizeUUID(req.DeviceID)
+	if !ok {
+		FailWithMessage(c, errcode.ErrBadRequest, "device_id must be a UUID")
+		return
+	}
+
+	userID := c.GetString("user_id")
+	jwtDeviceID := c.GetString("device_id")
+
+	// Cross-validate JWT device_id against registration request.
+	if jwtDeviceID != "" && jwtDeviceID != deviceID {
+		FailWithMessage(c, errcode.ErrBadRequest, "device_id does not match JWT claims")
+		return
+	}
+
+	// Register the cloud edge as a desktop-type device (cloud edge connects via WS like desktop).
+	device, err := h.deviceService.Register(deviceID, userID, "cloud_edge", req.AppVersion, req.Capabilities)
+	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+
+	// Issue a JWT for the cloud edge to authenticate its WebSocket connection.
+	ttl := h.jwtTTL
+	if ttl == 0 {
+		ttl = 24 * time.Hour
+	}
+	cloudJWT, err := jwtutil.GenerateAccessToken(userID, "cloud_edge", device.ID, h.jwtSecret, ttl)
+	if err != nil {
+		Fail(c, errcode.ErrInternal.WithMessage("failed to generate cloud edge JWT"))
+		return
+	}
+
+	OK(c, cloudEdgeRegisterResp{
+		DeviceID:   device.ID,
+		DeviceType: "cloud_edge",
+		JWT:        cloudJWT,
+	})
 }

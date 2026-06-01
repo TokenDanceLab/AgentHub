@@ -194,6 +194,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Execution Target service
 	targetSvc := service.NewExecutionTargetService(a.DB)
+	targetSvc.SetCache(a.CacheClient)
 	a.ExecutionTargetHandler = handler.NewExecutionTargetHandler(targetSvc)
 
 	// Audit service
@@ -223,6 +224,7 @@ func (a *App) Run(ctx context.Context) error {
 	// Relay service
 	a.RelayService = service.NewRelayService(a.CacheClient, a.mgr)
 	a.RelayHandler = handler.NewRelayHandler(a.RelayService)
+	a.AgentService.SetRelayService(a.RelayService)
 
 	// OIDC Service (optional — only when TokenDance ID client is configured)
 	if a.Config.TokenDanceID.ClientID != "" {
@@ -233,6 +235,7 @@ func (a *App) Run(ctx context.Context) error {
 	// Handler layer
 	a.AuthHandler = handler.NewAuthHandler(a.AuthService)
 	a.DeviceHandler = handler.NewDeviceHandler(a.DeviceService)
+	a.DeviceHandler.SetJWTConfig(a.Config.JWT.Secret, a.Config.JWT.AccessTTL)
 	a.ContactHandler = handler.NewContactHandler(a.ContactService)
 	a.SessionHandler = handler.NewSessionHandler(a.SessionService)
 	a.MessageHandler = handler.NewMessageHandler(a.MessageService)
