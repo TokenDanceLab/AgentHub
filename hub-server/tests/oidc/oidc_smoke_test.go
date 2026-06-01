@@ -19,6 +19,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// ptrStr returns a pointer to the given string.
+func ptrStr(s string) *string { return &s }
+
 // ── Mock OIDC Service ────────────────────────────────────────────────────────
 
 type mockOIDCService struct {
@@ -93,7 +96,7 @@ func TestOIDCSmoke(t *testing.T) {
 		user: &model.User{
 			Username:     "test-user",
 			Nickname:     "Test User",
-			PasswordHash: "hashed",
+			PasswordHash: ptrStr("hashed"),
 		},
 	}
 	// Set user ID manually (normally set by GORM)

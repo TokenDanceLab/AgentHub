@@ -1050,6 +1050,82 @@ export function createHubClient(opts: HubClientOptions = {}) {
 
     pingExecutionTarget: (id: string) =>
       request<undefined>(`/web/execution-targets/${encodeURIComponent(id)}/ping`, { method: 'POST' }),
+
+    // ── Agent teams / TeamRun console ────────────────
+
+    /** List all agent teams for the current user. */
+    listAgentTeams: () =>
+      request<AgentTeam[]>('/web/agent-teams'),
+
+    /** Get a single agent team (with members). */
+    getAgentTeam: (teamId: string) =>
+      request<AgentTeamDetail>(`/web/agent-teams/${encodeURIComponent(teamId)}`),
+
+    /** Create an agent team. */
+    createAgentTeam: (data: CreateAgentTeamRequest) =>
+      request<AgentTeam>('/web/agent-teams', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    /** Update an agent team. */
+    updateAgentTeam: (teamId: string, data: UpdateAgentTeamRequest) =>
+      request<AgentTeam>(`/web/agent-teams/${encodeURIComponent(teamId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    /** Delete an agent team. */
+    deleteAgentTeam: (teamId: string) =>
+      request<undefined>(`/web/agent-teams/${encodeURIComponent(teamId)}`, { method: 'DELETE' }),
+
+    /** Add a member (agent profile) to a team. */
+    addAgentTeamMember: (teamId: string, data: AddAgentTeamMemberRequest) =>
+      request<undefined>(`/web/agent-teams/${encodeURIComponent(teamId)}/members`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    /** List all runs for a team. */
+    listTeamRuns: (teamId: string) =>
+      request<AgentTeamRun[]>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs`),
+
+    /** Start a new team run. */
+    startTeamRun: (teamId: string, data: StartAgentTeamRunRequest) =>
+      request<AgentTeamRun>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    /** Get a single team run. */
+    getTeamRun: (teamId: string, runId: string) =>
+      request<AgentTeamRun>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}`),
+
+    /** Get comprehensive run state (members, tasks, approvals, conflicts, etc.). */
+    getTeamRunState: (teamId: string, runId: string) =>
+      request<TeamRunState>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/state`),
+
+    /** List tasks for a team run. */
+    listTeamTasks: (teamId: string, runId: string) =>
+      request<AgentTeamTask[]>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/tasks`),
+
+    /** List events for a team run. */
+    listTeamEvents: (teamId: string, runId: string) =>
+      request<AgentTeamEvent[]>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/events`),
+
+    /** Decide on a pending approval. */
+    decideTeamApproval: (teamId: string, runId: string, approvalId: string, decision: TeamApprovalDecisionRequest) =>
+      request<undefined>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}/decide`, {
+        method: 'POST',
+        body: JSON.stringify(decision),
+      }),
+
+    /** Resolve a file conflict. */
+    resolveTeamConflict: (teamId: string, runId: string, conflictId: string, resolution: TeamConflictResolutionRequest) =>
+      request<undefined>(`/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/conflicts/${encodeURIComponent(conflictId)}/resolve`, {
+        method: 'POST',
+        body: JSON.stringify(resolution),
+      }),
   };
 }
 

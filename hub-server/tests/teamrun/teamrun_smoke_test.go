@@ -30,6 +30,8 @@ type apiResp struct {
 	Data    json.RawMessage `json:"data"`
 }
 
+func ptrStr(s string) *string { return &s }
+
 func assertCode(t *testing.T, r apiResp, want, context string) {
 	t.Helper()
 	if r.Code != want {
@@ -285,7 +287,7 @@ func teamTestFixtures(t *testing.T, db *gorm.DB) (string, string, string) {
 
 	user := &model.User{
 		Username:     "smoke_test_user",
-		PasswordHash: "hashed",
+		PasswordHash: ptrStr("hashed"),
 		Nickname:     "Smoke Tester",
 	}
 	require.NoError(t, db.Create(user).Error, "create user")
