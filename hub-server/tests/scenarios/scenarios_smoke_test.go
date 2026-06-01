@@ -1,4 +1,4 @@
-package tests
+package scenarios
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/pkg/uuidv7"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,26 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
+
+// apiResp mirrors the Hub server's JSON response envelope.
+type apiResp struct {
+	Code    string          `json:"code"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data"`
+}
+
+// stringPtr returns a pointer to the given string.
+func stringPtr(s string) *string {
+	return &s
+}
+
+// mustUUID generates a UUIDv7 string for test use, failing the test on error.
+func mustUUID(t *testing.T) string {
+	t.Helper()
+	id, err := uuidv7.New()
+	require.NoError(t, err)
+	return id
+}
 
 // scenarioTestDB returns an in-memory SQLite database with the minimum tables
 // needed for execution target dispatch tests.
@@ -35,6 +56,8 @@ func scenarioTestDB(t *testing.T) *gorm.DB {
 			password_hash TEXT,
 			nickname TEXT NOT NULL DEFAULT '',
 			avatar_url TEXT DEFAULT '',
+			tokendance_sub TEXT DEFAULT NULL,
+			tokendance_sub_linked_at DATETIME DEFAULT NULL,
 			created_at DATETIME,
 			updated_at DATETIME
 		)`,
@@ -73,7 +96,10 @@ func scenarioTestDB(t *testing.T) *gorm.DB {
 			type TEXT NOT NULL DEFAULT '',
 			owner_user_id TEXT,
 			name TEXT DEFAULT '',
+			avatar_url TEXT DEFAULT '',
+			announcement TEXT DEFAULT '',
 			next_seq INTEGER NOT NULL DEFAULT 0,
+			last_message_at DATETIME,
 			dissolved INTEGER NOT NULL DEFAULT 0,
 			created_at DATETIME
 		)`,
@@ -148,26 +174,25 @@ func scenarioTestDB(t *testing.T) *gorm.DB {
 func scenarioTestFixtures(t *testing.T, db *gorm.DB) (userID, deviceID, sessionID string) {
 	t.Helper()
 
-	pw := stringPtr("hashed")
 	user := &model.User{
 		Username:     "scenario_user",
-		PasswordHash: pw,
+		PasswordHash: stringPtr("hashed"),
 		Nickname:     "Scenario Tester",
 	}
 	require.NoError(t, db.Create(user).Error, "create user")
 	require.NotEmpty(t, user.ID)
 
 	device := &model.Device{
+		ID:         mustUUID(t),
 		UserID:     user.ID,
 		DeviceType: "desktop",
 	}
 	require.NoError(t, db.Create(device).Error, "create device")
 	require.NotEmpty(t, device.ID)
 
-	ownerID := stringPtr(user.ID)
 	session := &model.Session{
 		Type:        model.SessionTypeGroup,
-		OwnerUserID: ownerID,
+		OwnerUserID: stringPtr(user.ID),
 		Name:        "Scenario Session",
 	}
 	require.NoError(t, db.Create(session).Error, "create session")
@@ -251,10 +276,9 @@ func TestScenarioDispatch_TargetOwnershipIsolation(t *testing.T) {
 	ownerID, deviceID, _ := scenarioTestFixtures(t, db)
 
 	// Create a second user
-	pw := stringPtr("hashed")
 	otherUser := &model.User{
 		Username:     "other_user",
-		PasswordHash: pw,
+		PasswordHash: stringPtr("hashed"),
 		Nickname:     "Other User",
 	}
 	require.NoError(t, db.Create(otherUser).Error)
@@ -396,19 +420,19 @@ func TestScenarioDispatch_TargetListByType(t *testing.T) {
 	targetSvc := service.NewExecutionTargetService(db)
 	targetHandler := handler.NewExecutionTargetHandler(targetSvc)
 
-	r := gin.New()
-	r.Use(func(c *gin.Context) {
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
 		c.Set("user_id", userID)
 		c.Next()
 	})
 
-	web := r.Group("/web")
+	web := router.Group("/web")
 	{
 		web.POST("/execution-targets", targetHandler.CreateTarget)
 		web.GET("/execution-targets", targetHandler.ListTargets)
 	}
 
-	ts := httptest.NewServer(r)
+	ts := httptest.NewServer(router)
 	defer ts.Close()
 	httpClient := ts.Client()
 
