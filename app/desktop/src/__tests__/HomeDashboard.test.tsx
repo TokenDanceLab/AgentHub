@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import HomeDashboard from '@/components/HomeDashboard';
 import * as useHealthModule from '@/hooks/useHealth';
-import * as threadQueriesModule from '@/api/threadQueries';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -45,9 +44,17 @@ vi.mock('@/api/threadQueries', () => ({
 }));
 
 vi.mock('@/stores/taskBridgeStore', () => ({
-  useTaskBridgeStore: () => ({
-    tasks: [],
-  }),
+  useTaskBridgeStore: (selector?: (s: { tasks: Array<{ status: string }> }) => unknown) => {
+    const state = { tasks: [{ status: 'running' }, { status: 'done' }] };
+    return selector ? selector(state) : state;
+  },
+}));
+
+vi.mock('@/stores/hubStore', () => ({
+  useHubStore: (selector?: (s: { authenticated: boolean; username: string | null }) => unknown) => {
+    const state = { authenticated: true, username: 'Ding' };
+    return selector ? selector(state) : state;
+  },
 }));
 
 describe('HomeDashboard', () => {
@@ -79,17 +86,51 @@ describe('HomeDashboard', () => {
   });
 
   it('renders pending approvals card', () => {
+    const onOpenApprovals = vi.fn();
     render(
       <HomeDashboard
         onNewThread={vi.fn()}
         onSelectThread={vi.fn()}
         onQuickStart={vi.fn()}
+        onOpenApprovals={onOpenApprovals}
         permissionCount={3}
       />,
     );
 
     expect(screen.getByText('home.pendingApprovals')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('home.reviewApprovals'));
+    expect(onOpenApprovals).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders Hub session and bridged task summary', () => {
+    render(
+      <HomeDashboard
+        onNewThread={vi.fn()}
+        onSelectThread={vi.fn()}
+        onQuickStart={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('home.hubSession')).toBeInTheDocument();
+    expect(screen.getByText('home.hubConnected')).toBeInTheDocument();
+    expect(screen.getByText('home.hubBridgeSummary')).toBeInTheDocument();
+  });
+
+  it('opens TeamRun Console from the dashboard card', () => {
+    const onOpenTeamRuns = vi.fn();
+    render(
+      <HomeDashboard
+        onNewThread={vi.fn()}
+        onSelectThread={vi.fn()}
+        onQuickStart={vi.fn()}
+        onOpenTeamRuns={onOpenTeamRuns}
+      />,
+    );
+
+    expect(screen.getByText('home.activeTeamRuns')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('home.openTeamRuns'));
+    expect(onOpenTeamRuns).toHaveBeenCalledTimes(1);
   });
 
   it('renders target health card', () => {
@@ -178,6 +219,21 @@ describe('HomeDashboard', () => {
 
     fireEvent.click(screen.getByText('home.newThread'));
     expect(onNew).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the run queue from active runs card', () => {
+    const onOpenRuns = vi.fn();
+    render(
+      <HomeDashboard
+        onNewThread={vi.fn()}
+        onSelectThread={vi.fn()}
+        onQuickStart={vi.fn()}
+        onOpenRuns={onOpenRuns}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('home.viewAllRuns'));
+    expect(onOpenRuns).toHaveBeenCalledTimes(1);
   });
 
   it('renders quick start suggestions', () => {

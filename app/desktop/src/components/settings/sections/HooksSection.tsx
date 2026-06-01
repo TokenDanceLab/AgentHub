@@ -2,9 +2,7 @@ import { useTranslation } from 'react-i18next';
 import Panel from '../primitives/Panel';
 import SettingRow from '../primitives/SettingRow';
 import Switch from '../primitives/Switch';
-import Callout from '../primitives/Callout';
 import { writeStoredValue } from '../utils';
-import styles from '../../SettingsPage.module.css';
 
 interface HooksSectionProps {
   enableHooks: boolean;

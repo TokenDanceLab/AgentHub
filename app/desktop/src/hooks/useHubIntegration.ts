@@ -399,7 +399,12 @@ export function useHubIntegration(
         }
 
         case 'run.finished': {
-          const output = outputByRunRef.current.get(runId) || 'Run finished';
+          const output =
+            typeof payload.content === 'string'
+              ? payload.content
+              : typeof payload.output === 'string'
+                ? payload.output
+                : outputByRunRef.current.get(runId) || 'Run finished';
           hubClient.doneTask(taskId, output, runId).catch(() => {});
           store.getState().updateTask(taskId, {
             status: 'done',
@@ -555,18 +560,18 @@ export function useHubIntegration(
       unsubDispatch();
       unsubCancel();
     };
-  }, [hubWS, hubClient, edgeBaseUrl, onDispatch]);
+  }, [hubWS, hubClient, edgeBaseUrl, onDispatch, store]);
 
   // ── Return stable handle ──────────────────────────────
 
   const getTaskByRunId = useCallback(
     (runId: string) => store.getState().getTaskByRunId(runId),
-    [],
+    [store],
   );
 
   const getRunByTaskId = useCallback(
     (taskId: string) => store.getState().getRunByTaskId(taskId),
-    [],
+    [store],
   );
 
   // Read tasks reactively from the store

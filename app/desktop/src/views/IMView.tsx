@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, CheckCheck, MessageCircle, X } from 'lucide-react';
+import { Check, CheckCheck, MessageCircle, RefreshCw, X } from 'lucide-react';
 import type { IMContact, IMMessage } from '@/components/IM/types';
 import IMContactList from '@/components/IM/IMContactList';
 import IMMessageView from '@/components/IM/IMMessageView';
@@ -71,6 +71,7 @@ export default function IMView(props: ViewProps) {
     readAllNotifications,
     markSessionRead,
     recallMessage,
+    refreshSessions,
     status,
     error,
   } = useIMChat({
@@ -103,6 +104,7 @@ export default function IMView(props: ViewProps) {
   );
 
   const unreadNotifications = notifications.filter((notification) => !notification.read);
+  const unreadSessionCount = contacts.reduce((total, contact) => total + (contact.unreadCount ?? 0), 0);
   const sessionReadError = activeSessionId
     ? actionState[`session:${activeSessionId}:read`]?.error
     : undefined;
@@ -139,9 +141,19 @@ export default function IMView(props: ViewProps) {
           <div className={styles.actionPanelHeader}>
             <span className={styles.chatType}>{label('im.snapshot.contactRequests', `${friendRequests.length} contact requests`, { count: friendRequests.length })}</span>
             <span className={styles.chatType}>{label('im.snapshot.notifications', `${unreadNotifications.length} unread notifications`, { count: unreadNotifications.length })}</span>
+            <span className={styles.chatType}>{label('im.snapshot.unreadSessions', `${unreadSessionCount} unread sessions`, { count: unreadSessionCount })}</span>
             {!actionCapabilities.friendRequests || !actionCapabilities.notifications ? (
               <span className={styles.interfaceGap}>{label('im.action.interfaceGap', 'Interface gap')}</span>
             ) : null}
+            <button
+              type="button"
+              className={styles.textAction}
+              onClick={() => void refreshSessions()}
+              disabled={status === 'loading'}
+            >
+              <RefreshCw size={14} />
+              <span>{label('im.snapshot.refresh', 'Refresh')}</span>
+            </button>
           </div>
 
           {friendRequests.length > 0 || notifications.length > 0 ? (
@@ -238,6 +250,10 @@ export default function IMView(props: ViewProps) {
         ) : status === 'error' ? (
           <div className={styles.noSelection} role="alert">
             <span>{error ? label(error, 'Hub messages are unavailable.') : label('im.state.unavailable', 'Hub messages are unavailable.')}</span>
+            <button type="button" className={styles.textAction} onClick={() => void refreshSessions()}>
+              <RefreshCw size={14} />
+              <span>{label('im.state.retry', 'Retry')}</span>
+            </button>
           </div>
         ) : contacts.length === 0 ? (
           <div className={styles.noSelection}>

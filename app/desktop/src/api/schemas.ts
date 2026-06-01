@@ -76,6 +76,19 @@ export const ThreadInfoSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const ThreadItemInfoSchema = z.object({
+  itemId: z.string(),
+  projectId: z.string(),
+  threadId: z.string(),
+  runId: z.string().optional(),
+  type: z.string(),
+  role: z.string().optional(),
+  status: z.string(),
+  content: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 // ── Run ─────────────────────────────────────────
 
 export const RunInfoSchema = z.object({

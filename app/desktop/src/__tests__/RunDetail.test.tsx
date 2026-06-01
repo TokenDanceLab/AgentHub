@@ -12,7 +12,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import RunDetail from '@/components/RunDetail';
 import { RunState } from '@/utils/runStateMachine';
@@ -177,5 +177,79 @@ describe('RunDetail', () => {
       />,
     );
     expect(screen.queryByText('action.cancelRun')).not.toBeInTheDocument();
+  });
+
+  it('renders runtime typed blocks from chat messages', () => {
+    const run = makeRun({ status: RunState.RUNNING });
+    render(
+      <RunDetail
+        run={run}
+        toolCalls={[]}
+        changedFiles={[]}
+        outputText=""
+        chatMessages={[
+          {
+            id: 'msg-1',
+            role: 'agent',
+            timestamp: '2026-01-01T00:00:00Z',
+            blocks: [
+              { kind: 'thinking', content: 'checking fixtures' },
+              {
+                kind: 'tool_use',
+                callId: 'call-1',
+                toolName: 'Bash',
+                input: { command: 'pnpm test' },
+                status: 'running',
+              },
+              {
+                kind: 'file_change',
+                path: 'src/App.tsx',
+                action: 'modified',
+                diff: '+hello',
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('run.runtimeBlocks')).toBeInTheDocument();
+    expect(screen.getByText('run.block.thinking')).toBeInTheDocument();
+    expect(screen.getByText('run.block.toolCall')).toBeInTheDocument();
+    expect(screen.getByText('run.block.fileChange')).toBeInTheDocument();
+    expect(screen.getByText('checking fixtures')).toBeInTheDocument();
+  });
+
+  it('shows approvals, artifact gap, preview gap, and approval failure state', async () => {
+    const run = makeRun({ status: RunState.WAITING_FOR_INPUT });
+    const onDecideApproval = async () => {
+      throw new Error('edge rejected decision');
+    };
+
+    render(
+      <RunDetail
+        run={run}
+        toolCalls={[]}
+        changedFiles={[]}
+        outputText=""
+        approvals={[
+          {
+            requestId: 'perm-1',
+            runId: run.runId,
+            toolName: 'Bash',
+            toolInput: { command: 'npm test' },
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+        ]}
+        onDecideApproval={onDecideApproval}
+      />,
+    );
+
+    expect(screen.getByText('run.reviewSurface')).toBeInTheDocument();
+    expect(screen.getByText('run.reviewArtifactGap')).toBeInTheDocument();
+    expect(screen.getByText('run.reviewPreviewGap')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('run.reviewAllow'));
+    await waitFor(() => expect(screen.getByText('run.reviewApprovalFailed')).toBeInTheDocument());
   });
 });

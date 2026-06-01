@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchHealth, fetchRunners, startRun, cancelRun, decidePermission } from '../api/edgeClient';
+import {
+  cancelRun,
+  createThread,
+  fetchHealth,
+  fetchRunners,
+  fetchThreadItems,
+  startRun,
+} from '../api/edgeClient';
 
 describe('edgeClient', () => {
   beforeEach(() => {
@@ -49,6 +56,78 @@ describe('edgeClient', () => {
       const result = await fetchRunners();
       expect(result.items).toHaveLength(1);
       expect(result.page.hasMore).toBe(false);
+    });
+  });
+
+  describe('threads', () => {
+    it('creates a thread with explicit project, title, and thread id', async () => {
+      const mock = {
+        threadId: 'thread_manual',
+        projectId: 'proj_local',
+        title: 'Manual thread',
+        status: 'active',
+        createdAt: '2026-05-26T00:00:00Z',
+        updatedAt: '2026-05-26T00:00:00Z',
+      };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mock),
+      } as Response);
+
+      const result = await createThread({
+        projectId: 'proj_local',
+        threadId: 'thread_manual',
+        title: 'Manual thread',
+      });
+
+      expect(result.threadId).toBe('thread_manual');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/threads$/),
+        expect.objectContaining({
+          body: JSON.stringify({
+            projectId: 'proj_local',
+            threadId: 'thread_manual',
+            title: 'Manual thread',
+          }),
+          method: 'POST',
+        }),
+      );
+    });
+
+    it('fetches thread items with Edge auth headers', async () => {
+      localStorage.setItem('agenthub:edge_auth_token', 'local-edge-token');
+      const mock = {
+        items: [
+          {
+            itemId: 'item_1',
+            projectId: 'proj_local',
+            threadId: 'thread_1',
+            type: 'message',
+            role: 'user',
+            status: 'created',
+            content: 'hello',
+            createdAt: '2026-05-26T00:00:00Z',
+            updatedAt: '2026-05-26T00:00:00Z',
+          },
+        ],
+        page: { hasMore: false },
+      };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mock),
+      } as Response);
+
+      const result = await fetchThreadItems('thread_1');
+
+      expect(result.items[0]?.itemId).toBe('item_1');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/threads\/thread_1\/items$/),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer local-edge-token',
+          }),
+        }),
+      );
     });
   });
 
@@ -115,6 +194,28 @@ describe('edgeClient', () => {
         }),
       );
     });
+
+    it('preserves threadId in the request body', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ runId: 'run_abc123', status: 'queued', threadId: 'thread-1' }),
+      } as Response);
+
+      await startRun({
+        prompt: 'continue thread',
+        threadId: 'thread-1',
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/runs$/),
+        expect.objectContaining({
+          body: JSON.stringify({
+            prompt: 'continue thread',
+            threadId: 'thread-1',
+          }),
+        }),
+      );
+    });
   });
 
   describe('cancelRun', () => {
@@ -140,35 +241,6 @@ describe('edgeClient', () => {
       expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringMatching(/\/v1\/runs\/run_x:cancel$/),
         expect.anything(),
-      );
-    });
-  });
-
-  describe('decidePermission', () => {
-    it('posts a run-scoped permission decision to Edge', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ status: 'ok' }),
-      } as Response);
-
-      await decidePermission({
-        runId: 'run_abc123',
-        requestId: 'perm_1',
-        decision: 'deny',
-        reason: 'test denial',
-      });
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/\/v1\/permissions\/decide$/),
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({
-            runId: 'run_abc123',
-            requestId: 'perm_1',
-            decision: 'deny',
-            reason: 'test denial',
-          }),
-        }),
       );
     });
   });

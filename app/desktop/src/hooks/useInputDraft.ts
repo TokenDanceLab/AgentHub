@@ -25,7 +25,10 @@ interface UseInputDraftReturn {
 export function useInputDraft(threadId: string | undefined): UseInputDraftReturn {
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const threadIdRef = useRef(threadId);
-  threadIdRef.current = threadId;
+
+  useEffect(() => {
+    threadIdRef.current = threadId;
+  }, [threadId]);
 
   // Clean up pending timer on unmount or threadId change
   useEffect(() => {

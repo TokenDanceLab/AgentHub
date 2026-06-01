@@ -41,7 +41,6 @@ export function useEventStream(online: boolean): EventStreamState {
   useEffect(() => {
     mountedRef.current = true;
     if (!online) {
-      setIsConnected(false);
       return;
     }
 
@@ -79,5 +78,5 @@ export function useEventStream(online: boolean): EventStreamState {
     };
   }, [online]);
 
-  return { events, isConnected, clearEvents };
+  return { events, isConnected: online && isConnected, clearEvents };
 }

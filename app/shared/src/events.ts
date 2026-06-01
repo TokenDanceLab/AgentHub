@@ -192,6 +192,16 @@ export interface RunFailedEvent extends EventEnvelope {
   };
 }
 
+export interface RunCancelledEvent extends EventEnvelope {
+  type: 'run.cancelled';
+  payload: {
+    runId: string;
+    finishedAt?: string;
+    reason?: string;
+    [key: string]: unknown;
+  };
+}
+
 export interface ApprovalRequestedEvent extends EventEnvelope {
   type: 'approval.requested';
   payload: {
@@ -268,6 +278,7 @@ export type AnyEvent =
   | RunOutputBatchEvent
   | RunFinishedEvent
   | RunFailedEvent
+  | RunCancelledEvent
   | ApprovalRequestedEvent
   | ApprovalDecidedEvent
   | ArtifactCreatedEvent

@@ -3,17 +3,20 @@ import { useTranslation } from 'react-i18next';
 import { MessageCircle, Plus, UserPlus, Users } from 'lucide-react';
 import type { ContactInfo } from '@/api/hubClient';
 import type { IMContact } from './types';
+import { Select } from '@shared/ui';
 import styles from './IMContactList.module.css';
 
 type ComposeMode = 'contact' | 'private' | 'group';
+type ComposeResult = boolean | undefined;
+type MaybePromise<T> = T | Promise<T>;
 
 interface IMContactListProps {
   contacts: IMContact[];
   hubContacts?: ContactInfo[];
   onSelect?: (contact: IMContact) => void;
-  onAddContact?: (userId: string) => boolean | void | Promise<boolean | void>;
-  onCreatePrivateSession?: (userId: string) => boolean | void | Promise<boolean | void>;
-  onCreateGroupSession?: (name: string, memberIds: string[]) => boolean | void | Promise<boolean | void>;
+  onAddContact?: (userId: string) => MaybePromise<ComposeResult>;
+  onCreatePrivateSession?: (userId: string) => MaybePromise<ComposeResult>;
+  onCreateGroupSession?: (name: string, memberIds: string[]) => MaybePromise<ComposeResult>;
   selectedId?: string;
 }
 
@@ -74,7 +77,7 @@ const IMContactList = memo(function IMContactList({
     if (submitting) return;
     setSubmitting(true);
     try {
-      let accepted: boolean | void = false;
+      let accepted: ComposeResult = false;
       if (composeMode === 'group') {
         const memberIds = groupMembers.map((id) => id.trim()).filter(Boolean);
         if (groupName.trim() && memberIds.length > 0) {
@@ -207,19 +210,19 @@ const IMContactList = memo(function IMContactList({
           ) : (
             <>
               {composeMode === 'private' && hubContacts.length > 0 && (
-                <select
+                <Select
                   className={styles.addInput}
                   value={targetUserId}
-                  onChange={(e) => setTargetUserId(e.target.value)}
-                  aria-label={label('im.contact.hubContact', 'Hub contact')}
-                >
-                  <option value="">{label('im.contact.chooseHubContact', 'Choose a Hub contact...')}</option>
-                  {hubContacts.map((contact) => (
-                    <option key={contact.user_id} value={contact.user_id}>
-                      {contact.remark ?? contact.nickname ?? contact.username}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setTargetUserId(value)}
+                  options={[
+                    ['', label('im.contact.chooseHubContact', 'Choose a Hub contact...')],
+                    ...hubContacts.map((contact) => [
+                      contact.user_id,
+                      contact.remark ?? contact.nickname ?? contact.username,
+                    ] as [string, string]),
+                  ]}
+                  placeholder={label('im.contact.chooseHubContact', 'Choose a Hub contact...')}
+                />
               )}
               <input
                 className={styles.addInput}

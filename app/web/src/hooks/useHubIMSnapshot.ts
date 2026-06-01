@@ -53,13 +53,15 @@ export function useHubIMSnapshot(token: string | null): HubIMSnapshot {
       getToken: () => token,
     });
 
-    setSnapshot((current) => ({
-      ...current,
-      error: undefined,
-      messagesBySessionId: emptyMessagesBySessionId,
-      sessions: [],
-      status: 'loading',
-    }));
+    setSnapshot((current) => {
+      const { error: _error, ...rest } = current;
+      return {
+        ...rest,
+        messagesBySessionId: emptyMessagesBySessionId,
+        sessions: [],
+        status: 'loading',
+      };
+    });
 
     async function loadSnapshot() {
       try {
