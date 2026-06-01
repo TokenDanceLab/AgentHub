@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",
-    "test:ci": "vitest run --exclude src/__tests__/integration/edge-real.test.ts",
+    "test:ci": "vitest run --config vitest.desktop-ts-ci.config.ts && vitest run --config vitest.desktop-tsx-ci.config.ts && vitest run --config vitest.edge-integration-ci.config.ts && vitest run --config vitest.shared-ci.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",

@@ -763,6 +763,50 @@
   gap: 8px;
 }
 
+.teamGraphInspector {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.teamGraphInspectorHead {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in oklch, var(--settings-chip-border) 78%, transparent);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+[data-theme='dark'] .teamGraphInspectorHead {
+  border-color: rgba(0, 0, 0, 0.16);
+  background: rgba(255, 255, 255, 0.034);
+}
+
+.teamGraphInspectorHead strong,
+.teamGraphInspectorHead span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamGraphInspectorHead strong {
+  color: var(--foreground);
+  font-size: 12.5px;
+  font-weight: 720;
+  line-height: 1.25;
+}
+
+.teamGraphInspectorHead span {
+  margin-top: 3px;
+  color: var(--settings-muted);
+  font-size: 11.5px;
+  font-weight: 560;
+  line-height: 1.25;
+}
+
 .teamGraphEdges {
   display: flex;
   min-width: 0;
@@ -780,17 +824,66 @@
   gap: 3px;
   padding: 9px 10px 9px 12px;
   border: 1px solid color-mix(in oklch, var(--settings-chip-border) 82%, transparent);
-  border-left: 2px solid color-mix(in oklch, var(--team-node-accent) 58%, transparent);
   border-radius: 12px;
   background: color-mix(in oklch, var(--settings-glass-bg) 92%, transparent);
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklch, var(--team-node-accent) 12%, transparent),
+    0 6px 16px rgba(15, 23, 42, 0.035);
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease,
+    transform 150ms ease;
 }
 
 [data-theme='dark'] .teamGraphNode {
   border-color: rgba(0, 0, 0, 0.2);
-  border-left-color: color-mix(in oklch, var(--team-node-accent) 52%, rgba(255, 255, 255, 0.08));
   background: rgba(42, 43, 51, 0.72);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklch, var(--team-node-accent) 14%, transparent),
+    0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.teamGraphNode:hover,
+.teamGraphNode:focus-visible {
+  background: var(--settings-glass-hover);
+  border-color: color-mix(in oklch, var(--team-node-accent) 34%, var(--settings-chip-border));
+  transform: translateY(-1px);
+}
+
+.teamGraphNode:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklch, var(--team-node-accent) 34%, transparent),
+    0 0 0 3px color-mix(in oklch, var(--team-node-accent) 18%, transparent);
+}
+
+.teamGraphNodeActive {
+  border-color: color-mix(in oklch, var(--team-node-accent) 46%, var(--settings-chip-border));
+  background: color-mix(in oklch, var(--team-node-accent) 10%, var(--settings-glass-bg));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklch, var(--team-node-accent) 28%, transparent),
+    0 8px 20px rgba(15, 23, 42, 0.055);
+}
+
+[data-theme='dark'] .teamGraphNodeActive {
+  background: color-mix(in oklch, var(--team-node-accent) 12%, rgba(42, 43, 51, 0.78));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklch, var(--team-node-accent) 30%, transparent),
+    0 10px 22px rgba(0, 0, 0, 0.14);
+}
+
+.teamGraphNodeMuted {
+  opacity: 0.42;
+}
+
+.teamGraphNodeAll {
+  --team-node-accent: var(--settings-accent);
 }
 
 .teamGraphNode strong {
@@ -868,6 +961,10 @@
   background: rgba(255, 255, 255, 0.032);
 }
 
+.teamGraphEdgeMuted {
+  opacity: 0.46;
+}
+
 .teamGraphEdge span {
   overflow: hidden;
   color: color-mix(in oklch, var(--foreground) 72%, var(--settings-muted));
@@ -890,6 +987,17 @@
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.teamGraphEmptyEdge {
+  min-height: 52px;
+  padding: 12px;
+  border: 1px dashed color-mix(in oklch, var(--settings-chip-border) 84%, transparent);
+  border-radius: 10px;
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1.35;
 }
 
 .teamConsoleGrid {
