@@ -30,11 +30,11 @@ function renderWithProviders(ui: React.ReactElement) {
 describe('Mobile App', () => {
   it('renders the bottom navigation bar', () => {
     renderWithProviders(<App />);
-    expect(screen.getByText('Threads')).toBeInTheDocument();
+    expect(screen.getByRole('navigation')).toBeInTheDocument();
   });
 
   it('starts on the threads view', () => {
     renderWithProviders(<App />);
-    expect(screen.getByText('Threads')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Threads', level: 1 })).toBeInTheDocument();
   });
 });
