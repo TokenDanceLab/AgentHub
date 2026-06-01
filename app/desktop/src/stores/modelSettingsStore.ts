@@ -315,11 +315,7 @@ export const useModelSettingsStore = create<ModelSettingsState>()(
       }),
       {
         name: 'agenthub-model-settings',
-<<<<<<< HEAD
-        version: 4,
-=======
         version: 3,
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
         migrate: migratePersistedState,
       },
     ),

@@ -34,11 +34,7 @@ export type MessageBlock =
       status: 'pending' | 'running' | 'draining' | 'completed' | 'failed';
       children?: ToolResultBlock[];
     }
-<<<<<<< HEAD
-  | { kind: 'file_change'; path: string; action: 'created' | 'modified' | 'deleted'; diff?: string; structuredDiff?: FileDiff }
-=======
   | { kind: 'file_change'; path: string; action: 'created' | 'modified' | 'deleted'; diff?: string }
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   | {
       kind: 'agent_task';
       taskId: string;
@@ -89,89 +85,6 @@ export type MessageBlock =
       model?: string;
       provider?: string;
       variant?: 'usage' | 'warning' | 'compaction';
-<<<<<<< HEAD
-    }
-  | {
-      kind: 'error';
-      error?: string;
-      message?: string;
-      detail?: string;
-      retryable?: boolean;
-      /** Error classification for rendering category-specific icon, suggestion, and action buttons. */
-      category?: 'network' | 'auth' | 'rate_limit' | 'tool' | 'model' | 'unknown';
-      /** Override default suggestion text for this category. */
-      suggestion?: string;
-    }
-  | {
-      kind: 'citation';
-      text?: string;
-      url?: string;
-      title?: string;
-    }
-  | {
-      kind: 'compact';
-      summary: string;
-      items?: MessageBlock[];
-      expanded?: boolean;
-    }
-  | {
-      kind: 'tool_group';
-      /** Original tool_use blocks that are grouped together */
-      items: Extract<MessageBlock, { kind: 'tool_use' }>[];
-      /** Initial collapsed state */
-      collapsed: boolean;
-      /** Count per tool name (e.g. { Read: 3, Write: 2, Edit: 1 }) */
-      toolCounts: Record<string, number>;
-      /** Total number of tools in this group */
-      totalCount: number;
-    }
-  | {
-      kind: 'approval';
-      approvalId: string;
-      agentName: string;
-      toolName: string;
-      riskLevel: 'low' | 'medium' | 'high' | 'critical';
-      status: 'pending' | 'approved' | 'denied' | 'timeout';
-      timestamp: string;
-      reason?: string | undefined;
-      decidedBy?: string | undefined;
-      decidedAt?: string | undefined;
-      /** Context for team approval API calls */
-      teamId?: string | undefined;
-      runId?: string | undefined;
-      agentTaskId?: string | undefined;
-    }
-  | {
-      kind: 'artifact';
-      artifactId: string;
-      artifactType: 'iframe' | 'file' | 'page' | 'image';
-      title: string;
-      artifactUrl?: string | undefined;
-      url?: string | undefined;
-      previewUrl?: string | undefined;
-      size?: number | undefined;
-      /** If true, an "Apply Diff" action button is rendered on the artifact preview. */
-      canApplyDiff?: boolean | undefined;
-      /** True after the diff has been successfully applied. */
-      diffApplied?: boolean | undefined;
-    }
-  | {
-      kind: 'deploy_card';
-      deployId?: string | undefined;
-      url?: string | undefined;
-      status: 'pending' | 'building' | 'deploying' | 'deployed' | 'failed';
-      statusMessage?: string | undefined;
-      timestamp?: string | undefined;
-    }
-  | {
-      kind: 'link_card';
-      url: string;
-      title?: string | undefined;
-      description?: string | undefined;
-      thumbnailUrl?: string | undefined;
-      siteName?: string | undefined;
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     };
 
 // Tool result subtypes (nested under tool_use, 参考: Cline DiffEditRow 双格式)

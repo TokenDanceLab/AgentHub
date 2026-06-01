@@ -4,12 +4,7 @@ import { Search, User, Bot, MessageSquareText } from 'lucide-react';
 import { useSearchStore } from '@/stores/searchStore';
 import { useShallow } from 'zustand/shallow';
 import type { ChatMessage } from '@/components/ChatView.types';
-<<<<<<< HEAD
-import { getBinding } from '@/stores/keybindingStore';
-import { matchesBinding } from '@/utils/keybinding';
-=======
 import type { ThreadInfo } from '@shared/types';
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 import styles from './SearchDialog.module.css';
 
 interface Props {
