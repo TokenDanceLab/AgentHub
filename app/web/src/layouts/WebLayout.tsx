@@ -183,6 +183,7 @@ export default function WebLayout() {
   const recoveryInProgressRef = useRef(false);
   const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
   const [mainSurface, setMainSurface] = useState<MainSurface>('workspace');
+  const [routeContext, setRouteContext] = useState<RouteContext | null>(null);
   const agents = agentData?.items ?? [];
   const threads = threadData?.items ?? [];
   const executionTargetsQuery = useHubExecutionTargets({ enabled: hubAuthenticated });
