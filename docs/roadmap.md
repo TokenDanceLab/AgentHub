@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-31（Desktop Run Workbench closure）
+最后更新：2026-06-02（Sprint closeout：ErrorBoundary chunk recovery / 虚拟滚动 / 6-theme engine / WS 横幅 / noUncheckedIndexedAccess / i18n 1496 key / CSS 变量 150+ / Mobile 27 tests / Hub 16 tests / API 统一 / 类型修复 / 分支清理）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
