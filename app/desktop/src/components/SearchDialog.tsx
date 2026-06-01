@@ -5,6 +5,7 @@ import { useSearchStore } from '@/stores/searchStore';
 import { useShallow } from 'zustand/shallow';
 import type { ChatMessage } from '@/components/ChatView.types';
 import type { ThreadInfo } from '@shared/types';
+import { matchesBinding, getBinding } from '@/utils/keyboardShortcuts';
 import styles from './SearchDialog.module.css';
 
 interface Props {
