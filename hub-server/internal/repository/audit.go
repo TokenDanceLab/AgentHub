@@ -9,9 +9,27 @@ import (
 
 const defaultAuditPageSize = 50
 
-// CreateAuditEvent inserts a new audit event record.
+// CreateAuditEvent inserts a new audit event record with hash-chain linking.
+// It computes PrevHash from the most recent audit event, then inserts the new
+// event in a single transaction to avoid race conditions in the hash chain.
 func CreateAuditEvent(db *gorm.DB, event *model.AuditEvent) error {
-	return db.Create(event).Error
+	return db.Transaction(func(tx *gorm.DB) error {
+		var prev model.AuditEvent
+		err := tx.Model(&model.AuditEvent{}).
+			Order("created_at DESC, id DESC").
+			Limit(1).
+			First(&prev).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return err
+		}
+		if err == gorm.ErrRecordNotFound {
+			// Genesis event: no predecessor.
+			event.PrevHash = ""
+		} else {
+			event.PrevHash = model.ComputeHash(prev.ID, prev.PrevHash)
+		}
+		return tx.Create(event).Error
+	})
 }
 
 // GetAuditEventByID returns an audit event by its ID.
@@ -64,9 +82,36 @@ func ListAuditEvents(db *gorm.DB, userID, eventType, severity string, since, unt
 	return events, hasMore, nil
 }
 
-// DeleteAuditEventsBefore removes audit events older than the given time (TTL cleanup).
-// Returns the number of deleted records.
-func DeleteAuditEventsBefore(db *gorm.DB, before time.Time) (int64, error) {
-	result := db.Where("created_at < ?", before).Delete(&model.AuditEvent{})
-	return result.RowsAffected, result.Error
+// GetLatestAuditEvent returns the most recent audit event for hash-chain
+// computation, or nil if no events exist.
+func GetLatestAuditEvent(db *gorm.DB) (*model.AuditEvent, error) {
+	var e model.AuditEvent
+	err := db.Model(&model.AuditEvent{}).
+		Order("created_at DESC, id DESC").
+		Limit(1).
+		First(&e).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
+// VerifyAuditChain verifies the integrity of up to limit audit events
+// ordered by creation time. Returns the index of the first invalid link,
+// or -1 if the chain is valid.
+func VerifyAuditChain(db *gorm.DB, limit int) (int, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	var events []model.AuditEvent
+	if err := db.Model(&model.AuditEvent{}).
+		Order("created_at ASC, id ASC").
+		Limit(limit).
+		Find(&events).Error; err != nil {
+		return -1, err
+	}
+	return model.VerifyChain(events), nil
 }

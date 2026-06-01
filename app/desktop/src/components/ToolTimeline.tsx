@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { MessageBlock } from './ChatView.types';
 import styles from './ToolTimeline.module.css';
 
-type TimelineStatus = 'pending' | 'running' | 'completed' | 'failed';
+type TimelineStatus = 'pending' | 'running' | 'draining' | 'completed' | 'failed';
 
 interface TimelineEntry {
   key: string;
@@ -98,6 +98,8 @@ function statusClass(status: TimelineStatus): string {
       return styles.statusPending ?? '';
     case 'running':
       return styles.statusRunning ?? '';
+    case 'draining':
+      return styles.statusDraining ?? '';
     case 'failed':
       return styles.statusFailed ?? '';
     case 'completed':

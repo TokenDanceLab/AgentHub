@@ -19,6 +19,8 @@ import { useThreads } from '@/api/threadQueries';
 import { useHealth } from '@/hooks/useHealth';
 import { resolveLocalOrchestration } from '@/utils/localOrchestration';
 import type { AgentInfo, ThreadInfo } from '@shared/types';
+import WorkspacePicker from '@/components/WorkspacePicker';
+import type { WorkspaceEntry } from '@/utils/workspaceStore';
 import styles from './HomeDashboard.module.css';
 
 interface Props {
@@ -38,6 +40,13 @@ interface Props {
   selectedAgentId?: string;
   onSelectAgent?: (agentId: string) => void;
   onStartLocalOrchestration?: (agentId: string, draft: string) => void;
+  workspaces?: WorkspaceEntry[];
+  selectedWorkspacePath?: string;
+  onSelectWorkspace?: (workspace: WorkspaceEntry) => void;
+  onBrowseWorkspace?: () => void;
+  onRemoveWorkspace?: (path: string) => void;
+  onClearWorkspaces?: () => void;
+  desktopAvailable?: boolean;
 }
 
 const QUICK_START_KEYS = [
@@ -101,6 +110,13 @@ export default function HomeDashboard({
   selectedAgentId,
   onSelectAgent,
   onStartLocalOrchestration,
+  workspaces = [],
+  selectedWorkspacePath,
+  onSelectWorkspace,
+  onBrowseWorkspace,
+  onRemoveWorkspace,
+  onClearWorkspaces,
+  desktopAvailable = false,
 }: Props) {
   const { t } = useTranslation();
   const { online, health } = useHealth();
@@ -232,6 +248,19 @@ export default function HomeDashboard({
           </span>
         </div>
       </div>
+
+      {/* Recent Workspaces */}
+      <section className={styles.section} aria-label={t('workspace.recent')}>
+        <WorkspacePicker
+          workspaces={workspaces}
+          selectedPath={selectedWorkspacePath}
+          onSelect={(ws) => onSelectWorkspace?.(ws)}
+          onBrowse={() => onBrowseWorkspace?.() ?? Promise.resolve()}
+          onRemove={(path) => onRemoveWorkspace?.(path)}
+          onClearAll={() => onClearWorkspaces?.()}
+          disabled={!desktopAvailable}
+        />
+      </section>
 
       {/* AgentTeam / TeamRun command surface */}
       <section className={styles.section} aria-label={t('home.teamRunTitle')}>

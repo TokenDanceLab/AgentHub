@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { Copy, Check } from 'lucide-react';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -9,7 +9,11 @@ interface CodeBlockProps {
   language?: string;
 }
 
-export default function CodeBlock({ content, language }: CodeBlockProps) {
+function codeBlockPropsEqual(prev: CodeBlockProps, next: CodeBlockProps): boolean {
+  return prev.content === next.content && prev.language === next.language;
+}
+
+const CodeBlock = memo(function CodeBlock({ content, language }: CodeBlockProps) {
   const [highlighted, setHighlighted] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -64,4 +68,6 @@ export default function CodeBlock({ content, language }: CodeBlockProps) {
       )}
     </div>
   );
-}
+});
+
+export default CodeBlock;

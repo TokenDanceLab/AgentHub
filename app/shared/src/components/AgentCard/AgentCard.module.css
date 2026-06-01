@@ -7,15 +7,25 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: var(--card);
-  transition: transform var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card {
+    transition: transform var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
 }
 
 .card:hover {
-  transform: translateY(-2px);
   border-color: oklch(0.55 0.16 255 / 0.24);
   box-shadow: 0 22px 54px oklch(0.14 0.005 260 / 0.16);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card:hover {
+    transform: translateY(-2px);
+  }
 }
 
 .installed {

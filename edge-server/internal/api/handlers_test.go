@@ -651,6 +651,9 @@ func TestPostRunsPassesRuntimeProfileConfigToExecutor(t *testing.T) {
 	h.Executor = executor
 	h.ensureDefaults()
 
+	// Allow the workDir used by this test to pass workspace validation.
+	h.WorkspaceAllowlist = []string{`D:\Code\TokenDance\AgentHub`}
+
 	body := `{
 		"projectId":"proj_local",
 		"threadId":"thread_local",
@@ -844,6 +847,84 @@ func TestPostRunsRejectsSymlinkEscapeFromWorkspaceAllowlist(t *testing.T) {
 	}
 	if len(executor.started) != 0 {
 		t.Fatalf("executor starts = %d, want 0", len(executor.started))
+	}
+}
+
+func TestPostRunsRejectsWorkDirWhenWorkspaceAllowlistEmpty(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+
+	// Empty allowlist (nil or zero-length slice) must reject all non-empty workDir values.
+	// This is the fail-closed security behavior for AH-SR-006.
+	h.WorkspaceAllowlist = []string{} // explicitly empty; nil would behave the same
+
+	tests := []struct {
+		name    string
+		workDir string
+	}{
+		{"any valid dir", t.TempDir()},
+		{"home directory", os.Getenv("USERPROFILE")},
+		{"root filesystem", string(filepath.Separator)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, err := json.Marshal(map[string]any{
+				"projectId": "proj_local",
+				"threadId":  "thread_local",
+				"workDir":   tt.workDir,
+			})
+			if err != nil {
+				t.Fatalf("json.Marshal returned error: %v", err)
+			}
+			req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(string(body)))
+			rec := httptest.NewRecorder()
+
+			h.PostRuns(rec, req)
+
+			if rec.Code != http.StatusForbidden {
+				t.Fatalf("expected status 403 for workDir=%q, got %d: %s", tt.workDir, rec.Code, rec.Body.String())
+			}
+			var resp map[string]any
+			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+				t.Fatalf("failed to decode body: %v", err)
+			}
+			errObj, ok := resp["error"].(map[string]any)
+			if !ok {
+				t.Fatalf("error body = %#v, want error object", resp)
+			}
+			if errObj["code"] != "workspace_not_allowed" {
+				t.Fatalf("error code = %#v, want workspace_not_allowed", errObj["code"])
+			}
+			msg, ok := errObj["message"].(string)
+			if !ok || !strings.Contains(msg, "allowlist") {
+				t.Fatalf("error message = %q, want mention of allowlist configuration", msg)
+			}
+		})
+	}
+
+	// Verify: no runs/items were created during any of the rejected requests.
+	if runs := h.Store.ListRuns("thread_local"); len(runs) != 0 {
+		t.Fatalf("stored runs = %d, want 0", len(runs))
+	}
+
+	// Verify: nil allowlist behaves identically to empty allowlist.
+	h.WorkspaceAllowlist = nil
+	body, err := json.Marshal(map[string]any{
+		"projectId": "proj_local",
+		"threadId":  "thread_local",
+		"workDir":   t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(string(body)))
+	rec := httptest.NewRecorder()
+	h.PostRuns(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("nil allowlist: expected status 403, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 

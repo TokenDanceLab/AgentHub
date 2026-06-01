@@ -29,5 +29,5 @@ tokendance_id:
   jwks_uri: ""
   client_id: ""
   client_secret: ""
-  redirect_uri: "http://localhost:8080/client/auth/oidc/callback"
+  redirect_uri: ""
   allowed_redirect_uris: []

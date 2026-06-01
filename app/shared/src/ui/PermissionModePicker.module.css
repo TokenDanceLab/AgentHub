@@ -22,7 +22,12 @@
   font-weight: 430;
   line-height: 20px;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .trigger {
+    transition: background 0.15s ease, color 0.15s ease;
+  }
 }
 
 .trigger:hover,
@@ -54,25 +59,32 @@
   padding: 8px;
   border: 1px solid var(--composer-panel-edge, rgba(0, 0, 0, 0.34));
   border-radius: 12px;
-  background: rgba(35, 35, 43, 0.97);
+  background: var(--composer-panel-bg, rgba(35, 35, 43, 0.97));
   box-shadow: var(--composer-panel-shadow, 0 22px 56px rgba(0, 0, 0, 0.38), 0 3px 12px rgba(0, 0, 0, 0.22));
   backdrop-filter: blur(22px) saturate(1.05);
   -webkit-backdrop-filter: blur(22px) saturate(1.05);
-  animation: popoverIn 0.12s ease-out;
 }
 
-.popoverUp {
-  animation-name: popoverInUp;
+@media (prefers-reduced-motion: no-preference) {
+  .popover {
+    animation: permissionPopoverIn 0.12s ease-out;
+  }
 }
 
-@keyframes popoverIn {
-  from { opacity: 0; transform: translateY(-3px) scale(0.99); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
+@media (prefers-reduced-motion: no-preference) {
+  .popoverUp {
+    animation-name: permissionPopoverInUp;
+  }
 
-@keyframes popoverInUp {
-  from { opacity: 0; transform: translateY(3px) scale(0.99); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  @keyframes permissionPopoverIn {
+    from { opacity: 0; transform: translateY(-3px) scale(0.99); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes permissionPopoverInUp {
+    from { opacity: 0; transform: translateY(3px) scale(0.99); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
 }
 
 .option {
@@ -94,7 +106,7 @@
 .option:hover,
 .option:focus-visible,
 .optionActive {
-  background: rgba(255, 255, 255, 0.046);
+  background: var(--composer-option-hover-bg, rgba(255, 255, 255, 0.046));
   outline: none;
 }
 
@@ -134,7 +146,7 @@
 
 [data-theme='light'] .popover {
   border-color: rgba(15, 23, 42, 0.08);
-  background: rgba(248, 249, 252, 0.96);
+  background: var(--composer-panel-bg-light, rgba(248, 249, 252, 0.96));
   box-shadow:
     0 18px 42px rgba(15, 23, 42, 0.14),
     0 2px 10px rgba(15, 23, 42, 0.08);

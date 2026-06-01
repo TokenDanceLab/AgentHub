@@ -53,7 +53,15 @@ func (p *NDJSONStreamParser) Parse(ctx context.Context, r io.Reader) error {
 
 	return ScanLines(ctx, r, func(line []byte) error {
 		p.seq++
-		p.parseLine(line)
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("ndjson: panic in parseLine, recovering to keep stream alive",
+						"runId", p.run.ID, "seq", p.seq, "panic", r)
+				}
+			}()
+			p.parseLine(line)
+		}()
 		return nil
 	})
 }
@@ -168,6 +176,35 @@ func (p *NDJSONStreamParser) parseLine(line []byte) {
 				"utilization": msg.RateLimitInfo.Utilization,
 				"resetsAt":    msg.RateLimitInfo.ResetsAt,
 			})
+		}
+
+	case "progress":
+		// Generic progress event (distinct from tool_progress; emitted during
+		// long-running tool executions). Map to BusEventToolCall for UI visibility.
+		p.emit(scope, BusEventToolCall, map[string]any{
+			"toolUseId": msg.ToolUseID,
+			"toolName":  msg.ToolName,
+			"status":    "in_progress",
+			"elapsed":   msg.ElapsedSeconds,
+		})
+
+	case "attachment":
+		// Per-turn attachments: file changes, structured output, queued commands.
+		// Emit file_change events for each attachment so downstream can sync file state.
+		if msg.FileChanges != nil {
+			for _, fc := range msg.FileChanges {
+				p.emit(scope, BusEventFileChange, map[string]any{
+					"path":       fc.Path,
+					"kind":       fc.Kind,
+					"attachment": true,
+				})
+			}
+		}
+		if msg.AttachmentStructuredOutput != nil {
+			slog.Debug("ndjson: attachment structured_output present")
+		}
+		if len(msg.QueuedCommands) > 0 {
+			slog.Debug("ndjson: attachment queued_commands", "count", len(msg.QueuedCommands))
 		}
 
 	default:
@@ -597,6 +634,16 @@ type claudeSDKMessage struct {
 	HookStderr   string `json:"stderr,omitempty"`
 	HookOutcome  string `json:"outcome,omitempty"`
 	HookExitCode int    `json:"exit_code,omitempty"`
+
+	// attachment fields
+	FileChanges                []attachmentFileChange `json:"file_changes,omitempty"`
+	AttachmentStructuredOutput any                    `json:"attachment_structured_output,omitempty"`
+	QueuedCommands             []string               `json:"queued_commands,omitempty"`
+}
+
+type attachmentFileChange struct {
+	Path string `json:"path"`
+	Kind string `json:"kind"`
 }
 
 type claudeRateLimitInfo struct {

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getSurfaceStatusMetadata, getSurfacesByPlatform } from "@agenthub/shared";
 import { ActivityCard, BottomSheet, SegmentedControl, StatusNotice, TokenDanceMark } from "@agenthub/shared/ui";
-import { Bell, Languages, Link2, LogIn, RefreshCw, ShieldCheck, Smartphone, Trash2, X } from "lucide-react";
+import { Bell, Languages, Link2, LogIn, Palette, RefreshCw, ShieldCheck, Smartphone, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { mobileLanguages, type MobileLanguage } from "../i18n";
 import {
@@ -10,6 +10,47 @@ import {
   sendMobileNotificationProbe,
   startMobileOidcLogin,
 } from "../native/mobileCommands";
+import { getNotifyPrefs, setNotifyEnabled, type NotifyEventType } from "../utils/notifyPrefs";
+
+type ThemeMode = "system" | "light" | "dark" | "oled";
+const THEME_STORAGE_KEY = "agenthub.mobile.theme";
+
+const themeModes: { value: ThemeMode; labelKey: string }[] = [
+  { value: "system", labelKey: "settings.theme.system" },
+  { value: "light", labelKey: "settings.theme.light" },
+  { value: "dark", labelKey: "settings.theme.dark" },
+  { value: "oled", labelKey: "settings.theme.oled" },
+];
+
+function readStoredTheme(): ThemeMode {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "light" || stored === "dark" || stored === "oled") return stored;
+  } catch {
+    // Storage blocked; fall back to system.
+  }
+  return "system";
+}
+
+function getThemeMetaColor(theme: ThemeMode): string {
+  if (theme === "light") return "#f5f5f7";
+  if (theme === "dark") return "#1f1f27";
+  if (theme === "oled") return "#000000";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "#1f1f27" : "#f5f5f7";
+}
+
+function applyTheme(theme: ThemeMode) {
+  const root = document.documentElement;
+  if (theme === "system") {
+    root.removeAttribute("data-theme");
+  } else {
+    root.setAttribute("data-theme", theme);
+  }
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (meta) {
+    meta.content = getThemeMetaColor(theme);
+  }
+}
 
 type NativeStatusKey =
   | "settings.status.idle"
@@ -35,9 +76,31 @@ export function AccountView() {
   const [clearSheetOpen, setClearSheetOpen] = useState(false);
   const [clearSheetStatusKey, setClearSheetStatusKey] = useState<NativeStatusKey>("settings.status.idle");
   const [isClearBusy, setIsClearBusy] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
+  const [notifyPrefs, setNotifyPrefs] = useState(getNotifyPrefs);
   const canRetryNativeAction = statusKey === "settings.status.nativeBridgeUnavailable";
   const currentLanguage: MobileLanguage = i18n.language?.startsWith("zh") ? "zh" : "en";
   const mobileSurfaces = getSurfacesByPlatform("mobile");
+
+  useEffect(() => {
+    applyTheme(theme);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // Storage blocked; theme still applies in memory.
+    }
+  }, [theme]);
+
+  // Re-apply meta theme-color when system preference changes while in system mode
+  useEffect(() => {
+    if (theme !== "system") return;
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    function handleChange() {
+      applyTheme("system");
+    }
+    mql.addEventListener("change", handleChange);
+    return () => mql.removeEventListener("change", handleChange);
+  }, [theme]);
   const readinessItems = [
     {
       icon: <Link2 size={16} />,
@@ -267,8 +330,52 @@ export function AccountView() {
           </section>
 
           <section className="mobileSettingCard">
+            <div className="mobileSettingHeader">
+              <div>
+                <h3>{t("settings.theme.title")}</h3>
+                <p>{t("settings.theme.description")}</p>
+              </div>
+              <span className="mobileSettingBadge">{t(`settings.theme.${theme}`)}</span>
+            </div>
+            <SegmentedControl
+              ariaLabel={t("settings.theme.title")}
+              value={theme}
+              onChange={(value) => setTheme(value as ThemeMode)}
+              className="mobileSegmentedToolbar"
+              optionClassName="mobileSegmentButton"
+              activeOptionClassName="mobileSegmentButtonActive"
+              options={themeModes.map((mode) => ({
+                value: mode.value,
+                label: t(mode.labelKey),
+                icon: <Palette size={14} />,
+              }))}
+            />
+          </section>
+
+          <section className="mobileSettingCard">
             <h3>{t("settings.notifications.title")}</h3>
             <p>{t("settings.notifications.description")}</p>
+            <div className="mobileNotifyPrefList">
+              {([
+                { key: "run_completed" as NotifyEventType, labelKey: "settings.notifications.runCompleted" },
+                { key: "run_failed" as NotifyEventType, labelKey: "settings.notifications.runFailed" },
+                { key: "approval_needed" as NotifyEventType, labelKey: "settings.notifications.approvalNeeded" },
+              ]).map(({ key, labelKey }) => (
+                <label key={key} className="mobileNotifyPrefRow">
+                  <span>{t(labelKey)}</span>
+                  <input
+                    type="checkbox"
+                    className="mobileToggle"
+                    checked={notifyPrefs[key]}
+                    onChange={(e) => {
+                      const enabled = e.currentTarget.checked;
+                      setNotifyEnabled(key, enabled);
+                      setNotifyPrefs((prev) => ({ ...prev, [key]: enabled }));
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
             <button
               className="mobileActionButton"
               type="button"

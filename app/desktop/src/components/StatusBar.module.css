@@ -110,6 +110,33 @@
   font-style: italic;
 }
 
+/* ── Draining indicator ── */
+
+.draining {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #8b5cf6;
+}
+
+.drainingIcon {
+  animation: drainingSpin 1.2s linear infinite;
+}
+
+.drainingText {
+  font-size: var(--font-size-xs);
+  font-style: italic;
+}
+
+@keyframes drainingSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ── Hub button ── */
 
 .hubBtn {
@@ -131,6 +158,42 @@
 .hubBtn:hover {
   color: var(--foreground);
   border-color: var(--border);
+}
+
+/* ── Token usage ── */
+
+.tokenUsage {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.tokenLabel {
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  color: var(--muted-foreground);
+  opacity: 0.5;
+  margin-right: 2px;
+  letter-spacing: 0;
+}
+
+.tokenIn {
+  color: var(--primary);
+}
+
+.tokenSep {
+  color: var(--muted-foreground);
+  opacity: 0.35;
+}
+
+.tokenOut {
+  color: var(--success);
 }
 
 /* ── Theme toggle button ── */
@@ -180,5 +243,9 @@
     min-width: 16px;
     height: 16px;
     font-size: 10px;
+  }
+
+  .tokenUsage {
+    display: none;
   }
 }

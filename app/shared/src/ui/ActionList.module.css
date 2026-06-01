@@ -56,3 +56,23 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Responsive ─────────────────── */
+
+@media (max-width: 480px) {
+  .item {
+    min-height: 56px;
+    padding: 8px 10px;
+    gap: 8px;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+  }
+
+  .icon {
+    width: var(--touch-target-min, 44px);
+    height: var(--touch-target-min, 44px);
+  }
+
+  .title {
+    font-size: 15px;
+  }
+}

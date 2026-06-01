@@ -1,5 +1,6 @@
 import React, { type ReactNode } from 'react';
 import styles from './MessageBubble.module.css';
+import { SkeletonBar } from './SkeletonBar';
 
 export interface MessageBubbleProps {
   author: ReactNode;
@@ -15,6 +16,10 @@ export interface MessageBubbleProps {
   authorClassName?: string | undefined;
   contentClassName?: string | undefined;
   actionsClassName?: string | undefined;
+  /** Show skeleton placeholder instead of content. */
+  isLoading?: boolean;
+  /** Shown instead of bubble content when truthy. Takes priority over loading. */
+  error?: string | ReactNode;
 }
 
 function cx(...classes: Array<string | false | null | undefined>): string {
@@ -35,7 +40,43 @@ export function MessageBubble({
   authorClassName,
   contentClassName,
   actionsClassName,
+  isLoading,
+  error,
 }: MessageBubbleProps) {
+  if (error) {
+    const ContentTag = contentAs;
+    return (
+      <article className={cx(styles.row, align === 'end' && styles.rowEnd, className)} data-align={align} aria-label={ariaLabel}>
+        <div className={cx(styles.bubble, bubbleClassName)}>
+          <div className={cx(styles.meta, metaClassName)}>
+            <strong className={authorClassName}>{author}</strong>
+            <time>{timestamp}</time>
+          </div>
+          <ContentTag className={cx(styles.content, contentClassName)} role="alert">
+            {typeof error === 'string' ? error : error}
+          </ContentTag>
+        </div>
+      </article>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <article className={cx(styles.row, align === 'end' && styles.rowEnd, className)} data-align={align} aria-busy="true" aria-label="Loading message">
+        <div className={cx(styles.bubble, bubbleClassName)}>
+          <div className={cx(styles.meta, metaClassName)}>
+            <strong className={authorClassName}>
+              <SkeletonBar width="80px" height="12px" lines={1} />
+            </strong>
+          </div>
+          <div className={cx(styles.content, contentClassName)}>
+            <SkeletonBar width="85%" height="12px" lines={3} gap="8px" />
+          </div>
+        </div>
+      </article>
+    );
+  }
+
   const ContentTag = contentAs;
 
   return (

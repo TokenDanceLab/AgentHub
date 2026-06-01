@@ -12,6 +12,7 @@ export interface IMMessage {
   content: string;
   timestamp: string;
   replyToId?: string | undefined;
+  recalled?: boolean;
 }
 
 export interface IMContact {
@@ -22,4 +23,7 @@ export interface IMContact {
   online: boolean;
   avatar?: string;
   lastSeen?: string | undefined;
+  pinned?: boolean;
+  archived?: boolean;
+  muted?: boolean;
 }

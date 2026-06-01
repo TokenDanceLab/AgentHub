@@ -3,6 +3,7 @@ import { persist, subscribeWithSelector } from 'zustand/middleware';
 
 export type ReasoningEffortPreference = 'low' | 'medium' | 'high' | 'max';
 export type ProviderHealth = 'ready' | 'degraded' | 'disabled';
+export type CredentialTestResult = 'idle' | 'connecting' | 'success' | 'error';
 
 export interface ModelAliasMapping {
   alias: string;
@@ -20,6 +21,17 @@ export interface CcSwitchProvider {
   notes: string;
 }
 
+export interface ProviderCredential {
+  providerId: string;
+  apiKey: string;
+  enabled: boolean;
+  baseUrl: string;
+  testResult: CredentialTestResult;
+  testError: string;
+}
+
+const CREDENTIAL_SALT = 'ah-creds-v1';
+
 interface ModelSettingsState {
   defaultModel: string;
   defaultProvider: string;
@@ -29,6 +41,7 @@ interface ModelSettingsState {
   aliases: ModelAliasMapping[];
   ccSwitchBridgeEnabled: boolean;
   ccSwitchProviders: CcSwitchProvider[];
+  credentials: ProviderCredential[];
   setDefaultModel: (value: string) => void;
   setDefaultProvider: (value: string) => void;
   setReasoningEffort: (value: ReasoningEffortPreference) => void;
@@ -38,6 +51,8 @@ interface ModelSettingsState {
   toggleAlias: (alias: string) => void;
   setCcSwitchBridgeEnabled: (value: boolean) => void;
   updateProvider: (id: string, updates: Partial<Omit<CcSwitchProvider, 'id'>>) => void;
+  setCredential: (providerId: string, updates: Partial<Omit<ProviderCredential, 'providerId'>>) => void;
+  setCredentialTestResult: (providerId: string, result: CredentialTestResult, error?: string) => void;
   resolveRunRequestOptions: (input?: RunModelSettingsInput) => ResolvedRunModelSettings;
   reset: () => void;
 }
@@ -110,8 +125,73 @@ const DEFAULT_CC_SWITCH_PROVIDERS: CcSwitchProvider[] = [
   },
 ];
 
+const DEFAULT_CREDENTIALS: ProviderCredential[] = [
+  {
+    providerId: 'tokendance-gateway',
+    apiKey: '',
+    enabled: true,
+    baseUrl: '',
+    testResult: 'idle',
+    testError: '',
+  },
+  {
+    providerId: 'anthropic',
+    apiKey: '',
+    enabled: false,
+    baseUrl: '',
+    testResult: 'idle',
+    testError: '',
+  },
+  {
+    providerId: 'openai',
+    apiKey: '',
+    enabled: false,
+    baseUrl: '',
+    testResult: 'idle',
+    testError: '',
+  },
+  {
+    providerId: 'cc-switch-local',
+    apiKey: '',
+    enabled: false,
+    baseUrl: '',
+    testResult: 'idle',
+    testError: '',
+  },
+];
+
 const cloneAliases = () => DEFAULT_ALIASES.map((item) => ({ ...item }));
 const cloneCcSwitchProviders = () => DEFAULT_CC_SWITCH_PROVIDERS.map((item) => ({ ...item }));
+const cloneCredentials = () => DEFAULT_CREDENTIALS.map((item) => ({ ...item }));
+
+function obscureApiKey(raw: string): string {
+  if (!raw) return '';
+  try {
+    const salted = CREDENTIAL_SALT + raw;
+    return btoa(salted);
+  } catch {
+    return '';
+  }
+}
+
+function revealApiKey(obscured: string): string {
+  if (!obscured) return '';
+  try {
+    const decoded = atob(obscured);
+    if (decoded.startsWith(CREDENTIAL_SALT)) {
+      return decoded.slice(CREDENTIAL_SALT.length);
+    }
+    return decoded;
+  } catch {
+    return obscured;
+  }
+}
+
+function maskApiKey(raw: string): string {
+  if (!raw) return '';
+  if (raw.length <= 8) return '*'.repeat(raw.length);
+  return raw.slice(0, 4) + '*'.repeat(Math.max(raw.length - 8, 4)) + raw.slice(-4);
+}
 
 function migrateProviderId(provider: string | undefined): string | undefined {
   return provider === LEGACY_TOKENDANCE_RELAY_PROVIDER_ID ? TOKENDANCE_GATEWAY_PROVIDER_ID : provider;
@@ -181,6 +261,7 @@ export const useModelSettingsStore = create<ModelSettingsState>()(
         aliases: cloneAliases(),
         ccSwitchBridgeEnabled: false,
         ccSwitchProviders: cloneCcSwitchProviders(),
+        credentials: cloneCredentials(),
 
         setDefaultModel: (value) => set({ defaultModel: value }),
         setDefaultProvider: (value) => set({ defaultProvider: value }),
@@ -206,6 +287,18 @@ export const useModelSettingsStore = create<ModelSettingsState>()(
               item.id === id ? { ...item, ...updates } : item,
             ),
           })),
+        setCredential: (providerId, updates) =>
+          set((state) => ({
+            credentials: state.credentials.map((item) =>
+              item.providerId === providerId ? { ...item, ...updates } : item,
+            ),
+          })),
+        setCredentialTestResult: (providerId, result, error = '') =>
+          set((state) => ({
+            credentials: state.credentials.map((item) =>
+              item.providerId === providerId ? { ...item, testResult: result, testError: error } : item,
+            ),
+          })),
         resolveRunRequestOptions: (input): ResolvedRunModelSettings => resolveRunRequestOptions(get(), input),
         reset: () =>
           set({
@@ -217,11 +310,12 @@ export const useModelSettingsStore = create<ModelSettingsState>()(
             aliases: cloneAliases(),
             ccSwitchBridgeEnabled: false,
             ccSwitchProviders: cloneCcSwitchProviders(),
+            credentials: cloneCredentials(),
           }),
       }),
       {
         name: 'agenthub-model-settings',
-        version: 3,
+        version: 4,
         migrate: migratePersistedState,
       },
     ),
@@ -230,3 +324,5 @@ export const useModelSettingsStore = create<ModelSettingsState>()(
 
 export const DEFAULT_MODEL_ALIASES = DEFAULT_ALIASES;
 export const DEFAULT_CC_SWITCH_PROVIDER_STATUS = DEFAULT_CC_SWITCH_PROVIDERS;
+
+export { obscureApiKey, revealApiKey, maskApiKey };

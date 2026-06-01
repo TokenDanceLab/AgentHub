@@ -1,0 +1,119 @@
+.container {
+  padding: 4px 0;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.eventRow {
+  display: flex;
+  gap: 0;
+}
+
+.eventDot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 24px;
+  flex-shrink: 0;
+}
+
+.dotCircle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dotLine {
+  width: 2px;
+  flex: 1;
+  min-height: 12px;
+  background: var(--color-border, rgba(255, 255, 255, 0.08));
+  margin: 2px 0;
+}
+
+.eventRow:last-child .dotLine {
+  display: none;
+}
+
+.eventContent {
+  flex: 1;
+  padding: 4px 0 10px 8px;
+  min-width: 0;
+}
+
+.eventHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.eventType {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text, #e5e7eb);
+}
+
+.eventSeq {
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--color-text-secondary, #9ca3af);
+  background: var(--color-surface-variant, rgba(255, 255, 255, 0.05));
+  padding: 0 5px;
+  border-radius: 3px;
+}
+
+.eventTime {
+  font-size: 10px;
+  color: var(--color-text-secondary, #9ca3af);
+  font-variant-numeric: tabular-nums;
+}
+
+.eventDetails {
+  font-size: 11px;
+  color: var(--color-text-secondary, #9ca3af);
+  line-height: 1.4;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+/* Dot colors */
+.eventAssignment { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
+.eventDone { background: rgba(16, 185, 129, 0.2); color: #86efac; }
+.eventFailed { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+.eventTask { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+.eventRoute { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+.eventStart { background: rgba(16, 185, 129, 0.2); color: #86efac; }
+.eventMessage { background: rgba(156, 163, 175, 0.2); color: #d1d5db; }
+.eventApproval { background: rgba(99, 102, 241, 0.2); color: #c4b5fd; }
+.eventConflict { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+.eventUnknown { background: rgba(156, 163, 175, 0.2); color: #9ca3af; }
+
+.hint,
+.empty,
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 13px;
+  text-align: center;
+}
+
+.emptyIcon {
+  opacity: 0.4;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+.error {
+  color: var(--color-danger, #ef4444);
+}

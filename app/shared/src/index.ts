@@ -69,6 +69,10 @@ export type {
   ReviewDiff,
 } from './diff';
 
+// Go-ported extraction / validation (edge-server/internal/diff/diff.go)
+export { isDiff, extractDiffs, isObj } from './diff';
+export type { DiffInput } from './diff';
+
 export {
   estimateTokens,
   breakdownContext,
@@ -202,3 +206,25 @@ export {
   type HubMessage,
   type HubContactInfo,
 } from './hubClient';
+
+// UI components (shared across Desktop and Web)
+export {
+  PermissionModePicker,
+  ToolTimeline,
+  DiffReviewPanel,
+} from './ui';
+export type {
+  PermissionModeOption,
+  PermissionModePickerProps,
+  ToolTimelineBlock,
+  ToolTimelineProps,
+  ToolTimelineLabels,
+  ToolTimelineToolUse,
+  ToolTimelineFileChange,
+  ToolTimelineAgentTask,
+  ToolTimelineChildAgent,
+  ToolTimelineRouteDecision,
+  DiffReviewFile,
+  DiffReviewLabels,
+  DiffReviewPanelProps,
+} from './ui';

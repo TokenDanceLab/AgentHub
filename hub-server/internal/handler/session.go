@@ -143,7 +143,15 @@ func (h *SessionHandler) Leave(c *gin.Context) {
 }
 
 type transferOwnerReq struct {
-	NewOwnerID string `json:"new_owner_id" binding:"required"`
+	NewOwnerID       string `json:"new_owner_id"`
+	NewOwnerUserID   string `json:"new_owner_user_id"`
+}
+
+func (r transferOwnerReq) resolveNewOwnerID() string {
+	if r.NewOwnerUserID != "" {
+		return r.NewOwnerUserID
+	}
+	return r.NewOwnerID
 }
 
 func (h *SessionHandler) TransferOwner(c *gin.Context) {
@@ -152,9 +160,14 @@ func (h *SessionHandler) TransferOwner(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
+	newOwnerID := req.resolveNewOwnerID()
+	if newOwnerID == "" {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
 	userID := c.GetString("user_id")
 	sessionID := c.Param("id")
-	if err := h.service.TransferGroupOwnership(c.Request.Context(), userID, sessionID, req.NewOwnerID); err != nil {
+	if err := h.service.TransferGroupOwnership(c.Request.Context(), userID, sessionID, newOwnerID); err != nil {
 		if e, ok := err.(*errcode.Error); ok {
 			Fail(c, e)
 			return

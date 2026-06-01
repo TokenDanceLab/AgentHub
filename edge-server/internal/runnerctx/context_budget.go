@@ -5,6 +5,7 @@ package runnerctx
 import (
 	"strings"
 	"sync/atomic"
+	"time"
 )
 
 // DefaultMaxTokens is the default context window size (Claude Opus 200K).
@@ -125,8 +126,47 @@ func EstimateTokens(text string) int {
 
 // Message represents a single message in a conversation history.
 type Message struct {
-	Role    string `json:"role"`    // "user", "assistant", "system", "tool"
-	Content string `json:"content"` // message text content
+	Role      string    `json:"role"`      // "user", "assistant", "system", "tool"
+	Content   string    `json:"content"`   // message text content
+	Timestamp time.Time `json:"timestamp"` // when the message was created
+}
+
+// BuildContextPreface formats thread history and pinned messages into a
+// system-prompt-compatible preface that injects conversation context into
+// any agent runtime. Pinned messages are presented first (highest priority),
+// followed by recent thread history. Returns an empty string when there is
+// no context to inject.
+//
+// The output is designed to be prepended to the agent's prompt (Codex,
+// OpenCode) or appended to the system prompt (Claude Code), so that every
+// agent runtime — not just Claude Code with --continue — receives Hub
+// thread history.
+func BuildContextPreface(messages, pinned []Message) string {
+	var b strings.Builder
+
+	if len(pinned) > 0 {
+		b.WriteString("[Pinned context - always relevant]\n")
+		for _, m := range pinned {
+			b.WriteString(m.Role)
+			b.WriteString(": ")
+			b.WriteString(m.Content)
+			b.WriteString("\n")
+		}
+		b.WriteString("[End of pinned context]\n\n")
+	}
+
+	if len(messages) > 0 {
+		b.WriteString("[Previous conversation context - for reference only]\n")
+		for _, m := range messages {
+			b.WriteString(m.Role)
+			b.WriteString(": ")
+			b.WriteString(m.Content)
+			b.WriteString("\n")
+		}
+		b.WriteString("[End of previous context]\n")
+	}
+
+	return b.String()
 }
 
 // CompactionResult contains statistics about a history compaction operation.

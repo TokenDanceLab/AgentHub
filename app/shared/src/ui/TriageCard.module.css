@@ -52,3 +52,22 @@
   justify-content: center;
   flex: 0 0 auto;
 }
+
+/* ── Responsive ─────────────────── */
+
+@media (max-width: 480px) {
+  .card {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .icon {
+    width: var(--touch-target-min, 44px);
+    height: var(--touch-target-min, 44px);
+  }
+
+  .title {
+    font-size: 14px;
+  }
+}

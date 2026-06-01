@@ -1,11 +1,14 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, CheckCircle2, Code2, Copy, FileText, GitPullRequestArrow, MessageSquareText, RefreshCw, SendHorizonal } from "lucide-react";
-import type { Thread, ThreadItem } from "@agenthub/shared";
+import { AlertCircle, ArrowLeft, CheckCircle2, Code2, Copy, FileText, GitPullRequestArrow, MessageSquareText, RefreshCw, Reply, SendHorizonal, Share, ShieldAlert, X, XCircle } from "lucide-react";
+import type { Approval, Run, Thread, ThreadItem } from "@agenthub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createThreadMessage, listThreadItems } from "@agenthub/shared";
-import { ActivityCard, ContextSummary, EmptyState, MessageBubble, StatusNotice } from "@agenthub/shared/ui";
+import { createThreadMessage, decideApproval, listApprovals, listRuns, listThreadItems } from "@agenthub/shared";
+import { ActionList, ActivityCard, BottomSheet, ContextSummary, EmptyState, MessageBubble, StatusNotice } from "@agenthub/shared/ui";
 import { useTranslation } from "react-i18next";
 import { MobileRecoveryPanel } from "../components/MobileRecoveryPanel";
+import { usePullDownGesture } from "../hooks/useSwipeableMessage";
+import { SwipeableMessageRow } from "../hooks/SwipeableMessageRow";
+import { useKeyboardAvoidance } from "../hooks/useKeyboardAvoidance";
 
 interface ChatViewProps {
   thread: Thread;
@@ -16,14 +19,52 @@ type ActivityKind = Exclude<ThreadItem["kind"], "message">;
 type LocalReplyStatus = "sending" | "failed" | "sent";
 
 export function ChatView({ thread, onBack }: ChatViewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [inputValue, setInputValue] = useState("");
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
   const [showLatestJump, setShowLatestJump] = useState(false);
   const [localReply, setLocalReply] = useState<{ content: string; status: LocalReplyStatus } | null>(null);
+  const [replyTarget, setReplyTarget] = useState<ThreadItem | null>(null);
+  const [contextMenuTarget, setContextMenuTarget] = useState<ThreadItem | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const latestRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const queryClient = useQueryClient();
+
+  // Keyboard avoidance — detect soft keyboard via Visual Viewport API
+  const { isKeyboardVisible, keyboardHeight } = useKeyboardAvoidance();
+
+  // ─── Inline approval state ───
+  const [localDecisionStatus, setLocalDecisionStatus] = useState<"approved" | "rejected" | null>(null);
+
+  const runs = useQuery({
+    queryKey: ["runs", thread.id],
+    queryFn: () => listRuns({ threadId: thread.id }),
+    refetchInterval: 5000,
+  });
+
+  const approvals = useQuery({
+    queryKey: ["approvals"],
+    queryFn: listApprovals,
+  });
+
+  const pendingRun = runs.data?.items.find((r) => r.status === "waiting_approval") ?? null;
+  const pendingApproval = pendingRun
+    ? approvals.data?.items.find((a) => a.runId === pendingRun.runId && a.status === "pending") ?? null
+    : null;
+  const decisionStatus = localDecisionStatus ?? pendingApproval?.status;
+
+  const decideApprovalMutation = useMutation({
+    mutationFn: async ({ approvalId, decision }: { approvalId: string; decision: "approved" | "rejected" }) => {
+      return decideApproval(approvalId, { decision });
+    },
+    onSuccess: (_result, variables) => {
+      setLocalDecisionStatus(variables.decision);
+      void queryClient.invalidateQueries({ queryKey: ["approvals"] });
+      void queryClient.invalidateQueries({ queryKey: ["runs", thread.id] });
+      void queryClient.invalidateQueries({ queryKey: ["thread-items", thread.id] });
+    },
+  });
 
   const messages = useQuery({
     queryKey: ["thread-items", thread.id],
@@ -67,6 +108,42 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
     setShowLatestJump(false);
   }, []);
 
+  // ─── Pull-down-to-refresh ───
+  const pullDownHandlers = usePullDownGesture(scrollRef, () => {
+    void messages.refetch();
+  }, messages.isFetching);
+
+  // ─── Long-press context menu ───
+  function openContextMenu(item: ThreadItem) {
+    setContextMenuTarget(item);
+  }
+
+  function closeContextMenu() {
+    setContextMenuTarget(null);
+  }
+
+  function handleSwipeReply(item: ThreadItem) {
+    setReplyTarget(item);
+  }
+
+  function handleForward(item: ThreadItem) {
+    navigator.clipboard.writeText(item.content).catch(() => {});
+    setCopiedItemId(item.id);
+    window.setTimeout(() => setCopiedItemId(null), 1400);
+  }
+
+  // ─── Keyboard avoidance: scroll the textarea into view on focus ───
+  const handleTextareaFocus = useCallback(() => {
+    // Delay slightly so the soft keyboard animation can start,
+    // then scroll the composer into the visible area.
+    window.setTimeout(() => {
+      const ta = textareaRef.current;
+      if (ta) {
+        ta.scrollIntoView({ block: "end", behavior: "smooth" });
+      }
+    }, 120);
+  }, []);
+
   const visibleItems = useMemo(
     () => (messages.data?.items ?? []).filter((item) => item.content.trim()),
     [messages.data?.items],
@@ -91,29 +168,37 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
     const isUser = item.role === "user";
 
     return (
-      <MessageBubble
+      <SwipeableMessageRow
         key={item.id}
-        className={`mobileMessageRow${isUser ? " mobileMessageRowUser" : ""}`}
-        bubbleClassName={`mobileMessage ${isUser ? "mobileUserMsg" : "mobileAgentMsg"}`}
-        metaClassName="mobileMessageMeta"
-        actionsClassName="mobileMessageActions"
-        align={isUser ? "end" : "start"}
-        author={isUser ? t("chat.participants.user") : t("chat.participants.agent")}
-        timestamp={new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-        actions={(
-          <button
-            className="mobileMessageAction"
-            type="button"
-            onClick={() => void copyContent(item)}
-            aria-label={isUser ? t("chat.actions.copyUser") : t("chat.actions.copyAgent")}
-          >
-            <Copy size={14} />
-            <span>{copiedItemId === item.id ? t("chat.actions.copied") : t("chat.actions.copy")}</span>
-          </button>
-        )}
+        isUser={isUser}
+        onReply={() => handleSwipeReply(item)}
+        onCopy={() => { void copyContent(item); }}
+        onForward={() => { handleForward(item); }}
+        onLongPress={() => { openContextMenu(item); }}
       >
-        {item.content}
-      </MessageBubble>
+        <MessageBubble
+          className={`mobileMessageRow${isUser ? " mobileMessageRowUser" : ""}`}
+          bubbleClassName={`mobileMessage ${isUser ? "mobileUserMsg" : "mobileAgentMsg"}`}
+          metaClassName="mobileMessageMeta"
+          actionsClassName="mobileMessageActions"
+          align={isUser ? "end" : "start"}
+          author={isUser ? t("chat.participants.user") : t("chat.participants.agent")}
+          timestamp={new Date(item.createdAt).toLocaleTimeString(i18n.resolvedLanguage || i18n.language, { hour: "2-digit", minute: "2-digit" })}
+          actions={(
+            <button
+              className="mobileMessageAction"
+              type="button"
+              onClick={() => void copyContent(item)}
+              aria-label={isUser ? t("chat.actions.copyUser") : t("chat.actions.copyAgent")}
+            >
+              <Copy size={14} />
+              <span>{copiedItemId === item.id ? t("chat.actions.copied") : t("chat.actions.copy")}</span>
+            </button>
+          )}
+        >
+          {item.content}
+        </MessageBubble>
+      </SwipeableMessageRow>
     );
   }
 
@@ -126,6 +211,9 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
     };
     const meta = activityMeta[item.kind as ActivityKind];
     const Icon = meta.icon;
+    const isApproval = item.kind === "approval" && pendingRun && pendingApproval;
+    const isDecided = decisionStatus === "approved" || decisionStatus === "rejected";
+    const buttonDisabled = decideApprovalMutation.isPending || isDecided;
 
     return (
       <ActivityCard
@@ -134,9 +222,43 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
         iconClassName="mobileActivityIcon"
         bodyClassName="mobileActivityBody"
         metaClassName="mobileActivityMeta"
+        actionsClassName="mobileActivityActions"
         label={meta.label}
-        meta={<time>{new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>}
+        meta={<time>{new Date(item.createdAt).toLocaleTimeString(i18n.resolvedLanguage || i18n.language, { hour: "2-digit", minute: "2-digit" })}</time>}
         icon={<Icon size={16} />}
+        actions={isApproval ? (
+          <div className="mobileInlineApprovalActions">
+            {isDecided ? (
+              <StatusNotice
+                className="mobileSignalRow"
+                icon={decisionStatus === "approved" ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+              >
+                {decisionStatus === "approved" ? t("runDetail.review.decisionApproved") : t("runDetail.review.decisionRejected")}
+              </StatusNotice>
+            ) : (
+              <>
+                <button
+                  className="mobileActionButton"
+                  type="button"
+                  disabled={buttonDisabled}
+                  onClick={() => decideApprovalMutation.mutate({ approvalId: pendingApproval.id, decision: "approved" })}
+                >
+                  {decideApprovalMutation.isPending ? <RefreshCw size={14} className="mobileSpin" /> : <CheckCircle2 size={14} />}
+                  <span>{t("runDetail.actions.approve")}</span>
+                </button>
+                <button
+                  className="mobileActionButton mobileDangerAction"
+                  type="button"
+                  disabled={buttonDisabled}
+                  onClick={() => decideApprovalMutation.mutate({ approvalId: pendingApproval.id, decision: "rejected" })}
+                >
+                  <XCircle size={14} />
+                  <span>{t("runDetail.actions.reject")}</span>
+                </button>
+              </>
+            )}
+          </div>
+        ) : undefined}
       >
         {item.content}
       </ActivityCard>
@@ -160,7 +282,39 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
         </div>
       </header>
 
-      <div className="mobileScroll mobileChatScroll" ref={scrollRef} onScroll={handleScroll}>
+      {pendingRun && pendingApproval && decisionStatus !== "approved" && decisionStatus !== "rejected" && (
+        <div className="mobileApprovalBar">
+          <ShieldAlert size={16} />
+          <span className="mobileApprovalBarSummary">{pendingApproval.summary || t("runDetail.review.pending")}</span>
+          <div className="mobileApprovalBarActions">
+            <button
+              className="mobileActionButton"
+              type="button"
+              disabled={decideApprovalMutation.isPending}
+              onClick={() => decideApprovalMutation.mutate({ approvalId: pendingApproval.id, decision: "approved" })}
+            >
+              {decideApprovalMutation.isPending ? <RefreshCw size={14} className="mobileSpin" /> : <CheckCircle2 size={14} />}
+              <span>{t("runDetail.actions.approve")}</span>
+            </button>
+            <button
+              className="mobileActionButton mobileDangerAction"
+              type="button"
+              disabled={decideApprovalMutation.isPending}
+              onClick={() => decideApprovalMutation.mutate({ approvalId: pendingApproval.id, decision: "rejected" })}
+            >
+              <XCircle size={14} />
+              <span>{t("runDetail.actions.reject")}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div
+        className={`mobileScroll mobileChatScroll${isKeyboardVisible ? " mobileKeyboardVisible" : ""}`}
+        ref={scrollRef}
+        onScroll={handleScroll}
+        {...pullDownHandlers}
+      >
         <ContextSummary
           className="mobileChatContextPanel"
           eyebrowClassName="mobileEyebrow"
@@ -172,7 +326,7 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
             {
               id: "updated",
               label: t("chat.context.updated"),
-              value: new Date(thread.updatedAt ?? thread.createdAt).toLocaleString([], {
+              value: new Date(thread.updatedAt ?? thread.createdAt).toLocaleString(i18n.resolvedLanguage || i18n.language, {
                 month: "short",
                 day: "numeric",
                 hour: "2-digit",
@@ -261,8 +415,10 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
         }}
       >
         <textarea
+          ref={textareaRef}
           value={inputValue}
           onChange={(event) => setInputValue(event.target.value)}
+          onFocus={handleTextareaFocus}
           aria-label={t("chat.composer.label")}
           placeholder={messages.isError ? t("chat.states.replyPaused") : t("chat.composer.placeholder")}
           rows={2}
@@ -310,6 +466,68 @@ export function ChatView({ thread, onBack }: ChatViewProps) {
           </StatusNotice>
         )}
       </form>
+
+      {/* ─── Long-press context menu ─── */}
+      {contextMenuTarget && (
+        <BottomSheet
+          ariaLabel={t("chat.sheets.contextActions")}
+          title={t("chat.sheets.contextActions")}
+          closeLabel={t("chat.sheets.closeSheet")}
+          onClose={closeContextMenu}
+          sheetClassName="mobileBottomSheet"
+          scrimClassName="mobileSheetScrim"
+          layerClassName="mobileSheetLayer"
+          handleClassName="mobileSheetHandle"
+          headerClassName="mobileSheetHeader"
+        >
+          <ActionList
+            items={[
+              {
+                id: "reply",
+                title: t("chat.actions.reply"),
+                icon: <Reply size={15} />,
+                onClick: () => { handleSwipeReply(contextMenuTarget); closeContextMenu(); },
+              },
+              ...(contextMenuTarget.role === "user"
+                ? []
+                : [{
+                  id: "copy",
+                  title: t("chat.actions.copy"),
+                  icon: <Copy size={15} />,
+                  onClick: () => { void copyContent(contextMenuTarget); closeContextMenu(); },
+                }]
+              ),
+              {
+                id: "forward",
+                title: t("chat.actions.forward"),
+                icon: <Share size={15} />,
+                onClick: () => { handleForward(contextMenuTarget); closeContextMenu(); },
+              },
+            ]}
+          />
+        </BottomSheet>
+      )}
+
+      {/* ─── Reply target indicator ─── */}
+      {replyTarget && (
+        <div
+          className="mobileReplyIndicator"
+          role="status"
+          aria-live="polite"
+        >
+          <span>
+            {t("chat.replyIndicator.prefix", { author: replyTarget.role === "user" ? t("chat.participants.user") : t("chat.participants.agent") })}
+          </span>
+          <button
+            className="mobileIconButton"
+            type="button"
+            aria-label={t("chat.replyIndicator.dismiss")}
+            onClick={() => setReplyTarget(null)}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

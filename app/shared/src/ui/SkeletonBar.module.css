@@ -1,0 +1,27 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .line {
+    display: block;
+    border-radius: var(--radius-sm, 0.25rem);
+    background: oklch(0 0 0 / 0.08);
+    animation: skeletonPulse 1.8s ease-in-out infinite;
+  }
+
+  @keyframes skeletonPulse {
+    0% { opacity: 0.48; }
+    50% { opacity: 0.86; }
+    100% { opacity: 0.48; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line {
+    animation: none;
+    opacity: 0.64;
+  }
+}

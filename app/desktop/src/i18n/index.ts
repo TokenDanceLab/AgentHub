@@ -7,6 +7,16 @@ const SUPPORTED = ['zh', 'en'] as const;
 
 function detectLanguage(): string {
   if (typeof navigator === 'undefined') return 'en';
+
+  // 1) Check user preference stored by LanguageContext
+  try {
+    const stored = localStorage.getItem('agenthub-lang');
+    if (stored === 'en' || stored === 'zh') return stored;
+  } catch {
+    /* localStorage unavailable */
+  }
+
+  // 2) Fall back to browser language
   const raw = navigator.language || (navigator as any).userLanguage || '';
   const base = raw.split('-')[0];
   return SUPPORTED.includes(base as any) ? base : 'en';
