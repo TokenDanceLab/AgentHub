@@ -48,11 +48,11 @@ func TestPublicStatsBucketsCountsAndUptime(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	var resp struct {
-		Status string              `json:"status"`
-		Data   handler.PublicStats `json:"data"`
+		Code string              `json:"code"`
+		Data handler.PublicStats `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	require.Equal(t, "ok", resp.Status)
+	require.Equal(t, "OK", resp.Code)
 	require.Equal(t, int64(30), resp.Data.TotalUsers)
 	require.Equal(t, int64(1000), resp.Data.TotalAgents)
 	require.Equal(t, int64(20), resp.Data.OnlineAgents)
