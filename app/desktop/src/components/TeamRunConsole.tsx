@@ -250,10 +250,10 @@ function parsePayloadSummary(payload: string): string {
 
 function statusClass(status: string | undefined): string {
   const normalized = status?.toLowerCase() ?? '';
-  if (DONE_STATUSES.has(normalized)) return styles.statusDone;
-  if (FAILED_STATUSES.has(normalized)) return styles.statusBlocked;
-  if (ACTIVE_STATUSES.has(normalized)) return styles.statusRunning;
-  return styles.statusNeutral;
+  if (DONE_STATUSES.has(normalized)) return styles.statusDone!;
+  if (FAILED_STATUSES.has(normalized)) return styles.statusBlocked!;
+  if (ACTIVE_STATUSES.has(normalized)) return styles.statusRunning!;
+  return styles.statusNeutral!;
 }
 
 function EmptyPanel({ title, body }: { title: string; body: string }) {

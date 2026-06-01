@@ -14,7 +14,7 @@ function detectLanguage(): string {
   if (typeof navigator === 'undefined') return 'en';
   const legacyNavigator = navigator as Navigator & { userLanguage?: string };
   const raw = navigator.language || legacyNavigator.userLanguage || '';
-  const base = raw.split('-')[0];
+  const base = raw.split('-')[0]!;
   return isSupportedLanguage(base) ? base : 'en';
 }
 

@@ -42,7 +42,7 @@
   height: 28px;
   border-radius: 6px;
   background: var(--brand);
-  color: #ffffff;
+  color: var(--primary-foreground);
   font-size: 12px;
   letter-spacing: 0;
 }
