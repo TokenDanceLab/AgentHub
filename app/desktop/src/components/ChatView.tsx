@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useLayoutEffect, memo } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, ChevronRight, Route, GitFork, Gauge } from 'lucide-react';
@@ -762,8 +762,54 @@ function RouteDecisionBlock({ block }: { block: Extract<MessageBlock, { kind: 'r
   );
 }
 
+// ── Stable block key generation ──────────────
+function blockKey(block: MessageBlock, index: number): string {
+  switch (block.kind) {
+    case 'tool_use':
+      return `tool-${block.callId}`;
+    case 'text':
+      return `text-${index}`;
+    case 'thinking':
+      return `thinking-${index}`;
+    case 'code':
+      return `code-${index}`;
+    case 'result':
+      return `result-${block.error ?? 'success'}-${index}`;
+    case 'file_change':
+      return `file-${block.path}-${block.action}-${index}`;
+    case 'agent_task':
+      return `task-${block.taskId}`;
+    case 'child_agent':
+      return `child-${block.childId}`;
+    case 'route_decision':
+      return `route-${block.action}-${index}`;
+    case 'context_usage':
+      return `context-${block.runId ?? index}`;
+    case 'session_init':
+      return `session-${block.model ?? index}`;
+    case 'artifact':
+      return `artifact-${block.artifactId}`;
+    case 'deploy_card':
+      return `deploy-${block.deployId ?? index}`;
+    case 'link_card':
+      return `link-${block.url}-${index}`;
+    case 'approval':
+      return `approval-${block.approvalId}`;
+    case 'tool_group':
+      return `toolgroup-${index}`;
+    case 'error':
+      return `error-${index}`;
+    case 'citation':
+      return `cite-${block.url ?? block.text ?? index}`;
+    case 'compact':
+      return `compact-${index}`;
+    default:
+      return `block-${index}`;
+  }
+}
+
 // ── Main BlockRenderer ──────────────────────
-function BlockRenderer({
+const BlockRenderer = memo(function BlockRenderer({
   block,
   t,
   role,
@@ -1030,7 +1076,7 @@ export default function ChatView({
           {msg.blocks.map((block, i) => {
             return (
               <BlockRenderer
-                key={i}
+                key={blockKey(block, i)}
                 block={block}
                 t={t}
                 role={msg.role}
