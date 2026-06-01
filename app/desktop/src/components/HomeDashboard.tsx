@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Activity,
-  AlertTriangle,
-  Bot,
+  GitBranch,
+  LogIn,
   MessageSquareText,
   Plus,
   Route,
@@ -17,21 +17,19 @@ import type { AgentTeamOverview } from '@/api/agentTeamQueries';
 import { useRuns } from '@/api/runQueries';
 import { useThreads } from '@/api/threadQueries';
 import { useHealth } from '@/hooks/useHealth';
-import { resolveLocalOrchestration } from '@/utils/localOrchestration';
-import type { AgentInfo, ThreadInfo } from '@shared/types';
-import WorkspacePicker from '@/components/WorkspacePicker';
-import type { WorkspaceEntry } from '@/utils/workspaceStore';
+import { useHubStore } from '@/stores/hubStore';
+import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
+import type { ThreadInfo } from '@shared/types';
 import styles from './HomeDashboard.module.css';
 
 interface Props {
   onNewThread: () => void;
   onSelectThread: (threadId: string) => void;
   onQuickStart: (prompt: string) => void;
-  onViewRuns: () => void;
-  onReviewApprovals: () => void;
-  onViewAllThreads: () => void;
-  onOpenTeamRuns: () => void;
-  onOpenHubAccount: () => void;
+  onOpenTeamRuns?: () => void;
+  onOpenRuns?: () => void;
+  onOpenApprovals?: () => void;
+  onOpenAuth?: () => void;
   permissionCount?: number;
   agentTeamOverview?: AgentTeamOverview;
   agentTeamsLoading?: boolean;
@@ -56,7 +54,7 @@ const QUICK_START_KEYS = [
 ] as const;
 
 function isRunActive(status: string): boolean {
-  return ['queued', 'running', 'streaming', 'waiting_for_input'].includes(status);
+  return ['queued', 'running', 'streaming', 'waiting_for_input', 'waiting_approval'].includes(status);
 }
 
 function isTeamRunActive(status?: string): boolean {
@@ -97,11 +95,10 @@ export default function HomeDashboard({
   onNewThread,
   onSelectThread,
   onQuickStart,
-  onViewRuns,
-  onReviewApprovals,
-  onViewAllThreads,
   onOpenTeamRuns,
-  onOpenHubAccount,
+  onOpenRuns,
+  onOpenApprovals,
+  onOpenAuth,
   permissionCount = 0,
   agentTeamOverview,
   agentTeamsLoading = false,
@@ -122,11 +119,18 @@ export default function HomeDashboard({
   const { online, health } = useHealth();
   const { data: runData } = useRuns();
   const { data: threadData } = useThreads();
+  const hubAuthenticated = useHubStore((s) => s.authenticated);
+  const hubUsername = useHubStore((s) => s.username);
+  const bridgedTasks = useTaskBridgeStore((s) => s.tasks);
 
-  const runs = runData?.items ?? [];
-  const threads = threadData?.items ?? [];
+  const runs = useMemo(() => runData?.items ?? [], [runData?.items]);
+  const threads = useMemo(() => threadData?.items ?? [], [threadData?.items]);
 
   const activeRunCount = useMemo(() => runs.filter((r) => isRunActive(r.status)).length, [runs]);
+  const activeBridgeCount = useMemo(
+    () => bridgedTasks.filter((task) => task.status === 'queued' || task.status === 'running').length,
+    [bridgedTasks],
+  );
   const recentThreads = useMemo(() => getRecentThreads(threads, 5), [threads]);
   const teamRuns = useMemo(
     () => agentTeamOverview?.bundles.flatMap((bundle) => bundle.runs.map((run) => ({ run, team: bundle.team }))) ?? [],
@@ -198,8 +202,9 @@ export default function HomeDashboard({
           <button
             type="button"
             className={styles.statFooter}
-            onClick={onViewRuns}
+            onClick={onOpenRuns}
             title={t('home.viewAllRuns')}
+            disabled={!onOpenRuns}
           >
             {t('home.viewAllRuns')}
           </button>
@@ -215,11 +220,53 @@ export default function HomeDashboard({
           <button
             type="button"
             className={styles.statFooter}
-            onClick={onReviewApprovals}
-            disabled={permissionCount === 0}
-            title={permissionCount === 0 ? t('home.noPendingApprovals') : t('home.reviewApprovals')}
+            onClick={onOpenApprovals}
+            disabled={!onOpenApprovals || permissionCount === 0}
           >
             {t('home.reviewApprovals')}
+          </button>
+        </div>
+
+        {/* Hub session / bridge */}
+        <div className={styles.statCard}>
+          <div className={styles.statLabel}>
+            <LogIn size={14} />
+            {t('home.hubSession')}
+          </div>
+          <div className={styles.statValue}>
+            {hubAuthenticated ? t('home.hubConnected') : t('home.localOnly')}
+          </div>
+          <span className={styles.statLabel}>
+            {hubAuthenticated
+              ? t('home.hubBridgeSummary', { count: activeBridgeCount, user: hubUsername ?? t('home.hubUserFallback') })
+              : t('home.hubSignedOut')}
+          </span>
+          {!hubAuthenticated ? (
+            <button
+              type="button"
+              className={styles.statFooter}
+              onClick={onOpenAuth}
+              disabled={!onOpenAuth}
+            >
+              {t('home.signInHub')}
+            </button>
+          ) : null}
+        </div>
+
+        {/* TeamRuns */}
+        <div className={styles.statCard}>
+          <div className={styles.statLabel}>
+            <GitBranch size={14} />
+            {t('home.activeTeamRuns')}
+          </div>
+          <div className={styles.statValue}>{t('home.teamRunConsole')}</div>
+          <button
+            type="button"
+            className={styles.statFooter}
+            onClick={onOpenTeamRuns}
+            disabled={!onOpenTeamRuns}
+          >
+            {t('home.openTeamRuns')}
           </button>
         </div>
 

@@ -11,7 +11,7 @@
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--space-lg);
 }
 
@@ -68,8 +68,12 @@
 }
 
 .statFooter:disabled {
-  cursor: not-allowed;
-  opacity: 0.48;
+  color: var(--muted-foreground);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.statFooter:disabled:hover {
   text-decoration: none;
 }
 

@@ -33,11 +33,13 @@ export function useEdgeStatus(online: boolean): EdgeStatus {
   // ── Banner lifecycle ──
   useEffect(() => {
     if (online) {
-      setBannerDismissed(false);
-      setLastError(null);
+      queueMicrotask(() => {
+        setBannerDismissed(false);
+        setLastError(null);
+      });
     } else if (wasOnlineRef.current) {
       if (!lastError) {
-        setLastError(t('banner.disconnected'));
+        queueMicrotask(() => setLastError(t('banner.disconnected')));
       }
     }
     wasOnlineRef.current = online;

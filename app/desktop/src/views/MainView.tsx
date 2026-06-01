@@ -1,5 +1,4 @@
 import { useCallback, lazy, Suspense } from 'react';
-import { useTranslation } from 'react-i18next';
 import type { ViewMode } from '@/config/viewRegistry';
 import type { ChatMessage } from '@/components/ChatView.types';
 import type { AgentInfo } from '@shared/types';
@@ -53,8 +52,6 @@ export default function MainView({
   onDelete,
   onSendMessage,
 }: Props) {
-  const { t } = useTranslation();
-
   const viewMode = resolveViewMode(allMessages, messages, threadsCount, isStreaming, isConnected);
   const handleCreateThread = useCallback(() => {
     const textarea = document.querySelector<HTMLTextAreaElement>(

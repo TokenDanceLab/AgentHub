@@ -1,9 +1,9 @@
-import { lazy, type ComponentType } from 'react';
-import { MessageSquare, Bot, PanelRight, Search, Keyboard, Shield, Users, Route, FolderTree } from 'lucide-react';
+import { lazy } from 'react';
+import { MessageSquare, Bot, PanelRight, Search, Keyboard, Shield, Users, GitBranch } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /** Slot in the layout shell that views can occupy. */
-export type ViewSlot = 'sidebar' | 'centerSidebar' | 'center' | 'rightPanel' | 'agentOverlay' | 'modal' | 'file-explorer';
+export type ViewSlot = 'shell' | 'sidebar' | 'centerSidebar' | 'center' | 'rightPanel' | 'agentOverlay' | 'modal';
 
 /**
  * Standardized props that every registered view component can receive.
@@ -23,7 +23,7 @@ export interface ViewConfig {
   /** Unique identifier; doubles as route key or slot selector. */
   id: string;
   /** The React component that renders this view. */
-  component: ComponentType<any>;
+  component: unknown;
   /** Which layout zone this view occupies. */
   slot: ViewSlot;
   /** Visible on mobile (< 768px). */
@@ -43,13 +43,10 @@ export interface ViewConfig {
 // ═══════════════════════════════════════════════════════════════════
 
 // Lazy imports
-const ChatView = lazy(() => import('@/components/ChatView'));
-const FileExplorer = lazy(() => import('@/components/FileExplorer'));
-const FileSearchDialog = lazy(() => import('@/components/FileSearchDialog'));
 const RunDetail = lazy(() => import('@/components/RunDetail'));
 const SearchDialog = lazy(() => import('@/components/SearchDialog'));
 const IMView = lazy(() => import('@/views/IMView'));
-const TeamRunConsole = lazy(() => import('@/views/TeamRunConsole'));
+const TeamRunConsole = lazy(() => import('@/components/TeamRunConsole'));
 
 // Eager imports
 import StatusBar from '@/components/StatusBar';
@@ -65,7 +62,7 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
   'status-bar': {
     id: 'status-bar',
     component: StatusBar,
-    slot: 'shell' as ViewSlot,
+    slot: 'shell',
     showOnMobile: true,
     showOnTablet: true,
     icon: Shield,
@@ -101,7 +98,7 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
   'prompt-input': {
     id: 'prompt-input',
     component: PromptInput,
-    slot: 'shell' as ViewSlot,
+    slot: 'shell',
     showOnMobile: true,
     showOnTablet: true,
     icon: MessageSquare,
@@ -155,34 +152,14 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
     label: 'view.messages',
     lazy: true,
   },
-  'team-run-console': {
-    id: 'team-run-console',
+  'teamrun-console': {
+    id: 'teamrun-console',
     component: TeamRunConsole,
     slot: 'center',
     showOnMobile: true,
     showOnTablet: true,
-    icon: Route,
-    label: 'view.teamRuns',
-    lazy: true,
-  },
-  'file-explorer': {
-    id: 'file-explorer',
-    component: FileExplorer,
-    slot: 'file-explorer',
-    showOnMobile: false,
-    showOnTablet: true,
-    icon: FolderTree,
-    label: 'fileExplorer.title',
-    lazy: true,
-  },
-  'file-search-dialog': {
-    id: 'file-search-dialog',
-    component: FileSearchDialog,
-    slot: 'modal',
-    showOnMobile: true,
-    showOnTablet: true,
-    icon: Search,
-    label: 'fileSearch.title',
+    icon: GitBranch,
+    label: 'view.teamRunConsole',
     lazy: true,
   },
 };

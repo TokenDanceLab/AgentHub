@@ -9,7 +9,6 @@ import { APP_VERSION, HUB_URL } from '@/config';
 import { readBrowserStorage, shortId } from '../utils';
 import styles from '../../SettingsPage.module.css';
 
-const DEVICE_ID_KEY = 'agenthub_device_id';
 const TD_CODE_VERIFIER_KEY = 'td_code_verifier';
 const TD_STATE_KEY = 'td_state';
 

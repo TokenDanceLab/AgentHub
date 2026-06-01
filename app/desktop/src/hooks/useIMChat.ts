@@ -13,6 +13,7 @@ import type { HubMessage } from '@/api/hubEvents';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
+import { useNotificationStore, type Notification, type NotificationType } from '@/stores/notificationStore';
 import { useToastStore } from '@/stores/toastStore';
 import type { IMMessage, IMContact, AuthorityType } from '@/components/IM/types';
 
@@ -22,6 +23,12 @@ type IMMessageWithHubState = IMMessage & {
 };
 type IMActionStatus = 'pending' | 'error';
 type IMActionState = Record<string, { status: IMActionStatus; error?: string }>;
+
+function omitActionState(state: IMActionState, key: string): IMActionState {
+  return Object.fromEntries(
+    Object.entries(state).filter(([candidate]) => candidate !== key),
+  );
+}
 
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
@@ -37,6 +44,39 @@ function isCallable<TMethod extends keyof HubClient>(client: HubClient, method: 
 
 function errorMessage(err: unknown): string {
   return err instanceof Error && err.message ? err.message : 'Hub action failed';
+}
+
+function parseNotificationPayload(payload: string): Record<string, string> {
+  try {
+    const parsed = JSON.parse(payload) as unknown;
+    if (!parsed || typeof parsed !== 'object') return {};
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).flatMap(([key, value]) =>
+        typeof value === 'string' && value.length > 0 ? [[key, value]] : [],
+      ),
+    );
+  } catch {
+    return payload ? { body: payload } : {};
+  }
+}
+
+function notificationType(type: string): NotificationType {
+  if (type === 'friend_request') return 'friend_request';
+  if (type === 'agent_task') return 'agent_task';
+  if (type === 'message' || type === 'mention') return 'message';
+  return 'system';
+}
+
+function hubNotificationToDesktopNotification(notification: HubNotification): Notification {
+  const payload = parseNotificationPayload(notification.payload);
+  return {
+    id: `hub:${notification.id}`,
+    type: notificationType(notification.type),
+    title: payload.title || payload.subject || notification.type || notification.id,
+    body: payload.body || payload.content || payload.message || notification.payload || notification.id,
+    read: notification.read,
+    createdAt: notification.created_at,
+  };
 }
 
 function readTextContent(content: string): string {
@@ -197,6 +237,8 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   const authenticated = useHubStore((s) => s.authenticated);
   const userId = useHubStore((s) => s.userId);
   const addToast = useToastStore((s) => s.addToast);
+  const addDesktopNotification = useNotificationStore((s) => s.addNotification);
+  const markDesktopNotificationRead = useNotificationStore((s) => s.markRead);
   const contactsByUserIdRef = useRef<Map<string, ContactInfo>>(new Map());
 
   const actionCapabilities = useMemo(
@@ -231,24 +273,28 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   const clearAction = useCallback((key: string) => {
     setActionState((prev) => {
       if (!prev[key]) return prev;
-      const next = { ...prev };
-      delete next[key];
-      return next;
+      return omitActionState(prev, key);
     });
   }, []);
 
   useEffect(() => {
+    for (const notification of notifications) {
+      addDesktopNotification(hubNotificationToDesktopNotification(notification));
+    }
+  }, [addDesktopNotification, notifications]);
+
+  useEffect(() => {
     if (hubWS || !authenticated || !getAccessToken()) {
-      setOwnedHubWS(null);
+      queueMicrotask(() => setOwnedHubWS(null));
       return;
     }
 
     const handle = createHubWS({ getToken: getAccessToken });
-    setOwnedHubWS(handle);
+    queueMicrotask(() => setOwnedHubWS(handle));
     handle.connect();
     return () => {
       handle.close();
-      setOwnedHubWS(null);
+      queueMicrotask(() => setOwnedHubWS(null));
     };
   }, [hubWS, authenticated]);
 
@@ -310,7 +356,9 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   }, [addToast, authenticated, client]);
 
   useEffect(() => {
-    void refreshSessions();
+    queueMicrotask(() => {
+      void refreshSessions();
+    });
   }, [refreshSessions]);
 
   const loadSessionMessages = useCallback(
@@ -612,6 +660,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
             notification.id === notificationId ? { ...notification, read: true } : notification,
           ),
         );
+        markDesktopNotificationRead(`hub:${notificationId}`);
         return { ok: true };
       } catch (err) {
         const message = errorMessage(err);
@@ -627,6 +676,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       authenticated,
       clearAction,
       client,
+      markDesktopNotificationRead,
       markActionError,
       markActionPending,
     ],
@@ -649,6 +699,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       await client.readAllNotifications();
       clearAction(key);
       setNotifications((prev) => prev.map((notification) => ({ ...notification, read: true })));
+      notifications.forEach((notification) => markDesktopNotificationRead(`hub:${notification.id}`));
       return { ok: true };
     } catch (err) {
       const message = errorMessage(err);
@@ -665,6 +716,8 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
     client,
     markActionError,
     markActionPending,
+    markDesktopNotificationRead,
+    notifications,
   ]);
 
   const markSessionRead = useCallback(

@@ -2,20 +2,31 @@
 // Replaces Zustand threadStore server-state reads and setInterval polling.
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
-  fetchThreads,
-  fetchThreadItems,
   createThread,
+  fetchThreadItems,
+  fetchThreads,
   renameThread,
   deleteThread,
-  archiveThread,
-  updateThreadStatus,
+  type CreateThreadRequest,
 } from './edgeClient';
-import type { ListResponse, ThreadInfo } from '@shared/types';
+import type { ListResponse, ThreadInfo, ThreadItemInfo } from '@shared/types';
 
 export function useThreads(projectId?: string) {
   return useQuery<ListResponse<ThreadInfo>>({
     queryKey: ['threads', projectId],
     queryFn: () => fetchThreads(projectId),
+    refetchInterval: 10_000,
+  });
+}
+
+export function useThreadItems(threadId?: string) {
+  return useQuery<ListResponse<ThreadItemInfo>>({
+    enabled: Boolean(threadId),
+    queryKey: ['threadItems', threadId],
+    queryFn: () => {
+      if (!threadId) throw new Error('threadId is required');
+      return fetchThreadItems(threadId);
+    },
     refetchInterval: 10_000,
   });
 }
@@ -146,8 +157,8 @@ export function useRestoreThread() {
 export function useCreateThread() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ title, threadId }: { title?: string; threadId?: string }) =>
-      createThread(title, threadId),
+    mutationFn: (request: CreateThreadRequest | undefined) =>
+      createThread(request),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['threads'] });
     },
@@ -157,7 +168,10 @@ export function useCreateThread() {
 export function useThreadMessages(threadId: string | null) {
   return useQuery({
     queryKey: ['threadItems', threadId],
-    queryFn: () => fetchThreadItems(threadId!),
+    queryFn: () => {
+      if (!threadId) throw new Error('threadId is required');
+      return fetchThreadItems(threadId);
+    },
     enabled: !!threadId,
     staleTime: 5_000,
   });

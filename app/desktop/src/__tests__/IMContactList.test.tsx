@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { IMContactList } from '@/components/IM';
 import type { IMContact } from '@/components/IM';
@@ -71,24 +71,89 @@ describe('IMContactList', () => {
     expect(screen.getByLabelText('Offline')).toBeInTheDocument();
   });
 
-  it('renders with hub contacts when provided', () => {
-    const contacts = [makeContact({ id: 'c1', name: 'Alice' })];
-    const hubContacts = [{ id: 'h1', name: 'Bob', type: 'user' as const, online: true }];
-    render(<IMContactList contacts={contacts} hubContacts={hubContacts} />);
-    expect(screen.getByText('Alice')).toBeInTheDocument();
+  it('does not expose compose actions without Hub handlers', () => {
+    render(<IMContactList contacts={[]} />);
+    expect(screen.queryByRole('button', { name: 'Open Hub compose' })).not.toBeInTheDocument();
   });
 
-  it('renders with add contact callback', () => {
-    const onAddContact = vi.fn(() => Promise.resolve({ ok: true, contactId: 'new-1' }));
-    const contacts = [makeContact({ id: 'c1', name: 'Alice' })];
-    render(<IMContactList contacts={contacts} onAddContact={onAddContact} />);
-    expect(screen.getByText('Alice')).toBeInTheDocument();
+  it('shows Hub contact form when compose is opened', () => {
+    render(<IMContactList contacts={[]} onAddContact={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open Hub compose' }));
+    expect(screen.getByLabelText('Hub user ID')).toBeInTheDocument();
+    expect(screen.getByText('Add')).toBeInTheDocument();
   });
 
-  it('renders compose form when showCompose is true', () => {
-    const contacts = [makeContact({ id: 'c1', name: 'Alice' })];
-    render(<IMContactList contacts={contacts} showCompose />);
-    expect(screen.getByText('Alice')).toBeInTheDocument();
+  it('calls onAddContact with Hub user id when add confirmed', async () => {
+    const onAddContact = vi.fn(async () => true);
+    render(<IMContactList contacts={[]} onAddContact={onAddContact} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open Hub compose' }));
+    fireEvent.change(screen.getByLabelText('Hub user ID'), {
+      target: { value: 'user-2' },
+    });
+    fireEvent.click(screen.getByText('Add'));
+    await waitFor(() => expect(onAddContact).toHaveBeenCalledWith('user-2'));
+  });
+
+  it('calls onAddContact on Enter in Hub user id input', async () => {
+    const onAddContact = vi.fn(async () => true);
+    render(<IMContactList contacts={[]} onAddContact={onAddContact} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open Hub compose' }));
+    const input = screen.getByLabelText('Hub user ID');
+    fireEvent.change(input, { target: { value: 'user-entered' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(onAddContact).toHaveBeenCalledWith('user-entered'));
+  });
+
+  it('hides add form on Escape', () => {
+    render(<IMContactList contacts={[]} onAddContact={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open Hub compose' }));
+    const input = screen.getByLabelText('Hub user ID');
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(screen.queryByLabelText('Hub user ID')).toBeNull();
+  });
+
+  it('creates private session from an existing Hub contact', async () => {
+    const onCreatePrivateSession = vi.fn(async () => true);
+    render(
+      <IMContactList
+        contacts={[]}
+        hubContacts={[{ user_id: 'friend-1', username: 'alice', nickname: 'Alice', online: true, type: 'friend' }]}
+        onCreatePrivateSession={onCreatePrivateSession}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Hub compose' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create direct chat' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a Hub contact...' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Alice' }));
+    fireEvent.click(screen.getByText('Create'));
+
+    await waitFor(() => expect(onCreatePrivateSession).toHaveBeenCalledWith('friend-1'));
+  });
+
+  it('creates group session from checked Hub contacts', async () => {
+    const onCreateGroupSession = vi.fn(async () => true);
+    render(
+      <IMContactList
+        contacts={[]}
+        hubContacts={[
+          { user_id: 'friend-1', username: 'alice', nickname: 'Alice', online: true, type: 'friend' },
+          { user_id: 'friend-2', username: 'bob', nickname: 'Bob', online: true, type: 'friend' },
+        ]}
+        onCreateGroupSession={onCreateGroupSession}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Hub compose' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create group chat' }));
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Build Room' } });
+    fireEvent.click(screen.getByLabelText('Alice'));
+    fireEvent.click(screen.getByLabelText('Bob'));
+    fireEvent.click(screen.getByText('Create'));
+
+    await waitFor(() =>
+      expect(onCreateGroupSession).toHaveBeenCalledWith('Build Room', ['friend-1', 'friend-2']),
+    );
   });
 
   it('highlights selected contact', () => {

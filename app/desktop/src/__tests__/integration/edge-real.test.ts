@@ -1,4 +1,3 @@
-// @ts-nocheck — uses Node built-ins (child_process, crypto, Buffer) for real Edge server E2E.
 //
 // Desktop↔Edge real server E2E — builds and runs the actual Go Edge server.
 //
@@ -22,7 +21,6 @@ import { spawn, execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
-  HealthResponse,
   AgentInfo,
   ListResponse,
   RunInfo,

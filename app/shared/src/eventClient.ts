@@ -19,6 +19,7 @@ export interface EventClientOptions {
 export class EventClient {
   private ws: WebSocket | null = null;
   private listeners = new Set<EventListener>();
+  private connectionListeners = new Set<EventConnectionListener>();
   private typeListeners = new Map<string, Set<EventListener>>();
   private connectionListeners = new Set<EventConnectionListener>();
   private baseUrl: string;
@@ -72,11 +73,9 @@ export class EventClient {
     this.ws.onmessage = (msg: MessageEvent<string>) => {
       try {
         const raw = JSON.parse(msg.data) as EventEnvelope;
-        if (raw.seq && raw.seq > this.lastSeq) {
+        if (typeof raw.seq === 'number' && raw.seq > this.lastSeq) {
           this.lastSeq = raw.seq;
-        }
-        if (raw.id) {
-          this.cursor = raw.id;
+          this.cursor = String(raw.seq);
         }
         const event = raw as AnyEvent;
         this.dispatch(event);
@@ -89,6 +88,7 @@ export class EventClient {
       this.ws = null;
       this.dispatchConnection('disconnected');
       if (!this.destroyed) {
+        this.dispatchConnection('disconnected', 'Edge event stream disconnected');
         this.scheduleReconnect();
       }
     };
@@ -117,6 +117,11 @@ export class EventClient {
   on(listener: EventListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  onConnection(listener: EventConnectionListener): () => void {
+    this.connectionListeners.add(listener);
+    return () => this.connectionListeners.delete(listener);
   }
 
   onType(type: string, listener: EventListener): () => void {
@@ -160,6 +165,19 @@ export class EventClient {
         } catch {
           // ignore
         }
+      }
+    }
+  }
+
+  private dispatchConnection(
+    status: EventConnectionStatus,
+    error?: string,
+  ): void {
+    for (const fn of this.connectionListeners) {
+      try {
+        fn(status, error);
+      } catch {
+        // Don't let one listener break others.
       }
     }
   }

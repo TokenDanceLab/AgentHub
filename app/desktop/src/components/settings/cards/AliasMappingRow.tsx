@@ -14,7 +14,7 @@ const MODEL_OPTIONS = [
 ] as const;
 
 const PROVIDER_OPTIONS = [
-  ['tokendance-relay', 'TokenDance Relay'],
+  ['tokendance-gateway', 'TokenDance Relay'],
   ['anthropic', 'Anthropic'],
   ['openai', 'OpenAI'],
   ['cc-switch-local', 'cc-switch local'],

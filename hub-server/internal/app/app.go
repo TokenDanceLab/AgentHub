@@ -159,8 +159,7 @@ func (a *App) Run(ctx context.Context) error {
 	if a.Config.S3.IsConfigured() {
 		s3Store, err := service.NewS3StorageFromConfig(ctx, a.Config.S3)
 		if err != nil {
-			slog.Error("failed to init S3 storage, falling back to local", "error", err)
-			attachmentStorage = service.NewLocalStorage(a.Config.Upload.Dir)
+			return fmt.Errorf("s3 attachment storage init failed: %w", err)
 		} else {
 			attachmentStorage = s3Store
 			slog.Info("S3 attachment storage configured", "bucket", a.Config.S3.Bucket, "endpoint", a.Config.S3.Endpoint)
@@ -209,7 +208,15 @@ func (a *App) Run(ctx context.Context) error {
 	middleware.AuditPermissionFn = auditSvc.RecordPermissionDecision
 
 	// AgentTeam service
-	a.AgentTeamService = service.NewAgentTeamService(a.DB, a.AgentService, a.CacheClient)
+	a.AgentTeamService = service.NewAgentTeamServiceWithGuardrails(a.DB, a.AgentService, a.CacheClient, service.AgentTeamGuardrails{
+		MaxDelegationDepth:       a.Config.AgentTeam.MaxDelegationDepth,
+		MaxActiveSubAgentsPerRun: int64(a.Config.AgentTeam.MaxActiveSubAgentsPerRun),
+		MaxRouteRepeats:          a.Config.AgentTeam.MaxRouteRepeats,
+		MaxTasksPerTeamRun:       int64(a.Config.AgentTeam.MaxTasksPerTeamRun),
+		AssignmentTimeout:        a.Config.AgentTeam.AssignmentTimeout,
+		MaxTeamRunBudgetTokens:   a.Config.AgentTeam.MaxTeamRunBudgetTokens,
+		MaxTeamRunBudgetUsagePct: a.Config.AgentTeam.MaxTeamRunBudgetUsagePct,
+	})
 	a.AgentTeamService.SetControlService(a.AgentControlService)
 	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
 
