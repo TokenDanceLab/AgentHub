@@ -100,6 +100,7 @@ func TestDispatchInterceptor_DetectsDispatchJSON(t *testing.T) {
 		parentRun: run,
 		depth:     0,
 		threadID:  run.ThreadID,
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	// Emit a text block containing a dispatch JSON line.
@@ -140,6 +141,7 @@ func TestDispatchInterceptor_IgnoresNonDispatchJSON(t *testing.T) {
 		parentRun: run,
 		depth:     0,
 		threadID:  run.ThreadID,
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	// JSON that is not a dispatch action should be ignored.
@@ -174,6 +176,7 @@ func TestDispatchInterceptor_ThreadIDPropagation(t *testing.T) {
 		parentRun: run,
 		depth:     0,
 		threadID:  "thread-1",
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	interceptor.Emit(BusEventTextBlock, nil, map[string]any{
@@ -203,6 +206,7 @@ func TestDispatchInterceptor_ModelPropagation(t *testing.T) {
 		depth:     0,
 		threadID:  run.ThreadID,
 		model:     "claude-sonnet-4-6",
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	interceptor.Emit(BusEventTextBlock, nil, map[string]any{
@@ -231,6 +235,7 @@ func TestDispatchInterceptor_AgentRegistered(t *testing.T) {
 		parentRun: run,
 		depth:     0,
 		threadID:  run.ThreadID,
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	interceptor.Emit(BusEventTextBlock, nil, map[string]any{
@@ -275,6 +280,7 @@ func TestDispatchInterceptor_SpawnerErrorEmitsFailure(t *testing.T) {
 		parentRun: run,
 		depth:     0,
 		threadID:  run.ThreadID,
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	interceptor.Emit(BusEventTextBlock, nil, map[string]any{
@@ -312,6 +318,7 @@ func TestDispatchInterceptor_NoSpawnerNoCrash(t *testing.T) {
 		parentRun: run,
 		depth:     0,
 		threadID:  run.ThreadID,
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	// This should not panic.
@@ -333,6 +340,7 @@ func TestDispatchInterceptor_MultipleDispatches(t *testing.T) {
 		parentRun: run,
 		depth:     0,
 		threadID:  run.ThreadID,
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	// Multi-line text with multiple dispatch JSON lines.
@@ -360,6 +368,7 @@ func TestDispatchInterceptor_DepthIncrements(t *testing.T) {
 		parentRun: run,
 		depth:     2,
 		threadID:  run.ThreadID,
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	interceptor.Emit(BusEventTextBlock, nil, map[string]any{
@@ -388,6 +397,7 @@ func TestDispatchInterceptor_RolePropagation(t *testing.T) {
 		parentRun: run,
 		depth:     0,
 		threadID:  run.ThreadID,
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	// Dispatch with explicit role.
@@ -419,6 +429,7 @@ func TestDispatchInterceptor_NoRegistryNoCrash(t *testing.T) {
 		parentRun: run,
 		depth:     0,
 		threadID:  run.ThreadID,
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	interceptor.Emit(BusEventTextBlock, nil, map[string]any{
@@ -560,6 +571,7 @@ func TestDispatchInterceptor_BudgetPropagation(t *testing.T) {
 		depth:     0,
 		threadID:  run.ThreadID,
 		budget:    budget,
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	interceptor.Emit(BusEventTextBlock, nil, map[string]any{
@@ -592,6 +604,7 @@ func TestDispatchInterceptor_NilBudget(t *testing.T) {
 		depth:     0,
 		threadID:  run.ThreadID,
 		budget:    nil,
+		dispatched: make(map[string]dispatchEvent),
 	}
 
 	interceptor.Emit(BusEventTextBlock, nil, map[string]any{
