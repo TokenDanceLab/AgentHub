@@ -67,6 +67,10 @@ func (h *RelayHandler) CreateCommand(c *gin.Context) {
 	userID := c.GetString("user_id")
 	cmd, err := h.svc.CreateCommand(c.Request.Context(), targetEdgeID, strings.TrimSpace(req.CommandType), req.Payload, userID)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}
