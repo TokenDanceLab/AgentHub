@@ -119,6 +119,7 @@ const (
 	BusEventTaskDispatched      = "run.agent.task_dispatched"
 	BusEventTaskProgress        = "run.agent.task_progress"
 	BusEventTaskNotification    = "run.agent.task_notification"
+	BusEventSubAgentStatus      = "run.agent.sub_agent_status"
 	BusEventSessionStateChanged = "run.agent.session_state_changed"
 	BusEventHookStarted         = "run.agent.hook_started"
 	BusEventHookProgress        = "run.agent.hook_progress"
