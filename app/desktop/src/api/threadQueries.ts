@@ -9,6 +9,7 @@ import {
   deleteThread,
   archiveThread,
   updateThreadStatus,
+  type CreateThreadRequest,
 } from './edgeClient';
 import type { ListResponse, ThreadInfo, ThreadItemInfo } from '@shared/types';
 
