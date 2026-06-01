@@ -85,16 +85,16 @@
 }
 
 /* Dot colors */
-.eventAssignment { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
-.eventDone { background: rgba(16, 185, 129, 0.2); color: #86efac; }
-.eventFailed { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
-.eventTask { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
-.eventRoute { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
-.eventStart { background: rgba(16, 185, 129, 0.2); color: #86efac; }
-.eventMessage { background: rgba(156, 163, 175, 0.2); color: #d1d5db; }
-.eventApproval { background: rgba(99, 102, 241, 0.2); color: #c4b5fd; }
-.eventConflict { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
-.eventUnknown { background: rgba(156, 163, 175, 0.2); color: #9ca3af; }
+.eventAssignment { background: rgba(99, 102, 241, 0.2); color: var(--primary); }
+.eventDone { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+.eventFailed { background: rgba(239, 68, 68, 0.2); color: var(--destructive); }
+.eventTask { background: rgba(59, 130, 246, 0.2); color: var(--info); }
+.eventRoute { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+.eventStart { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+.eventMessage { background: rgba(156, 163, 175, 0.2); color: var(--muted-foreground); }
+.eventApproval { background: rgba(99, 102, 241, 0.2); color: var(--skill); }
+.eventConflict { background: rgba(239, 68, 68, 0.2); color: var(--destructive); }
+.eventUnknown { background: rgba(156, 163, 175, 0.2); color: var(--muted-foreground); }
 
 .hint,
 .empty,

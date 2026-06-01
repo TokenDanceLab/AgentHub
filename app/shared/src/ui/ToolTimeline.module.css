@@ -113,7 +113,7 @@
 }
 
 .statusDraining {
-  color: color-mix(in oklch, #8b5cf6 72%, var(--foreground));
+  color: color-mix(in oklch, var(--primary) 72%, var(--foreground));
 }
 
 .statusCompleted {

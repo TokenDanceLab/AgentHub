@@ -77,7 +77,7 @@
 
 .meta {
   font-size: 11px;
-  color: #B0B0B5;
+  color: var(--text-weakest);
 }
 
 /* ── Unread dot ────────────────────────────── */
@@ -109,7 +109,7 @@
   border: none;
   border-radius: 5px;
   background: transparent;
-  color: #8E8E93;
+  color: var(--muted-foreground);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -134,7 +134,7 @@
 
 .empty {
   padding: 8px 12px;
-  color: #B0B0B5;
+  color: var(--text-weakest);
   font-size: 11px;
   text-align: center;
 }

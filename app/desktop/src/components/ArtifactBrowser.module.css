@@ -132,7 +132,7 @@
 }
 
 .artifactAction {
-  color: #8E8E93;
+  color: var(--muted-foreground);
   font-size: 9px;
   text-transform: uppercase;
   flex-shrink: 0;
@@ -174,10 +174,10 @@
 }
 
 /* ── Category icons ── */
-.catIconImage { color: #f4c76b; }
-.catIconCode  { color: #69c967; }
-.catIconDoc   { color: #5d9cec; }
-.catIconWeb   { color: #aeb7ff; }
+.catIconImage { color: var(--warning); }
+.catIconCode  { color: var(--success); }
+.catIconDoc   { color: var(--primary); }
+.catIconWeb   { color: var(--skill); }
 .catIconOther { color: var(--text-weakest); }
 
 /* ── Preview overlay ── */
@@ -284,7 +284,7 @@
   width: 100%;
   height: 260px;
   border: none;
-  background: #fff;
+  background: var(--card);
 }
 
 /* ── Code preview ── */

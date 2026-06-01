@@ -36,11 +36,11 @@
 }
 
 .sectionIconActive {
-  color: #f59e0b;
+  color: var(--warning);
 }
 
 .sectionIconDone {
-  color: #10b981;
+  color: var(--success);
 }
 
 .taskList {
@@ -99,7 +99,7 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  color: #f87171;
+  color: var(--destructive);
 }
 
 .attempt {
@@ -120,28 +120,28 @@
 }
 
 .statusPending {
-  color: #f59e0b;
+  color: var(--warning);
 }
 
 .statusDispatched {
-  color: #3b82f6;
+  color: var(--primary);
 }
 
 .statusRunning {
-  color: #f59e0b;
+  color: var(--warning);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 .statusDone {
-  color: #10b981;
+  color: var(--success);
 }
 
 .statusFailed {
-  color: #ef4444;
+  color: var(--destructive);
 }
 
 .statusCancelled {
-  color: #6b7280;
+  color: var(--muted-foreground);
 }
 
 @keyframes pulse {

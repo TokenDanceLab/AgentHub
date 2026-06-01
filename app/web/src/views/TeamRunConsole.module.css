@@ -116,7 +116,7 @@
   font-size: 12px;
   font-weight: 500;
   background: var(--color-primary, #6366f1);
-  color: #fff;
+  color: var(--primary-foreground);
   cursor: pointer;
   transition: opacity 0.15s;
 }
@@ -379,7 +379,7 @@
   padding: 0 5px;
   border-radius: 9px;
   background: var(--color-danger, #ef4444);
-  color: #fff;
+  color: var(--destructive-foreground);
   font-size: 10px;
   font-weight: 600;
   line-height: 1;
