@@ -1,10 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { Circle, Wifi, WifiOff, Sun, Moon, UserCircle } from 'lucide-react';
+import { Circle, Wifi, WifiOff, Sun, Moon, UserCircle, Loader2 } from 'lucide-react';
 import type { HealthResponse } from '@shared/types';
 import { StatusBadge } from '@shared/components';
+import { formatTokens } from '@shared/context/breakdown';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHubStore } from '@/stores/hubStore';
+import { useRunStore } from '@/stores/runStore';
 import styles from './StatusBar.module.css';
 
 interface Props {
@@ -29,6 +31,9 @@ export default memo(function StatusBar({ online, health, isConnected, error, pro
   const [isReconnecting, setIsReconnecting] = useState(false);
   const prevErrorRef = useRef<string | null>(null);
   const prevOnlineRef = useRef(online);
+  const runState = useRunStore((s) => s.runState);
+  const tokenStats = useRunStore((s) => s.tokenStats);
+  const isDraining = runState === 'DRAINING';
 
   // Track reconnecting state: true when online goes from true→false
   useEffect(() => {
@@ -74,6 +79,28 @@ export default memo(function StatusBar({ online, health, isConnected, error, pro
       )}
       {isReconnecting && (
         <span className={styles.reconnecting}>{t('status.reconnecting')}</span>
+      )}
+      {isDraining && (
+        <span className={styles.draining} title={t('status.draining', { defaultValue: 'Draining — finishing background tasks…' })}>
+          <Loader2 size={13} className={styles.drainingIcon} />
+          <span className={styles.drainingText}>{t('status.draining', { defaultValue: 'Draining' })}</span>
+        </span>
+      )}
+      {tokenStats && (
+        <span
+          className={styles.tokenUsage}
+          title={
+            tokenStats.contextLimit != null
+              ? `${formatTokens(tokenStats.totalTokens)} / ${formatTokens(tokenStats.contextLimit)} context`
+              : `In: ${formatTokens(tokenStats.inputTokens)}  Out: ${formatTokens(tokenStats.outputTokens)}  Total: ${formatTokens(tokenStats.totalTokens)}`
+          }
+          aria-label={`Token usage: ${formatTokens(tokenStats.inputTokens)} input, ${formatTokens(tokenStats.outputTokens)} output, ${formatTokens(tokenStats.totalTokens)} total`}
+        >
+          <span className={styles.tokenLabel}>TK</span>
+          <span className={styles.tokenIn}>{formatTokens(tokenStats.inputTokens)}</span>
+          <span className={styles.tokenSep}>/</span>
+          <span className={styles.tokenOut}>{formatTokens(tokenStats.outputTokens)}</span>
+        </span>
       )}
       {latencyMs != null && (
         <span

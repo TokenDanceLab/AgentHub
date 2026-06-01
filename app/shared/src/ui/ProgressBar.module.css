@@ -11,7 +11,12 @@
   height: 100%;
   border-radius: inherit;
   background: var(--brand, oklch(0.55 0.16 255));
-  transition: width var(--duration-slow, 0.5s) ease-out;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fill {
+    transition: width var(--duration-slow, 0.5s) ease-out;
+  }
 }
 
 .paused .fill {

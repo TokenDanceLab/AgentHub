@@ -1,10 +1,14 @@
-import { useState, useMemo, type ReactNode } from 'react';
+import { useState, useMemo, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, TerminalSquare, Wrench } from 'lucide-react';
-import { ActivityCard, DisclosureRow } from '@shared/ui';
+import { FileText, TerminalSquare, Wrench, Hash, Clock, Cpu, CheckCircle, Package } from 'lucide-react';
+import { ActivityCard, DisclosureRow, MetricGrid } from '@shared/ui';
+import type { MetricGridItem } from '@shared/ui';
 import type { RunInfo } from '@shared/types';
 import type { FileDiff, ChatMessage } from './ChatView.types';
 import type { SessionMetrics } from '@shared/context/breakdown';
+import { formatTokens } from '@shared/context/breakdown';
+import { createHubClient, type AgentRunEventSummary } from '@/api/hubClient';
+import { getAccessToken } from '@/hooks/useAuth';
 import { RunState } from '@/utils/runStateMachine';
 import { RunStateMachine } from '@/utils/runStateMachine';
 import DiffViewer from './DiffViewer';
@@ -74,6 +78,16 @@ function buildMetrics(chatMessages: ChatMessage[] | undefined): SessionMetrics |
   };
 }
 
+function formatElapsed(ms: number | undefined): string {
+  if (ms == null || ms < 0) return '--';
+  if (ms < 5000) return `${ms}ms`;
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const remS = s % 60;
+  return `${m}m ${remS}s`;
+}
+
 function ToolCallItem({ tc }: { tc: ToolCallEntry }) {
   const [expanded, setExpanded] = useState(false);
   const hasOutput = !!tc.output;
@@ -141,6 +155,84 @@ export default function RunDetail({
   const { t } = useTranslation();
 
   const metrics = useMemo(() => buildMetrics(chatMessages), [chatMessages]);
+
+  const hubClient = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
+
+  const [summary, setSummary] = useState<AgentRunEventSummary | null>(null);
+  const [summaryError, setSummaryError] = useState(false);
+
+  useEffect(() => {
+    const taskId = run?.runId;
+    if (!taskId || !getAccessToken()) {
+      setSummary(null);
+      setSummaryError(false);
+      return;
+    }
+
+    let cancelled = false;
+    hubClient
+      .getTaskRunEventSummary(taskId)
+      .then((data) => {
+        if (!cancelled) {
+          setSummary(data);
+          setSummaryError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSummary(null);
+          setSummaryError(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [run?.runId, hubClient]);
+
+  const summaryItems: MetricGridItem[] = useMemo(() => {
+    if (!summary) return [];
+    return [
+      {
+        id: 'steps',
+        icon: <Hash size={14} />,
+        value: summary.step_count,
+        label: t('run.summary.steps'),
+      },
+      {
+        id: 'elapsed',
+        icon: <Clock size={14} />,
+        value: formatElapsed(summary.elapsed_ms),
+        label: t('run.summary.elapsed'),
+      },
+      {
+        id: 'inputTokens',
+        icon: <Cpu size={14} />,
+        value: formatTokens(summary.input_tokens),
+        label: t('run.summary.tokensInput'),
+      },
+      {
+        id: 'outputTokens',
+        icon: <Cpu size={14} />,
+        value: formatTokens(summary.output_tokens),
+        label: t('run.summary.tokensOutput'),
+      },
+      {
+        id: 'approvals',
+        icon: <CheckCircle size={14} />,
+        value: `${summary.decided_approvals}/${summary.approval_count}`,
+        label: summary.pending_approvals > 0
+          ? t('run.summary.pendingApprovals', { decided: summary.decided_approvals, pending: summary.pending_approvals })
+          : t('run.summary.approvals'),
+      },
+      {
+        id: 'artifacts',
+        icon: <Package size={14} />,
+        value: summary.artifact_count,
+        label: t('run.summary.artifacts'),
+      },
+    ];
+  }, [summary, t]);
 
   if (!run) {
     return (
@@ -216,6 +308,12 @@ export default function RunDetail({
           <button className={styles.cancelButton} onClick={onCancel}>
             {t('action.cancelRun')}
           </button>
+        </div>
+      )}
+
+      {summaryItems.length > 0 && (
+        <div className={styles.summaryGrid}>
+          <MetricGrid items={summaryItems} />
         </div>
       )}
 

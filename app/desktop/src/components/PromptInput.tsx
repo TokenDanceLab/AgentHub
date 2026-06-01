@@ -8,7 +8,7 @@ import { useMention, type MentionItem } from '@/hooks/useMention';
 import MentionPopover from '@/components/MentionPopover';
 import ModelReasoningPicker from '@/components/ModelReasoningPicker';
 import type { ModelReasoningOption } from '@/components/ModelReasoningPicker';
-import PermissionModePicker from '@/components/PermissionModePicker';
+import { PermissionModePicker } from '@shared/ui/PermissionModePicker';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
 import type { ModelCatalogItem, ModelCatalogResponse } from '@/api/modelCatalogQueries';
@@ -25,9 +25,15 @@ type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 const PERMISSION_MODES = ['default', 'plan', 'acceptEdits', 'bypassPermissions', 'dontAsk'] as const;
 type PermissionMode = (typeof PERMISSION_MODES)[number];
 const MAX_BROWSER_ATTACHMENT_PREVIEW = 12_000;
-const WORK_DIR_STORAGE_KEY = 'agenthub.prompt.workDir';
-const RECENT_WORK_DIRS_STORAGE_KEY = 'agenthub.prompt.recentWorkDirs';
-const MAX_RECENT_WORK_DIRS = 6;
+import {
+  addRecentWorkspace,
+  getSavedWorkDir,
+  setSavedWorkDir,
+  readRecentWorkspaces,
+  clearRecentWorkspaces,
+  formatTimeAgo,
+  type WorkspaceEntry,
+} from '@/utils/workspaceStore';
 
 interface SendOptions {
   model?: string;
@@ -133,39 +139,6 @@ function normalizeWorkDir(value: string | null | undefined): string {
 
 function sameWorkDir(a: string, b: string): boolean {
   return normalizeWorkDir(a).toLowerCase() === normalizeWorkDir(b).toLowerCase();
-}
-
-function pushRecentWorkDir(items: string[], value: string): string[] {
-  const normalized = normalizeWorkDir(value);
-  if (!normalized) return items;
-  return [
-    normalized,
-    ...items.map(normalizeWorkDir).filter((item) => item && !sameWorkDir(item, normalized)),
-  ].slice(0, MAX_RECENT_WORK_DIRS);
-}
-
-function readRecentWorkDirs(): string[] {
-  try {
-    const raw = window.localStorage.getItem(RECENT_WORK_DIRS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((item): item is string => typeof item === 'string')
-      .map(normalizeWorkDir)
-      .filter(Boolean)
-      .slice(0, MAX_RECENT_WORK_DIRS);
-  } catch {
-    return [];
-  }
-}
-
-function persistRecentWorkDirs(items: string[]): void {
-  try {
-    window.localStorage.setItem(RECENT_WORK_DIRS_STORAGE_KEY, JSON.stringify(items));
-  } catch {
-    // Ignore persistence failures; the current selection still applies.
-  }
 }
 
 function formatBytes(value: number | undefined): string | undefined {
@@ -505,7 +478,7 @@ export default function PromptInput({
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
   const [workDir, setWorkDir] = useState('');
   const [workDirDraft, setWorkDirDraft] = useState('');
-  const [recentWorkDirs, setRecentWorkDirs] = useState<string[]>([]);
+  const [recentWorkDirs, setRecentWorkDirs] = useState<WorkspaceEntry[]>([]);
   const [workTargetOpen, setWorkTargetOpen] = useState(false);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
@@ -549,28 +522,22 @@ export default function PromptInput({
   const rememberWorkDir = useCallback((value: string) => {
     const normalized = normalizeWorkDir(value);
     if (!normalized) return;
-    setRecentWorkDirs((prev) => {
-      const next = pushRecentWorkDir(prev, normalized);
-      persistRecentWorkDirs(next);
-      return next;
-    });
+    addRecentWorkspace({ path: normalized });
+    setRecentWorkDirs(readRecentWorkspaces());
   }, []);
 
   const applyWorkDir = useCallback((value: string, options: { closeMenu?: boolean } = {}) => {
     const normalized = normalizeWorkDir(value);
     setWorkDir(normalized);
     setWorkDirDraft(normalized);
+    setSavedWorkDir(normalized);
     if (normalized) rememberWorkDir(normalized);
     if (options.closeMenu) setWorkTargetOpen(false);
   }, [rememberWorkDir]);
 
   const clearRecentWorkDirs = useCallback(() => {
     setRecentWorkDirs([]);
-    try {
-      window.localStorage.removeItem(RECENT_WORK_DIRS_STORAGE_KEY);
-    } catch {
-      // localStorage can be unavailable in tests.
-    }
+    clearRecentWorkspaces();
   }, []);
 
   const writeTextareaValue = useCallback((value: string, cursorPos = value.length) => {
@@ -682,11 +649,10 @@ export default function PromptInput({
 
   useEffect(() => {
     try {
-      const savedWorkDir = normalizeWorkDir(window.localStorage.getItem(WORK_DIR_STORAGE_KEY) ?? '');
-      const savedRecent = readRecentWorkDirs();
+      const savedWorkDir = getSavedWorkDir();
       setWorkDir(savedWorkDir);
       setWorkDirDraft(savedWorkDir);
-      setRecentWorkDirs(savedWorkDir ? pushRecentWorkDir(savedRecent, savedWorkDir) : savedRecent);
+      setRecentWorkDirs(readRecentWorkspaces());
       const savedMode = window.localStorage.getItem('agenthub.prompt.permissionMode');
       if (savedMode && PERMISSION_MODES.includes(savedMode as PermissionMode)) {
         setPermissionMode(savedMode as PermissionMode);
@@ -733,7 +699,7 @@ export default function PromptInput({
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(WORK_DIR_STORAGE_KEY, workDir);
+      setSavedWorkDir(workDir);
       window.localStorage.setItem('agenthub.prompt.permissionMode', permissionMode);
     } catch {
       // Ignore persistence failures; the controls still apply to the current run.
@@ -763,15 +729,19 @@ export default function PromptInput({
     if (!ta) return;
     restoreDraft(ta);
     setPromptLength(ta.value.length);
-    return () => { if (ta) flushDraft(ta.value, threadId); };
   }, [threadId]);
 
+  // Use a single cleanup effect that captures the current threadId for flushDraft
+  const threadIdRef = useRef(threadId);
+  threadIdRef.current = threadId;
   useEffect(() => {
     return () => {
       const ta = inputRef.current;
-      if (ta) flushDraft(ta.value);
+      if (ta && ta.value) {
+        flushDraft(ta.value, threadIdRef.current);
+      }
     };
-  }, []);
+  }, [flushDraft]);
 
   useEffect(() => {
     const ta = inputRef.current;
@@ -861,8 +831,8 @@ export default function PromptInput({
   const directTargets = executionTargets.filter(isSelectableLocalTarget);
   const unavailableLocalTargets = executionTargets.filter((target) => isRegisteredLocalTarget(target) && !isSelectableLocalTarget(target));
   const remoteInventoryTargets = executionTargets.filter((target) => target.target_type !== 'local_edge');
-  const recentWorkDirOptions = recentWorkDirs.filter((path) => (
-    path && !directTargets.some((target) => sameWorkDir(targetWorkspaceRoot(target), path))
+  const recentWorkDirOptions = recentWorkDirs.filter((entry) => (
+    entry?.path && !directTargets.some((target) => sameWorkDir(targetWorkspaceRoot(target), entry.path))
   ));
   const workTargetLabel = workDir.trim()
     ? compactPathLabel(workDir)
@@ -1328,22 +1298,28 @@ export default function PromptInput({
                           {t('prompt.clearRecentWorkspaces')}
                         </button>
                       </div>
-                      {recentWorkDirOptions.map((path) => {
-                        const active = sameWorkDir(path, workDir);
+                      {recentWorkDirOptions.map((entry) => {
+                        const active = sameWorkDir(entry.path, workDir);
                         return (
                           <button
-                            key={path}
+                            key={entry.path}
                             type="button"
                             className={`${styles.workTargetOption} ${active ? styles.workTargetOptionActive : ''}`}
-                            onClick={() => applyWorkDir(path, { closeMenu: true })}
+                            onClick={() => applyWorkDir(entry.path, { closeMenu: true })}
                           >
                             <Clock3 size={16} />
                             <span>
-                              <strong>{compactPathLabel(path)}</strong>
-                              <small>{path}</small>
-                              <em className={styles.workTargetMeta}>
-                                {t('prompt.targetRecentRunWorkDir')}
-                              </em>
+                              <strong>{entry.name || compactPathLabel(entry.path)}</strong>
+                              <small>{entry.path}</small>
+                              {entry.branch ? (
+                                <em className={styles.workTargetMeta}>
+                                  {entry.branch} {'·'} {formatTimeAgo(entry.lastOpenedAt)}
+                                </em>
+                              ) : (
+                                <em className={styles.workTargetMeta}>
+                                  {formatTimeAgo(entry.lastOpenedAt)}
+                                </em>
+                              )}
                             </span>
                             {active && <Check size={15} />}
                           </button>

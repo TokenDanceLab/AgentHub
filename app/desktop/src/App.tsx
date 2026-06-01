@@ -56,11 +56,15 @@ import { ToastContainer } from '@/components/Toast';
 import SettingsPage, { type SectionId as SettingsSectionId } from '@/components/SettingsPage';
 import {
   AlertTriangle,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   Circle,
   Copy,
+  FolderTree,
+  GitBranch,
+  GitCommit,
   Home,
   MessageSquareText,
   Maximize2,
@@ -94,6 +98,20 @@ import {
 import { resolveThreadSelectionId, type ThreadSelectionInput } from '@/utils/threadSelection';
 import { resolveTopMenuClickState, type TopMenuId } from '@/utils/topMenuState';
 import { buildAutomaticThreadTitle, canAutoRenameThreadTitle, getAutomaticThreadTitle } from '@/utils/threadTitle';
+import {
+  addRecentWorkspace,
+  setSavedWorkDir,
+  getSavedWorkDir,
+  migrateLegacyRecentWorkDirs,
+  readRecentWorkspaces,
+  clearRecentWorkspaces,
+  removeRecentWorkspace,
+  updateWorkspaceBranch,
+  syncWorkspacesToBackend,
+  restoreWorkspacesFromBackend,
+  type WorkspaceEntry,
+} from '@/utils/workspaceStore';
+import { useGitStatus } from '@/hooks/useGitStatus';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '@/App.module.css';
 
@@ -372,8 +390,8 @@ export default function App() {
   const { setOnline, setConnected, wsLatency } = useConnectionStore(
     useShallow((s) => ({ setOnline: s.setOnline, setConnected: s.setConnected, wsLatency: s.wsLatency })),
   );
-  const { selectedThreadId, selectedAgentId, selectThread, selectAgentThread } = useThreadStore(
-    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectedAgentId: s.selectedAgentId, selectThread: s.selectThread, selectAgentThread: s.selectAgentThread })),
+  const { selectedThreadId, selectedAgentId, selectThread, selectAgentThread, switchThreadAgent } = useThreadStore(
+    useShallow((s) => ({ selectedThreadId: s.selectedThreadId, selectedAgentId: s.selectedAgentId, selectThread: s.selectThread, selectAgentThread: s.selectAgentThread, switchThreadAgent: s.switchThreadAgent })),
   );
   const activeThreadId = resolveThreadSelectionId(selectedThreadId as ThreadSelectionInput);
   const { messages, isConnected, currentRun, permissionRequests, decidePermission } = useChatMessages(online, activeThreadId);
@@ -392,9 +410,13 @@ export default function App() {
       ? t('workspace.teamRunsActive', { count: agentTeamSummary.activeRuns })
       : t('settings.agentScheduling');
   const [userMessages, setUserMessages] = useState<ChatMessage[]>([]);
-  const [viewMode, setViewMode] = useState<'agent' | 'im'>('agent');
+  const [viewMode, setViewMode] = useState<'agent' | 'im' | 'team'>('agent');
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
+  const [fileExplorerOpen, setFileExplorerOpen] = useState(true);
+  const [agentSelectorOpen, setAgentSelectorOpen] = useState(false);
+  const agentSelectorRef = useRef<HTMLDivElement | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSectionId>('general');
   const [pendingComposerDraft, setPendingComposerDraft] = useState('');
@@ -431,6 +453,14 @@ export default function App() {
 
   // Mobile/tablet overlays
   const [navPanelOpen, setNavPanelOpen] = useState(false);
+
+  // Migrate legacy workspace data on mount
+  useEffect(() => {
+    migrateLegacyRecentWorkDirs();
+    void restoreWorkspacesFromBackend().then(() => {
+      setRecentWorkspaces(readRecentWorkspaces());
+    });
+  }, []);
 
   // Sync health → connection store
   const prevOnlineRef = useRef<boolean | null>(null);
@@ -571,6 +601,25 @@ export default function App() {
       window.removeEventListener('keydown', closeOnEscape, true);
     };
   }, [openTopMenu]);
+
+  // Close agent selector on outside click
+  useEffect(() => {
+    if (!agentSelectorOpen) return undefined;
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && agentSelectorRef.current?.contains(event.target)) return;
+      setAgentSelectorOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setAgentSelectorOpen(false);
+    };
+    window.addEventListener('pointerdown', closeOnPointerDown, true);
+    window.addEventListener('keydown', closeOnEscape, true);
+    return () => {
+      window.removeEventListener('pointerdown', closeOnPointerDown, true);
+      window.removeEventListener('keydown', closeOnEscape, true);
+    };
+  }, [agentSelectorOpen]);
 
   useEffect(() => {
     const node = workspaceRef.current;
@@ -750,6 +799,37 @@ export default function App() {
     }
   }, [addThreadToCache, agents, queryClient, setLeftSidebarView]);
 
+  const handleSwitchThreadAgent = useCallback((agentId: string) => {
+    if (!activeThreadId) return;
+    if (agentId === selectedAgentId) {
+      setAgentSelectorOpen(false);
+      return;
+    }
+    const previousAgent = agents.find((a) => a.id === selectedAgentId);
+    const nextAgent = agents.find((a) => a.id === agentId);
+    const handoff = switchThreadAgent(activeThreadId, agentId);
+    setAgentSelectorOpen(false);
+    // Inject a system message indicating the agent handoff
+    if (handoff.previousAgentId && handoff.previousAgentId !== agentId) {
+      const prevName = previousAgent?.name ?? handoff.previousAgentId;
+      const nextName = nextAgent?.name ?? agentId;
+      setUserMessages((prev) => [
+        ...prev,
+        {
+          id: `handoff-${Date.now()}`,
+          role: 'system',
+          timestamp: new Date().toISOString(),
+          blocks: [
+            {
+              kind: 'text',
+              content: `Switched active agent from **${prevName}** to **${nextName}**. Subsequent messages will be sent to ${nextName}.`,
+            },
+          ],
+        },
+      ]);
+    }
+  }, [activeThreadId, agents, selectedAgentId, switchThreadAgent]);
+
   const handleStartLocalOrchestration = useCallback(async (agentId: string, draft: string) => {
     await handleSelectAgent(agentId);
     setViewMode('agent');
@@ -827,14 +907,98 @@ export default function App() {
       const selected = await (await import('@tauri-apps/plugin-dialog')).open({ directory: true, multiple: false });
       const workDir = Array.isArray(selected) ? selected[0] : selected;
       if (typeof workDir !== 'string' || !workDir.trim()) return;
-      window.localStorage.setItem('agenthub.prompt.workDir', workDir);
-      window.dispatchEvent(new CustomEvent('agenthub:workdir-selected', { detail: { workDir } }));
+      const normalizedPath = workDir.trim();
+      setSavedWorkDir(normalizedPath);
+      addRecentWorkspace({ path: normalizedPath });
+      window.localStorage.setItem('agenthub.prompt.workDir', normalizedPath);
+      window.dispatchEvent(new CustomEvent('agenthub:workdir-selected', { detail: { workDir: normalizedPath } }));
       addToast({ type: 'success', message: t('toast.workDirSelected') });
       focusComposer();
     } catch {
       addToast({ type: 'error', message: t('toast.error') });
     }
   }, [addToast, desktopWindowAvailable, t]);
+
+  // ── File search dialog handlers ──
+
+  const handleFileSelect = useCallback(async (filePath: string) => {
+    // Open file with the system's default application via Tauri shell plugin.
+    try {
+      const { open } = await import('@tauri-apps/plugin-shell');
+      await open(filePath);
+    } catch {
+      // Fallback: open via file:// protocol (works in some Electron-like contexts).
+      try {
+        window.open(`file:///${filePath.replace(/\\/g, '/')}`, '_blank');
+      } catch {
+        addToast({ type: 'error', message: t('toast.error') });
+      }
+    }
+  }, [addToast, t]);
+
+  const handleOpenInVSCode = useCallback((filePath: string) => {
+    try {
+      window.open(`vscode://file/${filePath}`, '_blank');
+    } catch {
+      addToast({ type: 'error', message: t('toast.error') });
+    }
+  }, [addToast, t]);
+
+  // ── Workspace state ──
+  const [recentWorkspaces, setRecentWorkspaces] = useState<WorkspaceEntry[]>(() => readRecentWorkspaces());
+
+  const handleSelectWorkspace = useCallback((workspace: WorkspaceEntry) => {
+    setSavedWorkDir(workspace.path);
+    addRecentWorkspace({ path: workspace.path });
+    setRecentWorkspaces(readRecentWorkspaces());
+    void syncWorkspacesToBackend();
+    window.localStorage.setItem('agenthub.prompt.workDir', workspace.path);
+    window.dispatchEvent(new CustomEvent('agenthub:workdir-selected', { detail: { workDir: workspace.path } }));
+    addToast({ type: 'success', message: t('toast.workDirSelected') });
+    focusComposer();
+  }, [addToast, t]);
+
+  const handleRemoveWorkspace = useCallback((path: string) => {
+    removeRecentWorkspace(path);
+    setRecentWorkspaces(readRecentWorkspaces());
+    void syncWorkspacesToBackend();
+  }, []);
+
+  const handleClearWorkspaces = useCallback(() => {
+    clearRecentWorkspaces();
+    setRecentWorkspaces([]);
+    void syncWorkspacesToBackend();
+  }, []);
+
+  const handleBrowseWorkspace = useCallback(async () => {
+    await handleOpenFolder();
+    setRecentWorkspaces(readRecentWorkspaces());
+    void syncWorkspacesToBackend();
+  }, [handleOpenFolder]);
+
+  // ── Git status ──
+  const [workDirForGit, setWorkDirForGit] = useState<string>(() => getSavedWorkDir());
+  const gitStatus = useGitStatus(workDirForGit);
+
+  // Listen for workdir changes from other parts of the app
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.workDir) {
+        setWorkDirForGit(detail.workDir);
+      }
+    };
+    window.addEventListener('agenthub:workdir-selected', handler);
+    return () => window.removeEventListener('agenthub:workdir-selected', handler);
+  }, []);
+
+  // Persist git branch info into workspace entries
+  useEffect(() => {
+    if (gitStatus.status?.branch && workDirForGit) {
+      updateWorkspaceBranch(workDirForGit, gitStatus.status.branch);
+      setRecentWorkspaces(readRecentWorkspaces());
+    }
+  }, [gitStatus.status?.branch, workDirForGit]);
 
   const handleEditCommand = useCallback((command: 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'delete' | 'selectAll') => {
     const active = document.activeElement;
@@ -1285,6 +1449,9 @@ export default function App() {
       } else if (shellModifier && e.key.toLowerCase() === 'w') {
         e.preventDefault();
         void handleWindowCommand('close');
+      } else if (shellModifier && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setFileSearchOpen(true);
       }
       if (shellModifier && e.key.toLowerCase() === 'b' && !workspaceExpanded && !isMobile) {
         e.preventDefault();
@@ -1551,6 +1718,38 @@ export default function App() {
               </div>
             </div>
 
+            {/* File Explorer section */}
+            {workDirForGit && (
+              <div className={`${styles.sidebarSection} ${styles.fileExplorerSection}`}>
+                <button
+                  type="button"
+                  className={styles.sidebarSectionLabel}
+                  onClick={() => setFileExplorerOpen((v) => !v)}
+                  aria-expanded={fileExplorerOpen}
+                >
+                  <ChevronRight
+                    size={12}
+                    className={styles.sidebarSectionLabelChevron}
+                    style={{ transform: fileExplorerOpen ? 'rotate(90deg)' : undefined, transition: 'transform 0.15s ease' }}
+                  />
+                  <FolderTree size={13} />
+                  {t('fileExplorer.title')}
+                </button>
+                {fileExplorerOpen && (
+                  <div className={styles.fileExplorerScroll}>
+                    <Suspense fallback={null}>
+                      <Slot
+                        name="file-explorer"
+                        rootDir={workDirForGit}
+                        onFileSelect={handleFileSelect}
+                        gitStatus={gitStatus.status}
+                      />
+                    </Suspense>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Sidebar footer */}
             <div className={styles.sidebarFooter}>
               <ShellIconButton className={styles.navIconBtn} onClick={() => openSettings('general')} label={t('nav.settings')} tooltipSide="top">
@@ -1594,7 +1793,82 @@ export default function App() {
             {/* Workspace header */}
             <div className={styles.workspaceHeader}>
               <div className={`${styles.workspaceHeaderDot} ${online ? styles.workspaceHeaderDotOnline : styles.workspaceHeaderDotOffline}`} />
-              <h2>{selectedAgent ? selectedAgent.name : 'AgentHub'}</h2>
+              {/* Git status badge */}
+              {gitStatus.status && (
+                <div className={styles.gitBranchBadge} title={
+                  gitStatus.status.branch
+                    ? [
+                        `Branch: ${gitStatus.status.branch}`,
+                        gitStatus.status.ahead > 0 && `${gitStatus.status.ahead} ahead`,
+                        gitStatus.status.behind > 0 && `${gitStatus.status.behind} behind`,
+                        gitStatus.status.files.length > 0 && `${gitStatus.status.files.length} change(s)`,
+                      ].filter(Boolean).join(', ')
+                    : t('workspace.gitClean')
+                }>
+                  <GitBranch size={12} className={styles.gitBranchIcon} />
+                  {gitStatus.status.branch ? (
+                    <>
+                      <span className={styles.gitBranchName}>{gitStatus.status.branch}</span>
+                      {gitStatus.status.ahead > 0 && (
+                        <span className={styles.gitAhead}>
+                          <GitCommit size={10} />{gitStatus.status.ahead}
+                        </span>
+                      )}
+                      {gitStatus.status.behind > 0 && (
+                        <span className={styles.gitBehind}>
+                          <GitCommit size={10} />{gitStatus.status.behind}
+                        </span>
+                      )}
+                      {gitStatus.status.files.length > 0 && (
+                        <span className={styles.gitChangeCount}>{gitStatus.status.files.length}</span>
+                      )}
+                    </>
+                  ) : (
+                    <span className={styles.gitBranchDetached}>{t('workspace.gitNoRepo')}</span>
+                  )}
+                </div>
+              )}
+              {gitStatus.error && (
+                <div className={styles.gitBranchBadge} title={gitStatus.error}>
+                  <GitBranch size={12} className={styles.gitBranchIcon} />
+                  <span className={styles.gitBranchDetached}>{t('workspace.gitNoRepo')}</span>
+                </div>
+              )}
+              {/* Agent selector dropdown */}
+              <div className={styles.agentSelector} ref={agentSelectorRef}>
+                <button
+                  type="button"
+                  className={styles.agentSelectorTrigger}
+                  onClick={() => setAgentSelectorOpen((v) => !v)}
+                  aria-haspopup="listbox"
+                  aria-expanded={agentSelectorOpen}
+                  disabled={!activeThreadId}
+                  title={activeThreadId ? t('workspace.switchAgent') : t('workspace.noThreadToSwitch')}
+                >
+                  <h2>{selectedAgent ? selectedAgent.name : 'AgentHub'}</h2>
+                  <ChevronDown size={12} className={`${styles.agentSelectorChevron} ${agentSelectorOpen ? styles.agentSelectorChevronOpen : ''}`} />
+                </button>
+                {agentSelectorOpen && (
+                  <div className={styles.agentSelectorPanel} role="listbox" aria-label={t('workspace.switchAgent')}>
+                    {agents.map((agent) => (
+                      <button
+                        key={agent.id}
+                        type="button"
+                        role="option"
+                        aria-selected={agent.id === selectedAgentId}
+                        className={`${styles.agentSelectorItem} ${agent.id === selectedAgentId ? styles.agentSelectorItemActive : ''}`}
+                        onClick={() => handleSwitchThreadAgent(agent.id)}
+                      >
+                        <span className={styles.agentSelectorItemDot} data-online={online} />
+                        <span className={styles.agentSelectorItemName}>{agent.name}</span>
+                        {agent.id === selectedAgentId && (
+                          <span className={styles.agentSelectorItemCheck} aria-hidden="true">&#10003;</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               {selectedThread && <span className={styles.workspaceThreadTitle}>{selectedThread.title}</span>}
               <div className={styles.workspaceHeaderActions}>
                 <ShellIconButton
@@ -1607,10 +1881,14 @@ export default function App() {
                 </ShellIconButton>
                 <ShellIconButton
                   className={styles.workspaceHeaderBtn}
-                  onClick={() => setViewMode((mode) => (mode === 'agent' ? 'im' : 'agent'))}
-                  label={viewMode === 'agent' ? t('im.groupChat') : t('nav.agent')}
+                  onClick={() => setViewMode((mode) => {
+                    if (mode === 'agent') return 'im';
+                    if (mode === 'im') return 'team';
+                    return 'agent';
+                  })}
+                  label={viewMode === 'agent' ? t('im.groupChat') : viewMode === 'im' ? t('menu.view.teamRuns') : t('nav.agent')}
                   tooltipSide="bottom"
-                  aria-pressed={viewMode === 'im'}
+                  aria-pressed={viewMode === 'im' || viewMode === 'team'}
                 >
                   <MessageSquareText size={15} />
                 </ShellIconButton>
@@ -1713,9 +1991,18 @@ export default function App() {
                   selectedAgentId={selectedAgentId ?? undefined}
                   onSelectAgent={handleSelectAgent}
                   onStartLocalOrchestration={handleStartLocalOrchestration}
+                  workspaces={recentWorkspaces}
+                  selectedWorkspacePath={workDirForGit || undefined}
+                  onSelectWorkspace={handleSelectWorkspace}
+                  onBrowseWorkspace={handleBrowseWorkspace}
+                  onRemoveWorkspace={handleRemoveWorkspace}
+                  onClearWorkspaces={handleClearWorkspaces}
+                  desktopAvailable={desktopWindowAvailable}
                 />
               ) : viewMode === 'im' ? (
                 <ErrorBoundary><Suspense fallback={null}><Slot name="im-view" /></Suspense></ErrorBoundary>
+              ) : viewMode === 'team' ? (
+                <ErrorBoundary><Suspense fallback={null}><Slot name="team-run-console" /></Suspense></ErrorBoundary>
               ) : (
                 <Slot name="main-view" messages={messages} allMessages={allMessages} threadsCount={threads.length} isStreaming={composerLocked} isConnected={isConnected} agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={handleSelectAgent} onRetry={handleRetry} onFork={handleForkThread} onDelete={handleDelete} onSendMessage={handleSend} />
               )}
@@ -1758,12 +2045,33 @@ export default function App() {
       </>
       )}
 
+      {/* Bottom status bar */}
+      <Slot
+        name="status-bar"
+        online={online}
+        health={health}
+        isConnected={isConnected}
+        error={edgeStatus.lastError ?? null}
+        wsLatency={wsLatency}
+        hubAuthenticated={hubAuthenticated}
+      />
+
       {/* Modals */}
       <Suspense fallback={null}>
         <Slot name="search-dialog" messages={allMessages} threads={threads} onSelect={handleSearchMessageSelect} onSelectThread={handleSearchThreadSelect} />
       </Suspense>
+      <Suspense fallback={null}>
+        <Slot
+          name="file-search-dialog"
+          workspaceDir={workDirForGit || undefined}
+          onSelectFile={handleFileSelect}
+          onOpenInVSCode={handleOpenInVSCode}
+          open={fileSearchOpen}
+          onClose={() => setFileSearchOpen(false)}
+        />
+      </Suspense>
       <Slot name="permission-dialog" requests={permissionRequests} onDecide={handleDecidePermission} />
-      <Slot name="shortcut-help" open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
+      <Slot name="shortcut-help" open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} onNavigateToKeyboard={() => openSettings('keyboard')} />
 
       {showAuthModal && (
         <div className={styles.modalOverlay} onClick={() => useHubStore.getState().setShowAuthModal(false)}>

@@ -1,0 +1,330 @@
+/* ArtifactBrowser — generated files gallery */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Empty state ── */
+.emptyCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  opacity: 0.72;
+}
+
+[data-theme='light'] .emptyCard {
+  border-bottom-color: rgba(0, 0, 0, 0.055);
+}
+
+/* ── Category tabs ── */
+.tabBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 4px 0 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+[data-theme='light'] .tabBar {
+  border-bottom-color: rgba(0, 0, 0, 0.055);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-weakest);
+  font-size: 10px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--foreground);
+}
+
+.tabActive {
+  background: rgba(93, 104, 204, 0.15);
+  color: var(--foreground);
+}
+
+.tabCount {
+  opacity: 0.5;
+  font-size: 9px;
+  font-family: var(--font-mono);
+}
+
+/* ── Artifact list ── */
+.artifactList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.artifactRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: background 0.1s;
+}
+
+[data-theme='light'] .artifactRow {
+  border-bottom-color: rgba(0, 0, 0, 0.035);
+}
+
+.artifactRow:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.artifactRowActive {
+  background: rgba(93, 104, 204, 0.08);
+}
+
+.artifactInfo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  text-align: left;
+  outline-offset: 2px;
+}
+
+.artifactInfo:focus-visible {
+  outline: 1px solid var(--color-primary, #5d68cc);
+}
+
+.artifactPath {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+}
+
+.artifactAction {
+  color: #8E8E93;
+  font-size: 9px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.artifactActions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.artifactBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-weakest);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  text-decoration: none;
+}
+
+.artifactBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--foreground);
+}
+
+.appliedBtn {
+  color: var(--success);
+  opacity: 0.6;
+}
+
+/* ── Category icons ── */
+.catIconImage { color: #f4c76b; }
+.catIconCode  { color: #69c967; }
+.catIconDoc   { color: #5d9cec; }
+.catIconWeb   { color: #aeb7ff; }
+.catIconOther { color: var(--text-weakest); }
+
+/* ── Preview overlay ── */
+.previewOverlay {
+  margin-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+[data-theme='light'] .previewOverlay {
+  border-top-color: rgba(0, 0, 0, 0.06);
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0 4px;
+  min-height: 28px;
+}
+
+.previewTitle {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previewActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.previewBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-weakest);
+  font-size: 10px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.previewBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--foreground);
+}
+
+[data-theme='light'] .previewBtn {
+  border-color: rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme='light'] .previewBtn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.previewBody {
+  flex: 1;
+  min-height: 0;
+  max-height: 320px;
+  overflow: auto;
+}
+
+/* ── Image preview ── */
+.imagePreview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.previewImage {
+  max-width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+}
+
+/* ── Web / iframe preview ── */
+.webPreview {
+  min-height: 200px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.previewIframe {
+  width: 100%;
+  height: 260px;
+  border: none;
+  background: #fff;
+}
+
+/* ── Code preview ── */
+.codePreview {
+  max-height: 280px;
+  overflow: auto;
+}
+
+.previewCode {
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--muted-foreground);
+}
+
+[data-theme='dark'] .previewCode {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* ── Placeholder ── */
+.previewPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px 12px;
+  color: var(--text-weakest);
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.previewHint {
+  font-size: 10px;
+  opacity: 0.5;
+  font-style: italic;
+}

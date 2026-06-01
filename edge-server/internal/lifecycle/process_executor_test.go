@@ -896,6 +896,14 @@ func TestProcessExecutorHelper(t *testing.T) {
 		os.Exit(7)
 	case "sleep":
 		time.Sleep(5 * time.Second)
+	case "stdin-read":
+		buf := make([]byte, 1024)
+		_, err := os.Stdin.Read(buf)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "stdin read error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stdout, "stdin-ok\n")
 	case "pwd":
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -1135,4 +1143,110 @@ func TestSendSubAgentResult_NonSubAgentNoAction(t *testing.T) {
 
 	// Should not panic or send a message because parentID is empty.
 	executor.sendSubAgentResult("run-nosub", "finished", nil)
+}
+
+// needsStdinTestAdapter is a stub adapter that reports NeedsStdin=true and
+// uses the test helper binary. Its ParseStream drains stdout and then writes
+// a control response via stdin to verify the pipe is still open.
+type needsStdinTestAdapter struct {
+	cmdPath string
+	cmdArgs []string
+}
+
+func (a *needsStdinTestAdapter) Metadata() adapters.AdapterMetadata {
+	return adapters.AdapterMetadata{ID: "needs-stdin-test", Name: "Needs Stdin Test"}
+}
+
+func (a *needsStdinTestAdapter) Capabilities() adapters.AgentCapabilities {
+	return adapters.AgentCapabilities{Streaming: true, MultiTurn: true}
+}
+
+func (a *needsStdinTestAdapter) BuildCommand(ctx adapters.RunProcessContext) (string, []string, []string, string) {
+	return a.cmdPath, a.cmdArgs, append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"), ""
+}
+
+func (a *needsStdinTestAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter adapters.EventEmitter, run store.Run) error {
+	// Drain stdout (test helper prints "stdin-ok" after reading from stdin)
+	data, err := io.ReadAll(stdout)
+	if err != nil {
+		return err
+	}
+	emitter.Emit(adapters.BusEventResult, map[string]any{
+		"projectId": run.ProjectID,
+		"threadId":  run.ThreadID,
+		"runId":     run.ID,
+	}, map[string]any{"output": string(data)})
+	return nil
+}
+
+func (a *needsStdinTestAdapter) NeedsStdin() bool { return true }
+
+func (a *needsStdinTestAdapter) Available() bool { return true }
+
+// TestProcessExecutorKeepsStdinOpenForNeedsStdinAdapter verifies that when an
+// adapter reports NeedsStdin()==true and no DecisionLoop is configured, the
+// executor does NOT close stdin after cmd.Start(). The adapter's ParseStream
+// receives a writable stdin pipe, enabling the permission gating protocol to
+// function correctly (G03 fix).
+func TestProcessExecutorKeepsStdinOpenForNeedsStdinAdapter(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	_, ch, _ := bus.Subscribe(0)
+
+	adapter := &needsStdinTestAdapter{
+		cmdPath: os.Args[0],
+		cmdArgs: []string{processExecutorHelperRunFlag, "--", "stdin-read"},
+	}
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: "agenthub-needs-stdin-test",
+	}, adapter, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	// Wait for run.started so we know the close-or-keep section has run.
+	for {
+		evt := nextEventWithin(t, ch, 10*time.Second)
+		switch evt.Type {
+		case "run.started":
+			goto started
+		case "run.failed":
+			t.Fatalf("run failed before started: %#v", evt.Payload)
+		}
+	}
+started:
+
+	// After run.started, stdin should still be open (not closed prematurely).
+	executor.mu.Lock()
+	stdin := executor.stdins[run.ID]
+	executor.mu.Unlock()
+
+	if stdin == nil {
+		t.Fatal("stdin was nil after run.started — closed prematurely despite NeedsStdin()==true")
+	}
+
+	// Write a control response to stdin — the test helper is blocked reading stdin.
+	_, err = stdin.Write([]byte("test-control-response\n"))
+	if err != nil {
+		t.Fatalf("stdin.Write failed: %v — pipe was closed prematurely", err)
+	}
+
+	// Wait for the run to finish (the helper should exit after reading stdin).
+	for {
+		evt := nextEventWithin(t, ch, 10*time.Second)
+		switch evt.Type {
+		case "run.finished":
+			return
+		case "run.failed":
+			payload, _ := evt.Payload.(map[string]any)
+			errInfo, _ := payload["error"]
+			t.Fatalf("run failed: %#v", errInfo)
+		}
+	}
 }

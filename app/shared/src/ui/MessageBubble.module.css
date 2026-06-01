@@ -29,3 +29,15 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+
+/* ── Responsive ─────────────────── */
+
+@media (max-width: 480px) {
+  .bubble {
+    max-width: 100%;
+  }
+
+  .content {
+    font-size: 14px;
+  }
+}

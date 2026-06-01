@@ -2,7 +2,7 @@
 // Uses @agenthub/shared for all response types and error handling.
 // P0-1: Zod schema validation with safeParse on all responses.
 
-import { EDGE_URL } from '@/config';
+import { getEdgeBaseUrl } from '@/config';
 import type {
   HealthResponse,
   Runner,
@@ -64,22 +64,24 @@ export interface ModelCatalogResponse {
   sources: ModelCatalogSource[];
 }
 
-const BASE = EDGE_URL.replace(/\/+$/, '');
+function baseUrl(): string {
+  return getEdgeBaseUrl().replace(/\/+$/, '');
+}
 
 export async function fetchHealth(): Promise<HealthResponse> {
-  const res = await fetch(`${BASE}/v1/health`);
+  const res = await fetch(`${baseUrl()}/v1/health`);
   if (!res.ok) throw await parseError(res);
   return safeParse(HealthResponseSchema, await res.json(), 'health');
 }
 
 export async function fetchRunners(): Promise<ListResponse<Runner>> {
-  const res = await fetch(`${BASE}/v1/runners`, { headers: edgeAuthHeaders() });
+  const res = await fetch(`${baseUrl()}/v1/runners`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
   return safeParse(listResponseSchema(RunnerSchema), await res.json(), 'runners');
 }
 
 export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {
-  const res = await fetch(`${BASE}/v1/agents`, { headers: edgeAuthHeaders() });
+  const res = await fetch(`${baseUrl()}/v1/agents`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
   const raw = await res.json();
   const normalized = normalizeAgentList(raw);
@@ -87,7 +89,7 @@ export async function fetchAgents(): Promise<ListResponse<AgentInfo>> {
 }
 
 export async function fetchModelCatalog(): Promise<ModelCatalogResponse> {
-  const res = await fetch(`${BASE}/v1/model-catalog`, { headers: edgeAuthHeaders() });
+  const res = await fetch(`${baseUrl()}/v1/model-catalog`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
   return safeParse(ModelCatalogResponseSchema, await res.json(), 'modelCatalog');
 }
@@ -123,13 +125,13 @@ function normalizeAgentCapabilities(raw: unknown): AgentInfo['capabilities'] {
 
 export async function fetchThreads(projectId?: string): Promise<ListResponse<ThreadInfo>> {
   const params = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
-  const res = await fetch(`${BASE}/v1/threads${params}`, { headers: edgeAuthHeaders() });
+  const res = await fetch(`${baseUrl()}/v1/threads${params}`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
   return safeParse(listResponseSchema(ThreadInfoSchema), await res.json(), 'threads');
 }
 
 export async function createThread(title?: string, threadId?: string): Promise<ThreadInfo> {
-  const res = await fetch(`${BASE}/v1/threads`, {
+  const res = await fetch(`${baseUrl()}/v1/threads`, {
     method: 'POST',
     headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ title: title ?? '', threadId: threadId ?? '' }),
@@ -139,7 +141,7 @@ export async function createThread(title?: string, threadId?: string): Promise<T
 }
 
 export async function fetchThreadItems(threadId: string): Promise<ListResponse<{ id: string; role: string; content: string; timestamp: string }>> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/items`, {
+  const res = await fetch(`${baseUrl()}/v1/threads/${encodeURIComponent(threadId)}/items`, {
     headers: edgeAuthHeaders(),
   });
   if (!res.ok) throw await parseError(res);
@@ -151,13 +153,13 @@ export async function fetchRuns(projectId?: string, threadId?: string): Promise<
   if (projectId) params.set('projectId', projectId);
   if (threadId) params.set('threadId', threadId);
   const qs = params.toString();
-  const res = await fetch(`${BASE}/v1/runs${qs ? `?${qs}` : ''}`, { headers: edgeAuthHeaders() });
+  const res = await fetch(`${baseUrl()}/v1/runs${qs ? `?${qs}` : ''}`, { headers: edgeAuthHeaders() });
   if (!res.ok) throw await parseError(res);
   return safeParse(listResponseSchema(RunInfoSchema), await res.json(), 'runs');
 }
 
 export async function startRun(req?: StartRunRequest): Promise<RunInfo> {
-  const res = await fetch(`${BASE}/v1/runs`, {
+  const res = await fetch(`${baseUrl()}/v1/runs`, {
     method: 'POST',
     headers: edgeAuthHeaders(req ? { 'Content-Type': 'application/json' } : undefined),
     body: req ? JSON.stringify(req) : undefined,
@@ -167,7 +169,7 @@ export async function startRun(req?: StartRunRequest): Promise<RunInfo> {
 }
 
 export async function cancelRun(runId: string): Promise<RunInfo> {
-  const res = await fetch(`${BASE}/v1/runs/${encodeURIComponent(runId)}:cancel`, {
+  const res = await fetch(`${baseUrl()}/v1/runs/${encodeURIComponent(runId)}:cancel`, {
     method: 'POST',
     headers: edgeAuthHeaders(),
   });
@@ -176,7 +178,7 @@ export async function cancelRun(runId: string): Promise<RunInfo> {
 }
 
 export async function renameThread(threadId: string, title: string): Promise<ThreadInfo> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
+  const res = await fetch(`${baseUrl()}/v1/threads/${encodeURIComponent(threadId)}`, {
     method: 'PATCH',
     headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ title }),
@@ -186,7 +188,7 @@ export async function renameThread(threadId: string, title: string): Promise<Thr
 }
 
 export async function updateThreadStatus(threadId: string, status: 'active' | 'archived'): Promise<ThreadInfo> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
+  const res = await fetch(`${baseUrl()}/v1/threads/${encodeURIComponent(threadId)}`, {
     method: 'PATCH',
     headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ status }),
@@ -196,7 +198,7 @@ export async function updateThreadStatus(threadId: string, status: 'active' | 'a
 }
 
 export async function archiveThread(threadId: string): Promise<ThreadInfo> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}:archive`, {
+  const res = await fetch(`${baseUrl()}/v1/threads/${encodeURIComponent(threadId)}:archive`, {
     method: 'POST',
     headers: edgeAuthHeaders(),
   });
@@ -205,7 +207,7 @@ export async function archiveThread(threadId: string): Promise<ThreadInfo> {
 }
 
 export async function deleteThread(threadId: string): Promise<'deleted' | 'archived'> {
-  const res = await fetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}`, {
+  const res = await fetch(`${baseUrl()}/v1/threads/${encodeURIComponent(threadId)}`, {
     method: 'DELETE',
     headers: edgeAuthHeaders(),
   });
@@ -233,7 +235,7 @@ export interface PermissionDecideRequest {
 }
 
 export async function decidePermission(req: PermissionDecideRequest): Promise<void> {
-  const res = await fetch(`${BASE}/v1/permissions/decide`, {
+  const res = await fetch(`${baseUrl()}/v1/permissions/decide`, {
     method: 'POST',
     headers: edgeAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(req),

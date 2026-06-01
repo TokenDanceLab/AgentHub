@@ -282,3 +282,88 @@ export function parseUnifiedDiff(
     return [];
   }
 }
+
+// ── Go-ported extraction / validation ───────────
+// These match edge-server/internal/diff/diff.go semantics.
+// Field names (file/patch) mirror the wire format from OpenCode diffs.ts.
+
+export interface DiffInput {
+  file: string;
+  patch: string;
+  additions: number;
+  deletions: number;
+  status?: 'added' | 'deleted' | 'modified';
+}
+
+/**
+ * Returns true when value is a valid DiffInput object.
+ * Mirrors Go IsDiff: validates that all required fields exist and
+ * that status (if present) is one of the three allowed values.
+ */
+export function isDiff(value: unknown): value is DiffInput {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const d = value as Record<string, unknown>;
+  if (typeof d.file !== 'string') return false;
+  if (typeof d.patch !== 'string') return false;
+  if (typeof d.additions !== 'number') return false;
+  if (typeof d.deletions !== 'number') return false;
+  if (d.status === undefined || d.status === null) return true;
+  return d.status === 'added' || d.status === 'deleted' || d.status === 'modified';
+}
+
+function castDiff(d: Record<string, unknown>): DiffInput {
+  const result: DiffInput = {
+    file: d.file as string,
+    patch: d.patch as string,
+    additions: (d.additions as number) | 0,
+    deletions: (d.deletions as number) | 0,
+  };
+  const s = d.status as string | undefined;
+  if (s === 'added' || s === 'deleted' || s === 'modified') {
+    result.status = s;
+  }
+  return result;
+}
+
+/**
+ * Extract a DiffInput[] from various input shapes, matching Go ExtractDiffs:
+ *   - null/empty array -> null (TS returns [])
+ *   - single valid DiffInput -> wrapped
+ *   - array of all-valid -> returned as-is
+ *   - array with mixed -> filtered to valid only
+ *   - keyed object -> values filtered to valid DiffInput
+ */
+export function extractDiffs(value: unknown): DiffInput[] {
+  if (value === null || value === undefined) return [];
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return [];
+    // Fast path: every element is already a valid diff
+    if (value.every(isDiff)) return value;
+    // Filter to valid diffs only
+    const result: DiffInput[] = [];
+    for (const item of value) {
+      if (isDiff(item)) result.push(item);
+    }
+    return result;
+  }
+
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    // Single diff object
+    if (isDiff(obj)) return [obj];
+    // Keyed object: extract values that are diffs
+    const result: DiffInput[] = [];
+    for (const v of Object.values(obj)) {
+      if (isDiff(v)) result.push(v);
+    }
+    return result;
+  }
+
+  return [];
+}
+
+/** Mirrors Go IsObj: returns true when value is a non-nil, non-array object. */
+export function isObj(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}

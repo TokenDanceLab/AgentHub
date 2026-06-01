@@ -18,9 +18,14 @@
   color: var(--muted-foreground);
   font: inherit;
   cursor: pointer;
-  transition:
-    background var(--duration-fast, 0.16s),
-    color var(--duration-fast, 0.16s);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .button {
+    transition:
+      background var(--duration-fast, 0.16s),
+      color var(--duration-fast, 0.16s);
+  }
 }
 
 .button:hover {
@@ -48,7 +53,12 @@
   flex: 0 0 auto;
   font-size: 10px;
   opacity: 0.52;
-  transition: transform var(--duration-fast, 0.16s) var(--ease-out, ease);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .chevron {
+    transition: transform var(--duration-fast, 0.16s) var(--ease-out, ease);
+  }
 }
 
 .chevronExpanded {
@@ -77,4 +87,17 @@
 .body {
   min-width: 0;
   padding: 8px 10px 2px;
+}
+
+/* ── Responsive ─────────────────── */
+
+@media (max-width: 480px) {
+  .button {
+    min-height: var(--touch-target-min, 44px);
+    padding: 6px 10px;
+  }
+
+  .label {
+    font-size: 15px;
+  }
 }

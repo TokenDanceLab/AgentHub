@@ -1803,6 +1803,300 @@
   background: rgba(255, 255, 255, 0.055);
 }
 
+/* ── Keyboard shortcut editing UI ── */
+
+.shortcutActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.shortcutActions button {
+  white-space: nowrap;
+}
+
+/* Editable table container */
+.shortcutEditTable {
+  display: grid;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+}
+
+[data-theme='dark'] .shortcutEditTable {
+  border-color: var(--settings-glass-border);
+}
+
+.shortcutEditGroup {
+  display: grid;
+}
+
+.shortcutEditGroup + .shortcutEditGroup {
+  border-top: 1px solid rgba(0, 0, 0, 0.055);
+}
+
+[data-theme='dark'] .shortcutEditGroup + .shortcutEditGroup {
+  border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+.shortcutEditGroupTitle {
+  min-height: 34px;
+  padding: 10px 16px 6px;
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-weight: 780;
+  letter-spacing: 0;
+  line-height: 1.45;
+  text-transform: uppercase;
+}
+
+.shortcutEditRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 56px;
+  padding: 10px 16px;
+}
+
+.shortcutEditGroupTitle + .shortcutEditRow,
+.shortcutEditRow + .shortcutEditRow {
+  border-top: 1px solid rgba(0, 0, 0, 0.055);
+}
+
+[data-theme='dark'] .shortcutEditGroupTitle + .shortcutEditRow,
+[data-theme='dark'] .shortcutEditRow + .shortcutEditRow {
+  border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+.shortcutEditRowCapturing {
+  background: rgba(93, 104, 204, 0.06);
+}
+
+[data-theme='dark'] .shortcutEditRowCapturing {
+  background: rgba(93, 104, 204, 0.09);
+}
+
+.shortcutEditInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.shortcutEditLabel {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.shortcutEditDetail {
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 520;
+  line-height: 1.35;
+}
+
+.shortcutEditBinding {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.shortcutDisplayKeys {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.shortcutDisplayKeys kbd {
+  min-width: 26px;
+  height: 25px;
+  padding: 0 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom-color: rgba(0, 0, 0, 0.16);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  line-height: 23px;
+  text-align: center;
+}
+
+[data-theme='dark'] .shortcutDisplayKeys kbd {
+  border-color: rgba(255, 255, 255, 0.08);
+  border-bottom-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.shortcutCaptureArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 140px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 2px dashed var(--settings-accent);
+  border-radius: 8px;
+  background: rgba(93, 104, 204, 0.04);
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--duration-fast), background var(--duration-fast);
+}
+
+[data-theme='dark'] .shortcutCaptureArea {
+  background: rgba(93, 104, 204, 0.07);
+}
+
+.shortcutCaptureArea:focus-visible {
+  box-shadow: 0 0 0 3px rgba(93, 104, 204, 0.18);
+}
+
+.shortcutCaptureKeys {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.shortcutCaptureKeys kbd {
+  min-width: 26px;
+  height: 25px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in oklch, var(--settings-accent) 34%, rgba(0, 0, 0, 0.08));
+  border-bottom-color: color-mix(in oklch, var(--settings-accent) 42%, rgba(0, 0, 0, 0.16));
+  border-radius: 7px;
+  background: color-mix(in oklch, var(--settings-accent) 8%, rgba(255, 255, 255, 0.62));
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  line-height: 23px;
+  text-align: center;
+  animation: keyCaptureIn 0.12s ease-out;
+}
+
+[data-theme='dark'] .shortcutCaptureKeys kbd {
+  border-color: color-mix(in oklch, var(--settings-accent) 34%, rgba(255, 255, 255, 0.08));
+  border-bottom-color: color-mix(in oklch, var(--settings-accent) 42%, rgba(255, 255, 255, 0.16));
+  background: color-mix(in oklch, var(--settings-accent) 10%, rgba(255, 255, 255, 0.055));
+}
+
+@keyframes keyCaptureIn {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.shortcutCaptureHint {
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 600;
+  user-select: none;
+}
+
+.shortcutConflict {
+  color: var(--destructive, #e53e3e);
+  font-size: 11px;
+  font-weight: 650;
+  text-align: center;
+  max-width: 180px;
+  line-height: 1.3;
+}
+
+.shortcutEditActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.shortcutEditBtn,
+.shortcutConfirmBtn,
+.shortcutCancelBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: background var(--duration-fast), border-color var(--duration-fast);
+}
+
+[data-theme='dark'] .shortcutEditBtn,
+[data-theme='dark'] .shortcutConfirmBtn,
+[data-theme='dark'] .shortcutCancelBtn {
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+.shortcutEditBtn:hover,
+.shortcutEditBtn:focus-visible {
+  outline: none;
+  background: rgba(93, 104, 204, 0.1);
+  border-color: rgba(93, 104, 204, 0.24);
+}
+
+.shortcutConfirmBtn {
+  border-color: rgba(34, 197, 94, 0.28);
+  color: #22c55e;
+}
+
+.shortcutConfirmBtn:hover,
+.shortcutConfirmBtn:focus-visible {
+  outline: none;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.shortcutConfirmBtn:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.shortcutCancelBtn {
+  border-color: rgba(229, 62, 62, 0.24);
+  color: #e53e3e;
+}
+
+.shortcutCancelBtn:hover,
+.shortcutCancelBtn:focus-visible {
+  outline: none;
+  background: rgba(229, 62, 62, 0.08);
+}
+
+/* Footer bar */
+.shortcutEditFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.shortcutEditFooterActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .connectionIcon {
   display: grid;
   width: 34px;
@@ -2120,5 +2414,1986 @@
     max-width: none;
     width: 100%;
     text-align: left;
+  }
+}
+
+/* ----- Custom Agent Creator ----- */
+
+.creatorOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: creatorOverlayIn 180ms ease;
+}
+
+@keyframes creatorOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.creatorDialog {
+  display: flex;
+  flex-direction: column;
+  width: min(840px, calc(100vw - 40px));
+  max-height: calc(100vh - 56px);
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 14px;
+  background: var(--settings-glass-bg);
+  box-shadow:
+    0 18px 56px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(32px) saturate(1.2);
+  -webkit-backdrop-filter: blur(32px) saturate(1.2);
+  animation: creatorDialogIn 200ms ease;
+}
+
+@keyframes creatorDialogIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+[data-theme='dark'] .creatorDialog {
+  box-shadow:
+    0 18px 56px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.creatorHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--settings-glass-border);
+}
+
+.creatorHeaderLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  min-width: 0;
+}
+
+.creatorHeaderLeft h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.25;
+  color: var(--foreground);
+}
+
+.creatorHeaderLeft span {
+  display: block;
+  margin-top: 3px;
+  color: var(--settings-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.creatorCloseBtn {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--settings-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.creatorCloseBtn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--foreground);
+}
+
+[data-theme='dark'] .creatorCloseBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.creatorTabs {
+  display: flex;
+  gap: 3px;
+  padding: 12px 24px 0;
+  border-bottom: 1px solid var(--settings-glass-border);
+}
+
+.creatorTab {
+  padding: 8px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--settings-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.creatorTab:hover {
+  color: var(--foreground);
+}
+
+.creatorTabActive {
+  color: var(--settings-accent);
+  border-bottom-color: var(--settings-accent);
+}
+
+.creatorBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 24px;
+}
+
+.creatorSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.creatorSectionDesc {
+  margin: 0;
+  color: var(--settings-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.creatorField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.creatorField label {
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.creatorFieldLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.creatorFieldHint {
+  color: var(--settings-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.creatorInput,
+.creatorTextarea,
+.creatorSelect {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 9px;
+  background: color-mix(in oklch, var(--settings-glass-bg) 92%, transparent);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  transition: border-color 120ms ease;
+}
+
+.creatorInput:focus,
+.creatorTextarea:focus,
+.creatorSelect:focus {
+  outline: none;
+  border-color: color-mix(in oklch, var(--settings-accent) 46%, var(--settings-glass-border));
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--settings-accent) 12%, transparent);
+}
+
+.creatorTextarea {
+  resize: vertical;
+  min-height: 160px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 12.5px;
+}
+
+.creatorSelect {
+  cursor: pointer;
+}
+
+/* Emoji picker grid (Step 1) */
+.creatorEmojiGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.creatorEmojiOption {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.creatorEmojiOption:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='dark'] .creatorEmojiOption:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.creatorEmojiOptionSelected {
+  border-color: var(--settings-accent);
+  background: color-mix(in oklch, var(--settings-accent) 12%, transparent);
+}
+
+.creatorVariableBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.creatorVariableChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in oklch, var(--settings-accent) 22%, var(--settings-glass-border));
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--settings-accent) 6%, transparent);
+  color: color-mix(in oklch, var(--settings-accent) 82%, var(--foreground));
+  font: inherit;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.creatorVariableChip:hover {
+  background: color-mix(in oklch, var(--settings-accent) 14%, transparent);
+  border-color: color-mix(in oklch, var(--settings-accent) 40%, var(--settings-glass-border));
+}
+
+.creatorToolGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 152px), 1fr));
+  gap: 8px;
+}
+
+.creatorToolCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 9px;
+  background: var(--settings-glass-bg);
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.creatorToolCard:hover {
+  border-color: color-mix(in oklch, var(--settings-accent) 28%, var(--settings-glass-border));
+  background: var(--settings-glass-hover);
+}
+
+.creatorToolCardChecked {
+  border-color: color-mix(in oklch, var(--settings-accent) 46%, var(--settings-glass-border));
+  background: color-mix(in oklch, var(--settings-accent) 8%, var(--settings-glass-bg));
+  color: var(--foreground);
+}
+
+.creatorToolCardChecked:hover {
+  border-color: color-mix(in oklch, var(--settings-accent) 56%, var(--settings-glass-border));
+  background: color-mix(in oklch, var(--settings-accent) 13%, var(--settings-glass-bg));
+}
+
+.creatorToolCheckbox {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.creatorReasoningGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
+  gap: 8px;
+}
+
+.creatorReasoningCard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 9px;
+  background: var(--settings-glass-bg);
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.creatorReasoningCard:hover {
+  border-color: color-mix(in oklch, var(--settings-accent) 28%, var(--settings-glass-border));
+  background: var(--settings-glass-hover);
+}
+
+.creatorReasoningCard input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.creatorReasoningCardActive {
+  border-color: color-mix(in oklch, var(--settings-accent) 46%, var(--settings-glass-border));
+  background: color-mix(in oklch, var(--settings-accent) 10%, var(--settings-glass-bg));
+  color: var(--foreground);
+}
+
+/* Range slider (Step 3: temperature) */
+.creatorRange {
+  width: 100%;
+  accent-color: var(--settings-accent);
+  margin: 2px 0;
+}
+
+.creatorTestChat {
+  min-height: 240px;
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--settings-glass-bg) 80%, transparent);
+}
+
+.creatorTestEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 240px;
+  color: var(--settings-muted);
+}
+
+.creatorTestEmpty span {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.creatorTestMessages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.creatorTestMsg {
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.creatorTestMsgUser {
+  align-self: flex-end;
+  background: color-mix(in oklch, var(--settings-accent) 16%, var(--settings-glass-bg));
+  border: 1px solid color-mix(in oklch, var(--settings-accent) 22%, var(--settings-glass-border));
+  color: var(--foreground);
+}
+
+.creatorTestMsgAssistant {
+  align-self: flex-start;
+  border: 1px solid var(--settings-glass-border);
+  background: var(--settings-glass-bg);
+  color: var(--foreground);
+}
+
+.creatorTestMsgRole {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--settings-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.creatorTestMsg p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.creatorTestTyping {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.creatorTestInput {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.creatorTestInput .creatorInput {
+  flex: 1;
+}
+
+.creatorFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--settings-glass-border);
+}
+
+.creatorFooterRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ----- Wizard Progress Bar ----- */
+.wizardProgressBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 16px 24px 0;
+  border-bottom: 1px solid var(--settings-glass-border);
+  padding-bottom: 14px;
+}
+
+.wizardStep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.wizardStepIndicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--settings-glass-border);
+  background: var(--settings-chip-bg);
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+  flex-shrink: 0;
+}
+
+.wizardStepLabel {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--settings-muted);
+  white-space: nowrap;
+  transition: color 150ms ease;
+}
+
+.wizardStepConnector {
+  width: 32px;
+  height: 2px;
+  background: var(--settings-glass-border);
+  margin: 0 4px;
+  flex-shrink: 0;
+  transition: background 150ms ease;
+}
+
+.wizardStepActive .wizardStepIndicator {
+  border-color: var(--settings-accent);
+  background: var(--settings-accent);
+  color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--settings-accent) 15%, transparent);
+}
+
+.wizardStepActive .wizardStepLabel {
+  color: var(--foreground);
+}
+
+.wizardStepCompleted .wizardStepIndicator {
+  border-color: color-mix(in oklch, var(--settings-accent) 56%, var(--settings-glass-border));
+  background: color-mix(in oklch, var(--settings-accent) 18%, var(--settings-glass-bg));
+  color: var(--settings-accent);
+}
+
+.wizardStepCompleted .wizardStepLabel {
+  color: color-mix(in oklch, var(--settings-accent) 72%, var(--foreground));
+}
+
+.wizardStepCompleted .wizardStepConnector,
+.wizardStepConnectorCompleted {
+  background: color-mix(in oklch, var(--settings-accent) 36%, var(--settings-glass-border));
+}
+
+/* ----- Template Gallery ----- */
+.templateGallery {
+  margin-bottom: 20px;
+}
+
+.templateGalleryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.templateGalleryHeader h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.templateGalleryHeader span {
+  font-size: 11px;
+  color: var(--settings-muted);
+}
+
+.templateGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+}
+
+.templateCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 130ms ease;
+}
+
+.templateCard:hover {
+  border-color: color-mix(in oklch, var(--settings-accent) 30%, var(--settings-glass-border));
+  box-shadow: 0 4px 22px rgba(15, 23, 42, 0.065);
+  transform: translateY(-1px);
+}
+
+.templateCardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.templateCardEmoji {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.templateCardCategory {
+  font-size: 10px;
+  font-weight: 650;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: color-mix(in oklch, var(--settings-accent) 8%, transparent);
+  color: var(--settings-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.templateCardBody h4 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.templateCardBody p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--settings-muted);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.templateCardBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.templateCardTools {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.templateCardToolBadge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--settings-chip-bg);
+  color: var(--settings-muted);
+}
+
+.templateUseBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--settings-accent);
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--settings-accent) 8%, transparent);
+  color: var(--settings-accent);
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.templateUseBtn:hover {
+  background: color-mix(in oklch, var(--settings-accent) 18%, transparent);
+}
+
+/* ----- Agent Marketplace ----- */
+
+.marketTabBar {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--settings-chip-bg);
+}
+
+.marketTab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--settings-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.marketTab:hover {
+  color: var(--foreground);
+  background: var(--settings-glass-hover);
+}
+
+.marketTabActive {
+  background: var(--settings-glass-bg);
+  color: var(--foreground);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.07);
+}
+
+[data-theme='dark'] .marketTabActive {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+/* Search / Filter bar */
+.marketToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.marketSearchWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 220px;
+  padding: 8px 12px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--settings-glass-bg) 92%, transparent);
+  color: var(--settings-muted);
+}
+
+.marketSearchWrap:focus-within {
+  border-color: color-mix(in oklch, var(--settings-accent) 34%, var(--settings-glass-border));
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--settings-accent) 10%, transparent);
+}
+
+.marketSearchInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.marketSearchInput::placeholder {
+  color: var(--settings-muted);
+}
+
+.marketClearBtn {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--settings-muted);
+  cursor: pointer;
+}
+
+.marketClearBtn:hover {
+  background: var(--settings-chip-bg);
+  color: var(--foreground);
+}
+
+.marketToolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.marketFilterActive {
+  border-color: color-mix(in oklch, var(--settings-accent) 28%, var(--settings-glass-border));
+  background: color-mix(in oklch, var(--settings-accent) 8%, transparent);
+  color: color-mix(in oklch, var(--settings-accent) 86%, var(--foreground));
+}
+
+.marketTagBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--settings-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+/* Tag filter panel */
+.marketTagFilterPanel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: var(--settings-glass-bg);
+}
+
+.marketTagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--settings-chip-border);
+  border-radius: 7px;
+  background: var(--settings-chip-bg);
+  color: var(--settings-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.marketTagChip:hover {
+  border-color: color-mix(in oklch, var(--settings-accent) 28%, var(--settings-glass-border));
+  background: var(--settings-glass-hover);
+  color: var(--foreground);
+}
+
+.marketTagChipSelected {
+  border-color: color-mix(in oklch, var(--settings-accent) 46%, var(--settings-glass-border));
+  background: color-mix(in oklch, var(--settings-accent) 12%, var(--settings-glass-bg));
+  color: color-mix(in oklch, var(--settings-accent) 86%, var(--foreground));
+}
+
+/* Community agent card grid */
+.marketAgentGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.marketAgentCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 200px;
+  padding: 16px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 12px;
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+  backdrop-filter: blur(22px) saturate(1.18);
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+[data-theme='dark'] .marketAgentCard {
+  color-scheme: dark;
+}
+
+.marketAgentCard:hover {
+  border-color: color-mix(in oklch, var(--settings-accent) 18%, var(--settings-glass-border));
+  transform: translateY(-1px);
+}
+
+.marketAgentCardInstalled {
+  border-color: rgba(34, 197, 94, 0.18);
+}
+
+.marketAgentCardHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.marketAgentIcon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--settings-icon-bg);
+  color: color-mix(in oklch, var(--settings-accent) 86%, white);
+}
+
+.marketAgentTitle {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.marketAgentTitle strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketAgentTitle span {
+  overflow: hidden;
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketAgentRating {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  color: #f59e0b;
+}
+
+.marketAgentRating span {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.marketAgentRating small {
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.marketAgentDesc {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--settings-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.marketAgentTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.marketAgentTypeTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--settings-accent) 10%, var(--settings-chip-bg));
+  color: var(--settings-accent);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.marketAgentCapTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border: 1px solid var(--settings-chip-border);
+  border-radius: 6px;
+  background: var(--settings-chip-bg);
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.marketAgentMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.marketAgentMeta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.marketAgentActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.marketAgentActions .primaryBtn,
+.marketAgentActions .secondaryBtn {
+  flex: 1;
+  min-height: 32px;
+  font-size: 12px;
+}
+
+.marketInstalledBadge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.12);
+  color: #69c967;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+/* Sub-section headers */
+.marketSubSection {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+  margin-top: 18px;
+}
+
+.marketSubSection strong {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.marketSubSection span {
+  color: var(--settings-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Agent detail modal */
+.marketDetailOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: creatorOverlayIn 180ms ease;
+}
+
+.marketDetailDialog {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, calc(100vw - 40px));
+  max-height: calc(100vh - 56px);
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 14px;
+  background: var(--settings-glass-bg);
+  box-shadow:
+    0 18px 56px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(32px) saturate(1.2);
+  -webkit-backdrop-filter: blur(32px) saturate(1.2);
+  animation: creatorDialogIn 200ms ease;
+}
+
+[data-theme='dark'] .marketDetailDialog {
+  box-shadow:
+    0 18px 56px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.marketDetailHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--settings-glass-border);
+}
+
+.marketDetailHeadLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  min-width: 0;
+}
+
+.marketDetailHeadLeft h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.25;
+  color: var(--foreground);
+}
+
+.marketDetailHeadLeft span {
+  display: block;
+  margin-top: 3px;
+  color: var(--settings-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.marketDetailIcon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--settings-icon-bg);
+  color: color-mix(in oklch, var(--settings-accent) 86%, white);
+}
+
+.marketDetailBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.marketDetailStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
+  gap: 10px;
+}
+
+.marketDetailStat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 12px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 11px;
+  background: color-mix(in oklch, var(--settings-glass-bg) 86%, transparent);
+  text-align: center;
+}
+
+.marketDetailStat svg {
+  color: var(--settings-muted);
+}
+
+.marketDetailStat strong {
+  color: var(--foreground);
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.15;
+}
+
+.marketDetailStat span {
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.marketDetailSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.marketDetailSection strong {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.3;
+}
+
+.marketDetailSection p {
+  margin: 0;
+  color: var(--settings-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.marketDetailPrompt {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 9px;
+  background: color-mix(in oklch, var(--settings-glass-bg) 84%, transparent);
+  color: var(--foreground);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.marketDetailTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.marketDetailChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--settings-chip-border);
+  border-radius: 7px;
+  background: var(--settings-chip-bg);
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.marketDetailMeta {
+  color: var(--settings-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.marketDetailFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--settings-glass-border);
+}
+
+/* My Agents tab empty state */
+.marketMyAgentsEmpty {
+  display: flex;
+  min-height: 160px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+  color: var(--settings-muted);
+  text-align: center;
+}
+
+/* ── Per-Agent Profile Editor ── */
+
+/* ── Market CTA Bar ── */
+.marketCtaBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 11px;
+  background: color-mix(in oklch, var(--settings-accent) 4%, var(--settings-glass-bg));
+  box-shadow: var(--settings-glass-shadow);
+}
+
+.marketCtaBarText {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.marketCtaBarText svg {
+  color: var(--settings-accent);
+}
+
+/* ── Profile Card Actions (Edit / Delete) ── */
+.profileCardActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--settings-glass-border);
+}
+
+/* ── Danger Button ── */
+.dangerBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 9px;
+  background: transparent;
+  color: #ef4444;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease;
+}
+
+.dangerBtn:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.dangerBtn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* ── Per-Agent Profile Editor ── */
+
+.profileExpandTrigger {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profileExpandArrow {
+  display: flex;
+  justify-content: flex-end;
+  color: var(--settings-muted);
+}
+
+.profileEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 4px;
+  border-top: 1px solid var(--settings-glass-border);
+}
+
+.profileEditorSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profileEditorLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.profileEditorLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.profileEditorLabelRow strong {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.profileEditorLabelRow span,
+.profileEditorLabelRow em {
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.profileEditorTextarea {
+  width: 100%;
+  min-height: 140px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.48);
+  color: var(--foreground);
+  font: inherit;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 12.5px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+[data-theme='dark'] .profileEditorTextarea {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.profileEditorCharCount {
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ── Tool toggle grid ── */
+
+.profileToolGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
+  gap: 8px;
+}
+
+.profileToolToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 8px;
+  background: var(--settings-glass-bg);
+  color: var(--settings-muted);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.profileToolToggle:hover {
+  border-color: color-mix(in oklch, var(--settings-accent) 28%, var(--settings-glass-border));
+  background: var(--settings-glass-hover);
+}
+
+.profileToolToggleOn {
+  border-color: color-mix(in oklch, var(--settings-accent) 46%, var(--settings-glass-border));
+  background: color-mix(in oklch, var(--settings-accent) 8%, var(--settings-glass-bg));
+  color: var(--foreground);
+}
+
+.profileToolCheck {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  place-items: center;
+  border: 1px solid var(--settings-chip-border);
+  border-radius: 4px;
+  background: var(--settings-chip-bg);
+}
+
+.profileToolToggleOn .profileToolCheck {
+  border-color: color-mix(in oklch, var(--settings-accent) 46%, var(--settings-glass-border));
+  background: var(--settings-accent);
+}
+
+.profileToolCheckMark {
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.profileToolInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.profileToolInfo strong {
+  overflow: hidden;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileToolInfo span {
+  overflow: hidden;
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-weight: 520;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Model parameter sliders ── */
+
+.profileEditorSliders {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.profileEditorSliderLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+/* ── Publish Agent Modal ── */
+
+.publishModal {
+  max-width: 680px;
+  max-height: 85vh;
+}
+
+.publishPreviewCard {
+  padding: 16px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+}
+
+.publishSubmitting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.publishSubmitting strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.publishSubmitting span {
+  font-size: 13px;
+  color: var(--settings-muted);
+  max-width: 380px;
+}
+
+.publishSpinner {
+  animation: publishSpin 0.9s linear infinite;
+  color: var(--settings-accent);
+}
+
+@keyframes publishSpin {
+  to { transform: rotate(360deg); }
+}
+
+.publishSuccessIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+.publishReviewBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.publishReviewGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.publishCheckCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 8px;
+  background: var(--settings-glass-bg);
+}
+
+.publishCheckCard strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--foreground);
+  margin-bottom: 2px;
+}
+
+.publishCheckCard span {
+  font-size: 11px;
+  color: var(--settings-muted);
+}
+
+.publishCheckPassed {
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.publishCheckPassed .publishCheckIcon {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+.publishCheckFailed {
+  border-color: rgba(239, 68, 68, 0.15);
+}
+
+.publishCheckFailed .publishCheckIcon {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.publishCheckIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.publishWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  margin-top: 12px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.08);
+  color: #f59e0b;
+  font-size: 12px;
+  font-weight: 520;
+}
+
+.publishError {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  margin-top: 12px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  font-size: 12px;
+}
+
+.publishReviewSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: var(--settings-glass-bg);
+}
+
+.publishReviewRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--settings-muted);
+}
+
+.publishReviewRow svg {
+  flex-shrink: 0;
+  color: var(--settings-accent);
+}
+
+.publishReviewRow strong {
+  color: var(--foreground);
+}
+
+.publishReviewRow em {
+  font-style: italic;
+  color: var(--settings-muted);
+}
+
+/* ── Agent Market Card Actions ── */
+
+.profileCardActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--settings-glass-border);
+}
+
+.dangerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 7px;
+  background: rgba(239, 68, 68, 0.06);
+  color: #ef4444;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dangerBtn:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* ── Market CTA Bar ── */
+
+.marketCtaBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+}
+
+.marketCtaBarText {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.marketCtaBarText svg {
+  color: var(--settings-accent);
+}
+
+.marketMyAgentsEmpty {
+  display: flex;
+  min-height: 160px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--settings-glass-border);
+  border-radius: 10px;
+  background: var(--settings-glass-bg);
+  box-shadow: var(--settings-glass-shadow);
+  backdrop-filter: blur(20px) saturate(1.14);
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+  color: var(--settings-muted);
+  text-align: center;
+}
+
+.profileEditorSliderHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.profileEditorSliderHead span {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.profileEditorSliderHead em {
+  flex-shrink: 0;
+  min-width: 48px;
+  text-align: right;
+  color: var(--settings-muted);
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+.profileEditorSlider {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.1);
+  outline: none;
+  cursor: pointer;
+}
+
+[data-theme='dark'] .profileEditorSlider {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.profileEditorSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--settings-accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.profileEditorSlider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+}
+
+.profileEditorSlider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--settings-accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.profileEditorSlider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+}
+
+.profileEditorSliderHint {
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-weight: 520;
+  line-height: 1.3;
+}
+
+/* ── Model override row ── */
+
+.profileEditorModelRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profileEditorMiniLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.profileEditorMiniLabel .select {
+  width: 100%;
+}
+
+/* ── Input rows (MCP / skill links) ── */
+
+.profileEditorInputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profileEditorInputRow .textInput {
+  flex: 1;
+  min-width: 0;
+}
+
+.profileEditorAddBtn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.profileEditorRemoveBtn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* ── Action bar ── */
+
+.profileEditorActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--settings-glass-border);
+  flex-wrap: wrap;
+}
+
+.profileEditorActionsLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.profileEditorSource {
+  color: var(--settings-muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  word-break: break-all;
+}
+
+.profileEditorResetBtn {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.profileEditorSaveBtn {
+  min-width: 100px;
+  height: 34px;
+}
+
+@media (max-width: 860px) {
+  .profileEditorModelRow {
+    grid-template-columns: 1fr;
+  }
+
+  .profileToolGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .profileEditorActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .profileEditorActionsLeft {
+    justify-content: space-between;
   }
 }

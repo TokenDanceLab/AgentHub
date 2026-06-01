@@ -22,8 +22,32 @@ func NormalizeShellCommand(cmd string) string {
 	return cmd
 }
 
+// IsTrustedLocalHost reports whether a host (with optional port) is a trusted
+// loopback address. Used to allow non-browser WebSocket clients that do not
+// send an Origin header when connecting from localhost.
+func IsTrustedLocalHost(host string) bool {
+	host = strings.ToLower(host)
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	switch host {
+	case "localhost", "127.0.0.1", "::1", "tauri.localhost":
+		return true
+	default:
+		ip := net.ParseIP(host)
+		return ip != nil && ip.IsLoopback()
+	}
+}
+
 // IsTrustedLocalOrigin reports whether a browser Origin can control Local Edge.
 func IsTrustedLocalOrigin(origin string) bool {
+	return IsTrustedOrigin(origin, false)
+}
+
+// IsTrustedOrigin reports whether a browser Origin can control Edge.
+// When remoteMode is true, any valid http/https origin is trusted (auth
+// still required). When false, only localhost origins are trusted.
+func IsTrustedOrigin(origin string, remoteMode bool) bool {
 	// Reject empty Origin: non-browser clients (curl, scripts) send no
 	// Origin header, and the browser CORS spec always sends Origin for
 	// cross-origin requests. Accepting empty Origin would bypass CORS.
@@ -47,6 +71,11 @@ func IsTrustedLocalOrigin(origin string) bool {
 		return false
 	}
 
+	// Remote mode: any http/https origin is allowed (auth gate still applies).
+	if remoteMode {
+		return true
+	}
+
 	switch host {
 	case "localhost", "127.0.0.1", "::1", "tauri.localhost":
 		return true
@@ -59,6 +88,17 @@ func IsTrustedLocalOrigin(origin string) bool {
 // Local Edge exposes process-control APIs, so remote binding must wait for an
 // explicit authenticated remote mode instead of relying on browser Origin checks.
 func ValidateLocalListenAddr(addr string) error {
+	return validateListenAddr(addr, false)
+}
+
+// ValidateRemoteListenAddr allows wildcard and non-loopback listen addresses
+// for authenticated remote Edge deployments (SSH tunnel, Tailscale, cloud VM).
+// Remote mode requires authentication to be configured.
+func ValidateRemoteListenAddr(addr string) error {
+	return validateListenAddr(addr, true)
+}
+
+func validateListenAddr(addr string, remoteMode bool) error {
 	addr = strings.TrimSpace(addr)
 	if addr == "" {
 		return fmt.Errorf("listen address is required")
@@ -70,6 +110,9 @@ func ValidateLocalListenAddr(addr string) error {
 	}
 	host = strings.TrimSpace(strings.ToLower(host))
 	if host == "" {
+		if remoteMode {
+			return nil // 0.0.0.0 is allowed in remote mode
+		}
 		return fmt.Errorf("listen address %q uses a wildcard host; use 127.0.0.1, ::1, or localhost", addr)
 	}
 	if host == "localhost" || host == "tauri.localhost" {
@@ -78,9 +121,12 @@ func ValidateLocalListenAddr(addr string) error {
 
 	ip := net.ParseIP(host)
 	if ip == nil {
+		if remoteMode {
+			return nil // DNS hostnames allowed in remote mode
+		}
 		return fmt.Errorf("listen address %q host must be loopback, got %q", addr, host)
 	}
-	if !ip.IsLoopback() {
+	if !ip.IsLoopback() && !remoteMode {
 		return fmt.Errorf("listen address %q host must be loopback, got %q", addr, host)
 	}
 	return nil

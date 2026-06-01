@@ -1,5 +1,6 @@
 import React, { type ReactNode } from 'react';
 import styles from './ActionList.module.css';
+import { SkeletonBar } from './SkeletonBar';
 
 export interface ActionListItem {
   id: string;
@@ -22,6 +23,14 @@ export interface ActionListProps {
   titleClassName?: string;
   metaStackClassName?: string;
   metaClassName?: string;
+  /** Show skeleton placeholder instead of items. Default loadingRows is 4. */
+  isLoading?: boolean;
+  /** Number of skeleton rows to render in loading state. */
+  loadingRows?: number;
+  /** Shown when items is empty and not loading or erring. */
+  emptyState?: ReactNode;
+  /** Shown instead of list content when truthy. Takes priority over loading/empty. */
+  error?: string | ReactNode;
 }
 
 function cx(...classes: Array<string | false | null | undefined>): string {
@@ -37,7 +46,44 @@ export function ActionList({
   titleClassName,
   metaStackClassName,
   metaClassName,
+  isLoading,
+  loadingRows,
+  emptyState,
+  error,
 }: ActionListProps) {
+  if (error) {
+    return (
+      <div className={cx(styles.list, className)} role="alert">
+        {typeof error === 'string' ? (
+          <span className={cx(styles.item, styles.title)} style={{ color: 'var(--destructive, #dc2626)' }}>{error}</span>
+        ) : (
+          error
+        )}
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    const rows = loadingRows ?? 4;
+    return (
+      <div className={cx(styles.list, className)}>
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i} className={cx(styles.item, itemClassName)}>
+            <SkeletonBar width="34px" height="34px" lines={1} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
+              <SkeletonBar width="55%" height="14px" lines={1} />
+              <SkeletonBar width="35%" height="10px" lines={1} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (items.length === 0 && emptyState !== undefined) {
+    return <>{emptyState}</>;
+  }
+
   return (
     <div className={cx(styles.list, className)}>
       {items.map((item) => (

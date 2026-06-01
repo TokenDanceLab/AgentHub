@@ -20,7 +20,12 @@
   text-align: left;
   font-family: inherit;
   font-size: inherit;
-  transition: border-color var(--duration-fast, 150ms), background var(--duration-fast, 150ms);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card {
+    transition: border-color var(--duration-fast, 150ms), background var(--duration-fast, 150ms);
+  }
 }
 
 .card:hover {

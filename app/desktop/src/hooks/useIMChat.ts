@@ -209,6 +209,13 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         isCallable(client, 'readAllNotifications'),
       sessionRead: isCallable(client, 'markRead'),
       recallMessage: isCallable(client, 'recallMessage'),
+      forwardMessage: isCallable(client, 'forwardMessage'),
+      updateSessionSettings: isCallable(client, 'updateSessionSettings'),
+      addSessionMembers: isCallable(client, 'addSessionMembers'),
+      removeSessionMember: isCallable(client, 'removeSessionMember'),
+      transferSession: isCallable(client, 'transferSessionOwnership'),
+      dissolveSession: isCallable(client, 'dissolveSession'),
+      leaveSession: isCallable(client, 'leaveSession'),
     }),
     [client],
   );
@@ -454,7 +461,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   }, [activeHubWS, authenticated, upsertContact]);
 
   const sendMessage = useCallback(
-    async (sessionId: string, content: string): Promise<SendIMMessageResult> => {
+    async (sessionId: string, content: string, replyToId?: string): Promise<SendIMMessageResult> => {
       if (!authenticated) {
         addToast({ type: 'error', message: 'Connect to Hub to send messages' });
         return { ok: false };
@@ -471,6 +478,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
           client_msg_id: clientMsgId,
           content_type: 'text',
           content,
+          ...(replyToId ? { reply_to_message_id: replyToId } : {}),
         });
         const confirmed: IMMessageWithHubState = {
           id: response.message_id,
@@ -485,6 +493,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
           recalled: false,
           seqId: response.seq_id,
           read: false,
+          replyToId,
         };
         setMessages((prev) => {
           const next = new Map(prev);
@@ -784,6 +793,314 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
     ],
   );
 
+  const forwardMessage = useCallback(
+    async (messageId: string, targetSessionIds: string[]): Promise<HubIMActionResult> => {
+      if (!authenticated) {
+        addToast({ type: 'error', message: 'Connect to Hub to forward messages' });
+        return { ok: false, reason: 'unauthenticated' };
+      }
+      if (!actionCapabilities.forwardMessage) {
+        const message = 'Hub message forward interface is not available';
+        markActionError(`message:${messageId}:forward`, message);
+        return { ok: false, reason: 'interface-gap', error: message };
+      }
+
+      const key = `message:${messageId}:forward`;
+      markActionPending(key);
+      try {
+        await client.forwardMessage(messageId, targetSessionIds);
+        clearAction(key);
+        addToast({ type: 'success', message: `Message forwarded to ${targetSessionIds.length} session(s)` });
+        void refreshSessions();
+        return { ok: true };
+      } catch (err) {
+        const message = errorMessage(err);
+        markActionError(key, message);
+        addToast({ type: 'error', message: 'Failed to forward message' });
+        console.error('Failed to forward message:', err);
+        return { ok: false, reason: 'failed', error: message };
+      }
+    },
+    [
+      actionCapabilities.forwardMessage,
+      addToast,
+      authenticated,
+      clearAction,
+      client,
+      markActionError,
+      markActionPending,
+      refreshSessions,
+    ],
+  );
+
+  const updateSessionSettings = useCallback(
+    async (
+      sessionId: string,
+      settings: { pinned?: boolean; muted?: boolean; archived?: boolean },
+    ): Promise<HubIMActionResult> => {
+      if (!authenticated) {
+        addToast({ type: 'error', message: 'Connect to Hub to update session settings' });
+        return { ok: false, reason: 'unauthenticated' };
+      }
+      if (!actionCapabilities.updateSessionSettings) {
+        const message = 'Hub session settings interface is not available';
+        markActionError(`session:${sessionId}:settings`, message);
+        return { ok: false, reason: 'interface-gap', error: message };
+      }
+
+      const key = `session:${sessionId}:settings`;
+      markActionPending(key);
+      try {
+        await client.updateSessionSettings(sessionId, settings);
+        clearAction(key);
+        setContacts((prev) =>
+          prev.map((contact) =>
+            contact.id === sessionId
+              ? {
+                  ...contact,
+                  statusHint: settings.archived
+                    ? 'im.session.archived'
+                    : settings.muted
+                      ? 'im.session.muted'
+                      : settings.pinned
+                        ? 'im.session.pinned'
+                        : undefined,
+                }
+              : contact,
+          ),
+        );
+        addToast({ type: 'success', message: 'Session settings updated' });
+        return { ok: true };
+      } catch (err) {
+        const message = errorMessage(err);
+        markActionError(key, message);
+        addToast({ type: 'error', message: 'Failed to update session settings' });
+        console.error('Failed to update session settings:', err);
+        return { ok: false, reason: 'failed', error: message };
+      }
+    },
+    [
+      actionCapabilities.updateSessionSettings,
+      addToast,
+      authenticated,
+      clearAction,
+      client,
+      markActionError,
+      markActionPending,
+    ],
+  );
+
+  const addSessionMembers = useCallback(
+    async (sessionId: string, memberIds: string[]): Promise<HubIMActionResult> => {
+      if (!authenticated) {
+        addToast({ type: 'error', message: 'Connect to Hub to manage members' });
+        return { ok: false, reason: 'unauthenticated' };
+      }
+      if (!actionCapabilities.addSessionMembers) {
+        const message = 'Hub add members interface is not available';
+        markActionError(`session:${sessionId}:addMembers`, message);
+        return { ok: false, reason: 'interface-gap', error: message };
+      }
+
+      const key = `session:${sessionId}:addMembers`;
+      markActionPending(key);
+      try {
+        await client.addSessionMembers(sessionId, memberIds);
+        clearAction(key);
+        addToast({ type: 'success', message: `${memberIds.length} member(s) added` });
+        void refreshSessions();
+        return { ok: true };
+      } catch (err) {
+        const message = errorMessage(err);
+        markActionError(key, message);
+        addToast({ type: 'error', message: 'Failed to add members' });
+        console.error('Failed to add session members:', err);
+        return { ok: false, reason: 'failed', error: message };
+      }
+    },
+    [
+      actionCapabilities.addSessionMembers,
+      addToast,
+      authenticated,
+      clearAction,
+      client,
+      markActionError,
+      markActionPending,
+      refreshSessions,
+    ],
+  );
+
+  const removeSessionMember = useCallback(
+    async (sessionId: string, userIdToRemove: string): Promise<HubIMActionResult> => {
+      if (!authenticated) {
+        addToast({ type: 'error', message: 'Connect to Hub to remove members' });
+        return { ok: false, reason: 'unauthenticated' };
+      }
+      if (!actionCapabilities.removeSessionMember) {
+        const message = 'Hub remove member interface is not available';
+        markActionError(`session:${sessionId}:removeMember:${userIdToRemove}`, message);
+        return { ok: false, reason: 'interface-gap', error: message };
+      }
+
+      const key = `session:${sessionId}:removeMember:${userIdToRemove}`;
+      markActionPending(key);
+      try {
+        await client.removeSessionMember(sessionId, userIdToRemove);
+        clearAction(key);
+        addToast({ type: 'success', message: 'Member removed' });
+        void refreshSessions();
+        return { ok: true };
+      } catch (err) {
+        const message = errorMessage(err);
+        markActionError(key, message);
+        addToast({ type: 'error', message: 'Failed to remove member' });
+        console.error('Failed to remove session member:', err);
+        return { ok: false, reason: 'failed', error: message };
+      }
+    },
+    [
+      actionCapabilities.removeSessionMember,
+      addToast,
+      authenticated,
+      clearAction,
+      client,
+      markActionError,
+      markActionPending,
+      refreshSessions,
+    ],
+  );
+
+  const transferSessionOwnership = useCallback(
+    async (sessionId: string, newOwnerId: string): Promise<HubIMActionResult> => {
+      if (!authenticated) {
+        addToast({ type: 'error', message: 'Connect to Hub to transfer ownership' });
+        return { ok: false, reason: 'unauthenticated' };
+      }
+      if (!actionCapabilities.transferSession) {
+        const message = 'Hub transfer ownership interface is not available';
+        markActionError(`session:${sessionId}:transfer`, message);
+        return { ok: false, reason: 'interface-gap', error: message };
+      }
+
+      const key = `session:${sessionId}:transfer`;
+      markActionPending(key);
+      try {
+        await client.transferSessionOwnership(sessionId, newOwnerId);
+        clearAction(key);
+        addToast({ type: 'success', message: 'Session ownership transferred' });
+        void refreshSessions();
+        return { ok: true };
+      } catch (err) {
+        const message = errorMessage(err);
+        markActionError(key, message);
+        addToast({ type: 'error', message: 'Failed to transfer ownership' });
+        console.error('Failed to transfer session ownership:', err);
+        return { ok: false, reason: 'failed', error: message };
+      }
+    },
+    [
+      actionCapabilities.transferSession,
+      addToast,
+      authenticated,
+      clearAction,
+      client,
+      markActionError,
+      markActionPending,
+      refreshSessions,
+    ],
+  );
+
+  const dissolveSession = useCallback(
+    async (sessionId: string): Promise<HubIMActionResult> => {
+      if (!authenticated) {
+        addToast({ type: 'error', message: 'Connect to Hub to dissolve sessions' });
+        return { ok: false, reason: 'unauthenticated' };
+      }
+      if (!actionCapabilities.dissolveSession) {
+        const message = 'Hub dissolve session interface is not available';
+        markActionError(`session:${sessionId}:dissolve`, message);
+        return { ok: false, reason: 'interface-gap', error: message };
+      }
+
+      const key = `session:${sessionId}:dissolve`;
+      markActionPending(key);
+      try {
+        await client.dissolveSession(sessionId);
+        clearAction(key);
+        setContacts((prev) =>
+          prev.map((contact) =>
+            contact.id === sessionId
+              ? {
+                  ...contact,
+                  dissolved: true,
+                  online: false,
+                  lastSeen: 'Dissolved',
+                  statusHint: 'im.session.dissolved',
+                }
+              : contact,
+          ),
+        );
+        addToast({ type: 'success', message: 'Session dissolved' });
+        return { ok: true };
+      } catch (err) {
+        const message = errorMessage(err);
+        markActionError(key, message);
+        addToast({ type: 'error', message: 'Failed to dissolve session' });
+        console.error('Failed to dissolve session:', err);
+        return { ok: false, reason: 'failed', error: message };
+      }
+    },
+    [
+      actionCapabilities.dissolveSession,
+      addToast,
+      authenticated,
+      clearAction,
+      client,
+      markActionError,
+      markActionPending,
+    ],
+  );
+
+  const leaveSession = useCallback(
+    async (sessionId: string): Promise<HubIMActionResult> => {
+      if (!authenticated) {
+        addToast({ type: 'error', message: 'Connect to Hub to leave sessions' });
+        return { ok: false, reason: 'unauthenticated' };
+      }
+      if (!actionCapabilities.leaveSession) {
+        const message = 'Hub leave session interface is not available';
+        markActionError(`session:${sessionId}:leave`, message);
+        return { ok: false, reason: 'interface-gap', error: message };
+      }
+
+      const key = `session:${sessionId}:leave`;
+      markActionPending(key);
+      try {
+        await client.leaveSession(sessionId);
+        clearAction(key);
+        removeContact(sessionId);
+        addToast({ type: 'success', message: 'Left session' });
+        return { ok: true };
+      } catch (err) {
+        const message = errorMessage(err);
+        markActionError(key, message);
+        addToast({ type: 'error', message: 'Failed to leave session' });
+        console.error('Failed to leave session:', err);
+        return { ok: false, reason: 'failed', error: message };
+      }
+    },
+    [
+      actionCapabilities.leaveSession,
+      addToast,
+      authenticated,
+      clearAction,
+      client,
+      markActionError,
+      markActionPending,
+      removeContact,
+    ],
+  );
+
   const addContact = useCallback(
     async (targetUserId: string): Promise<HubIMActionResult> => {
       const trimmed = targetUserId.trim();
@@ -902,5 +1219,12 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
     readAllNotifications,
     markSessionRead,
     recallMessage,
+    forwardMessage,
+    updateSessionSettings,
+    addSessionMembers,
+    removeSessionMember,
+    transferSessionOwnership,
+    dissolveSession,
+    leaveSession,
   } as const;
 }

@@ -1,0 +1,266 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-surface, #1e1e1e);
+  color: var(--color-text, #cccccc);
+  font-size: 13px;
+  user-select: none;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary, #888);
+  border-bottom: 1px solid var(--color-border, #333);
+  flex-shrink: 0;
+}
+
+.headerTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collapseBtn {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary, #888);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.collapseBtn:hover {
+  background: var(--color-hover, #2a2a2a);
+  color: var(--color-text, #ccc);
+}
+
+.treeWrapper {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+}
+
+.treeWrapper::-webkit-scrollbar {
+  width: 8px;
+}
+
+.treeWrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.treeWrapper::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar, #424242);
+  border-radius: 4px;
+}
+
+.treeWrapper::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-hover, #555);
+}
+
+.empty {
+  padding: 20px 12px;
+  color: var(--color-text-secondary, #888);
+  font-size: 13px;
+  text-align: center;
+}
+
+.loading {
+  padding: 20px 12px;
+  color: var(--color-text-secondary, #888);
+  font-size: 13px;
+  text-align: center;
+}
+
+.errorMsg {
+  padding: 20px 12px;
+  color: var(--color-danger, #e53e3e);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Node styles */
+.node {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 2px 8px;
+  padding-left: var(--indent, 8px);
+  height: 26px;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.node:hover {
+  background: var(--color-hover, #2a2a2a);
+}
+
+.nodeSelected {
+  background: var(--color-active, #37373d);
+}
+
+.nodeSelected:hover {
+  background: var(--color-active, #37373d);
+}
+
+.chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--color-text-secondary, #888);
+  transition: transform 0.15s ease;
+}
+
+.chevronExpanded {
+  transform: rotate(90deg);
+}
+
+.chevronPlaceholder {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+/* Context menu */
+.contextOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 998;
+}
+
+.contextMenu {
+  position: fixed;
+  z-index: 999;
+  background: var(--color-surface-elevated, #252526);
+  border: 1px solid var(--color-border, #454545);
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  color: var(--color-text, #ccc);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.menuItem:hover {
+  background: var(--color-active, #094771);
+  color: #fff;
+}
+
+.menuItemDanger {
+  composes: menuItem;
+  color: var(--color-danger, #e53e3e);
+}
+
+.menuItemDanger:hover {
+  background: var(--color-danger, #e53e3e);
+  color: #fff;
+}
+
+.menuDivider {
+  height: 1px;
+  background: var(--color-border, #454545);
+  margin: 4px 0;
+}
+
+/* ── Git status overlay ───────────────────── */
+
+.gitOverlay {
+  margin-left: auto;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
+  flex-shrink: 0;
+  min-width: 14px;
+  text-align: center;
+}
+
+.gitStatusM {
+  background: color-mix(in oklch, var(--color-warning, #e2b714) 15%, transparent);
+  color: var(--color-warning, #e2b714);
+}
+
+.gitStatusA {
+  background: var(--diff-added-bg, rgba(70, 149, 74, 0.15));
+  color: var(--diff-added-border, #46954a);
+}
+
+.gitStatusD {
+  background: var(--diff-removed-bg, rgba(229, 83, 75, 0.15));
+  color: var(--diff-removed-border, #e5534b);
+}
+
+.gitStatusQuestion {
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
+  color: var(--primary);
+}
+
+.gitStatusR {
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+
+.gitStatusU {
+  background: var(--diff-removed-bg, rgba(229, 83, 75, 0.15));
+  color: var(--diff-removed-border, #e5534b);
+}
+
+/* ── Drag-and-Drop ────────────────────────── */
+
+.nodeDragSource {
+  opacity: 0.5;
+}
+
+.nodeDragOver {
+  background: var(--color-active, #37373d);
+  outline: 1px dashed var(--color-primary, #4fc1ff);
+  outline-offset: -1px;
+}
+
+.nodeDragOverCopy {
+  composes: nodeDragOver;
+  outline-color: var(--color-success, #4caf50);
+}

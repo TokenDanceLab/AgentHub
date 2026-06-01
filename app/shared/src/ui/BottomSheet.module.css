@@ -97,3 +97,29 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
+
+/* ── Responsive ─────────────────── */
+
+@media (max-width: 480px) {
+  .sheet {
+    width: 100%;
+    border-radius: 18px 18px 0 0;
+    padding: 8px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .header {
+    gap: 8px;
+  }
+
+  .title {
+    font-size: 16px;
+  }
+
+  .description {
+    font-size: 12px;
+  }
+
+  .footer {
+    gap: 6px;
+  }
+}

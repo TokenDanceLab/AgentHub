@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -24,6 +25,9 @@ func GenerateAccessToken(userID, deviceType, deviceID, secret string, ttl time.D
 		DeviceType: deviceType,
 		DeviceID:   deviceID,
 		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "agenthub-hub",
+			Audience:  jwt.ClaimStrings{"agenthub-api"},
+			Subject:   userID,
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
 			IssuedAt:  jwt.NewNumericDate(now),
 		},
@@ -35,13 +39,32 @@ func GenerateAccessToken(userID, deviceType, deviceID, secret string, ttl time.D
 func ParseToken(tokenString, secret string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		return []byte(secret), nil
-	})
+	},
+		jwt.WithValidMethods([]string{"HS256"}),
+	)
 	if err != nil {
 		return nil, err
 	}
 	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid {
 		return nil, jwt.ErrSignatureInvalid
+	}
+	// Lenient iss/aud validation: only check when claims are present, so
+	// tokens issued before R08 (without iss/aud) are not rejected.
+	if claims.Issuer != "" && claims.Issuer != "agenthub-hub" {
+		return nil, fmt.Errorf("jwt issuer mismatch: got %q, want agenthub-hub", claims.Issuer)
+	}
+	if len(claims.Audience) > 0 {
+		found := false
+		for _, a := range claims.Audience {
+			if a == "agenthub-api" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("jwt audience does not contain agenthub-api")
+		}
 	}
 	return claims, nil
 }

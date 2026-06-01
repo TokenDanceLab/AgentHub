@@ -8,13 +8,19 @@ export interface PermissionModeOption {
   label: string;
 }
 
-interface Props {
+export interface PermissionModePickerProps {
   value: string;
   label: string;
   options: PermissionModeOption[];
   disabled?: boolean;
   ariaLabel?: string;
   onChange: (value: string) => void;
+  /** Additional class names for customization */
+  className?: string;
+  triggerClassName?: string;
+  popoverClassName?: string;
+  optionClassName?: string;
+  activeOptionClassName?: string;
 }
 
 function optionIcon(value: string) {
@@ -24,7 +30,19 @@ function optionIcon(value: string) {
   return <Settings size={16} />;
 }
 
-export default function PermissionModePicker({ value, label, options, disabled, ariaLabel, onChange }: Props) {
+export function PermissionModePicker({
+  value,
+  label,
+  options,
+  disabled,
+  ariaLabel,
+  onChange,
+  className,
+  triggerClassName,
+  popoverClassName,
+  optionClassName,
+  activeOptionClassName,
+}: PermissionModePickerProps) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0, up: false });
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -77,10 +95,13 @@ export default function PermissionModePicker({ value, label, options, disabled, 
     };
   }, [open, updatePosition]);
 
+  const cx = (...classes: Array<string | false | null | undefined>): string =>
+    classes.filter(Boolean).join(' ');
+
   const popover = open && createPortal(
     <div
       ref={popoverRef}
-      className={`${styles.popover} ${pos.up ? styles.popoverUp : ''}`}
+      className={cx(styles.popover, pos.up ? styles.popoverUp : undefined, popoverClassName)}
       style={{
         position: 'fixed',
         zIndex: 9999,
@@ -94,7 +115,12 @@ export default function PermissionModePicker({ value, label, options, disabled, 
         <button
           key={option.value}
           type="button"
-          className={`${styles.option} ${option.value === value ? styles.optionActive : ''}`}
+          className={cx(
+            styles.option,
+            optionClassName,
+            option.value === value && styles.optionActive,
+            option.value === value && activeOptionClassName,
+          )}
           onClick={() => {
             onChange(option.value);
             setOpen(false);
@@ -110,11 +136,11 @@ export default function PermissionModePicker({ value, label, options, disabled, 
   );
 
   return (
-    <div className={styles.root}>
+    <div className={cx(styles.root, className)}>
       <button
         ref={triggerRef}
         type="button"
-        className={styles.trigger}
+        className={cx(styles.trigger, triggerClassName)}
         disabled={disabled}
         aria-label={ariaLabel}
         aria-expanded={open}

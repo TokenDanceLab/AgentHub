@@ -7,6 +7,7 @@ import (
 	"io"
 	"os/exec"
 
+	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -53,6 +54,7 @@ func (a *ClaudeCodeAdapter) Capabilities() AgentCapabilities {
 		ThinkingVisible: true,
 		MultiTurn:       true,
 		MCPIntegration:  true,
+		SubAgentSpawn:   true, // AgentTool (forkSubagent) for task delegation
 	}
 }
 
@@ -116,6 +118,15 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 			appendPrompt = ctx.SkillsPrompt + "\n\n" + appendPrompt
 		} else {
 			appendPrompt = ctx.SkillsPrompt
+		}
+	}
+	// Context continuity: inject thread history + pinned messages into system prompt
+	// so Claude Code has full conversation context even without --continue/--resume.
+	if contextPreface := runnerctx.BuildContextPreface(ctx.Messages, ctx.PinnedMessages); contextPreface != "" {
+		if appendPrompt != "" {
+			appendPrompt = contextPreface + "\n\n" + appendPrompt
+		} else {
+			appendPrompt = contextPreface
 		}
 	}
 	if appendPrompt != "" {

@@ -255,7 +255,7 @@ describe('PromptInput', () => {
         await Promise.resolve();
       });
 
-      expect(localStorage.getItem('ah:draft:thread-clear')).toBeNull();
+      expect(localStorage.getItem('draft_thread-clear')).toBeNull();
     } finally {
       vi.useRealTimers();
     }

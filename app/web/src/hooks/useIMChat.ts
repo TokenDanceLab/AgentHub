@@ -30,7 +30,7 @@ function hubMessageToIMMessage(msg: HubMessageLike, authority: AuthorityType = '
   const messageId =
     msg.client_msg_id ?? msg.id ?? msg.message_id ?? `${sessionId}-${msg.seq_id ?? Date.now()}`;
   const senderName = msg.sender?.nickname ?? msg.sender?.username ?? msg.sender_id;
-  return {
+  const imMsg: IMMessage = {
     id: messageId,
     sessionId,
     senderId: msg.sender_id,
@@ -41,6 +41,10 @@ function hubMessageToIMMessage(msg: HubMessageLike, authority: AuthorityType = '
     timestamp: msg.created_at ?? new Date().toISOString(),
     replyToId: msg.reply_to_message_id,
   };
+  if (msg.recalled !== undefined) {
+    imMsg.recalled = msg.recalled;
+  }
+  return imMsg;
 }
 
 function isDisplayableIMMessage(msg: HubMessageLike): boolean {
@@ -55,7 +59,10 @@ function sessionToContact(session: Session): IMContact {
     type: session.type === 'private' ? 'user' : 'group',
     authority: 'hub',
     online: false,
-    lastSeen: session.updated_at,
+    lastSeen: session.last_message_at ?? session.updated_at,
+    pinned: session.pinned ?? false,
+    archived: session.archived ?? false,
+    muted: session.muted ?? false,
   };
 }
 
@@ -165,15 +172,45 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
       });
     });
 
+    const unsubRecall = hubWS.on(HUB_EVENTS.MESSAGE_RECALL, (rawPayload: unknown) => {
+      const payload = rawPayload as Record<string, unknown>;
+      const sessionId =
+        typeof payload.session_id === 'string'
+          ? payload.session_id
+          : typeof payload.sessionId === 'string'
+            ? payload.sessionId
+            : undefined;
+      const messageId =
+        typeof payload.message_id === 'string'
+          ? payload.message_id
+          : typeof payload.id === 'string'
+            ? payload.id
+            : undefined;
+      if (!sessionId || !messageId) return;
+      setMessages((prev) => {
+        const next = new Map(prev);
+        next.set(
+          sessionId,
+          (next.get(sessionId) ?? []).map((m) =>
+            m.id === messageId
+              ? { ...m, recalled: true, content: '[Message recalled]' }
+              : m,
+          ),
+        );
+        return next;
+      });
+    });
+
     return () => {
       unsub();
       unsubSession();
+      unsubRecall();
     };
   }, [hubWS, authenticated, refreshSessions]);
 
   // Send messages through Hub REST; Hub WS delivers the realtime message.new fanout.
   const sendMessage = useCallback(
-    (sessionId: string, content: string) => {
+    (sessionId: string, content: string, replyToId?: string) => {
       if (!authenticated || !getAccessToken()) {
         addToast({ type: 'error', message: 'Not connected to Hub' });
         return;
@@ -188,6 +225,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
         authority: 'hub',
         content,
         timestamp: new Date().toISOString(),
+        replyToId,
       };
       setMessages((prev) => {
         const next = new Map(prev);
@@ -199,6 +237,7 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
           client_msg_id: clientMsgId,
           content_type: 'text',
           content,
+          ...(replyToId ? { reply_to_message_id: replyToId } : {}),
         })
         .then((res) => {
           setMessages((prev) => {
@@ -236,6 +275,56 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
     hubWSRef.current?.sendTyping(sessionId);
   }, []);
 
+  const recallMessage = useCallback(
+    async (messageId: string, sessionId: string) => {
+      if (!authenticated || !getAccessToken()) {
+        addToast({ type: 'error', message: 'Not connected to Hub' });
+        return;
+      }
+      try {
+        await hubClientRef.current.recallMessage(messageId);
+        setMessages((prev) => {
+          const next = new Map(prev);
+          next.set(
+            sessionId,
+            (next.get(sessionId) ?? []).map((m) =>
+              m.id === messageId
+                ? { ...m, recalled: true, content: '[Message recalled]' }
+                : m,
+            ),
+          );
+          return next;
+        });
+        addToast({ type: 'success', message: 'Message recalled' });
+      } catch (error) {
+        addToast({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Failed to recall message',
+        });
+      }
+    },
+    [authenticated, addToast],
+  );
+
+  const forwardMessage = useCallback(
+    async (messageId: string, targetSessionIds: string[]) => {
+      if (!authenticated || !getAccessToken()) {
+        addToast({ type: 'error', message: 'Not connected to Hub' });
+        return;
+      }
+      try {
+        await hubClientRef.current.forwardMessage(messageId, targetSessionIds);
+        addToast({ type: 'success', message: `Message forwarded to ${targetSessionIds.length} session(s)` });
+      } catch (error) {
+        addToast({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Failed to forward message',
+        });
+      }
+    },
+    [authenticated, addToast],
+  );
+
   // Get messages for a specific session
   const getSessionMessages = useCallback(
     (sessionId: string): IMMessage[] => messages.get(sessionId) ?? [],
@@ -270,16 +359,99 @@ export function useIMChat({ hubWS }: UseIMChatOptions) {
     [contacts],
   );
 
+  // Search sessions via Hub API
+  const searchSessions = useCallback(
+    async (query: string): Promise<IMContact[]> => {
+      if (!authenticated || !getAccessToken() || !query.trim()) return contacts;
+      try {
+        const sessions = await hubClientRef.current.searchSessions(query);
+        return sessions.map(sessionToContact);
+      } catch {
+        return contacts;
+      }
+    },
+    [authenticated, contacts],
+  );
+
+  // Pin/unpin a session
+  const togglePinSession = useCallback(
+    async (sessionId: string) => {
+      if (!authenticated || !getAccessToken()) return;
+      const current = contacts.find((c) => c.id === sessionId);
+      const newPinned = !(current?.pinned ?? false);
+      try {
+        await hubClientRef.current.updateSessionSettings(sessionId, { pinned: newPinned });
+        setContacts((prev) =>
+          prev.map((c) => (c.id === sessionId ? { ...c, pinned: newPinned } : c)),
+        );
+      } catch (error) {
+        addToast({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Failed to update pin status',
+        });
+      }
+    },
+    [authenticated, contacts, addToast],
+  );
+
+  // Archive/unarchive a session
+  const toggleArchiveSession = useCallback(
+    async (sessionId: string) => {
+      if (!authenticated || !getAccessToken()) return;
+      const current = contacts.find((c) => c.id === sessionId);
+      const newArchived = !(current?.archived ?? false);
+      try {
+        await hubClientRef.current.updateSessionSettings(sessionId, { archived: newArchived });
+        setContacts((prev) =>
+          prev.map((c) => (c.id === sessionId ? { ...c, archived: newArchived } : c)),
+        );
+      } catch (error) {
+        addToast({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Failed to update archive status',
+        });
+      }
+    },
+    [authenticated, contacts, addToast],
+  );
+
+  // Toggle mute for a session
+  const toggleMuteSession = useCallback(
+    async (sessionId: string) => {
+      if (!authenticated || !getAccessToken()) return;
+      const current = contacts.find((c) => c.id === sessionId);
+      const newMuted = !(current?.muted ?? false);
+      try {
+        await hubClientRef.current.updateSessionSettings(sessionId, { muted: newMuted });
+        setContacts((prev) =>
+          prev.map((c) => (c.id === sessionId ? { ...c, muted: newMuted } : c)),
+        );
+      } catch (error) {
+        addToast({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Failed to update mute status',
+        });
+      }
+    },
+    [authenticated, contacts, addToast],
+  );
+
   return {
     messages,
     contacts,
     sendMessage,
     sendTyping,
+    recallMessage,
+    forwardMessage,
     getSessionMessages,
     loadSessionMessages,
     refreshSessions,
     upsertContact,
     removeContact,
     searchContacts,
+    searchSessions,
+    togglePinSession,
+    toggleArchiveSession,
+    toggleMuteSession,
   } as const;
 }
