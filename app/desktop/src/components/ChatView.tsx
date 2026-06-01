@@ -1116,6 +1116,9 @@ const MessageCard = memo(function MessageCard({
   if (prev.msg.role !== next.msg.role) return false;
   if (prev.language !== next.language) return false;
 
+  // Function references (stable in production, test mocks may produce new refs)
+  if (prev.t !== next.t) return false;
+
   return true;
 });
 
@@ -1244,6 +1247,19 @@ export default function ChatView({
     scrollToBottom(true);
   }, [scrollToBottom]);
 
+  const handleCancelDelete = useCallback(() => {
+    setDeletingMessageId(null);
+  }, []);
+
+  const handleDeleteClick = useCallback((messageId: string) => {
+    setDeletingMessageId(messageId);
+  }, []);
+
+  const handleConfirmDelete = useCallback((messageId: string) => {
+    onDelete?.(messageId);
+    setDeletingMessageId(null);
+  }, [onDelete]);
+
   return (
     <div className={styles.root}>
       <div
@@ -1287,12 +1303,9 @@ export default function ChatView({
                   onCopy={handleCopy}
                   onRetry={onRetry}
                   onFork={onFork}
-                  onDeleteClick={onDelete ? setDeletingMessageId : undefined}
-                  onCancelDelete={() => setDeletingMessageId(null)}
-                  onConfirmDelete={(messageId: string) => {
-                    onDelete?.(messageId);
-                    setDeletingMessageId(null);
-                  }}
+                  onDeleteClick={onDelete ? handleDeleteClick : undefined}
+                  onCancelDelete={handleCancelDelete}
+                  onConfirmDelete={handleConfirmDelete}
                 />
               </div>
             ))}
