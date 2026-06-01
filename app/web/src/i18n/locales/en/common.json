@@ -357,6 +357,8 @@
   "im.message.ariaLabel": "{{type}} message by {{name}}",
   "im.message.emptyTitle": "No messages yet",
   "im.message.emptyDescription": "Start a Hub conversation to begin.",
+  "im.search": "Search conversations...",
+  "im.searchClear": "Clear search",
 
   "diff.actions.diffApplied": "Applied",
   "diff.actions.applyDiff": "Apply diff"
