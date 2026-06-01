@@ -15,12 +15,14 @@
         "title": "AgentHub Desktop",
         "width": 1200,
         "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
         "decorations": false,
         "transparent": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:3210 ws://127.0.0.1:3210 http://127.0.0.1:* http://localhost:*; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:*; style-src 'self' 'unsafe-inline'"
     }
   },
   "bundle": {
@@ -46,6 +48,16 @@
   "plugins": {
     "shell": {
       "open": true
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://releases.agenthub.dev/updater/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "pubkey": "",
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }
