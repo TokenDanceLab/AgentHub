@@ -133,6 +133,8 @@ func (a *OrchestratorAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 			threadID:        run.ThreadID,
 			model:           a.parentModel,
 			maxConcurrency:  a.dispatchConcurrency,
+			ctx:             ctx,
+			dispatched:      make(map[string]dispatchEvent),
 		}
 		if budget, ok := ctx.Value(CtxBudgetKey).(*runnerctx.ContextBudget); ok {
 			effectiveEmitter.(*dispatchInterceptor).budget = budget
@@ -178,6 +180,13 @@ type dispatchInterceptor struct {
 	model           string
 	budget          *runnerctx.ContextBudget
 	maxConcurrency  int
+
+	// Sub-agent result injection and status tracking.
+	ctx                context.Context    // set from ParseStream; cancelled when run ends
+	resultListenerOnce sync.Once         // ensures result listener starts exactly once
+	dispatchedMu       sync.Mutex
+	dispatchedCount    int               // total sub-agents dispatched by this interceptor
+	dispatched         map[string]dispatchEvent // agentID -> original dispatch event for result injection
 }
 
 func (d *dispatchInterceptor) Emit(eventType string, scope map[string]any, payload any) {
@@ -368,6 +377,31 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 		"model":     model,
 		"subtaskId": evt.SubtaskID,
 	})
+
+	// P1: Sub-agent status streaming — emit initial status on dispatch.
+	d.inner.Emit(BusEventSubAgentStatus, scope, map[string]any{
+		"agentId":   agentID,
+		"agentName": evt.Agent,
+		"status":    string(agents.StatusBusy),
+		"progress":  "dispatched",
+	})
+
+	// P1: Track dispatched sub-agents for progress summary and result injection.
+	d.dispatchedMu.Lock()
+	d.dispatched[agentID] = evt
+	d.dispatchedCount++
+	d.dispatchedMu.Unlock()
+
+	// P1: Start the result listener goroutine (once) to receive sub-agent results
+	// and inject them back into the orchestrator's stream.
+	d.resultListenerOnce.Do(func() {
+		if d.ctx != nil && d.queue != nil {
+			go d.runResultListener(d.ctx)
+		}
+	})
+
+	// P1: Emit progress summary on dispatch.
+	d.emitProgressSummary(scope)
 }
 
 // extractTextContent pulls the text string from various event payload shapes.
@@ -431,4 +465,172 @@ func formatAgentList(agents []string) string {
 		escaped[i] = escapePromptLiteral(a)
 	}
 	return strings.Join(escaped, ", ")
+}
+
+// runResultListener reads the parent orchestrator's message queue for sub-agent
+// result/error messages. When a result arrives, it emits status updates, injects
+// the result/error as a text block into the orchestrator's stream, and emits an
+// aggregate progress summary. Exits when the context is cancelled.
+func (d *dispatchInterceptor) runResultListener(ctx context.Context) {
+	ch := d.queue.Receive(d.parentRun.ID)
+	if ch == nil {
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-ch:
+			if !ok {
+				return
+			}
+			d.processResultMessage(msg)
+		}
+	}
+}
+
+// processResultMessage handles a single sub-agent result or error message from
+// the parent queue, injecting it into the orchestrator's text stream.
+func (d *dispatchInterceptor) processResultMessage(msg agents.Message) {
+	switch msg.Type {
+	case agents.MsgTypeResult:
+		d.handleSubAgentResult(msg, false)
+	case agents.MsgTypeError:
+		d.handleSubAgentResult(msg, true)
+	}
+}
+
+// handleSubAgentResult injects a sub-agent result or error as a system message
+// into the orchestrator's text stream, emits a status update, and updates progress.
+func (d *dispatchInterceptor) handleSubAgentResult(msg agents.Message, isError bool) {
+	payload, _ := msg.Payload.(map[string]any)
+	agentName := ""
+	if payload != nil {
+		if name, ok := payload["agentName"].(string); ok {
+			agentName = name
+		}
+	}
+	agentID := msg.FromAgentID
+
+	// Build the injected message following OpenCode's XML task result injection pattern.
+	var injectedText string
+	if isError {
+		errMsg := ""
+		if payload != nil {
+			if err, ok := payload["result"].(string); ok {
+				errMsg = err
+			}
+		}
+		injectedText = fmt.Sprintf("[Sub-agent: %s] failed\nError: %s", agentName, errMsg)
+	} else {
+		resultSummary := formatResultSummary(payload)
+		injectedText = fmt.Sprintf("[Sub-agent: %s] completed task\nResult: %s", agentName, resultSummary)
+	}
+
+	// P1: Inject result/error into the orchestrator's text stream.
+	scope := map[string]any{"runId": d.parentRun.ID}
+	d.inner.Emit(BusEventTextBlock, scope, map[string]any{
+		"text":   injectedText,
+		"source": "sub_agent_result",
+	})
+
+	// P1: Emit sub-agent status update.
+	status := string(agents.StatusCompleted)
+	errStr := ""
+	if isError {
+		status = string(agents.StatusError)
+		if payload != nil {
+			if err, ok := payload["result"].(string); ok {
+				errStr = err
+			}
+		}
+	}
+	d.inner.Emit(BusEventSubAgentStatus, scope, map[string]any{
+		"agentId":   agentID,
+		"agentName": agentName,
+		"status":    status,
+		"progress":  status,
+		"error":     errStr,
+	})
+
+	// P1: Emit aggregate progress summary.
+	d.emitProgressSummary(scope)
+}
+
+// emitProgressSummary counts sub-agents by status and emits a human-readable
+// progress summary. Fires whenever a sub-agent status changes (dispatch or completion).
+func (d *dispatchInterceptor) emitProgressSummary(scope map[string]any) {
+	if d.registry == nil {
+		return
+	}
+	children := d.registry.ListByParent(d.parentRun.ID)
+	if len(children) == 0 {
+		return
+	}
+
+	var completed, running, waiting, errored int
+	for _, child := range children {
+		switch child.Status {
+		case agents.StatusCompleted:
+			completed++
+		case agents.StatusError:
+			errored++
+		case agents.StatusBusy:
+			running++
+		default:
+			waiting++
+		}
+	}
+
+	var parts []string
+	if completed > 0 {
+		parts = append(parts, fmt.Sprintf("%d completed", completed))
+	}
+	if errored > 0 {
+		parts = append(parts, fmt.Sprintf("%d error", errored))
+	}
+	if running > 0 {
+		parts = append(parts, fmt.Sprintf("%d running", running))
+	}
+	if waiting > 0 {
+		parts = append(parts, fmt.Sprintf("%d waiting", waiting))
+	}
+
+	summary := fmt.Sprintf("%d of %d sub-agents done", completed+errored, len(children))
+	if len(parts) > 0 {
+		summary += " (" + strings.Join(parts, ", ") + ")"
+	}
+
+	d.inner.Emit(BusEventTaskProgress, scope, map[string]any{
+		"summary":    summary,
+		"completed":  completed,
+		"errored":    errored,
+		"running":    running,
+		"waiting":    waiting,
+		"total":      len(children),
+	})
+}
+
+// formatResultSummary extracts a human-readable summary from the sub-agent
+// result payload, truncating to approximately 500 characters.
+func formatResultSummary(payload map[string]any) string {
+	if payload == nil {
+		return "(no output)"
+	}
+	if result, ok := payload["result"].(string); ok && result != "" {
+		if len(result) > 500 {
+			return result[:500] + "..."
+		}
+		return result
+	}
+	// Try to marshal the whole payload as a fallback.
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return "(unable to format result)"
+	}
+	s := string(b)
+	if len(s) > 500 {
+		s = s[:500] + "..."
+	}
+	return s
 }
