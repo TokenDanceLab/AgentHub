@@ -2,6 +2,7 @@
 package runnerctx
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -75,11 +76,16 @@ func (s *RunOutputStore) Close() error {
 	if s.file == nil {
 		return nil
 	}
-	_ = s.file.Sync()
-	_ = s.file.Close()
+	var errs []error
+	if err := s.file.Sync(); err != nil {
+		errs = append(errs, fmt.Errorf("sync run output: %w", err))
+	}
+	if err := s.file.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("close run output: %w", err))
+	}
 	s.file = nil
 	if err := os.Remove(s.path); err != nil && !os.IsNotExist(err) {
-		return err
+		errs = append(errs, fmt.Errorf("remove run output: %w", err))
 	}
-	return nil
+	return errors.Join(errs...)
 }

@@ -1,8 +1,15 @@
 import { setBaseUrl } from "@agenthub/shared";
 
-// Hub Server - shared API helpers append /v1 paths.
-export const HUB_API_URL = "https://hub.vectorcontrol.tech";
-export const HUB_WS_URL = "wss://hub.vectorcontrol.tech/ws";
+// Hub Server URL — use VITE_HUB_URL / VITE_HUB_WS_URL env vars in production builds.
+// In dev mode (vite dev / visual:qa) fall back to localhost so the mobile WebView
+// talks to a locally running Hub without hitting production.
+export const DEFAULT_HUB_URL =
+  import.meta.env.VITE_HUB_URL ||
+  (import.meta.env.DEV ? "http://localhost:8080" : "");
+
+export const DEFAULT_HUB_WS_URL =
+  import.meta.env.VITE_HUB_WS_URL ||
+  (import.meta.env.DEV ? "ws://localhost:8080/client/ws" : "");
 
 // Initialize shared API client to target Hub Server
-setBaseUrl(HUB_API_URL);
+setBaseUrl(DEFAULT_HUB_URL);
