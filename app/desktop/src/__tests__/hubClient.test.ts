@@ -32,15 +32,6 @@ function jsonResponse(status: number, data: unknown, statusText = status === 200
   });
 }
 
-<<<<<<< HEAD
-function mockFetch(status: number, data: unknown, statusText?: string) {
-  return vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse(status, data, statusText));
-}
-
-function mockFetchSequence(responses: Array<{ status: number; data: unknown; statusText?: string }>) {
-  for (const r of responses) {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse(r.status, r.data, r.statusText));
-=======
 function mockFetchSequence(responses: Array<{ status: number; data: unknown }>) {
   const fetchSpy = vi.spyOn(globalThis, 'fetch');
   for (const r of responses) {
@@ -51,7 +42,6 @@ function mockFetchSequence(responses: Array<{ status: number; data: unknown }>) 
         headers: { 'Content-Type': 'application/json' },
       }),
     );
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
   }
   return fetchSpy;
 }

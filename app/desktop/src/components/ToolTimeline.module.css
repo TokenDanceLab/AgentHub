@@ -112,13 +112,6 @@
   color: color-mix(in oklch, var(--warning) 72%, var(--foreground));
 }
 
-<<<<<<< HEAD
-.statusDraining {
-  color: color-mix(in oklch, #8b5cf6 72%, var(--foreground));
-}
-
-=======
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
 .statusCompleted {
   color: color-mix(in oklch, var(--success) 72%, var(--foreground));
 }

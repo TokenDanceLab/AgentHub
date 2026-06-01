@@ -32,9 +32,6 @@ describe('AuthPage', () => {
 
     expect(screen.getByText('auth.title')).toBeInTheDocument();
     expect(screen.getByText('auth.tagline')).toBeInTheDocument();
-<<<<<<< HEAD
-    expect(screen.getByText('AH')).toBeInTheDocument();
-=======
     expect(screen.getByAltText('TokenDance')).toBeInTheDocument();
     expect(screen.queryByText('AH')).not.toBeInTheDocument();
   });
@@ -46,7 +43,6 @@ describe('AuthPage', () => {
 
   it('renders the primary auth hint', () => {
     renderAuthPage();
->>>>>>> 6aa56f6 (fix(desktop): 收敛聊天和本地编排基础)
     expect(screen.getByText('auth.tokenDancePrimary')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'auth.tokenDanceLogin' })).toBeInTheDocument();
   });
