@@ -9,6 +9,11 @@ import {
   deleteThread,
   updateThreadStatus,
   renameThread,
+  createThread,
+  fetchThreadItems,
+  fetchRunDiff,
+  fetchArtifacts,
+  fetchPreviews,
 } from '../api/edgeClient';
 
 describe('edgeClient', () => {
