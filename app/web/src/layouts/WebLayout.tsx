@@ -180,6 +180,7 @@ export default function WebLayout() {
   const [optimisticRun, setOptimisticRun] = useState<WebRunInfo | null>(null);
   const [taskRunEvents, setTaskRunEvents] = useState<AgentRunEvent[]>([]);
   const [runStartPending, setRunStartPending] = useState(false);
+  const recoveryInProgressRef = useRef(false);
   const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
   const [mainSurface, setMainSurface] = useState<MainSurface>('workspace');
   const agents = agentData?.items ?? [];
@@ -266,7 +267,10 @@ export default function WebLayout() {
     }
   }, [optimisticRun?.runId, setLastEventSeq, taskRunEvents]);
 
-  // Stream recovery on WebSocket reconnection
+  // Stream recovery on WebSocket reconnection with exponential backoff.
+  // Matches the pattern in Desktop's eventClient.ts: base delay 1s, double each
+  // retry, max 30s, with +/-20% jitter. Max 3 recovery fetch attempts before
+  // surfacing the "failed" banner.
   useEffect(() => {
     const taskId = optimisticRun?.runId;
 
@@ -276,19 +280,46 @@ export default function WebLayout() {
       setRecoveryState('recovering');
       setRecoveryError(null);
 
-      hubClient.listTaskRunEvents(taskId)
-        .then((recovered) => {
-          // Merge recovered events with existing ones (mergeAgentRunEvents deduplicates by key)
-          setTaskRunEvents((current) => mergeAgentRunEvents(current, recovered));
-          setRecoveryState('idle');
-          recoveryInProgressRef.current = false;
-        })
-        .catch((err) => {
-          const message = err instanceof Error ? err.message : 'Failed to recover stream events';
-          setRecoveryError(message);
-          setRecoveryState('failed');
-          recoveryInProgressRef.current = false;
-        });
+      let cancelled = false;
+      const BASE_DELAY_MS = 1000;
+      const MAX_DELAY_MS = 30000;
+      const MAX_RECOVERY_RETRIES = 3;
+
+      const attemptRecovery = async () => {
+        for (let attempt = 0; attempt <= MAX_RECOVERY_RETRIES; attempt++) {
+          if (cancelled) return;
+          try {
+            const recovered = await hubClient.listTaskRunEvents(taskId);
+            if (!cancelled) {
+              setTaskRunEvents((current) => mergeAgentRunEvents(current, recovered));
+              setRecoveryState('idle');
+              recoveryInProgressRef.current = false;
+            }
+            return;
+          } catch (err) {
+            if (cancelled) return;
+            if (attempt >= MAX_RECOVERY_RETRIES) {
+              const message = err instanceof Error ? err.message : 'Failed to recover stream events';
+              setRecoveryError(message);
+              setRecoveryState('failed');
+              recoveryInProgressRef.current = false;
+              return;
+            }
+            // Exponential backoff with +/-20% jitter (matching Desktop's eventClient.ts)
+            const rawDelay = Math.min(BASE_DELAY_MS * Math.pow(2, attempt), MAX_DELAY_MS);
+            const jitter = rawDelay * 0.2 * (Math.random() * 2 - 1);
+            const delay = Math.round(Math.max(0, rawDelay + jitter));
+            await new Promise<void>((resolve) => setTimeout(resolve, delay));
+          }
+        }
+      };
+
+      void attemptRecovery();
+
+      return () => {
+        cancelled = true;
+        recoveryInProgressRef.current = false;
+      };
     }
 
     // Reset when connection is lost
@@ -296,6 +327,7 @@ export default function WebLayout() {
     if (!isConnected) {
       recoveryInProgressRef.current = false;
     }
+    // Cleanup function must be synchronous — no-op when not in recovery.
   }, [hubRealtime.justReconnected, hubRealtime.authenticated, hubRealtime.status, optimisticRun?.runId, hubClient, setRecoveryState, setRecoveryError]);
 
   // Clear recovery state when optimisticRun changes (new task started)
@@ -918,6 +950,11 @@ export default function WebLayout() {
                       )}
                     />
                   )}
+                  {recoveryState === 'recovering' && optimisticRun && (
+                    <div className={styles.recoveryBannerRecovering}>
+                      <span>{t('status.reconnecting')}</span>
+                    </div>
+                  )}
                   {recoveryState === 'failed' && optimisticRun && (
                     <div className={styles.recoveryBanner}>
                       <span>{t('webChat.recoveryFailed')}</span>
@@ -925,19 +962,36 @@ export default function WebLayout() {
                         className={styles.recoveryRetryBtn}
                         type="button"
                         onClick={() => {
-                          if (optimisticRun?.runId) {
-                            setRecoveryState('recovering');
-                            hubClient.listTaskRunEvents(optimisticRun.runId)
-                              .then((recovered) => {
+                          const taskId = optimisticRun?.runId;
+                          if (!taskId) return;
+                          setRecoveryState('recovering');
+                          setRecoveryError(null);
+
+                          const BASE_DELAY_MS = 1000;
+                          const MAX_DELAY_MS = 30000;
+                          const MAX_RETRIES = 3;
+
+                          void (async () => {
+                            for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+                              try {
+                                const recovered = await hubClient.listTaskRunEvents(taskId);
                                 setTaskRunEvents((current) => mergeAgentRunEvents(current, recovered));
                                 setRecoveryState('idle');
                                 setRecoveryError(null);
-                              })
-                              .catch((err) => {
-                                setRecoveryError(err instanceof Error ? err.message : 'Recovery failed');
-                                setRecoveryState('failed');
-                              });
-                          }
+                                return;
+                              } catch (err) {
+                                if (attempt >= MAX_RETRIES) {
+                                  setRecoveryError(err instanceof Error ? err.message : 'Recovery failed');
+                                  setRecoveryState('failed');
+                                  return;
+                                }
+                                const rawDelay = Math.min(BASE_DELAY_MS * Math.pow(2, attempt), MAX_DELAY_MS);
+                                const jitter = rawDelay * 0.2 * (Math.random() * 2 - 1);
+                                const delay = Math.round(Math.max(0, rawDelay + jitter));
+                                await new Promise<void>((resolve) => setTimeout(resolve, delay));
+                              }
+                            }
+                          })();
                         }}
                       >
                         {t('chat.action.retry')}

@@ -33,6 +33,10 @@ type config struct {
 	HubURL   string // Hub server base URL for Edge callback reporting
 	HubToken string // JWT bearer token for authenticating with Hub
 
+	// Tailscale mode (implies --remote-mode, registers with Hub via tailscale identity)
+	Tailscale   bool   // enable tailscale mode
+	TailscaleIP string // tailscale IP for Hub registration identity
+
 	// Agent adapter configuration
 	AgentDefault   string // default agent adapter ID
 	ClaudeCodePath string // path to claude binary
@@ -150,6 +154,8 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.HubToken, "hub-token", getEnv("AGENTHUB_HUB_TOKEN", ""), "JWT bearer token for authenticating callback requests to Hub")
 	fs.BoolVar(&cfg.RemoteMode, "remote-mode", getEnv("AGENTHUB_REMOTE_MODE", "0") == "1", "allow non-loopback bind and remote origins (requires --local-auth-token or --hub-jwt-secret)")
 	fs.BoolVar(&cfg.Dev, "dev", getEnv("AGENTHUB_DEV", "0") == "1", "disable auto-generated local auth token for development; all endpoints are open")
+	fs.BoolVar(&cfg.Tailscale, "tailscale", getEnv("AGENTHUB_TAILSCALE", "0") == "1", "enable tailscale mode (implies --remote-mode, registers with Hub via tailscale identity)")
+	fs.StringVar(&cfg.TailscaleIP, "tailscale-ip", getEnv("AGENTHUB_TAILSCALE_IP", ""), "tailscale IP address for Hub registration identity")
 	fs.Var(&cfg.RunnerArgs, "runner-arg", "argument passed to --runner-command; may be repeated")
 	fs.Var(&cfg.RunnerEnv, "runner-env", "environment variable passed to --runner-command as KEY=VALUE; may be repeated")
 
@@ -168,6 +174,15 @@ func buildConfig(args []string) (config, error) {
 		return config{}, err
 	}
 	cfg.Addr = strings.TrimSpace(cfg.Addr)
+	// --tailscale implies --remote-mode and tailscale-aware registration with Hub
+	if cfg.Tailscale {
+		cfg.RemoteMode = true
+		if cfg.TailscaleIP != "" {
+			slog.Info("tailscale mode enabled", "tailscale_ip", cfg.TailscaleIP)
+		} else {
+			slog.Info("tailscale mode enabled")
+		}
+	}
 	if cfg.RemoteMode {
 		if err := security.ValidateRemoteListenAddr(cfg.Addr); err != nil {
 			return config{}, err

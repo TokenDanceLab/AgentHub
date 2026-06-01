@@ -237,7 +237,7 @@ func teamTestFixtures(t *testing.T, db *gorm.DB) (string, string, string) {
 
 	user := &model.User{
 		Username:     "smoke_test_user",
-		PasswordHash: "hashed",
+		PasswordHash: stringPtr("hashed"),
 		Nickname:     "Smoke Tester",
 	}
 	require.NoError(t, db.Create(user).Error, "create user")
