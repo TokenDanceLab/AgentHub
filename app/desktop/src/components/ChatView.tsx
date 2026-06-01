@@ -10,6 +10,7 @@ import CodeBlock from './CodeBlock';
 import EmptyState from './EmptyState';
 import TaskList from './TaskList';
 import ToolTimeline from './ToolTimeline';
+import ToolGroup from './ToolGroup';
 import TeamRunDock from './TeamRunDock';
 import { useStreamingText } from '@/hooks/useStreamingText';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
@@ -796,7 +797,7 @@ function blockKey(block: MessageBlock, index: number): string {
     case 'approval':
       return `approval-${block.approvalId}`;
     case 'tool_group':
-      return `toolgroup-${index}`;
+      return `toolgroup-${block.blocks[0]?.callId ?? index}`;
     case 'error':
       return `error-${index}`;
     case 'citation':
@@ -834,6 +835,9 @@ const BlockRenderer = memo(function BlockRenderer({
 
     case 'tool_use':
       return <ToolUseBlock block={block} />;
+
+    case 'tool_group':
+      return <ToolGroup blocks={block.blocks} isStreaming={active} />;
 
     case 'file_change':
       return <FileChangeBlock block={block} />;
@@ -957,7 +961,7 @@ function messageBlockSignature(blocks: ChatMessage['blocks']): string {
     if (b.kind === 'route_decision') return `route:${b.action}`;
     if (b.kind === 'artifact') return `artifact:${b.artifactId}`;
     if (b.kind === 'approval') return `approval:${b.approvalId}:${b.status}`;
-    if (b.kind === 'tool_group') return `tgrp:${b.totalCount}`;
+    if (b.kind === 'tool_group') return `tgrp:${b.blocks.map((tb) => `${tb.callId}:${tb.status}:${tb.children?.length ?? 0}`).join(',')}`;
     return b.kind;
   }).join('|');
 }
@@ -997,17 +1001,36 @@ const MessageCard = memo(function MessageCard({
       {msg.role === 'agent' ? <TaskList blocks={msg.blocks} /> : null}
       {msg.role === 'agent' ? <ToolTimeline blocks={msg.blocks} /> : null}
 
-      {msg.blocks.map((block, i) => {
-        return (
+      {/* Group consecutive tool_use blocks into ToolGroup */}
+      {(() => {
+        const items: Array<MessageBlock | { kind: 'tool_group'; blocks: Extract<MessageBlock, { kind: 'tool_use' }>[]; totalCount: number }> = [];
+        let toolBuffer: Extract<MessageBlock, { kind: 'tool_use' }>[] = [];
+
+        for (const block of msg.blocks) {
+          if (block.kind === 'tool_use') {
+            toolBuffer.push(block);
+          } else {
+            if (toolBuffer.length > 0) {
+              items.push({ kind: 'tool_group', blocks: [...toolBuffer], totalCount: toolBuffer.length });
+              toolBuffer = [];
+            }
+            items.push(block);
+          }
+        }
+        if (toolBuffer.length > 0) {
+          items.push({ kind: 'tool_group', blocks: [...toolBuffer], totalCount: toolBuffer.length });
+        }
+
+        return items.map((block, i) => (
           <BlockRenderer
-            key={blockKey(block, i)}
-            block={block}
+            key={blockKey(block as MessageBlock, i)}
+            block={block as MessageBlock}
             t={t}
             role={msg.role}
             active={isActive}
           />
-        );
-      })}
+        ));
+      })()}
 
       {msg.role !== 'user' && (
         <div className={`${styles.messageFooter} ${isDeleting ? styles.messageFooterActive : ''}`}>
