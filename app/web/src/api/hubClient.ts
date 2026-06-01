@@ -1009,7 +1009,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
     listTaskRunEvents: (taskId: string) =>
       request<AgentRunEvent[]>(`/web/agent-tasks/${encodeURIComponent(taskId)}/events`),
 
-    // 鈹€鈹€ Custom agents 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    getTaskRunEventSummary: (taskId: string) =>
+      request<AgentRunEventSummary>(`/web/agent-tasks/${encodeURIComponent(taskId)}/summary`),
+
+    // ── Custom agents ──────────────────────────────────
 
     listCustomAgents: () =>
       request<Record<string, unknown>[]>('/web/custom-agents'),

@@ -56,6 +56,12 @@ import {
   type ResolvedRunModelSettings,
 } from '@/stores/modelSettingsStore';
 import type { AgentInfo, RunInfo } from '@shared/types';
+import {
+  getSurfaceByDesktopSectionId,
+  getSurfaceStatusMetadata,
+  type SurfaceMetadata,
+} from '@shared/surfaceMetadata';
+import { ActivityCard, EmptyState, StatusNotice } from '@shared/ui';
 import styles from './SettingsPage.module.css';
 
 export type SectionId =
