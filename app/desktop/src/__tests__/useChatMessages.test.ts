@@ -38,7 +38,7 @@ function makeEvent(type: string, payload: Record<string, unknown> = {}, scope: R
 
 describe('useChatMessages', () => {
   let eventHandler: ((event: EventEnvelope) => void) | null;
-  let statusHandler: ((connected: boolean) => void) | null;
+  let statusHandler: ((status: string) => void) | null;
 
   beforeEach(() => {
     eventHandler = null;
@@ -104,7 +104,7 @@ describe('useChatMessages', () => {
     expect(statusHandler).not.toBeNull();
 
     act(() => {
-      statusHandler!(true);
+      statusHandler!('connected');
     });
 
     expect(result.current.isConnected).toBe(true);
@@ -114,12 +114,12 @@ describe('useChatMessages', () => {
     const { result } = renderHook(() => useChatMessages(true));
 
     act(() => {
-      statusHandler!(true);
+      statusHandler!('connected');
     });
     expect(result.current.isConnected).toBe(true);
 
     act(() => {
-      statusHandler!(false);
+      statusHandler!('disconnected');
     });
     expect(result.current.isConnected).toBe(false);
   });

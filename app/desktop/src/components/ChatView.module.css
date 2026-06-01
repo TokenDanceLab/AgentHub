@@ -251,6 +251,166 @@
   50% { opacity: 0.4; }
 }
 
+/* ── Connection status banner ──────────────── */
+.connectionBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  font-size: 13px;
+  line-height: 1.45;
+  animation: bannerSlideIn 0.25s ease-out;
+  z-index: 5;
+}
+
+.connectionBannerReconnecting {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+}
+
+.connectionBannerFailed {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.connectionBannerIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  opacity: 0.85;
+}
+
+.connectionBannerMsg {
+  flex: 0 0 auto;
+  font-weight: 520;
+  white-space: nowrap;
+}
+
+.connectionBannerReconnecting .connectionBannerMsg {
+  animation: connectionPulse 1.5s ease-in-out infinite;
+}
+
+.connectionBannerDetail {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in oklch, #ef4444 78%, var(--foreground) 22%);
+  font-size: 12px;
+  font-weight: 460;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.86;
+}
+
+.connectionBannerBtn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid color-mix(in oklch, #ef4444 40%, transparent);
+  border-radius: 5px;
+  background: transparent;
+  color: #ef4444;
+  font-size: 11px;
+  font-weight: 520;
+  line-height: 1.45;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+
+.connectionBannerBtn:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #ef4444;
+}
+
+.connectionBannerBtn:active {
+  transform: scale(0.97);
+}
+
+.connectionBannerDismiss {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.62;
+  transition: opacity 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+
+.connectionBannerDismiss:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme='light'] .connectionBanner {
+  border-bottom-color: rgba(15, 23, 42, 0.06);
+}
+
+[data-theme='light'] .connectionBannerReconnecting {
+  background: rgba(251, 191, 36, 0.12);
+}
+
+[data-theme='light'] .connectionBannerFailed {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+[data-theme='light'] .connectionBannerBtn {
+  border-color: color-mix(in oklch, #ef4444 40%, transparent);
+}
+
+[data-theme='light'] .connectionBannerBtn:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+[data-theme='light'] .connectionBannerDismiss:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+@keyframes bannerSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes connectionPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.connectionBannerFadeOut {
+  animation: connectionFadeOut 0.35s ease-out forwards;
+}
+
+@keyframes connectionFadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
 /* Ensure content sits above any overlay */
 .message > * {
   position: relative;
