@@ -165,7 +165,7 @@
 }
 
 .status_configuring {
-  background: #F59E0B;
+  background: var(--warning);
 }
 
 .status_unavailable {
