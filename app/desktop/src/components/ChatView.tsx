@@ -16,6 +16,7 @@ import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { useToastStore } from '@/stores/toastStore';
 import type { AgentTeamOverview } from '@/api/agentTeamQueries';
 import type { LocalOrchestrationStatus } from '@/utils/localOrchestration';
+import type { TeamLocalExecution } from '@/utils/teamLocalExecution';
 import styles from './ChatView.module.css';
 
 export type { ChatMessage, MessageBlock };
@@ -29,6 +30,7 @@ interface Props {
   agentTeamOverview?: AgentTeamOverview;
   agentTeamsLoading?: boolean;
   agentTeamsSignedIn?: boolean;
+  teamLocalExecutions?: TeamLocalExecution[];
   localOrchestration?: LocalOrchestrationStatus;
   onStartLocalOrchestration?: (agentId: string, draft: string) => void;
   onOpenTeamRuns?: () => void;
@@ -888,6 +890,7 @@ export default function ChatView({
   agentTeamOverview,
   agentTeamsLoading,
   agentTeamsSignedIn,
+  teamLocalExecutions,
   localOrchestration,
   onStartLocalOrchestration,
   onOpenTeamRuns,
@@ -1142,6 +1145,7 @@ export default function ChatView({
             overview={agentTeamOverview}
             loading={agentTeamsLoading}
             signedIn={agentTeamsSignedIn}
+            localExecutions={teamLocalExecutions}
             localOrchestration={localOrchestration}
             onStartLocalOrchestration={onStartLocalOrchestration}
             onOpenConsole={onOpenTeamRuns}
