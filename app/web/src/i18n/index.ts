@@ -8,7 +8,6 @@ import zhAgentSquare from './locales/zh/agentSquare.json';
 import zhPrivateChats from './locales/zh/privateChats.json';
 import zhGroupWorkspace from './locales/zh/groupWorkspace.json';
 import zhProject from './locales/zh/project.json';
-import zhLegacyCommon from './locales/zh.json';
 
 import enCommon from './locales/en/common.json';
 import enStatus from './locales/en/status.json';
@@ -17,7 +16,6 @@ import enAgentSquare from './locales/en/agentSquare.json';
 import enPrivateChats from './locales/en/privateChats.json';
 import enGroupWorkspace from './locales/en/groupWorkspace.json';
 import enProject from './locales/en/project.json';
-import enLegacyCommon from './locales/en.json';
 
 export type AppLanguage = 'en' | 'zh';
 
@@ -63,7 +61,7 @@ export function setLanguagePreference(language: AppLanguage): void {
 i18n.use(initReactI18next).init({
   resources: {
     zh: {
-      common: { ...zhLegacyCommon, ...zhCommon },
+      common: zhCommon,
       status: zhStatus,
       workbench: zhWorkbench,
       agentSquare: zhAgentSquare,
@@ -72,7 +70,7 @@ i18n.use(initReactI18next).init({
       project: zhProject,
     },
     en: {
-      common: { ...enLegacyCommon, ...enCommon },
+      common: enCommon,
       status: enStatus,
       workbench: enWorkbench,
       agentSquare: enAgentSquare,
