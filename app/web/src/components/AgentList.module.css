@@ -24,12 +24,7 @@
   padding: 0 8px;
   border-radius: 999px;
   background: rgba(0,0,0,0.045);
-  color: #8E8E93;
-  font-size: 11px;
-  font-weight: 650;
-}
-
-[data-theme='dark'] .countPill {
+  color: var(--text-weaker);
   background: rgba(255,255,255,0.065);
 }
 
@@ -143,10 +138,7 @@
 }
 
 .status_configuring {
-  background: #F59E0B;
-}
-
-.status_unavailable {
+  background: var(--warning);
   background: var(--color-danger);
 }
 
@@ -197,13 +189,7 @@
   padding: 0 6px;
   border-radius: 999px;
   background: rgba(0,0,0,0.04);
-  color: #8E8E93;
-  font-size: 10px;
-  font-weight: 650;
-  line-height: 1;
-}
-
-[data-theme='dark'] .version,
+  color: var(--text-weaker);
 [data-theme='dark'] .runtimeMeta {
   background: rgba(255,255,255,0.065);
 }

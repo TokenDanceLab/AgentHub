@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, useEffect, useLayoutEffect, memo } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Copy, RefreshCw, Trash2, ArrowDown, FileText, Pencil, Terminal, Search, FolderOpen, Globe, Bot, CheckSquare, Wrench, ChevronRight, Route, GitFork, Gauge, AlertTriangle, X, Settings } from 'lucide-react';
 import { ClaudeCode, Codex, OpenCode } from '@lobehub/icons';
 import { formatTokens, formatCost } from '@shared/context/breakdown';
@@ -770,14 +771,14 @@ type ErrorBlockType = Extract<MessageBlock, { kind: 'error' }>;
 
 function errorCategoryClass(category: ErrorBlockType['category']): string {
   switch (category) {
-    case 'auth': return styles.errorBlockAuth;
-    case 'quota': return styles.errorBlockQuota;
-    case 'model': return styles.errorBlockModel;
-    case 'network': return styles.errorBlockNetwork;
-    case 'server': return styles.errorBlockServer;
-    case 'context_length': return styles.errorBlockContextLength;
-    case 'tool': return styles.errorBlockTool;
-    default: return styles.errorBlockUnknown;
+    case 'auth': return styles.errorBlockAuth!;
+    case 'quota': return styles.errorBlockQuota!;
+    case 'model': return styles.errorBlockModel!;
+    case 'network': return styles.errorBlockNetwork!;
+    case 'server': return styles.errorBlockServer!;
+    case 'context_length': return styles.errorBlockContextLength!;
+    case 'tool': return styles.errorBlockTool!;
+    default: return styles.errorBlockUnknown!;
   }
 }
 
@@ -1267,9 +1268,45 @@ export default function ChatView({
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const visibleMessages = messages.filter(hasVisibleMessage);
 
+  // ── Virtualizer ──────────────────────────────
+  const virtualizer = useVirtualizer({
+    count: visibleMessages.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: (index: number) => {
+      const msg = visibleMessages[index];
+      if (!msg) return 200;
+      if (msg.role === 'system') return 80;
+      const hasToolUse = msg.blocks.some((b) => b.kind === 'tool_use');
+      if (hasToolUse) return 320;
+      const hasApproval = msg.blocks.some((b) => b.kind === 'approval');
+      if (hasApproval) return 280;
+      const hasAgentTask = msg.blocks.some((b) => b.kind === 'agent_task' || b.kind === 'child_agent' || b.kind === 'route_decision');
+      if (hasAgentTask) return 250;
+      const hasContextUsage = msg.blocks.some((b) => b.kind === 'context_usage');
+      if (hasContextUsage) return 220;
+      return 160;
+    },
+    overscan: 5,
+    getItemKey: (index: number) => visibleMessages[index]?.id ?? index,
+  });
+
+  // Stable refs so the callback closure always sees latest values
+  const visibleMessagesRef = useRef(visibleMessages);
+  visibleMessagesRef.current = visibleMessages;
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+
   const { scrollToBottom, isNearBottom } = useAutoScroll(
     scrollRef,
     { messages: visibleMessages, isStreaming: isStreaming ?? false },
+    {
+      scrollToBottomFn: () => {
+        const len = visibleMessagesRef.current.length;
+        if (len > 0) {
+          virtualizerRef.current.scrollToIndex(len - 1, { align: 'end' });
+        }
+      },
+    },
   );
 
   const lastMsg = visibleMessages[visibleMessages.length - 1];
@@ -1487,30 +1524,39 @@ export default function ChatView({
             description={t('chat.emptyDescription')}
           />
         ) : (
-          <div className={styles.messageList}>
-            {visibleMessages.map((msg) => (
-              <div
-                key={msg.id}
-                data-message-id={msg.id}
-                className={`${styles.messageRow} ${msg.role === 'user' ? styles.messageRowUser : ''}`}
-              >
-                <MessageCard
-                  msg={msg}
-                  t={t}
-                  language={i18n.language}
-                  isStreaming={isStreaming ?? false}
-                  isLastMsg={msg.id === lastMsg?.id}
-                  isCopying={copiedMessageId === msg.id}
-                  isDeleting={deletingMessageId === msg.id}
-                  onCopy={handleCopy}
-                  onRetry={onRetry}
-                  onFork={onFork}
-                  onDeleteClick={onDelete ? handleDeleteClick : undefined}
-                  onCancelDelete={handleCancelDelete}
-                  onConfirmDelete={handleConfirmDelete}
-                />
-              </div>
-            ))}
+          <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative', flexShrink: 0 }}>
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const msg = visibleMessages[virtualRow.index];
+              if (!msg) return null;
+              return (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  data-message-id={msg.id}
+                  ref={virtualizer.measureElement}
+                  className={`${styles.virtualItem} ${msg.role === 'user' ? styles.messageRowUser : ''}`}
+                  style={{
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <MessageCard
+                    msg={msg}
+                    t={t}
+                    language={i18n.language}
+                    isStreaming={isStreaming ?? false}
+                    isLastMsg={msg.id === lastMsg?.id}
+                    isCopying={copiedMessageId === msg.id}
+                    isDeleting={deletingMessageId === msg.id}
+                    onCopy={handleCopy}
+                    onRetry={onRetry}
+                    onFork={onFork}
+                    onDeleteClick={onDelete ? handleDeleteClick : undefined}
+                    onCancelDelete={handleCancelDelete}
+                    onConfirmDelete={handleConfirmDelete}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
         {isStreaming && !lastMsgHasText ? <PendingThinking label={t('chat.thinkingLabel')} /> : null}

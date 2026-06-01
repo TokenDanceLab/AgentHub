@@ -766,7 +766,7 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #8E8E93;
+  color: var(--text-weaker);
   font-size: 12px;
   font-family: var(--font-sans);
   font-weight: 500;
@@ -777,15 +777,15 @@
 .rightPanelTab:hover { color: var(--foreground); }
 
 [data-theme='dark'] .rightPanelTab {
-  color: #6B7280;
+  color: var(--text-weaker);
 }
 
 [data-theme='dark'] .rightPanelTab:hover {
-  color: #E5E7EB;
+  color: var(--foreground);
 }
 
 .rightPanelTabActive {
-  background: #FFFFFF;
+  background: var(--card);
   color: var(--foreground);
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
@@ -883,7 +883,7 @@
 
 .topBarNavBtnAccent {
   background: rgba(93, 104, 204, 0.96);
-  color: #fff;
+  color: var(--primary-foreground);
   box-shadow: 0 4px 12px rgba(93, 104, 204, 0.26);
 }
 
@@ -1014,7 +1014,7 @@
 }
 
 .topMenuItemDanger:not(:disabled) {
-  color: #fb7185;
+  color: var(--destructive);
 }
 
 .topMenuItemLabel {
@@ -1120,7 +1120,7 @@
 }
 
 .winBtn:hover { background: rgba(0,0,0,0.05); color: var(--foreground); }
-.winBtnClose:hover { background: #E81123; color: #fff; }
+.winBtnClose:hover { background: var(--destructive); color: #fff; }
 
 /* ═══════════════════════════════════════════════
    Banner, overlay, modal, nav
