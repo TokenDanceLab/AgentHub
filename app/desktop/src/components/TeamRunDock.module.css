@@ -122,6 +122,41 @@
   color: var(--text-weaker);
 }
 
+.localExecution {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+  margin-top: 7px;
+  padding-left: 33px;
+  color: var(--text-weaker);
+  font-size: 11.5px;
+  line-height: 1.2;
+}
+
+.localExecution strong,
+.localExecution span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.localExecution strong {
+  color: var(--foreground);
+  font-weight: 540;
+}
+
+.localExecutionIcon {
+  color: color-mix(in oklch, var(--primary) 68%, var(--foreground) 32%);
+}
+
 .blockingMetric {
   color: color-mix(in oklch, var(--warning) 84%, var(--foreground) 16%) !important;
 }
@@ -135,7 +170,9 @@
 [data-theme='light'] .signal,
 [data-theme='light'] .statusPill,
 [data-theme='light'] .openButton,
-[data-theme='light'] .metrics span {
+[data-theme='light'] .metrics span,
+[data-theme='light'] .localExecution strong,
+[data-theme='light'] .localExecution span {
   background: rgba(15, 23, 42, 0.045);
 }
 
@@ -154,6 +191,10 @@
   }
 
   .metrics {
+    padding-left: 0;
+  }
+
+  .localExecution {
     padding-left: 0;
   }
 }

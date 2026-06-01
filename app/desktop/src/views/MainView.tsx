@@ -4,6 +4,7 @@ import type { ChatMessage } from '@/components/ChatView.types';
 import type { AgentTeamOverview } from '@/api/agentTeamQueries';
 import type { AgentInfo } from '@shared/types';
 import { resolveLocalOrchestration } from '@/utils/localOrchestration';
+import type { TeamLocalExecution } from '@/utils/teamLocalExecution';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import { SkeletonLine } from '@/components/Skeleton';
@@ -27,6 +28,7 @@ interface Props {
   agentTeamOverview?: AgentTeamOverview;
   agentTeamsLoading?: boolean;
   agentTeamsSignedIn?: boolean;
+  teamLocalExecutions?: TeamLocalExecution[];
   onStartLocalOrchestration?: (agentId: string, draft: string) => void;
   onOpenTeamRuns?: () => void;
 }
@@ -61,6 +63,7 @@ export default function MainView({
   agentTeamOverview,
   agentTeamsLoading,
   agentTeamsSignedIn,
+  teamLocalExecutions,
   onStartLocalOrchestration,
   onOpenTeamRuns,
 }: Props) {
@@ -135,6 +138,7 @@ export default function MainView({
           agentTeamOverview={agentTeamOverview}
           agentTeamsLoading={agentTeamsLoading}
           agentTeamsSignedIn={agentTeamsSignedIn}
+          teamLocalExecutions={teamLocalExecutions}
           localOrchestration={localOrchestration}
           onStartLocalOrchestration={onStartLocalOrchestration}
           onOpenTeamRuns={onOpenTeamRuns}
