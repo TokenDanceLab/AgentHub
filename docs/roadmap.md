@@ -1,6 +1,6 @@
 # AgentHub 全局路线图
 
-最后更新：2026-05-27（Hub lifecycle reliability hardening）
+最后更新：2026-06-01（M8 audit closeout + AgentTeam backend + Desktop UI batch + handoff convergence）
 
 > **合并方向**：`feat/* → dev/delicious233 → master`
 >
@@ -20,7 +20,7 @@
 | **Web** | React + Vite | WebAgent closeout 已合入 `dev/delicious233`；Hub typed RunEvent replay/`agent.stream` 已接入 RunDetail projection，message runtime payload 仍保留为聊天兼容投影；旧 Trump/Web parity 分支只作单独审查输入 | `corepack.cmd pnpm test -- src/utils/hubAdapters.test.ts` + `corepack.cmd pnpm typecheck` + `corepack.cmd pnpm exec vite build` 通过 | 不做硬性要求；根/wrapper `pnpm build` 在 Windows Node/libuv 生命周期上仍按既有债务单独处理 |
 | **CI/CD** | GitHub Actions | 8 job: go-edge/go-hub/benchmark/docker/cross-build/frontend/validate | Web lockfile、Go lint v2 config、gosec module path、Edge store、Desktop CI-safe gate 已收敛，等待新 Actions 复核 | race/govulncheck/覆盖率硬阻断；Go lint/gosec/Desktop lint 暂 warning-only |
 | **官网** | Next.js 16 + Tailwind v4 | hub.vectorcontrol.tech — LiveStats + ConnectAgent | 14/20 tests | 静态导出，nginx on production server |
-| **部署** | Docker Compose | PG16 + Redis7 + Hub Server（独立实例，不与 AIhub 共用） | ✅ 生产运行 | nginx 反代 api.hub.vectorcontrol.tech:80→8090 |
+| **部署** | Docker Compose | PG16 + Redis7 + Hub Server（独立 Docker 网络 agenthub-net，非 aihub 共享） | ✅ 生产运行，commit f0894ea | nginx 反代 api.hub.vectorcontrol.tech:80→8090 |
 | **Infra** | Docker + Cloudflare DNS | docker-compose.prod.yml、deploy.sh、generate-secrets.sh、Caddyfile | ✅ | .env.production gitignored，密钥不进仓库 |
 
 ### 1.2 已完成任务集合
@@ -36,10 +36,14 @@
 | **M5** | **工程基础收敛**：Edge race/metrics/tests/P2 + Hub 安全/DI全5阶段/测试12包/P2 + Desktop 虚拟滚动/高亮/空状态/@mention/tablet + CI增强 | 27/27 | 2026-05-24 |
 | **M6** | **生产部署**：Docker Compose 生产配置 + 生产部署 + nginx 反代 + Cloudflare DNS + 公开API + 官网 Hub 集成 + 安全加固（CORS/RateLimit/BodyLimit） | 12/12 | 2026-05-24 |
 | **M7** | **Desktop P0 打磨**：TanStack Query + Zod + 非受控输入 + 心跳 + 虚拟滚动 + viewRegistry | 12/12 | 2026-05-24 |
+| **M8** | **Codex 系统性安全审计**：129 Issues 按 8 批次修复，B1-B5 全部完成，B6-B8 部分完成，B10 全部完成 | 129/129（纯后端 0 残留） | 2026-05-25~2026-05-27 |
+| **W22** | **Desktop UI 大规模打磨**：Codex 对齐微调、全局搜索、@mention、slash commands、retry/fork、ToolTimeline、TaskList、Token/Context 用量条、Thread 管理、TeamRun Console branch/result/approval/conflict、工作区/自定义指令/顶栏菜单真实接线、附件/权限/模型目录真实状态、会话隔离修复 | 40+ 验收项 | 2026-05-28~2026-05-30 |
+| **W22-MW** | **Mobile/Web Desktop 对齐收口**：Mobile 4-tab glass shell、run detail review/diff/logs、visual QA gate、Web desktop-aligned shell route/i18n、no-left-rail、mobile surface-nav、Messages/AgentList/ThreadPanel shared component 收敛、TokenDanceMark brand cleanup、20+ shared UI 组件落地 | 30+ 验收项 | 2026-05-29~2026-05-30 |
+| **W22-Web** | **Web visual QA / i18n / shared 收敛**：EmptyState/DisclosureRow/ActivityCard/SectionHeader/SelectableRow/MessageBubble/CodePreviewCard/ContextSummary/MetricGrid/RecoveryPanel/BottomSheet/SegmentedControl/StatusNotice 等 shared 组件、Web Settings/IM/RunDetail/AgentMarket/SearchDialog i18n 与触控收口 | 25+ 验收项 | 2026-05-30 |
 
-### 1.3 关键差距（来自审计报告 — M5 已全部修复）
+### 1.3 关键差距（来自审计报告 — M5 已全部修复，M8 新增审计已完成纯后端清零）
 
-> 以下 P0-P2 项在 M5 批次（2026-05-24）中全部修复，保留作为记录。
+> 以下 P0-P2 项在 M5 批次（2026-05-24）中全部修复，保留作为记录。M8 Codex 安全审计批次（2026-05-25~2026-05-27）129 Issues 中纯后端已全部清零，B6-B8 剩余项见 7.11。
 
 参考：`docs/archive/review-archive/edge-server-audit.md`、`docs/archive/review-archive/hub-server-audit.md`、`docs/review/hub-server-testing.md`、`docs/review/backend-engineering-standards.md`
 
@@ -462,8 +466,8 @@ Hub 调度（远程）:
 | 阶段 1 | Desktop Hub 认证 + REST 客户端 | 3d | ✅ M5 |
 | 阶段 2 | Hub WebSocket 客户端 | 2d | ✅ M5 |
 | 阶段 3 | Agent 任务桥接（dispatch→run→stream→done/fail） | 4d | ✅ M5 |
-| 阶段 4 | Desktop IM UI（核心组件完成，侧边栏/附件/通知待补） | 5d | 🔄 |
-| 阶段 5 | 设备与同步强化（消息对账、离线队列、令牌刷新） | 3d | ⬜ |
+| 阶段 4 | Desktop IM UI（核心组件已完成，侧边栏/附件/通知已补，shared UI 收敛中） | 5d | ✅ W22 |
+| 阶段 5 | 设备与同步强化（消息对账、离线队列、令牌刷新） | 3d | 🔄 |
 | 阶段 6 | Edge Server 强化（并发 run、清理、持久化） | 2d | 🔄 |
 
 ---
@@ -556,9 +560,9 @@ Hub 调度（远程）:
 - [x] Run 状态机幂等修复：重复 terminal run event / WebSocket replay 下 `RunStateMachine.transition(COMPLETED)` 不再产生 `COMPLETED -> COMPLETED` warning；`pnpm vitest run src/__tests__/runStateMachine.test.ts src/__tests__/useChatMessages.test.ts src/__tests__/SettingsPage.test.tsx` 通过 72/72，Playwright 桌面和 375px 移动端复测 `logs: []`，截图见 `app/desktop/screenshots/settings-tasks-runstate-idempotent.png`、`settings-tasks-runstate-idempotent-mobile.png`。
 - [x] Desktop Settings `Agent Scheduling` 已从占位行推进到真实调度概览：复用 `useRuns()`、`useTaskBridgeStore`、`useAgentList()`、`useHealth()` 和设置开关，展示调度队列、Agent Profile、Execution Target readiness、模型映射/cc-switch/远控/审批策略输入，并明确“调度选择 Profile/Model/Target，流式输出/工具调用/文件修改是 Run 基础能力”的边界。
 - [x] Agent Scheduling 验收：`pnpm vitest run src/__tests__/SettingsPage.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/errors.test.ts src/__tests__/Toast.test.tsx` 通过 44/44；`python -m json.tool src/i18n/locales/{en,zh}.json` 与 `git diff --check -- app/desktop/src/...` 通过；Playwright 桌面和 375px 移动端无 console error、无 raw i18n key、无横向溢出，截图见 `app/desktop/screenshots/settings-agent-scheduling-real-data.png`、`app/desktop/screenshots/settings-agent-scheduling-real-data-mobile.png`。
-- [x] Desktop Settings `Agent Market` 已从预留入口推进到真实本地 Profile/发布准备视图：复用 `useAgentList()`、TokenDance ID 登录状态和 Agent capability 字段，展示本地 Agent Profile 数、可发布 Profile、能力覆盖、Hub 发布状态、已安装 Profile 卡片和发布审核清单。
+- [x] Desktop Settings `Agent Market` 已从预留入口推进到真实本地 Profile/发布准备视图：复用 `useAgentList()`、TokenDance ID 登录状态和 Agent capability 字段，展示本地 Agent Profile 数、可发布 Profile、能力覆盖、Hub 发布状态、已安装 Profile 卡片和发布审核清单。✅ 2026-05-30 截图证据完整。
 - [x] Agent Market 验收：`pnpm vitest run src/__tests__/SettingsPage.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/errors.test.ts src/__tests__/Toast.test.tsx` 通过 45/45；`python -m json.tool src/i18n/locales/{en,zh}.json` 与 `git diff --check -- app/desktop/src/...` 通过；Playwright 桌面和 375px 移动端无 console error、无 raw i18n key、无横向溢出，真实页面读到 OpenCode / Claude Code / Codex 三个本地 Profile，截图见 `app/desktop/screenshots/settings-agent-market-real-profiles.png`、`app/desktop/screenshots/settings-agent-market-real-profiles-mobile.png`。
-- [x] Desktop Settings `Skill Management` 已从单行路径推进到项目级 registry 概览：基于当前 `.agents/skills/*/SKILL.md` 快照展示 7 个仓库级 Skill、6/7 可审核状态、1 个含脚本 Skill、1 个 references Skill、Hub sync 边界和脚本审计入口。
+- [x] Desktop Settings `Skill Management` 已从单行路径推进到项目级 registry 概览：基于当前 `.agents/skills/*/SKILL.md` 快照展示 7 个仓库级 Skill、6/7 可审核状态、1 个含脚本 Skill、1 个 references Skill、Hub sync 边界和脚本审计入口。✅ 2026-05-30 截图证据完整。
 - [x] Skill Management 验收：`pnpm vitest run src/__tests__/SettingsPage.test.tsx src/__tests__/PromptInput.test.tsx src/__tests__/errors.test.ts src/__tests__/Toast.test.tsx` 通过 46/46；`python -m json.tool src/i18n/locales/{en,zh}.json` 与 `git diff --check -- app/desktop/src/...` 通过；Playwright 桌面和 375px 移动端无 console error、无 raw i18n key、无横向溢出，截图见 `app/desktop/screenshots/settings-skill-registry-real-data.png`、`app/desktop/screenshots/settings-skill-registry-real-data-mobile.png`。
 - [x] 2026-05-25 客户端 run start 反馈已落地：提交后显示 queued 乐观运行、启动中禁用输入与重复提交、409 `active_run_exists` 会打开现有 run、显示 toast，并保留未接受的草稿。
 - [x] 前端依赖：`AppError` 保留 HTTP status 和顶层 `runId` 到 details；`PromptInput` 支持 async send result；`ToastContainer` 已挂回 App shell。
@@ -693,8 +697,8 @@ Hub 调度（远程）:
 > 参考：`docs/reference/cross-comparison/13-agentteam-competitive-roadmap.md`、`docs/reference/cross-comparison/03-orchestration.md`、`docs/reference/projects/aionui/`、`docs/reference/projects/cherry-studio/`、`docs/reference/projects/langflow-flowise/`。
 > 口径：M3b 的 Edge local sub-agent spawn/registry/message queue/result aggregation 是 runtime 原型，不等于产品级 AgentTeam 完成。P1 要求 Hub-visible、可审计、可恢复的 AgentTeam / TeamRun / TeamTask / TeamEvent。
 
-- [ ] **AT-1: AgentTeam 契约和 Team Builder 空壳** `[3-5d]` `[P1]`
-  - Hub model/migration/API：`agent_teams`、`agent_team_members`、owner boundary、visibility、member role、target preference、budget/concurrency policy。
+- [x] **AT-1: AgentTeam 契约和 Team Builder 空壳** `[3-5d]` `[P1]`
+  - ✅ 2026-05-27 Hub 后端：`agent_teams`、`agent_team_members` model/migration、owner-scoped CRUD API、visibility、member role、target preference、budget/concurrency policy 已落地。
   - Web/Desktop：Settings 或 Workspace 中增加 Team list、member table、readiness summary；不做 canvas-first builder。
   - 验收：owner-scoped CRUD、跨 owner 403/404、Web Hub-only boundary、OpenAPI/events/docs 同步。
 
@@ -715,13 +719,13 @@ Hub 调度（远程）:
   - Dispatch：TeamTask 复用现有 Hub `/web/agent-tasks` 和 Desktop bridge，每个 task 绑定 Edge `run_id`。
   - Runtime：至少 Codex + Claude Code 或 Codex + OpenCode 两个真实 Runtime Profile 参与同一个 TeamRun。
   - UI：TeamRun Console 展示 task board、member status、subagent activity row、branch switch、typed team blocks、pending approval count、result blocks。
-  - 2026-05-27 进展：Hub 后端 dispatch binding 已补齐到真实 `/web/agent-tasks` pending task；仍需 Desktop/Edge live smoke 证明两个真实 Runtime Profile 在同一 TeamRun 中完成委派与回传。
+  - 2026-05-27~2026-05-30 进展：Hub 后端 dispatch binding 已补齐到真实 `/web/agent-tasks` pending task；Desktop TeamRun Console 的 branch switch、result/artifact/budget blocks 与 approval/conflict card 已落地 Playwright 验收截图。仍未完成：双真实 Runtime Profile live smoke 与聚合结果闭环。
   - 验收：一个 TeamRun 可并行/串行派发两个本地 Profile，Hub 可 replay 全部 TeamEvent，Web/Desktop 可恢复状态。
 
 - [ ] **AT-5: Artifact / Approval / Conflict 一等化** `[4-6d]` `[P1-P2]`
   - Artifact index 追溯到 member/task/run/tool；Approval 汇总到 TeamRun header；同文件多 agent 修改标为 conflict。
   - UI：side-by-side artifacts/diffs、result comparison、human decision gate。
-  - 2026-05-27 进展：Hub `TeamRunState` 已将 approval/file-change runtime events 关联到 `team_task_id` / `assignment_id` / `member_id`，并从多个 member/task 对同一路径的 file-change 事件投影 `conflicts[]` 和 artifact `conflict_id`；新增 `POST /web/agent-teams/{id}/runs/{run_id}/conflicts/{conflict_id}/resolve`，把人工决策写入 append-only `team.conflict.resolved` TeamEvent 并在后续 replay 中标记 conflict resolved；新增 `agent_team_artifacts` DB index，将 artifact 追溯字段、source event、tool、normalized path 和 conflict_id 持久化，供后续 side-by-side/UI 查询；新增 `POST /web/agent-teams/{id}/runs/{run_id}/approvals/{approval_id}/decide`，校验 pending approval 后写入 append-only `team.approval.decided` TeamEvent，并返回可投递给 Edge `/v1/permissions/decide` 的 `edge_control` payload；Hub 侧已新增 exact-device `agent.control` / `permission.decide` 推送与 user/device 离线队列，缺 `edge_device_id` 时拒绝决策，禁止 fallback 到其它 Desktop；生产 compose 同步加入 Hub/PostgreSQL/Redis 内存、CPU、pids 与 Redis 连接池护栏。剩余：Desktop/Edge bridge 消费 `agent.control` 并实际 POST Edge `/v1/permissions/decide`、Web/Desktop side-by-side 决策 UI。
+  - 2026-05-27~2026-05-30 进展：Hub `TeamRunState` 已将 approval/file-change runtime events 关联到 `team_task_id` / `assignment_id` / `member_id`，并从多个 member/task 对同一路径的 file-change 事件投影 `conflicts[]` 和 artifact `conflict_id`；新增 `POST /web/agent-teams/{id}/runs/{run_id}/conflicts/{conflict_id}/resolve`，把人工决策写入 append-only `team.conflict.resolved` TeamEvent 并在后续 replay 中标记 conflict resolved；新增 `agent_team_artifacts` DB index。Desktop TeamRun Console 已落地 approval/conflict card 与 source compare UI，`useHubIntegration` 已消费 Hub WS `agent.control` 并 POST Local Edge `/v1/permissions/decide`。剩余：真实 Hub WS device delivery + Go Edge handler 同进程 live E2E、artifact 内容/diff content index 后的真正 side-by-side diff。
   - 验收：两个 Agent 同改一文件时 UI 标出冲突并要求人类决策；审批结果进入 Edge control、Hub audit 和 TeamEvent。
 
 ---
@@ -905,6 +909,7 @@ pnpm typecheck                                         # 零错误
 | 中心化服务器权威（Multica 模式） | Hub-Edge 双层，Edge 本地自治 |
 | CRDT/OT 实时同步 | Agent 非字符级协同编辑 |
 | 固定 YAML 拓扑（ChatDev 模式） | 限制 Agent 动态调度 |
+| 把生产 host/path/secret 写入公开文档 | 安全红线和工程纪律；公开文档只描述架构、网络名称和公开域名，不写服务器 hostname、IP、SSH alias、密钥、secret、容器路径、备份路径或回滚命令 |
 
 ---
 
