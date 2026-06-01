@@ -8,7 +8,7 @@ import { useMention, type MentionItem } from '@/hooks/useMention';
 import MentionPopover from '@/components/MentionPopover';
 import ModelReasoningPicker from '@/components/ModelReasoningPicker';
 import type { ModelReasoningOption } from '@/components/ModelReasoningPicker';
-import PermissionModePicker from '@/components/PermissionModePicker';
+import { PermissionModePicker } from '@shared/ui';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import { preferredProfileAlias } from '@/utils/agentProfile';
 import type { ModelCatalogItem, ModelCatalogResponse } from '@/api/modelCatalogQueries';
