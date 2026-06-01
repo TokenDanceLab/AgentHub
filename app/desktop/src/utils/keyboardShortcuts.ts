@@ -55,3 +55,70 @@ export const KEYBOARD_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
 ];
 
 export const KEYBOARD_SHORTCUTS = KEYBOARD_SHORTCUT_GROUPS.flatMap((group) => group.shortcuts);
+
+// ── Custom keybinding overrides (localStorage-backed) ──────
+
+export interface CustomKeybinding {
+  id: string;
+  keys: string[];
+}
+
+const CUSTOM_BINDINGS_KEY = 'agenthub-custom-keybindings';
+
+function loadCustomBindings(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(CUSTOM_BINDINGS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function getResolvedShortcutGroups(): KeyboardShortcutGroup[] {
+  const custom = loadCustomBindings();
+  return KEYBOARD_SHORTCUT_GROUPS.map((group) => ({
+    ...group,
+    shortcuts: group.shortcuts.map((s) =>
+      s.id in custom ? { ...s, keys: custom[s.id] } : s,
+    ),
+  }));
+}
+
+export function hasCustomKeybindings(): boolean {
+  return Object.keys(loadCustomBindings()).length > 0;
+}
+
+export function saveCustomKeybindings(bindings: CustomKeybinding[]): void {
+  const obj: Record<string, string[]> = {};
+  for (const b of bindings) {
+    obj[b.id] = b.keys;
+  }
+  localStorage.setItem(CUSTOM_BINDINGS_KEY, JSON.stringify(obj));
+}
+
+export function resetKeybindings(): void {
+  localStorage.removeItem(CUSTOM_BINDINGS_KEY);
+}
+
+export function deriveKeysFromEvent(e: KeyboardEvent): string[] {
+  const result: string[] = [];
+  if (e.ctrlKey || e.metaKey) result.push(e.ctrlKey ? 'Ctrl' : '⌘');
+  if (e.altKey) result.push('Alt');
+  if (e.shiftKey) result.push('Shift');
+  const mainKey = e.key;
+  if (!['Control', 'Meta', 'Alt', 'Shift'].includes(e.key) && mainKey) {
+    result.push(mainKey.length === 1 ? mainKey.toUpperCase() : mainKey);
+  }
+  return result;
+}
+
+export function checkConflicts(keys: string[], capturingId: string): KeyboardShortcut | null {
+  const keyStr = keys.join('+');
+  for (const group of KEYBOARD_SHORTCUT_GROUPS) {
+    for (const s of group.shortcuts) {
+      if (s.id === capturingId) continue;
+      if (s.keys.join('+') === keyStr) return s;
+    }
+  }
+  return null;
+}

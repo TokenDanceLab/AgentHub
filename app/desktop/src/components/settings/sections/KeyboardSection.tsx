@@ -1,7 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { RotateCcw, Check, X, Pencil } from 'lucide-react';
 import Panel from '../primitives/Panel';
-import { KEYBOARD_SHORTCUT_GROUPS } from '@/utils/keyboardShortcuts';
+import {
+  KEYBOARD_SHORTCUT_GROUPS,
+  type KeyboardShortcut,
+  type KeyboardShortcutGroup,
+  type CustomKeybinding,
+  getResolvedShortcutGroups,
+  hasCustomKeybindings,
+  saveCustomKeybindings,
+  resetKeybindings,
+  deriveKeysFromEvent,
+  checkConflicts,
+} from '@/utils/keyboardShortcuts';
 import styles from '../../SettingsPage.module.css';
 
 export default function KeyboardSection() {
