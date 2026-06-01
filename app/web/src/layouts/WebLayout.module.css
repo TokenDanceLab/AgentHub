@@ -646,6 +646,33 @@
   background: oklch(0.48 0.18 27 / 0.12);
 }
 
+.recoveryBannerRecovering {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 10px 0;
+  padding: 8px 12px;
+  border: 1px solid oklch(0.58 0.16 82 / 0.28);
+  border-radius: 8px;
+  background: oklch(0.58 0.16 82 / 0.06);
+  color: oklch(0.58 0.16 82);
+  font-size: 13px;
+  font-weight: 620;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+[data-theme='dark'] .recoveryBannerRecovering {
+  border-color: oklch(0.62 0.14 82 / 0.2);
+  background: oklch(0.58 0.16 82 / 0.05);
+}
+
+.recoveryBannerRecovering span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .scrim {
   position: fixed;
   inset: 54px 0 0;

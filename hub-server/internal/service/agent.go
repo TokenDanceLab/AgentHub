@@ -29,15 +29,26 @@ type agentCache interface {
 	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
 }
 
+// relayDispatcher is the subset of *RelayService methods used by AgentService.
+type relayDispatcher interface {
+	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*RelayCommandData, error)
+}
+
 type AgentService struct {
 	db          *gorm.DB
 	bus         *Bus
 	mgr         *ws.Manager
 	cacheClient agentCache
+	relay       relayDispatcher
 }
 
 func NewAgentService(db *gorm.DB, bus *Bus, mgr *ws.Manager, cacheClient *cache.Client) *AgentService {
 	return &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient)}
+}
+
+// SetRelayService injects an optional relay service for hub_relay target dispatch.
+func (s *AgentService) SetRelayService(relay relayDispatcher) {
+	s.relay = relay
 }
 
 // CustomAgent CRUD
@@ -331,8 +342,10 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 	if err != nil {
 		return nil, err
 	}
+	targetType := ""
 	if dispatchTarget != nil {
 		targetID = dispatchTarget.ID
+		targetType = dispatchTarget.TargetType
 	} else {
 		targetID = ""
 	}
@@ -354,7 +367,7 @@ func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMess
 
 	// #100: Use context.WithoutCancel so the dispatch goroutine is not
 	// cancelled when the HTTP handler's request context is cancelled.
-	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, promptFromMessage(msg), modelParams)
+	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, promptFromMessage(msg), modelParams, targetType)
 
 	return task, nil
 }
@@ -416,7 +429,7 @@ func promptFromMessage(msg *model.Message) string {
 	return msg.Content
 }
 
-func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams string) {
+func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string) {
 	dp := dispatchPayload{
 		TaskID:           task.ID,
 		AgentInstanceID:  ai.ID,
@@ -456,6 +469,23 @@ func (s *AgentService) dispatchTask(ctx context.Context, task *model.PendingAgen
 	if task.TargetID != "" {
 		if task.EdgeDeviceID == "" {
 			slog.Error("target-bound agent task missing edge device id", "task_id", task.ID, "user_id", ai.InviterUserID, "target_id", task.TargetID)
+			return
+		}
+		// Route by target type: hub_relay uses the relay service; all others
+		// (local_edge, remote_ssh, cloud_edge, tailscale) go through the
+		// device-bound WebSocket path.
+		if targetType == "hub_relay" && s.relay != nil {
+			_, err := s.relay.CreateCommand(ctx, ai.InviterUserID, "agent_dispatch", json.RawMessage(payload), ai.InviterUserID)
+			if err != nil {
+				slog.Error("failed to create relay command for hub_relay dispatch", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+				if pushErr := cacheClient.PushPendingTargetTask(ctx, ai.InviterUserID, task.TargetID, task.EdgeDeviceID, string(payload)); pushErr != nil {
+					slog.Error("failed to push hub_relay task to offline queue", "task_id", task.ID, "user_id", ai.InviterUserID, "error", pushErr)
+				}
+				return
+			}
+			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, task.EdgeDeviceID); err != nil {
+				slog.Error("failed to mark hub_relay task dispatched", "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+			}
 			return
 		}
 		s.dispatchTargetBoundTask(ctx, cacheClient, task, ai.InviterUserID, task.EdgeDeviceID, payload)

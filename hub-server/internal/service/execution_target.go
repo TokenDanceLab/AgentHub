@@ -19,7 +19,13 @@ import (
 
 // ExecutionTargetService handles CRUD for execution targets.
 type ExecutionTargetService struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache ExecutionTargetCache
+}
+
+// ExecutionTargetCache is the subset of *cache.Client methods used by ExecutionTargetService.
+type ExecutionTargetCache interface {
+	IsOnline(ctx context.Context, userID string) (bool, error)
 }
 
 // TargetListResult holds paginated execution target results.
@@ -31,6 +37,11 @@ type TargetListResult struct {
 
 func NewExecutionTargetService(db *gorm.DB) *ExecutionTargetService {
 	return &ExecutionTargetService{db: db}
+}
+
+// SetCache injects an optional cache client for hub_relay health checks.
+func (s *ExecutionTargetService) SetCache(cache ExecutionTargetCache) {
+	s.cache = cache
 }
 
 func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error) {
@@ -206,7 +217,18 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 		addr := net.JoinHostPort(t.Host, fmt.Sprintf("%d", port))
 		return pingEdgeServer(ctx, addr, t.AuthMethod, t.ID, id, s.db)
 	case "hub_relay":
-		return errcode.TargetNotRoutable.WithMessage("execution target health proof is not available")
+		// hub_relay health depends on whether the owner has an active
+		// WebSocket connection that can relay tasks.
+		if s.cache == nil {
+			return errcode.TargetNotRoutable.WithMessage("execution target health proof is not available")
+		}
+		online, err := s.cache.IsOnline(ctx, t.OwnerID)
+		if err != nil || !online {
+			_ = repository.UpdateTargetOnlineStatus(s.db, id, false)
+			return errcode.TargetNotRoutable.WithMessage("relay route not available: target owner is offline")
+		}
+		_ = repository.UpdateTargetOnlineStatus(s.db, id, true)
+		return nil
 	default:
 		return errcode.ErrBadRequest.WithMessage("unsupported target_type")
 	}

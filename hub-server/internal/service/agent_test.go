@@ -145,7 +145,7 @@ func TestDispatchTaskIncludesPrompt(t *testing.T) {
 		DisplayName:   "Claude",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run the real runtime", `{"model":"claude-sonnet-4-6"}`)
+	svc.dispatchTask(context.Background(), task, agent, "Run the real runtime", `{"model":"claude-sonnet-4-6"}`, "")
 
 	snapshot := cache.snapshot()
 	require.Equal(t, "user-1", snapshot.pushedUser)
@@ -179,7 +179,7 @@ func TestDispatchTaskIncludesTargetID(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run the selected target", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run the selected target", "", "")
 
 	snapshot := cache.snapshot()
 	require.Equal(t, "user-1", snapshot.pushedUser)
@@ -263,7 +263,7 @@ func TestDispatchTaskIncludesTeamRunContext(t *testing.T) {
 		DisplayName:   "Supervisor",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Route this team run", "")
+	svc.dispatchTask(context.Background(), task, agent, "Route this team run", "", "")
 
 	snapshot := cache.snapshot()
 	require.Len(t, snapshot.pushed, 1)
@@ -300,7 +300,7 @@ func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run invalid target", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run invalid target", "", "")
 
 	select {
 	case <-connA.Send:
@@ -334,7 +334,7 @@ func TestDispatchTaskDoesNotPushWhenDispatchedStateMissing(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run missing task", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run missing task", "", "")
 
 	select {
 	case <-conn.Send:
@@ -368,7 +368,7 @@ func TestDispatchTaskDoesNotPushTerminalTask(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run cancelled task", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run cancelled task", "", "")
 
 	select {
 	case <-conn.Send:
@@ -415,7 +415,7 @@ func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run on B", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run on B", "", "")
 
 	select {
 	case data := <-connB.Send:
@@ -470,7 +470,7 @@ func TestDispatchTaskDoesNotPushTargetWhenDispatchedStateMissing(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run missing target task", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run missing target task", "", "")
 
 	select {
 	case <-connB.Send:
@@ -510,7 +510,7 @@ func TestDispatchTaskDoesNotPushTerminalTargetTask(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run cancelled target", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run cancelled target", "", "")
 
 	select {
 	case <-connB.Send:
@@ -546,7 +546,7 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchTask(context.Background(), task, agent, "Run on offline B", "")
+	svc.dispatchTask(context.Background(), task, agent, "Run on offline B", "", "")
 
 	select {
 	case <-connA.Send:
