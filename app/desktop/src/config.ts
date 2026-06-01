@@ -75,6 +75,7 @@ export const WS_URL = resolveWsUrl();
 export const EDGE_AUTH_TOKEN = import.meta.env.VITE_EDGE_AUTH_TOKEN || '';
 export const HUB_URL = import.meta.env.VITE_HUB_URL || 'http://localhost:8080';
 export const HUB_WS_URL = import.meta.env.VITE_HUB_WS_URL || 'ws://localhost:8080/client/ws';
+export const TOKENDANCE_LOGIN_URL = import.meta.env.VITE_TOKENDANCE_LOGIN_URL || '';
 
 export const HEALTH_POLL_MS = 5000;
 export const RUNNERS_POLL_MS = 5000;

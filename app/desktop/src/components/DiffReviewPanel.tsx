@@ -2,7 +2,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, X } from 'lucide-react';
-import type { FileDiff, DiffHunk, DiffLine } from './ChatView.types';
+import type { DiffHunk } from './ChatView.types';
 import styles from './DiffReviewPanel.module.css';
 
 // ── Side-by-side row types ──────────────────────────────────────────────
@@ -49,7 +49,8 @@ function buildSideBySideRows(hunk: DiffHunk): SideBySideRow[] {
       lines[i + 1]?.type === 'added'
     ) {
       // Pair consecutive deleted + added as "modified"
-      const addedLine = lines[i + 1]!;
+      const addedLine = lines[i + 1];
+      if (!addedLine) break;
       rows.push({
         left: { lineNumber: line.oldLineNumber, content: line.content },
         right: { lineNumber: addedLine.newLineNumber, content: addedLine.content },

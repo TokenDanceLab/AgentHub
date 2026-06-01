@@ -285,6 +285,7 @@ export interface HubAgentTask {
   agent_instance_id: string;
   triggered_by_user_id: string;
   trigger_message_id: string;
+  target_id?: string;
   status: HubAgentTaskStatus;
   edge_run_id?: string;
   edge_device_id?: string;
@@ -297,7 +298,14 @@ export interface HubAgentTask {
 
 export interface HubTriggerAgentTaskRequest {
   trigger_message_id: string;
+  agent_instance_id?: string;
+  agent_type?: string;
+  custom_agent_id?: string;
+  model_params?: string;
+  target_id?: string;
 }
+
+export type HubTriggerAgentTaskOptions = Omit<HubTriggerAgentTaskRequest, 'trigger_message_id'>;
 
 export interface HubTaskRunRequest {
   run_id?: string;
@@ -984,10 +992,10 @@ export function createHubClient(opts: HubClientOptions = {}) {
           body: JSON.stringify(body),
         },
       ),
-    triggerAgentTask: (triggerMessageId: string) =>
+    triggerAgentTask: (triggerMessageId: string, options: HubTriggerAgentTaskOptions = {}) =>
       request<HubAgentTask>('/web/agent-tasks', {
         method: 'POST',
-        body: JSON.stringify({ trigger_message_id: triggerMessageId }),
+        body: JSON.stringify({ trigger_message_id: triggerMessageId, ...options }),
       }),
     cancelAgentTask: (taskId: string) =>
       requestWithFallback<void>(

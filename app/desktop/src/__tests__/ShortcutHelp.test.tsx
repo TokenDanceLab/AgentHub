@@ -17,9 +17,9 @@ describe('ShortcutHelp', () => {
     expect(screen.getByText('shortcut.group.composer')).toBeInTheDocument();
     expect(screen.getByText('shortcut.toggleSidebar')).toBeInTheDocument();
     expect(screen.getByText('shortcut.toggleRunPanel')).toBeInTheDocument();
-    expect(screen.getByText('shortcut.newThread')).toBeInTheDocument();
-    expect(screen.getByText('shortcut.slashCommands')).toBeInTheDocument();
-    expect(screen.getAllByText('Ctrl/⌘').length).toBeGreaterThan(4);
+    expect(screen.getAllByText('Ctrl')).toHaveLength(3);
+    expect(screen.getByText('B')).toBeInTheDocument();
+    expect(screen.getByText('J')).toBeInTheDocument();
   });
 
   it('closes on Escape', () => {

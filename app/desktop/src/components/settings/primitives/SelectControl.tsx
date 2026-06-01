@@ -1,4 +1,4 @@
-import styles from '../../SettingsPage.module.css';
+import { Select } from '@shared/ui';
 
 type SelectValue = string;
 
@@ -9,13 +9,5 @@ interface SelectControlProps {
 }
 
 export default function SelectControl({ value, options, onChange }: SelectControlProps) {
-  return (
-    <select className={styles.select} value={value} onChange={(event) => onChange(event.target.value)}>
-      {options.map(([optionValue, label]) => (
-        <option key={optionValue} value={optionValue}>
-          {label}
-        </option>
-      ))}
-    </select>
-  );
+  return <Select value={value} options={options} onChange={onChange} />;
 }

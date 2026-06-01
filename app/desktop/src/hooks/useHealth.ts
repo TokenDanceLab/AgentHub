@@ -30,7 +30,9 @@ export function useHealth(): HealthState {
 
   useEffect(() => {
     mountedRef.current = true;
-    poll();
+    queueMicrotask(() => {
+      void poll();
+    });
     const id = setInterval(poll, HEALTH_POLL_MS);
     return () => {
       mountedRef.current = false;

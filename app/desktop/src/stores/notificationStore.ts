@@ -33,7 +33,7 @@ export const useNotificationStore = create<NotificationState>()(
 
     addNotification: (n) =>
       set((state) => {
-        const next = [n, ...state.notifications].slice(0, 100);
+        const next = [n, ...state.notifications.filter((item) => item.id !== n.id)].slice(0, 100);
         return { notifications: next, unreadCount: calcUnread(next) };
       }),
 
