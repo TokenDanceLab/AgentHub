@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Pencil, RotateCcw, X } from 'lucide-react';
 import Panel from '../primitives/Panel';
 import {
   getResolvedShortcutGroups,

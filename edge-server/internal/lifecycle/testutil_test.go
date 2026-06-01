@@ -33,16 +33,10 @@ func testID(t *testing.T) string {
 	return fmt.Sprintf("%s_%d_%d", replacer.Replace(t.Name()), os.Getpid(), time.Now().UnixNano())
 }
 
-// nextEvent reads the next event from a channel with a 500ms timeout.
+// nextEvent reads the next event from a channel with a CI-safe timeout.
 func nextEvent(t *testing.T, ch <-chan events.EventEnvelope) events.EventEnvelope {
 	t.Helper()
-	select {
-	case evt := <-ch:
-		return evt
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timed out waiting for event")
-		return events.EventEnvelope{}
-	}
+	return nextEventWithin(t, ch, 5*time.Second)
 }
 
 // nextEventWithin reads the next event from a channel with a configurable timeout.

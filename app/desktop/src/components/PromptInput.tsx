@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, Clock3, FileText, FolderOpen, HardDrive, Plus, Server, Square, ArrowUp, LoaderCircle, X } from 'lucide-react';
 import type { AgentInfo, ThreadInfo } from '@shared/types';
@@ -34,6 +34,26 @@ import {
   formatTimeAgo,
   type WorkspaceEntry,
 } from '@/utils/workspaceStore';
+
+function getStoredWorkDir(): string {
+  try {
+    return window.localStorage.getItem('agenthub.prompt.workDir') ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function getStoredPermissionMode(): PermissionMode {
+  try {
+    const savedMode = window.localStorage.getItem('agenthub.prompt.permissionMode');
+    if (savedMode && PERMISSION_MODES.includes(savedMode as PermissionMode)) {
+      return savedMode as PermissionMode;
+    }
+  } catch {
+    // localStorage can be unavailable in tests.
+  }
+  return 'default';
+}
 
 interface SendOptions {
   model?: string;
@@ -81,7 +101,7 @@ interface Props {
   modelCatalog?: ModelCatalogResponse;
   selectedAgentId?: string;
   onSelectAgent: (agentId: string) => void;
-  onSend: (prompt: string, agentId?: string, opts?: SendOptions) => boolean | void | Promise<boolean | void>;
+  onSend: (prompt: string, agentId?: string, opts?: SendOptions) => boolean | undefined | Promise<boolean | undefined>;
   isStreaming?: boolean;
   isStarting?: boolean;
   onCancel?: () => void;
@@ -475,15 +495,8 @@ export default function PromptInput({
   const [model, setModel] = useState<string>('');
   const [selectedCatalogRoute, setSelectedCatalogRoute] = useState<SelectedCatalogRoute | null>(null);
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
-  const [workDir, setWorkDir] = useState('');
-  const [workDirDraft, setWorkDirDraft] = useState('');
-  const [recentWorkDirs, setRecentWorkDirs] = useState<WorkspaceEntry[]>([]);
-  const [workTargetOpen, setWorkTargetOpen] = useState(false);
-  const [slashOpen, setSlashOpen] = useState(false);
-  const [slashQuery, setSlashQuery] = useState('');
-  const [slashIndex, setSlashIndex] = useState(0);
-  const desktopRuntimeAvailable = isTauriRuntime();
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(getStoredPermissionMode);
+  const [workDir] = useState(getStoredWorkDir);
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const selectedAgentAlias = preferredProfileAlias(selectedAgent);
   const routeModel = model || selectedAgentAlias || undefined;
@@ -498,24 +511,10 @@ export default function PromptInput({
       resolveRunRequestOptions: s.resolveRunRequestOptions,
     })),
   );
-  const resolvedRoute = useMemo(
-    () => modelSettings.resolveRunRequestOptions({
-      model: routeModel,
-      reasoningEffort: reasoningEffort || undefined,
-    }),
-    [
-      model,
-      modelSettings.aliases,
-      modelSettings.defaultModel,
-      modelSettings.defaultProvider,
-      modelSettings.defaultReasoningEffort,
-      modelSettings.modelMappingEnabled,
-      modelSettings.providerFallbackEnabled,
-      modelSettings.resolveRunRequestOptions,
-      reasoningEffort,
-      routeModel,
-    ],
-  );
+  const resolvedRoute = modelSettings.resolveRunRequestOptions({
+    model: routeModel,
+    reasoningEffort: reasoningEffort || undefined,
+  });
 
   const { restore: restoreDraft, save: saveDraft, flush: flushDraft, clear: clearDraft } = useInputDraft(threadId);
 
@@ -649,57 +648,7 @@ export default function PromptInput({
 
   useEffect(() => {
     try {
-      const savedWorkDir = getSavedWorkDir();
-      setWorkDir(savedWorkDir);
-      setWorkDirDraft(savedWorkDir);
-      setRecentWorkDirs(readRecentWorkspaces());
-      const savedMode = window.localStorage.getItem('agenthub.prompt.permissionMode');
-      if (savedMode && PERMISSION_MODES.includes(savedMode as PermissionMode)) {
-        setPermissionMode(savedMode as PermissionMode);
-      }
-    } catch {
-      // localStorage can be unavailable in tests.
-    }
-  }, []);
-
-  useEffect(() => {
-    const handleWorkDirSelected = (event: Event) => {
-      const nextWorkDir = normalizeWorkDir((event as CustomEvent<{ workDir?: string }>).detail?.workDir);
-      if (!nextWorkDir) return;
-      applyWorkDir(nextWorkDir);
-    };
-    const handleSetComposerDraft = (event: Event) => {
-      const detail = (event as CustomEvent<{ text?: string }>).detail;
-      const nextText = detail?.text ?? '';
-      if (!nextText.trim()) return;
-      clearDraft();
-      setAttachments([]);
-      if (attachmentInputRef.current) attachmentInputRef.current.value = '';
-      closeMention();
-      closeSlash();
-      writeTextareaValue(nextText);
-      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      window.setTimeout(() => inputRef.current?.focus(), 120);
-    };
-    const handleFocusComposer = () => {
-      const input = inputRef.current;
-      if (!input) return;
-      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      window.setTimeout(() => input.focus(), 120);
-    };
-    window.addEventListener('agenthub:workdir-selected', handleWorkDirSelected);
-    window.addEventListener('agenthub:set-composer-draft', handleSetComposerDraft);
-    window.addEventListener('agenthub:focus-composer', handleFocusComposer);
-    return () => {
-      window.removeEventListener('agenthub:workdir-selected', handleWorkDirSelected);
-      window.removeEventListener('agenthub:set-composer-draft', handleSetComposerDraft);
-      window.removeEventListener('agenthub:focus-composer', handleFocusComposer);
-    };
-  }, [applyWorkDir, clearDraft, closeMention, closeSlash, writeTextareaValue]);
-
-  useEffect(() => {
-    try {
-      setSavedWorkDir(workDir);
+      window.localStorage.setItem('agenthub.prompt.workDir', workDir);
       window.localStorage.setItem('agenthub.prompt.permissionMode', permissionMode);
     } catch {
       // Ignore persistence failures; the controls still apply to the current run.
@@ -729,19 +678,8 @@ export default function PromptInput({
     if (!ta) return;
     restoreDraft(ta);
     setPromptLength(ta.value.length);
-  }, [threadId]);
-
-  // Use a single cleanup effect that captures the current threadId for flushDraft
-  const threadIdRef = useRef(threadId);
-  threadIdRef.current = threadId;
-  useEffect(() => {
-    return () => {
-      const ta = inputRef.current;
-      if (ta && ta.value) {
-        flushDraft(ta.value, threadIdRef.current);
-      }
-    };
-  }, [flushDraft]);
+    return () => { if (ta) flushDraft(ta.value, threadId); };
+  }, [flushDraft, restoreDraft, threadId]);
 
   useEffect(() => {
     const ta = inputRef.current;
@@ -764,7 +702,7 @@ export default function PromptInput({
     };
     ta.addEventListener('input', handleUpdate);
     return () => ta.removeEventListener('input', handleUpdate);
-  }, [closeMention, closeSlash, mentionHandleInput, saveDraft]);
+  }, [mentionHandleInput, saveDraft]);
 
   const handleSend = useCallback(async () => {
     const ta = inputRef.current;

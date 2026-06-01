@@ -823,12 +823,15 @@ func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDev
 	msg.SeqID = seq
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if err := repository.CreateAgentRunEventWithNextSeq(tx, runEvent); err != nil {
+		if err := repository.CreateAgentRunEventWithNextSeqLimited(tx, runEvent, config.MaxRunEventsPerTask); err != nil {
 			return err
 		}
 		return repository.InsertMessage(tx, msg)
 	})
 	if err != nil {
+		if errors.Is(err, repository.ErrRunEventLimitExceeded) {
+			return errcode.ErrBadRequest.WithMessage("agent callback event limit exceeded")
+		}
 		return err
 	}
 

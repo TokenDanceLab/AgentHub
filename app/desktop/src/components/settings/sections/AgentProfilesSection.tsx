@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Bot, Cpu } from 'lucide-react';
-import type { AgentInfo, RunnerHealthItem } from '@shared/types';
+import type { AgentInfo } from '@shared/types';
 import type { ResolvedRunModelSettings } from '@/stores/modelSettingsStore';
 import Panel from '../primitives/Panel';
 import SettingRow from '../primitives/SettingRow';
@@ -14,11 +14,10 @@ interface AgentProfilesSectionProps {
   agents: AgentInfo[];
   edgeOnline: boolean;
   runnerSummary: string;
-  runnerItems: RunnerHealthItem[];
   localAgentProfiles: Array<{ agent: AgentInfo; alias: string; route: ResolvedRunModelSettings }>;
 }
 
-export default function AgentProfilesSection({ agents, edgeOnline, runnerSummary, runnerItems, localAgentProfiles }: AgentProfilesSectionProps) {
+export default function AgentProfilesSection({ agents, edgeOnline, runnerSummary, localAgentProfiles }: AgentProfilesSectionProps) {
   const { t } = useTranslation();
   const availableRuntimes = agents.filter((agent) => agent.status === 'available').length;
   return (

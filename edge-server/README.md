@@ -60,22 +60,24 @@ Edge 是本地执行权威；Hub 是账号、云端 IM、多端同步、远程�
 
 ```powershell
 cd edge-server
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile agenthub-runner-mock
+```
+
+真实 Runtime preset：
+
+```powershell
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile codex
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile opencode
 ```
 
 指定默认 Runtime adapter：
 
 ```powershell
-go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --agent-default claude-code
+go run ./cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code --agent-default claude-code
 ```
 
-使用 Runtime preset：
-
-```powershell
-go run ./cmd/agenthub-edge --runner-profile claude-code
-go run ./cmd/agenthub-edge --runner-profile codex
-go run ./cmd/agenthub-edge --runner-profile opencode
-```
+`--runner-profile` 选择实际 executor/runtime command preset；`--agent-default` 只是在 run 未指定 agent 时选择默认 adapter ID，不会单独启动 CLI。
 
 常用配置：
 
