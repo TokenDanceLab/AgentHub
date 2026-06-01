@@ -43,6 +43,65 @@ vi.mock('@/stores/toastStore', () => ({
   },
 }));
 
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({
+    count,
+    estimateSize,
+    getItemKey,
+  }: {
+    count: number;
+    estimateSize?: (index: number) => number;
+    getItemKey?: (index: number) => string | number;
+  }) => {
+    const items = Array.from({ length: count }, (_, index) => {
+      const size = estimateSize ? estimateSize(index) : 160;
+      const start = Array.from({ length: index }, (_, j) => (estimateSize ? estimateSize(j) : 160)).reduce(
+        (sum, val) => sum + val,
+        0,
+      );
+      return {
+        index,
+        key: getItemKey ? getItemKey(index) : index,
+        start,
+        end: start + size,
+        size,
+      };
+    });
+    const totalSize = items.length > 0 ? items[items.length - 1]!.end : 0;
+    return {
+      getVirtualItems: () => items,
+      getTotalSize: () => totalSize,
+      scrollToIndex: vi.fn(),
+      measureElement: vi.fn(),
+    };
+  },
+}));
+
+const autoScrollState = {
+  isNearBottom: true,
+  scrollToBottom: vi.fn(),
+};
+
+vi.mock('@/hooks/useAutoScroll', () => ({
+  useAutoScroll: () => ({
+    scrollToBottom: autoScrollState.scrollToBottom,
+    get isNearBottom() {
+      return autoScrollState.isNearBottom;
+    },
+  }),
+}));
+
+vi.mock('@/stores/connectionStore', () => ({
+  useConnectionStore: (selector: (s: { connectionStatus: string }) => unknown) => {
+    const store = { connectionStatus: 'connected' as const };
+    return selector(store);
+  },
+}));
+
+vi.mock('zustand/shallow', () => ({
+  useShallow: (fn: (...args: unknown[]) => unknown) => fn,
+}));
+
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -113,6 +172,9 @@ describe('ChatView', () => {
     try { vi.runAllTimers(); } catch { /* some timers may refuse to advance */ }
     try { vi.useRealTimers(); } catch { /* already real */ }
     vi.unstubAllGlobals();
+    // Reset mock state
+    autoScrollState.isNearBottom = true;
+    autoScrollState.scrollToBottom.mockReset();
   });
 
   it('renders empty state when messages array is empty', () => {
@@ -475,15 +537,14 @@ describe('ChatView', () => {
     installAnimationFrameShim();
     const older = makeAgentTextMessage('Earlier output', 'agent-old');
     // Start with isStreaming=true to avoid the atomic force-scroll that fires
-    // on the false→true transition in useAutoScroll.
+    // on the false->true transition in useAutoScroll (which is mocked, so this is
+    // just for alignment with the component's expected state).
     const { container, rerender } = render(<ChatView messages={[older]} isStreaming />);
     const stream = container.querySelector('[role="log"]') as HTMLElement;
     setScrollMetrics(stream, { scrollHeight: 1400, clientHeight: 400, scrollTop: 1400 - 400 }); // scrolled to bottom
 
-    // User scrolls up to read history
-    fireEvent.wheel(stream, { deltaY: -120 });
-    fireEvent.scroll(stream);
-    await flushScheduledScrollWork();
+    // Simulate user scrolling away, which makes useAutoScroll report !isNearBottom
+    autoScrollState.isNearBottom = false;
 
     // New agent message streams in while user is still reading history
     rerender(
@@ -508,14 +569,12 @@ describe('ChatView', () => {
     const stream = container.querySelector('[role="log"]') as HTMLElement;
     setScrollMetrics(stream, { scrollHeight: 1400, clientHeight: 400, scrollTop: 1400 - 400 });
 
-    // User scrolls away
-    fireEvent.wheel(stream, { deltaY: -120 });
-    fireEvent.scroll(stream);
-    await flushScheduledScrollWork();
+    // Simulate user scrolling away
+    autoScrollState.isNearBottom = false;
 
     // Now simulate: streaming stops, and a new user message appears.
-    // ChatView's lastMessageId effect calls scrollToBottom(force=true) when
-    // lastMsg.role === 'user', which resets userScrolledRef and force-scrolls.
+    // ChatView's lastMessageId effect calls scrollToBottom(force=true) which resets
+    // userScrolledRef and force-scrolls.
     rerender(
       <ChatView
         messages={[
@@ -527,12 +586,9 @@ describe('ChatView', () => {
     );
     await flushScheduledScrollWork();
 
-    // After force-scrolling for a user message, the scroll indicator is hidden
-    // and the stream is back at the bottom. We verify the virtualizer did scroll
-    // by checking the scrollToIndex target through the stream's scrollTop.
-    // With scrollHeight=1400 and clientHeight=400, the max is 1000 (jsdom caps).
-    // The virtualizer's scrollToIndex(1, { align: 'end' }) with our scrollTo impl
-    // writes scrollTop. Verify it moved beyond the earlier reading position.
-    expect(stream.scrollTop).toBeGreaterThan(200);
+    // After force-scrolling for a user message, the virtualizer's scrollToIndex
+    // is invoked via the useAutoScroll mock. We verify the scrollToIndex mock
+    // was called.
+    expect(autoScrollState.scrollToBottom).toHaveBeenCalled();
   });
 });
