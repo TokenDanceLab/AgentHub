@@ -43,7 +43,7 @@ vi.mock('@agenthub/shared/ui', () => ({
           ? (primaryAction as Record<string, string>)?.busyLabel
           : (primaryAction as Record<string, string>)?.label}
       </button>
-      {secondaryAction && (
+      {(secondaryAction as Record<string, unknown> | null) && (
         <button
           data-testid="secondary-btn"
           onClick={() => (secondaryAction as Record<string, () => void>)?.onClick?.()}

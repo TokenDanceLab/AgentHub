@@ -1064,5 +1064,5 @@
 }
 
 .sendBtnActive:hover {
-  background: #ffffff;
+  background: var(--primary-foreground);
 }

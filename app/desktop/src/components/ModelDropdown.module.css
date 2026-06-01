@@ -82,8 +82,8 @@
 
 /* ── Body ─────────────────────────────────── */
 .itemBody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.itemName { font-size: 14px; font-weight: 560; color: #1F2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.itemActive .itemName { color: #111827; }
+.itemName { font-size: 14px; font-weight: 560; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.itemActive .itemName { color: var(--text-strong); }
 .itemDesc { font-size: 12px; font-weight: 400; color: var(--text-weaker); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; }
 
 /* ── Right side ───────────────────────────── */

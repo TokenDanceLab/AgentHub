@@ -35,6 +35,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import AppearanceSection from './settings/sections/AppearanceSection';
 import { useHubStore } from '@/stores/hubStore';
 import { APP_VERSION, HUB_URL } from '@/config';
 import {
@@ -361,7 +362,7 @@ function formatTargetEndpoint(target: ExecutionTarget) {
 
 export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'general', modelCatalog, modelDisplayNames }: Props) {
   const { t } = useTranslation();
-  const { themeMode, setThemeMode } = useTheme();
+  const { themeMode, setThemeMode, themePreset, setThemePreset } = useTheme();
   const hubAuth = useAuth();
   const hubInventoryEnabled = hubAuth.isAuthenticated && Boolean(hubAuth.token);
   const hubTargetsQuery = useHubExecutionTargets({
@@ -868,30 +869,14 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
           )}
 
           {active === 'appearance' && (
-            <>
-              <Panel title={t('settings.theme')} description={t('settings.themeDesc')}>
-                <div className={styles.segmented}>
-                  {(['dark', 'light', 'system'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      className={themeMode === mode ? styles.segmentActive : ''}
-                      onClick={() => setThemeMode(mode)}
-                    >
-                      {t(`settings.theme.${mode}`)}
-                    </button>
-                  ))}
-                </div>
-              </Panel>
-              <Panel title={t('settings.density')}>
-                <SettingRow
-                  title={t('settings.compactMode')}
-                  description={t('settings.compactModeDesc')}
-                  control={
-                    <Switch checked={compactMode} onChange={setBooleanSetting('compactMode', setCompactMode)} />
-                  }
-                />
-              </Panel>
-            </>
+            <AppearanceSection
+              themeMode={themeMode}
+              setThemeMode={setThemeMode}
+              compactMode={compactMode}
+              setCompactMode={setCompactMode}
+              themePreset={themePreset}
+              setThemePreset={setThemePreset}
+            />
           )}
 
           {active === 'configuration' && (

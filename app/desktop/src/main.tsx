@@ -9,6 +9,7 @@ import { LanguageProvider } from '@/contexts/LanguageContext';
 import '@/i18n';
 import '@/styles/tokens.css';
 import '@/styles/themes.css';
+import '@/styles/presets.css';
 
 function AppShell() {
   return <App />;
