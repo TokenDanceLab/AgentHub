@@ -90,6 +90,38 @@ describe('TeamRunDock', () => {
     expect(onOpenConsole).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the current Desktop bridge execution evidence in the chat dock', () => {
+    render(
+      <TeamRunDock
+        overview={makeOverview()}
+        signedIn
+        localExecutions={[
+          {
+            id: 'agent:task-a',
+            source: 'desktopBridge',
+            status: 'running',
+            title: 'Build compact dock.',
+            runtimeLabel: 'codex',
+            agentTaskId: 'task-a',
+            edgeRunId: 'edge-run-1',
+            hubTaskId: 'task-1',
+            latestEventType: 'run.step.delta',
+            eventCount: 3,
+          },
+        ]}
+      />,
+    );
+
+    const row = screen.getByTestId('teamrun-dock-local-execution');
+    expect(within(row).getByText('codex')).toBeInTheDocument();
+    expect(within(row).getByText('settings.agentTeamLocalSource')).toBeInTheDocument();
+    expect(within(row).getByText('settings.taskStatus.running(defaultValue=running)')).toBeInTheDocument();
+    expect(within(row).getByText('settings.agentTeamHubTask: task-a')).toBeInTheDocument();
+    expect(within(row).getByText('settings.agentTeamEdgeRun: edge-run-1')).toBeInTheDocument();
+    expect(within(row).getByText('run.step.delta')).toBeInTheDocument();
+    expect(within(row).getByText('settings.agentTeamLocalEvents(count=3)')).toBeInTheDocument();
+  });
+
   it('starts local orchestration only when a real local orchestrator is available', () => {
     const onStartLocalOrchestration = vi.fn();
     const localOrchestration: LocalOrchestrationStatus = {
