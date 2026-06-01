@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Shield, ShieldCheck, ShieldX, X, ChevronDown, ChevronUp } from 'lucide-react';
 import type { PermissionRequestItem } from '@/hooks/useChatMessages';
@@ -151,17 +151,9 @@ function PermissionItem({
 }) {
   const [showInput, setShowInput] = useState(false);
   const { t } = useTranslation();
-  const allowRef = useRef<HTMLButtonElement>(null);
 
   const isPending = !request.decision;
   const isAllowed = request.decision === 'allow';
-
-  // Auto-focus Allow button for the first pending item
-  useEffect(() => {
-    if (isPending) {
-      allowRef.current?.focus();
-    }
-  }, [isPending, request.requestId]);
 
   // 60s auto-deny timeout for pending requests
   useEffect(() => {
@@ -212,7 +204,6 @@ function PermissionItem({
       {isPending && (
         <div className={styles.itemActions}>
           <button
-            ref={allowRef}
             className={styles.allowBtn}
             onClick={handleAllow}
             aria-label={`Allow ${request.toolName} execution`}
