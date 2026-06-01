@@ -31,6 +31,7 @@
   "prompt.targetAuto": "Auto target",
   "prompt.targetOfflineQueue": "offline queue",
   "prompt.targetLocked": "locked",
+  "prompt.targetLabel": "{{name}} via {{status}}",
   "run.status.queued": "Queued",
   "run.status.running": "Running",
   "run.status.finished": "Finished",

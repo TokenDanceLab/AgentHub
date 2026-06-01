@@ -3,16 +3,21 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { HealthResponse } from '@shared/types';
+import type { TransportStatus } from '@/api/transport';
 
 interface ConnectionState {
   online: boolean;
   health: HealthResponse | null;
   isConnected: boolean;
+  /** Granular WebSocket transport status (connecting/reconnecting/connected/disconnected). */
+  connectionStatus: TransportStatus;
   error: string | null;
   /** WebSocket ping-pong round-trip latency in milliseconds (QW-3). */
   wsLatency: number | null;
   setOnline: (v: boolean, health?: HealthResponse | null) => void;
   setConnected: (v: boolean) => void;
+  /** Update granular WebSocket transport status. Derived `isConnected` is set automatically. */
+  setConnectionStatus: (s: TransportStatus) => void;
   setError: (e: string | null) => void;
   setWsLatency: (v: number | null) => void;
 }
@@ -22,11 +27,17 @@ export const useConnectionStore = create<ConnectionState>()(
     online: false,
     health: null,
     isConnected: false,
+    connectionStatus: 'disconnected',
     error: null,
     wsLatency: null,
 
     setOnline: (v, health) => set({ online: v, health: health ?? null }),
     setConnected: (v) => set({ isConnected: v }),
+    setConnectionStatus: (s) =>
+      set({
+        connectionStatus: s,
+        isConnected: s === 'connected',
+      }),
     setError: (e) => set({ error: e }),
     setWsLatency: (v) => set({ wsLatency: v }),
   })),

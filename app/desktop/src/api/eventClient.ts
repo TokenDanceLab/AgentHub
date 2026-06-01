@@ -13,7 +13,7 @@ import type { EventEnvelope } from '@shared/events';
 
 export type { EventEnvelope };
 export type EventHandler = (event: EventEnvelope) => void;
-export type StatusHandler = (connected: boolean) => void;
+export type StatusHandler = (status: TransportStatus) => void;
 
 const PING_INTERVAL_MS = 10_000;
 const PONG_TIMEOUT_MS = 5_000;
@@ -74,8 +74,8 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
   let latestLatencyMs: number | null = null;
   let pingSendTime = 0;
 
-  function notifyStatus(connected: boolean) {
-    for (const h of statusHandlers) h(connected);
+  function notifyStatus(status: TransportStatus) {
+    for (const h of statusHandlers) h(status);
   }
 
   function clearHeartbeat() {
@@ -145,13 +145,12 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
     if (unsubStatus) { unsubStatus(); unsubStatus = null; }
 
     unsubStatus = t.on('status', (status: TransportStatus) => {
-      const connected = status === 'connected';
-      if (connected) {
+      if (status === 'connected') {
         startHeartbeat();
       } else {
         clearHeartbeat();
       }
-      notifyStatus(connected);
+      notifyStatus(status);
     });
 
     unsubMessage = t.on('message', (data: unknown) => {
@@ -176,7 +175,7 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
       retryCount = 0;
       reconnectDelay = 1000;
       startHeartbeat();
-      notifyStatus(true);
+      notifyStatus('connected');
     };
 
     ws.onmessage = (event) => {
@@ -190,7 +189,7 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
 
     ws.onclose = () => {
       clearHeartbeat();
-      notifyStatus(false);
+      notifyStatus('disconnected');
       if (!closed) scheduleReconnect();
     };
 
@@ -203,7 +202,7 @@ export function createEventStream(cursorOrUrl?: string, opts?: EventStreamOption
     if (closed) return;
     if (retryCount >= MAX_RETRIES) {
       console.error('[EventStream] Max retries reached, giving up');
-      notifyStatus(false);
+      notifyStatus('disconnected');
       return;
     }
     retryCount++;
