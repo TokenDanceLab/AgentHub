@@ -4,6 +4,8 @@ import {
   Activity,
   AlertTriangle,
   Bot,
+  GitBranch,
+  LogIn,
   MessageSquareText,
   Plus,
   Route,
@@ -17,6 +19,8 @@ import type { AgentTeamOverview } from '@/api/agentTeamQueries';
 import { useRuns } from '@/api/runQueries';
 import { useThreads } from '@/api/threadQueries';
 import { useHealth } from '@/hooks/useHealth';
+import { useHubStore } from '@/stores/hubStore';
+import { useTaskBridgeStore } from '@/stores/taskBridgeStore';
 import { resolveLocalOrchestration } from '@/utils/localOrchestration';
 import type { AgentInfo, ThreadInfo } from '@shared/types';
 import styles from './HomeDashboard.module.css';
@@ -48,23 +52,6 @@ const QUICK_START_KEYS = [
 
 function isRunActive(status: string): boolean {
   return ['queued', 'running', 'streaming', 'waiting_for_input', 'waiting_approval'].includes(status);
-}
-
-function isTeamRunActive(status?: string): boolean {
-  if (!status) return false;
-  return [
-    'queued',
-    'planning',
-    'dispatching',
-    'running',
-    'waiting_for_approval',
-    'merging',
-  ].includes(status);
-}
-
-function isPendingTeamApproval(status?: string): boolean {
-  if (!status) return false;
-  return ['pending', 'requested', 'waiting', 'waiting_for_approval'].includes(status);
 }
 
 function isTeamRunActive(status?: string): boolean {

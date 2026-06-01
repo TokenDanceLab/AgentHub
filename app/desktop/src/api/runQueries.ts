@@ -7,6 +7,49 @@ import { startRun, cancelRun, fetchRuns } from './edgeClient';
 import { RunInfoSchema, safeParse, listResponseSchema } from './schemas';
 import type { RunInfo, ListResponse, StartRunRequest } from '@shared/types';
 
+type RunQuerySnapshot = Array<[readonly unknown[], ListResponse<RunInfo> | undefined]>;
+
+export function snapshotRunQueries(qc: QueryClient): RunQuerySnapshot {
+  return qc.getQueriesData<ListResponse<RunInfo>>({ queryKey: ['runs'] });
+}
+
+export function upsertRunInQueries(qc: QueryClient, run: RunInfo) {
+  qc.setQueriesData<ListResponse<RunInfo>>({ queryKey: ['runs'] }, (current) => {
+    if (!current) return { items: [run], page: { hasMore: false } };
+    const idx = current.items.findIndex((r) => r.runId === run.runId);
+    if (idx >= 0) {
+      const items = [...current.items];
+      items[idx] = run;
+      return { ...current, items };
+    }
+    return { ...current, items: [run, ...current.items] };
+  });
+}
+
+export function restoreRunsSnapshot(qc: QueryClient, snapshot: RunQuerySnapshot | undefined) {
+  if (!snapshot) return;
+  for (const [queryKey, value] of snapshot) {
+    qc.setQueryData(queryKey, value);
+  }
+}
+
+export function updateRunStatusInQueries(
+  qc: QueryClient,
+  runId: string,
+  status: string,
+  overrides?: Partial<RunInfo>,
+) {
+  qc.setQueriesData<ListResponse<RunInfo>>({ queryKey: ['runs'] }, (current) => {
+    if (!current) return current;
+    return {
+      ...current,
+      items: current.items.map((r) =>
+        r.runId === runId ? { ...r, status, ...overrides } : r,
+      ),
+    };
+  });
+}
+
 export function useRuns(projectId?: string, threadId?: string, options: { enabled?: boolean } = {}) {
   return useQuery<ListResponse<RunInfo>>({
     queryKey: ['runs', projectId, threadId],
