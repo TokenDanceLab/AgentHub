@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAgentList } from '@/api/agentQueries';
+import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import { useThreads } from '@/api/threadQueries';
 import { createHubClient, type AgentRunEvent } from '@/api/hubClient';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -120,9 +121,12 @@ export default function WebLayout() {
   const [optimisticRun, setOptimisticRun] = useState<WebRunInfo | null>(null);
   const [taskRunEvents, setTaskRunEvents] = useState<AgentRunEvent[]>([]);
   const [runStartPending, setRunStartPending] = useState(false);
+  const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
   const [mainSurface, setMainSurface] = useState<MainSurface>('workspace');
   const agents = agentData?.items ?? [];
   const threads = threadData?.items ?? [];
+  const executionTargetsQuery = useHubExecutionTargets({ enabled: hubAuthenticated });
+  const executionTargets = executionTargetsQuery.data?.items ?? [];
   const activeAgentId = selectedAgentId ?? agents[0]?.id;
   const selectedThread = (threads.find((thread) => thread.threadId === selectedThreadId) ?? null) as HubThreadInfo | null;
   const selectedAgent = agents.find((agent) => agent.id === activeAgentId);
@@ -196,8 +200,21 @@ export default function WebLayout() {
     [addToast, createWorkspaceThread, hubAuthenticated, selectAgentThread, selectedThread, setShowAuthModal, t, threads],
   );
 
+  useEffect(() => {
+    if (executionTargets.length === 0) {
+      if (selectedExecutionTargetId) setSelectedExecutionTargetId('');
+      return;
+    }
+    const current = executionTargets.find((target) => target.id === selectedExecutionTargetId);
+    if (current && (current.target_type === 'local_edge' || current.target_type === 'hub_relay')) return;
+    const preferred =
+      executionTargets.find((target) => (target.target_type === 'local_edge' || target.target_type === 'hub_relay') && target.is_online) ??
+      executionTargets.find((target) => target.target_type === 'local_edge' || target.target_type === 'hub_relay');
+    setSelectedExecutionTargetId(preferred?.id ?? '');
+  }, [executionTargets, selectedExecutionTargetId]);
+
   const handleSend = useCallback(
-    async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string }) => {
+    async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string; targetId?: string }) => {
       if (!prompt.trim() || runStartPending) return false;
       if (!hubAuthenticated || !getAccessToken()) {
         setShowAuthModal(true);
@@ -221,6 +238,7 @@ export default function WebLayout() {
       const triggerOptions = {
         agent_type: agentType,
         ...(modelParams ? { model_params: modelParams } : {}),
+        ...(opts?.targetId ? { target_id: opts.targetId } : {}),
       };
       setRunStartPending(true);
       appendOptimistic({
@@ -371,6 +389,8 @@ export default function WebLayout() {
       hubAuthenticated,
       isConnected: online,
       isStreaming: runStartPending || optimisticRun?.status === 'queued' || optimisticRun?.status === 'running',
+      executionTargets,
+      selectedTargetId: selectedExecutionTargetId,
       selectedAgentId: activeAgentId,
       selectedId: selectedThreadId ?? undefined,
       messages: hubMessages,
@@ -383,10 +403,11 @@ export default function WebLayout() {
       outputText,
       onSelectAgent: handleSelectAgent,
       onSelect: handleSelectThread,
+      onSelectTarget: setSelectedExecutionTargetId,
       onRetry: () => {
         const lastUserMessage = [...hubMessages].reverse().find((message) => message.role === 'user');
         const text = lastUserMessage?.blocks.find((block) => block.kind === 'text')?.content;
-        if (text) void handleSend(text, activeAgentId);
+        if (text) void handleSend(text, activeAgentId, selectedExecutionTargetId ? { targetId: selectedExecutionTargetId } : undefined);
       },
       onDelete: (messageId: string) => {
         removeMessage(messageId);
@@ -399,6 +420,7 @@ export default function WebLayout() {
     [
       activeAgentId,
       agents,
+      executionTargets,
       handleCancel,
       handleSelectAgent,
       handleSelectThread,
@@ -415,6 +437,7 @@ export default function WebLayout() {
       changedFiles,
       removeMessage,
       runStartPending,
+      selectedExecutionTargetId,
       selectedThreadId,
       threads.length,
       hubMessages,
