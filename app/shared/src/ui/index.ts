@@ -52,16 +52,7 @@ export { SurfaceHeader } from './SurfaceHeader';
 export type { SurfaceHeaderProps } from './SurfaceHeader';
 export { TriageCard } from './TriageCard';
 export type { TriageCardProps } from './TriageCard';
-export { default as Modal } from './Modal';
-export type { ModalProps } from './Modal';
-export { DiffReviewPanel } from './DiffReviewPanel';
-export type { DiffReviewFile, DiffReviewLabels, DiffReviewPanelProps } from './DiffReviewPanel';
 export { ToolTimeline } from './ToolTimeline';
 export type { ToolTimelineToolUse, ToolTimelineFileChange, ToolTimelineAgentTask, ToolTimelineChildAgent, ToolTimelineRouteDecision, ToolTimelineBlock, ToolTimelineLabels, ToolTimelineProps } from './ToolTimeline';
 export { PermissionModePicker } from './PermissionModePicker';
 export type { PermissionModePickerProps, PermissionModeOption } from './PermissionModePicker';
-// Internal (kept for reference — no platform consumption yet)
-// export { default as Modal } from './Modal';
-// export type { ModalProps } from './Modal';
-// export { DiffReviewPanel } from './DiffReviewPanel';
-// export type { DiffReviewFile, DiffReviewLabels, DiffReviewPanelProps } from './DiffReviewPanel';
