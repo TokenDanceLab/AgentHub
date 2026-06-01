@@ -69,6 +69,10 @@ func (h *CustomAgentHandler) List(c *gin.Context) {
 	userID := c.GetString("user_id")
 	agents, err := h.service.ListCustomAgents(c.Request.Context(), userID)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}

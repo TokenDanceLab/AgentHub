@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-const HUB_API_PREFIX: &str = "http://api.hub.example.invalid/";
+/// Hub API prefix — injected at compile time via the `HUB_API_PREFIX` env var.
+/// Falls back to an empty string, which allows all URLs (dev convenience).
+/// **Production builds MUST set this** (e.g. `HUB_API_PREFIX=https://api.hub.example.invalid/`)
+/// to restrict the native bridge to authorised endpoints only.
+const HUB_API_PREFIX: &str = option_env!("HUB_API_PREFIX").unwrap_or("");
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

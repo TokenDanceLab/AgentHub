@@ -84,6 +84,10 @@ func (h *SessionHandler) List(c *gin.Context) {
 	userID := c.GetString("user_id")
 	result, err := h.service.ListSessions(c.Request.Context(), userID)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}
@@ -266,6 +270,10 @@ func (h *SessionHandler) SearchSessions(c *gin.Context) {
 
 	result, err := h.service.SearchSessions(c.Request.Context(), userID, q)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}

@@ -21,7 +21,7 @@ import { parseError } from './errors';
 
 // ── Config ────────────────────────────────────
 
-let baseUrl = 'http://127.0.0.1:3210';
+let baseUrl = '';
 
 export function setBaseUrl(url: string) {
   baseUrl = url.replace(/\/+$/, '');
@@ -31,12 +31,19 @@ export function getBaseUrl() {
   return baseUrl;
 }
 
+export function isConfigured(): boolean {
+  return baseUrl !== '';
+}
+
 // ── Internal fetch wrapper ────────────────────
 
 async function request<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  if (!baseUrl) {
+    throw new Error('[AgentHub API] Base URL is not configured. Call setBaseUrl() before making API requests.');
+  }
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
@@ -57,6 +64,9 @@ async function request<T>(
 }
 
 async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
+  if (!baseUrl) {
+    throw new Error('[AgentHub API] Base URL is not configured. Call setBaseUrl() before making API requests.');
+  }
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {

@@ -44,6 +44,10 @@ func (h *MarketHandler) SearchMarketProfiles(c *gin.Context) {
 
 	result, err := h.svc.SearchMarket(c.Request.Context(), runtimeID, q, sortBy, cursor, pageSize)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}

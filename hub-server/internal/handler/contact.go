@@ -77,6 +77,10 @@ func (h *ContactHandler) ListFriendRequests(c *gin.Context) {
 	userID := c.GetString("user_id")
 	result, err := h.service.ListFriendRequests(c.Request.Context(), userID)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}
@@ -115,6 +119,10 @@ func (h *ContactHandler) ListContacts(c *gin.Context) {
 	userID := c.GetString("user_id")
 	result, err := h.service.ListContacts(c.Request.Context(), userID)
 	if err != nil {
+		if e, ok := err.(*errcode.Error); ok {
+			Fail(c, e)
+			return
+		}
 		Fail(c, errcode.ErrInternal)
 		return
 	}

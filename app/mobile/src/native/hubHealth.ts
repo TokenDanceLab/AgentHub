@@ -1,6 +1,6 @@
 import { isTauriRuntime, requestHubViaNative } from "./hubTransport";
 
-const HUB_HEALTH_URL = "http://api.hub.example.invalid/health";
+const HUB_HEALTH_URL = import.meta.env.VITE_HUB_HEALTH_URL || '/health';
 
 export interface MobileHubHealth {
   status: string;
