@@ -11,6 +11,12 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
+  webServer: {
+    command: 'cd ../web && pnpm exec vite preview --port 5175 --strictPort',
+    port: 5175,
+    timeout: 120_000,
+    reuseExistingServer: !process.env.CI,
+  },
   projects: [
     {
       name: 'chromium',
