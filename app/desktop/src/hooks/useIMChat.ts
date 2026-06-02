@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   createHubClient,
   type ContactInfo,
@@ -105,6 +106,7 @@ function makeClientMessageId(): string {
 function hubMessageToIMMessage(
   msg: HubMessage | MessageResponse,
   authority: AuthorityType = 'hub',
+  recalledLabel = '[Message recalled]',
 ): IMMessage {
   const record = msg as unknown as Record<string, unknown>;
   const message: IMMessageWithHubState = {
@@ -115,7 +117,7 @@ function hubMessageToIMMessage(
     senderName: msg.sender_id,
     senderType: msg.sender_type === 'agent' ? 'agent' : 'user',
     authority,
-    content: msg.recalled ? '[Message recalled]' : readTextContent(msg.content),
+    content: msg.recalled ? recalledLabel : readTextContent(msg.content),
     timestamp: msg.created_at ?? new Date().toISOString(),
     replyToId: msg.reply_to_message_id,
     recalled: msg.recalled,
@@ -126,7 +128,11 @@ function hubMessageToIMMessage(
   return message;
 }
 
-function sessionToContact(session: Session, contactsByUserId: Map<string, ContactInfo>): IMContact {
+function sessionToContact(
+  session: Session,
+  contactsByUserId: Map<string, ContactInfo>,
+  labels?: { groupChat?: string; directChat?: string },
+): IMContact {
   const sessionId = sessionIdOf(session);
   const memberUserIds = session.members
     ?.filter((member) => member.member_type === 'user')
@@ -135,7 +141,9 @@ function sessionToContact(session: Session, contactsByUserId: Map<string, Contac
     .map((id) => contactsByUserId.get(id))
     .find(Boolean);
   const lastMessage = session.last_message as Record<string, unknown> | undefined;
-  const fallbackName = session.type === 'group' ? 'Group chat' : 'Direct chat';
+  const fallbackName = session.type === 'group'
+    ? (labels?.groupChat ?? 'Group chat')
+    : (labels?.directChat ?? 'Direct chat');
 
   return {
     id: sessionId,
@@ -237,6 +245,12 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   const authenticated = useHubStore((s) => s.authenticated);
   const userId = useHubStore((s) => s.userId);
   const addToast = useToastStore((s) => s.addToast);
+  const { t } = useTranslation();
+  const hubLabels = useMemo(() => ({
+    groupChat: t('hub.label.groupChat'),
+    directChat: t('hub.label.directChat'),
+  }), [t]);
+  const recalledLabel = useMemo(() => t('im.message.recalledStatus'), [t]);
   const addDesktopNotification = useNotificationStore((s) => s.addNotification);
   const markDesktopNotificationRead = useNotificationStore((s) => s.markRead);
   const contactsByUserIdRef = useRef<Map<string, ContactInfo>>(new Map());
@@ -341,7 +355,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       setHubContacts(contactSnapshot);
       setFriendRequests(friendRequestSnapshot);
       setNotifications(notificationSnapshot as HubNotification[]);
-      setContacts(sessionSnapshot.map((session) => sessionToContact(session, contactsByUserId)));
+      setContacts(sessionSnapshot.map((session) => sessionToContact(session, contactsByUserId, hubLabels)));
       setStatus('ready');
     } catch (err) {
       setContacts([]);
@@ -350,7 +364,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       setNotifications([]);
       setStatus('error');
       setError('im.state.unavailable');
-      addToast({ type: 'error', message: 'Failed to load Hub sessions' });
+      addToast({ type: 'error', message: t('hub.toast.loadSessionsFailed') });
       console.error('Failed to load IM sessions:', err);
     }
   }, [addToast, authenticated, client]);
@@ -366,14 +380,14 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       if (!authenticated) return;
       try {
         const snapshot = await client.getMessages(sessionId, { limit: 50 });
-        const incoming = snapshot.map((msg) => hubMessageToIMMessage(msg));
+        const incoming = snapshot.map((msg) => hubMessageToIMMessage(msg, 'hub', recalledLabel));
         setMessages((prev) => {
           const next = new Map(prev);
           next.set(sessionId, mergeMessages(next.get(sessionId) ?? [], incoming));
           return next;
         });
       } catch (err) {
-        addToast({ type: 'error', message: 'Failed to load Hub messages' });
+        addToast({ type: 'error', message: t('hub.toast.loadMessagesFailed') });
         console.error('Failed to load IM messages:', err);
       }
     },
@@ -387,7 +401,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       const msg = rawPayload as HubMessage;
       if (!msg?.id || !msg?.session_id) return;
 
-      const imMsg = hubMessageToIMMessage(msg);
+      const imMsg = hubMessageToIMMessage(msg, 'hub', recalledLabel);
       setMessages((prev) => {
         const next = new Map(prev);
         next.set(msg.session_id, mergeMessages(next.get(msg.session_id) ?? [], [imMsg]));
@@ -406,7 +420,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
           sessionId,
           (next.get(sessionId) ?? []).map((message) =>
             message.id === messageId
-              ? { ...message, recalled: true, content: '[Message recalled]' }
+              ? { ...message, recalled: true, content: recalledLabel }
               : message,
           ),
         );
@@ -425,7 +439,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       const session = getPayloadSession(payload);
       if (session && sessionIdOf(session)) {
         upsertContact({
-          ...sessionToContact(session, contactsByUserIdRef.current),
+          ...sessionToContact(session, contactsByUserIdRef.current, hubLabels),
           statusHint: 'im.session.updated',
         });
       }
@@ -511,12 +525,12 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   const sendMessage = useCallback(
     async (sessionId: string, content: string, replyToId?: string): Promise<SendIMMessageResult> => {
       if (!authenticated) {
-        addToast({ type: 'error', message: 'Connect to Hub to send messages' });
+        addToast({ type: 'error', message: t('hub.toast.connectToSend') });
         return { ok: false };
       }
       const session = contacts.find((contact) => contact.id === sessionId);
       if (session?.dissolved) {
-        addToast({ type: 'error', message: 'This Hub session is no longer available' });
+        addToast({ type: 'error', message: t('hub.toast.sessionUnavailable') });
         return { ok: false };
       }
 
@@ -550,7 +564,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         });
         return { ok: true };
       } catch (err) {
-        addToast({ type: 'error', message: 'Failed to send Hub message' });
+        addToast({ type: 'error', message: t('hub.toast.sendMessageFailed') });
         console.error('Failed to send IM message:', err);
         return { ok: false };
       }
@@ -561,7 +575,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   const acceptFriendRequest = useCallback(
     async (requestId: string): Promise<HubIMActionResult> => {
       if (!authenticated) {
-        addToast({ type: 'error', message: 'Connect to Hub to accept contact requests' });
+        addToast({ type: 'error', message: t('hub.toast.connectToAccept') });
         return { ok: false, reason: 'unauthenticated' };
       }
       if (!actionCapabilities.friendRequests) {
@@ -576,13 +590,13 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         await client.acceptFriendRequest(requestId);
         clearAction(key);
         setFriendRequests((prev) => prev.filter((request) => request.request_id !== requestId));
-        addToast({ type: 'success', message: 'Friend request accepted' });
+        addToast({ type: 'success', message: t('hub.toast.friendRequestAccepted') });
         void refreshSessions();
         return { ok: true };
       } catch (err) {
-        const message = errorMessage(err);
+        const message = err instanceof Error ? err.message : t('hub.error.actionFailed');
         markActionError(key, message);
-        addToast({ type: 'error', message: 'Failed to accept friend request' });
+        addToast({ type: 'error', message: t('hub.toast.acceptFriendRequestFailed') });
         console.error('Failed to accept friend request:', err);
         return { ok: false, reason: 'failed', error: message };
       }
@@ -602,7 +616,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
   const rejectFriendRequest = useCallback(
     async (requestId: string): Promise<HubIMActionResult> => {
       if (!authenticated) {
-        addToast({ type: 'error', message: 'Connect to Hub to reject contact requests' });
+        addToast({ type: 'error', message: t('hub.toast.connectToReject') });
         return { ok: false, reason: 'unauthenticated' };
       }
       if (!actionCapabilities.friendRequests) {
@@ -617,12 +631,12 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         await client.rejectFriendRequest(requestId);
         clearAction(key);
         setFriendRequests((prev) => prev.filter((request) => request.request_id !== requestId));
-        addToast({ type: 'success', message: 'Friend request rejected' });
+        addToast({ type: 'success', message: t('hub.toast.friendRequestRejected') });
         return { ok: true };
       } catch (err) {
-        const message = errorMessage(err);
+        const message = err instanceof Error ? err.message : t('hub.error.actionFailed');
         markActionError(key, message);
-        addToast({ type: 'error', message: 'Failed to reject friend request' });
+        addToast({ type: 'error', message: t('hub.toast.rejectFriendRequestFailed') });
         console.error('Failed to reject friend request:', err);
         return { ok: false, reason: 'failed', error: message };
       }
@@ -663,9 +677,9 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         markDesktopNotificationRead(`hub:${notificationId}`);
         return { ok: true };
       } catch (err) {
-        const message = errorMessage(err);
+        const message = err instanceof Error ? err.message : t('hub.error.actionFailed');
         markActionError(key, message);
-        addToast({ type: 'error', message: 'Failed to mark notification read' });
+        addToast({ type: 'error', message: t('hub.toast.markNotificationReadFailed') });
         console.error('Failed to mark notification read:', err);
         return { ok: false, reason: 'failed', error: message };
       }
@@ -704,7 +718,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
     } catch (err) {
       const message = errorMessage(err);
       markActionError(key, message);
-      addToast({ type: 'error', message: 'Failed to mark all notifications read' });
+      addToast({ type: 'error', message: t('hub.toast.markAllNotificationsReadFailed') });
       console.error('Failed to mark all notifications read:', err);
       return { ok: false, reason: 'failed', error: message };
     }
@@ -762,9 +776,9 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         );
         return { ok: true };
       } catch (err) {
-        const message = errorMessage(err);
+        const message = err instanceof Error ? err.message : t('hub.error.actionFailed');
         markActionError(key, message);
-        addToast({ type: 'error', message: 'Failed to mark Hub session read' });
+        addToast({ type: 'error', message: t('hub.toast.markSessionReadFailed') });
         console.error('Failed to mark Hub session read:', err);
         return { ok: false, reason: 'failed', error: message };
       }
@@ -818,7 +832,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         });
         return { ok: true };
       } catch (err) {
-        const messageText = errorMessage(err);
+        const messageText = err instanceof Error ? err.message : t('hub.error.actionFailed');
         markActionError(key, messageText);
         setMessages((prev) => {
           const next = new Map(prev);
@@ -830,7 +844,7 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
           );
           return next;
         });
-        addToast({ type: 'error', message: 'Failed to recall Hub message' });
+        addToast({ type: 'error', message: t('hub.toast.recallMessageFailed') });
         console.error('Failed to recall IM message:', err);
         return { ok: false, reason: 'failed', error: messageText };
       }
@@ -867,9 +881,9 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         void refreshSessions();
         return { ok: true };
       } catch (err) {
-        const message = errorMessage(err);
+        const message = err instanceof Error ? err.message : t('hub.error.actionFailed');
         markActionError(key, message);
-        addToast({ type: 'error', message: 'Failed to forward message' });
+        addToast({ type: 'error', message: t('hub.toast.forwardMessageFailed') });
         console.error('Failed to forward message:', err);
         return { ok: false, reason: 'failed', error: message };
       }
@@ -922,12 +936,12 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
               : contact,
           ),
         );
-        addToast({ type: 'success', message: 'Session settings updated' });
+        addToast({ type: 'success', message: t('hub.toast.sessionSettingsUpdated') });
         return { ok: true };
       } catch (err) {
-        const message = errorMessage(err);
+        const message = err instanceof Error ? err.message : t('hub.error.actionFailed');
         markActionError(key, message);
-        addToast({ type: 'error', message: 'Failed to update session settings' });
+        addToast({ type: 'error', message: t('hub.toast.updateSessionSettingsFailed') });
         console.error('Failed to update session settings:', err);
         return { ok: false, reason: 'failed', error: message };
       }
@@ -964,9 +978,9 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         void refreshSessions();
         return { ok: true };
       } catch (err) {
-        const message = errorMessage(err);
+        const message = err instanceof Error ? err.message : t('hub.error.actionFailed');
         markActionError(key, message);
-        addToast({ type: 'error', message: 'Failed to add members' });
+        addToast({ type: 'error', message: t('hub.toast.addMembersFailed') });
         console.error('Failed to add session members:', err);
         return { ok: false, reason: 'failed', error: message };
       }
@@ -1000,13 +1014,13 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       try {
         await client.removeSessionMember(sessionId, userIdToRemove);
         clearAction(key);
-        addToast({ type: 'success', message: 'Member removed' });
+        addToast({ type: 'success', message: t('hub.toast.memberRemoved') });
         void refreshSessions();
         return { ok: true };
       } catch (err) {
-        const message = errorMessage(err);
+        const message = err instanceof Error ? err.message : t('hub.error.actionFailed');
         markActionError(key, message);
-        addToast({ type: 'error', message: 'Failed to remove member' });
+        addToast({ type: 'error', message: t('hub.toast.removeMemberFailed') });
         console.error('Failed to remove session member:', err);
         return { ok: false, reason: 'failed', error: message };
       }
@@ -1040,13 +1054,13 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       try {
         await client.transferSessionOwnership(sessionId, newOwnerId);
         clearAction(key);
-        addToast({ type: 'success', message: 'Session ownership transferred' });
+        addToast({ type: 'success', message: t('hub.toast.ownershipTransferred') });
         void refreshSessions();
         return { ok: true };
       } catch (err) {
-        const message = errorMessage(err);
+        const message = err instanceof Error ? err.message : t('hub.error.actionFailed');
         markActionError(key, message);
-        addToast({ type: 'error', message: 'Failed to transfer ownership' });
+        addToast({ type: 'error', message: t('hub.toast.transferOwnershipFailed') });
         console.error('Failed to transfer session ownership:', err);
         return { ok: false, reason: 'failed', error: message };
       }
@@ -1093,12 +1107,12 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
               : contact,
           ),
         );
-        addToast({ type: 'success', message: 'Session dissolved' });
+        addToast({ type: 'success', message: t('hub.toast.sessionDissolved') });
         return { ok: true };
       } catch (err) {
-        const message = errorMessage(err);
+        const message = err instanceof Error ? err.message : t('hub.error.actionFailed');
         markActionError(key, message);
-        addToast({ type: 'error', message: 'Failed to dissolve session' });
+        addToast({ type: 'error', message: t('hub.toast.dissolveSessionFailed') });
         console.error('Failed to dissolve session:', err);
         return { ok: false, reason: 'failed', error: message };
       }
@@ -1132,12 +1146,12 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         await client.leaveSession(sessionId);
         clearAction(key);
         removeContact(sessionId);
-        addToast({ type: 'success', message: 'Left session' });
+        addToast({ type: 'success', message: t('hub.toast.leftSession') });
         return { ok: true };
       } catch (err) {
-        const message = errorMessage(err);
+        const message = err instanceof Error ? err.message : t('hub.error.actionFailed');
         markActionError(key, message);
-        addToast({ type: 'error', message: 'Failed to leave session' });
+        addToast({ type: 'error', message: t('hub.toast.leaveSessionFailed') });
         console.error('Failed to leave session:', err);
         return { ok: false, reason: 'failed', error: message };
       }
@@ -1166,11 +1180,11 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
       try {
         await client.searchUser(trimmed);
         await client.sendFriendRequest(trimmed);
-        addToast({ type: 'success', message: 'Friend request sent' });
+        addToast({ type: 'success', message: t('hub.toast.friendRequestSent') });
         await refreshSessions();
         return { ok: true };
       } catch (err) {
-        addToast({ type: 'error', message: 'Failed to add Hub contact' });
+        addToast({ type: 'error', message: t('hub.toast.addContactFailed') });
         console.error('Failed to add Hub contact:', err);
         return { ok: false };
       }
@@ -1191,10 +1205,10 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         const session = await client.createPrivateSession({ target_user_id: trimmed });
         upsertContact(sessionToContact(session, contactsByUserIdRef.current));
         await refreshSessions();
-        addToast({ type: 'success', message: 'Direct chat created' });
+        addToast({ type: 'success', message: t('hub.toast.directChatCreated') });
         return { ok: true };
       } catch (err) {
-        addToast({ type: 'error', message: 'Failed to create Hub direct chat' });
+        addToast({ type: 'error', message: t('hub.toast.createDirectChatFailed') });
         console.error('Failed to create Hub direct chat:', err);
         return { ok: false };
       }
@@ -1221,10 +1235,10 @@ export function useIMChat({ hubClient, hubWS }: UseIMChatOptions = {}) {
         });
         upsertContact(sessionToContact(session, contactsByUserIdRef.current));
         await refreshSessions();
-        addToast({ type: 'success', message: 'Group chat created' });
+        addToast({ type: 'success', message: t('hub.toast.groupChatCreated') });
         return { ok: true };
       } catch (err) {
-        addToast({ type: 'error', message: 'Failed to create Hub group chat' });
+        addToast({ type: 'error', message: t('hub.toast.createGroupChatFailed') });
         console.error('Failed to create Hub group chat:', err);
         return { ok: false };
       }
