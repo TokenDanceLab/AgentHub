@@ -12,7 +12,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: 'cd ../web && pnpm exec vite preview --port 5175 --strictPort',
+    command: 'python3 -m http.server 5175 --directory ../web/dist',
     port: 5175,
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
