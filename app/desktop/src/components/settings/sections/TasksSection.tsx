@@ -57,7 +57,7 @@ export default function TasksSection({
         <SummaryCard
           icon={<Monitor size={18} />}
           label={t('settings.taskLastRun')}
-          value={latestRun ? t(`run.status.${latestRun.status}`, { defaultValue: latestRun.status }) : t('settings.noData')}
+          value={latestRun ? t(`run.status.${latestRun.status.toLowerCase()}`, { defaultValue: latestRun.status }) : t('settings.noData')}
           detail={latestRun ? formatTimestamp(latestRun.finishedAt ?? latestRun.startedAt ?? latestRun.createdAt) : t('settings.taskLastRunDesc')}
         />
         <SummaryCard
