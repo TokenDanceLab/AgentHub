@@ -9,8 +9,7 @@ export async function resolve(specifier, context, nextResolve) {
     return await nextResolve(specifier, context);
   } catch (e) {
     const parent = context.parentURL || '';
-    if (e.code === 'ERR_MODULE_NOT_FOUND' &&
-        (parent.includes('@lobehub/icons') || parent.includes('@lobehub/ui'))) {
+    if (parent.includes('@lobehub/icons') || parent.includes('@lobehub/ui')) {
       return {
         shortCircuit: true,
         format: 'module',
