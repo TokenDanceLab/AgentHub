@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -179,6 +180,42 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	// Result aggregator collects sub-agent output and routes it back to the parent orchestrator.
 	resultAgg := lifecycle.NewResultAggregator(bus, agentReg)
 	_ = resultAgg.Start() // stop function; goroutine exits on process shutdown
+
+	// Per-run event counter: tracks event counts per run and debugs at
+	// completion time. OFF by default (slog.Debug). Observers are NOT
+	// in the hot path — the bus fans out concurrently.
+	{
+		var mu sync.Mutex
+		type runEventTracker struct {
+			count int64
+			types map[string]int64
+		}
+		trackers := make(map[string]*runEventTracker)
+		bus.AddObserver(func(evt events.EventEnvelope) {
+			runID, _ := evt.Scope["runId"].(string)
+			if runID == "" {
+				return
+			}
+			mu.Lock()
+			t, ok := trackers[runID]
+			if !ok {
+				t = &runEventTracker{types: make(map[string]int64)}
+				trackers[runID] = t
+			}
+			t.count++
+			t.types[evt.Type]++
+			switch evt.Type {
+			case "run.finished", "run.failed", "run.cancelled":
+				typeStrs := make([]string, 0, len(t.types))
+				for k, v := range t.types {
+					typeStrs = append(typeStrs, fmt.Sprintf("%s=%d", k, v))
+				}
+				slog.Debug("ws.run.events", "runId", runID, "eventCount", t.count, "eventTypes", typeStrs)
+				delete(trackers, runID)
+			}
+			mu.Unlock()
+		})
+	}
 
 	if cfg.ProcessExecutor.Command != "" || hasAdapter {
 		execCfg := cfg.ProcessExecutor
