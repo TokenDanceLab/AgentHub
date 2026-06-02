@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -265,6 +266,7 @@ func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier, redi
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
+		slog.Error("oidc token endpoint unreachable", "error", err, "token_url", tokenURL)
 		return nil, fmt.Errorf("token endpoint request: %w", err)
 	}
 	defer resp.Body.Close()
@@ -275,6 +277,11 @@ func (s *OIDCService) exchangeCode(ctx context.Context, code, codeVerifier, redi
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		slog.Error("oidc token endpoint returned non-200",
+			"status", resp.StatusCode,
+			"response_body", string(body),
+			"redirect_uri_sent", redirectURI,
+		)
 		return nil, fmt.Errorf("token endpoint returned %d: %s", resp.StatusCode, string(body))
 	}
 
