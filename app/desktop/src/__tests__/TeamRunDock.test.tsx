@@ -141,6 +141,10 @@ describe('TeamRunDock', () => {
     );
 
     expect(screen.getByText('chat.teamRunHubSyncSignedOut')).toBeInTheDocument();
+    expect(screen.queryByText(/chat\.teamRunMembers/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/chat\.teamRunTasks/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/chat\.teamRunRoutes/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/chat\.teamRunArtifacts/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('teamrun-dock-local-orchestration'));
     expect(onStartLocalOrchestration).toHaveBeenCalledWith(
       'orchestrator',
