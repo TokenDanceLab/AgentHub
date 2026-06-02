@@ -1,0 +1,432 @@
+/* AgentTeams Section — team list + CRUD modals + member management */
+
+.teamList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.teamCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(0,0,0,0.05);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.5);
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.teamCard:hover {
+  background: rgba(255,255,255,0.78);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+[data-theme='dark'] .teamCard {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.06);
+}
+
+[data-theme='dark'] .teamCard:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.teamCardIcon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(99,102,241,0.08);
+  color: #6366F1;
+  flex-shrink: 0;
+}
+
+.teamCardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.teamCardBody strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teamCardBody span {
+  font-size: 11px;
+  color: #8E8E93;
+}
+
+.teamCardMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.teamCardBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 500;
+  background: rgba(0,0,0,0.04);
+  color: #6B7280;
+}
+
+[data-theme='dark'] .teamCardBadge {
+  background: rgba(255,255,255,0.06);
+  color: #9CA3AF;
+}
+
+.teamCardActions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.teamCardActionBtn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8E8E93;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.teamCardActionBtn:hover {
+  background: rgba(0,0,0,0.06);
+  color: var(--foreground);
+}
+
+[data-theme='dark'] .teamCardActionBtn:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.teamCardActionBtnDanger:hover {
+  background: rgba(239,68,68,0.1);
+  color: #EF4444;
+}
+
+/* ── Toolbar ────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+/* ── Modal overlay ──────────────────────────── */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0,0,0,0.22);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  width: 420px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: 0 16px 48px -8px rgba(0,0,0,0.14);
+  padding: 20px;
+}
+
+[data-theme='dark'] .modal {
+  background: rgba(36,36,44,0.96);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.modal h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.modalSubtitle {
+  display: block;
+  font-size: 12px;
+  color: #8E8E93;
+  margin-bottom: 16px;
+}
+
+/* ── Form ───────────────────────────────────── */
+
+.formGroup {
+  margin-bottom: 14px;
+}
+
+.formGroup label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--foreground);
+}
+
+.formGroup input,
+.formGroup textarea,
+.formGroup select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.02);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  color: var(--foreground);
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.formGroup input:focus,
+.formGroup textarea:focus,
+.formGroup select:focus {
+  border-color: #6366F1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.08);
+}
+
+[data-theme='dark'] .formGroup input,
+[data-theme='dark'] .formGroup textarea,
+[data-theme='dark'] .formGroup select {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.08);
+}
+
+.formGroup textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+/* ── Modal actions ──────────────────────────── */
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.btnPrimary {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #6366F1;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 560;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: #4F46E5;
+}
+
+.btnPrimary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btnSecondary {
+  padding: 8px 18px;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btnSecondary:hover:not(:disabled) {
+  background: rgba(0,0,0,0.04);
+}
+
+[data-theme='dark'] .btnSecondary {
+  border-color: rgba(255,255,255,0.1);
+}
+
+[data-theme='dark'] .btnSecondary:hover:not(:disabled) {
+  background: rgba(255,255,255,0.06);
+}
+
+.btnDanger {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #EF4444;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 560;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: #DC2626;
+}
+
+.btnDanger:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── Member list ────────────────────────────── */
+
+.memberList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.015);
+}
+
+[data-theme='dark'] .memberRow {
+  background: rgba(255,255,255,0.025);
+}
+
+.memberRowInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.memberRowInfo strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 580;
+}
+
+.memberRowInfo span {
+  font-size: 11px;
+  color: #8E8E93;
+}
+
+.memberRowRemoveBtn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8E8E93;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.memberRowRemoveBtn:hover {
+  background: rgba(239,68,68,0.08);
+  color: #EF4444;
+}
+
+/* ── Add member form ────────────────────────── */
+
+.addMemberForm {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: flex-end;
+}
+
+.addMemberForm .formGroup {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.addMemberForm select {
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+/* ── Confirm dialog ─────────────────────────── */
+
+.confirmText {
+  font-size: 13px;
+  color: var(--foreground);
+  margin-bottom: 20px;
+  line-height: 1.45;
+}
+
+/* ── Inline Add button ──────────────────────── */
+
+.inlineAddBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px dashed rgba(0,0,0,0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: #6366F1;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.inlineAddBtn:hover {
+  background: rgba(99,102,241,0.05);
+  border-color: #6366F1;
+}
+
+[data-theme='dark'] .inlineAddBtn {
+  border-color: rgba(255,255,255,0.1);
+}
+
+/* ── Section header with action ─────────────── */
+
+.sectionLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9CA3AF;
+  margin-top: 16px;
+  margin-bottom: 6px;
+}
+
+.sectionLabel:first-child {
+  margin-top: 0;
+}

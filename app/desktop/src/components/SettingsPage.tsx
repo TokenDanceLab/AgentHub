@@ -31,6 +31,7 @@ import {
   SlidersHorizontal,
   TerminalSquare,
   UserCircle,
+  Users,
   Wrench,
   XCircle,
 } from 'lucide-react';
@@ -66,6 +67,7 @@ import OnlineImSection from '@/components/settings/sections/OnlineImSection';
 import GroupChatSection from '@/components/settings/sections/GroupChatSection';
 import TasksSection from '@/components/settings/sections/TasksSection';
 import AgentMarketSection from '@/components/settings/sections/AgentMarketSection';
+import AgentTeamsSection from '@/components/settings/sections/AgentTeamsSection';
 import McpSection from '@/components/settings/sections/McpSection';
 import ModelsSection from '@/components/settings/sections/ModelsSection';
 import ModelMappingSection from '@/components/settings/sections/ModelMappingSection';
@@ -89,6 +91,7 @@ export type SectionId =
   | 'groupChat'
   | 'agentScheduling'
   | 'agentMarket'
+  | 'agentTeams'
   | 'keyboard'
   | 'mcp'
   | 'skills'
@@ -504,6 +507,7 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
       { id: 'groupChat', label: t('settings.groupChat'), icon: <MessageSquareText size={17} />, group: 'workspace' },
       { id: 'agentScheduling', label: t('settings.agentScheduling'), icon: <Route size={17} />, group: 'workspace' },
       { id: 'agentMarket', label: t('settings.agentMarket'), icon: <Bot size={17} />, group: 'workspace' },
+      { id: 'agentTeams', label: t('settings.agentTeams'), icon: <Users size={17} />, group: 'workspace' },
       { id: 'keyboard', label: t('settings.keyboard'), icon: <Keyboard size={17} />, group: 'workspace' },
       { id: 'mcp', label: t('settings.mcp'), icon: <Plug size={17} />, group: 'automation' },
       { id: 'skills', label: t('settings.skills'), icon: <Code2 size={17} />, group: 'automation' },
@@ -1130,6 +1134,13 @@ export default function SettingsPage({ onBack, onOpenAuth, initialSection = 'gen
               refetch={() => {
                 void customAgentsQuery.refetch();
               }}
+              onOpenAuth={onOpenAuth}
+            />
+          )}
+
+          {active === 'agentTeams' && (
+            <AgentTeamsSection
+              hubSessionActive={hubSessionActive}
               onOpenAuth={onOpenAuth}
             />
           )}
