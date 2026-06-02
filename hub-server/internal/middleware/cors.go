@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/url"
 	"os"
@@ -20,7 +20,8 @@ func CORS() gin.HandlerFunc {
 	}
 	origins := splitAndTrim(raw)
 	if err := validateCORSOriginsForEnvironment(corsEnvironment(), origins); err != nil {
-		log.Fatalf("CORS: %v", err)
+		slog.Error("invalid CORS configuration", "err", err)
+		os.Exit(1)
 	}
 	return cors.New(cors.Config{
 		AllowOrigins:     origins,
