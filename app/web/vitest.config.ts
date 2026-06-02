@@ -14,5 +14,13 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     exclude: ['src/**/*.e2e.test.ts', 'src/**/*.e2e.test.tsx', 'e2e/**'],
     setupFiles: [],
+    deps: {
+      optimizer: {
+        web: {
+          enabled: true,
+          include: ['emoji-mart', '@emoji-mart/data', '@emoji-mart/react'],
+        },
+      },
+    },
   },
 });
