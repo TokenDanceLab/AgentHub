@@ -57,6 +57,8 @@
   "thread.status.waitingApproval": "Needs approval",
   "thread.status.failed": "Failed",
   "chat.empty": "Select a thread and send a message to start",
+  "chat.edgeNotConnected": "Edge not connected",
+  "chat.edgeNotConnectedHint": "Connect to your local Edge Server first, or open Settings to configure the connection.",
   "chat.emptyTitle": "What can I help you build today?",
   "chat.emptyDescription": "Select an agent above and send a message to start collaborating with AI agents",
   "chat.emptyAction": "Try an example",

@@ -149,7 +149,12 @@ function startCallbackServer(): Promise<{ port: number; result: Promise<Callback
   // ---- Tauri path: Rust HTTP callback server ----
   return import('@tauri-apps/api/core')
     .then(({ invoke }) => invoke<number>('start_oidc_callback_server'))
-    .then((port) => {
+    .then(async (port) => {
+      // Import modules up front so listeners are registered before we return.
+      const [{ listen }] = await Promise.all([
+        import('@tauri-apps/api/event'),
+      ]);
+
       const result = new Promise<CallbackResult>((resolve, reject) => {
         let settled = false;
 
@@ -165,51 +170,42 @@ function startCallbackServer(): Promise<{ port: number; result: Promise<Callback
         let unlistenError: () => void = () => {};
 
         // Listen for successful callback
-        import('@tauri-apps/api/event')
-          .then(({ listen }) => {
-            const p1 = listen<{ code: string; state: string }>('oidc-callback', (event) => {
-              if (settled) return;
-              settled = true;
-              clearTimeout(timeout);
-              unlistenError();
-              resolve({ code: event.payload.code, state: event.payload.state });
-            });
+        listen<{ code: string; state: string }>('oidc-callback', (event) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          unlistenError();
+          resolve({ code: event.payload.code, state: event.payload.state });
+        }).then((u) => {
+          if (settled) {
+            u();
+            return;
+          }
+          unlisten = u;
+        });
 
-            const p2 = listen<{ error: string; description?: string }>(
-              'oidc-callback-error',
-              (event) => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timeout);
-                unlisten();
-                reject(
-                  new OidcError(
-                    'callbackError',
-                    `OIDC error: ${event.payload.error}${event.payload.description ? ` — ${event.payload.description}` : ''}`,
-                    `${event.payload.error}${event.payload.description ? ` — ${event.payload.description}` : ''}`,
-                  ),
-                );
-              },
+        listen<{ error: string; description?: string }>(
+          'oidc-callback-error',
+          (event) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            unlisten();
+            reject(
+              new OidcError(
+                'callbackError',
+                `OIDC error: ${event.payload.error}${event.payload.description ? ` — ${event.payload.description}` : ''}`,
+                `${event.payload.error}${event.payload.description ? ` — ${event.payload.description}` : ''}`,
+              ),
             );
-
-            return Promise.all([p1, p2]);
-          })
-          .then(([u1, u2]) => {
-            if (settled) {
-              u1();
-              u2();
-              return;
-            }
-            unlisten = u1;
-            unlistenError = u2;
-          })
-          .catch((err) => {
-            if (!settled) {
-              settled = true;
-              clearTimeout(timeout);
-              reject(new OidcError('listenFailed', `Failed to listen for OIDC callback: ${err}`, String(err)));
-            }
-          });
+          },
+        ).then((u) => {
+          if (settled) {
+            u();
+            return;
+          }
+          unlistenError = u;
+        });
       });
 
       return { port, result };
