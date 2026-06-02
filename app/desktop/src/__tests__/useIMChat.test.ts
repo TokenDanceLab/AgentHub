@@ -302,7 +302,7 @@ describe('useIMChat', () => {
     });
 
     expect(result.current.getSessionMessages('sess-1')).toHaveLength(0);
-    expect(addToast).toHaveBeenCalledWith({ type: 'error', message: 'Failed to send Hub message' });
+    expect(addToast).toHaveBeenCalledWith({ type: 'error', message: 'hub.toast.sendMessageFailed' });
   });
 
   it('deduplicates message.new against a REST-confirmed client message', async () => {
@@ -387,7 +387,7 @@ describe('useIMChat', () => {
 
     expect(result.current.getSessionMessages('sess-1')[0]).toMatchObject({
       recalled: true,
-      content: '[Message recalled]',
+      content: 'im.message.recalledStatus',
     });
     expect(result.current.contacts[0]).toMatchObject({
       statusHint: 'im.session.messageRecalled',
