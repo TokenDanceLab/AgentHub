@@ -9,7 +9,7 @@ export async function resolve(specifier, context, nextResolve) {
     return await nextResolve(specifier, context);
   } catch (e) {
     const parent = context.parentURL || '';
-    if (parent.includes('@lobehub/icons') || parent.includes('@lobehub/ui')) {
+    if (parent.includes('/node_modules/')) {
       return {
         shortCircuit: true,
         format: 'module',
