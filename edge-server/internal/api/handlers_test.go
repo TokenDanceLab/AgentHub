@@ -24,6 +24,7 @@ func newTestHandler() *Handler {
 		Bus:      events.NewBus(1000),
 		Registry: runners.NewRegistry(),
 		Store:    store.New(),
+		Executor: lifecycle.NewMockExecutor(events.NewBus(1000), store.New()),
 	}
 }
 
