@@ -445,6 +445,7 @@
 
 [data-theme='dark'] .sidebarFooter {
   border-top-color: rgba(255,255,255,0.06);
+  background: rgba(31, 31, 39, 0.9);
 }
 
 .navIconBtn {
@@ -464,6 +465,10 @@
 .navIconBtn:hover {
   background: rgba(0,0,0,0.05);
   color: var(--foreground);
+}
+
+[data-theme='dark'] .navIconBtn:hover {
+  background: rgba(255,255,255,0.065);
 }
 
 /* ═══════════════════════════════════════════════
