@@ -721,6 +721,17 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Resolve adapter label for debug logging.
+	resolvedAdapterID := req.AgentID
+	if resolvedAdapterID == "" {
+		if h.AdapterRegistry != nil {
+			resolvedAdapterID = "default"
+		} else {
+			resolvedAdapterID = "none"
+		}
+	}
+	slog.Debug("run.create", "agentId", req.AgentID, "threadId", req.ThreadID, "model", req.Model, "adapterResolved", resolvedAdapterID, "hasExecutor", h.Executor != nil)
+
 	runID := genID("run_")
 	run, err := repository.CreateRun(runID, req.ProjectID, req.ThreadID)
 	h.runCreateMu.Unlock()
@@ -740,6 +751,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 
 	// Emit run.queued
 	h.Bus.Publish("run.queued", scope, run)
+	slog.Debug("run.queued", "runId", runID, "agentId", req.AgentID)
 	if strings.TrimSpace(req.Prompt) != "" {
 		if item, err := ensureStore(h).CreateItem(store.Item{
 			ID:        genID("item_"),

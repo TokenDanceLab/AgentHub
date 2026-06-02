@@ -462,6 +462,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		e.stdins[run.ID] = stdin
 		e.mu.Unlock()
 	}
+	slog.Debug("executor.subprocess.starting", "runId", run.ID, "command", cmdPath, "args", args)
 	if err := cmd.Start(); err != nil {
 		if ctx.Err() != nil {
 			e.publishCancelled(run)
@@ -478,6 +479,8 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 		e.publishCancelled(run)
 		return
 	}
+
+	slog.Debug("executor.subprocess.started", "runId", run.ID, "pid", cmd.Process.Pid)
 
 	// Track process for graceful shutdown signals (SIGTERM on Unix).
 	e.mu.Lock()
@@ -542,6 +545,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	}
 
 	waitErr := cmd.Wait()
+	slog.Debug("executor.subprocess.exited", "runId", run.ID, "exitCode", ExitCodeFromErr(waitErr))
 	wg.Wait()
 
 	// Context budget compaction check: after the stream completes, evaluate
@@ -677,6 +681,7 @@ func (e *ProcessExecutor) envForRun(run store.Run, profileEnv, extraEnv []string
 }
 
 func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
+	slog.Debug("executor.run.failed", "runId", run.ID, "err", err)
 	failed, ok := e.store.SetRunStatusIf(run.ID, "failed", "queued", "started")
 	if ok {
 		exitCode := ExitCodeFromErr(err)

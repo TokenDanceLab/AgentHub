@@ -358,6 +358,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await computeCodeChallenge(codeVerifier);
       const deviceId = getOrCreateDeviceId();
+      console.debug('[oidc] PKCE generated, code_verifier length:', codeVerifier.length);
 
       // 2. Start local callback server (Tauri) or prepare manual fallback.
       //    In Tauri, the Rust backend starts an HTTP server on a random port
@@ -368,6 +369,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
 
       if (isTauri()) {
         const { port, result } = await startCallbackServer();
+        console.debug('[oidc] Callback server on port:', port);
         redirectUri = buildRedirectUri(port);
         callbackResult = result;
       } else {
@@ -415,6 +417,7 @@ export function createHubAuth(client?: HubClient): HubAuth {
       }
 
       const { state: serverState, authorization_url: authUrl } = authorizeResp;
+      console.debug('[oidc] Hub returned authorization URL, state:', serverState.substring(0, 8) + '...');
 
       // code_verifier stays in closure — never written to sessionStorage/localStorage
       pendingOidcState = serverState;
@@ -434,8 +437,11 @@ export function createHubAuth(client?: HubClient): HubAuth {
         }
       }
 
+      console.debug('[oidc] Browser opened for auth URL');
+
       // 5. Wait for the callback from the local HTTP server (Tauri) or manual paste
       const callback = await callbackResult;
+      console.debug('[oidc] Callback received, state match:', callback.state === serverState);
 
       // 6. Validate state matches (CSRF protection)
       if (callback.state !== serverState) {
@@ -444,8 +450,10 @@ export function createHubAuth(client?: HubClient): HubAuth {
 
       // 7. Exchange the code for Hub tokens
       let tokenResp: HubTokenResponse;
+      console.debug('[oidc] Exchanging code for tokens, redirect_uri:', redirectUri);
       try {
         tokenResp = await exchangeCodeForToken(callback.code, callback.state, codeVerifier, redirectUri, deviceId);
+        console.debug('[oidc] Token exchange complete, username:', tokenResp.user?.username);
       } catch (err) {
         const detail = err instanceof Error ? err.message : 'Unknown error';
         const oidcErr = new OidcError('tokenExchangeFailed', `Token exchange failed: ${detail}`, detail);
