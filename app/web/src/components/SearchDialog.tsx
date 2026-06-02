@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, User, Bot } from 'lucide-react';
+import { EmptyState, SelectableRow } from '@shared/ui';
 import { useSearchStore } from '@/stores/searchStore';
 import { useShallow } from 'zustand/shallow';
 import type { ChatMessage } from '@/components/ChatView.types';
@@ -42,6 +44,7 @@ interface ResultItem extends ChatMessage {
 // ── Component ────────────────────────────────
 
 export default function SearchDialog({ messages, onSelect }: Props) {
+  const { t } = useTranslation();
   const { open, query, selectedIndex, closeDialog, setQuery, setSelectedIndex } =
     useSearchStore(
       useShallow((s) => ({
@@ -117,7 +120,7 @@ export default function SearchDialog({ messages, onSelect }: Props) {
             className={styles.input}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search messages..."
+            placeholder={t('search.placeholder')}
             autoFocus
           />
           <kbd className={styles.kbd}>ESC</kbd>
@@ -125,30 +128,40 @@ export default function SearchDialog({ messages, onSelect }: Props) {
         {results.length > 0 && (
           <div className={styles.results}>
             {results.map((msg, i) => (
-              <div
+              <SelectableRow
                 key={msg.id}
-                className={`${styles.item} ${i === selectedIndex ? styles.selected : ''}`}
-                onClick={() => {
+                className={styles.item}
+                buttonClassName={styles.itemButton}
+                selectedClassName={styles.selected}
+                iconClassName={styles.itemIcon}
+                bodyClassName={styles.itemContent}
+                titleClassName={styles.itemTitle}
+                metaClassName={styles.itemSnippet}
+                actionsClassName={styles.timestamp}
+                selected={i === selectedIndex}
+                ariaLabel={t('search.resultAria', {
+                  role: msg.role === 'user' ? t('search.user') : t('search.agent'),
+                  snippet: msg._snippet,
+                })}
+                onSelect={() => {
                   closeDialog();
                   onSelect(msg.id);
                 }}
-              >
-                <span className={styles.itemIcon}>
-                  {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
-                </span>
-                <div className={styles.itemContent}>
-                  <span className={styles.itemTitle}>
-                    {msg.role === 'user' ? 'User' : 'Agent'}
-                  </span>
-                  <span className={styles.itemSnippet}>{msg._snippet}</span>
-                </div>
-                <span className={styles.timestamp}>{formatTime(msg.timestamp)}</span>
-              </div>
+                icon={msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
+                title={msg.role === 'user' ? t('search.user') : t('search.agent')}
+                meta={msg._snippet}
+                actions={<span>{formatTime(msg.timestamp)}</span>}
+              />
             ))}
           </div>
         )}
         {query && results.length === 0 && (
-          <div className={styles.empty}>No messages found</div>
+          <EmptyState
+            className={styles.empty ?? ''}
+            icon={<Search size={22} />}
+            title={t('search.emptyTitle')}
+            description={t('search.emptyDescription')}
+          />
         )}
       </div>
     </div>

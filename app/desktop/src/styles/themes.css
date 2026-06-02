@@ -7,7 +7,7 @@
 
 /* ── Dark Theme : Codex-style Linear Glass ───────────────────────────────
    Source target: codex-theme-v1 / linear / dark
-   accent #5d68cc, surface #25252d, ink #e3e4e6.
+   accent #5d68cc, surface #25252d, ink #d7d9e1.
    Purple is not the default atmosphere; reserve it for explicit semantic
    states such as skills or local product accents.
    ───────────────────────────────────────────────────────────────────── */
@@ -15,29 +15,29 @@
   /* Base layer — deep charcoal, not pure black */
   --app-bg: #1f1f27;
   --background: #1f1f27;
-  --foreground: #e3e4e6;
+  --foreground: #d7d9e1;
 
   /* Cards — Codex-style translucent glass over the dark workspace */
   --card: #25252d;
-  --card-foreground: #e3e4e6;
+  --card-foreground: #d7d9e1;
   --popover: #30303a;
-  --popover-foreground: #e3e4e6;
+  --popover-foreground: #d7d9e1;
 
   /* Primary — linear Codex blue, not the old purple atmosphere */
   --primary: #5d68cc;
   --primary-foreground: #f4f5ff;
   --secondary: rgba(255, 255, 255, 0.055);
-  --secondary-foreground: #e3e4e6;
-  --muted: rgba(255, 255, 255, 0.045);
-  --muted-foreground: #a0a1aa;
+  --secondary-foreground: #d7d9e1;
+  --muted: rgba(255, 255, 255, 0.042);
+  --muted-foreground: #a2a6b1;
   --accent: #5d68cc;
   --accent-foreground: #f4f5ff;
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
 
   /* Borders — faint white glow for glass edge */
-  --border: rgba(255, 255, 255, 0.075);
-  --input: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.058);
+  --input: rgba(255, 255, 255, 0.052);
   --ring: rgba(93, 104, 204, 0.42);
 
   /* Status */
@@ -50,7 +50,7 @@
 
   --color-success: #69c967;
   --color-danger: #EF4444;
-  --color-border: rgba(255, 255, 255, 0.06);
+  --color-border: rgba(255, 255, 255, 0.05);
 
   --brand: #5d68cc;
   --skill: #c2a1ff;
@@ -81,13 +81,15 @@
   --sidebar-bg: #1f1f27;
 
   --surface-base: #1f1f27;
-  --surface-raised: #25252d;
-  --surface-raised-hover: #333340;
+  --surface-raised: #24242c;
+  --surface-raised-hover: #2d2d36;
   --surface-overlay: #3c3c48;
   --hover-overlay: rgba(255, 255, 255, 0.04);
 
-  --text-weaker: #a0a1aa;
-  --text-weakest: #6e7079;
+  --text-strong: #f0f2f7;
+  --text-primary: #d7d9e1;
+  --text-weaker: #858a96;
+  --text-weakest: #656a75;
 
   /* TokenDance cross-app aliases */
   --td-canvas: var(--app-bg);
@@ -112,10 +114,10 @@
 
   /* ── Floating input panel ───────────────────── */
   --input-panel-bg: #25252d;
-  --input-panel-border: rgba(255, 255, 255, 0.09);
-  --input-panel-shadow: 0 -10px 34px rgba(0, 0, 0, 0.24);
-  --input-ghost-btn: rgba(255, 255, 255, 0.045);
-  --input-ghost-btn-hover: rgba(255, 255, 255, 0.075);
+  --input-panel-border: rgba(0, 0, 0, 0.11);
+  --input-panel-shadow: 0 -10px 30px rgba(0, 0, 0, 0.14);
+  --input-ghost-btn: rgba(255, 255, 255, 0.042);
+  --input-ghost-btn-hover: rgba(255, 255, 255, 0.062);
 
   --agent-card-bg: transparent;
   --agent-card-hover: rgba(255, 255, 255, 0.03);
@@ -191,6 +193,8 @@
 
   --hover-overlay: rgba(0, 0, 0, 0.04);
 
+  --text-strong: #111827;
+  --text-primary: #1F2937;
   --text-weaker: #8E8E93;
   --text-weakest: #B0B0B5;
 

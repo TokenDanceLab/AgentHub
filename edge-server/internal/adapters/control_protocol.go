@@ -121,6 +121,10 @@ func (h *DefaultPermissionHandler) HandleControlRequest(ctx context.Context, std
 }
 
 func (h *DefaultPermissionHandler) handleCanUseTool(ctx context.Context, stdin io.Writer, requestID string, inner *ControlRequestInner) error {
+	// Compute base risk level for the event payload (no blocked-pattern scan here —
+	// the SecurityHook pierces on PreToolUse before we reach this handler).
+	riskLevel := ClassifyToolRisk(inner.ToolName)
+
 	// Emit permission_requested so Desktop can display approval UI
 	if h.emitter != nil {
 		h.emitter.Emit("run.agent.permission_requested", nil, map[string]any{
@@ -128,6 +132,7 @@ func (h *DefaultPermissionHandler) handleCanUseTool(ctx context.Context, stdin i
 			"toolName":  inner.ToolName,
 			"toolUseId": inner.ToolUseID,
 			"input":     inner.Input,
+			"riskLevel": string(riskLevel),
 		})
 	}
 

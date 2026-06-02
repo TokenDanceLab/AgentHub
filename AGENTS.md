@@ -114,7 +114,7 @@ Rust/Tauri 隔离规则：
 - AgentHub Home 的 `https://hub.vectorcontrol.tech/api/auth/callback` 是产品官网静态站 OIDC callback，不是 Hub API 登录 callback。
 - 现有 TokenDance ID bearer-token middleware 只是兼容路径；最终浏览器/桌面登录必须由 Hub Server 兑换 code 并签发 Hub 本地 session。
 
-当前协作提醒（2026-05-25）：Hub Agent 和 Client Agent 正在做登录链路时，只接 TokenDance ID 这一层。不要在 Hub、Desktop、Web 中新增 GitHub/Google/飞书按钮、provider callback、provider token storage 或 provider account table；这些需求全部回到 `tokendance-id` 的 provider registry / `oauth_bindings`。
+当前协作提醒（2026-06-02）：Hub Agent 和 Client Agent 正在做登录链路时，只接 TokenDance ID 这一层。不要在 Hub、Desktop、Web 中新增 GitHub/Google/飞书按钮、provider callback、provider token storage 或 provider account table；这些需求全部回到 `tokendance-id` 的 provider registry / `oauth_bindings`。
 
 ### AgentHub 授权边界
 
@@ -162,6 +162,23 @@ AgentHub 后续调用模型 API 网关时，产品名写 TokenDance Gateway / �
 - subagent 提示必须包含：目标、允许修改的路径、必须阅读的文档、必须运行的检查、隐私红线。
 - subagent 不自行扩大范围；发现范围不够，停下交回主 Agent。
 
+### subagent 质量红线
+
+以下情况视为交付不合格，主 Agent 必须退回重做：
+
+1. **冲突标记未清理**：提交包含 `<<<<<<<`、`=======`、`>>>>>>>` 等未解决的合并冲突标记。
+2. **CI 降级规避**：不得通过降低覆盖率阈值、放宽 lint 规则、跳过检查步骤来让 CI 变绿。
+3. **不完整功能**：提交标记为 `feat` 但实际只有脚手架或占位符。不完整功能用 `wip:` 前缀或留在本地分支。
+4. **未验证的提交**：提交前未运行对应模块的测试和 typecheck。前端至少跑 `pnpm typecheck && pnpm test`，后端至少跑 `go test ./... -short -count=1`。
+5. **大规模无关联改动**：一个 PR 包含不相关的文件变更（如同时改 desktop UI 和 CI workflow 且不在 PR 描述中说明关联）。
+6. **伪造验收证据**：声称"已完成"但截图是 mock 数据、空壳页面或无法交互的静态 UI。
+
+subagent 完成后、提交前，自检：
+```powershell
+git diff --check                  # 无冲突标记、无行尾空格
+git status --short --branch       # 确认只改了允许的路径
+```
+
 ### 模型分配策略
 
 > 实际后端模型映射，AgentHub 项目专用。dev-loop skill 同步更新。
@@ -193,7 +210,7 @@ dev-loop 主 Agent 每次循环开始时检查收件箱，按优先级处理，�
 
 ## 3. 技术主线
 
-- Hub Server 和 Edge Server 使用 Go。早期独立 `runner/` 目录已废弃；当前执行生命周期在 `edge-server/internal/lifecycle/`，Agent Runtime 协议适配在 `edge-server/internal/adapters/`。
+- Hub Server 和 Edge Server 使用 Go。早期独立 `runner/` 目录已废弃；当前执行生命周期在 `edge-server/internal/lifecycle/`，Agent Runtime 协议适配在 `edge-server/internal/adapters/`。`edge-server/internal/runners/` 仍保留为内部兼容包，通过 `/v1/runners` 提供 Runtime/Target health 摘要；但 root-level `runner/` 目录（原独立服务）已不再存在。
 - UI 使用 React + TypeScript，Desktop 使用 Tauri。
 - 主协议是 REST JSON API + WebSocket typed events。
 - REST endpoint 入口是 `api/openapi.yaml`。
@@ -277,8 +294,8 @@ feat/* → dev/delicious233 → master
 | 分支 | 说明 | 状态 |
 |------|------|:--:|
 | **dev/delicious233** | 主开发分支，唯一事实源 | ✅ 活跃 |
-| master | PR-only 稳定快照，Q2 里程碑后同步 | 滞后（勿直接 clone 使用） |
-| origin/dev/trump | Trump 独立分支，不作为可信进度来源 | 保留，不自动合并 |
+| master | PR-only 稳定快照，v0.1.0 已同步 | ✅ 当前 |
+| origin/dev/trump | Trump 独立分支，55 ahead/89 behind，代码已过期不建议合入 | 保留，不自动合并 |
 | origin/dev/johnny | Johnny 开发线，仍有少量独有提交 | 单独审，不直合 |
 | origin/feat/team-johnny-merge | Johnny 聚合 merge，冲突大 | 单独审，不直合 |
 | ~~feat/web-desktop-parity / origin/worktree-feat+web-desktop-parity~~ | 早期 Web parity 残留已导出 patch 并删除远端 | ✅ 已归档 |
@@ -368,7 +385,7 @@ python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml')
 git status --short --branch
 ```
 
-运行命令以真实入口为准：Edge 是 `edge-server/cmd/agenthub-edge`，Hub 是 `hub-server/cmd/server-hub`。`scripts/dev-start.ps1` / `scripts/dev-start.sh` 已修复 Hub 入口路径。`scripts/client-smoke.ps1` 仍包含已删除 `runner/` 的历史检查；修复脚本前不要把这些脚本作为验收依据。
+运行命令以真实入口为准：Edge 是 `edge-server/cmd/agenthub-edge`，Hub 是 `hub-server/cmd/server-hub`。`scripts/dev-start.ps1` / `scripts/dev-start.sh` 已修复 Hub 入口路径。`scripts/client-smoke.ps1` 当前使用 Edge 内置 `agenthub-runner-mock` 兼容 profile，不再构建早期已删除的独立 `runner/` 目录。
 
 有 Go 代码后追加：
 
@@ -413,7 +430,7 @@ corepack.cmd pnpm exec vite build
 |------|-----------|------|
 | edge-server | 75% | CI 强制阻断 |
 | hub-server | 40% | CI 强制阻断 |
-| app/desktop | 不做硬性要求 | 551/560 tests |
+| app/desktop | 不做硬性要求 | 不做硬性要求 |
 | app/web | 不做硬性要求 | build 通过即可 |
 
 - CI 使用 `go test -short` 跳过需要真实 CLI 的集成测试。

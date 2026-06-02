@@ -8,8 +8,8 @@ import {
 // ── TRANSITIONS completeness ──────────────────────────────────────────
 
 describe('RunState enum', () => {
-  it('has all 7 expected members', () => {
-    expect(Object.values(RunState)).toHaveLength(7);
+  it('has all 8 expected members', () => {
+    expect(Object.values(RunState)).toHaveLength(8);
     expect(RunState.IDLE).toBe('IDLE');
     expect(RunState.RUNNING).toBe('RUNNING');
     expect(RunState.STREAMING).toBe('STREAMING');

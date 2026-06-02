@@ -1,6 +1,7 @@
 /* ============================================================
-   AgentHub Web Design Tokens -- OKLCH color system
-   Shared with app/desktop. DO NOT hardcode hex in components.
+   AgentHub Web Design Tokens
+   Mapped to @agenthub/shared designTokens Desktop glass aliases.
+   Do not add app-local gradients, left rails, or new palettes here.
    ============================================================ */
 
 :root {
@@ -212,4 +213,20 @@ button {
 ::selection {
   background: oklch(0.7 0.15 260 / 0.3);
   color: inherit;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Reduced motion: WCAG 2.2 SC 2.3.3 safety net
+   Overrides every transition/animation when the user prefers reduced motion.
+   Component-level wrappers are the primary mechanism; this is the fallback.
+   ═══════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+    transition-delay: 0s !important;
+    animation-delay: 0s !important;
+  }
 }

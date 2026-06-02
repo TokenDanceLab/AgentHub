@@ -1,4 +1,7 @@
 import {
+  Bot,
+  FileText,
+  FolderKanban,
   LogIn,
   Menu,
   MessageSquare,
@@ -9,15 +12,20 @@ import {
   PanelRightOpen,
   Settings,
   Sun,
+  TerminalSquare,
+  Users,
   User,
   Wifi,
   WifiOff,
+  Wrench,
   X,
+  UserCog,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAgentList } from '@/api/agentQueries';
+import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import { useThreads } from '@/api/threadQueries';
 import { createHubClient, type AgentRunEvent } from '@/api/hubClient';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -27,10 +35,14 @@ import { useHubStore } from '@/stores/hubStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useThreadStore } from '@/stores/threadStore';
 import { getAccessToken } from '@/hooks/useAuth';
+import { useWebAuth } from '@/hooks/useWebAuth';
+import { useStreamRecovery } from '@/hooks/useStreamRecovery';
 import { useHubMainChat } from '@/hooks/useHubMainChat';
 import { useIsMobile, useIsTablet } from '@/hooks/useMediaQuery';
 import { useHealth } from '@/hooks/useHealth';
 import { useHubWSConnection } from '@/hooks/useHubWSConnection';
+import { ActivityCard, ContextSummary, SectionHeader, TokenDanceMark } from '@shared/ui';
+import { getSurfaceByWebRoute, getSurfaceMetadata, getSurfaceStatusMetadata, type SurfaceMetadata } from '@shared/surfaceMetadata';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { AppError } from '@shared/errors';
 import type { AgentInfo, RunInfo } from '@shared/types';
@@ -44,12 +56,55 @@ import {
 import { Slot } from '@/views/viewRegistry';
 import AuthPage from '@/components/AuthPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { NotificationBell } from '@/components/NotificationBell';
 import SettingsPage from '@/components/SettingsPage';
 import { ToastContainer } from '@/components/Toast';
 import styles from './WebLayout.module.css';
 
-type MainSurface = 'workspace' | 'messages' | 'settings';
+type MainSurface = 'workspace' | 'messages' | 'teamRun' | 'settings';
 type WebRunInfo = RunInfo & ReturnType<typeof projectRunDetail>;
+
+interface RouteContext {
+  surface: SurfaceMetadata;
+  id?: string;
+}
+
+const SURFACE_PATHS: Record<MainSurface, string> = {
+  workspace: '/',
+  messages: '/chats',
+  teamRun: '/team',
+  settings: '/settings',
+};
+
+function surfaceFromPath(pathname: string): MainSurface {
+  if (pathname === '/chats' || pathname.startsWith('/chats/')) return 'messages';
+  if (pathname === '/team' || pathname.startsWith('/team/')) return 'teamRun';
+  if (pathname === '/settings' || pathname.startsWith('/settings/')) return 'settings';
+  return 'workspace';
+}
+
+function routeContextFromPath(pathname: string): RouteContext | null {
+  const surface = getSurfaceByWebRoute(pathname);
+  if (!surface || surface.id === 'web.workbench' || surface.id === 'web.privateChats') return null;
+
+  const groupMatch = pathname.match(/^\/group\/([^/]+)$/);
+  const projectMatch = pathname.match(/^\/project\/([^/]+)$/);
+  const routeId = groupMatch?.[1] ?? projectMatch?.[1];
+
+  return routeId
+    ? {
+        surface,
+        id: decodeURIComponent(routeId),
+      }
+    : { surface };
+}
+
+function routeSourceLabelKey(surface: SurfaceMetadata): string {
+  if (surface.id === 'web.agentSquare') return 'webShell.route.sources.catalog';
+  if (surface.id === 'web.groupWorkspace') return 'webShell.route.sources.group';
+  if (surface.id === 'web.projectPreview') return 'webShell.route.sources.project';
+  return 'webShell.route.metrics.shell';
+}
 
 function resolveHubAgentType(agent?: AgentInfo): string {
   const key = `${agent?.runtimeId ?? ''} ${agent?.id ?? ''} ${agent?.name ?? ''} ${agent?.description ?? ''}`.toLowerCase();
@@ -89,6 +144,7 @@ function isAgentMissing(error: unknown): boolean {
 
 export default function WebLayout() {
   const { t } = useTranslation();
+  const { ensureAuth } = useWebAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
@@ -105,6 +161,9 @@ export default function WebLayout() {
   const setMobileSidebarOpen = useUIStore((s) => s.setMobileSidebarOpen);
   const setMobileRightPanelOpen = useUIStore((s) => s.setMobileRightPanelOpen);
   const setOnline = useConnectionStore((s) => s.setOnline);
+  const reconnecting = useConnectionStore((s) => s.reconnecting);
+  const recoveryState = useConnectionStore((s) => s.recoveryState);
+  const recoveryError = useConnectionStore((s) => s.recoveryError);
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const username = useHubStore((s) => s.username);
   const showAuthModal = useHubStore((s) => s.showAuthModal);
@@ -120,9 +179,13 @@ export default function WebLayout() {
   const [optimisticRun, setOptimisticRun] = useState<WebRunInfo | null>(null);
   const [taskRunEvents, setTaskRunEvents] = useState<AgentRunEvent[]>([]);
   const [runStartPending, setRunStartPending] = useState(false);
+  const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
   const [mainSurface, setMainSurface] = useState<MainSurface>('workspace');
+  const [routeContext, setRouteContext] = useState<RouteContext | null>(null);
   const agents = agentData?.items ?? [];
   const threads = threadData?.items ?? [];
+  const executionTargetsQuery = useHubExecutionTargets({ enabled: hubAuthenticated });
+  const executionTargets = executionTargetsQuery.data?.items ?? [];
   const activeAgentId = selectedAgentId ?? agents[0]?.id;
   const selectedThread = (threads.find((thread) => thread.threadId === selectedThreadId) ?? null) as HubThreadInfo | null;
   const selectedAgent = agents.find((agent) => agent.id === activeAgentId);
@@ -140,10 +203,56 @@ export default function WebLayout() {
   const eventRunDetail = useMemo(() => projectRunEvents(taskRunEvents), [taskRunEvents]);
   const runDetail = taskRunEvents.length > 0 ? eventRunDetail : chatRunDetail;
   const { outputText, toolCalls, changedFiles } = runDetail;
+  const hasProjectedRunDetail = outputText.length > 0 || toolCalls.length > 0 || changedFiles.length > 0;
+  const projectedRun = hasProjectedRunDetail
+    ? {
+        runId: selectedThreadId ?? 'hub-thread',
+        projectId: selectedThread?.projectId ?? 'hub',
+        threadId: selectedThreadId ?? selectedThread?.threadId ?? 'hub-thread',
+        status: 'finished',
+      }
+    : null;
+
+  const { retryRecovery } = useStreamRecovery({
+    optimisticRun,
+    taskRunEvents,
+    setTaskRunEvents,
+    hubClient,
+    justReconnected: hubRealtime.justReconnected,
+    isConnected: hubRealtime.authenticated && hubRealtime.status === 'connected',
+  });
 
   useEffect(() => {
     setOnline(online, health);
   }, [health, online, setOnline]);
+
+  useEffect(() => {
+    if (selectedThreadId || threads.length === 0) return;
+    const firstThread = threads[0];
+    if (firstThread?.threadId) {
+      selectThread(firstThread.threadId);
+    }
+  }, [selectThread, selectedThreadId, threads]);
+
+  useEffect(() => {
+    const syncSurfaceFromPath = () => {
+      setMainSurface(surfaceFromPath(window.location.pathname));
+      setRouteContext(routeContextFromPath(window.location.pathname));
+    };
+    window.addEventListener('popstate', syncSurfaceFromPath);
+    return () => window.removeEventListener('popstate', syncSurfaceFromPath);
+  }, []);
+
+  const selectMainSurface = useCallback((surface: MainSurface) => {
+    setMainSurface(surface);
+    setRouteContext(null);
+
+    if (typeof window === 'undefined') return;
+    const nextPath = SURFACE_PATHS[surface];
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState(null, '', nextPath);
+    }
+  }, []);
 
   const createWorkspaceThread = useCallback(async (): Promise<HubThreadInfo> => {
     const title = t('thread.defaultTitle');
@@ -178,11 +287,7 @@ export default function WebLayout() {
         return;
       }
 
-      if (!hubAuthenticated || !getAccessToken()) {
-        setShowAuthModal(true);
-        addToast({ type: 'error', message: t('webChat.signInRequired') });
-        return;
-      }
+      if (!ensureAuth()) return;
 
       let groupThread =
         selectedThread?.sessionType === 'group'
@@ -193,17 +298,26 @@ export default function WebLayout() {
       }
       selectAgentThread(agentId, groupThread.threadId);
     },
-    [addToast, createWorkspaceThread, hubAuthenticated, selectAgentThread, selectedThread, setShowAuthModal, t, threads],
+    [createWorkspaceThread, ensureAuth, selectAgentThread, selectedThread, threads],
   );
 
+  useEffect(() => {
+    if (executionTargets.length === 0) {
+      if (selectedExecutionTargetId) setSelectedExecutionTargetId('');
+      return;
+    }
+    const current = executionTargets.find((target) => target.id === selectedExecutionTargetId);
+    if (current && (current.target_type === 'local_edge' || current.target_type === 'hub_relay')) return;
+    const preferred =
+      executionTargets.find((target) => (target.target_type === 'local_edge' || target.target_type === 'hub_relay') && target.is_online) ??
+      executionTargets.find((target) => target.target_type === 'local_edge' || target.target_type === 'hub_relay');
+    setSelectedExecutionTargetId(preferred?.id ?? '');
+  }, [executionTargets, selectedExecutionTargetId]);
+
   const handleSend = useCallback(
-    async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string }) => {
+    async (prompt: string, agentId?: string, opts?: { model?: string; reasoningEffort?: string; targetId?: string }) => {
       if (!prompt.trim() || runStartPending) return false;
-      if (!hubAuthenticated || !getAccessToken()) {
-        setShowAuthModal(true);
-        addToast({ type: 'error', message: t('webChat.signInRequired') });
-        return false;
-      }
+      if (!ensureAuth()) return false;
       let targetThread = selectedThread;
       if (!targetThread) {
         targetThread = await createWorkspaceThread();
@@ -221,6 +335,7 @@ export default function WebLayout() {
       const triggerOptions = {
         agent_type: agentType,
         ...(modelParams ? { model_params: modelParams } : {}),
+        ...(opts?.targetId ? { target_id: opts.targetId } : {}),
       };
       setRunStartPending(true);
       appendOptimistic({
@@ -268,7 +383,7 @@ export default function WebLayout() {
         return true;
       } catch (error) {
         if (!messagePersisted) removeMessage(messageId);
-        addToast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to start run' });
+        addToast({ type: 'error', message: error instanceof Error ? error.message : t('webChat.startFailed') });
         return false;
       } finally {
         setRunStartPending(false);
@@ -280,14 +395,13 @@ export default function WebLayout() {
       agents,
       appendOptimistic,
       createWorkspaceThread,
-      hubAuthenticated,
+      ensureAuth,
       hubClient,
       refreshMessages,
       removeMessage,
       runStartPending,
       selectedAgent,
       selectedThread,
-      setShowAuthModal,
       t,
     ],
   );
@@ -360,33 +474,53 @@ export default function WebLayout() {
     };
   }, [addToast, changedFiles, hubRealtime.hubWS, optimisticRun?.runId, outputText, toolCalls]);
 
-  const shellProps = useMemo(
+  // Split shellProps into three focused blocks to keep each useMemo readable
+  const routingProps = useMemo(
     () => ({
       agents,
+      executionTargets,
+      selectedTargetId: selectedExecutionTargetId,
+      selectedAgentId: activeAgentId,
+      selectedId: selectedThreadId ?? undefined,
+      onSelectAgent: handleSelectAgent,
+      onSelect: handleSelectThread,
+      onSelectTarget: setSelectedExecutionTargetId,
+    }),
+    [agents, executionTargets, selectedExecutionTargetId, activeAgentId, selectedThreadId, handleSelectAgent, handleSelectThread],
+  );
+
+  const connectionProps = useMemo(
+    () => ({
       online,
       health,
       hubWS: hubRealtime.hubWS,
       hubWSStatus: hubRealtime.status,
       hubWSAuthenticated: hubRealtime.authenticated,
+      hubReconnecting: reconnecting,
+      hubRecoveryState: recoveryState,
+      hubRecoveryError: recoveryError,
       hubAuthenticated,
       isConnected: online,
       isStreaming: runStartPending || optimisticRun?.status === 'queued' || optimisticRun?.status === 'running',
-      selectedAgentId: activeAgentId,
-      selectedId: selectedThreadId ?? undefined,
+    }),
+    [online, health, hubRealtime.hubWS, hubRealtime.status, hubRealtime.authenticated, reconnecting, recoveryState, recoveryError, hubAuthenticated, runStartPending, optimisticRun],
+  );
+
+  const chatProps = useMemo(
+    () => ({
       messages: hubMessages,
       allMessages: hubMessages,
       threadsCount: threads.length,
       requests: [],
-      run: optimisticRun,
-      toolCalls: optimisticRun ? toolCalls : [],
-      changedFiles: optimisticRun ? changedFiles : [],
+      run: optimisticRun ?? projectedRun,
+      toolCalls,
+      changedFiles,
       outputText,
-      onSelectAgent: handleSelectAgent,
-      onSelect: handleSelectThread,
+      chatMessages: hubMessages,
       onRetry: () => {
         const lastUserMessage = [...hubMessages].reverse().find((message) => message.role === 'user');
         const text = lastUserMessage?.blocks.find((block) => block.kind === 'text')?.content;
-        if (text) void handleSend(text, activeAgentId);
+        if (text) void handleSend(text, activeAgentId, selectedExecutionTargetId ? { targetId: selectedExecutionTargetId } : undefined);
       },
       onDelete: (messageId: string) => {
         removeMessage(messageId);
@@ -396,39 +530,67 @@ export default function WebLayout() {
       onSend: handleSend,
       onSendMessage: handleSend,
     }),
-    [
-      activeAgentId,
-      agents,
-      handleCancel,
-      handleSelectAgent,
-      handleSelectThread,
-      handleSend,
-      health,
-      hubAuthenticated,
-      hubRealtime.authenticated,
-      hubRealtime.hubWS,
-      hubRealtime.status,
-      online,
-      optimisticRun,
-      outputText,
-      toolCalls,
-      changedFiles,
-      removeMessage,
-      runStartPending,
-      selectedThreadId,
-      threads.length,
-      hubMessages,
-    ],
+    [hubMessages, threads.length, optimisticRun, projectedRun, outputText, toolCalls, changedFiles, handleSend, activeAgentId, selectedExecutionTargetId, removeMessage, handleCancel],
+  );
+
+  const shellProps = useMemo(
+    () => ({ ...routingProps, ...connectionProps, ...chatProps }),
+    [routingProps, connectionProps, chatProps],
+  );
+
+  const runDetailFallback = (
+    <div className={styles.runDetailFallback} role="region" aria-label={t('run.title')}>
+      <div className={styles.runDetailFallbackTitle}>{t('run.title')}</div>
+      <div className={styles.runDetailFallbackStack}>
+        <ActivityCard
+          className={styles.runDetailFallbackCard}
+          icon={<TerminalSquare size={16} />}
+          iconClassName={styles.runDetailFallbackIcon}
+          bodyClassName={styles.runDetailFallbackBody}
+          label={t('run.empty')}
+        />
+        <ActivityCard
+          className={styles.runDetailFallbackCard}
+          icon={<FileText size={16} />}
+          iconClassName={styles.runDetailFallbackIcon}
+          bodyClassName={styles.runDetailFallbackBody}
+          label={t('run.emptyOutput')}
+        />
+        <ActivityCard
+          className={styles.runDetailFallbackCard}
+          icon={<Wrench size={16} />}
+          iconClassName={styles.runDetailFallbackIcon}
+          bodyClassName={styles.runDetailFallbackBody}
+          label={t('run.emptySources')}
+        />
+      </div>
+    </div>
   );
 
   const sidebarOpen = isMobile ? mobileSidebarOpen : true;
   const detailOpen = isMobile ? mobileRightPanelOpen : rightPanelOpen;
   const showDesktopDetail = !isMobile && rightPanelOpen;
   const realtimeLabel = !hubAuthenticated
-    ? 'Sign in for realtime'
-    : hubRealtime.authenticated
-      ? 'Hub WS live'
-      : `Hub WS ${hubRealtime.status}`;
+    ? t('webShell.status.realtimeSignIn')
+    : recoveryState === 'recovering'
+      ? t('status.reconnecting')
+      : recoveryState === 'failed'
+        ? t('webChat.recoveryFailed')
+        : reconnecting
+          ? t('status.reconnecting')
+          : hubRealtime.authenticated
+            ? t('webShell.status.realtimeLive')
+            : t('webShell.status.realtimeState', { state: hubRealtime.status });
+  const routeContextIcon =
+    routeContext?.surface.id === 'web.agentSquare'
+      ? <Bot size={16} />
+      : routeContext?.surface.id === 'web.groupWorkspace'
+        ? <Users size={16} />
+        : <FolderKanban size={16} />;
+  const routeContextStatus = routeContext ? getSurfaceStatusMetadata(routeContext.surface.defaultStatus) : null;
+  const mobileAccountSurface = getSurfaceMetadata('mobile.account');
+  const mobileAccountLabel = t(mobileAccountSurface.labelKey);
+  const mobileAccountDescription = t(mobileAccountSurface.descriptionKey);
 
   return (
     <ErrorBoundary>
@@ -439,7 +601,7 @@ export default function WebLayout() {
               <button
                 className={styles.iconBtn}
                 onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-                aria-label={mobileSidebarOpen ? 'Close navigation' : 'Open navigation'}
+                aria-label={mobileSidebarOpen ? t('webShell.nav.close') : t('webShell.nav.open')}
                 type="button"
               >
                 {mobileSidebarOpen ? <X size={18} /> : <Menu size={18} />}
@@ -448,54 +610,74 @@ export default function WebLayout() {
               <button
                 className={styles.iconBtn}
                 onClick={() => setLeftSidebarCollapsed(!sidebarCollapsed)}
-                aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-label={sidebarCollapsed ? t('webShell.nav.expand') : t('webShell.nav.collapse')}
                 type="button"
               >
                 {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
               </button>
             )}
 
-            <div className={styles.brandMark} aria-hidden="true">
-              AH
-            </div>
+            <TokenDanceMark className={styles.brandMark} alt="" aria-hidden="true" />
             <div className={styles.brandText}>
               <strong>AgentHub</strong>
-              <span>Web workspace</span>
+              <span>{t('webShell.brand.subtitle')}</span>
             </div>
           </div>
 
           <div className={styles.statusCluster}>
-            <div className={styles.surfaceTabs} role="tablist" aria-label="Main surface">
+            <div className={styles.surfaceTabs} role="tablist" aria-label={t('webShell.surface.aria')}>
               <button
                 className={mainSurface === 'workspace' ? styles.surfaceTabActive : styles.surfaceTab}
-                onClick={() => setMainSurface('workspace')}
-                aria-label="Workspace"
+                onClick={() => selectMainSurface('workspace')}
+                aria-label={t('webShell.surface.workspace')}
                 aria-selected={mainSurface === 'workspace'}
                 role="tab"
                 type="button"
               >
                 <PanelLeftOpen size={15} />
-                <span>Workspace</span>
+                <span>{t('webShell.surface.workspace')}</span>
               </button>
               <button
                 className={mainSurface === 'messages' ? styles.surfaceTabActive : styles.surfaceTab}
-                onClick={() => setMainSurface('messages')}
-                aria-label="Messages"
+                onClick={() => selectMainSurface('messages')}
+                aria-label={t('webShell.surface.messages')}
                 aria-selected={mainSurface === 'messages'}
                 role="tab"
                 type="button"
               >
                 <MessageSquare size={15} />
-                <span>Messages</span>
+                <span>{t('webShell.surface.messages')}</span>
+              </button>
+              <button
+                className={mainSurface === 'teamRun' ? styles.surfaceTabActive : styles.surfaceTab}
+                onClick={() => selectMainSurface('teamRun')}
+                aria-label={t('view.teamRun', 'TeamRun')}
+                aria-selected={mainSurface === 'teamRun'}
+                role="tab"
+                type="button"
+              >
+                <UserCog size={15} />
+                <span>{t('view.teamRun', 'TeamRun')}</span>
               </button>
             </div>
             <span className={online ? styles.statusPillOnline : styles.statusPill}>
               {online ? <Wifi size={14} /> : <WifiOff size={14} />}
-              <span>{online ? `Hub REST ${health?.version ?? 'ready'}` : 'Hub path idle'}</span>
+              <span>
+                {online
+                  ? t('webShell.status.restReady', { version: health?.version ?? t('webShell.status.ready') })
+                  : t('webShell.status.restIdle')}
+              </span>
             </span>
-            <span className={hubRealtime.authenticated ? styles.statusPillOnline : styles.statusPill}>
+            <span className={
+              recoveryState === 'failed' ? styles.statusPillError :
+              recoveryState === 'recovering' || reconnecting ? styles.statusPillReconnecting :
+              hubRealtime.authenticated ? styles.statusPillOnline : styles.statusPill
+            }>
               {hubRealtime.authenticated ? <Wifi size={14} /> : <WifiOff size={14} />}
               <span>{realtimeLabel}</span>
+            </span>
+            <span className={styles.notificationSlot}>
+              <NotificationBell />
             </span>
             <button
               className={styles.accountBtn}
@@ -503,12 +685,12 @@ export default function WebLayout() {
               type="button"
             >
               {hubAuthenticated ? <User size={15} /> : <LogIn size={15} />}
-              <span>{hubAuthenticated ? username || 'Account' : 'Sign in'}</span>
+              <span>{hubAuthenticated ? username || t('webShell.account.account') : t('webShell.account.signIn')}</span>
             </button>
             <button
               className={styles.iconBtn}
               onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              aria-label={theme === 'dark' ? t('theme.switchToLight') : t('theme.switchToDark')}
               type="button"
             >
               {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
@@ -517,7 +699,7 @@ export default function WebLayout() {
               <button
                 className={styles.iconBtn}
                 onClick={() => setRightPanelOpen(!rightPanelOpen)}
-                aria-label={rightPanelOpen ? 'Close run detail' : 'Open run detail'}
+                aria-label={rightPanelOpen ? t('webShell.runDetail.close') : t('webShell.runDetail.open')}
                 type="button"
               >
                 {rightPanelOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
@@ -525,8 +707,8 @@ export default function WebLayout() {
             )}
             <button
               className={mainSurface === 'settings' ? styles.iconBtnActive : styles.iconBtn}
-              onClick={() => setMainSurface((surface) => (surface === 'settings' ? 'workspace' : 'settings'))}
-              aria-label="Settings"
+              onClick={() => selectMainSurface(mainSurface === 'settings' ? 'workspace' : 'settings')}
+              aria-label={t('settings.open')}
               type="button"
             >
               <Settings size={17} />
@@ -535,7 +717,7 @@ export default function WebLayout() {
               <button
                 className={styles.iconBtn}
                 onClick={() => setMobileRightPanelOpen(!mobileRightPanelOpen)}
-                aria-label={mobileRightPanelOpen ? 'Close run detail' : 'Open run detail'}
+                aria-label={mobileRightPanelOpen ? t('webShell.runDetail.close') : t('webShell.runDetail.open')}
                 type="button"
               >
                 {mobileRightPanelOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
@@ -549,7 +731,7 @@ export default function WebLayout() {
             <button
               className={styles.scrim}
               onClick={() => setMobileSidebarOpen(false)}
-              aria-label="Close navigation overlay"
+              aria-label={t('webShell.nav.closeOverlay')}
               type="button"
             />
           )}
@@ -566,7 +748,7 @@ export default function WebLayout() {
                   <button
                     className={styles.iconBtn}
                     onClick={() => setLeftSidebarCollapsed(false)}
-                    aria-label="Expand sidebar"
+                    aria-label={t('webShell.nav.expand')}
                     type="button"
                   >
                     <PanelLeftOpen size={18} />
@@ -575,17 +757,21 @@ export default function WebLayout() {
               ) : (
                 <div className={styles.sidebarContent}>
                   <section className={styles.sidebarSection}>
-                    <div className={styles.sectionHeader}>
-                      <span>Agents</span>
-                    </div>
+                    <SectionHeader
+                      className={styles.sectionHeader ?? ''}
+                      titleClassName={styles.sectionHeaderTitle ?? ''}
+                      title={t('webShell.sidebar.agents')}
+                    />
                     <div className={styles.sidebarScroll}>
                       <Slot name="agent-list" {...shellProps} />
                     </div>
                   </section>
                   <section className={styles.sidebarSection}>
-                    <div className={styles.sectionHeader}>
-                      <span>Threads</span>
-                    </div>
+                    <SectionHeader
+                      className={styles.sectionHeader ?? ''}
+                      titleClassName={styles.sectionHeaderTitle ?? ''}
+                      title={t('webShell.sidebar.threads')}
+                    />
                     <div className={styles.sidebarScroll}>
                       <Slot name="thread-panel" {...shellProps} />
                     </div>
@@ -599,13 +785,73 @@ export default function WebLayout() {
             <div className={styles.workspaceGlass}>
               {mainSurface === 'settings' ? (
                 <SettingsPage
-                  onBack={() => setMainSurface('workspace')}
+                  onBack={() => selectMainSurface('workspace')}
                   onOpenAuth={() => setShowAuthModal(true)}
                 />
               ) : mainSurface === 'messages' ? (
                 <Slot name="im-view" {...shellProps} />
+              ) : mainSurface === 'teamRun' ? (
+                <Slot name="team-run-console" {...shellProps} />
               ) : (
                 <>
+                  {routeContext && (
+                    <ContextSummary
+                      className={styles.routeContextPanel}
+                      headerClassName={styles.routeContextHeader}
+                      iconClassName={styles.routeContextIcon}
+                      eyebrowClassName={styles.routeEyebrow}
+                      titleClassName={styles.routeContextTitle}
+                      descriptionClassName={styles.routeContextCopy}
+                      listClassName={styles.routeContextGrid}
+                      itemClassName={styles.routeMetric}
+                      valueClassName={styles.routeMetricValue}
+                      labelClassName={styles.routeMetricLabel}
+                      actionsClassName={styles.routeActionRow}
+                      ariaLabel={t('webShell.route.aria', { surface: t(routeContext.surface.labelKey) })}
+                      icon={routeContextIcon}
+                      eyebrow={t('webShell.route.eyebrow')}
+                      title={t(routeContext.surface.labelKey)}
+                      description={t(routeContext.surface.descriptionKey)}
+                      items={[
+                        { id: 'agents', value: agents.length, label: t('webShell.route.metrics.agents') },
+                        { id: 'threads', value: threads.length, label: t('webShell.route.metrics.threads') },
+                        { id: 'source', value: routeContext.id ?? t('webShell.route.metrics.shell'), label: t(routeSourceLabelKey(routeContext.surface)) },
+                        ...(routeContextStatus
+                          ? [{ id: 'status', value: t(routeContextStatus.labelKey), label: t('webShell.route.sources.status') }]
+                          : []),
+                        { id: 'registry', value: routeContext.surface.platform, label: t('webShell.route.sources.registry') },
+                      ]}
+                      actions={(
+                        <>
+                        <button className={styles.routeAction} type="button" onClick={() => selectMainSurface('messages')}>
+                          <MessageSquare size={16} />
+                          <span>{t('webShell.route.actions.messages')}</span>
+                        </button>
+                        <button className={styles.routeAction} type="button" onClick={() => selectMainSurface('settings')}>
+                          <Settings size={16} />
+                          <span>{t('webShell.route.actions.settings')}</span>
+                        </button>
+                        </>
+                      )}
+                    />
+                  )}
+                  {recoveryState === 'recovering' && optimisticRun && (
+                    <div className={styles.recoveryBannerRecovering}>
+                      <span>{t('status.reconnecting')}</span>
+                    </div>
+                  )}
+                  {recoveryState === 'failed' && optimisticRun && (
+                    <div className={styles.recoveryBanner}>
+                      <span>{t('webChat.recoveryFailed')}</span>
+                      <button
+                        className={styles.recoveryRetryBtn}
+                        type="button"
+                        onClick={retryRecovery}
+                      >
+                        {t('chat.action.retry')}
+                      </button>
+                    </div>
+                  )}
                   <Slot name="main-view" {...shellProps} />
                   <Slot name="prompt-input" {...shellProps} />
                 </>
@@ -615,7 +861,7 @@ export default function WebLayout() {
 
           {showDesktopDetail && (
             <aside className={isTablet ? styles.rightOverlay : styles.rightPanel}>
-              <Slot name="run-detail" {...shellProps} />
+              <Slot name="run-detail" fallback={runDetailFallback} {...shellProps} />
             </aside>
           )}
 
@@ -624,17 +870,88 @@ export default function WebLayout() {
               <button
                 className={styles.scrim}
                 onClick={() => setMobileRightPanelOpen(false)}
-                aria-label="Close run detail overlay"
+                aria-label={t('webShell.runDetail.closeOverlay')}
                 type="button"
               />
               <aside className={styles.rightOverlay}>
-                <Slot name="run-detail" {...shellProps} />
+                <Slot name="run-detail" fallback={runDetailFallback} {...shellProps} />
               </aside>
             </>
           )}
         </div>
 
+        {isMobile && (
+          <nav className={styles.mobileSurfaceNav} aria-label={t('webShell.surface.aria')}>
+            <button
+              className={mainSurface === 'workspace' ? styles.mobileSurfaceNavItemActive : styles.mobileSurfaceNavItem}
+              type="button"
+              aria-current={mainSurface === 'workspace' ? 'page' : undefined}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setMobileRightPanelOpen(false);
+                selectMainSurface('workspace');
+              }}
+            >
+              <PanelLeftOpen size={20} />
+              <span>{t('webShell.surface.workspace')}</span>
+            </button>
+            <button
+              className={mainSurface === 'messages' ? styles.mobileSurfaceNavItemActive : styles.mobileSurfaceNavItem}
+              type="button"
+              aria-current={mainSurface === 'messages' ? 'page' : undefined}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setMobileRightPanelOpen(false);
+                selectMainSurface('messages');
+              }}
+            >
+              <MessageSquare size={20} />
+              <span>{t('webShell.surface.messages')}</span>
+            </button>
+            <button
+              className={mainSurface === 'teamRun' ? styles.mobileSurfaceNavItemActive : styles.mobileSurfaceNavItem}
+              type="button"
+              aria-current={mainSurface === 'teamRun' ? 'page' : undefined}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setMobileRightPanelOpen(false);
+                selectMainSurface('teamRun');
+              }}
+            >
+              <UserCog size={20} />
+              <span>{t('view.teamRun', 'TeamRun')}</span>
+            </button>
+            <button
+              className={detailOpen ? styles.mobileSurfaceNavItemActive : styles.mobileSurfaceNavItem}
+              type="button"
+              aria-pressed={detailOpen}
+              aria-label={detailOpen ? t('webShell.runDetail.close') : t('webShell.runDetail.open')}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setMobileRightPanelOpen(!mobileRightPanelOpen);
+              }}
+            >
+              <PanelRightOpen size={20} />
+              <span>{t('webShell.surface.runDetail')}</span>
+            </button>
+            <button
+              className={styles.mobileSurfaceNavItem}
+              type="button"
+              aria-label={`${hubAuthenticated ? username || mobileAccountLabel : mobileAccountLabel}. ${mobileAccountDescription}`}
+              onClick={() => {
+                setMobileSidebarOpen(false);
+                setMobileRightPanelOpen(false);
+                setShowAuthModal(true);
+              }}
+            >
+              {hubAuthenticated ? <User size={20} /> : <LogIn size={20} />}
+              <span>{hubAuthenticated ? username || mobileAccountLabel : mobileAccountLabel}</span>
+            </button>
+          </nav>
+        )}
+
         <Slot name="permission-dialog" {...shellProps} />
+        <Slot name="search-dialog" {...shellProps} onSelect={() => undefined} />
         <Slot name="shortcut-help" />
         {showAuthModal && (
           <div className={styles.modalLayer}>

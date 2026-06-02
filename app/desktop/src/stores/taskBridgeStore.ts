@@ -17,6 +17,26 @@ export interface AgentTask {
   createdAt: string;
 }
 
+const MAX_TASK_HISTORY = 80;
+
+function trimTaskHistory(tasks: AgentTask[]): AgentTask[] {
+  if (tasks.length <= MAX_TASK_HISTORY) return tasks;
+  const active = tasks.filter((task) => task.status === 'queued' || task.status === 'running');
+  const terminal = tasks
+    .filter((task) => task.status !== 'queued' && task.status !== 'running')
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  return [...active, ...terminal.slice(0, Math.max(0, MAX_TASK_HISTORY - active.length))]
+    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+}
+
+function buildRunIndex(tasks: AgentTask[]): Record<string, string> {
+  const index: Record<string, string> = {};
+  for (const task of tasks) {
+    if (task.runId) index[task.runId] = task.taskId;
+  }
+  return index;
+}
+
 interface TaskBridgeState {
   tasks: AgentTask[];
   /** Reverse index: runId → taskId for fast lookup. */
@@ -41,13 +61,11 @@ export const useTaskBridgeStore = create<TaskBridgeState>()(
       set((s) => {
         // Deduplicate by taskId
         if (s.tasks.some((t) => t.taskId === task.taskId)) return s;
-        const next = {
-          tasks: [...s.tasks, task],
-          runToTask: task.runId
-            ? { ...s.runToTask, [task.runId]: task.taskId }
-            : s.runToTask,
+        const tasks = trimTaskHistory([...s.tasks, task]);
+        return {
+          tasks,
+          runToTask: buildRunIndex(tasks),
         };
-        return next;
       }),
 
     updateTask: (taskId, updates) =>
@@ -59,19 +77,9 @@ export const useTaskBridgeStore = create<TaskBridgeState>()(
         if (!oldTask) return s;
         const updated = { ...oldTask, ...updates };
 
-        const newTasks = [...s.tasks];
-        newTasks[idx] = updated;
+        const newTasks = trimTaskHistory([...s.tasks.slice(0, idx), updated, ...s.tasks.slice(idx + 1)]);
 
-        // Maintain runToTask index
-        const newRunToTask = { ...s.runToTask };
-        if (oldTask.runId && oldTask.runId !== updated.runId) {
-          delete newRunToTask[oldTask.runId];
-        }
-        if (updated.runId) {
-          newRunToTask[updated.runId] = taskId;
-        }
-
-        return { tasks: newTasks, runToTask: newRunToTask };
+        return { tasks: newTasks, runToTask: buildRunIndex(newTasks) };
       }),
 
     removeTask: (taskId) =>

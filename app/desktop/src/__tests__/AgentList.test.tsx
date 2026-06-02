@@ -12,9 +12,15 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@lobehub/icons', () => ({
-  ClaudeCode: ({ size }: { size?: number }) => <span data-testid="claude-icon" style={{ width: size, height: size }} />,
-  Codex: ({ size }: { size?: number }) => <span data-testid="codex-icon" style={{ width: size, height: size }} />,
-  OpenCode: ({ size }: { size?: number }) => <span data-testid="opencode-icon" style={{ width: size, height: size }} />,
+  ClaudeCode: ({ size }: { size?: number }) => (
+    <svg data-testid="claude-icon" width={size} height={size}><title>Claude Code</title></svg>
+  ),
+  Codex: ({ size }: { size?: number }) => (
+    <svg data-testid="codex-icon" width={size} height={size}><title>Codex</title></svg>
+  ),
+  OpenCode: ({ size }: { size?: number }) => (
+    <svg data-testid="opencode-icon" width={size} height={size}><title>OpenCode</title></svg>
+  ),
 }));
 
 import { describe, it, expect, vi } from 'vitest';
@@ -55,9 +61,15 @@ describe('AgentList', () => {
 
   it('renders list of agents with names', () => {
     const agents = [makeAgent({ id: 'a1', name: 'Codex' }), makeAgent({ id: 'a2', name: 'Claude Code' })];
-    render(<AgentList agents={agents} online={true} />);
+    const { container } = render(<AgentList agents={agents} online={true} />);
     expect(screen.getByText('Codex')).toBeInTheDocument();
     expect(screen.getByText('Claude Code')).toBeInTheDocument();
+    expect(container.querySelectorAll('title')).toHaveLength(0);
+    const runtimeButtons = screen.getAllByRole('button').map((button) => button.textContent ?? '');
+    expect(runtimeButtons).toContain('Codexagent.status.available');
+    expect(runtimeButtons).toContain('Claude Codeagent.status.available');
+    expect(runtimeButtons.some((text) => text.includes('CodexCodex'))).toBe(false);
+    expect(runtimeButtons.some((text) => text.includes('Claude CodeClaude Code'))).toBe(false);
   });
 
   it('orders primary runtimes and hides unknown runtimes behind Other by default', () => {
@@ -81,6 +93,37 @@ describe('AgentList', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /agent\.runtime\.other/ }));
     expect(screen.getByText('Custom Runtime')).toBeInTheDocument();
+  });
+
+  it('shows the local orchestrator as a primary runtime instead of hiding it under Other', () => {
+    const agents = [
+      makeAgent({ id: 'codex', name: 'Codex' }),
+      makeAgent({
+        id: 'orchestrator',
+        name: 'Orchestrator',
+        capabilities: {
+          streaming: true,
+          toolCalls: true,
+          fileChanges: true,
+          thinkingVisible: true,
+          multiTurn: true,
+          mcpIntegration: true,
+          permissionHooks: true,
+          subAgentSpawn: true,
+        },
+      }),
+    ];
+    render(<AgentList agents={agents} online={true} />);
+
+    const runtimeButtons = screen
+      .getAllByRole('button')
+      .map((button) => button.textContent ?? '')
+      .filter((text) => /Orchestrator|Codex|agent\.runtime\.other/.test(text));
+
+    expect(runtimeButtons[0]).toContain('Orchestrator');
+    expect(runtimeButtons[1]).toContain('Codex');
+    expect(screen.getByText('Orchestrator')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /agent\.runtime\.other/ })).not.toBeInTheDocument();
   });
 
   it('highlights selected agent', () => {

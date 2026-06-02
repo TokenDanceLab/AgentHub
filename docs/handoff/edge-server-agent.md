@@ -20,10 +20,10 @@
 ```
 
 ```powershell
-cd D:\Code\AgentHub
+cd D:\Code\TokenDance\AgentHub
 git worktree add .worktrees/feat-edge-adapters -b feat/edge-adapters
 # 或如果已存在：
-cd D:\Code\AgentHub\.worktrees\feat-edge-adapters
+cd D:\Code\TokenDance\AgentHub\.worktrees\feat-edge-adapters
 ```
 
 ## 全局架构
@@ -183,7 +183,7 @@ adapters.BusEventResult      = "run.agent.result"
 ## 构建和测试
 
 ```powershell
-cd D:\Code\AgentHub\.worktrees\feat-edge-adapters\edge-server
+cd D:\Code\TokenDance\AgentHub\.worktrees\feat-edge-adapters\edge-server
 
 # 编译
 go build ./...

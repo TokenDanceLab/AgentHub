@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createEventStream } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
 import { EVENT_LOG_MAX } from '@/config';
+import type { TransportStatus } from '@/api/transport';
 
 export interface LogEntry {
   seq: number;
@@ -41,15 +42,14 @@ export function useEventStream(online: boolean): EventStreamState {
   useEffect(() => {
     mountedRef.current = true;
     if (!online) {
-      setIsConnected(false);
       return;
     }
 
     const stream = createEventStream();
 
-    const unsubStatus = stream.onStatusChange((connected) => {
+    const unsubStatus = stream.onStatusChange((status: TransportStatus) => {
       if (!mountedRef.current) return;
-      setIsConnected(connected);
+      setIsConnected(status === 'connected');
     });
 
     const unsubEvents = stream.subscribe((event: EventEnvelope) => {
@@ -79,5 +79,5 @@ export function useEventStream(online: boolean): EventStreamState {
     };
   }, [online]);
 
-  return { events, isConnected, clearEvents };
+  return { events, isConnected: online && isConnected, clearEvents };
 }

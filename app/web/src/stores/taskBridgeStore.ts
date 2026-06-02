@@ -72,9 +72,10 @@ export const useTaskBridgeStore = create<TaskBridgeState>()(
         newTasks[idx] = updated;
 
         // Maintain runToTask index
-        const newRunToTask = { ...s.runToTask };
+        let newRunToTask = { ...s.runToTask };
         if (oldTask.runId && oldTask.runId !== updated.runId) {
-          delete newRunToTask[oldTask.runId];
+          const { [oldTask.runId]: _removed, ...restRunToTask } = newRunToTask;
+          newRunToTask = restRunToTask;
         }
         if (updated.runId) {
           newRunToTask[updated.runId] = taskId;
@@ -88,9 +89,10 @@ export const useTaskBridgeStore = create<TaskBridgeState>()(
         const task = s.tasks.find((t) => t.taskId === taskId);
         if (!task) return s;
 
-        const newRunToTask = { ...s.runToTask };
+        let newRunToTask = { ...s.runToTask };
         if (task.runId) {
-          delete newRunToTask[task.runId];
+          const { [task.runId]: _removed, ...restRunToTask } = newRunToTask;
+          newRunToTask = restRunToTask;
         }
 
         return {
