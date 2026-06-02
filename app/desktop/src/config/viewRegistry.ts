@@ -46,7 +46,7 @@ export interface ViewConfig {
 const RunDetail = lazy(() => import('@/components/RunDetail'));
 const SearchDialog = lazy(() => import('@/components/SearchDialog'));
 const IMView = lazy(() => import('@/views/IMView'));
-const TeamRunConsole = lazy(() => import('@/components/TeamRunConsole'));
+const TeamRunConsole = lazy(() => import('@/views/TeamRunConsole'));
 
 // Eager imports
 import StatusBar from '@/components/StatusBar';
