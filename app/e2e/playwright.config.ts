@@ -22,8 +22,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm --filter agenthub-web preview',
+    command: 'cd ../web && npx vite preview --port 5175 --strictPort',
     port: 5175,
+    timeout: 30_000,
     reuseExistingServer: !process.env.CI,
   },
 });
