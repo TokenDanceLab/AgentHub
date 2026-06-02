@@ -1,20 +1,98 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import zh from './locales/zh.json';
-import en from './locales/en.json';
 
-function detectLanguage(): string {
+import zhCommon from './locales/zh/common.json';
+import zhStatus from './locales/zh/status.json';
+import zhWorkbench from './locales/zh/workbench.json';
+import zhAgentSquare from './locales/zh/agentSquare.json';
+import zhPrivateChats from './locales/zh/privateChats.json';
+import zhGroupWorkspace from './locales/zh/groupWorkspace.json';
+import zhProject from './locales/zh/project.json';
+
+import enCommon from './locales/en/common.json';
+import enStatus from './locales/en/status.json';
+import enWorkbench from './locales/en/workbench.json';
+import enAgentSquare from './locales/en/agentSquare.json';
+import enPrivateChats from './locales/en/privateChats.json';
+import enGroupWorkspace from './locales/en/groupWorkspace.json';
+import enProject from './locales/en/project.json';
+
+export type AppLanguage = 'en' | 'zh';
+
+const LANGUAGE_STORAGE_KEY = 'agenthub-language';
+
+export function normalizeLanguage(value: string | null | undefined): AppLanguage {
+  return value?.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+}
+
+function isAppLanguage(value: string | null | undefined): value is AppLanguage {
+  return value === 'en' || value === 'zh';
+}
+
+function readStoredLanguage(): AppLanguage | null {
+  try {
+    const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    return isAppLanguage(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function detectBrowserLanguage(): AppLanguage {
   if (typeof navigator === 'undefined') return 'en';
-  const lang = navigator.language || '';
-  if (lang.startsWith('zh')) return 'zh';
-  return 'en';
+  const language = navigator.language || navigator.languages?.[0] || '';
+  return normalizeLanguage(language);
+}
+
+export function getInitialLanguage(): AppLanguage {
+  return readStoredLanguage() ?? detectBrowserLanguage() ?? 'en';
+}
+
+export function setLanguagePreference(language: AppLanguage): void {
+  try {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+  } catch {
+    // localStorage may be unavailable in private mode or embedded contexts.
+  }
+
+  void i18n.changeLanguage(language);
 }
 
 i18n.use(initReactI18next).init({
-  resources: { zh: { translation: zh }, en: { translation: en } },
-  lng: detectLanguage(),
+  resources: {
+    zh: {
+      common: zhCommon,
+      status: zhStatus,
+      workbench: zhWorkbench,
+      agentSquare: zhAgentSquare,
+      privateChats: zhPrivateChats,
+      groupWorkspace: zhGroupWorkspace,
+      project: zhProject,
+    },
+    en: {
+      common: enCommon,
+      status: enStatus,
+      workbench: enWorkbench,
+      agentSquare: enAgentSquare,
+      privateChats: enPrivateChats,
+      groupWorkspace: enGroupWorkspace,
+      project: enProject,
+    },
+  },
+  ns: ['common', 'status', 'workbench', 'agentSquare', 'privateChats', 'groupWorkspace', 'project'],
+  defaultNS: 'common',
+  lng: getInitialLanguage(),
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
 });
+
+if (typeof document !== 'undefined') {
+  const syncDocumentLanguage = (language: string) => {
+    document.documentElement.lang = normalizeLanguage(language);
+  };
+
+  syncDocumentLanguage(i18n.resolvedLanguage || i18n.language || getInitialLanguage());
+  i18n.on('languageChanged', syncDocumentLanguage);
+}
 
 export default i18n;

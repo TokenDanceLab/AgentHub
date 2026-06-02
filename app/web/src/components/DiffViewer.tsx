@@ -1,6 +1,9 @@
 // GitHub-style diff viewer with file tree, collapsible hunks, and line numbers
 import { useState } from 'react';
 import { Check, X, ChevronRight, FileCode } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import { EmptyState } from '@shared/ui';
 import type { FileDiff, DiffHunk } from './ChatView.types';
 import styles from './DiffViewer.module.css';
 
@@ -11,11 +14,22 @@ interface Props {
 }
 
 export default function DiffViewer({ files, onAcceptFile, onRejectFile }: Props) {
+  const { t } = useTranslation();
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(() => new Set(files.map((f) => f.filePath)));
   const [activeFile, setActiveFile] = useState<string | null>(files[0]?.filePath ?? null);
 
   if (files.length === 0) {
-    return <div className={styles.empty}>No changes to display</div>;
+    return (
+      <EmptyState
+        className={styles.empty ?? ''}
+        iconClassName={styles.emptyIcon ?? ''}
+        titleClassName={styles.emptyTitle ?? ''}
+        descriptionClassName={styles.emptyDescription ?? ''}
+        icon={<FileCode size={20} />}
+        title={t('diff.empty.title')}
+        description={t('diff.empty.description')}
+      />
+    );
   }
 
   const toggleFile = (path: string) => {
@@ -38,17 +52,27 @@ export default function DiffViewer({ files, onAcceptFile, onRejectFile }: Props)
       <div className={styles.fileTree}>
         <div className={styles.fileTreeHeader}>
           <span className={styles.fileTreeTitle}>
-            {files.length} changed file{files.length !== 1 ? 's' : ''}
+            {t('diff.changedFiles', { count: files.length })}
           </span>
           <span className={styles.fileTreeStats}>
             <span className={styles.addedCount}>+{totalAdditions}</span>
             <span className={styles.deletedCount}>-{totalDeletions}</span>
           </span>
           <div className={styles.fileTreeActions}>
-            <button className={styles.miniBtn} onClick={expandAll} title="Expand all">
+            <button
+              className={styles.miniBtn}
+              onClick={expandAll}
+              title={t('diff.actions.expandAll')}
+              aria-label={t('diff.actions.expandAll')}
+            >
               <ChevronRight size={14} style={{ transform: 'rotate(90deg)' }} />
             </button>
-            <button className={styles.miniBtn} onClick={collapseAll} title="Collapse all">
+            <button
+              className={styles.miniBtn}
+              onClick={collapseAll}
+              title={t('diff.actions.collapseAll')}
+              aria-label={t('diff.actions.collapseAll')}
+            >
               <ChevronRight size={14} />
             </button>
           </div>
@@ -86,6 +110,7 @@ export default function DiffViewer({ files, onAcceptFile, onRejectFile }: Props)
             onToggle={() => toggleFile(file.filePath)}
             onAcceptFile={onAcceptFile}
             onRejectFile={onRejectFile}
+            t={t}
           />
         ))}
       </div>
@@ -111,12 +136,14 @@ function FileDiffSection({
   onToggle,
   onAcceptFile,
   onRejectFile,
+  t,
 }: {
   file: FileDiff;
   expanded: boolean;
   onToggle: () => void;
   onAcceptFile?: ((path: string) => void) | undefined;
   onRejectFile?: ((path: string) => void) | undefined;
+  t: TFunction;
 }) {
   const [accepted, setAccepted] = useState(false);
   const [rejected, setRejected] = useState(false);
@@ -170,16 +197,16 @@ function FileDiffSection({
         <button
           className={`${styles.actionBtn} ${styles.acceptBtn} ${accepted ? styles.acceptBtnActive : ''}`}
           onClick={handleAccept}
-          title={accepted ? 'Undo accept' : 'Accept all changes in this file'}
-          aria-label={accepted ? 'Undo accept' : 'Accept file'}
+          title={accepted ? t('diff.actions.undoAccept') : t('diff.actions.acceptAll')}
+          aria-label={accepted ? t('diff.actions.undoAccept') : t('diff.actions.acceptFile')}
         >
           <Check size={14} />
         </button>
         <button
           className={`${styles.actionBtn} ${styles.rejectBtn} ${rejected ? styles.rejectBtnActive : ''}`}
           onClick={handleReject}
-          title={rejected ? 'Undo reject' : 'Reject all changes in this file'}
-          aria-label={rejected ? 'Undo reject' : 'Reject file'}
+          title={rejected ? t('diff.actions.undoReject') : t('diff.actions.rejectAll')}
+          aria-label={rejected ? t('diff.actions.undoReject') : t('diff.actions.rejectFile')}
         >
           <X size={14} />
         </button>

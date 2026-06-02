@@ -10,7 +10,9 @@ import { VIEW_REGISTRY as REGISTRY } from '@/config/viewRegistry';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 // ── Derive slot→component mapping from config ──
-const SLOT_TO_COMPONENT: Record<string, ComponentType<any>> = {};
+type SlotComponent = ComponentType<Record<string, unknown>>;
+
+const SLOT_TO_COMPONENT: Record<string, unknown> = {};
 for (const [key, cfg] of Object.entries(REGISTRY)) {
   SLOT_TO_COMPONENT[key] = cfg.component;
 }
@@ -34,7 +36,7 @@ interface SlotProps {
  * - Component errors (wraps in ErrorBoundary)
  */
 export const Slot = memo(function Slot({ name, fallback, ...props }: SlotProps) {
-  const Component = SLOT_TO_COMPONENT[name] as ComponentType<any> | undefined;
+  const Component = SLOT_TO_COMPONENT[name] as SlotComponent | undefined;
 
   if (!Component) {
     const msg = `[Slot] Unknown slot "${name}" — not registered. Available: ${Object.keys(SLOT_TO_COMPONENT).join(', ')}`;
@@ -64,7 +66,7 @@ export const Slot = memo(function Slot({ name, fallback, ...props }: SlotProps) 
   const isLazy =
     typeof Component === 'object' &&
     Component !== null &&
-    (Component as any).$$typeof === Symbol.for('react.lazy');
+    (Component as { $$typeof?: symbol }).$$typeof === Symbol.for('react.lazy');
 
   const inner = <Component {...props} />;
 

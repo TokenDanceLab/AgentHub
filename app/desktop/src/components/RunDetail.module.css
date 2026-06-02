@@ -55,9 +55,9 @@
   font-weight: 600;
   font-family: var(--font-mono);
 }
-.statusDone    { background: rgba(105, 201, 103, 0.09); color: #69c967; }
-.statusFailed  { background: rgba(255, 126, 120, 0.09); color: #ff7e78; }
-.statusRunning { background: rgba(93, 104, 204, 0.11); color: #aeb7ff; }
+.statusDone    { background: rgba(105, 201, 103, 0.09); color: var(--success); }
+.statusFailed  { background: rgba(255, 126, 120, 0.09); color: var(--diff-removed-border); }
+.statusRunning { background: rgba(93, 104, 204, 0.11); color: var(--skill); }
 .statusPending { background: rgba(255, 255, 255, 0.07); color: var(--muted-foreground); }
 
 .runId {
@@ -86,11 +86,11 @@
 }
 
 .outputWarning {
-  color: #f4c76b;
+  color: var(--warning);
 }
 
 .outputError {
-  color: #ff9a95;
+  color: var(--destructive);
 }
 
 [data-theme='light'] .output {
@@ -134,6 +134,136 @@
   overflow: hidden;
 }
 
+.reviewSurface {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  padding: 3px 0 8px;
+}
+
+[data-theme='light'] .reviewSurface {
+  border-bottom-color: rgba(0, 0, 0, 0.055);
+}
+
+.reviewGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.reviewCard {
+  min-width: 0;
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+[data-theme='light'] .reviewCard {
+  border-top-color: rgba(0, 0, 0, 0.055);
+}
+
+.reviewCardTitle,
+.reviewItem,
+.runtimeItem {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.reviewCardTitle {
+  gap: 6px;
+  color: color-mix(in oklch, var(--muted-foreground) 82%, transparent);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.reviewList,
+.runtimeList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 5px;
+}
+
+.reviewItem {
+  gap: 7px;
+  min-height: 24px;
+}
+
+.reviewSummary,
+.runtimeSummary,
+.sourceTag,
+.gapText,
+.errorText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: color-mix(in oklch, var(--muted-foreground) 74%, transparent);
+  font-size: 11px;
+}
+
+.sourceTag {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: color-mix(in oklch, var(--muted-foreground) 86%, transparent);
+  font-size: 10px;
+}
+
+.errorText {
+  display: block;
+  padding-top: 5px;
+  color: var(--destructive);
+  white-space: normal;
+}
+
+.reviewActions {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.iconAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.iconAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.actionText {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.runtimeItem {
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.035);
+}
+
+[data-theme='light'] .runtimeItem {
+  border-top-color: rgba(0, 0, 0, 0.045);
+}
+
+.runtimeKind {
+  flex: 0 0 82px;
+  color: var(--foreground);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .cardHeader {
   display: flex;
   align-items: center;
@@ -151,7 +281,7 @@
   padding: 1px 5px;
   border-radius: 999px;
   background: rgba(0,0,0,0.035);
-  color: #8E8E93;
+  color: var(--muted-foreground);
   font-size: 10px;
   font-weight: 600;
 }
@@ -258,7 +388,7 @@
 }
 
 .action {
-  color: #8E8E93;
+  color: var(--muted-foreground);
   font-size: 10px;
   text-transform: uppercase;
   flex-shrink: 0;
@@ -285,6 +415,12 @@
   margin: var(--space-xs) 0;
 }
 
+.evidenceSource {
+  padding: 0 0 6px;
+  color: color-mix(in oklch, var(--muted-foreground) 74%, transparent);
+  font-size: 11px;
+}
+
 /* Secondary summary when diff review is the primary view */
 .tabContentSecondary {
   flex: 0 0 auto;
@@ -306,5 +442,39 @@
   align-items: center;
   padding: 2px 0;
 }
-.usageLabel { font-size: 11px; color: #8E8E93; }
+.usageLabel { font-size: 11px; color: var(--muted-foreground); }
 .usageValue { font-size: 11px; font-family: var(--font-mono); }
+
+/* ── Event summary grid ─────────────────────── */
+.summaryGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  padding: 4px 0 8px;
+}
+
+.summaryItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.summaryIcon {
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
+.summaryLabel {
+  font-size: 11px;
+  color: var(--text-weakest);
+  flex: 1;
+  min-width: 0;
+}
+
+.summaryValue {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--muted-foreground);
+}

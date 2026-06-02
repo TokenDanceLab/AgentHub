@@ -1,14 +1,53 @@
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clipboard,
+  Code2,
+  Copy,
+  ExternalLink,
+  FileText,
+  GitPullRequestArrow,
+  RefreshCw,
+  ShieldAlert,
+  TerminalSquare,
+  X,
+  XCircle,
+} from "lucide-react";
 import { StatusBadge } from "@agenthub/shared/components";
+import { ActivityCard, BottomSheet, CodePreviewCard, MetricGrid, SegmentedControl, StatusNotice } from "@agenthub/shared/ui";
 import type { StatusVariant } from "@agenthub/shared/components";
-import type { Run, RunStatus } from "@agenthub/shared";
-import { useQuery } from "@tanstack/react-query";
-import { getRun, getRunLogs } from "@agenthub/shared";
+import type { Artifact, Preview, Run, RunStatus, ThreadItem } from "@agenthub/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  decideApproval,
+  getRun,
+  getRunDiff,
+  getRunLogs,
+  listApprovals,
+  listArtifacts,
+  listPreviews,
+  listRunItems,
+} from "@agenthub/shared";
+import { useTranslation } from "react-i18next";
 
 interface RunStatusViewProps {
   run: Run;
   onBack: () => void;
 }
+
+type RunSection = "review" | "diff" | "blocks" | "outputs" | "logs";
+type Decision = "approved" | "rejected";
+type LogFilter = "all" | "review" | "diff" | "mobile" | "error";
+type RunDiffFile = {
+  path?: string;
+  filePath?: string;
+  diff?: string;
+  status?: string;
+  additions?: number;
+  deletions?: number;
+  hunks?: Array<{ lines?: Array<{ content?: string; text?: string }> }>;
+};
 
 function runStatusToVariant(s: RunStatus): StatusVariant {
   switch (s) {
@@ -17,65 +56,428 @@ function runStatusToVariant(s: RunStatus): StatusVariant {
     case "running": return "running";
     case "waiting_approval": return "review";
     case "finished": return "done";
+    case "failed": return "error";
+    case "cancelled": return "offline";
     default: return "pending";
   }
 }
 
+function blockIcon(kind: ThreadItem["kind"]) {
+  switch (kind) {
+    case "approval": return ShieldAlert;
+    case "diff": return GitPullRequestArrow;
+    case "code": return Code2;
+    case "file": return FileText;
+    default: return TerminalSquare;
+  }
+}
+
+function logRows(stdout: string | undefined, stderr: string | undefined, waitingLabel: string) {
+  const rows = [
+    ...(stdout ?? "").split(/\r?\n/).filter(Boolean).map((line) => ({ source: "stdout", line })),
+    ...(stderr ?? "").split(/\r?\n/).filter(Boolean).map((line) => ({ source: "stderr", line })),
+  ];
+  return rows.length ? rows : [{ source: "stdout", line: waitingLabel }];
+}
+
+function diffFilePath(file: RunDiffFile) {
+  return file.path ?? file.filePath ?? "changed file";
+}
+
+function diffFileText(file: RunDiffFile) {
+  if (file.diff) return file.diff;
+  const hunkText = file.hunks
+    ?.flatMap((hunk) => hunk.lines ?? [])
+    .map((line) => line.content ?? line.text ?? "")
+    .filter(Boolean)
+    .join("\n");
+  return hunkText || `${file.status ?? "modified"} +${file.additions ?? 0} -${file.deletions ?? 0}`;
+}
+
 export function RunStatusView({ run, onBack }: RunStatusViewProps) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [activeSection, setActiveSection] = useState<RunSection>("review");
+  const [logFilter, setLogFilter] = useState<LogFilter>("all");
+  const [pendingDecision, setPendingDecision] = useState<Decision | null>(null);
+  const [sheetError, setSheetError] = useState(false);
+  const [decisionNotice, setDecisionNotice] = useState<Decision | null>(null);
+  const [localDecisionStatus, setLocalDecisionStatus] = useState<Decision | null>(null);
+  const [selectedResource, setSelectedResource] = useState<Artifact | Preview | null>(null);
+  const [copiedResourceId, setCopiedResourceId] = useState<string | null>(null);
+  const [copiedDetail, setCopiedDetail] = useState(false);
+
+  const reviewRef = useRef<HTMLElement | null>(null);
+  const diffRef = useRef<HTMLElement | null>(null);
+  const blocksRef = useRef<HTMLElement | null>(null);
+  const outputsRef = useRef<HTMLElement | null>(null);
+  const logsRef = useRef<HTMLElement | null>(null);
+
   const runDetail = useQuery({
     queryKey: ["run", run.runId],
     queryFn: () => getRun(run.runId),
     refetchInterval: 5000,
   });
+  const runItems = useQuery({ queryKey: ["run-items", run.runId], queryFn: () => listRunItems(run.runId) });
+  const diff = useQuery({ queryKey: ["run-diff", run.runId], queryFn: () => getRunDiff(run.runId) });
+  const logs = useQuery({ queryKey: ["run-logs", run.runId], queryFn: () => getRunLogs(run.runId) });
+  const approvals = useQuery({ queryKey: ["approvals"], queryFn: listApprovals });
+  const artifacts = useQuery({ queryKey: ["artifacts"], queryFn: listArtifacts });
+  const previews = useQuery({ queryKey: ["previews"], queryFn: listPreviews });
 
-  const logs = useQuery({
-    queryKey: ["run-logs", run.runId],
-    queryFn: () => getRunLogs(run.runId),
+  const approval = approvals.data?.items.find((item) => item.runId === run.runId);
+  const decisionStatus = localDecisionStatus ?? approval?.status;
+  const status = decisionStatus === "approved"
+    ? "running"
+    : decisionStatus === "rejected"
+      ? "failed"
+      : (runDetail.data?.status ?? run.status);
+  const blocks = runItems.data?.items ?? [];
+  const diffFiles = (diff.data?.files ?? []) as RunDiffFile[];
+  const runArtifacts = artifacts.data?.items.filter((item) => item.runId === run.runId) ?? [];
+  const runPreviews = previews.data?.items.filter((item) => item.runId === run.runId) ?? [];
+  const resources = [...runArtifacts, ...runPreviews];
+  const allLogRows = logRows(logs.data?.stdout, logs.data?.stderr, t("runDetail.context.waitingOutput"));
+  const filteredLogRows = useMemo(() => {
+    if (logFilter === "all") return allLogRows;
+    const needle = logFilter.toLowerCase();
+    return allLogRows.filter((row) => row.source.toLowerCase().includes(needle) || row.line.toLowerCase().includes(needle));
+  }, [allLogRows, logFilter]);
+  const logFilterOptions: Array<{ value: LogFilter; label: string }> = [
+    { value: "all", label: t("runDetail.logs.filters.all") },
+    { value: "review", label: t("runDetail.logs.filters.review") },
+    { value: "diff", label: t("runDetail.logs.filters.diff") },
+    { value: "mobile", label: t("runDetail.logs.filters.mobile") },
+    { value: "error", label: t("runDetail.logs.filters.error") },
+  ];
+
+  const decision = useMutation({
+    mutationFn: (nextDecision: Decision) => {
+      if (!approval) throw new Error(t("runDetail.review.missingApproval"));
+      return decideApproval(approval.id, { decision: nextDecision });
+    },
+    onSuccess: (_result, nextDecision) => {
+      setSheetError(false);
+      setDecisionNotice(nextDecision);
+      setLocalDecisionStatus(nextDecision);
+      setPendingDecision(null);
+      queryClient.setQueryData<{ items: Run[] }>(["runs"], (current) => current
+        ? {
+            ...current,
+            items: current.items.map((item) => item.runId === run.runId
+              ? { ...item, status: nextDecision === "approved" ? "running" : "failed" }
+              : item),
+          }
+        : current);
+      void queryClient.invalidateQueries({ queryKey: ["approvals"] });
+      void queryClient.invalidateQueries({ queryKey: ["runs"] });
+      void queryClient.invalidateQueries({ queryKey: ["run", run.runId] });
+    },
+    onError: () => setSheetError(true),
   });
 
-  const status = runDetail.data?.status ?? run.status;
+  function sectionRef(section: RunSection) {
+    return { review: reviewRef, diff: diffRef, blocks: blocksRef, outputs: outputsRef, logs: logsRef }[section];
+  }
+
+  function jumpTo(section: RunSection) {
+    setActiveSection(section);
+    sectionRef(section).current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  async function copyResource(resource: Artifact | Preview) {
+    const value = "path" in resource ? resource.path : resource.url ?? resource.id;
+    await navigator.clipboard.writeText(value);
+    setCopiedResourceId(resource.id);
+    window.setTimeout(() => setCopiedResourceId(null), 1400);
+  }
+
+  async function copySelectedResource() {
+    if (!selectedResource) return;
+    const value = "path" in selectedResource ? selectedResource.path : selectedResource.url ?? selectedResource.id;
+    await navigator.clipboard.writeText(value);
+    setCopiedDetail(true);
+  }
 
   return (
-    <div className="flex flex-col h-full">
-      <header
-        className="glass shrink-0 flex items-center gap-3 px-3"
-        style={{
-          height: "calc(56px + env(safe-area-inset-top))",
-          paddingTop: "env(safe-area-inset-top)",
-        }}
-      >
-        <button
-          onClick={onBack}
-          className="flex items-center justify-center rounded-lg"
-          style={{ width: 40, height: 40, color: "var(--td-ink-70)" }}
-          aria-label="Back"
-        >
+    <div className="mobileView">
+      <header className="mobileHeader mobileChatHeader">
+        <button onClick={onBack} className="mobileIconButton" type="button" aria-label={t("runDetail.actions.back")}>
           <ArrowLeft size={20} />
         </button>
-        <div className="flex-1 min-w-0 flex items-center gap-2">
-          <h2 className="text-base font-semibold truncate" style={{ color: "var(--td-ink)" }}>
-            Run {run.runId.slice(0, 8)}
-          </h2>
+        <div className="mobileHeaderTitle">
+          <p className="mobileEyebrow">{t("runDetail.header.eyebrow")}</p>
+          <h1>{t("runDetail.header.title", { runId: run.runId.slice(0, 8) })}</h1>
+        </div>
+        <div className="mobileStatusBadge">
           <StatusBadge status={runStatusToVariant(status)} />
         </div>
-        {runDetail.isFetching && (
-          <RefreshCw size={14} className="animate-spin" style={{ color: "var(--td-ink-30)" }} />
-        )}
+        {runDetail.isFetching && <RefreshCw size={14} className="mobileSpin" />}
       </header>
 
-      <div className="flex-1 scroll-container px-3 py-3">
-        <pre
-          className="text-xs font-mono whitespace-pre-wrap rounded-lg p-3"
-          style={{
-            backgroundColor: "var(--td-surface)",
-            border: "1px solid var(--td-line)",
-            color: "var(--td-ink-70)",
-            minHeight: 100,
-          }}
-        >
-          {logs.data?.stdout ?? "Waiting for output..."}
-        </pre>
+      <div className="mobileScroll mobileRunDetailScroll">
+        <section className="mobileOverviewPanel">
+          <p className="mobileEyebrow">{t("runDetail.context.eyebrow")}</p>
+          <h2>{run.projectId}</h2>
+          <MetricGrid
+            className="mobileMetricGrid"
+            itemClassName="mobileMetricTile"
+            interactiveItemClassName="mobileSummaryShortcut"
+            items={[
+              {
+                id: "review",
+                value: decisionStatus === "approved"
+                  ? t("runDetail.summary.approved")
+                  : decisionStatus === "rejected"
+                    ? t("runDetail.summary.rejected")
+                    : t("runDetail.summary.reviewValue"),
+                label: t("runDetail.summary.review"),
+                onClick: () => jumpTo("review"),
+              },
+              {
+                id: "blocks",
+                value: blocks.length,
+                label: t("runDetail.summary.blocks"),
+                ariaLabel: `Blocks summary: ${blocks.length} items`,
+                onClick: () => jumpTo("blocks"),
+              },
+              {
+                id: "outputs",
+                value: resources.length,
+                label: t("runDetail.summary.outputs"),
+                onClick: () => jumpTo("outputs"),
+              },
+            ]}
+          />
+        </section>
+
+        <SegmentedControl
+          as="nav"
+          ariaLabel={t("runDetail.sections.aria")}
+          value={activeSection}
+          onChange={jumpTo}
+          className="mobileRunSectionNav"
+          optionClassName="mobileSegmentButton"
+          activeOptionClassName="mobileSegmentButtonActive"
+          options={(["review", "diff", "blocks", "outputs", "logs"] as RunSection[]).map((section) => ({
+            value: section,
+            label: t(`runDetail.sections.${section}`),
+          }))}
+        />
+
+        <section className="mobileApprovalPanel" ref={reviewRef}>
+          <p className="mobileEyebrow">{t("runDetail.sections.review")}</p>
+          <h2>{approval?.summary ?? t("runDetail.review.pending")}</h2>
+          <p>{decisionStatus === "approved" ? t("runDetail.review.approved") : decisionStatus === "rejected" ? t("runDetail.review.rejected") : t("runDetail.review.description")}</p>
+          {decisionNotice && (
+            <StatusNotice className="mobileDecisionNotice">
+              {decisionNotice === "approved"
+                ? t("runDetail.review.decisionApproved")
+                : t("runDetail.review.decisionRejected")}
+            </StatusNotice>
+          )}
+          {decisionStatus && decisionStatus !== "pending" && (
+            <StatusNotice
+              className="mobileDecisionLock"
+              icon={decisionStatus === "approved" ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+              role="note"
+              ariaLive="off"
+            >
+              {decisionStatus === "approved" ? t("runDetail.review.lockApproved") : t("runDetail.review.lockRejected")}
+            </StatusNotice>
+          )}
+          {decisionStatus && decisionStatus !== "pending" && (
+            <button className="mobileActionButton" type="button" onClick={onBack}>{t("runDetail.actions.backToQueue")}</button>
+          )}
+        </section>
+
+        <section className="mobileDiffPanel" ref={diffRef}>
+          <p className="mobileEyebrow">{t("runDetail.sections.diff")}</p>
+          <h2>{t("runDetail.diff.title", { count: diffFiles.length })}</h2>
+          {diffFiles.map((file) => (
+            <CodePreviewCard
+              key={diffFilePath(file)}
+              className="mobileDiffFile"
+              titleClassName="mobileDiffFileTitle"
+              bodyClassName="mobileDiffCode"
+              title={diffFilePath(file)}
+              meta={`+${file.additions ?? 0} -${file.deletions ?? 0}`}
+              code={diffFileText(file)}
+            />
+          ))}
+        </section>
+
+        <section className="mobileRunBlocksPanel" ref={blocksRef}>
+          <p className="mobileEyebrow">{t("runDetail.sections.blocks")}</p>
+          <h2>{t("runDetail.blocks.title", { count: blocks.length })}</h2>
+          <div className="mobileRunBlockList">
+            {blocks.map((block, index) => {
+              const Icon = blockIcon(block.kind);
+              return (
+                <ActivityCard
+                  key={block.id}
+                  className="mobileRunBlock"
+                  leading={index + 1}
+                  leadingClassName="mobileRunBlockIndex"
+                  icon={<Icon size={16} />}
+                  iconClassName="mobileRunBlockIcon"
+                  bodyClassName="mobileRunBlockBody"
+                  label={block.kind}
+                >
+                  {block.content}
+                </ActivityCard>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="mobileRunResourcesPanel" ref={outputsRef}>
+          <p className="mobileEyebrow">{t("runDetail.sections.outputs")}</p>
+          <h2>{t("runDetail.outputs.title", { count: resources.length })}</h2>
+          {resources.map((resource) => {
+            const isArtifact = "path" in resource;
+            const label = isArtifact ? resource.path : resource.url ?? resource.id;
+            return (
+              <ActivityCard
+                key={resource.id}
+                className="mobileResourceRow"
+                icon={isArtifact ? <FileText size={16} /> : <ExternalLink size={16} />}
+                iconClassName="mobileRunBlockIcon"
+                bodyClassName="mobileRunBlockBody"
+                label={isArtifact ? t("runDetail.outputs.artifact") : t("runDetail.outputs.preview")}
+                actionsClassName="mobileResourceActions"
+                actions={(
+                  <>
+                    <button className="mobileActionButton" type="button" onClick={() => void copyResource(resource)}>
+                      <Copy size={15} />
+                      <span>{copiedResourceId === resource.id ? t("common.copied") : t("runDetail.actions.copy")}</span>
+                    </button>
+                    <button className="mobileActionButton" type="button" aria-label={t("runDetail.actions.inspectResource", { label })} onClick={() => { setCopiedDetail(false); setSelectedResource(resource); }}>
+                      <Clipboard size={15} />
+                      <span>{t("runDetail.actions.inspect")}</span>
+                    </button>
+                  </>
+                )}
+              >
+                {label}
+              </ActivityCard>
+            );
+          })}
+        </section>
+
+        <section className="mobileLogPanel" ref={logsRef}>
+          <p className="mobileEyebrow">{t("runDetail.sections.logs")}</p>
+          <h2>{t("runDetail.logs.title")}</h2>
+          <SegmentedControl
+            ariaLabel={t("runDetail.logs.title")}
+            value={logFilter}
+            onChange={setLogFilter}
+            className="mobileLogFilterBar"
+            optionClassName="mobileLogFilterChip"
+            activeOptionClassName="mobileLogFilterChipActive"
+            options={logFilterOptions}
+          />
+          <div className="mobileLogFrame">
+            {filteredLogRows.map((row, index) => (
+              <div className="mobileLogLine" key={`${row.source}-${index}`}>
+                <span>{index + 1}</span>
+                <strong>{row.source}</strong>
+                <code>{row.line}</code>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
+
+      {(!decisionStatus || decisionStatus === "pending") && (
+        <div className="mobileReviewDock">
+          <button className="mobileActionButton" type="button" onClick={() => { setSheetError(false); setPendingDecision("approved"); }}>
+            <CheckCircle2 size={16} />
+            <span>{t("runDetail.actions.approve")}</span>
+          </button>
+          <button className="mobileActionButton mobileDangerAction" type="button" onClick={() => { setSheetError(false); setPendingDecision("rejected"); }}>
+            <XCircle size={16} />
+            <span>{t("runDetail.actions.reject")}</span>
+          </button>
+        </div>
+      )}
+
+      {pendingDecision && (
+        <BottomSheet
+          ariaLabel={t("runDetail.decisionSheet.aria")}
+          title={t("runDetail.decisionSheet.title")}
+          closeLabel={t("runDetail.decisionSheet.close")}
+          eyebrow={pendingDecision === "approved" ? t("runDetail.actions.approve") : t("runDetail.actions.reject")}
+          description={pendingDecision === "approved" ? t("runDetail.decisionSheet.approveDescription") : t("runDetail.decisionSheet.rejectDescription")}
+          closeIcon={<X size={18} />}
+          closeDisabled={decision.isPending}
+          onClose={() => setPendingDecision(null)}
+          layerClassName="mobileSheetLayer"
+          scrimClassName="mobileSheetScrim"
+          sheetClassName="mobileBottomSheet"
+          handleClassName="mobileSheetHandle"
+          headerClassName="mobileSheetHeader"
+          eyebrowClassName="mobileEyebrow"
+          closeButtonClassName="mobileIconButton"
+          descriptionClassName="mobileSheetDescription"
+          footerClassName="mobileSheetActions"
+          footer={(
+            <>
+              <button className="mobileActionButton" type="button" disabled={decision.isPending} onClick={() => setPendingDecision(null)}>{t("common.cancel")}</button>
+              <button
+                className="mobileActionButton"
+                type="button"
+                disabled={decision.isPending}
+                onClick={() => decision.mutate(pendingDecision)}
+              >
+                {decision.isPending && <RefreshCw size={16} className="mobileSpin" />}
+                <span>{pendingDecision === "approved" ? t("runDetail.decisionSheet.confirmApprove") : t("runDetail.decisionSheet.confirmReject")}</span>
+              </button>
+            </>
+          )}
+        >
+            <StatusNotice
+              className="mobileSignalRow"
+              icon={decision.isPending ? <RefreshCw size={14} className="mobileSpin" /> : sheetError ? <XCircle size={14} /> : <ShieldAlert size={14} />}
+            >
+              {decision.isPending
+                ? t("runDetail.decisionSheet.submitting")
+                : sheetError
+                  ? t("runDetail.decisionSheet.error")
+                  : t("runDetail.decisionSheet.ready")}
+            </StatusNotice>
+        </BottomSheet>
+      )}
+
+      {selectedResource && (
+        <BottomSheet
+          ariaLabel={t("runDetail.resourceSheet.aria")}
+          title={t("runDetail.resourceSheet.title")}
+          closeLabel={t("runDetail.resourceSheet.close")}
+          eyebrow={t("runDetail.resourceSheet.eyebrow")}
+          description={"path" in selectedResource ? selectedResource.path : selectedResource.url ?? selectedResource.id}
+          closeIcon={<X size={18} />}
+          onClose={() => setSelectedResource(null)}
+          layerClassName="mobileSheetLayer"
+          scrimClassName="mobileSheetScrim"
+          sheetClassName="mobileBottomSheet"
+          handleClassName="mobileSheetHandle"
+          headerClassName="mobileSheetHeader"
+          eyebrowClassName="mobileEyebrow"
+          closeButtonClassName="mobileIconButton"
+          descriptionClassName="mobileSheetDescription"
+          footerClassName="mobileSheetActions"
+          footer={(
+            <>
+              <button className="mobileActionButton" type="button" onClick={() => void copySelectedResource()}>
+                <Copy size={16} />
+                <span>{copiedDetail ? t("common.copied") : t("runDetail.actions.copyPath")}</span>
+              </button>
+              <button className="mobileActionButton" type="button" onClick={() => setSelectedResource(null)}>{t("runDetail.resourceSheet.close")}</button>
+            </>
+          )}
+        />
+      )}
     </div>
   );
 }

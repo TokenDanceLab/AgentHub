@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createEventStream, EventHandler } from '../api/eventClient';
+import { createEventStream } from '../api/eventClient';
 
 // Track WebSocket instances created by the stream
 const instances: MockWebSocket[] = [];
@@ -71,10 +71,10 @@ describe('eventClient', () => {
     stream.onStatusChange(statusFn);
 
     lastWs().onopen?.();
-    expect(statusFn).toHaveBeenCalledWith(true);
+    expect(statusFn).toHaveBeenCalledWith('connected');
 
-    lastWs().close(); // triggers onclose → notifyStatus(false)
-    expect(statusFn).toHaveBeenCalledWith(false);
+    lastWs().close(); // triggers onclose → notifyStatus('disconnected')
+    expect(statusFn).toHaveBeenCalledWith('disconnected');
 
     stream.close();
   });

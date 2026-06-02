@@ -5,6 +5,7 @@ package adapters
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/agenthub/edge-server/internal/runnerctx"
@@ -118,6 +119,7 @@ const (
 	BusEventTaskDispatched      = "run.agent.task_dispatched"
 	BusEventTaskProgress        = "run.agent.task_progress"
 	BusEventTaskNotification    = "run.agent.task_notification"
+	BusEventSubAgentStatus      = "run.agent.sub_agent_status"
 	BusEventSessionStateChanged = "run.agent.session_state_changed"
 	BusEventHookStarted         = "run.agent.hook_started"
 	BusEventHookProgress        = "run.agent.hook_progress"
@@ -141,3 +143,47 @@ type ctxKey string
 // CtxSessionID is used to pass the session ID through context to adapters
 // so the permission handler can include it in permission events.
 const CtxSessionID ctxKey = "agenthub-session-id"
+
+// --- Stream parse error handling ---
+
+// ParseStreamError wraps an error from ParseStream with a recoverability flag.
+// Non-recoverable errors (pipe broken, context cancelled) should fail the run.
+// Recoverable errors (malformed tool result, orphaned tool, single bad event)
+// should emit a BusEventContextWarning and allow the run to finish naturally.
+//
+// Reference: Kanna agent.ts:1406-1419 (try/catch in runTurn, appends error
+// entry, calls recordTurnFailed), OpenCode prompt.ts:1281-1290 (orphaned
+// interrupted tools handling — logs warning, exits loop cleanly).
+type ParseStreamError struct {
+	err        error
+	recoverable bool
+}
+
+// NewRecoverableParseError creates a ParseStreamError that should not
+// terminate the run. Use for individual malformed events, orphaned tool
+// results, or other recoverable stream parsing issues.
+func NewRecoverableParseError(err error) *ParseStreamError {
+	return &ParseStreamError{err: err, recoverable: true}
+}
+
+// NewNonRecoverableParseError creates a ParseStreamError that should
+// terminate the run. Use for broken pipes, context cancellation, and
+// other unrecoverable I/O failures.
+func NewNonRecoverableParseError(err error) *ParseStreamError {
+	return &ParseStreamError{err: err, recoverable: false}
+}
+
+// Recoverable reports whether this error should allow the run to complete
+// rather than being marked as failed.
+func (e *ParseStreamError) Recoverable() bool { return e.recoverable }
+
+// Error implements the error interface.
+func (e *ParseStreamError) Error() string {
+	if e.err == nil {
+		return "parse stream error"
+	}
+	return fmt.Sprintf("parse stream error: %v", e.err)
+}
+
+// Unwrap returns the underlying error for errors.Is / errors.As chains.
+func (e *ParseStreamError) Unwrap() error { return e.err }

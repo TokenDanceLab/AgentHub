@@ -25,7 +25,7 @@
 
 .textarea {
   width: 100%;
-  min-height: 36px;
+  min-height: 44px;
   max-height: 120px;
   padding: var(--space-sm) var(--space-md);
   border: 1px solid oklch(0.84 0.008 250 / 0.58);
@@ -104,8 +104,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: none;
   border-radius: 8px;
   background: var(--brand);
@@ -127,5 +127,9 @@
 @media (max-width: 768px) {
   .root {
     padding: var(--space-sm);
+  }
+
+  .bar {
+    gap: 8px;
   }
 }

@@ -11,10 +11,15 @@ export default defineConfig({
     },
   },
   build: {
-    target: "es2021",
+    target: ['es2021', 'chrome100', 'safari15'],
   },
+  envPrefix: ['VITE_', 'TAURI_'],
   server: {
     port: 5174,
     strictPort: true,
+  },
+  test: {
+    environment: "jsdom",
+    globals: true,
   },
 });

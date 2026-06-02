@@ -1,0 +1,320 @@
+/* ToolGroup — collapsed group of consecutive tool_use blocks */
+.root {
+  width: fit-content;
+  max-width: 100%;
+  margin: 3px 0;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.018);
+  overflow: hidden;
+}
+
+[data-theme='light'] .root {
+  border-color: rgba(15, 23, 42, 0.07);
+  background: rgba(15, 23, 42, 0.016);
+}
+
+/* ── Summary header (collapsed state) ──────── */
+.summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 10px 4px 8px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: color-mix(in oklch, var(--foreground) 62%, transparent);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.45;
+  transition:
+    background 0.18s var(--ease-out),
+    color 0.18s var(--ease-out);
+}
+
+.summary:hover,
+.summary:focus-visible {
+  background: rgba(255, 255, 255, 0.04);
+  color: color-mix(in oklch, var(--foreground) 82%, transparent);
+  outline: none;
+}
+
+.summary .chevron {
+  flex-shrink: 0;
+  margin-left: 0;
+  font-size: 13px;
+  opacity: 0.72;
+}
+
+.summary .chevronOpen {
+  transform: rotate(90deg);
+}
+
+.summaryCount {
+  font-weight: 680;
+  white-space: nowrap;
+}
+
+.summaryCategories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.categoryChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 540;
+  line-height: 1.45;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.04);
+  color: color-mix(in oklch, var(--foreground) 58%, var(--muted-foreground) 42%);
+}
+
+[data-theme='light'] .categoryChip {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.categoryChip .chipCount {
+  font-weight: 720;
+  color: color-mix(in oklch, var(--foreground) 76%, var(--muted-foreground) 24%);
+}
+
+.summaryStatus {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 540;
+  line-height: 1.45;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ── Expanded body ─────────────────────────── */
+.body {
+  padding: 0 6px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ── Individual tool card inside group ─────── */
+.toolCard {
+  width: 100%;
+  margin: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+[data-theme='light'] .toolCard {
+  background: rgba(15, 23, 42, 0.012);
+}
+
+.toolCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 26px;
+  padding: 3px 8px 3px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: color-mix(in oklch, var(--foreground) 56%, transparent);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.45;
+  transition:
+    background 0.15s var(--ease-out),
+    color 0.15s var(--ease-out);
+}
+
+.toolCardHeader:hover,
+.toolCardHeader:focus-visible {
+  background: rgba(255, 255, 255, 0.035);
+  color: color-mix(in oklch, var(--foreground) 78%, transparent);
+  outline: none;
+}
+
+.toolCardIcon {
+  flex-shrink: 0;
+  font-size: 13px;
+  opacity: 0.58;
+}
+
+.toolCardName {
+  font-weight: 620;
+  white-space: nowrap;
+}
+
+.toolCardSummary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.5;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.toolCardStatus {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 540;
+  line-height: 1.4;
+}
+
+.toolCardChevron {
+  flex-shrink: 0;
+  margin-left: 1px;
+  font-size: 11px;
+  opacity: 0;
+}
+
+.toolCardHeader:hover .toolCardChevron,
+.toolCardHeader:focus-visible .toolCardChevron,
+.toolCardHeader[aria-expanded='true'] .toolCardChevron {
+  opacity: 0.62;
+}
+
+.toolCardChevronOpen {
+  transform: rotate(90deg);
+}
+
+/* ── Tool card expanded body ───────────────── */
+.toolCardBody {
+  padding: 2px 8px 6px 24px;
+}
+
+.toolCardBody .showParamsBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.035);
+  color: color-mix(in oklch, var(--foreground) 54%, transparent);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.45;
+  transition:
+    background 0.15s var(--ease-out),
+    color 0.15s var(--ease-out);
+}
+
+.toolCardBody .showParamsBtn:hover,
+.toolCardBody .showParamsBtn:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+  color: color-mix(in oklch, var(--foreground) 76%, transparent);
+  outline: none;
+}
+
+.toolCardParams {
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 5px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  max-height: 180px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  color: color-mix(in oklch, var(--foreground) 56%, var(--muted-foreground) 44%);
+}
+
+/* Reuse result styles from ChatView */
+.readResult {
+  margin: 3px 0;
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 11px;
+  color: color-mix(in oklch, var(--foreground) 52%, var(--muted-foreground) 48%);
+}
+
+.readResult code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.bashResult {
+  margin: 3px 0;
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 11px;
+}
+
+.toolOutput {
+  margin: 2px 0;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  max-height: 160px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  color: color-mix(in oklch, var(--foreground) 62%, var(--muted-foreground) 38%);
+}
+
+.toolStderr {
+  color: color-mix(in oklch, var(--destructive) 62%, var(--foreground) 38%);
+}
+
+.exitCode {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 540;
+  font-family: var(--font-mono);
+  background: rgba(255, 255, 255, 0.03);
+  color: color-mix(in oklch, var(--foreground) 54%, var(--muted-foreground) 46%);
+}
+
+/* ── Status badges ─────────────────────────── */
+.statusPending {
+  background: rgba(255, 255, 255, 0.03);
+  color: color-mix(in oklch, var(--muted-foreground) 74%, var(--foreground) 26%);
+}
+
+.statusRunning {
+  background: rgba(255, 255, 255, 0.04);
+  color: color-mix(in oklch, var(--warning) 72%, var(--foreground) 28%);
+}
+
+.statusDone {
+  background: rgba(255, 255, 255, 0.03);
+  color: color-mix(in oklch, var(--success) 68%, var(--foreground) 32%);
+}
+
+.statusFailed {
+  background: rgba(255, 255, 255, 0.03);
+  color: color-mix(in oklch, var(--destructive) 72%, var(--foreground) 28%);
+}
+
+/* ── Light theme overrides ─────────────────── */
+[data-theme='light'] .toolCardBody .showParamsBtn {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+[data-theme='light'] .toolCardBody .showParamsBtn:hover,
+[data-theme='light'] .toolCardBody .showParamsBtn:focus-visible {
+  background: rgba(15, 23, 42, 0.06);
+}

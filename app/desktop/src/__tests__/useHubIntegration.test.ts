@@ -98,7 +98,8 @@ vi.mock('@/stores/taskBridgeStore', () => {
 // ── Imports after mocks ─────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
+import { createServer, type IncomingMessage } from 'node:http';
 import type { HubWSHandle } from '@/api/hubWS';
 import type { HubClient } from '@/api/hubClient';
 import { HUB_EVENTS } from '@shared/hubEvents';
@@ -133,6 +134,20 @@ function makeDispatchPayload(overrides: Record<string, unknown> = {}): Record<st
 }
 
 type HubEventHandler = (payload: unknown) => void;
+const HUB_AGENT_CONTROL_EVENT = 'agent.control';
+const nativeFetch = globalThis.fetch.bind(globalThis);
+
+function readRequestBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => resolve(body));
+    req.on('error', reject);
+  });
+}
 
 describe('useHubIntegration', () => {
   let hubWS: HubWSHandle;
@@ -607,6 +622,11 @@ describe('useHubIntegration', () => {
       { runId: 'run-1' },
     );
     expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'done', 'run-1');
+    expect(hoisted.storeTasks).toContainEqual(expect.objectContaining({
+      taskId: 'task-1',
+      runId: 'run-1',
+      status: 'done',
+    }));
   });
 
   it('uses remembered output for successful run.agent.result without content', async () => {
@@ -702,6 +722,285 @@ describe('useHubIntegration', () => {
     );
   });
 
+  // ── Hub agent.control → Edge permission decision ──────
+
+  it('applies Hub permission.decide agent.control to Local Edge', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_AGENT_CONTROL_EVENT, {
+        kind: 'permission.decide',
+        agent_task_id: 'task-approval-1',
+        edge_control: {
+          runId: 'edge-run-1',
+          requestId: 'perm-1',
+          decision: 'allow',
+          reason: 'Approved from TeamRun Console',
+        },
+      });
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:3210/v1/permissions/decide',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    expect(fetchBodyFor('/v1/permissions/decide')).toEqual({
+      runId: 'edge-run-1',
+      requestId: 'perm-1',
+      decision: 'allow',
+      reason: 'Approved from TeamRun Console',
+    });
+  });
+
+  it('accepts camelCase edgeControl agent.control payloads', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_AGENT_CONTROL_EVENT, {
+        kind: 'permission.decide',
+        edgeControl: {
+          run_id: 'edge-run-2',
+          request_id: 'perm-2',
+          decision: 'DENY',
+        },
+      });
+    });
+
+    expect(fetchBodyFor('/v1/permissions/decide')).toEqual({
+      runId: 'edge-run-2',
+      requestId: 'perm-2',
+      decision: 'deny',
+    });
+  });
+
+  it('does not replay duplicate successful agent.control permission decisions in one session', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    const payload = {
+      kind: 'permission.decide',
+      edge_control: {
+        runId: 'edge-run-dup',
+        requestId: 'perm-dup',
+        decision: 'allow',
+      },
+    };
+
+    await act(async () => {
+      fireHubEvent(HUB_AGENT_CONTROL_EVENT, payload);
+      fireHubEvent(HUB_AGENT_CONTROL_EVENT, payload);
+    });
+
+    expect(fetchCallCountEndingWith('/v1/permissions/decide')).toBe(1);
+  });
+
+  it('consumes a real HTTP Edge pending permission endpoint from Hub agent.control', async () => {
+    type PendingPermission = {
+      projectId: string;
+      threadId: string;
+      runId: string;
+      requestId: string;
+      toolName: string;
+      toolUseId: string;
+    };
+
+    const pending = new Map<string, PendingPermission>();
+    const keyFor = (runId: string, requestId: string) => `${runId}\u001f${requestId}`;
+    pending.set(keyFor('edge-run-live', 'perm-live'), {
+      projectId: 'proj-live',
+      threadId: 'thread-live',
+      runId: 'edge-run-live',
+      requestId: 'perm-live',
+      toolName: 'Bash',
+      toolUseId: 'tool-live',
+    });
+
+    const requests: Array<Record<string, unknown>> = [];
+    const decidedEvents: Array<Record<string, unknown>> = [];
+    const server = createServer(async (req, res) => {
+      if (req.method !== 'POST' || req.url !== '/v1/permissions/decide') {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { code: 'not_found' } }));
+        return;
+      }
+
+      const body = JSON.parse(await readRequestBody(req)) as {
+        runId?: string;
+        requestId?: string;
+        decision?: string;
+        reason?: string;
+      };
+      requests.push(body);
+
+      if (!body.runId || !body.requestId || !['allow', 'deny'].includes(body.decision ?? '')) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { code: 'bad_request' } }));
+        return;
+      }
+
+      const pendingKey = keyFor(body.runId, body.requestId);
+      const permission = pending.get(pendingKey);
+      if (!permission) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { code: 'permission_request_not_found' } }));
+        return;
+      }
+
+      pending.delete(pendingKey);
+      decidedEvents.push({
+        type: 'run.agent.permission_decided',
+        scope: {
+          projectId: permission.projectId,
+          threadId: permission.threadId,
+          runId: permission.runId,
+        },
+        payload: {
+          requestId: permission.requestId,
+          decision: body.decision,
+          reason: body.reason,
+          toolName: permission.toolName,
+          toolUseId: permission.toolUseId,
+        },
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok' }));
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', () => resolve());
+    });
+
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('failed to start test Edge permission server');
+    }
+    const edgeBaseUrl = `http://127.0.0.1:${address.port}`;
+
+    globalThis.fetch = nativeFetch as typeof globalThis.fetch;
+    try {
+      renderHook(() =>
+        useHubIntegration({ hubWS, hubClient, edgeBaseUrl }),
+      );
+
+      const payload = {
+        kind: 'permission.decide',
+        agent_task_id: 'task-live-approval',
+        edge_control: {
+          runId: 'edge-run-live',
+          requestId: 'perm-live',
+          decision: 'allow',
+          reason: 'approved by live HTTP test',
+        },
+      };
+
+      await act(async () => {
+        fireHubEvent(HUB_AGENT_CONTROL_EVENT, payload);
+      });
+
+      await waitFor(() => {
+        expect(requests).toHaveLength(1);
+        expect(decidedEvents).toHaveLength(1);
+      });
+
+      expect(requests[0]).toEqual({
+        runId: 'edge-run-live',
+        requestId: 'perm-live',
+        decision: 'allow',
+        reason: 'approved by live HTTP test',
+      });
+      expect(pending.has(keyFor('edge-run-live', 'perm-live'))).toBe(false);
+      expect(decidedEvents[0]).toEqual({
+        type: 'run.agent.permission_decided',
+        scope: {
+          projectId: 'proj-live',
+          threadId: 'thread-live',
+          runId: 'edge-run-live',
+        },
+        payload: {
+          requestId: 'perm-live',
+          decision: 'allow',
+          reason: 'approved by live HTTP test',
+          toolName: 'Bash',
+          toolUseId: 'tool-live',
+        },
+      });
+
+      await act(async () => {
+        fireHubEvent(HUB_AGENT_CONTROL_EVENT, payload);
+      });
+      await new Promise((resolve) => window.setTimeout(resolve, 80));
+      expect(requests).toHaveLength(1);
+    } finally {
+      globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it('ignores malformed agent.control permission decisions', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_AGENT_CONTROL_EVENT, {
+        kind: 'permission.decide',
+        edge_control: {
+          requestId: 'perm-missing-run',
+          decision: 'allow',
+        },
+      });
+      fireHubEvent(HUB_AGENT_CONTROL_EVENT, {
+        kind: 'agent.stop',
+        edge_control: {
+          runId: 'edge-run-stop',
+          requestId: 'perm-stop',
+          decision: 'allow',
+        },
+      });
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('Malformed agent.control permission.decide payload');
+    warnSpy.mockRestore();
+  });
+
+  it('uses custom edgeBaseUrl when applying agent.control permission decisions', async () => {
+    renderHook(() =>
+      useHubIntegration({ hubWS, hubClient, edgeBaseUrl: 'http://192.168.1.1:3210' }),
+    );
+
+    await act(async () => {
+      fireHubEvent(HUB_AGENT_CONTROL_EVENT, {
+        kind: 'permission.decide',
+        edge_control: {
+          runId: 'edge-run-custom',
+          requestId: 'perm-custom',
+          decision: 'allow',
+        },
+      });
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://192.168.1.1:3210/v1/permissions/decide',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
   // ── Cleanup ───────────────────────────────────────────
 
   it('cleans up subscriptions on unmount', () => {
@@ -711,12 +1010,14 @@ describe('useHubIntegration', () => {
 
     expect(hubWS.on).toHaveBeenCalledWith(HUB_EVENTS.AGENT_DISPATCH, expect.any(Function));
     expect(hubWS.on).toHaveBeenCalledWith(HUB_EVENTS.AGENT_CANCEL, expect.any(Function));
+    expect(hubWS.on).toHaveBeenCalledWith(HUB_AGENT_CONTROL_EVENT, expect.any(Function));
     expect((hoisted.mockStream as StreamHandle).subscribe).toHaveBeenCalled();
 
     unmount();
 
     expect(hubHandlers.get(HUB_EVENTS.AGENT_DISPATCH)?.size).toBe(0);
     expect(hubHandlers.get(HUB_EVENTS.AGENT_CANCEL)?.size).toBe(0);
+    expect(hubHandlers.get(HUB_AGENT_CONTROL_EVENT)?.size).toBe(0);
     expect((hoisted.mockStream as StreamHandle).close).toHaveBeenCalled();
   });
 
@@ -800,8 +1101,13 @@ describe('useHubIntegration', () => {
     });
     expect(hubClient.doneTask).toHaveBeenCalledTimes(1);
     expect(hubClient.streamTaskEvent).toHaveBeenCalledTimes(1);
+    expect(hoisted.storeTasks).toContainEqual(expect.objectContaining({
+      taskId: 'task-1',
+      runId: 'run-1',
+      status: 'done',
+    }));
 
-    // Second event for the same runId — mapping cleaned up, should be ignored
+    // Second event for the same runId is ignored while terminal evidence stays visible locally.
     act(() => {
       fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'late' }));
     });
